@@ -53,7 +53,7 @@ packageVersionParser = v4 <|> v3 <|> v2 <|> v1
 parsePackageVersion :: ByteString -> Maybe PackageVersion
 parsePackageVersion =
   either (const Nothing) Just .
-  parseOnly packageVersionParser
+  parseOnly (packageVersionParser <* endOfInput)
 
 -- | Migration function.
 parsePackageVersionFromString :: String -> Maybe PackageVersion
