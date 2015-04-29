@@ -29,9 +29,11 @@ library
                    , conduit-extra >= 1.1.7.1
                    , containers >= 0.5.5.1
                    , exceptions >= 0.8.0.2
+                   , hashable >= 1.2.3.2
                    , stackage-build >= 0.2.0
                    , stackage-build >= 0.2.0
                    , stackage-build >= 0.2.0
                    , system-filepath >= 0.4.13.2
                    , text >= 1.2.0.4
                    , transformers >= 0.3.0.0
+                   , vector >= 0.10.12.3

@@ -1,7 +1,12 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+
 -- | Versions for packages.
 
 module Stackage.PackageVersion
   (PackageVersion
+  ,VersionRange
   ,packageVersionParser
   ,parsePackageVersion
   ,parsePackageVersionFromString)
@@ -10,7 +15,11 @@ module Stackage.PackageVersion
 import Control.Applicative
 import Data.Attoparsec.ByteString.Char8
 import Data.ByteString.Char8 as S8
+import Data.Data
+import Data.Hashable
 import Data.Word (Word8)
+import Distribution.Version
+import GHC.Generics
 
 -- | A package version.
 data PackageVersion
@@ -24,7 +33,9 @@ data PackageVersion
                     !Word8
                     !Word8
                     !Word8
-  deriving (Ord,Eq)
+  deriving (Eq,Ord,Typeable,Data,Generic)
+
+instance Hashable PackageVersion
 
 instance Show PackageVersion where
   show p =

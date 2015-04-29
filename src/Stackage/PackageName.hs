@@ -1,3 +1,7 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+
 -- | Names for packages.
 
 module Stackage.PackageName
@@ -12,11 +16,14 @@ import           Data.Attoparsec.ByteString.Char8
 import qualified Data.ByteString.Char8 as S8
 import           Data.ByteString.Char8 as S8
 import           Data.Char (isLetter)
+import           Data.Data
+import           Data.Hashable
+import           GHC.Generics
 
 -- | A package name.
 newtype PackageName =
   PackageName ByteString
-  deriving (Eq,Ord)
+  deriving (Eq,Ord,Typeable,Data,Generic,Hashable)
 
 instance Show PackageName where
   show (PackageName n) = S8.unpack n
