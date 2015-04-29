@@ -14,11 +14,24 @@ cabal-version:       >=1.8
 library
   hs-source-dirs:    src/
   ghc-options:       -Wall -O2
-  exposed-modules:   
-  build-depends:     base >= 4 && <5
-
-executable stackage-common
-  hs-source-dirs:    src/
-  ghc-options:       -Wall -O2
-  main-is:           Main.hs
-  build-depends:     base >= 4 && < 5
+  exposed-modules:   Stackage.Types
+                     Stackage.GhcPkg
+                     Stackage.GhcPkgId
+                     Stackage.PackageName
+                     Stackage.PackageVersion
+  build-depends:     Cabal >= 1.18.1.5
+                   , attoparsec >= 0.12.1.5
+                   , base >= 4 && <5
+                   , bytestring
+                   , conduit >= 1.2.4
+                   , conduit >= 1.2.4
+                   , conduit-extra >= 1.1.7.1
+                   , conduit-extra >= 1.1.7.1
+                   , containers >= 0.5.5.1
+                   , exceptions >= 0.8.0.2
+                   , stackage-build >= 0.2.0
+                   , stackage-build >= 0.2.0
+                   , stackage-build >= 0.2.0
+                   , system-filepath >= 0.4.13.2
+                   , text >= 1.2.0.4
+                   , transformers >= 0.3.0.0
