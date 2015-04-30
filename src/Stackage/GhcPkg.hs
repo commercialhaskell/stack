@@ -58,6 +58,7 @@ getAllPackages =
          throw GetAllPackagesFail
        AttoLazy.Done _ r -> liftIO (evaluate r)
 
+-- | Parser for ghc-pkg's list output.
 pkgsListParser :: Parser (Map PackageName PackageVersion)
 pkgsListParser =
   fmap (M.fromList . concat) sections
