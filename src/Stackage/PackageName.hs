@@ -13,6 +13,7 @@ module Stackage.PackageName
 
 import           Control.Applicative
 import           Data.Attoparsec.ByteString.Char8
+import           Data.Attoparsec.Combinators
 import qualified Data.ByteString.Char8 as S8
 import           Data.ByteString.Char8 as S8
 import           Data.Char (isLetter)
@@ -32,9 +33,12 @@ instance Show PackageName where
 packageNameParser :: Parser PackageName
 packageNameParser =
   fmap (PackageName . S8.pack)
-       ((++) <$>
-        many1 (satisfy isLetter) <*>
-        many (satisfy (\c -> isLetter c || isDigit c || c == '-')))
+       (appending (many1 (satisfy isLetter))
+                  (concating (many (alternating
+                                      (pured (satisfy (\c -> isLetter c ||
+                                                              isDigit c)))
+                                      (appending (pured (satisfy (== '-')))
+                                                 (pured (satisfy isLetter)))))))
 
 -- | Convenient way to parse a package name from a bytestring.
 parsePackageName :: ByteString -> Maybe PackageName

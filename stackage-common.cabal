@@ -20,20 +20,25 @@ library
                      Stackage.PackageName
                      Stackage.PackageVersion
   build-depends:     Cabal >= 1.18.1.5
+                   , async >= 2.0.2
                    , attoparsec >= 0.12.1.5
                    , base >= 4 && <5
                    , bytestring
                    , conduit >= 1.2.4
                    , conduit >= 1.2.4
+                   , conduit-combinators >= 0.3.0.6
                    , conduit-extra >= 1.1.7.1
                    , conduit-extra >= 1.1.7.1
                    , containers >= 0.5.5.1
                    , exceptions >= 0.8.0.2
                    , hashable >= 1.2.3.2
+                   , process >= 1.2.0.0
                    , stackage-build >= 0.2.0
                    , stackage-build >= 0.2.0
                    , stackage-build >= 0.2.0
+                   , streaming-commons >= 0.1.10.0
                    , system-filepath >= 0.4.13.2
                    , text >= 1.2.0.4
                    , transformers >= 0.3.0.0
                    , vector >= 0.10.12.3
+                   , void >= 0.7
