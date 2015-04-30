@@ -19,6 +19,7 @@ library
                      Stackage.GhcPkgId
                      Stackage.PackageName
                      Stackage.PackageVersion
+  other-modules:     Stackage.Process
   build-depends:     Cabal >= 1.18.1.5
                    , async >= 2.0.2
                    , attoparsec >= 0.12.1.5
