@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -12,53 +13,40 @@ module Stackage.PackageVersion
   ,parsePackageVersionFromString)
   where
 
-import Control.Applicative
-import Data.Attoparsec.ByteString.Char8
-import Data.ByteString.Char8 as S8
-import Data.Data
-import Data.Hashable
-import Data.Word (Word8)
-import Distribution.Version
-import GHC.Generics
+import           Control.Applicative
+import           Data.Attoparsec.ByteString.Char8
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as S8
+import           Data.Data
+import           Data.Hashable
+import           Data.List
+import           Data.Vector.Unboxed (Vector)
+import qualified Data.Vector.Unboxed as V
+import           Distribution.Version
+import           GHC.Generics
 
 -- | A package version.
-data PackageVersion
-  = PackageVersion1 !Word8
-  | PackageVersion2 !Word8
-                    !Word8
-  | PackageVersion3 !Word8
-                    !Word8
-                    !Word8
-  | PackageVersion4 !Word8
-                    !Word8
-                    !Word8
-                    !Word8
+newtype PackageVersion =
+  PackageVersion {unPackageVersion :: Vector Int}
   deriving (Eq,Ord,Typeable,Data,Generic)
 
-instance Hashable PackageVersion
+instance Hashable PackageVersion where
+  hashWithSalt i = hashWithSalt i . V.toList . unPackageVersion
 
 instance Show PackageVersion where
-  show p =
-    case p of
-      PackageVersion1 a       -> show a
-      PackageVersion2 a b     -> show a ++ "." ++ show b
-      PackageVersion3 a b c   -> show a ++ "." ++ show b ++ "." ++ show c
-      PackageVersion4 a b c d -> show a ++ "." ++ show b ++ "." ++ show c ++ "." ++ show d
+  show (PackageVersion v) =
+    intercalate "."
+                (map show (V.toList v))
 
 -- | Attoparsec parser for a package version from bytestring.
 packageVersionParser :: Parser PackageVersion
-packageVersionParser = v4 <|> v3 <|> v2 <|> v1
-  where v1 =
-          PackageVersion1 <$> num
-        v2 =
-          PackageVersion2 <$> num <*> num'
-        v3 =
-          PackageVersion3 <$> num <*> num' <*> num'
-        v4 =
-          PackageVersion4 <$> num <*> num' <*> num' <*> num'
-        num = hexadecimal
+packageVersionParser =
+  do ls <- ((:) <$> num <*> many num')
+     let !v = V.fromList ls
+     return (PackageVersion v)
+  where num = decimal
         num' = point *> num
-        point = satisfy (=='.')
+        point = satisfy (== '.')
 
 -- | Convenient way to parse a package version from a bytestring.
 parsePackageVersion :: ByteString -> Maybe PackageVersion
