@@ -54,17 +54,20 @@ getAllPackages =
              (\(ProcessExitedUnsuccessfully _ _) ->
                 throw GetAllPackagesFail)
      case AttoLazy.parse pkgsListParser lbs of
-       AttoLazy.Fail _ _ _ -> throw GetAllPackagesFail
+       AttoLazy.Fail _ _ _ ->
+         throw GetAllPackagesFail
        AttoLazy.Done _ r -> liftIO (evaluate r)
 
 pkgsListParser :: Parser (Map PackageName PackageVersion)
 pkgsListParser =
-  fmap (M.fromList . concat)
-       sections
-  where sections = many (heading *>
-                         (many (pkg <* endOfLine)) <*
-                         optional endOfLine)
-        heading = many1 (satisfy (not . (=='\n'))) <* endOfLine
+  fmap (M.fromList . concat) sections
+  where sections =
+          many (heading *>
+                (many (pkg <* endOfLine)) <*
+                optional endOfLine)
+        heading =
+          many1 (satisfy (not . (== '\n'))) <*
+          endOfLine
         pkg =
           do space
              space
@@ -107,10 +110,12 @@ findPackageId name =
 -- | Get all current package ids.
 getPackageIds :: [PackageName] -> IO (Map PackageName GhcPkgId)
 getPackageIds pkgs = collect pkgs >>= evaluate
-  where collect = fmap (M.fromList . catMaybes) . mapM getTuple
+  where collect =
+          fmap (M.fromList . catMaybes) .
+          mapM getTuple
         getTuple name =
           do mpid <- findPackageId name
              case mpid of
-               Nothing ->
-                 return Nothing
-               Just pid -> return (Just (name,pid))
+               Nothing -> return Nothing
+               Just pid ->
+                 return (Just (name,pid))
