@@ -22,12 +22,13 @@ import           Data.Hashable
 import           Data.List
 import           Data.Vector.Unboxed (Vector)
 import qualified Data.Vector.Unboxed as V
+import           Data.Word
 import           Distribution.Version
 import           GHC.Generics
 
 -- | A package version.
 newtype PackageVersion =
-  PackageVersion {unPackageVersion :: Vector Int}
+  PackageVersion {unPackageVersion :: Vector Word}
   deriving (Eq,Ord,Typeable,Data,Generic)
 
 instance Hashable PackageVersion where
