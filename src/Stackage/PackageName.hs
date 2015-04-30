@@ -8,7 +8,8 @@ module Stackage.PackageName
   (PackageName
   ,packageNameParser
   ,parsePackageName
-  ,parsePackageNameFromString)
+  ,parsePackageNameFromString
+  ,packageNameString)
   where
 
 import           Control.Applicative
@@ -50,3 +51,7 @@ parsePackageName =
 parsePackageNameFromString :: String -> Maybe PackageName
 parsePackageNameFromString =
   parsePackageName . S8.pack
+
+-- | Produce a string representation of a package name.
+packageNameString :: PackageName -> String
+packageNameString (PackageName n) = S8.unpack n
