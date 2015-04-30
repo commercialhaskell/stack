@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -9,7 +10,8 @@ module Stackage.PackageName
   ,packageNameParser
   ,parsePackageName
   ,parsePackageNameFromString
-  ,packageNameString)
+  ,packageNameString
+  ,fromCabalPackageName)
   where
 
 import           Control.Applicative
@@ -20,6 +22,7 @@ import           Data.ByteString.Char8 as S8
 import           Data.Char (isLetter)
 import           Data.Data
 import           Data.Hashable
+import qualified Distribution.Package as Cabal
 import           GHC.Generics
 
 -- | A package name.
@@ -55,3 +58,9 @@ parsePackageNameFromString =
 -- | Produce a string representation of a package name.
 packageNameString :: PackageName -> String
 packageNameString (PackageName n) = S8.unpack n
+
+-- | Convert from a Cabal package name.
+fromCabalPackageName :: Cabal.PackageName -> PackageName
+fromCabalPackageName (Cabal.PackageName name) =
+  let !x = S8.pack name
+  in PackageName x
