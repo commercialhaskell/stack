@@ -9,23 +9,15 @@
 -- | Dealing with Cabal.
 
 module Stackage.Build.Cabal
-       (getPackage, flagsForPackage, parsePackageName, parseVersion,
-        getPkgIndex, resolvePackageVersions, fetchPackage, getPkgVersions,
-        downloadPkgIndex, loadPkgIndex, PackageIndex, PackageSuggestion(..))
-       where
+  (getPackage
+  ,flagsForPackage
+  ,parsePackageName)
+  where
 
-import           Codec.Archive.Tar
-import           Codec.Compression.GZip as GZip
 import           Control.Arrow
 import           Control.Exception
 import           Control.Monad
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger (logDebug,MonadLogger)
 import           Control.Monad.Loops
-import           Data.Aeson
-import qualified Data.ByteString as S
-import qualified Data.ByteString.Lazy as L
 import           Data.Data
 import           Data.Function
 import           Data.List
@@ -37,8 +29,6 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import qualified Data.Version as V ( parseVersion )
 import           Data.Yaml (ParseException)
 import           Distribution.Compiler
 import           Distribution.InstalledPackageInfo (PError)
@@ -48,20 +38,13 @@ import           Distribution.PackageDescription
 import           Distribution.PackageDescription.Parse
 import           Distribution.Simple.Utils
 import           Distribution.System
-import           Distribution.Text (display)
 import           Distribution.Version
 import           Filesystem
 import           Filesystem.Loc as FL
 import qualified Filesystem.Path.CurrentOS as FP
-import           Network.HTTP.Client
-import           Network.HTTP.Types.Status
 import           Prelude hiding (FilePath)
 import           Stackage.Constants
 import           Stackage.PackageName
-import           System.Directory
-import           System.IO
-import           System.IO.Temp
-import qualified Text.ParserCombinators.ReadP as ReadP ( readP_to_S )
 
 -- | All exceptions thrown by the library.
 data FPException
@@ -75,9 +58,6 @@ data FPException
   | FPDependencyIssues [FPException]
   | FPMissingTool Dependency
   | FPCouldn'tFindPkgId PackageName
-  | FPPackageDownloadError PackageName (Response L.ByteString)
-  | FPResolvePackagesError [PackageName] (Response L.ByteString)
-  | FPIndexDownloadError (Response L.ByteString)
   | FPStackagePackageVersionMismatch PackageName Version Version
   | FPStackageDepVerMismatch PackageName Version VersionRange
   deriving (Show,Typeable)
@@ -91,56 +71,18 @@ data FinalAction
   | DoNothing
   deriving (Eq,Bounded,Enum,Show)
 
--- | A suggestion for package version/flags from stackage.org
-data PackageSuggestion =
-  PackageSuggestion {suggestionName :: !PackageName
-                    ,suggestionVersion :: !Version
-                    ,suggestionFlags :: !(Map Text Bool)}
-  deriving (Show)
-
-instance FromJSON PackageSuggestion where
-  parseJSON j =
-    do o <- parseJSON j
-       name <- fmap unAeson (o .: "name")
-       ver <- fmap unAeson (o .: "version")
-       flags <- o .: "flags"
-       return (PackageSuggestion name ver flags)
-
--- | Simple wrapper for orphan instances.
-newtype Aeson a = Aeson { unAeson :: a}
-
-instance FromJSON (Aeson Version) where
-  parseJSON j =
-    do s <- parseJSON j
-       case parseVersion s of
-         Nothing ->
-           fail "Couldn't parse version."
-         Just ver -> return (Aeson ver)
-
-instance FromJSON (Aeson PackageName) where
-  parseJSON j =
-    do s <- parseJSON j
-       case parsePackageName (T.encodeUtf8 s) of
-         Nothing ->
-           fail "Couldn't parse version."
-         Just n -> return (Aeson n)
-
--- | Wrapper to an existant package index.
-newtype PackageIndex =
-  PackageIndex (Loc Absolute Dir)
-
 -- | Some package info.
 data Package =
   Package {pinfoName :: !PackageName                      -- ^ Name of the package.
-               ,pinfoVersion :: !Version                 -- ^ Version of the package
-               ,pinfoDir :: !(Loc Absolute Dir)          -- ^ Directory of the package.
-               ,pinfoFiles :: !(Set (Loc Absolute File)) -- ^ Files that the package depends on.
-               ,pinfoDeps :: !(Map PackageName VersionRange)   -- ^ Packages that the package depends on.
-               ,pinfoTools :: ![Dependency]              -- ^ A build tool name.
-               ,pinfoAllDeps :: !(Set PackageName)             -- ^ Original dependencies (not sieved).
-               ,pinfoFlags :: !(Map Text Bool)           -- ^ Flags used on package.
-               }
-  deriving (Show,Typeable,Data)
+          ,pinfoVersion :: !Version                       -- ^ Version of the package
+          ,pinfoDir :: !(Loc Absolute Dir)                -- ^ Directory of the package.
+          ,pinfoFiles :: !(Set (Loc Absolute File))       -- ^ Files that the package depends on.
+          ,pinfoDeps :: !(Map PackageName VersionRange)   -- ^ Packages that the package depends on.
+          ,pinfoTools :: ![Dependency]                    -- ^ A build tool name.
+          ,pinfoAllDeps :: !(Set PackageName)             -- ^ Original dependencies (not sieved).
+          ,pinfoFlags :: !(Map Text Bool)                 -- ^ Flags used on package.
+          }
+ deriving (Show,Typeable,Data)
 
 -- | Compares the package name.
 instance Ord Package where
@@ -149,8 +91,6 @@ instance Ord Package where
 -- | Compares the package name.
 instance Eq Package where
   (==) = on (==) pinfoName
-
--- | Stackage build config.
 
 -- | Get dependencies of a package.
 getPackage :: FinalAction
@@ -400,8 +340,6 @@ depName = \(Dependency n _) -> fromCabalPackageName n
 depRange :: Dependency -> VersionRange
 depRange = \(Dependency _ r) -> r
 
-
-
 -- | Try to resolve the list of base names in the given directory by
 -- looking for unique instances of base names applied with the given
 -- extensions.
@@ -431,203 +369,3 @@ resolveFiles dirs names exts =
                             (appendLoc dir)
                             (FL.parseRelativeFileLoc (FP.decodeString fp)))
               exts
-
--- | Parse a package version.
-parseVersion :: String -> Maybe Version
-parseVersion s =
-  case reverse (ReadP.readP_to_S V.parseVersion s) of
-    ((ver,""):_) -> Just ver
-    _ -> Nothing
-
--- | Try to get the package index.
-getPkgIndex :: MonadIO m => Loc Absolute Dir -> m (Maybe PackageIndex)
-getPkgIndex dir =
-  do exists <-
-       liftIO (doesDirectoryExist (FL.encodeString dir))
-     return (if exists
-                then Just (PackageIndex dir)
-                else Nothing)
-
--- | Load the package index, if it does not exist, download it.
-loadPkgIndex :: (MonadMask m,MonadLogger m,MonadThrow m,MonadIO m)
-             => Loc Absolute Dir -> m PackageIndex
-loadPkgIndex dir =
-  do mindex <- liftIO (getPkgIndex dir)
-     case mindex of
-       Just index -> return index
-       Nothing ->
-         do liftIO (putStrLn "No package index. Downloading latest ...")
-            index <- downloadPkgIndex dir "http://hackage.haskell.org/packages/archive/00-index.tar.gz"
-            liftIO (putStrLn "Downloaded and unpacked package index.")
-            return index
-
--- | Get the package index.
--- TODO: Catch http exceptions.
--- Example usage:
--- getPkgIndex $(mkAbsoluteDir "/home/chris/.stackage/pkg-index") "http://hackage.haskell.org/packages/archive/00-index.tar.gz"
-downloadPkgIndex :: (MonadMask m,MonadLogger m,MonadThrow m,MonadIO m)
-                 => Loc Absolute Dir -> String -> m PackageIndex
-downloadPkgIndex dir url =
-  do req <- parseUrl url
-     $logDebug "Downloading package index ..."
-     resp <-
-       liftIO (withManager defaultManagerSettings
-                           (httpLbs req))
-     case responseStatus resp of
-       Status 200 _ ->
-         withSystemTempFile
-           "pkg-index"
-           (\fp h ->
-              do $logDebug "Decompressing ..."
-                 liftIO (L.hPutStr h (GZip.decompress (responseBody resp)))
-                 liftIO (hClose h)
-                 $logDebug "Extracting ..."
-                 liftIO (createDirectoryIfMissing True (FL.encodeString dir))
-                 liftIO (extract (FL.encodeString dir) fp)
-                 return (PackageIndex dir))
-       _ ->
-         liftIO (throwIO (FPIndexDownloadError resp))
-
--- | Get versions available for the given package in the index.
-getPkgVersions :: MonadIO m => PackageIndex -> PackageName -> m (Maybe (Set Version))
-getPkgVersions (PackageIndex dir) name =
-  liftIO (do exists <-
-               doesDirectoryExist (FL.encodeString pkgDir)
-             if exists
-                then do contents <-
-                          fmap (mapMaybe parseVersion)
-                               (getDirectoryContents (FL.encodeString pkgDir))
-                        return (Just (S.fromList contents))
-                else return Nothing)
-  where pkgDir =
-          appendLoc dir
-                    (fromMaybe (error "Unable to produce valid directory name for package.")
-                               (parseRelativeDirLoc (FP.decodeString ((packageNameString name)))))
-
--- | Resolve package versions.
--- TODO: Catch http exceptions.
--- TODO: Handle non-existent package case.
--- Example usage:
--- runNoLoggingT (resolvePackageVersions [PackageName "warp",PackageName "snap"])
-resolvePackageVersions :: (MonadThrow m,MonadIO m) => [PackageName] -> m [PackageSuggestion]
-resolvePackageVersions (null -> True) = return []
-resolvePackageVersions names =
-  do liftIO (putStrLn "Resolving package versions against Stackage ...")
-     req <- parseUrl url
-     resp <-
-       liftIO (withManager defaultManagerSettings
-                           (httpLbs req))
-     case responseStatus resp of
-       Status 200 _ ->
-         case decode (responseBody resp) of
-           Nothing ->
-             liftIO (throwIO (FPResolvePackagesError names resp))
-           Just vers -> return vers
-       _ ->
-         liftIO (throwIO (FPResolvePackagesError names resp))
-  where url = "http://www.stackage.org/lts/build-plan?" ++
-              packages ++ "&_accept=application/json"
-        packages =
-          intercalate
-            "&"
-            (map (\x ->
-                    "package=" ++
-                    (packageNameString x))
-                 names)
-
-
--- | Fetch the package index.
--- Example usage: runStdoutLoggingT (fetchPackage $(mkAbsoluteDir "/home/chris/.stackage/pkg-index") (fromJust (parsePackageName "lens")) (fromJust (parseVersion "4.6.0.1")))
-fetchPackage :: (MonadMask m,MonadLogger m,MonadThrow m,MonadIO m)
-             => PackageIndex -> PackageName -> Version -> m (Loc Absolute Dir)
-fetchPackage (PackageIndex dir) name ver =
-  do unpacked <-
-       packageUnpacked (PackageIndex dir)
-                       name
-                       ver
-     if unpacked
-        then return pkgVerContentsDir
-        else do req <- parseUrl url
-                liftIO (putStrLn ((packageNameString name) ++
-                                  ": downloading " ++ display ver))
-                resp <-
-                  liftIO (withManager defaultManagerSettings
-                                      (httpLbs req))
-                case responseStatus resp of
-                  Status 200 _ ->
-                    withSystemTempFile
-                      "pkg-index"
-                      (\fp h ->
-                         do indexCabalFile <-
-                              liftIO (S.readFile oldCabalFilePath)
-                            $logDebug (T.pack ("Decompressing " ++
-                                               (packageNameString name)))
-                            liftIO (L.hPutStr h (GZip.decompress (responseBody resp)))
-                            liftIO (hClose h)
-                            $logDebug (T.pack ("Extracting to " ++
-                                               FL.encodeString pkgVerDir))
-                            liftIO (extract (FL.encodeString pkgVerDir) fp)
-                            $logDebug (T.pack ("Updating cabal file " ++
-                                               newCabalFilePath))
-                            liftIO (S.writeFile newCabalFilePath indexCabalFile)
-                            return pkgVerContentsDir)
-                  _ ->
-                    liftIO (throwIO (FPPackageDownloadError name resp))
-  where newCabalFilePath =
-          FL.encodeString
-            (appendLoc pkgVerDir
-                       (fromMaybe (error "Unable to make valid .cabal file name.")
-                                  (parseRelativeFileLoc
-                                     (FP.decodeString
-                                        (nameVer ++
-                                         "/" ++
-                                         (packageNameString name) ++
-                                         ".cabal")))))
-        oldCabalFilePath =
-          FL.encodeString
-            (appendLoc pkgVerDir
-                       (fromMaybe (error "Unable to make valid .cabal file name.")
-                                  (parseRelativeFileLoc
-                                     (FP.decodeString
-                                        ((packageNameString name) ++
-                                         ".cabal")))))
-        url =
-          concat ["http://hackage.haskell.org/package/"
-                 ,nameVer
-                 ,"/"
-                 ,nameVer
-                 ,".tar.gz"] -- TODO: customize this.
-        nameVer =
-          (packageNameString name) ++
-          "-" ++ display ver
-        pkgVerContentsDir :: Loc Absolute Dir
-        pkgVerContentsDir =
-          mkPkgVerContentsDir dir name ver
-        pkgVerDir :: Loc Absolute Dir
-        pkgVerDir = mkPkgVerDir dir name ver
-
--- | Has the package been unpacked already?
-packageUnpacked :: (MonadIO m)
-                => PackageIndex -> PackageName -> Version -> m Bool
-packageUnpacked (PackageIndex dir) name ver =
-  liftIO (doesDirectoryExist (FL.encodeString (mkPkgVerContentsDir dir name ver)))
-
--- | Make the directory for the package version (with a single .cabal file in it).
-mkPkgVerDir :: Loc Absolute Dir -> PackageName -> Version -> Loc Absolute Dir
-mkPkgVerDir dir name ver =
-  appendLoc dir
-            (fromMaybe (error "Unable to make valid path name for package-version.")
-                       (parseRelativeDirLoc
-                          (FP.decodeString
-                             ((packageNameString name) ++
-                              "/" ++ display ver))))
-
--- | Make the directory for the package contents (with the .cabal and sources, etc).
-mkPkgVerContentsDir :: Loc Absolute Dir -> PackageName -> Version -> Loc Absolute Dir
-mkPkgVerContentsDir dir name ver =
-  appendLoc (mkPkgVerDir dir name ver)
-            (fromMaybe (error "Unable to make valid path name for package-version.")
-                       (parseRelativeDirLoc
-                          (FP.decodeString
-                             ((packageNameString name) ++
-                              "-" ++ display ver))))
