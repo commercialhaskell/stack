@@ -2,9 +2,12 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
 
--- |
+-- | Fetching package archives.
 
-module Stackage.Fetch where
+module Stackage.Fetch
+  (fetchPackage
+  ,packageUnpacked)
+  where
 
 import           Codec.Archive.Tar
 import           Codec.Compression.GZip as GZip

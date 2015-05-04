@@ -9,9 +9,7 @@
 -- | Dealing with Cabal.
 
 module Stackage.Build.Cabal
-  (getPackage
-  ,flagsForPackage
-  ,parsePackageName)
+  (getPackage)
   where
 
 import           Control.Arrow

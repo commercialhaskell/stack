@@ -4,7 +4,12 @@
 
 -- | Package identifier (name-version).
 
-module Stackage.PackageIdentifier where
+module Stackage.PackageIdentifier
+  (PackageIdentifier
+  ,toTuple
+  ,fromTuple
+  ,packageIdentifierParser)
+  where
 
 import Data.Data
 import GHC.Generics

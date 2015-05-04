@@ -2,8 +2,12 @@
 
 module Stackage.Types
   (PackageName
-  ,PackageVersion)
+  ,PackageVersion
+  ,PackageIdentifier
+  ,GhcPkgId)
   where
 
 import Stackage.PackageName
 import Stackage.PackageVersion
+import Stackage.PackageIdentifier
+import Stackage.GhcPkgId
