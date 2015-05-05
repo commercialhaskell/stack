@@ -41,9 +41,6 @@ library
                    , monad-logger >= 0.3.13.1
                    , monad-loops >= 0.4.2.1
                    , process >= 1.2.0.0
-                   , stackage-build >= 0.2.0
-                   , stackage-build >= 0.2.0
-                   , stackage-build >= 0.2.0
                    , streaming-commons >= 0.1.10.0
                    , system-fileio >= 0.3.16.2
                    , system-filepath >= 0.4.13.2
