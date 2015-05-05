@@ -7,3 +7,4 @@ cabal-dev/
 TAGS
 tags
 *.tag
+cabal.sandbox.config
