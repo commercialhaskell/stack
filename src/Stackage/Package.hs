@@ -1,20 +1,24 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ViewPatterns #-}
 
 -- | Dealing with Cabal.
 
 module Stackage.Build.Cabal
-  (getPackage)
+  (readPackage
+  ,Package
+  ,PackageConfig)
   where
 
 import           Control.Arrow
 import           Control.Exception
 import           Control.Monad
+import           Control.Monad.Catch
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger (MonadLogger, logDebug)
 import           Control.Monad.Loops
 import           Data.Data
 import           Data.Function
@@ -61,14 +65,6 @@ data FPException
   deriving (Show,Typeable)
 instance Exception FPException
 
--- | Run a Setup.hs action after building a package, before installing.
-data FinalAction
-  = DoTests
-  | DoBenchmarks
-  | DoHaddock
-  | DoNothing
-  deriving (Eq,Bounded,Enum,Show)
-
 -- | Some package info.
 data Package =
   Package {pinfoName :: !PackageName                      -- ^ Name of the package.
@@ -82,6 +78,14 @@ data Package =
           }
  deriving (Show,Typeable,Data)
 
+-- | Package build configuration
+data PackageConfig =
+  PackageConfig {packageConfigEnableTests :: !Bool        -- ^ Are tests enabled?
+                ,packageConfigEnableBenchmarks :: !Bool   -- ^ Are benchmarks enabled?
+                ,packageConfigFlags :: !(Map Text Bool)   -- ^ Package config flags.
+                }
+ deriving (Show,Typeable,Data)
+
 -- | Compares the package name.
 instance Ord Package where
   compare = on compare pinfoName
@@ -90,34 +94,33 @@ instance Ord Package where
 instance Eq Package where
   (==) = on (==) pinfoName
 
--- | Get dependencies of a package.
-getPackage :: FinalAction
-         -> Map Text Bool
-         -> Map PackageName (Map Text Bool)
-         -> Loc Absolute File
-         -> IO Package
-getPackage finalAction flags packageFlags cabalfp =
+-- | Reads and exposes the package information
+readPackage :: (MonadLogger m, MonadIO m, MonadThrow m)
+            => PackageConfig
+            -> Loc Absolute File
+            -> m Package
+readPackage packageConfig cabalfp =
   do chars <-
-       Prelude.readFile (FL.encodeString cabalfp)
+       liftIO (Prelude.readFile (FL.encodeString cabalfp))
      case parsePackageDescription chars of
        ParseFailed per ->
-         throwIO (FPInvalidCabalFile cabalfp per)
+         liftedThrowIO (FPInvalidCabalFile cabalfp per)
        ParseOk _ gpkg ->
          let pkgId =
                package (packageDescription gpkg)
              name = fromCabalPackageName (pkgName pkgId)
              pkgFlags =
-               flagsForPackage gpkg flags packageFlags name
+               packageConfigFlags packageConfig
              pkg =
-               resolvePackage finalAction pkgFlags gpkg
+               resolvePackage packageConfig gpkg
          in case packageDependencies pkg of
               deps
                 | M.null deps ->
-                  throwIO (FPNoDeps cabalfp)
+                  liftedThrowIO (FPNoDeps cabalfp)
                 | otherwise ->
                   do let dir = FL.parent cabalfp
                      pkgFiles <-
-                       packageFiles dir pkg
+                       liftIO (packageFiles dir pkg)
                      let files = cabalfp : pkgFiles
                          deps' =
                            M.filterWithKey (const . (/= name))
@@ -131,28 +134,13 @@ getPackage finalAction flags packageFlags cabalfp =
                                    ,pinfoFlags = pkgFlags
                                    ,pinfoAllDeps =
                                       S.fromList (M.keys deps')})
-
--- | Combine global and package-specific flags together, with
--- preference for the package-specific flags overriding global ones.
-flagsForPackage :: GenericPackageDescription
-                -> Map Text Bool
-                -> Map PackageName (Map Text Bool)
-                -> PackageName
-                -> Map Text Bool
-flagsForPackage gpkg globalFlags packageFlags pname =
-  M.union (fromMaybe mempty (M.lookup pname packageFlags))
-          (M.union globalFlags defaultFlags)
-  where defaultFlags =
-          M.fromList
-            (map (unFlagName . flagName &&& flagDefault)
-                 (genPackageFlags gpkg))
-          where unFlagName (FlagName n) = T.pack n
+  where liftedThrowIO = liftIO . throwIO
 
 -- | Get all dependencies of the package (buildable targets only).
 packageDependencies :: PackageDescription -> Map PackageName VersionRange
 packageDependencies =
   M.fromList .
-  concatMap (map (\dep -> ( (depName dep),depRange dep)) .
+  concatMap (map (\dep -> ((depName dep),depRange dep)) .
              targetBuildDepends) .
   allBuildInfo
 
@@ -240,11 +228,10 @@ buildFiles dir build =
 
 -- | Get all dependencies of a package, including library,
 -- executables, tests, benchmarks.
-resolvePackage :: FinalAction
-               -> Map Text Bool
+resolvePackage :: PackageConfig
                -> GenericPackageDescription
                -> PackageDescription
-resolvePackage finalAction passedFlags (GenericPackageDescription desc defaultFlags mlib exes tests benches) =
+resolvePackage packageConfig (GenericPackageDescription desc defaultFlags mlib exes tests benches) =
   desc {library =
           fmap (resolveConditions flags' updateLibDeps) mlib
        ,executables =
@@ -260,7 +247,7 @@ resolvePackage finalAction passedFlags (GenericPackageDescription desc defaultFl
                snd)
               benches}
   where flags =
-          M.union passedFlags
+          M.union (packageConfigFlags packageConfig)
                   (flagMap defaultFlags)
         flags' =
           (map (FlagName . T.unpack)
@@ -275,17 +262,11 @@ resolvePackage finalAction passedFlags (GenericPackageDescription desc defaultFl
         updateTestDeps test deps =
           test {testBuildInfo =
                   (testBuildInfo test) {targetBuildDepends = deps}
-               ,testEnabled =
-                  case finalAction of
-                    DoTests -> True
-                    _ -> False}
+               ,testEnabled = packageConfigEnableTests packageConfig}
         updateBenchmarkDeps benchmark deps =
           benchmark {benchmarkBuildInfo =
                        (benchmarkBuildInfo benchmark) {targetBuildDepends = deps}
-                    ,benchmarkEnabled =
-                       case finalAction of
-                         DoBenchmarks -> True
-                         _ -> False}
+                    ,benchmarkEnabled = packageConfigEnableBenchmarks packageConfig}
 
 -- | Make a map from a list of flag specifications.
 --
