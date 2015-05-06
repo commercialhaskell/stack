@@ -24,15 +24,16 @@ import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Data.Attoparsec.ByteString.Char8
 import qualified Data.Attoparsec.ByteString.Lazy as AttoLazy
-import qualified Data.ByteString.Lazy.Char8 as L8
+import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteString.Lazy as L
 import           Data.Data
 import           Data.List
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Maybe
-import           Data.Streaming.Process
-import qualified Data.Text.Lazy as LT
-import qualified Data.Text.Lazy.Encoding as LT
+
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import           Prelude hiding (FilePath)
 import           System.IO hiding (char8)
 
@@ -48,15 +49,18 @@ instance Exception GhcPkgException
 getAllPackages :: (MonadCatch m,MonadIO m,MonadThrow m)
                => m (Map PackageName PackageVersion)
 getAllPackages =
-  do lbs <-
-       catch (lazyProcessStdout "ghc-pkg"
-                                ["list"])
-             (\(ProcessExitedUnsuccessfully _ _) ->
-                throw GetAllPackagesFail)
-     case AttoLazy.parse pkgsListParser lbs of
-       AttoLazy.Fail _ _ _ ->
-         throw GetAllPackagesFail
-       AttoLazy.Done _ r -> liftIO (evaluate r)
+  do result <-
+       tryProcessStdout "ghc-pkg"
+                        ["list"]
+     case result of
+       Left{} -> throw GetAllPackagesFail
+       Right lbs ->
+         case AttoLazy.parse pkgsListParser
+                             (L.fromStrict lbs) of
+           AttoLazy.Fail _ _ _ ->
+             throw GetAllPackagesFail
+           AttoLazy.Done _ r ->
+             liftIO (evaluate r)
 
 -- | Parser for ghc-pkg's list output.
 pkgsListParser :: Parser (Map PackageName PackageVersion)
@@ -79,34 +83,34 @@ pkgsListParser =
 -- | Get the package of the package database.
 getUserDbPath :: IO FilePath
 getUserDbPath =
-  do lbs <-
-       catch (lazyProcessStdout "ghc-pkg"
-                                ["list","--user"])
-             (\(ProcessExitedUnsuccessfully _ _) ->
-                throw GetUserDbPathFail)
+  do result <-
+       tryProcessStdout "ghc-pkg"
+                        ["list","--user"]
      case find (not .
-                LT.isPrefixOf " ")
-               (map LT.decodeUtf8 (L8.lines lbs)) >>=
-          LT.stripSuffix ":" of
+                T.isPrefixOf " ")
+               (map T.decodeUtf8 (S8.lines (either (const "") id result))) >>=
+          T.stripSuffix ":" of
        Nothing -> throw GetUserDbPathFail
-       Just path -> evaluate (LT.unpack path)
+       Just path -> evaluate (T.unpack path)
 
 -- | Get the id of the package e.g. @foo-0.0.0-9c293923c0685761dcff6f8c3ad8f8ec@.
 findPackageId :: PackageName -> IO (Maybe GhcPkgId)
 findPackageId name =
-  do lbs <-
-       catch (lazyProcessStdout "ghc-pkg"
-                                ["describe",packageNameString name])
-             (\(ProcessExitedUnsuccessfully _ _) ->
-                throw FindPackageIdFail)
-     let mpid =
-           fmap (L8.toStrict . LT.encodeUtf8)
-                (listToMaybe
-                   (mapMaybe (LT.stripPrefix "id: ")
-                             (map LT.decodeUtf8 (L8.lines lbs))))
-     case mpid of
-       Just !pid -> return (Just (GhcPkgId pid))
-       _ -> return Nothing
+  do result <-
+       tryProcessStdout "ghc-pkg"
+                        ["describe",packageNameString name]
+     case result of
+       Left{} -> throw FindPackageIdFail
+       Right lbs ->
+         do let mpid =
+                  fmap T.encodeUtf8
+                       (listToMaybe
+                          (mapMaybe (T.stripPrefix "id: ")
+                                    (map T.decodeUtf8 (S8.lines lbs))))
+            case mpid of
+              Just !pid ->
+                return (Just (GhcPkgId pid))
+              _ -> return Nothing
 
 -- | Get all current package ids.
 getPackageIds :: [PackageName] -> IO (Map PackageName GhcPkgId)
