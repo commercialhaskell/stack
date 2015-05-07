@@ -20,6 +20,7 @@ library
                      Stackage.PackageName
                      Stackage.PackageVersion
   other-modules:     Stackage.Process
+                     Stackage.PackageIdentifier
   build-depends:     Cabal >= 1.18.1.5
                    , aeson >= 0.8.0.2
                    , async >= 2.0.2
