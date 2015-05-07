@@ -49,21 +49,21 @@ import           Stackage.Constants
 import           Stackage.PackageName
 
 -- | All exceptions thrown by the library.
-data FPException
-  = FPConfigError ParseException
-  | FPNoConfigFile
-  | FPNoCabalFile (Loc Absolute Dir)
-  | FPInvalidCabalFile (Loc Absolute File) PError
-  | FPNoDeps (Loc Absolute File)
-  | FPDepCycle PackageName
-  | FPMissingDep Package PackageName VersionRange
-  | FPDependencyIssues [FPException]
-  | FPMissingTool Dependency
-  | FPCouldn'tFindPkgId PackageName
-  | FPStackagePackageVersionMismatch PackageName Version Version
-  | FPStackageDepVerMismatch PackageName Version VersionRange
+data PackageException
+  = PackageConfigError ParseException
+  | PackageNoConfigFile
+  | PackageNoCabalFile (Loc Absolute Dir)
+  | PackageInvalidCabalFile (Loc Absolute File) PError
+  | PackageNoDeps (Loc Absolute File)
+  | PackageDepCycle PackageName
+  | PackageMissingDep Package PackageName VersionRange
+  | PackageDependencyIssues [PackageException]
+  | PackageMissingTool Dependency
+  | PackageCouldn'tFindPkgId PackageName
+  | PackageStackagePackageVersionMismatch PackageName Version Version
+  | PackageStackageDepVerMismatch PackageName Version VersionRange
   deriving (Show,Typeable)
-instance Exception FPException
+instance Exception PackageException
 
 -- | Some package info.
 data Package =
@@ -104,7 +104,7 @@ readPackage packageConfig cabalfp =
        liftIO (Prelude.readFile (FL.encodeString cabalfp))
      case parsePackageDescription chars of
        ParseFailed per ->
-         liftedThrowIO (FPInvalidCabalFile cabalfp per)
+         liftedThrowIO (PackageInvalidCabalFile cabalfp per)
        ParseOk _ gpkg ->
          let pkgId =
                package (packageDescription gpkg)
@@ -116,7 +116,7 @@ readPackage packageConfig cabalfp =
          in case packageDependencies pkg of
               deps
                 | M.null deps ->
-                  liftedThrowIO (FPNoDeps cabalfp)
+                  liftedThrowIO (PackageNoDeps cabalfp)
                 | otherwise ->
                   do let dir = FL.parent cabalfp
                      pkgFiles <-
