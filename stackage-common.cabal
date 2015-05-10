@@ -14,7 +14,13 @@ cabal-version:       >=1.8
 library
   hs-source-dirs:    src/
   ghc-options:       -Wall -O2
+  extensions:        DeriveDataTypeable
+                     RecordWildCards
+                     DataKinds
+                     OverloadedStrings
   exposed-modules:   Stackage.Types
+                     Stackage.Config
+                     Stackage.Environment
                      Stackage.GhcPkg
                      Stackage.GhcPkgId
                      Stackage.PackageName
