@@ -14,6 +14,7 @@ module Stackage.PackageVersion
   where
 
 import           Control.Applicative
+import           Data.Aeson
 import           Data.Attoparsec.ByteString.Char8
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
@@ -38,6 +39,14 @@ instance Show PackageVersion where
   show (PackageVersion v) =
     intercalate "."
                 (map show (V.toList v))
+
+instance FromJSON PackageVersion where
+  parseJSON j =
+    do s <- parseJSON j
+       case parsePackageVersionFromString s of
+         Nothing ->
+           fail ("Couldn't parse package version: " ++ s)
+         Just ver -> return ver
 
 -- | Attoparsec parser for a package version from bytestring.
 packageVersionParser :: Parser PackageVersion

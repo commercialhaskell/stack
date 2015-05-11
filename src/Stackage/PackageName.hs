@@ -15,6 +15,7 @@ module Stackage.PackageName
   where
 
 import           Control.Applicative
+import           Data.Aeson
 import           Data.Attoparsec.ByteString.Char8
 import           Data.Attoparsec.Combinators
 import qualified Data.ByteString.Char8 as S8
@@ -32,6 +33,14 @@ newtype PackageName =
 
 instance Show PackageName where
   show (PackageName n) = S8.unpack n
+
+instance FromJSON PackageName where
+  parseJSON j =
+    do s <- parseJSON j
+       case parsePackageNameFromString s of
+         Nothing ->
+           fail ("Couldn't parse package name: " ++ s)
+         Just ver -> return ver
 
 -- | Attoparsec parser for a package name from bytestring.
 packageNameParser :: Parser PackageName

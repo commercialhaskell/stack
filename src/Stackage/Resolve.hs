@@ -21,14 +21,11 @@ import           Data.List
 import           Data.Map.Strict (Map)
 import           Data.Maybe
 import           Data.Text (Text)
-import qualified Data.Text.Encoding as T
-import qualified Data.Version as V ( parseVersion )
-import           Distribution.Version
 import           Network.HTTP.Client
 import           Network.HTTP.Types.Status
 import           Prelude hiding (FilePath)
 import           Stackage.PackageName
-import qualified Text.ParserCombinators.ReadP as ReadP ( readP_to_S )
+import           Stackage.PackageVersion
 
 data ResolveException =
   FPResolvePackagesError [PackageName]
@@ -36,37 +33,18 @@ data ResolveException =
  deriving (Show,Typeable)
 instance Exception ResolveException
 
--- | Simple wrapper for orphan instances.
-newtype Aeson a = Aeson { unAeson :: a}
-
-instance FromJSON (Aeson Version) where
-  parseJSON j =
-    do s <- parseJSON j
-       case parseVersion s of
-         Nothing ->
-           fail "Couldn't parse version."
-         Just ver -> return (Aeson ver)
-
-instance FromJSON (Aeson PackageName) where
-  parseJSON j =
-    do s <- parseJSON j
-       case parsePackageName (T.encodeUtf8 s) of
-         Nothing ->
-           fail "Couldn't parse version."
-         Just n -> return (Aeson n)
-
 -- | A suggestion for package version/flags from stackage.org
 data PackageSuggestion =
   PackageSuggestion {suggestionName :: !PackageName
-                    ,suggestionVersion :: !Version
+                    ,suggestionVersion :: !PackageVersion
                     ,suggestionFlags :: !(Map Text Bool)}
   deriving (Show)
 
 instance FromJSON PackageSuggestion where
   parseJSON j =
     do o <- parseJSON j
-       name <- fmap unAeson (o .: "name")
-       ver <- fmap unAeson (o .: "version")
+       name <- o .: "name"
+       ver <- o .: "version"
        flags <- o .: "flags"
        return (PackageSuggestion name ver flags)
 
@@ -101,10 +79,3 @@ resolvePackageVersions names =
                     "package=" ++
                     (packageNameString x))
                  names)
-
--- | Parse a package version.
-parseVersion :: String -> Maybe Version
-parseVersion s =
-  case reverse (ReadP.readP_to_S V.parseVersion s) of
-    ((ver,""):_) -> Just ver
-    _ -> Nothing

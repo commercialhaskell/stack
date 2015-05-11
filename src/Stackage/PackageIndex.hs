@@ -26,17 +26,15 @@ import           Data.Data
 import           Data.Maybe
 import           Data.Set (Set)
 import qualified Data.Set as S
-import qualified Data.Version as V ( parseVersion )
-import           Distribution.Version
 import           Network.HTTP.Client
 import           Network.HTTP.Types.Status
 import           Path as FL
 import           Prelude hiding (FilePath)
 import           Stackage.PackageName
+import           Stackage.PackageVersion
 import           System.Directory
 import           System.IO
 import           System.IO.Temp
-import qualified Text.ParserCombinators.ReadP as ReadP ( readP_to_S )
 
 data PackageIndexException =
   FPIndexDownloadError (Response L.ByteString)
@@ -97,13 +95,13 @@ downloadPkgIndex dir url =
          liftIO (throwIO (FPIndexDownloadError resp))
 
 -- | Get versions available for the given package in the index.
-getPkgVersions :: MonadIO m => PackageIndex -> PackageName -> m (Maybe (Set Version))
+getPkgVersions :: MonadIO m => PackageIndex -> PackageName -> m (Maybe (Set PackageVersion))
 getPkgVersions (PackageIndex dir) name =
   liftIO (do exists <-
                doesDirectoryExist (FL.toFilePath pkgDir)
              if exists
                 then do contents <-
-                          fmap (mapMaybe parseVersion)
+                          fmap (mapMaybe parsePackageVersionFromString)
                                (getDirectoryContents (FL.toFilePath pkgDir))
                         return (Just (S.fromList contents))
                 else return Nothing)
@@ -111,10 +109,3 @@ getPkgVersions (PackageIndex dir) name =
           dir FL.</>
           (fromMaybe (error "Unable to produce valid directory name for package.")
                      (parseRelDir (packageNameString name)))
-
--- | Parse a package version.
-parseVersion :: String -> Maybe Version
-parseVersion s =
-  case reverse (ReadP.readP_to_S V.parseVersion s) of
-    ((ver,""):_) -> Just ver
-    _ -> Nothing
