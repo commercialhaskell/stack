@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
@@ -5,6 +6,7 @@
 
 module Stackage.GhcPkgId where
 
+import           Data.Aeson
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Data
@@ -19,3 +21,13 @@ instance Hashable GhcPkgId
 
 instance Show GhcPkgId where
   show (GhcPkgId x) = S8.unpack x
+
+instance FromJSON GhcPkgId where
+  parseJSON x =
+    do s <- parseJSON x
+       let !b = S8.pack s
+       return (GhcPkgId b)
+
+instance ToJSON GhcPkgId where
+  toJSON (GhcPkgId x) =
+    toJSON (S8.unpack x)
