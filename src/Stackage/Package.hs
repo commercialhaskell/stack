@@ -67,8 +67,8 @@ instance Exception PackageException
 data Package =
   Package {pinfoName :: !PackageName                      -- ^ Name of the package.
           ,pinfoVersion :: !Version                       -- ^ Version of the package
-          ,pinfoDir :: !(Path Abs Dir)                -- ^ Directory of the package.
-          ,pinfoFiles :: !(Set (Path Abs File))       -- ^ Files that the package depends on.
+          ,pinfoDir :: !(Path Abs Dir)                    -- ^ Directory of the package.
+          ,pinfoFiles :: !(Set (Path Abs File))           -- ^ Files that the package depends on.
           ,pinfoDeps :: !(Map PackageName VersionRange)   -- ^ Packages that the package depends on.
           ,pinfoTools :: ![Dependency]                    -- ^ A build tool name.
           ,pinfoAllDeps :: !(Set PackageName)             -- ^ Original dependencies (not sieved).
