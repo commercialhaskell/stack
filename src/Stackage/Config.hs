@@ -31,6 +31,7 @@ import Data.Typeable
 import qualified Data.Yaml as Yaml
 import Path
 
+-- | The top-level Stackage configuration.
 data Config =
   Config {configPkgDbLocation :: Path Abs Dir
          ,configSandboxLocation :: Path Abs Dir
