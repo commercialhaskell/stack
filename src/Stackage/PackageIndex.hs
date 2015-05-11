@@ -6,7 +6,7 @@
 -- | Package index handling.
 
 module Stackage.PackageIndex
-  (PackageIndex
+  (PackageIndex(..)
   ,PackageIndexException
   ,getPkgIndex
   ,loadPkgIndex
@@ -28,10 +28,9 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Version as V ( parseVersion )
 import           Distribution.Version
-import           Filesystem.Loc as FL
-import qualified Filesystem.Path.CurrentOS as FP
 import           Network.HTTP.Client
 import           Network.HTTP.Types.Status
+import           Path as FL
 import           Prelude hiding (FilePath)
 import           Stackage.PackageName
 import           System.Directory
@@ -46,20 +45,20 @@ instance Exception PackageIndexException
 
 -- | Wrapper to an existant package index.
 newtype PackageIndex =
-  PackageIndex (Loc Absolute Dir)
+  PackageIndex (Path Abs Dir)
 
 -- | Try to get the package index.
-getPkgIndex :: MonadIO m => Loc Absolute Dir -> m (Maybe PackageIndex)
+getPkgIndex :: MonadIO m => Path Abs Dir -> m (Maybe PackageIndex)
 getPkgIndex dir =
   do exists <-
-       liftIO (doesDirectoryExist (FL.encodeString dir))
+       liftIO (doesDirectoryExist (FL.toFilePath dir))
      return (if exists
                 then Just (PackageIndex dir)
                 else Nothing)
 
 -- | Load the package index, if it does not exist, download it.
 loadPkgIndex :: (MonadMask m,MonadLogger m,MonadThrow m,MonadIO m)
-             => Loc Absolute Dir -> m PackageIndex
+             => Path Abs Dir -> m PackageIndex
 loadPkgIndex dir =
   do mindex <- liftIO (getPkgIndex dir)
      case mindex of
@@ -75,7 +74,7 @@ loadPkgIndex dir =
 -- Example usage:
 -- getPkgIndex $(mkAbsoluteDir "/home/chris/.stackage/pkg-index") "http://hackage.haskell.org/packages/archive/00-index.tar.gz"
 downloadPkgIndex :: (MonadMask m,MonadLogger m,MonadThrow m,MonadIO m)
-                 => Loc Absolute Dir -> String -> m PackageIndex
+                 => Path Abs Dir -> String -> m PackageIndex
 downloadPkgIndex dir url =
   do req <- parseUrl url
      $logDebug "Downloading package index ..."
@@ -91,8 +90,8 @@ downloadPkgIndex dir url =
                  liftIO (L.hPutStr h (GZip.decompress (responseBody resp)))
                  liftIO (hClose h)
                  $logDebug "Extracting ..."
-                 liftIO (createDirectoryIfMissing True (FL.encodeString dir))
-                 liftIO (extract (FL.encodeString dir) fp)
+                 liftIO (createDirectoryIfMissing True (FL.toFilePath dir))
+                 liftIO (extract (FL.toFilePath dir) fp)
                  return (PackageIndex dir))
        _ ->
          liftIO (throwIO (FPIndexDownloadError resp))
@@ -101,17 +100,17 @@ downloadPkgIndex dir url =
 getPkgVersions :: MonadIO m => PackageIndex -> PackageName -> m (Maybe (Set Version))
 getPkgVersions (PackageIndex dir) name =
   liftIO (do exists <-
-               doesDirectoryExist (FL.encodeString pkgDir)
+               doesDirectoryExist (FL.toFilePath pkgDir)
              if exists
                 then do contents <-
                           fmap (mapMaybe parseVersion)
-                               (getDirectoryContents (FL.encodeString pkgDir))
+                               (getDirectoryContents (FL.toFilePath pkgDir))
                         return (Just (S.fromList contents))
                 else return Nothing)
   where pkgDir =
-          appendLoc dir
-                    (fromMaybe (error "Unable to produce valid directory name for package.")
-                               (parseRelativeDirLoc (FP.decodeString ((packageNameString name)))))
+          dir FL.</>
+          (fromMaybe (error "Unable to produce valid directory name for package.")
+                     (parseRelDir (packageNameString name)))
 
 -- | Parse a package version.
 parseVersion :: String -> Maybe Version

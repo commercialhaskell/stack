@@ -1,5 +1,9 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+
 -- | The general Stackage configuration that starts everything off. This should
--- be smart to falback if there is no stackage.config, instead relying on 
+-- be smart to falback if there is no stackage.config, instead relying on
 -- whatever files are available.
 --
 -- If there is no stackage.config, and there is a cabal.config, we
@@ -25,14 +29,13 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Typeable
 import qualified Data.Yaml as Yaml
-
-import Filesystem.Loc
+import Path
 
 data Config =
-  Config {configPkgDbLocation :: Loc Absolute Dir
-         ,configSandboxLocation :: Loc Absolute Dir
-         ,configGhcBinLocation :: Loc Absolute Dir
-         ,configCabalBinLocation :: Loc Absolute Dir
+  Config {configPkgDbLocation :: Path Abs Dir
+         ,configSandboxLocation :: Path Abs Dir
+         ,configGhcBinLocation :: Path Abs Dir
+         ,configCabalBinLocation :: Path Abs Dir
          ,configInDocker :: Bool
          }
 data Settings = Settings
@@ -150,7 +153,7 @@ instance FromJSON a => FromJSON (CustomBuildStrategy a) where
 
 instance FromJSON StackageConfig where
   parseJSON = withObject "StackageConfig" $ \obj -> do
-    configStackageRoot <- obj .:? "stackage-root" 
+    configStackageRoot <- obj .:? "stackage-root"
     configStackageHost <- obj .:? "stackage-host"
     configBuildStrategy <-
       (Docker <$> obj .: "docker") <|>
@@ -171,7 +174,7 @@ instance FromJSON CabalSandboxBuildStrategy where
     (BuildAgainstCustom <$> obj .: "custom")
 
 parseBuildStrategy :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => CabalSandboxBuildStrategy -> m (CustomBuildStrategy (Loc Absolute Dir))
+  => CabalSandboxBuildStrategy -> m (CustomBuildStrategy (Path Abs Dir))
 parseBuildStrategy (BuildAgainstLTS lts) =
   resolveLTSSnapshot lts >>= parseBuildStrategy . BuildAgainstSnapshot
 parseBuildStrategy (BuildAgainstNightly nightly) =
@@ -194,7 +197,7 @@ parseBuildStrategy (BuildAgainstCustom custom) = do
 -- TODO
 -- Build strategy based on whatever ghc, cabal, and sandbox are visible.
 --defaultBuildStrategy :: (MonadLogger m, MonadIO m, MonadThrow m)
---  => m (CustomBuildStrategy (Loc Absolute Dir))
+--  => m (CustomBuildStrategy (Path Abs Dir))
 --defaultBuildStrategy = undefined
 
 getStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
@@ -236,25 +239,25 @@ resolveNightlySnapshot _ = throwM $ NotYetImplemented "resolveNightlySnapshot"
 
 
 resolveSnapshotSandboxLoc :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => SnapshotBuildStrategy -> m (Loc Absolute Dir)
+  => SnapshotBuildStrategy -> m (Path Abs Dir)
 resolveSnapshotSandboxLoc _ = throwM $ NotYetImplemented "resolveSnapshotSandboxLoc"
 
 resolveSnapshotGhcLoc :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => SnapshotBuildStrategy -> m (Loc Absolute Dir)
+  => SnapshotBuildStrategy -> m (Path Abs Dir)
 resolveSnapshotGhcLoc _ = throwM $ NotYetImplemented "resolveSnapshotGhcLoc"
 
 resolveSnapshotCabalLoc :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => SnapshotBuildStrategy -> m (Loc Absolute Dir)
+  => SnapshotBuildStrategy -> m (Path Abs Dir)
 resolveSnapshotCabalLoc _ = throwM $ NotYetImplemented "resolveSnapshotCabalLoc"
 
 resolveCustomSandboxLoc :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => Text -> m (Loc Absolute Dir)
+  => Text -> m (Path Abs Dir)
 resolveCustomSandboxLoc _ = throwM $ NotYetImplemented "resolveCustomSandboxLoc"
 
 resolveCustomGhcLoc :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => Text -> m (Loc Absolute Dir)
+  => Text -> m (Path Abs Dir)
 resolveCustomGhcLoc _ = throwM $ NotYetImplemented "resolveCustomGhcLoc"
 
 resolveCustomCabalLoc :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => Text -> m (Loc Absolute Dir)
+  => Text -> m (Path Abs Dir)
 resolveCustomCabalLoc _ = throwM $ NotYetImplemented "resolveCustomCabalLoc"

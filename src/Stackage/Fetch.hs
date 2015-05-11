@@ -24,10 +24,9 @@ import           Data.Maybe
 import qualified Data.Text as T
 import           Distribution.Text (display)
 import           Distribution.Version
-import           Filesystem.Loc as FL
-import qualified Filesystem.Path.CurrentOS as FP
 import           Network.HTTP.Client
 import           Network.HTTP.Types.Status
+import           Path as FL
 import           Prelude hiding (FilePath)
 import           Stackage.PackageIndex
 import           Stackage.PackageName
@@ -45,7 +44,7 @@ instance Exception StackageFetchException
 -- | Fetch the package index.
 -- Example usage: runStdoutLoggingT (fetchPackage $(mkAbsoluteDir "/home/chris/.stackage/pkg-index") (fromJust (parsePackageName "lens")) (fromJust (parseVersion "4.6.0.1")))
 fetchPackage :: (MonadMask m,MonadLogger m,MonadThrow m,MonadIO m)
-             => PackageIndex -> PackageName -> Version -> m (Loc Absolute Dir)
+             => PackageIndex -> PackageName -> Version -> m (Path Abs Dir)
 fetchPackage (PackageIndex dir) name ver =
   do unpacked <-
        packageUnpacked (PackageIndex dir)
@@ -71,8 +70,8 @@ fetchPackage (PackageIndex dir) name ver =
                             liftIO (L.hPutStr h (GZip.decompress (responseBody resp)))
                             liftIO (hClose h)
                             $logDebug (T.pack ("Extracting to " ++
-                                               FL.encodeString pkgVerDir))
-                            liftIO (extract (FL.encodeString pkgVerDir) fp)
+                                               FL.toFilePath pkgVerDir))
+                            liftIO (extract (FL.toFilePath pkgVerDir) fp)
                             $logDebug (T.pack ("Updating cabal file " ++
                                                newCabalFilePath))
                             liftIO (S.writeFile newCabalFilePath indexCabalFile)
@@ -80,23 +79,16 @@ fetchPackage (PackageIndex dir) name ver =
                   _ ->
                     liftIO (throwIO (FPPackageDownloadError name resp))
   where newCabalFilePath =
-          FL.encodeString
-            (appendLoc pkgVerDir
-                       (fromMaybe (error "Unable to make valid .cabal file name.")
-                                  (parseRelativeFileLoc
-                                     (FP.decodeString
-                                        (nameVer ++
-                                         "/" ++
-                                         (packageNameString name) ++
-                                         ".cabal")))))
+          FL.toFilePath
+            (pkgVerDir </>
+             (fromMaybe (error "Unable to make valid .cabal file name.")
+                        (parseRelFile
+                           (nameVer ++ "/" ++ packageNameString name ++ ".cabal"))))
         oldCabalFilePath =
-          FL.encodeString
-            (appendLoc pkgVerDir
-                       (fromMaybe (error "Unable to make valid .cabal file name.")
-                                  (parseRelativeFileLoc
-                                     (FP.decodeString
-                                        ((packageNameString name) ++
-                                         ".cabal")))))
+          FL.toFilePath
+            (pkgVerDir </>
+             (fromMaybe (error "Unable to make valid .cabal file name.")
+                        (parseRelFile (packageNameString name ++ ".cabal"))))
         url =
           concat ["http://hackage.haskell.org/package/"
                  ,nameVer
@@ -106,34 +98,28 @@ fetchPackage (PackageIndex dir) name ver =
         nameVer =
           (packageNameString name) ++
           "-" ++ display ver
-        pkgVerContentsDir :: Loc Absolute Dir
+        pkgVerContentsDir :: Path Abs Dir
         pkgVerContentsDir =
           mkPkgVerContentsDir dir name ver
-        pkgVerDir :: Loc Absolute Dir
+        pkgVerDir :: Path Abs Dir
         pkgVerDir = mkPkgVerDir dir name ver
 
 -- | Has the package been unpacked already?
 packageUnpacked :: (MonadIO m)
                 => PackageIndex -> PackageName -> Version -> m Bool
 packageUnpacked (PackageIndex dir) name ver =
-  liftIO (doesDirectoryExist (FL.encodeString (mkPkgVerContentsDir dir name ver)))
+  liftIO (doesDirectoryExist (FL.toFilePath (mkPkgVerContentsDir dir name ver)))
 
 -- | Make the directory for the package version (with a single .cabal file in it).
-mkPkgVerDir :: Loc Absolute Dir -> PackageName -> Version -> Loc Absolute Dir
+mkPkgVerDir :: Path Abs Dir -> PackageName -> Version -> Path Abs Dir
 mkPkgVerDir dir name ver =
-  appendLoc dir
-            (fromMaybe (error "Unable to make valid path name for package-version.")
-                       (parseRelativeDirLoc
-                          (FP.decodeString
-                             ((packageNameString name) ++
-                              "/" ++ display ver))))
+  dir </>
+  fromMaybe (error "Unable to make valid path name for package-version.")
+            (parseRelDir (packageNameString name ++ "/" ++ display ver))
 
 -- | Make the directory for the package contents (with the .cabal and sources, etc).
-mkPkgVerContentsDir :: Loc Absolute Dir -> PackageName -> Version -> Loc Absolute Dir
+mkPkgVerContentsDir :: Path Abs Dir -> PackageName -> Version -> Path Abs Dir
 mkPkgVerContentsDir dir name ver =
-  appendLoc (mkPkgVerDir dir name ver)
-            (fromMaybe (error "Unable to make valid path name for package-version.")
-                       (parseRelativeDirLoc
-                          (FP.decodeString
-                             ((packageNameString name) ++
-                              "-" ++ display ver))))
+  mkPkgVerDir dir name ver </>
+  fromMaybe (error "Unable to make valid path name for package-version.")
+            (parseRelDir (packageNameString name ++ "-" ++ display ver))

@@ -14,19 +14,20 @@ cabal-version:       >=1.8
 library
   hs-source-dirs:    src/
   ghc-options:       -Wall -O2
-  extensions:        DeriveDataTypeable
-                     RecordWildCards
-                     DataKinds
-                     OverloadedStrings
-  exposed-modules:   Stackage.Types
+  exposed-modules:   Stackage.BuildPlan
                      Stackage.Config
-                     Stackage.Environment
+                     Stackage.Constants
+                     Stackage.Fetch
                      Stackage.GhcPkg
                      Stackage.GhcPkgId
+                     Stackage.Package
+                     Stackage.PackageIdentifier
+                     Stackage.PackageIndex
                      Stackage.PackageName
                      Stackage.PackageVersion
+                     Stackage.Resolve
+                     Stackage.Types
   other-modules:     Stackage.Process
-                     Stackage.PackageIdentifier
   build-depends:     Cabal >= 1.18.1.5
                    , aeson >= 0.8.0.2
                    , async >= 2.0.2
@@ -61,3 +62,4 @@ library
                    , void >= 0.7
                    , yaml >= 0.8.10.1
                    , zlib >= 0.5.4.2
+                   , path >= 0.1.0

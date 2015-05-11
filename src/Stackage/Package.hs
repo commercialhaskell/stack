@@ -7,18 +7,17 @@
 
 -- | Dealing with Cabal.
 
-module Stackage.Build.Cabal
+module Stackage.Package
   (readPackage
   ,Package
   ,PackageConfig)
   where
 
-import           Control.Arrow
 import           Control.Exception
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger (MonadLogger, logDebug)
+import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Loops
 import           Data.Data
 import           Data.Function
@@ -41,20 +40,19 @@ import           Distribution.PackageDescription.Parse
 import           Distribution.Simple.Utils
 import           Distribution.System
 import           Distribution.Version
-import           Filesystem
-import           Filesystem.Loc as FL
-import qualified Filesystem.Path.CurrentOS as FP
+import           Path as FL
 import           Prelude hiding (FilePath)
 import           Stackage.Constants
 import           Stackage.PackageName
+import           System.Directory (doesFileExist)
 
 -- | All exceptions thrown by the library.
 data PackageException
   = PackageConfigError ParseException
   | PackageNoConfigFile
-  | PackageNoCabalFile (Loc Absolute Dir)
-  | PackageInvalidCabalFile (Loc Absolute File) PError
-  | PackageNoDeps (Loc Absolute File)
+  | PackageNoCabalFile (Path Abs Dir)
+  | PackageInvalidCabalFile (Path Abs File) PError
+  | PackageNoDeps (Path Abs File)
   | PackageDepCycle PackageName
   | PackageMissingDep Package PackageName VersionRange
   | PackageDependencyIssues [PackageException]
@@ -69,14 +67,14 @@ instance Exception PackageException
 data Package =
   Package {pinfoName :: !PackageName                      -- ^ Name of the package.
           ,pinfoVersion :: !Version                       -- ^ Version of the package
-          ,pinfoDir :: !(Loc Absolute Dir)                -- ^ Directory of the package.
-          ,pinfoFiles :: !(Set (Loc Absolute File))       -- ^ Files that the package depends on.
+          ,pinfoDir :: !(Path Abs Dir)                -- ^ Directory of the package.
+          ,pinfoFiles :: !(Set (Path Abs File))       -- ^ Files that the package depends on.
           ,pinfoDeps :: !(Map PackageName VersionRange)   -- ^ Packages that the package depends on.
           ,pinfoTools :: ![Dependency]                    -- ^ A build tool name.
           ,pinfoAllDeps :: !(Set PackageName)             -- ^ Original dependencies (not sieved).
           ,pinfoFlags :: !(Map Text Bool)                 -- ^ Flags used on package.
           }
- deriving (Show,Typeable,Data)
+ deriving (Show,Typeable)
 
 -- | Package build configuration
 data PackageConfig =
@@ -84,7 +82,7 @@ data PackageConfig =
                 ,packageConfigEnableBenchmarks :: !Bool   -- ^ Are benchmarks enabled?
                 ,packageConfigFlags :: !(Map Text Bool)   -- ^ Package config flags.
                 }
- deriving (Show,Typeable,Data)
+ deriving (Show,Typeable)
 
 -- | Compares the package name.
 instance Ord Package where
@@ -97,11 +95,11 @@ instance Eq Package where
 -- | Reads and exposes the package information
 readPackage :: (MonadLogger m, MonadIO m, MonadThrow m)
             => PackageConfig
-            -> Loc Absolute File
+            -> Path Abs File
             -> m Package
 readPackage packageConfig cabalfp =
   do chars <-
-       liftIO (Prelude.readFile (FL.encodeString cabalfp))
+       liftIO (Prelude.readFile (FL.toFilePath cabalfp))
      case parsePackageDescription chars of
        ParseFailed per ->
          liftedThrowIO (PackageInvalidCabalFile cabalfp per)
@@ -118,7 +116,7 @@ readPackage packageConfig cabalfp =
                 | M.null deps ->
                   liftedThrowIO (PackageNoDeps cabalfp)
                 | otherwise ->
-                  do let dir = FL.parent cabalfp
+                  do let dir = FL.parentAbs cabalfp
                      pkgFiles <-
                        liftIO (packageFiles dir pkg)
                      let files = cabalfp : pkgFiles
@@ -149,7 +147,7 @@ packageTools :: PackageDescription -> [Dependency]
 packageTools = concatMap buildTools . allBuildInfo
 
 -- | Get all files referenced by the package.
-packageFiles :: Loc Absolute Dir -> PackageDescription -> IO [Loc Absolute File]
+packageFiles :: Path Abs Dir -> PackageDescription -> IO [Path Abs File]
 packageFiles dir pkg =
   do libfiles <- fmap concat
                       (mapM (libraryFiles dir)
@@ -168,41 +166,42 @@ packageFiles dir pkg =
      return (concat [libfiles,exefiles,dfiles,srcfiles,tmpfiles,docfiles])
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
-resolveGlobFiles :: Loc Absolute Dir -> [String] -> IO [Loc Absolute File]
+resolveGlobFiles :: Path Abs Dir -> [String] -> IO [Path Abs File]
 resolveGlobFiles dir = fmap concat . mapM resolve
   where resolve name =
           if any (== '*') name
              then explode name
              else return [(either (error . show)
-                                  (appendLoc dir)
-                                  (FL.parseRelativeFileLoc (FP.decodeString name)))]
+                                  (dir </>)
+                                  (FL.parseRelFile name))]
         explode name =
-          fmap (map (either (error . show) (appendLoc dir) .
-                     FL.parseRelativeFileLoc . FP.decodeString))
-               (matchDirFileGlob (FL.encodeString dir)
+          fmap (map (either (error . show)
+                            (dir </>) .
+                     FL.parseRelFile))
+               (matchDirFileGlob (FL.toFilePath dir)
                                  name)
 
 -- | Get all files referenced by the executable.
-executableFiles :: Loc Absolute Dir -> Executable -> IO [Loc Absolute File]
+executableFiles :: Path Abs Dir -> Executable -> IO [Path Abs File]
 executableFiles dir exe =
-  do exposed <- resolveFiles
-                  (map (either (error . show)
-                               (appendLoc dir) .
-                        FL.parseRelativeDirLoc . FP.decodeString)
-                       (hsSourceDirs build) ++
-                   [dir])
-                  [Right (modulePath exe)]
-                  haskellFileExts
+  do exposed <-
+       resolveFiles
+         (map (either (error . show) (dir </>) .
+               FL.parseRelDir)
+              (hsSourceDirs build) ++
+          [dir])
+         [Right (modulePath exe)]
+         haskellFileExts
      bfiles <- buildFiles dir build
      return (concat [bfiles,exposed])
   where build = buildInfo exe
 
 -- | Get all files referenced by the library.
-libraryFiles :: Loc Absolute Dir -> Library -> IO [Loc Absolute File]
+libraryFiles :: Path Abs Dir -> Library -> IO [Path Abs File]
 libraryFiles dir lib =
   do exposed <- resolveFiles
-                  (map (either (error . show) (appendLoc dir) .
-                        FL.parseRelativeDirLoc . FP.decodeString)
+                  (map (either (error . show) (dir </>) .
+                        FL.parseRelDir)
                        (hsSourceDirs build) ++
                    [dir])
                   (map Left (exposedModules lib))
@@ -212,18 +211,18 @@ libraryFiles dir lib =
   where build = libBuildInfo lib
 
 -- | Get all files in a build.
-buildFiles :: Loc Absolute Dir -> BuildInfo -> IO [Loc Absolute File]
+buildFiles :: Path Abs Dir -> BuildInfo -> IO [Path Abs File]
 buildFiles dir build =
   do other <- resolveFiles
-                (map (either (error . show) (appendLoc dir) .
-                      FL.parseRelativeDirLoc . FP.decodeString)
+                (map (either (error . show) (dir </>) .
+                      FL.parseRelDir)
                      (hsSourceDirs build) ++
                  [dir])
                 (map Left (otherModules build))
                 haskellFileExts
      return (concat [other
-                    ,map (either (error . show) (appendLoc dir) .
-                          FL.parseRelativeFileLoc . FP.decodeString)
+                    ,map (either (error . show) (dir </>) .
+                          FL.parseRelFile)
                          (cSources build)])
 
 -- | Get all dependencies of a package, including library,
@@ -322,29 +321,29 @@ depRange = \(Dependency _ r) -> r
 -- | Try to resolve the list of base names in the given directory by
 -- looking for unique instances of base names applied with the given
 -- extensions.
-resolveFiles :: [Loc Absolute Dir] -- ^ Directories to look in.
+resolveFiles :: [Path Abs Dir] -- ^ Directories to look in.
              -> [Either ModuleName String] -- ^ Base names.
              -> [Text] -- ^ Extentions.
-             -> IO [Loc Absolute File]
+             -> IO [Path Abs File]
 resolveFiles dirs names exts =
   fmap catMaybes (forM names makeNameCandidates)
   where makeNameCandidates name =
-          firstM (isFile . FL.toFilePath)
+          firstM (doesFileExist . FL.toFilePath)
                  (concatMap (makeDirCandidates name) dirs)
         makeDirCandidates :: Either ModuleName String
-                          -> Loc Absolute Dir
-                          -> [Loc Absolute File]
+                          -> Path Abs Dir
+                          -> [Path Abs File]
         makeDirCandidates name dir =
           map (\ext ->
                  case name of
                    Left mn ->
                      (either (error . show)
-                             (appendLoc dir)
-                             (FL.parseRelativeFileLoc
-                                (FP.addExtension (FP.decodeString (Cabal.toFilePath mn))
-                                                 ext)))
+                             (dir </>)
+                             (FL.parseRelFile
+                                (Cabal.toFilePath mn ++
+                                 "." ++ ext)))
                    Right fp ->
                      either (error . show)
-                            (appendLoc dir)
-                            (FL.parseRelativeFileLoc (FP.decodeString fp)))
-              exts
+                            (dir </>)
+                            (FL.parseRelFile fp))
+              (map T.unpack exts)
