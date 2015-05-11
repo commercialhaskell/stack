@@ -9,7 +9,7 @@
 
 module Stackage.Package
   (readPackage
-  ,Package
+  ,Package(..)
   ,PackageConfig)
   where
 
@@ -116,7 +116,7 @@ readPackage packageConfig cabalfp =
                 | M.null deps ->
                   liftedThrowIO (PackageNoDeps cabalfp)
                 | otherwise ->
-                  do let dir = FL.parentAbs cabalfp
+                  do let dir = FL.parent cabalfp
                      pkgFiles <-
                        liftIO (packageDescFiles dir pkg)
                      let files = cabalfp : pkgFiles

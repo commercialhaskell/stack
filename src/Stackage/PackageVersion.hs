@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -10,7 +11,9 @@ module Stackage.PackageVersion
   ,VersionRange
   ,packageVersionParser
   ,parsePackageVersion
-  ,parsePackageVersionFromString)
+  ,parsePackageVersionFromString
+  ,packageVersionString
+  ,packageVersionText)
   where
 
 import           Control.Applicative
@@ -21,6 +24,8 @@ import qualified Data.ByteString.Char8 as S8
 import           Data.Data
 import           Data.Hashable
 import           Data.List
+import           Data.Text (Text)
+import qualified Data.Text as T
 import           Data.Vector.Unboxed (Vector)
 import qualified Data.Vector.Unboxed as V
 import           Data.Word
@@ -68,3 +73,17 @@ parsePackageVersion =
 parsePackageVersionFromString :: String -> Maybe PackageVersion
 parsePackageVersionFromString =
   parsePackageVersion . S8.pack
+
+-- | Get a string representation of a package version.
+packageVersionString :: PackageVersion -> String
+packageVersionString (PackageVersion v) =
+  intercalate "."
+              (map show (V.toList v))
+
+-- | Get a string representation of a package version.
+packageVersionText :: PackageVersion -> Text
+packageVersionText (PackageVersion v) =
+  T.intercalate
+    "."
+    (map (T.pack . show)
+         (V.toList v))

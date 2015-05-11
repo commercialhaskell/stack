@@ -11,6 +11,7 @@ module Stackage.PackageName
   ,parsePackageName
   ,parsePackageNameFromString
   ,packageNameString
+  ,packageNameText
   ,fromCabalPackageName)
   where
 
@@ -23,6 +24,8 @@ import           Data.ByteString.Char8 as S8
 import           Data.Char (isLetter)
 import           Data.Data
 import           Data.Hashable
+import           Data.Text (Text)
+import qualified Data.Text.Encoding as T
 import qualified Distribution.Package as Cabal
 import           GHC.Generics
 
@@ -67,6 +70,10 @@ parsePackageNameFromString =
 -- | Produce a string representation of a package name.
 packageNameString :: PackageName -> String
 packageNameString (PackageName n) = S8.unpack n
+
+-- | Produce a string representation of a package name.
+packageNameText :: PackageName -> Text
+packageNameText (PackageName n) = T.decodeUtf8 n
 
 -- | Convert from a Cabal package name.
 fromCabalPackageName :: Cabal.PackageName -> PackageName

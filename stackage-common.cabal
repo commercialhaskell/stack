@@ -62,4 +62,4 @@ library
                    , void >= 0.7
                    , yaml >= 0.8.10.1
                    , zlib >= 0.5.4.2
-                   , path >= 0.1.0
+                   , path >= 0.2.0
