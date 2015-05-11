@@ -34,7 +34,7 @@ import           Data.Yaml (ParseException)
 import           Distribution.Compiler
 import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.ModuleName as Cabal
-import           Distribution.Package hiding (Package,PackageName)
+import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion)
 import           Distribution.PackageDescription
 import           Distribution.PackageDescription.Parse
 import           Distribution.Simple.Utils
@@ -65,14 +65,14 @@ instance Exception PackageException
 
 -- | Some package info.
 data Package =
-  Package {pinfoName :: !PackageName                      -- ^ Name of the package.
-          ,pinfoVersion :: !Version                       -- ^ Version of the package
-          ,pinfoDir :: !(Path Abs Dir)                    -- ^ Directory of the package.
-          ,pinfoFiles :: !(Set (Path Abs File))           -- ^ Files that the package depends on.
-          ,pinfoDeps :: !(Map PackageName VersionRange)   -- ^ Packages that the package depends on.
-          ,pinfoTools :: ![Dependency]                    -- ^ A build tool name.
-          ,pinfoAllDeps :: !(Set PackageName)             -- ^ Original dependencies (not sieved).
-          ,pinfoFlags :: !(Map Text Bool)                 -- ^ Flags used on package.
+  Package {packageName :: !PackageName                    -- ^ Name of the package.
+          ,packageVersion :: !Version                     -- ^ Version of the package
+          ,packageDir :: !(Path Abs Dir)                  -- ^ Directory of the package.
+          ,packageFiles :: !(Set (Path Abs File))         -- ^ Files that the package depends on.
+          ,packageDeps :: !(Map PackageName VersionRange) -- ^ Packages that the package depends on.
+          ,packageTools :: ![Dependency]                  -- ^ A build tool name.
+          ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
+          ,packageFlags :: !(Map Text Bool)               -- ^ Flags used on package.
           }
  deriving (Show,Typeable)
 
@@ -86,11 +86,11 @@ data PackageConfig =
 
 -- | Compares the package name.
 instance Ord Package where
-  compare = on compare pinfoName
+  compare = on compare packageName
 
 -- | Compares the package name.
 instance Eq Package where
-  (==) = on (==) pinfoName
+  (==) = on (==) packageName
 
 -- | Reads and exposes the package information
 readPackage :: (MonadLogger m, MonadIO m, MonadThrow m)
@@ -118,19 +118,19 @@ readPackage packageConfig cabalfp =
                 | otherwise ->
                   do let dir = FL.parentAbs cabalfp
                      pkgFiles <-
-                       liftIO (packageFiles dir pkg)
+                       liftIO (packageDescFiles dir pkg)
                      let files = cabalfp : pkgFiles
                          deps' =
                            M.filterWithKey (const . (/= name))
                                            deps
-                     return (Package {pinfoName = name
-                                   ,pinfoVersion = pkgVersion pkgId
-                                   ,pinfoDeps = deps'
-                                   ,pinfoDir = dir
-                                   ,pinfoFiles = S.fromList files
-                                   ,pinfoTools = packageTools pkg
-                                   ,pinfoFlags = pkgFlags
-                                   ,pinfoAllDeps =
+                     return (Package {packageName = name
+                                   ,packageVersion = pkgVersion pkgId
+                                   ,packageDeps = deps'
+                                   ,packageDir = dir
+                                   ,packageFiles = S.fromList files
+                                   ,packageTools = packageDescTools pkg
+                                   ,packageFlags = pkgFlags
+                                   ,packageAllDeps =
                                       S.fromList (M.keys deps')})
   where liftedThrowIO = liftIO . throwIO
 
@@ -143,12 +143,12 @@ packageDependencies =
   allBuildInfo
 
 -- | Get all dependencies of the package (buildable targets only).
-packageTools :: PackageDescription -> [Dependency]
-packageTools = concatMap buildTools . allBuildInfo
+packageDescTools :: PackageDescription -> [Dependency]
+packageDescTools = concatMap buildTools . allBuildInfo
 
 -- | Get all files referenced by the package.
-packageFiles :: Path Abs Dir -> PackageDescription -> IO [Path Abs File]
-packageFiles dir pkg =
+packageDescFiles :: Path Abs Dir -> PackageDescription -> IO [Path Abs File]
+packageDescFiles dir pkg =
   do libfiles <- fmap concat
                       (mapM (libraryFiles dir)
                             (maybe [] return (library pkg)))
