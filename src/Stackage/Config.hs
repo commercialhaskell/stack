@@ -13,8 +13,8 @@
 -- probably default to behaving like cabal, possibly with spitting out
 -- a warning that "you should run `stk init` to make things better".
 module Stackage.Config (
-    Config
-  , Settings
+    Config(..)
+  , Settings(..)
   , getConfig
   , NotYetImplemented(..)
   ) where
