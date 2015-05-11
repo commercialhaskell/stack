@@ -25,11 +25,17 @@ import Control.Monad.Catch
 import Control.Monad.Logger hiding (Loc)
 import Control.Monad.IO.Class
 import Data.Aeson
+import Data.Maybe
+import Data.Map (Map)
+import qualified Data.Map as Map
+import Data.Monoid
+import Data.String
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Typeable
 import qualified Data.Yaml as Yaml
 import Path
+import System.Environment
 
 -- | The top-level Stackage configuration.
 data Config =
@@ -123,6 +129,8 @@ data CustomBuildStrategy a =
   }
   deriving Show
 
+type StackageRoot = Path Abs Dir
+type StackageHost = String
 
 instance FromJSON LTSBuildStrategy where
   parseJSON j = parseAsText j <|> parseAsScientific j where
@@ -175,17 +183,17 @@ instance FromJSON CabalSandboxBuildStrategy where
     (BuildAgainstCustom <$> obj .: "custom")
 
 parseBuildStrategy :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => CabalSandboxBuildStrategy -> m (CustomBuildStrategy (Path Abs Dir))
-parseBuildStrategy (BuildAgainstLTS lts) =
-  resolveLTSSnapshot lts >>= parseBuildStrategy . BuildAgainstSnapshot
-parseBuildStrategy (BuildAgainstNightly nightly) =
-  resolveNightlySnapshot nightly >>= parseBuildStrategy . BuildAgainstSnapshot
-parseBuildStrategy (BuildAgainstSnapshot snapshot) = do
-  customGhcBinLocation <- resolveSnapshotGhcLoc snapshot
-  customCabalBinLocation <- resolveSnapshotCabalLoc snapshot
-  customSandboxLocation <- resolveSnapshotSandboxLoc snapshot
+  => StackageRoot -> CabalSandboxBuildStrategy -> m (CustomBuildStrategy (Path Abs Dir))
+parseBuildStrategy stackageRoot (BuildAgainstLTS lts) =
+  resolveLTSSnapshot stackageRoot lts >>= parseBuildStrategy stackageRoot . BuildAgainstSnapshot
+parseBuildStrategy stackageRoot (BuildAgainstNightly nightly) =
+  resolveNightlySnapshot nightly >>= parseBuildStrategy stackageRoot . BuildAgainstSnapshot
+parseBuildStrategy stackageRoot (BuildAgainstSnapshot snapshot) = do
+  customGhcBinLocation <- resolveSnapshotGhcLoc stackageRoot snapshot
+  customCabalBinLocation <- resolveSnapshotCabalLoc stackageRoot snapshot
+  customSandboxLocation <- resolveSnapshotSandboxLoc stackageRoot snapshot
   return CustomBuildStrategy{..}
-parseBuildStrategy (BuildAgainstCustom custom) = do
+parseBuildStrategy stackageRoot (BuildAgainstCustom custom) = do
   ghcBinLoc <- resolveCustomGhcLoc (customGhcBinLocation custom)
   cabalBinLoc <- resolveCustomCabalLoc (customCabalBinLocation custom)
   sandboxLocation <- resolveCustomSandboxLoc (customSandboxLocation custom)
@@ -211,17 +219,21 @@ getStackageConfig = do
 configFromStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
   => StackageConfig -> m Config
 configFromStackageConfig StackageConfig{..} = do
+  stackageHost <- resolveStackageHost configStackageHost
+  stackageRoot <- resolveStackageRoot configStackageRoot
   CustomBuildStrategy{..} <- case configBuildStrategy of
-    CabalSandbox strategy -> parseBuildStrategy strategy
+    CabalSandbox strategy -> parseBuildStrategy stackageRoot strategy
     Docker _ -> throwM $ NotYetImplemented "configFromStackageConfig"
   let configPkgDbLocation = undefined
       configSandboxLocation = undefined
       configGhcBinLocation = undefined
       configCabalBinLocation = undefined
       configInDocker = undefined
-  return Config{..}
+  _ <- return Config{..}
+  -- TODO: fill in undefineds above
+  throwM $ NotYetImplemented "configFromStackageConfig: return"
 
--- TODO: handle more settings
+-- TODO: handle Settings
 -- TODO: handle failure to retrieve StacakgeConfig
 getConfig :: (MonadLogger m,MonadIO m,MonadThrow m)
           => Settings -> m Config
@@ -231,8 +243,16 @@ getConfig Settings = do
 
 
 resolveLTSSnapshot :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => LTSBuildStrategy -> m SnapshotBuildStrategy
-resolveLTSSnapshot _ = throwM $ NotYetImplemented "resolveLTSSnapshot"
+  => StackageRoot -> LTSBuildStrategy -> m SnapshotBuildStrategy
+resolveLTSSnapshot stackageRoot LTSBuildStrategy{..} = do
+  lts <- case Text.stripPrefix "lts-" configLTS of
+    Nothing -> return $ "lts-" <> configLTS
+    Just{} -> return configLTS
+  mSnapshots <- liftIO $ Yaml.decodeFile (toFilePath stackageRoot)
+  configSnapshot <- case Map.lookup lts =<< (mSnapshots :: Maybe (Map Text Text)) of
+    Nothing -> return lts
+    Just lts' -> return lts'
+  return SnapshotBuildStrategy{..}
 
 resolveNightlySnapshot :: (MonadLogger m, MonadIO m, MonadThrow m)
   => NightlyBuildStrategy -> m SnapshotBuildStrategy
@@ -240,16 +260,16 @@ resolveNightlySnapshot _ = throwM $ NotYetImplemented "resolveNightlySnapshot"
 
 
 resolveSnapshotSandboxLoc :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => SnapshotBuildStrategy -> m (Path Abs Dir)
-resolveSnapshotSandboxLoc _ = throwM $ NotYetImplemented "resolveSnapshotSandboxLoc"
+  => StackageRoot -> SnapshotBuildStrategy -> m (Path Abs Dir)
+resolveSnapshotSandboxLoc _ _ = throwM $ NotYetImplemented "resolveSnapshotSandboxLoc"
 
 resolveSnapshotGhcLoc :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => SnapshotBuildStrategy -> m (Path Abs Dir)
-resolveSnapshotGhcLoc _ = throwM $ NotYetImplemented "resolveSnapshotGhcLoc"
+  => StackageRoot -> SnapshotBuildStrategy -> m (Path Abs Dir)
+resolveSnapshotGhcLoc _ _ = throwM $ NotYetImplemented "resolveSnapshotGhcLoc"
 
 resolveSnapshotCabalLoc :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => SnapshotBuildStrategy -> m (Path Abs Dir)
-resolveSnapshotCabalLoc _ = throwM $ NotYetImplemented "resolveSnapshotCabalLoc"
+  => StackageRoot -> SnapshotBuildStrategy -> m (Path Abs Dir)
+resolveSnapshotCabalLoc _ _ = throwM $ NotYetImplemented "resolveSnapshotCabalLoc"
 
 resolveCustomSandboxLoc :: (MonadLogger m, MonadIO m, MonadThrow m)
   => Text -> m (Path Abs Dir)
@@ -262,3 +282,21 @@ resolveCustomGhcLoc _ = throwM $ NotYetImplemented "resolveCustomGhcLoc"
 resolveCustomCabalLoc :: (MonadLogger m, MonadIO m, MonadThrow m)
   => Text -> m (Path Abs Dir)
 resolveCustomCabalLoc _ = throwM $ NotYetImplemented "resolveCustomCabalLoc"
+
+-- TODO: copy from stackage-sandbox or wherver this has been well defined
+resolveStackageRoot :: (MonadLogger m, MonadIO m, MonadThrow m)
+  => Maybe Text -> m StackageRoot
+resolveStackageRoot (Just t) = parseAbsDir (fromString $ Text.unpack t)
+resolveStackageRoot Nothing = do
+  home <- liftIO $ getEnv "HOME"
+  homeLoc <- parseAbsDir (fromString home)
+  stackageLoc <- parseRelDir ".stackage"
+  return $ homeLoc </> stackageLoc
+
+-- TODO: copy from stackage-sandbox or wherver this has been well defined
+resolveStackageHost :: (MonadLogger m, MonadIO m, MonadThrow m)
+  => Maybe Text -> m StackageHost
+resolveStackageHost (Just t) = return $ Text.unpack t -- TODO: parse
+resolveStackageHost Nothing = do
+  mHost <- liftIO $ lookupEnv "STACKAGE_HOST"
+  return $ fromMaybe "https://www.stackage.org" mHost
