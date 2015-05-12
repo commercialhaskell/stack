@@ -13,16 +13,18 @@ module Stackage.PackageName
   ,parsePackageNameFromString
   ,packageNameString
   ,packageNameText
-  ,fromCabalPackageName)
+  ,fromCabalPackageName
+  ,parsePackageNameFromFilePath)
   where
 
 import           Control.Applicative
+import           Control.Monad
 import           Control.Monad.Catch
 import           Data.Aeson
 import           Data.Attoparsec.ByteString.Char8
 import           Data.Attoparsec.Combinators
+import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as S8
-import           Data.ByteString.Char8 as S8
 import           Data.Char (isLetter)
 import           Data.Data
 import           Data.Hashable
@@ -30,10 +32,12 @@ import           Data.Text (Text)
 import qualified Data.Text.Encoding as T
 import qualified Distribution.Package as Cabal
 import           GHC.Generics
+import           Path
 
 -- | A parse fail.
-data PackageNameParseFail =
-  PackageNameParseFail ByteString
+data PackageNameParseFail
+  = PackageNameParseFail ByteString
+  | CabalFileNameParseFail FilePath
   deriving (Show,Typeable)
 instance Exception PackageNameParseFail
 
@@ -89,3 +93,11 @@ fromCabalPackageName :: Cabal.PackageName -> PackageName
 fromCabalPackageName (Cabal.PackageName name) =
   let !x = S8.pack name
   in PackageName x
+
+-- | Parse a package name from a file path.
+parsePackageNameFromFilePath :: MonadThrow m => Path a File -> m PackageName
+parsePackageNameFromFilePath fp =
+  clean (toFilePath fp) >>= parsePackageNameFromString
+  where clean = liftM reverse . strip . reverse
+        strip ('l':'a':'b':'a':'c':'.':xs) = return xs
+        strip _ = throwM (CabalFileNameParseFail (toFilePath fp))
