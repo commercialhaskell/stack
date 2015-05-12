@@ -4,7 +4,10 @@
 
 -- | A ghc-pkg id.
 
-module Stackage.GhcPkgId where
+module Stackage.GhcPkgId
+  (GhcPkgId
+  ,parseGhcPkgIdFromString)
+  where
 
 import           Data.Aeson
 import           Data.ByteString (ByteString)
@@ -31,3 +34,7 @@ instance FromJSON GhcPkgId where
 instance ToJSON GhcPkgId where
   toJSON (GhcPkgId x) =
     toJSON (S8.unpack x)
+
+-- | Parse a GHC package id from a string.
+parseGhcPkgIdFromString :: String -> Maybe GhcPkgId
+parseGhcPkgIdFromString = Just . GhcPkgId . S8.pack

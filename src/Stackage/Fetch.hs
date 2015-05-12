@@ -22,14 +22,13 @@ import           Data.Data
 import           Data.List
 import           Data.Maybe
 import qualified Data.Text as T
-import           Distribution.Text (display)
-import           Distribution.Version
 import           Network.HTTP.Client
 import           Network.HTTP.Types.Status
 import           Path as FL
 import           Prelude hiding (FilePath)
 import           Stackage.PackageIndex
 import           Stackage.PackageName
+import           Stackage.PackageVersion
 import           System.Directory
 import           System.IO
 import           System.IO.Temp
@@ -44,7 +43,7 @@ instance Exception StackageFetchException
 -- | Fetch the package index.
 -- Example usage: runStdoutLoggingT (fetchPackage $(mkAbsoluteDir "/home/chris/.stackage/pkg-index") (fromJust (parsePackageName "lens")) (fromJust (parseVersion "4.6.0.1")))
 fetchPackage :: (MonadMask m,MonadLogger m,MonadThrow m,MonadIO m)
-             => PackageIndex -> PackageName -> Version -> m (Path Abs Dir)
+             => PackageIndex -> PackageName -> PackageVersion -> m (Path Abs Dir)
 fetchPackage (PackageIndex dir) name ver =
   do unpacked <-
        packageUnpacked (PackageIndex dir)
@@ -54,7 +53,7 @@ fetchPackage (PackageIndex dir) name ver =
         then return pkgVerContentsDir
         else do req <- parseUrl url
                 liftIO (putStrLn ((packageNameString name) ++
-                                  ": downloading " ++ display ver))
+                                  ": downloading " ++ packageVersionString ver))
                 resp <-
                   liftIO (withManager defaultManagerSettings
                                       (httpLbs req))
@@ -96,8 +95,7 @@ fetchPackage (PackageIndex dir) name ver =
                  ,nameVer
                  ,".tar.gz"] -- TODO: customize this.
         nameVer =
-          (packageNameString name) ++
-          "-" ++ display ver
+          packageNameString name ++ "-" ++ packageVersionString ver
         pkgVerContentsDir :: Path Abs Dir
         pkgVerContentsDir =
           mkPkgVerContentsDir dir name ver
@@ -106,20 +104,22 @@ fetchPackage (PackageIndex dir) name ver =
 
 -- | Has the package been unpacked already?
 packageUnpacked :: (MonadIO m)
-                => PackageIndex -> PackageName -> Version -> m Bool
+                => PackageIndex -> PackageName -> PackageVersion -> m Bool
 packageUnpacked (PackageIndex dir) name ver =
   liftIO (doesDirectoryExist (FL.toFilePath (mkPkgVerContentsDir dir name ver)))
 
 -- | Make the directory for the package version (with a single .cabal file in it).
-mkPkgVerDir :: Path Abs Dir -> PackageName -> Version -> Path Abs Dir
+mkPkgVerDir :: Path Abs Dir -> PackageName -> PackageVersion -> Path Abs Dir
 mkPkgVerDir dir name ver =
   dir </>
   fromMaybe (error "Unable to make valid path name for package-version.")
-            (parseRelDir (packageNameString name ++ "/" ++ display ver))
+            (parseRelDir
+               (packageNameString name ++ "/" ++ packageVersionString ver))
 
 -- | Make the directory for the package contents (with the .cabal and sources, etc).
-mkPkgVerContentsDir :: Path Abs Dir -> PackageName -> Version -> Path Abs Dir
+mkPkgVerContentsDir :: Path Abs Dir -> PackageName -> PackageVersion -> Path Abs Dir
 mkPkgVerContentsDir dir name ver =
   mkPkgVerDir dir name ver </>
   fromMaybe (error "Unable to make valid path name for package-version.")
-            (parseRelDir (packageNameString name ++ "-" ++ display ver))
+            (parseRelDir
+               (packageNameString name ++ "-" ++ packageVersionString ver))

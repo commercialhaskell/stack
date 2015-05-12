@@ -10,7 +10,7 @@
 module Stackage.Package
   (readPackage
   ,Package(..)
-  ,PackageConfig)
+  ,PackageConfig(..))
   where
 
 import           Control.Exception
@@ -44,6 +44,7 @@ import           Path as FL
 import           Prelude hiding (FilePath)
 import           Stackage.Constants
 import           Stackage.PackageName
+import           Stackage.PackageVersion
 import           System.Directory (doesFileExist)
 
 -- | All exceptions thrown by the library.
@@ -66,7 +67,7 @@ instance Exception PackageException
 -- | Some package info.
 data Package =
   Package {packageName :: !PackageName                    -- ^ Name of the package.
-          ,packageVersion :: !Version                     -- ^ Version of the package
+          ,packageVersion :: !PackageVersion              -- ^ Version of the package
           ,packageDir :: !(Path Abs Dir)                  -- ^ Directory of the package.
           ,packageFiles :: !(Set (Path Abs File))         -- ^ Files that the package depends on.
           ,packageDeps :: !(Map PackageName VersionRange) -- ^ Packages that the package depends on.
@@ -124,7 +125,7 @@ readPackage packageConfig cabalfp =
                            M.filterWithKey (const . (/= name))
                                            deps
                      return (Package {packageName = name
-                                   ,packageVersion = pkgVersion pkgId
+                                   ,packageVersion = fromCabalVersion (pkgVersion pkgId)
                                    ,packageDeps = deps'
                                    ,packageDir = dir
                                    ,packageFiles = S.fromList files

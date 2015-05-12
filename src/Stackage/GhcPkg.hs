@@ -103,13 +103,13 @@ findPackageId name =
        Left{} -> throw FindPackageIdFail
        Right lbs ->
          do let mpid =
-                  fmap T.encodeUtf8
+                  fmap T.unpack
                        (listToMaybe
                           (mapMaybe (T.stripPrefix "id: ")
                                     (map T.decodeUtf8 (S8.lines lbs))))
             case mpid of
               Just !pid ->
-                return (Just (GhcPkgId pid))
+                return (parseGhcPkgIdFromString pid)
               _ -> return Nothing
 
 -- | Get all current package ids.

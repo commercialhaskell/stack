@@ -13,7 +13,9 @@ module Stackage.PackageVersion
   ,parsePackageVersion
   ,parsePackageVersionFromString
   ,packageVersionString
-  ,packageVersionText)
+  ,packageVersionText
+  ,toCabalVersion
+  ,fromCabalVersion)
   where
 
 import           Control.Applicative
@@ -87,3 +89,14 @@ packageVersionText (PackageVersion v) =
     "."
     (map (T.pack . show)
          (V.toList v))
+
+-- | Convert to a Cabal version.
+toCabalVersion :: PackageVersion -> Version
+toCabalVersion (PackageVersion v) =
+  Version (map fromIntegral (V.toList v)) []
+
+-- | Convert from a Cabal version.
+fromCabalVersion :: Version -> PackageVersion
+fromCabalVersion (Version vs _) =
+  let !v = V.fromList (map fromIntegral vs)
+  in PackageVersion v
