@@ -62,6 +62,7 @@ data Settings = Settings
 configInDocker :: Config -> Bool
 configInDocker = (== "docker") . configBuildIn
 
+-- TODO: eliminate occurrences of this exception.
 data NotYetImplemented = NotYetImplemented Text
   deriving (Show, Typeable)
 instance Exception NotYetImplemented
@@ -377,14 +378,30 @@ parsePackageDb = do
     else
       return Nothing
 
+getEnvFileStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
+  => m StackageConfig
+getEnvFileStackageConfig = liftIO (lookupEnvText "STACKAGE_CONFIG") >>= \case
+  Just file -> getFileStackageConfig file
+  Nothing -> return mempty
+
+getGlobalStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
+  => m StackageConfig
+getGlobalStackageConfig = liftIO (lookupEnvText "STACKAGE_GLOBAL_CONFIG") >>= \case
+  Just file -> getFileStackageConfig file
+  Nothing -> getFileStackageConfig defaultStackageGlobalConfig
+
+-- TODO: What about Windows?
+defaultStackageGlobalConfig :: Text
+defaultStackageGlobalConfig = "/etc/stackage/config"
 
 getStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
   => m StackageConfig
 getStackageConfig = do
   envStackageConfig <- getEnvStackageConfig
+  envFileStackageConfig <- getEnvFileStackageConfig
   localStackageConfig <- getLocalStackageConfig
 
-  let config0 = envStackageConfig <> localStackageConfig
+  let config0 = envStackageConfig <> envFileStackageConfig <> localStackageConfig
 
   configRootDef <- case stackageOptsRoot (stackageConfigStackageOpts config0) of
     -- Root def already present, don't do the work to find the default
@@ -403,7 +420,8 @@ getStackageConfig = do
       Just stackageRoot = stackageOptsRoot (stackageConfigStackageOpts config1)
 
   rootConfig <- getFileStackageConfig stackageRoot
-  return $ config1 <> rootConfig
+  globalStackageConfig <- getGlobalStackageConfig
+  return $ config1 <> rootConfig <> globalStackageConfig
 
 getLocalStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
   => m StackageConfig
@@ -442,6 +460,7 @@ getEnvBuildOpts = liftIO $ do
     }
 
 -- TODO: support build opts in the env
+-- Loads stackage.config options from environment variables.
 getEnvStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
   => m StackageConfig
 getEnvStackageConfig = do
@@ -453,6 +472,7 @@ getEnvStackageConfig = do
     }
 
 
+-- Interprets StackageConfig options.
 configFromStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
   => StackageConfig -> m Config
 configFromStackageConfig StackageConfig{..} = do
@@ -466,7 +486,6 @@ configFromStackageConfig StackageConfig{..} = do
   return Config{..}
 
 -- TODO: handle Settings
--- TODO: handle failure to retrieve StacakgeConfig
 getConfig :: (MonadLogger m,MonadIO m,MonadThrow m)
           => Settings -> m Config
 getConfig Settings = do
