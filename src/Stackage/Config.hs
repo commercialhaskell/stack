@@ -338,13 +338,13 @@ detectGhcLocation :: (MonadLogger m, MonadIO m, MonadThrow m)
   => m (Path Abs Dir)
 detectGhcLocation = do
   whichGhc <- liftIO $ readProcess "which" ["ghc"] ""
-  parentAbs `liftM` parseAbsFile whichGhc
+  parent `liftM` parseAbsFile whichGhc
 
 detectCabalLocation :: (MonadLogger m, MonadIO m, MonadThrow m)
   => m (Path Abs Dir)
 detectCabalLocation = do
   whichCabal <- liftIO $ readProcess "which" ["cabal"] ""
-  parentAbs `liftM` parseAbsFile whichCabal
+  parent `liftM` parseAbsFile whichCabal
 
 --detectSandboxLocation :: (MonadLogger m, MonadIO m, MonadThrow m)
 --  => m (Path Abs Dir)
