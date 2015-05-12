@@ -19,6 +19,7 @@ module Stackage.PackageVersion
   where
 
 import           Control.Applicative
+import           Control.Monad.Catch
 import           Data.Aeson
 import           Data.Attoparsec.ByteString.Char8
 import           Data.ByteString (ByteString)
@@ -33,6 +34,12 @@ import qualified Data.Vector.Unboxed as V
 import           Data.Word
 import           Distribution.Version
 import           GHC.Generics
+
+-- | A parse fail.
+data PackageVersionParseFail =
+  PackageVersionParseFail ByteString
+  deriving (Show,Typeable)
+instance Exception PackageVersionParseFail
 
 -- | A package version.
 newtype PackageVersion =
@@ -66,13 +73,14 @@ packageVersionParser =
         point = satisfy (== '.')
 
 -- | Convenient way to parse a package version from a bytestring.
-parsePackageVersion :: ByteString -> Maybe PackageVersion
-parsePackageVersion =
-  either (const Nothing) Just .
-  parseOnly (packageVersionParser <* endOfInput)
+parsePackageVersion :: MonadThrow m => ByteString -> m PackageVersion
+parsePackageVersion x = go x
+  where go =
+          either (const (throwM (PackageVersionParseFail x))) return .
+          parseOnly (packageVersionParser <* endOfInput)
 
 -- | Migration function.
-parsePackageVersionFromString :: String -> Maybe PackageVersion
+parsePackageVersionFromString :: MonadThrow m => String -> m PackageVersion
 parsePackageVersionFromString =
   parsePackageVersion . S8.pack
 

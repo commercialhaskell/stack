@@ -7,6 +7,7 @@
 
 module Stackage.PackageName
   (PackageName
+  ,PackageNameParseFail(..)
   ,packageNameParser
   ,parsePackageName
   ,parsePackageNameFromString
@@ -16,6 +17,7 @@ module Stackage.PackageName
   where
 
 import           Control.Applicative
+import           Control.Monad.Catch
 import           Data.Aeson
 import           Data.Attoparsec.ByteString.Char8
 import           Data.Attoparsec.Combinators
@@ -28,6 +30,12 @@ import           Data.Text (Text)
 import qualified Data.Text.Encoding as T
 import qualified Distribution.Package as Cabal
 import           GHC.Generics
+
+-- | A parse fail.
+data PackageNameParseFail =
+  PackageNameParseFail ByteString
+  deriving (Show,Typeable)
+instance Exception PackageNameParseFail
 
 -- | A package name.
 newtype PackageName =
@@ -57,13 +65,14 @@ packageNameParser =
                                                  (pured (satisfy isLetter)))))))
 
 -- | Convenient way to parse a package name from a bytestring.
-parsePackageName :: ByteString -> Maybe PackageName
-parsePackageName =
-  either (const Nothing) Just .
-  parseOnly (packageNameParser <* endOfInput)
+parsePackageName :: MonadThrow m => ByteString -> m PackageName
+parsePackageName x = go x
+  where go =
+          either (const (throwM (PackageNameParseFail x))) return .
+          parseOnly (packageNameParser <* endOfInput)
 
 -- | Migration function.
-parsePackageNameFromString :: String -> Maybe PackageName
+parsePackageNameFromString :: MonadThrow m => String -> m PackageName
 parsePackageNameFromString =
   parsePackageName . S8.pack
 

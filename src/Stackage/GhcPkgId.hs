@@ -9,6 +9,7 @@ module Stackage.GhcPkgId
   ,parseGhcPkgIdFromString)
   where
 
+import           Control.Monad.Catch
 import           Data.Aeson
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
@@ -36,5 +37,5 @@ instance ToJSON GhcPkgId where
     toJSON (S8.unpack x)
 
 -- | Parse a GHC package id from a string.
-parseGhcPkgIdFromString :: String -> Maybe GhcPkgId
-parseGhcPkgIdFromString = Just . GhcPkgId . S8.pack
+parseGhcPkgIdFromString :: MonadThrow m => String -> m GhcPkgId
+parseGhcPkgIdFromString = return . GhcPkgId . S8.pack
