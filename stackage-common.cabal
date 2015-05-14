@@ -25,6 +25,7 @@ library
                      Stackage.PackageIndex
                      Stackage.PackageName
                      Stackage.PackageVersion
+                     Stackage.Path
                      Stackage.Resolve
                      Stackage.Types
   other-modules:     Stackage.Process
@@ -63,3 +64,25 @@ library
                    , yaml >= 0.8.10.1
                    , zlib >= 0.5.4.2
                    , path >= 0.2.0
+
+executable stackage-exec
+  hs-source-dirs:      main
+  main-is:             Exec.hs
+  ghc-options:         -Wall -O2
+  build-depends:
+      base >=4.7
+    , stackage-common
+    , monad-logger
+    , process
+    , filepath
+  default-language:    Haskell2010
+
+executable stackage-path
+  hs-source-dirs:      main
+  main-is:             Path.hs
+  ghc-options:         -Wall -O2
+  build-depends:
+      base >=4.7
+    , stackage-common
+    , monad-logger
+  default-language:    Haskell2010
