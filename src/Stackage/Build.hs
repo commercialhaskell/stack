@@ -1,5 +1,6 @@
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -728,7 +729,7 @@ newConfig gconfig bconfig pinfo =
 -- Package info/dependencies/etc
 
 -- | Get packages' information.
-getPackageInfos :: (MonadIO m,MonadLogger m,MonadThrow m,MonadMask m)
+getPackageInfos :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m,MonadMask m)
                 => FinalAction -> Maybe BuildConfig -> Config -> m (Set Package)
 getPackageInfos finalAction mbconfig = go True
   where go retry cfg =
@@ -835,7 +836,7 @@ validateSuggestion globalPackages okPkgVers =
 
 -- | Check that a package is actually available in the general (Hackage) package
 -- index.
-checkPackageInIndex :: MonadIO m
+checkPackageInIndex :: (MonadIO m, MonadLogger m,MonadThrow m)
                     => PackageIndex
                     -> (PackageName,(VersionRange,t))
                     -> m (Either PackageName (PackageName,VersionRange))
