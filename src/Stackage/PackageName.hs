@@ -97,7 +97,7 @@ fromCabalPackageName (Cabal.PackageName name) =
 -- | Parse a package name from a file path.
 parsePackageNameFromFilePath :: MonadThrow m => Path a File -> m PackageName
 parsePackageNameFromFilePath fp =
-  clean (toFilePath fp) >>= parsePackageNameFromString
+  clean (toFilePath (filename fp)) >>= parsePackageNameFromString
   where clean = liftM reverse . strip . reverse
         strip ('l':'a':'b':'a':'c':'.':xs) = return xs
         strip _ = throwM (CabalFileNameParseFail (toFilePath fp))
