@@ -36,8 +36,8 @@ import Network.HTTP.Conduit
        (Response(responseBody), parseUrl, withManager, http)
 import Network.URI (URI, uriToString, parseURI)
 import Path
-       (Path, Abs, Dir, File, toFilePath, parseAbsDir, mkRelFile,
-        mkRelDir, (</>))
+       (Path, Abs, Dir, File, toFilePath, parseAbsDir, parseAbsFile,
+        mkRelFile, mkRelDir, (</>))
 import Stackage.PackageName (PackageName, packageNameString)
 import Stackage.PackageVersion
        (PackageVersion, parsePackageVersionFromString)
@@ -120,68 +120,90 @@ updateIndex idx =
 updateIndexGit :: (MonadIO m,MonadLogger m,MonadThrow m)
                => PackageIndex -> m ()
 updateIndexGit (PackageIndex idxPath) =
-  do git <- isGitInstalled
-     unless git (error "Please install git and provide the executable on your PATH")
-     $logWarn "FIXME: USING LOCAL DEFAULTS FOR URL & PATH"
-     let gitUrl =
-           uriToString id pkgIndexGitUriDefault []
-         repoName = $(mkRelDir "all-cabal-files")
-         cloneArgs =
-           ["clone",gitUrl,(toFilePath repoName),"--depth","1","-b","display"]
-     sDir <-
-       liftIO (parseAbsDir =<<
-               getAppUserDataDirectory "stackage")
-     let suDir =
-           sDir </>
-           $(mkRelDir "update")
-         acfDir = suDir </> repoName
-     repoExists <-
-       liftIO (doesDirectoryExist (toFilePath acfDir))
-     unless repoExists
-            (do $logInfo ("Cloning repository for first from " <> T.pack gitUrl)
-                runIn suDir "git" cloneArgs Nothing)
-     runIn acfDir "git" ["fetch","--tags","--depth=1"] Nothing
-     let tarFile = pkgIndexTarPath idxPath
-     _ <-
-       (liftIO . tryIO) (removeFile (toFilePath tarFile))
-     $logWarn "FIXME: WE DONT YET HAVE FLAG|DEFAULT FOR GIT GPG VALIDATION"
-     when False
-          (do runIn acfDir
-                    "git"
-                    ["tag","-v","current-hackage"]
-                    (Just (unlines ["Signature verification failed. "
-                                   ,"Please ensure you've set up your"
-                                   ,"GPG keychain to accept the D6CF60FD signing key."
-                                   ,"For more information, see:"
-                                   ,"https://github.com/fpco/stackage-update#readme"])))
-     $logDebug ("Exporting a tarball to " <>
-                (T.pack . toFilePath) tarFile)
-     runIn acfDir
-           "git"
-           ["archive","--format=tar","-o",toFilePath tarFile,"current-hackage"]
-           Nothing
-  where tryIO =
-          try :: forall a. IO a -> IO (Either IOException a)
-        runIn dir cmd args errMsg =
-          do let dir' = toFilePath dir
-             liftIO (createDirectoryIfMissing True dir')
-             (Nothing,Nothing,Nothing,ph) <-
-               liftIO (createProcess
-                         (proc cmd args) {cwd =
-                                            Just dir'})
-             ec <- liftIO (waitForProcess ph)
-             when (ec /= ExitSuccess)
-                  (do $logError (T.pack (concat ["Exit code "
-                                                ,show ec
-                                                ," while running "
-                                                ,show (cmd : args)
-                                                ," in "
-                                                ,dir']))
-                      $logError (T.pack (maybe defErrMsg id errMsg))
-                      liftIO (exitWith ec))
-        defErrMsg =
-          concat ["If the problem persists, please delete the following directory "
-                 ,"and try again"]
+  do path <- liftIO (findExecutable "git")
+     case path of
+       Nothing ->
+         error "Please install git and provide the executable on your PATH"
+       Just fp ->
+         do gitPath <- parseAbsFile fp
+            $logWarn "FIXME: USING LOCAL DEFAULTS FOR URL & PATH"
+            let gitUrl =
+                  uriToString id pkgIndexGitUriDefault []
+                repoName =
+                  $(mkRelDir "all-cabal-files")
+                cloneArgs =
+                  ["clone"
+                  ,gitUrl
+                  ,(toFilePath repoName)
+                  ,"--depth"
+                  ,"1"
+                  ,"-b"
+                  ,"display"]
+            sDir <-
+              liftIO (parseAbsDir =<<
+                      getAppUserDataDirectory "stackage")
+            let suDir =
+                  sDir </>
+                  $(mkRelDir "update")
+                acfDir = suDir </> repoName
+            repoExists <-
+              liftIO (doesDirectoryExist (toFilePath acfDir))
+            unless repoExists
+                   (do $logInfo ("Cloning repository for first from " <>
+                                 T.pack gitUrl)
+                       runIn suDir gitPath cloneArgs Nothing)
+            runIn acfDir gitPath ["fetch","--tags","--depth=1"] Nothing
+            let tarFile = pkgIndexTarPath idxPath
+            _ <-
+              (liftIO . tryIO) (removeFile (toFilePath tarFile))
+            $logWarn "FIXME: WE DONT YET HAVE FLAG|SETTING|DEFAULT FOR GIT GPG VALIDATION"
+            when False
+                 (do runIn acfDir
+                           gitPath
+                           ["tag","-v","current-hackage"]
+                           (Just (unlines ["Signature verification failed. "
+                                          ,"Please ensure you've set up your"
+                                          ,"GPG keychain to accept the D6CF60FD signing key."
+                                          ,"For more information, see:"
+                                          ,"https://github.com/fpco/stackage-update#readme"])))
+            $logDebug ("Exporting a tarball to " <>
+                       (T.pack . toFilePath) tarFile)
+            runIn acfDir
+                  gitPath
+                  ["archive"
+                  ,"--format=tar"
+                  ,"-o"
+                  ,toFilePath tarFile
+                  ,"current-hackage"]
+                  Nothing
+
+tryIO :: forall a.
+         IO a -> IO (Either IOException a)
+tryIO = try
+
+runIn :: forall (m :: * -> *).
+         (MonadLogger m,MonadIO m)
+      => Path Abs Dir -> Path Abs File -> [String] -> Maybe String -> m ()
+runIn dir cmd args errMsg =
+  do let dir' = toFilePath dir
+         cmd' = toFilePath cmd
+     liftIO (createDirectoryIfMissing True dir')
+     (Nothing,Nothing,Nothing,ph) <-
+       liftIO (createProcess
+                 (proc cmd' args) {cwd =
+                                     Just dir'})
+     ec <- liftIO (waitForProcess ph)
+     when (ec /= ExitSuccess)
+          (do $logError (T.pack (concat ["Exit code "
+                                        ,show ec
+                                        ," while running "
+                                        ,show (cmd' : args)
+                                        ," in "
+                                        ,dir']))
+              when (isJust errMsg)
+                   (($logError .
+                     T.pack . fromJust) errMsg)
+              liftIO (exitWith ec))
 
 -- | Update the index tarball via HTTP
 updateIndexHTTP :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m)
