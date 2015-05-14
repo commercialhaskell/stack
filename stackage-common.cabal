@@ -41,6 +41,7 @@ library
                    , conduit-extra >= 1.1.7.1
                    , conduit-extra >= 1.1.7.1
                    , containers >= 0.5.5.1
+                   , data-default >= 0.5.3
                    , directory >= 1.2.1.0
                    , exceptions >= 0.8.0.2
                    , filepath >= 1.3.0.2
@@ -49,7 +50,11 @@ library
                    , http-types >= 0.8.6
                    , monad-logger >= 0.3.13.1
                    , monad-loops >= 0.4.2.1
+                   , mtl >= 2.1.3.1
+                   , path >= 0.2.0
                    , process >= 1.2.0.0
+                   , resourcet >= 1.1.4.1
+                   , shake >= 0.15
                    , streaming-commons >= 0.1.10.0
                    , system-fileio >= 0.3.16.2
                    , system-filepath >= 0.4.13.2
@@ -58,23 +63,24 @@ library
                    , temporary >= 1.2.0.3
                    , text >= 1.2.0.4
                    , transformers >= 0.3.0.0
+                   , unix >= 2.7.0.1
                    , unordered-containers >= 0.2.5.1
                    , vector >= 0.10.12.3
                    , void >= 0.7
                    , yaml >= 0.8.10.1
                    , zlib >= 0.5.4.2
-                   , path >= 0.2.0
 
 executable stackage-exec
   hs-source-dirs:      main
   main-is:             Exec.hs
   ghc-options:         -Wall -O2
   build-depends:
-      base >=4.7
-    , stackage-common
-    , monad-logger
-    , process
-    , filepath
+                    base >=4.7
+                , data-default >= 0.5.3
+                , filepath
+                , monad-logger
+                , process
+                , stackage-common
   default-language:    Haskell2010
 
 executable stackage-path
@@ -82,7 +88,8 @@ executable stackage-path
   main-is:             Path.hs
   ghc-options:         -Wall -O2
   build-depends:
-      base >=4.7
-    , stackage-common
-    , monad-logger
+                    base >=4.7
+                , data-default >= 0.5.3
+                , monad-logger
+                , stackage-common
   default-language:    Haskell2010
