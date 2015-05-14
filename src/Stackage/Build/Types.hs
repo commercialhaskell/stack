@@ -212,8 +212,8 @@ data Docker =
            -- ^ Optional username for Docker registry.
          ,dockerRegistryPassword :: !(Maybe String)
            -- ^ Optional password for Docker registry.
-         ,dockerForcePull :: !Bool
-           -- ^ Always pull the image, even if it already exists locally.
+         ,dockerAutoPull :: !Bool
+           -- ^ Automatically pull new images.
          ,dockerDetach :: !Bool
            -- ^ Whether to run a detached container
          ,dockerPersist :: !Bool
@@ -250,7 +250,7 @@ instance FromJSON Docker where
               <*> o .:? dockerRegistryLoginArgName .!= dockerRegistryLogin def
               <*> o .:? dockerRegistryUsernameArgName .!= dockerRegistryUsername def
               <*> o .:? dockerRegistryPasswordArgName .!= dockerRegistryPassword def
-              <*> o .:? dockerForcePullArgName .!= dockerForcePull def
+              <*> o .:? dockerAutoPullArgName .!= dockerAutoPull def
               <*> o .:? dockerDetachArgName .!= dockerDetach def
               <*> o .:? dockerPersistArgName .!= dockerPersist def
               <*> o .:? dockerContainerNameArgName .!= dockerContainerName def
@@ -272,7 +272,7 @@ instance Default Docker where
                ,dockerRegistryLogin = False
                ,dockerRegistryUsername = Nothing
                ,dockerRegistryPassword = Nothing
-               ,dockerForcePull = False
+               ,dockerAutoPull = False
                ,dockerDetach = False
                ,dockerPersist = False
                ,dockerContainerName = Nothing
@@ -310,8 +310,8 @@ dockerRegistryUsernameArgName = "registry-username"
 dockerRegistryPasswordArgName :: Text
 dockerRegistryPasswordArgName = "registry-password"
 
-dockerForcePullArgName :: Text
-dockerForcePullArgName = "force-pull"
+dockerAutoPullArgName :: Text
+dockerAutoPullArgName = "auto-pull"
 
 dockerDetachArgName :: Text
 dockerDetachArgName = "detach"
