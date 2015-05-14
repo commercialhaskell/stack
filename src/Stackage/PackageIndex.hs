@@ -198,6 +198,7 @@ updateIndexHTTP (PackageIndex idxPath) =
           do res <- http req mgr
              responseBody res $$+-
                sinkFile ((fromString . toFilePath) tarFile))
+     $logWarn "FIXME: WE CAN'T RUN GIT GPG SIGNATURE VERIFICATION WITHOUT GIT"
 
 -- | Fetch all the package versions for a given package
 getPkgVersions :: (MonadIO m,MonadLogger m,MonadThrow m)
