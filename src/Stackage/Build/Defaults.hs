@@ -70,7 +70,7 @@ haddockExtension = "haddock"
 
 -- | User documentation directory.
 userDocsDir :: Path Abs Dir -> Path Abs Dir
-userDocsDir homeDir = homeDir </> $(mkRelDir ".cabal/doc/")
+userDocsDir homeDir = homeDir </> $(mkRelDir ".stackage/doc/")
 
 -- | Package's documentation directory.
 packageDocDir :: Package -> Path Abs Dir
