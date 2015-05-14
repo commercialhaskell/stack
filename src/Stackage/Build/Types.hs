@@ -264,7 +264,7 @@ instance FromJSON Docker where
 -- | Default values for Docker configuration.
 instance Default Docker where
   def = Docker {dockerEnable = False
-               ,dockerRepoOwner = "docker.fpcomplete.com/haskell"
+               ,dockerRepoOwner = "fpco"
                ,dockerRepo = "dev"
                ,dockerRepoSuffix = ""
                ,dockerImageTag = Nothing
