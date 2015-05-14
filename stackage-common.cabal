@@ -28,7 +28,13 @@ library
                      Stackage.Path
                      Stackage.Resolve
                      Stackage.Types
+                     Stackage.Build
+                     Stackage.Build.Types
+                     Stackage.Build.Defaults
+                     Stackage.Build.Doc
+                     Stackage.Build.Config
   other-modules:     Stackage.Process
+                     Path.Find
   build-depends:     Cabal >= 1.18.1.5
                    , aeson >= 0.8.0.2
                    , async >= 2.0.2
