@@ -38,8 +38,9 @@ import qualified Data.Text as T
 import Data.Typeable (Typeable)
 import Network.HTTP.Conduit
        (Request(checkStatus, requestHeaders),
-        Response(responseBody, responseHeaders), parseUrl, withManager,
-        http)
+        Response(responseBody, responseHeaders, responseStatus), parseUrl,
+        withManager, http)
+import Network.HTTP.Types (status200)
 import Path
        (Path, Abs, Dir, File, toFilePath, parseAbsDir, parseAbsFile,
         mkRelFile, mkRelDir, (</>))
@@ -222,18 +223,19 @@ updateIndexHTTP (PackageIndex idxPath) =
             (\mgr ->
                do res <-
                     http (req {checkStatus = \_ _ _ -> Nothing}) mgr
-                  let etag =
-                        lookup "ETag" (responseHeaders res)
-                  forM_ etag
-                        (\e ->
-                           sourceLbs (L.fromStrict e) $$
-                           sinkFile etagFP)
-                  responseBody res $$+-
-                    sinkFile (fromString tmpTarGzFp)
-                  sourceFile (fromString tmpTarGzFp) $$
-                    ungzip $=
-                    sinkFile (fromString tarFp)
-                  liftIO (renameFile tmpTarGzFp tarGzFp))
+                  when (responseStatus res == status200)
+                       (do let etag =
+                                 lookup "ETag" (responseHeaders res)
+                           forM_ etag
+                                 (\e ->
+                                    sourceLbs (L.fromStrict e) $$
+                                    sinkFile etagFP)
+                           responseBody res $$+-
+                             sinkFile (fromString tmpTarGzFp)
+                           sourceFile (fromString tmpTarGzFp) $$
+                             ungzip $=
+                             sinkFile (fromString tarFp)
+                           liftIO (renameFile tmpTarGzFp tarGzFp)))
 
 -- | Fetch all the package versions for a given package
 getPkgVersions :: (MonadIO m,MonadLogger m,MonadThrow m)
