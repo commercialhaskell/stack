@@ -294,4 +294,4 @@ pkgIndexGitUriDefault =
 -- this module until we work out the Stackage.Config for it.
 pkgIndexHttpUriDefault :: URI
 pkgIndexHttpUriDefault =
-  (fromJust . parseURI) "http://hackage.fpcomplete.com/00-index.tar.gz"
+  (fromJust . parseURI) "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"
