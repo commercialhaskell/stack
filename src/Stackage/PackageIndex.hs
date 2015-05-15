@@ -25,7 +25,7 @@ import Control.Monad.Trans.Control (MonadBaseControl)
 import Control.Monad.Trans.Resource (MonadResource)
 import qualified Data.ByteString.Lazy as L
 import Data.Conduit (($$+-),($$),($=))
-import Data.Conduit.Binary (sourceLbs, sourceFile, sinkFile, sinkLbs)
+import Data.Conduit.Binary (sourceLbs, sourceFile, sinkFile)
 import qualified Data.Conduit.Binary as C
 import Data.Conduit.Zlib (ungzip)
 import Data.Maybe (fromJust, isJust)
