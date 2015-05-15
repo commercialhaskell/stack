@@ -29,7 +29,7 @@ import Data.Conduit.Binary (sourceLbs, sourceFile, sinkFile)
 import qualified Data.Conduit.Binary as C
 import Data.Conduit.Zlib (ungzip)
 import Data.Foldable (forM_)
-import Data.Maybe (fromJust, isJust)
+import Data.Maybe (isJust)
 import Data.Monoid ((<>))
 import Data.Set (Set)
 import qualified Data.Set as Set
