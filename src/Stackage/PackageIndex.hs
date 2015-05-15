@@ -62,12 +62,6 @@ instance Exception PackageIndexException
 newtype PackageIndex =
   PackageIndex (Path Abs Dir)
 
--- I don't know if there's a point in checking if the Git index is out
--- of date, simply fetching and regenerating is quick enough
-
--- For HTTP outdated: we need to save a file with the etag header info
--- and, when we download next, compare. The current way of doing
--- things (first checking and then downloading) won't work
 -- | Try to get the package index.
 getPkgIndex :: (MonadIO m,MonadLogger m,MonadThrow m)
             => (Path Abs Dir) -> m (Maybe PackageIndex)
