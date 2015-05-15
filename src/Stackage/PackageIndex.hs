@@ -20,7 +20,7 @@ import Control.Monad (unless, when)
 import Control.Monad.Catch (MonadThrow, throwM)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Logger
-       (MonadLogger, logWarn, logInfo, logError, logDebug)
+       (MonadLogger, logWarn, logInfo, logDebug)
 import Control.Monad.Trans.Control (MonadBaseControl)
 import Control.Monad.Trans.Resource (MonadResource)
 import qualified Data.ByteString.Lazy as L
@@ -42,17 +42,16 @@ import Network.HTTP.Conduit
         withManager, http)
 import Network.HTTP.Types (status200)
 import Path
-       (Path, Abs, Dir, File, toFilePath, parseAbsDir, parseAbsFile,
-        mkRelFile, mkRelDir, (</>))
+       (Path, Abs, Dir, toFilePath, parseAbsDir, parseAbsFile, mkRelFile,
+        mkRelDir, (</>))
 import Stackage.PackageName (PackageName, packageNameString)
 import Stackage.PackageVersion
        (PackageVersion, parsePackageVersionFromString)
+import Stackage.Process (runIn)
 import System.Directory
        (removeFile, renameFile, getAppUserDataDirectory, findExecutable,
-        doesFileExist, doesDirectoryExist, createDirectoryIfMissing)
-import System.Exit (ExitCode(ExitSuccess), exitWith)
+        doesFileExist, doesDirectoryExist)
 import System.IO (IOMode(ReadMode), withBinaryFile)
-import System.Process (createProcess, cwd, proc, waitForProcess)
 
 data PackageIndexException =
   Couldn'tReadIndexTarball FilePath
@@ -159,29 +158,6 @@ updateIndexGit (PackageIndex idxPath) =
 tryIO :: forall a.
          IO a -> IO (Either IOException a)
 tryIO = try
-
-runIn :: forall (m :: * -> *).
-         (MonadLogger m,MonadIO m)
-      => Path Abs Dir -> Path Abs File -> [String] -> Maybe String -> m ()
-runIn dir cmd args errMsg =
-  do let dir' = toFilePath dir
-         cmd' = toFilePath cmd
-     liftIO (createDirectoryIfMissing True dir')
-     (Nothing,Nothing,Nothing,ph) <-
-       liftIO (createProcess
-                 (proc cmd' args) {cwd =
-                                     Just dir'})
-     ec <- liftIO (waitForProcess ph)
-     when (ec /= ExitSuccess)
-          (do $logError (T.pack (concat ["Exit code "
-                                        ,show ec
-                                        ," while running "
-                                        ,show (cmd' : args)
-                                        ," in "
-                                        ,dir']))
-              forM_ errMsg
-                    (\e -> ($logError (T.pack e)))
-              liftIO (exitWith ec))
 
 -- | Update the index tarball via HTTP
 updateIndexHTTP :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m,MonadThrow m)
