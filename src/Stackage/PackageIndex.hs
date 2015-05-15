@@ -40,7 +40,6 @@ import Network.HTTP.Conduit
        (Request(checkStatus, requestHeaders),
         Response(responseBody, responseHeaders), parseUrl, withManager,
         http)
-import Network.URI (URI, uriToString, parseURI)
 import Path
        (Path, Abs, Dir, File, toFilePath, parseAbsDir, parseAbsFile,
         mkRelFile, mkRelDir, (</>))
@@ -106,13 +105,11 @@ updateIndexGit (PackageIndex idxPath) =
        Just fp ->
          do gitPath <- parseAbsFile fp
             $logWarn "FIXME: USING LOCAL DEFAULTS FOR URL & PATH"
-            let gitUrl =
-                  uriToString id pkgIndexGitUriDefault []
-                repoName =
+            let repoName =
                   $(mkRelDir "all-cabal-files")
                 cloneArgs =
                   ["clone"
-                  ,gitUrl
+                  ,pkgIndexGitUriDefault
                   ,(toFilePath repoName)
                   ,"--depth"
                   ,"1"
@@ -129,7 +126,7 @@ updateIndexGit (PackageIndex idxPath) =
               liftIO (doesDirectoryExist (toFilePath acfDir))
             unless repoExists
                    (do $logInfo ("Cloning repository for first from " <>
-                                 T.pack gitUrl)
+                                 T.pack pkgIndexGitUriDefault)
                        runIn suDir gitPath cloneArgs Nothing)
             runIn acfDir gitPath ["fetch","--tags","--depth=1"] Nothing
             let tarFile = idxPath
@@ -188,9 +185,7 @@ updateIndexHTTP :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource 
                 => PackageIndex -> m ()
 updateIndexHTTP (PackageIndex idxPath) =
   do $logWarn "FIXME: USING LOCAL DEFAULTS FOR URL"
-     let url =
-           uriToString id pkgIndexHttpUriDefault []
-         tarPath =
+     let tarPath =
            idxPath </>
            $(mkRelFile "00-index.tar")
          tarFilePath = toFilePath tarPath
@@ -202,8 +197,9 @@ updateIndexHTTP (PackageIndex idxPath) =
            idxPath </>
            $(mkRelFile "00-index.tar.gz.etag")
          etagFilePath = toFilePath etagPath
-     req <- parseUrl url
-     $logDebug ("Downloading package index from " <> T.pack url)
+     req <- parseUrl pkgIndexHttpUriDefault
+     $logDebug ("Downloading package index from " <>
+                T.pack pkgIndexHttpUriDefault)
      etagFileExists <-
        liftIO (doesFileExist etagFilePath)
      if (etagFileExists)
@@ -286,12 +282,10 @@ isGitInstalled =
 
 -- | Temporarily define the standard Git repo url locally here in this
 -- module until we work out the Stackage.Config for it.
-pkgIndexGitUriDefault :: URI
-pkgIndexGitUriDefault =
-  (fromJust . parseURI) "https://github.com/commercialhaskell/all-cabal-files.git"
+pkgIndexGitUriDefault :: String
+pkgIndexGitUriDefault = "https://github.com/commercialhaskell/all-cabal-files.git"
 
 -- | Temporarily define the standard HTTP tarball url locally here in
 -- this module until we work out the Stackage.Config for it.
-pkgIndexHttpUriDefault :: URI
-pkgIndexHttpUriDefault =
-  (fromJust . parseURI) "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"
+pkgIndexHttpUriDefault :: String
+pkgIndexHttpUriDefault = "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"
