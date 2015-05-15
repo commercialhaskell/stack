@@ -24,9 +24,10 @@ import Control.Monad.Logger
 import Control.Monad.Trans.Control (MonadBaseControl)
 import Control.Monad.Trans.Resource (MonadResource)
 import qualified Data.ByteString.Lazy as L
-import Data.Conduit (($$+-),($$))
+import Data.Conduit (($$+-),($$),($=))
 import Data.Conduit.Binary (sourceLbs, sourceFile, sinkFile, sinkLbs)
 import qualified Data.Conduit.Binary as C
+import Data.Conduit.Zlib (ungzip)
 import Data.Maybe (fromJust, isJust)
 import Data.Monoid ((<>))
 import Data.Set (Set)
@@ -231,7 +232,7 @@ updateIndexHTTP (PackageIndex idxPath) =
                   when (isJust etag)
                        (sourceLbs ((L.fromStrict . fromJust) etag) $$
                         sinkFile etagFP)
-                  responseBody res $$+-
+                  responseBody res $$+- ungzip $=
                     sinkFile (fromString tarFP))
 
 -- | Fetch all the package versions for a given package
