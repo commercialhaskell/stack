@@ -36,8 +36,9 @@ import Data.String (IsString(fromString))
 import qualified Data.Text as T
 import Data.Typeable (Typeable)
 import Network.HTTP.Conduit
-       (Request(requestHeaders), Response(responseBody, responseHeaders),
-        parseUrl, withManager, http)
+       (Request(checkStatus, requestHeaders),
+        Response(responseBody, responseHeaders), parseUrl, withManager,
+        http)
 import Network.URI (URI, uriToString, parseURI)
 import Path
        (Path, Abs, Dir, File, toFilePath, parseAbsDir, parseAbsFile,
@@ -220,7 +221,8 @@ updateIndexHTTP (PackageIndex idxPath) =
   where download req tarFP etagFP =
           withManager
             (\mgr ->
-               do res <- http req mgr
+               do res <-
+                    http (req {checkStatus = \_ _ _ -> Nothing}) mgr
                   let etag =
                         lookup "ETag" (responseHeaders res)
                   when (isJust etag)
