@@ -189,9 +189,13 @@ updateIndexHTTP (PackageIndex idxPath) =
            idxPath </>
            $(mkRelFile "00-index.tar")
          tarFilePath = toFilePath tarPath
+         tarGzPath =
+           idxPath </>
+           $(mkRelFile "00-index.tar.gz")
+         tarGzFilePath = toFilePath tarGzPath
          tmpTarPath =
            idxPath </>
-           $(mkRelFile "00-index.tar.tmp")
+           $(mkRelFile "00-index.tar.gz.tmp")
          tmpTarFilePath = toFilePath tmpTarPath
          etagPath =
            idxPath </>
@@ -210,11 +214,10 @@ updateIndexHTTP (PackageIndex idxPath) =
                       req {requestHeaders =
                              requestHeaders req ++
                              [("If-None-Match",L.toStrict etag)]}
-                download req' tmpTarFilePath etagFilePath
-        else download req tmpTarFilePath etagFilePath
-     liftIO (renameFile tmpTarFilePath tarFilePath)
+                download req' tmpTarFilePath tarGzFilePath tarFilePath etagFilePath
+        else download req tmpTarFilePath tarGzFilePath tarFilePath etagFilePath
      $logWarn "FIXME: WE CAN'T RUN GIT GPG SIGNATURE VERIFICATION WITHOUT GIT"
-  where download req tarFP etagFP =
+  where download req tmpTarGzFp tarGzFp tarFp etagFP =
           withManager
             (\mgr ->
                do res <-
@@ -225,8 +228,12 @@ updateIndexHTTP (PackageIndex idxPath) =
                         (\e ->
                            sourceLbs (L.fromStrict e) $$
                            sinkFile etagFP)
-                  responseBody res $$+- ungzip $=
-                    sinkFile (fromString tarFP))
+                  responseBody res $$+-
+                    sinkFile (fromString tmpTarGzFp)
+                  sourceFile (fromString tmpTarGzFp) $$
+                    ungzip $=
+                    sinkFile (fromString tarFp)
+                  liftIO (renameFile tmpTarGzFp tarGzFp))
 
 -- | Fetch all the package versions for a given package
 getPkgVersions :: (MonadIO m,MonadLogger m,MonadThrow m)
