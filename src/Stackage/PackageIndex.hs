@@ -28,6 +28,7 @@ import Data.Conduit (($$+-),($$),($=))
 import Data.Conduit.Binary (sourceLbs, sourceFile, sinkFile)
 import qualified Data.Conduit.Binary as C
 import Data.Conduit.Zlib (ungzip)
+import Data.Foldable (forM_)
 import Data.Maybe (fromJust, isJust)
 import Data.Monoid ((<>))
 import Data.Set (Set)
@@ -178,9 +179,8 @@ runIn dir cmd args errMsg =
                                         ,show (cmd' : args)
                                         ," in "
                                         ,dir']))
-              when (isJust errMsg)
-                   (($logError .
-                     T.pack . fromJust) errMsg)
+              forM_ errMsg
+                    (\e -> ($logError (T.pack e)))
               liftIO (exitWith ec))
 
 -- | Update the index tarball via HTTP
@@ -225,9 +225,10 @@ updateIndexHTTP (PackageIndex idxPath) =
                     http (req {checkStatus = \_ _ _ -> Nothing}) mgr
                   let etag =
                         lookup "ETag" (responseHeaders res)
-                  when (isJust etag)
-                       (sourceLbs ((L.fromStrict . fromJust) etag) $$
-                        sinkFile etagFP)
+                  forM_ etag
+                        (\e ->
+                           sourceLbs (L.fromStrict e) $$
+                           sinkFile etagFP)
                   responseBody res $$+- ungzip $=
                     sinkFile (fromString tarFP))
 
