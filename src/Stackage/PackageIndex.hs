@@ -199,7 +199,7 @@ updateIndexHTTP (PackageIndex idxPath) =
          tmpTarFilePath = toFilePath tmpTarPath
          etagPath =
            idxPath </>
-           $(mkRelFile "00-index.etag")
+           $(mkRelFile "00-index.tar.gz.etag")
          etagFilePath = toFilePath etagPath
      req <- parseUrl url
      $logDebug ("Downloading package index from " <> T.pack url)
