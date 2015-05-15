@@ -10,8 +10,8 @@
 -- | Package index handling.
 
 module Stackage.PackageIndex
-       (PackageIndex(..), getPkgIndex, loadPkgIndex, isIndexOutdated,
-        updateIndex, getPkgVersions)
+       (PackageIndex(..), getPkgIndex, loadPkgIndex, updateIndex,
+        getPkgVersions)
        where
 
 import qualified Codec.Archive.Tar as Tar
@@ -22,9 +22,11 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Logger
        (MonadLogger, logWarn, logInfo, logError, logDebug)
 import Control.Monad.Trans.Control (MonadBaseControl)
+import Control.Monad.Trans.Resource (MonadResource)
 import qualified Data.ByteString.Lazy as L
-import Data.Conduit (($$+-))
-import Data.Conduit.Binary (sinkFile)
+import Data.Conduit (($$+-),($$))
+import Data.Conduit.Binary (sourceLbs, sourceFile, sinkFile, sinkLbs)
+import qualified Data.Conduit.Binary as C
 import Data.Maybe (fromJust, isJust)
 import Data.Monoid ((<>))
 import Data.Set (Set)
@@ -33,7 +35,8 @@ import Data.String (IsString(fromString))
 import qualified Data.Text as T
 import Data.Typeable (Typeable)
 import Network.HTTP.Conduit
-       (Response(responseBody), parseUrl, withManager, http)
+       (Request(requestHeaders), Response(responseBody, responseHeaders),
+        parseUrl, withManager, http)
 import Network.URI (URI, uriToString, parseURI)
 import Path
        (Path, Abs, Dir, File, toFilePath, parseAbsDir, parseAbsFile,
@@ -43,7 +46,7 @@ import Stackage.PackageVersion
        (PackageVersion, parsePackageVersionFromString)
 import System.Directory
        (removeFile, renameFile, getAppUserDataDirectory, findExecutable,
-        doesDirectoryExist, createDirectoryIfMissing)
+        doesFileExist, doesDirectoryExist, createDirectoryIfMissing)
 import System.Exit (ExitCode(ExitSuccess), exitWith)
 import System.IO (IOMode(ReadMode), withBinaryFile)
 import System.Process (createProcess, cwd, proc, waitForProcess)
@@ -58,6 +61,12 @@ instance Exception PackageIndexException
 newtype PackageIndex =
   PackageIndex (Path Abs Dir)
 
+-- I don't know if there's a point in checking if the Git index is out
+-- of date, simply fetching and regenerating is quick enough
+
+-- For HTTP outdated: we need to save a file with the etag header info
+-- and, when we download next, compare. The current way of doing
+-- things (first checking and then downloading) won't work
 -- | Try to get the package index.
 getPkgIndex :: (MonadIO m,MonadLogger m,MonadThrow m)
             => (Path Abs Dir) -> m (Maybe PackageIndex)
@@ -69,7 +78,7 @@ getPkgIndex dir =
                 else Nothing)
 
 -- | Load the package index, if it does not exist, download it.
-loadPkgIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m)
+loadPkgIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m,MonadThrow m)
              => Path Abs Dir -> m PackageIndex
 loadPkgIndex dir =
   do maybeIdx <- getPkgIndex dir
@@ -80,35 +89,8 @@ loadPkgIndex dir =
             updateIndex idx
             return idx
 
--- | Check if the index is outdated
-isIndexOutdated :: (MonadIO m,MonadLogger m,MonadThrow m)
-                => PackageIndex -> m Bool
-isIndexOutdated idx =
-  do git <- isGitInstalled
-     if git
-        then isOutdatedGit idx
-        else isOutdatedHTTP idx
-
--- | Check if the index Git repo is outdated
-isOutdatedGit :: (MonadIO m,MonadLogger m,MonadThrow m)
-              => PackageIndex -> m Bool
-isOutdatedGit idx =
-  do $logWarn "FIXME: HOW DO WE DETERMINE THE INDEX IS OUTDATED?"
-     -- TODO: IF THE INDEX IS PRESENT DO A `git remote update` & CHECK
-     -- THE INDEX VS THE MAIN BRANCH WITH THE CABAL FILES.
-     return True
-
--- | Check if the index tarball (via http) is outdated
-isOutdatedHTTP :: (MonadIO m,MonadLogger m,MonadThrow m)
-               => PackageIndex -> m Bool
-isOutdatedHTTP idx =
-  do $logWarn "FIXME: HOW DO WE DETERMINE THE INDEX TARBALL IS OUTDATED?"
-     -- TODO: IS THE FILE EVEN PRESENT? CHECK DIGEST W/ HTTP HEAD
-     -- ETAGS FROM S3?
-     return True
-
 -- | Update the index tarball
-updateIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m)
+updateIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m,MonadThrow m)
             => PackageIndex -> m ()
 updateIndex idx =
   do git <- isGitInstalled
@@ -206,7 +188,7 @@ runIn dir cmd args errMsg =
               liftIO (exitWith ec))
 
 -- | Update the index tarball via HTTP
-updateIndexHTTP :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m)
+updateIndexHTTP :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m,MonadThrow m)
                 => PackageIndex -> m ()
 updateIndexHTTP (PackageIndex idxPath) =
   do $logWarn "FIXME: USING LOCAL DEFAULTS FOR URL"
@@ -218,17 +200,39 @@ updateIndexHTTP (PackageIndex idxPath) =
          tarFilePath = toFilePath tarPath
          tmpTarPath =
            idxPath </>
-           $(mkRelFile "00-index.tar.tmp") -- Path is missing <.>
+           $(mkRelFile "00-index.tar.tmp")
          tmpTarFilePath = toFilePath tmpTarPath
+         etagPath =
+           idxPath </>
+           $(mkRelFile "00-index.etag")
+         etagFilePath = toFilePath etagPath
      req <- parseUrl url
      $logDebug ("Downloading package index from " <> T.pack url)
-     withManager
-       (\mgr ->
-          do res <- http req mgr
-             responseBody res $$+-
-               sinkFile (fromString tmpTarFilePath))
+     etagFileExists <-
+       liftIO (doesFileExist etagFilePath)
+     if (etagFileExists)
+        then do etag <-
+                  sourceFile etagFilePath $$
+                  C.take 512
+                let req' =
+                      req {requestHeaders =
+                             requestHeaders req ++
+                             [("If-None-Match",L.toStrict etag)]}
+                download req' tmpTarFilePath etagFilePath
+        else download req tmpTarFilePath etagFilePath
      liftIO (renameFile tmpTarFilePath tarFilePath)
      $logWarn "FIXME: WE CAN'T RUN GIT GPG SIGNATURE VERIFICATION WITHOUT GIT"
+  where download req tarFP etagFP =
+          withManager
+            (\mgr ->
+               do res <- http req mgr
+                  let etag =
+                        lookup "ETag" (responseHeaders res)
+                  when (isJust etag)
+                       (sourceLbs ((L.fromStrict . fromJust) etag) $$
+                        sinkFile etagFP)
+                  responseBody res $$+-
+                    sinkFile (fromString tarFP))
 
 -- | Fetch all the package versions for a given package
 getPkgVersions :: (MonadIO m,MonadLogger m,MonadThrow m)
