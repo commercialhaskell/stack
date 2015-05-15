@@ -130,7 +130,9 @@ updateIndexGit (PackageIndex idxPath) =
                                  T.pack pkgIndexGitUriDefault)
                        runIn suDir gitPath cloneArgs Nothing)
             runIn acfDir gitPath ["fetch","--tags","--depth=1"] Nothing
-            let tarFile = idxPath
+            let tarFile =
+                  idxPath </>
+                  $(mkRelFile "00-index.tar")
             _ <-
               (liftIO . tryIO) (removeFile (toFilePath tarFile))
             $logWarn "FIXME: WE DONT YET HAVE FLAG|SETTING|DEFAULT FOR GIT GPG VALIDATION"
