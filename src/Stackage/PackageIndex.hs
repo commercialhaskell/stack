@@ -292,6 +292,4 @@ pkgIndexGitUriDefault =
 -- this module until we work out the Stackage.Config for it.
 pkgIndexHttpUriDefault :: URI
 pkgIndexHttpUriDefault =
-  (fromJust . parseURI)
-    ("https://github.com/commercialhaskell/all-cabal-files" <>
-     "files/archive/master.tar.gz")
+  (fromJust . parseURI) "http://hackage.fpcomplete.com/00-index.tar.gz"
