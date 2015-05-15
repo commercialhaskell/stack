@@ -44,6 +44,7 @@ import Network.HTTP.Types (status200)
 import Path
        (Path, Abs, Dir, toFilePath, parseAbsDir, parseAbsFile, mkRelFile,
         mkRelDir, (</>))
+import Stackage.IO (tryIO)
 import Stackage.PackageName (PackageName, packageNameString)
 import Stackage.PackageVersion
        (PackageVersion, parsePackageVersionFromString)
@@ -154,10 +155,6 @@ updateIndexGit (PackageIndex idxPath) =
                   ,toFilePath tarFile
                   ,"current-hackage"]
                   Nothing
-
-tryIO :: forall a.
-         IO a -> IO (Either IOException a)
-tryIO = try
 
 -- | Update the index tarball via HTTP
 updateIndexHTTP :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m,MonadThrow m)
