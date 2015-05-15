@@ -42,7 +42,7 @@ import Stackage.PackageName (PackageName, packageNameString)
 import Stackage.PackageVersion
        (PackageVersion, parsePackageVersionFromString)
 import System.Directory
-       (removeFile, getAppUserDataDirectory, findExecutable,
+       (removeFile, renameFile, getAppUserDataDirectory, findExecutable,
         doesDirectoryExist, createDirectoryIfMissing)
 import System.Exit (ExitCode(ExitSuccess), exitWith)
 import System.IO (IOMode(ReadMode), withBinaryFile)
@@ -153,7 +153,7 @@ updateIndexGit (PackageIndex idxPath) =
                                  T.pack gitUrl)
                        runIn suDir gitPath cloneArgs Nothing)
             runIn acfDir gitPath ["fetch","--tags","--depth=1"] Nothing
-            let tarFile = pkgIndexTarPath idxPath
+            let tarFile = idxPath
             _ <-
               (liftIO . tryIO) (removeFile (toFilePath tarFile))
             $logWarn "FIXME: WE DONT YET HAVE FLAG|SETTING|DEFAULT FOR GIT GPG VALIDATION"
@@ -212,31 +212,39 @@ updateIndexHTTP (PackageIndex idxPath) =
   do $logWarn "FIXME: USING LOCAL DEFAULTS FOR URL"
      let url =
            uriToString id pkgIndexHttpUriDefault []
+         tarPath =
+           idxPath </>
+           $(mkRelFile "00-index.tar")
+         tarFilePath = toFilePath tarPath
+         tmpTarPath =
+           idxPath </>
+           $(mkRelFile "00-index.tar.tmp") -- Path is missing <.>
+         tmpTarFilePath = toFilePath tmpTarPath
      req <- parseUrl url
-     let tarFile = idxPath </> $(mkRelFile "00-index.tar")
      $logDebug ("Downloading package index from " <> T.pack url)
      withManager
        (\mgr ->
           do res <- http req mgr
              responseBody res $$+-
-               sinkFile ((fromString . toFilePath) tarFile))
+               sinkFile (fromString tmpTarFilePath))
+     liftIO (renameFile tmpTarFilePath tarFilePath)
      $logWarn "FIXME: WE CAN'T RUN GIT GPG SIGNATURE VERIFICATION WITHOUT GIT"
 
 -- | Fetch all the package versions for a given package
 getPkgVersions :: (MonadIO m,MonadLogger m,MonadThrow m)
                => PackageIndex -> PackageName -> m (Maybe (Set PackageVersion))
 getPkgVersions (PackageIndex idxPath) pkg =
-  do let tarPath = pkgIndexTarPath idxPath
-         tarPath' = toFilePath tarPath
+  do let tarPath = idxPath </> $(mkRelFile "00-index.tar")
+         tarFilePath = toFilePath tarPath
      $logWarn "FIXME: USING LOCAL DEFAULTS FOR URL & PATH"
-     $logDebug ("Iterating through tarball " <> T.pack tarPath')
+     $logDebug ("Iterating through tarball " <> T.pack tarFilePath)
      liftIO (withBinaryFile
-               tarPath'
+               tarFilePath
                ReadMode
                (\h ->
                   do lbs <- L.hGetContents h
                      vers <-
-                       liftIO (iterateTarball tarPath'
+                       liftIO (iterateTarball tarFilePath
                                               (packageNameString pkg)
                                               Set.empty
                                               (Tar.read lbs))
@@ -273,12 +281,6 @@ isGitInstalled :: MonadIO m
 isGitInstalled =
   return . isJust =<<
   liftIO (findExecutable "git")
-
--- | The PackageIndex index tarball path
-pkgIndexTarPath :: (Path Abs Dir) -> (Path Abs File)
-pkgIndexTarPath idxPath =
-  idxPath </>
-  $(mkRelFile "00-index.tar")
 
 -- | Temporarily define the standard Git repo url locally here in this
 -- module until we work out the Stackage.Config for it.
