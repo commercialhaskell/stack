@@ -6,7 +6,8 @@
 -- | Functionality for downloading packages securely for cabal's usage.
 
 module Stackage.Fetch
-    ( download
+    ( fetchPackage
+    , fetchPackages
     , Settings
     , defaultSettings
     , setGetManager
@@ -202,11 +203,15 @@ defaultIndexLocation = do
     cabalDir <- getAppUserDataDirectory "cabal"
     return $ cabalDir </> "packages" </> "hackage.haskell.org" </> "00-index.tar"
 
+-- | Download the given package into the directory expected by cabal.
+fetchPackage :: Settings -> PackageName -> PackageVersion -> IO ()
+fetchPackage s p v = fetchPackages s [(p,v)]
+
 -- | Download the given name,version pairs into the directory expected by cabal.
 --
 -- Since 0.1.0.0
-download :: (F.Foldable f,Functor f) => Settings -> f (PackageName, PackageVersion) -> IO ()
-download s (fmap (packageNameString *** packageVersionString) -> pkgs) = do
+fetchPackages :: (F.Foldable f,Functor f) => Settings -> f (PackageName, PackageVersion) -> IO ()
+fetchPackages s (fmap (packageNameString *** packageVersionString) -> pkgs) = do
     indexFP <- _indexLocation s
     packageLocation <- _packageLocation s
     withAsync (getPackageInfo indexFP $
