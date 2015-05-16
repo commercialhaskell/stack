@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -15,7 +16,8 @@ module Stackage.PackageVersion
   ,packageVersionString
   ,packageVersionText
   ,toCabalVersion
-  ,fromCabalVersion)
+  ,fromCabalVersion
+  ,mkPackageVersion)
   where
 
 import           Control.Applicative
@@ -34,6 +36,8 @@ import qualified Data.Vector.Unboxed as V
 import           Data.Word
 import           Distribution.Version
 import           GHC.Generics
+import           Language.Haskell.TH
+import           Language.Haskell.TH.Syntax
 
 -- | A parse fail.
 data PackageVersionParseFail =
@@ -48,6 +52,13 @@ newtype PackageVersion =
 
 instance Hashable PackageVersion where
   hashWithSalt i = hashWithSalt i . V.toList . unPackageVersion
+
+instance Lift PackageVersion where
+  lift (PackageVersion n) =
+    appE (conE 'PackageVersion)
+         (appE (varE 'V.fromList)
+               (listE (map (litE . IntegerL . fromIntegral)
+                           (V.toList n))))
 
 instance Show PackageVersion where
   show (PackageVersion v) =
@@ -108,3 +119,10 @@ fromCabalVersion :: Version -> PackageVersion
 fromCabalVersion (Version vs _) =
   let !v = V.fromList (map fromIntegral vs)
   in PackageVersion v
+
+-- | Make a package version.
+mkPackageVersion :: String -> Q Exp
+mkPackageVersion s =
+  case parsePackageVersionFromString s of
+    Nothing -> error ("Invalid package version: " ++ show s)
+    Just pn -> [|pn|]

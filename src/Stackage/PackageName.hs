@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -14,7 +15,8 @@ module Stackage.PackageName
   ,packageNameString
   ,packageNameText
   ,fromCabalPackageName
-  ,parsePackageNameFromFilePath)
+  ,parsePackageNameFromFilePath
+  ,mkPackageName)
   where
 
 import           Control.Applicative
@@ -32,6 +34,8 @@ import           Data.Text (Text)
 import qualified Data.Text.Encoding as T
 import qualified Distribution.Package as Cabal
 import           GHC.Generics
+import           Language.Haskell.TH
+import           Language.Haskell.TH.Syntax
 import           Path
 
 -- | A parse fail.
@@ -45,6 +49,11 @@ instance Exception PackageNameParseFail
 newtype PackageName =
   PackageName ByteString
   deriving (Eq,Ord,Typeable,Data,Generic,Hashable)
+
+instance Lift PackageName where
+  lift (PackageName n) =
+    appE (conE 'PackageName)
+         (stringE (S8.unpack n))
 
 instance Show PackageName where
   show (PackageName n) = S8.unpack n
@@ -67,6 +76,13 @@ packageNameParser =
                                                               isDigit c)))
                                       (appending (pured (satisfy (== '-')))
                                                  (pured (satisfy isLetter)))))))
+
+-- | Make a package name.
+mkPackageName :: String -> Q Exp
+mkPackageName s =
+  case parsePackageNameFromString s of
+    Nothing -> error ("Invalid package name: " ++ show s)
+    Just pn -> [|pn|]
 
 -- | Convenient way to parse a package name from a bytestring.
 parsePackageName :: MonadThrow m => ByteString -> m PackageName
