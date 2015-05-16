@@ -1,125 +1,315 @@
+{-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE ViewPatterns       #-}
 
--- | Fetching package archives.
+-- | Functionality for downloading packages securely for cabal's usage.
 
 module Stackage.Fetch
-  (fetchPackage
-  ,packageUnpacked)
-  where
+    ( download
+    , Settings
+    , defaultSettings
+    , setGetManager
+    , setPackageLocation
+    , defaultPackageLocation
+    , setIndexLocation
+    , defaultIndexLocation
+    ) where
 
-import           Codec.Archive.Tar
-import           Codec.Compression.GZip as GZip
-import           Control.Exception
-import           Control.Monad
-import           Control.Monad.Catch
-import           Control.Monad.IO.Class
-import           Control.Monad.Logger (logDebug,MonadLogger)
-import qualified Data.ByteString as S
-import qualified Data.ByteString.Lazy as L
-import           Data.Data
-import           Data.List
-import           Data.Maybe
-import qualified Data.Text as T
-import           Network.HTTP.Client
-import           Network.HTTP.Types.Status
-import           Path as FL
-import           Prelude hiding (FilePath)
-import           Stackage.PackageIndex
 import           Stackage.PackageName
 import           Stackage.PackageVersion
-import           System.Directory
-import           System.IO
-import           System.IO.Temp
 
--- | A fetching exception.
-data StackageFetchException =
-  FPPackageDownloadError PackageName
-                         (Response L.ByteString)
-  deriving (Show,Typeable)
+import qualified Codec.Archive.Tar as Tar
+import           Control.Applicative ((*>), (<$>), (<*>))
+import           Control.Arrow
+import           Control.Concurrent.Async (Concurrently (..))
+import           Control.Concurrent.Async (wait, withAsync)
+import           Control.Concurrent.STM   (atomically, newTVarIO, readTVar,
+                                           writeTVar)
+import           Control.Exception (Exception, throwIO)
+import           Control.Monad (join, unless, when)
+import           Crypto.Hash              (Context, Digest, SHA512,
+                                           digestToHexByteString, hashFinalize,
+                                           hashInit, hashUpdate)
+import           Data.Aeson               (FromJSON (..), decode, withObject,
+                                           (.!=), (.:?))
+import qualified Data.ByteString as S
+import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteString.Lazy as L
+import qualified Data.Foldable as F
+import           Data.Function (fix)
+import           Data.Map (Map)
+import qualified Data.Map as Map
+import           Data.Set (Set)
+import qualified Data.Set as Set
+import           Data.Text (Text)
+import qualified Data.Text as T
+import           Data.Text.Encoding (encodeUtf8)
+import           Data.Typeable (Typeable)
+import           Data.Word (Word64)
+import           Network.HTTP.Client      (Manager, brRead, checkStatus,
+                                           managerResponseTimeout, newManager,
+                                           parseUrl, responseBody,
+                                           responseStatus, withResponse)
+import           Network.HTTP.Client.TLS (tlsManagerSettings)
+import           Network.HTTP.Types (statusCode)
+import           System.Directory         (createDirectoryIfMissing,
+                                           doesFileExist,
+                                           getAppUserDataDirectory, renameFile)
+import           System.FilePath (takeDirectory, (<.>), (</>), takeExtension)
+import           System.IO                (IOMode (ReadMode, WriteMode), stdout,
+                                           withBinaryFile)
+
+-- | Settings used by 'download'.
+--
+-- Since 0.1.0.0
+data Settings = Settings
+    { _getManager     :: !(IO Manager)
+    , _cabalCommand   :: !FilePath
+    , _downloadPrefix :: !String
+    , _onDownload     :: !(String -> IO ())
+    , _onDownloadErr  :: !(String -> IO ())
+    , _connections    :: !Int
+    , _packageLocation :: !(IO (String -> String -> FilePath))
+    , _indexLocation :: !(IO FilePath)
+    }
+
+-- | Default value for 'Settings'.
+--
+-- Since 0.1.0.0
+defaultSettings :: Settings
+defaultSettings = Settings
+    { _getManager = newManager tlsManagerSettings
+        { managerResponseTimeout = Just 90000000
+        }
+    , _cabalCommand = "cabal"
+    , _downloadPrefix = "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
+    , _onDownload = \s -> S8.hPut stdout $ S8.pack $ concat
+        [ "Downloading "
+        , s
+        , "\n"
+        ]
+    , _onDownloadErr = \s -> S8.hPut stdout $ S8.pack $ concat
+        [ "Error downloading "
+        , s
+        , ", if this is a local package, this message can be ignored\n"
+        ]
+    , _connections = 8
+    , _packageLocation = defaultPackageLocation
+    , _indexLocation = defaultIndexLocation
+    }
+
+-- | Set how to get the connection manager
+--
+-- Default: @newManager tlsManagerSettings@
+--
+-- Since 0.1.1.0
+setGetManager :: IO Manager -> Settings -> Settings
+setGetManager x s = s { _getManager = x }
+
+data Package = Package
+    { packageHashes    :: Map Text Text
+    , packageLocations :: [Text]
+    , packageSize      :: Maybe Word64
+    }
+    deriving Show
+instance FromJSON Package where
+    parseJSON = withObject "Package" $ \o -> Package
+        <$> o .:? "package-hashes" .!= Map.empty
+        <*> o .:? "package-locations" .!= []
+        <*> o .:? "package-size"
+
+getPackageInfo :: FilePath -> Set (String, String) -> IO (Map (String, String) Package)
+getPackageInfo indexTar pkgs0 = withBinaryFile indexTar ReadMode $ \h -> do
+    lbs <- L.hGetContents h
+    loop pkgs0 Map.empty False $ Tar.read lbs
+  where
+    loop pkgs m sawJSON Tar.Done = do
+        when (not (Set.null pkgs) && sawJSON) $
+            putStrLn $ "Warning: packages not found in index: " ++ show (Set.toList pkgs)
+        return m
+    loop _ _m _ (Tar.Fail e) = throwIO $ Couldn'tReadIndexTarball indexTar e
+    loop pkgs m sawJSON (Tar.Next e es) =
+        case (getName $ Tar.entryPath e, Tar.entryContent e) of
+            (Just pair, Tar.NormalFile lbs _)
+                    | pair `Set.member` pkgs
+                    , Just p <- decode lbs ->
+                loop (Set.delete pair pkgs) (Map.insert pair p m) sawJSON' es
+            _ -> loop pkgs m sawJSON' es
+      where
+        sawJSON' = sawJSON || takeExtension (Tar.entryPath e) == ".json"
+
+    getName name =
+        case T.splitOn "/" $ T.pack name of
+            [pkg, ver, fp] | T.stripSuffix ".json" fp == Just pkg
+                -> Just (T.unpack pkg, T.unpack ver)
+            _ -> Nothing
+
+data StackageFetchException
+    = Couldn'tReadIndexTarball FilePath Tar.FormatError
+    | InvalidDownloadSize
+        { _idsUrl             :: String
+        , _idsExpected        :: Word64
+        , _idsTotalDownloaded :: Word64
+        }
+    | InvalidHash
+        { _ihUrl      :: String
+        , _ihExpected :: Text
+        , _ihActual   :: Digest SHA512
+        }
+    deriving (Show, Typeable)
 instance Exception StackageFetchException
 
--- | Fetch the package index.
--- Example usage: runStdoutLoggingT (fetchPackage $(mkAbsoluteDir "/home/chris/.stackage/pkg-index") (fromJust (parsePackageName "lens")) (fromJust (parseVersion "4.6.0.1")))
-fetchPackage :: (MonadMask m,MonadLogger m,MonadThrow m,MonadIO m)
-             => PackageIndex -> PackageName -> PackageVersion -> m (Path Abs Dir)
-fetchPackage (PackageIndex dir) name ver =
-  do unpacked <-
-       packageUnpacked (PackageIndex dir)
-                       name
-                       ver
-     if unpacked
-        then return pkgVerContentsDir
-        else do req <- parseUrl url
-                liftIO (putStrLn ((packageNameString name) ++
-                                  ": downloading " ++ packageVersionString ver))
-                resp <-
-                  liftIO (withManager defaultManagerSettings
-                                      (httpLbs req))
-                case responseStatus resp of
-                  Status 200 _ ->
-                    withSystemTempFile
-                      "pkg-index"
-                      (\fp h ->
-                         do indexCabalFile <-
-                              liftIO (S.readFile oldCabalFilePath)
-                            $logDebug (T.pack ("Decompressing " ++
-                                               (packageNameString name)))
-                            liftIO (L.hPutStr h (GZip.decompress (responseBody resp)))
-                            liftIO (hClose h)
-                            $logDebug (T.pack ("Extracting to " ++
-                                               FL.toFilePath pkgVerDir))
-                            liftIO (extract (FL.toFilePath pkgVerDir) fp)
-                            $logDebug (T.pack ("Updating cabal file " ++
-                                               newCabalFilePath))
-                            liftIO (S.writeFile newCabalFilePath indexCabalFile)
-                            return pkgVerContentsDir)
-                  _ ->
-                    liftIO (throwIO (FPPackageDownloadError name resp))
-  where newCabalFilePath =
-          FL.toFilePath
-            (pkgVerDir </>
-             (fromMaybe (error "Unable to make valid .cabal file name.")
-                        (parseRelFile
-                           (nameVer ++ "/" ++ packageNameString name ++ ".cabal"))))
-        oldCabalFilePath =
-          FL.toFilePath
-            (pkgVerDir </>
-             (fromMaybe (error "Unable to make valid .cabal file name.")
-                        (parseRelFile (packageNameString name ++ ".cabal"))))
-        url =
-          concat ["http://hackage.haskell.org/package/"
-                 ,nameVer
-                 ,"/"
-                 ,nameVer
-                 ,".tar.gz"] -- TODO: customize this.
-        nameVer =
-          packageNameString name ++ "-" ++ packageVersionString ver
-        pkgVerContentsDir :: Path Abs Dir
-        pkgVerContentsDir =
-          mkPkgVerContentsDir dir name ver
-        pkgVerDir :: Path Abs Dir
-        pkgVerDir = mkPkgVerDir dir name ver
+-- | Get the location that a package name/package version combination is stored
+-- on the filesystem.
+--
+-- @~/.cabal/packages/hackage.haskell.org/name/version/name-version.tar.gz@
+--
+-- Since 0.1.1.0
+defaultPackageLocation :: IO (String -> String -> FilePath)
+defaultPackageLocation = do
+    cabalDir <- getAppUserDataDirectory "cabal"
+    let packageDir = cabalDir </> "packages" </> "hackage.haskell.org"
+    return $ \name version ->
+             packageDir </>
+             name </>
+             version </>
+             concat [name, "-", version, ".tar.gz"]
 
--- | Has the package been unpacked already?
-packageUnpacked :: (MonadIO m)
-                => PackageIndex -> PackageName -> PackageVersion -> m Bool
-packageUnpacked (PackageIndex dir) name ver =
-  liftIO (doesDirectoryExist (FL.toFilePath (mkPkgVerContentsDir dir name ver)))
+-- | Set the location packages are stored to.
+--
+-- Default: 'defaultPackageLocation'
+--
+-- Since 0.1.1.0
+setPackageLocation :: IO (String -> String -> FilePath) -> Settings -> Settings
+setPackageLocation x s = s { _packageLocation = x }
 
--- | Make the directory for the package version (with a single .cabal file in it).
-mkPkgVerDir :: Path Abs Dir -> PackageName -> PackageVersion -> Path Abs Dir
-mkPkgVerDir dir name ver =
-  dir </>
-  fromMaybe (error "Unable to make valid path name for package-version.")
-            (parseRelDir
-               (packageNameString name ++ "/" ++ packageVersionString ver))
+-- | Set the location the 00-index.tar file is stored.
+--
+-- Default: 'defaultIndexLocation'
+--
+-- Since 0.1.1.0
+setIndexLocation :: IO FilePath -> Settings -> Settings
+setIndexLocation x s = s { _indexLocation = x }
 
--- | Make the directory for the package contents (with the .cabal and sources, etc).
-mkPkgVerContentsDir :: Path Abs Dir -> PackageName -> PackageVersion -> Path Abs Dir
-mkPkgVerContentsDir dir name ver =
-  mkPkgVerDir dir name ver </>
-  fromMaybe (error "Unable to make valid path name for package-version.")
-            (parseRelDir
-               (packageNameString name ++ "-" ++ packageVersionString ver))
+-- | Get the location that the 00-index.tar file is stored.
+--
+-- @~/.cabal/packages/hackage.haskell.org/00-index.tar@
+--
+-- Since 0.1.1.0
+defaultIndexLocation :: IO FilePath
+defaultIndexLocation = do
+    cabalDir <- getAppUserDataDirectory "cabal"
+    return $ cabalDir </> "packages" </> "hackage.haskell.org" </> "00-index.tar"
+
+-- | Download the given name,version pairs into the directory expected by cabal.
+--
+-- Since 0.1.0.0
+download :: (F.Foldable f,Functor f) => Settings -> f (PackageName, PackageVersion) -> IO ()
+download s (fmap (packageNameString *** packageVersionString) -> pkgs) = do
+    indexFP <- _indexLocation s
+    packageLocation <- _packageLocation s
+    withAsync (getPackageInfo indexFP $
+               Set.fromList $
+               F.toList pkgs) $ \a -> do
+        man <- _getManager s
+        parMapM_ (_connections s) (go packageLocation man (wait a)) pkgs
+  where
+    unlessM p f = do
+        p' <- p
+        unless p' f
+
+    go packageLocation man getPackageInfo' pair@(name, version) = do
+        unlessM (doesFileExist fp) $ do
+            _onDownload s pkg
+            packageInfo <- getPackageInfo'
+            let (msha512, url, msize) =
+                    case Map.lookup pair packageInfo of
+                        Nothing -> (Nothing, defUrl, Nothing)
+                        Just p ->
+                            ( Map.lookup "SHA512" $ packageHashes p
+                            , case reverse $ packageLocations p of
+                                [] -> defUrl
+                                x:_ -> T.unpack x
+                            , packageSize p
+                            )
+            createDirectoryIfMissing True $ takeDirectory fp
+            req <- parseUrl url
+            let req' = req
+                    { checkStatus = \s' x y ->
+                        if statusCode s' `elem` [401, 403]
+                            -- See: https://github.com/fpco/stackage-install/issues/2
+                            then Nothing
+                            else checkStatus req s' x y
+                    }
+            withResponse req' man $ \res -> if statusCode (responseStatus res) == 200
+                then do
+                    let tmp = fp <.> "tmp"
+                    withBinaryFile tmp WriteMode $ \h -> do
+                        let loop total ctx = do
+                                bs <- brRead $ responseBody res
+                                if S.null bs
+                                    then
+                                        case msize of
+                                            Nothing -> return ()
+                                            Just expected
+                                                | expected /= total ->
+                                                    throwIO InvalidDownloadSize
+                                                        { _idsUrl = url
+                                                        , _idsExpected = expected
+                                                        , _idsTotalDownloaded = total
+                                                        }
+                                                | otherwise -> validHash url msha512 ctx
+                                    else do
+                                        S.hPut h bs
+                                        let total' = total + fromIntegral (S.length bs)
+                                        case msize of
+                                            Just expected | expected < total' ->
+                                                throwIO InvalidDownloadSize
+                                                    { _idsUrl = url
+                                                    , _idsExpected = expected
+                                                    , _idsTotalDownloaded = total'
+                                                    }
+                                            _ -> loop total' $! hashUpdate ctx bs
+                        loop 0 hashInit
+                    renameFile tmp fp
+                else _onDownloadErr s pkg
+      where
+        pkg = concat [name, "-", version]
+        targz = pkg ++ ".tar.gz"
+        defUrl = _downloadPrefix s ++ targz
+        fp = packageLocation name version
+
+validHash :: String -> Maybe Text -> Context SHA512 -> IO ()
+validHash _ Nothing _ = return ()
+validHash url (Just sha512) ctx
+    | encodeUtf8 sha512 == digestToHexByteString dig = return ()
+    | otherwise = throwIO InvalidHash
+        { _ihUrl = url
+        , _ihExpected = sha512
+        , _ihActual = dig
+        }
+  where
+    dig = hashFinalize ctx
+
+parMapM_ :: F.Foldable f
+         => Int
+         -> (a -> IO ())
+         -> f a
+         -> IO ()
+parMapM_ (max 1 -> 1) f xs = F.mapM_ f xs
+parMapM_ cnt f xs0 = do
+    var <- newTVarIO $ F.toList xs0
+    let worker :: IO ()
+        worker = fix $ \loop -> join $ atomically $ do
+            xs <- readTVar var
+            case xs of
+                [] -> return $ return ()
+                x:xs' -> do
+                    writeTVar var xs'
+                    return $ do
+                        f x
+                        loop
+        workers 1 = Concurrently worker
+        workers i = Concurrently worker *> workers (i - 1)
+    runConcurrently $ workers cnt
