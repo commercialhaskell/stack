@@ -1,5 +1,6 @@
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -117,9 +118,9 @@ build :: BuildConfig -> IO ()
 build bconfig =
   do cfg <- readConfig
      pinfos <-
-       runNoLoggingT (getPackageInfos (bconfigFinalAction bconfig)
-                              (Just bconfig)
-                              cfg)
+       runNoLoggingT (runResourceT (getPackageInfos (bconfigFinalAction bconfig)
+                                    (Just bconfig)
+                                    cfg))
      pkgIds <-
        getPackageIds (map packageName (S.toList pinfos))
      pwd <- getCurrentDirectory >>= parseAbsDir
@@ -182,7 +183,7 @@ clean :: IO ()
 clean =
   do cfg <- readConfig
      pinfos <-
-       runNoLoggingT (getPackageInfos DoNothing Nothing cfg)
+       runNoLoggingT (runResourceT (getPackageInfos DoNothing Nothing cfg))
      forM_ (S.toList pinfos)
            (\pinfo ->
               do deleteGenFile (packageDir pinfo)
@@ -728,7 +729,7 @@ newConfig gconfig bconfig pinfo =
 -- Package info/dependencies/etc
 
 -- | Get packages' information.
-getPackageInfos :: (MonadIO m,MonadLogger m,MonadThrow m,MonadMask m)
+getPackageInfos :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m,MonadResource m,MonadMask m)
                 => FinalAction -> Maybe BuildConfig -> Config -> m (Set Package)
 getPackageInfos finalAction mbconfig = go True
   where go retry cfg =
@@ -835,7 +836,7 @@ validateSuggestion globalPackages okPkgVers =
 
 -- | Check that a package is actually available in the general (Hackage) package
 -- index.
-checkPackageInIndex :: MonadIO m
+checkPackageInIndex :: (MonadIO m, MonadLogger m,MonadThrow m)
                     => PackageIndex
                     -> (PackageName,(VersionRange,t))
                     -> m (Either PackageName (PackageName,VersionRange))
