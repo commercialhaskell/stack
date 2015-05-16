@@ -31,6 +31,7 @@ import           Data.List
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Maybe
+import           Data.Streaming.Process
 
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -41,8 +42,8 @@ import           System.IO hiding (char8)
 data GhcPkgException
   = GetAllPackagesFail
   | GetUserDbPathFail
-  | FindPackageIdFail
-  deriving (Typeable,Data,Show)
+  | FindPackageIdFail PackageName ProcessExitedUnsuccessfully
+  deriving (Typeable,Show)
 instance Exception GhcPkgException
 
 -- | Get all available packages.
@@ -100,7 +101,7 @@ findPackageId name =
        tryProcessStdout "ghc-pkg"
                         ["describe",packageNameString name]
      case result of
-       Left{} -> throw FindPackageIdFail
+       Left err -> return Nothing
        Right lbs ->
          do let mpid =
                   fmap T.unpack

@@ -5,20 +5,22 @@
 -- | Package identifier (name-version).
 
 module Stackage.PackageIdentifier
-  (PackageIdentifier
+  (PackageIdentifier(..)
   ,toTuple
   ,fromTuple
-  ,packageIdentifierParser)
+  ,packageIdentifierVersion
+  ,packageIdentifierName
+  ,packageIdentifierParser
+  ,packageIdentifierString)
   where
 
+import Data.Attoparsec.ByteString.Char8
 import Data.Data
+import Data.Hashable
 import GHC.Generics
+import Prelude hiding (FilePath)
 import Stackage.PackageName
 import Stackage.PackageVersion
-
-import Data.Attoparsec.ByteString.Char8
-import Data.Hashable
-import Prelude hiding (FilePath)
 
 -- | A pkg-ver combination.
 data PackageIdentifier =
@@ -29,7 +31,7 @@ data PackageIdentifier =
 instance Hashable PackageIdentifier
 
 instance Show PackageIdentifier where
-  show (PackageIdentifier n v) = show n ++ "-" ++ show v
+  show = show . packageIdentifierString
 
 -- | Convert from a package identifier to a tuple.
 toTuple :: PackageIdentifier -> (PackageName,PackageVersion)
@@ -39,6 +41,14 @@ toTuple (PackageIdentifier n v) = (n,v)
 fromTuple :: (PackageName,PackageVersion) -> PackageIdentifier
 fromTuple (n,v) = PackageIdentifier n v
 
+-- | Get the version part of the identifier.
+packageIdentifierVersion :: PackageIdentifier -> PackageVersion
+packageIdentifierVersion (PackageIdentifier _ ver) = ver
+
+-- | Get the name part of the identifier.
+packageIdentifierName :: PackageIdentifier -> PackageName
+packageIdentifierName (PackageIdentifier name _) = name
+
 -- | A parser for a package-version pair.
 packageIdentifierParser :: Parser PackageIdentifier
 packageIdentifierParser =
@@ -46,3 +56,7 @@ packageIdentifierParser =
      char8 '-'
      version <- packageVersionParser
      return (PackageIdentifier name version)
+
+-- | Get a string representation of the package identifier; name-ver.
+packageIdentifierString :: PackageIdentifier -> String
+packageIdentifierString (PackageIdentifier n v) = show n ++ "-" ++ show v

@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings  #-}
@@ -6,8 +7,7 @@
 -- | Functionality for downloading packages securely for cabal's usage.
 
 module Stackage.Fetch
-    ( fetchPackage
-    , fetchPackages
+    ( fetchPackages
     , Settings
     , defaultSettings
     , setGetManager
@@ -15,14 +15,17 @@ module Stackage.Fetch
     , defaultPackageLocation
     , setIndexLocation
     , defaultIndexLocation
+    , packageLocationGetter
     ) where
 
+import           Control.Monad.IO.Class
+import           Stackage.PackageIdentifier
 import           Stackage.PackageName
 import           Stackage.PackageVersion
 
 import qualified Codec.Archive.Tar as Tar
 import           Control.Applicative ((*>), (<$>), (<*>))
-import           Control.Arrow
+
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.Async (wait, withAsync)
 import           Control.Concurrent.STM   (atomically, newTVarIO, readTVar,
@@ -71,7 +74,7 @@ data Settings = Settings
     , _onDownload     :: !(String -> IO ())
     , _onDownloadErr  :: !(String -> IO ())
     , _connections    :: !Int
-    , _packageLocation :: !(IO (String -> String -> FilePath))
+    , _packageLocation :: !(forall m. MonadIO m => m (PackageIdentifier -> FilePath))
     , _indexLocation :: !(IO FilePath)
     }
 
@@ -120,7 +123,7 @@ instance FromJSON Package where
         <*> o .:? "package-locations" .!= []
         <*> o .:? "package-size"
 
-getPackageInfo :: FilePath -> Set (String, String) -> IO (Map (String, String) Package)
+getPackageInfo :: FilePath -> Set PackageIdentifier -> IO (Map PackageIdentifier Package)
 getPackageInfo indexTar pkgs0 = withBinaryFile indexTar ReadMode $ \h -> do
     lbs <- L.hGetContents h
     loop pkgs0 Map.empty False $ Tar.read lbs
@@ -142,8 +145,11 @@ getPackageInfo indexTar pkgs0 = withBinaryFile indexTar ReadMode $ \h -> do
 
     getName name =
         case T.splitOn "/" $ T.pack name of
-            [pkg, ver, fp] | T.stripSuffix ".json" fp == Just pkg
-                -> Just (T.unpack pkg, T.unpack ver)
+            [pkg, ver, fp]
+              | T.stripSuffix ".json" fp == Just pkg ->
+                do name <- parsePackageNameFromString (T.unpack pkg)
+                   ver <- parsePackageVersionFromString (T.unpack ver)
+                   return (PackageIdentifier name ver)
             _ -> Nothing
 
 data StackageFetchException
@@ -167,22 +173,22 @@ instance Exception StackageFetchException
 -- @~/.cabal/packages/hackage.haskell.org/name/version/name-version.tar.gz@
 --
 -- Since 0.1.1.0
-defaultPackageLocation :: IO (String -> String -> FilePath)
-defaultPackageLocation = do
-    cabalDir <- getAppUserDataDirectory "cabal"
-    let packageDir = cabalDir </> "packages" </> "hackage.haskell.org"
-    return $ \name version ->
-             packageDir </>
-             name </>
-             version </>
-             concat [name, "-", version, ".tar.gz"]
+defaultPackageLocation :: MonadIO m => m (PackageIdentifier -> FilePath)
+defaultPackageLocation =
+  liftIO (do cabalDir <-
+               getAppUserDataDirectory "cabal"
+             let packageDir = cabalDir </> "packages" </> "hackage.haskell.org"
+             return $
+               \(PackageIdentifier (packageNameString -> name) (packageVersionString -> version)) ->
+                 packageDir </> name </> version </>
+                 concat [name,"-",version,".tar.gz"])
 
 -- | Set the location packages are stored to.
 --
 -- Default: 'defaultPackageLocation'
 --
 -- Since 0.1.1.0
-setPackageLocation :: IO (String -> String -> FilePath) -> Settings -> Settings
+setPackageLocation :: (forall m. MonadIO m => m (PackageIdentifier -> FilePath)) -> Settings -> Settings
 setPackageLocation x s = s { _packageLocation = x }
 
 -- | Set the location the 00-index.tar file is stored.
@@ -203,33 +209,31 @@ defaultIndexLocation = do
     cabalDir <- getAppUserDataDirectory "cabal"
     return $ cabalDir </> "packages" </> "hackage.haskell.org" </> "00-index.tar"
 
--- | Download the given package into the directory expected by cabal.
-fetchPackage :: Settings -> PackageName -> PackageVersion -> IO ()
-fetchPackage s p v = fetchPackages s [(p,v)]
-
 -- | Download the given name,version pairs into the directory expected by cabal.
 --
 -- Since 0.1.0.0
-fetchPackages :: (F.Foldable f,Functor f) => Settings -> f (PackageName, PackageVersion) -> IO ()
-fetchPackages s (fmap (packageNameString *** packageVersionString) -> pkgs) = do
-    indexFP <- _indexLocation s
-    packageLocation <- _packageLocation s
-    withAsync (getPackageInfo indexFP $
-               Set.fromList $
-               F.toList pkgs) $ \a -> do
-        man <- _getManager s
-        parMapM_ (_connections s) (go packageLocation man (wait a)) pkgs
+fetchPackages :: (F.Foldable f,Functor f,MonadIO m)
+              => Settings -> f PackageIdentifier -> m ()
+fetchPackages s pkgs = liftIO (do
+     indexFP <- _indexLocation s
+     packageLocation <- _packageLocation s
+     withAsync (getPackageInfo indexFP $
+                Set.fromList $
+                F.toList pkgs) $ \a -> do
+         man <- _getManager s
+         parMapM_ (_connections s) (go packageLocation man (wait a)) pkgs)
   where
     unlessM p f = do
         p' <- p
         unless p' f
 
-    go packageLocation man getPackageInfo' pair@(name, version) = do
+    go :: (PackageIdentifier -> FilePath) -> Manager -> IO (Map PackageIdentifier Package) -> PackageIdentifier -> IO ()
+    go packageLocation man getPackageInfo' ident = do
         unlessM (doesFileExist fp) $ do
             _onDownload s pkg
             packageInfo <- getPackageInfo'
             let (msha512, url, msize) =
-                    case Map.lookup pair packageInfo of
+                    case Map.lookup ident packageInfo of
                         Nothing -> (Nothing, defUrl, Nothing)
                         Just p ->
                             ( Map.lookup "SHA512" $ packageHashes p
@@ -280,10 +284,10 @@ fetchPackages s (fmap (packageNameString *** packageVersionString) -> pkgs) = do
                     renameFile tmp fp
                 else _onDownloadErr s pkg
       where
-        pkg = concat [name, "-", version]
+        pkg = packageIdentifierString ident
         targz = pkg ++ ".tar.gz"
         defUrl = _downloadPrefix s ++ targz
-        fp = packageLocation name version
+        fp = packageLocation ident
 
 validHash :: String -> Maybe Text -> Context SHA512 -> IO ()
 validHash _ Nothing _ = return ()
@@ -318,3 +322,7 @@ parMapM_ cnt f xs0 = do
         workers 1 = Concurrently worker
         workers i = Concurrently worker *> workers (i - 1)
     runConcurrently $ workers cnt
+
+packageLocationGetter :: Settings
+                      -> (forall m. MonadIO m => m (PackageIdentifier -> FilePath))
+packageLocationGetter = _packageLocation

@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -19,18 +21,22 @@ module Stackage.Build
   ,getPackageInfos)
   where
 
+import           Codec.Archive.Tar
+import           Codec.Compression.GZip as GZip
 import           Control.Arrow
+import           Control.Concurrent.MVar
 import           Control.Exception
 import           Control.Monad
 import           Control.Monad.Catch (MonadMask)
-import           Control.Monad.Logger (runNoLoggingT,MonadLogger)
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Writer
 import           Data.Aeson
-import qualified Data.ByteString as S (readFile)
+import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
-import           Data.Conduit (($$),($=))
+import           Data.Conduit (($$),($=),ConduitM)
 import           Data.Conduit.Binary (sinkIOHandle,sourceHandle)
 import qualified Data.Conduit.List as CL
 import           Data.Default
@@ -48,7 +54,7 @@ import           Data.Streaming.Process
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Development.Shake hiding (doesFileExist,doesDirectoryExist,getDirectoryContents)
-import           Distribution.Package hiding (packageName,packageVersion,Package,PackageName)
+import           Distribution.Package hiding (packageName,packageVersion,Package,PackageName,PackageIdentifier)
 import           Distribution.Version
 import           Path as FL
 import           Path.Find
@@ -57,18 +63,21 @@ import           Stackage.Build.Config
 import           Stackage.Build.Defaults
 import           Stackage.Build.Doc
 import           Stackage.Build.Types
-import           Stackage.Fetch
+import           Stackage.Fetch as Fetch
 import           Stackage.GhcPkg
 import           Stackage.GhcPkgId
 import           Stackage.Package
-import           Stackage.PackageIndex
+import           Stackage.PackageIdentifier
+import           Stackage.PackageIndex.Read
+import           Stackage.PackageIndex.Update
 import           Stackage.PackageName
 import           Stackage.PackageVersion
 import           Stackage.Resolve
 import           System.Directory hiding (findFiles)
 import           System.Environment
 import qualified System.FilePath as FilePath
-import           System.IO (openFile,IOMode(..),writeFile)
+import           System.IO
+import           System.IO.Temp
 import           System.Posix.Files (createSymbolicLink,removeLink)
 
 --------------------------------------------------------------------------------
@@ -127,6 +136,7 @@ build bconfig =
      docLoc <- getUserDocLoc
      installResource <-
        newResourceIO "cabal install" 1
+     cfgVar <- newMVar ConfigLock
      plans <-
        forM (S.toList pinfos)
             (\pinfo ->
@@ -141,6 +151,7 @@ build bconfig =
                                       (packageDir pinfo)
                                       wantedTarget
                                       pinfo
+                                      cfgVar
                   return (makePlan pkgIds
                                    wantedTarget
                                    bconfig
@@ -148,7 +159,8 @@ build bconfig =
                                    pinfos
                                    pinfo
                                    installResource
-                                   docLoc))
+                                   docLoc
+                                   cfgVar))
      if bconfigDryrun bconfig
         then dryRunPrint pinfos
         else withArgs []
@@ -219,12 +231,13 @@ makePlan :: Map PackageName GhcPkgId
          -> Package
          -> Resource
          -> Path Abs Dir
+         -> MVar ConfigLock
          -> Rules ()
-makePlan pkgIds wanted bconfig gconfig pinfos pinfo installResource docLoc =
+makePlan pkgIds wanted bconfig gconfig pinfos pinfo installResource docLoc cfgVar =
   do when wanted (want [target])
      target %>
        \_ ->
-         do needDependencies pkgIds bconfig pinfos pinfo
+         do needDependencies pkgIds bconfig pinfos pinfo cfgVar
             needTools pinfo
             needSourceFiles
             removeAfterwards <- liftIO (ensureSetupHs dir)
@@ -264,8 +277,9 @@ needDependencies :: Map PackageName GhcPkgId
                  -> BuildConfig
                  -> Set Package
                  -> Package
+                 -> MVar ConfigLock
                  -> Action ()
-needDependencies pkgIds bconfig pinfos pinfo =
+needDependencies pkgIds bconfig pinfos pinfo cfgVar =
   do deps <- mapM (\pinfo' ->
                      let dir' = packageDir pinfo'
                          genFile = builtFileFromDir dir'
@@ -274,7 +288,8 @@ needDependencies pkgIds bconfig pinfos pinfo =
                                                            bconfig
                                                            dir'
                                                            False
-                                                           pinfo'))
+                                                           pinfo'
+                                                           cfgVar))
                            return (FL.toFilePath genFile))
                   (mapMaybe (\name ->
                                find ((== name) . packageName)
@@ -669,43 +684,46 @@ readGenConfigFile :: Map PackageName GhcPkgId
                   -> Path Abs Dir
                   -> Bool
                   -> Package
+                  -> MVar ConfigLock
                   -> IO GenConfig
-readGenConfigFile pkgIds name bconfig dir wanted pinfo =
-  do bytes <-
-       catch (fmap Just (S.readFile (FL.toFilePath fp)))
-             (\(_ :: IOException) ->
-                do {-putStrLn ("(No config file for " ++ printPName name ++ ": One will be created.)")-}
-                   return Nothing)
-     case bytes >>= decode . L.fromStrict of
-       Just gconfig ->
-         if genFileChanged pkgIds bconfig gconfig name pinfo
-            then
-                 -- If the build config has changed such that the gen
-                 -- config needs to be regenerated...
-                 do let invalidated =
-                          genFileInvalidated pkgIds bconfig gconfig name pinfo
-                    when (invalidated || wanted)
-                         (deleteGenFile dir)
+readGenConfigFile pkgIds name bconfig dir wanted pinfo cfgVar = withMVar cfgVar (const go)
+  where go =
+          do bytes <-
+               catch (fmap Just
+                           (S.readFile (FL.toFilePath fp)))
+                     (\(_ :: IOException) ->
+                        return Nothing)
+             case bytes >>= decode . L.fromStrict of
+               Just gconfig ->
+                 if genFileChanged pkgIds bconfig gconfig name pinfo
+                    then
+                         -- If the build config has changed such that the gen
+                         -- config needs to be regenerated...
+                         do let invalidated =
+                                  genFileInvalidated pkgIds bconfig gconfig name pinfo
+                            when (invalidated || wanted)
+                                 (deleteGenFile dir)
+                            let gconfig' =
+                                  (newConfig gconfig bconfig pinfo) {gconfigForceRecomp = invalidated}
+                            -- When a file has been invalidated it means the
+                            -- configuration has changed such that things need
+                            -- to be recompiled, hence the above setting of force
+                            -- recomp.
+                            writeGenConfigFile dir gconfig'
+                            return gconfig'
+                    else return gconfig -- No change, the generated config is consistent with the build config.
+               Nothing ->
+                 do maybe (return ())
+                          (const (putStrLn ("Warning: Couldn't parse config file for " ++
+                                            packageNameString name ++
+                                            ", migrating to latest configuration format. This will force a rebuild.")))
+                          bytes
+                    deleteGenFile dir
                     let gconfig' =
-                          (newConfig gconfig bconfig pinfo) {gconfigForceRecomp = invalidated}
-                    -- When a file has been invalidated it means the
-                    -- configuration has changed such that things need
-                    -- to be recompiled, hence the above setting of force
-                    -- recomp.
+                          newConfig def bconfig pinfo
                     writeGenConfigFile dir gconfig'
-                    return gconfig'
-            else return gconfig -- No change, the generated config is consistent with the build config.
-       Nothing ->
-         do maybe (return ())
-                  (const (putStrLn ("Warning: Couldn't parse config file for " ++
-                                    packageNameString name ++
-                                    ", migrating to latest configuration format. This will force a rebuild.")))
-                  bytes
-            deleteGenFile dir
-            let gconfig' = newConfig def bconfig pinfo
-            writeGenConfigFile dir gconfig'
-            return gconfig' -- Probably doesn't exist or is out of date (not parseable.)
-  where fp = builtConfigFileFromDir dir
+                    return gconfig' -- Probably doesn't exist or is out of date (not parseable.)
+        fp = builtConfigFileFromDir dir
 
 -- | Update a gen configuration using the build configuration.
 newConfig :: GenConfig -- ^ Build configuration.
@@ -732,7 +750,8 @@ newConfig gconfig bconfig pinfo =
 getPackageInfos :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m,MonadResource m,MonadMask m)
                 => FinalAction -> Maybe BuildConfig -> Config -> m (Set Package)
 getPackageInfos finalAction mbconfig = go True
-  where go retry cfg =
+  where indexSettings = Fetch.defaultSettings
+        go retry cfg =
           do globalPackages <- getAllPackages
              {-liftIO (putStrLn ("All global packages: " ++ show globalPackages))-}
              (infos,errs) <-
@@ -767,19 +786,19 @@ getPackageInfos finalAction mbconfig = go True
                       [] -> do {-liftIO (putStrLn "No validated packages!")-}
                                return infos
                       toFetch ->
-                        do {-liftIO (putStrLn ("Fetching: " ++ show toFetch))-}
-                           newPackageDirs <-
-                             forM toFetch
-                                  (\(PackageSuggestion name ver _flags) ->
-                                     runNoLoggingT (fetchPackage index name ver))
+                        do newPkgDirs <- fetchAndUnpackPackages
+                                           indexSettings
+                                           (map (\(PackageSuggestion name ver _flags) ->
+                                               fromTuple (name,ver))
+                                                toFetch)
+                           getPkgLoc <- packageLocationGetter indexSettings
                            -- Here is where we inject third-party
                            -- dependencies and their flags and re-run
                            -- this function.
-                           {-liftIO (putStrLn "Looping...")-}
                            go
                              False
                              cfg {configPackages = configPackages cfg <>
-                                                   S.fromList newPackageDirs
+                                                   S.fromList newPkgDirs
                                  ,configPackageFlags =
                                     configPackageFlags cfg <>
                                     mconcat (map (\s ->
@@ -947,6 +966,77 @@ composeFlags pname pflags gflags = collapse pflags <> gflags
         collapse = fromMaybe mempty . M.lookup pname
 
 --------------------------------------------------------------------------------
+-- Package fetching
+
+-- | Fetch and unpack the package.
+fetchAndUnpackPackages :: (MonadIO m,MonadThrow m,MonadLogger m,MonadMask m)
+                       => Settings
+                       -> [PackageIdentifier]
+                       -> m [Path Abs Dir]
+fetchAndUnpackPackages settings pkgs =
+  do getPkgLoc <- packageLocationGetter indexSettings
+     fetchPackages indexSettings pkgs
+     locs <-
+       mapM (\ident ->
+               liftM (ident,)
+                     (parseAbsFile (getPkgLoc ident)))
+            pkgs
+     descs <- readPackageDescs pkgs
+     forM locs
+          (\(ident@(PackageIdentifier name version),tarGzPath) ->
+             case M.lookup name descs of
+               Nothing ->
+                 error "TODO: Throw error about package not existing in index."
+               Just latestCabalFileContent ->
+                 unpackAndUpdateTarball ident tarGzPath latestCabalFileContent)
+  where indexSettings = Fetch.defaultSettings
+
+-- | Read package descriptions.
+readPackageDescs :: MonadIO m
+                 => [PackageIdentifier] -> m (Map PackageName L.ByteString)
+readPackageDescs pkgs =
+  liftM M.fromList
+        (liftIO (runResourceT
+                   (sourcePackageIndex pkgIndexFile $=
+                    CL.filter (\ucf ->
+                                 elem (PackageIdentifier (ucfName ucf)
+                                                         (ucfVersion ucf))
+                                      pkgs) $=
+                    CL.isolate (length pkgs) $=
+                    CL.map (\unparsed ->
+                              (ucfName unparsed,ucfLbs unparsed)) $$
+                    CL.consume)))
+
+-- | Unpack and update the package tarball.
+unpackAndUpdateTarball :: (MonadIO m,MonadLogger m,MonadMask m)
+                       => PackageIdentifier
+                       -> Path Abs File
+                       -> L.ByteString
+                       -> m (Path Abs Dir)
+unpackAndUpdateTarball ident tarGzPath latestCabalFileContent =
+  do pkgVerDir <-
+       liftM (pkgUnpackDir </>) (parseRelDir (packageIdentifierString ident))
+     newCabalFilePath <-
+       liftM (pkgVerDir </>)
+             (parseRelFile (packageNameString (packageIdentifierName ident) ++ ".cabal"))
+     withSystemTempFile
+       "pkg-index"
+       (\fp h ->
+          do $logDebug (T.pack ("Decompressing " ++
+                                (packageIdentifierString ident)))
+             targzContent <-
+               liftIO (L.readFile (toFilePath tarGzPath))
+             liftIO (L.hPutStr h (GZip.decompress targzContent))
+             liftIO (hClose h)
+             $logDebug (T.pack ("Extracting to " ++ FL.toFilePath pkgUnpackDir))
+             liftIO (extract (FL.toFilePath pkgUnpackDir) fp)
+             $logDebug (T.pack ("Updating cabal file " ++
+                                toFilePath newCabalFilePath))
+             liftIO (L.writeFile (toFilePath newCabalFilePath)
+                                 latestCabalFileContent)
+             return pkgVerDir)
+
+--------------------------------------------------------------------------------
 -- Paths
 
 -- | Path to .shake files.
@@ -965,3 +1055,13 @@ configDir cfg =
 -- | Returns true for paths whose last directory component begins with ".".
 isHiddenDir :: Path b Dir -> Bool
 isHiddenDir = isPrefixOf "." . toFilePath . dirname
+
+--------------------------------------------------------------------------------
+-- Debugging facilities
+
+doUpdate =
+  runResourceT (runStdoutLoggingT (loadPkgIndex pkgIndexDir) :: ResourceT IO PackageIndex)
+
+pkgUnpackDir = $(mkAbsDir "/home/chris/.stackage/unpacked")
+pkgIndexDir = $(mkAbsDir "/home/chris/.stackage/package-index")
+pkgIndexFile = pkgIndexDir </> $(mkRelFile "00-index.tar")

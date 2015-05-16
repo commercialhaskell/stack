@@ -9,50 +9,48 @@
 
 -- | Package index handling.
 
-module Stackage.PackageIndex
+module Stackage.PackageIndex.Update
        (PackageIndex(..), getPkgIndex, loadPkgIndex, updateIndex,
         getPkgVersions)
        where
 
 import qualified Codec.Archive.Tar as Tar
-import Control.Exception (Exception)
-import Control.Monad (unless, when)
-import Control.Monad.Catch (MonadThrow, throwM)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Logger
+import           Control.Exception (Exception)
+import           Control.Monad (unless, when)
+import           Control.Monad.Catch (MonadThrow, throwM)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Control.Monad.Logger
        (MonadLogger, logWarn, logInfo, logDebug)
-import Control.Monad.Trans.Control (MonadBaseControl)
-import Control.Monad.Trans.Resource (MonadResource)
+import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Control.Monad.Trans.Resource (MonadResource)
 import qualified Data.ByteString.Lazy as L
-import Data.Conduit (($$+-),($$),($=))
-import Data.Conduit.Binary (sourceLbs, sourceFile, sinkFile)
+import           Data.Conduit (($$+-),($$),($=))
+import           Data.Conduit.Binary (sourceLbs, sourceFile, sinkFile)
 import qualified Data.Conduit.Binary as C
-import Data.Conduit.Zlib (ungzip)
-import Data.Foldable (forM_)
-import Data.Maybe (isJust)
-import Data.Monoid ((<>))
-import Data.Set (Set)
+import           Data.Conduit.Zlib (ungzip)
+import           Data.Foldable (forM_)
+import           Data.Maybe (isJust)
+import           Data.Monoid ((<>))
+import           Data.Set (Set)
 import qualified Data.Set as Set
-import Data.String (IsString(fromString))
+import           Data.String (IsString(fromString))
 import qualified Data.Text as T
-import Data.Typeable (Typeable)
-import Network.HTTP.Conduit
+import           Data.Typeable (Typeable)
+import           Network.HTTP.Conduit
        (Request(checkStatus, requestHeaders),
         Response(responseBody, responseHeaders, responseStatus), parseUrl,
         withManager, http)
-import Network.HTTP.Types (status200)
-import Path
+import           Network.HTTP.Types (status200)
+import           Path
        (Path, Abs, Dir, toFilePath, parseAbsDir, parseAbsFile, mkRelFile,
         mkRelDir, (</>))
-import Stackage.IO (tryIO)
-import Stackage.PackageName (PackageName, packageNameString)
-import Stackage.PackageVersion
+import           Stackage.IO (tryIO)
+import           Stackage.PackageName (PackageName, packageNameString)
+import           Stackage.PackageVersion
        (PackageVersion, parsePackageVersionFromString)
-import Stackage.Process (runIn)
-import System.Directory
-       (removeFile, renameFile, getAppUserDataDirectory, findExecutable,
-        doesFileExist, doesDirectoryExist)
-import System.IO (IOMode(ReadMode), withBinaryFile)
+import           Stackage.Process (runIn)
+import           System.Directory
+import           System.IO (IOMode(ReadMode), withBinaryFile)
 
 data PackageIndexException =
   Couldn'tReadIndexTarball FilePath
@@ -99,7 +97,8 @@ updateIndex idx =
 updateIndexGit :: (MonadIO m,MonadLogger m,MonadThrow m)
                => PackageIndex -> m ()
 updateIndexGit (PackageIndex idxPath) =
-  do path <- liftIO (findExecutable "git")
+  do liftIO (createDirectoryIfMissing True (toFilePath idxPath))
+     path <- liftIO (findExecutable "git")
      case path of
        Nothing ->
          error "Please install git and provide the executable on your PATH"
@@ -114,7 +113,7 @@ updateIndexGit (PackageIndex idxPath) =
                   ,(toFilePath repoName)
                   ,"--depth"
                   ,"1"
-                  ,"-b"
+                  ,"-b" --
                   ,"display"]
             sDir <-
               liftIO (parseAbsDir =<<

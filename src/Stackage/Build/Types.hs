@@ -366,3 +366,5 @@ data Dependencies =
 
 -- | Used for mutex locking on the install step. Beats magic ().
 data InstallLock = InstallLock
+
+data ConfigLock = ConfigLock
