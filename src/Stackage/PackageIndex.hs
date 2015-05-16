@@ -15,7 +15,7 @@ module Stackage.PackageIndex
        where
 
 import qualified Codec.Archive.Tar as Tar
-import Control.Exception (Exception, IOException, try)
+import Control.Exception (Exception)
 import Control.Monad (unless, when)
 import Control.Monad.Catch (MonadThrow, throwM)
 import Control.Monad.IO.Class (MonadIO, liftIO)
