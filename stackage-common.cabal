@@ -48,7 +48,6 @@ library
                    , conduit >= 1.2.4
                    , conduit-combinators >= 0.3.0.6
                    , conduit-extra >= 1.1.7.1
-                   , conduit-extra >= 1.1.7.1
                    , containers >= 0.5.5.1
                    , cryptohash >= 0.11.6
                    , data-default >= 0.5.3
@@ -83,7 +82,6 @@ library
                    , void >= 0.7
                    , yaml >= 0.8.10.1
                    , zlib >= 0.5.4.2
-                   , zlib-conduit
 
 executable stackage-exec
   hs-source-dirs:      main
