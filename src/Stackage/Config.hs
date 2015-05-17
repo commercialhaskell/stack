@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -18,14 +19,30 @@
 -- database from there, etc. And if there's nothing, we should
 -- probably default to behaving like cabal, possibly with spitting out
 -- a warning that "you should run `stk init` to make things better".
-module Stackage.Config (
-    Config(..)
+module Stackage.Config
+  ( Config(..)
   , configInDocker
   , Settings(..)
   , Docker(..)
   , Mount(..)
   , getConfig
+  , getDocker
   , NotYetImplemented(..)
+  , dockerRepoOwnerArgName
+  , dockerRepoArgName
+  , dockerRepoSuffixArgName
+  , dockerImageTagArgName
+  , dockerImageArgName
+  , dockerRegistryLoginArgName
+  , dockerRegistryUsernameArgName
+  , dockerRegistryPasswordArgName
+  , dockerAutoPullArgName
+  , dockerDetachArgName
+  , dockerPersistArgName
+  , dockerContainerNameArgName
+  , dockerRunArgsArgName
+  , dockerMountArgName
+  , dockerPassHostArgName
   ) where
 
 import           Control.Applicative
@@ -52,6 +69,7 @@ import qualified Data.Text.IO as Text
 import           Data.Typeable
 import qualified Data.Yaml as Yaml
 import           Path
+import           Path.Find
 import           Stackage.PackageName
 import           System.Directory
 import           System.Environment
@@ -76,6 +94,11 @@ data Settings = Settings
 
 configInDocker :: Config -> Bool
 configInDocker = (== "docker") . configBuildIn
+
+data ConfigException =
+  ConfigInvalidYaml String
+  deriving (Typeable,Show)
+instance Exception ConfigException
 
 -- TODO: eliminate occurrences of this exception.
 data NotYetImplemented = NotYetImplemented Text
@@ -162,12 +185,12 @@ instance FromJSON (Path Abs Dir -> StackageConfig) where
     \obj ->
       do stackageConfigStackageOpts <- obj .:? "stackage" .!= mempty
          getBuildOpts <- obj .:? "build" .!= mempty
-         getDocker <- obj .:? "docker"
+         getTheDocker <- obj .:? "docker"
          return (\parentDir ->
                    let stackageConfigBuildOpts = getBuildOpts parentDir
                        stackageConfigDir =
                          Just parentDir
-                       stackageConfigDockerOpts = DockerOpts (fmap ($ parentDir) getDocker)
+                       stackageConfigDockerOpts = DockerOpts (fmap ($ parentDir) getTheDocker)
                    in StackageConfig {..})
 
 data StackageOpts =
@@ -771,6 +794,55 @@ configFromStackageConfig StackageConfig{..} =
      configDir <-
        maybe (error "Couldn't determine config dir.") return stackageConfigDir -- FIXME: Proper exception.
      return Config {..}
+
+-- | Get docker configuration. Currently only looks in current/parent
+-- dirs, not, e.g. $HOME/.stackage.
+--
+-- TODO: Look in other locations.
+getDocker :: (MonadIO m,MonadLogger m,MonadThrow m) => m (Maybe Docker)
+getDocker =
+  do mdocker <- getDockerLocal
+     case mdocker of
+       Just docker -> return (Just docker)
+       Nothing -> return Nothing
+
+-- | Get local directory docker configuration. Searches upwards for
+-- the first parent containing the config file.
+getDockerLocal :: (MonadIO m,MonadLogger m,MonadThrow m)
+               => m (Maybe Docker)
+getDockerLocal =
+  do pwd <-
+       liftIO (getCurrentDirectory >>= parseAbsDir)
+     $logDebug ("Current directory is: " <>
+                T.pack (show pwd))
+     mfile <- findFileUp pwd ((== stackageDotConfig) . filename) Nothing
+     case mfile of
+       Nothing -> return Nothing
+       Just file -> do $logDebug ("Reading from config file: " <>
+                                  T.pack (show file))
+                       readDockerFrom file
+
+-- | Read a Docker config, if there is any, from the given YAML file.
+readDockerFrom :: (MonadIO m,MonadThrow m)
+               => Path Abs File -> m (Maybe Docker)
+readDockerFrom fp =
+  do result <-
+       liftM Yaml.decodeEither (liftIO (S.readFile (toFilePath fp)))
+     case result of
+       Left err -> throwM (ConfigInvalidYaml err)
+       Right (wholeValue :: Value) ->
+         case Yaml.parseEither
+                (\v ->
+                   do o <- parseJSON v
+                      mdocker <- o .:? "docker"
+                      return mdocker)
+                wholeValue of
+           Right (Just dockerValue) ->
+             case Yaml.parseEither parseJSON dockerValue of
+               Left err ->
+                 throwM (ConfigInvalidYaml err)
+               Right docker -> return (Just (docker (parent fp)))
+           _ -> return Nothing
 
 -- TODO: handle Settings
 getConfig :: (MonadLogger m,MonadIO m,MonadThrow m)

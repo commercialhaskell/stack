@@ -9,17 +9,20 @@ module Path.Find
   where
 
 import Control.Monad
+import Control.Monad.IO.Class
 import Data.List
 import Data.Maybe
 import Path as FL
 import System.Directory (getDirectoryContents,doesDirectoryExist)
 
 -- | Find the location of a file matching the given predicate.
-findFileUp :: Path Abs Dir                -- ^ Start here.
+findFileUp :: MonadIO m
+           => Path Abs Dir                -- ^ Start here.
            -> (Path Abs File -> Bool)     -- ^ Predicate to match the file.
            -> Maybe (Path Abs Dir)        -- ^ Do not ascend above this directory.
-           -> IO (Maybe (Path Abs File))  -- ^ Absolute file path.
-findFileUp = findPathUp parseAbsFile
+           -> m (Maybe (Path Abs File))  -- ^ Absolute file path.
+findFileUp s p d =
+  liftIO (findPathUp parseAbsFile s p d)
 
 -- | Find the location of a directory matching the given predicate.
 findDirUp :: Path Abs Dir                -- ^ Start here.
