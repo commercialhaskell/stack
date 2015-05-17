@@ -59,11 +59,10 @@ import           Distribution.Version
 import           Path as FL
 import           Path.Find
 import           Prelude hiding (FilePath,writeFile)
-import           Stackage.Build.Config
 import           Stackage.Build.Defaults
 import           Stackage.Build.Doc
 import           Stackage.Build.Types
-import qualified Stackage.Config
+import           Stackage.Config
 import           Stackage.Fetch as Fetch
 import           Stackage.GhcPkg
 import           Stackage.GhcPkgId
@@ -129,11 +128,9 @@ benchmark config conf =
 -- | Build using Shake.
 build :: Stackage.Config.Config -> BuildConfig -> IO ()
 build config bconfig =
-  do cfg <- readConfig
-     pinfos <-
-       runNoLoggingT (runResourceT (getPackageInfos config (bconfigFinalAction bconfig)
-                                    (Just bconfig)
-                                    cfg))
+  do pinfos <-
+       runNoLoggingT (runResourceT (getPackageInfos (bconfigFinalAction bconfig)
+                                    (Just bconfig) config))
      pkgIds <-
        getPackageIds (map packageName (S.toList pinfos))
      pwd <- getCurrentDirectory >>= parseAbsDir
@@ -170,7 +167,7 @@ build config bconfig =
         else withArgs []
                       (shakeArgs shakeOptions {shakeVerbosity = bconfigVerbosity bconfig
                                               ,shakeFiles =
-                                                 FL.toFilePath (shakeFilesPath cfg)
+                                                 FL.toFilePath (shakeFilesPath (configDir config))
                                               ,shakeThreads = defaultShakeThreads}
                                  (do sequence_ plans
                                      when (bconfigFinalAction bconfig ==
@@ -197,9 +194,8 @@ dryRunPrint pinfos =
 -- | Reset the build (remove Shake database and .gen files).
 clean :: Stackage.Config.Config -> IO ()
 clean config =
-  do cfg <- readConfig
-     pinfos <-
-       runNoLoggingT (runResourceT (getPackageInfos config DoNothing Nothing cfg))
+  do pinfos <-
+       runNoLoggingT (runResourceT (getPackageInfos DoNothing Nothing config))
      forM_ (S.toList pinfos)
            (\pinfo ->
               do deleteGenFile (packageDir pinfo)
@@ -207,11 +203,11 @@ clean config =
                        FL.toFilePath (distDirFromDir (packageDir pinfo))
                  exists <- doesDirectoryExist distDir
                  when exists (removeDirectoryRecursive distDir))
-     let listDir = FL.parent (shakeFilesPath cfg)
+     let listDir = FL.parent (shakeFilesPath (configDir config))
      ls <-
        fmap (map (FL.toFilePath listDir ++))
             (getDirectoryContents (FL.toFilePath listDir))
-     mapM_ (rmShakeMetadata cfg) ls
+     mapM_ (rmShakeMetadata (configDir config)) ls
   where rmShakeMetadata cfg p =
           when (isPrefixOf
                   (FilePath.takeFileName
@@ -752,8 +748,8 @@ newConfig gconfig bconfig pinfo =
 
 -- | Get packages' information.
 getPackageInfos :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m,MonadResource m,MonadMask m)
-                => Stackage.Config.Config -> FinalAction -> Maybe BuildConfig -> Config -> m (Set Package)
-getPackageInfos config finalAction mbconfig = go True
+                => FinalAction -> Maybe BuildConfig -> Config -> m (Set Package)
+getPackageInfos finalAction mbconfig = go True
   where go retry cfg =
           do globalPackages <- getAllPackages
              {-liftIO (putStrLn ("All global packages: " ++ show globalPackages))-}
@@ -789,7 +785,7 @@ getPackageInfos config finalAction mbconfig = go True
                       [] -> do {-liftIO (putStrLn "No validated packages!")-}
                                return infos
                       toFetch ->
-                        do newPkgDirs <- fetchAndUnpackPackages config
+                        do newPkgDirs <- fetchAndUnpackPackages cfg
                                            (map (\(PackageSuggestion name ver _flags) ->
                                                fromTuple (name,ver))
                                                 toFetch)
@@ -1042,17 +1038,10 @@ unpackAndUpdateTarball config ident tarGzPath latestCabalFileContent =
 -- Paths
 
 -- | Path to .shake files.
-shakeFilesPath :: Config -> Path Abs File
-shakeFilesPath cfg =
-  configDir cfg </>
+shakeFilesPath :: Path Abs Dir -> Path Abs File
+shakeFilesPath dir =
+  dir </>
   $(mkRelFile ".shake")
-
--- | Directory of configuration file, or throws 'FPNoConfigFile' if no configuration file.
-configDir :: Config -> Path Abs Dir
-configDir cfg =
-  case configMaybeDir cfg of
-    Just d -> d
-    Nothing -> throw FPNoConfigFile
 
 -- | Returns true for paths whose last directory component begins with ".".
 isHiddenDir :: Path b Dir -> Bool

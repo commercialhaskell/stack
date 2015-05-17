@@ -22,6 +22,8 @@ module Stackage.Config (
     Config(..)
   , configInDocker
   , Settings(..)
+  , Docker(..)
+  , Mount(..)
   , getConfig
   , NotYetImplemented(..)
   ) where
@@ -57,16 +59,19 @@ import           System.Process
 
 -- | The top-level Stackage configuration.
 data Config =
-  Config
-    { configPkgDbLocation    :: !(Path Abs Dir)
-    , configGhcBinLocation   :: !(Path Abs Dir)
-    , configCabalBinLocation :: !(Path Abs Dir)
-    , configStackageRoot     :: !(Path Abs Dir)
-    , configStackageHost     :: !String
-    , configBuildIn          :: !Text
-    , configDocker           :: !(Maybe Docker)
-    }
-  deriving Show
+  Config {configPkgDbLocation    :: !(Path Abs Dir)
+         ,configGhcBinLocation   :: !(Path Abs Dir)
+         ,configCabalBinLocation :: !(Path Abs Dir)
+         ,configStackageRoot     :: !(Path Abs Dir)
+         ,configStackageHost     :: !String
+         ,configBuildIn          :: !Text
+         ,configDocker           :: !(Maybe Docker)
+         ,configPackages         :: !(Set (Path Abs Dir))
+         ,configFlags            :: !(Map Text Bool)
+         ,configPackageFlags     :: !(Map PackageName (Map Text Bool))
+         ,configDir              :: !(Path Abs Dir)}
+  -- ^ Flags for each package's Cabal config.
+  deriving (Show)
 data Settings = Settings
 
 configInDocker :: Config -> Bool
@@ -76,7 +81,6 @@ configInDocker = (== "docker") . configBuildIn
 data NotYetImplemented = NotYetImplemented Text
   deriving (Show, Typeable)
 instance Exception NotYetImplemented
-
 
 -- Some examples of stackage.config
 
@@ -111,8 +115,9 @@ instance Exception NotYetImplemented
 data StackageConfig =
   StackageConfig
     { stackageConfigStackageOpts :: !StackageOpts
-    , stackageConfigBuildOpts :: !BuildOpts
-    , stackageConfigDockerOpts :: !DockerOpts
+    , stackageConfigBuildOpts    :: !BuildOpts
+    , stackageConfigDockerOpts   :: !DockerOpts
+    , stackageConfigDir          :: !(Maybe (Path Abs Dir))
     }
   deriving Show
 
@@ -142,11 +147,13 @@ instance Monoid StackageConfig where
     { stackageConfigStackageOpts = mempty
     , stackageConfigBuildOpts = mempty
     , stackageConfigDockerOpts = mempty
+    , stackageConfigDir = Nothing
     }
   mappend l r = StackageConfig
     { stackageConfigStackageOpts = appendOf stackageConfigStackageOpts l r
     , stackageConfigBuildOpts = appendOf stackageConfigBuildOpts l r
     , stackageConfigDockerOpts = stackageConfigDockerOpts l <> stackageConfigDockerOpts r
+    , stackageConfigDir = stackageConfigDir l <|> stackageConfigDir r
     }
 
 instance FromJSON (Path Abs Dir -> StackageConfig) where
@@ -155,10 +162,12 @@ instance FromJSON (Path Abs Dir -> StackageConfig) where
     \obj ->
       do stackageConfigStackageOpts <- obj .:? "stackage" .!= mempty
          getBuildOpts <- obj .:? "build" .!= mempty
-         stackageConfigDockerOpts <-
-           fmap DockerOpts (obj .:? "docker")
+         getDocker <- obj .:? "docker"
          return (\parentDir ->
                    let stackageConfigBuildOpts = getBuildOpts parentDir
+                       stackageConfigDir =
+                         Just parentDir
+                       stackageConfigDockerOpts = DockerOpts (fmap ($ parentDir) getDocker)
                    in StackageConfig {..})
 
 data StackageOpts =
@@ -237,32 +246,34 @@ data Docker =
            -- ^ Pass Docker daemon connection information into container.
          ,dockerExtra :: ![String]
            -- ^ This is a placeholder for command-line argument parsing.
+         ,dockerDir :: (Path Abs Dir) -- ^ Intentionally lazy because of the 'Default' instance.
          }
   deriving (Show)
 
 -- | For YAML.
-instance FromJSON Docker where
+instance FromJSON (Path Abs Dir -> Docker) where
   parseJSON v =
     do o <- parseJSON v
-       Docker <$> o .:? dockerEnableArgName .!= True
-              <*> o .:? dockerRepoOwnerArgName .!= dockerRepoOwner def
-              <*> o .:? dockerRepoArgName .!= dockerRepo def
-              <*> o .:? dockerRepoSuffixArgName .!= dockerRepoSuffix def
-              <*> o .:? dockerImageTagArgName .!= dockerImageTag def
-              <*> o .:? dockerImageArgName
-              <*> o .:? dockerRegistryLoginArgName .!= dockerRegistryLogin def
-              <*> o .:? dockerRegistryUsernameArgName .!= dockerRegistryUsername def
-              <*> o .:? dockerRegistryPasswordArgName .!= dockerRegistryPassword def
-              <*> o .:? dockerAutoPullArgName .!= dockerAutoPull def
-              <*> o .:? dockerDetachArgName .!= dockerDetach def
-              <*> o .:? dockerPersistArgName .!= dockerPersist def
-              <*> o .:? dockerContainerNameArgName .!= dockerContainerName def
-              <*> o .:? dockerRunArgsArgName .!= dockerRunArgsDefault def
-              <*> pure (dockerRunArgsExtra def)
-              <*> o .:? dockerMountArgName .!= dockerMountDefault def
-              <*> pure (dockerMountExtra def)
-              <*> o .:? dockerPassHostArgName .!= dockerPassHost def
-              <*> pure (dockerExtra def)
+       x <- Docker <$> o .:? dockerEnableArgName .!= True
+                   <*> o .:? dockerRepoOwnerArgName .!= dockerRepoOwner def
+                   <*> o .:? dockerRepoArgName .!= dockerRepo def
+                   <*> o .:? dockerRepoSuffixArgName .!= dockerRepoSuffix def
+                   <*> o .:? dockerImageTagArgName .!= dockerImageTag def
+                   <*> o .:? dockerImageArgName
+                   <*> o .:? dockerRegistryLoginArgName .!= dockerRegistryLogin def
+                   <*> o .:? dockerRegistryUsernameArgName .!= dockerRegistryUsername def
+                   <*> o .:? dockerRegistryPasswordArgName .!= dockerRegistryPassword def
+                   <*> o .:? dockerAutoPullArgName .!= dockerAutoPull def
+                   <*> o .:? dockerDetachArgName .!= dockerDetach def
+                   <*> o .:? dockerPersistArgName .!= dockerPersist def
+                   <*> o .:? dockerContainerNameArgName .!= dockerContainerName def
+                   <*> o .:? dockerRunArgsArgName .!= dockerRunArgsDefault def
+                   <*> pure (dockerRunArgsExtra def)
+                   <*> o .:? dockerMountArgName .!= dockerMountDefault def
+                   <*> pure (dockerMountExtra def)
+                   <*> o .:? dockerPassHostArgName .!= dockerPassHost def
+                   <*> pure (dockerExtra def)
+       return x
 
 -- | Default values for Docker configuration.
 instance Default Docker where
@@ -284,7 +295,11 @@ instance Default Docker where
                ,dockerMountDefault = []
                ,dockerMountExtra = []
                ,dockerPassHost = False
-               ,dockerExtra = []}
+               ,dockerExtra = []
+               ,dockerDir = error "Docker dir not determined!"
+               -- FIXME: This is ugly but I don't see an obvious
+               -- better way to add the value after the fact.
+               }
 
 dockerEnableArgName :: Text
 dockerEnableArgName = "enable"
@@ -705,9 +720,8 @@ lookupEnvText :: String -> IO (Maybe Text)
 lookupEnvText var = fmap Text.pack <$> lookupEnv var
 
 getEnvStackageOpts :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => m StackageOpts
-getEnvStackageOpts = liftIO $ do
-  stackageRoot <- lookupEnv "STACKAGE_ROOT" >>= maybe (return Nothing) (fmap Just . parseAbsDir)
+  => Maybe (Path Abs Dir) -> m StackageOpts
+getEnvStackageOpts stackageRoot = liftIO $ do
   stackageHost <- lookupEnvText "STACKAGE_HOST"
   return mempty
     { stackageOptsRoot = stackageRoot
@@ -727,28 +741,36 @@ getEnvBuildOpts = liftIO $ do
 getEnvStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
   => m StackageConfig
 getEnvStackageConfig = do
-  stackageOpts <- getEnvStackageOpts
+  dir <- liftIO (lookupEnv "STACKAGE_ROOT" >>= maybe (return Nothing) (fmap Just . parseAbsDir))
+  stackageOpts <- getEnvStackageOpts dir
   buildOpts <- getEnvBuildOpts
   return mempty
     { stackageConfigStackageOpts = stackageOpts
     , stackageConfigBuildOpts = buildOpts
+    , stackageConfigDir = dir
     }
-
 
 -- Interprets StackageConfig options.
 configFromStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
   => StackageConfig -> m Config
-configFromStackageConfig StackageConfig{..} = do
-  let StackageOpts{..} = stackageConfigStackageOpts
-  configStackageHost <- resolveStackageHost stackageOptsHost
-  configStackageRoot <- maybe (error "No stackage root.") return stackageOptsRoot -- FIXME: This is not good.
-  let BuildOpts{..} = stackageConfigBuildOpts
-  configBuildIn <- resolveBuildIn buildOptsIn
-  (configGhcBinLocation, configCabalBinLocation, configPkgDbLocation) <-
-    resolveBuildWith configStackageRoot buildOptsWith
-  configDocker <- return (case stackageConfigDockerOpts of
-                            DockerOpts x -> x)
-  return Config{..}
+configFromStackageConfig StackageConfig{..} =
+  do let StackageOpts{..} = stackageConfigStackageOpts
+     configStackageHost <- resolveStackageHost stackageOptsHost
+     configStackageRoot <-
+       maybe (error "No stackage root.") return stackageOptsRoot -- FIXME: This is not good.
+     let BuildOpts{..} = stackageConfigBuildOpts
+     configBuildIn <- resolveBuildIn buildOptsIn
+     (configGhcBinLocation,configCabalBinLocation,configPkgDbLocation) <-
+       resolveBuildWith configStackageRoot buildOptsWith
+     configDocker <-
+       return (case stackageConfigDockerOpts of
+                 DockerOpts x -> x)
+     configFlags <- return buildOptsFlags
+     configPackageFlags <- return buildOptsPackageFlags
+     configPackages <- return buildOptsPackages
+     configDir <-
+       maybe (error "Couldn't determine config dir.") return stackageConfigDir -- FIXME: Proper exception.
+     return Config {..}
 
 -- TODO: handle Settings
 getConfig :: (MonadLogger m,MonadIO m,MonadThrow m)

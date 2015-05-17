@@ -40,16 +40,16 @@ import qualified Filesystem.Path.CurrentOS as FP
 import qualified Path as FL
 import           Path.Find (findFileUp)
 import           Paths_stackage_common (version)
-import           Stackage.Build (shakeFilesPath,configDir)
+import           Stackage.Build (shakeFilesPath)
+import           Stackage.Build.Defaults (configFileName)
+import           Stackage.Config
 import           Stackage.Docker.GlobalDB (updateDockerImageLastUsed,getDockerImagesLastUsed,pruneDockerImagesLastUsed)
-import           Stackage.Build.Types
 import           System.Directory
 import           System.Environment (lookupEnv,unsetEnv)
 import           System.Exit (ExitCode(ExitSuccess,ExitFailure),exitWith)
 import           System.IO (hPutStrLn,stderr,stdin,stdout,hIsTerminalDevice)
 import qualified System.Process as Proc
 import           System.Process.PagerEditor (editByteString)
-import           Stackage.Build.Defaults (configFileName)
 import           Text.ParserCombinators.ReadP (readP_to_S)
 import           Text.Printf (printf)
 
@@ -62,7 +62,7 @@ getInContainer =
        Just _ -> return True
 
 -- | Run a command in a new Docker container, then exit the process.
-runContainerAndExit :: DockerOnlyConfig
+runContainerAndExit :: Docker
                     -> FilePath
                     -> [String]
                     -> [(String,String)]
@@ -73,13 +73,13 @@ runContainerAndExit config cmnd args envVars successPostAction =
             (runContainerAndExitAction config cmnd args envVars successPostAction)
 
 -- | Shake action to run a command in a new Docker container.
-runContainerAndExitAction :: DockerOnlyConfig
+runContainerAndExitAction :: Docker
                           -> FilePath
                           -> [String]
                           -> [(String,String)]
                           -> IO ()
                           -> Action ()
-runContainerAndExitAction (DockerOnlyConfig cfg@Config{configDocker = config})
+runContainerAndExitAction config
                           cmnd
                           args
                           envVars
@@ -104,7 +104,7 @@ runContainerAndExitAction (DockerOnlyConfig cfg@Config{configDocker = config})
              ("WARNING: using boot2docker is NOT supported, and not likely to perform well.")))
      sandboxDirFP <- case maybeSandboxDir of
        Just dir -> return dir
-       Nothing -> do let sandboxDirFP = FP.decodeString (FL.toFilePath (configDir cfg))
+       Nothing -> do let sandboxDirFP = FP.decodeString (FL.toFilePath (dockerDir config))
                                         </> dockerSandboxName
                      liftIO (FS.createTree sandboxDirFP)
                      return sandboxDirFP
@@ -210,7 +210,7 @@ runContainerAndExitAction (DockerOnlyConfig cfg@Config{configDocker = config})
                   ,args])
                 successPostAction
      liftIO (do updateDockerImageLastUsed (iiId imageInfo)
-                                          (FL.toFilePath (configDir cfg))
+                                          (FL.toFilePath (dockerDir config))
                 execDockerProcess)
 
   where
@@ -467,21 +467,21 @@ pullImage config image =
              Proc.callProcess "docker" ["pull", image])
 
 -- | Pull latest version of configured Docker image from registry.
-pull :: DockerOnlyConfig -> IO ()
-pull doc@(DockerOnlyConfig Config{configDocker=config}) =
+pull :: Docker -> IO ()
+pull config =
   runAction
-    (Just doc)
+    (Just config)
     (do checkDockerVersion
         pullImage config (dockerImageName config))
 
 -- | Run a Shake action.
-runAction :: Maybe DockerOnlyConfig -> Action () -> IO ()
+runAction :: Maybe Docker -> Action () -> IO ()
 runAction Nothing inner =
   shake shakeOptions{shakeVerbosity = Quiet}
         (action inner)
-runAction (Just (DockerOnlyConfig cfg)) inner =
+runAction (Just cfg) inner =
   shake shakeOptions{shakeVerbosity = Quiet
-                    ,shakeFiles = FL.toFilePath (shakeFilesPath cfg)}
+                    ,shakeFiles = FL.toFilePath (shakeFilesPath (dockerDir cfg))}
         (action inner)
 
 -- | Check docker version (throws exception if incorrect)
