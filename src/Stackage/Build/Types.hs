@@ -24,6 +24,7 @@ import Distribution.Package hiding (Package,PackageName)
 import GHC.Generics
 import Path as FL
 import Prelude hiding (FilePath)
+import Stackage.FlagName
 import Stackage.GhcPkgId
 import Stackage.Package
 import Stackage.PackageName
