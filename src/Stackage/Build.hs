@@ -340,7 +340,7 @@ buildPackage bconfig pinfos pinfo gconfig setupAction installResource docLoc =
                        (if enabled
                            then ""
                            else "-") <>
-                       T.unpack name)
+                       flagNameString name)
                     (M.toList (packageFlags pinfo))])
      runhaskell
        pinfo

@@ -24,6 +24,7 @@ import           Data.Text (Text)
 import           Network.HTTP.Client
 import           Network.HTTP.Types.Status
 import           Prelude hiding (FilePath)
+import           Stackage.FlagName
 import           Stackage.PackageName
 import           Stackage.PackageVersion
 
@@ -37,7 +38,7 @@ instance Exception ResolveException
 data PackageSuggestion =
   PackageSuggestion {suggestionName :: !PackageName
                     ,suggestionVersion :: !PackageVersion
-                    ,suggestionFlags :: !(Map Text Bool)}
+                    ,suggestionFlags :: !(Map FlagName Bool)}
   deriving (Show)
 
 instance FromJSON PackageSuggestion where

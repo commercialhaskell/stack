@@ -57,7 +57,7 @@ data Config =
           -- ^ List of local packages.
          ,configMaybeDir :: !(Maybe (Path Abs Dir))
           -- ^ Directory of the configuration file.
-         ,configFlags :: !(Map Text Bool)
+         ,configFlags :: !(Map FlagName Bool)
           -- ^ Flags for Cabal configuration.
          ,configPackageFlags :: !(Map PackageName (Map FlagName Bool))
           -- ^ Flags for each package's Cabal config.
@@ -175,7 +175,7 @@ data GenConfig =
             ,gconfigLibProfiling :: !Bool
             ,gconfigExeProfiling :: !Bool
             ,gconfigGhcOptions :: ![Text]
-            ,gconfigFlags :: !(Map Text Bool)
+            ,gconfigFlags :: !(Map FlagName Bool)
             ,gconfigPkgId :: GhcPkgId}
   deriving (Generic,Show)
 

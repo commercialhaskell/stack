@@ -16,8 +16,10 @@ module Stackage.BuildPlan
     , getSnapshots
     , allPackages
     , loadBuildPlan
+    , resolveBuildPlan
     ) where
 
+import           Control.Monad               (unless, when)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -30,6 +32,16 @@ import Path
 import Stackage.Package
 import Stackage.PackageName
 import Stackage.FlagName
+import qualified Data.Foldable as F
+import           Control.Monad.State.Strict  (execState, get,State,
+                                              modify, put)
+import qualified Data.Set                    as Set
+import "stackage-types" Stackage.Types              (BuildPlan (..), Component (..),
+                                              DepInfo (..),
+                                              PackageConstraints (..),
+                                              PackagePlan (..), SystemInfo (..),
+                                              display, mkPackageName,
+                                              sdPackages, unFlagName)
 import           Control.Applicative                   ((<$>), (<*>), (<|>))
 import           Control.Exception                     (Exception, assert)
 import           Control.Monad                         (unless)
@@ -87,6 +99,7 @@ import qualified System.FilePath as FP
 data BuildPlanException
     = ParseSnapNameException Text
     | GetSnapshotsException String
+    | UnknownPackages (Set PackageName)
     deriving (Show, Typeable)
 instance Exception BuildPlanException
 
@@ -94,12 +107,68 @@ instance Exception BuildPlanException
 -- location, etc.
 data BuildPlanConfig
 
-resolveBuildPlan :: (MonadLogger m,MonadIO m,MonadThrow m)
-                 => Config
-                 -> BuildPlanConfig
-                 -> Set PackageIdentifier
-                 -> m (Set PackageIdentifier)
-resolveBuildPlan = undefined
+-- | Determine the necessary packages to install to have the given set of
+-- packages available.
+--
+-- This function will not provide test suite and benchmark dependencies.
+--
+-- This may fail if a target package is not present in the @BuildPlan@.
+resolveBuildPlan :: MonadThrow m
+                 => BuildPlan
+                 -> Set PackageName
+                 -> m (Map PackageName (Version, Set FlagName))
+resolveBuildPlan bp packages
+    | Set.null (rsUnknown rs) = return (rsToInstall rs)
+    | otherwise = throwM $ UnknownPackages $ rsUnknown rs
+  where
+    rs = execState (F.mapM_ (getDeps bp) packages) ResolveState
+        { rsVisited = Set.empty
+        , rsUnknown = Set.empty
+        , rsToInstall = Map.empty
+        }
+
+data ResolveState = ResolveState
+    { rsVisited :: Set PackageName
+    , rsUnknown :: Set PackageName
+    , rsToInstall :: Map PackageName (Version, Set FlagName)
+    }
+
+getDeps :: BuildPlan -> PackageName -> State ResolveState ()
+getDeps bp =
+    goName
+  where
+    goName :: PackageName -> State ResolveState ()
+    goName name = do
+        rs <- get
+        let name' = toCabalPackageName name
+        when (name `Set.notMember` rsVisited rs) $ do
+            put rs { rsVisited = Set.insert name $ rsVisited rs }
+            case Map.lookup name' $ bpPackages bp of
+                Just pkg -> goPkg name pkg
+                Nothing ->
+                    case Map.lookup name' $ siCorePackages $ bpSystemInfo bp of
+                        Just _version -> return ()
+                        Nothing -> modify $ \rs' -> rs'
+                            { rsUnknown = Set.insert name $ rsUnknown rs'
+                            }
+
+    goPkg name pp = do
+        F.forM_ (Map.toList $ sdPackages $ ppDesc pp) $ \(name', depInfo) ->
+            when (includeDep depInfo) (goName $ fromCabalPackageName name')
+        modify $ \rs -> rs
+            { rsToInstall = Map.insert name (ppVersion pp, flags)
+                          $ rsToInstall rs
+            }
+      where
+        flags = Set.fromList
+              $ map (fromCabalFlagName . fst)
+              $ filter snd
+              $ Map.toList
+              $ pcFlagOverrides
+              $ ppConstraints pp
+
+    includeDep di = CompLibrary `Set.member` diComponents di
+                 || CompExecutable `Set.member` diComponents di
 
 -- | The name of an LTS Haskell or Stackage Nightly snapshot.
 data SnapName

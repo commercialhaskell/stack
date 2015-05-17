@@ -15,6 +15,7 @@ module Stackage.PackageName
   ,packageNameString
   ,packageNameText
   ,fromCabalPackageName
+  ,toCabalPackageName
   ,parsePackageNameFromFilePath
   ,mkPackageName)
   where
@@ -109,6 +110,12 @@ fromCabalPackageName :: Cabal.PackageName -> PackageName
 fromCabalPackageName (Cabal.PackageName name) =
   let !x = S8.pack name
   in PackageName x
+
+-- | Convert to a Cabal package name.
+toCabalPackageName :: PackageName -> Cabal.PackageName
+toCabalPackageName (PackageName name) =
+  let !x = S8.unpack name
+  in Cabal.PackageName x
 
 -- | Parse a package name from a file path.
 parsePackageNameFromFilePath :: MonadThrow m => Path a File -> m PackageName

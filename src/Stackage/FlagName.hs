@@ -1,8 +1,10 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TupleSections #-}
 
 -- | Names for flags.
 
@@ -30,6 +32,8 @@ import qualified Data.ByteString.Char8 as S8
 import           Data.Char (isLetter)
 import           Data.Data
 import           Data.Hashable
+import           Data.Map (Map)
+import qualified Data.Map as Map
 import           Data.Text (Text)
 import qualified Data.Text.Encoding as T
 import qualified Distribution.PackageDescription as Cabal
@@ -114,3 +118,12 @@ toCabalFlagName :: FlagName -> Cabal.FlagName
 toCabalFlagName (FlagName name) =
   let !x = S8.unpack name
   in Cabal.FlagName x
+
+instance ToJSON a => ToJSON (Map FlagName a) where
+  toJSON = toJSON . Map.mapKeysWith const flagNameText
+instance FromJSON a => FromJSON (Map FlagName a) where
+    parseJSON v = do
+        m <- parseJSON v
+        fmap Map.fromList $ mapM go $ Map.toList m
+      where
+        go (k, v) = fmap (, v) $ either (fail . show) return $ parseFlagNameFromString k
