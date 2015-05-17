@@ -429,7 +429,7 @@ instance FromJSON (Path Abs Dir -> BuildOpts) where
       do buildOptsIn <- obj .:? "in"
          buildOptsWith <- obj .:? "with"
          packages <-
-           do ps <- obj .: "packages"
+           do ps <- obj .:? "packages" .!= []
               fmap S.fromList
                    (mapM (\x ->
                             if x == "."
