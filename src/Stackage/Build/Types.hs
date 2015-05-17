@@ -30,6 +30,7 @@ import           Distribution.Package hiding (Package,PackageName)
 import           GHC.Generics
 import           Path as FL
 import           Prelude hiding (FilePath)
+import           Stackage.FlagName
 import           Stackage.GhcPkgId
 import           Stackage.Package
 import           Stackage.PackageName
@@ -44,7 +45,6 @@ data StackageBuildException
   | FPStackageDepVerMismatch PackageName PackageVersion VersionRange
   | FPStackagePackageVersionMismatch PackageName PackageVersion PackageVersion
   | FPDependencyIssues [StackageBuildException]
-  | FPNoCabalFile (Path Abs Dir)
   deriving (Typeable,Show)
 
 instance Exception StackageBuildException
@@ -59,7 +59,7 @@ data Config =
           -- ^ Directory of the configuration file.
          ,configFlags :: !(Map Text Bool)
           -- ^ Flags for Cabal configuration.
-         ,configPackageFlags :: !(Map PackageName (Map Text Bool))
+         ,configPackageFlags :: !(Map PackageName (Map FlagName Bool))
           -- ^ Flags for each package's Cabal config.
          }
   deriving (Show)
