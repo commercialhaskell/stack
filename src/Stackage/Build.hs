@@ -55,12 +55,16 @@ import qualified Data.Text as T
 import           Development.Shake hiding (doesFileExist,doesDirectoryExist,getDirectoryContents)
 import           Distribution.Compiler (CompilerId (CompilerId), buildCompilerId)
 import           Distribution.Package hiding (packageName,packageVersion,Package,PackageName,PackageIdentifier)
+import           Network.HTTP.Client (newManager)
+import           Network.HTTP.Client.TLS (tlsManagerSettings)
 import           Path as FL
 import           Path.Find
 import           Prelude hiding (FilePath,writeFile)
 import           Stackage.Build.Defaults
 import           Stackage.Build.Doc
 import           Stackage.Build.Types
+import           Stackage.BuildPlan
+import           Stackage.BuildPlan.Types
 import           Stackage.Config
 import           Stackage.Fetch as Fetch
 import           Stackage.FlagName
@@ -72,7 +76,6 @@ import           Stackage.PackageIndex.Read
 import           Stackage.PackageIndex.Update
 import           Stackage.PackageName
 import           Stackage.Version
-import           Stackage.Resolve
 import           System.Directory hiding (findFiles)
 import           System.Environment
 import qualified System.FilePath as FilePath
@@ -95,7 +98,8 @@ test config conf =
                      DoTests
                      False
                      []
-                     (tconfigInDocker conf))
+                     (tconfigInDocker conf)
+                     (LTS 2 8)) -- FIXME figure out where to get the SnapName from
 
 -- | Build and haddock using Shake.
 haddock :: Stackage.Config.Config -> HaddockConfig -> IO ()
@@ -109,7 +113,8 @@ haddock config conf =
                      DoHaddock
                      False
                      []
-                     (hconfigInDocker conf))
+                     (hconfigInDocker conf)
+                     (LTS 2 8)) -- FIXME figure out where to get the SnapName from
 
 -- | Build and benchmark using Shake.
 benchmark :: Stackage.Config.Config -> BenchmarkConfig -> IO ()
@@ -123,7 +128,8 @@ benchmark config conf =
                      DoBenchmarks
                      False
                      []
-                     (benchInDocker conf))
+                     (benchInDocker conf)
+                     (LTS 2 8)) -- FIXME figure out where to get the SnapName from
 
 -- | Build using Shake.
 build :: Stackage.Config.Config -> BuildConfig -> IO ()
@@ -767,26 +773,30 @@ getPackageInfos finalAction mbconfig = go True
                  | Just bconfig <- mbconfig
                  , not (bconfigInDocker bconfig)
                  , retry ->
-                   outsideOfDockerApproach infos globalPackages cfg errs
+                   outsideOfDockerApproach infos globalPackages cfg bconfig errs
                  | otherwise ->
                    liftIO (throwIO (FPDependencyIssues (nubBy (on (==) show) errs)))
-        outsideOfDockerApproach infos globalPackages cfg errs =
+        outsideOfDockerApproach infos globalPackages cfg bconfig errs =
           do indexDir <- liftIO getIndexDir
              index <- loadPkgIndex indexDir
              results <- forM names (checkPackageInIndex index)
              case lefts results of
                [] ->
                  do let okPkgVers = M.fromList (rights results)
+                    manager <- liftIO $ newManager tlsManagerSettings -- FIXME store in the config
+                    bp <-
+                      loadBuildPlan manager (bconfigSnapName bconfig)
                     mapping <-
-                      resolveVersions (M.keys okPkgVers)
+                      resolveBuildPlan bp (M.keysSet okPkgVers)
                     validated <-
-                      liftM catMaybes (mapM (validateSuggestion globalPackages okPkgVers) mapping)
+                      liftM catMaybes (mapM (validateSuggestion globalPackages okPkgVers)
+                        (M.toList mapping))
                     case validated of
                       [] -> do {-liftIO (putStrLn "No validated packages!")-}
                                return infos
                       toFetch ->
                         do newPkgDirs <- fetchAndUnpackPackages cfg
-                                           (map (\(PackageSuggestion name ver _flags) ->
+                                           (map (\(name, (ver, _flags)) ->
                                                fromTuple (name,ver))
                                                 toFetch)
                            -- Here is where we inject third-party
@@ -798,9 +808,8 @@ getPackageInfos finalAction mbconfig = go True
                                                    S.fromList newPkgDirs
                                  ,configPackageFlags =
                                     configPackageFlags cfg <>
-                                    mconcat (map (\s ->
-                                                    M.singleton (suggestionName s)
-                                                                (suggestionFlags s))
+                                    mconcat (map (\(name, (_version, flags)) ->
+                                                    M.singleton name flags)
                                                  validated)}
                erroneous ->
                  liftIO (throwIO (FPDependencyIssues
@@ -832,10 +841,10 @@ getMissingDeps =
 validateSuggestion :: MonadIO m
                    => Map PackageName Version
                    -> Map PackageName VersionRange
-                   -> PackageSuggestion
-                   -> m (Maybe PackageSuggestion)
+                   -> (PackageName, (Version, Map FlagName Bool))
+                   -> m (Maybe (PackageName, (Version, Map FlagName Bool)))
 validateSuggestion globalPackages okPkgVers =
-  (\suggestion@(PackageSuggestion name suggestedVer _) ->
+  (\suggestion@(name, (suggestedVer, _)) ->
      case M.lookup name okPkgVers of
        Just range
          | not (withinRange suggestedVer range) ->

@@ -23,6 +23,7 @@ import Development.Shake (Verbosity)
 import Distribution.Package hiding (Package,PackageName)
 import GHC.Generics
 import Prelude hiding (FilePath)
+import Stackage.BuildPlan.Types
 import Stackage.FlagName
 import Stackage.GhcPkgId
 import Stackage.Package
@@ -52,7 +53,8 @@ data BuildConfig =
               ,bconfigFinalAction :: !FinalAction
               ,bconfigDryrun :: !Bool
               ,bconfigGhcOptions :: ![Text]
-              ,bconfigInDocker :: !Bool}
+              ,bconfigInDocker :: !Bool
+              ,bconfigSnapName :: !SnapName}
   deriving (Show)
 
 -- | Configuration for testing.

@@ -32,7 +32,6 @@ library
                      Stackage.PackageName
                      Stackage.Version
                      Stackage.Path
-                     Stackage.Resolve
                      Stackage.Types
                      Stackage.Build
                      Stackage.Build.Types

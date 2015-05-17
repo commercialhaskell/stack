@@ -81,7 +81,7 @@ instance Exception BuildPlanException
 resolveBuildPlan :: MonadThrow m
                  => BuildPlan
                  -> Set PackageName
-                 -> m (Map PackageName (Version, Set FlagName))
+                 -> m (Map PackageName (Version, Map FlagName Bool))
 resolveBuildPlan bp packages
     | Set.null (rsUnknown rs) = return (rsToInstall rs)
     | otherwise = throwM $ UnknownPackages $ rsUnknown rs
@@ -95,7 +95,7 @@ resolveBuildPlan bp packages
 data ResolveState = ResolveState
     { rsVisited   :: Set PackageName
     , rsUnknown   :: Set PackageName
-    , rsToInstall :: Map PackageName (Version, Set FlagName)
+    , rsToInstall :: Map PackageName (Version, Map FlagName Bool)
     }
 
 getDeps :: BuildPlan -> PackageName -> State ResolveState ()
@@ -120,16 +120,9 @@ getDeps bp =
         F.forM_ (Map.toList $ sdPackages $ ppDesc pp) $ \(name', depInfo) ->
             when (includeDep depInfo) (goName name')
         modify $ \rs -> rs
-            { rsToInstall = Map.insert name (ppVersion pp, flags)
+            { rsToInstall = Map.insert name (ppVersion pp, pcFlagOverrides $ ppConstraints pp)
                           $ rsToInstall rs
             }
-      where
-        flags = Set.fromList
-              $ map fst
-              $ filter snd
-              $ Map.toList
-              $ pcFlagOverrides
-              $ ppConstraints pp
 
     includeDep di = CompLibrary `Set.member` diComponents di
                  || CompExecutable `Set.member` diComponents di
