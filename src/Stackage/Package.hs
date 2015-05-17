@@ -143,7 +143,7 @@ resolvePackage packageConfig cabalfp gpkg = do
      case packageDependencies pkg of
        deps
          | M.null deps ->
-           liftedThrowIO (PackageNoDeps cabalfp)
+           throwM (PackageNoDeps cabalfp)
          | otherwise ->
            do let dir = FL.parent cabalfp
               pkgFiles <-
@@ -161,7 +161,6 @@ resolvePackage packageConfig cabalfp gpkg = do
                             ,packageFlags = pkgFlags
                             ,packageAllDeps =
                                S.fromList (M.keys deps')})
-  where liftedThrowIO = liftIO . throwIO
 
 -- | Get all dependencies of the package (buildable targets only).
 packageDependencies :: PackageDescription -> Map PackageName VersionRange
