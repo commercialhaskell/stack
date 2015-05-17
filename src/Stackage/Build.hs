@@ -950,7 +950,7 @@ getPackageInfo finalAction flags pflags pkgDir =
                            -- build this package is the same used to build user
                            -- code is very false.
                            case buildCompilerId of
-                             CompilerId _ version -> version}
+                             CompilerId _ version -> fromCabalVersion version}
 
 -- | Compose the package flags with the global flags in a left-biased
 -- form, i.e., package-specific flags will be preferred over global

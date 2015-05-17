@@ -1,8 +1,10 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TupleSections #-}
 
 -- | Names for packages.
 
@@ -31,6 +33,8 @@ import qualified Data.ByteString.Char8 as S8
 import           Data.Char (isLetter)
 import           Data.Data
 import           Data.Hashable
+import           Data.Map (Map)
+import qualified Data.Map as Map
 import           Data.Text (Text)
 import qualified Data.Text.Encoding as T
 import qualified Distribution.Package as Cabal
@@ -59,6 +63,8 @@ instance Lift PackageName where
 instance Show PackageName where
   show (PackageName n) = S8.unpack n
 
+instance ToJSON PackageName where
+    toJSON = toJSON . packageNameText
 instance FromJSON PackageName where
   parseJSON j =
     do s <- parseJSON j
@@ -124,3 +130,12 @@ parsePackageNameFromFilePath fp =
   where clean = liftM reverse . strip . reverse
         strip ('l':'a':'b':'a':'c':'.':xs) = return xs
         strip _ = throwM (CabalFileNameParseFail (toFilePath fp))
+
+instance ToJSON a => ToJSON (Map PackageName a) where
+  toJSON = toJSON . Map.mapKeysWith const packageNameText
+instance FromJSON a => FromJSON (Map PackageName a) where
+    parseJSON v = do
+        m <- parseJSON v
+        fmap Map.fromList $ mapM go $ Map.toList m
+      where
+        go (k, v) = fmap (, v) $ either (fail . show) return $ parsePackageNameFromString k

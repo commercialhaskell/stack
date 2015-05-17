@@ -1,6 +1,6 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE EmptyDataDecls    #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PackageImports    #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
 
@@ -27,7 +27,6 @@ import           Data.Aeson (FromJSON (..))
 import           Data.Set (Set)
 import           Stackage.Config
 import           Stackage.PackageIdentifier
-import           "stackage-types" Stackage.Types       (BuildPlan, bpPackages, bpSystemInfo, display, ppVersion, siCorePackages, siGhcVersion)
 import Path
 import Stackage.Package
 import Stackage.PackageName
@@ -36,12 +35,6 @@ import qualified Data.Foldable as F
 import           Control.Monad.State.Strict  (execState, get,State,
                                               modify, put)
 import qualified Data.Set                    as Set
-import "stackage-types" Stackage.Types              (BuildPlan (..), Component (..),
-                                              DepInfo (..),
-                                              PackageConstraints (..),
-                                              PackagePlan (..), SystemInfo (..),
-                                              display, mkPackageName,
-                                              sdPackages, unFlagName)
 import           Control.Applicative                   ((<$>), (<*>), (<|>))
 import           Control.Exception                     (Exception, assert)
 import           Control.Monad                         (unless)
@@ -72,7 +65,6 @@ import           Data.Text.Encoding.Error              (lenientDecode)
 import           Data.Text.Read                        (decimal)
 import           Data.Time                             (Day)
 import           Data.Typeable                         (Typeable)
-import           Data.Version                          (Version)
 import           Data.Yaml                             (decodeFileEither)
 import           Distribution.Compiler                 (CompilerFlavor (GHC))
 import           Distribution.InstalledPackageInfo     (PError)
@@ -88,7 +80,8 @@ import           Network.HTTP.Client                   (Manager, parseUrl,
                                                         withResponse)
 import           Network.HTTP.Client.Conduit           (bodyReaderSource)
 import           Safe                                  (readMay)
-import           "stackage-types" Stackage.Types       (BuildPlan, bpPackages, bpSystemInfo, display, ppVersion, siCorePackages, siGhcVersion)
+import           Stackage.BuildPlan.Types
+import           Stackage.PackageVersion
 import           System.Directory                      (createDirectoryIfMissing,
                                                         getAppUserDataDirectory,
                                                         getDirectoryContents)
@@ -97,15 +90,10 @@ import           System.FilePath                       (takeDirectory,
 import qualified System.FilePath as FP
 
 data BuildPlanException
-    = ParseSnapNameException Text
-    | GetSnapshotsException String
+    = GetSnapshotsException String
     | UnknownPackages (Set PackageName)
     deriving (Show, Typeable)
 instance Exception BuildPlanException
-
--- | Includes things like flags, the current package database
--- location, etc.
-data BuildPlanConfig
 
 -- | Determine the necessary packages to install to have the given set of
 -- packages available.
@@ -116,7 +104,7 @@ data BuildPlanConfig
 resolveBuildPlan :: MonadThrow m
                  => BuildPlan
                  -> Set PackageName
-                 -> m (Map PackageName (Version, Set FlagName))
+                 -> m (Map PackageName (PackageVersion, Set FlagName))
 resolveBuildPlan bp packages
     | Set.null (rsUnknown rs) = return (rsToInstall rs)
     | otherwise = throwM $ UnknownPackages $ rsUnknown rs
@@ -130,7 +118,7 @@ resolveBuildPlan bp packages
 data ResolveState = ResolveState
     { rsVisited :: Set PackageName
     , rsUnknown :: Set PackageName
-    , rsToInstall :: Map PackageName (Version, Set FlagName)
+    , rsToInstall :: Map PackageName (PackageVersion, Set FlagName)
     }
 
 getDeps :: BuildPlan -> PackageName -> State ResolveState ()
@@ -140,13 +128,12 @@ getDeps bp =
     goName :: PackageName -> State ResolveState ()
     goName name = do
         rs <- get
-        let name' = toCabalPackageName name
         when (name `Set.notMember` rsVisited rs) $ do
             put rs { rsVisited = Set.insert name $ rsVisited rs }
-            case Map.lookup name' $ bpPackages bp of
+            case Map.lookup name $ bpPackages bp of
                 Just pkg -> goPkg name pkg
                 Nothing ->
-                    case Map.lookup name' $ siCorePackages $ bpSystemInfo bp of
+                    case Map.lookup name $ siCorePackages $ bpSystemInfo bp of
                         Just _version -> return ()
                         Nothing -> modify $ \rs' -> rs'
                             { rsUnknown = Set.insert name $ rsUnknown rs'
@@ -154,14 +141,14 @@ getDeps bp =
 
     goPkg name pp = do
         F.forM_ (Map.toList $ sdPackages $ ppDesc pp) $ \(name', depInfo) ->
-            when (includeDep depInfo) (goName $ fromCabalPackageName name')
+            when (includeDep depInfo) (goName name')
         modify $ \rs -> rs
             { rsToInstall = Map.insert name (ppVersion pp, flags)
                           $ rsToInstall rs
             }
       where
         flags = Set.fromList
-              $ map (fromCabalFlagName . fst)
+              $ map fst
               $ filter snd
               $ Map.toList
               $ pcFlagOverrides
@@ -169,35 +156,6 @@ getDeps bp =
 
     includeDep di = CompLibrary `Set.member` diComponents di
                  || CompExecutable `Set.member` diComponents di
-
--- | The name of an LTS Haskell or Stackage Nightly snapshot.
-data SnapName
-    = LTS !Int !Int
-    | Nightly !Day
-    deriving (Show, Eq, Ord)
-
--- | Convert a 'SnapName' into its short representation, e.g. @lts-2.8@,
--- @nightly-2015-03-05@.
-renderSnapName :: SnapName -> Text
-renderSnapName (LTS x y) = T.pack $ concat ["lts-", show x, ".", show y]
-renderSnapName (Nightly d) = T.pack $ "nightly-" ++ show d
-
--- | Parse the short representation of a 'SnapName'.
-parseSnapName :: MonadThrow m => Text -> m SnapName
-parseSnapName t0 =
-    case lts <|> nightly of
-        Nothing -> throwM $ ParseSnapNameException t0
-        Just sn -> return sn
-  where
-    lts = do
-        t1 <- T.stripPrefix "lts-" t0
-        Right (x, t2) <- Just $ decimal t1
-        t3 <- T.stripPrefix "." t2
-        Right (y, "") <- Just $ decimal t3
-        return $ LTS x y
-    nightly = do
-        t1 <- T.stripPrefix "nightly-" t0
-        Nightly <$> readMay (T.unpack t1)
 
 -- | Download the 'Snapshots' value from stackage.org.
 getSnapshots :: MonadIO m => Manager -> m Snapshots
@@ -276,8 +234,7 @@ loadBuildPlan man name = do
 
 -- | Get all packages present in the given build plan, including both core and
 -- non-core.
-allPackages :: BuildPlan -> Map PackageName Version
+allPackages :: BuildPlan -> Map PackageName PackageVersion
 allPackages bp =
-    Map.mapKeysWith const fromCabalPackageName $
     siCorePackages (bpSystemInfo bp) <>
     fmap ppVersion (bpPackages bp)

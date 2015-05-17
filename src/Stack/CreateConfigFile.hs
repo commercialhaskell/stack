@@ -43,7 +43,6 @@ import           Data.Text.Encoding.Error              (lenientDecode)
 import           Data.Text.Read                        (decimal)
 import           Data.Time                             (Day)
 import           Data.Typeable                         (Typeable)
-import           Data.Version                          (Version)
 import           Data.Yaml                             (decodeFileEither)
 import           Distribution.Compiler                 (CompilerFlavor (GHC))
 import           Distribution.InstalledPackageInfo     (PError)
@@ -59,7 +58,7 @@ import           Network.HTTP.Client                   (Manager, parseUrl,
                                                         withResponse)
 import           Network.HTTP.Client.Conduit           (bodyReaderSource)
 import           Safe                                  (readMay)
-import           "stackage-types" Stackage.Types       (BuildPlan, bpPackages, bpSystemInfo, display, ppVersion, siCorePackages, siGhcVersion)
+import           Stackage.BuildPlan.Types
 import           System.Directory                      (createDirectoryIfMissing,
                                                         getAppUserDataDirectory,
                                                         getDirectoryContents)
@@ -67,6 +66,7 @@ import           System.FilePath                       (takeDirectory,
                                                         takeExtension, (<.>))
 import qualified System.FilePath as FP
 import Stackage.BuildPlan
+import Stackage.PackageVersion
 
 -- | Find the set of @FlagName@s necessary to get the given
 -- @GenericPackageDescription@ to compile against the given @BuildPlan@. Will
@@ -120,7 +120,7 @@ checkBuildPlan name bp cabalfp gpd = do
 checkDeps :: MonadLogger m
           => Map FlagName Bool -- ^ used only for debugging purposes
           -> Map PackageName VersionRange
-          -> Map PackageName Version
+          -> Map PackageName PackageVersion
           -> m Bool
 checkDeps flags deps packages = do
     let errs = mapMaybe go $ Map.toList deps
@@ -136,13 +136,13 @@ checkDeps flags deps packages = do
         case Map.lookup name packages of
             Nothing -> Just $ "Package not present: " <> packageNameText name
             Just v
-                | withinRange v range -> Nothing
+                | withinRange (toCabalVersion v) range -> Nothing
                 | otherwise -> Just $ T.concat
                     [ packageNameText name
                     , " version available: "
-                    , display v
+                    , packageVersionText v
                     , " does not match "
-                    , display range
+                    , versionRangeText range
                     ]
 
 -- | Find a snapshot and set of flags that is compatible with the given

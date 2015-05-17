@@ -69,8 +69,8 @@ data PackageException
   | PackageDependencyIssues [PackageException]
   | PackageMissingTool Dependency
   | PackageCouldn'tFindPkgId PackageName
-  | PackageStackagePackageVersionMismatch PackageName Version Version
-  | PackageStackageDepVerMismatch PackageName Version VersionRange
+  | PackageStackagePackageVersionMismatch PackageName PackageVersion PackageVersion
+  | PackageStackageDepVerMismatch PackageName PackageVersion VersionRange
   | PackageNoCabalFileFound (Path Abs Dir)
   | PackageMultipleCabalFilesFound (Path Abs Dir) [Path Abs File]
   deriving (Show,Typeable)
@@ -94,7 +94,7 @@ data PackageConfig =
   PackageConfig {packageConfigEnableTests :: !Bool        -- ^ Are tests enabled?
                 ,packageConfigEnableBenchmarks :: !Bool   -- ^ Are benchmarks enabled?
                 ,packageConfigFlags :: !(Map FlagName Bool)   -- ^ Package config flags.
-                ,packageConfigGhcVersion :: !Version      -- ^ GHC version
+                ,packageConfigGhcVersion :: !PackageVersion      -- ^ GHC version
                 }
  deriving (Show,Typeable)
 
@@ -315,12 +315,12 @@ data ResolveConditions = ResolveConditions
     }
 
 -- | Generic a @ResolveConditions@ using sensible defaults.
-mkResolveConditions :: Version -- ^ GHC version
+mkResolveConditions :: PackageVersion -- ^ GHC version
                     -> [FlagName] -- ^ enabled flags
                     -> ResolveConditions
 mkResolveConditions ghcVersion flags = ResolveConditions
     { rcFlags = flags
-    , rcCompiler = CompilerId GHC ghcVersion
+    , rcCompiler = CompilerId GHC $ toCabalVersion ghcVersion
     , rcOS = buildOS
     , rcArch = buildArch
     }
