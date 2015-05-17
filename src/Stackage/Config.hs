@@ -408,7 +408,7 @@ getStackageConfig = do
     Just _ -> return mempty
     -- No root def so far, do the work to find the default
     Nothing -> do
-      dir <- liftIO $ getAppUserDataDirectory ".stackage"
+      dir <- liftIO $ getAppUserDataDirectory "stackage"
       return mempty
         { stackageConfigStackageOpts = mempty
           { stackageOptsRoot = Just $ Text.pack dir
