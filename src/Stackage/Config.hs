@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -24,27 +26,34 @@ module Stackage.Config (
   , NotYetImplemented(..)
   ) where
 
-import Control.Applicative
-import Control.Exception
-import Control.Monad
-import Control.Monad.Catch
-import Control.Monad.Logger hiding (Loc)
-import Control.Monad.IO.Class
-import Data.Aeson
-import Data.Aeson.Types (typeMismatch)
-import Data.Maybe
-import Data.Map (Map)
+import           Control.Applicative
+import           Control.Exception
+import           Control.Monad
+import           Control.Monad.Catch
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger hiding (Loc)
+import           Data.Aeson
+import           Data.Aeson.Types (typeMismatch)
+
+import qualified Data.ByteString as S (readFile)
+import           Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Monoid
-import Data.Text (Text)
+import qualified Data.Map.Strict as M
+import           Data.Maybe
+import           Data.Monoid
+import           Data.Set (Set)
+import qualified Data.Set as S
+import           Data.Text (Text)
+import qualified Data.Text as T
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
-import Data.Typeable
+import           Data.Typeable
 import qualified Data.Yaml as Yaml
-import Path
-import System.Directory
-import System.Environment
-import System.Process
+import           Path
+import           Stackage.PackageName
+import           System.Directory
+import           System.Environment
+import           System.Process
 
 -- | The top-level Stackage configuration.
 data Config =
@@ -125,16 +134,16 @@ instance Monoid StackageConfig where
     , stackageConfigBuildOpts = appendOf stackageConfigBuildOpts l r
     }
 
-instance FromJSON StackageConfig where
+instance FromJSON (Path Abs Dir -> StackageConfig) where
   parseJSON = withObject "StackageConfig" $ \obj -> do
     stackageConfigStackageOpts <- obj .:? "stackage" .!= mempty
-    stackageConfigBuildOpts <- obj .:? "build" .!= mempty
-    return StackageConfig{..}
-
+    getBuildOpts <- obj .:? "build" .!= mempty
+    return (\parentDir -> let stackageConfigBuildOpts = getBuildOpts parentDir
+                          in StackageConfig{..})
 
 data StackageOpts =
   StackageOpts
-    { stackageOptsRoot :: !(Maybe Text)
+    { stackageOptsRoot :: !(Maybe (Path Abs Dir))
     , stackageOptsHost :: !(Maybe Text)
     }
   deriving Show
@@ -150,33 +159,86 @@ instance Monoid StackageOpts where
     }
 
 instance FromJSON StackageOpts where
-  parseJSON = withObject "StackageOpts" $ \obj -> do
-    stackageOptsRoot <- obj .:? "root"
-    stackageOptsHost <- obj .:? "host"
-    return StackageOpts{..}
+  parseJSON =
+    withObject "StackageOpts" $
+    \obj ->
+      do stackageOptsRoot <-
+           obj .:? "root" >>=
+           \x ->
+             case x of
+               Nothing -> return Nothing
+               Just x' ->
+                 case parseAbsDir x' of
+                   Nothing ->
+                     fail "Unable to parse valid absolute root directory."
+                   Just dir -> return (Just dir)
+         stackageOptsHost <- obj .:? "host"
+         return StackageOpts {..}
 
 data BuildOpts =
   BuildOpts
     { buildOptsIn :: !(Maybe BuildIn)
     , buildOptsWith :: !(Maybe BuildWith)
+    , buildOptsPackages :: !(Set (Path Abs Dir))
+    , buildOptsFlags :: !(Map Text Bool)
+    , buildOptsPackageFlags :: !(Map PackageName (Map Text Bool))
     }
   deriving Show
 
 instance Monoid BuildOpts where
   mempty = BuildOpts
-    { buildOptsIn = Nothing
-    , buildOptsWith = Nothing
-    }
+   { buildOptsIn           = Nothing
+   , buildOptsWith         = Nothing
+   , buildOptsPackages     = mempty
+   , buildOptsFlags        = mempty
+   , buildOptsPackageFlags = mempty
+   }
   mappend l r = BuildOpts
     { buildOptsIn = altOf buildOptsIn l r
     , buildOptsWith = altOf buildOptsWith l r
+    , buildOptsPackages = buildOptsPackages l <> buildOptsPackages r
+    , buildOptsFlags = buildOptsFlags l <> buildOptsFlags r
+    , buildOptsPackageFlags = buildOptsPackageFlags l <> buildOptsPackageFlags r
     }
 
-instance FromJSON BuildOpts where
-  parseJSON = withObject "BuildOpts" $ \obj -> do
-    buildOptsIn <- obj .:? "in"
-    buildOptsWith <- obj .:? "with"
-    return BuildOpts{..}
+instance FromJSON (Path Abs Dir -> BuildOpts) where
+  parseJSON =
+    withObject "BuildOpts" $
+    \obj ->
+      do buildOptsIn <- obj .:? "in"
+         buildOptsWith <- obj .:? "with"
+         packages <-
+           do ps <- obj .: "packages"
+              fmap S.fromList
+                   (mapM (\x ->
+                            if x == "."
+                               then return (Left ())
+                               else fmap Right
+                                         (either (fail . ("Unable to parse relative directory location: " ++) .
+                                                         show)
+                                                 return
+                                                 (parseRelDir x)))
+                         ps)
+         buildOptsFlags <-
+           fmap (fromMaybe mempty)
+                (obj .:? "flags")
+         buildOptsPackageFlags <-
+           fmap (M.fromList .
+                 mapMaybe (\(name,x) ->
+                             do name' <- parsePackageNameFromString name
+                                return (name',x)) .
+                 M.toList)
+                (fmap (fromMaybe mempty)
+                      (obj .:? "package-flags"))
+         return (\parentDir ->
+                   let buildOptsPackages =
+                         S.map (\x ->
+                                  case x of
+                                    Left () -> parentDir
+                                    Right p ->
+                                      (parentDir </> p))
+                               packages
+                   in BuildOpts {..})
 
 newtype BuildIn = BuildIn Text
   deriving Show
@@ -256,9 +318,6 @@ instance FromJSON CustomEnvBins where
 --  , customSandboxLocation :: a
 --  }
 --  deriving Show
-
-type StackageRoot = Path Abs Dir
-type StackageHost = String
 
 --instance FromJSON LTSBuildStrategy where
 --  parseJSON j = parseAsText j <|> parseAsScientific j where
@@ -380,19 +439,20 @@ parsePackageDb = do
 
 getEnvFileStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
   => m StackageConfig
-getEnvFileStackageConfig = liftIO (lookupEnvText "STACKAGE_CONFIG") >>= \case
-  Just file -> getFileStackageConfig file
-  Nothing -> return mempty
+getEnvFileStackageConfig = liftIO (lookupEnv "STACKAGE_CONFIG") >>= \case
+  Just (parseAbsFile -> Just configFilePath) -> getFileStackageConfig configFilePath
+  _ -> return mempty
 
 getGlobalStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
   => m StackageConfig
-getGlobalStackageConfig = liftIO (lookupEnvText "STACKAGE_GLOBAL_CONFIG") >>= \case
-  Just file -> getFileStackageConfig file
-  Nothing -> getFileStackageConfig defaultStackageGlobalConfig
+getGlobalStackageConfig = liftIO (lookupEnv "STACKAGE_GLOBAL_CONFIG") >>= \case
+  Just (parseAbsFile -> Just configFilePath) -> getFileStackageConfig configFilePath
+  _ -> getFileStackageConfig defaultStackageGlobalConfig
 
 -- TODO: What about Windows?
-defaultStackageGlobalConfig :: Text
-defaultStackageGlobalConfig = "/etc/stackage/config"
+-- FIXME: This will not build on Windows. (Good!)
+defaultStackageGlobalConfig :: Path Abs File
+defaultStackageGlobalConfig = $(mkAbsFile "/etc/stackage/config")
 
 getStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
   => m StackageConfig
@@ -408,10 +468,10 @@ getStackageConfig = do
     Just _ -> return mempty
     -- No root def so far, do the work to find the default
     Nothing -> do
-      dir <- liftIO $ getAppUserDataDirectory "stackage"
+      dir <- liftIO $ getAppUserDataDirectory "stackage" >>= parseAbsDir
       return mempty
         { stackageConfigStackageOpts = mempty
-          { stackageOptsRoot = Just $ Text.pack dir
+          { stackageOptsRoot = Just dir
           }
         }
 
@@ -419,24 +479,46 @@ getStackageConfig = do
       -- The above ensures this is safe
       Just stackageRoot = stackageOptsRoot (stackageConfigStackageOpts config1)
 
-  rootConfig <- getFileStackageConfig stackageRoot
+  rootConfig <- getFileStackageConfig (stackageRoot </> stackageDotConfig)
   globalStackageConfig <- getGlobalStackageConfig
   return $ config1 <> rootConfig <> globalStackageConfig
 
-getLocalStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => m StackageConfig
-getLocalStackageConfig = getFileStackageConfig "stackage.config"
+-- | Get the current directory's @stackage.config@ file.
+getLocalStackageConfig :: (MonadLogger m,MonadIO m,MonadThrow m)
+                       => m StackageConfig
+getLocalStackageConfig =
+  do pwd <-
+       liftIO (getCurrentDirectory >>= parseAbsDir)
+     $logDebug ("Current directory is: " <>
+                T.pack (show pwd))
+     let filePath = pwd </> stackageDotConfig
+     $logDebug ("Reading from config file: " <>
+                T.pack (show filePath))
+     getFileStackageConfig filePath
 
 getFileStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => Text -> m StackageConfig
-getFileStackageConfig fileNameText = liftIO $ do
-  let file = Text.unpack fileNameText
-  exists <- doesFileExist file
-  if exists
-    then do
-      mconf <- Yaml.decodeFile file
-      return $ fromMaybe mempty mconf
-    else return mempty
+  => Path Abs File -> m StackageConfig
+getFileStackageConfig configFilePath =
+  do exists <-
+       liftIO (doesFileExist (toFilePath configFilePath))
+     if exists
+        then do mconf <-
+                  liftM Yaml.decodeEither (liftIO (S.readFile (toFilePath configFilePath)))
+                case mconf of
+                  Right c ->
+                    $logDebug ("Parsed config: " <>
+                               T.pack (show (c dir)))
+                  Left err ->
+                    $logDebug ("Parsing config file failed at " <>
+                               T.pack (show configFilePath) <>
+                               ": " <>
+                               T.pack err)
+                return $
+                  either (const mempty) ($ dir) mconf
+        else do $logDebug ("No config file exist at " <>
+                           T.pack (show configFilePath))
+                return mempty
+  where dir = parent configFilePath
 
 lookupEnvText :: String -> IO (Maybe Text)
 lookupEnvText var = fmap Text.pack <$> lookupEnv var
@@ -444,7 +526,7 @@ lookupEnvText var = fmap Text.pack <$> lookupEnv var
 getEnvStackageOpts :: (MonadLogger m, MonadIO m, MonadThrow m)
   => m StackageOpts
 getEnvStackageOpts = liftIO $ do
-  stackageRoot <- lookupEnvText "STACKAGE_ROOT"
+  stackageRoot <- lookupEnv "STACKAGE_ROOT" >>= maybe (return Nothing) (fmap Just . parseAbsDir)
   stackageHost <- lookupEnvText "STACKAGE_HOST"
   return mempty
     { stackageOptsRoot = stackageRoot
@@ -478,7 +560,7 @@ configFromStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
 configFromStackageConfig StackageConfig{..} = do
   let StackageOpts{..} = stackageConfigStackageOpts
   configStackageHost <- resolveStackageHost stackageOptsHost
-  configStackageRoot <- resolveStackageRoot stackageOptsRoot
+  configStackageRoot <- maybe (error "No stackage root.") return stackageOptsRoot -- FIXME: This is not good.
   let BuildOpts{..} = stackageConfigBuildOpts
   configBuildIn <- resolveBuildIn buildOptsIn
   (configGhcBinLocation, configCabalBinLocation, configPkgDbLocation) <-
@@ -499,9 +581,10 @@ resolveBuildIn = return . maybe defaultBuildIn (\(BuildIn t) -> t)
 defaultBuildIn :: Text
 defaultBuildIn = "sandbox"
 
-resolveBuildWith :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => StackageRoot -> (Maybe BuildWith) -> m (Path Abs Dir, Path Abs Dir, Path Abs Dir)
-                                         -- (ghc,          cabal,        package-db)
+resolveBuildWith :: (MonadLogger m,MonadIO m,MonadThrow m)
+                 => Path Abs Dir
+                 -> (Maybe BuildWith)
+                 -> m (Path Abs Dir,Path Abs Dir,Path Abs Dir) -- (ghc, cabal, package-db)
 resolveBuildWith sr mbw = resolveBuildWith' sr $ fromMaybe defaultBuildWith mbw
 
 defaultBuildWith :: BuildWith
@@ -510,8 +593,8 @@ defaultBuildWith = BuildWithCustom (CustomEnvBins mempty)
 -- TODO: BuildWithSnapshot
 -- TODO: handle vague things like "ghc: 7.10"
 resolveBuildWith' :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => StackageRoot -> BuildWith -> m (Path Abs Dir, Path Abs Dir, Path Abs Dir)
-                                 -- (ghc,          cabal,        package-db)
+  => Path Abs Dir -> BuildWith -> m (Path Abs Dir, Path Abs Dir, Path Abs Dir)
+                                             -- (ghc,          cabal,        package-db)
 resolveBuildWith' _stackageRoot (BuildWithSnapshot _) =
   throwM $ NotYetImplemented "resolveBuildWith': BuildWithSnapshot"
 resolveBuildWith' _stackageRoot (BuildWithCustom (CustomEnvBins bins)) = do
@@ -572,15 +655,13 @@ resolveBuildWith' _stackageRoot (BuildWithCustom (CustomEnvBins bins)) = do
 --resolveCustomCabalLoc _ = throwM $ NotYetImplemented "resolveCustomCabalLoc"
 
 -- TODO: copy from stackage-sandbox or wherver this has been well defined
-resolveStackageRoot :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => Maybe Text -> m StackageRoot
-resolveStackageRoot (Just t) = parseAbsDir (Text.unpack t)
-resolveStackageRoot Nothing = throwM $ NotYetImplemented "resolveStackageRoot: unexpected error"
-
--- TODO: copy from stackage-sandbox or wherver this has been well defined
 resolveStackageHost :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => Maybe Text -> m StackageHost
+  => Maybe Text -> m String
 resolveStackageHost = return . maybe stackageHostDefault Text.unpack
 
 stackageHostDefault :: String
 stackageHostDefault = "https://www.stackage.org"
+
+-- | The filename used for the stackage config file.
+stackageDotConfig :: Path Rel File
+stackageDotConfig = $(mkRelFile "stackage.config")
