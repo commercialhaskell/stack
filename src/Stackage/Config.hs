@@ -21,6 +21,7 @@
 -- a warning that "you should run `stk init` to make things better".
 module Stackage.Config
   ( Config(..)
+  , ConfigException(..)
   , configInDocker
   , Settings(..)
   , Docker(..)
@@ -96,8 +97,10 @@ data Settings = Settings
 configInDocker :: Config -> Bool
 configInDocker = (== "docker") . configBuildIn
 
-data ConfigException =
-  ConfigInvalidYaml String
+data ConfigException
+  = ConfigInvalidYaml String
+  | ConfigNoFile
+  | ConfigNoDockerConfig
   deriving (Typeable,Show)
 instance Exception ConfigException
 
@@ -800,12 +803,12 @@ configFromStackageConfig StackageConfig{..} =
 -- dirs, not, e.g. $HOME/.stackage.
 --
 -- TODO: Look in other locations.
-getDocker :: (MonadIO m,MonadLogger m,MonadThrow m) => m (Maybe Docker)
+getDocker :: (MonadIO m,MonadLogger m,MonadThrow m) => m Docker
 getDocker =
   do mdocker <- getDockerLocal
      case mdocker of
-       Just docker -> return (Just docker)
-       Nothing -> return Nothing
+       Just docker -> return docker
+       Nothing -> throwM ConfigNoDockerConfig
 
 -- | Get local directory docker configuration. Searches upwards for
 -- the first parent containing the config file.
@@ -818,7 +821,7 @@ getDockerLocal =
                 T.pack (show pwd))
      mfile <- findFileUp pwd ((== stackageDotConfig) . filename) Nothing
      case mfile of
-       Nothing -> return Nothing
+       Nothing -> throwM ConfigNoFile
        Just file -> do $logDebug ("Reading from config file: " <>
                                   T.pack (show file))
                        readDockerFrom file
