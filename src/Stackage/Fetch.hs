@@ -147,9 +147,9 @@ getPackageInfo indexTar pkgs0 = withBinaryFile indexTar ReadMode $ \h -> do
         case T.splitOn "/" $ T.pack name of
             [pkg, ver, fp]
               | T.stripSuffix ".json" fp == Just pkg ->
-                do name <- parsePackageNameFromString (T.unpack pkg)
-                   ver <- parsePackageVersionFromString (T.unpack ver)
-                   return (PackageIdentifier name ver)
+                do name' <- parsePackageNameFromString (T.unpack pkg)
+                   ver' <- parsePackageVersionFromString (T.unpack ver)
+                   return (PackageIdentifier name' ver')
             _ -> Nothing
 
 data StackageFetchException

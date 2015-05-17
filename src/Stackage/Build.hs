@@ -36,7 +36,7 @@ import           Data.Aeson
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
-import           Data.Conduit (($$),($=),ConduitM)
+import           Data.Conduit (($$),($=))
 import           Data.Conduit.Binary (sinkIOHandle,sourceHandle)
 import qualified Data.Conduit.List as CL
 import           Data.Default
@@ -59,10 +59,10 @@ import           Distribution.Version
 import           Path as FL
 import           Path.Find
 import           Prelude hiding (FilePath,writeFile)
-import           Stackage.Build.Config
 import           Stackage.Build.Defaults
 import           Stackage.Build.Doc
 import           Stackage.Build.Types
+import           Stackage.Config
 import           Stackage.Fetch as Fetch
 import           Stackage.FlagName
 import           Stackage.GhcPkg
@@ -85,9 +85,10 @@ import           System.Posix.Files (createSymbolicLink,removeLink)
 -- Top-level commands
 
 -- | Build and test using Shake.
-test :: TestConfig -> IO ()
-test conf =
-  build (BuildConfig (tconfigTargets conf)
+test :: Stackage.Config.Config -> TestConfig -> IO ()
+test config conf =
+  build config
+        (BuildConfig (tconfigTargets conf)
                      (tconfigVerbosity conf)
                      False
                      False
@@ -98,9 +99,10 @@ test conf =
                      (tconfigInDocker conf))
 
 -- | Build and haddock using Shake.
-haddock :: HaddockConfig -> IO ()
-haddock conf =
-  build (BuildConfig (hconfigTargets conf)
+haddock :: Stackage.Config.Config -> HaddockConfig -> IO ()
+haddock config conf =
+  build config
+        (BuildConfig (hconfigTargets conf)
                      (hconfigVerbosity conf)
                      False
                      False
@@ -111,9 +113,10 @@ haddock conf =
                      (hconfigInDocker conf))
 
 -- | Build and benchmark using Shake.
-benchmark :: BenchmarkConfig -> IO ()
-benchmark conf =
-  build (BuildConfig (benchTargets conf)
+benchmark :: Stackage.Config.Config -> BenchmarkConfig -> IO ()
+benchmark config conf =
+  build config
+        (BuildConfig (benchTargets conf)
                      (benchVerbosity conf)
                      False
                      False
@@ -124,13 +127,11 @@ benchmark conf =
                      (benchInDocker conf))
 
 -- | Build using Shake.
-build :: BuildConfig -> IO ()
-build bconfig =
-  do cfg <- readConfig
-     pinfos <-
+build :: Stackage.Config.Config -> BuildConfig -> IO ()
+build config bconfig =
+  do pinfos <-
        runNoLoggingT (runResourceT (getPackageInfos (bconfigFinalAction bconfig)
-                                    (Just bconfig)
-                                    cfg))
+                                    (Just bconfig) config))
      pkgIds <-
        getPackageIds (map packageName (S.toList pinfos))
      pwd <- getCurrentDirectory >>= parseAbsDir
@@ -167,7 +168,7 @@ build bconfig =
         else withArgs []
                       (shakeArgs shakeOptions {shakeVerbosity = bconfigVerbosity bconfig
                                               ,shakeFiles =
-                                                 FL.toFilePath (shakeFilesPath cfg)
+                                                 FL.toFilePath (shakeFilesPath (configDir config))
                                               ,shakeThreads = defaultShakeThreads}
                                  (do sequence_ plans
                                      when (bconfigFinalAction bconfig ==
@@ -192,11 +193,10 @@ dryRunPrint pinfos =
      forM_ (S.toList pinfos) (\pinfo -> putStrLn (packageNameString (packageName pinfo)))
 
 -- | Reset the build (remove Shake database and .gen files).
-clean :: IO ()
-clean =
-  do cfg <- readConfig
-     pinfos <-
-       runNoLoggingT (runResourceT (getPackageInfos DoNothing Nothing cfg))
+clean :: Stackage.Config.Config -> IO ()
+clean config =
+  do pinfos <-
+       runNoLoggingT (runResourceT (getPackageInfos DoNothing Nothing config))
      forM_ (S.toList pinfos)
            (\pinfo ->
               do deleteGenFile (packageDir pinfo)
@@ -204,11 +204,11 @@ clean =
                        FL.toFilePath (distDirFromDir (packageDir pinfo))
                  exists <- doesDirectoryExist distDir
                  when exists (removeDirectoryRecursive distDir))
-     let listDir = FL.parent (shakeFilesPath cfg)
+     let listDir = FL.parent (shakeFilesPath (configDir config))
      ls <-
        fmap (map (FL.toFilePath listDir ++))
             (getDirectoryContents (FL.toFilePath listDir))
-     mapM_ (rmShakeMetadata cfg) ls
+     mapM_ (rmShakeMetadata (configDir config)) ls
   where rmShakeMetadata cfg p =
           when (isPrefixOf
                   (FilePath.takeFileName
@@ -400,9 +400,9 @@ runhaskell pinfo args =
                                cp {cwd =
                                      Just (FL.toFilePath dir)
                                   ,std_err = Inherit}
-                               (\ClosedStream stdout stderr ->
-                                  do logFrom stdout outRef
-                                     logFrom stderr errRef)
+                               (\ClosedStream stdout' stderr' ->
+                                  do logFrom stdout' outRef
+                                     logFrom stderr' errRef)
                              return (return ()))
                          (\e@ProcessExitedUnsuccessfully{} ->
                             return (do putQuiet (display <> ": ERROR")
@@ -751,8 +751,7 @@ newConfig gconfig bconfig pinfo =
 getPackageInfos :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m,MonadResource m,MonadMask m)
                 => FinalAction -> Maybe BuildConfig -> Config -> m (Set Package)
 getPackageInfos finalAction mbconfig = go True
-  where indexSettings = Fetch.defaultSettings
-        go retry cfg =
+  where go retry cfg =
           do globalPackages <- getAllPackages
              {-liftIO (putStrLn ("All global packages: " ++ show globalPackages))-}
              (infos,errs) <-
@@ -787,12 +786,10 @@ getPackageInfos finalAction mbconfig = go True
                       [] -> do {-liftIO (putStrLn "No validated packages!")-}
                                return infos
                       toFetch ->
-                        do newPkgDirs <- fetchAndUnpackPackages
-                                           indexSettings
+                        do newPkgDirs <- fetchAndUnpackPackages cfg
                                            (map (\(PackageSuggestion name ver _flags) ->
                                                fromTuple (name,ver))
                                                 toFetch)
-                           getPkgLoc <- packageLocationGetter indexSettings
                            -- Here is where we inject third-party
                            -- dependencies and their flags and re-run
                            -- this function.
@@ -968,10 +965,10 @@ composeFlags pname pflags gflags = collapse pflags <> gflags
 
 -- | Fetch and unpack the package.
 fetchAndUnpackPackages :: (MonadIO m,MonadThrow m,MonadLogger m,MonadMask m)
-                       => Settings
+                       => Stackage.Config.Config
                        -> [PackageIdentifier]
                        -> m [Path Abs Dir]
-fetchAndUnpackPackages settings pkgs =
+fetchAndUnpackPackages config pkgs =
   do getPkgLoc <- packageLocationGetter indexSettings
      fetchPackages indexSettings pkgs
      locs <-
@@ -979,23 +976,23 @@ fetchAndUnpackPackages settings pkgs =
                liftM (ident,)
                      (parseAbsFile (getPkgLoc ident)))
             pkgs
-     descs <- readPackageDescs pkgs
+     descs <- readPackageDescs config pkgs
      forM locs
-          (\(ident@(PackageIdentifier name version),tarGzPath) ->
+          (\(ident@(PackageIdentifier name _),tarGzPath) ->
              case M.lookup name descs of
                Nothing ->
                  error "TODO: Throw error about package not existing in index."
                Just latestCabalFileContent ->
-                 unpackAndUpdateTarball ident tarGzPath latestCabalFileContent)
+                 unpackAndUpdateTarball config ident tarGzPath latestCabalFileContent)
   where indexSettings = Fetch.defaultSettings
 
 -- | Read package descriptions.
 readPackageDescs :: MonadIO m
-                 => [PackageIdentifier] -> m (Map PackageName L.ByteString)
-readPackageDescs pkgs =
+                 => Stackage.Config.Config -> [PackageIdentifier] -> m (Map PackageName L.ByteString)
+readPackageDescs config pkgs =
   liftM M.fromList
         (liftIO (runResourceT
-                   (sourcePackageIndex pkgIndexFile $=
+                   (sourcePackageIndex (pkgIndexFile config) $=
                     CL.filter (\ucf ->
                                  elem (PackageIdentifier (ucfName ucf)
                                                          (ucfVersion ucf))
@@ -1007,13 +1004,14 @@ readPackageDescs pkgs =
 
 -- | Unpack and update the package tarball.
 unpackAndUpdateTarball :: (MonadIO m,MonadLogger m,MonadMask m)
-                       => PackageIdentifier
+                       => Stackage.Config.Config
+                       -> PackageIdentifier
                        -> Path Abs File
                        -> L.ByteString
                        -> m (Path Abs Dir)
-unpackAndUpdateTarball ident tarGzPath latestCabalFileContent =
+unpackAndUpdateTarball config ident tarGzPath latestCabalFileContent =
   do pkgVerDir <-
-       liftM (pkgUnpackDir </>) (parseRelDir (packageIdentifierString ident))
+       liftM (pkgUnpackDir config </>) (parseRelDir (packageIdentifierString ident))
      newCabalFilePath <-
        liftM (pkgVerDir </>)
              (parseRelFile (packageNameString (packageIdentifierName ident) ++ ".cabal"))
@@ -1026,8 +1024,8 @@ unpackAndUpdateTarball ident tarGzPath latestCabalFileContent =
                liftIO (L.readFile (toFilePath tarGzPath))
              liftIO (L.hPutStr h (GZip.decompress targzContent))
              liftIO (hClose h)
-             $logDebug (T.pack ("Extracting to " ++ FL.toFilePath pkgUnpackDir))
-             liftIO (extract (FL.toFilePath pkgUnpackDir) fp)
+             $logDebug (T.pack ("Extracting to " ++ FL.toFilePath (pkgUnpackDir config)))
+             liftIO (extract (FL.toFilePath (pkgUnpackDir config)) fp)
              $logDebug (T.pack ("Updating cabal file " ++
                                 toFilePath newCabalFilePath))
              liftIO (L.writeFile (toFilePath newCabalFilePath)
@@ -1038,28 +1036,11 @@ unpackAndUpdateTarball ident tarGzPath latestCabalFileContent =
 -- Paths
 
 -- | Path to .shake files.
-shakeFilesPath :: Config -> Path Abs File
-shakeFilesPath cfg =
-  configDir cfg </>
+shakeFilesPath :: Path Abs Dir -> Path Abs File
+shakeFilesPath dir =
+  dir </>
   $(mkRelFile ".shake")
-
--- | Directory of configuration file, or throws 'FPNoConfigFile' if no configuration file.
-configDir :: Config -> Path Abs Dir
-configDir cfg =
-  case configMaybeDir cfg of
-    Just d -> d
-    Nothing -> throw FPNoConfigFile
 
 -- | Returns true for paths whose last directory component begins with ".".
 isHiddenDir :: Path b Dir -> Bool
 isHiddenDir = isPrefixOf "." . toFilePath . dirname
-
---------------------------------------------------------------------------------
--- Debugging facilities
-
-doUpdate =
-  runResourceT (runStdoutLoggingT (loadPkgIndex pkgIndexDir) :: ResourceT IO PackageIndex)
-
-pkgUnpackDir = $(mkAbsDir "/home/chris/.stackage/unpacked")
-pkgIndexDir = $(mkAbsDir "/home/chris/.stackage/package-index")
-pkgIndexFile = pkgIndexDir </> $(mkRelFile "00-index.tar")

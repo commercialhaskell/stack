@@ -156,7 +156,7 @@ simpleParse :: (MonadThrow m,DT.Text a)
 simpleParse x =
   case DT.simpleParse (T.unpack x) of
     Nothing -> throwM (SimpleParseException x)
-    Just x -> return x
+    Just x' -> return x'
 
 -- | A simple parse exception.
 newtype SimpleParseException = SimpleParseException Text
