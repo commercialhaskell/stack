@@ -83,6 +83,7 @@ data UnparsedCabalFile = UnparsedCabalFile
     , ucfVersion :: Version
     , ucfParse   :: forall m. MonadThrow m => m GenericPackageDescription
     , ucfLbs :: L.ByteString
+    , ucfEntry :: Tar.Entry
     }
 
 
@@ -108,6 +109,7 @@ sourcePackageIndex fp = do
                 , ucfVersion = version
                 , ucfParse = goContent (Tar.entryPath e) name version lbs
                 , ucfLbs = lbs
+                , ucfEntry = e
                 }
         | otherwise = return ()
 
