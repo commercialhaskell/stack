@@ -39,6 +39,8 @@ library
                      Stackage.Build.Config
   other-modules:     Stackage.Process
                      Path.Find
+                     System.Process.PagerEditor
+                     Paths_stackage_common
   build-depends:     Cabal >= 1.18.1.5
                    , aeson >= 0.8.0.2
                    , async >= 2.0.2
