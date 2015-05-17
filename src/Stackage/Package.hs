@@ -46,7 +46,6 @@ import           Distribution.PackageDescription hiding (FlagName)
 import           Distribution.PackageDescription.Parse
 import           Distribution.Simple.Utils
 import           Distribution.System
-import           Distribution.Version
 import           Path as FL
 import           Path.Find (findFiles)
 import           Prelude hiding (FilePath)
@@ -308,7 +307,7 @@ flagMap = M.fromList . map pair
 
 data ResolveConditions = ResolveConditions
     { rcFlags :: [FlagName]
-    , rcCompiler :: CompilerId
+    , rcGhcVersion :: PackageVersion
     , rcOS :: OS
     , rcArch :: Arch
     }
@@ -319,7 +318,7 @@ mkResolveConditions :: PackageVersion -- ^ GHC version
                     -> ResolveConditions
 mkResolveConditions ghcVersion flags = ResolveConditions
     { rcFlags = flags
-    , rcCompiler = CompilerId GHC $ toCabalVersion ghcVersion
+    , rcGhcVersion = ghcVersion
     , rcOS = buildOS
     , rcArch = buildArch
     }
@@ -353,10 +352,8 @@ resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
                     Arch arch -> arch == rcArch rc
                     Flag flag -> elem (fromCabalFlagName flag) (rcFlags rc)
                     Impl flavor range ->
-                      case rcCompiler rc of
-                        CompilerId flavor' ver ->
-                          flavor' == flavor &&
-                          withinRange ver range
+                        flavor == GHC &&
+                        withinRange (rcGhcVersion rc) range
 
 -- | Get the name of a dependency.
 depName :: Dependency -> PackageName

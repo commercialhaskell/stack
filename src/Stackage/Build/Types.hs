@@ -22,7 +22,6 @@ import Data.Yaml
 import Development.Shake (Verbosity)
 import Distribution.Package hiding (Package,PackageName)
 import GHC.Generics
-import Path as FL
 import Prelude hiding (FilePath)
 import Stackage.FlagName
 import Stackage.GhcPkgId

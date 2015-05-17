@@ -6,7 +6,6 @@
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RankNTypes         #-}
 {-# LANGUAGE ViewPatterns       #-}
-{-# LANGUAGE NoImplicitPrelude  #-}
 {-# LANGUAGE GADTs              #-}
 
 -- | Dealing with the 00-index file and all its cabal files.
@@ -17,11 +16,19 @@ module Stackage.PackageIndex.Read
     , getPackageIndexPath
     ) where
 
-import           ClassyPrelude.Conduit
+import Data.Typeable (Typeable)
+import Data.Text (Text)
+import Control.Monad.Catch (MonadThrow, throwM)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.Monoid (mempty, (<>))
+import qualified Data.Map as Map
+import Data.Traversable (forM)
 import qualified Codec.Archive.Tar as Tar
+import           Control.Exception (Exception)
 import qualified Data.ByteString.Lazy as L
 import           Data.Conduit.Lazy (MonadActive, lazyConsume)
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
 import qualified Distribution.Package as Cabal
 import           Distribution.PackageDescription       (package,
                                                         packageDescription)
@@ -33,27 +40,40 @@ import           Path hiding ((</>))
 import           Stackage.PackageName
 import           Stackage.PackageVersion
 import           System.Directory (getAppUserDataDirectory)
+import qualified Data.Conduit.List as CL
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Control (MonadBaseControl)
+import Data.Conduit
+import Data.Map (Map)
+import Data.Maybe (fromMaybe)
+import Data.Text.Lazy.Encoding (decodeUtf8With)
+import Data.Text.Encoding.Error (lenientDecode)
+import Control.Monad.Trans.Resource (runResourceT, MonadResource)
+import Control.Monad (when)
+import qualified Data.Conduit.Text as CT
+import qualified Data.Conduit.Binary as CB
+import System.FilePath ((</>))
 
 -- | Name of the 00-index.tar downloaded from Hackage.
 getPackageIndexPath :: MonadIO m => m FilePath
 getPackageIndexPath = liftIO $ do
     c <- getCabalRoot
-    configLines <- runResourceT $ sourceFile (c </> "config")
-                               $$ decodeUtf8C
-                               =$ linesUnboundedC
-                               =$ concatMapC getRemoteCache
-                               =$ sinkList
+    configLines <- runResourceT $ CB.sourceFile (c </> "config")
+                               $$ CT.decodeUtf8
+                               =$ CT.lines
+                               =$ CL.mapMaybe getRemoteCache
+                               =$ CL.consume
     case configLines of
         [x] -> return $ x </> "hackage.haskell.org" </> "00-index.tar"
         [] -> error $ "No remote-repo-cache found in Cabal config file"
         _ -> error $ "Multiple remote-repo-cache entries found in Cabal config file"
   where
     getCabalRoot :: IO FilePath
-    getCabalRoot = fpFromString <$> getAppUserDataDirectory "cabal"
+    getCabalRoot = getAppUserDataDirectory "cabal"
 
     getRemoteCache s = do
-        ("remote-repo-cache", stripPrefix ":" -> Just v) <- Just $ break (== ':') s
-        Just $ fpFromText $ T.strip v
+        ("remote-repo-cache", T.stripPrefix ":" -> Just v) <- Just $ T.break (== ':') s
+        Just $ T.unpack $ T.strip v
 
 -- | A cabal file with name and version parsed from the filepath, and the
 -- package description itself ready to be parsed. It's left in unparsed form
@@ -72,7 +92,7 @@ sourcePackageIndex :: (MonadThrow m, MonadResource m, MonadActive m, MonadBaseCo
 sourcePackageIndex fp = do
     -- yay for the tar package. Use lazyConsume instead of readFile to get some
     -- kind of resource protection
-    lbs <- lift $ fromChunks <$> lazyConsume (sourceFile (fromString (Path.toFilePath fp)))
+    lbs <- lift $ fmap L.fromChunks $ lazyConsume $ CB.sourceFile $ Path.toFilePath fp
     loop (Tar.read lbs)
   where
     loop (Tar.Next e es) = goE e >> loop es
@@ -80,7 +100,7 @@ sourcePackageIndex fp = do
     loop (Tar.Fail e) = throwM e
 
     goE e
-        | Just front <- stripSuffix ".cabal" $ pack $ Tar.entryPath e
+        | Just front <- T.stripSuffix ".cabal" $ T.pack $ Tar.entryPath e
         , Tar.NormalFile lbs _size <- Tar.entryContent e = do
             (fromCabalPackageName -> name, fromCabalVersion -> version) <- parseNameVersion front
             yield UnparsedCabalFile
@@ -93,27 +113,27 @@ sourcePackageIndex fp = do
 
     goContent :: String -> PackageName -> PackageVersion -> L.ByteString -> (forall m. MonadThrow m => m GenericPackageDescription)
     goContent fp' name version lbs =
-        case parsePackageDescription $ unpack $ dropBOM $ decodeUtf8 lbs of
-            ParseFailed e -> throwM $ CabalParseException (fpFromString fp') e
+        case parsePackageDescription $ TL.unpack $ dropBOM $ decodeUtf8With lenientDecode lbs of
+            ParseFailed e -> throwM $ CabalParseException fp' e
             ParseOk _warnings gpd -> do
                 let pd = packageDescription gpd
                     Cabal.PackageIdentifier (fromCabalPackageName -> name') (fromCabalVersion -> version') = package pd
                 when (name /= name' || version /= version') $
-                    throwM $ MismatchedNameVersion (fpFromString fp')
+                    throwM $ MismatchedNameVersion fp'
                         name name' version version'
                 return gpd
 
     -- https://github.com/haskell/hackage-server/issues/351
-    dropBOM t = fromMaybe t $ stripPrefix "\xFEFF" t
+    dropBOM t = fromMaybe t $ TL.stripPrefix "\xFEFF" t
 
     parseNameVersion t1 = do
-        let (p', t2) = break (== '/') $ T.replace "\\" "/" t1
+        let (p', t2) = T.break (== '/') $ T.replace "\\" "/" t1
         p <- simpleParse p'
         t3 <- maybe (throwM $ InvalidCabalPath t1 "no slash") return
-            $ stripPrefix "/" t2
-        let (v', t4) = break (== '/') t3
+            $ T.stripPrefix "/" t2
+        let (v', t4) = T.break (== '/') t3
         v <- simpleParse v'
-        when (t4 /= cons '/' p') $ throwM $ InvalidCabalPath t1 $ "Expected at end: " ++ p'
+        when (t4 /= T.cons '/' p') $ throwM $ InvalidCabalPath t1 $ "Expected at end: " <> p'
         return (p, v)
 
 data InvalidCabalPath = InvalidCabalPath Text Text
@@ -139,14 +159,14 @@ getLatestDescriptions :: MonadIO m
                       -> (GenericPackageDescription -> IO desc)
                       -> m (Map PackageName desc)
 getLatestDescriptions fp f parseDesc = liftIO $ do
-    m <- runResourceT $ sourcePackageIndex fp $$ filterC f' =$ foldlC add mempty
+    m <- runResourceT $ sourcePackageIndex fp $$ CL.filter f' =$ CL.fold add mempty
     forM m $ \ucf -> liftIO $ ucfParse ucf >>= parseDesc
   where
     f' ucf = f (ucfName ucf) (ucfVersion ucf)
     add m ucf =
-        case lookup name m of
+        case Map.lookup name m of
             Just ucf' | ucfVersion ucf < ucfVersion ucf' -> m
-            _ -> insertMap name ucf m
+            _ -> Map.insert name ucf m
       where
         name = ucfName ucf
 

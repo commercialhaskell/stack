@@ -20,7 +20,6 @@ import           Data.Data
 import           Data.List
 import           Data.Map.Strict (Map)
 import           Data.Maybe
-import           Data.Text (Text)
 import           Network.HTTP.Client
 import           Network.HTTP.Types.Status
 import           Prelude hiding (FilePath)

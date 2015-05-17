@@ -55,7 +55,6 @@ import qualified Data.Text as T
 import           Development.Shake hiding (doesFileExist,doesDirectoryExist,getDirectoryContents)
 import           Distribution.Compiler (CompilerId (CompilerId), buildCompilerId)
 import           Distribution.Package hiding (packageName,packageVersion,Package,PackageName,PackageIdentifier)
-import           Distribution.Version
 import           Path as FL
 import           Path.Find
 import           Prelude hiding (FilePath,writeFile)
@@ -839,7 +838,7 @@ validateSuggestion globalPackages okPkgVers =
   (\suggestion@(PackageSuggestion name suggestedVer _) ->
      case M.lookup name okPkgVers of
        Just range
-         | not (withinRange (toCabalVersion suggestedVer) range) ->
+         | not (withinRange suggestedVer range) ->
            liftIO (throwIO (FPStackageDepVerMismatch name suggestedVer range))
        _ ->
          case M.lookup name globalPackages of
@@ -861,7 +860,7 @@ checkPackageInIndex index (name,(range,_)) =
   do mversions <- getPkgVersions index name
      case mversions of
        Just vers
-         | any (flip withinRange range . toCabalVersion)
+         | any (flip withinRange range)
                (S.toList vers) ->
            return (Right (name,range))
          | otherwise -> return (Left name)
@@ -896,12 +895,12 @@ sievePackages globalNameVersions localNameVersions p =
   do deps <-
        filterM (\(name,range) ->
                   case M.lookup name localNameVersions of
-                    Just ver | withinRange (toCabalVersion ver) range -> return True
+                    Just ver | withinRange ver range -> return True
                              | otherwise -> do tell [FPMissingDep p name range]
                                                return False
                     Nothing -> case M.lookup name globalNameVersions of
                                  Just ver
-                                   | withinRange (toCabalVersion ver) range ->
+                                   | withinRange ver range ->
                                      return False
                                    | otherwise ->
                                      do tell [FPMissingDep p name range]

@@ -18,7 +18,8 @@ module Stackage.PackageVersion
   ,toCabalVersion
   ,fromCabalVersion
   ,mkPackageVersion
-  ,versionRangeText)
+  ,versionRangeText
+  ,withinRange)
   where
 
 import           Control.Applicative
@@ -35,10 +36,11 @@ import qualified Data.Text as T
 import           Data.Vector.Unboxed (Vector)
 import qualified Data.Vector.Unboxed as V
 import           Data.Word
-import           Distribution.Version
+import           Distribution.Version hiding (withinRange)
 import           GHC.Generics
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
+import qualified Distribution.Version as C             (withinRange)
 import Distribution.Text (disp)
 import Text.PrettyPrint (render)
 
@@ -135,3 +137,7 @@ mkPackageVersion s =
 -- | Display a version range
 versionRangeText :: VersionRange -> Text
 versionRangeText = T.pack . render . disp
+
+-- | Check if a version is within a version range.
+withinRange :: PackageVersion -> VersionRange -> Bool
+withinRange v r = toCabalVersion v `C.withinRange` r

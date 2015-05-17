@@ -49,7 +49,6 @@ library
                    , attoparsec >= 0.12.1.5
                    , base >= 4 && <5
                    , bytestring
-                   , classy-prelude-conduit >= 0.11.0
                    , conduit >= 1.2.4
                    , conduit >= 1.2.4
                    , conduit-combinators >= 0.3.0.6

@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE EmptyDataDecls    #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE EmptyDataDecls     #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE TemplateHaskell    #-}
 
 
 -- | Resolving a build plan for a set of packages in a given Stackage
@@ -19,75 +19,52 @@ module Stackage.BuildPlan
     , checkDeps
     ) where
 
-import           Control.Monad               (unless, when)
+import           Control.Applicative             ((<$>), (<*>))
+import           Control.Monad                   (when)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Data.Aeson (FromJSON (..))
-import           Data.Set (Set)
-import           Stackage.Config
-import           Stackage.PackageIdentifier
-import Path
-import Stackage.Package
-import Stackage.PackageName
-import Stackage.FlagName
-import qualified Data.Foldable as F
-import           Control.Monad.State.Strict  (execState, get,State,
-                                              modify, put)
-import qualified Data.Set                    as Set
-import           Control.Applicative                   ((<$>), (<*>), (<|>))
-import           Control.Exception                     (Exception, assert)
-import           Control.Monad                         (unless)
-import           Control.Monad.Catch                   (MonadThrow, throwM)
-import           Control.Monad.IO.Class                (MonadIO, liftIO)
-import           Control.Monad.Logger                  (MonadLogger, logDebug)
-import           Control.Monad.Trans.Resource          (runResourceT)
-import           Data.Aeson                            (FromJSON (..),
-                                                        withObject, withText,
-                                                        (.:))
-import           Data.Aeson.Parser                     (json')
-import           Data.Aeson.Types                      (parseEither)
-import qualified Data.ByteString                       as S
-import           Data.Conduit                          (($$))
-import           Data.Conduit.Attoparsec               (sinkParser)
-import qualified Data.Conduit.Binary                   as CB
-import qualified Data.HashMap.Strict                   as HM
-import           Data.IntMap                           (IntMap)
-import qualified Data.IntMap                           as IntMap
-import           Data.Map                              (Map)
-import qualified Data.Map                              as Map
-import           Data.Maybe                            (mapMaybe)
-import           Data.Monoid                           ((<>))
-import           Data.Text                             (Text)
-import qualified Data.Text                             as T
-import           Data.Text.Encoding                    (decodeUtf8With)
-import           Data.Text.Encoding.Error              (lenientDecode)
-import           Data.Text.Read                        (decimal)
-import           Data.Time                             (Day)
-import           Data.Typeable                         (Typeable)
-import           Data.Yaml                             (decodeFileEither)
-import           Distribution.Compiler                 (CompilerFlavor (GHC))
-import           Distribution.InstalledPackageInfo     (PError)
-import           Distribution.PackageDescription       (GenericPackageDescription, genPackageFlags, flagManual, flagName, flagDefault)
-import           Distribution.PackageDescription.Parse (ParseResult (..),
-                                                        parsePackageDescription)
-import           Distribution.System                   (buildArch, buildOS)
-import           Distribution.Version                  (VersionRange,
-                                                        intersectVersionRanges,
-                                                        withinRange)
-import           Network.HTTP.Client                   (Manager, parseUrl,
-                                                        responseBody,
-                                                        withResponse)
-import           Network.HTTP.Client.Conduit           (bodyReaderSource)
-import           Safe                                  (readMay)
+import           Control.Monad.State.Strict      (State, execState, get, modify,
+                                                  put)
+import           Control.Monad.Trans.Resource    (runResourceT)
+import           Data.Aeson                      (FromJSON (..))
+import           Data.Aeson                      (withObject, withText, (.:))
+import           Data.Aeson.Parser               (json')
+import           Data.Aeson.Types                (parseEither)
+import           Data.Conduit                    (($$))
+import           Data.Conduit.Attoparsec         (sinkParser)
+import qualified Data.Conduit.Binary             as CB
+import qualified Data.Foldable                   as F
+import qualified Data.HashMap.Strict             as HM
+import           Data.IntMap                     (IntMap)
+import qualified Data.IntMap                     as IntMap
+import           Data.Map                        (Map)
+import qualified Data.Map                        as Map
+import           Data.Maybe                      (mapMaybe)
+import           Data.Monoid                     ((<>))
+import           Data.Set                        (Set)
+import qualified Data.Set                        as Set
+import           Data.Text                       (Text)
+import qualified Data.Text                       as T
+import           Data.Time                       (Day)
+import           Data.Typeable                   (Typeable)
+import           Data.Yaml                       (decodeFileEither)
+import           Distribution.PackageDescription (GenericPackageDescription,
+                                                  flagDefault, flagManual,
+                                                  flagName, genPackageFlags)
+import           Network.HTTP.Client             (Manager, parseUrl,
+                                                  responseBody, withResponse)
+import           Network.HTTP.Client.Conduit     (bodyReaderSource)
+import           Path
 import           Stackage.BuildPlan.Types
+import           Stackage.FlagName
+import           Stackage.Package
+import           Stackage.PackageName
 import           Stackage.PackageVersion
-import           System.Directory                      (createDirectoryIfMissing,
-                                                        getAppUserDataDirectory,
-                                                        getDirectoryContents)
-import           System.FilePath                       (takeDirectory,
-                                                        takeExtension, (<.>))
-import qualified System.FilePath as FP
+import           System.Directory                (createDirectoryIfMissing,
+                                                  getAppUserDataDirectory)
+import           System.FilePath                 (takeDirectory, (<.>))
+import qualified System.FilePath                 as FP
 
 data BuildPlanException
     = GetSnapshotsException String
@@ -116,8 +93,8 @@ resolveBuildPlan bp packages
         }
 
 data ResolveState = ResolveState
-    { rsVisited :: Set PackageName
-    , rsUnknown :: Set PackageName
+    { rsVisited   :: Set PackageName
+    , rsUnknown   :: Set PackageName
     , rsToInstall :: Map PackageName (PackageVersion, Set FlagName)
     }
 
@@ -307,7 +284,7 @@ checkDeps flags deps packages = do
         case Map.lookup name packages of
             Nothing -> Just $ "Package not present: " <> packageNameText name
             Just v
-                | withinRange (toCabalVersion v) range -> Nothing
+                | withinRange v range -> Nothing
                 | otherwise -> Just $ T.concat
                     [ packageNameText name
                     , " version available: "
