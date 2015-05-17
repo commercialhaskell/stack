@@ -17,7 +17,8 @@ module Stackage.PackageVersion
   ,packageVersionText
   ,toCabalVersion
   ,fromCabalVersion
-  ,mkPackageVersion)
+  ,mkPackageVersion
+  ,versionRangeText)
   where
 
 import           Control.Applicative
@@ -38,6 +39,8 @@ import           Distribution.Version
 import           GHC.Generics
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
+import Distribution.Text (disp)
+import Text.PrettyPrint (render)
 
 -- | A parse fail.
 data PackageVersionParseFail =
@@ -65,6 +68,8 @@ instance Show PackageVersion where
     intercalate "."
                 (map show (V.toList v))
 
+instance ToJSON PackageVersion where
+  toJSON = toJSON . packageVersionText
 instance FromJSON PackageVersion where
   parseJSON j =
     do s <- parseJSON j
@@ -126,3 +131,7 @@ mkPackageVersion s =
   case parsePackageVersionFromString s of
     Nothing -> error ("Invalid package version: " ++ show s)
     Just pn -> [|pn|]
+
+-- | Display a version range
+versionRangeText :: VersionRange -> Text
+versionRangeText = T.pack . render . disp

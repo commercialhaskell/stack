@@ -15,11 +15,13 @@ library
   hs-source-dirs:    src/
   ghc-options:       -Wall -O2
   exposed-modules:   Stackage.BuildPlan
+                     Stackage.BuildPlan.Types
                      Stackage.Config
                      Stackage.Constants
                      Stackage.Docker
                      Stackage.Docker.GlobalDB
                      Stackage.Fetch
+                     Stackage.FlagName
                      Stackage.GhcPkg
                      Stackage.GhcPkgId
                      Stackage.IO
@@ -71,8 +73,10 @@ library
                    , persistent >= 2.1.2
                    , persistent-sqlite >= 2.1.4
                    , persistent-template >= 2.1.1
+                   , pretty
                    , process >= 1.2.0.0
                    , resourcet >= 1.1.4.1
+                   , safe >= 0.3
                    , shake >= 0.15
                    , stm >= 2.4.4
                    , streaming-commons >= 0.1.10.0

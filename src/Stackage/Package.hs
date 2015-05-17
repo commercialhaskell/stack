@@ -9,6 +9,9 @@
 
 module Stackage.Package
   (readPackage
+  ,readPackageUnresolved
+  ,resolvePackage
+  ,getCabalFileName
   ,Package(..)
   ,PackageConfig(..))
   where
@@ -19,6 +22,7 @@ import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Loops
+import qualified Data.ByteString                       as S
 import           Data.Data
 import           Data.Function
 import           Data.List
@@ -31,22 +35,27 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Text.Encoding (decodeUtf8With)
+import           Data.Text.Encoding.Error (lenientDecode)
 import           Data.Yaml (ParseException)
 import           Distribution.Compiler
 import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.ModuleName as Cabal
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion)
-import           Distribution.PackageDescription
+import           Distribution.PackageDescription hiding (FlagName)
 import           Distribution.PackageDescription.Parse
 import           Distribution.Simple.Utils
 import           Distribution.System
 import           Distribution.Version
 import           Path as FL
+import           Path.Find (findFiles)
 import           Prelude hiding (FilePath)
 import           Stackage.Constants
+import           Stackage.FlagName
 import           Stackage.PackageName
 import           Stackage.PackageVersion
 import           System.Directory (doesFileExist)
+import qualified System.FilePath as FilePath
 
 -- | All exceptions thrown by the library.
 data PackageException
@@ -60,8 +69,10 @@ data PackageException
   | PackageDependencyIssues [PackageException]
   | PackageMissingTool Dependency
   | PackageCouldn'tFindPkgId PackageName
-  | PackageStackagePackageVersionMismatch PackageName Version Version
-  | PackageStackageDepVerMismatch PackageName Version VersionRange
+  | PackageStackagePackageVersionMismatch PackageName PackageVersion PackageVersion
+  | PackageStackageDepVerMismatch PackageName PackageVersion VersionRange
+  | PackageNoCabalFileFound (Path Abs Dir)
+  | PackageMultipleCabalFilesFound (Path Abs Dir) [Path Abs File]
   deriving (Show,Typeable)
 instance Exception PackageException
 
@@ -74,7 +85,7 @@ data Package =
           ,packageDeps :: !(Map PackageName VersionRange) -- ^ Packages that the package depends on.
           ,packageTools :: ![Dependency]                  -- ^ A build tool name.
           ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
-          ,packageFlags :: !(Map Text Bool)               -- ^ Flags used on package.
+          ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
           }
  deriving (Show,Typeable)
 
@@ -82,7 +93,8 @@ data Package =
 data PackageConfig =
   PackageConfig {packageConfigEnableTests :: !Bool        -- ^ Are tests enabled?
                 ,packageConfigEnableBenchmarks :: !Bool   -- ^ Are benchmarks enabled?
-                ,packageConfigFlags :: !(Map Text Bool)   -- ^ Package config flags.
+                ,packageConfigFlags :: !(Map FlagName Bool)   -- ^ Package config flags.
+                ,packageConfigGhcVersion :: !PackageVersion      -- ^ GHC version
                 }
  deriving (Show,Typeable)
 
@@ -94,46 +106,61 @@ instance Ord Package where
 instance Eq Package where
   (==) = on (==) packageName
 
+-- | Read the raw, unresolved package information.
+readPackageUnresolved :: (MonadLogger m, MonadIO m, MonadThrow m)
+                      => Path Abs File
+                      -> m GenericPackageDescription
+readPackageUnresolved cabalfp = do
+  do bs <- liftIO (S.readFile (FL.toFilePath cabalfp))
+     let chars = T.unpack (decodeUtf8With lenientDecode bs)
+     case parsePackageDescription chars of
+       ParseFailed per ->
+         throwM (PackageInvalidCabalFile cabalfp per)
+       ParseOk _ gpkg -> return gpkg
+
 -- | Reads and exposes the package information
 readPackage :: (MonadLogger m, MonadIO m, MonadThrow m)
             => PackageConfig
             -> Path Abs File
             -> m Package
 readPackage packageConfig cabalfp =
-  do chars <-
-       liftIO (Prelude.readFile (FL.toFilePath cabalfp))
-     case parsePackageDescription chars of
-       ParseFailed per ->
-         throwM (PackageInvalidCabalFile cabalfp per)
-       ParseOk _ gpkg ->
-         let pkgId =
-               package (packageDescription gpkg)
-             name = fromCabalPackageName (pkgName pkgId)
-             pkgFlags =
-               packageConfigFlags packageConfig
-             pkg =
-               resolvePackage packageConfig gpkg
-         in case packageDependencies pkg of
-              deps
-                | M.null deps ->
-                  throwM (PackageNoDeps cabalfp)
-                | otherwise ->
-                  do let dir = FL.parent cabalfp
-                     pkgFiles <-
-                       liftIO (packageDescFiles dir pkg)
-                     let files = cabalfp : pkgFiles
-                         deps' =
-                           M.filterWithKey (const . (/= name))
-                                           deps
-                     return (Package {packageName = name
-                                   ,packageVersion = fromCabalVersion (pkgVersion pkgId)
-                                   ,packageDeps = deps'
-                                   ,packageDir = dir
-                                   ,packageFiles = S.fromList files
-                                   ,packageTools = packageDescTools pkg
-                                   ,packageFlags = pkgFlags
-                                   ,packageAllDeps =
-                                      S.fromList (M.keys deps')})
+  readPackageUnresolved cabalfp >>= resolvePackage packageConfig cabalfp
+
+-- | Resolve a parsed cabal file into a 'Package'.
+resolvePackage :: (MonadLogger m, MonadIO m, MonadThrow m)
+               => PackageConfig
+               -> Path Abs File
+               -> GenericPackageDescription
+               -> m Package
+resolvePackage packageConfig cabalfp gpkg = do
+     let pkgId =
+           package (packageDescription gpkg)
+         name = fromCabalPackageName (pkgName pkgId)
+         pkgFlags =
+           packageConfigFlags packageConfig
+         pkg =
+           resolvePackageDescription packageConfig gpkg
+     case packageDependencies pkg of
+       deps
+         | M.null deps ->
+           throwM (PackageNoDeps cabalfp)
+         | otherwise ->
+           do let dir = FL.parent cabalfp
+              pkgFiles <-
+                liftIO (packageDescFiles dir pkg)
+              let files = cabalfp : pkgFiles
+                  deps' =
+                    M.filterWithKey (const . (/= name))
+                                    deps
+              return (Package {packageName = name
+                            ,packageVersion = fromCabalVersion (pkgVersion pkgId)
+                            ,packageDeps = deps'
+                            ,packageDir = dir
+                            ,packageFiles = S.fromList files
+                            ,packageTools = packageDescTools pkg
+                            ,packageFlags = pkgFlags
+                            ,packageAllDeps =
+                               S.fromList (M.keys deps')})
 
 -- | Get all dependencies of the package (buildable targets only).
 packageDependencies :: PackageDescription -> Map PackageName VersionRange
@@ -228,30 +255,33 @@ buildFiles dir build =
 
 -- | Get all dependencies of a package, including library,
 -- executables, tests, benchmarks.
-resolvePackage :: PackageConfig
-               -> GenericPackageDescription
-               -> PackageDescription
-resolvePackage packageConfig (GenericPackageDescription desc defaultFlags mlib exes tests benches) =
+resolvePackageDescription :: PackageConfig
+                          -> GenericPackageDescription
+                          -> PackageDescription
+resolvePackageDescription packageConfig (GenericPackageDescription desc defaultFlags mlib exes tests benches) =
   desc {library =
-          fmap (resolveConditions flags' updateLibDeps) mlib
+          fmap (resolveConditions rc updateLibDeps) mlib
        ,executables =
-          map (resolveConditions flags' updateExeDeps .
+          map (resolveConditions rc updateExeDeps .
                snd)
               exes
        ,testSuites =
-          map (resolveConditions flags' updateTestDeps .
+          map (resolveConditions rc updateTestDeps .
                snd)
               tests
        ,benchmarks =
-          map (resolveConditions flags' updateBenchmarkDeps .
+          map (resolveConditions rc updateBenchmarkDeps .
                snd)
               benches}
   where flags =
           M.union (packageConfigFlags packageConfig)
                   (flagMap defaultFlags)
-        flags' =
-          (map (FlagName . T.unpack)
-               (map fst (filter snd (M.toList flags))))
+        flags' = map fst (filter snd (M.toList flags))
+
+        rc = mkResolveConditions
+                (packageConfigGhcVersion packageConfig)
+                flags'
+
         updateLibDeps lib deps =
           lib {libBuildInfo =
                  ((libBuildInfo lib) {targetBuildDepends =
@@ -271,25 +301,42 @@ resolvePackage packageConfig (GenericPackageDescription desc defaultFlags mlib e
 -- | Make a map from a list of flag specifications.
 --
 -- What is @flagManual@ for?
-flagMap :: [Flag] -> Map Text Bool
+flagMap :: [Flag] -> Map FlagName Bool
 flagMap = M.fromList . map pair
-  where pair :: Flag -> (Text, Bool)
-        pair (MkFlag (unName -> name) _desc def _manual) = (name,def)
-        unName (FlagName t) = T.pack t
+  where pair :: Flag -> (FlagName, Bool)
+        pair (MkFlag (fromCabalFlagName -> name) _desc def _manual) = (name,def)
+
+data ResolveConditions = ResolveConditions
+    { rcFlags :: [FlagName]
+    , rcCompiler :: CompilerId
+    , rcOS :: OS
+    , rcArch :: Arch
+    }
+
+-- | Generic a @ResolveConditions@ using sensible defaults.
+mkResolveConditions :: PackageVersion -- ^ GHC version
+                    -> [FlagName] -- ^ enabled flags
+                    -> ResolveConditions
+mkResolveConditions ghcVersion flags = ResolveConditions
+    { rcFlags = flags
+    , rcCompiler = CompilerId GHC $ toCabalVersion ghcVersion
+    , rcOS = buildOS
+    , rcArch = buildArch
+    }
 
 -- | Resolve the condition tree for the library.
 resolveConditions :: (Monoid target,Show target)
-                  => [FlagName]
+                  => ResolveConditions
                   -> (target -> cs -> target)
                   -> CondTree ConfVar cs target
                   -> target
-resolveConditions flags addDeps (CondNode lib deps cs) = basic <> children
+resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
   where basic = addDeps lib deps
         children = mconcat (map apply cs)
           where apply (cond,node,mcs) =
                   if (condSatisfied cond)
-                     then resolveConditions flags addDeps node
-                     else maybe mempty (resolveConditions flags addDeps) mcs
+                     then resolveConditions rc addDeps node
+                     else maybe mempty (resolveConditions rc addDeps) mcs
                 condSatisfied c =
                   case c of
                     Var v -> varSatisifed v
@@ -302,11 +349,11 @@ resolveConditions flags addDeps (CondNode lib deps cs) = basic <> children
                       and [condSatisfied cx,condSatisfied cy]
                 varSatisifed v =
                   case v of
-                    OS os -> os == buildOS
-                    Arch arch -> arch == buildArch
-                    Flag flag -> elem flag flags
+                    OS os -> os == rcOS rc
+                    Arch arch -> arch == rcArch rc
+                    Flag flag -> elem (fromCabalFlagName flag) (rcFlags rc)
                     Impl flavor range ->
-                      case buildCompilerId of
+                      case rcCompiler rc of
                         CompilerId flavor' ver ->
                           flavor' == flavor &&
                           withinRange ver range
@@ -348,3 +395,22 @@ resolveFiles dirs names exts =
                             (dir </>)
                             (FL.parseRelFile fp))
               (map T.unpack exts)
+
+-- | Get the filename for the cabal file in the given directory.
+--
+-- If no .cabal file is present, or more than one is present, an exception is
+-- thrown via 'throwM'.
+getCabalFileName
+    :: (MonadThrow m, MonadIO m)
+    => Path Abs Dir -- ^ package directory
+    -> m (Path Abs File)
+getCabalFileName pkgDir = do
+    files <- liftIO $ findFiles
+        pkgDir
+        (flip hasExtension "cabal" . FL.toFilePath)
+        (const False)
+    case files of
+        [] -> throwM $ PackageNoCabalFileFound pkgDir
+        [x] -> return x
+        _:_ -> throwM $ PackageMultipleCabalFilesFound pkgDir files
+  where hasExtension fp x = FilePath.takeExtensions fp == "." ++ x

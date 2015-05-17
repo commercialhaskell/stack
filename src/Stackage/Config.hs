@@ -70,6 +70,7 @@ import           Data.Typeable
 import qualified Data.Yaml as Yaml
 import           Path
 import           Path.Find
+import           Stackage.FlagName
 import           Stackage.PackageName
 import           System.Directory
 import           System.Environment
@@ -85,8 +86,8 @@ data Config =
          ,configBuildIn          :: !Text
          ,configDocker           :: !(Maybe Docker)
          ,configPackages         :: !(Set (Path Abs Dir))
-         ,configFlags            :: !(Map Text Bool)
-         ,configPackageFlags     :: !(Map PackageName (Map Text Bool))
+         ,configFlags            :: !(Map FlagName Bool)
+         ,configPackageFlags     :: !(Map PackageName (Map FlagName Bool))
          ,configDir              :: !(Path Abs Dir)}
   -- ^ Flags for each package's Cabal config.
   deriving (Show)
@@ -397,8 +398,8 @@ data BuildOpts =
     { buildOptsIn :: !(Maybe BuildIn)
     , buildOptsWith :: !(Maybe BuildWith)
     , buildOptsPackages :: !(Set (Path Abs Dir))
-    , buildOptsFlags :: !(Map Text Bool)
-    , buildOptsPackageFlags :: !(Map PackageName (Map Text Bool))
+    , buildOptsFlags :: !(Map FlagName Bool)
+    , buildOptsPackageFlags :: !(Map PackageName (Map FlagName Bool))
     }
   deriving Show
 

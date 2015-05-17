@@ -24,6 +24,7 @@ import Distribution.Package hiding (Package,PackageName)
 import GHC.Generics
 import Path as FL
 import Prelude hiding (FilePath)
+import Stackage.FlagName
 import Stackage.GhcPkgId
 import Stackage.Package
 import Stackage.PackageName
@@ -38,7 +39,6 @@ data StackageBuildException
   | FPStackageDepVerMismatch PackageName PackageVersion VersionRange
   | FPStackagePackageVersionMismatch PackageName PackageVersion PackageVersion
   | FPDependencyIssues [StackageBuildException]
-  | FPNoCabalFile (Path Abs Dir)
   deriving (Typeable,Show)
 
 instance Exception StackageBuildException
@@ -84,7 +84,7 @@ data GenConfig =
             ,gconfigLibProfiling :: !Bool
             ,gconfigExeProfiling :: !Bool
             ,gconfigGhcOptions :: ![Text]
-            ,gconfigFlags :: !(Map Text Bool)
+            ,gconfigFlags :: !(Map FlagName Bool)
             ,gconfigPkgId :: GhcPkgId}
   deriving (Generic,Show)
 

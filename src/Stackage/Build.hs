@@ -51,9 +51,9 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Set.Monad as S
 import           Data.Streaming.Process
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Development.Shake hiding (doesFileExist,doesDirectoryExist,getDirectoryContents)
+import           Distribution.Compiler (CompilerId (CompilerId), buildCompilerId)
 import           Distribution.Package hiding (packageName,packageVersion,Package,PackageName,PackageIdentifier)
 import           Distribution.Version
 import           Path as FL
@@ -64,6 +64,7 @@ import           Stackage.Build.Doc
 import           Stackage.Build.Types
 import           Stackage.Config
 import           Stackage.Fetch as Fetch
+import           Stackage.FlagName
 import           Stackage.GhcPkg
 import           Stackage.GhcPkgId
 import           Stackage.Package
@@ -339,7 +340,7 @@ buildPackage bconfig pinfos pinfo gconfig setupAction installResource docLoc =
                        (if enabled
                            then ""
                            else "-") <>
-                       T.unpack name)
+                       flagNameString name)
                     (M.toList (packageFlags pinfo))])
      runhaskell
        pinfo
@@ -869,10 +870,10 @@ checkPackageInIndex index (name,(range,_)) =
 -- | Build a map of package names to dependencies.
 buildDependencies :: MonadIO m
                   => FinalAction
-                  -> Map Text Bool
+                  -> Map FlagName Bool
                   -> Map PackageName PackageVersion
                   -> Set (Path Abs Dir)
-                  -> Map PackageName (Map Text Bool)
+                  -> Map PackageName (Map FlagName Bool)
                   -> WriterT [StackageBuildException] m (Set Package)
 buildDependencies finalAction flags globals packages pflags =
   do pkgs <-
@@ -914,32 +915,23 @@ sievePackages globalNameVersions localNameVersions p =
 -- | Get the package name and dependencies from the given package
 -- directory.
 getPackageInfo :: FinalAction
-               -> Map Text Bool
-               -> Map PackageName (Map Text Bool)
+               -> Map FlagName Bool
+               -> Map PackageName (Map FlagName Bool)
                -> Path Abs Dir
                -> IO Package
 getPackageInfo finalAction flags pflags pkgDir =
-  do mcabal <-
-       findFileUp
-         pkgDir
-         (flip hasExtension "cabal" .
-          FL.toFilePath)
-         (Just pkgDir)
-     case mcabal of
-       Nothing -> throwIO (FPNoCabalFile pkgDir)
-       Just cabal ->
-         do pname <- parsePackageNameFromFilePath cabal
-            info <-
-              runNoLoggingT
-                (readPackage (cfg pname)
-                             cabal)
-            existing <-
-              fmap S.fromList
-                   (filterM (doesFileExist . FL.toFilePath)
-                            (S.toList (packageFiles info)))
-            return info {packageFiles = existing}
-  where hasExtension fp x = FilePath.takeExtensions fp == "." ++ x
-        cfg pname =
+  do cabal <- getCabalFileName pkgDir
+     pname <- parsePackageNameFromFilePath cabal
+     info <-
+       runNoLoggingT
+         (readPackage (cfg pname)
+                      cabal)
+     existing <-
+       fmap S.fromList
+            (filterM (doesFileExist . FL.toFilePath)
+                     (S.toList (packageFiles info)))
+     return info {packageFiles = existing}
+  where cfg pname =
           PackageConfig {packageConfigEnableTests =
                            case finalAction of
                              DoTests -> True
@@ -949,17 +941,23 @@ getPackageInfo finalAction flags pflags pkgDir =
                              DoBenchmarks -> True
                              _ -> False
                         ,packageConfigFlags =
-                           composeFlags pname pflags flags}
+                           composeFlags pname pflags flags
+                        ,packageConfigGhcVersion =
+                           -- FIXME the assumption that the GHC version used to
+                           -- build this package is the same used to build user
+                           -- code is very false.
+                           case buildCompilerId of
+                             CompilerId _ version -> fromCabalVersion version}
 
 -- | Compose the package flags with the global flags in a left-biased
 -- form, i.e., package-specific flags will be preferred over global
 -- flags.
 composeFlags :: PackageName
-             -> Map PackageName (Map Text Bool)
-             -> Map Text Bool
-             -> Map Text Bool
+             -> Map PackageName (Map FlagName Bool)
+             -> Map FlagName Bool
+             -> Map FlagName Bool
 composeFlags pname pflags gflags = collapse pflags <> gflags
-  where collapse :: Map PackageName (Map Text Bool) -> Map Text Bool
+  where collapse :: Map PackageName (Map FlagName Bool) -> Map FlagName Bool
         collapse = fromMaybe mempty . M.lookup pname
 
 --------------------------------------------------------------------------------
