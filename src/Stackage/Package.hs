@@ -104,7 +104,7 @@ readPackage packageConfig cabalfp =
        liftIO (Prelude.readFile (FL.toFilePath cabalfp))
      case parsePackageDescription chars of
        ParseFailed per ->
-         liftedThrowIO (PackageInvalidCabalFile cabalfp per)
+         throwM (PackageInvalidCabalFile cabalfp per)
        ParseOk _ gpkg ->
          let pkgId =
                package (packageDescription gpkg)
@@ -116,7 +116,7 @@ readPackage packageConfig cabalfp =
          in case packageDependencies pkg of
               deps
                 | M.null deps ->
-                  liftedThrowIO (PackageNoDeps cabalfp)
+                  throwM (PackageNoDeps cabalfp)
                 | otherwise ->
                   do let dir = FL.parent cabalfp
                      pkgFiles <-
@@ -134,7 +134,6 @@ readPackage packageConfig cabalfp =
                                    ,packageFlags = pkgFlags
                                    ,packageAllDeps =
                                       S.fromList (M.keys deps')})
-  where liftedThrowIO = liftIO . throwIO
 
 -- | Get all dependencies of the package (buildable targets only).
 packageDependencies :: PackageDescription -> Map PackageName VersionRange
