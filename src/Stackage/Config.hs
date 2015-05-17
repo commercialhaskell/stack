@@ -496,6 +496,8 @@ getLocalStackageConfig =
                 T.pack (show filePath))
      getFileStackageConfig filePath
 
+-- | Parse configuration from the specified file, or return an empty
+-- config if it doesn't exist.
 getFileStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
   => Path Abs File -> m StackageConfig
 getFileStackageConfig configFilePath =
