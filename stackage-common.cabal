@@ -39,8 +39,6 @@ library
                      Stackage.Build.Defaults
                      Stackage.Build.Doc
                      Stackage.Build.Config
-
-                     Stack.CreateConfigFile
   other-modules:     Stackage.Process
                      Path.Find
                      System.Process.PagerEditor
