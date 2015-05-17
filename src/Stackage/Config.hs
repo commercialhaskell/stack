@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -6,7 +7,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ViewPatterns #-}
-
 
 -- | The general Stackage configuration that starts everything off. This should
 -- be smart to falback if there is no stackage.config, instead relying on
@@ -34,8 +34,8 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
 import           Data.Aeson
 import           Data.Aeson.Types (typeMismatch)
-
 import qualified Data.ByteString as S (readFile)
+import           Data.Default
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
@@ -58,12 +58,13 @@ import           System.Process
 -- | The top-level Stackage configuration.
 data Config =
   Config
-    { configPkgDbLocation    :: Path Abs Dir
-    , configGhcBinLocation   :: Path Abs Dir
-    , configCabalBinLocation :: Path Abs Dir
-    , configStackageRoot     :: Path Abs Dir
-    , configStackageHost     :: String
-    , configBuildIn          :: Text
+    { configPkgDbLocation    :: !(Path Abs Dir)
+    , configGhcBinLocation   :: !(Path Abs Dir)
+    , configCabalBinLocation :: !(Path Abs Dir)
+    , configStackageRoot     :: !(Path Abs Dir)
+    , configStackageHost     :: !String
+    , configBuildIn          :: !Text
+    , configDocker           :: !(Maybe Docker)
     }
   deriving Show
 data Settings = Settings
@@ -111,8 +112,20 @@ data StackageConfig =
   StackageConfig
     { stackageConfigStackageOpts :: !StackageOpts
     , stackageConfigBuildOpts :: !BuildOpts
+    , stackageConfigDockerOpts :: !DockerOpts
     }
   deriving Show
+
+-- | Dummy type to support this monoid business.
+newtype DockerOpts = DockerOpts (Maybe Docker)
+  deriving (Show)
+
+-- | Left-biased instance.
+instance Monoid DockerOpts where
+  mappend (DockerOpts Nothing) x = x
+  mappend x (DockerOpts Nothing) = x
+  mappend x _ = x
+  mempty = DockerOpts Nothing
 
 -- Note that the Maybe mappend upon two Justs
 -- will mappend their contents.
@@ -128,18 +141,25 @@ instance Monoid StackageConfig where
   mempty = StackageConfig
     { stackageConfigStackageOpts = mempty
     , stackageConfigBuildOpts = mempty
+    , stackageConfigDockerOpts = mempty
     }
   mappend l r = StackageConfig
     { stackageConfigStackageOpts = appendOf stackageConfigStackageOpts l r
     , stackageConfigBuildOpts = appendOf stackageConfigBuildOpts l r
+    , stackageConfigDockerOpts = stackageConfigDockerOpts l <> stackageConfigDockerOpts r
     }
 
 instance FromJSON (Path Abs Dir -> StackageConfig) where
-  parseJSON = withObject "StackageConfig" $ \obj -> do
-    stackageConfigStackageOpts <- obj .:? "stackage" .!= mempty
-    getBuildOpts <- obj .:? "build" .!= mempty
-    return (\parentDir -> let stackageConfigBuildOpts = getBuildOpts parentDir
-                          in StackageConfig{..})
+  parseJSON =
+    withObject "StackageConfig" $
+    \obj ->
+      do stackageConfigStackageOpts <- obj .:? "stackage" .!= mempty
+         getBuildOpts <- obj .:? "build" .!= mempty
+         stackageConfigDockerOpts <-
+           fmap DockerOpts (obj .:? "docker")
+         return (\parentDir ->
+                   let stackageConfigBuildOpts = getBuildOpts parentDir
+                   in StackageConfig {..})
 
 data StackageOpts =
   StackageOpts
@@ -174,6 +194,165 @@ instance FromJSON StackageOpts where
                    Just dir -> return (Just dir)
          stackageOptsHost <- obj .:? "host"
          return StackageOpts {..}
+
+-- | Docker configuration.
+data Docker =
+  Docker {dockerEnable :: !Bool
+           -- ^ Is using Docker enabled?
+         ,dockerRepoOwner :: !String
+           -- ^ Docker repository (registry and) owner
+         ,dockerRepo :: !String
+           -- ^ Docker repository name (e.g. @dev@)
+         ,dockerRepoSuffix :: !String
+           -- ^ Docker repository name's suffix (e.g. stackage ver)
+         ,dockerImageTag :: !(Maybe String)
+           -- ^ Optional Docker image tag (e.g. the date)
+         ,dockerImage :: !(Maybe String)
+           -- ^ Exact Docker image tag or ID.  Overrides docker-repo-*/tag.
+         ,dockerRegistryLogin :: !Bool
+           -- ^ Does registry require login for pulls?
+         ,dockerRegistryUsername :: !(Maybe String)
+           -- ^ Optional username for Docker registry.
+         ,dockerRegistryPassword :: !(Maybe String)
+           -- ^ Optional password for Docker registry.
+         ,dockerAutoPull :: !Bool
+           -- ^ Automatically pull new images.
+         ,dockerDetach :: !Bool
+           -- ^ Whether to run a detached container
+         ,dockerPersist :: !Bool
+           -- ^ Create a persistent container (don't remove it when finished).  Implied by
+           -- `dockerDetach`.
+         ,dockerContainerName :: !(Maybe String)
+           -- ^ Container name to use, only makes sense from command-line with `dockerPersist`
+           -- or `dockerDetach`.
+         ,dockerRunArgsDefault :: ![String]
+           -- ^ Arguments to pass directly to @docker run@ (from @stackage-build.config@).
+         ,dockerRunArgsExtra :: ![[String]]
+           -- ^ Arguments to pass directly to @docker run@ (passed on stackage-build command-line).
+         ,dockerMountDefault :: ![Mount]
+           -- ^ Volumes to mount in the container (from @stackage-build.config@).
+         ,dockerMountExtra :: ![Mount]
+           -- ^ Volumes to mount in the container (from stackage-build command-line).
+         ,dockerPassHost :: !Bool
+           -- ^ Pass Docker daemon connection information into container.
+         ,dockerExtra :: ![String]
+           -- ^ This is a placeholder for command-line argument parsing.
+         }
+  deriving (Show)
+
+-- | For YAML.
+instance FromJSON Docker where
+  parseJSON v =
+    do o <- parseJSON v
+       Docker <$> o .:? dockerEnableArgName .!= True
+              <*> o .:? dockerRepoOwnerArgName .!= dockerRepoOwner def
+              <*> o .:? dockerRepoArgName .!= dockerRepo def
+              <*> o .:? dockerRepoSuffixArgName .!= dockerRepoSuffix def
+              <*> o .:? dockerImageTagArgName .!= dockerImageTag def
+              <*> o .:? dockerImageArgName
+              <*> o .:? dockerRegistryLoginArgName .!= dockerRegistryLogin def
+              <*> o .:? dockerRegistryUsernameArgName .!= dockerRegistryUsername def
+              <*> o .:? dockerRegistryPasswordArgName .!= dockerRegistryPassword def
+              <*> o .:? dockerAutoPullArgName .!= dockerAutoPull def
+              <*> o .:? dockerDetachArgName .!= dockerDetach def
+              <*> o .:? dockerPersistArgName .!= dockerPersist def
+              <*> o .:? dockerContainerNameArgName .!= dockerContainerName def
+              <*> o .:? dockerRunArgsArgName .!= dockerRunArgsDefault def
+              <*> pure (dockerRunArgsExtra def)
+              <*> o .:? dockerMountArgName .!= dockerMountDefault def
+              <*> pure (dockerMountExtra def)
+              <*> o .:? dockerPassHostArgName .!= dockerPassHost def
+              <*> pure (dockerExtra def)
+
+-- | Default values for Docker configuration.
+instance Default Docker where
+  def = Docker {dockerEnable = False
+               ,dockerRepoOwner = "fpco"
+               ,dockerRepo = "dev"
+               ,dockerRepoSuffix = ""
+               ,dockerImageTag = Nothing
+               ,dockerImage = Nothing
+               ,dockerRegistryLogin = False
+               ,dockerRegistryUsername = Nothing
+               ,dockerRegistryPassword = Nothing
+               ,dockerAutoPull = False
+               ,dockerDetach = False
+               ,dockerPersist = False
+               ,dockerContainerName = Nothing
+               ,dockerRunArgsDefault = []
+               ,dockerRunArgsExtra = []
+               ,dockerMountDefault = []
+               ,dockerMountExtra = []
+               ,dockerPassHost = False
+               ,dockerExtra = []}
+
+dockerEnableArgName :: Text
+dockerEnableArgName = "enable"
+
+dockerRepoOwnerArgName :: Text
+dockerRepoOwnerArgName = "repo-owner"
+
+dockerRepoArgName :: Text
+dockerRepoArgName = "repo"
+
+dockerRepoSuffixArgName :: Text
+dockerRepoSuffixArgName = "repo-suffix"
+
+dockerImageTagArgName :: Text
+dockerImageTagArgName = "image-tag"
+
+dockerImageArgName :: Text
+dockerImageArgName = "image"
+
+dockerRegistryLoginArgName :: Text
+dockerRegistryLoginArgName = "registry-login"
+
+dockerRegistryUsernameArgName :: Text
+dockerRegistryUsernameArgName = "registry-username"
+
+dockerRegistryPasswordArgName :: Text
+dockerRegistryPasswordArgName = "registry-password"
+
+dockerAutoPullArgName :: Text
+dockerAutoPullArgName = "auto-pull"
+
+dockerDetachArgName :: Text
+dockerDetachArgName = "detach"
+
+dockerRunArgsArgName :: Text
+dockerRunArgsArgName = "run-args"
+
+dockerMountArgName :: Text
+dockerMountArgName = "mount"
+
+dockerContainerNameArgName :: Text
+dockerContainerNameArgName = "container-name"
+
+dockerPersistArgName :: Text
+dockerPersistArgName = "persist"
+
+dockerPassHostArgName :: Text
+dockerPassHostArgName = "pass-host"
+
+-- | Docker volume mount.
+data Mount = Mount String String
+
+-- | For optparse-applicative.
+instance Read Mount where
+  readsPrec _ s = case break (== ':') s of
+                    (a,(':':b)) -> [(Mount a b,"")]
+                    (a,[]) -> [(Mount a a,"")]
+                    _ -> fail "Invalid value for mount"
+
+-- | Show instance.
+instance Show Mount where
+  show (Mount a b) = if a == b
+                        then a
+                        else concat [a,":",b]
+
+-- | For YAML.
+instance FromJSON Mount where
+  parseJSON v = fmap read (parseJSON v)
 
 data BuildOpts =
   BuildOpts
@@ -567,6 +746,8 @@ configFromStackageConfig StackageConfig{..} = do
   configBuildIn <- resolveBuildIn buildOptsIn
   (configGhcBinLocation, configCabalBinLocation, configPkgDbLocation) <-
     resolveBuildWith configStackageRoot buildOptsWith
+  configDocker <- return (case stackageConfigDockerOpts of
+                            DockerOpts x -> x)
   return Config{..}
 
 -- TODO: handle Settings
