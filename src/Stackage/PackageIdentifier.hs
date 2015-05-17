@@ -20,12 +20,12 @@ import Data.Hashable
 import GHC.Generics
 import Prelude hiding (FilePath)
 import Stackage.PackageName
-import Stackage.PackageVersion
+import Stackage.Version
 
 -- | A pkg-ver combination.
 data PackageIdentifier =
   PackageIdentifier !PackageName
-                    !PackageVersion
+                    !Version
   deriving (Eq,Ord,Generic,Data,Typeable)
 
 instance Hashable PackageIdentifier
@@ -34,15 +34,15 @@ instance Show PackageIdentifier where
   show = show . packageIdentifierString
 
 -- | Convert from a package identifier to a tuple.
-toTuple :: PackageIdentifier -> (PackageName,PackageVersion)
+toTuple :: PackageIdentifier -> (PackageName,Version)
 toTuple (PackageIdentifier n v) = (n,v)
 
 -- | Convert from a tuple to a package identifier.
-fromTuple :: (PackageName,PackageVersion) -> PackageIdentifier
+fromTuple :: (PackageName,Version) -> PackageIdentifier
 fromTuple (n,v) = PackageIdentifier n v
 
 -- | Get the version part of the identifier.
-packageIdentifierVersion :: PackageIdentifier -> PackageVersion
+packageIdentifierVersion :: PackageIdentifier -> Version
 packageIdentifierVersion (PackageIdentifier _ ver) = ver
 
 -- | Get the name part of the identifier.
@@ -54,7 +54,7 @@ packageIdentifierParser :: Parser PackageIdentifier
 packageIdentifierParser =
   do name <- packageNameParser
      char8 '-'
-     version <- packageVersionParser
+     version <- versionParser
      return (PackageIdentifier name version)
 
 -- | Get a string representation of the package identifier; name-ver.

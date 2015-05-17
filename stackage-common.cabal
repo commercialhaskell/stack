@@ -30,7 +30,7 @@ library
                      Stackage.PackageIndex.Read
                      Stackage.PackageIndex.Update
                      Stackage.PackageName
-                     Stackage.PackageVersion
+                     Stackage.Version
                      Stackage.Path
                      Stackage.Resolve
                      Stackage.Types

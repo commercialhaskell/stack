@@ -48,7 +48,7 @@ import Stackage.PackageName
 import Stackage.FlagName
 import           Distribution.System             (Arch, OS)
 import qualified Distribution.Text               as DT
-import           Stackage.PackageVersion         (PackageVersion, VersionRange)
+import           Stackage.Version                (Version, VersionRange)
 import qualified Distribution.Version            as C
 import Safe (readMay)
 
@@ -60,7 +60,7 @@ data SnapName
 
 data BuildPlan = BuildPlan
     { bpSystemInfo  :: SystemInfo
-    , bpTools       :: Vector (PackageName, PackageVersion)
+    , bpTools       :: Vector (PackageName, Version)
     , bpPackages    :: Map PackageName PackagePlan
     , bpGithubUsers :: Map Text (Set Text)
     }
@@ -91,7 +91,7 @@ instance FromJSON BuildPlan where
             <*> o .: "version"
 
 data PackagePlan = PackagePlan
-    { ppVersion     :: PackageVersion
+    { ppVersion     :: Version
     , ppGithubPings :: Set Text
     , ppUsers       :: Set PackageName
     , ppConstraints :: PackageConstraints
@@ -195,10 +195,10 @@ instance FromJSON TestState where
                $ map (\x -> (testStateToText x, x)) [minBound..maxBound]
 
 data SystemInfo = SystemInfo
-    { siGhcVersion      :: PackageVersion
+    { siGhcVersion      :: Version
     , siOS              :: OS
     , siArch            :: Arch
-    , siCorePackages    :: Map PackageName PackageVersion
+    , siCorePackages    :: Map PackageName Version
     , siCoreExecutables :: Set ExeName
     }
     deriving (Show, Eq, Ord)

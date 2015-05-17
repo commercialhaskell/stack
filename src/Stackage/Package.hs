@@ -52,7 +52,7 @@ import           Prelude hiding (FilePath)
 import           Stackage.Constants
 import           Stackage.FlagName
 import           Stackage.PackageName
-import           Stackage.PackageVersion
+import           Stackage.Version
 import           System.Directory (doesFileExist)
 import qualified System.FilePath as FilePath
 
@@ -68,8 +68,8 @@ data PackageException
   | PackageDependencyIssues [PackageException]
   | PackageMissingTool Dependency
   | PackageCouldn'tFindPkgId PackageName
-  | PackageStackagePackageVersionMismatch PackageName PackageVersion PackageVersion
-  | PackageStackageDepVerMismatch PackageName PackageVersion VersionRange
+  | PackageStackageVersionMismatch PackageName Version Version
+  | PackageStackageDepVerMismatch PackageName Version VersionRange
   | PackageNoCabalFileFound (Path Abs Dir)
   | PackageMultipleCabalFilesFound (Path Abs Dir) [Path Abs File]
   deriving (Show,Typeable)
@@ -78,7 +78,7 @@ instance Exception PackageException
 -- | Some package info.
 data Package =
   Package {packageName :: !PackageName                    -- ^ Name of the package.
-          ,packageVersion :: !PackageVersion              -- ^ Version of the package
+          ,packageVersion :: !Version              -- ^ Version of the package
           ,packageDir :: !(Path Abs Dir)                  -- ^ Directory of the package.
           ,packageFiles :: !(Set (Path Abs File))         -- ^ Files that the package depends on.
           ,packageDeps :: !(Map PackageName VersionRange) -- ^ Packages that the package depends on.
@@ -93,7 +93,7 @@ data PackageConfig =
   PackageConfig {packageConfigEnableTests :: !Bool        -- ^ Are tests enabled?
                 ,packageConfigEnableBenchmarks :: !Bool   -- ^ Are benchmarks enabled?
                 ,packageConfigFlags :: !(Map FlagName Bool)   -- ^ Package config flags.
-                ,packageConfigGhcVersion :: !PackageVersion      -- ^ GHC version
+                ,packageConfigGhcVersion :: !Version      -- ^ GHC version
                 }
  deriving (Show,Typeable)
 
@@ -307,13 +307,13 @@ flagMap = M.fromList . map pair
 
 data ResolveConditions = ResolveConditions
     { rcFlags :: [FlagName]
-    , rcGhcVersion :: PackageVersion
+    , rcGhcVersion :: Version
     , rcOS :: OS
     , rcArch :: Arch
     }
 
 -- | Generic a @ResolveConditions@ using sensible defaults.
-mkResolveConditions :: PackageVersion -- ^ GHC version
+mkResolveConditions :: Version -- ^ GHC version
                     -> [FlagName] -- ^ enabled flags
                     -> ResolveConditions
 mkResolveConditions ghcVersion flags = ResolveConditions

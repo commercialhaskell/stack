@@ -60,7 +60,7 @@ import           Stackage.BuildPlan.Types
 import           Stackage.FlagName
 import           Stackage.Package
 import           Stackage.PackageName
-import           Stackage.PackageVersion
+import           Stackage.Version
 import           System.Directory                (createDirectoryIfMissing,
                                                   getAppUserDataDirectory)
 import           System.FilePath                 (takeDirectory, (<.>))
@@ -81,7 +81,7 @@ instance Exception BuildPlanException
 resolveBuildPlan :: MonadThrow m
                  => BuildPlan
                  -> Set PackageName
-                 -> m (Map PackageName (PackageVersion, Set FlagName))
+                 -> m (Map PackageName (Version, Set FlagName))
 resolveBuildPlan bp packages
     | Set.null (rsUnknown rs) = return (rsToInstall rs)
     | otherwise = throwM $ UnknownPackages $ rsUnknown rs
@@ -95,7 +95,7 @@ resolveBuildPlan bp packages
 data ResolveState = ResolveState
     { rsVisited   :: Set PackageName
     , rsUnknown   :: Set PackageName
-    , rsToInstall :: Map PackageName (PackageVersion, Set FlagName)
+    , rsToInstall :: Map PackageName (Version, Set FlagName)
     }
 
 getDeps :: BuildPlan -> PackageName -> State ResolveState ()
@@ -211,7 +211,7 @@ loadBuildPlan man name = do
 
 -- | Get all packages present in the given build plan, including both core and
 -- non-core.
-allPackages :: BuildPlan -> Map PackageName PackageVersion
+allPackages :: BuildPlan -> Map PackageName Version
 allPackages bp =
     siCorePackages (bpSystemInfo bp) <>
     fmap ppVersion (bpPackages bp)
@@ -268,7 +268,7 @@ checkBuildPlan name bp cabalfp gpd = do
 checkDeps :: MonadLogger m
           => Map FlagName Bool -- ^ used only for debugging purposes
           -> Map PackageName VersionRange
-          -> Map PackageName PackageVersion
+          -> Map PackageName Version
           -> m Bool
 checkDeps flags deps packages = do
     let errs = mapMaybe go $ Map.toList deps
@@ -288,7 +288,7 @@ checkDeps flags deps packages = do
                 | otherwise -> Just $ T.concat
                     [ packageNameText name
                     , " version available: "
-                    , packageVersionText v
+                    , versionText v
                     , " does not match "
                     , versionRangeText range
                     ]

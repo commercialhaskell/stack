@@ -15,7 +15,7 @@ module Stackage.GhcPkg
 import           Stackage.GhcPkgId
 import           Stackage.PackageIdentifier
 import           Stackage.PackageName
-import           Stackage.PackageVersion
+import           Stackage.Version
 import           Stackage.Process
 
 import           Control.Applicative
@@ -48,7 +48,7 @@ instance Exception GhcPkgException
 
 -- | Get all available packages.
 getAllPackages :: (MonadCatch m,MonadIO m,MonadThrow m)
-               => m (Map PackageName PackageVersion)
+               => m (Map PackageName Version)
 getAllPackages =
   do result <-
        tryProcessStdout "ghc-pkg"
@@ -64,7 +64,7 @@ getAllPackages =
              liftIO (evaluate r)
 
 -- | Parser for ghc-pkg's list output.
-pkgsListParser :: Parser (Map PackageName PackageVersion)
+pkgsListParser :: Parser (Map PackageName Version)
 pkgsListParser =
   fmap (M.fromList . concat) sections
   where sections =

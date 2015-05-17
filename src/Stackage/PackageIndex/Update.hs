@@ -46,8 +46,8 @@ import           Path
         mkRelDir, (</>))
 import           Stackage.IO (tryIO)
 import           Stackage.PackageName (PackageName, packageNameString)
-import           Stackage.PackageVersion
-       (PackageVersion, parsePackageVersionFromString)
+import           Stackage.Version
+       (Version, parseVersionFromString)
 import           Stackage.Process (runIn)
 import           System.Directory
 import           System.IO (IOMode(ReadMode), withBinaryFile)
@@ -213,7 +213,7 @@ updateIndexHTTP (PackageIndex idxPath) =
 
 -- | Fetch all the package versions for a given package
 getPkgVersions :: (MonadIO m,MonadLogger m,MonadThrow m)
-               => PackageIndex -> PackageName -> m (Maybe (Set PackageVersion))
+               => PackageIndex -> PackageName -> m (Maybe (Set Version))
 getPkgVersions (PackageIndex idxPath) pkg =
   do let tarPath = idxPath </> $(mkRelFile "00-index.tar")
          tarFilePath = toFilePath tarPath
@@ -238,7 +238,7 @@ getPkgVersions (PackageIndex idxPath) pkg =
           case (getNameAndVersion (Tar.entryPath e),Tar.entryContent e) of
             (Just (name',ver),_)
               | name' == name ->
-                do parsedVer <- parsePackageVersionFromString ver
+                do parsedVer <- parseVersionFromString ver
                    iterateTarball tarPath
                                   name
                                   (Set.insert parsedVer vers)

@@ -71,7 +71,7 @@ import           Stackage.PackageIdentifier
 import           Stackage.PackageIndex.Read
 import           Stackage.PackageIndex.Update
 import           Stackage.PackageName
-import           Stackage.PackageVersion
+import           Stackage.Version
 import           Stackage.Resolve
 import           System.Directory hiding (findFiles)
 import           System.Environment
@@ -778,7 +778,7 @@ getPackageInfos finalAction mbconfig = go True
                [] ->
                  do let okPkgVers = M.fromList (rights results)
                     mapping <-
-                      resolvePackageVersions (M.keys okPkgVers)
+                      resolveVersions (M.keys okPkgVers)
                     validated <-
                       liftM catMaybes (mapM (validateSuggestion globalPackages okPkgVers) mapping)
                     case validated of
@@ -830,7 +830,7 @@ getMissingDeps =
 --   consider it good for installation.
 --
 validateSuggestion :: MonadIO m
-                   => Map PackageName PackageVersion
+                   => Map PackageName Version
                    -> Map PackageName VersionRange
                    -> PackageSuggestion
                    -> m (Maybe PackageSuggestion)
@@ -846,7 +846,7 @@ validateSuggestion globalPackages okPkgVers =
              | installedVer == suggestedVer ->
                return Nothing
              | otherwise ->
-               liftIO (throwIO (FPStackagePackageVersionMismatch name suggestedVer installedVer))
+               liftIO (throwIO (FPStackageVersionMismatch name suggestedVer installedVer))
            Nothing ->
              return (Just suggestion))
 
@@ -870,7 +870,7 @@ checkPackageInIndex index (name,(range,_)) =
 buildDependencies :: MonadIO m
                   => FinalAction
                   -> Map FlagName Bool
-                  -> Map PackageName PackageVersion
+                  -> Map PackageName Version
                   -> Set (Path Abs Dir)
                   -> Map PackageName (Map FlagName Bool)
                   -> WriterT [StackageBuildException] m (Set Package)
@@ -887,8 +887,8 @@ buildDependencies finalAction flags globals packages pflags =
 -- | Remove third-party package dependencies, e.g. mtl, bytestring,
 -- etc.
 sievePackages :: MonadIO m
-              => Map PackageName PackageVersion
-              -> Map PackageName PackageVersion
+              => Map PackageName Version
+              -> Map PackageName Version
               -> Package
               -> WriterT [StackageBuildException] m Package
 sievePackages globalNameVersions localNameVersions p =

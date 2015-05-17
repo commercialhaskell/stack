@@ -38,7 +38,7 @@ import           Distribution.ParseUtils (PError)
 import qualified Distribution.Text as DT
 import           Path hiding ((</>))
 import           Stackage.PackageName
-import           Stackage.PackageVersion
+import           Stackage.Version
 import           System.Directory (getAppUserDataDirectory)
 import qualified Data.Conduit.List as CL
 import Control.Monad.Trans.Class (lift)
@@ -80,7 +80,7 @@ getPackageIndexPath = liftIO $ do
 -- for efficiency.
 data UnparsedCabalFile = UnparsedCabalFile
     { ucfName    :: PackageName
-    , ucfVersion :: PackageVersion
+    , ucfVersion :: Version
     , ucfParse   :: forall m. MonadThrow m => m GenericPackageDescription
     , ucfLbs :: L.ByteString
     }
@@ -111,7 +111,7 @@ sourcePackageIndex fp = do
                 }
         | otherwise = return ()
 
-    goContent :: String -> PackageName -> PackageVersion -> L.ByteString -> (forall m. MonadThrow m => m GenericPackageDescription)
+    goContent :: String -> PackageName -> Version -> L.ByteString -> (forall m. MonadThrow m => m GenericPackageDescription)
     goContent fp' name version lbs =
         case parsePackageDescription $ TL.unpack $ dropBOM $ decodeUtf8With lenientDecode lbs of
             ParseFailed e -> throwM $ CabalParseException fp' e
@@ -146,8 +146,8 @@ data CabalParseException
   | MismatchedNameVersion FilePath
                           PackageName
                           PackageName
-                          PackageVersion
-                          PackageVersion
+                          Version
+                          Version
   deriving (Show,Typeable)
 instance Exception CabalParseException
 
@@ -155,7 +155,7 @@ instance Exception CabalParseException
 -- given criterion.
 getLatestDescriptions :: MonadIO m
                       => Path Abs File
-                      -> (PackageName -> PackageVersion -> Bool)
+                      -> (PackageName -> Version -> Bool)
                       -> (GenericPackageDescription -> IO desc)
                       -> m (Map PackageName desc)
 getLatestDescriptions fp f parseDesc = liftIO $ do

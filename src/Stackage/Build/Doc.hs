@@ -15,12 +15,12 @@ import qualified Data.Text as T
 import           Path as FL
 import           Stackage.Build.Defaults
 import           Stackage.PackageName
-import           Stackage.PackageVersion
+import           Stackage.Version
 import           System.Directory
 import           System.FilePath (takeFileName)
 
 -- | Get all packages included in documentation from directory.
-getDocPackages :: Path Abs Dir -> IO (Map PackageName [PackageVersion])
+getDocPackages :: Path Abs Dir -> IO (Map PackageName [Version])
 getDocPackages loc =
   do ls <- fmap (map (FL.toFilePath loc ++)) (getDirectoryContents (FL.toFilePath loc))
      mdirs <- forM ls (\e -> do isDir <- doesDirectoryExist e
@@ -34,14 +34,14 @@ getDocPackages loc =
      return (M.fromAscListWith (++) (map (\(k,v) -> (k,[v])) sorted))
 
 -- | Split a documentation directory name into package name and version.
-breakPkgVer :: FilePath -> Maybe (PackageName,PackageVersion)
+breakPkgVer :: FilePath -> Maybe (PackageName,Version)
 breakPkgVer pkgPath =
   case T.breakOnEnd "-"
                     (T.pack (takeFileName pkgPath)) of
     ("",_) -> Nothing
     (pkgD,verT) ->
       let pkgstr = T.dropEnd 1 pkgD
-      in case parsePackageVersionFromString (T.unpack verT) of
+      in case parseVersionFromString (T.unpack verT) of
            Just v
              | Just pkg <-
                 parsePackageNameFromString (T.unpack pkgstr) ->
@@ -49,8 +49,8 @@ breakPkgVer pkgPath =
            _ -> Nothing
 
 -- | Construct a documentation directory name from package name and version.
-joinPkgVer :: (PackageName,PackageVersion) -> FilePath
-joinPkgVer (pkg,ver) = (packageNameString pkg ++ "-" ++ packageVersionString ver)
+joinPkgVer :: (PackageName,Version) -> FilePath
+joinPkgVer (pkg,ver) = (packageNameString pkg ++ "-" ++ versionString ver)
 
 -- | Get location of user-generated documentation.
 getUserDocLoc :: IO (Path Abs Dir)

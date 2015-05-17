@@ -7,17 +7,17 @@
 
 -- | Versions for packages.
 
-module Stackage.PackageVersion
-  (PackageVersion
-  ,VersionRange
-  ,packageVersionParser
-  ,parsePackageVersion
-  ,parsePackageVersionFromString
-  ,packageVersionString
-  ,packageVersionText
+module Stackage.Version
+  (Version
+  ,Cabal.VersionRange -- FIXME in the future should have a newtype wrapper
+  ,versionParser
+  ,parseVersion
+  ,parseVersionFromString
+  ,versionString
+  ,versionText
   ,toCabalVersion
   ,fromCabalVersion
-  ,mkPackageVersion
+  ,mkVersion
   ,versionRangeText
   ,withinRange)
   where
@@ -36,108 +36,107 @@ import qualified Data.Text as T
 import           Data.Vector.Unboxed (Vector)
 import qualified Data.Vector.Unboxed as V
 import           Data.Word
-import           Distribution.Version hiding (withinRange)
 import           GHC.Generics
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
-import qualified Distribution.Version as C             (withinRange)
 import Distribution.Text (disp)
 import Text.PrettyPrint (render)
+import qualified Distribution.Version as Cabal
 
 -- | A parse fail.
-data PackageVersionParseFail =
-  PackageVersionParseFail ByteString
+data VersionParseFail =
+  VersionParseFail ByteString
   deriving (Show,Typeable)
-instance Exception PackageVersionParseFail
+instance Exception VersionParseFail
 
 -- | A package version.
-newtype PackageVersion =
-  PackageVersion {unPackageVersion :: Vector Word}
+newtype Version =
+  Version {unVersion :: Vector Word}
   deriving (Eq,Ord,Typeable,Data,Generic)
 
-instance Hashable PackageVersion where
-  hashWithSalt i = hashWithSalt i . V.toList . unPackageVersion
+instance Hashable Version where
+  hashWithSalt i = hashWithSalt i . V.toList . unVersion
 
-instance Lift PackageVersion where
-  lift (PackageVersion n) =
-    appE (conE 'PackageVersion)
+instance Lift Version where
+  lift (Version n) =
+    appE (conE 'Version)
          (appE (varE 'V.fromList)
                (listE (map (litE . IntegerL . fromIntegral)
                            (V.toList n))))
 
-instance Show PackageVersion where
-  show (PackageVersion v) =
+instance Show Version where
+  show (Version v) =
     intercalate "."
                 (map show (V.toList v))
 
-instance ToJSON PackageVersion where
-  toJSON = toJSON . packageVersionText
-instance FromJSON PackageVersion where
+instance ToJSON Version where
+  toJSON = toJSON . versionText
+instance FromJSON Version where
   parseJSON j =
     do s <- parseJSON j
-       case parsePackageVersionFromString s of
+       case parseVersionFromString s of
          Nothing ->
            fail ("Couldn't parse package version: " ++ s)
          Just ver -> return ver
 
 -- | Attoparsec parser for a package version from bytestring.
-packageVersionParser :: Parser PackageVersion
-packageVersionParser =
+versionParser :: Parser Version
+versionParser =
   do ls <- ((:) <$> num <*> many num')
      let !v = V.fromList ls
-     return (PackageVersion v)
+     return (Version v)
   where num = decimal
         num' = point *> num
         point = satisfy (== '.')
 
 -- | Convenient way to parse a package version from a bytestring.
-parsePackageVersion :: MonadThrow m => ByteString -> m PackageVersion
-parsePackageVersion x = go x
+parseVersion :: MonadThrow m => ByteString -> m Version
+parseVersion x = go x
   where go =
-          either (const (throwM (PackageVersionParseFail x))) return .
-          parseOnly (packageVersionParser <* endOfInput)
+          either (const (throwM (VersionParseFail x))) return .
+          parseOnly (versionParser <* endOfInput)
 
 -- | Migration function.
-parsePackageVersionFromString :: MonadThrow m => String -> m PackageVersion
-parsePackageVersionFromString =
-  parsePackageVersion . S8.pack
+parseVersionFromString :: MonadThrow m => String -> m Version
+parseVersionFromString =
+  parseVersion . S8.pack
 
 -- | Get a string representation of a package version.
-packageVersionString :: PackageVersion -> String
-packageVersionString (PackageVersion v) =
+versionString :: Version -> String
+versionString (Version v) =
   intercalate "."
               (map show (V.toList v))
 
 -- | Get a string representation of a package version.
-packageVersionText :: PackageVersion -> Text
-packageVersionText (PackageVersion v) =
+versionText :: Version -> Text
+versionText (Version v) =
   T.intercalate
     "."
     (map (T.pack . show)
          (V.toList v))
 
 -- | Convert to a Cabal version.
-toCabalVersion :: PackageVersion -> Version
-toCabalVersion (PackageVersion v) =
-  Version (map fromIntegral (V.toList v)) []
+toCabalVersion :: Version -> Cabal.Version
+toCabalVersion (Version v) =
+  Cabal.Version (map fromIntegral (V.toList v)) []
 
 -- | Convert from a Cabal version.
-fromCabalVersion :: Version -> PackageVersion
-fromCabalVersion (Version vs _) =
+fromCabalVersion :: Cabal.Version -> Version
+fromCabalVersion (Cabal.Version vs _) =
   let !v = V.fromList (map fromIntegral vs)
-  in PackageVersion v
+  in Version v
 
 -- | Make a package version.
-mkPackageVersion :: String -> Q Exp
-mkPackageVersion s =
-  case parsePackageVersionFromString s of
+mkVersion :: String -> Q Exp
+mkVersion s =
+  case parseVersionFromString s of
     Nothing -> error ("Invalid package version: " ++ show s)
     Just pn -> [|pn|]
 
 -- | Display a version range
-versionRangeText :: VersionRange -> Text
+versionRangeText :: Cabal.VersionRange -> Text
 versionRangeText = T.pack . render . disp
 
 -- | Check if a version is within a version range.
-withinRange :: PackageVersion -> VersionRange -> Bool
-withinRange v r = toCabalVersion v `C.withinRange` r
+withinRange :: Version -> Cabal.VersionRange -> Bool
+withinRange v r = toCabalVersion v `Cabal.withinRange` r

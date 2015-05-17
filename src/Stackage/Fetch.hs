@@ -21,7 +21,7 @@ module Stackage.Fetch
 import           Control.Monad.IO.Class
 import           Stackage.PackageIdentifier
 import           Stackage.PackageName
-import           Stackage.PackageVersion
+import           Stackage.Version
 
 import qualified Codec.Archive.Tar as Tar
 import           Control.Applicative ((*>), (<$>), (<*>))
@@ -148,7 +148,7 @@ getPackageInfo indexTar pkgs0 = withBinaryFile indexTar ReadMode $ \h -> do
             [pkg, ver, fp]
               | T.stripSuffix ".json" fp == Just pkg ->
                 do name' <- parsePackageNameFromString (T.unpack pkg)
-                   ver' <- parsePackageVersionFromString (T.unpack ver)
+                   ver' <- parseVersionFromString (T.unpack ver)
                    return (PackageIdentifier name' ver')
             _ -> Nothing
 
@@ -179,7 +179,7 @@ defaultPackageLocation =
                getAppUserDataDirectory "cabal"
              let packageDir = cabalDir </> "packages" </> "hackage.haskell.org"
              return $
-               \(PackageIdentifier (packageNameString -> name) (packageVersionString -> version)) ->
+               \(PackageIdentifier (packageNameString -> name) (versionString -> version)) ->
                  packageDir </> name </> version </>
                  concat [name,"-",version,".tar.gz"])
 

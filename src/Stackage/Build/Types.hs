@@ -27,7 +27,7 @@ import Stackage.FlagName
 import Stackage.GhcPkgId
 import Stackage.Package
 import Stackage.PackageName
-import Stackage.PackageVersion
+import Stackage.Version
 
 data StackageBuildException
   = FPNoConfigFile
@@ -35,8 +35,8 @@ data StackageBuildException
   | FPMissingTool Dependency
   | FPCouldn'tFindPkgId PackageName
   | FPMissingDep Package PackageName VersionRange
-  | FPStackageDepVerMismatch PackageName PackageVersion VersionRange
-  | FPStackagePackageVersionMismatch PackageName PackageVersion PackageVersion
+  | FPStackageDepVerMismatch PackageName Version VersionRange
+  | FPStackageVersionMismatch PackageName Version Version
   | FPDependencyIssues [StackageBuildException]
   deriving (Typeable,Show)
 

@@ -7,7 +7,7 @@
 
 module Stackage.Resolve
   (PackageSuggestion(..)
-  ,resolvePackageVersions)
+  ,resolveVersions)
   where
 
 import           Control.Exception
@@ -25,7 +25,7 @@ import           Network.HTTP.Types.Status
 import           Prelude hiding (FilePath)
 import           Stackage.FlagName
 import           Stackage.PackageName
-import           Stackage.PackageVersion
+import           Stackage.Version
 
 data ResolveException =
   FPResolvePackagesError [PackageName]
@@ -36,7 +36,7 @@ instance Exception ResolveException
 -- | A suggestion for package version/flags from stackage.org
 data PackageSuggestion =
   PackageSuggestion {suggestionName :: !PackageName
-                    ,suggestionVersion :: !PackageVersion
+                    ,suggestionVersion :: !Version
                     ,suggestionFlags :: !(Map FlagName Bool)}
   deriving (Show)
 
@@ -53,10 +53,10 @@ instance FromJSON PackageSuggestion where
 -- TODO: Catch http exceptions.
 -- TODO: Handle non-existent package case.
 -- Example usage:
--- runNoLoggingT (resolvePackageVersions [PackageName "warp",PackageName "snap"])
-resolvePackageVersions :: (MonadThrow m,MonadIO m) => [PackageName] -> m [PackageSuggestion]
-resolvePackageVersions (null -> True) = return []
-resolvePackageVersions names =
+-- runNoLoggingT (resolveVersions [PackageName "warp",PackageName "snap"])
+resolveVersions :: (MonadThrow m,MonadIO m) => [PackageName] -> m [PackageSuggestion]
+resolveVersions (null -> True) = return []
+resolveVersions names =
   do liftIO (putStrLn "Resolving package versions against Stackage ...")
      req <- parseUrl url
      resp <-
