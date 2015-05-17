@@ -134,8 +134,8 @@ parsePackageNameFromFilePath fp =
 instance ToJSON a => ToJSON (Map PackageName a) where
   toJSON = toJSON . Map.mapKeysWith const packageNameText
 instance FromJSON a => FromJSON (Map PackageName a) where
-    parseJSON v = do
-        m <- parseJSON v
+    parseJSON val = do
+        m <- parseJSON val
         fmap Map.fromList $ mapM go $ Map.toList m
       where
         go (k, v) = fmap (, v) $ either (fail . show) return $ parsePackageNameFromString k

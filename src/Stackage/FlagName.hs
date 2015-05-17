@@ -22,7 +22,6 @@ module Stackage.FlagName
   where
 
 import           Control.Applicative
-import           Control.Monad
 import           Control.Monad.Catch
 import           Data.Aeson
 import           Data.Attoparsec.ByteString.Char8
@@ -40,7 +39,6 @@ import qualified Distribution.PackageDescription as Cabal
 import           GHC.Generics
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
-import           Path
 
 -- | A parse fail.
 data FlagNameParseFail
@@ -122,8 +120,8 @@ toCabalFlagName (FlagName name) =
 instance ToJSON a => ToJSON (Map FlagName a) where
   toJSON = toJSON . Map.mapKeysWith const flagNameText
 instance FromJSON a => FromJSON (Map FlagName a) where
-    parseJSON v = do
-        m <- parseJSON v
+    parseJSON val = do
+        m <- parseJSON val
         fmap Map.fromList $ mapM go $ Map.toList m
       where
         go (k, v) = fmap (, v) $ either (fail . show) return $ parseFlagNameFromString k
