@@ -10,6 +10,7 @@ import Data.Text (Text)
 import Filesystem.Path.CurrentOS ()
 import Path as FL
 import Prelude
+import Stackage.Config
 import Stackage.Package
 import System.Directory
 
@@ -92,3 +93,18 @@ getIndexDir =
   do homeDir <- getHomeDirectory >>= parseAbsDir
      return (homeDir </>
              $(mkRelDir ".stackage/pkg-index"))
+
+pkgUnpackDir :: Stackage.Config.Config -> Path Abs Dir
+pkgUnpackDir config =
+  configStackageRoot config </>
+  $(mkRelDir "unpacked")
+
+pkgIndexDir :: Stackage.Config.Config -> Path Abs Dir
+pkgIndexDir config =
+  configStackageRoot config </>
+  $(mkRelDir "package-index")
+
+pkgIndexFile :: Stackage.Config.Config -> Path Abs File
+pkgIndexFile config =
+  pkgIndexDir config </>
+  $(mkRelFile "00-index.tar")

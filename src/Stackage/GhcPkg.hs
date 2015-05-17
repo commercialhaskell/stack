@@ -101,7 +101,7 @@ findPackageId name =
        tryProcessStdout "ghc-pkg"
                         ["describe",packageNameString name]
      case result of
-       Left err -> return Nothing
+       Left{} -> return Nothing
        Right lbs ->
          do let mpid =
                   fmap T.unpack
