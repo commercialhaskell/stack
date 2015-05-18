@@ -13,7 +13,7 @@ module Stack.GhcPkg
   where
 
 import           Stack.Types
-import           Stack.Process
+import           System.Process.Read
 
 import           Control.Applicative
 import           Control.Exception hiding (catch)

@@ -4,7 +4,7 @@
 
 -- | Reading from external processes.
 
-module Stack.Process
+module System.Process.Read
   (readProcessStdout
   ,tryProcessStdout
   ,sinkProcessStdout
@@ -61,9 +61,15 @@ sinkProcessStdout name args sink =
   where asBSSource :: Source m S.ByteString -> Source m S.ByteString
         asBSSource = id
 
+-- | Run the given command in the given directory. If it exits with anything
+-- but success, throw an exception.
 runIn :: forall (m :: * -> *).
          (MonadLogger m,MonadIO m)
-      => Path Abs Dir -> Path Abs File -> [String] -> Maybe String -> m ()
+      => Path Abs Dir -- ^ directory to run in
+      -> Path Abs File -- ^ command to run
+      -> [String] -- ^ command line arguments
+      -> Maybe String -- ^ error message on failure, if Nothing uses a default
+      -> m ()
 runIn dir cmd args errMsg =
   do let dir' = toFilePath dir
          cmd' = toFilePath cmd

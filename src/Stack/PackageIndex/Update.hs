@@ -46,7 +46,7 @@ import           Path
         mkRelDir, (</>))
 import           Control.Exception.Enclosed (tryIO)
 import           Stack.Types
-import           Stack.Process (runIn)
+import           System.Process.Read (runIn)
 import           Stack.Constants
 import           System.Directory
 import           System.IO (IOMode(ReadMode), withBinaryFile)
