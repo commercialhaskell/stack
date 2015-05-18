@@ -40,17 +40,18 @@ data StackageBuildException
 instance Exception StackageBuildException
 
 -- | Configuration for building.
-data BuildConfig =
-  BuildConfig {bconfigTargets :: ![Text]
-              ,bconfigVerbosity :: !Verbosity
-              ,bconfigLibProfile :: !Bool
-              ,bconfigExeProfile :: !Bool
-              ,bconfigEnableOptimizations :: !(Maybe Bool)
-              ,bconfigFinalAction :: !FinalAction
-              ,bconfigDryrun :: !Bool
-              ,bconfigGhcOptions :: ![Text]
-              ,bconfigInDocker :: !Bool
-              ,bconfigSnapName :: !SnapName}
+data BuildOpts =
+  BuildOpts {boptsTargets :: ![Text]
+            ,boptsVerbosity :: !Verbosity
+            ,boptsLibProfile :: !Bool
+            ,boptsExeProfile :: !Bool
+            ,boptsEnableOptimizations :: !(Maybe Bool)
+            ,boptsFinalAction :: !FinalAction
+            ,boptsDryrun :: !Bool
+            ,boptsGhcOptions :: ![Text]
+            ,boptsInDocker :: !Bool
+            ,boptsSnapName :: !SnapName
+            }
   deriving (Show)
 
 -- | Configuration for testing.

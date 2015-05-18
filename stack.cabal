@@ -25,6 +25,7 @@ library
                      Stack.PackageIndex.Read
                      Stack.PackageIndex.Update
                      Stack.Types
+                     Stack.Types.Internal
                      Stack.Types.BuildPlan
                      Stack.Types.FlagName
                      Stack.Types.GhcPkgId
@@ -98,5 +99,12 @@ executable stack
   main-is:        Main.hs
   ghc-options:    -Wall -O2
   build-depends:  base >=4.7 && < 5
+                , http-conduit >= 2.1.5
+                , monad-logger >= 0.3.13.1
+                , mtl >= 2.1.3.1
+                , optparse-applicative >= 0.11.0.2
+                , optparse-simple >= 0.0.2
+                , shake
                 , stack
+                , text >= 1.2.0.4
   default-language:    Haskell2010

@@ -86,57 +86,56 @@ test :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env)
      => TestConfig
      -> m ()
 test conf =
-  build (BuildConfig (tconfigTargets conf)
-                     (tconfigVerbosity conf)
-                     False
-                     False
-                     Nothing
-                     DoTests
-                     False
-                     []
-                     (tconfigInDocker conf)
-                     (LTS 2 8)) -- FIXME figure out where to get the SnapName from
+  build (BuildOpts (tconfigTargets conf)
+                   (tconfigVerbosity conf)
+                   False
+                   False
+                   Nothing
+                   DoTests
+                   False
+                   []
+                   (tconfigInDocker conf)
+                   (LTS 2 8)) -- FIXME figure out where to get the SnapName from
 
 -- | Build and haddock using Shake.
 haddock :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env)
         => HaddockConfig -> m ()
 haddock conf =
-  build (BuildConfig (hconfigTargets conf)
-                     (hconfigVerbosity conf)
-                     False
-                     False
-                     Nothing
-                     DoHaddock
-                     False
-                     []
-                     (hconfigInDocker conf)
-                     (LTS 2 8)) -- FIXME figure out where to get the SnapName from
+  build (BuildOpts (hconfigTargets conf)
+                   (hconfigVerbosity conf)
+                   False
+                   False
+                   Nothing
+                   DoHaddock
+                   False
+                   []
+                   (hconfigInDocker conf)
+                   (LTS 2 8)) -- FIXME figure out where to get the SnapName from
 
 -- | Build and benchmark using Shake.
 benchmark :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env)
           => BenchmarkConfig -> m ()
 benchmark conf =
-  build (BuildConfig (benchTargets conf)
-                     (benchVerbosity conf)
-                     False
-                     False
-                     Nothing
-                     DoBenchmarks
-                     False
-                     []
-                     (benchInDocker conf)
-                     (LTS 2 8)) -- FIXME figure out where to get the SnapName from
+  build (BuildOpts (benchTargets conf)
+                   (benchVerbosity conf)
+                   False
+                   False
+                   Nothing
+                   DoBenchmarks
+                   False
+                   []
+                   (benchInDocker conf)
+                   (LTS 2 8)) -- FIXME figure out where to get the SnapName from
 
 -- | Build using Shake.
-build :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env)
-      => BuildConfig
-      -> m ()
-build bconfig =
+build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env)
+      => BuildOpts -> m ()
+build bopts =
   do env <- ask
      pinfos <- liftIO
         $ runNoLoggingT
         $ runResourceT
-        $ getPackageInfos (bconfigFinalAction bconfig) (Just bconfig) env
+        $ getPackageInfos (boptsFinalAction bopts) (Just bopts) env
      pkgIds <- liftIO $ getPackageIds (map packageName (S.toList pinfos))
      pwd <- liftIO $ getCurrentDirectory >>= parseAbsDir
      docLoc <- liftIO $ getUserDocLoc
@@ -147,42 +146,42 @@ build bconfig =
             (\pinfo ->
                do let wantedTarget =
                         wanted pwd pinfo
-                  when (wantedTarget && bconfigFinalAction bconfig /= DoNothing)
+                  when (wantedTarget && boptsFinalAction bopts /= DoNothing)
                        (liftIO (deleteGenFile (packageDir pinfo)))
                   gconfig <- liftIO $
                     readGenConfigFile pkgIds
                                       (packageName pinfo)
-                                      bconfig
+                                      bopts
                                       (packageDir pinfo)
                                       wantedTarget
                                       pinfo
                                       cfgVar
                   return (makePlan pkgIds
                                    wantedTarget
-                                   bconfig
+                                   bopts
                                    gconfig
                                    pinfos
                                    pinfo
                                    installResource
                                    docLoc
                                    cfgVar))
-     if bconfigDryrun bconfig
+     if boptsDryrun bopts
         then liftIO $ dryRunPrint pinfos
         else do
             let config = getConfig env
             liftIO $ withArgs []
-                      (shakeArgs shakeOptions {shakeVerbosity = bconfigVerbosity bconfig
+                      (shakeArgs shakeOptions {shakeVerbosity = boptsVerbosity bopts
                                               ,shakeFiles =
                                                  FL.toFilePath (shakeFilesPath (configDir config))
                                               ,shakeThreads = defaultShakeThreads}
                                  (do sequence_ plans
-                                     when (bconfigFinalAction bconfig ==
+                                     when (boptsFinalAction bopts ==
                                            DoHaddock)
                                           (buildDocIndex (wanted pwd)
                                                          docLoc
                                                          pinfos)))
   where wanted pwd pinfo =
-          case bconfigTargets bconfig of
+          case boptsTargets bopts of
             [] ->
               FL.isParentOf pwd
                             (packageDir pinfo) ||
@@ -235,7 +234,7 @@ clean =
 -- | Make a Shake plan for a package.
 makePlan :: Map PackageName GhcPkgId
          -> Bool
-         -> BuildConfig
+         -> BuildOpts
          -> GenConfig
          -> Set Package
          -> Package
@@ -243,22 +242,22 @@ makePlan :: Map PackageName GhcPkgId
          -> Path Abs Dir
          -> MVar ConfigLock
          -> Rules ()
-makePlan pkgIds wanted bconfig gconfig pinfos pinfo installResource docLoc cfgVar =
+makePlan pkgIds wanted bopts gconfig pinfos pinfo installResource docLoc cfgVar =
   do when wanted (want [target])
      target %>
        \_ ->
-         do needDependencies pkgIds bconfig pinfos pinfo cfgVar
+         do needDependencies pkgIds bopts pinfos pinfo cfgVar
             needTools pinfo
             needSourceFiles
             removeAfterwards <- liftIO (ensureSetupHs dir)
             actionFinally
               (buildPackage
-                 bconfig
+                 bopts
                  pinfos
                  pinfo
                  gconfig
                  (if wanted
-                     then bconfigFinalAction bconfig
+                     then boptsFinalAction bopts
                      else DoNothing)
                  installResource
                  docLoc)
@@ -284,18 +283,18 @@ needTools pinfo =
 -- | Specify that the given package needs the following other
 -- packages.
 needDependencies :: Map PackageName GhcPkgId
-                 -> BuildConfig
+                 -> BuildOpts
                  -> Set Package
                  -> Package
                  -> MVar ConfigLock
                  -> Action ()
-needDependencies pkgIds bconfig pinfos pinfo cfgVar =
+needDependencies pkgIds bopts pinfos pinfo cfgVar =
   do deps <- mapM (\pinfo' ->
                      let dir' = packageDir pinfo'
                          genFile = builtFileFromDir dir'
                      in do void (liftIO (readGenConfigFile pkgIds
                                                            (packageName pinfo')
-                                                           bconfig
+                                                           bopts
                                                            dir'
                                                            False
                                                            pinfo'
@@ -327,7 +326,7 @@ writeFinalFiles gconfig dir name =
                     updateGenFile dir)
 
 -- | Build the given package with the given configuration.
-buildPackage :: BuildConfig
+buildPackage :: BuildOpts
              -> Set Package
              -> Package
              -> GenConfig
@@ -335,7 +334,7 @@ buildPackage :: BuildConfig
              -> Resource
              -> Path Abs Dir
              -> Action ()
-buildPackage bconfig pinfos pinfo gconfig setupAction installResource docLoc =
+buildPackage bopts pinfos pinfo gconfig setupAction installResource docLoc =
   do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath pinfo))) :: IO (Either IOException ())))
      runhaskell
        pinfo
@@ -356,7 +355,7 @@ buildPackage bconfig pinfos pinfo gconfig setupAction installResource docLoc =
        (concat [["build"]
                ,["--ghc-options=-O2" | gconfigOptimize gconfig]
                ,["--ghc-options=-fforce-recomp" | gconfigForceRecomp gconfig]
-               ,concat [["--ghc-options",T.unpack opt] | opt <- bconfigGhcOptions bconfig]])
+               ,concat [["--ghc-options",T.unpack opt] | opt <- boptsGhcOptions bopts]])
      case setupAction of
        DoTests ->
          runhaskell pinfo
@@ -612,12 +611,12 @@ haddockInterfaceOpts userDocLoc pinfo pinfos =
 
 -- | Should the generated config be considered invalid?
 genFileInvalidated :: Map PackageName GhcPkgId
-                   -> BuildConfig
+                   -> BuildOpts
                    -> GenConfig
                    -> PackageName
                    -> Package
                    -> Bool
-genFileInvalidated pkgIds bconfig gconfig pname pinfo =
+genFileInvalidated pkgIds bopts gconfig pname pinfo =
   or [installedPkgIdChanged
      ,optimizationsChanged
      ,profilingChanged
@@ -626,14 +625,14 @@ genFileInvalidated pkgIds bconfig gconfig pname pinfo =
   where installedPkgIdChanged =
           Just (gconfigPkgId gconfig) /=
           M.lookup pname pkgIds
-        ghcOptsChanged = bconfigGhcOptions bconfig /= gconfigGhcOptions gconfig
+        ghcOptsChanged = boptsGhcOptions bopts /= gconfigGhcOptions gconfig
         profilingChanged =
-          (bconfigLibProfile bconfig &&
+          (boptsLibProfile bopts &&
            not (gconfigLibProfiling gconfig)) ||
-          (bconfigExeProfile bconfig &&
+          (boptsExeProfile bopts &&
            not (gconfigExeProfiling gconfig))
         optimizationsChanged =
-          case bconfigEnableOptimizations bconfig of
+          case boptsEnableOptimizations bopts of
             Just optimize
               | optimize /= gconfigOptimize gconfig && optimize -> True
             _ -> False
@@ -641,12 +640,12 @@ genFileInvalidated pkgIds bconfig gconfig pname pinfo =
 
 -- | Should the generated config be updated?
 genFileChanged :: Map PackageName GhcPkgId
-               -> BuildConfig
+               -> BuildOpts
                -> GenConfig
                -> PackageName
                -> Package
                -> Bool
-genFileChanged pkgIds bconfig gconfig pname pinfo =
+genFileChanged pkgIds bopts gconfig pname pinfo =
   or [installedPkgIdChanged
      ,optimizationsChanged
      ,profilingChanged
@@ -655,14 +654,14 @@ genFileChanged pkgIds bconfig gconfig pname pinfo =
   where installedPkgIdChanged =
           Just (gconfigPkgId gconfig) /=
           M.lookup pname pkgIds
-        ghcOptsChanged = bconfigGhcOptions bconfig /= gconfigGhcOptions gconfig
+        ghcOptsChanged = boptsGhcOptions bopts /= gconfigGhcOptions gconfig
         profilingChanged =
-          (bconfigLibProfile bconfig &&
+          (boptsLibProfile bopts &&
            not (gconfigLibProfiling gconfig)) ||
-          (bconfigExeProfile bconfig &&
+          (boptsExeProfile bopts &&
            not (gconfigExeProfiling gconfig))
         optimizationsChanged =
-          maybe False (/= gconfigOptimize gconfig) (bconfigEnableOptimizations bconfig)
+          maybe False (/= gconfigOptimize gconfig) (boptsEnableOptimizations bopts)
         flagsChanged =
           packageFlags pinfo /=
           gconfigFlags gconfig
@@ -690,13 +689,13 @@ writeGenConfigFile dir gconfig = liftIO $
 -- build configuration.
 readGenConfigFile :: Map PackageName GhcPkgId
                   -> PackageName
-                  -> BuildConfig
+                  -> BuildOpts
                   -> Path Abs Dir
                   -> Bool
                   -> Package
                   -> MVar ConfigLock
                   -> IO GenConfig
-readGenConfigFile pkgIds name bconfig dir wanted pinfo cfgVar = withMVar cfgVar (const go)
+readGenConfigFile pkgIds name bopts dir wanted pinfo cfgVar = withMVar cfgVar (const go)
   where go =
           do bytes <-
                catch (fmap Just
@@ -705,16 +704,16 @@ readGenConfigFile pkgIds name bconfig dir wanted pinfo cfgVar = withMVar cfgVar 
                         return Nothing)
              case bytes >>= decode . L.fromStrict of
                Just gconfig ->
-                 if genFileChanged pkgIds bconfig gconfig name pinfo
+                 if genFileChanged pkgIds bopts gconfig name pinfo
                     then
                          -- If the build config has changed such that the gen
                          -- config needs to be regenerated...
                          do let invalidated =
-                                  genFileInvalidated pkgIds bconfig gconfig name pinfo
+                                  genFileInvalidated pkgIds bopts gconfig name pinfo
                             when (invalidated || wanted)
                                  (deleteGenFile dir)
                             let gconfig' =
-                                  (newConfig gconfig bconfig pinfo) {gconfigForceRecomp = invalidated}
+                                  (newConfig gconfig bopts pinfo) {gconfigForceRecomp = invalidated}
                             -- When a file has been invalidated it means the
                             -- configuration has changed such that things need
                             -- to be recompiled, hence the above setting of force
@@ -730,26 +729,26 @@ readGenConfigFile pkgIds name bconfig dir wanted pinfo cfgVar = withMVar cfgVar 
                           bytes
                     deleteGenFile dir
                     let gconfig' =
-                          newConfig def bconfig pinfo
+                          newConfig def bopts pinfo
                     writeGenConfigFile dir gconfig'
                     return gconfig' -- Probably doesn't exist or is out of date (not parseable.)
         fp = builtConfigFileFromDir dir
 
 -- | Update a gen configuration using the build configuration.
 newConfig :: GenConfig -- ^ Build configuration.
-          -> BuildConfig -- ^ A base gen configuration.
+          -> BuildOpts -- ^ A base gen configuration.
           -> Package
           -> GenConfig
-newConfig gconfig bconfig pinfo =
+newConfig gconfig bopts pinfo =
   def {gconfigOptimize =
          maybe (gconfigOptimize gconfig)
                id
-               (bconfigEnableOptimizations bconfig)
-      ,gconfigLibProfiling = bconfigLibProfile bconfig ||
+               (boptsEnableOptimizations bopts)
+      ,gconfigLibProfiling = boptsLibProfile bopts ||
                              gconfigLibProfiling gconfig
-      ,gconfigExeProfiling = bconfigExeProfile bconfig ||
+      ,gconfigExeProfiling = boptsExeProfile bopts ||
                              gconfigExeProfiling gconfig
-      ,gconfigGhcOptions = bconfigGhcOptions bconfig
+      ,gconfigGhcOptions = boptsGhcOptions bopts
       ,gconfigFlags = packageFlags pinfo
       ,gconfigPkgId = gconfigPkgId gconfig}
 
@@ -760,10 +759,10 @@ newConfig gconfig bconfig pinfo =
 getPackageInfos :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m
                    ,MonadResource m,MonadMask m
                    ,HasHttpManager env,HasConfig env)
-                => FinalAction -> Maybe BuildConfig
+                => FinalAction -> Maybe BuildOpts
                 -> env -- FIXME this shouldn't be necessary, but I got weird type errors without it
                 -> m (Set Package)
-getPackageInfos finalAction mbconfig env =
+getPackageInfos finalAction mbopts env =
     runReaderT (go True (getConfig env)) env
   where go retry cfg =
           do globalPackages <- getAllPackages
@@ -779,13 +778,13 @@ getPackageInfos finalAction mbconfig env =
              case errs of
                [] -> return infos
                _
-                 | Just bconfig <- mbconfig
-                 , not (bconfigInDocker bconfig)
+                 | Just bopts <- mbopts
+                 , not (boptsInDocker bopts)
                  , retry ->
-                   outsideOfDockerApproach infos globalPackages cfg bconfig errs
+                   outsideOfDockerApproach infos globalPackages cfg bopts errs
                  | otherwise ->
                    liftIO (throwIO (FPDependencyIssues (nubBy (on (==) show) errs)))
-        outsideOfDockerApproach infos globalPackages cfg bconfig errs =
+        outsideOfDockerApproach infos globalPackages cfg bopts errs =
           do indexDir <- liftIO getIndexDir
              index <- loadPkgIndex indexDir
              results <- forM names (checkPackageInIndex index)
@@ -793,7 +792,7 @@ getPackageInfos finalAction mbconfig env =
                [] ->
                  do let okPkgVers = M.fromList (rights results)
                     bp <-
-                      loadBuildPlan (bconfigSnapName bconfig)
+                      loadBuildPlan (boptsSnapName bopts)
                     mapping <-
                       resolveBuildPlan bp (M.keysSet okPkgVers)
                     validated <-
