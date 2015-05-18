@@ -13,13 +13,13 @@ module Stack.PackageIndex.Read
     ( sourcePackageIndex
     , UnparsedCabalFile (..)
     , getLatestDescriptions
-    , getPackageIndexPath
     ) where
 
 import Data.Typeable (Typeable)
 import Data.Text (Text)
 import Control.Monad.Catch (MonadThrow, throwM)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.Reader (runReaderT)
 import Data.Monoid (mempty, (<>))
 import qualified Data.Map as Map
 import Data.Traversable (forM)
@@ -38,7 +38,6 @@ import           Distribution.ParseUtils (PError)
 import qualified Distribution.Text as DT
 import           Path hiding ((</>))
 import           Stack.Types
-import           System.Directory (getAppUserDataDirectory)
 import qualified Data.Conduit.List as CL
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Control (MonadBaseControl)
@@ -49,30 +48,8 @@ import Data.Text.Lazy.Encoding (decodeUtf8With)
 import Data.Text.Encoding.Error (lenientDecode)
 import Control.Monad.Trans.Resource (runResourceT, MonadResource)
 import Control.Monad (when)
-import qualified Data.Conduit.Text as CT
 import qualified Data.Conduit.Binary as CB
-import System.FilePath ((</>))
-
--- | Name of the 00-index.tar downloaded from Hackage.
-getPackageIndexPath :: MonadIO m => m FilePath
-getPackageIndexPath = liftIO $ do
-    c <- getCabalRoot
-    configLines <- runResourceT $ CB.sourceFile (c </> "config")
-                               $$ CT.decodeUtf8
-                               =$ CT.lines
-                               =$ CL.mapMaybe getRemoteCache
-                               =$ CL.consume
-    case configLines of
-        [x] -> return $ x </> "hackage.haskell.org" </> "00-index.tar"
-        [] -> error $ "No remote-repo-cache found in Cabal config file"
-        _ -> error $ "Multiple remote-repo-cache entries found in Cabal config file"
-  where
-    getCabalRoot :: IO FilePath
-    getCabalRoot = getAppUserDataDirectory "cabal"
-
-    getRemoteCache s = do
-        ("remote-repo-cache", T.stripPrefix ":" -> Just v) <- Just $ T.break (== ':') s
-        Just $ T.unpack $ T.strip v
+import Stack.Config
 
 -- | A cabal file with name and version parsed from the filepath, and the
 -- package description itself ready to be parsed. It's left in unparsed form
@@ -87,12 +64,15 @@ data UnparsedCabalFile = UnparsedCabalFile
 
 
 -- | Stream all of the cabal files from the 00-index tar file.
-sourcePackageIndex :: (MonadThrow m, MonadResource m, MonadActive m, MonadBaseControl IO m)
-                   => Path Abs File -> Producer m UnparsedCabalFile
-sourcePackageIndex fp = do
+sourcePackageIndex :: ( MonadThrow m, MonadResource m, MonadActive m, MonadBaseControl IO m
+                      , MonadReader env m, HasConfig env
+                      )
+                   => Producer m UnparsedCabalFile
+sourcePackageIndex = do
     -- yay for the tar package. Use lazyConsume instead of readFile to get some
     -- kind of resource protection
-    lbs <- lift $ fmap L.fromChunks $ lazyConsume $ CB.sourceFile $ Path.toFilePath fp
+    config <- askConfig
+    lbs <- lift $ fmap L.fromChunks $ lazyConsume $ CB.sourceFile $ Path.toFilePath $ configPackageIndex config
     loop (Tar.read lbs)
   where
     loop (Tar.Next e es) = goE e >> loop es
@@ -154,14 +134,17 @@ instance Exception CabalParseException
 
 -- | Get all of the latest descriptions for name/version pairs matching the
 -- given criterion.
-getLatestDescriptions :: MonadIO m
-                      => Path Abs File
-                      -> (PackageName -> Version -> Bool)
+getLatestDescriptions :: (MonadIO m, MonadReader env m, HasConfig env)
+                      => (PackageName -> Version -> Bool)
                       -> (GenericPackageDescription -> IO desc)
                       -> m (Map PackageName desc)
-getLatestDescriptions fp f parseDesc = liftIO $ do
-    m <- runResourceT $ sourcePackageIndex fp $$ CL.filter f' =$ CL.fold add mempty
-    forM m $ \ucf -> liftIO $ ucfParse ucf >>= parseDesc
+getLatestDescriptions f parseDesc = do
+    env <- ask
+    liftIO $ do
+        m <- flip runReaderT env
+                $ runResourceT
+                $ sourcePackageIndex $$ CL.filter f' =$ CL.fold add mempty
+        forM m $ \ucf -> liftIO $ ucfParse ucf >>= parseDesc
   where
     f' ucf = f (ucfName ucf) (ucfVersion ucf)
     add m ucf =

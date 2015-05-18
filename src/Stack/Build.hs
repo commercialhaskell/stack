@@ -785,9 +785,7 @@ getPackageInfos finalAction mbopts env =
                  | otherwise ->
                    liftIO (throwIO (DependencyIssues (nubBy (on (==) show) errs)))
         outsideOfDockerApproach infos globalPackages cfg bopts errs =
-          do indexDir <- liftIO getIndexDir
-             index <- loadPkgIndex indexDir
-             results <- forM names (checkPackageInIndex index)
+          do results <- forM names checkPackageInIndex
              case lefts results of
                [] ->
                  do let okPkgVers = M.fromList (rights results)
@@ -802,7 +800,7 @@ getPackageInfos finalAction mbopts env =
                       [] -> do {-liftIO (putStrLn "No validated packages!")-}
                                return infos
                       toFetch ->
-                        do newPkgDirs <- fetchAndUnpackPackages cfg
+                        do newPkgDirs <- fetchAndUnpackPackages
                                            (map (\(name, (ver, _flags)) ->
                                                fromTuple (name,ver))
                                                 toFetch)
@@ -868,12 +866,12 @@ validateSuggestion globalPackages okPkgVers =
 
 -- | Check that a package is actually available in the general (Hackage) package
 -- index.
-checkPackageInIndex :: (MonadIO m, MonadLogger m,MonadThrow m)
-                    => PackageIndex
-                    -> (PackageName,(VersionRange,t))
+checkPackageInIndex :: (MonadIO m, MonadLogger m,MonadThrow m
+                       ,MonadReader env m,HasConfig env)
+                    => (PackageName,(VersionRange,t))
                     -> m (Either PackageName (PackageName,VersionRange))
-checkPackageInIndex index (name,(range,_)) =
-  do mversions <- getPkgVersions index name
+checkPackageInIndex (name,(range,_)) =
+  do mversions <- getPkgVersions name
      case mversions of
        Just vers
          | any (flip withinRange range)
@@ -979,11 +977,10 @@ composeFlags pname pflags gflags = collapse pflags <> gflags
 -- Package fetching
 
 -- | Fetch and unpack the package.
-fetchAndUnpackPackages :: (MonadIO m,MonadThrow m,MonadLogger m,MonadMask m,MonadReader env m,HasHttpManager env)
-                       => Stack.Config.Config
-                       -> [PackageIdentifier]
+fetchAndUnpackPackages :: (MonadIO m,MonadThrow m,MonadLogger m,MonadMask m,MonadReader env m,HasHttpManager env,HasConfig env)
+                       => [PackageIdentifier]
                        -> m [Path Abs Dir]
-fetchAndUnpackPackages config pkgs =
+fetchAndUnpackPackages pkgs =
   do getPkgLoc <- packageLocationGetter indexSettings
      fetchPackages indexSettings pkgs
      locs <-
@@ -991,23 +988,23 @@ fetchAndUnpackPackages config pkgs =
                liftM (ident,)
                      (parseAbsFile (getPkgLoc ident)))
             pkgs
-     descs <- readPackageDescs config pkgs
+     descs <- readPackageDescs pkgs
      forM locs
           (\(ident@(PackageIdentifier name _),tarGzPath) ->
              case M.lookup name descs of
                Nothing ->
                  error "TODO: Throw error about package not existing in index."
                Just latestCabalFileContent ->
-                 unpackAndUpdateTarball config ident tarGzPath latestCabalFileContent)
+                 unpackAndUpdateTarball ident tarGzPath latestCabalFileContent)
   where indexSettings = Fetch.defaultSettings
 
 -- | Read package descriptions.
-readPackageDescs :: MonadIO m
-                 => Stack.Config.Config -> [PackageIdentifier] -> m (Map PackageName L.ByteString)
-readPackageDescs config pkgs =
-  liftM M.fromList
-        (liftIO (runResourceT
-                   (sourcePackageIndex (pkgIndexFile config) $=
+readPackageDescs :: (MonadIO m, MonadReader env m, HasConfig env)
+                 => [PackageIdentifier] -> m (Map PackageName L.ByteString)
+readPackageDescs pkgs = do
+  config <- ask
+  liftM M.fromList $ liftIO $ runResourceT $ flip runReaderT config $
+                    sourcePackageIndex $=
                     CL.filter (\ucf ->
                                  elem (PackageIdentifier (ucfName ucf)
                                                          (ucfVersion ucf))
@@ -1015,17 +1012,17 @@ readPackageDescs config pkgs =
                     CL.isolate (length pkgs) $=
                     CL.map (\unparsed ->
                               (ucfName unparsed,ucfLbs unparsed)) $$
-                    CL.consume)))
+                    CL.consume
 
 -- | Unpack and update the package tarball.
-unpackAndUpdateTarball :: (MonadIO m,MonadLogger m,MonadMask m)
-                       => Stack.Config.Config
-                       -> PackageIdentifier
+unpackAndUpdateTarball :: (MonadIO m,MonadLogger m,MonadMask m,MonadReader env m,HasConfig env)
+                       => PackageIdentifier
                        -> Path Abs File
                        -> L.ByteString
                        -> m (Path Abs Dir)
-unpackAndUpdateTarball config ident tarGzPath latestCabalFileContent =
-  do pkgVerDir <-
+unpackAndUpdateTarball ident tarGzPath latestCabalFileContent =
+  do config <- askConfig
+     pkgVerDir <-
        liftM (pkgUnpackDir config </>) (parseRelDir (packageIdentifierString ident))
      newCabalFilePath <-
        liftM (pkgVerDir </>)

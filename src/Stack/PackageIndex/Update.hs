@@ -10,7 +10,7 @@
 -- | Package index handling.
 
 module Stack.PackageIndex.Update
-       (PackageIndex(..), getPkgIndex, loadPkgIndex, updateIndex,
+       (updateIndex,
         getPkgVersions)
        where
 
@@ -24,34 +24,26 @@ import           Control.Monad.Logger
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Control.Monad.Trans.Resource (MonadResource)
 import qualified Data.ByteString.Lazy as L
-import           Data.Conduit (($$),($=))
-import           Data.Conduit.Binary (sourceLbs, sourceFile, sinkFile)
-import qualified Data.Conduit.Binary as C
+import           Data.Conduit (($$), (=$))
+import           Data.Conduit.Binary (sourceHandle, sinkHandle)
 import           Data.Conduit.Zlib (ungzip)
-import           Data.Foldable (forM_)
 import           Data.Maybe (isJust)
 import           Data.Monoid ((<>))
 import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.String (IsString(fromString))
 import qualified Data.Text as T
 import           Data.Typeable (Typeable)
-import           Network.HTTP.Client.Conduit
-       (Request(checkStatus, requestHeaders),
-        Response(responseBody, responseHeaders, responseStatus),
-        withResponse)
 import           Network.HTTP.Download
-import           Network.HTTP.Types (status200)
 import           Path
-       (Path, Abs, Dir, toFilePath, parseRelDir, parseAbsFile, mkRelFile,
-        mkRelDir, (</>))
+       (toFilePath, parseRelDir, parseAbsFile,
+        mkRelDir, (</>), parent)
 import           Control.Exception.Enclosed (tryIO)
 import           Stack.Types
 import           System.Process.Read (runIn)
 import           Stack.Config
 import           System.Directory
-import           System.FilePath (takeBaseName)
-import           System.IO (IOMode(ReadMode), withBinaryFile)
+import           System.FilePath (takeBaseName, (<.>))
+import           System.IO (IOMode(ReadMode, WriteMode), withBinaryFile)
 
 data PackageIndexException =
   Couldn'tReadIndexTarball FilePath
@@ -59,50 +51,25 @@ data PackageIndexException =
   deriving (Show,Typeable)
 instance Exception PackageIndexException
 
--- | Wrapper to an existant package index.
-newtype PackageIndex =
-  PackageIndex (Path Abs Dir)
-
--- | Try to get the package index.
-getPkgIndex :: (MonadIO m,MonadLogger m,MonadThrow m)
-            => (Path Abs Dir) -> m (Maybe PackageIndex)
-getPkgIndex dir =
-  do exists <-
-       (liftIO . doesDirectoryExist . toFilePath) dir
-     return (if exists
-                then Just (PackageIndex dir)
-                else Nothing)
-
--- | Load the package index, if it does not exist, download it.
-loadPkgIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m
-                ,MonadThrow m,MonadReader env m,HasHttpManager env
-                ,HasConfig env)
-             => Path Abs Dir -> m PackageIndex
-loadPkgIndex dir =
-  do maybeIdx <- getPkgIndex dir
-     case maybeIdx of
-       Just idx -> return idx
-       Nothing ->
-         do let idx = (PackageIndex dir)
-            updateIndex idx
-            return idx
-
 -- | Update the index tarball
 updateIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m
                ,MonadThrow m,MonadReader env m,HasHttpManager env
                ,HasConfig env)
-            => PackageIndex -> m ()
-updateIndex idx =
+            => m ()
+updateIndex =
   do git <- isGitInstalled
      if git
-        then updateIndexGit idx
-        else updateIndexHTTP idx
+        then updateIndexGit
+        else updateIndexHTTP
 
 -- | Update the index Git repo and the index tarball
 updateIndexGit :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasConfig env)
-               => PackageIndex -> m ()
-updateIndexGit (PackageIndex idxPath) =
-  do liftIO (createDirectoryIfMissing True (toFilePath idxPath))
+               => m ()
+updateIndexGit = do
+     config <- askConfig
+     let tarFile = configPackageIndex config
+         idxPath = parent tarFile
+     liftIO (createDirectoryIfMissing True (toFilePath idxPath))
      path <- liftIO (findExecutable "git")
      case path of
        Nothing ->
@@ -119,7 +86,6 @@ updateIndexGit (PackageIndex idxPath) =
                   ,"1"
                   ,"-b" --
                   ,"display"]
-            config <- askConfig
             let sDir = configStackageRoot config
             let suDir =
                   sDir </>
@@ -131,9 +97,6 @@ updateIndexGit (PackageIndex idxPath) =
                    (do $logInfo ("Cloning repository for first from " <> gitUrl)
                        runIn suDir gitPath cloneArgs Nothing)
             runIn acfDir gitPath ["fetch","--tags","--depth=1"] Nothing
-            let tarFile =
-                  idxPath </>
-                  $(mkRelFile "00-index.tar")
             _ <-
               (liftIO . tryIO) (removeFile (toFilePath tarFile))
             when (configGpgVerifyIndex config)
@@ -159,67 +122,42 @@ updateIndexGit (PackageIndex idxPath) =
 -- | Update the index tarball via HTTP
 updateIndexHTTP :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m
                    ,MonadThrow m,MonadReader env m,HasHttpManager env,HasConfig env)
-                => PackageIndex -> m ()
-updateIndexHTTP (PackageIndex idxPath) =
-  do let tarPath =
-           idxPath </>
-           $(mkRelFile "00-index.tar")
-         tarFilePath = toFilePath tarPath
-         tarGzPath =
-           idxPath </>
-           $(mkRelFile "00-index.tar.gz")
-         tarGzFilePath = toFilePath tarGzPath
-         tmpTarPath =
-           idxPath </>
-           $(mkRelFile "00-index.tar.gz.tmp")
-         tmpTarFilePath = toFilePath tmpTarPath
-         etagPath =
-           idxPath </>
-           $(mkRelFile "00-index.tar.gz.etag")
-         etagFilePath = toFilePath etagPath
-     url <- askPackageIndexHttpUrl
-     req <- parseUrl $ T.unpack url
-     $logDebug ("Downloading package index from " <> url)
-     etagFileExists <-
-       liftIO (doesFileExist etagFilePath)
-     if (etagFileExists)
-        then do etag <-
-                  sourceFile etagFilePath $$
-                  C.take 512
-                let req' =
-                      req {requestHeaders =
-                             requestHeaders req ++
-                             [("If-None-Match",L.toStrict etag)]}
-                download' req' tmpTarFilePath tarGzFilePath tarFilePath etagFilePath
-        else download' req tmpTarFilePath tarGzFilePath tarFilePath etagFilePath
-     config <- askConfig
-     when (configGpgVerifyIndex config)
+                => m ()
+updateIndexHTTP = do
+    config <- askConfig
+    url <- askPackageIndexHttpUrl
+    req <- parseUrl $ T.unpack url
+    $logDebug ("Downloading package index from " <> url)
+    wasDownloaded <- redownload req (configPackageIndexGz config)
+    toUnpack <-
+        if wasDownloaded
+            then return True
+            else liftIO $ fmap not $ doesFileExist $ toFilePath $ configPackageIndex config
+
+    when toUnpack $ do
+        let gz = toFilePath $ configPackageIndexGz config
+            tar = toFilePath $ configPackageIndex config
+            tmp = tar <.> "tmp"
+
+        liftIO $ do
+            withBinaryFile gz ReadMode $ \input ->
+                withBinaryFile tmp WriteMode $ \output ->
+                    sourceHandle input
+                    $$ ungzip
+                    =$ sinkHandle output
+            renameFile tmp tar
+
+    when (configGpgVerifyIndex config)
         $ $logWarn
         $ "You have enabled GPG verification of the package index, " <>
           "but GPG verification only works with Git downloading"
-  where download' req tmpTarGzFp tarGzFp tarFp etagFP = do -- FIXME consider making this the behavior of Network.HTTP.Download.download
-          withResponse req { checkStatus = \_ _ _ -> Nothing } $ \res ->
-                  when (responseStatus res == status200)
-                       (do let etag =
-                                 lookup "ETag" (responseHeaders res)
-                           forM_ etag
-                                 (\e ->
-                                    sourceLbs (L.fromStrict e) $$
-                                    sinkFile etagFP)
-                           responseBody res $$
-                             sinkFile (fromString tmpTarGzFp)
-                           sourceFile (fromString tmpTarGzFp) $$
-                             ungzip $=
-                             sinkFile (fromString tarFp)
-                           liftIO (renameFile tmpTarGzFp tarGzFp))
 
 -- | Fetch all the package versions for a given package
-getPkgVersions :: (MonadIO m,MonadLogger m,MonadThrow m)
-               => PackageIndex -> PackageName -> m (Maybe (Set Version))
-getPkgVersions (PackageIndex idxPath) pkg =
-  do let tarPath = idxPath </> $(mkRelFile "00-index.tar")
-         tarFilePath = toFilePath tarPath
-     $logWarn "FIXME: USING LOCAL DEFAULTS FOR URL & PATH"
+getPkgVersions :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasConfig env)
+               => PackageName -> m (Maybe (Set Version))
+getPkgVersions pkg =
+  do config <- askConfig
+     let tarFilePath = toFilePath $ configPackageIndex config
      $logDebug ("Iterating through tarball " <> T.pack tarFilePath)
      liftIO (withBinaryFile
                tarFilePath

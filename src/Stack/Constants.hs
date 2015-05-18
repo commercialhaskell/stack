@@ -11,7 +11,6 @@ import Filesystem.Path.CurrentOS ()
 import Path as FL
 import Prelude
 import Stack.Config
-import System.Directory
 
 -- | Extensions used for Haskell files.
 haskellFileExts :: [Text]
@@ -66,13 +65,6 @@ distDirFromDir fp = fp </> distRelativeDir
 -- | Relative location of build artifacts.
 distRelativeDir :: Path Rel Dir
 distRelativeDir = $(mkRelDir "dist/")
-
--- | Get the package index directory.
-getIndexDir :: IO (Path Abs Dir)
-getIndexDir =
-  do homeDir <- getHomeDirectory >>= parseAbsDir
-     return (homeDir </>
-             $(mkRelDir ".stackage/pkg-index"))
 
 pkgUnpackDir :: Stack.Config.Config -> Path Abs Dir
 pkgUnpackDir config =

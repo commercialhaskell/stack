@@ -47,6 +47,8 @@ module Stack.Config
   , dockerRunArgsArgName
   , dockerMountArgName
   , dockerPassHostArgName
+  , configPackageIndex
+  , configPackageIndexGz
   , askConfig
   , askLatestSnapshotUrl
   , askPackageIndexGitUrl
@@ -979,6 +981,14 @@ configBinPaths config =
    toFilePath (configGhcBinLocation config) <>
    [searchPathSeparator] <>
    toFilePath (configCabalBinLocation config)
+
+-- | Location of the 00-index.tar file
+configPackageIndex :: Config -> Path Abs File
+configPackageIndex config = configStackageRoot config </> $(mkRelFile "00-index.tar")
+
+-- | Location of the 00-index.tar.gz file
+configPackageIndexGz :: Config -> Path Abs File
+configPackageIndexGz config = configStackageRoot config </> $(mkRelFile "00-index.tar.gz")
 
 -- | Helper function to ask the environment and apply getConfig
 askConfig :: (MonadReader env m, HasConfig env) => m Config
