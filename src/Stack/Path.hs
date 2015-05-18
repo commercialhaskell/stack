@@ -15,6 +15,6 @@ import Stack.Config
 getBinPaths :: (MonadLogger m, MonadIO m, MonadThrow m)
   => m String
 getBinPaths = do
-   Config{..} <- getConfig Settings
+   Config{..} <- loadConfig
    return $ toFilePath configGhcBinLocation <> [searchPathSeparator]
      <> toFilePath configCabalBinLocation

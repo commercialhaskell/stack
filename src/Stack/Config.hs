@@ -23,10 +23,12 @@ module Stack.Config
   ( Config(..)
   , ConfigException(..)
   , configInDocker
-  , Settings(..)
   , Docker(..)
   , Mount(..)
-  , getConfig
+  , HasConfig (..)
+  , MonadReader
+  , ask
+  , loadConfig
   , getDocker
   , NotYetImplemented(..)
   , dockerRepoOwnerArgName
@@ -52,6 +54,7 @@ import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
+import           Control.Monad.Reader (MonadReader, ask)
 import           Data.Aeson
 import           Data.Aeson.Types (typeMismatch)
 import qualified Data.ByteString as S (readFile)
@@ -91,7 +94,13 @@ data Config =
          ,configDir              :: !(Path Abs Dir)}
   -- ^ Flags for each package's Cabal config.
   deriving (Show)
-data Settings = Settings
+
+-- | Class for environment values that can provide a 'Config'.
+class HasConfig env where
+    getConfig :: env -> Config
+instance HasConfig Config where
+    getConfig = id
+    {-# INLINE getConfig #-}
 
 configInDocker :: Config -> Bool
 configInDocker = (== "docker") . configBuildIn
@@ -847,10 +856,9 @@ readDockerFrom fp =
                Right docker -> return (Just (docker (parent fp)))
            _ -> return Nothing
 
--- TODO: handle Settings
-getConfig :: (MonadLogger m,MonadIO m,MonadThrow m)
-          => Settings -> m Config
-getConfig Settings = do
+loadConfig :: (MonadLogger m,MonadIO m,MonadThrow m)
+           => m Config
+loadConfig = do
   stackageConfig <- getStackageConfig
   configFromStackageConfig stackageConfig
 

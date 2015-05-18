@@ -51,12 +51,11 @@ import           Data.Maybe
 import           Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Set.Monad as S
-import           Data.Streaming.Process
+import           Data.Streaming.Process hiding (env)
 import qualified Data.Text as T
 import           Development.Shake hiding (doesFileExist,doesDirectoryExist,getDirectoryContents)
 import           Distribution.Compiler (CompilerId (CompilerId), buildCompilerId)
 import           Distribution.Package hiding (packageName,packageVersion,Package,PackageName,PackageIdentifier)
-import           Network.HTTP.Client (Manager)
 import           Network.HTTP.Download
 import           Path as FL
 import           Path.Find
@@ -83,10 +82,11 @@ import           System.Posix.Files (createSymbolicLink,removeLink)
 -- Top-level commands
 
 -- | Build and test using Shake.
-test :: Stack.Config.Config -> TestConfig -> IO ()
-test config conf =
-  build config
-        (BuildConfig (tconfigTargets conf)
+test :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env)
+     => TestConfig
+     -> m ()
+test conf =
+  build (BuildConfig (tconfigTargets conf)
                      (tconfigVerbosity conf)
                      False
                      False
@@ -98,10 +98,10 @@ test config conf =
                      (LTS 2 8)) -- FIXME figure out where to get the SnapName from
 
 -- | Build and haddock using Shake.
-haddock :: Stack.Config.Config -> HaddockConfig -> IO ()
-haddock config conf =
-  build config
-        (BuildConfig (hconfigTargets conf)
+haddock :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env)
+        => HaddockConfig -> m ()
+haddock conf =
+  build (BuildConfig (hconfigTargets conf)
                      (hconfigVerbosity conf)
                      False
                      False
@@ -113,10 +113,10 @@ haddock config conf =
                      (LTS 2 8)) -- FIXME figure out where to get the SnapName from
 
 -- | Build and benchmark using Shake.
-benchmark :: Stack.Config.Config -> BenchmarkConfig -> IO ()
-benchmark config conf =
-  build config
-        (BuildConfig (benchTargets conf)
+benchmark :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env)
+          => BenchmarkConfig -> m ()
+benchmark conf =
+  build (BuildConfig (benchTargets conf)
                      (benchVerbosity conf)
                      False
                      False
@@ -128,18 +128,20 @@ benchmark config conf =
                      (LTS 2 8)) -- FIXME figure out where to get the SnapName from
 
 -- | Build using Shake.
-build :: Stack.Config.Config -> BuildConfig -> IO ()
-build config bconfig =
-  do pinfos <-
-       runNoLoggingT (runResourceT (getPackageInfos (bconfigFinalAction bconfig)
-                                    (Just bconfig) config))
-     pkgIds <-
-       getPackageIds (map packageName (S.toList pinfos))
-     pwd <- getCurrentDirectory >>= parseAbsDir
-     docLoc <- getUserDocLoc
-     installResource <-
-       newResourceIO "cabal install" 1
-     cfgVar <- newMVar ConfigLock
+build :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env)
+      => BuildConfig
+      -> m ()
+build bconfig =
+  do env <- ask
+     pinfos <- liftIO
+        $ runNoLoggingT
+        $ runResourceT
+        $ getPackageInfos (bconfigFinalAction bconfig) (Just bconfig) env
+     pkgIds <- liftIO $ getPackageIds (map packageName (S.toList pinfos))
+     pwd <- liftIO $ getCurrentDirectory >>= parseAbsDir
+     docLoc <- liftIO $ getUserDocLoc
+     installResource <- liftIO $ newResourceIO "cabal install" 1
+     cfgVar <- liftIO $ newMVar ConfigLock
      plans <-
        forM (S.toList pinfos)
             (\pinfo ->
@@ -147,7 +149,7 @@ build config bconfig =
                         wanted pwd pinfo
                   when (wantedTarget && bconfigFinalAction bconfig /= DoNothing)
                        (liftIO (deleteGenFile (packageDir pinfo)))
-                  gconfig <-
+                  gconfig <- liftIO $
                     readGenConfigFile pkgIds
                                       (packageName pinfo)
                                       bconfig
@@ -165,8 +167,10 @@ build config bconfig =
                                    docLoc
                                    cfgVar))
      if bconfigDryrun bconfig
-        then dryRunPrint pinfos
-        else withArgs []
+        then liftIO $ dryRunPrint pinfos
+        else do
+            let config = getConfig env
+            liftIO $ withArgs []
                       (shakeArgs shakeOptions {shakeVerbosity = bconfigVerbosity bconfig
                                               ,shakeFiles =
                                                  FL.toFilePath (shakeFilesPath (configDir config))
@@ -194,23 +198,27 @@ dryRunPrint pinfos =
      forM_ (S.toList pinfos) (\pinfo -> putStrLn (packageNameString (packageName pinfo)))
 
 -- | Reset the build (remove Shake database and .gen files).
-clean :: Manager -> Stack.Config.Config -> IO () -- FIXME why is this suddenly in IO instead of MonadIO etc?
-clean manager config =
-  do pinfos <-
-       runReaderT (runNoLoggingT (runResourceT (getPackageInfos DoNothing Nothing config))) manager
+clean :: forall m env.
+         (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env)
+      => m ()
+clean =
+  do env <- ask
+     pinfos <- liftIO $ runNoLoggingT (runResourceT (getPackageInfos DoNothing Nothing env))
+     let config = getConfig env
      forM_ (S.toList pinfos)
            (\pinfo ->
               do deleteGenFile (packageDir pinfo)
                  let distDir =
                        FL.toFilePath (distDirFromDir (packageDir pinfo))
-                 exists <- doesDirectoryExist distDir
-                 when exists (removeDirectoryRecursive distDir))
+                 liftIO $ do
+                     exists <- doesDirectoryExist distDir
+                     when exists (removeDirectoryRecursive distDir))
      let listDir = FL.parent (shakeFilesPath (configDir config))
-     ls <-
+     ls <- liftIO $
        fmap (map (FL.toFilePath listDir ++))
             (getDirectoryContents (FL.toFilePath listDir))
      mapM_ (rmShakeMetadata (configDir config)) ls
-  where rmShakeMetadata cfg p =
+  where rmShakeMetadata cfg p = liftIO $
           when (isPrefixOf
                   (FilePath.takeFileName
                      (FL.toFilePath (shakeFilesPath cfg) ++
@@ -660,20 +668,20 @@ genFileChanged pkgIds bconfig gconfig pname pinfo =
           gconfigFlags gconfig
 
 -- | Write out the gen file for the build dir.
-updateGenFile :: Path Abs Dir -> IO ()
-updateGenFile dir =
+updateGenFile :: MonadIO m => Path Abs Dir -> m ()
+updateGenFile dir = liftIO $
   L.writeFile (FL.toFilePath (builtFileFromDir dir))
               ""
 
 -- | Delete the gen file, which will cause a rebuild.
-deleteGenFile :: Path Abs Dir -> IO ()
-deleteGenFile dir =
+deleteGenFile :: MonadIO m => Path Abs Dir -> m ()
+deleteGenFile dir = liftIO $
   catch (removeFile (FL.toFilePath (builtFileFromDir dir)))
         (\(_ :: IOException) -> return ())
 
 -- | Save generated configuration.
-writeGenConfigFile :: Path Abs Dir -> GenConfig -> IO ()
-writeGenConfigFile dir gconfig =
+writeGenConfigFile :: MonadIO m => Path Abs Dir -> GenConfig -> m ()
+writeGenConfigFile dir gconfig = liftIO $
   do createDirectoryIfMissing True (FL.toFilePath (FL.parent (builtConfigFileFromDir dir)))
      L.writeFile (FL.toFilePath (builtConfigFileFromDir dir))
                  (encode gconfig)
@@ -749,9 +757,14 @@ newConfig gconfig bconfig pinfo =
 -- Package info/dependencies/etc
 
 -- | Get packages' information.
-getPackageInfos :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m,MonadResource m,MonadMask m,MonadReader env m,HasHttpManager env)
-                => FinalAction -> Maybe BuildConfig -> Config -> m (Set Package)
-getPackageInfos finalAction mbconfig = go True
+getPackageInfos :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m
+                   ,MonadResource m,MonadMask m
+                   ,HasHttpManager env,HasConfig env)
+                => FinalAction -> Maybe BuildConfig
+                -> env -- FIXME this shouldn't be necessary, but I got weird type errors without it
+                -> m (Set Package)
+getPackageInfos finalAction mbconfig env =
+    runReaderT (go True (getConfig env)) env
   where go retry cfg =
           do globalPackages <- getAllPackages
              {-liftIO (putStrLn ("All global packages: " ++ show globalPackages))-}
