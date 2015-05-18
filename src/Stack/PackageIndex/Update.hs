@@ -136,8 +136,7 @@ updateIndexGit (PackageIndex idxPath) =
                   $(mkRelFile "00-index.tar")
             _ <-
               (liftIO . tryIO) (removeFile (toFilePath tarFile))
-            $logWarn "FIXME: WE DONT YET HAVE FLAG|SETTING|DEFAULT FOR GIT GPG VALIDATION"
-            when False
+            when (configGpgVerifyIndex config)
                  (do runIn acfDir
                            gitPath
                            ["tag","-v","current-hackage"]
@@ -193,7 +192,11 @@ updateIndexHTTP (PackageIndex idxPath) =
                              [("If-None-Match",L.toStrict etag)]}
                 download' req' tmpTarFilePath tarGzFilePath tarFilePath etagFilePath
         else download' req tmpTarFilePath tarGzFilePath tarFilePath etagFilePath
-     $logWarn "FIXME: WE CAN'T RUN GIT GPG SIGNATURE VERIFICATION WITHOUT GIT"
+     config <- askConfig
+     when (configGpgVerifyIndex config)
+        $ $logWarn
+        $ "You have enabled GPG verification of the package index, " <>
+          "but GPG verification only works with Git downloading"
   where download' req tmpTarGzFp tarGzFp tarFp etagFP = do -- FIXME consider making this the behavior of Network.HTTP.Download.download
           withResponse req { checkStatus = \_ _ _ -> Nothing } $ \res ->
                   when (responseStatus res == status200)

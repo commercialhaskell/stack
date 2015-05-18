@@ -99,6 +99,7 @@ data Config =
          ,configPackageFlags     :: !(Map PackageName (Map FlagName Bool))
          ,configDir              :: !(Path Abs Dir)
          ,configUrls             :: !(Map Text Text)
+         ,configGpgVerifyIndex   :: !Bool
          }
   -- ^ Flags for each package's Cabal config.
   deriving (Show)
@@ -157,11 +158,12 @@ instance Exception NotYetImplemented
 -- Configurations may be "cascaded" using mappend (left-biased).
 data StackageConfig =
   StackageConfig
-    { stackageConfigStackageOpts :: !StackageOpts
-    , stackageConfigBuildOpts    :: !BuildOpts
-    , stackageConfigDockerOpts   :: !DockerOpts
-    , stackageConfigDir          :: !(Maybe (Path Abs Dir))
-    , stackageConfigUrls         :: !(Map Text Text)
+    { stackageConfigStackageOpts   :: !StackageOpts
+    , stackageConfigBuildOpts      :: !BuildOpts
+    , stackageConfigDockerOpts     :: !DockerOpts
+    , stackageConfigDir            :: !(Maybe (Path Abs Dir))
+    , stackageConfigUrls           :: !(Map Text Text)
+    , stackageConfigGpgVerifyIndex :: !(Maybe Bool)
     }
   deriving Show
 
@@ -193,6 +195,7 @@ instance Monoid StackageConfig where
     , stackageConfigDockerOpts = mempty
     , stackageConfigDir = Nothing
     , stackageConfigUrls = mempty
+    , stackageConfigGpgVerifyIndex = Nothing
     }
   mappend l r = StackageConfig
     { stackageConfigStackageOpts = appendOf stackageConfigStackageOpts l r
@@ -200,6 +203,7 @@ instance Monoid StackageConfig where
     , stackageConfigDockerOpts = stackageConfigDockerOpts l <> stackageConfigDockerOpts r
     , stackageConfigDir = stackageConfigDir l <|> stackageConfigDir r
     , stackageConfigUrls = stackageConfigUrls l <> stackageConfigUrls r
+    , stackageConfigGpgVerifyIndex = stackageConfigGpgVerifyIndex l <|> stackageConfigGpgVerifyIndex r
     }
 
 instance FromJSON (Path Abs Dir -> StackageConfig) where
@@ -210,6 +214,7 @@ instance FromJSON (Path Abs Dir -> StackageConfig) where
          getBuildOpts <- obj .:? "build" .!= mempty
          getTheDocker <- obj .:? "docker"
          stackageConfigUrls <- obj .:? "urls" .!= mempty
+         stackageConfigGpgVerifyIndex <- obj .:? "gpg-verify-index"
          return (\parentDir ->
                    let stackageConfigBuildOpts = getBuildOpts parentDir
                        stackageConfigDir =
@@ -818,6 +823,7 @@ configFromStackageConfig StackageConfig{..} =
      configDir <-
        maybe (error "Couldn't determine config dir.") return stackageConfigDir -- FIXME: Proper exception.
      let configUrls = stackageConfigUrls
+         configGpgVerifyIndex = fromMaybe False stackageConfigGpgVerifyIndex
      return Config {..}
 
 -- | Get docker configuration. Currently only looks in current/parent
