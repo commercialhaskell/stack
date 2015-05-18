@@ -57,13 +57,14 @@ import           Network.HTTP.Client             (Manager, parseUrl,
 import           Network.HTTP.Client.Conduit     (bodyReaderSource)
 import           Path
 import           Stackage.BuildPlan.Types
+import           Stackage.Constants
 import           Stackage.FlagName
 import           Stackage.Package
 import           Stackage.PackageName
 import           Stackage.Version
 import           System.Directory                (createDirectoryIfMissing,
                                                   getAppUserDataDirectory)
-import           System.FilePath                 (takeDirectory, (<.>))
+import           System.FilePath                 (takeDirectory)
 import qualified System.FilePath                 as FP
 
 data BuildPlanException
@@ -129,13 +130,13 @@ getDeps bp =
 
 -- | Download the 'Snapshots' value from stackage.org.
 getSnapshots :: MonadIO m => Manager -> m Snapshots
-getSnapshots man = liftIO $ withResponse req man $ \res -> do
-    val <- bodyReaderSource (responseBody res) $$ sinkParser json'
-    case parseEither parseJSON val of
-        Left e -> throwM $ GetSnapshotsException e
-        Right x -> return x
-  where
-    req = "https://www.stackage.org/download/snapshots.json"
+getSnapshots man = liftIO $ do
+    req <- parseUrl $ T.unpack latestSnapshotUrl -- FIXME get from Config
+    withResponse req man $ \res -> do
+        val <- bodyReaderSource (responseBody res) $$ sinkParser json'
+        case parseEither parseJSON val of
+            Left e -> throwM $ GetSnapshotsException e
+            Right x -> return x
 
 -- | Most recent Nightly and newest LTS version per major release.
 data Snapshots = Snapshots
@@ -174,7 +175,7 @@ loadBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m)
               -> m BuildPlan
 loadBuildPlan man name = do
     stackage <- liftIO $ getAppUserDataDirectory "stackage"
-    let fp = stackage FP.</> "build-plan" FP.</> T.unpack (renderSnapName name) <.> "yaml"
+    let fp = stackage FP.</> "build-plan" FP.</> T.unpack file
     $logDebug $ "Decoding build plan from: " <> T.pack fp
     eres <- liftIO $ decodeFileEither fp
     case eres of
@@ -190,17 +191,12 @@ loadBuildPlan man name = do
                 $$ CB.sinkFile fp
             liftIO (decodeFileEither fp) >>= either throwM return
   where
-    url = T.concat
-        [ "https://raw.githubusercontent.com/fpco/"
-        , reponame
-        , "/master/"
-        , renderSnapName name
-        , ".yaml"
-        ]
+    file = renderSnapName name <> ".yaml"
     reponame =
         case name of
             LTS _ _ -> "lts-haskell"
             Nightly _ -> "stackage-nightly"
+    url = rawGithubUrl "fpco" reponame "master" file
 
 -- | Get all packages present in the given build plan, including both core and
 -- non-core.

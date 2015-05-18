@@ -106,10 +106,10 @@ updateIndexGit (PackageIndex idxPath) =
          do gitPath <- parseAbsFile fp
             $logWarn "FIXME: USING LOCAL DEFAULTS FOR URL & PATH"
             let repoName =
-                  $(mkRelDir "all-cabal-files")
+                  $(mkRelDir "all-cabal-hashes")
                 cloneArgs =
                   ["clone"
-                  ,pkgIndexGitUriDefault
+                  ,packageIndexGitUri -- FIXME get from Config
                   ,(toFilePath repoName)
                   ,"--depth"
                   ,"1"
@@ -126,7 +126,7 @@ updateIndexGit (PackageIndex idxPath) =
               liftIO (doesDirectoryExist (toFilePath acfDir))
             unless repoExists
                    (do $logInfo ("Cloning repository for first from " <>
-                                 T.pack pkgIndexGitUriDefault)
+                                 T.pack packageIndexGitUrl) -- FIXME get from Config
                        runIn suDir gitPath cloneArgs Nothing)
             runIn acfDir gitPath ["fetch","--tags","--depth=1"] Nothing
             let tarFile =
@@ -176,9 +176,9 @@ updateIndexHTTP (PackageIndex idxPath) =
            idxPath </>
            $(mkRelFile "00-index.tar.gz.etag")
          etagFilePath = toFilePath etagPath
-     req <- parseUrl pkgIndexHttpUriDefault
+     req <- parseUrl $ T.unpack packageIndexHttpUrl -- FIXME get from Config
      $logDebug ("Downloading package index from " <>
-                T.pack pkgIndexHttpUriDefault)
+                packageIndexHttpUrl) -- FIXME get from Config
      etagFileExists <-
        liftIO (doesFileExist etagFilePath)
      if (etagFileExists)
@@ -262,13 +262,3 @@ isGitInstalled :: MonadIO m
 isGitInstalled =
   return . isJust =<<
   liftIO (findExecutable "git")
-
--- | Temporarily define the standard Git repo url locally here in this
--- module until we work out the Stackage.Config for it.
-pkgIndexGitUriDefault :: String
-pkgIndexGitUriDefault = "https://github.com/commercialhaskell/all-cabal-files.git"
-
--- | Temporarily define the standard HTTP tarball url locally here in
--- this module until we work out the Stackage.Config for it.
-pkgIndexHttpUriDefault :: String
-pkgIndexHttpUriDefault = "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"

@@ -6,6 +6,7 @@
 module Stackage.Constants where
 
 import Data.Text (Text)
+import qualified Data.Text as T
 import Filesystem.Path.CurrentOS ()
 import Path as FL
 import Prelude
@@ -87,3 +88,36 @@ pkgIndexFile :: Stackage.Config.Config -> Path Abs File
 pkgIndexFile config =
   pkgIndexDir config </>
   $(mkRelFile "00-index.tar")
+
+-- | URL prefix for downloading packages
+packageDownloadPrefix :: Text
+packageDownloadPrefix = "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
+
+-- | Git URL for the package index
+packageIndexGitUrl :: Text
+packageIndexGitUrl = "https://github.com/commercialhaskell/all-cabal-hashes.git"
+
+-- | HTTPS URL for the package index
+packageIndexHttpUrl :: Text
+packageIndexHttpUrl = "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"
+
+-- | URL for downloading latest snapshot information
+latestSnapshotUrl :: Text
+latestSnapshotUrl = "https://www.stackage.org/download/snapshots.json"
+
+-- | Get a URL for a raw file on Github
+rawGithubUrl :: Text -- ^ user/org name
+             -> Text -- ^ repo name
+             -> Text -- ^ branch name
+             -> Text -- ^ filename
+             -> Text
+rawGithubUrl org repo branch file = T.concat
+    [ "https://raw.githubusercontent.com/"
+    , org
+    , "/"
+    , repo
+    , "/"
+    , branch
+    , "/"
+    , file
+    ]
