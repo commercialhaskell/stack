@@ -47,6 +47,10 @@ module Stack.Config
   , dockerRunArgsArgName
   , dockerMountArgName
   , dockerPassHostArgName
+  , askConfig
+  , askLatestSnapshotUrl
+  , askPackageIndexGitUrl
+  , askPackageIndexHttpUrl
   ) where
 
 import           Control.Applicative
@@ -93,7 +97,9 @@ data Config =
          ,configPackages         :: !(Set (Path Abs Dir))
          ,configFlags            :: !(Map FlagName Bool)
          ,configPackageFlags     :: !(Map PackageName (Map FlagName Bool))
-         ,configDir              :: !(Path Abs Dir)}
+         ,configDir              :: !(Path Abs Dir)
+         ,configUrls             :: !(Map Text Text)
+         }
   -- ^ Flags for each package's Cabal config.
   deriving (Show)
 
@@ -155,6 +161,7 @@ data StackageConfig =
     , stackageConfigBuildOpts    :: !BuildOpts
     , stackageConfigDockerOpts   :: !DockerOpts
     , stackageConfigDir          :: !(Maybe (Path Abs Dir))
+    , stackageConfigUrls         :: !(Map Text Text)
     }
   deriving Show
 
@@ -185,12 +192,14 @@ instance Monoid StackageConfig where
     , stackageConfigBuildOpts = mempty
     , stackageConfigDockerOpts = mempty
     , stackageConfigDir = Nothing
+    , stackageConfigUrls = mempty
     }
   mappend l r = StackageConfig
     { stackageConfigStackageOpts = appendOf stackageConfigStackageOpts l r
     , stackageConfigBuildOpts = appendOf stackageConfigBuildOpts l r
     , stackageConfigDockerOpts = stackageConfigDockerOpts l <> stackageConfigDockerOpts r
     , stackageConfigDir = stackageConfigDir l <|> stackageConfigDir r
+    , stackageConfigUrls = stackageConfigUrls l <> stackageConfigUrls r
     }
 
 instance FromJSON (Path Abs Dir -> StackageConfig) where
@@ -200,6 +209,7 @@ instance FromJSON (Path Abs Dir -> StackageConfig) where
       do stackageConfigStackageOpts <- obj .:? "stackage" .!= mempty
          getBuildOpts <- obj .:? "build" .!= mempty
          getTheDocker <- obj .:? "docker"
+         stackageConfigUrls <- obj .:? "urls" .!= mempty
          return (\parentDir ->
                    let stackageConfigBuildOpts = getBuildOpts parentDir
                        stackageConfigDir =
@@ -807,6 +817,7 @@ configFromStackageConfig StackageConfig{..} =
      configPackages <- return buildOptsPackages
      configDir <-
        maybe (error "Couldn't determine config dir.") return stackageConfigDir -- FIXME: Proper exception.
+     let configUrls = stackageConfigUrls
      return Config {..}
 
 -- | Get docker configuration. Currently only looks in current/parent
@@ -962,3 +973,26 @@ configBinPaths config =
    toFilePath (configGhcBinLocation config) <>
    [searchPathSeparator] <>
    toFilePath (configCabalBinLocation config)
+
+-- | Helper function to ask the environment and apply getConfig
+askConfig :: (MonadReader env m, HasConfig env) => m Config
+askConfig = liftM getConfig ask
+
+-- | Helper for looking up URLs
+askUrl :: (MonadReader env m, HasConfig env)
+       => Text -- ^ key
+       -> Text -- ^ default
+       -> m Text
+askUrl key val = liftM (fromMaybe val . Map.lookup key . configUrls) askConfig
+
+-- | Get the URL to request the information on the latest snapshots
+askLatestSnapshotUrl :: (MonadReader env m, HasConfig env) => m Text
+askLatestSnapshotUrl = askUrl "latest-snapshot-url" "https://www.stackage.org/download/snapshots.json"
+
+-- | Git URL for the package index
+askPackageIndexGitUrl :: (MonadReader env m, HasConfig env) => m Text
+askPackageIndexGitUrl = askUrl "package-index-git-url" "https://github.com/commercialhaskell/all-cabal-hashes.git"
+
+-- | HTTP URL for the package index
+askPackageIndexHttpUrl :: (MonadReader env m, HasConfig env) => m Text
+askPackageIndexHttpUrl = askUrl "package-index-http-url" "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"

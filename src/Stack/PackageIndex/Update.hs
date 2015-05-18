@@ -43,13 +43,14 @@ import           Network.HTTP.Client.Conduit
 import           Network.HTTP.Download
 import           Network.HTTP.Types (status200)
 import           Path
-       (Path, Abs, Dir, toFilePath, parseAbsDir, parseAbsFile, mkRelFile,
+       (Path, Abs, Dir, toFilePath, parseRelDir, parseAbsFile, mkRelFile,
         mkRelDir, (</>))
 import           Control.Exception.Enclosed (tryIO)
 import           Stack.Types
 import           System.Process.Read (runIn)
-import           Stack.Constants
+import           Stack.Config
 import           System.Directory
+import           System.FilePath (takeBaseName)
 import           System.IO (IOMode(ReadMode), withBinaryFile)
 
 data PackageIndexException =
@@ -73,7 +74,9 @@ getPkgIndex dir =
                 else Nothing)
 
 -- | Load the package index, if it does not exist, download it.
-loadPkgIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m,MonadThrow m,MonadReader env m,HasHttpManager env)
+loadPkgIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m
+                ,MonadThrow m,MonadReader env m,HasHttpManager env
+                ,HasConfig env)
              => Path Abs Dir -> m PackageIndex
 loadPkgIndex dir =
   do maybeIdx <- getPkgIndex dir
@@ -85,7 +88,9 @@ loadPkgIndex dir =
             return idx
 
 -- | Update the index tarball
-updateIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m,MonadThrow m,MonadReader env m,HasHttpManager env)
+updateIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m
+               ,MonadThrow m,MonadReader env m,HasHttpManager env
+               ,HasConfig env)
             => PackageIndex -> m ()
 updateIndex idx =
   do git <- isGitInstalled
@@ -94,7 +99,7 @@ updateIndex idx =
         else updateIndexHTTP idx
 
 -- | Update the index Git repo and the index tarball
-updateIndexGit :: (MonadIO m,MonadLogger m,MonadThrow m)
+updateIndexGit :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasConfig env)
                => PackageIndex -> m ()
 updateIndexGit (PackageIndex idxPath) =
   do liftIO (createDirectoryIfMissing True (toFilePath idxPath))
@@ -104,20 +109,18 @@ updateIndexGit (PackageIndex idxPath) =
          error "Please install git and provide the executable on your PATH"
        Just fp ->
          do gitPath <- parseAbsFile fp
-            $logWarn "FIXME: USING LOCAL DEFAULTS FOR URL & PATH"
-            let repoName =
-                  $(mkRelDir "all-cabal-hashes")
-                cloneArgs =
+            gitUrl <- askPackageIndexGitUrl
+            repoName <- parseRelDir $ takeBaseName $ T.unpack gitUrl
+            let cloneArgs =
                   ["clone"
-                  ,T.unpack packageIndexGitUrl -- FIXME get from Config
-                  ,(toFilePath repoName)
+                  ,T.unpack gitUrl
+                  ,toFilePath repoName
                   ,"--depth"
                   ,"1"
                   ,"-b" --
                   ,"display"]
-            sDir <-
-              liftIO (parseAbsDir =<<
-                      getAppUserDataDirectory "stackage")
+            config <- askConfig
+            let sDir = configStackageRoot config
             let suDir =
                   sDir </>
                   $(mkRelDir "update")
@@ -125,8 +128,7 @@ updateIndexGit (PackageIndex idxPath) =
             repoExists <-
               liftIO (doesDirectoryExist (toFilePath acfDir))
             unless repoExists
-                   (do $logInfo ("Cloning repository for first from " <>
-                                 packageIndexGitUrl) -- FIXME get from Config
+                   (do $logInfo ("Cloning repository for first from " <> gitUrl)
                        runIn suDir gitPath cloneArgs Nothing)
             runIn acfDir gitPath ["fetch","--tags","--depth=1"] Nothing
             let tarFile =
@@ -156,11 +158,11 @@ updateIndexGit (PackageIndex idxPath) =
                   Nothing
 
 -- | Update the index tarball via HTTP
-updateIndexHTTP :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m,MonadThrow m,MonadReader env m,HasHttpManager env)
+updateIndexHTTP :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m
+                   ,MonadThrow m,MonadReader env m,HasHttpManager env,HasConfig env)
                 => PackageIndex -> m ()
 updateIndexHTTP (PackageIndex idxPath) =
-  do $logWarn "FIXME: USING LOCAL DEFAULTS FOR URL"
-     let tarPath =
+  do let tarPath =
            idxPath </>
            $(mkRelFile "00-index.tar")
          tarFilePath = toFilePath tarPath
@@ -176,9 +178,9 @@ updateIndexHTTP (PackageIndex idxPath) =
            idxPath </>
            $(mkRelFile "00-index.tar.gz.etag")
          etagFilePath = toFilePath etagPath
-     req <- parseUrl $ T.unpack packageIndexHttpUrl -- FIXME get from Config
-     $logDebug ("Downloading package index from " <>
-                packageIndexHttpUrl) -- FIXME get from Config
+     url <- askPackageIndexHttpUrl
+     req <- parseUrl $ T.unpack url
+     $logDebug ("Downloading package index from " <> url)
      etagFileExists <-
        liftIO (doesFileExist etagFilePath)
      if (etagFileExists)

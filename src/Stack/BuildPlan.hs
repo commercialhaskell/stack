@@ -49,12 +49,11 @@ import           Distribution.PackageDescription (GenericPackageDescription,
 import           Network.HTTP.Download
 import           Path
 import           Stack.Types
+import           Stack.Config
 import           Stack.Constants
 import           Stack.Package
-import           System.Directory                (createDirectoryIfMissing,
-                                                  getAppUserDataDirectory)
+import           System.Directory                (createDirectoryIfMissing)
 import           System.FilePath                 (takeDirectory)
-import qualified System.FilePath                 as FP
 
 data BuildPlanException = UnknownPackages (Set PackageName)
     deriving (Show, Typeable)
@@ -116,10 +115,9 @@ getDeps bp =
                  || CompExecutable `Set.member` diComponents di
 
 -- | Download the 'Snapshots' value from stackage.org.
-getSnapshots :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env) => m Snapshots
-getSnapshots = do
-    req <- parseUrl $ T.unpack latestSnapshotUrl -- FIXME get from Config
-    downloadJSON req
+getSnapshots :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env)
+             => m Snapshots
+getSnapshots = askLatestSnapshotUrl >>= parseUrl . T.unpack >>= downloadJSON
 
 -- | Most recent Nightly and newest LTS version per major release.
 data Snapshots = Snapshots
@@ -152,12 +150,14 @@ instance FromJSON Snapshots where
 
 -- | Load the 'BuildPlan' for the given snapshot. Will load from a local copy
 -- if available, otherwise downloading from Github.
-loadBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env)
+loadBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env)
               => SnapName
               -> m BuildPlan
 loadBuildPlan name = do
-    stackage <- liftIO $ getAppUserDataDirectory "stackage" -- FIXME this should probably come from Config
-    fp <- parseAbsFile $ stackage FP.</> "build-plan" FP.</> T.unpack file
+    config <- askConfig
+    let stackage = configStackageRoot config
+    file' <- parseRelFile $ T.unpack file
+    let fp = stackage </> $(mkRelDir "build-plan") </> file'
     $logDebug $ "Decoding build plan from: " <> T.pack (toFilePath fp)
     eres <- liftIO $ decodeFileEither $ toFilePath fp
     case eres of
@@ -263,7 +263,7 @@ checkDeps flags deps packages = do
 
 -- | Find a snapshot and set of flags that is compatible with the given
 -- 'GenericPackageDescription'. Returns 'Nothing' if no such snapshot is found.
-findBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env)
+findBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env)
               => Path Abs File
               -> GenericPackageDescription
               -> m (Maybe (SnapName, [FlagName]))
