@@ -15,23 +15,23 @@ library
   hs-source-dirs:    src/
   ghc-options:       -Wall -O2
   exposed-modules:   Stack.BuildPlan
-                     Stack.BuildPlan.Types
                      Stack.Config
                      Stack.Constants
                      Stack.Docker
                      Stack.Docker.GlobalDB
                      Stack.Fetch
-                     Stack.FlagName
                      Stack.GhcPkg
-                     Stack.GhcPkgId
                      Stack.Package
-                     Stack.PackageIdentifier
                      Stack.PackageIndex.Read
                      Stack.PackageIndex.Update
-                     Stack.PackageName
-                     Stack.Version
                      Stack.Path
                      Stack.Types
+                     Stack.Types.BuildPlan
+                     Stack.Types.FlagName
+                     Stack.Types.GhcPkgId
+                     Stack.Types.PackageIdentifier
+                     Stack.Types.PackageName
+                     Stack.Types.Version
                      Stack.Build
                      Stack.Build.Types
                      Stack.Build.Doc

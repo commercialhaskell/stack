@@ -19,9 +19,7 @@ module Stack.Fetch
     ) where
 
 import           Control.Monad.IO.Class
-import           Stack.PackageIdentifier
-import           Stack.PackageName
-import           Stack.Version
+import           Stack.Types
 
 import qualified Codec.Archive.Tar as Tar
 import           Control.Applicative ((*>), (<$>), (<*>))

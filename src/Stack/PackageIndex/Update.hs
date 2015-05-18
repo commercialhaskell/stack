@@ -45,8 +45,7 @@ import           Path
        (Path, Abs, Dir, toFilePath, parseAbsDir, parseAbsFile, mkRelFile,
         mkRelDir, (</>))
 import           Control.Exception.Enclosed (tryIO)
-import           Stack.PackageName (PackageName, packageNameString)
-import           Stack.Version (Version, parseVersionFromString)
+import           Stack.Types
 import           Stack.Process (runIn)
 import           Stack.Constants
 import           System.Directory

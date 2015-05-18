@@ -4,7 +4,7 @@
 
 -- | A ghc-pkg id.
 
-module Stack.GhcPkgId
+module Stack.Types.GhcPkgId
   (GhcPkgId
   ,parseGhcPkgIdFromString)
   where

@@ -53,9 +53,7 @@ import           Path as FL
 import           Path.Find (findFiles)
 import           Prelude hiding (FilePath)
 import           Stack.Constants
-import           Stack.FlagName
-import           Stack.PackageName
-import           Stack.Version
+import           Stack.Types
 import           System.Directory (doesFileExist)
 import qualified System.FilePath as FilePath
 

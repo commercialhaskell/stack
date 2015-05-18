@@ -64,18 +64,13 @@ import           Stack.Constants
 import           Stack.Build.Doc
 import           Stack.Build.Types
 import           Stack.BuildPlan
-import           Stack.BuildPlan.Types
+import           Stack.Types
 import           Stack.Config
 import           Stack.Fetch as Fetch
-import           Stack.FlagName
 import           Stack.GhcPkg
-import           Stack.GhcPkgId
 import           Stack.Package
-import           Stack.PackageIdentifier
 import           Stack.PackageIndex.Read
 import           Stack.PackageIndex.Update
-import           Stack.PackageName
-import           Stack.Version
 import           System.Directory hiding (findFiles)
 import           System.Environment
 import qualified System.FilePath as FilePath

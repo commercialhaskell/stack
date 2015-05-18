@@ -12,10 +12,7 @@ module Stack.GhcPkg
   ,getPackageIds)
   where
 
-import           Stack.GhcPkgId
-import           Stack.PackageIdentifier
-import           Stack.PackageName
-import           Stack.Version
+import           Stack.Types
 import           Stack.Process
 
 import           Control.Applicative

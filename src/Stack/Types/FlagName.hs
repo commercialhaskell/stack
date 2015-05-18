@@ -8,7 +8,7 @@
 
 -- | Names for flags.
 
-module Stack.FlagName
+module Stack.Types.FlagName
   (FlagName
   ,FlagNameParseFail(..)
   ,flagNameParser

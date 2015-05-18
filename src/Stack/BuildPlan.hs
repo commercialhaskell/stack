@@ -56,12 +56,9 @@ import           Network.HTTP.Client             (Manager, parseUrl,
                                                   responseBody, withResponse)
 import           Network.HTTP.Client.Conduit     (bodyReaderSource)
 import           Path
-import           Stack.BuildPlan.Types
+import           Stack.Types
 import           Stack.Constants
-import           Stack.FlagName
 import           Stack.Package
-import           Stack.PackageName
-import           Stack.Version
 import           System.Directory                (createDirectoryIfMissing,
                                                   getAppUserDataDirectory)
 import           System.FilePath                 (takeDirectory)

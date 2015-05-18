@@ -23,12 +23,8 @@ import Development.Shake (Verbosity)
 import Distribution.Package hiding (Package,PackageName)
 import GHC.Generics
 import Prelude hiding (FilePath)
-import Stack.BuildPlan.Types
-import Stack.FlagName
-import Stack.GhcPkgId
+import Stack.Types
 import Stack.Package
-import Stack.PackageName
-import Stack.Version
 
 data StackageBuildException
   = FPNoConfigFile

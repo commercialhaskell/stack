@@ -37,8 +37,7 @@ import           Distribution.PackageDescription.Parse (ParseResult (..), parseP
 import           Distribution.ParseUtils (PError)
 import qualified Distribution.Text as DT
 import           Path hiding ((</>))
-import           Stack.PackageName
-import           Stack.Version
+import           Stack.Types
 import           System.Directory (getAppUserDataDirectory)
 import qualified Data.Conduit.List as CL
 import Control.Monad.Trans.Class (lift)

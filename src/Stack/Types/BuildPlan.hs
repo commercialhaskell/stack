@@ -4,7 +4,7 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleInstances          #-}
 -- | Shared types for various stackage packages.
-module Stack.BuildPlan.Types
+module Stack.Types.BuildPlan
     ( -- * Types
       BuildPlan (..)
     , PackagePlan (..)
@@ -44,13 +44,13 @@ import           Data.Time                       (Day)
 import qualified Data.Traversable                as T
 import           Data.Typeable                   (TypeRep, Typeable, typeOf)
 import           Data.Vector                     (Vector)
-import Stack.PackageName
-import Stack.FlagName
 import           Distribution.System             (Arch, OS)
 import qualified Distribution.Text               as DT
-import           Stack.Version                   (Version, VersionRange)
 import qualified Distribution.Version            as C
-import Safe (readMay)
+import           Safe (readMay)
+import           Stack.Types.FlagName
+import           Stack.Types.PackageName
+import           Stack.Types.Version
 
 -- | The name of an LTS Haskell or Stackage Nightly snapshot.
 data SnapName

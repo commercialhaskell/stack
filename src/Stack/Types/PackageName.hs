@@ -8,7 +8,7 @@
 
 -- | Names for packages.
 
-module Stack.PackageName
+module Stack.Types.PackageName
   (PackageName
   ,PackageNameParseFail(..)
   ,packageNameParser

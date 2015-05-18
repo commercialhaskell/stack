@@ -71,8 +71,7 @@ import           Data.Typeable
 import qualified Data.Yaml as Yaml
 import           Path
 import           Path.Find
-import           Stack.FlagName
-import           Stack.PackageName
+import           Stack.Types
 import           System.Directory
 import           System.Environment
 import           System.Process

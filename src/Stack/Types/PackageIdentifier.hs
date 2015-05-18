@@ -4,7 +4,7 @@
 
 -- | Package identifier (name-version).
 
-module Stack.PackageIdentifier
+module Stack.Types.PackageIdentifier
   (PackageIdentifier(..)
   ,toTuple
   ,fromTuple
@@ -19,8 +19,8 @@ import Data.Data
 import Data.Hashable
 import GHC.Generics
 import Prelude hiding (FilePath)
-import Stack.PackageName
-import Stack.Version
+import Stack.Types.PackageName
+import Stack.Types.Version
 
 -- | A pkg-ver combination.
 data PackageIdentifier =

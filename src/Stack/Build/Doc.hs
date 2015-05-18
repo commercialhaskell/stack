@@ -14,8 +14,7 @@ import           Data.Maybe
 import qualified Data.Text as T
 import           Path as FL
 import           Stack.Constants
-import           Stack.PackageName
-import           Stack.Version
+import           Stack.Types
 import           System.Directory
 import           System.FilePath (takeFileName)
 

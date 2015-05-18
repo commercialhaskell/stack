@@ -7,7 +7,7 @@
 
 -- | Versions for packages.
 
-module Stack.Version
+module Stack.Types.Version
   (Version
   ,Cabal.VersionRange -- FIXME in the future should have a newtype wrapper
   ,versionParser

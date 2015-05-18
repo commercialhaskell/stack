@@ -1,13 +1,12 @@
 -- | All types.
 
 module Stack.Types
-  (PackageName
-  ,Version
-  ,PackageIdentifier
-  ,GhcPkgId)
+  (module X)
   where
 
-import Stack.PackageName
-import Stack.Version
-import Stack.PackageIdentifier
-import Stack.GhcPkgId
+import Stack.Types.BuildPlan as X
+import Stack.Types.FlagName as X
+import Stack.Types.GhcPkgId as X
+import Stack.Types.PackageIdentifier as X
+import Stack.Types.PackageName as X
+import Stack.Types.Version as X
