@@ -24,7 +24,6 @@ library
                      Stack.Package
                      Stack.PackageIndex.Read
                      Stack.PackageIndex.Update
-                     Stack.Path
                      Stack.Types
                      Stack.Types.BuildPlan
                      Stack.Types.FlagName

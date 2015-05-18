@@ -23,6 +23,7 @@ module Stack.Config
   ( Config(..)
   , ConfigException(..)
   , configInDocker
+  , configBinPaths
   , Docker(..)
   , Mount(..)
   , HasConfig (..)
@@ -77,6 +78,7 @@ import           Path.Find
 import           Stack.Types
 import           System.Directory
 import           System.Environment
+import           System.FilePath (searchPathSeparator)
 import           System.Process
 
 -- | The top-level Stackage configuration.
@@ -953,3 +955,10 @@ stackageHostDefault = "https://www.stackage.org"
 -- | The filename used for the stackage config file.
 stackageDotConfig :: Path Rel File
 stackageDotConfig = $(mkRelFile "stackage.config")
+
+-- | Get the binary locations as a string that could be used in the PATH
+configBinPaths :: Config -> String
+configBinPaths config =
+   toFilePath (configGhcBinLocation config) <>
+   [searchPathSeparator] <>
+   toFilePath (configCabalBinLocation config)
