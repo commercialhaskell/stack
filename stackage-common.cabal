@@ -34,7 +34,6 @@ library
                      Stackage.Types
                      Stackage.Build
                      Stackage.Build.Types
-                     Stackage.Build.Defaults
                      Stackage.Build.Doc
                      Stackage.Build.Config
   other-modules:     Stackage.Process

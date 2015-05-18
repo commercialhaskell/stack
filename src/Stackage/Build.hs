@@ -60,7 +60,7 @@ import           Network.HTTP.Client.TLS (tlsManagerSettings)
 import           Path as FL
 import           Path.Find
 import           Prelude hiding (FilePath,writeFile)
-import           Stackage.Build.Defaults
+import           Stackage.Constants
 import           Stackage.Build.Doc
 import           Stackage.Build.Types
 import           Stackage.BuildPlan

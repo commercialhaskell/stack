@@ -13,7 +13,7 @@ import qualified Data.Map.Strict as M
 import           Data.Maybe
 import qualified Data.Text as T
 import           Path as FL
-import           Stackage.Build.Defaults
+import           Stackage.Constants
 import           Stackage.PackageName
 import           Stackage.Version
 import           System.Directory

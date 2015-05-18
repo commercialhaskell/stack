@@ -41,7 +41,7 @@ import qualified Path as FL
 import           Path.Find (findFileUp)
 import           Paths_stackage_common (version)
 import           Stackage.Build (shakeFilesPath)
-import           Stackage.Build.Defaults (configFileName)
+import           Stackage.Constants (configFileName)
 import           Stackage.Config
 import           Stackage.Docker.GlobalDB (updateDockerImageLastUsed,getDockerImagesLastUsed,pruneDockerImagesLastUsed)
 import           System.Directory

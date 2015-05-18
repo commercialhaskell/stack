@@ -13,7 +13,10 @@ module Stackage.Package
   ,resolvePackage
   ,getCabalFileName
   ,Package(..)
-  ,PackageConfig(..))
+  ,PackageConfig(..)
+  ,buildLogPath
+  ,packageDocDir
+  ,stackageBuildDir)
   where
 
 import           Control.Exception
@@ -411,3 +414,22 @@ getCabalFileName pkgDir = do
         [x] -> return x
         _:_ -> throwM $ PackageMultipleCabalFilesFound pkgDir files
   where hasExtension fp x = FilePath.takeExtensions fp == "." ++ x
+
+-- | Path for the project's build log.
+buildLogPath :: Package -> Path Abs File
+buildLogPath package' =
+  stackageBuildDir package' </>
+  $(mkRelFile "build-log")
+
+-- | Get the build directory.
+stackageBuildDir :: Package -> Path Abs Dir
+stackageBuildDir package' =
+  distDirFromDir dir </>
+  $(mkRelDir "stackage-build")
+  where dir = packageDir package'
+
+-- | Package's documentation directory.
+packageDocDir :: Package -> Path Abs Dir
+packageDocDir package' =
+  distDirFromDir (packageDir package') </>
+  $(mkRelDir "doc/")
