@@ -36,7 +36,8 @@ library
                      Stack.Build.Types
                      Stack.Build.Doc
                      Stack.Build.Config
-  other-modules:     Path.Find
+  other-modules:     Network.HTTP.Download
+                     Path.Find
                      System.Process.PagerEditor
                      System.Process.Read
                      Paths_stack

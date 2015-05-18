@@ -24,7 +24,7 @@ import           Control.Monad.Logger
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Control.Monad.Trans.Resource (MonadResource)
 import qualified Data.ByteString.Lazy as L
-import           Data.Conduit (($$+-),($$),($=))
+import           Data.Conduit (($$),($=))
 import           Data.Conduit.Binary (sourceLbs, sourceFile, sinkFile)
 import qualified Data.Conduit.Binary as C
 import           Data.Conduit.Zlib (ungzip)
@@ -36,10 +36,11 @@ import qualified Data.Set as Set
 import           Data.String (IsString(fromString))
 import qualified Data.Text as T
 import           Data.Typeable (Typeable)
-import           Network.HTTP.Conduit
+import           Network.HTTP.Client.Conduit
        (Request(checkStatus, requestHeaders),
-        Response(responseBody, responseHeaders, responseStatus), parseUrl,
-        withManager, http)
+        Response(responseBody, responseHeaders, responseStatus),
+        withResponse)
+import           Network.HTTP.Download
 import           Network.HTTP.Types (status200)
 import           Path
        (Path, Abs, Dir, toFilePath, parseAbsDir, parseAbsFile, mkRelFile,
@@ -72,7 +73,7 @@ getPkgIndex dir =
                 else Nothing)
 
 -- | Load the package index, if it does not exist, download it.
-loadPkgIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m,MonadThrow m)
+loadPkgIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m,MonadThrow m,MonadReader env m,HasHttpManager env)
              => Path Abs Dir -> m PackageIndex
 loadPkgIndex dir =
   do maybeIdx <- getPkgIndex dir
@@ -84,7 +85,7 @@ loadPkgIndex dir =
             return idx
 
 -- | Update the index tarball
-updateIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m,MonadThrow m)
+updateIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m,MonadThrow m,MonadReader env m,HasHttpManager env)
             => PackageIndex -> m ()
 updateIndex idx =
   do git <- isGitInstalled
@@ -155,7 +156,7 @@ updateIndexGit (PackageIndex idxPath) =
                   Nothing
 
 -- | Update the index tarball via HTTP
-updateIndexHTTP :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m,MonadThrow m)
+updateIndexHTTP :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m,MonadThrow m,MonadReader env m,HasHttpManager env)
                 => PackageIndex -> m ()
 updateIndexHTTP (PackageIndex idxPath) =
   do $logWarn "FIXME: USING LOCAL DEFAULTS FOR URL"
@@ -188,14 +189,11 @@ updateIndexHTTP (PackageIndex idxPath) =
                       req {requestHeaders =
                              requestHeaders req ++
                              [("If-None-Match",L.toStrict etag)]}
-                download req' tmpTarFilePath tarGzFilePath tarFilePath etagFilePath
-        else download req tmpTarFilePath tarGzFilePath tarFilePath etagFilePath
+                download' req' tmpTarFilePath tarGzFilePath tarFilePath etagFilePath
+        else download' req tmpTarFilePath tarGzFilePath tarFilePath etagFilePath
      $logWarn "FIXME: WE CAN'T RUN GIT GPG SIGNATURE VERIFICATION WITHOUT GIT"
-  where download req tmpTarGzFp tarGzFp tarFp etagFP =
-          withManager
-            (\mgr ->
-               do res <-
-                    http (req {checkStatus = \_ _ _ -> Nothing}) mgr
+  where download' req tmpTarGzFp tarGzFp tarFp etagFP = do -- FIXME consider making this the behavior of Network.HTTP.Download.download
+          withResponse req { checkStatus = \_ _ _ -> Nothing } $ \res ->
                   when (responseStatus res == status200)
                        (do let etag =
                                  lookup "ETag" (responseHeaders res)
@@ -203,12 +201,12 @@ updateIndexHTTP (PackageIndex idxPath) =
                                  (\e ->
                                     sourceLbs (L.fromStrict e) $$
                                     sinkFile etagFP)
-                           responseBody res $$+-
+                           responseBody res $$
                              sinkFile (fromString tmpTarGzFp)
                            sourceFile (fromString tmpTarGzFp) $$
                              ungzip $=
                              sinkFile (fromString tarFp)
-                           liftIO (renameFile tmpTarGzFp tarGzFp)))
+                           liftIO (renameFile tmpTarGzFp tarGzFp))
 
 -- | Fetch all the package versions for a given package
 getPkgVersions :: (MonadIO m,MonadLogger m,MonadThrow m)

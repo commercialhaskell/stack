@@ -30,6 +30,7 @@ import           Control.Monad
 import           Control.Monad.Catch (MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import           Control.Monad.Reader (runReaderT)
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Writer
 import           Data.Aeson
@@ -55,8 +56,8 @@ import qualified Data.Text as T
 import           Development.Shake hiding (doesFileExist,doesDirectoryExist,getDirectoryContents)
 import           Distribution.Compiler (CompilerId (CompilerId), buildCompilerId)
 import           Distribution.Package hiding (packageName,packageVersion,Package,PackageName,PackageIdentifier)
-import           Network.HTTP.Client (newManager)
-import           Network.HTTP.Client.TLS (tlsManagerSettings)
+import           Network.HTTP.Client (Manager)
+import           Network.HTTP.Download
 import           Path as FL
 import           Path.Find
 import           Prelude hiding (FilePath,writeFile)
@@ -193,10 +194,10 @@ dryRunPrint pinfos =
      forM_ (S.toList pinfos) (\pinfo -> putStrLn (packageNameString (packageName pinfo)))
 
 -- | Reset the build (remove Shake database and .gen files).
-clean :: Stack.Config.Config -> IO ()
-clean config =
+clean :: Manager -> Stack.Config.Config -> IO () -- FIXME why is this suddenly in IO instead of MonadIO etc?
+clean manager config =
   do pinfos <-
-       runNoLoggingT (runResourceT (getPackageInfos DoNothing Nothing config))
+       runReaderT (runNoLoggingT (runResourceT (getPackageInfos DoNothing Nothing config))) manager
      forM_ (S.toList pinfos)
            (\pinfo ->
               do deleteGenFile (packageDir pinfo)
@@ -748,7 +749,7 @@ newConfig gconfig bconfig pinfo =
 -- Package info/dependencies/etc
 
 -- | Get packages' information.
-getPackageInfos :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m,MonadResource m,MonadMask m)
+getPackageInfos :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m,MonadResource m,MonadMask m,MonadReader env m,HasHttpManager env)
                 => FinalAction -> Maybe BuildConfig -> Config -> m (Set Package)
 getPackageInfos finalAction mbconfig = go True
   where go retry cfg =
@@ -778,9 +779,8 @@ getPackageInfos finalAction mbconfig = go True
              case lefts results of
                [] ->
                  do let okPkgVers = M.fromList (rights results)
-                    manager <- liftIO $ newManager tlsManagerSettings -- FIXME store in the config
                     bp <-
-                      loadBuildPlan manager (bconfigSnapName bconfig)
+                      loadBuildPlan (bconfigSnapName bconfig)
                     mapping <-
                       resolveBuildPlan bp (M.keysSet okPkgVers)
                     validated <-
@@ -967,7 +967,7 @@ composeFlags pname pflags gflags = collapse pflags <> gflags
 -- Package fetching
 
 -- | Fetch and unpack the package.
-fetchAndUnpackPackages :: (MonadIO m,MonadThrow m,MonadLogger m,MonadMask m)
+fetchAndUnpackPackages :: (MonadIO m,MonadThrow m,MonadLogger m,MonadMask m,MonadReader env m,HasHttpManager env)
                        => Stack.Config.Config
                        -> [PackageIdentifier]
                        -> m [Path Abs Dir]

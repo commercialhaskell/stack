@@ -26,14 +26,8 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.State.Strict      (State, execState, get, modify,
                                                   put)
-import           Control.Monad.Trans.Resource    (runResourceT)
 import           Data.Aeson                      (FromJSON (..))
 import           Data.Aeson                      (withObject, withText, (.:))
-import           Data.Aeson.Parser               (json')
-import           Data.Aeson.Types                (parseEither)
-import           Data.Conduit                    (($$))
-import           Data.Conduit.Attoparsec         (sinkParser)
-import qualified Data.Conduit.Binary             as CB
 import qualified Data.Foldable                   as F
 import qualified Data.HashMap.Strict             as HM
 import           Data.IntMap                     (IntMap)
@@ -52,9 +46,7 @@ import           Data.Yaml                       (decodeFileEither)
 import           Distribution.PackageDescription (GenericPackageDescription,
                                                   flagDefault, flagManual,
                                                   flagName, genPackageFlags)
-import           Network.HTTP.Client             (Manager, parseUrl,
-                                                  responseBody, withResponse)
-import           Network.HTTP.Client.Conduit     (bodyReaderSource)
+import           Network.HTTP.Download
 import           Path
 import           Stack.Types
 import           Stack.Constants
@@ -64,9 +56,7 @@ import           System.Directory                (createDirectoryIfMissing,
 import           System.FilePath                 (takeDirectory)
 import qualified System.FilePath                 as FP
 
-data BuildPlanException
-    = GetSnapshotsException String
-    | UnknownPackages (Set PackageName)
+data BuildPlanException = UnknownPackages (Set PackageName)
     deriving (Show, Typeable)
 instance Exception BuildPlanException
 
@@ -126,14 +116,10 @@ getDeps bp =
                  || CompExecutable `Set.member` diComponents di
 
 -- | Download the 'Snapshots' value from stackage.org.
-getSnapshots :: MonadIO m => Manager -> m Snapshots
-getSnapshots man = liftIO $ do
+getSnapshots :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env) => m Snapshots
+getSnapshots = do
     req <- parseUrl $ T.unpack latestSnapshotUrl -- FIXME get from Config
-    withResponse req man $ \res -> do
-        val <- bodyReaderSource (responseBody res) $$ sinkParser json'
-        case parseEither parseJSON val of
-            Left e -> throwM $ GetSnapshotsException e
-            Right x -> return x
+    downloadJSON req
 
 -- | Most recent Nightly and newest LTS version per major release.
 data Snapshots = Snapshots
@@ -166,27 +152,23 @@ instance FromJSON Snapshots where
 
 -- | Load the 'BuildPlan' for the given snapshot. Will load from a local copy
 -- if available, otherwise downloading from Github.
-loadBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m)
-              => Manager
-              -> SnapName
+loadBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env)
+              => SnapName
               -> m BuildPlan
-loadBuildPlan man name = do
-    stackage <- liftIO $ getAppUserDataDirectory "stackage"
-    let fp = stackage FP.</> "build-plan" FP.</> T.unpack file
-    $logDebug $ "Decoding build plan from: " <> T.pack fp
-    eres <- liftIO $ decodeFileEither fp
+loadBuildPlan name = do
+    stackage <- liftIO $ getAppUserDataDirectory "stackage" -- FIXME this should probably come from Config
+    fp <- parseAbsFile $ stackage FP.</> "build-plan" FP.</> T.unpack file
+    $logDebug $ "Decoding build plan from: " <> T.pack (toFilePath fp)
+    eres <- liftIO $ decodeFileEither $ toFilePath fp
     case eres of
         Right bp -> return bp
         Left e -> do
             $logDebug $ "Decoding failed: " <> T.pack (show e)
-            liftIO $ createDirectoryIfMissing True $ takeDirectory fp
+            liftIO $ createDirectoryIfMissing True $ takeDirectory $ toFilePath fp
             req <- parseUrl $ T.unpack url
             $logDebug $ "Downloading build plan from: " <> url
-            liftIO $ withResponse req man $ \res ->
-                   runResourceT
-                 $ bodyReaderSource (responseBody res)
-                $$ CB.sinkFile fp
-            liftIO (decodeFileEither fp) >>= either throwM return
+            download req fp
+            liftIO (decodeFileEither $ toFilePath fp) >>= either throwM return
   where
     file = renderSnapName name <> ".yaml"
     reponame =
@@ -281,20 +263,19 @@ checkDeps flags deps packages = do
 
 -- | Find a snapshot and set of flags that is compatible with the given
 -- 'GenericPackageDescription'. Returns 'Nothing' if no such snapshot is found.
-findBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m)
-              => Manager
-              -> Path Abs File
+findBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env)
+              => Path Abs File
               -> GenericPackageDescription
               -> m (Maybe (SnapName, [FlagName]))
-findBuildPlan manager cabalfp gpd = do
-    snapshots <- liftIO $ getSnapshots manager
+findBuildPlan cabalfp gpd = do
+    snapshots <- getSnapshots
     let names =
             map (uncurry LTS)
                 (take 2 $ reverse $ IntMap.toList $ snapshotsLts snapshots)
             ++ [Nightly $ snapshotsNightly snapshots]
         loop [] = return Nothing
         loop (name:names') = do
-            bp <- loadBuildPlan manager name
+            bp <- loadBuildPlan name
             mflags <- checkBuildPlan name bp cabalfp gpd
             case mflags of
                 Nothing -> loop names'

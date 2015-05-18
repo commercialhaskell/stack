@@ -10,7 +10,6 @@ module Stack.Fetch
     ( fetchPackages
     , Settings
     , defaultSettings
-    , setGetManager
     , setPackageLocation
     , defaultPackageLocation
     , setIndexLocation
@@ -49,12 +48,12 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import           Data.Typeable (Typeable)
 import           Data.Word (Word64)
+import           Network.HTTP.Download
 import           Network.HTTP.Client      (Manager, brRead, checkStatus,
-                                           managerResponseTimeout, newManager,
-                                           parseUrl, responseBody,
+                                           responseBody,
                                            responseStatus, withResponse)
-import           Network.HTTP.Client.TLS (tlsManagerSettings)
 import           Network.HTTP.Types (statusCode)
+import           Stack.Constants
 import           System.Directory         (createDirectoryIfMissing,
                                            doesFileExist,
                                            getAppUserDataDirectory, renameFile)
@@ -65,10 +64,8 @@ import           System.IO                (IOMode (ReadMode, WriteMode), stdout,
 -- | Settings used by 'download'.
 --
 -- Since 0.1.0.0
-data Settings = Settings
-    { _getManager     :: !(IO Manager)
-    , _cabalCommand   :: !FilePath
-    , _downloadPrefix :: !String
+data Settings = Settings -- FIXME unify with the Stack.Config.Config datatype
+    { _downloadPrefix :: !String
     , _onDownload     :: !(String -> IO ())
     , _onDownloadErr  :: !(String -> IO ())
     , _connections    :: !Int
@@ -81,17 +78,13 @@ data Settings = Settings
 -- Since 0.1.0.0
 defaultSettings :: Settings
 defaultSettings = Settings
-    { _getManager = newManager tlsManagerSettings
-        { managerResponseTimeout = Just 90000000
-        }
-    , _cabalCommand = "cabal"
-    , _downloadPrefix = "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
-    , _onDownload = \s -> S8.hPut stdout $ S8.pack $ concat
+    { _downloadPrefix = T.unpack packageDownloadPrefix
+    , _onDownload = \s -> S8.hPut stdout $ S8.pack $ concat -- FIXME use MonadLogger instead
         [ "Downloading "
         , s
         , "\n"
         ]
-    , _onDownloadErr = \s -> S8.hPut stdout $ S8.pack $ concat
+    , _onDownloadErr = \s -> S8.hPut stdout $ S8.pack $ concat -- FIXME use MonadLogger instead
         [ "Error downloading "
         , s
         , ", if this is a local package, this message can be ignored\n"
@@ -100,14 +93,6 @@ defaultSettings = Settings
     , _packageLocation = defaultPackageLocation
     , _indexLocation = defaultIndexLocation
     }
-
--- | Set how to get the connection manager
---
--- Default: @newManager tlsManagerSettings@
---
--- Since 0.1.1.0
-setGetManager :: IO Manager -> Settings -> Settings
-setGetManager x s = s { _getManager = x }
 
 data Package = Package
     { packageHashes    :: Map Text Text
@@ -210,15 +195,17 @@ defaultIndexLocation = do
 -- | Download the given name,version pairs into the directory expected by cabal.
 --
 -- Since 0.1.0.0
-fetchPackages :: (F.Foldable f,Functor f,MonadIO m)
+fetchPackages :: (F.Foldable f,Functor f,MonadIO m,MonadReader env m,HasHttpManager env)
               => Settings -> f PackageIdentifier -> m ()
-fetchPackages s pkgs = liftIO (do
+fetchPackages s pkgs = do
+   env <- ask
+   let man = getHttpManager env
+   liftIO (do
      indexFP <- _indexLocation s
      packageLocation <- _packageLocation s
      withAsync (getPackageInfo indexFP $
                 Set.fromList $
                 F.toList pkgs) $ \a -> do
-         man <- _getManager s
          parMapM_ (_connections s) (go packageLocation man (wait a)) pkgs)
   where
     unlessM p f = do
