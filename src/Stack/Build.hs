@@ -40,7 +40,6 @@ import qualified Data.ByteString.Lazy as L
 import           Data.Conduit (($$),($=))
 import           Data.Conduit.Binary (sinkIOHandle,sourceHandle)
 import qualified Data.Conduit.List as CL
-import           Data.Default
 import           Data.Either
 import           Data.Function
 import           Data.IORef
@@ -729,7 +728,7 @@ readGenConfigFile pkgIds name bopts dir wanted pinfo cfgVar = withMVar cfgVar (c
                           bytes
                     deleteGenFile dir
                     let gconfig' =
-                          newConfig def bopts pinfo
+                          newConfig defaultGenConfig bopts pinfo
                     writeGenConfigFile dir gconfig'
                     return gconfig' -- Probably doesn't exist or is out of date (not parseable.)
         fp = builtConfigFileFromDir dir
@@ -740,7 +739,8 @@ newConfig :: GenConfig -- ^ Build configuration.
           -> Package
           -> GenConfig
 newConfig gconfig bopts pinfo =
-  def {gconfigOptimize =
+  defaultGenConfig
+      {gconfigOptimize =
          maybe (gconfigOptimize gconfig)
                id
                (boptsEnableOptimizations bopts)

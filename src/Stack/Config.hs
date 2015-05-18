@@ -65,7 +65,6 @@ import           Control.Monad.Reader (MonadReader, ask)
 import           Data.Aeson
 import           Data.Aeson.Types (typeMismatch)
 import qualified Data.ByteString as S (readFile)
-import           Data.Default
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
@@ -309,29 +308,30 @@ instance FromJSON (Path Abs Dir -> Docker) where
   parseJSON v =
     do o <- parseJSON v
        x <- Docker <$> o .:? dockerEnableArgName .!= True
-                   <*> o .:? dockerRepoOwnerArgName .!= dockerRepoOwner def
-                   <*> o .:? dockerRepoArgName .!= dockerRepo def
-                   <*> o .:? dockerRepoSuffixArgName .!= dockerRepoSuffix def
-                   <*> o .:? dockerImageTagArgName .!= dockerImageTag def
+                   <*> o .:? dockerRepoOwnerArgName .!= dockerRepoOwner defaultDocker
+                   <*> o .:? dockerRepoArgName .!= dockerRepo defaultDocker
+                   <*> o .:? dockerRepoSuffixArgName .!= dockerRepoSuffix defaultDocker
+                   <*> o .:? dockerImageTagArgName .!= dockerImageTag defaultDocker
                    <*> o .:? dockerImageArgName
-                   <*> o .:? dockerRegistryLoginArgName .!= dockerRegistryLogin def
-                   <*> o .:? dockerRegistryUsernameArgName .!= dockerRegistryUsername def
-                   <*> o .:? dockerRegistryPasswordArgName .!= dockerRegistryPassword def
-                   <*> o .:? dockerAutoPullArgName .!= dockerAutoPull def
-                   <*> o .:? dockerDetachArgName .!= dockerDetach def
-                   <*> o .:? dockerPersistArgName .!= dockerPersist def
-                   <*> o .:? dockerContainerNameArgName .!= dockerContainerName def
-                   <*> o .:? dockerRunArgsArgName .!= dockerRunArgsDefault def
-                   <*> pure (dockerRunArgsExtra def)
-                   <*> o .:? dockerMountArgName .!= dockerMountDefault def
-                   <*> pure (dockerMountExtra def)
-                   <*> o .:? dockerPassHostArgName .!= dockerPassHost def
-                   <*> pure (dockerExtra def)
+                   <*> o .:? dockerRegistryLoginArgName .!= dockerRegistryLogin defaultDocker
+                   <*> o .:? dockerRegistryUsernameArgName .!= dockerRegistryUsername defaultDocker
+                   <*> o .:? dockerRegistryPasswordArgName .!= dockerRegistryPassword defaultDocker
+                   <*> o .:? dockerAutoPullArgName .!= dockerAutoPull defaultDocker
+                   <*> o .:? dockerDetachArgName .!= dockerDetach defaultDocker
+                   <*> o .:? dockerPersistArgName .!= dockerPersist defaultDocker
+                   <*> o .:? dockerContainerNameArgName .!= dockerContainerName defaultDocker
+                   <*> o .:? dockerRunArgsArgName .!= dockerRunArgsDefault defaultDocker
+                   <*> pure (dockerRunArgsExtra defaultDocker)
+                   <*> o .:? dockerMountArgName .!= dockerMountDefault defaultDocker
+                   <*> pure (dockerMountExtra defaultDocker)
+                   <*> o .:? dockerPassHostArgName .!= dockerPassHost defaultDocker
+                   <*> pure (dockerExtra defaultDocker)
        return x
 
 -- | Default values for Docker configuration.
-instance Default Docker where
-  def = Docker {dockerEnable = False
+defaultDocker :: Docker
+defaultDocker =
+        Docker {dockerEnable = False
                ,dockerRepoOwner = "fpco"
                ,dockerRepo = "dev"
                ,dockerRepoSuffix = ""

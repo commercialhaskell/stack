@@ -13,7 +13,6 @@ module Stack.Build.Types where
 import Control.Exception
 import Data.Aeson
 import Data.Data
-import Data.Default
 import Data.Map.Strict (Map)
 import Data.Maybe
 import Data.Monoid
@@ -87,8 +86,8 @@ data GenConfig =
 instance FromJSON GenConfig
 instance ToJSON GenConfig
 
-instance Default GenConfig where
-  def =
+defaultGenConfig :: GenConfig
+defaultGenConfig =
     GenConfig {gconfigOptimize = False
               ,gconfigForceRecomp = False
               ,gconfigLibProfiling = False
