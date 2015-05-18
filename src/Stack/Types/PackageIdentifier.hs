@@ -11,12 +11,15 @@ module Stack.Types.PackageIdentifier
   ,packageIdentifierVersion
   ,packageIdentifierName
   ,packageIdentifierParser
-  ,packageIdentifierString)
+  ,packageIdentifierString
+  ,packageIdentifierText)
   where
 
 import Data.Attoparsec.ByteString.Char8
 import Data.Data
 import Data.Hashable
+import Data.Text (Text)
+import qualified Data.Text as T
 import GHC.Generics
 import Prelude hiding (FilePath)
 import Stack.Types.PackageName
@@ -60,3 +63,7 @@ packageIdentifierParser =
 -- | Get a string representation of the package identifier; name-ver.
 packageIdentifierString :: PackageIdentifier -> String
 packageIdentifierString (PackageIdentifier n v) = show n ++ "-" ++ show v
+
+-- | Get a Text representation of the package identifier; name-ver.
+packageIdentifierText :: PackageIdentifier -> Text
+packageIdentifierText = T.pack .  packageIdentifierString

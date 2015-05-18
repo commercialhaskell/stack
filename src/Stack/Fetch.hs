@@ -2,19 +2,13 @@
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE TemplateHaskell    #-}
 {-# LANGUAGE ViewPatterns       #-}
 
 -- | Functionality for downloading packages securely for cabal's usage.
 
 module Stack.Fetch
     ( fetchPackages
-    , Settings
-    , defaultSettings
-    , setPackageLocation
-    , defaultPackageLocation
-    , setIndexLocation
-    , defaultIndexLocation
-    , packageLocationGetter
     ) where
 
 import           Control.Monad.IO.Class
@@ -35,7 +29,6 @@ import           Crypto.Hash              (Context, Digest, SHA512,
 import           Data.Aeson               (FromJSON (..), decode, withObject,
                                            (.!=), (.:?))
 import qualified Data.ByteString as S
-import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Foldable as F
 import           Data.Function (fix)
@@ -54,45 +47,14 @@ import           Network.HTTP.Client      (Manager, brRead, checkStatus,
                                            responseStatus, withResponse)
 import           Network.HTTP.Types (statusCode)
 import           Stack.Constants
+import           Stack.Config
+import Path
 import           System.Directory         (createDirectoryIfMissing,
                                            doesFileExist,
-                                           getAppUserDataDirectory, renameFile)
-import           System.FilePath (takeDirectory, (<.>), (</>), takeExtension)
-import           System.IO                (IOMode (ReadMode, WriteMode), stdout,
+                                           renameFile)
+import           System.FilePath (takeDirectory, (<.>), takeExtension)
+import           System.IO                (IOMode (ReadMode, WriteMode),
                                            withBinaryFile)
-
--- | Settings used by 'download'.
---
--- Since 0.1.0.0
-data Settings = Settings -- FIXME unify with the Stack.Config.Config datatype
-    { _downloadPrefix :: !String
-    , _onDownload     :: !(String -> IO ())
-    , _onDownloadErr  :: !(String -> IO ())
-    , _connections    :: !Int
-    , _packageLocation :: !(forall m. MonadIO m => m (PackageIdentifier -> FilePath))
-    , _indexLocation :: !(IO FilePath)
-    }
-
--- | Default value for 'Settings'.
---
--- Since 0.1.0.0
-defaultSettings :: Settings
-defaultSettings = Settings
-    { _downloadPrefix = T.unpack packageDownloadPrefix
-    , _onDownload = \s -> S8.hPut stdout $ S8.pack $ concat -- FIXME use MonadLogger instead
-        [ "Downloading "
-        , s
-        , "\n"
-        ]
-    , _onDownloadErr = \s -> S8.hPut stdout $ S8.pack $ concat -- FIXME use MonadLogger instead
-        [ "Error downloading "
-        , s
-        , ", if this is a local package, this message can be ignored\n"
-        ]
-    , _connections = 8
-    , _packageLocation = defaultPackageLocation
-    , _indexLocation = defaultIndexLocation
-    }
 
 data Package = Package
     { packageHashes    :: Map Text Text
@@ -150,72 +112,33 @@ data StackageFetchException
     deriving (Show, Typeable)
 instance Exception StackageFetchException
 
--- | Get the location that a package name/package version combination is stored
--- on the filesystem.
---
--- @~/.cabal/packages/hackage.haskell.org/name/version/name-version.tar.gz@
---
--- Since 0.1.1.0
-defaultPackageLocation :: MonadIO m => m (PackageIdentifier -> FilePath)
-defaultPackageLocation =
-  liftIO (do cabalDir <-
-               getAppUserDataDirectory "cabal"
-             let packageDir = cabalDir </> "packages" </> "hackage.haskell.org"
-             return $
-               \(PackageIdentifier (packageNameString -> name) (versionString -> version)) ->
-                 packageDir </> name </> version </>
-                 concat [name,"-",version,".tar.gz"])
-
--- | Set the location packages are stored to.
---
--- Default: 'defaultPackageLocation'
---
--- Since 0.1.1.0
-setPackageLocation :: (forall m. MonadIO m => m (PackageIdentifier -> FilePath)) -> Settings -> Settings
-setPackageLocation x s = s { _packageLocation = x }
-
--- | Set the location the 00-index.tar file is stored.
---
--- Default: 'defaultIndexLocation'
---
--- Since 0.1.1.0
-setIndexLocation :: IO FilePath -> Settings -> Settings
-setIndexLocation x s = s { _indexLocation = x }
-
--- | Get the location that the 00-index.tar file is stored.
---
--- @~/.cabal/packages/hackage.haskell.org/00-index.tar@
---
--- Since 0.1.1.0
-defaultIndexLocation :: IO FilePath
-defaultIndexLocation = do
-    cabalDir <- getAppUserDataDirectory "cabal"
-    return $ cabalDir </> "packages" </> "hackage.haskell.org" </> "00-index.tar"
-
 -- | Download the given name,version pairs into the directory expected by cabal.
 --
 -- Since 0.1.0.0
-fetchPackages :: (F.Foldable f,Functor f,MonadIO m,MonadReader env m,HasHttpManager env)
-              => Settings -> f PackageIdentifier -> m ()
-fetchPackages s pkgs = do
+fetchPackages :: (F.Foldable f,Functor f,MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env)
+              => f PackageIdentifier -> m ()
+fetchPackages pkgs = do
    env <- ask
    let man = getHttpManager env
+       config = getConfig env
+       indexFP = toFilePath $ configPackageIndex config
    liftIO (do
-     indexFP <- _indexLocation s
-     packageLocation <- _packageLocation s
+     let packageLocation = configPackageTarball config
      withAsync (getPackageInfo indexFP $
                 Set.fromList $
                 F.toList pkgs) $ \a -> do
-         parMapM_ (_connections s) (go packageLocation man (wait a)) pkgs)
+         parMapM_ connectionCount (go packageLocation man (wait a)) pkgs)
   where
+    connectionCount = 8 -- FIXME put in Config
     unlessM p f = do
         p' <- p
         unless p' f
 
-    go :: (PackageIdentifier -> FilePath) -> Manager -> IO (Map PackageIdentifier Package) -> PackageIdentifier -> IO ()
+    go :: (PackageIdentifier -> IO (Path Abs File)) -> Manager -> IO (Map PackageIdentifier Package) -> PackageIdentifier -> IO ()
     go packageLocation man getPackageInfo' ident = do
+        fp <- fmap toFilePath $ packageLocation ident
         unlessM (doesFileExist fp) $ do
-            _onDownload s pkg
+            -- FIXME $logInfo $ "Downloading " <> packageIdentifierText ident
             packageInfo <- getPackageInfo'
             let (msha512, url, msize) =
                     case Map.lookup ident packageInfo of
@@ -267,12 +190,14 @@ fetchPackages s pkgs = do
                                             _ -> loop total' $! hashUpdate ctx bs
                         loop 0 hashInit
                     renameFile tmp fp
-                else _onDownloadErr s pkg
+                else do
+                    return ()
+                    -- FIXME $logError $ "Error downloading " <> packageIdentifierText ident
+
       where
         pkg = packageIdentifierString ident
         targz = pkg ++ ".tar.gz"
-        defUrl = _downloadPrefix s ++ targz
-        fp = packageLocation ident
+        defUrl = T.unpack packageDownloadPrefix ++ targz
 
 validHash :: String -> Maybe Text -> Context SHA512 -> IO ()
 validHash _ Nothing _ = return ()
@@ -307,7 +232,3 @@ parMapM_ cnt f xs0 = do
         workers 1 = Concurrently worker
         workers i = Concurrently worker *> workers (i - 1)
     runConcurrently $ workers cnt
-
-packageLocationGetter :: Settings
-                      -> (forall m. MonadIO m => m (PackageIdentifier -> FilePath))
-packageLocationGetter = _packageLocation

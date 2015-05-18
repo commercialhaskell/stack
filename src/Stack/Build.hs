@@ -981,12 +981,12 @@ fetchAndUnpackPackages :: (MonadIO m,MonadThrow m,MonadLogger m,MonadMask m,Mona
                        => [PackageIdentifier]
                        -> m [Path Abs Dir]
 fetchAndUnpackPackages pkgs =
-  do getPkgLoc <- packageLocationGetter indexSettings
-     fetchPackages indexSettings pkgs
+  do fetchPackages pkgs
+     config <- askConfig
      locs <-
        mapM (\ident ->
                liftM (ident,)
-                     (parseAbsFile (getPkgLoc ident)))
+                     (configPackageTarball config ident))
             pkgs
      descs <- readPackageDescs pkgs
      forM locs
@@ -996,7 +996,6 @@ fetchAndUnpackPackages pkgs =
                  error "TODO: Throw error about package not existing in index."
                Just latestCabalFileContent ->
                  unpackAndUpdateTarball ident tarGzPath latestCabalFileContent)
-  where indexSettings = Fetch.defaultSettings
 
 -- | Read package descriptions.
 readPackageDescs :: (MonadIO m, MonadReader env m, HasConfig env)

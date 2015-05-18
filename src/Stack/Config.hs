@@ -49,6 +49,7 @@ module Stack.Config
   , dockerPassHostArgName
   , configPackageIndex
   , configPackageIndexGz
+  , configPackageTarball
   , askConfig
   , askLatestSnapshotUrl
   , askPackageIndexGitUrl
@@ -83,7 +84,7 @@ import           Path.Find
 import           Stack.Types
 import           System.Directory
 import           System.Environment
-import           System.FilePath (searchPathSeparator)
+import           System.FilePath (searchPathSeparator, (<.>))
 import           System.Process
 
 -- | The top-level Stackage configuration.
@@ -989,6 +990,14 @@ configPackageIndex config = configStackageRoot config </> $(mkRelFile "00-index.
 -- | Location of the 00-index.tar.gz file
 configPackageIndexGz :: Config -> Path Abs File
 configPackageIndexGz config = configStackageRoot config </> $(mkRelFile "00-index.tar.gz")
+
+-- | Location of a package tarball
+configPackageTarball :: MonadThrow m => Config -> PackageIdentifier -> m (Path Abs File)
+configPackageTarball config ident = do
+    name <- parseRelDir $ packageNameString $ packageIdentifierName ident
+    ver <- parseRelDir $ versionString $ packageIdentifierVersion ident
+    base <- parseRelFile $ packageIdentifierString ident <.> "tar.gz"
+    return $ configStackageRoot config </> $(mkRelDir "packages") </> name </> ver </> base
 
 -- | Helper function to ask the environment and apply getConfig
 askConfig :: (MonadReader env m, HasConfig env) => m Config
