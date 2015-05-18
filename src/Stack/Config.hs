@@ -19,7 +19,7 @@
 -- database from there, etc. And if there's nothing, we should
 -- probably default to behaving like cabal, possibly with spitting out
 -- a warning that "you should run `stk init` to make things better".
-module Stackage.Config
+module Stack.Config
   ( Config(..)
   , ConfigException(..)
   , configInDocker
@@ -71,8 +71,8 @@ import           Data.Typeable
 import qualified Data.Yaml as Yaml
 import           Path
 import           Path.Find
-import           Stackage.FlagName
-import           Stackage.PackageName
+import           Stack.FlagName
+import           Stack.PackageName
 import           System.Directory
 import           System.Environment
 import           System.Process

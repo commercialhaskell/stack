@@ -7,7 +7,7 @@
 
 -- | Dealing with Cabal.
 
-module Stackage.Package
+module Stack.Package
   (readPackage
   ,readPackageUnresolved
   ,resolvePackage
@@ -52,10 +52,10 @@ import           Distribution.System
 import           Path as FL
 import           Path.Find (findFiles)
 import           Prelude hiding (FilePath)
-import           Stackage.Constants
-import           Stackage.FlagName
-import           Stackage.PackageName
-import           Stackage.Version
+import           Stack.Constants
+import           Stack.FlagName
+import           Stack.PackageName
+import           Stack.Version
 import           System.Directory (doesFileExist)
 import qualified System.FilePath as FilePath
 

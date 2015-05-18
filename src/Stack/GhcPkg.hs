@@ -5,18 +5,18 @@
 
 -- | Functions for the GHC package database.
 
-module Stackage.GhcPkg
+module Stack.GhcPkg
   (getAllPackages
   ,getUserDbPath
   ,findPackageId
   ,getPackageIds)
   where
 
-import           Stackage.GhcPkgId
-import           Stackage.PackageIdentifier
-import           Stackage.PackageName
-import           Stackage.Version
-import           Stackage.Process
+import           Stack.GhcPkgId
+import           Stack.PackageIdentifier
+import           Stack.PackageName
+import           Stack.Version
+import           Stack.Process
 
 import           Control.Applicative
 import           Control.Exception hiding (catch)

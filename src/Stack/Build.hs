@@ -10,7 +10,7 @@
 
 -- | Build project(s).
 
-module Stackage.Build
+module Stack.Build
   (build
   ,test
   ,haddock
@@ -60,22 +60,22 @@ import           Network.HTTP.Client.TLS (tlsManagerSettings)
 import           Path as FL
 import           Path.Find
 import           Prelude hiding (FilePath,writeFile)
-import           Stackage.Constants
-import           Stackage.Build.Doc
-import           Stackage.Build.Types
-import           Stackage.BuildPlan
-import           Stackage.BuildPlan.Types
-import           Stackage.Config
-import           Stackage.Fetch as Fetch
-import           Stackage.FlagName
-import           Stackage.GhcPkg
-import           Stackage.GhcPkgId
-import           Stackage.Package
-import           Stackage.PackageIdentifier
-import           Stackage.PackageIndex.Read
-import           Stackage.PackageIndex.Update
-import           Stackage.PackageName
-import           Stackage.Version
+import           Stack.Constants
+import           Stack.Build.Doc
+import           Stack.Build.Types
+import           Stack.BuildPlan
+import           Stack.BuildPlan.Types
+import           Stack.Config
+import           Stack.Fetch as Fetch
+import           Stack.FlagName
+import           Stack.GhcPkg
+import           Stack.GhcPkgId
+import           Stack.Package
+import           Stack.PackageIdentifier
+import           Stack.PackageIndex.Read
+import           Stack.PackageIndex.Update
+import           Stack.PackageName
+import           Stack.Version
 import           System.Directory hiding (findFiles)
 import           System.Environment
 import qualified System.FilePath as FilePath
@@ -87,7 +87,7 @@ import           System.Posix.Files (createSymbolicLink,removeLink)
 -- Top-level commands
 
 -- | Build and test using Shake.
-test :: Stackage.Config.Config -> TestConfig -> IO ()
+test :: Stack.Config.Config -> TestConfig -> IO ()
 test config conf =
   build config
         (BuildConfig (tconfigTargets conf)
@@ -102,7 +102,7 @@ test config conf =
                      (LTS 2 8)) -- FIXME figure out where to get the SnapName from
 
 -- | Build and haddock using Shake.
-haddock :: Stackage.Config.Config -> HaddockConfig -> IO ()
+haddock :: Stack.Config.Config -> HaddockConfig -> IO ()
 haddock config conf =
   build config
         (BuildConfig (hconfigTargets conf)
@@ -117,7 +117,7 @@ haddock config conf =
                      (LTS 2 8)) -- FIXME figure out where to get the SnapName from
 
 -- | Build and benchmark using Shake.
-benchmark :: Stackage.Config.Config -> BenchmarkConfig -> IO ()
+benchmark :: Stack.Config.Config -> BenchmarkConfig -> IO ()
 benchmark config conf =
   build config
         (BuildConfig (benchTargets conf)
@@ -132,7 +132,7 @@ benchmark config conf =
                      (LTS 2 8)) -- FIXME figure out where to get the SnapName from
 
 -- | Build using Shake.
-build :: Stackage.Config.Config -> BuildConfig -> IO ()
+build :: Stack.Config.Config -> BuildConfig -> IO ()
 build config bconfig =
   do pinfos <-
        runNoLoggingT (runResourceT (getPackageInfos (bconfigFinalAction bconfig)
@@ -198,7 +198,7 @@ dryRunPrint pinfos =
      forM_ (S.toList pinfos) (\pinfo -> putStrLn (packageNameString (packageName pinfo)))
 
 -- | Reset the build (remove Shake database and .gen files).
-clean :: Stackage.Config.Config -> IO ()
+clean :: Stack.Config.Config -> IO ()
 clean config =
   do pinfos <-
        runNoLoggingT (runResourceT (getPackageInfos DoNothing Nothing config))
@@ -973,7 +973,7 @@ composeFlags pname pflags gflags = collapse pflags <> gflags
 
 -- | Fetch and unpack the package.
 fetchAndUnpackPackages :: (MonadIO m,MonadThrow m,MonadLogger m,MonadMask m)
-                       => Stackage.Config.Config
+                       => Stack.Config.Config
                        -> [PackageIdentifier]
                        -> m [Path Abs Dir]
 fetchAndUnpackPackages config pkgs =
@@ -996,7 +996,7 @@ fetchAndUnpackPackages config pkgs =
 
 -- | Read package descriptions.
 readPackageDescs :: MonadIO m
-                 => Stackage.Config.Config -> [PackageIdentifier] -> m (Map PackageName L.ByteString)
+                 => Stack.Config.Config -> [PackageIdentifier] -> m (Map PackageName L.ByteString)
 readPackageDescs config pkgs =
   liftM M.fromList
         (liftIO (runResourceT
@@ -1012,7 +1012,7 @@ readPackageDescs config pkgs =
 
 -- | Unpack and update the package tarball.
 unpackAndUpdateTarball :: (MonadIO m,MonadLogger m,MonadMask m)
-                       => Stackage.Config.Config
+                       => Stack.Config.Config
                        -> PackageIdentifier
                        -> Path Abs File
                        -> L.ByteString

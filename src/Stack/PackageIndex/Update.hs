@@ -9,7 +9,7 @@
 
 -- | Package index handling.
 
-module Stackage.PackageIndex.Update
+module Stack.PackageIndex.Update
        (PackageIndex(..), getPkgIndex, loadPkgIndex, updateIndex,
         getPkgVersions)
        where
@@ -45,10 +45,10 @@ import           Path
        (Path, Abs, Dir, toFilePath, parseAbsDir, parseAbsFile, mkRelFile,
         mkRelDir, (</>))
 import           Control.Exception.Enclosed (tryIO)
-import           Stackage.PackageName (PackageName, packageNameString)
-import           Stackage.Version
-       (Version, parseVersionFromString)
-import           Stackage.Process (runIn)
+import           Stack.PackageName (PackageName, packageNameString)
+import           Stack.Version (Version, parseVersionFromString)
+import           Stack.Process (runIn)
+import           Stack.Constants
 import           System.Directory
 import           System.IO (IOMode(ReadMode), withBinaryFile)
 
@@ -109,7 +109,7 @@ updateIndexGit (PackageIndex idxPath) =
                   $(mkRelDir "all-cabal-hashes")
                 cloneArgs =
                   ["clone"
-                  ,packageIndexGitUri -- FIXME get from Config
+                  ,T.unpack packageIndexGitUrl -- FIXME get from Config
                   ,(toFilePath repoName)
                   ,"--depth"
                   ,"1"
@@ -126,7 +126,7 @@ updateIndexGit (PackageIndex idxPath) =
               liftIO (doesDirectoryExist (toFilePath acfDir))
             unless repoExists
                    (do $logInfo ("Cloning repository for first from " <>
-                                 T.pack packageIndexGitUrl) -- FIXME get from Config
+                                 packageIndexGitUrl) -- FIXME get from Config
                        runIn suDir gitPath cloneArgs Nothing)
             runIn acfDir gitPath ["fetch","--tags","--depth=1"] Nothing
             let tarFile =

@@ -4,7 +4,7 @@
 
 -- | Configuration parsing the stackage-build.yaml.
 
-module Stackage.Build.Config where
+module Stack.Build.Config where
 
 -- import           Stackage.Build.Defaults
 -- import           Stackage.Build.Types

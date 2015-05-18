@@ -1,7 +1,7 @@
 {-# LANGUAGE NamedFieldPuns, TupleSections, RankNTypes #-}
 
 -- | Run commands in Docker containers
-module Stackage.Docker
+module Stack.Docker
   (resetOnHost
   ,resetInContainer
   ,getInContainer
@@ -40,10 +40,10 @@ import qualified Filesystem.Path.CurrentOS as FP
 import qualified Path as FL
 import           Path.Find (findFileUp)
 import           Paths_stackage_common (version)
-import           Stackage.Build (shakeFilesPath)
-import           Stackage.Constants (configFileName)
-import           Stackage.Config
-import           Stackage.Docker.GlobalDB (updateDockerImageLastUsed,getDockerImagesLastUsed,pruneDockerImagesLastUsed)
+import           Stack.Build (shakeFilesPath)
+import           Stack.Constants (configFileName)
+import           Stack.Config
+import           Stack.Docker.GlobalDB (updateDockerImageLastUsed,getDockerImagesLastUsed,pruneDockerImagesLastUsed)
 import           System.Directory
 import           System.Environment (lookupEnv,unsetEnv)
 import           System.Exit (ExitCode(ExitSuccess,ExitFailure),exitWith)

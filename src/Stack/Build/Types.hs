@@ -8,7 +8,7 @@
 
 -- | All data types.
 
-module Stackage.Build.Types where
+module Stack.Build.Types where
 
 import Control.Exception
 import Data.Aeson
@@ -23,12 +23,12 @@ import Development.Shake (Verbosity)
 import Distribution.Package hiding (Package,PackageName)
 import GHC.Generics
 import Prelude hiding (FilePath)
-import Stackage.BuildPlan.Types
-import Stackage.FlagName
-import Stackage.GhcPkgId
-import Stackage.Package
-import Stackage.PackageName
-import Stackage.Version
+import Stack.BuildPlan.Types
+import Stack.FlagName
+import Stack.GhcPkgId
+import Stack.Package
+import Stack.PackageName
+import Stack.Version
 
 data StackageBuildException
   = FPNoConfigFile

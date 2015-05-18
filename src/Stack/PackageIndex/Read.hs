@@ -9,7 +9,7 @@
 {-# LANGUAGE GADTs              #-}
 
 -- | Dealing with the 00-index file and all its cabal files.
-module Stackage.PackageIndex.Read
+module Stack.PackageIndex.Read
     ( sourcePackageIndex
     , UnparsedCabalFile (..)
     , getLatestDescriptions
@@ -37,8 +37,8 @@ import           Distribution.PackageDescription.Parse (ParseResult (..), parseP
 import           Distribution.ParseUtils (PError)
 import qualified Distribution.Text as DT
 import           Path hiding ((</>))
-import           Stackage.PackageName
-import           Stackage.Version
+import           Stack.PackageName
+import           Stack.Version
 import           System.Directory (getAppUserDataDirectory)
 import qualified Data.Conduit.List as CL
 import Control.Monad.Trans.Class (lift)

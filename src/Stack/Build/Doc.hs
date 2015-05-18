@@ -4,7 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 -- | Utilities for built documentation, shared between @stackage-build@ and @fpdoc@.
-module Stackage.Build.Doc where
+module Stack.Build.Doc where
 
 import           Control.Monad
 import           Data.List
@@ -13,9 +13,9 @@ import qualified Data.Map.Strict as M
 import           Data.Maybe
 import qualified Data.Text as T
 import           Path as FL
-import           Stackage.Constants
-import           Stackage.PackageName
-import           Stackage.Version
+import           Stack.Constants
+import           Stack.PackageName
+import           Stack.Version
 import           System.Directory
 import           System.FilePath (takeFileName)
 

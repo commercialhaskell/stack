@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 
-module Stackage.Path (getBinPaths) where
+module Stack.Path (getBinPaths) where
 
 import Control.Monad.Catch
 import Control.Monad.IO.Class
@@ -9,7 +9,7 @@ import Data.Monoid
 import Path
 import System.FilePath
 
-import Stackage.Config
+import Stack.Config
 
 
 getBinPaths :: (MonadLogger m, MonadIO m, MonadThrow m)

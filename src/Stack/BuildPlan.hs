@@ -7,7 +7,7 @@
 -- | Resolving a build plan for a set of packages in a given Stackage
 -- snapshot.
 
-module Stackage.BuildPlan
+module Stack.BuildPlan
     ( BuildPlanException (..)
     , Snapshots (..)
     , getSnapshots
@@ -56,12 +56,12 @@ import           Network.HTTP.Client             (Manager, parseUrl,
                                                   responseBody, withResponse)
 import           Network.HTTP.Client.Conduit     (bodyReaderSource)
 import           Path
-import           Stackage.BuildPlan.Types
-import           Stackage.Constants
-import           Stackage.FlagName
-import           Stackage.Package
-import           Stackage.PackageName
-import           Stackage.Version
+import           Stack.BuildPlan.Types
+import           Stack.Constants
+import           Stack.FlagName
+import           Stack.Package
+import           Stack.PackageName
+import           Stack.Version
 import           System.Directory                (createDirectoryIfMissing,
                                                   getAppUserDataDirectory)
 import           System.FilePath                 (takeDirectory)

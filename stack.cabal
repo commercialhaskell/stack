@@ -1,7 +1,7 @@
-name:                stackage-common
+name:                stack
 version:             0.0.0
-synopsis:            Common stackage functionality
-description:         Common stackage functionality
+synopsis:            The Haskell Tool Stack
+description:         The Haskell Tool Stack
 license:             BSD3
 license-file:        LICENSE
 author:              Chris Done
@@ -14,32 +14,32 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:    src/
   ghc-options:       -Wall -O2
-  exposed-modules:   Stackage.BuildPlan
-                     Stackage.BuildPlan.Types
-                     Stackage.Config
-                     Stackage.Constants
-                     Stackage.Docker
-                     Stackage.Docker.GlobalDB
-                     Stackage.Fetch
-                     Stackage.FlagName
-                     Stackage.GhcPkg
-                     Stackage.GhcPkgId
-                     Stackage.Package
-                     Stackage.PackageIdentifier
-                     Stackage.PackageIndex.Read
-                     Stackage.PackageIndex.Update
-                     Stackage.PackageName
-                     Stackage.Version
-                     Stackage.Path
-                     Stackage.Types
-                     Stackage.Build
-                     Stackage.Build.Types
-                     Stackage.Build.Doc
-                     Stackage.Build.Config
-  other-modules:     Stackage.Process
+  exposed-modules:   Stack.BuildPlan
+                     Stack.BuildPlan.Types
+                     Stack.Config
+                     Stack.Constants
+                     Stack.Docker
+                     Stack.Docker.GlobalDB
+                     Stack.Fetch
+                     Stack.FlagName
+                     Stack.GhcPkg
+                     Stack.GhcPkgId
+                     Stack.Package
+                     Stack.PackageIdentifier
+                     Stack.PackageIndex.Read
+                     Stack.PackageIndex.Update
+                     Stack.PackageName
+                     Stack.Version
+                     Stack.Path
+                     Stack.Types
+                     Stack.Build
+                     Stack.Build.Types
+                     Stack.Build.Doc
+                     Stack.Build.Config
+  other-modules:     Stack.Process
                      Path.Find
                      System.Process.PagerEditor
-                     Paths_stackage_common
+                     Paths_stack
   build-depends:     Cabal >= 1.18.1.5
                    , aeson >= 0.8.0.2
                    , async >= 2.0.2

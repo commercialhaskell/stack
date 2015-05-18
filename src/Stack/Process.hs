@@ -4,7 +4,7 @@
 
 -- | Reading from external processes.
 
-module Stackage.Process
+module Stack.Process
   (readProcessStdout
   ,tryProcessStdout
   ,sinkProcessStdout

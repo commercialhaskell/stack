@@ -6,7 +6,7 @@
 
 -- | Functionality for downloading packages securely for cabal's usage.
 
-module Stackage.Fetch
+module Stack.Fetch
     ( fetchPackages
     , Settings
     , defaultSettings
@@ -19,9 +19,9 @@ module Stackage.Fetch
     ) where
 
 import           Control.Monad.IO.Class
-import           Stackage.PackageIdentifier
-import           Stackage.PackageName
-import           Stackage.Version
+import           Stack.PackageIdentifier
+import           Stack.PackageName
+import           Stack.Version
 
 import qualified Codec.Archive.Tar as Tar
 import           Control.Applicative ((*>), (<$>), (<*>))

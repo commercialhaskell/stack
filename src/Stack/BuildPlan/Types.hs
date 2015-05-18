@@ -4,7 +4,7 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE FlexibleInstances          #-}
 -- | Shared types for various stackage packages.
-module Stackage.BuildPlan.Types
+module Stack.BuildPlan.Types
     ( -- * Types
       BuildPlan (..)
     , PackagePlan (..)
@@ -44,11 +44,11 @@ import           Data.Time                       (Day)
 import qualified Data.Traversable                as T
 import           Data.Typeable                   (TypeRep, Typeable, typeOf)
 import           Data.Vector                     (Vector)
-import Stackage.PackageName
-import Stackage.FlagName
+import Stack.PackageName
+import Stack.FlagName
 import           Distribution.System             (Arch, OS)
 import qualified Distribution.Text               as DT
-import           Stackage.Version                (Version, VersionRange)
+import           Stack.Version                   (Version, VersionRange)
 import qualified Distribution.Version            as C
 import Safe (readMay)
 

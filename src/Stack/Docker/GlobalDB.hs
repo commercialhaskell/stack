@@ -4,7 +4,7 @@
 
 -- | Global sqlite database shared by all projects.
 -- Warning: this is currently only accessible from __outside__ a Docker container.
-module Stackage.Docker.GlobalDB
+module Stack.Docker.GlobalDB
   (updateDockerImageLastUsed
   ,getDockerImagesLastUsed
   ,pruneDockerImagesLastUsed
