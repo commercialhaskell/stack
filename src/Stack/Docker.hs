@@ -39,7 +39,7 @@ import           Filesystem.Path.CurrentOS ((</>))
 import qualified Filesystem.Path.CurrentOS as FP
 import qualified Path as FL
 import           Path.Find (findFileUp)
-import           Paths_stackage_common (version)
+import           Paths_stack (version)
 import           Stack.Build (shakeFilesPath)
 import           Stack.Constants (configFileName)
 import           Stack.Config
