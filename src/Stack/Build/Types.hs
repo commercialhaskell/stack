@@ -18,7 +18,7 @@ import Data.Map.Strict (Map)
 import Data.Maybe
 import Data.Monoid
 import Data.Text (Text)
-import Data.Yaml
+
 import Development.Shake (Verbosity)
 import Distribution.Package hiding (Package,PackageName)
 import GHC.Generics
@@ -26,18 +26,16 @@ import Prelude hiding (FilePath)
 import Stack.Types
 import Stack.Package
 
-data StackageBuildException
-  = FPNoConfigFile
-  | FPConfigError ParseException
-  | FPMissingTool Dependency
-  | FPCouldn'tFindPkgId PackageName
-  | FPMissingDep Package PackageName VersionRange
-  | FPStackageDepVerMismatch PackageName Version VersionRange
-  | FPStackageVersionMismatch PackageName Version Version
-  | FPDependencyIssues [StackageBuildException]
+data StackBuildException
+  = MissingTool Dependency
+  | Couldn'tFindPkgId PackageName
+  | MissingDep Package PackageName VersionRange
+  | StackageDepVerMismatch PackageName Version VersionRange
+  | StackageVersionMismatch PackageName Version Version
+  | DependencyIssues [StackBuildException]
   deriving (Typeable,Show)
 
-instance Exception StackageBuildException
+instance Exception StackBuildException
 
 -- | Configuration for building.
 data BuildOpts =

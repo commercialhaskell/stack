@@ -276,7 +276,7 @@ needTools pinfo =
                    do m <- findExecutable (packageNameString (fromCabalPackageName n))
                       case m of
                         Nothing ->
-                          liftIO (throwIO (FPMissingTool dep))
+                          liftIO (throwIO (MissingTool dep))
                         _ -> return ())
                 (packageTools pinfo))
 
@@ -315,7 +315,7 @@ writeFinalFiles :: MonadIO m => GenConfig -> Path Abs Dir -> PackageName -> m ()
 writeFinalFiles gconfig dir name =
   liftIO (do mpkigid <- findPackageId name
              case mpkigid of
-               Nothing -> throwIO (FPCouldn'tFindPkgId name)
+               Nothing -> throwIO (Couldn'tFindPkgId name)
                Just pkgid ->
                  do writeGenConfigFile
                       dir
@@ -783,7 +783,7 @@ getPackageInfos finalAction mbopts env =
                  , retry ->
                    outsideOfDockerApproach infos globalPackages cfg bopts errs
                  | otherwise ->
-                   liftIO (throwIO (FPDependencyIssues (nubBy (on (==) show) errs)))
+                   liftIO (throwIO (DependencyIssues (nubBy (on (==) show) errs)))
         outsideOfDockerApproach infos globalPackages cfg bopts errs =
           do indexDir <- liftIO getIndexDir
              index <- loadPkgIndex indexDir
@@ -819,17 +819,17 @@ getPackageInfos finalAction mbopts env =
                                                     M.singleton name flags)
                                                  validated)}
                erroneous ->
-                 liftIO (throwIO (FPDependencyIssues
+                 liftIO (throwIO (DependencyIssues
                                     (map snd (mapMaybe (flip lookup names) erroneous))))
           where names = getMissingDeps errs
 
 -- | Extract the missing dependencies and their version ranges, but
 -- keeping hold of the original exception for later use.
-getMissingDeps :: [StackageBuildException] -> [(PackageName,(VersionRange,StackageBuildException))]
+getMissingDeps :: [StackBuildException] -> [(PackageName,(VersionRange,StackBuildException))]
 getMissingDeps =
   mapMaybe (\x ->
               case x of
-                FPMissingDep _ name range ->
+                MissingDep _ name range ->
                   Just (name,(range,x))
                 _ -> Nothing)
 
@@ -855,14 +855,14 @@ validateSuggestion globalPackages okPkgVers =
      case M.lookup name okPkgVers of
        Just range
          | not (withinRange suggestedVer range) ->
-           liftIO (throwIO (FPStackageDepVerMismatch name suggestedVer range))
+           liftIO (throwIO (StackageDepVerMismatch name suggestedVer range))
        _ ->
          case M.lookup name globalPackages of
            Just installedVer
              | installedVer == suggestedVer ->
                return Nothing
              | otherwise ->
-               liftIO (throwIO (FPStackageVersionMismatch name suggestedVer installedVer))
+               liftIO (throwIO (StackageVersionMismatch name suggestedVer installedVer))
            Nothing ->
              return (Just suggestion))
 
@@ -889,7 +889,7 @@ buildDependencies :: MonadIO m
                   -> Map PackageName Version
                   -> Set (Path Abs Dir)
                   -> Map PackageName (Map FlagName Bool)
-                  -> WriterT [StackageBuildException] m (Set Package)
+                  -> WriterT [StackBuildException] m (Set Package)
 buildDependencies finalAction flags globals packages pflags =
   do pkgs <-
        liftIO (S.mapM (getPackageInfo finalAction flags pflags) packages)
@@ -906,23 +906,23 @@ sievePackages :: MonadIO m
               => Map PackageName Version
               -> Map PackageName Version
               -> Package
-              -> WriterT [StackageBuildException] m Package
+              -> WriterT [StackBuildException] m Package
 sievePackages globalNameVersions localNameVersions p =
   do deps <-
        filterM (\(name,range) ->
                   case M.lookup name localNameVersions of
                     Just ver | withinRange ver range -> return True
-                             | otherwise -> do tell [FPMissingDep p name range]
+                             | otherwise -> do tell [MissingDep p name range]
                                                return False
                     Nothing -> case M.lookup name globalNameVersions of
                                  Just ver
                                    | withinRange ver range ->
                                      return False
                                    | otherwise ->
-                                     do tell [FPMissingDep p name range]
+                                     do tell [MissingDep p name range]
                                         return False
                                  Nothing ->
-                                   do tell [FPMissingDep p name range]
+                                   do tell [MissingDep p name range]
                                       return False)
                (M.toList (packageDeps p))
      return (p {packageDeps = M.fromList deps})

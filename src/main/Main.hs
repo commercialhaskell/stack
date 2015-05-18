@@ -1,22 +1,27 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 -- | Main stack tool entry point.
 
 module Main where
 
+import           Control.Exception
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
+import           Data.List
 import           Data.Maybe
 import qualified Data.Text as T
 import           Development.Shake (Verbosity(..))
+import           Distribution.Text (display)
 import           Network.HTTP.Conduit
 import           Options.Applicative.Extra
 import           Options.Applicative.Simple
 import           Stack.Build
 import           Stack.Build.Types
 import           Stack.Config
-import           Stack.Types.BuildPlan
+import           Stack.Package
+import           Stack.Types
 import           Stack.Types.Internal
 
 -- | Commandline dispatcher.
@@ -38,7 +43,38 @@ main =
 buildCmd :: BuildOpts -> IO ()
 buildCmd opts =
   do config <- runMonadLogger loadConfig
-     runCmd config (Stack.Build.build opts {boptsInDocker = configInDocker config})
+     catch (runCmd config (Stack.Build.build opts {boptsInDocker = configInDocker config}))
+           (error . printBuildException)
+  where printBuildException e =
+          case e of
+            MissingTool dep -> "Missing build tool: " <> display dep
+            Couldn'tFindPkgId name ->
+              ("After installing " <> packageNameString name <>
+               ", the package id couldn't be found " <>
+               "(via ghc-pkg describe " <> packageNameString name <>
+               "). This shouldn't happen, " <> "please report as a bug")
+            MissingDep p d range ->
+              "Missing dependency for package " <>
+              packageNameString (packageName p) <>
+              ": " <>
+              packageNameString d <>
+              " " <>
+              display range
+            StackageDepVerMismatch name ver range ->
+              ("The package '" <> packageNameString name <>
+               "' in this Stackage snapshot is " <> versionString ver <>
+               ", but there is an (unsatisfiable) local constraint of " <>
+               display range <> ". Suggestion: " <>
+               "Check your local package constraints and make them consistent with your current Stackage")
+            StackageVersionMismatch name this that ->
+              ("There was a mismatch between an installed package, " <>
+               packageNameString name <> "==" <> versionString this <>
+               " but this Stackage snapshot should be " <>
+               versionString that)
+            DependencyIssues es ->
+              ("Dependency issues:\n" ++
+               intercalate "\n"
+                           (map printBuildException es))
 
 -- | Parser for build arguments.
 --
