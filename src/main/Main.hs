@@ -1,9 +1,12 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 -- | Main stack tool entry point.
 
 module Main where
 
 import           Control.Monad.Logger
 import           Control.Monad.Reader
+import           Control.Monad.Trans.Resource
 import           Data.Maybe
 import qualified Data.Text as T
 import           Development.Shake (Verbosity(..))
@@ -19,7 +22,7 @@ import           Stack.Types.Internal
 -- | Commandline dispatcher.
 main :: IO ()
 main =
-  do (_,runCmd) <-
+  do (_,run) <-
        simpleOptions
          "ver"
          "header"
@@ -29,16 +32,13 @@ main =
                         "Build the project(s) in this directory/configuration"
                         buildCmd
                         buildOpts)
-     runCmd
+     run
 
 -- | Build the project.
 buildCmd :: BuildOpts -> IO ()
 buildCmd opts =
-  do config <- runMonadLoggerCmd loadConfig
-     withManager
-       (\manager ->
-          runReaderT (Stack.Build.build opts {boptsInDocker = configInDocker config})
-                     (Env config manager))
+  do config <- runMonadLogger loadConfig
+     runCmd config (Stack.Build.build opts {boptsInDocker = configInDocker config})
 
 -- | Parser for build arguments.
 --
@@ -84,5 +84,13 @@ buildOpts = BuildOpts <$> target <*> verbose <*> libProfiling <*> exeProfiling <
 -- | Run logging monad for commands.
 --
 -- FIXME: Decide on logging levels based on verbosity.
-runMonadLoggerCmd :: LoggingT IO a -> IO a
-runMonadLoggerCmd = runStdoutLoggingT
+runMonadLogger :: LoggingT IO a -> IO a
+runMonadLogger = runStdoutLoggingT
+
+-- | Run a command with the given config.
+runCmd :: (MonadBaseControl IO m,MonadIO m)
+       => Config -> ReaderT Env (ResourceT m) a -> m a
+runCmd config m = withManager
+                    (\manager ->
+                       runReaderT m
+                                  (Env config manager))
