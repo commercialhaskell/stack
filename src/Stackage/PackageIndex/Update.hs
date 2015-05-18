@@ -44,7 +44,7 @@ import           Network.HTTP.Types (status200)
 import           Path
        (Path, Abs, Dir, toFilePath, parseAbsDir, parseAbsFile, mkRelFile,
         mkRelDir, (</>))
-import           Stackage.IO (tryIO)
+import           Control.Exception.Enclosed (tryIO)
 import           Stackage.PackageName (PackageName, packageNameString)
 import           Stackage.Version
        (Version, parseVersionFromString)
