@@ -525,123 +525,6 @@ instance FromJSON CustomEnvBins where
     <|> typeMismatch "CustomEnvBins" j
 
 
-
---data BuildStrategy
---  = CabalSandbox CabalSandboxBuildStrategy
---  | Docker DockerBuildStrategy
---  deriving Show
-
---data CabalSandboxBuildStrategy
---  = BuildAgainstLTS LTSBuildStrategy
---  | BuildAgainstNightly NightlyBuildStrategy
---  | BuildAgainstSnapshot SnapshotBuildStrategy
---  | BuildAgainstCustom (CustomBuildStrategy Text)
---  deriving Show
-
---data DockerBuildStrategy =
---  DockerBuildStrategy
---  deriving Show
-
---data LTSBuildStrategy =
---  LTSBuildStrategy
---    { configLTS :: Text
---    }
---  deriving Show
-
---data NightlyBuildStrategy =
---  NightlyBuildStrategy
---    { configNightly :: Text
---    }
---  deriving Show
-
---data SnapshotBuildStrategy =
---  SnapshotBuildStrategy
---    { configSnapshot :: Text
---    }
---  deriving Show
-
---data CustomBuildStrategy a =
---  CustomBuildStrategy
---  { customGhcBinLocation :: a
---  , customCabalBinLocation :: a
---  , customSandboxLocation :: a
---  }
---  deriving Show
-
---instance FromJSON LTSBuildStrategy where
---  parseJSON j = parseAsText j <|> parseAsScientific j where
---    parseAsText = withText "LTSBuildStrategy" $ \t -> do
---      let configLTS = t
---      return LTSBuildStrategy{..}
---    -- allows people to not have to quote the lts field
---    parseAsScientific = withScientific "LTSBuildStrategy" $ \s -> do
---      let configLTS = Text.pack $ show s
---      return LTSBuildStrategy{..}
-
---instance FromJSON NightlyBuildStrategy where
---  parseJSON = withText "NightlyBuildStrategy" $ \t -> do
---    let configNightly = t
---    return NightlyBuildStrategy{..}
-
---instance FromJSON SnapshotBuildStrategy where
---  parseJSON = withText "SnapshotBuildStrategy" $ \t -> do
---    let configSnapshot = t
---    return SnapshotBuildStrategy{..}
-
-
---instance (a ~ Text) => FromJSON (CustomBuildStrategy a) where
---  parseJSON = withObject "CustomBuildStrategy" $ \obj -> do
---    customGhcBinLocation <- obj .: "ghc" .!= "detect"
---    customCabalBinLocation <- obj .: "cabal" .!= "detect"
---    customSandboxLocation <- obj .:? "sandbox" .!= "detect"
---    return CustomBuildStrategy{..}
-
-
---instance FromJSON DockerBuildStrategy where
---  parseJSON = withBool "DockerBuildStrategy" $ \b ->
---    if b
---      then return DockerBuildStrategy
---      else fail "docker: false"
-
---instance FromJSON CabalSandboxBuildStrategy where
---  parseJSON = withObject "CabalSandboxBuildStrategy" $ \obj ->
---    (BuildAgainstLTS <$> obj .: "lts") <|>
---    (BuildAgainstNightly <$> obj .: "nightly") <|>
---    (BuildAgainstSnapshot <$> obj .: "snapshot") <|>
---    (BuildAgainstCustom <$> obj .: "custom")
-
---parseBuildStrategy :: (MonadLogger m, MonadIO m, MonadThrow m)
---  => StackageRoot -> CabalSandboxBuildStrategy -> m (CustomBuildStrategy (Path Abs Dir))
---parseBuildStrategy stackageRoot (BuildAgainstLTS lts) =
---  resolveLTSSnapshot stackageRoot lts >>= parseBuildStrategy stackageRoot . BuildAgainstSnapshot
---parseBuildStrategy stackageRoot (BuildAgainstNightly nightly) =
---  resolveNightlySnapshot nightly >>= parseBuildStrategy stackageRoot . BuildAgainstSnapshot
---parseBuildStrategy stackageRoot (BuildAgainstSnapshot snapshot) = do
---  customGhcBinLocation <- resolveSnapshotGhcLoc stackageRoot snapshot
---  customCabalBinLocation <- resolveSnapshotCabalLoc stackageRoot snapshot
---  customSandboxLocation <- resolveSnapshotSandboxLoc stackageRoot snapshot
---  return CustomBuildStrategy{..}
---parseBuildStrategy _stackageRoot (BuildAgainstCustom custom) = do
---  ghcBinLoc <- resolveCustomGhcLoc (customGhcBinLocation custom)
---  cabalBinLoc <- resolveCustomCabalLoc (customCabalBinLocation custom)
---  sandboxLocation <- resolveCustomSandboxLoc (customSandboxLocation custom)
---  return CustomBuildStrategy
---    { customGhcBinLocation = ghcBinLoc
---    , customCabalBinLocation = cabalBinLoc
---    , customSandboxLocation = sandboxLocation
---    }
-
--- TODO
--- Build strategy based on whatever ghc, cabal, and sandbox are visible.
---defaultBuildStrategy :: (MonadLogger m, MonadIO m, MonadThrow m)
---  => m (CustomBuildStrategy (Path Abs Dir))
---defaultBuildStrategy = do
---  customGhcBinLocation <- detectGhcLocation
---  customCabalBinLocation <- detectCabalLocation
---  customSandboxLocation <- detectSandboxLocation
---  return CustomBuildStrategy{..}
-
-
 -- TODO: use where.exe if on Windows?
 detectGhcLocation :: (MonadLogger m, MonadIO m, MonadThrow m)
   => m (Path Abs Dir)
@@ -655,15 +538,6 @@ detectCabalLocation = do
   whichCabal <- liftIO $ readProcess "which" ["cabal"] ""
   parent `liftM` parseAbsFile whichCabal
 
---detectSandboxLocation :: (MonadLogger m, MonadIO m, MonadThrow m)
---  => m (Path Abs Dir)
---detectSandboxLocation =  do
---  mPackageDb <- liftIO $ parsePackageDb
---  case mPackageDb of
---    Just dbText -> do
---      dbDir <- parseAbsDir $ Text.unpack dbText
---      return $ parentAbs dbDir
---    Nothing -> throwM $ NotYetImplemented "detectSandboxLocation: no cabal.sandbox.config"
 
 detectPackageDbLocation :: (MonadLogger m, MonadIO m, MonadThrow m)
   => m (Path Abs Dir)
@@ -920,49 +794,6 @@ resolveBuildWith' _stackageRoot (BuildWithCustom (CustomEnvBins bins)) = do
   return (ghcBinLoc, cabalBinLoc, packageDbLoc)
 
 
---resolveLTSSnapshot :: (MonadLogger m, MonadIO m, MonadThrow m)
---  => StackageRoot -> LTSBuildStrategy -> m SnapshotBuildStrategy
---resolveLTSSnapshot stackageRoot LTSBuildStrategy{..} = do
---  lts <- case Text.stripPrefix "lts-" configLTS of
---    Nothing -> return $ "lts-" <> configLTS
---    Just{} -> return configLTS
---  mSnapshots <- liftIO $ Yaml.decodeFile (toFilePath stackageRoot)
---  configSnapshot <- case Map.lookup lts =<< (mSnapshots :: Maybe (Map Text Text)) of
---    Nothing -> return lts
---    Just lts' -> return lts'
---  return SnapshotBuildStrategy{..}
-
---resolveNightlySnapshot :: (MonadLogger m, MonadIO m, MonadThrow m)
---  => NightlyBuildStrategy -> m SnapshotBuildStrategy
---resolveNightlySnapshot _ = throwM $ NotYetImplemented "resolveNightlySnapshot"
-
-
---resolveSnapshotSandboxLoc :: (MonadLogger m, MonadIO m, MonadThrow m)
---  => StackageRoot -> SnapshotBuildStrategy -> m (Path Abs Dir)
---resolveSnapshotSandboxLoc _ _ = throwM $ NotYetImplemented "resolveSnapshotSandboxLoc"
-
---resolveSnapshotGhcLoc :: (MonadLogger m, MonadIO m, MonadThrow m)
---  => StackageRoot -> SnapshotBuildStrategy -> m (Path Abs Dir)
---resolveSnapshotGhcLoc _ _ = throwM $ NotYetImplemented "resolveSnapshotGhcLoc"
-
---resolveSnapshotCabalLoc :: (MonadLogger m, MonadIO m, MonadThrow m)
---  => StackageRoot -> SnapshotBuildStrategy -> m (Path Abs Dir)
---resolveSnapshotCabalLoc _ _ = throwM $ NotYetImplemented "resolveSnapshotCabalLoc"
-
---resolveCustomSandboxLoc :: (MonadLogger m, MonadIO m, MonadThrow m)
---  => Text -> m (Path Abs Dir)
---resolveCustomSandboxLoc "detect" = detectSandboxLocation
---resolveCustomSandboxLoc _ = throwM $ NotYetImplemented "resolveCustomSandboxLoc"
-
---resolveCustomGhcLoc :: (MonadLogger m, MonadIO m, MonadThrow m)
---  => Text -> m (Path Abs Dir)
---resolveCustomGhcLoc "detect" = detectGhcLocation
---resolveCustomGhcLoc _ = throwM $ NotYetImplemented "resolveCustomGhcLoc"
-
---resolveCustomCabalLoc :: (MonadLogger m, MonadIO m, MonadThrow m)
---  => Text -> m (Path Abs Dir)
---resolveCustomCabalLoc "detect" = detectCabalLocation
---resolveCustomCabalLoc _ = throwM $ NotYetImplemented "resolveCustomCabalLoc"
 
 -- TODO: copy from stackage-sandbox or wherver this has been well defined
 resolveStackageHost :: (MonadLogger m, MonadIO m, MonadThrow m)
