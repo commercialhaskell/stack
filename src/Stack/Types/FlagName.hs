@@ -75,8 +75,9 @@ flagNameParser =
                   (concating (many (alternating
                                       (pured (satisfy (\c -> isLetter c ||
                                                               isDigit c)))
-                                      (appending (pured (satisfy (== '-')))
+                                      (appending (pured (satisfy separator))
                                                  (pured (satisfy isLetter)))))))
+  where separator c = c == '-' || c == '_'
 
 -- | Make a flag name.
 mkFlagName :: String -> Q Exp
