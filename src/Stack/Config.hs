@@ -143,9 +143,9 @@ getDefaultResolver dir = do
         Right cabalfp -> do
             gpd <- readPackageUnresolved cabalfp
             mpair <- findBuildPlan cabalfp gpd
-            return $ fmap fst mpair
+            return mpair
     case msnap of
-        Just snap -> return $ ResolverSnapshot snap
+        Just (snap, _FIXMEflagsIgnored) -> return $ ResolverSnapshot snap
         Nothing -> return $ ResolverSnapshot $ LTS 2 9 -- FIXME
 
 -- | Dummy type to support this monoid business.
