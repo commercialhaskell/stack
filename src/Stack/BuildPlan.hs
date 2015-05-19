@@ -162,10 +162,10 @@ loadBuildPlan name = do
     case eres of
         Right bp -> return bp
         Left e -> do
-            $logDebug $ "Decoding failed: " <> T.pack (show e)
+            $logWarn $ "Decoding build plan from file failed: " <> T.pack (show e)
             liftIO $ createDirectoryIfMissing True $ takeDirectory $ toFilePath fp
             req <- parseUrl $ T.unpack url
-            $logDebug $ "Downloading build plan from: " <> url
+            $logWarn $ "Instead, downloading build plan from: " <> url
             download req fp
             liftIO (decodeFileEither $ toFilePath fp) >>= either throwM return
   where
@@ -194,7 +194,7 @@ checkBuildPlan :: (MonadLogger m, MonadThrow m, MonadIO m)
                -> GenericPackageDescription
                -> m (Maybe [FlagName])
 checkBuildPlan name bp cabalfp gpd = do
-    $logDebug $ "Checking against build plan " <> renderSnapName name
+    $logInfo $ "Checking against build plan " <> renderSnapName name
     loop flagOptions
   where
     loop [] = return Nothing

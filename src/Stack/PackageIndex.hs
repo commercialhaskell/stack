@@ -216,7 +216,8 @@ updateIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m
                ,HasConfig env)
             => m ()
 updateIndex =
-  do git <- isGitInstalled
+  do $logInfo "Updating package index ..."
+     git <- isGitInstalled
      if git
         then updateIndexGit
         else updateIndexHTTP
@@ -286,7 +287,7 @@ updateIndexHTTP = do
     config <- askConfig
     url <- askPackageIndexHttpUrl
     req <- parseUrl $ T.unpack url
-    $logDebug ("Downloading package index from " <> url)
+    $logInfo ("Downloading package index from " <> url)
     wasDownloaded <- redownload req (configPackageIndexGz config)
     toUnpack <-
         if wasDownloaded

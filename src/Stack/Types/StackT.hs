@@ -107,9 +107,9 @@ loggerFunc :: (MonadIO m,ToLogStr msg,MonadReader r m,HasLogLevel r)
 loggerFunc loc _src level msg =
   do maxLogLevel <- asks getLogLevel
      when (level >= maxLogLevel)
-          (liftIO (do out <- getOutput
+          (liftIO (do out <- getOutput maxLogLevel
                       S8.putStrLn (S8.pack out)))
-  where getOutput =
+  where getOutput maxLogLevel =
           do date <- getDate
              l <- getLevel
              lc <- getLoc

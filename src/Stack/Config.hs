@@ -138,7 +138,7 @@ getDefaultResolver dir = do
     ecabalfp <- try $ getCabalFileName dir
     msnap <- case ecabalfp of
         Left e -> do
-            $logDebug $ T.pack $ show (e :: PackageException)
+            $logWarn $ T.pack $ show (e :: PackageException)
             return Nothing
         Right cabalfp -> do
             gpd <- readPackageUnresolved cabalfp
@@ -418,13 +418,13 @@ getFileConfigMonoid configFilePath =
                     $logDebug ("Parsed config: " <>
                                T.pack (show (c dir)))
                   Left err ->
-                    $logDebug ("Parsing config file failed at " <>
-                               T.pack (show configFilePath) <>
-                               ": " <>
-                               T.pack err)
+                    $logWarn ("Parsing config file failed at " <>
+                                   T.pack (show configFilePath) <>
+                                   ": " <>
+                                   T.pack err)
                 return $
                   either (const mempty) ($ dir) mconf
-        else do $logDebug ("No config file exist at " <>
+        else do $logDebug ("No config file exists at " <>
                            T.pack (show configFilePath))
                 return mempty
   where dir = parent configFilePath
@@ -523,8 +523,6 @@ getDockerLocal :: (MonadIO m,MonadLogger m,MonadThrow m)
 getDockerLocal =
   do pwd <-
        liftIO (getCurrentDirectory >>= parseAbsDir)
-     $logDebug ("Current directory is: " <>
-                T.pack (show pwd))
      mfile <- findFileUp pwd ((== stackDotYaml) . filename) Nothing
      case mfile of
        Nothing -> throwM ConfigNoFile

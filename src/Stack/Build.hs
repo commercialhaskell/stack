@@ -754,7 +754,7 @@ getPackageInfos finalAction mbopts =
     do cfg <- asks getConfig
        go True cfg
   where go retry cfg =
-          do $logDebug "Resolving build plan ..."
+          do $logInfo "Getting pack information, dependencies, etc. ..."
              globalPackages <- getAllPackages
 
              (infos,errs) <-
@@ -783,7 +783,7 @@ getPackageInfos finalAction mbopts =
                     !mapping <- case configResolver cfg of
                         ResolverSnapshot snapName -> do
                             bp <- loadBuildPlan snapName
-                            $logDebug "Resolving build plan ..."
+                            $logInfo "Resolving build plan ..."
                             !mapping <-
                               resolveBuildPlan bp (M.keysSet okPkgVers)
                             $logDebug "Resolved. Checking ..."
@@ -795,7 +795,7 @@ getPackageInfos finalAction mbopts =
                     case validated of
                       [] -> return infos
                       toFetch ->
-                        do $logDebug "Fetching and unpacking third party packages ..."
+                        do $logInfo "Fetching and unpacking third party packages ..."
                            newPkgDirs <- fetchAndUnpackPackages
                                            (map (\(name, (ver, _flags)) ->
                                                fromTuple (name,ver))

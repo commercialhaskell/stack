@@ -78,7 +78,7 @@ setup ghcVersion = do
   b <- isSetup ghcVersion
   if b
     then do
-      $logDebug ("ghc-" <> Text.pack (show ghcVersion) <> " is already set up")
+      $logWarn ("ghc-" <> Text.pack (show ghcVersion) <> " is already set up")
     else do
       -- TODO: a better implementation
       liftIO $ withArgs ["ghc-" ++ show ghcVersion] main
