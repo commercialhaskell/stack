@@ -754,7 +754,7 @@ getPackageInfos finalAction mbopts =
     do cfg <- asks getConfig
        go True cfg
   where go retry cfg =
-          do $logInfo "Getting pack information, dependencies, etc. ..."
+          do unless retry ($logInfo "Getting pack information, dependencies, etc. ...")
              globalPackages <- getAllPackages
 
              (infos,errs) <-
