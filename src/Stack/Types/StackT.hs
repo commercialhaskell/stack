@@ -115,19 +115,19 @@ loggerFunc loc _src level msg =
              lc <- getLoc
              return (date ++ l ++ S8.unpack (fromLogStr (toLogStr msg)) ++ lc)
           where getDate
-                  | level <= LevelDebug =
+                  | maxLogLevel <= LevelDebug =
                     do now <- getCurrentTime
                        return (formatTime defaultTimeLocale "%Y-%m-%d %T%Q" now ++
                                ": ")
                   | otherwise = return ""
                 getLevel
-                  | level <= LevelDebug =
+                  | maxLogLevel <= LevelDebug =
                     return ("[" ++
                             map toLower (drop 5 (show level)) ++
                             "] ")
                   | otherwise = return ""
                 getLoc
-                  | level <= LevelDebug =
+                  | maxLogLevel <= LevelDebug =
                     return (" @(" ++ fileLocStr ++ ")")
                   | otherwise = return ""
                 fileLocStr =
