@@ -73,11 +73,11 @@ flagNameParser =
   fmap (FlagName . S8.pack)
        (appending (many1 (satisfy isLetter))
                   (concating (many (alternating
-                                      (pured (satisfy (\c -> isLetter c ||
-                                                              isDigit c)))
+                                      (pured (satisfy isAlphaNum))
                                       (appending (pured (satisfy separator))
-                                                 (pured (satisfy isLetter)))))))
+                                                 (pured (satisfy isAlphaNum)))))))
   where separator c = c == '-' || c == '_'
+        isAlphaNum c = isLetter c || isDigit c
 
 -- | Make a flag name.
 mkFlagName :: String -> Q Exp
