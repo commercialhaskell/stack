@@ -66,7 +66,7 @@ import           Stack.Config
 import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
-import           Stack.PackageIndex.Update
+import           Stack.PackageIndex
 import           System.Directory hiding (findFiles)
 import           System.Environment
 import qualified System.FilePath as FilePath

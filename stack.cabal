@@ -22,8 +22,7 @@ library
                      Stack.Fetch
                      Stack.GhcPkg
                      Stack.Package
-                     Stack.PackageIndex.Read
-                     Stack.PackageIndex.Update
+                     Stack.PackageIndex
                      Stack.Setup
                      Stack.Types
                      Stack.Types.Internal
