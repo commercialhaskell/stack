@@ -7,6 +7,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
+-- TODO: use Network.HTTP.Download
 module Stack.Setup
   ( setup
   , isSetup
@@ -16,7 +17,6 @@ module Stack.Setup
 
 -- Copied imports from stackage-setup
 ---------------------------------------------------------------------
-import Control.Applicative
 import Control.Exception (Exception, bracket_, onException, IOException)
 import Control.Monad (when, liftM)
 import Control.Monad.Catch (MonadThrow, throwM, catch)
@@ -45,8 +45,6 @@ import qualified Data.Text.Lazy as LText
 import qualified Data.Text.Lazy.Encoding as LText
 import Data.Typeable (Typeable)
 import qualified Data.Yaml as Yaml
-import Options.Applicative (Parser, strArgument, metavar, value)
-import Stackage.CLI
 import Network.HTTP.Client.Conduit
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.HTTP.Types (hUserAgent)
@@ -56,14 +54,12 @@ import System.Environment (lookupEnv, setEnv)
 import System.Exit (exitFailure)
 import System.IO (stderr, hPutStrLn)
 import System.Process (callProcess, readProcess)
-import qualified Paths_stack as CabalInfo
 
 -- Imports and new definitions for Stack.Setup
 -------------------------------------------------------------------
 import Stack.Types.Version
 import qualified Stack.Config as Stack
 import Path (Path, Abs, Dir)
-import System.Environment (withArgs)
 import Control.Monad.Logger
 
 data SetupException
@@ -81,7 +77,7 @@ setup ghcVersion = do
       $logWarn ("ghc-" <> Text.pack (show ghcVersion) <> " is already set up")
     else do
       -- TODO: a better implementation
-      liftIO $ withArgs ["ghc-" ++ show ghcVersion] main
+      liftIO $ main ("ghc-" ++ show ghcVersion)
 
 isSetup :: (MonadIO m, MonadReader env m, Stack.HasConfig env, MonadLogger m)
   => Version -> m Bool
@@ -104,15 +100,6 @@ getPaths _ghcVersion = return $ Paths []
 
 -- Copied code from stackage-setup follows
 ---------------------------------------------------------------------
-mainVer :: String
-mainVer = $(simpleVersion CabalInfo.version)
-
-header :: String
-header = "Retrieve ghc, cabal, etc, for use with stackage"
-
-progDesc :: String
-progDesc = header
-
 userAgent :: ByteString
 userAgent = "stackage-setup"
 
@@ -120,14 +107,8 @@ stackageHostDefault :: String
 stackageHostDefault = "https://www.stackage.org"
 
 
-main :: IO ()
-main = do
-  (target,()) <- simpleOptions
-    mainVer
-    header
-    progDesc
-    setupTargetParser
-    empty
+main :: SetupTarget -> IO ()
+main target = do
   withManagerSettings tlsManagerSettings
     $ withConfig
     $ curryReaderT R
@@ -281,10 +262,6 @@ getLinksReq :: (MonadThrow m, GetConfig m) => GhcMajorVersion -> m Request
 getLinksReq ghcMajorVersion = do
   stackageHost <- getStackageHost
   parseUrl $ stackageHost <> "/download/" <> arch <> "/ghc-" <> ghcMajorVersion <> "-links.yaml"
-
-setupTargetParser :: Parser SetupTarget
-setupTargetParser = strArgument mods where
-  mods = metavar "TARGET" <> value "lts"
 
 refreshSnapshots ::
   ( HasHttpManager env

@@ -47,8 +47,8 @@ type SetupOpts = String
 setupCmd :: SetupOpts -> LogLevel -> IO ()
 setupCmd opts logLevel = do
   version <- parseVersionFromString opts
-  -- TODO: actually load the config and use it
-  runStackT logLevel (undefined :: Config) $ setup version
+  config <- runStackLoggingT logLevel loadConfig
+  runStackT logLevel config $ setup version
 
 setupOpts :: Parser SetupOpts
 setupOpts = strArgument (metavar "GHC_MAJOR_VERSION")
