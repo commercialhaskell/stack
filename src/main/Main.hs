@@ -21,6 +21,7 @@ import           Stack.Build
 import           Stack.Build.Types
 import           Stack.Config
 import           Stack.Package
+import           Stack.Setup
 import           Stack.Types
 import           Stack.Types.Internal
 
@@ -36,8 +37,23 @@ main =
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
                         buildCmd
-                        buildOpts)
+                        buildOpts
+             addCommand "setup"
+                        "Get the appropriate ghc for your project"
+                        setupCmd
+                        setupOpts)
      run
+
+type SetupOpts = String
+
+setupCmd :: SetupOpts -> IO ()
+setupCmd opts = do
+  version <- parseVersionFromString opts
+  -- TODO: actually load the config and use it
+  runMonadLogger $ flip runReaderT (undefined :: Config) $ setup version
+
+setupOpts :: Parser SetupOpts
+setupOpts = strArgument (metavar "GHC_MAJOR_VERSION")
 
 -- | Build the project.
 buildCmd :: BuildOpts -> IO ()
