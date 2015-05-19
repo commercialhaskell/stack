@@ -10,3 +10,5 @@ import Stack.Types.GhcPkgId as X
 import Stack.Types.PackageIdentifier as X
 import Stack.Types.PackageName as X
 import Stack.Types.Version as X
+import Stack.Types.Config as X
+import Stack.Types.Docker as X
