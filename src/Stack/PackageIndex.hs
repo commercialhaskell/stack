@@ -17,6 +17,7 @@ module Stack.PackageIndex
     , UnparsedCabalFile (..)
     , getLatestDescriptions
     , updateIndex
+    , requireIndex
     , getPkgVersions
     ) where
 
@@ -197,6 +198,17 @@ data PackageIndexException =
                            Tar.FormatError
   deriving (Show,Typeable)
 instance Exception PackageIndexException
+
+-- | Require that an index be present, updating if it isn't.
+requireIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m
+                ,MonadThrow m,MonadReader env m,HasHttpManager env
+                ,HasConfig env)
+             => m ()
+requireIndex = do
+    config <- askConfig
+    let tarFile = configPackageIndex config
+    exists <- liftIO $ doesFileExist $ toFilePath tarFile
+    unless exists updateIndex
 
 -- | Update the index tarball
 updateIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m
