@@ -805,7 +805,7 @@ stackageHostDefault = "https://www.stackage.org"
 
 -- | The filename used for the stackage config file.
 stackageDotConfig :: Path Rel File
-stackageDotConfig = $(mkRelFile "stackage.config")
+stackageDotConfig = $(mkRelFile "stack.config")
 
 -- | Get the binary locations as a string that could be used in the PATH
 configBinPaths :: Config -> String

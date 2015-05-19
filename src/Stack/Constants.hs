@@ -18,13 +18,13 @@ haskellFileExts = ["hs","hsc","lhs"]
 
 -- | Default name used for config path.
 configFileName :: Path Rel File
-configFileName = $(mkRelFile "stackage-build.config")
+configFileName = $(mkRelFile "stack.config")
 
 -- | The filename used for completed build indicators.
 builtFileFromDir :: Path Abs Dir -> Path Abs File
 builtFileFromDir fp =
   distDirFromDir fp </>
-  $(mkRelFile "stackage-build.gen")
+  $(mkRelFile "stack.gen")
 
 -- | The filename used for completed build indicators.
 builtConfigFileFromDir :: Path Abs Dir -> Path Abs File
@@ -34,7 +34,7 @@ builtConfigFileFromDir fp = fp </> builtConfigRelativeFile
 builtConfigRelativeFile :: Path Rel File
 builtConfigRelativeFile =
   distRelativeDir </>
-  $(mkRelFile "stackage-build.config")
+  $(mkRelFile "stack.config")
 
 -- | Default shake thread count for parallel builds.
 defaultShakeThreads :: Int
