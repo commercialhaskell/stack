@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 
@@ -7,13 +8,11 @@ module Main where
 
 import           Control.Exception
 import           Control.Monad.Logger
-import           Control.Monad.Reader
 import           Data.List
 import           Data.Maybe
 import qualified Data.Text as T
 import           Development.Shake (Verbosity(..))
 import           Distribution.Text (display)
-import           Network.HTTP.Conduit
 import           Options.Applicative.Extra
 import           Options.Applicative.Simple
 import           Stack.Build
@@ -22,17 +21,17 @@ import           Stack.Config
 import           Stack.Package
 import           Stack.Setup
 import           Stack.Types
-import           Stack.Types.Internal
+import           Stack.Types.StackT
 
 -- | Commandline dispatcher.
 main :: IO ()
 main =
-  do (_,run) <-
+  do (level,run) <-
        simpleOptions
          "ver"
          "header"
          "desc"
-         (pure ())
+         logLevelOpt
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
                         buildCmd
@@ -41,35 +40,36 @@ main =
                         "Get the appropriate ghc for your project"
                         setupCmd
                         setupOpts)
-     run
+     run level
 
 type SetupOpts = String
 
-setupCmd :: SetupOpts -> IO ()
-setupCmd opts = do
+setupCmd :: SetupOpts -> LogLevel -> IO ()
+setupCmd opts logLevel = do
   version <- parseVersionFromString opts
   -- TODO: actually load the config and use it
-  runMonadLogger $ flip runReaderT (undefined :: Config) $ setup version
+  runStackT logLevel (undefined :: Config) $ setup version
 
 setupOpts :: Parser SetupOpts
 setupOpts = strArgument (metavar "GHC_MAJOR_VERSION")
 
 -- | Build the project.
-buildCmd :: BuildOpts -> IO ()
-buildCmd opts =
-  do manager <- newManager conduitManagerSettings
-     config <- runReaderT (runMonadLogger loadConfig) manager
-     let env = Env config manager
-     catch (flip runReaderT env (Stack.Build.build opts {boptsInDocker = configInDocker config}))
+buildCmd :: BuildOpts -> LogLevel -> IO ()
+buildCmd opts logLevel =
+  do config <-
+       runStackLoggingT logLevel loadConfig
+     catch (runStackT logLevel
+                      config
+                      (Stack.Build.build opts {boptsInDocker = configInDocker config}))
            (error . printBuildException)
   where printBuildException e =
           case e of
             MissingTool dep -> "Missing build tool: " <> display dep
             Couldn'tFindPkgId name ->
               ("After installing " <> packageNameString name <>
-               ", the package id couldn't be found " <>
-               "(via ghc-pkg describe " <> packageNameString name <>
-               "). This shouldn't happen, " <> "please report as a bug")
+               ", the package id couldn't be found " <> "(via ghc-pkg describe " <>
+               packageNameString name <> "). This shouldn't happen, " <>
+               "please report as a bug")
             MissingDep p d range ->
               "Missing dependency for package " <>
               packageNameString (packageName p) <>
@@ -86,8 +86,7 @@ buildCmd opts =
             StackageVersionMismatch name this that ->
               ("There was a mismatch between an installed package, " <>
                packageNameString name <> "==" <> versionString this <>
-               " but this Stackage snapshot should be " <>
-               versionString that)
+               " but this Stackage snapshot should be " <> versionString that)
             DependencyIssues es ->
               ("Dependency issues:\n" ++
                intercalate "\n"
@@ -132,8 +131,25 @@ buildOpts = BuildOpts <$> target <*> verbose <*> libProfiling <*> exeProfiling <
                                  help "Additional options passed to GHC")))
         inDocker = pure False
 
--- | Run logging monad for commands.
---
--- FIXME: Decide on logging levels based on verbosity.
-runMonadLogger :: MonadIO m => LoggingT m a -> m a
-runMonadLogger = runStdoutLoggingT
+-- | Parse for a logging level.
+logLevelOpt :: Parser LogLevel
+logLevelOpt =
+  fmap parse
+       (strOption (long "verbosity" <>
+                   metavar "VERBOSITY" <>
+                   help "Verbosity: silent, error, warn, info, debug")) <|>
+  flag defaultLogLevel
+       LevelInfo
+       (short 'v' <>
+        help "Enable verbose mode: verbosity level \"info\"")
+  where parse s =
+          case s of
+            "debug" -> LevelDebug
+            "info" -> LevelInfo
+            "warn" -> LevelWarn
+            "error" -> LevelError
+            _ -> LevelOther (T.pack s)
+
+-- | Default logging level should be something useful but not crazy.
+defaultLogLevel :: LogLevel
+defaultLogLevel = LevelInfo

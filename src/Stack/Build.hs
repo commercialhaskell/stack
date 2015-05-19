@@ -25,10 +25,11 @@ import           Control.Arrow
 import           Control.Concurrent.MVar
 import           Control.Exception
 import           Control.Monad
+import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.Catch (MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (runReaderT)
+import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Writer
 import           Data.Aeson
@@ -56,15 +57,15 @@ import           Network.HTTP.Download
 import           Path as FL
 import           Path.Find
 import           Prelude hiding (FilePath,writeFile)
-import           Stack.Constants
 import           Stack.Build.Doc
 import           Stack.Build.Types
 import           Stack.BuildPlan
-import           Stack.Types
+import           Stack.Constants
 import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.PackageIndex
+import           Stack.Types
 import           System.Directory hiding (findFiles)
 import           System.Environment
 import qualified System.FilePath as FilePath
@@ -75,7 +76,7 @@ import           System.Posix.Files (createSymbolicLink,removeLink)
 -- Top-level commands
 
 -- | Build and test using Shake.
-test :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env)
+test :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
      => TestConfig
      -> m ()
 test conf =
@@ -90,7 +91,7 @@ test conf =
                    (tconfigInDocker conf))
 
 -- | Build and haddock using Shake.
-haddock :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env)
+haddock :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
         => HaddockConfig -> m ()
 haddock conf =
   build (BuildOpts (hconfigTargets conf)
@@ -104,7 +105,7 @@ haddock conf =
                    (hconfigInDocker conf))
 
 -- | Build and benchmark using Shake.
-benchmark :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env)
+benchmark :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
           => BenchmarkConfig -> m ()
 benchmark conf =
   build (BuildOpts (benchTargets conf)
@@ -118,14 +119,11 @@ benchmark conf =
                    (benchInDocker conf))
 
 -- | Build using Shake.
-build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env)
+build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
       => BuildOpts -> m ()
 build bopts =
   do env <- ask
-     pinfos <- liftIO
-        $ runStdoutLoggingT
-        $ runResourceT
-        $ getPackageInfos (boptsFinalAction bopts) (Just bopts) env
+     pinfos <- runResourceT (getPackageInfos (boptsFinalAction bopts) (Just bopts))
      pkgIds <- liftIO $ getPackageIds (map packageName (S.toList pinfos))
      pwd <- liftIO $ getCurrentDirectory >>= parseAbsDir
      docLoc <- liftIO $ getUserDocLoc
@@ -188,11 +186,11 @@ dryRunPrint pinfos =
 
 -- | Reset the build (remove Shake database and .gen files).
 clean :: forall m env.
-         (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env)
+         (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
       => m ()
 clean =
   do env <- ask
-     pinfos <- liftIO $ runStdoutLoggingT (runResourceT (getPackageInfos DoNothing Nothing env))
+     pinfos <- runResourceT (getPackageInfos DoNothing Nothing)
      let config = getConfig env
      forM_ (S.toList pinfos)
            (\pinfo ->
@@ -748,13 +746,13 @@ newConfig gconfig bopts pinfo =
 
 -- | Get packages' information.
 getPackageInfos :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m
-                   ,MonadResource m,MonadMask m
-                   ,HasHttpManager env,HasConfig env)
+                   ,MonadMask m
+                   ,HasHttpManager env,HasConfig env,MonadReader env m)
                 => FinalAction -> Maybe BuildOpts
-                -> env -- FIXME this shouldn't be necessary, but I got weird type errors without it
                 -> m (Set Package)
-getPackageInfos finalAction mbopts env =
-    runReaderT (go True (getConfig env)) env
+getPackageInfos finalAction mbopts =
+    do cfg <- asks getConfig
+       go True cfg
   where go retry cfg =
           do $logDebug "Resolving build plan ..."
              globalPackages <- getAllPackages
