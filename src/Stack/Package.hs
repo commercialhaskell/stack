@@ -16,7 +16,8 @@ module Stack.Package
   ,PackageConfig(..)
   ,buildLogPath
   ,packageDocDir
-  ,stackageBuildDir)
+  ,stackageBuildDir
+  ,PackageException (..))
   where
 
 import           Control.Exception

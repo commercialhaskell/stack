@@ -61,7 +61,7 @@ import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
-import           Control.Monad.Reader (MonadReader, ask)
+import           Control.Monad.Reader (MonadReader, ask, runReaderT)
 import           Data.Aeson
 import           Data.Aeson.Types (typeMismatch)
 import qualified Data.ByteString as S (readFile)
@@ -77,8 +77,11 @@ import qualified Data.Text as T
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Yaml as Yaml
+import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager)
 import           Path
 import           Path.Find
+import           Stack.BuildPlan
+import           Stack.Package
 import           Stack.Types
 import           System.Directory
 import           System.Environment
@@ -123,8 +126,27 @@ data ConfigMonoid =
     , configMonoidDir            :: !(Maybe (Path Abs Dir))
     , configMonoidUrls           :: !(Map Text Text)
     , configMonoidGpgVerifyIndex :: !(Maybe Bool)
+    , configMonoidResolver       :: !(Maybe Resolver)
     }
   deriving Show
+
+-- | Get the default resolver value
+getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasStackRoot env, HasUrls env, HasHttpManager env, MonadLogger m)
+                   => Path Abs Dir
+                   -> m Resolver
+getDefaultResolver dir = do
+    ecabalfp <- try $ getCabalFileName dir
+    msnap <- case ecabalfp of
+        Left e -> do
+            $logDebug $ T.pack $ show (e :: PackageException)
+            return Nothing
+        Right cabalfp -> do
+            gpd <- readPackageUnresolved cabalfp
+            mpair <- findBuildPlan cabalfp gpd
+            return $ fmap fst mpair
+    case msnap of
+        Just snap -> return $ ResolverSnapshot snap
+        Nothing -> return $ ResolverSnapshot $ LTS 2 9 -- FIXME
 
 -- | Dummy type to support this monoid business.
 newtype DockerOpts = DockerOpts (Maybe Docker)
@@ -155,6 +177,7 @@ instance Monoid ConfigMonoid where
     , configMonoidDir = Nothing
     , configMonoidUrls = mempty
     , configMonoidGpgVerifyIndex = Nothing
+    , configMonoidResolver = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidStackRoot = configMonoidStackRoot l <|> configMonoidStackRoot r
@@ -163,6 +186,7 @@ instance Monoid ConfigMonoid where
     , configMonoidDir = configMonoidDir l <|> configMonoidDir r
     , configMonoidUrls = configMonoidUrls l <> configMonoidUrls r
     , configMonoidGpgVerifyIndex = configMonoidGpgVerifyIndex l <|> configMonoidGpgVerifyIndex r
+    , configMonoidResolver = configMonoidResolver l <|> configMonoidResolver r
     }
 
 instance FromJSON (Path Abs Dir -> ConfigMonoid) where
@@ -179,6 +203,7 @@ instance FromJSON (Path Abs Dir -> ConfigMonoid) where
          getTheDocker <- obj .:? "docker"
          configMonoidUrls <- obj .:? "urls" .!= mempty
          configMonoidGpgVerifyIndex <- obj .:? "gpg-verify-index"
+         configMonoidResolver <- obj .:? "resolver"
          return (\parentDir ->
                    let configMonoidBuildOpts = getBuildOpts parentDir
                        configMonoidDir =
@@ -429,7 +454,7 @@ getEnvConfigMonoid = do
     }
 
 -- Interprets ConfigMonoid options.
-configFromConfigMonoid :: (MonadLogger m, MonadIO m, MonadThrow m)
+configFromConfigMonoid :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env)
   => ConfigMonoid -> m Config
 configFromConfigMonoid ConfigMonoid{..} =
   do configStackRoot <-
@@ -448,7 +473,37 @@ configFromConfigMonoid ConfigMonoid{..} =
        maybe (error "Couldn't determine config dir.") return configMonoidDir -- FIXME: Proper exception.
      let configUrls = configMonoidUrls
          configGpgVerifyIndex = fromMaybe False configMonoidGpgVerifyIndex
+
+     env <- ask
+     let miniConfig = MiniConfig (getHttpManager env) configStackRoot configUrls
+     configResolver <- case configMonoidResolver of
+        Nothing -> do
+            -- FIXME should we assume the current directory for the default
+            -- resolver like this?
+            currDir <- liftIO $ canonicalizePath "." >>= parseAbsDir
+            r <- runReaderT (getDefaultResolver currDir) miniConfig
+            $logWarn $ T.concat
+                [ "No resolver value found in your config files. "
+                , "Without a value stated, your build will be slower and unstable. "
+                , "Please consider adding the following line to your config file:"
+                ]
+            $logWarn $ "resolver: " <> renderResolver r
+            return r
+        Just r -> return r
+     configGhcVersion <-
+        case configResolver of
+            ResolverSnapshot snapName -> do
+                bp <- runReaderT (loadBuildPlan snapName) miniConfig
+                return $ siGhcVersion $ bpSystemInfo bp
      return Config {..}
+
+data MiniConfig = MiniConfig Manager (Path Abs Dir) (Map Text Text)
+instance HasStackRoot MiniConfig where
+    getStackRoot (MiniConfig _ root _) = root
+instance HasHttpManager MiniConfig where
+    getHttpManager (MiniConfig man _ _) = man
+instance HasUrls MiniConfig where
+    getUrls (MiniConfig _ _ urls) = urls
 
 -- | Get docker configuration. Currently only looks in current/parent
 -- dirs, not, e.g. $HOME/.stack.
@@ -499,7 +554,7 @@ readDockerFrom fp =
                Right docker -> return (Just (docker (parent fp)))
            _ -> return Nothing
 
-loadConfig :: (MonadLogger m,MonadIO m,MonadThrow m)
+loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env)
            => m Config
 loadConfig = do
   configMonoid <- getConfigMonoid
@@ -566,26 +621,3 @@ configPackageTarball config ident = do
     ver <- parseRelDir $ versionString $ packageIdentifierVersion ident
     base <- parseRelFile $ packageIdentifierString ident <.> "tar.gz"
     return $ configStackRoot config </> $(mkRelDir "packages") </> name </> ver </> base
-
--- | Helper function to ask the environment and apply getConfig
-askConfig :: (MonadReader env m, HasConfig env) => m Config
-askConfig = liftM getConfig ask
-
--- | Helper for looking up URLs
-askUrl :: (MonadReader env m, HasConfig env)
-       => Text -- ^ key
-       -> Text -- ^ default
-       -> m Text
-askUrl key val = liftM (fromMaybe val . Map.lookup key . configUrls) askConfig
-
--- | Get the URL to request the information on the latest snapshots
-askLatestSnapshotUrl :: (MonadReader env m, HasConfig env) => m Text
-askLatestSnapshotUrl = askUrl "latest-snapshot-url" "https://www.stackage.org/download/snapshots.json"
-
--- | Git URL for the package index
-askPackageIndexGitUrl :: (MonadReader env m, HasConfig env) => m Text
-askPackageIndexGitUrl = askUrl "package-index-git-url" "https://github.com/commercialhaskell/all-cabal-hashes.git"
-
--- | HTTP URL for the package index
-askPackageIndexHttpUrl :: (MonadReader env m, HasConfig env) => m Text
-askPackageIndexHttpUrl = askUrl "package-index-http-url" "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"

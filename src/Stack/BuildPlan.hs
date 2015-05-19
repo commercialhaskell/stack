@@ -49,7 +49,6 @@ import           Distribution.PackageDescription (GenericPackageDescription,
 import           Network.HTTP.Download
 import           Path
 import           Stack.Types
-import           Stack.Config
 import           Stack.Constants
 import           Stack.Package
 import           System.Directory                (createDirectoryIfMissing)
@@ -115,7 +114,7 @@ getDeps bp =
                  || CompExecutable `Set.member` diComponents di
 
 -- | Download the 'Snapshots' value from stackage.org.
-getSnapshots :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env)
+getSnapshots :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env, HasStackRoot env, HasUrls env)
              => m Snapshots
 getSnapshots = askLatestSnapshotUrl >>= parseUrl . T.unpack >>= downloadJSON
 
@@ -150,12 +149,12 @@ instance FromJSON Snapshots where
 
 -- | Load the 'BuildPlan' for the given snapshot. Will load from a local copy
 -- if available, otherwise downloading from Github.
-loadBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env)
+loadBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasStackRoot env)
               => SnapName
               -> m BuildPlan
 loadBuildPlan name = do
-    config <- askConfig
-    let stackage = configStackRoot config
+    env <- ask
+    let stackage = getStackRoot env
     file' <- parseRelFile $ T.unpack file
     let fp = stackage </> $(mkRelDir "build-plan") </> file'
     $logDebug $ "Decoding build plan from: " <> T.pack (toFilePath fp)
@@ -263,7 +262,7 @@ checkDeps flags deps packages = do
 
 -- | Find a snapshot and set of flags that is compatible with the given
 -- 'GenericPackageDescription'. Returns 'Nothing' if no such snapshot is found.
-findBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env)
+findBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasStackRoot env, HasUrls env)
               => Path Abs File
               -> GenericPackageDescription
               -> m (Maybe (SnapName, [FlagName]))

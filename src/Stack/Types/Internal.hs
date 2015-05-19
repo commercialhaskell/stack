@@ -3,13 +3,15 @@
 module Stack.Types.Internal where
 
 import Network.HTTP.Client.Conduit (Manager,HasHttpManager(..))
-import Stack.Config (Config,HasConfig(..))
+import Stack.Types.Config
 
 -- | Monadic environment.
 data Env =
   Env {envConfig :: Config
       ,envManager :: Manager}
 
+instance HasStackRoot Env
+instance HasUrls Env
 instance HasConfig Env where
   getConfig = envConfig
 

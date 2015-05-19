@@ -47,7 +47,6 @@ data BuildOpts =
             ,boptsDryrun :: !Bool
             ,boptsGhcOptions :: ![Text]
             ,boptsInDocker :: !Bool
-            ,boptsSnapName :: !SnapName
             }
   deriving (Show)
 

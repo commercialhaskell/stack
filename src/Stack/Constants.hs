@@ -10,7 +10,7 @@ import qualified Data.Text as T
 import Filesystem.Path.CurrentOS ()
 import Path as FL
 import Prelude
-import Stack.Config
+import Stack.Types.Config
 
 -- | Extensions used for Haskell files.
 haskellFileExts :: [Text]
@@ -66,17 +66,17 @@ distDirFromDir fp = fp </> distRelativeDir
 distRelativeDir :: Path Rel Dir
 distRelativeDir = $(mkRelDir "dist/")
 
-pkgUnpackDir :: Stack.Config.Config -> Path Abs Dir
+pkgUnpackDir :: Config -> Path Abs Dir
 pkgUnpackDir config =
   configStackRoot config </>
   $(mkRelDir "unpacked")
 
-pkgIndexDir :: Stack.Config.Config -> Path Abs Dir
+pkgIndexDir :: Config -> Path Abs Dir
 pkgIndexDir config =
   configStackRoot config </>
   $(mkRelDir "package-index")
 
-pkgIndexFile :: Stack.Config.Config -> Path Abs File
+pkgIndexFile :: Config -> Path Abs File
 pkgIndexFile config =
   pkgIndexDir config </>
   $(mkRelFile "00-index.tar")

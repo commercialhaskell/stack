@@ -8,7 +8,6 @@ module Main where
 import           Control.Exception
 import           Control.Monad.Logger
 import           Control.Monad.Reader
-import           Control.Monad.Trans.Resource
 import           Data.List
 import           Data.Maybe
 import qualified Data.Text as T
@@ -58,8 +57,10 @@ setupOpts = strArgument (metavar "GHC_MAJOR_VERSION")
 -- | Build the project.
 buildCmd :: BuildOpts -> IO ()
 buildCmd opts =
-  do config <- runMonadLogger loadConfig
-     catch (runCmd config (Stack.Build.build opts {boptsInDocker = configInDocker config}))
+  do manager <- newManager conduitManagerSettings
+     config <- runReaderT (runMonadLogger loadConfig) manager
+     let env = Env config manager
+     catch (flip runReaderT env (Stack.Build.build opts {boptsInDocker = configInDocker config}))
            (error . printBuildException)
   where printBuildException e =
           case e of
@@ -97,8 +98,7 @@ buildCmd opts =
 -- FIXME: Parse Snapshot version properly.
 buildOpts :: Parser BuildOpts
 buildOpts = BuildOpts <$> target <*> verbose <*> libProfiling <*> exeProfiling <*>
-            optimize <*> finalAction <*> dryRun <*> ghcOpts <*> inDocker <*>
-            ltsVer
+            optimize <*> finalAction <*> dryRun <*> ghcOpts <*> inDocker
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies"
         target =
@@ -131,18 +131,9 @@ buildOpts = BuildOpts <$> target <*> verbose <*> libProfiling <*> exeProfiling <
                                  metavar "OPTION" <>
                                  help "Additional options passed to GHC")))
         inDocker = pure False
-        ltsVer = pure (LTS 2 1)
 
 -- | Run logging monad for commands.
 --
 -- FIXME: Decide on logging levels based on verbosity.
-runMonadLogger :: LoggingT IO a -> IO a
+runMonadLogger :: MonadIO m => LoggingT m a -> m a
 runMonadLogger = runStdoutLoggingT
-
--- | Run a command with the given config.
-runCmd :: (MonadBaseControl IO m,MonadIO m)
-       => Config -> ReaderT Env (ResourceT m) a -> m a
-runCmd config m = withManager
-                    (\manager ->
-                       runReaderT m
-                                  (Env config manager))

@@ -51,7 +51,6 @@ import qualified Data.Set.Monad as S
 import           Data.Streaming.Process hiding (env)
 import qualified Data.Text as T
 import           Development.Shake hiding (doesFileExist,doesDirectoryExist,getDirectoryContents)
-import           Distribution.Compiler (CompilerId (CompilerId), buildCompilerId)
 import           Distribution.Package hiding (packageName,packageVersion,Package,PackageName,PackageIdentifier)
 import           Network.HTTP.Download
 import           Path as FL
@@ -62,7 +61,6 @@ import           Stack.Build.Doc
 import           Stack.Build.Types
 import           Stack.BuildPlan
 import           Stack.Types
-import           Stack.Config
 import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
@@ -89,8 +87,7 @@ test conf =
                    DoTests
                    False
                    []
-                   (tconfigInDocker conf)
-                   (LTS 2 8)) -- FIXME figure out where to get the SnapName from
+                   (tconfigInDocker conf))
 
 -- | Build and haddock using Shake.
 haddock :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env)
@@ -104,8 +101,7 @@ haddock conf =
                    DoHaddock
                    False
                    []
-                   (hconfigInDocker conf)
-                   (LTS 2 8)) -- FIXME figure out where to get the SnapName from
+                   (hconfigInDocker conf))
 
 -- | Build and benchmark using Shake.
 benchmark :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env)
@@ -119,8 +115,7 @@ benchmark conf =
                    DoBenchmarks
                    False
                    []
-                   (benchInDocker conf)
-                   (LTS 2 8)) -- FIXME figure out where to get the SnapName from
+                   (benchInDocker conf))
 
 -- | Build using Shake.
 build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env)
@@ -769,6 +764,7 @@ getPackageInfos finalAction mbopts env =
                  (buildDependencies finalAction
                                     (configFlags cfg)
                                     globalPackages
+                                    cfg
                                     (configPackages cfg)
                                     (configPackageFlags cfg))
              case errs of
@@ -777,20 +773,22 @@ getPackageInfos finalAction mbopts env =
                  | Just bopts <- mbopts
                  , not (boptsInDocker bopts)
                  , retry ->
-                   outsideOfDockerApproach infos globalPackages cfg bopts errs
+                   outsideOfDockerApproach infos globalPackages cfg errs
                  | otherwise ->
                    liftIO (throwIO (DependencyIssues (nubBy (on (==) show) errs)))
-        outsideOfDockerApproach infos globalPackages cfg bopts errs =
+        outsideOfDockerApproach infos globalPackages cfg errs =
           do results <- forM names checkPackageInIndex
              case lefts results of
                [] ->
                  do let okPkgVers = M.fromList (rights results)
-                    bp <-
-                      loadBuildPlan (boptsSnapName bopts)
-                    $logDebug "Resolving build plan ..."
-                    !mapping <-
-                      resolveBuildPlan bp (M.keysSet okPkgVers)
-                    $logDebug "Resolved. Checking ..."
+                    !mapping <- case configResolver cfg of
+                        ResolverSnapshot snapName -> do
+                            bp <- loadBuildPlan snapName
+                            $logDebug "Resolving build plan ..."
+                            !mapping <-
+                              resolveBuildPlan bp (M.keysSet okPkgVers)
+                            $logDebug "Resolved. Checking ..."
+                            return mapping
                     !validated <-
                       liftM catMaybes (mapM (validateSuggestion globalPackages okPkgVers)
                         (M.toList mapping))
@@ -885,12 +883,13 @@ buildDependencies :: MonadIO m
                   => FinalAction
                   -> Map FlagName Bool
                   -> Map PackageName Version
+                  -> Config
                   -> Set (Path Abs Dir)
                   -> Map PackageName (Map FlagName Bool)
                   -> WriterT [StackBuildException] m (Set Package)
-buildDependencies finalAction flags globals packages pflags =
+buildDependencies finalAction flags globals config packages pflags =
   do pkgs <-
-       liftIO (S.mapM (getPackageInfo finalAction flags pflags) packages)
+       liftIO (S.mapM (getPackageInfo finalAction flags pflags config) packages)
      S.mapM (sievePackages
                globals
                (M.fromList
@@ -930,9 +929,10 @@ sievePackages globalNameVersions localNameVersions p =
 getPackageInfo :: FinalAction
                -> Map FlagName Bool
                -> Map PackageName (Map FlagName Bool)
+               -> Config
                -> Path Abs Dir
                -> IO Package
-getPackageInfo finalAction flags pflags pkgDir =
+getPackageInfo finalAction flags pflags config pkgDir =
   do cabal <- getCabalFileName pkgDir
      pname <- parsePackageNameFromFilePath cabal
      info <-
@@ -956,11 +956,7 @@ getPackageInfo finalAction flags pflags pkgDir =
                         ,packageConfigFlags =
                            composeFlags pname pflags flags
                         ,packageConfigGhcVersion =
-                           -- FIXME the assumption that the GHC version used to
-                           -- build this package is the same used to build user
-                           -- code is very false.
-                           case buildCompilerId of
-                             CompilerId _ version -> fromCabalVersion version}
+                           configGhcVersion config}
 
 -- | Compose the package flags with the global flags in a left-biased
 -- form, i.e., package-specific flags will be preferred over global
