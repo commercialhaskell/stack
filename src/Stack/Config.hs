@@ -9,11 +9,11 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ViewPatterns #-}
 
--- | The general Stackage configuration that starts everything off. This should
--- be smart to falback if there is no stackage.config, instead relying on
+-- | The general Stack configuration that starts everything off. This should
+-- be smart to falback if there is no stack.yaml, instead relying on
 -- whatever files are available.
 --
--- If there is no stackage.config, and there is a cabal.config, we
+-- If there is no stack.yaml, and there is a cabal.config, we
 -- read in those constraints, and if there's a cabal.sandbox.config,
 -- we read any constraints from there and also find the package
 -- database from there, etc. And if there's nothing, we should
@@ -85,7 +85,7 @@ import           System.Environment
 import           System.FilePath (searchPathSeparator, (<.>))
 import           System.Process
 
--- Some examples of stackage.config
+-- Some examples of stack.yaml
 
 -- (example 1)
 -- build:
@@ -115,14 +115,14 @@ import           System.Process
 
 -- An uninterpreted representation of configuration options.
 -- Configurations may be "cascaded" using mappend (left-biased).
-data StackageConfig =
-  StackageConfig
-    { stackageConfigStackageOpts   :: !StackageOpts
-    , stackageConfigBuildOpts      :: !BuildOpts
-    , stackageConfigDockerOpts     :: !DockerOpts
-    , stackageConfigDir            :: !(Maybe (Path Abs Dir))
-    , stackageConfigUrls           :: !(Map Text Text)
-    , stackageConfigGpgVerifyIndex :: !(Maybe Bool)
+data ConfigMonoid =
+  ConfigMonoid
+    { configMonoidStackRoot      :: !(Maybe (Path Abs Dir))
+    , configMonoidBuildOpts      :: !BuildOpts
+    , configMonoidDockerOpts     :: !DockerOpts
+    , configMonoidDir            :: !(Maybe (Path Abs Dir))
+    , configMonoidUrls           :: !(Map Text Text)
+    , configMonoidGpgVerifyIndex :: !(Maybe Bool)
     }
   deriving Show
 
@@ -147,73 +147,44 @@ appendOf getter l r = getter l <> getter r
 altOf :: (a -> Maybe b) -> a -> a -> Maybe b
 altOf getter l r = getter l <|> getter r
 
-instance Monoid StackageConfig where
-  mempty = StackageConfig
-    { stackageConfigStackageOpts = mempty
-    , stackageConfigBuildOpts = mempty
-    , stackageConfigDockerOpts = mempty
-    , stackageConfigDir = Nothing
-    , stackageConfigUrls = mempty
-    , stackageConfigGpgVerifyIndex = Nothing
+instance Monoid ConfigMonoid where
+  mempty = ConfigMonoid
+    { configMonoidStackRoot = Nothing
+    , configMonoidBuildOpts = mempty
+    , configMonoidDockerOpts = mempty
+    , configMonoidDir = Nothing
+    , configMonoidUrls = mempty
+    , configMonoidGpgVerifyIndex = Nothing
     }
-  mappend l r = StackageConfig
-    { stackageConfigStackageOpts = appendOf stackageConfigStackageOpts l r
-    , stackageConfigBuildOpts = appendOf stackageConfigBuildOpts l r
-    , stackageConfigDockerOpts = stackageConfigDockerOpts l <> stackageConfigDockerOpts r
-    , stackageConfigDir = stackageConfigDir l <|> stackageConfigDir r
-    , stackageConfigUrls = stackageConfigUrls l <> stackageConfigUrls r
-    , stackageConfigGpgVerifyIndex = stackageConfigGpgVerifyIndex l <|> stackageConfigGpgVerifyIndex r
+  mappend l r = ConfigMonoid
+    { configMonoidStackRoot = configMonoidStackRoot l <|> configMonoidStackRoot r
+    , configMonoidBuildOpts = appendOf configMonoidBuildOpts l r
+    , configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
+    , configMonoidDir = configMonoidDir l <|> configMonoidDir r
+    , configMonoidUrls = configMonoidUrls l <> configMonoidUrls r
+    , configMonoidGpgVerifyIndex = configMonoidGpgVerifyIndex l <|> configMonoidGpgVerifyIndex r
     }
 
-instance FromJSON (Path Abs Dir -> StackageConfig) where
+instance FromJSON (Path Abs Dir -> ConfigMonoid) where
   parseJSON =
-    withObject "StackageConfig" $
+    withObject "ConfigMonoid" $
     \obj ->
-      do stackageConfigStackageOpts <- obj .:? "stackage" .!= mempty
+      do configMonoidStackRoot <- obj .:? "stack-root"
+                              -- FIXME shouldn't we allow stack-root to be a
+                              -- relative directory as well?
+                              >>= maybe
+                                (return Nothing)
+                                (either (fail . show) (return . Just) . parseAbsDir)
          getBuildOpts <- obj .:? "build" .!= mempty
          getTheDocker <- obj .:? "docker"
-         stackageConfigUrls <- obj .:? "urls" .!= mempty
-         stackageConfigGpgVerifyIndex <- obj .:? "gpg-verify-index"
+         configMonoidUrls <- obj .:? "urls" .!= mempty
+         configMonoidGpgVerifyIndex <- obj .:? "gpg-verify-index"
          return (\parentDir ->
-                   let stackageConfigBuildOpts = getBuildOpts parentDir
-                       stackageConfigDir =
+                   let configMonoidBuildOpts = getBuildOpts parentDir
+                       configMonoidDir =
                          Just parentDir
-                       stackageConfigDockerOpts = DockerOpts (fmap ($ parentDir) getTheDocker)
-                   in StackageConfig {..})
-
-data StackageOpts =
-  StackageOpts
-    { stackageOptsRoot :: !(Maybe (Path Abs Dir))
-    , stackageOptsHost :: !(Maybe Text)
-    }
-  deriving Show
-
-instance Monoid StackageOpts where
-  mempty = StackageOpts
-    { stackageOptsRoot = Nothing
-    , stackageOptsHost = Nothing
-    }
-  mappend l r = StackageOpts
-    { stackageOptsRoot = altOf stackageOptsRoot l r
-    , stackageOptsHost = altOf stackageOptsHost l r
-    }
-
-instance FromJSON StackageOpts where
-  parseJSON =
-    withObject "StackageOpts" $
-    \obj ->
-      do stackageOptsRoot <-
-           obj .:? "root" >>=
-           \x ->
-             case x of
-               Nothing -> return Nothing
-               Just x' ->
-                 case parseAbsDir x' of
-                   Nothing ->
-                     fail "Unable to parse valid absolute root directory."
-                   Just dir -> return (Just dir)
-         stackageOptsHost <- obj .:? "host"
-         return StackageOpts {..}
+                       configMonoidDockerOpts = DockerOpts (fmap ($ parentDir) getTheDocker)
+                   in ConfigMonoid {..})
 
 data BuildOpts =
   BuildOpts
@@ -351,70 +322,67 @@ parsePackageDb = do
     else
       return Nothing
 
-getEnvFileStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => m StackageConfig
-getEnvFileStackageConfig = liftIO (lookupEnv "STACKAGE_CONFIG") >>= \case
-  Just (parseAbsFile -> Just configFilePath) -> getFileStackageConfig configFilePath
+getEnvFileConfigMonoid :: (MonadLogger m, MonadIO m, MonadThrow m)
+  => m ConfigMonoid
+getEnvFileConfigMonoid = liftIO (lookupEnv "STACKAGE_CONFIG") >>= \case
+  Just (parseAbsFile -> Just configFilePath) -> getFileConfigMonoid configFilePath
   _ -> return mempty
 
-getGlobalStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => m StackageConfig
-getGlobalStackageConfig = liftIO (lookupEnv "STACKAGE_GLOBAL_CONFIG") >>= \case
-  Just (parseAbsFile -> Just configFilePath) -> getFileStackageConfig configFilePath
-  _ -> getFileStackageConfig defaultStackageGlobalConfig
+getGlobalConfigMonoid :: (MonadLogger m, MonadIO m, MonadThrow m)
+  => m ConfigMonoid
+getGlobalConfigMonoid = liftIO (lookupEnv "STACKAGE_GLOBAL_CONFIG") >>= \case
+  Just (parseAbsFile -> Just configFilePath) -> getFileConfigMonoid configFilePath
+  _ -> getFileConfigMonoid defaultStackGlobalConfig
 
 -- TODO: What about Windows?
 -- FIXME: This will not build on Windows. (Good!)
-defaultStackageGlobalConfig :: Path Abs File
-defaultStackageGlobalConfig = $(mkAbsFile "/etc/stackage/config")
+defaultStackGlobalConfig :: Path Abs File
+defaultStackGlobalConfig = $(mkAbsFile "/etc/stack/config")
 
-getStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => m StackageConfig
-getStackageConfig = do
-  envStackageConfig <- getEnvStackageConfig
-  envFileStackageConfig <- getEnvFileStackageConfig
-  localStackageConfig <- getLocalStackageConfig
+getConfigMonoid :: (MonadLogger m, MonadIO m, MonadThrow m)
+  => m ConfigMonoid
+getConfigMonoid = do
+  envConfigMonoid <- getEnvConfigMonoid
+  envFileConfigMonoid <- getEnvFileConfigMonoid
+  localConfigMonoid <- getLocalConfigMonoid
 
-  let config0 = envStackageConfig <> envFileStackageConfig <> localStackageConfig
+  let config0 = envConfigMonoid <> envFileConfigMonoid <> localConfigMonoid
 
-  configRootDef <- case stackageOptsRoot (stackageConfigStackageOpts config0) of
+  configRootDef <- case configMonoidStackRoot config0 of
     -- Root def already present, don't do the work to find the default
     Just _ -> return mempty
     -- No root def so far, do the work to find the default
     Nothing -> do
-      dir <- liftIO $ getAppUserDataDirectory "stackage" >>= parseAbsDir
-      return mempty
-        { stackageConfigStackageOpts = mempty
-          { stackageOptsRoot = Just dir
-          }
-        }
+      dir <- liftIO $ getAppUserDataDirectory "stack" >>= parseAbsDir
+      return mempty { configMonoidStackRoot = Just dir }
 
+  -- FIXME from Michael: the following is not good practice. Let the types prove that there is no partiality here by returning stackRoot from above
   let config1 = config0 <> configRootDef
       -- The above ensures this is safe
-      Just stackageRoot = stackageOptsRoot (stackageConfigStackageOpts config1)
+      Just stackRoot = configMonoidStackRoot config1
 
-  rootConfig <- getFileStackageConfig (stackageRoot </> stackageDotConfig)
-  globalStackageConfig <- getGlobalStackageConfig
-  return $ config1 <> rootConfig <> globalStackageConfig
+  rootConfig <- getFileConfigMonoid (stackRoot </> stackDotYaml)
+  globalConfigMonoid <- getGlobalConfigMonoid
+  return $ config1 <> rootConfig <> globalConfigMonoid
 
--- | Get the current directory's @stackage.config@ file.
-getLocalStackageConfig :: (MonadLogger m,MonadIO m,MonadThrow m)
-                       => m StackageConfig
-getLocalStackageConfig =
+-- | Get the current directory's @stack.config@ file.
+getLocalConfigMonoid :: (MonadLogger m,MonadIO m,MonadThrow m)
+                     => m ConfigMonoid
+getLocalConfigMonoid =
   do pwd <-
        liftIO (getCurrentDirectory >>= parseAbsDir)
      $logDebug ("Current directory is: " <>
                 T.pack (show pwd))
-     let filePath = pwd </> stackageDotConfig
+     let filePath = pwd </> stackDotYaml
      $logDebug ("Reading from config file: " <>
                 T.pack (show filePath))
-     getFileStackageConfig filePath
+     getFileConfigMonoid filePath
 
 -- | Parse configuration from the specified file, or return an empty
 -- config if it doesn't exist.
-getFileStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => Path Abs File -> m StackageConfig
-getFileStackageConfig configFilePath =
+getFileConfigMonoid :: (MonadLogger m, MonadIO m, MonadThrow m)
+  => Path Abs File -> m ConfigMonoid
+getFileConfigMonoid configFilePath =
   do exists <-
        liftIO (doesFileExist (toFilePath configFilePath))
      if exists
@@ -439,63 +407,51 @@ getFileStackageConfig configFilePath =
 lookupEnvText :: String -> IO (Maybe Text)
 lookupEnvText var = fmap Text.pack <$> lookupEnv var
 
-getEnvStackageOpts :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => Maybe (Path Abs Dir) -> m StackageOpts
-getEnvStackageOpts stackageRoot = liftIO $ do
-  stackageHost <- lookupEnvText "STACKAGE_HOST"
-  return mempty
-    { stackageOptsRoot = stackageRoot
-    , stackageOptsHost = stackageHost
-    }
-
 getEnvBuildOpts :: (MonadLogger m, MonadIO m, MonadThrow m)
   => m BuildOpts
 getEnvBuildOpts = liftIO $ do
-  buildIn <- lookupEnvText "STACKAGE_BUILD_IN"
+  buildIn <- lookupEnvText "STACK_BUILD_IN"
   return mempty
     { buildOptsIn = BuildIn <$> buildIn
     }
 
 -- TODO: support build opts in the env
--- Loads stackage.config options from environment variables.
-getEnvStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => m StackageConfig
-getEnvStackageConfig = do
-  dir <- liftIO (lookupEnv "STACKAGE_ROOT" >>= maybe (return Nothing) (fmap Just . parseAbsDir))
-  stackageOpts <- getEnvStackageOpts dir
+-- Loads stack.config options from environment variables.
+getEnvConfigMonoid :: (MonadLogger m, MonadIO m, MonadThrow m)
+  => m ConfigMonoid
+getEnvConfigMonoid = do
+  dir <- liftIO (lookupEnv "STACK_ROOT" >>= maybe (return Nothing) (fmap Just . parseAbsDir))
   buildOpts <- getEnvBuildOpts
   return mempty
-    { stackageConfigStackageOpts = stackageOpts
-    , stackageConfigBuildOpts = buildOpts
-    , stackageConfigDir = dir
+    { configMonoidStackRoot = dir
+    , configMonoidBuildOpts = buildOpts
+    , configMonoidDir = dir
     }
 
--- Interprets StackageConfig options.
-configFromStackageConfig :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => StackageConfig -> m Config
-configFromStackageConfig StackageConfig{..} =
-  do let StackageOpts{..} = stackageConfigStackageOpts
-     configStackageHost <- resolveStackageHost stackageOptsHost
-     configStackageRoot <-
-       maybe (error "No stackage root.") return stackageOptsRoot -- FIXME: This is not good.
-     let BuildOpts{..} = stackageConfigBuildOpts
+-- Interprets ConfigMonoid options.
+configFromConfigMonoid :: (MonadLogger m, MonadIO m, MonadThrow m)
+  => ConfigMonoid -> m Config
+configFromConfigMonoid ConfigMonoid{..} =
+  do configStackRoot <-
+       maybe (error "No stack root.") return configMonoidStackRoot -- FIXME: This is not good.
+     let BuildOpts{..} = configMonoidBuildOpts
      configBuildIn <- resolveBuildIn buildOptsIn
      (configGhcBinLocation,configCabalBinLocation,configPkgDbLocation) <-
-       resolveBuildWith configStackageRoot buildOptsWith
+       resolveBuildWith configStackRoot buildOptsWith
      configDocker <-
-       return (case stackageConfigDockerOpts of
+       return (case configMonoidDockerOpts of
                  DockerOpts x -> x)
      configFlags <- return buildOptsFlags
      configPackageFlags <- return buildOptsPackageFlags
      configPackages <- return buildOptsPackages
      configDir <-
-       maybe (error "Couldn't determine config dir.") return stackageConfigDir -- FIXME: Proper exception.
-     let configUrls = stackageConfigUrls
-         configGpgVerifyIndex = fromMaybe False stackageConfigGpgVerifyIndex
+       maybe (error "Couldn't determine config dir.") return configMonoidDir -- FIXME: Proper exception.
+     let configUrls = configMonoidUrls
+         configGpgVerifyIndex = fromMaybe False configMonoidGpgVerifyIndex
      return Config {..}
 
 -- | Get docker configuration. Currently only looks in current/parent
--- dirs, not, e.g. $HOME/.stackage.
+-- dirs, not, e.g. $HOME/.stack.
 --
 -- TODO: Look in other locations.
 getDocker :: (MonadIO m,MonadLogger m,MonadThrow m) => m Docker
@@ -514,7 +470,7 @@ getDockerLocal =
        liftIO (getCurrentDirectory >>= parseAbsDir)
      $logDebug ("Current directory is: " <>
                 T.pack (show pwd))
-     mfile <- findFileUp pwd ((== stackageDotConfig) . filename) Nothing
+     mfile <- findFileUp pwd ((== stackDotYaml) . filename) Nothing
      case mfile of
        Nothing -> throwM ConfigNoFile
        Just file -> do $logDebug ("Reading from config file: " <>
@@ -546,8 +502,8 @@ readDockerFrom fp =
 loadConfig :: (MonadLogger m,MonadIO m,MonadThrow m)
            => m Config
 loadConfig = do
-  stackageConfig <- getStackageConfig
-  configFromStackageConfig stackageConfig
+  configMonoid <- getConfigMonoid
+  configFromConfigMonoid configMonoid
 
 resolveBuildIn :: (MonadLogger m, MonadIO m, MonadThrow m)
   => (Maybe BuildIn) -> m Text
@@ -570,9 +526,9 @@ defaultBuildWith = BuildWithCustom (CustomEnvBins mempty)
 resolveBuildWith' :: (MonadLogger m, MonadIO m, MonadThrow m)
   => Path Abs Dir -> BuildWith -> m (Path Abs Dir, Path Abs Dir, Path Abs Dir)
                                              -- (ghc,          cabal,        package-db)
-resolveBuildWith' _stackageRoot (BuildWithSnapshot _) =
+resolveBuildWith' _stackRoot (BuildWithSnapshot _) =
   throwM $ NotYetImplemented "resolveBuildWith': BuildWithSnapshot"
-resolveBuildWith' _stackageRoot (BuildWithCustom (CustomEnvBins bins)) = do
+resolveBuildWith' _stackRoot (BuildWithCustom (CustomEnvBins bins)) = do
   let ghcDirText = fromMaybe "detect" $ Map.lookup "ghc" bins
   let cabalDirText = fromMaybe "detect" $ Map.lookup "cabal" bins
   ghcBinLoc <- case ghcDirText of
@@ -584,19 +540,9 @@ resolveBuildWith' _stackageRoot (BuildWithCustom (CustomEnvBins bins)) = do
   packageDbLoc <- detectPackageDbLocation
   return (ghcBinLoc, cabalBinLoc, packageDbLoc)
 
-
-
--- TODO: copy from stackage-sandbox or wherver this has been well defined
-resolveStackageHost :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => Maybe Text -> m String
-resolveStackageHost = return . maybe stackageHostDefault Text.unpack
-
-stackageHostDefault :: String
-stackageHostDefault = "https://www.stackage.org"
-
--- | The filename used for the stackage config file.
-stackageDotConfig :: Path Rel File
-stackageDotConfig = $(mkRelFile "stack.yaml")
+-- | The filename used for the stack config file.
+stackDotYaml :: Path Rel File
+stackDotYaml = $(mkRelFile "stack.yaml")
 
 -- | Get the binary locations as a string that could be used in the PATH
 configBinPaths :: Config -> String
@@ -607,11 +553,11 @@ configBinPaths config =
 
 -- | Location of the 00-index.tar file
 configPackageIndex :: Config -> Path Abs File
-configPackageIndex config = configStackageRoot config </> $(mkRelFile "00-index.tar")
+configPackageIndex config = configStackRoot config </> $(mkRelFile "00-index.tar")
 
 -- | Location of the 00-index.tar.gz file
 configPackageIndexGz :: Config -> Path Abs File
-configPackageIndexGz config = configStackageRoot config </> $(mkRelFile "00-index.tar.gz")
+configPackageIndexGz config = configStackRoot config </> $(mkRelFile "00-index.tar.gz")
 
 -- | Location of a package tarball
 configPackageTarball :: MonadThrow m => Config -> PackageIdentifier -> m (Path Abs File)
@@ -619,7 +565,7 @@ configPackageTarball config ident = do
     name <- parseRelDir $ packageNameString $ packageIdentifierName ident
     ver <- parseRelDir $ versionString $ packageIdentifierVersion ident
     base <- parseRelFile $ packageIdentifierString ident <.> "tar.gz"
-    return $ configStackageRoot config </> $(mkRelDir "packages") </> name </> ver </> base
+    return $ configStackRoot config </> $(mkRelDir "packages") </> name </> ver </> base
 
 -- | Helper function to ask the environment and apply getConfig
 askConfig :: (MonadReader env m, HasConfig env) => m Config

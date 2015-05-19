@@ -155,7 +155,7 @@ loadBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, Has
               -> m BuildPlan
 loadBuildPlan name = do
     config <- askConfig
-    let stackage = configStackageRoot config
+    let stackage = configStackRoot config
     file' <- parseRelFile $ T.unpack file
     let fp = stackage </> $(mkRelDir "build-plan") </> file'
     $logDebug $ "Decoding build plan from: " <> T.pack (toFilePath fp)

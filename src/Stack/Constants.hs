@@ -68,12 +68,12 @@ distRelativeDir = $(mkRelDir "dist/")
 
 pkgUnpackDir :: Stack.Config.Config -> Path Abs Dir
 pkgUnpackDir config =
-  configStackageRoot config </>
+  configStackRoot config </>
   $(mkRelDir "unpacked")
 
 pkgIndexDir :: Stack.Config.Config -> Path Abs Dir
 pkgIndexDir config =
-  configStackageRoot config </>
+  configStackRoot config </>
   $(mkRelDir "package-index")
 
 pkgIndexFile :: Stack.Config.Config -> Path Abs File

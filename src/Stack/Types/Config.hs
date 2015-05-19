@@ -20,8 +20,7 @@ data Config =
   Config {configPkgDbLocation    :: !(Path Abs Dir)
          ,configGhcBinLocation   :: !(Path Abs Dir)
          ,configCabalBinLocation :: !(Path Abs Dir)
-         ,configStackageRoot     :: !(Path Abs Dir)
-         ,configStackageHost     :: !String
+         ,configStackRoot        :: !(Path Abs Dir)
          ,configBuildIn          :: !Text
          ,configDocker           :: !(Maybe Docker)
          ,configPackages         :: !(Set (Path Abs Dir))

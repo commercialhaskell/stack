@@ -245,7 +245,7 @@ updateIndexGit = do
                   ,"1"
                   ,"-b" --
                   ,"display"]
-            let sDir = configStackageRoot config
+            let sDir = configStackRoot config
             let suDir =
                   sDir </>
                   $(mkRelDir "update")
