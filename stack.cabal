@@ -27,6 +27,8 @@ library
                      Stack.Types
                      Stack.Types.Internal
                      Stack.Types.BuildPlan
+                     Stack.Types.Config
+                     Stack.Types.Docker
                      Stack.Types.FlagName
                      Stack.Types.GhcPkgId
                      Stack.Types.PackageIdentifier
