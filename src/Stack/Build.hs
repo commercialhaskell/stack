@@ -128,7 +128,7 @@ build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env)
 build bopts =
   do env <- ask
      pinfos <- liftIO
-        $ runNoLoggingT
+        $ runStdoutLoggingT
         $ runResourceT
         $ getPackageInfos (boptsFinalAction bopts) (Just bopts) env
      pkgIds <- liftIO $ getPackageIds (map packageName (S.toList pinfos))
@@ -197,7 +197,7 @@ clean :: forall m env.
       => m ()
 clean =
   do env <- ask
-     pinfos <- liftIO $ runNoLoggingT (runResourceT (getPackageInfos DoNothing Nothing env))
+     pinfos <- liftIO $ runStdoutLoggingT (runResourceT (getPackageInfos DoNothing Nothing env))
      let config = getConfig env
      forM_ (S.toList pinfos)
            (\pinfo ->
@@ -761,8 +761,9 @@ getPackageInfos :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m
 getPackageInfos finalAction mbopts env =
     runReaderT (go True (getConfig env)) env
   where go retry cfg =
-          do globalPackages <- getAllPackages
-             {-liftIO (putStrLn ("All global packages: " ++ show globalPackages))-}
+          do $logDebug "Resolving build plan ..."
+             globalPackages <- getAllPackages
+
              (infos,errs) <-
                runWriterT
                  (buildDependencies finalAction
@@ -770,7 +771,6 @@ getPackageInfos finalAction mbopts env =
                                     globalPackages
                                     (configPackages cfg)
                                     (configPackageFlags cfg))
-             {-liftIO (putStrLn ("Erroneous packages: " ++ show errs))-}
              case errs of
                [] -> return infos
                _
@@ -787,22 +787,26 @@ getPackageInfos finalAction mbopts env =
                  do let okPkgVers = M.fromList (rights results)
                     bp <-
                       loadBuildPlan (boptsSnapName bopts)
-                    mapping <-
+                    $logDebug "Resolving build plan ..."
+                    !mapping <-
                       resolveBuildPlan bp (M.keysSet okPkgVers)
-                    validated <-
+                    $logDebug "Resolved. Checking ..."
+                    !validated <-
                       liftM catMaybes (mapM (validateSuggestion globalPackages okPkgVers)
                         (M.toList mapping))
+                    $logDebug "Done checking."
                     case validated of
-                      [] -> do {-liftIO (putStrLn "No validated packages!")-}
-                               return infos
+                      [] -> return infos
                       toFetch ->
-                        do newPkgDirs <- fetchAndUnpackPackages
+                        do $logDebug "Fetching and unpacking third party packages ..."
+                           newPkgDirs <- fetchAndUnpackPackages
                                            (map (\(name, (ver, _flags)) ->
                                                fromTuple (name,ver))
                                                 toFetch)
                            -- Here is where we inject third-party
                            -- dependencies and their flags and re-run
                            -- this function.
+                           $logDebug "Re-running build plan resolver ..."
                            go
                              False
                              cfg {configPackages = configPackages cfg <>
@@ -932,9 +936,9 @@ getPackageInfo finalAction flags pflags pkgDir =
   do cabal <- getCabalFileName pkgDir
      pname <- parsePackageNameFromFilePath cabal
      info <-
-       runNoLoggingT
-         (readPackage (cfg pname)
-                      cabal)
+       runStdoutLoggingT
+                          (readPackage (cfg pname)
+                                       cabal)
      existing <-
        fmap S.fromList
             (filterM (doesFileExist . FL.toFilePath)
