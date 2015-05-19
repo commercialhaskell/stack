@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -34,8 +35,11 @@ import           Network.HTTP.Client.Conduit (HasHttpManager(..))
 import           Network.HTTP.Conduit
 import           Stack.Types.Config
 import           Stack.Types.Internal
-import           System.Locale
 import           System.Log.FastLogger
+
+#if !MIN_VERSION_time(1, 5, 0)
+import           System.Locale
+#endif
 
 --------------------------------------------------------------------------------
 -- Main StackT monad transformer
