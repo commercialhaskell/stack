@@ -43,6 +43,11 @@ data Config =
          -- packages.
          ,configGhcVersion       :: !Version
          -- ^ Version of GHC we'll be using for this build
+         ,configInstallDeps      :: !Bool
+         -- ^ Whether or not dependencies should be installed. If @False@, any
+         -- missing dependencies will result in a compilation failure. Useful
+         -- to disable this flag, for example, when using a precompiled binary
+         -- package database, such as via Docker.
          }
   -- ^ Flags for each package's Cabal config.
   deriving (Show)

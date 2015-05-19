@@ -46,22 +46,19 @@ data BuildOpts =
             ,boptsFinalAction :: !FinalAction
             ,boptsDryrun :: !Bool
             ,boptsGhcOptions :: ![Text]
-            ,boptsInDocker :: !Bool
             }
   deriving (Show)
 
 -- | Configuration for testing.
 data TestConfig =
   TestConfig {tconfigTargets :: ![Text]
-             ,tconfigVerbosity :: !Verbosity
-             ,tconfigInDocker :: !Bool}
+             ,tconfigVerbosity :: !Verbosity}
   deriving (Show)
 
 -- | Configuration for haddocking.
 data HaddockConfig =
   HaddockConfig {hconfigTargets :: ![Text]
-                ,hconfigVerbosity :: !Verbosity
-                ,hconfigInDocker :: !Bool}
+                ,hconfigVerbosity :: !Verbosity}
   deriving (Show)
 
 -- | Configuration for benchmarking.

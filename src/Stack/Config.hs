@@ -127,6 +127,7 @@ data ConfigMonoid =
     , configMonoidUrls           :: !(Map Text Text)
     , configMonoidGpgVerifyIndex :: !(Maybe Bool)
     , configMonoidResolver       :: !(Maybe Resolver)
+    , configMonoidInstallDeps    :: !(Maybe Bool)
     }
   deriving Show
 
@@ -178,6 +179,7 @@ instance Monoid ConfigMonoid where
     , configMonoidUrls = mempty
     , configMonoidGpgVerifyIndex = Nothing
     , configMonoidResolver = Nothing
+    , configMonoidInstallDeps = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidStackRoot = configMonoidStackRoot l <|> configMonoidStackRoot r
@@ -187,6 +189,7 @@ instance Monoid ConfigMonoid where
     , configMonoidUrls = configMonoidUrls l <> configMonoidUrls r
     , configMonoidGpgVerifyIndex = configMonoidGpgVerifyIndex l <|> configMonoidGpgVerifyIndex r
     , configMonoidResolver = configMonoidResolver l <|> configMonoidResolver r
+    , configMonoidInstallDeps = configMonoidInstallDeps l <|> configMonoidInstallDeps r
     }
 
 instance FromJSON (Path Abs Dir -> ConfigMonoid) where
@@ -204,6 +207,7 @@ instance FromJSON (Path Abs Dir -> ConfigMonoid) where
          configMonoidUrls <- obj .:? "urls" .!= mempty
          configMonoidGpgVerifyIndex <- obj .:? "gpg-verify-index"
          configMonoidResolver <- obj .:? "resolver"
+         configMonoidInstallDeps <- obj .:? "install-dependencies"
          return (\parentDir ->
                    let configMonoidBuildOpts = getBuildOpts parentDir
                        configMonoidDir =
@@ -473,6 +477,13 @@ configFromConfigMonoid ConfigMonoid{..} =
        maybe (error "Couldn't determine config dir.") return configMonoidDir -- FIXME: Proper exception.
      let configUrls = configMonoidUrls
          configGpgVerifyIndex = fromMaybe False configMonoidGpgVerifyIndex
+         configInstallDeps =
+            case configMonoidInstallDeps of
+                Just b -> b
+                Nothing ->
+                    case configMonoidDockerOpts of
+                        DockerOpts Nothing -> True
+                        DockerOpts (Just _) -> False
 
      env <- ask
      let miniConfig = MiniConfig (getHttpManager env) configStackRoot configUrls

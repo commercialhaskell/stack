@@ -60,7 +60,7 @@ buildCmd opts logLevel =
        runStackLoggingT logLevel loadConfig
      catch (runStackT logLevel
                       config
-                      (Stack.Build.build opts {boptsInDocker = configInDocker config}))
+                      (Stack.Build.build opts))
            (error . printBuildException)
   where printBuildException e =
           case e of
@@ -97,7 +97,7 @@ buildCmd opts logLevel =
 -- FIXME: Parse Snapshot version properly.
 buildOpts :: Parser BuildOpts
 buildOpts = BuildOpts <$> target <*> verbose <*> libProfiling <*> exeProfiling <*>
-            optimize <*> finalAction <*> dryRun <*> ghcOpts <*> inDocker
+            optimize <*> finalAction <*> dryRun <*> ghcOpts
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies"
         target =
@@ -129,7 +129,6 @@ buildOpts = BuildOpts <$> target <*> verbose <*> libProfiling <*> exeProfiling <
                      (strOption (long "ghc-options" <>
                                  metavar "OPTION" <>
                                  help "Additional options passed to GHC")))
-        inDocker = pure False
 
 -- | Parse for a logging level.
 logLevelOpt :: Parser LogLevel

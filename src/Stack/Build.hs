@@ -87,8 +87,7 @@ test conf =
                    Nothing
                    DoTests
                    False
-                   []
-                   (tconfigInDocker conf))
+                   [])
 
 -- | Build and haddock using Shake.
 haddock :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
@@ -101,8 +100,7 @@ haddock conf =
                    Nothing
                    DoHaddock
                    False
-                   []
-                   (hconfigInDocker conf))
+                   [])
 
 -- | Build and benchmark using Shake.
 benchmark :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
@@ -115,15 +113,14 @@ benchmark conf =
                    Nothing
                    DoBenchmarks
                    False
-                   []
-                   (benchInDocker conf))
+                   [])
 
 -- | Build using Shake.
 build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
       => BuildOpts -> m ()
 build bopts =
   do env <- ask
-     pinfos <- runResourceT (getPackageInfos (boptsFinalAction bopts) (Just bopts))
+     pinfos <- runResourceT (getPackageInfos (boptsFinalAction bopts))
      pkgIds <- liftIO $ getPackageIds (map packageName (S.toList pinfos))
      pwd <- liftIO $ getCurrentDirectory >>= parseAbsDir
      docLoc <- liftIO $ getUserDocLoc
@@ -190,7 +187,7 @@ clean :: forall m env.
       => m ()
 clean =
   do env <- ask
-     pinfos <- runResourceT (getPackageInfos DoNothing Nothing)
+     pinfos <- runResourceT (getPackageInfos DoNothing)
      let config = getConfig env
      forM_ (S.toList pinfos)
            (\pinfo ->
@@ -745,12 +742,14 @@ newConfig gconfig bopts pinfo =
 -- Package info/dependencies/etc
 
 -- | Get packages' information.
+--
+-- Needs to be refactored, see: https://github.com/fpco/stack/issues/40
 getPackageInfos :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m
                    ,MonadMask m
                    ,HasHttpManager env,HasConfig env,MonadReader env m)
-                => FinalAction -> Maybe BuildOpts
+                => FinalAction
                 -> m (Set Package)
-getPackageInfos finalAction mbopts =
+getPackageInfos finalAction =
     do cfg <- asks getConfig
        go True cfg
   where go retry cfg =
@@ -765,16 +764,16 @@ getPackageInfos finalAction mbopts =
                                     cfg
                                     (configPackages cfg)
                                     (configPackageFlags cfg))
+             _ <- error $ show (infos, errs)
              case errs of
                [] -> return infos
                _
-                 | Just bopts <- mbopts
-                 , not (boptsInDocker bopts)
+                 | configInstallDeps cfg
                  , retry ->
-                   outsideOfDockerApproach infos globalPackages cfg errs
+                   installDeps infos globalPackages cfg errs
                  | otherwise ->
                    liftIO (throwIO (DependencyIssues (nubBy (on (==) show) errs)))
-        outsideOfDockerApproach infos globalPackages cfg errs =
+        installDeps infos globalPackages cfg errs =
           do requireIndex
              results <- forM names checkPackageInIndex
              case lefts results of
