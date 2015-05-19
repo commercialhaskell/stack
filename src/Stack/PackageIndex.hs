@@ -199,7 +199,7 @@ data PackageIndexException =
 instance Exception PackageIndexException
 
 -- | Update the index tarball
-updateIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m
+updateIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m
                ,MonadThrow m,MonadReader env m,HasHttpManager env
                ,HasConfig env)
             => m ()
@@ -267,7 +267,7 @@ updateIndexGit = do
                   Nothing
 
 -- | Update the index tarball via HTTP
-updateIndexHTTP :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadResource m
+updateIndexHTTP :: (MonadBaseControl IO m,MonadIO m,MonadLogger m
                    ,MonadThrow m,MonadReader env m,HasHttpManager env,HasConfig env)
                 => m ()
 updateIndexHTTP = do
