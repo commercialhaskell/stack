@@ -1,6 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -17,21 +16,34 @@ module Stack.Setup
 
 -- Copied imports from stackage-setup
 ---------------------------------------------------------------------
-import qualified ClassyPrelude.Conduit as ClassyPrelude
-import ClassyPrelude.Conduit hiding ((<>))
 import Control.Applicative
+import Control.Exception (Exception, bracket_, onException, IOException)
+import Control.Monad (when, liftM)
+import Control.Monad.Catch (MonadThrow, throwM, catch)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.Reader (MonadReader, ReaderT (..), ask)
+import Control.Monad.Trans.Control (MonadBaseControl)
+import Control.Monad.Trans.Resource (runResourceT)
 import Crypto.Hash
 import Crypto.Hash.Conduit (sinkHash)
 import Data.Aeson (FromJSON(..), withObject, (.:), (.:?), (.!=))
 import qualified Data.Aeson as Aeson
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as LByteString
 import qualified Data.Char as Char
+import Data.Conduit (($$), ZipSink (..))
+import Data.Conduit.Binary (sinkFile)
+import Data.Foldable (forM_)
+import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as List
 import Data.Monoid
+import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Lazy as LText
 import qualified Data.Text.Lazy.Encoding as LText
+import Data.Typeable (Typeable)
 import qualified Data.Yaml as Yaml
 import Options.Applicative (Parser, strArgument, metavar, value)
 import Stackage.CLI
@@ -39,14 +51,12 @@ import Network.HTTP.Client.Conduit
 import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Network.HTTP.Types (hUserAgent)
 import System.Directory
-import System.FilePath (searchPathSeparator, getSearchPath)
-import System.Environment (lookupEnv, getEnv, setEnv)
+import System.FilePath (searchPathSeparator, getSearchPath, (</>), (<.>))
+import System.Environment (lookupEnv, setEnv)
 import System.Exit (exitFailure)
+import System.IO (stderr, hPutStrLn)
 import System.Process (callProcess, readProcess)
 import qualified Paths_stack as CabalInfo
-
-import qualified Prelude
-import Prelude (Bool(..))
 
 -- Imports and new definitions for Stack.Setup
 -------------------------------------------------------------------
@@ -151,8 +161,7 @@ checkDependencies :: [String] -> IO ()
 checkDependencies deps = do
   missing <- mapM checkIsMissing deps
   when (or missing) $ do
-    hPutStrLn stderr $ asText $
-      "Please install missing dependencies and try again."
+    hPutStrLn stderr $ "Please install missing dependencies and try again."
     exitFailure
 
 -- return True if it appears to be missing
@@ -193,8 +202,8 @@ getStackageRootIO = do
     Nothing -> do
       -- TODO: windows-ify
       home <- lookupEnv "HOME" >>= \case
-        Just homeStr -> return (fromString homeStr)
-        Nothing -> throwIO StackageRootNotFound
+        Just homeStr -> return homeStr
+        Nothing -> throwM StackageRootNotFound
       return (home </> ".stackage")
   createDirectoryIfMissing True stackageRoot
   return stackageRoot
@@ -203,7 +212,7 @@ readFileMay :: FilePath -> IO (Maybe ByteString)
 readFileMay path = do
   exists <- doesFileExist path
   if exists
-    then Just <$> ClassyPrelude.readFile path
+    then Just <$> S.readFile path
     else return Nothing
 
 getFirstJust :: [IO (Maybe a)] -> IO (Maybe a)
@@ -345,14 +354,14 @@ instance Exception SetupExceptions
 readSeries :: String -> Maybe Series
 readSeries s@"lts" = Just s
 readSeries s@"nightly" = Just s
-readSeries s@(stripPrefix "lts-" -> Just sver)
+readSeries s@(List.stripPrefix "lts-" -> Just sver)
   | all Char.isNumber sver = Just s
-readSeries (stripPrefix "lts/" -> Just sver)
+readSeries (List.stripPrefix "lts/" -> Just sver)
   | all Char.isNumber sver = Just $ "lts-" <> sver
 readSeries _ = Nothing
 
 readGhcVersion :: String -> Maybe GhcMajorVersion
-readGhcVersion (stripPrefix "ghc-" -> Just s) = case break (== '.') s of
+readGhcVersion (List.stripPrefix "ghc-" -> Just s) = case break (== '.') s of
   (m1, '.':m2) | all Char.isNumber m1 && all Char.isNumber m2
     -> Just s
   _ -> Nothing
@@ -371,7 +380,7 @@ getGhcMajorVersion target = case readGhcVersion target of
     snapshot <- case readSeries target of
       Just series -> lookupSnapshot series
       Nothing -> return target -- just try using it as a snapshot
-    putStrLn $ "Setup for snapshot: " <> pack snapshot
+    liftIO $ putStrLn $ "Setup for snapshot: " <> snapshot
     lookupGhcMajorVersion snapshot
 
 lookupSnapshot ::
@@ -398,7 +407,7 @@ lookupGhcMajorVersion ::
 lookupGhcMajorVersion snapshot = do
   response <- httpLbs =<< ghcMajorVersionReq snapshot
   let lbs = responseBody response
-  return $ unpack $ LText.toStrict $ LText.decodeUtf8 lbs
+  return $ LText.unpack $ LText.decodeUtf8 lbs
 
 
 oldSetup ::
@@ -411,7 +420,7 @@ oldSetup ::
   ) => SetupTarget -> m ()
 oldSetup target = do
   ghcMajorVersion <- getGhcMajorVersion target
-  putStrLn $ "Selecting ghc-" <> pack ghcMajorVersion
+  liftIO $ putStrLn $ "Selecting ghc-" <> ghcMajorVersion
   links <- getLinks ghcMajorVersion
 
   stackageRoot <- getStackageRoot
@@ -427,7 +436,7 @@ oldSetup target = do
         liftIO $ checkDependencies (depsFor downloadName)
         download downloadUrl downloadSha1 dir
         postDownload d dir versionedDir
-      else putStrLn $ "Already have: " <> downloadName <> "-" <> downloadVersion
+      else liftIO $ putStrLn $ Text.unpack $ "Already have: " <> downloadName <> "-" <> downloadVersion
 
     augmentPath (versionedDir </> "bin")
 
@@ -482,7 +491,7 @@ augmentPath :: MonadIO m => FilePath -> m ()
 augmentPath pathHead = liftIO $ do
   pathRest <- getSearchPath
   let paths = pathHead : pathRest
-      path = intercalate [searchPathSeparator] paths
+      path = List.intercalate [searchPathSeparator] paths
   setEnv "PATH" path
 
 
@@ -500,12 +509,12 @@ expectInstructions "happy" = justUnpackInstructions
 expectInstructions t = unexpectedInstructions t
 
 unexpectedInstructions :: (MonadIO m) => Text -> Download -> FilePath -> FilePath -> m ()
-unexpectedInstructions t Download{..} dir _ = do
-  putStrLn $ "Unexpected download: " <> t
+unexpectedInstructions t Download{..} dir _ = liftIO $ do
+  putStrLn $ "Unexpected download: " <> Text.unpack t
   when (not $ null downloadInstructions) $ do
     putStrLn $ "Manual instructions:"
-    putStrLn $ "$ cd " <> Text.pack dir
-    mapM_ (putStrLn . ("$ " <>)) downloadInstructions
+    putStrLn $ "$ cd " <> dir
+    mapM_ (putStrLn . ("$ " <>) . Text.unpack) downloadInstructions
 
 justUnpackInstructions :: (MonadIO m) => Download -> FilePath -> FilePath -> m ()
 justUnpackInstructions Download{..} dir _ = do
@@ -513,13 +522,13 @@ justUnpackInstructions Download{..} dir _ = do
   where
     go :: [Text] -> IO ()
     go [] = return ()
-    go ( (stripPrefix "tar xJf " -> Just file)
+    go ( (Text.stripPrefix "tar xJf " -> Just file)
        : next
        ) = unzipXZ dir (Text.unpack file) >> go next
-    go ( (stripPrefix "rm " -> Just _file)
+    go ( (Text.stripPrefix "rm " -> Just _file)
        : next
        ) = go next -- already done in unzipXZ
-    go (t:_) = fail $ "command not recognized: " <> unpack t
+    go (t:_) = fail $ "command not recognized: " <> Text.unpack t
 
 
 expectGhcInstructions :: (MonadIO m) => Download -> FilePath -> FilePath -> m ()
@@ -528,20 +537,20 @@ expectGhcInstructions Download{..} dir versionedDir =
   where
     go :: [Text] -> IO ()
     go [] = return ()
-    go ( (stripPrefix "tar xJf " -> Just file)
+    go ( (Text.stripPrefix "tar xJf " -> Just file)
        : next
        ) = unzipXZ dir (Text.unpack file) >> go next
-    go ( (stripPrefix "rm ghc-" -> Just _file)
+    go ( (Text.stripPrefix "rm ghc-" -> Just _file)
        : next
        ) = go next -- already done in unzipXZ
-    go ( (stripPrefix "cd ghc-" -> Just version)
+    go ( (Text.stripPrefix "cd ghc-" -> Just version)
        : "./configure --prefix=`pwd`"
        : "make install"
        : "cd .."
        : next
        ) | version == downloadVersion
        = ghcConfigureInstall versionedDir >> go next
-    go (t:_) = fail $ "command not recognized: " <> unpack t
+    go (t:_) = fail $ "command not recognized: " <> Text.unpack t
 
 
 inDir :: FilePath -> IO a -> IO a
@@ -555,7 +564,8 @@ inDir dir action = do
 ghcConfigureInstall :: (MonadIO m) => FilePath -> m ()
 ghcConfigureInstall versionedDir = liftIO $ do
   let srcDir = versionedDir <.> "src"
-  whenM (doesDirectoryExist srcDir) $ removeDirectoryRecursive srcDir -- TODO: reuse instead
+  exists <- doesDirectoryExist srcDir
+  when exists $ removeDirectoryRecursive srcDir -- TODO: reuse instead
   renameDirectory versionedDir srcDir
   createDirectoryIfMissing True versionedDir
   let go = inDir srcDir $ do
@@ -569,26 +579,26 @@ expectCabalInstructions Download{..} dir versionedDir =
     liftIO $ rememberingOldCabal $ go downloadInstructions
   where
     go [] = return ()
-    go ( (stripPrefix "tar xzf " -> Just file)
+    go ( (Text.stripPrefix "tar xzf " -> Just file)
        : next
        ) = unzipGZ dir (Text.unpack file) >> go next
-    go ( (stripPrefix "rm cabal-install-" ->
-          Just (stripSuffix ".tar.gz" -> Just _file))
+    go ( (Text.stripPrefix "rm cabal-install-" ->
+          Just (Text.stripSuffix ".tar.gz" -> Just _file))
        : next
        ) = go next -- already done in unzipGZ
-    go ( (stripPrefix "cd cabal-install-" -> Just version)
+    go ( (Text.stripPrefix "cd cabal-install-" -> Just version)
        : "./bootstrap.sh"
        : "cd .."
-       : (stripPrefix "rm -r cabal-install-" -> Just version')
+       : (Text.stripPrefix "rm -r cabal-install-" -> Just version')
        : next
        ) | version == downloadVersion && version == version'
        = cabalBootstrap dir version >> go next
-    go ( (stripPrefix "mkdir cabal-" -> Just version)
-       : (stripPrefix "mv $HOME/.cabal/bin/cabal cabal-" -> Just _newLoc)
+    go ( (Text.stripPrefix "mkdir cabal-" -> Just version)
+       : (Text.stripPrefix "mv $HOME/.cabal/bin/cabal cabal-" -> Just _newLoc)
        : next
        ) | version == downloadVersion
        = cabalMoveExe versionedDir >> go next
-    go (t:_) = fail $ "command not recognized: " <> unpack t
+    go (t:_) = fail $ "command not recognized: " <> Text.unpack t
 
 cabalBootstrap :: FilePath -> Text -> IO ()
 cabalBootstrap dir version = do
@@ -635,7 +645,7 @@ download url sha1 dir = do
   let fname = List.drop (List.last slashes + 1) url
       slashes = List.findIndices (== '/') url
       file = dir </> fname
-  putStrLn $ "Downloading: " <> pack fname
+  liftIO $ putStrLn $ "Downloading: " <> fname
   req0 <- parseUrl url
   let req = req0
         { requestHeaders = [(hUserAgent, userAgent)] }
@@ -647,14 +657,14 @@ download url sha1 dir = do
     let _ = theDigest :: Digest SHA1
     when (show theDigest /= sha1) $ do
       fail "Corrupted download"
-    putStrLn $ "Verified sha1: " <> pack sha1
+    liftIO $ putStrLn $ "Verified sha1: " <> sha1
 
 -- TODO: make cross platform
-unzipDownload :: (MonadIO m)
+_unzipDownload :: (MonadIO m)
   => FilePath -> FilePath -> m ()
-unzipDownload dir file = case stripSuffix ".tar.xz" (Text.pack file) of
+_unzipDownload dir file = case Text.stripSuffix ".tar.xz" (Text.pack file) of
   Just{} -> unzipXZ dir file
-  _ -> case stripSuffix ".tar.gz" (Text.pack file) of
+  _ -> case Text.stripSuffix ".tar.gz" (Text.pack file) of
     Just {} -> unzipGZ dir file
     _ -> fail $ "unzipDownload: unknown extension"
   -- TODO: other extensions
@@ -694,4 +704,4 @@ snapshotsPath :: FilePath
 snapshotsPath = Text.unpack "snapshots.json"
 
 linksPath :: GhcMajorVersion -> FilePath
-linksPath ghcMajorVersion = Text.unpack $ "ghc-" <> pack ghcMajorVersion <> "-links.yaml"
+linksPath ghcMajorVersion = Text.unpack $ "ghc-" <> Text.pack ghcMajorVersion <> "-links.yaml"
