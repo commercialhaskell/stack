@@ -775,7 +775,8 @@ getPackageInfos finalAction mbopts =
                  | otherwise ->
                    liftIO (throwIO (DependencyIssues (nubBy (on (==) show) errs)))
         outsideOfDockerApproach infos globalPackages cfg errs =
-          do results <- forM names checkPackageInIndex
+          do requireIndex
+             results <- forM names checkPackageInIndex
              case lefts results of
                [] ->
                  do let okPkgVers = M.fromList (rights results)
