@@ -21,8 +21,6 @@ module Stack.Build
   ,getPackageInfos)
   where
 
-import           Codec.Archive.Tar
-import           Codec.Compression.GZip as GZip
 import           Control.Arrow
 import           Control.Concurrent.MVar
 import           Control.Exception
@@ -68,13 +66,11 @@ import           Stack.Config
 import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
-import           Stack.PackageIndex.Read
 import           Stack.PackageIndex.Update
 import           System.Directory hiding (findFiles)
 import           System.Environment
 import qualified System.FilePath as FilePath
 import           System.IO
-import           System.IO.Temp
 import           System.Posix.Files (createSymbolicLink,removeLink)
 
 --------------------------------------------------------------------------------
@@ -980,68 +976,10 @@ composeFlags pname pflags gflags = collapse pflags <> gflags
 fetchAndUnpackPackages :: (MonadIO m,MonadThrow m,MonadLogger m,MonadMask m,MonadReader env m,HasHttpManager env,HasConfig env)
                        => [PackageIdentifier]
                        -> m [Path Abs Dir]
-fetchAndUnpackPackages pkgs =
-  do fetchPackages pkgs
-     config <- askConfig
-     locs <-
-       mapM (\ident ->
-               liftM (ident,)
-                     (configPackageTarball config ident))
-            pkgs
-     descs <- readPackageDescs pkgs
-     forM locs
-          (\(ident@(PackageIdentifier name _),tarGzPath) ->
-             case M.lookup name descs of
-               Nothing ->
-                 error "TODO: Throw error about package not existing in index."
-               Just latestCabalFileContent ->
-                 unpackAndUpdateTarball ident tarGzPath latestCabalFileContent)
-
--- | Read package descriptions.
-readPackageDescs :: (MonadIO m, MonadReader env m, HasConfig env)
-                 => [PackageIdentifier] -> m (Map PackageName L.ByteString)
-readPackageDescs pkgs = do
-  config <- ask
-  liftM M.fromList $ liftIO $ runResourceT $ flip runReaderT config $
-                    sourcePackageIndex $=
-                    CL.filter (\ucf ->
-                                 elem (PackageIdentifier (ucfName ucf)
-                                                         (ucfVersion ucf))
-                                      pkgs) $=
-                    CL.isolate (length pkgs) $=
-                    CL.map (\unparsed ->
-                              (ucfName unparsed,ucfLbs unparsed)) $$
-                    CL.consume
-
--- | Unpack and update the package tarball.
-unpackAndUpdateTarball :: (MonadIO m,MonadLogger m,MonadMask m,MonadReader env m,HasConfig env)
-                       => PackageIdentifier
-                       -> Path Abs File
-                       -> L.ByteString
-                       -> m (Path Abs Dir)
-unpackAndUpdateTarball ident tarGzPath latestCabalFileContent =
-  do config <- askConfig
-     pkgVerDir <-
-       liftM (pkgUnpackDir config </>) (parseRelDir (packageIdentifierString ident))
-     newCabalFilePath <-
-       liftM (pkgVerDir </>)
-             (parseRelFile (packageNameString (packageIdentifierName ident) ++ ".cabal"))
-     withSystemTempFile
-       "pkg-index"
-       (\fp h ->
-          do $logDebug (T.pack ("Decompressing " ++
-                                (packageIdentifierString ident)))
-             targzContent <-
-               liftIO (L.readFile (toFilePath tarGzPath))
-             liftIO (L.hPutStr h (GZip.decompress targzContent))
-             liftIO (hClose h)
-             $logDebug (T.pack ("Extracting to " ++ FL.toFilePath (pkgUnpackDir config)))
-             liftIO (extract (FL.toFilePath (pkgUnpackDir config)) fp)
-             $logDebug (T.pack ("Updating cabal file " ++
-                                toFilePath newCabalFilePath))
-             liftIO (L.writeFile (toFilePath newCabalFilePath)
-                                 latestCabalFileContent)
-             return pkgVerDir)
+fetchAndUnpackPackages pkgs = do
+    config <- askConfig
+    let dest = pkgUnpackDir config
+    fetchPackages $ map (, Just $ dest) pkgs
 
 --------------------------------------------------------------------------------
 -- Paths
