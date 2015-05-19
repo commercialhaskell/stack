@@ -8,3 +8,5 @@ TAGS
 tags
 *.tag
 cabal.sandbox.config
+*.swp
+/.cabal-sandbox/
