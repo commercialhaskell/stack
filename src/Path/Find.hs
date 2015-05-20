@@ -11,7 +11,6 @@ module Path.Find
   ,resolveFile)
   where
 
-import Control.Exception (Exception)
 import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.IO.Class

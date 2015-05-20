@@ -8,7 +8,6 @@ module Stack.Types.Docker where
 import Control.Applicative
 import Data.Aeson
 import Data.Text (Text)
-import Path
 
 -- | Docker configuration.
 data Docker =
