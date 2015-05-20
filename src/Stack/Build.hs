@@ -757,17 +757,15 @@ getPackageInfos finalAction =
           do unless retry ($logInfo "Getting pack information, dependencies, etc. ...")
              globalPackages <- getAllPackages
 
+             paths <- unpackPackageIdentsForBuild (configPackagesIdent cfg)
+
              (infos,errs) <-
                runWriterT
                  (buildDependencies finalAction
                                     (configFlags cfg)
                                     globalPackages
                                     cfg
-                                    -- FIXME we know this function has to be
-                                    -- cleaned up significantly anyway. When we
-                                    -- get there, make sure to handle
-                                    -- configPackagesIdent as well.
-                                    (configPackagesPath cfg)
+                                    (configPackagesPath cfg <> paths)
                                     (configPackageFlags cfg))
              case errs of
                [] -> return infos

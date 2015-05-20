@@ -17,6 +17,7 @@ module Stack.Types.PackageIdentifier
   ,packageIdentifierText)
   where
 
+import Control.Applicative ((<*))
 import Control.Exception (Exception)
 import Control.Monad.Catch (MonadThrow, throwM)
 import Data.Attoparsec.ByteString.Char8

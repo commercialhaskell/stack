@@ -17,6 +17,7 @@ module Stack.Setup
 
 -- Copied imports from stackage-setup
 ---------------------------------------------------------------------
+import Control.Applicative ((<$>), (<*))
 import Control.Exception (Exception, bracket_, onException, IOException)
 import Control.Monad (when, liftM)
 import Control.Monad.Catch (MonadThrow, throwM, catch)

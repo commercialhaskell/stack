@@ -152,3 +152,11 @@ configPackageTarball config ident = do
     ver <- parseRelDir $ versionString $ packageIdentifierVersion ident
     base <- parseRelFile $ packageIdentifierString ident ++ ".tar.gz"
     return $ configStackRoot config </> $(mkRelDir "packages") </> name </> ver </> base
+
+-- | Per-project work dir
+configProjectWorkDir :: Config -> Path Abs Dir
+configProjectWorkDir config = configDir config </> $(mkRelDir ".stack-work")
+
+-- | Where to unpack packages for local build
+configLocalUnpackDir :: Config -> Path Abs Dir
+configLocalUnpackDir config = configProjectWorkDir config </> $(mkRelDir "unpacked")

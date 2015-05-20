@@ -11,9 +11,11 @@
 module Stack.Fetch
     ( fetchPackages
     , unpackPackages
+    , unpackPackageIdentsForBuild
     ) where
 
 import           Control.Monad.IO.Class
+import           Control.Monad (forM, liftM)
 import           Control.Monad.Logger
 import           Data.Monoid ((<>))
 import           Stack.Types
@@ -160,7 +162,7 @@ unpackPackages :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,
                -> [String] -- ^ names or identifiers
                -> m ()
 unpackPackages dest input = do
-    dest' <- liftIO (canonicalizePath ".") >>= parseAbsDir
+    dest' <- liftIO (canonicalizePath dest) >>= parseAbsDir
     (names, idents1) <- case partitionEithers $ map parse input of
         ([], x) -> return $ partitionEithers x
         (errs, _) -> throwM $ CouldNotParsePackageSelectors errs
@@ -169,7 +171,7 @@ unpackPackages dest input = do
             then return []
             else findNewestVersions names
     dests <- fetchPackages $ map (, Just dest') $ idents1 ++ idents2
-    mapM_ (\dest -> $logInfo $ "Unpacked to " <> T.pack (toFilePath dest)) dests
+    mapM_ (\dest'' -> $logInfo $ "Unpacked to " <> T.pack (toFilePath dest'')) dests
   where
     -- Possible future enhancement: parse names as name + version range
     parse s =
@@ -179,6 +181,28 @@ unpackPackages dest input = do
                 case parsePackageIdentifierFromString s of
                     Left _ -> Left s
                     Right x -> Right $ Right x
+
+-- | Ensure that all of the given package idents are unpacked into the build
+-- unpack directory, and return the paths to all of the subdirectories.
+unpackPackageIdentsForBuild
+    :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m)
+    => Set PackageIdentifier
+    -> m (Set (Path Abs Dir))
+unpackPackageIdentsForBuild idents0 = do
+    config <- askConfig
+    let unpackDir = configLocalUnpackDir config
+    (idents, paths1) <- liftM partitionEithers $ forM (Set.toList idents0) $ \ident -> do
+        rel <- parseRelDir $ packageIdentifierString ident
+        let dir = unpackDir </> rel
+        exists <- liftIO $ doesDirectoryExist $ toFilePath dir
+        if exists
+            then return $ Right dir
+            else return $ Left ident
+    if null idents
+        then return $ Set.fromList paths1
+        else do
+            paths2 <- fetchPackages $ map (, Just unpackDir) idents
+            return $ Set.fromList $ paths1 ++ paths2
 
 -- | Download the given name,version pairs into the directory expected by cabal.
 --
