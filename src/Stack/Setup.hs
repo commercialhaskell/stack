@@ -58,7 +58,7 @@ import System.Process (callProcess, readProcess)
 -- Imports and new definitions for Stack.Setup
 -------------------------------------------------------------------
 import Stack.Types.Version
-import qualified Stack.Config as Stack
+import qualified Stack.Types as Stack
 import Path (Path, Abs, Dir)
 import Control.Monad.Logger
 

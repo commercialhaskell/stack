@@ -52,15 +52,13 @@ data Docker =
            -- ^ Pass Docker daemon connection information into container.
          ,dockerExtra :: ![String]
            -- ^ This is a placeholder for command-line argument parsing.
-         ,dockerDir :: (Path Abs Dir) -- ^ Intentionally lazy because of the 'Default' instance.
          }
   deriving (Show)
 
 -- | For YAML.
-instance FromJSON (Path Abs Dir -> Docker) where
-  parseJSON v =
-    do o <- parseJSON v
-       x <- Docker <$> o .:? dockerEnableArgName .!= True
+instance FromJSON Docker where
+  parseJSON = withObject "Docker" $ \o ->
+            Docker <$> o .:? dockerEnableArgName .!= True
                    <*> o .:? dockerRepoOwnerArgName .!= dockerRepoOwner defaultDocker
                    <*> o .:? dockerRepoArgName .!= dockerRepo defaultDocker
                    <*> o .:? dockerRepoSuffixArgName .!= dockerRepoSuffix defaultDocker
@@ -79,7 +77,6 @@ instance FromJSON (Path Abs Dir -> Docker) where
                    <*> pure (dockerMountExtra defaultDocker)
                    <*> o .:? dockerPassHostArgName .!= dockerPassHost defaultDocker
                    <*> pure (dockerExtra defaultDocker)
-       return x
 
 -- | Default values for Docker configuration.
 defaultDocker :: Docker
@@ -103,9 +100,6 @@ defaultDocker =
                ,dockerMountExtra = []
                ,dockerPassHost = False
                ,dockerExtra = []
-               ,dockerDir = error "Docker dir not determined!"
-               -- FIXME: This is ugly but I don't see an obvious
-               -- better way to add the value after the fact.
                }
 
 dockerEnableArgName :: Text

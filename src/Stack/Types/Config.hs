@@ -1,6 +1,7 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- | The Config type.
 
@@ -28,6 +29,7 @@ import Stack.Types.Version
 -- | The top-level Stackage configuration.
 data Config =
   Config {configStackRoot        :: !(Path Abs Dir)
+         -- ^ ~/.stack more often than not
          ,configDocker           :: !(Maybe Docker)
          ,configPackagesPath     :: !(Set (Path Abs Dir))
          -- ^ Local packages identified by a path
@@ -36,6 +38,7 @@ data Config =
          ,configFlags            :: !(Map FlagName Bool) -- FIXME rename to global?
          ,configPackageFlags     :: !(Map PackageName (Map FlagName Bool))
          ,configDir              :: !(Path Abs Dir)
+         -- ^ Directory containing the project's stack.yaml file
          ,configUrls             :: !(Map Text Text)
          ,configGpgVerifyIndex   :: !Bool
          ,configResolver         :: !Resolver
@@ -126,3 +129,19 @@ askPackageIndexGitUrl = askUrl "package-index-git-url" "https://github.com/comme
 -- | HTTP URL for the package index
 askPackageIndexHttpUrl :: (MonadReader env m, HasUrls env) => m Text
 askPackageIndexHttpUrl = askUrl "package-index-http-url" "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"
+
+-- | Location of the 00-index.tar file
+configPackageIndex :: Config -> Path Abs File
+configPackageIndex config = configStackRoot config </> $(mkRelFile "00-index.tar")
+
+-- | Location of the 00-index.tar.gz file
+configPackageIndexGz :: Config -> Path Abs File
+configPackageIndexGz config = configStackRoot config </> $(mkRelFile "00-index.tar.gz")
+
+-- | Location of a package tarball
+configPackageTarball :: MonadThrow m => Config -> PackageIdentifier -> m (Path Abs File)
+configPackageTarball config ident = do
+    name <- parseRelDir $ packageNameString $ packageIdentifierName ident
+    ver <- parseRelDir $ versionString $ packageIdentifierVersion ident
+    base <- parseRelFile $ packageIdentifierString ident ++ ".tar.gz"
+    return $ configStackRoot config </> $(mkRelDir "packages") </> name </> ver </> base

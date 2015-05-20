@@ -42,7 +42,7 @@ import           Path.Find (findFileUp)
 import           Paths_stack (version)
 import           Stack.Build (shakeFilesPath)
 import           Stack.Constants (configFileName)
-import           Stack.Config
+import           Stack.Types hiding (Version (..), parseVersion) -- FIXME don't hide this
 import           Stack.Docker.GlobalDB (updateDockerImageLastUsed,getDockerImagesLastUsed,pruneDockerImagesLastUsed)
 import           System.Directory
 import           System.Environment (lookupEnv,unsetEnv)
@@ -52,6 +52,9 @@ import qualified System.Process as Proc
 import           System.Process.PagerEditor (editByteString)
 import           Text.ParserCombinators.ReadP (readP_to_S)
 import           Text.Printf (printf)
+
+dockerDir :: a -- FIXME need to figure out where to get this from, possibly configDir
+dockerDir = error "dockerDir used but not implemented!"
 
 -- | 'True' if we are currently running inside a Docker container.
 getInContainer :: IO Bool
