@@ -77,12 +77,13 @@ instance FromJSON PackageName where
 packageNameParser :: Parser PackageName
 packageNameParser =
   fmap (PackageName . S8.pack)
-       (appending (many1 (satisfy isLetter))
+       (appending (many1 (satisfy isAlphaNum))
                   (concating (many (alternating
-                                      (pured (satisfy (\c -> isLetter c ||
-                                                              isDigit c)))
+                                      (pured (satisfy isAlphaNum))
                                       (appending (pured (satisfy (== '-')))
                                                  (pured (satisfy isLetter)))))))
+  where
+    isAlphaNum c = isLetter c || isDigit c
 
 -- | Make a package name.
 mkPackageName :: String -> Q Exp
