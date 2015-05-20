@@ -44,8 +44,9 @@ data Config =
          ,configResolver         :: !Resolver
          -- ^ How we resolve which dependencies to install given a set of
          -- packages.
-         ,configGhcVersion       :: !Version
-         -- ^ Version of GHC we'll be using for this build
+         ,configGhcVersion       :: !(Maybe Version)
+         -- ^ Version of GHC we'll be using for this build, @Nothing@ if no
+         -- preference
          ,configInstallDeps      :: !Bool
          -- ^ Whether or not dependencies should be installed. If @False@, any
          -- missing dependencies will result in a compilation failure. Useful
@@ -60,6 +61,8 @@ data Resolver
   = ResolverSnapshot SnapName
   -- ^ Use an official snapshot from the Stackage project, either an LTS
   -- Haskell or Stackage Nightly
+  | ResolverNone
+  -- ^ No way to resolve packages
   deriving (Show)
 
 instance FromJSON Resolver where

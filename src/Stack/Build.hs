@@ -941,16 +941,21 @@ getPackageInfo :: FinalAction
 getPackageInfo finalAction flags pflags config pkgDir =
   do cabal <- getCabalFileName pkgDir
      pname <- parsePackageNameFromFilePath cabal
+     ghcVersion <-
+        case configGhcVersion config of
+            -- FIXME yes this is partial for now, but this code is all getting
+            -- refactored soon
+            Just ghcVersion -> return ghcVersion
      info <-
        runStdoutLoggingT
-                          (readPackage (cfg pname)
+                          (readPackage (cfg pname ghcVersion)
                                        cabal)
      existing <-
        fmap S.fromList
             (filterM (doesFileExist . FL.toFilePath)
                      (S.toList (packageFiles info)))
      return info {packageFiles = existing}
-  where cfg pname =
+  where cfg pname ghcVersion =
           PackageConfig {packageConfigEnableTests =
                            case finalAction of
                              DoTests -> True
@@ -961,8 +966,7 @@ getPackageInfo finalAction flags pflags config pkgDir =
                              _ -> False
                         ,packageConfigFlags =
                            composeFlags pname pflags flags
-                        ,packageConfigGhcVersion =
-                           configGhcVersion config}
+                        ,packageConfigGhcVersion = ghcVersion}
 
 -- | Compose the package flags with the global flags in a left-biased
 -- form, i.e., package-specific flags will be preferred over global

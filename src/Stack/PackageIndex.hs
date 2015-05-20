@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE FlexibleContexts           #-}
@@ -14,6 +15,7 @@
 -- | Dealing with the 00-index file and all its cabal files.
 module Stack.PackageIndex
     ( sourcePackageIndex
+    , findNewestVersions
     , UnparsedCabalFile (..)
     , getLatestDescriptions
     , updateIndex
@@ -30,17 +32,12 @@ import           Control.Monad.IO.Class                (MonadIO, liftIO)
 import           Control.Monad.Logger                  (MonadLogger, logDebug,
                                                         logInfo, logWarn)
 import           Control.Monad.Reader                  (runReaderT)
-import           Control.Monad.Trans.Class             (lift)
 import           Control.Monad.Trans.Control           (MonadBaseControl)
-import           Control.Monad.Trans.Resource          (MonadResource,
-                                                        runResourceT)
+import           Control.Monad.Trans.Resource          (runResourceT)
 import qualified Data.ByteString.Lazy                  as L
 import           Data.Conduit                          (($$), (=$), yield, Producer)
 import           Data.Conduit.Binary                   (sinkHandle,
                                                         sourceHandle)
-import qualified Data.Conduit.Binary                   as CB
-import           Data.Conduit.Lazy                     (MonadActive,
-                                                        lazyConsume)
 import qualified Data.Conduit.List                     as CL
 import           Data.Conduit.Zlib                     (ungzip)
 import           Data.Map                              (Map)
@@ -69,7 +66,6 @@ import           Path                                  (mkRelDir, parent,
                                                         parseAbsFile,
                                                         parseRelDir, toFilePath,
                                                         (</>))
-import           Stack.Config
 import           Stack.Types
 import           System.Directory
 import           System.FilePath                       (takeBaseName, (<.>))
@@ -88,17 +84,37 @@ data UnparsedCabalFile = UnparsedCabalFile
     , ucfEntry   :: Tar.Entry
     }
 
+-- | Find the newest versions of all given package names.
+findNewestVersions :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env)
+                   => [PackageName]
+                   -> m [PackageIdentifier]
+findNewestVersions names0 = do
+    (m, discovered) <- sourcePackageIndex $$ CL.fold add (Map.empty, Set.empty)
+    let missing = Set.difference names discovered
+    if Set.null missing
+        then return $ map fromTuple $ Map.toList m
+        else throwM $ Couldn'tFindPackages missing
+  where
+    names = Set.fromList names0
+
+    add orig@(m, discovered) ucf
+        | n `Set.member` names =
+            let !m' = Map.insertWith max n v m
+                !d' = Set.insert n discovered
+             in (m', d')
+        | otherwise = orig
+      where
+        n = ucfName ucf
+        v = ucfVersion ucf
 
 -- | Stream all of the cabal files from the 00-index tar file.
-sourcePackageIndex :: ( MonadThrow m, MonadResource m, MonadActive m, MonadBaseControl IO m
-                      , MonadReader env m, HasConfig env
-                      )
+sourcePackageIndex :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env)
                    => Producer m UnparsedCabalFile
 sourcePackageIndex = do
-    -- yay for the tar package. Use lazyConsume instead of readFile to get some
-    -- kind of resource protection
+    -- This uses full on lazy I/O instead of ResourceT to provide some
+    -- protections. Caveat emptor
     config <- askConfig
-    lbs <- lift $ fmap L.fromChunks $ lazyConsume $ CB.sourceFile $ Path.toFilePath $ configPackageIndex config
+    lbs <- liftIO $ L.readFile $ Path.toFilePath $ configPackageIndex config
     loop (Tar.read lbs)
   where
     loop (Tar.Next e es) = goE e >> loop es
@@ -196,6 +212,7 @@ instance Exception SimpleParseException
 data PackageIndexException =
   Couldn'tReadIndexTarball FilePath
                            Tar.FormatError
+  | Couldn'tFindPackages (Set PackageName)
   deriving (Show,Typeable)
 instance Exception PackageIndexException
 

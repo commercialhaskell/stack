@@ -9,6 +9,7 @@ module Stack.Types.PackageIdentifier
   ,toTuple
   ,fromTuple
   ,parsePackageIdentifier
+  ,parsePackageIdentifierFromString
   ,packageIdentifierVersion
   ,packageIdentifierName
   ,packageIdentifierParser
@@ -20,6 +21,7 @@ import Control.Exception (Exception)
 import Control.Monad.Catch (MonadThrow, throwM)
 import Data.Attoparsec.ByteString.Char8
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as S8
 import Data.Data
 import Data.Hashable
 import Data.Text (Text)
@@ -76,6 +78,11 @@ parsePackageIdentifier x = go x
   where go =
           either (const (throwM (PackageIdentifierParseFail x))) return .
           parseOnly (packageIdentifierParser <* endOfInput)
+
+-- | Migration function.
+parsePackageIdentifierFromString :: MonadThrow m => String -> m PackageIdentifier
+parsePackageIdentifierFromString =
+  parsePackageIdentifier . S8.pack
 
 -- | Get a string representation of the package identifier; name-ver.
 packageIdentifierString :: PackageIdentifier -> String

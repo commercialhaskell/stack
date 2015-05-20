@@ -22,6 +22,8 @@
 -- a warning that "you should run `stk init` to make things better".
 module Stack.Config
   ( loadConfig
+  , LoadOptions (..)
+  , defaultLoadOptions
   ) where
 
 import           Control.Applicative
@@ -177,13 +179,28 @@ instance FromJSON (Path Abs Dir -> Project) where -- FIXME get rid of Path Abs D
 defaultStackGlobalConfig :: Path Abs File
 defaultStackGlobalConfig = $(mkAbsFile "/etc/stack/config")
 
+defaultLoadOptions :: LoadOptions
+defaultLoadOptions = LoadOptions
+    { loWriteMissing = True
+    , loSmartResolver = True
+    }
+
+data LoadOptions = LoadOptions
+    { loWriteMissing :: !Bool
+    -- ^ Write out a stack.yaml if none was found
+    , loSmartResolver :: !Bool
+    -- ^ Use the intelligent resolver locator, otherwise just provides no
+    -- resolver
+    }
+
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env)
-  => Path Abs Dir -- ^ stack root, e.g. ~/.stack
+  => LoadOptions
+  -> Path Abs Dir -- ^ stack root, e.g. ~/.stack
   -> Project
   -> ConfigMonoid
   -> m Config
-configFromConfigMonoid configStackRoot Project{..} ConfigMonoid{..} = do
+configFromConfigMonoid lo configStackRoot Project{..} ConfigMonoid{..} = do
      let configDocker = case configMonoidDockerOpts of
                  DockerOpts x -> x
          configFlags = projectGlobalFlags
@@ -208,21 +225,28 @@ configFromConfigMonoid configStackRoot Project{..} ConfigMonoid{..} = do
      env <- ask
      let miniConfig = MiniConfig (getHttpManager env) configStackRoot configUrls
      configResolver <- case configMonoidResolver of
-        Nothing -> do
+        Nothing | loSmartResolver lo -> do
             r <- runReaderT (getDefaultResolver configDir) miniConfig
             $logWarn $ T.concat
                 [ "No resolver value found in your config files. "
                 , "Without a value stated, your build will be slower and unstable. "
                 , "Please consider adding the following line to your config file:"
                 ]
-            $logWarn $ "resolver: " <> renderResolver r
+            $logWarn $ "    resolver: " <> renderResolver r
             return r
+        Nothing -> return ResolverNone
         Just r -> return r
      configGhcVersion <-
         case configResolver of
             ResolverSnapshot snapName -> do
                 bp <- runReaderT (loadBuildPlan snapName) miniConfig
-                return $ siGhcVersion $ bpSystemInfo bp
+                return $ Just $ siGhcVersion $ bpSystemInfo bp
+            ResolverNone -> return Nothing
+
+     when (loWriteMissing lo && not projectConfigExists) $ do
+        let dest = toFilePath $ projectRoot </> stackDotYaml
+        $logInfo $ "Writing default config file to: " <> T.pack dest
+        error "FIXME write config file"
      return Config {..}
 
 data MiniConfig = MiniConfig Manager (Path Abs Dir) (Map Text Text)
@@ -233,9 +257,12 @@ instance HasHttpManager MiniConfig where
 instance HasUrls MiniConfig where
     getUrls (MiniConfig _ _ urls) = urls
 
+-- | Load the configuration, using current directory, environment variables,
+-- and defaults as necessary.
 loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env)
-           => m Config
-loadConfig = do
+           => LoadOptions
+           -> m Config
+loadConfig lo = do
     env <- liftIO getEnvironment
     stackRoot <- (>>= parseAbsDir) $
         case lookup "STACK_ROOT" env of
@@ -245,7 +272,7 @@ loadConfig = do
     extraConfigs <- getExtraConfigs stackRoot >>= mapM loadConfigMonoid
     project <- loadProjectConfig
     let config = mconcat (projectConfigMonoid project:extraConfigs)
-    configFromConfigMonoid stackRoot project config
+    configFromConfigMonoid lo stackRoot project config
 
 -- | Determine the extra config file locations which exist.
 --
@@ -275,16 +302,20 @@ loadConfigMonoid path =
 -- | Find the project config file location, respecting environment variables
 -- and otherwise traversing parents. If no config is found, we supply a default
 -- based on current directory.
-loadProjectConfig :: (MonadIO m, MonadThrow m) => m Project
+loadProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m) => m Project
 loadProjectConfig = do
     env <- liftIO getEnvironment
     case lookup "STACK_YAML" env of
-        Just fp -> parseAbsFile fp >>= load
+        Just fp -> do
+            $logInfo "Getting project config file from STACK_YAML environment"
+            parseAbsFile fp >>= load
         Nothing -> do
-            currDir <- liftIO $ canonicalizePath "." >>= parseAbsDir
-            mfp <- liftIO $ search currDir
+            currDir <- liftIO (canonicalizePath ".") >>= parseAbsDir
+            mfp <- search currDir
             case mfp of
-                Just fp -> load fp
+                Just fp -> do
+                    $logInfo $ "Project config file at " <> T.pack (toFilePath fp)
+                    load fp
   where
     load fp = do
         mkProject <-
@@ -294,7 +325,9 @@ loadProjectConfig = do
 
     search dir = do
         let fp = dir </> stackDotYaml
-        exists <- doesFileExist $ toFilePath fp
+            fp' = toFilePath fp
+        $logDebug $ "Checking for project config at: " <> T.pack fp'
+        exists <- liftIO $ doesFileExist fp'
         if exists
             then return $ Just fp
             else do

@@ -3,17 +3,21 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE TupleSections      #-}
 {-# LANGUAGE ViewPatterns       #-}
 
 -- | Functionality for downloading packages securely for cabal's usage.
 
 module Stack.Fetch
     ( fetchPackages
+    , unpackPackages
     ) where
 
 import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import           Data.Monoid ((<>))
 import           Stack.Types
-
+import           Stack.PackageIndex (findNewestVersions)
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Check as Tar
 import           Control.Applicative ((*>), (<$>), (<*>))
@@ -23,8 +27,8 @@ import           Control.Concurrent.Async (wait, withAsync)
 import           Control.Concurrent.STM   (atomically, newTVarIO, readTVar,
                                            writeTVar, TVar, modifyTVar, readTVarIO)
 import           Control.Exception (Exception, throwIO, SomeException, toException)
-import           Control.Monad (join, unless, when)
-import           Control.Monad.Catch (throwM)
+import           Control.Monad (join, unless, when, void)
+import           Control.Monad.Catch (MonadThrow, throwM)
 import Codec.Compression.GZip (decompress)
 import           Crypto.Hash              (Context, Digest, SHA512,
                                            digestToHexByteString, hashFinalize,
@@ -34,6 +38,7 @@ import           Data.Aeson               (FromJSON (..), decode, withObject,
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Foldable as F
+import           Data.Either (partitionEithers)
 import           Data.Function (fix)
 import           Data.Map (Map)
 import qualified Data.Map as Map
@@ -54,7 +59,7 @@ import           Stack.Config
 import Path
 import           System.Directory         (createDirectoryIfMissing,
                                            doesFileExist, doesDirectoryExist,
-                                           renameFile)
+                                           renameFile, canonicalizePath)
 import           System.FilePath (takeDirectory, (<.>), takeExtension)
 import qualified System.FilePath as FP
 import           System.IO                (IOMode (ReadMode, WriteMode),
@@ -143,9 +148,37 @@ data FetchException
         , _ihActual   :: Digest SHA512
         }
     | CabalFileNotFound PackageIdentifier
-    | UnpackDirectoryAlreadyExists (Path Abs Dir)
+    | UnpackDirectoryAlreadyExists FilePath
+    | CouldNotParsePackageSelectors [String]
     deriving (Show, Typeable)
 instance Exception FetchException
+
+-- | Similar to 'fetchPackages', but optimized for command line input, where
+-- the values may be either package names or package identifiers.
+unpackPackages :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadThrow m,MonadLogger m)
+               => FilePath -- ^ destination
+               -> [String] -- ^ names or identifiers
+               -> m ()
+unpackPackages dest input = do
+    dest' <- liftIO (canonicalizePath ".") >>= parseAbsDir
+    (names, idents1) <- case partitionEithers $ map parse input of
+        ([], x) -> return $ partitionEithers x
+        (errs, _) -> throwM $ CouldNotParsePackageSelectors errs
+    idents2 <-
+        if null names
+            then return []
+            else findNewestVersions names
+    dests <- fetchPackages $ map (, Just dest') $ idents1 ++ idents2
+    mapM_ (\dest -> $logInfo $ "Unpacked to " <> T.pack (toFilePath dest)) dests
+  where
+    -- Possible future enhancement: parse names as name + version range
+    parse s =
+        case parsePackageNameFromString s of
+            Right x -> Right $ Left x
+            Left _ ->
+                case parsePackageIdentifierFromString s of
+                    Left _ -> Left s
+                    Right x -> Right $ Right x
 
 -- | Download the given name,version pairs into the directory expected by cabal.
 --
@@ -262,7 +295,7 @@ fetchPackages pkgs = do
                 let dest = toFilePath dest'
                     innerDest = dest FP.</> packageIdentifierString ident
                 exists <- doesDirectoryExist innerDest
-                when exists $ throwM $ UnpackDirectoryAlreadyExists dest'
+                when exists $ throwM $ UnpackDirectoryAlreadyExists innerDest
 
                 createDirectoryIfMissing True dest
 

@@ -16,6 +16,7 @@ import           Distribution.Text (display)
 import           Options.Applicative.Extra
 import           Options.Applicative.Simple
 import           Stack.Build
+import           Stack.Fetch
 import           Stack.Build.Types
 import           Stack.Config
 import           Stack.Package
@@ -38,26 +39,26 @@ main =
                         buildOpts
              addCommand "setup"
                         "Get the appropriate ghc for your project"
-                        setupCmd
-                        setupOpts)
+                        (const setupCmd)
+                        (pure ())
+             addCommand "unpack"
+                        "Unpack one or more packages locally"
+                        unpackCmd
+                        (some $ strArgument $ metavar "PACKAGE"))
      run level
 
-type SetupOpts = String
-
-setupCmd :: SetupOpts -> LogLevel -> IO ()
-setupCmd opts logLevel = do
-  version <- parseVersionFromString opts
-  config <- runStackLoggingT logLevel loadConfig
-  runStackT logLevel config $ setup version
-
-setupOpts :: Parser SetupOpts
-setupOpts = strArgument (metavar "GHC_MAJOR_VERSION")
+setupCmd :: LogLevel -> IO ()
+setupCmd logLevel = do
+  config <- runStackLoggingT logLevel (loadConfig defaultLoadOptions)
+  case configGhcVersion config of
+    Just version -> runStackT logLevel config $ setup version
+    Nothing -> error "GHC version not discovered" -- FIXME statically ensure this can't happen
 
 -- | Build the project.
 buildCmd :: BuildOpts -> LogLevel -> IO ()
 buildCmd opts logLevel =
   do config <-
-       runStackLoggingT logLevel loadConfig
+       runStackLoggingT logLevel (loadConfig defaultLoadOptions)
      catch (runStackT logLevel
                       config
                       (Stack.Build.build opts))
@@ -91,6 +92,15 @@ buildCmd opts logLevel =
               ("Dependency issues:\n" ++
                intercalate "\n"
                            (map printBuildException es))
+
+-- | Unpack packages to the filesystem
+unpackCmd :: [String] -> LogLevel -> IO ()
+unpackCmd names logLevel = do
+    config <- runStackLoggingT logLevel (loadConfig defaultLoadOptions
+        { loWriteMissing = False
+        , loSmartResolver = False
+        })
+    runStackT logLevel config (Stack.Fetch.unpackPackages "." names)
 
 -- | Parser for build arguments.
 --
