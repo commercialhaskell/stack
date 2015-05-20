@@ -71,6 +71,7 @@ import           System.Directory hiding (findFiles)
 import           System.Environment
 import qualified System.FilePath as FilePath
 import           System.IO
+import           System.IO.Temp (withSystemTempDirectory)
 import           System.Posix.Files (createSymbolicLink,removeLink)
 
 --------------------------------------------------------------------------------
@@ -795,12 +796,12 @@ getPackageInfos finalAction =
                     $logDebug "Done checking."
                     case validated of
                       [] -> return infos
-                      toFetch ->
-                        do $logInfo "Fetching and unpacking third party packages ..."
-                           newPkgDirs <- fetchAndUnpackPackages
-                                           (map (\(name, (ver, _flags)) ->
+                      toFetch -> do
+                        $logInfo "Fetching and unpacking third party packages ..."
+                        let toUnpack = map (\(name, (ver, _flags)) ->
                                                fromTuple (name,ver))
-                                                toFetch)
+                                                toFetch
+                        withTempUnpacked toUnpack $ \newPkgDirs -> do
                            -- Here is where we inject third-party
                            -- dependencies and their flags and re-run
                            -- this function.
@@ -982,13 +983,14 @@ composeFlags pname pflags gflags = collapse pflags <> gflags
 -- Package fetching
 
 -- | Fetch and unpack the package.
-fetchAndUnpackPackages :: (MonadIO m,MonadThrow m,MonadLogger m,MonadMask m,MonadReader env m,HasHttpManager env,HasConfig env)
-                       => [PackageIdentifier]
-                       -> m [Path Abs Dir]
-fetchAndUnpackPackages pkgs = do
-    config <- askConfig
-    let dest = pkgUnpackDir config
-    fetchPackages $ map (, Just $ dest) pkgs
+withTempUnpacked :: (MonadIO m,MonadThrow m,MonadLogger m,MonadMask m,MonadReader env m,HasHttpManager env,HasConfig env)
+                 => [PackageIdentifier]
+                 -> ([Path Abs Dir] -> m a)
+                 -> m a
+withTempUnpacked pkgs inner = withSystemTempDirectory "stack-unpack" $ \tmp -> do
+    dest <- parseAbsDir tmp
+    dirs <- fetchPackages $ map (, Just dest) pkgs
+    inner dirs
 
 --------------------------------------------------------------------------------
 -- Paths

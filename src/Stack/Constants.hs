@@ -66,11 +66,6 @@ distDirFromDir fp = fp </> distRelativeDir
 distRelativeDir :: Path Rel Dir
 distRelativeDir = $(mkRelDir "dist/")
 
-pkgUnpackDir :: Config -> Path Abs Dir
-pkgUnpackDir config =
-  configStackRoot config </>
-  $(mkRelDir "unpacked")
-
 pkgIndexDir :: Config -> Path Abs Dir
 pkgIndexDir config =
   configStackRoot config </>
