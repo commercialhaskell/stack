@@ -20,17 +20,16 @@ module Stack.Package
   ,PackageException (..))
   where
 
-import           Control.Exception
+import           Control.Exception hiding (try)
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
-import           Control.Monad.Loops
-import qualified Data.ByteString                       as S
+import qualified Data.ByteString as S
 import           Data.Data
+import           Data.Either
 import           Data.Function
 import           Data.List
-
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Maybe
@@ -55,7 +54,7 @@ import           Path.Find
 import           Prelude hiding (FilePath)
 import           Stack.Constants
 import           Stack.Types
-import           System.Directory (doesFileExist)
+
 import qualified System.FilePath as FilePath
 
 -- | All exceptions thrown by the library.
@@ -362,25 +361,20 @@ resolveFiles :: [Path Abs Dir] -- ^ Directories to look in.
 resolveFiles dirs names exts =
   fmap catMaybes (forM names makeNameCandidates)
   where makeNameCandidates name =
-          firstM (doesFileExist . FL.toFilePath)
-                 (concatMap (makeDirCandidates name) dirs)
+          fmap (listToMaybe . rights . concat)
+               (mapM (makeDirCandidates name) dirs)
         makeDirCandidates :: Either ModuleName String
                           -> Path Abs Dir
-                          -> [Path Abs File]
+                          -> IO [Either ResolveException (Path Abs File)]
         makeDirCandidates name dir =
-          map (\ext ->
-                 case name of
-                   Left mn ->
-                     (either (error . show)
-                             (dir </>)
-                             (FL.parseRelFile
-                                (Cabal.toFilePath mn ++
-                                 "." ++ ext)))
-                   Right fp ->
-                     either (error . show)
-                            (dir </>)
-                            (FL.parseRelFile fp))
-              (map T.unpack exts)
+          mapM (\ext ->
+                  try (case name of
+                         Left mn ->
+                           resolveFile dir
+                                       (Cabal.toFilePath mn ++ "." ++ ext)
+                         Right fp ->
+                           resolveFile dir fp))
+               (map T.unpack exts)
 
 -- | Get the filename for the cabal file in the given directory.
 --

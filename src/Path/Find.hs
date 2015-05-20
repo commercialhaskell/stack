@@ -8,7 +8,8 @@ module Path.Find
   ,findDirUp
   ,findFiles
   ,resolveDir
-  ,resolveFile)
+  ,resolveFile
+  ,ResolveException(..))
   where
 
 import Control.Monad
