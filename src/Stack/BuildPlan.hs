@@ -192,7 +192,7 @@ checkBuildPlan :: (MonadLogger m, MonadThrow m, MonadIO m)
                -> BuildPlan
                -> Path Abs File -- ^ cabal file path, used only for debugging purposes
                -> GenericPackageDescription
-               -> m (Maybe [FlagName])
+               -> m (Maybe (Map FlagName Bool))
 checkBuildPlan name bp cabalfp gpd = do
     $logInfo $ "Checking against build plan " <> renderSnapName name
     loop flagOptions
@@ -202,7 +202,7 @@ checkBuildPlan name bp cabalfp gpd = do
         pkg <- resolvePackage pkgConfig cabalfp gpd
         passes <- checkDeps flags (packageDeps pkg) packages
         if passes
-            then return $ Just $ map fst $ filter snd $ Map.toList flags
+            then return $ Just flags
             else loop rest
       where
         pkgConfig = PackageConfig
@@ -265,7 +265,7 @@ checkDeps flags deps packages = do
 findBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasStackRoot env, HasUrls env)
               => Path Abs File
               -> GenericPackageDescription
-              -> m (Maybe (SnapName, [FlagName]))
+              -> m (Maybe (SnapName, Map FlagName Bool))
 findBuildPlan cabalfp gpd = do
     snapshots <- getSnapshots
     let names =

@@ -263,11 +263,10 @@ resolvePackageDescription packageConfig (GenericPackageDescription desc defaultF
   where flags =
           M.union (packageConfigFlags packageConfig)
                   (flagMap defaultFlags)
-        flags' = map fst (filter snd (M.toList flags))
 
         rc = mkResolveConditions
                 (packageConfigGhcVersion packageConfig)
-                flags'
+                flags
 
         updateLibDeps lib deps =
           lib {libBuildInfo =
@@ -294,7 +293,7 @@ flagMap = M.fromList . map pair
         pair (MkFlag (fromCabalFlagName -> name) _desc def _manual) = (name,def)
 
 data ResolveConditions = ResolveConditions
-    { rcFlags :: [FlagName]
+    { rcFlags :: Map FlagName Bool
     , rcGhcVersion :: Version
     , rcOS :: OS
     , rcArch :: Arch
@@ -302,7 +301,7 @@ data ResolveConditions = ResolveConditions
 
 -- | Generic a @ResolveConditions@ using sensible defaults.
 mkResolveConditions :: Version -- ^ GHC version
-                    -> [FlagName] -- ^ enabled flags
+                    -> Map FlagName Bool -- ^ enabled flags
                     -> ResolveConditions
 mkResolveConditions ghcVersion flags = ResolveConditions
     { rcFlags = flags
@@ -338,7 +337,14 @@ resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
                   case v of
                     OS os -> os == rcOS rc
                     Arch arch -> arch == rcArch rc
-                    Flag flag -> elem (fromCabalFlagName flag) (rcFlags rc)
+                    Flag flag ->
+                        case M.lookup (fromCabalFlagName flag) (rcFlags rc) of
+                            Just x -> x
+                            Nothing ->
+                                -- NOTE: This should never happen, as all flags
+                                -- which are used must be declared. Defaulting
+                                -- to False
+                                False
                     Impl flavor range ->
                         flavor == GHC &&
                         withinRange (rcGhcVersion rc) range
