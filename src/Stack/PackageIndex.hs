@@ -15,6 +15,7 @@
 -- | Dealing with the 00-index file and all its cabal files.
 module Stack.PackageIndex
     ( sourcePackageIndex
+    , readPackageIdents
     , findNewestVersions
     , UnparsedCabalFile (..)
     , getLatestDescriptions
@@ -45,7 +46,7 @@ import           Data.Conduit.Zlib                     (ungzip)
 import qualified Data.Foldable                         as F
 import           Data.Map                              (Map)
 import qualified Data.Map                              as Map
-import           Data.Maybe                            (fromMaybe, isJust)
+import           Data.Maybe                            (fromMaybe, isJust, mapMaybe)
 import           Data.Monoid                           (mempty, (<>))
 import           Data.Set                              (Set)
 import qualified Data.Set                              as Set
@@ -355,47 +356,14 @@ updateIndexHTTP = do
 
 -- | Fetch all the package versions for a given package
 getPkgVersions :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasConfig env)
-               => PackageName -> m (Maybe (Set Version))
-getPkgVersions pkg =
-  do config <- askConfig
-     let tarFilePath = toFilePath $ configPackageIndex config
-     $logDebug ("Iterating through tarball " <> T.pack tarFilePath)
-     liftIO (withBinaryFile
-               tarFilePath
-               ReadMode
-               (\h ->
-                  do lbs <- L.hGetContents h
-                     vers <-
-                       liftIO (iterateTarball tarFilePath
-                                              (packageNameString pkg)
-                                              Set.empty
-                                              (Tar.read lbs))
-                     case vers of
-                       set
-                         | Set.empty == set ->
-                           return Nothing
-                       set -> return (Just set)))
-  where iterateTarball tarPath name vers (Tar.Next e es) =
-          case (getNameAndVersion (Tar.entryPath e),Tar.entryContent e) of
-            (Just (name',ver),_)
-              | name' == name ->
-                do parsedVer <- parseVersionFromString ver
-                   iterateTarball tarPath
-                                  name
-                                  (Set.insert parsedVer vers)
-                                  es
-            _ ->
-              iterateTarball tarPath name vers es
-        iterateTarball tarPath _ _ (Tar.Fail e) =
-          throwM (Couldn'tReadIndexTarball tarPath e)
-        iterateTarball _ _ vers Tar.Done = return vers
-        getNameAndVersion name =
-          case T.splitOn "/" (T.pack name) of
-            [n,v,fp]
-              | T.stripSuffix ".json" fp ==
-                  Just n ->
-                Just (T.unpack n,T.unpack v)
-            _ -> Nothing
+               => PackageName -> m (Set Version)
+getPkgVersions pkg = do
+    idents <- readPackageIdents
+    return $ Set.fromList $ mapMaybe go idents
+  where
+    go (PackageIdentifier n v)
+        | n == pkg = Just v
+        | otherwise = Nothing
 
 -- | Is the git executable installed?
 isGitInstalled :: MonadIO m

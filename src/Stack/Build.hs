@@ -48,6 +48,7 @@ import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Set (Set)
 import qualified Data.Set as S
+import qualified Data.Set as Set
 import qualified Data.Set.Monad as S
 import           Data.Streaming.Process hiding (env)
 import qualified Data.Text as T
@@ -875,14 +876,14 @@ checkPackageInIndex :: (MonadIO m, MonadLogger m,MonadThrow m
                     => (PackageName,(VersionRange,t))
                     -> m (Either PackageName (PackageName,VersionRange))
 checkPackageInIndex (name,(range,_)) =
-  do mversions <- getPkgVersions name
-     case mversions of
-       Just vers
+  do vers <- getPkgVersions name
+     case () of
+       ()
+         | Set.null vers -> return (Right (name,range))
          | any (flip withinRange range)
                (S.toList vers) ->
            return (Right (name,range))
          | otherwise -> return (Left name)
-       Nothing -> return (Right (name,range))
 
 -- | Build a map of package names to dependencies.
 buildDependencies :: MonadIO m
