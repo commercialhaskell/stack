@@ -200,25 +200,18 @@ resolveGlobFiles dir = fmap concat . mapM resolve
   where resolve name =
           if any (== '*') name
              then explode name
-             else return [(either (error . show)
-                                  (dir </>)
-                                  (FL.parseRelFile name))]
-        explode name =
-          fmap (map (either (error . show)
-                            (dir </>) .
-                     FL.parseRelFile))
-               (matchDirFileGlob (FL.toFilePath dir)
-                                 name)
+             else liftM return (resolveFile dir name)
+        explode name = do
+            names <- matchDirFileGlob (FL.toFilePath dir) name
+            mapM (resolveFile dir) names
 
 -- | Get all files referenced by the executable.
 executableFiles :: Path Abs Dir -> Executable -> IO [Path Abs File]
 executableFiles dir exe =
-  do exposed <-
+  do dirs <- mapM (resolveDir dir) (hsSourceDirs build)
+     exposed <-
        resolveFiles
-         (map (either (error . show) (dir </>) .
-               FL.parseRelDir)
-              (hsSourceDirs build) ++
-          [dir])
+         (dirs ++ [dir])
          [Right (modulePath exe)]
          haskellFileExts
      bfiles <- buildFiles dir build
@@ -228,11 +221,9 @@ executableFiles dir exe =
 -- | Get all files referenced by the library.
 libraryFiles :: Path Abs Dir -> Library -> IO [Path Abs File]
 libraryFiles dir lib =
-  do exposed <- resolveFiles
-                  (map (either (error . show) (dir </>) .
-                        FL.parseRelDir)
-                       (hsSourceDirs build) ++
-                   [dir])
+  do dirs <- mapM (resolveDir dir) (hsSourceDirs build)
+     exposed <- resolveFiles
+                  (dirs ++ [dir])
                   (map Left (exposedModules lib))
                   haskellFileExts
      bfiles <- buildFiles dir build
