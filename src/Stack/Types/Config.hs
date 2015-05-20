@@ -133,6 +133,10 @@ askPackageIndexGitUrl = askUrl "package-index-git-url" "https://github.com/comme
 askPackageIndexHttpUrl :: (MonadReader env m, HasUrls env) => m Text
 askPackageIndexHttpUrl = askUrl "package-index-http-url" "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"
 
+-- | Location of the 00-index.cache file
+configPackageIndexCache :: Config -> Path Abs File
+configPackageIndexCache config = configStackRoot config </> $(mkRelFile "00-index.cache")
+
 -- | Location of the 00-index.tar file
 configPackageIndex :: Config -> Path Abs File
 configPackageIndex config = configStackRoot config </> $(mkRelFile "00-index.tar")

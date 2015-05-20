@@ -24,9 +24,9 @@ module Stack.PackageIndex
     ) where
 
 import qualified Codec.Archive.Tar                     as Tar
-import           Control.Exception                     (Exception)
+import           Control.Exception                     (Exception, toException)
 import           Control.Exception.Enclosed            (tryIO)
-import           Control.Monad                         (unless, when)
+import           Control.Monad                         (unless, when, liftM)
 import           Control.Monad.Catch                   (MonadThrow, throwM)
 import           Control.Monad.IO.Class                (MonadIO, liftIO)
 import           Control.Monad.Logger                  (MonadLogger, logDebug,
@@ -34,12 +34,15 @@ import           Control.Monad.Logger                  (MonadLogger, logDebug,
 import           Control.Monad.Reader                  (runReaderT)
 import           Control.Monad.Trans.Control           (MonadBaseControl)
 import           Control.Monad.Trans.Resource          (runResourceT)
+import qualified Data.ByteString                       as S
+import qualified Data.ByteString.Char8                 as S8
 import qualified Data.ByteString.Lazy                  as L
 import           Data.Conduit                          (($$), (=$), yield, Producer)
 import           Data.Conduit.Binary                   (sinkHandle,
                                                         sourceHandle)
 import qualified Data.Conduit.List                     as CL
 import           Data.Conduit.Zlib                     (ungzip)
+import qualified Data.Foldable                         as F
 import           Data.Map                              (Map)
 import qualified Data.Map                              as Map
 import           Data.Maybe                            (fromMaybe, isJust)
@@ -84,12 +87,33 @@ data UnparsedCabalFile = UnparsedCabalFile
     , ucfEntry   :: Tar.Entry
     }
 
+-- | Stream a list of all the package identifiers
+readPackageIdents :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m)
+                  => m [PackageIdentifier]
+readPackageIdents = do
+    config <- askConfig
+    let fp = toFilePath $ configPackageIndexCache config
+        load = do
+            ebs <- liftIO $ tryIO $ S.readFile fp
+            case ebs of
+                Left e -> return $ Left $ toException e
+                Right bs -> return $ mapM parsePackageIdentifier $ S8.lines bs
+    x <- load
+    case x of
+        Left e -> do
+            $logDebug $ "Populate index cache, load failed with " <> T.pack (show e)
+            let toIdent ucf = PackageIdentifier (ucfName ucf) (ucfVersion ucf)
+            pis <- sourcePackageIndex $$ CL.map toIdent =$ CL.consume
+            liftIO $ S.writeFile fp $ S8.pack $ unlines $ map packageIdentifierString pis
+            return pis
+        Right y -> return y
+
 -- | Find the newest versions of all given package names.
-findNewestVersions :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env)
+findNewestVersions :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m)
                    => [PackageName]
                    -> m [PackageIdentifier]
 findNewestVersions names0 = do
-    (m, discovered) <- sourcePackageIndex $$ CL.fold add (Map.empty, Set.empty)
+    (m, discovered) <- liftM (F.foldl' add (Map.empty, Set.empty)) readPackageIdents
     let missing = Set.difference names discovered
     if Set.null missing
         then return $ map fromTuple $ Map.toList m
@@ -97,15 +121,12 @@ findNewestVersions names0 = do
   where
     names = Set.fromList names0
 
-    add orig@(m, discovered) ucf
+    add orig@(m, discovered) (PackageIdentifier n v)
         | n `Set.member` names =
             let !m' = Map.insertWith max n v m
                 !d' = Set.insert n discovered
              in (m', d')
         | otherwise = orig
-      where
-        n = ucfName ucf
-        v = ucfVersion ucf
 
 -- | Stream all of the cabal files from the 00-index tar file.
 sourcePackageIndex :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env)
@@ -287,6 +308,7 @@ updateIndexGit = do
                                           ,"https://github.com/fpco/stackage-update#readme"])))
             $logDebug ("Exporting a tarball to " <>
                        (T.pack . toFilePath) tarFile)
+            deleteCache
             runIn acfDir
                   gitPath
                   ["archive"
@@ -315,6 +337,8 @@ updateIndexHTTP = do
         let gz = toFilePath $ configPackageIndexGz config
             tar = toFilePath $ configPackageIndex config
             tmp = tar <.> "tmp"
+
+        deleteCache
 
         liftIO $ do
             withBinaryFile gz ReadMode $ \input ->
@@ -379,3 +403,13 @@ isGitInstalled :: MonadIO m
 isGitInstalled =
   return . isJust =<<
   liftIO (findExecutable "git")
+
+-- | Delete the package index cache
+deleteCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m) => m ()
+deleteCache = do
+    config <- askConfig
+    let fp = toFilePath $ configPackageIndexCache config
+    eres <- liftIO $ tryIO $ removeFile fp
+    case eres of
+        Left e -> $logInfo $ "Could not delete cache: " <> T.pack (show e)
+        Right () -> $logDebug $ "Deleted index cache at " <> T.pack fp
