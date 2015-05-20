@@ -768,7 +768,6 @@ getPackageInfos finalAction =
                                     -- configPackagesIdent as well.
                                     (configPackagesPath cfg)
                                     (configPackageFlags cfg))
-             _ <- error $ show (infos, errs)
              case errs of
                [] -> return infos
                _
