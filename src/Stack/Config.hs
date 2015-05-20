@@ -46,6 +46,7 @@ import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Yaml as Yaml
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager)
 import           Path
+import           Path.Find (resolveDir)
 import           Stack.BuildPlan
 import           Stack.Package
 import           Stack.Types
@@ -203,9 +204,7 @@ configFromConfigMonoid configStackRoot Project{..} ConfigMonoid{..} = do
                         DockerOpts Nothing -> True
                         DockerOpts (Just _) -> False
 
-     configPackagesPath' <- forM projectPackagesPath $ \p -> do
-        dir <- liftIO $ canonicalizePath $ toFilePath projectRoot FP.</> p
-        parseAbsDir dir
+     configPackagesPath' <- mapM (resolveDir projectRoot) projectPackagesPath
      let configPackagesPath = S.fromList configPackagesPath'
          configMaybeResolver = configMonoidResolver
      origEnv <- liftIO getEnvironment

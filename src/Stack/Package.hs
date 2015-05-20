@@ -51,7 +51,7 @@ import           Distribution.PackageDescription.Parse
 import           Distribution.Simple.Utils
 import           Distribution.System
 import           Path as FL
-import           Path.Find (findFiles)
+import           Path.Find
 import           Prelude hiding (FilePath)
 import           Stack.Constants
 import           Stack.Types
@@ -241,18 +241,14 @@ libraryFiles dir lib =
 
 -- | Get all files in a build.
 buildFiles :: Path Abs Dir -> BuildInfo -> IO [Path Abs File]
-buildFiles dir build =
-  do other <- resolveFiles
-                (map (either (error . show) (dir </>) .
-                      FL.parseRelDir)
-                     (hsSourceDirs build) ++
-                 [dir])
+buildFiles dir build = do
+    dirs <- mapM (resolveDir dir) (hsSourceDirs build)
+    other <- resolveFiles
+                (dirs ++ [dir])
                 (map Left (otherModules build))
                 haskellFileExts
-     return (concat [other
-                    ,map (either (error . show) (dir </>) .
-                          FL.parseRelFile)
-                         (cSources build)])
+    cSources' <- mapM (resolveFile dir) (cSources build)
+    return (other ++ cSources')
 
 -- | Get all dependencies of a package, including library,
 -- executables, tests, benchmarks.
