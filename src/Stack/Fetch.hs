@@ -57,7 +57,7 @@ import           Network.HTTP.Client      (Manager, brRead, checkStatus,
                                            responseStatus, withResponse)
 import           Network.HTTP.Types (statusCode)
 import           Stack.Constants
-import           Stack.Config
+
 import Path
 import           System.Directory         (createDirectoryIfMissing,
                                            doesFileExist, doesDirectoryExist,

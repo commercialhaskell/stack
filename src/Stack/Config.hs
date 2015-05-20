@@ -52,7 +52,7 @@ import           Stack.Package
 import           Stack.Types
 import           System.Directory
 import           System.Environment
-import qualified System.FilePath as FP
+
 
 -- An uninterpreted representation of configuration options.
 -- Configurations may be "cascaded" using mappend (left-biased).
