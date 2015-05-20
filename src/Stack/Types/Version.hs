@@ -10,6 +10,7 @@
 module Stack.Types.Version
   (Version
   ,Cabal.VersionRange -- FIXME in the future should have a newtype wrapper
+  ,getMajorVersion
   ,versionParser
   ,parseVersion
   ,parseVersionFromString
@@ -53,6 +54,14 @@ instance Exception VersionParseFail
 newtype Version =
   Version {unVersion :: Vector Word}
   deriving (Eq,Ord,Typeable,Data,Generic)
+
+-- | Returns the first two components, defaulting to 0 if not present
+getMajorVersion :: Version -> (Word, Word)
+getMajorVersion (Version v) =
+    case V.length v of
+        0 -> (0, 0)
+        1 -> (V.head v, 0)
+        _ -> (V.head v, v V.! 1)
 
 instance Hashable Version where
   hashWithSalt i = hashWithSalt i . V.toList . unVersion

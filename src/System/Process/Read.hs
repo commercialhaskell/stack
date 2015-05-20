@@ -5,55 +5,76 @@
 -- | Reading from external processes.
 
 module System.Process.Read
-  (readProcessStdout
+  (HasExternalEnv(..)
+  ,callProcess
+  ,readProcessStdout
   ,tryProcessStdout
   ,sinkProcessStdout
   ,runIn)
   where
 
-import           Conduit
+import           Conduit -- FIXME drop this dependency
 import           Control.Applicative ((*>))
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Exception
 import           Control.Monad (when)
 import           Control.Monad.Logger (MonadLogger, logError)
+import           Control.Monad.Reader (MonadReader, asks, runReaderT)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
-import           Data.Conduit.Process
+import           Data.Conduit.Process hiding (callProcess)
 import           Data.Foldable (forM_)
 import qualified Data.Text as T
 import           Path (Path, Abs, Dir, File, toFilePath)
 import           System.Directory (createDirectoryIfMissing)
 import           System.Exit (ExitCode(ExitSuccess), exitWith)
 
+-- | Reader values which have optional environment variable overrides
+class HasExternalEnv env where
+    getExternalEnv :: env -> Maybe [(String, String)]
+
+newtype EnvHelper = EnvHelper (Maybe [(String, String)])
+instance HasExternalEnv EnvHelper where
+    getExternalEnv (EnvHelper x) = x
+
 -- | Try to produce a strict 'S.ByteString' from the stdout of a
 -- process.
-tryProcessStdout :: MonadIO m
+tryProcessStdout :: (MonadIO m, MonadReader env m, HasExternalEnv env)
                  => String
                  -> [String]
                  -> m (Either ProcessExitedUnsuccessfully S.ByteString)
-tryProcessStdout name args =
-  liftIO (try (readProcessStdout name args))
+tryProcessStdout name args = do
+  menv <- asks (EnvHelper . getExternalEnv)
+  liftIO (try (runReaderT (readProcessStdout name args) menv))
 
 -- | Produce a strict 'S.ByteString' from the stdout of a
 -- process. Throws a 'ProcessExitedUnsuccessfully' exception if the
 -- process fails.
-readProcessStdout :: MonadIO m => String
-                    -> [String]
-                    -> m S.ByteString
+readProcessStdout :: (MonadIO m, MonadReader env m, HasExternalEnv env)
+                  => String
+                  -> [String]
+                  -> m S.ByteString
 readProcessStdout name args =
   sinkProcessStdout name args sinkLazy >>=
   liftIO . evaluate . L.toStrict
 
+-- | Same as @System.Process.callProcess@, but respect @HasExternalEnv@
+callProcess :: (MonadIO m, MonadReader env m, HasExternalEnv env)
+            => String
+            -> [String]
+            -> m ()
+callProcess name args = sinkProcessStdout name args sinkNull
+
 -- | Consume the stdout of a process feeding strict 'S.ByteString's to a consumer.
-sinkProcessStdout :: MonadIO m
+sinkProcessStdout :: (MonadIO m, MonadReader env m, HasExternalEnv env)
                   => String
                   -> [String]
                   -> Consumer S.ByteString IO a
                   -> m a
-sinkProcessStdout name args sink =
+sinkProcessStdout name args sink = do
+  env' <- asks getExternalEnv
   liftIO (withCheckedProcess
-            (proc name args)
+            (proc name args) { env = env' }
             (\ClosedStream out err ->
                runConcurrently $
                Concurrently (asBSSource err $$ sinkNull) *>

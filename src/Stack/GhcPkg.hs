@@ -7,7 +7,6 @@
 
 module Stack.GhcPkg
   (getAllPackages
-  ,getUserDbPath
   ,findPackageId
   ,getPackageIds)
   where
@@ -17,8 +16,10 @@ import           System.Process.Read
 
 import           Control.Applicative
 import           Control.Exception hiding (catch)
+import           Control.Monad (liftM, forM_, unless)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
+import           Control.Monad.Reader (MonadReader)
 import           Data.Attoparsec.ByteString.Char8
 import qualified Data.Attoparsec.ByteString.Lazy as AttoLazy
 import qualified Data.ByteString.Char8 as S8
@@ -32,8 +33,9 @@ import           Data.Streaming.Process
 
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import           Path (Path, Abs, Dir, toFilePath, parent)
 import           Prelude hiding (FilePath)
-import           System.IO hiding (char8)
+import           System.Directory (createDirectoryIfMissing, doesDirectoryExist)
 
 -- | A ghc-pkg exception.
 data GhcPkgException
@@ -43,15 +45,41 @@ data GhcPkgException
   deriving (Typeable,Show)
 instance Exception GhcPkgException
 
+-- | Run the ghc-pkg executable
+ghcPkg :: (MonadIO m, MonadReader env m, HasExternalEnv env)
+       => [Path Abs Dir]
+       -> [String]
+       -> m (Either ProcessExitedUnsuccessfully S8.ByteString)
+ghcPkg pkgDbs args = do
+    eres <- go
+    case eres of
+        Left _ -> do
+            forM_ pkgDbs $ \db -> do
+                let db' = toFilePath db
+                exists <- liftIO $ doesDirectoryExist db'
+                unless exists $ do
+                    -- Creating the parent doesn't seem necessary, as ghc-pkg
+                    -- seems to be sufficiently smart. But I don't feel like
+                    -- finding out it isn't the hard way
+                    liftIO $ createDirectoryIfMissing True $ toFilePath $ parent db
+                    _ <- tryProcessStdout "ghc-pkg" ["init", db']
+                    return ()
+            go
+        Right _ -> return eres
+  where
+    go = tryProcessStdout "ghc-pkg"
+        $ "--no-user-package-db"
+        : map (\x -> ("--package-db=" ++ toFilePath x)) pkgDbs
+       ++ args
+
 -- | Get all available packages.
-getAllPackages :: (MonadCatch m,MonadIO m,MonadThrow m)
-               => m (Map PackageName Version)
-getAllPackages =
-  do result <-
-       tryProcessStdout "ghc-pkg"
-                        ["list"]
+getAllPackages :: (MonadCatch m,MonadIO m,MonadThrow m,MonadReader env m,HasExternalEnv env)
+               => [Path Abs Dir] -- ^ package databases
+               -> m (Map PackageName Version)
+getAllPackages pkgDbs =
+  do result <- ghcPkg pkgDbs ["list"]
      case result of
-       Left{} -> throw GetAllPackagesFail
+       Left {} -> throw GetAllPackagesFail
        Right lbs ->
          case AttoLazy.parse pkgsListParser
                              (L.fromStrict lbs) of
@@ -78,25 +106,12 @@ pkgsListParser =
              space
              fmap toTuple packageIdentifierParser
 
--- | Get the package of the package database.
-getUserDbPath :: IO FilePath
-getUserDbPath =
-  do result <-
-       tryProcessStdout "ghc-pkg"
-                        ["list","--user"]
-     case find (not .
-                T.isPrefixOf " ")
-               (map T.decodeUtf8 (S8.lines (either (const "") id result))) >>=
-          T.stripSuffix ":" of
-       Nothing -> throw GetUserDbPathFail
-       Just path -> evaluate (T.unpack path)
-
 -- | Get the id of the package e.g. @foo-0.0.0-9c293923c0685761dcff6f8c3ad8f8ec@.
-findPackageId :: PackageName -> IO (Maybe GhcPkgId)
-findPackageId name =
-  do result <-
-       tryProcessStdout "ghc-pkg"
-                        ["describe",packageNameString name]
+findPackageId :: (MonadIO m, MonadReader env m, HasExternalEnv env)
+              => [Path Abs Dir] -- ^ package databases
+              -> PackageName -> m (Maybe GhcPkgId)
+findPackageId pkgDbs name =
+  do result <- ghcPkg pkgDbs ["describe", packageNameString name]
      case result of
        Left{} -> return Nothing
        Right lbs ->
@@ -111,13 +126,16 @@ findPackageId name =
               _ -> return Nothing
 
 -- | Get all current package ids.
-getPackageIds :: [PackageName] -> IO (Map PackageName GhcPkgId)
-getPackageIds pkgs = collect pkgs >>= evaluate
+getPackageIds :: (MonadIO m, MonadReader env m, HasExternalEnv env)
+              => [Path Abs Dir] -- ^ package databases
+              -> [PackageName]
+              -> m (Map PackageName GhcPkgId)
+getPackageIds pkgDbs pkgs = collect pkgs >>= liftIO . evaluate
   where collect =
-          fmap (M.fromList . catMaybes) .
+          liftM (M.fromList . catMaybes) .
           mapM getTuple
         getTuple name =
-          do mpid <- findPackageId name
+          do mpid <- findPackageId pkgDbs name
              case mpid of
                Nothing -> return Nothing
                Just pid ->

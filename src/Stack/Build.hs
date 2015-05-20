@@ -18,6 +18,7 @@ module Stack.Build
   ,clean
   ,shakeFilesPath
   ,configDir
+  ,checkGHCVersion
   ,getPackageInfos)
   where
 
@@ -51,6 +52,7 @@ import qualified Data.Set as S
 import qualified Data.Set as Set
 import qualified Data.Set.Monad as S
 import           Data.Streaming.Process hiding (env)
+import qualified Data.Streaming.Process as Process
 import qualified Data.Text as T
 import           Development.Shake hiding (doesFileExist,doesDirectoryExist,getDirectoryContents)
 import           Distribution.Package hiding (packageName,packageVersion,Package,PackageName,PackageIdentifier)
@@ -73,6 +75,7 @@ import qualified System.FilePath as FilePath
 import           System.IO
 import           System.IO.Temp (withSystemTempDirectory)
 import           System.Posix.Files (createSymbolicLink,removeLink)
+import           System.Process.Read (getExternalEnv, readProcessStdout)
 
 --------------------------------------------------------------------------------
 -- Top-level commands
@@ -123,7 +126,9 @@ build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,Mona
 build bopts =
   do env <- ask
      pinfos <- runResourceT (getPackageInfos (boptsFinalAction bopts))
-     pkgIds <- liftIO $ getPackageIds (map packageName (S.toList pinfos))
+     pkgIds <- getPackageIds
+                [bcPackageDatabase $ getBuildConfig env]
+                (map packageName (S.toList pinfos))
      pwd <- liftIO $ getCurrentDirectory >>= parseAbsDir
      docLoc <- liftIO $ getUserDocLoc
      installResource <- liftIO $ newResourceIO "cabal install" 1
@@ -146,6 +151,7 @@ build bopts =
                   return (makePlan pkgIds
                                    wantedTarget
                                    bopts
+                                   (getBuildConfig env)
                                    gconfig
                                    pinfos
                                    pinfo
@@ -222,6 +228,7 @@ clean =
 makePlan :: Map PackageName GhcPkgId
          -> Bool
          -> BuildOpts
+         -> BuildConfig
          -> GenConfig
          -> Set Package
          -> Package
@@ -229,7 +236,7 @@ makePlan :: Map PackageName GhcPkgId
          -> Path Abs Dir
          -> MVar ConfigLock
          -> Rules ()
-makePlan pkgIds wanted bopts gconfig pinfos pinfo installResource docLoc cfgVar =
+makePlan pkgIds wanted bopts bconfig gconfig pinfos pinfo installResource docLoc cfgVar =
   do when wanted (want [target])
      target %>
        \_ ->
@@ -240,6 +247,7 @@ makePlan pkgIds wanted bopts gconfig pinfos pinfo installResource docLoc cfgVar 
             actionFinally
               (buildPackage
                  bopts
+                 bconfig
                  pinfos
                  pinfo
                  gconfig
@@ -249,7 +257,7 @@ makePlan pkgIds wanted bopts gconfig pinfos pinfo installResource docLoc cfgVar 
                  installResource
                  docLoc)
               removeAfterwards
-            writeFinalFiles gconfig dir (packageName pinfo)
+            writeFinalFiles gconfig bconfig dir (packageName pinfo)
   where needSourceFiles =
           need (map FL.toFilePath (S.toList (packageFiles pinfo)))
         dir = packageDir pinfo
@@ -298,9 +306,13 @@ needDependencies pkgIds bopts pinfos pinfo cfgVar =
 
 -- | Write the final generated files after a build successfully
 -- completes.
-writeFinalFiles :: MonadIO m => GenConfig -> Path Abs Dir -> PackageName -> m ()
-writeFinalFiles gconfig dir name =
-  liftIO (do mpkigid <- findPackageId name
+writeFinalFiles :: (MonadIO m)
+                => GenConfig -> BuildConfig -> Path Abs Dir -> PackageName -> m ()
+writeFinalFiles gconfig bconfig dir name = liftIO $
+         (do mpkigid <- flip runReaderT bconfig
+                      $ findPackageId
+                            [bcPackageDatabase bconfig]
+                            name
              case mpkigid of
                Nothing -> throwIO (Couldn'tFindPkgId name)
                Just pkgid ->
@@ -314,6 +326,7 @@ writeFinalFiles gconfig dir name =
 
 -- | Build the given package with the given configuration.
 buildPackage :: BuildOpts
+             -> BuildConfig
              -> Set Package
              -> Package
              -> GenConfig
@@ -321,11 +334,14 @@ buildPackage :: BuildOpts
              -> Resource
              -> Path Abs Dir
              -> Action ()
-buildPackage bopts pinfos pinfo gconfig setupAction installResource docLoc =
+buildPackage bopts bconfig pinfos pinfo gconfig setupAction installResource docLoc =
   do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath pinfo))) :: IO (Either IOException ())))
      runhaskell
        pinfo
+       (getExternalEnv bconfig)
        (concat [["configure","--user"]
+               ,["--package-db=clear","--package-db=global"]
+               ,["--package-db=" ++ toFilePath (bcPackageDatabase bconfig)] -- FIXME do the more complicated double-package-database thing once we have two-phase builds
                ,["--enable-library-profiling" | gconfigLibProfiling gconfig]
                ,["--enable-executable-profiling" | gconfigExeProfiling gconfig]
                ,["--enable-tests" | setupAction == DoTests]
@@ -339,6 +355,7 @@ buildPackage bopts pinfos pinfo gconfig setupAction installResource docLoc =
                     (M.toList (packageFlags pinfo))])
      runhaskell
        pinfo
+       (getExternalEnv bconfig)
        (concat [["build"]
                ,["--ghc-options=-O2" | gconfigOptimize gconfig]
                ,["--ghc-options=-fforce-recomp" | gconfigForceRecomp gconfig]
@@ -346,11 +363,13 @@ buildPackage bopts pinfos pinfo gconfig setupAction installResource docLoc =
      case setupAction of
        DoTests ->
          runhaskell pinfo
+                    (getExternalEnv bconfig)
                     ["test"]
        DoHaddock ->
            do liftIO (removeDocLinks docLoc pinfo)
               ifcOpts <- liftIO (haddockInterfaceOpts docLoc pinfo pinfos)
               runhaskell pinfo
+                         (getExternalEnv bconfig)
                          ["haddock"
                          ,"--html"
                          ,"--hoogle"
@@ -374,18 +393,20 @@ buildPackage bopts pinfos pinfo gconfig setupAction installResource docLoc =
                                  ,hoogleDbPath])
        DoBenchmarks ->
          runhaskell pinfo
+                    (getExternalEnv bconfig)
                     ["bench"]
        _ -> return ()
      withResource installResource 1
                   (runhaskell pinfo
+                              (getExternalEnv bconfig)
                               ["install","--user"])
      case setupAction of
        DoHaddock -> liftIO (createDocLinks docLoc pinfo)
        _ -> return ()
 
 -- | Run the Haskell command for the given package.
-runhaskell :: Package -> [String] -> Action ()
-runhaskell pinfo args =
+runhaskell :: Package -> Maybe [(String, String)] -> [String] -> Action ()
+runhaskell pinfo menv args =
   do liftIO (createDirectoryIfMissing True
                                       (FL.toFilePath (stackageBuildDir pinfo)))
      putQuiet display
@@ -394,6 +415,7 @@ runhaskell pinfo args =
      join (liftIO (catch (do withCheckedProcess
                                cp {cwd =
                                      Just (FL.toFilePath dir)
+                                  ,Process.env = menv
                                   ,std_err = Inherit}
                                (\ClosedStream stdout' stderr' ->
                                   do logFrom stdout' outRef
@@ -756,11 +778,11 @@ getPackageInfos finalAction =
        go True cfg
   where go retry cfg =
           do unless retry ($logInfo "Getting pack information, dependencies, etc. ...")
-             globalPackages <- getAllPackages
+             bconfig <- asks getBuildConfig
+             globalPackages <- getAllPackages [bcPackageDatabase bconfig]
 
              paths <- unpackPackageIdentsForBuild (configPackagesIdent cfg)
 
-             bconfig <- asks getBuildConfig
              (infos,errs) <-
                runWriterT
                  (buildDependencies finalAction
@@ -1002,3 +1024,17 @@ shakeFilesPath dir =
 -- | Returns true for paths whose last directory component begins with ".".
 isHiddenDir :: Path b Dir -> Bool
 isHiddenDir = isPrefixOf "." . toFilePath . dirname
+
+--------------------------------------------------------------------------------
+-- | Check that the GHC on the PATH matches the expected GHC
+checkGHCVersion :: (MonadIO m, MonadThrow m, MonadReader env m, HasBuildConfig env)
+                => m ()
+checkGHCVersion = do
+    bs <- readProcessStdout "ghc" ["--numeric-version"]
+    actualVersion <- parseVersion $ S8.takeWhile isValidChar bs
+    bconfig <- asks getBuildConfig
+    when (getMajorVersion actualVersion /= getMajorVersion (bcGhcVersion bconfig))
+        $ throwM $ GHCVersionMismatch actualVersion (bcGhcVersion bconfig)
+  where
+    isValidChar '.' = True
+    isValidChar c = '0' <= c && c <= '9'

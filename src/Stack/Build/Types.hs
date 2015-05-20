@@ -32,6 +32,7 @@ data StackBuildException
   | StackageDepVerMismatch PackageName Version VersionRange
   | StackageVersionMismatch PackageName Version Version
   | DependencyIssues [StackBuildException]
+  | GHCVersionMismatch Version Version
   deriving (Typeable,Show)
 
 instance Exception StackBuildException

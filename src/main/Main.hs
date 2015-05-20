@@ -52,14 +52,18 @@ setupCmd logLevel = do
   bc <- runStackLoggingT logLevel (loadConfig >>= toBuildConfig)
   runStackT logLevel bc $ setup $ bcGhcVersion bc
 
+-- | Modify the PATH appropriately, possibly doing installation too
+setupPath :: Monad m => BuildConfig -> m BuildConfig
+setupPath = return
+
 -- | Build the project.
 buildCmd :: BuildOpts -> LogLevel -> IO ()
 buildCmd opts logLevel =
   do config <-
-       runStackLoggingT logLevel (loadConfig >>= toBuildConfig)
-     catch (runStackT logLevel
-                      config
-                      (Stack.Build.build opts))
+       runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupPath)
+     catch (runStackT logLevel config $ do
+                 checkGHCVersion
+                 Stack.Build.build opts)
            (error . printBuildException)
   where printBuildException e =
           case e of
@@ -90,6 +94,11 @@ buildCmd opts logLevel =
               ("Dependency issues:\n" ++
                intercalate "\n"
                            (map printBuildException es))
+            GHCVersionMismatch actual expected ->
+              ("GHC version mismatched, found " ++
+               versionString actual ++
+               ", but expected " ++
+               versionString expected)
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> LogLevel -> IO ()

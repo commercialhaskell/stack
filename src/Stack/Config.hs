@@ -26,6 +26,7 @@ module Stack.Config
   ) where
 
 import           Control.Applicative
+import           Control.Arrow ((***))
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -34,6 +35,7 @@ import           Control.Monad.Reader (MonadReader, ask, runReaderT)
 import           Data.Aeson
 import           Data.Either (partitionEithers)
 import           Data.Map (Map)
+import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Set (Set)
@@ -206,6 +208,8 @@ configFromConfigMonoid configStackRoot Project{..} ConfigMonoid{..} = do
         parseAbsDir dir
      let configPackagesPath = S.fromList configPackagesPath'
          configMaybeResolver = configMonoidResolver
+     origEnv <- liftIO getEnvironment
+     let configExternalEnv = Map.fromList $ map (T.pack *** T.pack) origEnv
      return Config {..}
 
 toBuildConfig :: (HasHttpManager env, MonadReader env m, MonadCatch m, MonadIO m, MonadLogger m)

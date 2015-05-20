@@ -7,6 +7,7 @@
 
 module Stack.Types.Config where
 
+import Control.Arrow ((***))
 import Control.Exception
 import Control.Monad (liftM)
 import Control.Monad.Catch (MonadThrow)
@@ -17,6 +18,7 @@ import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import Data.Text (Text)
+import qualified Data.Text as T
 import Data.Typeable
 import Path
 import Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
@@ -25,6 +27,7 @@ import Stack.Types.FlagName
 import Stack.Types.PackageIdentifier
 import Stack.Types.PackageName
 import Stack.Types.Version
+import System.Process.Read (HasExternalEnv (..))
 
 -- | The top-level Stackage configuration.
 data Config =
@@ -49,6 +52,8 @@ data Config =
          -- missing dependencies will result in a compilation failure. Useful
          -- to disable this flag, for example, when using a precompiled binary
          -- package database, such as via Docker.
+         ,configExternalEnv      :: !(Map Text Text) -- FIXME different env for ghc/shell that includes GHC_PACKAGE_PATH and one that doesn't? or maybe just hardcode removing it when necessary
+         -- ^ Environment variables to be passed to external tools
          }
   -- ^ Flags for each package's Cabal config.
   deriving (Show)
@@ -103,11 +108,13 @@ class HasUrls env where
     {-# INLINE getUrls #-}
 
 -- | Class for environment values that can provide a 'Config'.
-class (HasStackRoot env, HasUrls env) => HasConfig env where
+class (HasStackRoot env, HasUrls env, HasExternalEnv env) => HasConfig env where
     getConfig :: env -> Config
     default getConfig :: HasBuildConfig env => env -> Config
     getConfig = bcConfig . getBuildConfig
     {-# INLINE getConfig #-}
+instance HasExternalEnv Config where
+    getExternalEnv = Just . map (T.unpack *** T.unpack) . Map.toList . configExternalEnv
 instance HasStackRoot Config
 instance HasUrls Config
 instance HasConfig Config where
@@ -120,6 +127,8 @@ class HasConfig env => HasBuildConfig env where
 instance HasStackRoot BuildConfig
 instance HasUrls BuildConfig
 instance HasConfig BuildConfig
+instance HasExternalEnv BuildConfig where
+    getExternalEnv = getExternalEnv . getConfig
 instance HasBuildConfig BuildConfig where
     getBuildConfig = id
     {-# INLINE getBuildConfig #-}
@@ -180,9 +189,13 @@ configPackageTarball config ident = do
     return $ configStackRoot config </> $(mkRelDir "packages") </> name </> ver </> base
 
 -- | Per-project work dir
-configProjectWorkDir :: Config -> Path Abs Dir
-configProjectWorkDir config = configDir config </> $(mkRelDir ".stack-work")
+configProjectWorkDir :: HasConfig env => env -> Path Abs Dir
+configProjectWorkDir env = configDir (getConfig env) </> $(mkRelDir ".stack-work")
 
 -- | Where to unpack packages for local build
 configLocalUnpackDir :: Config -> Path Abs Dir
 configLocalUnpackDir config = configProjectWorkDir config </> $(mkRelDir "unpacked")
+
+-- | Package database to compile against. Probably need to get more complicated
+bcPackageDatabase :: HasConfig env => env -> Path Abs Dir -- FIXME do the more complicated double-package-database thing once we have two-phase builds
+bcPackageDatabase env = configProjectWorkDir env </> $(mkRelDir "pkgdb") -- FIXME include the GHC version also?
