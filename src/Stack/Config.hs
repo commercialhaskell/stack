@@ -123,8 +123,8 @@ instance FromJSON ConfigMonoid where
       do getTheDocker <- obj .:? "docker"
          configMonoidUrls <- obj .:? "urls" .!= mempty
          configMonoidGpgVerifyIndex <- obj .:? "gpg-verify-index"
-         configMonoidResolver <- obj .:? "resolver"
-         configMonoidInstallDeps <- obj .:? "install-dependencies"
+         configMonoidResolver <- obj .:? "resolver" -- FIXME move to Project?
+         configMonoidInstallDeps <- obj .:? "install-dependencies" -- FIXME move to Project?
          let configMonoidDockerOpts = DockerOpts getTheDocker
          return ConfigMonoid {..}
 
@@ -246,7 +246,10 @@ configFromConfigMonoid lo configStackRoot Project{..} ConfigMonoid{..} = do
      when (loWriteMissing lo && not projectConfigExists) $ do
         let dest = toFilePath $ projectRoot </> stackDotYaml
         $logInfo $ "Writing default config file to: " <> T.pack dest
-        error "FIXME write config file"
+        liftIO $ Yaml.encodeFile dest $ object
+            [ "packages" .= ["." :: Text]
+            , "resolver" .= renderResolver configResolver
+            ]
      return Config {..}
 
 data MiniConfig = MiniConfig Manager (Path Abs Dir) (Map Text Text)
@@ -314,8 +317,19 @@ loadProjectConfig = do
             mfp <- search currDir
             case mfp of
                 Just fp -> do
-                    $logInfo $ "Project config file at " <> T.pack (toFilePath fp)
+                    $logInfo $ "Loading project config file at " <> T.pack (toFilePath fp)
                     load fp
+                Nothing -> do
+                    $logInfo $ "No project config file found, using defaults"
+                    return Project
+                        { projectRoot = currDir
+                        , projectPackagesPath = ["."]
+                        , projectPackagesIdent = mempty
+                        , projectGlobalFlags = mempty
+                        , projectPackageFlags = mempty
+                        , projectConfigExists = False
+                        , projectConfigMonoid = mempty
+                        }
   where
     load fp = do
         mkProject <-
