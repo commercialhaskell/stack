@@ -1,6 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -22,8 +23,6 @@
 module Stack.Config
   ( Config(..)
   , ConfigException(..)
-  , configInDocker
-  , configBinPaths
   , Docker(..)
   , Mount(..)
   , HasConfig (..)
@@ -65,8 +64,8 @@ import           Control.Monad.Reader (MonadReader, ask, runReaderT)
 import           Data.Aeson
 import           Data.Aeson.Types (typeMismatch)
 import qualified Data.ByteString as S (readFile)
+import           Data.Either (partitionEithers)
 import           Data.Map (Map)
-import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Monoid
@@ -74,8 +73,8 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
 import qualified Data.Yaml as Yaml
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager)
 import           Path
@@ -85,49 +84,24 @@ import           Stack.Package
 import           Stack.Types
 import           System.Directory
 import           System.Environment
-import           System.FilePath (searchPathSeparator, (<.>))
-import           System.Process
-
--- Some examples of stack.yaml
-
--- (example 1)
--- build:
---   in: docker
-
--- (example 2)
--- build:
---   with: lts-2
-
--- (example 3)
--- build:
---   with: nightly-2015-06-01
-
--- (example 4)
--- build:
---   with:
---     ghc: /home/dan/ghc/ghc-6.12/bin
---     cabal: /home/dan/.cabal/bin
---   in:
---     sandbox: .cabal-sandbox
-
--- (example 5)
--- build:
---   with:
---     ghc: '7.10'
---     cabal: detect
+import           System.FilePath ((<.>))
 
 -- An uninterpreted representation of configuration options.
 -- Configurations may be "cascaded" using mappend (left-biased).
 data ConfigMonoid =
   ConfigMonoid
-    { configMonoidStackRoot      :: !(Maybe (Path Abs Dir))
-    , configMonoidBuildOpts      :: !BuildOpts
-    , configMonoidDockerOpts     :: !DockerOpts
-    , configMonoidDir            :: !(Maybe (Path Abs Dir))
+    { configMonoidDockerOpts     :: !DockerOpts
     , configMonoidUrls           :: !(Map Text Text)
+    -- ^ Various URLs for downloading things. Yes, this is stringly typed,
+    -- making it easy to extend. Please make sure to only access it using
+    -- helper functions.
     , configMonoidGpgVerifyIndex :: !(Maybe Bool)
+    -- ^ Controls how package index updating occurs
     , configMonoidResolver       :: !(Maybe Resolver)
+    -- ^ How we resolve which dependencies to use
     , configMonoidInstallDeps    :: !(Maybe Bool)
+    -- ^ Whether or not we should install dependencies. When using Docker,
+    -- default is False, otherwise default is True
     }
   deriving Show
 
@@ -172,20 +146,14 @@ altOf getter l r = getter l <|> getter r
 
 instance Monoid ConfigMonoid where
   mempty = ConfigMonoid
-    { configMonoidStackRoot = Nothing
-    , configMonoidBuildOpts = mempty
-    , configMonoidDockerOpts = mempty
-    , configMonoidDir = Nothing
+    { configMonoidDockerOpts = mempty
     , configMonoidUrls = mempty
     , configMonoidGpgVerifyIndex = Nothing
     , configMonoidResolver = Nothing
     , configMonoidInstallDeps = Nothing
     }
   mappend l r = ConfigMonoid
-    { configMonoidStackRoot = configMonoidStackRoot l <|> configMonoidStackRoot r
-    , configMonoidBuildOpts = appendOf configMonoidBuildOpts l r
-    , configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
-    , configMonoidDir = configMonoidDir l <|> configMonoidDir r
+    { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
     , configMonoidUrls = configMonoidUrls l <> configMonoidUrls r
     , configMonoidGpgVerifyIndex = configMonoidGpgVerifyIndex l <|> configMonoidGpgVerifyIndex r
     , configMonoidResolver = configMonoidResolver l <|> configMonoidResolver r
@@ -196,216 +164,65 @@ instance FromJSON (Path Abs Dir -> ConfigMonoid) where
   parseJSON =
     withObject "ConfigMonoid" $
     \obj ->
-      do configMonoidStackRoot <- obj .:? "stack-root"
-                              -- FIXME shouldn't we allow stack-root to be a
-                              -- relative directory as well?
-                              >>= maybe
-                                (return Nothing)
-                                (either (fail . show) (return . Just) . parseAbsDir)
-         getBuildOpts <- obj .:? "build" .!= mempty
-         getTheDocker <- obj .:? "docker"
+      do getTheDocker <- obj .:? "docker"
          configMonoidUrls <- obj .:? "urls" .!= mempty
          configMonoidGpgVerifyIndex <- obj .:? "gpg-verify-index"
          configMonoidResolver <- obj .:? "resolver"
          configMonoidInstallDeps <- obj .:? "install-dependencies"
          return (\parentDir ->
-                   let configMonoidBuildOpts = getBuildOpts parentDir
-                       configMonoidDir =
-                         Just parentDir
-                       configMonoidDockerOpts = DockerOpts (fmap ($ parentDir) getTheDocker)
+                   let configMonoidDockerOpts = DockerOpts (fmap ($ parentDir) getTheDocker)
                    in ConfigMonoid {..})
 
-data BuildOpts =
-  BuildOpts
-    { buildOptsIn :: !(Maybe BuildIn)
-    , buildOptsWith :: !(Maybe BuildWith)
-    , buildOptsPackages :: !(Set (Path Abs Dir))
-    , buildOptsFlags :: !(Map FlagName Bool)
-    , buildOptsPackageFlags :: !(Map PackageName (Map FlagName Bool))
+-- | A project is a collection of packages. We can have multiple stack.yaml
+-- files, but only one of them may contain project information.
+data Project = Project
+    { projectRoot :: !(Path Abs Dir)
+    -- ^ The directory containing the project's stack.yaml
+    , projectPackagesPath :: !(Set (Path Abs Dir))
+    -- ^ Components of the package list which refer to local directories
+    , projectPackagesIdent :: !(Set PackageIdentifier)
+    -- ^ Components of the package list referring to package/version combos,
+    -- see: https://github.com/fpco/stack/issues/41
+    , projectGlobalFlags :: !(Map FlagName Bool)
+    -- ^ Applied to all packages
+    , projectPackageFlags :: !(Map PackageName (Map FlagName Bool))
+    -- ^ Applied to an individual package, overriding global flags
+    , projectConfigExists :: !Bool
+    -- ^ If 'True', then we actually loaded this from a real config file. If
+    -- 'False', then we just made up a default.
+    , projectConfigMonoid :: !ConfigMonoid
+    -- ^ Extra config values found
     }
   deriving Show
 
-instance Monoid BuildOpts where
-  mempty = BuildOpts
-   { buildOptsIn           = Nothing
-   , buildOptsWith         = Nothing
-   , buildOptsPackages     = mempty
-   , buildOptsFlags        = mempty
-   , buildOptsPackageFlags = mempty
-   }
-  mappend l r = BuildOpts
-    { buildOptsIn = altOf buildOptsIn l r
-    , buildOptsWith = altOf buildOptsWith l r
-    , buildOptsPackages = buildOptsPackages l <> buildOptsPackages r
-    , buildOptsFlags = buildOptsFlags l <> buildOptsFlags r
-    , buildOptsPackageFlags = buildOptsPackageFlags l <> buildOptsPackageFlags r
-    }
-
-instance FromJSON (Path Abs Dir -> BuildOpts) where
-  parseJSON =
-    withObject "BuildOpts" $
-    \obj ->
-      do buildOptsIn <- obj .:? "in"
-         buildOptsWith <- obj .:? "with"
-         packages <-
-           do ps <- obj .:? "packages" .!= []
-              fmap S.fromList
-                   (mapM (\x ->
-                            if x == "."
-                               then return (Left ())
-                               else fmap Right
-                                         (either (fail . ("Unable to parse relative directory location: " ++) .
-                                                         show)
-                                                 return
-                                                 (parseRelDir x)))
-                         ps)
-         buildOptsFlags <-
-           fmap (fromMaybe mempty)
-                (obj .:? "flags")
-         buildOptsPackageFlags <-
-           fmap (M.fromList .
-                 mapMaybe (\(name,x) ->
-                             do name' <- parsePackageNameFromString name
-                                return (name',x)) .
-                 M.toList)
-                (fmap (fromMaybe mempty)
-                      (obj .:? "package-flags"))
-         return (\parentDir ->
-                   let buildOptsPackages =
-                         S.map (\x ->
-                                  case x of
-                                    Left () -> parentDir
-                                    Right p ->
-                                      (parentDir </> p))
-                               packages
-                   in BuildOpts {..})
-
-newtype BuildIn = BuildIn Text
-  deriving Show
-
-instance FromJSON BuildIn where
-  parseJSON = withText "BuildIn" $ \t ->
-    pure $ BuildIn t
-
-data BuildWith
-  = BuildWithSnapshot !SnapshotEnv
-  | BuildWithCustom !CustomEnvBins
-  deriving Show
-
-data CustomEnvBins
-  = CustomEnvBins !(Map Text Text)
-  deriving Show
-
-newtype SnapshotEnv = SnapshotEnv Text
-  deriving Show
-
-
-instance FromJSON BuildWith where
-  parseJSON j =
-        (BuildWithSnapshot <$> parseJSON j)
-    <|> (BuildWithCustom   <$> parseJSON j)
-    <|> typeMismatch "BuildWith" j
-
-instance FromJSON SnapshotEnv where
-  parseJSON = withText "SnapshotEnv" $ \t ->
-    pure $ SnapshotEnv t
-
-instance FromJSON CustomEnvBins where
-  parseJSON j =
-        (CustomEnvBins <$> parseJSON j)
-    <|> typeMismatch "CustomEnvBins" j
-
-
--- TODO: use where.exe if on Windows?
-detectGhcLocation :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => m (Path Abs Dir)
-detectGhcLocation = do
-  whichGhc <- liftIO $ readProcess "which" ["ghc"] ""
-  parent `liftM` parseAbsFile whichGhc
-
-detectCabalLocation :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => m (Path Abs Dir)
-detectCabalLocation = do
-  whichCabal <- liftIO $ readProcess "which" ["cabal"] ""
-  parent `liftM` parseAbsFile whichCabal
-
-
-detectPackageDbLocation :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => m (Path Abs Dir)
-detectPackageDbLocation = do
-  mPackageDb <- liftIO $ parsePackageDb
-  case mPackageDb of
-    Just dbText -> do
-      parseAbsDir $ Text.unpack dbText
-    Nothing -> throwM $ NotYetImplemented "detectPackageDbLocation: no cabal.sandbox.config"
-
-
-parsePackageDb :: IO (Maybe Text)
-parsePackageDb = do
-  cabalSandboxConfigExists <- doesFileExist "cabal.sandbox.config"
-  if cabalSandboxConfigExists
-    then do
-      t <- Text.readFile "cabal.sandbox.config"
-      let packageDbLine = Text.stripPrefix "package-db: "
-      return $ listToMaybe $ mapMaybe packageDbLine $ Text.lines t
-    else
-      return Nothing
-
-getEnvFileConfigMonoid :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => m ConfigMonoid
-getEnvFileConfigMonoid = liftIO (lookupEnv "STACKAGE_CONFIG") >>= \case
-  Just (parseAbsFile -> Just configFilePath) -> getFileConfigMonoid configFilePath
-  _ -> return mempty
-
-getGlobalConfigMonoid :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => m ConfigMonoid
-getGlobalConfigMonoid = liftIO (lookupEnv "STACKAGE_GLOBAL_CONFIG") >>= \case
-  Just (parseAbsFile -> Just configFilePath) -> getFileConfigMonoid configFilePath
-  _ -> getFileConfigMonoid defaultStackGlobalConfig
+instance FromJSON (Path Abs Dir -> Project) where
+    parseJSON = withObject "Project" $ \o -> do
+        ps <- o .:? "packages" .!= ["."]
+        eps <- forM ps $ \p ->
+            case parsePackageIdentifier $ encodeUtf8 p of
+                Right pi -> return $ Left pi
+                Left e1 ->
+                    case parseRelDir $ T.unpack p of
+                        Right d -> return $ Right d
+                        Left e2 -> fail $ "Could not parse as reldir or package identifier: " ++ T.unpack p ++ ", " ++ show (e1, e2)
+        let (idents, dirs) = partitionEithers eps
+        gf <- o .:? "flags" .!= mempty
+        pf <- o .:? "package-flags" .!= mempty
+        mkConfig <- parseJSON $ Object o
+        return $ \root -> Project
+            { projectRoot = root
+            , projectPackagesPath = S.fromList $ map (root </>) dirs
+            , projectPackagesIdent = S.fromList idents
+            , projectGlobalFlags = gf
+            , projectPackageFlags = pf
+            , projectConfigExists = True
+            , projectConfigMonoid = mkConfig root
+            }
 
 -- TODO: What about Windows?
 -- FIXME: This will not build on Windows. (Good!)
 defaultStackGlobalConfig :: Path Abs File
 defaultStackGlobalConfig = $(mkAbsFile "/etc/stack/config")
-
-getConfigMonoid :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => m ConfigMonoid
-getConfigMonoid = do
-  envConfigMonoid <- getEnvConfigMonoid
-  envFileConfigMonoid <- getEnvFileConfigMonoid
-  localConfigMonoid <- getLocalConfigMonoid
-
-  let config0 = envConfigMonoid <> envFileConfigMonoid <> localConfigMonoid
-
-  configRootDef <- case configMonoidStackRoot config0 of
-    -- Root def already present, don't do the work to find the default
-    Just _ -> return mempty
-    -- No root def so far, do the work to find the default
-    Nothing -> do
-      dir <- liftIO $ getAppUserDataDirectory "stack" >>= parseAbsDir
-      return mempty { configMonoidStackRoot = Just dir }
-
-  -- FIXME from Michael: the following is not good practice. Let the types prove that there is no partiality here by returning stackRoot from above
-  let config1 = config0 <> configRootDef
-      -- The above ensures this is safe
-      Just stackRoot = configMonoidStackRoot config1
-
-  rootConfig <- getFileConfigMonoid (stackRoot </> stackDotYaml)
-  globalConfigMonoid <- getGlobalConfigMonoid
-  return $ config1 <> rootConfig <> globalConfigMonoid
-
--- | Get the current directory's @stack.config@ file.
-getLocalConfigMonoid :: (MonadLogger m,MonadIO m,MonadThrow m)
-                     => m ConfigMonoid
-getLocalConfigMonoid =
-  do pwd <-
-       liftIO (getCurrentDirectory >>= parseAbsDir)
-     $logDebug ("Current directory is: " <>
-                T.pack (show pwd))
-     let filePath = pwd </> stackDotYaml
-     $logDebug ("Reading from config file: " <>
-                T.pack (show filePath))
-     getFileConfigMonoid filePath
 
 -- | Parse configuration from the specified file, or return an empty
 -- config if it doesn't exist.
@@ -436,46 +253,21 @@ getFileConfigMonoid configFilePath =
 lookupEnvText :: String -> IO (Maybe Text)
 lookupEnvText var = fmap Text.pack <$> lookupEnv var
 
-getEnvBuildOpts :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => m BuildOpts
-getEnvBuildOpts = liftIO $ do
-  buildIn <- lookupEnvText "STACK_BUILD_IN"
-  return mempty
-    { buildOptsIn = BuildIn <$> buildIn
-    }
-
--- TODO: support build opts in the env
--- Loads stack.config options from environment variables.
-getEnvConfigMonoid :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => m ConfigMonoid
-getEnvConfigMonoid = do
-  dir <- liftIO (lookupEnv "STACK_ROOT" >>= maybe (return Nothing) (fmap Just . parseAbsDir))
-  buildOpts <- getEnvBuildOpts
-  return mempty
-    { configMonoidStackRoot = dir
-    , configMonoidBuildOpts = buildOpts
-    , configMonoidDir = dir
-    }
-
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env)
-  => ConfigMonoid -> m Config
-configFromConfigMonoid ConfigMonoid{..} =
-  do configStackRoot <-
-       maybe (error "No stack root.") return configMonoidStackRoot -- FIXME: This is not good.
-     let BuildOpts{..} = configMonoidBuildOpts
-     configBuildIn <- resolveBuildIn buildOptsIn
-     (configGhcBinLocation,configCabalBinLocation,configPkgDbLocation) <-
-       resolveBuildWith configStackRoot buildOptsWith
-     configDocker <-
-       return (case configMonoidDockerOpts of
-                 DockerOpts x -> x)
-     configFlags <- return buildOptsFlags
-     configPackageFlags <- return buildOptsPackageFlags
-     configPackages <- return buildOptsPackages
-     configDir <-
-       maybe (error "Couldn't determine config dir.") return configMonoidDir -- FIXME: Proper exception.
-     let configUrls = configMonoidUrls
+  => Path Abs Dir -- ^ stack root, e.g. ~/.stack
+  -> Project
+  -> ConfigMonoid
+  -> m Config
+configFromConfigMonoid configStackRoot Project{..} ConfigMonoid{..} =
+  do let configDocker = case configMonoidDockerOpts of
+                 DockerOpts x -> x
+         configFlags = projectGlobalFlags
+         configPackageFlags = projectPackageFlags
+         configPackagesPath = projectPackagesPath
+         configPackagesIdent = projectPackagesIdent
+         configDir = projectRoot
+         configUrls = configMonoidUrls
          configGpgVerifyIndex = fromMaybe False configMonoidGpgVerifyIndex
          configInstallDeps =
             case configMonoidInstallDeps of
@@ -489,10 +281,7 @@ configFromConfigMonoid ConfigMonoid{..} =
      let miniConfig = MiniConfig (getHttpManager env) configStackRoot configUrls
      configResolver <- case configMonoidResolver of
         Nothing -> do
-            -- FIXME should we assume the current directory for the default
-            -- resolver like this?
-            currDir <- liftIO $ canonicalizePath "." >>= parseAbsDir
-            r <- runReaderT (getDefaultResolver currDir) miniConfig
+            r <- runReaderT (getDefaultResolver configDir) miniConfig
             $logWarn $ T.concat
                 [ "No resolver value found in your config files. "
                 , "Without a value stated, your build will be slower and unstable. "
@@ -566,54 +355,77 @@ readDockerFrom fp =
 loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env)
            => m Config
 loadConfig = do
-  configMonoid <- getConfigMonoid
-  configFromConfigMonoid configMonoid
+    env <- liftIO getEnvironment
+    stackRoot <- (>>= parseAbsDir) $
+        case lookup "STACK_ROOT" env of
+            Nothing -> liftIO $ getAppUserDataDirectory "stack"
+            Just x -> return x
 
-resolveBuildIn :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => (Maybe BuildIn) -> m Text
-resolveBuildIn = return . maybe defaultBuildIn (\(BuildIn t) -> t)
+    extraConfigs <- getExtraConfigs stackRoot >>= mapM loadConfigMonoid
+    project <- loadProjectConfig
+    let config = mconcat (projectConfigMonoid project:extraConfigs)
+    configFromConfigMonoid stackRoot project config
 
-defaultBuildIn :: Text
-defaultBuildIn = "sandbox"
+-- | Determine the extra config file locations which exist.
+--
+-- Returns most local first
+getExtraConfigs :: MonadIO m
+                => Path Abs Dir -- ^ stack root
+                -> m [Path Abs File]
+getExtraConfigs stackRoot = liftIO $ do
+    env <- getEnvironment
+    mstackConfig <-
+        maybe (return Nothing) (fmap Just . parseAbsFile)
+      $ lookup "STACK_CONFIG" env
+    mstackGlobalConfig <-
+        maybe (return Nothing) (fmap Just . parseAbsFile)
+      $ lookup "STACK_GLOBAL_CONFIG" env
+    filterM (liftIO . doesFileExist . toFilePath)
+        [ fromMaybe (stackRoot </> stackDotYaml) mstackConfig
+        , fromMaybe defaultStackGlobalConfig mstackGlobalConfig
+        ]
 
-resolveBuildWith :: (MonadLogger m,MonadIO m,MonadThrow m)
-                 => Path Abs Dir
-                 -> (Maybe BuildWith)
-                 -> m (Path Abs Dir,Path Abs Dir,Path Abs Dir) -- (ghc, cabal, package-db)
-resolveBuildWith sr mbw = resolveBuildWith' sr $ fromMaybe defaultBuildWith mbw
+-- | Load the value of a 'ConfigMonoid' from the given file.
+loadConfigMonoid :: MonadIO m => Path Abs File -> m ConfigMonoid
+loadConfigMonoid path =
+    liftIO $ Yaml.decodeFileEither (toFilePath path)
+         >>= either throwM (return . ($ parent path))
 
-defaultBuildWith :: BuildWith
-defaultBuildWith = BuildWithCustom (CustomEnvBins mempty)
+-- | Find the project config file location, respecting environment variables
+-- and otherwise traversing parents. If no config is found, we supply a default
+-- based on current directory.
+loadProjectConfig :: (MonadIO m, MonadThrow m) => m Project
+loadProjectConfig = do
+    env <- liftIO getEnvironment
+    case lookup "STACK_YAML" env of
+        Just fp -> parseAbsFile fp >>= load
+        Nothing -> do
+            currDir <- liftIO $ canonicalizePath "." >>= parseAbsDir
+            mfp <- liftIO $ search currDir
+            case mfp of
+                Just fp -> load fp
+  where
+    load fp = do
+        mkProject <-
+            liftIO (Yaml.decodeFileEither (toFilePath fp))
+               >>= either throwM return
+        return $ mkProject $ parent fp
 
--- TODO: BuildWithSnapshot
--- TODO: handle vague things like "ghc: 7.10"
-resolveBuildWith' :: (MonadLogger m, MonadIO m, MonadThrow m)
-  => Path Abs Dir -> BuildWith -> m (Path Abs Dir, Path Abs Dir, Path Abs Dir)
-                                             -- (ghc,          cabal,        package-db)
-resolveBuildWith' _stackRoot (BuildWithSnapshot _) =
-  throwM $ NotYetImplemented "resolveBuildWith': BuildWithSnapshot"
-resolveBuildWith' _stackRoot (BuildWithCustom (CustomEnvBins bins)) = do
-  let ghcDirText = fromMaybe "detect" $ Map.lookup "ghc" bins
-  let cabalDirText = fromMaybe "detect" $ Map.lookup "cabal" bins
-  ghcBinLoc <- case ghcDirText of
-    "detect" -> detectGhcLocation
-    _ -> parseAbsDir $ Text.unpack ghcDirText
-  cabalBinLoc <- case cabalDirText of
-    "detect" -> detectCabalLocation
-    _ -> parseAbsDir $ Text.unpack cabalDirText
-  packageDbLoc <- detectPackageDbLocation
-  return (ghcBinLoc, cabalBinLoc, packageDbLoc)
+    search dir = do
+        let fp = dir </> stackDotYaml
+        exists <- doesFileExist $ toFilePath fp
+        if exists
+            then return $ Just fp
+            else do
+                let dir' = parent dir
+                if dir == dir'
+                    -- fully traversed, give up
+                    then return Nothing
+                    else search dir'
 
 -- | The filename used for the stack config file.
 stackDotYaml :: Path Rel File
 stackDotYaml = $(mkRelFile "stack.yaml")
-
--- | Get the binary locations as a string that could be used in the PATH
-configBinPaths :: Config -> String
-configBinPaths config =
-   toFilePath (configGhcBinLocation config) <>
-   [searchPathSeparator] <>
-   toFilePath (configCabalBinLocation config)
 
 -- | Location of the 00-index.tar file
 configPackageIndex :: Config -> Path Abs File

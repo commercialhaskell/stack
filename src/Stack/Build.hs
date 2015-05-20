@@ -762,7 +762,11 @@ getPackageInfos finalAction =
                                     (configFlags cfg)
                                     globalPackages
                                     cfg
-                                    (configPackages cfg)
+                                    -- FIXME we know this function has to be
+                                    -- cleaned up significantly anyway. When we
+                                    -- get there, make sure to handle
+                                    -- configPackagesIdent as well.
+                                    (configPackagesPath cfg)
                                     (configPackageFlags cfg))
              _ <- error $ show (infos, errs)
              case errs of
@@ -802,10 +806,15 @@ getPackageInfos finalAction =
                            -- Here is where we inject third-party
                            -- dependencies and their flags and re-run
                            -- this function.
+                           --
+                           -- FIXME: New approach: two stage builds described
+                           -- in:
+                           --
+                           -- https://github.com/fpco/stack/issues/42
                            $logDebug "Re-running build plan resolver ..."
                            go
                              False
-                             cfg {configPackages = configPackages cfg <>
+                             cfg {configPackagesPath = configPackagesPath cfg <>
                                                    S.fromList newPkgDirs
                                  ,configPackageFlags =
                                     configPackageFlags cfg <>

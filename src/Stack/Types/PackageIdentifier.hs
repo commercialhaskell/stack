@@ -8,6 +8,7 @@ module Stack.Types.PackageIdentifier
   (PackageIdentifier(..)
   ,toTuple
   ,fromTuple
+  ,parsePackageIdentifier
   ,packageIdentifierVersion
   ,packageIdentifierName
   ,packageIdentifierParser
@@ -15,7 +16,10 @@ module Stack.Types.PackageIdentifier
   ,packageIdentifierText)
   where
 
+import Control.Exception (Exception)
+import Control.Monad.Catch (MonadThrow, throwM)
 import Data.Attoparsec.ByteString.Char8
+import Data.ByteString (ByteString)
 import Data.Data
 import Data.Hashable
 import Data.Text (Text)
@@ -24,6 +28,12 @@ import GHC.Generics
 import Prelude hiding (FilePath)
 import Stack.Types.PackageName
 import Stack.Types.Version
+
+-- | A parse fail.
+data PackageIdentifierParseFail
+  = PackageIdentifierParseFail ByteString
+  deriving (Show,Typeable)
+instance Exception PackageIdentifierParseFail
 
 -- | A pkg-ver combination.
 data PackageIdentifier =
@@ -59,6 +69,13 @@ packageIdentifierParser =
      char8 '-'
      version <- versionParser
      return (PackageIdentifier name version)
+
+-- | Convenient way to parse a package identifier from a bytestring.
+parsePackageIdentifier :: MonadThrow m => ByteString -> m PackageIdentifier
+parsePackageIdentifier x = go x
+  where go =
+          either (const (throwM (PackageIdentifierParseFail x))) return .
+          parseOnly (packageIdentifierParser <* endOfInput)
 
 -- | Get a string representation of the package identifier; name-ver.
 packageIdentifierString :: PackageIdentifier -> String

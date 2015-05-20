@@ -21,19 +21,19 @@ import Path
 import Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
 import Stack.Types.Docker
 import Stack.Types.FlagName
+import Stack.Types.PackageIdentifier
 import Stack.Types.PackageName
 import Stack.Types.Version
 
 -- | The top-level Stackage configuration.
 data Config =
-  Config {configPkgDbLocation    :: !(Path Abs Dir)
-         ,configGhcBinLocation   :: !(Path Abs Dir)
-         ,configCabalBinLocation :: !(Path Abs Dir)
-         ,configStackRoot        :: !(Path Abs Dir)
-         ,configBuildIn          :: !Text
+  Config {configStackRoot        :: !(Path Abs Dir)
          ,configDocker           :: !(Maybe Docker)
-         ,configPackages         :: !(Set (Path Abs Dir))
-         ,configFlags            :: !(Map FlagName Bool)
+         ,configPackagesPath     :: !(Set (Path Abs Dir))
+         -- ^ Local packages identified by a path
+         ,configPackagesIdent    :: !(Set PackageIdentifier)
+         -- ^ Local packages identified by a package identifier
+         ,configFlags            :: !(Map FlagName Bool) -- FIXME rename to global?
          ,configPackageFlags     :: !(Map PackageName (Map FlagName Bool))
          ,configDir              :: !(Path Abs Dir)
          ,configUrls             :: !(Map Text Text)
@@ -91,9 +91,6 @@ instance HasUrls Config
 instance HasConfig Config where
     getConfig = id
     {-# INLINE getConfig #-}
-
-configInDocker :: Config -> Bool
-configInDocker = (== "docker") . configBuildIn
 
 data ConfigException
   = ConfigInvalidYaml String
