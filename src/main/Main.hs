@@ -49,16 +49,14 @@ main =
 
 setupCmd :: LogLevel -> IO ()
 setupCmd logLevel = do
-  config <- runStackLoggingT logLevel (loadConfig defaultLoadOptions)
-  case configGhcVersion config of
-    Just version -> runStackT logLevel config $ setup version
-    Nothing -> error "GHC version not discovered" -- FIXME statically ensure this can't happen
+  bc <- runStackLoggingT logLevel (loadConfig >>= toBuildConfig)
+  runStackT logLevel bc $ setup $ bcGhcVersion bc
 
 -- | Build the project.
 buildCmd :: BuildOpts -> LogLevel -> IO ()
 buildCmd opts logLevel =
   do config <-
-       runStackLoggingT logLevel (loadConfig defaultLoadOptions)
+       runStackLoggingT logLevel (loadConfig >>= toBuildConfig)
      catch (runStackT logLevel
                       config
                       (Stack.Build.build opts))
@@ -96,10 +94,7 @@ buildCmd opts logLevel =
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> LogLevel -> IO ()
 unpackCmd names logLevel = do
-    config <- runStackLoggingT logLevel (loadConfig defaultLoadOptions
-        { loWriteMissing = False
-        , loSmartResolver = False
-        })
+    config <- runStackLoggingT logLevel loadConfig
     runStackT logLevel config (Stack.Fetch.unpackPackages "." names)
 
 -- | Parser for build arguments.

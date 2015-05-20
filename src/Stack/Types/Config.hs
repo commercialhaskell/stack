@@ -35,18 +35,15 @@ data Config =
          -- ^ Local packages identified by a path
          ,configPackagesIdent    :: !(Set PackageIdentifier)
          -- ^ Local packages identified by a package identifier
-         ,configFlags            :: !(Map FlagName Bool) -- FIXME rename to global?
+         ,configGlobalFlags      :: !(Map FlagName Bool)
          ,configPackageFlags     :: !(Map PackageName (Map FlagName Bool))
          ,configDir              :: !(Path Abs Dir)
          -- ^ Directory containing the project's stack.yaml file
          ,configUrls             :: !(Map Text Text)
          ,configGpgVerifyIndex   :: !Bool
-         ,configResolver         :: !Resolver
-         -- ^ How we resolve which dependencies to install given a set of
-         -- packages.
-         ,configGhcVersion       :: !(Maybe Version)
-         -- ^ Version of GHC we'll be using for this build, @Nothing@ if no
-         -- preference
+         ,configMaybeResolver    :: !(Maybe Resolver)
+         -- ^ May not actually be available in the config. See 'BuildConfig'
+         -- where this is guaranteed to be resolved.
          ,configInstallDeps      :: !Bool
          -- ^ Whether or not dependencies should be installed. If @False@, any
          -- missing dependencies will result in a compilation failure. Useful
@@ -56,13 +53,27 @@ data Config =
   -- ^ Flags for each package's Cabal config.
   deriving (Show)
 
+-- | A superset of 'Config' adding information on how to build code. The reason
+-- for this breakdown is because we will need some of the information from
+-- 'Config' in order to determine the values here.
+data BuildConfig = BuildConfig
+    { bcConfig     :: !Config
+    , bcResolver   :: !Resolver
+      -- ^ How we resolve which dependencies to install given a set of
+      -- packages.
+    , bcGhcVersion :: !Version
+      -- ^ Version of GHC we'll be using for this build, @Nothing@ if no
+      -- preference
+    }
+
 -- | How we resolve which dependencies to install given a set of packages.
 data Resolver
   = ResolverSnapshot SnapName
   -- ^ Use an official snapshot from the Stackage project, either an LTS
   -- Haskell or Stackage Nightly
-  | ResolverNone
-  -- ^ No way to resolve packages
+
+  -- FIXME add ResolverDepSolver, which will (short term) use cabal --dry-run
+  -- and (long term) use Nathan's SAT solver
   deriving (Show)
 
 instance FromJSON Resolver where
@@ -82,21 +93,36 @@ class HasStackRoot env where
     getStackRoot :: env -> Path Abs Dir
     default getStackRoot :: HasConfig env => env -> Path Abs Dir
     getStackRoot = configStackRoot . getConfig
+    {-# INLINE getStackRoot #-}
 
 -- | Class for environment values which have access to the URLs
 class HasUrls env where
     getUrls :: env -> Map Text Text
     default getUrls :: HasConfig env => env -> Map Text Text
     getUrls = configUrls . getConfig
+    {-# INLINE getUrls #-}
 
 -- | Class for environment values that can provide a 'Config'.
 class (HasStackRoot env, HasUrls env) => HasConfig env where
     getConfig :: env -> Config
+    default getConfig :: HasBuildConfig env => env -> Config
+    getConfig = bcConfig . getBuildConfig
+    {-# INLINE getConfig #-}
 instance HasStackRoot Config
 instance HasUrls Config
 instance HasConfig Config where
     getConfig = id
     {-# INLINE getConfig #-}
+
+-- | Class for environment values that can provide a 'BuildConfig'.
+class HasConfig env => HasBuildConfig env where
+    getBuildConfig :: env -> BuildConfig
+instance HasStackRoot BuildConfig
+instance HasUrls BuildConfig
+instance HasConfig BuildConfig
+instance HasBuildConfig BuildConfig where
+    getBuildConfig = id
+    {-# INLINE getBuildConfig #-}
 
 data ConfigException
   = ConfigInvalidYaml String

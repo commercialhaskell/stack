@@ -33,7 +33,6 @@ import           Data.Time
 import           Language.Haskell.TH.Syntax
 import           Network.HTTP.Client.Conduit (HasHttpManager(..))
 import           Network.HTTP.Conduit
-import           Stack.Types.Config
 import           Stack.Types.Internal
 import           System.Log.FastLogger
 
@@ -45,29 +44,29 @@ import           System.Locale
 -- Main StackT monad transformer
 
 -- | The monad used for the executable @stack@.
-newtype StackT m a =
-  StackT {unStackT :: ReaderT Env m a}
-  deriving (Functor,Applicative,Monad,MonadIO,MonadReader Env,MonadThrow,MonadCatch,MonadMask,MonadTrans)
+newtype StackT config m a =
+  StackT {unStackT :: ReaderT (Env config) m a}
+  deriving (Functor,Applicative,Monad,MonadIO,MonadReader (Env config),MonadThrow,MonadCatch,MonadMask,MonadTrans)
 
-deriving instance (MonadBase b m) => MonadBase b (StackT m)
+deriving instance (MonadBase b m) => MonadBase b (StackT config m)
 
-instance MonadBaseControl b m => MonadBaseControl b (StackT m) where
-    type StM (StackT m) a = ComposeSt StackT m a
+instance MonadBaseControl b m => MonadBaseControl b (StackT config m) where
+    type StM (StackT config m) a = ComposeSt (StackT config) m a
     liftBaseWith     = defaultLiftBaseWith
     restoreM         = defaultRestoreM
 
-instance MonadTransControl StackT where
-    type StT StackT a = StT (ReaderT Env) a
+instance MonadTransControl (StackT config) where
+    type StT (StackT config) a = StT (ReaderT (Env config)) a
     liftWith = defaultLiftWith StackT unStackT
     restoreT = defaultRestoreT StackT
 
 -- | Takes the configured log level into account.
-instance (MonadIO m) => MonadLogger (StackT m) where
+instance (MonadIO m) => MonadLogger (StackT config m) where
   monadLoggerLog = loggerFunc
 
 -- | Run a Stack action.
 runStackT :: (MonadIO m,MonadBaseControl IO m)
-          => LogLevel -> Config -> StackT m a -> m a
+          => LogLevel -> config -> StackT config m a -> m a
 runStackT logLevel config m =
   do manager <-
        liftIO (newManager conduitManagerSettings)

@@ -7,23 +7,27 @@ import Network.HTTP.Client.Conduit (Manager,HasHttpManager(..))
 import Stack.Types.Config
 
 -- | Monadic environment.
-data Env =
-  Env {envConfig :: !Config
+data Env config =
+  Env {envConfig :: !config
       ,envLogLevel :: !LogLevel
       ,envManager :: !Manager}
 
-instance HasStackRoot Env
-instance HasUrls Env
-instance HasConfig Env where
-  getConfig = envConfig
+instance HasStackRoot config => HasStackRoot (Env config) where
+    getStackRoot = getStackRoot . envConfig
+instance HasUrls config => HasUrls (Env config) where
+    getUrls = getUrls . envConfig
+instance HasConfig config => HasConfig (Env config) where
+    getConfig = getConfig . envConfig
+instance HasBuildConfig config => HasBuildConfig (Env config) where
+    getBuildConfig = getBuildConfig . envConfig
 
-instance HasHttpManager Env where
+instance HasHttpManager (Env config) where
   getHttpManager = envManager
 
 class HasLogLevel r where
   getLogLevel :: r -> LogLevel
 
-instance HasLogLevel Env where
+instance HasLogLevel (Env config) where
   getLogLevel = envLogLevel
 
 instance HasLogLevel LogLevel where

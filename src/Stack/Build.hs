@@ -78,7 +78,7 @@ import           System.Posix.Files (createSymbolicLink,removeLink)
 -- Top-level commands
 
 -- | Build and test using Shake.
-test :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
+test :: (MonadIO m, MonadReader env m, HasHttpManager env, HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
      => TestConfig
      -> m ()
 test conf =
@@ -92,7 +92,7 @@ test conf =
                    [])
 
 -- | Build and haddock using Shake.
-haddock :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
+haddock :: (MonadIO m, MonadReader env m, HasHttpManager env, HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
         => HaddockConfig -> m ()
 haddock conf =
   build (BuildOpts (hconfigTargets conf)
@@ -105,7 +105,7 @@ haddock conf =
                    [])
 
 -- | Build and benchmark using Shake.
-benchmark :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
+benchmark :: (MonadIO m, MonadReader env m, HasHttpManager env, HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
           => BenchmarkConfig -> m ()
 benchmark conf =
   build (BuildOpts (benchTargets conf)
@@ -118,7 +118,7 @@ benchmark conf =
                    [])
 
 -- | Build using Shake.
-build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
+build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
       => BuildOpts -> m ()
 build bopts =
   do env <- ask
@@ -185,7 +185,7 @@ dryRunPrint pinfos =
 
 -- | Reset the build (remove Shake database and .gen files).
 clean :: forall m env.
-         (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
+         (MonadIO m, MonadReader env m, HasHttpManager env, HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
       => m ()
 clean =
   do env <- ask
@@ -748,7 +748,7 @@ newConfig gconfig bopts pinfo =
 -- Needs to be refactored, see: https://github.com/fpco/stack/issues/40
 getPackageInfos :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m
                    ,MonadMask m
-                   ,HasHttpManager env,HasConfig env,MonadReader env m)
+                   ,HasHttpManager env,HasBuildConfig env,MonadReader env m)
                 => FinalAction
                 -> m (Set Package)
 getPackageInfos finalAction =
@@ -760,12 +760,13 @@ getPackageInfos finalAction =
 
              paths <- unpackPackageIdentsForBuild (configPackagesIdent cfg)
 
+             bconfig <- asks getBuildConfig
              (infos,errs) <-
                runWriterT
                  (buildDependencies finalAction
-                                    (configFlags cfg)
+                                    (configGlobalFlags cfg)
                                     globalPackages
-                                    cfg
+                                    bconfig
                                     (configPackagesPath cfg <> paths)
                                     (configPackageFlags cfg))
              case errs of
@@ -782,7 +783,8 @@ getPackageInfos finalAction =
              case lefts results of
                [] ->
                  do let okPkgVers = M.fromList (rights results)
-                    !mapping <- case configResolver cfg of
+                    bc <- asks getBuildConfig
+                    !mapping <- case bcResolver bc of
                         ResolverSnapshot snapName -> do
                             bp <- loadBuildPlan snapName
                             $logInfo "Resolving build plan ..."
@@ -889,13 +891,13 @@ buildDependencies :: MonadIO m
                   => FinalAction
                   -> Map FlagName Bool
                   -> Map PackageName Version
-                  -> Config
+                  -> BuildConfig
                   -> Set (Path Abs Dir)
                   -> Map PackageName (Map FlagName Bool)
                   -> WriterT [StackBuildException] m (Set Package)
-buildDependencies finalAction flags globals config packages pflags =
+buildDependencies finalAction flags globals bconfig packages pflags =
   do pkgs <-
-       liftIO (S.mapM (getPackageInfo finalAction flags pflags config) packages)
+       liftIO (S.mapM (getPackageInfo finalAction flags pflags bconfig) packages)
      S.mapM (sievePackages
                globals
                (M.fromList
@@ -935,17 +937,13 @@ sievePackages globalNameVersions localNameVersions p =
 getPackageInfo :: FinalAction
                -> Map FlagName Bool
                -> Map PackageName (Map FlagName Bool)
-               -> Config
+               -> BuildConfig
                -> Path Abs Dir
                -> IO Package
-getPackageInfo finalAction flags pflags config pkgDir =
+getPackageInfo finalAction flags pflags bconfig pkgDir =
   do cabal <- getCabalFileName pkgDir
      pname <- parsePackageNameFromFilePath cabal
-     ghcVersion <-
-        case configGhcVersion config of
-            -- FIXME yes this is partial for now, but this code is all getting
-            -- refactored soon
-            Just ghcVersion -> return ghcVersion
+     let ghcVersion = bcGhcVersion bconfig
      info <-
        runStdoutLoggingT
                           (readPackage (cfg pname ghcVersion)
