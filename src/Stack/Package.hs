@@ -168,11 +168,30 @@ packageDependencies =
   M.fromList .
   concatMap (map (\dep -> ((depName dep),depRange dep)) .
              targetBuildDepends) .
-  allBuildInfo
+  allBuildInfo'
 
 -- | Get all dependencies of the package (buildable targets only).
 packageDescTools :: PackageDescription -> [Dependency]
-packageDescTools = concatMap buildTools . allBuildInfo
+packageDescTools = concatMap buildTools . allBuildInfo'
+
+-- | This is a copy-paste from Cabal's @allBuildInfo@ function, but with the
+-- @buildable@ test removed. The reason is that (surprise) Cabal is broken,
+-- see: https://github.com/haskell/cabal/issues/1725
+allBuildInfo' :: PackageDescription -> [BuildInfo]
+allBuildInfo' pkg_descr = [ bi | Just lib <- [library pkg_descr]
+                              , let bi = libBuildInfo lib
+                              , True || buildable bi ]
+                      ++ [ bi | exe <- executables pkg_descr
+                              , let bi = buildInfo exe
+                              , True || buildable bi ]
+                      ++ [ bi | tst <- testSuites pkg_descr
+                              , let bi = testBuildInfo tst
+                              , True || buildable bi
+                              , testEnabled tst ]
+                      ++ [ bi | tst <- benchmarks pkg_descr
+                              , let bi = benchmarkBuildInfo tst
+                              , True || buildable bi
+                              , benchmarkEnabled tst ]
 
 -- | Get all files referenced by the package.
 packageDescFiles :: Path Abs Dir -> PackageDescription -> IO [Path Abs File]
