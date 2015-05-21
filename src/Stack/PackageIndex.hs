@@ -35,8 +35,8 @@ import           Control.Monad.Logger                  (MonadLogger, logDebug,
 import           Control.Monad.Reader                  (runReaderT)
 import           Control.Monad.Trans.Control           (MonadBaseControl)
 import           Control.Monad.Trans.Resource          (runResourceT)
-import qualified Data.ByteString                       as S
-import qualified Data.ByteString.Char8                 as S8
+import qualified Data.Binary                           as Binary
+import           Data.Binary.Get                       (ByteOffset)
 import qualified Data.ByteString.Lazy                  as L
 import           Data.Conduit                          (($$), (=$), yield, Producer)
 import           Data.Conduit.Binary                   (sinkHandle,
@@ -95,19 +95,24 @@ readPackageIdents = do
     config <- askConfig
     let fp = toFilePath $ configPackageIndexCache config
         load = do
-            ebs <- liftIO $ tryIO $ S.readFile fp
+            ebs <- liftIO $ tryIO $ Binary.decodeFileOrFail fp
             case ebs of
                 Left e -> return $ Left $ toException e
-                Right bs -> return $ mapM parsePackageIdentifier $ S8.lines bs
+                Right (Left e) -> return $ Left $ toException $ BinaryParseException e
+                Right (Right pis) -> return $ Right pis
     x <- load
     case x of
         Left e -> do
             $logDebug $ "Populate index cache, load failed with " <> T.pack (show e)
             let toIdent ucf = PackageIdentifier (ucfName ucf) (ucfVersion ucf)
             pis <- sourcePackageIndex $$ CL.map toIdent =$ CL.consume
-            liftIO $ S.writeFile fp $ S8.pack $ unlines $ map packageIdentifierString pis
+            liftIO $ Binary.encodeFile fp pis
             return pis
         Right y -> return y
+
+newtype BinaryParseException = BinaryParseException (ByteOffset, String)
+    deriving (Show, Typeable)
+instance Exception BinaryParseException
 
 -- | Find the newest versions of all given package names.
 findNewestVersions :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m)
