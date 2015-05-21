@@ -57,6 +57,7 @@ import           Network.HTTP.Client      (Manager, brRead, checkStatus,
                                            responseStatus, withResponse)
 import           Network.HTTP.Types (statusCode)
 import           Stack.Constants
+import           Stack.PackageIndex (requireIndex)
 
 import Path
 import           System.Directory         (createDirectoryIfMissing,
@@ -185,7 +186,7 @@ unpackPackages dest input = do
 -- | Ensure that all of the given package idents are unpacked into the build
 -- unpack directory, and return the paths to all of the subdirectories.
 unpackPackageIdentsForBuild
-    :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m)
+    :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m)
     => Set PackageIdentifier
     -> m (Set (Path Abs Dir))
 unpackPackageIdentsForBuild idents0 = do
@@ -218,7 +219,7 @@ unpackPackageIdentsForBuild idents0 = do
 -- @
 --
 -- Since 0.1.0.0
-fetchPackages :: (F.Foldable f,Functor f,MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env)
+fetchPackages :: (F.Foldable f,Functor f,MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m)
               => f (PackageIdentifier, Maybe (Path Abs Dir))
               -> m [Path Abs Dir]
 fetchPackages pkgs = do
@@ -226,6 +227,7 @@ fetchPackages pkgs = do
    let man = getHttpManager env
        config = getConfig env
        indexFP = toFilePath $ configPackageIndex config
+   requireIndex
    liftIO $ do
      outputVar <- newTVarIO []
      let packageLocation = configPackageTarball config

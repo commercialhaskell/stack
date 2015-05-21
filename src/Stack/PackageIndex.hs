@@ -32,9 +32,6 @@ import           Control.Monad.Catch                   (MonadThrow, throwM)
 import           Control.Monad.IO.Class                (MonadIO, liftIO)
 import           Control.Monad.Logger                  (MonadLogger, logDebug,
                                                         logInfo, logWarn)
-import           Control.Monad.Reader                  (runReaderT)
-import           Control.Monad.Trans.Control           (MonadBaseControl)
-import           Control.Monad.Trans.Resource          (runResourceT)
 import qualified Data.Binary                           as Binary
 import           Data.Binary.Get                       (ByteOffset)
 import qualified Data.ByteString.Lazy                  as L
@@ -89,7 +86,7 @@ data UnparsedCabalFile = UnparsedCabalFile
     }
 
 -- | Stream a list of all the package identifiers
-readPackageIdents :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m)
+readPackageIdents :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
                   => m [PackageIdentifier]
 readPackageIdents = do
     config <- askConfig
@@ -115,7 +112,7 @@ newtype BinaryParseException = BinaryParseException (ByteOffset, String)
 instance Exception BinaryParseException
 
 -- | Find the newest versions of all given package names.
-findNewestVersions :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m)
+findNewestVersions :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
                    => [PackageName]
                    -> m [PackageIdentifier]
 findNewestVersions names0 = do
@@ -135,9 +132,10 @@ findNewestVersions names0 = do
         | otherwise = orig
 
 -- | Stream all of the cabal files from the 00-index tar file.
-sourcePackageIndex :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env)
+sourcePackageIndex :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m)
                    => Producer m UnparsedCabalFile
 sourcePackageIndex = do
+    requireIndex
     -- This uses full on lazy I/O instead of ResourceT to provide some
     -- protections. Caveat emptor
     config <- askConfig
@@ -203,17 +201,13 @@ instance Exception CabalParseException
 
 -- | Get all of the latest descriptions for name/version pairs matching the
 -- given criterion.
-getLatestDescriptions :: (MonadIO m, MonadReader env m, HasConfig env)
+getLatestDescriptions :: (MonadIO m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadThrow m)
                       => (PackageName -> Version -> Bool)
                       -> (GenericPackageDescription -> IO desc)
                       -> m (Map PackageName desc)
 getLatestDescriptions f parseDesc = do
-    env <- ask
-    liftIO $ do
-        m <- flip runReaderT env
-                $ runResourceT
-                $ sourcePackageIndex $$ CL.filter f' =$ CL.fold add mempty
-        forM m $ \ucf -> liftIO $ ucfParse ucf >>= parseDesc
+    m <- sourcePackageIndex $$ CL.filter f' =$ CL.fold add mempty
+    liftIO $ forM m $ \ucf -> ucfParse ucf >>= parseDesc
   where
     f' ucf = f (ucfName ucf) (ucfVersion ucf)
     add m ucf =
@@ -244,7 +238,7 @@ data PackageIndexException =
 instance Exception PackageIndexException
 
 -- | Require that an index be present, updating if it isn't.
-requireIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m
+requireIndex :: (MonadIO m,MonadLogger m
                 ,MonadThrow m,MonadReader env m,HasHttpManager env
                 ,HasConfig env)
              => m ()
@@ -255,7 +249,7 @@ requireIndex = do
     unless exists updateIndex
 
 -- | Update the index tarball
-updateIndex :: (MonadBaseControl IO m,MonadIO m,MonadLogger m
+updateIndex :: (MonadIO m,MonadLogger m
                ,MonadThrow m,MonadReader env m,HasHttpManager env
                ,HasConfig env)
             => m ()
@@ -325,7 +319,7 @@ updateIndexGit = do
                   Nothing
 
 -- | Update the index tarball via HTTP
-updateIndexHTTP :: (MonadBaseControl IO m,MonadIO m,MonadLogger m
+updateIndexHTTP :: (MonadIO m,MonadLogger m
                    ,MonadThrow m,MonadReader env m,HasHttpManager env,HasConfig env)
                 => m ()
 updateIndexHTTP = do
@@ -360,7 +354,7 @@ updateIndexHTTP = do
           "but GPG verification only works with Git downloading"
 
 -- | Fetch all the package versions for a given package
-getPkgVersions :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasConfig env)
+getPkgVersions :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasConfig env,HasHttpManager env)
                => PackageName -> m (Set Version)
 getPkgVersions pkg = do
     idents <- readPackageIdents

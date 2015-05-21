@@ -1129,7 +1129,7 @@ validateSuggestion globalPackages okPkgVers =
 -- | Check that a package is actually available in the general (Hackage) package
 -- index.
 checkPackageInIndex :: (MonadIO m, MonadLogger m,MonadThrow m
-                       ,MonadReader env m,HasConfig env)
+                       ,MonadReader env m,HasConfig env,HasHttpManager env)
                     => (PackageName,(VersionRange,t))
                     -> m (Either PackageName (PackageName,VersionRange))
 checkPackageInIndex (name,(range,_)) =
