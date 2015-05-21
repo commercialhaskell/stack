@@ -287,7 +287,7 @@ installDependencies bopts deps' = do
                     readPackage (packageConfig flags bconfig) cabalfp
                 plans <- forM (S.toList pinfos) $ \pinfo -> do
                     let gconfig = GenConfig -- FIXME
-                            { gconfigOptimize = True
+                            { gconfigOptimize = False
                             , gconfigForceRecomp = False
                             , gconfigLibProfiling = True
                             , gconfigExeProfiling = False
