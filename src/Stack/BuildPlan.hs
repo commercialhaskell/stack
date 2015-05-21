@@ -99,8 +99,8 @@ instance Binary.Binary MiniBuildPlan
 -- In the future, we may want to make the behavior actually match what's stated
 -- (removing all the reverse deps). For now, we'll leave it to 'getDeps' to
 -- discover if there's a dependency on a removed package.
-removeReverseDeps :: F.Foldable f => MiniBuildPlan -> f PackageName -> MiniBuildPlan
-removeReverseDeps mbp toRemove = mbp
+removeReverseDeps :: F.Foldable f => f PackageName -> MiniBuildPlan -> MiniBuildPlan
+removeReverseDeps toRemove mbp = mbp
     { mbpPackages = Map.difference (mbpPackages mbp) toRemoveMap
     }
   where
@@ -112,6 +112,7 @@ toMiniBuildPlan bp = MiniBuildPlan
     , mbpPackages = Map.union cores extras
     }
   where
+    -- We never build the test suites or benchmarks of dependencies
     includeDep di = CompLibrary `Set.member` diComponents di
                  || CompExecutable `Set.member` diComponents di
 
@@ -147,7 +148,7 @@ getDeps mbp packages =
                 Just (version, flags, deps) -> do
                     F.mapM_ goName deps
                     modify $ \rs' -> rs'
-                        { rsToInstall = Map.insert name (version, flags) $ rsToInstall rs
+                        { rsToInstall = Map.insert name (version, flags) $ rsToInstall rs'
                         }
                 Nothing -> modify $ \rs' -> rs'
                     { rsUnknown = Set.insert name $ rsUnknown rs'

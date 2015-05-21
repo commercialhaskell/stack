@@ -29,6 +29,9 @@ data StackBuildException
   = MissingTool Dependency
   | Couldn'tFindPkgId PackageName
   | MissingDep Package PackageName VersionRange
+  | MissingDep2 PackageName PackageName VersionRange
+  | MismatchedLocalDep PackageName Version PackageName VersionRange
+  | MismatchedDep PackageName Version PackageName VersionRange
   | StackageDepVerMismatch PackageName Version VersionRange
   | StackageVersionMismatch PackageName Version Version
   | DependencyIssues [StackBuildException]

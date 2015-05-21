@@ -42,7 +42,7 @@ import           Path.Find (findFileUp)
 import           Paths_stack (version)
 import           Stack.Build (shakeFilesPath)
 import           Stack.Constants (configFileName)
-import           Stack.Types hiding (Version (..), parseVersion) -- FIXME don't hide this
+import           Stack.Types hiding (Version, parseVersion) -- FIXME don't hide this
 import           Stack.Docker.GlobalDB (updateDockerImageLastUsed,getDockerImagesLastUsed,pruneDockerImagesLastUsed)
 import           System.Directory
 import           System.Environment (lookupEnv,unsetEnv)

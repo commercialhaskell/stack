@@ -123,7 +123,169 @@ benchmark conf =
 -- | Build using Shake.
 build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
       => BuildOpts -> m ()
-build bopts =
+build bopts = do
+    bconfig <- asks getBuildConfig
+    cfg <- asks getConfig
+
+    locals <- determineLocals bopts
+    ranges <- getDependencyRanges locals
+    dependencies <- getDependencies locals ranges
+    installDependencies dependencies
+    buildLocals bopts locals
+
+-- | Determine all of the local packages we wish to install. This does not
+-- include any dependencies.
+determineLocals
+    :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
+    => BuildOpts
+    -> m [Package]
+determineLocals bopts = do
+    cfg <- askConfig
+    bconfig <- asks getBuildConfig
+
+    $logDebug "Unpacking packages as necessary"
+    paths2 <- unpackPackageIdentsForBuild (configPackagesIdent cfg)
+    let paths = configPackagesPath cfg <> paths2 -- FIXME shouldn't some command line options tell us which of these we care about right now?
+    $logDebug $ "Installing from local directories: " <> T.pack (show paths)
+    locals <- forM (Set.toList paths) $ \dir -> do
+        cabalfp <- getCabalFileName dir
+        name <- parsePackageNameFromFilePath cabalfp
+        readPackage (packageConfig name bconfig) cabalfp
+    $logDebug $ "Local packages to install: " <> T.pack
+        (show $ map (\p -> PackageIdentifier (packageName p) (packageVersion p)) locals)
+    return locals
+  where
+    finalAction = boptsFinalAction bopts
+
+    packageConfig name bconfig = PackageConfig
+        { packageConfigEnableTests =
+            case finalAction of
+                DoTests -> True
+                _ -> False
+        , packageConfigEnableBenchmarks =
+            case finalAction of
+                DoBenchmarks -> True
+                _ -> False
+        , packageConfigFlags =
+               fromMaybe M.empty (M.lookup name $ configPackageFlags config)
+            <> configGlobalFlags config
+        , packageConfigGhcVersion = bcGhcVersion bconfig
+        }
+      where
+        config = bcConfig bconfig
+
+-- | Get the version ranges for all dependencies. This takes care of checking
+-- for consistency amongst the local packages themselves, and removing locally
+-- provided dependencies from that list.
+--
+-- Note that we return a Map from the package name of the dependency, to a Map
+-- of the user and the required range. This allows us to give user friendly
+-- error messages.
+getDependencyRanges
+    :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
+    => [Package] -- ^ locals
+    -> m (Map PackageName (Map PackageName VersionRange))
+getDependencyRanges locals = do
+    -- All version ranges demanded by our local packages. We keep track of where the range came from for nicer error messages
+    let allRanges =
+            M.unionsWith M.union $ flip map locals $ \l ->
+            fmap (M.singleton (packageName l)) (packageDeps l)
+
+    -- Check and then strip out any dependencies provided by a local package
+    let stripLocal (errs, ranges) local =
+            (errs', ranges')
+          where
+            name = packageName local
+            version = packageVersion local
+            errs' = checkMismatches local (fromMaybe M.empty $ M.lookup name ranges)
+                 ++ errs
+            ranges' = M.delete name ranges
+        checkMismatches :: Package
+                        -> Map PackageName VersionRange
+                        -> [StackBuildException]
+        checkMismatches pkg users =
+            mapMaybe go (M.toList users)
+          where
+            version = packageVersion pkg
+            go (user, range)
+                | withinRange version range = Nothing
+                | otherwise = Just $ MismatchedLocalDep
+                    (packageName pkg)
+                    (packageVersion pkg)
+                    user
+                    range
+
+    case foldl' stripLocal ([], allRanges) locals of
+        ([], ranges) -> return ranges
+        (errs, _) -> throwM $ DependencyIssues errs
+
+-- | Determine all of the dependencies which need to be available.
+--
+-- This function checks that the dependency ranges will all be satisfies
+getDependencies
+    :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
+    => [Package] -- ^ locals
+    -> Map PackageName (Map PackageName VersionRange) -- ^ ranges
+    -> m (Map PackageName (Version, Map FlagName Bool))
+getDependencies locals ranges = do
+    bconfig <- asks getBuildConfig
+    dependencies <- case bcResolver bconfig of
+        ResolverSnapshot snapName -> do
+            $logDebug $ "Checking resolver: " <> renderSnapName snapName
+            mbp <- liftM (removeReverseDeps $ map packageName locals)
+                 $ loadMiniBuildPlan snapName
+            resolveBuildPlan mbp (M.keysSet ranges)
+
+    let checkDepRange (dep, users) =
+            concatMap go $ M.toList users
+          where
+            go (user, range) =
+                case M.lookup dep dependencies of
+                    Nothing -> [MissingDep2 user dep range]
+                    Just (version, _)
+                        | withinRange version range -> []
+                        | otherwise -> [MismatchedDep dep version user range]
+    case concatMap checkDepRange $ M.toList ranges of
+        [] -> return ()
+        errs -> throwM $ DependencyIssues errs
+    return dependencies
+
+-- | Install the given set of dependencies into the dependency database, if missing.
+--
+-- FIXME: may need to tweak some of the flags for OS-specific stuff, think about how to do that
+installDependencies
+    :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
+    => Map PackageName (Version, Map FlagName Bool)
+    -> m ()
+installDependencies deps' = do
+    pkgdb <- packageDatabaseDeps
+    installed <- liftM toIdents $ getAllPackages [pkgdb]
+    let toInstall = M.difference deps installed
+    if M.null toInstall
+        then $logInfo "All dependencies are already installed"
+        else do
+            $logInfo $ "Installing dependencies: " <> T.pack (show $ M.keys toInstall)
+            -- FIXME
+  where
+    deps = M.fromList $ map (\(name, (version, flags)) -> (PackageIdentifier name version, flags))
+                      $ M.toList deps'
+    toIdents = M.fromList . map (\(name, version) -> (PackageIdentifier name version, ())) . M.toList
+
+-- | Build all of the given local packages, assuming all necessary dependencies
+-- are already installed.
+buildLocals
+    :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
+    => BuildOpts
+    -> [Package]
+    -> m ()
+buildLocals _ [] = $logInfo "No local packages to install"
+buildLocals bopts locals = do
+    $logInfo $ "Installing local packages: " <> T.pack (show $ map toIdent locals)
+    -- FIXME
+  where
+    toIdent p = PackageIdentifier (packageName p) (packageVersion p)
+
+{- FIXME
   do env <- ask
      pinfos <- runResourceT (getPackageInfos (boptsFinalAction bopts))
      pkgIds <- getPackageIds
@@ -182,6 +344,7 @@ build bopts =
             packages ->
               elem (packageName pinfo)
                    (mapMaybe (parsePackageNameFromString . T.unpack) packages)
+                   -}
 
 -- | Dry run output.
 dryRunPrint :: Set Package -> IO ()

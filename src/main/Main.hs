@@ -80,6 +80,34 @@ buildCmd opts logLevel =
               packageNameString d <>
               " " <>
               display range
+            MissingDep2 user dep range ->
+              "Local package " <>
+              packageNameString user <>
+              " depends on " <>
+              packageNameString dep <>
+              " (" <>
+              display range <>
+              "), but it wasn't found. Perhaps add it to your local package list?"
+            MismatchedLocalDep dep version user range ->
+              "Mismatched local dependencies, " <>
+              packageNameString user <>
+              " depends on " <>
+              packageNameString dep <>
+              " (" <>
+              display range <>
+              "), but " <>
+              versionString version <>
+              " is provided locally"
+            MismatchedDep dep version user range ->
+              "Mismatched dependencies, " <>
+              packageNameString user <>
+              " depends on " <>
+              packageNameString dep <>
+              " (" <>
+              display range <>
+              "), but " <>
+              versionString version <>
+              " is provided locally"
             StackageDepVerMismatch name ver range ->
               ("The package '" <> packageNameString name <>
                "' in this Stackage snapshot is " <> versionString ver <>
