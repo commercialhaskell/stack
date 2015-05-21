@@ -13,15 +13,17 @@ module System.Process.Read
   ,runIn)
   where
 
-import           Conduit -- FIXME drop this dependency
 import           Control.Applicative ((*>))
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Exception
 import           Control.Monad (when)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger (MonadLogger, logError)
 import           Control.Monad.Reader (MonadReader, asks, runReaderT)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
+import           Data.Conduit
+import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process hiding (callProcess)
 import           Data.Foldable (forM_)
 import qualified Data.Text as T
@@ -55,15 +57,15 @@ readProcessStdout :: (MonadIO m, MonadReader env m, HasExternalEnv env)
                   -> [String]
                   -> m S.ByteString
 readProcessStdout name args =
-  sinkProcessStdout name args sinkLazy >>=
-  liftIO . evaluate . L.toStrict
+  sinkProcessStdout name args CL.consume >>=
+  liftIO . evaluate . S.concat
 
 -- | Same as @System.Process.callProcess@, but respect @HasExternalEnv@
 callProcess :: (MonadIO m, MonadReader env m, HasExternalEnv env)
             => String
             -> [String]
             -> m ()
-callProcess name args = sinkProcessStdout name args sinkNull
+callProcess name args = sinkProcessStdout name args CL.sinkNull
 
 -- | Consume the stdout of a process feeding strict 'S.ByteString's to a consumer.
 sinkProcessStdout :: (MonadIO m, MonadReader env m, HasExternalEnv env)
@@ -77,7 +79,7 @@ sinkProcessStdout name args sink = do
             (proc name args) { env = env' }
             (\ClosedStream out err ->
                runConcurrently $
-               Concurrently (asBSSource err $$ sinkNull) *>
+               Concurrently (asBSSource err $$ CL.sinkNull) *>
                Concurrently (asBSSource out $$ sink)))
   where asBSSource :: Source m S.ByteString -> Source m S.ByteString
         asBSSource = id

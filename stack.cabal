@@ -52,17 +52,13 @@ library
                    , binary >= 0.7
                    , bytestring
                    , conduit >= 1.2.4
-                   , conduit >= 1.2.4
-                   , conduit-combinators >= 0.3.0.6
                    , conduit-extra >= 1.1.7.1
                    , containers >= 0.5.5.1
-                   , cryptohash
                    , cryptohash >= 0.11.6
                    , cryptohash-conduit
                    , directory >= 1.2.1.0
                    , enclosed-exceptions
                    , exceptions >= 0.8.0.2
-                   , fast-logger >= 2.3.1
                    , fast-logger >= 2.3.1
                    , filepath >= 1.3.0.2
                    , hashable >= 1.2.3.2

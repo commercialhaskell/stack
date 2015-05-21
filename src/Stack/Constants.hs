@@ -7,7 +7,6 @@ module Stack.Constants where
 
 import Data.Text (Text)
 import qualified Data.Text as T
-import Filesystem.Path.CurrentOS ()
 import Path as FL
 import Prelude
 import Stack.Types.Config
