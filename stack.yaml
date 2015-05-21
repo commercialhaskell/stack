@@ -1,3 +1,4 @@
 packages:
 - .
+- path-0.3.0
 resolver: lts-2.9
