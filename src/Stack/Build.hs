@@ -127,11 +127,13 @@ build bopts = do
     bconfig <- asks getBuildConfig
     cfg <- asks getConfig
 
+    -- FIXME currently this will install all dependencies for the entire
+    -- project even if just building a subset of the project
     locals <- determineLocals bopts
     ranges <- getDependencyRanges locals
     dependencies <- getDependencies locals ranges
-    installDependencies dependencies
-    buildLocals bopts locals
+    installDependencies bopts dependencies
+    buildLocals bopts (S.fromList locals)
 
 -- | Determine all of the local packages we wish to install. This does not
 -- include any dependencies.
@@ -255,46 +257,95 @@ getDependencies locals ranges = do
 -- FIXME: may need to tweak some of the flags for OS-specific stuff, think about how to do that
 installDependencies
     :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
-    => Map PackageName (Version, Map FlagName Bool)
+    => BuildOpts
+    -> Map PackageName (Version, Map FlagName Bool)
     -> m ()
-installDependencies deps' = do
+installDependencies bopts deps' = do
     pkgdb <- packageDatabaseDeps
     installed <- liftM toIdents $ getAllPackages [pkgdb]
     let toInstall = M.difference deps installed
+    bconfig <- asks getBuildConfig
+
+    installResource <- liftIO $ newResourceIO "cabal install" 1
+    cfgVar <- liftIO $ newMVar ConfigLock
+    docLoc <- liftIO $ getUserDocLoc
+
     if M.null toInstall
         then $logInfo "All dependencies are already installed"
         else do
             $logInfo $ "Installing dependencies: " <> T.pack (show $ M.keys toInstall)
-            -- FIXME
+            withTempUnpacked (M.keys toInstall) $ \newPkgDirs -> do
+                $logInfo "All dependencies unpacked"
+                -- FIXME unregister conflicting?
+
+                pinfos <- liftM S.fromList $ forM newPkgDirs $ \dir -> do
+                    cabalfp <- getCabalFileName dir
+                    name <- parsePackageNameFromFilePath cabalfp
+                    flags <- case M.lookup name deps' of
+                        Nothing -> assert False $ return M.empty
+                        Just (_, flags) -> return flags
+                    readPackage (packageConfig flags bconfig) cabalfp
+                plans <- forM (S.toList pinfos) $ \pinfo -> do
+                    let gconfig = GenConfig -- FIXME
+                            { gconfigOptimize = True
+                            , gconfigForceRecomp = False
+                            , gconfigLibProfiling = True
+                            , gconfigExeProfiling = False
+                            , gconfigGhcOptions = []
+                            , gconfigFlags = packageFlags pinfo
+                            , gconfigPkgId = error "gconfigPkgId"
+                            }
+                    return $ makePlan -- FIXME dedupe this code with buildLocals
+                        M.empty
+                        True
+                        bopts
+                        bconfig
+                        [pkgdb]
+                        gconfig
+                        pinfos
+                        pinfo
+                        installResource
+                        docLoc
+                        cfgVar
+
+                if boptsDryrun bopts
+                    then $logInfo "Dry run, not doing anything with dependencies"
+                    else runPlans bopts
+                            pinfos
+                            plans (\_ _ -> True) docLoc -- FIXME think about haddocks here
   where
     deps = M.fromList $ map (\(name, (version, flags)) -> (PackageIdentifier name version, flags))
                       $ M.toList deps'
     toIdents = M.fromList . map (\(name, version) -> (PackageIdentifier name version, ())) . M.toList
+
+    packageConfig flags bconfig = PackageConfig
+        { packageConfigEnableTests = False
+        , packageConfigEnableBenchmarks = False
+        , packageConfigFlags = flags
+        , packageConfigGhcVersion = bcGhcVersion bconfig
+        }
 
 -- | Build all of the given local packages, assuming all necessary dependencies
 -- are already installed.
 buildLocals
     :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
     => BuildOpts
-    -> [Package]
+    -> Set Package
     -> m ()
-buildLocals _ [] = $logInfo "No local packages to install"
-buildLocals bopts locals = do
-    $logInfo $ "Installing local packages: " <> T.pack (show $ map toIdent locals)
-    -- FIXME
-  where
-    toIdent p = PackageIdentifier (packageName p) (packageVersion p)
-
-{- FIXME
-  do env <- ask
-     pinfos <- runResourceT (getPackageInfos (boptsFinalAction bopts))
-     pkgIds <- getPackageIds
-                [bcPackageDatabase $ getBuildConfig env]
+buildLocals bopts pinfos = do
+     env <- ask
+     pkgIds <- getPackageIds [packageDatabaseLocal env]
                 (map packageName (S.toList pinfos))
      pwd <- liftIO $ getCurrentDirectory >>= parseAbsDir
      docLoc <- liftIO $ getUserDocLoc
      installResource <- liftIO $ newResourceIO "cabal install" 1
      cfgVar <- liftIO $ newMVar ConfigLock
+
+     depDb <- packageDatabaseDeps
+     let pkgDbs =
+            [ depDb
+            , packageDatabaseLocal env
+            ]
      plans <-
        forM (S.toList pinfos)
             (\pinfo ->
@@ -314,6 +365,7 @@ buildLocals bopts locals = do
                                    wantedTarget
                                    bopts
                                    (getBuildConfig env)
+                                   pkgDbs
                                    gconfig
                                    pinfos
                                    pinfo
@@ -324,7 +376,29 @@ buildLocals bopts locals = do
         then liftIO $ dryRunPrint pinfos
         else do
             let config = getConfig env
-            liftIO $ withArgs []
+            runPlans bopts pinfos plans wanted docLoc
+  where
+    toIdent p = PackageIdentifier (packageName p) (packageVersion p)
+
+    wanted pwd pinfo = case boptsTargets bopts of
+        [] -> FL.isParentOf pwd (packageDir pinfo) ||
+              packageDir pinfo == pwd
+        packages ->
+              elem (packageName pinfo)
+                   (mapMaybe (parsePackageNameFromString . T.unpack) packages)
+
+-- FIXME clean up this function to make it more nicely shareable
+runPlans :: (MonadIO m, MonadReader env m, HasConfig env)
+         => BuildOpts
+         -> Set Package
+         -> [Rules ()]
+         -> (Path Abs Dir -> Package -> Bool)
+         -> Path Abs Dir -- FIXME figure out local vs shared docs location
+         -> m ()
+runPlans bopts pinfos plans wanted docLoc = do
+    config <- asks getConfig
+    pwd <- liftIO $ getCurrentDirectory >>= parseAbsDir
+    liftIO $ withArgs []
                       (shakeArgs shakeOptions {shakeVerbosity = boptsVerbosity bopts
                                               ,shakeFiles =
                                                  FL.toFilePath (shakeFilesPath (configDir config))
@@ -335,16 +409,6 @@ buildLocals bopts locals = do
                                           (buildDocIndex (wanted pwd)
                                                          docLoc
                                                          pinfos)))
-  where wanted pwd pinfo =
-          case boptsTargets bopts of
-            [] ->
-              FL.isParentOf pwd
-                            (packageDir pinfo) ||
-              packageDir pinfo == pwd
-            packages ->
-              elem (packageName pinfo)
-                   (mapMaybe (parsePackageNameFromString . T.unpack) packages)
-                   -}
 
 -- | Dry run output.
 dryRunPrint :: Set Package -> IO ()
@@ -392,6 +456,7 @@ makePlan :: Map PackageName GhcPkgId
          -> Bool
          -> BuildOpts
          -> BuildConfig
+         -> [Path Abs Dir] -- ^ package databases
          -> GenConfig
          -> Set Package
          -> Package
@@ -399,7 +464,7 @@ makePlan :: Map PackageName GhcPkgId
          -> Path Abs Dir
          -> MVar ConfigLock
          -> Rules ()
-makePlan pkgIds wanted bopts bconfig gconfig pinfos pinfo installResource docLoc cfgVar =
+makePlan pkgIds wanted bopts bconfig pkgDbs gconfig pinfos pinfo installResource docLoc cfgVar =
   do when wanted (want [target])
      target %>
        \_ ->
@@ -411,6 +476,7 @@ makePlan pkgIds wanted bopts bconfig gconfig pinfos pinfo installResource docLoc
               (buildPackage
                  bopts
                  bconfig
+                 pkgDbs
                  pinfos
                  pinfo
                  gconfig
@@ -420,7 +486,7 @@ makePlan pkgIds wanted bopts bconfig gconfig pinfos pinfo installResource docLoc
                  installResource
                  docLoc)
               removeAfterwards
-            writeFinalFiles gconfig bconfig dir (packageName pinfo)
+            writeFinalFiles gconfig bconfig pkgDbs dir (packageName pinfo)
   where needSourceFiles =
           need (map FL.toFilePath (S.toList (packageFiles pinfo)))
         dir = packageDir pinfo
@@ -470,11 +536,14 @@ needDependencies pkgIds bopts pinfos pinfo cfgVar =
 -- | Write the final generated files after a build successfully
 -- completes.
 writeFinalFiles :: (MonadIO m)
-                => GenConfig -> BuildConfig -> Path Abs Dir -> PackageName -> m ()
-writeFinalFiles gconfig bconfig dir name = liftIO $
-         (do mpkigid <- flip runReaderT bconfig
+                => GenConfig -> BuildConfig
+                -> [Path Abs Dir] -- package databases
+                -> Path Abs Dir -> PackageName -> m ()
+writeFinalFiles gconfig bconfig pkgDbs dir name = liftIO $
+         (do mpkigid <- runNoLoggingT
+                      $ flip runReaderT bconfig
                       $ findPackageId
-                            [bcPackageDatabase bconfig]
+                            pkgDbs
                             name
              case mpkigid of
                Nothing -> throwIO (Couldn'tFindPkgId name)
@@ -490,6 +559,7 @@ writeFinalFiles gconfig bconfig dir name = liftIO $
 -- | Build the given package with the given configuration.
 buildPackage :: BuildOpts
              -> BuildConfig
+             -> [Path Abs Dir] -- ^ package databases
              -> Set Package
              -> Package
              -> GenConfig
@@ -497,14 +567,14 @@ buildPackage :: BuildOpts
              -> Resource
              -> Path Abs Dir
              -> Action ()
-buildPackage bopts bconfig pinfos pinfo gconfig setupAction installResource docLoc =
+buildPackage bopts bconfig pkgDbs pinfos pinfo gconfig setupAction installResource docLoc =
   do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath pinfo))) :: IO (Either IOException ())))
      runhaskell
        pinfo
        (getExternalEnv bconfig)
        (concat [["configure","--user"]
                ,["--package-db=clear","--package-db=global"]
-               ,["--package-db=" ++ toFilePath (bcPackageDatabase bconfig)] -- FIXME do the more complicated double-package-database thing once we have two-phase builds
+               ,map (("--package-db=" ++) . toFilePath) pkgDbs
                ,["--enable-library-profiling" | gconfigLibProfiling gconfig]
                ,["--enable-executable-profiling" | gconfigExeProfiling gconfig]
                ,["--enable-tests" | setupAction == DoTests]
@@ -562,7 +632,7 @@ buildPackage bopts bconfig pinfos pinfo gconfig setupAction installResource docL
      withResource installResource 1
                   (runhaskell pinfo
                               (getExternalEnv bconfig)
-                              ["install","--user"])
+                              ["install"])
      case setupAction of
        DoHaddock -> liftIO (createDocLinks docLoc pinfo)
        _ -> return ()
@@ -942,7 +1012,7 @@ getPackageInfos finalAction =
   where go retry cfg =
           do unless retry ($logInfo "Getting pack information, dependencies, etc. ...")
              bconfig <- asks getBuildConfig
-             globalPackages <- getAllPackages [bcPackageDatabase bconfig]
+             globalPackages <- getAllPackages $ error "getPackageInfos: FIXME" -- [bcPackageDatabase bconfig]
 
              paths <- unpackPackageIdentsForBuild (configPackagesIdent cfg)
 

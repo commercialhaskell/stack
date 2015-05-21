@@ -196,10 +196,6 @@ configProjectWorkDir env = configDir (getConfig env) </> $(mkRelDir ".stack-work
 configLocalUnpackDir :: Config -> Path Abs Dir
 configLocalUnpackDir config = configProjectWorkDir config </> $(mkRelDir "unpacked")
 
--- | Package database to compile against. Probably need to get more complicated
-bcPackageDatabase :: HasConfig env => env -> Path Abs Dir -- FIXME do the more complicated double-package-database thing once we have two-phase builds
-bcPackageDatabase env = configProjectWorkDir env </> $(mkRelDir "pkgdb") -- FIXME include the GHC version also?
-
 -- | Package database for installing dependencies into
 packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
 packageDatabaseDeps = do
@@ -208,6 +204,11 @@ packageDatabaseDeps = do
         case bcResolver bc of
             ResolverSnapshot name -> parseRelDir $ T.unpack $ renderSnapName name
     return $ configStackRoot (bcConfig bc) </> $(mkRelDir "package-databases") </> name
+
+-- | Package database for installing local packages into
+packageDatabaseLocal :: HasConfig env => env -> Path Abs Dir
+packageDatabaseLocal env =
+    configProjectWorkDir (getConfig env) </> $(mkRelDir "package-database")
 
 -- | Where to store mini build plan caches
 configMiniBuildPlanCache :: (MonadThrow m, MonadReader env m, HasStackRoot env)

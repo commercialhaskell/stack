@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS -fno-warn-unused-do-bind #-}
 
 -- | Functions for the GHC package database.
@@ -19,6 +20,7 @@ import           Control.Exception hiding (catch)
 import           Control.Monad (liftM, forM_, unless)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
+import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader)
 import           Data.Attoparsec.ByteString.Char8
 import qualified Data.Attoparsec.ByteString.Lazy as AttoLazy
@@ -29,6 +31,7 @@ import           Data.List
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Maybe
+import           Data.Monoid ((<>))
 import           Data.Streaming.Process
 
 import qualified Data.Text as T
@@ -46,11 +49,12 @@ data GhcPkgException
 instance Exception GhcPkgException
 
 -- | Run the ghc-pkg executable
-ghcPkg :: (MonadIO m, MonadReader env m, HasExternalEnv env)
+ghcPkg :: (MonadIO m, MonadReader env m, HasExternalEnv env, MonadLogger m)
        => [Path Abs Dir]
        -> [String]
        -> m (Either ProcessExitedUnsuccessfully S8.ByteString)
 ghcPkg pkgDbs args = do
+    $logDebug $ "Calling ghc-pkg with: " <> T.pack (show args')
     eres <- go
     case eres of
         Left _ -> do
@@ -67,17 +71,18 @@ ghcPkg pkgDbs args = do
             go
         Right _ -> return eres
   where
-    go = tryProcessStdout "ghc-pkg"
-        $ "--no-user-package-db"
+    args' =
+          "--no-user-package-db"
         : map (\x -> ("--package-db=" ++ toFilePath x)) pkgDbs
        ++ args
+    go = tryProcessStdout "ghc-pkg" args'
 
 -- | Get all available packages.
-getAllPackages :: (MonadCatch m,MonadIO m,MonadThrow m,MonadReader env m,HasExternalEnv env)
+getAllPackages :: (MonadCatch m,MonadIO m,MonadThrow m,MonadReader env m,HasExternalEnv env,MonadLogger m)
                => [Path Abs Dir] -- ^ package databases
                -> m (Map PackageName Version)
 getAllPackages pkgDbs =
-  do result <- ghcPkg pkgDbs ["list"]
+  do result <- ghcPkg pkgDbs ["--global", "list"]
      case result of
        Left {} -> throw GetAllPackagesFail
        Right lbs ->
@@ -107,7 +112,7 @@ pkgsListParser =
              fmap toTuple packageIdentifierParser
 
 -- | Get the id of the package e.g. @foo-0.0.0-9c293923c0685761dcff6f8c3ad8f8ec@.
-findPackageId :: (MonadIO m, MonadReader env m, HasExternalEnv env)
+findPackageId :: (MonadIO m, MonadReader env m, HasExternalEnv env, MonadLogger m)
               => [Path Abs Dir] -- ^ package databases
               -> PackageName -> m (Maybe GhcPkgId)
 findPackageId pkgDbs name =
@@ -126,7 +131,7 @@ findPackageId pkgDbs name =
               _ -> return Nothing
 
 -- | Get all current package ids.
-getPackageIds :: (MonadIO m, MonadReader env m, HasExternalEnv env)
+getPackageIds :: (MonadIO m, MonadReader env m, HasExternalEnv env, MonadLogger m)
               => [Path Abs Dir] -- ^ package databases
               -> [PackageName]
               -> m (Map PackageName GhcPkgId)
