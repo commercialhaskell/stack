@@ -27,6 +27,7 @@ import           Control.Applicative
 import           Control.Monad.Catch
 import           Data.Aeson
 import           Data.Attoparsec.ByteString.Char8
+import           Data.Binary (Binary)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Data
@@ -34,6 +35,7 @@ import           Data.Hashable
 import           Data.List
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Vector.Binary ()
 import           Data.Vector.Unboxed (Vector)
 import qualified Data.Vector.Unboxed as V
 import           Data.Word
@@ -53,7 +55,7 @@ instance Exception VersionParseFail
 -- | A package version.
 newtype Version =
   Version {unVersion :: Vector Word}
-  deriving (Eq,Ord,Typeable,Data,Generic)
+  deriving (Eq,Ord,Typeable,Data,Generic,Binary)
 
 -- | Returns the first two components, defaulting to 0 if not present
 getMajorVersion :: Version -> (Word, Word)

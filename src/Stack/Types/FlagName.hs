@@ -26,6 +26,7 @@ import           Control.Monad.Catch
 import           Data.Aeson
 import           Data.Attoparsec.ByteString.Char8
 import           Data.Attoparsec.Combinators
+import           Data.Binary (Binary)
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Char (isLetter)
@@ -49,7 +50,7 @@ instance Exception FlagNameParseFail
 -- | A flag name.
 newtype FlagName =
   FlagName ByteString
-  deriving (Eq,Ord,Typeable,Data,Generic,Hashable)
+  deriving (Eq,Ord,Typeable,Data,Generic,Hashable,Binary)
 
 instance Lift FlagName where
   lift (FlagName n) =

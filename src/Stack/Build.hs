@@ -808,7 +808,8 @@ getPackageInfos finalAction =
                     bc <- asks getBuildConfig
                     !mapping <- case bcResolver bc of
                         ResolverSnapshot snapName -> do
-                            bp <- loadBuildPlan snapName
+                            bp <- loadMiniBuildPlan snapName
+                            -- FIXME use removeReverseDeps on bp for the target packages
                             $logInfo "Resolving build plan ..."
                             !mapping <-
                               resolveBuildPlan bp (M.keysSet okPkgVers)

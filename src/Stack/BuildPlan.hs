@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE EmptyDataDecls     #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE TemplateHaskell    #-}
@@ -9,17 +10,18 @@
 
 module Stack.BuildPlan
     ( BuildPlanException (..)
+    , MiniBuildPlan
+    , mbpGhcVersion
     , Snapshots (..)
     , getSnapshots
-    , allPackages
-    , loadBuildPlan
+    , loadMiniBuildPlan
     , resolveBuildPlan
-    , checkBuildPlan
     , findBuildPlan
-    , checkDeps
+    , removeReverseDeps
     ) where
 
 import           Control.Applicative             ((<$>), (<*>))
+import           Control.Exception.Enclosed      (tryIO)
 import           Control.Monad                   (when)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -28,6 +30,7 @@ import           Control.Monad.State.Strict      (State, execState, get, modify,
                                                   put)
 import           Data.Aeson                      (FromJSON (..))
 import           Data.Aeson                      (withObject, withText, (.:))
+import qualified Data.Binary                     as Binary
 import qualified Data.Foldable                   as F
 import qualified Data.HashMap.Strict             as HM
 import           Data.IntMap                     (IntMap)
@@ -46,6 +49,7 @@ import           Data.Yaml                       (decodeFileEither)
 import           Distribution.PackageDescription (GenericPackageDescription,
                                                   flagDefault, flagManual,
                                                   flagName, genPackageFlags)
+import           GHC.Generics                    (Generic)
 import           Network.HTTP.Download
 import           Path
 import           Stack.Types
@@ -65,18 +69,14 @@ instance Exception BuildPlanException
 --
 -- This may fail if a target package is not present in the @BuildPlan@.
 resolveBuildPlan :: MonadThrow m
-                 => BuildPlan
+                 => MiniBuildPlan
                  -> Set PackageName
                  -> m (Map PackageName (Version, Map FlagName Bool))
-resolveBuildPlan bp packages
+resolveBuildPlan mbp packages
     | Set.null (rsUnknown rs) = return (rsToInstall rs)
     | otherwise = throwM $ UnknownPackages $ rsUnknown rs
   where
-    rs = execState (F.mapM_ (getDeps bp) packages) ResolveState
-        { rsVisited = Set.empty
-        , rsUnknown = Set.empty
-        , rsToInstall = Map.empty
-        }
+    rs = getDeps mbp packages
 
 data ResolveState = ResolveState
     { rsVisited   :: Set PackageName
@@ -84,34 +84,74 @@ data ResolveState = ResolveState
     , rsToInstall :: Map PackageName (Version, Map FlagName Bool)
     }
 
-getDeps :: BuildPlan -> PackageName -> State ResolveState ()
-getDeps bp =
-    goName
+data MiniBuildPlan = MiniBuildPlan
+    { mbpGhcVersion :: !Version
+    , mbpPackages :: !(Map PackageName (Version, Map FlagName Bool, Set PackageName))
+    }
+    deriving (Generic, Show)
+instance Binary.Binary MiniBuildPlan
+
+-- | When a set of targets includes one of the packages in a build plan, we
+-- need to remove that package from the build plan. See:
+--
+-- https://github.com/fpco/stack/issues/42
+--
+-- In the future, we may want to make the behavior actually match what's stated
+-- (removing all the reverse deps). For now, we'll leave it to 'getDeps' to
+-- discover if there's a dependency on a removed package.
+removeReverseDeps :: F.Foldable f => MiniBuildPlan -> f PackageName -> MiniBuildPlan
+removeReverseDeps mbp toRemove = mbp
+    { mbpPackages = Map.difference (mbpPackages mbp) toRemoveMap
+    }
+  where
+    toRemoveMap = Map.unions $ map (\x -> Map.singleton x ()) $ F.toList toRemove
+
+toMiniBuildPlan :: BuildPlan -> MiniBuildPlan
+toMiniBuildPlan bp = MiniBuildPlan
+    { mbpGhcVersion = siGhcVersion $ bpSystemInfo bp
+    , mbpPackages = Map.union cores extras
+    }
+  where
+    includeDep di = CompLibrary `Set.member` diComponents di
+                 || CompExecutable `Set.member` diComponents di
+
+    cores = fmap (\v -> (v, Map.empty, Set.empty)) $ siCorePackages $ bpSystemInfo bp
+    extras = fmap goPP $ bpPackages bp
+
+    goPP pp =
+        ( ppVersion pp
+        , pcFlagOverrides $ ppConstraints pp
+        , Set.unions $ map goDI $ Map.toList $ sdPackages $ ppDesc pp
+        -- FIXME add tool info
+        )
+
+    goDI (name, di)
+        | includeDep di = Set.singleton name
+        | otherwise = Set.empty
+
+-- | Resolve all packages necessary to install for
+getDeps :: F.Foldable f => MiniBuildPlan -> f PackageName -> ResolveState
+getDeps mbp packages =
+    execState (F.mapM_ goName packages) ResolveState
+        { rsVisited = Set.empty
+        , rsUnknown = Set.empty
+        , rsToInstall = Map.empty
+        }
   where
     goName :: PackageName -> State ResolveState ()
     goName name = do
         rs <- get
         when (name `Set.notMember` rsVisited rs) $ do
             put rs { rsVisited = Set.insert name $ rsVisited rs }
-            case Map.lookup name $ bpPackages bp of
-                Just pkg -> goPkg name pkg
-                Nothing ->
-                    case Map.lookup name $ siCorePackages $ bpSystemInfo bp of
-                        Just _version -> return ()
-                        Nothing -> modify $ \rs' -> rs'
-                            { rsUnknown = Set.insert name $ rsUnknown rs'
-                            }
-
-    goPkg name pp = do
-        F.forM_ (Map.toList $ sdPackages $ ppDesc pp) $ \(name', depInfo) ->
-            when (includeDep depInfo) (goName name')
-        modify $ \rs -> rs
-            { rsToInstall = Map.insert name (ppVersion pp, pcFlagOverrides $ ppConstraints pp)
-                          $ rsToInstall rs
-            }
-
-    includeDep di = CompLibrary `Set.member` diComponents di
-                 || CompExecutable `Set.member` diComponents di
+            case Map.lookup name $ mbpPackages mbp of
+                Just (version, flags, deps) -> do
+                    F.mapM_ goName deps
+                    modify $ \rs' -> rs'
+                        { rsToInstall = Map.insert name (version, flags) $ rsToInstall rs
+                        }
+                Nothing -> modify $ \rs' -> rs'
+                    { rsUnknown = Set.insert name $ rsUnknown rs'
+                    }
 
 -- | Download the 'Snapshots' value from stackage.org.
 getSnapshots :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env, HasStackRoot env, HasUrls env)
@@ -147,6 +187,28 @@ instance FromJSON Snapshots where
                 Right (LTS x y) -> return $ IntMap.singleton x y
                 Right (Nightly _) -> fail "Unexpected nightly value"
 
+-- | Load up a 'MiniBuildPlan', preferably from cache
+loadMiniBuildPlan
+    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasStackRoot env)
+    => SnapName
+    -> m MiniBuildPlan
+loadMiniBuildPlan name = do
+    path <- configMiniBuildPlanCache name
+    let fp = toFilePath path
+        dir = toFilePath $ parent path
+
+    eres <- liftIO $ tryIO $ Binary.decodeFileOrFail fp
+    case eres of
+        Right (Right mbp) -> return mbp
+        _ -> do
+            $logDebug $ "loadMiniBuildPlan from cache failed: " <> T.pack (show (name, eres))
+            bp <- loadBuildPlan name
+            let mbp = toMiniBuildPlan bp
+            liftIO $ do
+                createDirectoryIfMissing True dir
+                Binary.encodeFile fp mbp
+            return mbp
+
 -- | Load the 'BuildPlan' for the given snapshot. Will load from a local copy
 -- if available, otherwise downloading from Github.
 loadBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasStackRoot env)
@@ -176,31 +238,24 @@ loadBuildPlan name = do
             Nightly _ -> "stackage-nightly"
     url = rawGithubUrl "fpco" reponame "master" file
 
--- | Get all packages present in the given build plan, including both core and
--- non-core.
-allPackages :: BuildPlan -> Map PackageName Version
-allPackages bp =
-    siCorePackages (bpSystemInfo bp) <>
-    fmap ppVersion (bpPackages bp)
-
 -- | Find the set of @FlagName@s necessary to get the given
 -- @GenericPackageDescription@ to compile against the given @BuildPlan@. Will
 -- only modify non-manual flags, and will prefer default values for flags.
 -- Returns @Nothing@ if no combination exists.
 checkBuildPlan :: (MonadLogger m, MonadThrow m, MonadIO m)
                => SnapName -- ^ used only for debugging purposes
-               -> BuildPlan
+               -> MiniBuildPlan
                -> Path Abs File -- ^ cabal file path, used only for debugging purposes
                -> GenericPackageDescription
                -> m (Maybe (Map FlagName Bool))
-checkBuildPlan name bp cabalfp gpd = do
+checkBuildPlan name mbp cabalfp gpd = do
     $logInfo $ "Checking against build plan " <> renderSnapName name
     loop flagOptions
   where
     loop [] = return Nothing
     loop (flags:rest) = do
         pkg <- resolvePackage pkgConfig cabalfp gpd
-        passes <- checkDeps flags (packageDeps pkg) packages
+        passes <- checkDeps flags (packageDeps pkg) (mbpPackages mbp)
         if passes
             then return $ Just flags
             else loop rest
@@ -212,7 +267,7 @@ checkBuildPlan name bp cabalfp gpd = do
             , packageConfigGhcVersion = ghcVersion
             }
 
-    ghcVersion = siGhcVersion $ bpSystemInfo bp
+    ghcVersion = mbpGhcVersion mbp
 
     flagName' = fromCabalFlagName . flagName
 
@@ -227,7 +282,6 @@ checkBuildPlan name bp cabalfp gpd = do
             [ (flagName' f, False)
             , (flagName' f, True)
             ]
-    packages = allPackages bp
 
 -- | Checks if the given package dependencies can be satisfied by the given set
 -- of packages. Will fail if a package is either missing or has a version
@@ -235,7 +289,7 @@ checkBuildPlan name bp cabalfp gpd = do
 checkDeps :: MonadLogger m
           => Map FlagName Bool -- ^ used only for debugging purposes
           -> Map PackageName VersionRange
-          -> Map PackageName Version
+          -> Map PackageName (Version, ignored1, ignored2)
           -> m Bool
 checkDeps flags deps packages = do
     let errs = mapMaybe go $ Map.toList deps
@@ -250,7 +304,7 @@ checkDeps flags deps packages = do
     go (name, range) =
         case Map.lookup name packages of
             Nothing -> Just $ "Package not present: " <> packageNameText name
-            Just v
+            Just (v, _, _)
                 | withinRange v range -> Nothing
                 | otherwise -> Just $ T.concat
                     [ packageNameText name
@@ -274,8 +328,8 @@ findBuildPlan cabalfp gpd = do
             ++ [Nightly $ snapshotsNightly snapshots]
         loop [] = return Nothing
         loop (name:names') = do
-            bp <- loadBuildPlan name
-            mflags <- checkBuildPlan name bp cabalfp gpd
+            mbp <- loadMiniBuildPlan name
+            mflags <- checkBuildPlan name mbp cabalfp gpd
             case mflags of
                 Nothing -> loop names'
                 Just flags -> return $ Just (name, flags)

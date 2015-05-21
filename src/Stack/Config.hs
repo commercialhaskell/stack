@@ -245,8 +245,8 @@ toBuildConfig config = do
     ghcVersion <-
         case resolver of
             ResolverSnapshot snapName -> do
-                bp <- runReaderT (loadBuildPlan snapName) miniConfig
-                return $ siGhcVersion $ bpSystemInfo bp
+                mbp <- runReaderT (loadMiniBuildPlan snapName) miniConfig
+                return $ mbpGhcVersion mbp
 
     return BuildConfig
         { bcConfig = config

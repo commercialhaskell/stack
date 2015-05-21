@@ -11,7 +11,7 @@ import Control.Arrow ((***))
 import Control.Exception
 import Control.Monad (liftM)
 import Control.Monad.Catch (MonadThrow)
-import Control.Monad.Reader (MonadReader, ask)
+import Control.Monad.Reader (MonadReader, ask, asks)
 import Data.Aeson (FromJSON, parseJSON, withText)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -199,3 +199,12 @@ configLocalUnpackDir config = configProjectWorkDir config </> $(mkRelDir "unpack
 -- | Package database to compile against. Probably need to get more complicated
 bcPackageDatabase :: HasConfig env => env -> Path Abs Dir -- FIXME do the more complicated double-package-database thing once we have two-phase builds
 bcPackageDatabase env = configProjectWorkDir env </> $(mkRelDir "pkgdb") -- FIXME include the GHC version also?
+
+-- | Where to store mini build plan caches
+configMiniBuildPlanCache :: (MonadThrow m, MonadReader env m, HasStackRoot env)
+                         => SnapName
+                         -> m (Path Abs File)
+configMiniBuildPlanCache name = do
+    root <- asks getStackRoot
+    file <- parseRelFile $ T.unpack (renderSnapName name) ++ ".cache"
+    return (root </> file)

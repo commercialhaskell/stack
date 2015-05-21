@@ -49,6 +49,7 @@ library
                    , async >= 2.0.2
                    , attoparsec >= 0.12.1.5
                    , base >= 4 && <5
+                   , binary >= 0.7
                    , bytestring
                    , conduit >= 1.2.4
                    , conduit >= 1.2.4
@@ -98,6 +99,7 @@ library
                    , unix >= 2.7.0.1
                    , unordered-containers >= 0.2.5.1
                    , vector >= 0.10.12.3
+                   , vector-binary-instances
                    , void >= 0.7
                    , yaml >= 0.8.10.1
                    , zlib >= 0.5.4.2
