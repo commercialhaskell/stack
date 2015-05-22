@@ -536,7 +536,7 @@ getPackageDatabases bconfig buildType = liftIO $ do
         BTLocals -> [depDb, packageDatabaseLocal bconfig]
 
 getInstallRoot bconfig BTDeps = liftIO $ runReaderT installationRootDeps bconfig
-getInstallRoot bconfig BTDeps = return $ configProjectWorkDir bconfig
+getInstallRoot bconfig BTLocals = return $ configProjectWorkDir bconfig
 
 -- | Write the final generated files after a build successfully
 -- completes.
