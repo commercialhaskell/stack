@@ -261,10 +261,10 @@ installDependencies
     -> Map PackageName (Version, Map FlagName Bool)
     -> m ()
 installDependencies bopts deps' = do
-    pkgdb <- packageDatabaseDeps
-    installed <- liftM toIdents $ getAllPackages [pkgdb]
-    let toInstall = M.difference deps installed
     bconfig <- asks getBuildConfig
+    pkgDbs <- getPackageDatabases bconfig BTDeps
+    installed <- liftM toIdents $ getAllPackages pkgDbs
+    let toInstall = M.difference deps installed
 
     installResource <- liftIO $ newResourceIO "cabal install" 1
     cfgVar <- liftIO $ newMVar ConfigLock
@@ -300,7 +300,7 @@ installDependencies bopts deps' = do
                         True
                         bopts
                         bconfig
-                        [pkgdb]
+                        BTDeps
                         gconfig
                         pinfos
                         pinfo
@@ -341,11 +341,6 @@ buildLocals bopts pinfos = do
      installResource <- liftIO $ newResourceIO "cabal install" 1
      cfgVar <- liftIO $ newMVar ConfigLock
 
-     depDb <- packageDatabaseDeps
-     let pkgDbs =
-            [ depDb
-            , packageDatabaseLocal env
-            ]
      plans <-
        forM (S.toList pinfos)
             (\pinfo ->
@@ -365,7 +360,7 @@ buildLocals bopts pinfos = do
                                    wantedTarget
                                    bopts
                                    (getBuildConfig env)
-                                   pkgDbs
+                                   BTLocals
                                    gconfig
                                    pinfos
                                    pinfo
@@ -456,7 +451,7 @@ makePlan :: Map PackageName GhcPkgId
          -> Bool
          -> BuildOpts
          -> BuildConfig
-         -> [Path Abs Dir] -- ^ package databases
+         -> BuildType
          -> GenConfig
          -> Set Package
          -> Package
@@ -464,7 +459,7 @@ makePlan :: Map PackageName GhcPkgId
          -> Path Abs Dir
          -> MVar ConfigLock
          -> Rules ()
-makePlan pkgIds wanted bopts bconfig pkgDbs gconfig pinfos pinfo installResource docLoc cfgVar =
+makePlan pkgIds wanted bopts bconfig buildType gconfig pinfos pinfo installResource docLoc cfgVar =
   do when wanted (want [target])
      target %>
        \_ ->
@@ -477,7 +472,7 @@ makePlan pkgIds wanted bopts bconfig pkgDbs gconfig pinfos pinfo installResource
                  bopts
                  bconfig
                  setuphs
-                 pkgDbs
+                 buildType
                  pinfos
                  pinfo
                  gconfig
@@ -487,7 +482,7 @@ makePlan pkgIds wanted bopts bconfig pkgDbs gconfig pinfos pinfo installResource
                  installResource
                  docLoc)
               removeAfterwards
-            writeFinalFiles gconfig bconfig pkgDbs dir (packageName pinfo)
+            writeFinalFiles gconfig bconfig buildType dir (packageName pinfo)
   where needSourceFiles =
           need (map FL.toFilePath (S.toList (packageFiles pinfo)))
         dir = packageDir pinfo
@@ -534,14 +529,23 @@ needDependencies pkgIds bopts pinfos pinfo cfgVar =
 --------------------------------------------------------------------------------
 -- Build actions
 
+getPackageDatabases bconfig buildType = liftIO $ do
+    depDb <- runReaderT packageDatabaseDeps bconfig
+    return $ case buildType of
+        BTDeps -> [depDb]
+        BTLocals -> [depDb, packageDatabaseLocal bconfig]
+
+getInstallRoot bconfig BTDeps = liftIO $ runReaderT installationRootDeps bconfig
+getInstallRoot bconfig BTDeps = return $ configProjectWorkDir bconfig
+
 -- | Write the final generated files after a build successfully
 -- completes.
 writeFinalFiles :: (MonadIO m)
-                => GenConfig -> BuildConfig
-                -> [Path Abs Dir] -- package databases
+                => GenConfig -> BuildConfig -> BuildType
                 -> Path Abs Dir -> PackageName -> m ()
-writeFinalFiles gconfig bconfig pkgDbs dir name = liftIO $
-         (do mpkigid <- runNoLoggingT
+writeFinalFiles gconfig bconfig buildType dir name = liftIO $
+         (do pkgDbs <- getPackageDatabases bconfig buildType
+             mpkigid <- runNoLoggingT
                       $ flip runReaderT bconfig
                       $ findPackageId
                             pkgDbs
@@ -557,11 +561,13 @@ writeFinalFiles gconfig bconfig pkgDbs dir name = liftIO $
                     -- configuration, no recompilation forcing is required.
                     updateGenFile dir)
 
+data BuildType = BTDeps | BTLocals
+
 -- | Build the given package with the given configuration.
 buildPackage :: BuildOpts
              -> BuildConfig
              -> Path Abs File -- ^ Setup.hs file
-             -> [Path Abs Dir] -- ^ package databases
+             -> BuildType
              -> Set Package
              -> Package
              -> GenConfig
@@ -569,8 +575,10 @@ buildPackage :: BuildOpts
              -> Resource
              -> Path Abs Dir
              -> Action ()
-buildPackage bopts bconfig setuphs pkgDbs pinfos pinfo gconfig setupAction installResource docLoc =
+buildPackage bopts bconfig setuphs buildType pinfos pinfo gconfig setupAction installResource docLoc =
   do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath pinfo))) :: IO (Either IOException ())))
+     pkgDbs <- getPackageDatabases bconfig buildType
+     installRoot <- getInstallRoot bconfig buildType
      runhaskell
        pinfo
        setuphs
@@ -578,6 +586,11 @@ buildPackage bopts bconfig setuphs pkgDbs pinfos pinfo gconfig setupAction insta
        (concat [["configure","--user"]
                ,["--package-db=clear","--package-db=global"]
                ,map (("--package-db=" ++) . toFilePath) pkgDbs
+               ,["--libdir=" ++ toFilePath (installRoot </> $(mkRelDir "lib"))
+                ,"--bindir=" ++ toFilePath (installRoot </> bindirSuffix)
+                ,"--datadir=" ++ toFilePath (installRoot </> $(mkRelDir "share"))
+                ,"--docdir=" ++ toFilePath (installRoot </> $(mkRelDir "doc"))
+                ]
                ,["--enable-library-profiling" | gconfigLibProfiling gconfig]
                ,["--enable-executable-profiling" | gconfigExeProfiling gconfig]
                ,["--enable-tests" | setupAction == DoTests]

@@ -1,20 +1,28 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- | Main stack tool entry point.
 
 module Main where
 
+import           Control.Arrow ((***))
 import           Control.Exception
+import           Control.Monad.Catch (MonadThrow)
 import           Control.Monad.Logger
+import           Control.Monad.Reader
 import           Data.List
+import           Data.Map (Map)
+import qualified Data.Map as Map
 import           Data.Maybe
+import           Data.Text (Text)
 import qualified Data.Text as T
 import           Development.Shake (Verbosity(..))
 import           Distribution.Text (display)
 import           Options.Applicative.Extra
 import           Options.Applicative.Simple
+import           Path
 import           Stack.Build
 import           Stack.Fetch
 import           Stack.Build.Types
@@ -24,6 +32,9 @@ import qualified Stack.PackageIndex
 import           Stack.Setup
 import           Stack.Types
 import           Stack.Types.StackT
+import           System.Exit (exitWith)
+import           System.FilePath (searchPathSeparator)
+import qualified System.Process as P
 
 -- | Commandline dispatcher.
 main :: IO ()
@@ -49,7 +60,13 @@ main =
              addCommand "update"
                         "Update the package index"
                         updateCmd
-                        (pure ()))
+                        (pure ())
+             addCommand "exec"
+                        "Execute a command"
+                        execCmd
+                        ((,)
+                            <$> strArgument (metavar "CMD")
+                            <*> many (strArgument (metavar "[ARGS]"))))
      run level
 
 setupCmd :: LogLevel -> IO ()
@@ -57,15 +74,41 @@ setupCmd logLevel = do
   bc <- runStackLoggingT logLevel (loadConfig >>= toBuildConfig)
   runStackT logLevel bc $ setup $ bcGhcVersion bc
 
--- | Modify the PATH appropriately, possibly doing installation too
-setupPath :: Monad m => BuildConfig -> m BuildConfig
-setupPath = return
+-- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
+setupEnv :: (MonadIO m, MonadThrow m, MonadLogger m) -- FIXME move this logic into the library itself?
+         => Bool -- ^ setup GHC_PACKAGE_PATH? ideally we'd do this always, but Cabal doesn't like that
+         -> BuildConfig
+         -> m BuildConfig
+setupEnv setGhcPackagePath bconfig = do
+    dirs <- runReaderT extraBinDirs bconfig
+    let env0 = configExternalEnv $ bcConfig bconfig
+        env1 = addPath dirs env0
+    env2 <- if setGhcPackagePath
+        then flip runReaderT bconfig $ do
+            -- FIXME make sure the directories exist?
+            deps <- packageDatabaseDeps
+            let local = toFilePath $ packageDatabaseLocal bconfig
+            global <- return "FIXME get the global database by querying ghc-pkg presumably"
+            let v = intercalate [searchPathSeparator]
+                    [ local
+                    , toFilePath deps
+                    , global
+                    ]
+            return $ Map.insert "GHC_PACKAGE_PATH" (T.pack v) env1
+        else return env1
+    $logDebug $ "New env: " <> T.pack (show env2)
+    return bconfig { bcConfig = (bcConfig bconfig) { configExternalEnv = env2 } }
+  where
+    addPath dirs m = Map.insert "PATH" (mkPath dirs $ Map.lookup "PATH" m) m
+
+    mkPath dirs mpath = T.pack $ intercalate [searchPathSeparator]
+        (map toFilePath dirs ++ maybe [] (return . T.unpack) mpath)
 
 -- | Build the project.
 buildCmd :: BuildOpts -> LogLevel -> IO ()
 buildCmd opts logLevel =
   do config <-
-       runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupPath)
+       runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv False)
      catch (runStackT logLevel config $ do
                  checkGHCVersion
                  Stack.Build.build opts)
@@ -144,6 +187,15 @@ updateCmd :: () -> LogLevel -> IO ()
 updateCmd () logLevel = do
     config <- runStackLoggingT logLevel loadConfig
     runStackT logLevel config Stack.PackageIndex.updateIndex
+
+-- | Execute a command
+execCmd :: (String, [String]) -> LogLevel -> IO ()
+execCmd (cmd, args) logLevel = do
+    config <- runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv True)
+    let cp = (P.proc cmd args) { P.env = Just $ map (T.unpack *** T.unpack) $ Map.toList $ configExternalEnv $ bcConfig config }
+    (Nothing, Nothing, Nothing, ph) <- P.createProcess cp
+    ec <- P.waitForProcess ph
+    exitWith ec
 
 -- | Parser for build arguments.
 --

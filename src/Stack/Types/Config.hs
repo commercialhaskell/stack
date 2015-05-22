@@ -196,14 +196,20 @@ configProjectWorkDir env = configDir (getConfig env) </> $(mkRelDir ".stack-work
 configLocalUnpackDir :: Config -> Path Abs Dir
 configLocalUnpackDir config = configProjectWorkDir config </> $(mkRelDir "unpacked")
 
--- | Package database for installing dependencies into
-packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
-packageDatabaseDeps = do
+-- | Installation root for dependencies
+installationRootDeps :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
+installationRootDeps = do
     bc <- asks getBuildConfig
     name <-
         case bcResolver bc of
             ResolverSnapshot name -> parseRelDir $ T.unpack $ renderSnapName name
-    return $ configStackRoot (bcConfig bc) </> $(mkRelDir "package-databases") </> name
+    return $ configStackRoot (bcConfig bc) </> $(mkRelDir "snapshots") </> name
+
+-- | Package database for installing dependencies into
+packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
+packageDatabaseDeps = do
+    root <- installationRootDeps
+    return $ root </> $(mkRelDir "pkgdb")
 
 -- | Package database for installing local packages into
 packageDatabaseLocal :: HasConfig env => env -> Path Abs Dir
@@ -218,3 +224,15 @@ configMiniBuildPlanCache name = do
     root <- asks getStackRoot
     file <- parseRelFile $ T.unpack (renderSnapName name) ++ ".cache"
     return (root </> $(mkRelDir "build-plan-cache") </> file)
+
+-- | Suffix applied to an installation root to get the bin dir
+bindirSuffix :: Path Rel Dir
+bindirSuffix = $(mkRelDir "bin")
+
+-- | Get the extra bin directories (for the PATH). Puts more local first
+extraBinDirs :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m [Path Abs Dir]
+extraBinDirs = do
+    deps <- installationRootDeps
+    config <- asks getConfig
+    let local = configProjectWorkDir config
+    return [local </> bindirSuffix, deps </> bindirSuffix]
