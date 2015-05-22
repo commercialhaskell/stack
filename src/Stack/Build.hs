@@ -471,11 +471,12 @@ makePlan pkgIds wanted bopts bconfig pkgDbs gconfig pinfos pinfo installResource
          do needDependencies pkgIds bopts pinfos pinfo cfgVar
             needTools pinfo
             needSourceFiles
-            removeAfterwards <- liftIO (ensureSetupHs dir)
+            (setuphs, removeAfterwards) <- liftIO (ensureSetupHs dir)
             actionFinally
               (buildPackage
                  bopts
                  bconfig
+                 setuphs
                  pkgDbs
                  pinfos
                  pinfo
@@ -559,6 +560,7 @@ writeFinalFiles gconfig bconfig pkgDbs dir name = liftIO $
 -- | Build the given package with the given configuration.
 buildPackage :: BuildOpts
              -> BuildConfig
+             -> Path Abs File -- ^ Setup.hs file
              -> [Path Abs Dir] -- ^ package databases
              -> Set Package
              -> Package
@@ -567,10 +569,11 @@ buildPackage :: BuildOpts
              -> Resource
              -> Path Abs Dir
              -> Action ()
-buildPackage bopts bconfig pkgDbs pinfos pinfo gconfig setupAction installResource docLoc =
+buildPackage bopts bconfig setuphs pkgDbs pinfos pinfo gconfig setupAction installResource docLoc =
   do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath pinfo))) :: IO (Either IOException ())))
      runhaskell
        pinfo
+       setuphs
        (getExternalEnv bconfig)
        (concat [["configure","--user"]
                ,["--package-db=clear","--package-db=global"]
@@ -588,6 +591,7 @@ buildPackage bopts bconfig pkgDbs pinfos pinfo gconfig setupAction installResour
                     (M.toList (packageFlags pinfo))])
      runhaskell
        pinfo
+       setuphs
        (getExternalEnv bconfig)
        (concat [["build"]
                ,["--ghc-options=-O2" | gconfigOptimize gconfig]
@@ -596,12 +600,14 @@ buildPackage bopts bconfig pkgDbs pinfos pinfo gconfig setupAction installResour
      case setupAction of
        DoTests ->
          runhaskell pinfo
+                    setuphs
                     (getExternalEnv bconfig)
                     ["test"]
        DoHaddock ->
            do liftIO (removeDocLinks docLoc pinfo)
               ifcOpts <- liftIO (haddockInterfaceOpts docLoc pinfo pinfos)
               runhaskell pinfo
+                         setuphs
                          (getExternalEnv bconfig)
                          ["haddock"
                          ,"--html"
@@ -626,11 +632,13 @@ buildPackage bopts bconfig pkgDbs pinfos pinfo gconfig setupAction installResour
                                  ,hoogleDbPath])
        DoBenchmarks ->
          runhaskell pinfo
+                    setuphs
                     (getExternalEnv bconfig)
                     ["bench"]
        _ -> return ()
      withResource installResource 1
                   (runhaskell pinfo
+                              setuphs
                               (getExternalEnv bconfig)
                               ["install"])
      case setupAction of
@@ -638,8 +646,10 @@ buildPackage bopts bconfig pkgDbs pinfos pinfo gconfig setupAction installResour
        _ -> return ()
 
 -- | Run the Haskell command for the given package.
-runhaskell :: Package -> Maybe [(String, String)] -> [String] -> Action ()
-runhaskell pinfo menv args =
+runhaskell :: Package
+           -> Path Abs File -- ^ Setup.hs or Setup.lhs file
+           -> Maybe [(String, String)] -> [String] -> Action ()
+runhaskell pinfo setuphs menv args =
   do liftIO (createDirectoryIfMissing True
                                       (FL.toFilePath (stackageBuildDir pinfo)))
      putQuiet display
@@ -681,20 +691,20 @@ runhaskell pinfo menv args =
             _ -> mempty
         dir = packageDir pinfo
         cp =
-          proc "runhaskell" ("Setup.hs" : args)
+          proc "runhaskell" (toFilePath setuphs : args)
 
 -- | Ensure Setup.hs exists in the given directory. Returns an action
 -- to remove it later.
-ensureSetupHs :: Path Abs Dir -> IO (IO ())
+ensureSetupHs :: Path Abs Dir -> IO (Path Abs File, IO ())
 ensureSetupHs dir =
-  do exists <- doesFileExist (FL.toFilePath fp)
-     if exists
-        then return (return ())
-        else do writeFile (FL.toFilePath fp) "import Distribution.Simple\nmain = defaultMain"
-                return (removeFile (FL.toFilePath fp))
-  where fp =
-          dir </>
-          $(mkRelFile "Setup.hs")
+  do exists1 <- doesFileExist (FL.toFilePath fp1)
+     exists2 <- doesFileExist (FL.toFilePath fp2)
+     if exists1 || exists2
+        then return (if exists1 then fp1 else fp2, return ())
+        else do writeFile (FL.toFilePath fp1) "import Distribution.Simple\nmain = defaultMain"
+                return (fp1, removeFile (FL.toFilePath fp1))
+  where fp1 = dir </> $(mkRelFile "Setup.hs")
+        fp2 = dir </> $(mkRelFile "Setup.lhs")
 
 -- | Build the haddock documentation index and contents.
 buildDocIndex :: (Package -> Bool) -> Path Abs Dir -> Set Package -> Rules ()
