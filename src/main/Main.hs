@@ -20,6 +20,7 @@ import           Stack.Fetch
 import           Stack.Build.Types
 import           Stack.Config
 import           Stack.Package
+import qualified Stack.PackageIndex
 import           Stack.Setup
 import           Stack.Types
 import           Stack.Types.StackT
@@ -44,7 +45,11 @@ main =
              addCommand "unpack"
                         "Unpack one or more packages locally"
                         unpackCmd
-                        (some $ strArgument $ metavar "PACKAGE"))
+                        (some $ strArgument $ metavar "PACKAGE")
+             addCommand "update"
+                        "Update the package index"
+                        updateCmd
+                        (pure ()))
      run level
 
 setupCmd :: LogLevel -> IO ()
@@ -133,6 +138,12 @@ unpackCmd :: [String] -> LogLevel -> IO ()
 unpackCmd names logLevel = do
     config <- runStackLoggingT logLevel loadConfig
     runStackT logLevel config (Stack.Fetch.unpackPackages "." names)
+
+-- | Update the package index
+updateCmd :: () -> LogLevel -> IO ()
+updateCmd () logLevel = do
+    config <- runStackLoggingT logLevel loadConfig
+    runStackT logLevel config Stack.PackageIndex.updateIndex
 
 -- | Parser for build arguments.
 --

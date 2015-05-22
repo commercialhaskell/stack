@@ -378,5 +378,5 @@ deleteCache = do
     let fp = toFilePath $ configPackageIndexCache config
     eres <- liftIO $ tryIO $ removeFile fp
     case eres of
-        Left e -> $logInfo $ "Could not delete cache: " <> T.pack (show e)
+        Left e -> $logDebug $ "Could not delete cache: " <> T.pack (show e)
         Right () -> $logDebug $ "Deleted index cache at " <> T.pack fp
