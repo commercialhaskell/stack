@@ -195,8 +195,7 @@ allBuildInfo' pkg_descr = [ bi | Just lib <- [library pkg_descr]
 
 -- | Get all files referenced by the package.
 packageDescFiles :: Path Abs Dir -> PackageDescription -> IO [Path Abs File]
-packageDescFiles dir pkg = return [] -- FIXME code disabled for now as it prevents building anything, see: https://github.com/fpco/stack/issues/47
-{-
+packageDescFiles dir pkg =
   do libfiles <- fmap concat
                       (mapM (libraryFiles dir)
                             (maybe [] return (library pkg)))
@@ -204,15 +203,16 @@ packageDescFiles dir pkg = return [] -- FIXME code disabled for now as it preven
                       (mapM (executableFiles dir)
                             (executables pkg))
      dfiles <- resolveGlobFiles dir
-                                (dataFiles pkg)
+                                (map (dataDir pkg FilePath.</>) (dataFiles pkg))
      srcfiles <- resolveGlobFiles dir
                                   (extraSrcFiles pkg)
-     tmpfiles <- resolveGlobFiles dir
-                                  (extraTmpFiles pkg)
+     -- extraTmpFiles purposely not included here, as those are files generated
+     -- by the build script. Another possible implementation: include them, but
+     -- don't error out if not present
+
      docfiles <- resolveGlobFiles dir
                                   (extraDocFiles pkg)
-     return (concat [libfiles,exefiles,dfiles,srcfiles,tmpfiles,docfiles])
-     -}
+     return (concat [libfiles,exefiles,dfiles,srcfiles,docfiles])
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
 resolveGlobFiles :: Path Abs Dir -> [String] -> IO [Path Abs File]
