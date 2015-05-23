@@ -12,16 +12,17 @@ import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Maybe
 import qualified Data.Text as T
-import           Path as FL
+import           Path
 import           Stack.Constants
 import           Stack.Types
 import           System.Directory
 import           System.FilePath (takeFileName)
+import           System.Environment (lookupEnv)
 
 -- | Get all packages included in documentation from directory.
 getDocPackages :: Path Abs Dir -> IO (Map PackageName [Version])
 getDocPackages loc =
-  do ls <- fmap (map (FL.toFilePath loc ++)) (getDirectoryContents (FL.toFilePath loc))
+  do ls <- fmap (map (toFilePath loc ++)) (getDirectoryContents (toFilePath loc))
      mdirs <- forM ls (\e -> do isDir <- doesDirectoryExist e
                                 return $ if isDir then (Just e) else Nothing)
      let sorted = -- Sort by package name ascending, version descending
@@ -52,32 +53,39 @@ joinPkgVer :: (PackageName,Version) -> FilePath
 joinPkgVer (pkg,ver) = (packageNameString pkg ++ "-" ++ versionString ver)
 
 -- | Get location of user-generated documentation.
-getUserDocLoc :: IO (Path Abs Dir)
-getUserDocLoc = do
+getUserDocPath :: IO (Path Abs Dir)
+getUserDocPath = do
     homeDir <- parseAbsDir =<< getHomeDirectory
     return (userDocsDir homeDir)
 
 -- | Get location of user-generated documentation if it exists.
-getExistingUserDocLoc :: IO (Maybe (Path Abs Dir))
-getExistingUserDocLoc = do
-    docPath <- getUserDocLoc
-    docExists <- doesDirectoryExist (FL.toFilePath docPath)
+getExistingUserDocPath :: IO (Maybe (Path Abs Dir))
+getExistingUserDocPath = do
+    docPath <- getUserDocPath
+    docExists <- doesDirectoryExist (toFilePath docPath)
     if docExists
         then return (Just docPath)
         else return Nothing
 
--- | Get locations of global package docs and GHC docs.
-getGlobalDocLocs :: IO (Maybe (Path Abs Dir),Maybe (Path Abs Dir))
-getGlobalDocLocs = do
+-- | Get location of global package docs.
+getGlobalDocPath :: IO (Maybe (Path Abs Dir))
+getGlobalDocPath = do
+    maybeRootEnv <- lookupEnv "STACKAGE_DOC_ROOT"
+    case maybeRootEnv of
+        Nothing -> return Nothing
+        Just rootEnv -> do
+            pkgDocPath <- parseAbsDir rootEnv
+            pkgDocExists <- doesDirectoryExist (toFilePath pkgDocPath)
+            return (if pkgDocExists then Just pkgDocPath else Nothing)
+
+-- | Get location of GHC docs.
+getGhcDocPath :: IO (Maybe (Path Abs Dir))
+getGhcDocPath = do
     maybeGhcPathS <- findExecutable "ghc"
     case maybeGhcPathS of
-        Nothing -> return (Nothing,Nothing)
+        Nothing -> return Nothing
         Just ghcPathS -> do
-          ghcLoc <- parseAbsFile ghcPathS
-          let rootLoc = parent (parent ghcLoc)
-              pkgDocLoc = rootLoc </> $(mkRelDir "doc/")
-              ghcDocLoc = rootLoc </> $(mkRelDir "share/doc/ghc/html/")
-          pkgDocExists <- doesDirectoryExist (FL.toFilePath pkgDocLoc)
-          ghcDocExists <- doesDirectoryExist (FL.toFilePath ghcDocLoc)
-          return (if pkgDocExists then Just pkgDocLoc else Nothing
-                 ,if ghcDocExists then Just ghcDocLoc else Nothing)
+            ghcPath <- parseAbsFile ghcPathS
+            let ghcDocPath = parent (parent ghcPath) </> $(mkRelDir "share/doc/ghc/html/")
+            ghcDocExists <- doesDirectoryExist (toFilePath ghcDocPath)
+            return (if ghcDocExists then Just ghcDocPath else Nothing)

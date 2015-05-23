@@ -268,7 +268,7 @@ installDependencies bopts deps' = do
 
     installResource <- liftIO $ newResourceIO "cabal install" 1
     cfgVar <- liftIO $ newMVar ConfigLock
-    docLoc <- liftIO $ getUserDocLoc
+    docLoc <- liftIO getUserDocPath
 
     if M.null toInstall
         then $logInfo "All dependencies are already installed"
@@ -337,7 +337,7 @@ buildLocals bopts pinfos = do
      pkgIds <- getPackageIds [packageDatabaseLocal env]
                 (map packageName (S.toList pinfos))
      pwd <- liftIO $ getCurrentDirectory >>= parseAbsDir
-     docLoc <- liftIO $ getUserDocLoc
+     docLoc <- liftIO getUserDocPath
      installResource <- liftIO $ newResourceIO "cabal install" 1
      cfgVar <- liftIO $ newMVar ConfigLock
 
@@ -835,7 +835,7 @@ createDocLinks docLoc pinfo =
 -- | Get @-i@ arguments for haddock for dependencies.
 haddockInterfaceOpts :: Path Abs Dir -> Package -> Set Package -> IO [String]
 haddockInterfaceOpts userDocLoc pinfo pinfos =
-  do (mglobalDocLoc, _) <- getGlobalDocLocs
+  do mglobalDocLoc <- getGlobalDocPath
      globalPkgVers <-
        case mglobalDocLoc of
          Nothing -> return M.empty
