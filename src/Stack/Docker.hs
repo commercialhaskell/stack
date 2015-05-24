@@ -157,6 +157,7 @@ runContainerAndExitAction config
          sandboxSubdirsFP = map (\d -> sandboxRepoDirFP </> FP.decodeString d)
                                 sandboxedHomeSubdirectories
          sandboxSubdirsS = map FP.encodeString sandboxSubdirsFP
+         isTerm = isStdinTerminal && isStdoutTerminal && isStderrTerminal
          execDockerProcess =
            do mapM_ FS.createTree ([sandboxHomeDirFP
                                    ,sandboxSandboxDirFP] ++
@@ -198,12 +199,9 @@ runContainerAndExitAction config
                      Nothing -> []
                   ,if dockerDetach config
                       then ["-d"]
-                      else concat [if dockerPersist config
-                                      then []
-                                      else ["--rm"]
-                                  ,if isStdinTerminal && isStdoutTerminal && isStderrTerminal
-                                      then ["-t", "-i"]
-                                      else []]
+                      else concat [["--rm" | not (dockerPersist config)]
+                                  ,["-t" | isTerm]
+                                  ,["-i" | isTerm]]
                   ,dockerRunArgsDefault config
                   ,concat (dockerRunArgsExtra config)
                   ,[image
