@@ -48,6 +48,7 @@ import           System.Directory
 import           System.Environment (lookupEnv,unsetEnv)
 import           System.Exit (ExitCode(ExitSuccess,ExitFailure),exitWith)
 import           System.IO (hPutStrLn,stderr,stdin,stdout,hIsTerminalDevice)
+import           System.Posix.Signals (installHandler,sigTERM,Handler(Catch))
 import qualified System.Process as Proc
 import           System.Process.PagerEditor (editByteString)
 import           Text.ParserCombinators.ReadP (readP_to_S)
@@ -525,6 +526,7 @@ runInContainerAndExit cmnd args =
 execProcessAndExit :: FilePath -> [String] -> IO () -> IO ()
 execProcessAndExit cmnd args successPostAction =
   do (_, _, _, h) <- Proc.createProcess (Proc.proc cmnd args){Proc.delegate_ctlc = True}
+     _ <- installHandler sigTERM (Catch (Proc.terminateProcess h)) Nothing
      exitCode <- Proc.waitForProcess h
      when (exitCode == ExitSuccess)
           successPostAction
