@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
--- | Utilities for built documentation, shared between @stackage-build@ and @fpdoc@.
+-- | Utilities for built documentation, shared between @stack@ and @stack-doc-server@.
 module Stack.Build.Doc where
 
 import           Control.Monad

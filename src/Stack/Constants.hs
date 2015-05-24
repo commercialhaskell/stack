@@ -55,7 +55,7 @@ haddockExtension = "haddock"
 
 -- | User documentation directory.
 userDocsDir :: Path Abs Dir -> Path Abs Dir
-userDocsDir homeDir = homeDir </> $(mkRelDir ".stackage/doc/")
+userDocsDir homeDir = homeDir </> $(mkRelDir ".stack/doc/")
 
 -- | Package's build artifacts directory.
 distDirFromDir :: Path Abs Dir -> Path Abs Dir
