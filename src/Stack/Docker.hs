@@ -126,7 +126,7 @@ runContainerAndExitAction config
          | otherwise ->
              error ("The Docker image referenced by " ++ FL.toFilePath configFileName ++
                     " has not\nbeen downloaded:\n\n" ++
-                    "Run 'stackage-docker " ++ dockerPullCmdName ++
+                    "Run 'stack docker " ++ dockerPullCmdName ++
                     "' to download it, then try again.")
      let pwdS = FP.encodeString pwdFP
          sandboxDirS = FP.encodeString sandboxDirFP
@@ -264,7 +264,7 @@ cleanupAction opts =
                                       inspectMap
                plan = toLazyByteString (execWriter planWriter)
            case dcAction opts of
-             CleanupInteractive -> editByteString "stackage-docker-docker-cleanup-plan" plan
+             CleanupInteractive -> editByteString "stack-docker-cleanup-plan" plan
              CleanupImmediate -> return plan
              CleanupDryRun -> do LBS.hPut stdout plan
                                  return LBS.empty)
@@ -308,7 +308,7 @@ cleanupAction opts =
               inspectMap =
       do case dcAction opts of
            CleanupInteractive ->
-             do buildStrLn "# STACKAGE-DOCKER DOCKER CLEANUP PLAN\n\
+             do buildStrLn "# STACK DOCKER CLEANUP PLAN\n\
                            \#\n\
                            \# When you leave the editor, the lines in this plan will be processed.\n\
                            \#\n\
@@ -327,14 +327,14 @@ cleanupAction opts =
                 buildDefault dcRemoveRunningContainersCreatedDaysAgo "Running containers created"
                 buildStrLn "#\n\
                            \# The default plan can be adjusted using command-line arguments.\n\
-                           \# Run `stackage-docker docker-cleanup --help' for details.\n\
+                           \# Run `stack docker cleanup --help' for details.\n\
                            \#"
            _ -> buildStrLn "# Lines that begin with `R' denote an image or container that will be.\n\
                            \# removed."
-         buildSection "KNOWN IMAGES (pulled/used by stackage-docker)"
+         buildSection "KNOWN IMAGES (pulled/used by stack)"
                       imagesLastUsed
                       buildKnownImage
-         buildSection "UNKNOWN IMAGES (not managed by stackage-docker)"
+         buildSection "UNKNOWN IMAGES (not managed by stack)"
                       (sortCreated (Map.toList (foldl' (\m (h,_) -> Map.delete h m)
                                                        imageRepos
                                                        imagesLastUsed)))
@@ -589,7 +589,7 @@ getSandboxDir =
 
 -- | Subdirectories of the home directory to sandbox between GHC/Stackage versions.
 sandboxedHomeSubdirectories :: [FilePath]
-sandboxedHomeSubdirectories = [".ghc", ".cabal", ".ghcjs", ".stackage"]
+sandboxedHomeSubdirectories = [".ghc", ".cabal", ".ghcjs", ".stack"]
 
 -- | Name of @.docker-sandbox@ directory.
 dockerSandboxName :: FP.FilePath
@@ -615,14 +615,14 @@ removeDirectoryContents path exclude =
                                            then FS.removeTree l
                                            else FS.removeFile l)))
 
--- | Check host `stackage-docker` version
+-- | Check host 'stack' version
 checkHostStackageDockerVersion :: Version -> IO ()
 checkHostStackageDockerVersion minVersion =
   do maybeHostVer <- lookupEnv hostVersionEnvVar
      case parseVersion' =<< maybeHostVer of
        Just hostVer
          | hostVer < minVersion ->
-             error ("Your host's version of `stackage-docker' is too old.\nVersion " ++
+             error ("Your host's version of 'stack' is too old.\nVersion " ++
                     showVersion minVersion ++
                     " is required; you have " ++
                     showVersion hostVer ++
@@ -631,12 +631,12 @@ checkHostStackageDockerVersion minVersion =
        Nothing ->
           do inContainer <- getInContainer
              if inContainer
-                then error ("Your host's version of `stackage-docker' is too old.\nVersion " ++
+                then error ("Your host's version of 'stack' is too old.\nVersion " ++
                             showVersion minVersion ++ " is required.")
                 else return ()
 
 
--- | Check host and container `stackage-docker' versions are compatible.
+-- | Check host and container 'stack' versions are compatible.
 checkVersions :: IO ()
 checkVersions =
   do checkHostStackageDockerVersion requireHostVersion
@@ -644,11 +644,11 @@ checkVersions =
      case parseVersion' =<< maybeReqVer of
        Just reqVer
          | version < reqVer ->
-             error ("Your Docker image's version of `stackage-docker' is too old.\nVersion " ++
+             error ("Your Docker image's version of 'stack' is too old.\nVersion " ++
                     showVersion reqVer ++
                     " is required; you have " ++
                     showVersion version ++
-                    ".\nPlease update your `stackage-docker.conf' to use a newer image.")
+                    ".\nPlease update your 'stack.config' to use a newer image.")
          | otherwise -> return ()
        _ -> return ()
 
@@ -671,11 +671,11 @@ dockerImageName config =
                       ,maybe "" (const ":") (dockerImageTag config)
                       ,maybe "" id (dockerImageTag config)]
 
--- | Environment variable to the host's stackage-docker version.
+-- | Environment variable to the host's stack version.
 hostVersionEnvVar :: String
 hostVersionEnvVar = "STACKAGE_DOCKER_HOST_VERSION"
 
--- | Environment variable to pass required container stackage-docker version.
+-- | Environment variable to pass required container stack version.
 requireVersionEnvVar :: String
 requireVersionEnvVar = "STACKAGE_DOCKER_REQUIRE_VERSION"
 
@@ -687,11 +687,11 @@ sandboxIDEnvVar = "DOCKER_SANDBOX_ID"
 dockerPullCmdName :: String
 dockerPullCmdName = "docker-pull"
 
--- | Version of `stackage-docker' required to be installed in container.
+-- | Version of 'stack' required to be installed in container.
 requireContainerVersion :: Version
 requireContainerVersion = Version [0,0,4] []
 
--- | Version of `stackage-docker' required to be installed on the host.
+-- | Version of 'stack' required to be installed on the host.
 requireHostVersion :: Version
 requireHostVersion = Version [0,1,1] []
 
