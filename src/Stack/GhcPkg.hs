@@ -138,13 +138,13 @@ findPackageId menv pkgDbs name =
        Left{} -> return Nothing
        Right lbs ->
          do let mpid =
-                  fmap T.unpack
+                  fmap T.encodeUtf8
                        (listToMaybe
                           (mapMaybe (T.stripPrefix "id: ")
                                     (map T.decodeUtf8 (S8.lines lbs))))
             case mpid of
               Just !pid ->
-                return (parseGhcPkgIdFromString pid)
+                return (parseGhcPkgId pid)
               _ -> return Nothing
 
 -- | Get all current package ids.
