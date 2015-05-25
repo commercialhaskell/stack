@@ -19,6 +19,8 @@ module Stack.Build
   where
 
 
+import qualified Control.Applicative as A
+import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.MVar
 import           Control.Exception
 import           Control.Monad
@@ -34,7 +36,7 @@ import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.Conduit (($$),($=))
-import           Data.Conduit.Binary (sinkIOHandle,sourceHandle)
+import           Data.Conduit.Binary (sinkHandle,sourceHandle)
 import qualified Data.Conduit.List as CL
 import           Data.Either
 import           Data.Function
@@ -650,14 +652,17 @@ runhaskell cabalPkgVer pinfo setuphs config' buildType args =
      putQuiet display
      outRef <- liftIO (newIORef mempty)
      errRef <- liftIO (newIORef mempty)
-     join (liftIO (catch (do withCheckedProcess
+     let withSink inner =
+            withBinaryFile (FL.toFilePath (buildLogPath pinfo)) AppendMode
+            $ \h -> inner (sinkHandle h)
+     join (liftIO (catch (do withSink $ \sink -> withCheckedProcess
                                cp {cwd =
                                      Just (FL.toFilePath dir)
                                   ,Process.env = envHelper menv
                                   ,std_err = Inherit}
-                               (\ClosedStream stdout' stderr' ->
-                                  do logFrom stdout' outRef
-                                     logFrom stderr' errRef)
+                               (\ClosedStream stdout' stderr' -> runConcurrently $
+                                     Concurrently (logFrom stdout' sink outRef) A.*>
+                                     Concurrently (logFrom stderr' sink errRef))
                              return (return ()))
                          (\e@ProcessExitedUnsuccessfully{} ->
                             return (do putQuiet (display <> ": ERROR")
@@ -670,14 +675,12 @@ runhaskell cabalPkgVer pinfo setuphs config' buildType args =
                                               (do putQuiet "Stderr was:"
                                                   putQuiet (S8.unpack errs))
                                        liftIO (throwIO e)))))
-  where logFrom h ref =
-          void (try (runResourceT
-                       (sourceHandle h $=
+  where logFrom src sink ref =
+                        src $=
                         CL.mapM (\chunk ->
                                    do liftIO (modifyIORef' ref (<> chunk))
                                       return chunk) $$
-                        sinkIOHandle (openFile (FL.toFilePath (buildLogPath pinfo)) AppendMode)))
-                :: IO (Either IOException ()))
+                        sink
         display =
           packageNameString (packageName pinfo) <>
           ": " <>
