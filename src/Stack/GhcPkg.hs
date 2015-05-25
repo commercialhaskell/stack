@@ -124,7 +124,8 @@ pkgsListParser =
              space
              space
              space
-             fmap toTuple packageIdentifierParser
+             fmap toTuple (packageIdentifierParser <|>
+                ("(" *> packageIdentifierParser <* ")")) -- hidden packages
 
 -- | Get the id of the package e.g. @foo-0.0.0-9c293923c0685761dcff6f8c3ad8f8ec@.
 findPackageId :: (MonadIO m, MonadLogger m)
