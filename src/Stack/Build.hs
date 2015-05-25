@@ -529,7 +529,7 @@ writeFinalFiles gconfig bconfig buildType dir name = liftIO $
                  do writeGenConfigFile
                       dir
                       gconfig {gconfigForceRecomp = False
-                              ,gconfigPkgId = pkgid}
+                              ,gconfigPkgId = Just pkgid}
                     -- After a build has completed successfully for a given
                     -- configuration, no recompilation forcing is required.
                     updateGenFile dir)
@@ -872,7 +872,7 @@ genFileInvalidated pkgIds bopts gconfig pname pinfo =
      ,ghcOptsChanged
      ,flagsChanged]
   where installedPkgIdChanged =
-          Just (gconfigPkgId gconfig) /=
+          gconfigPkgId gconfig /=
           M.lookup pname pkgIds
         ghcOptsChanged = boptsGhcOptions bopts /= gconfigGhcOptions gconfig
         profilingChanged =
@@ -901,7 +901,7 @@ genFileChanged pkgIds bopts gconfig pname pinfo =
      ,ghcOptsChanged
      ,flagsChanged]
   where installedPkgIdChanged =
-          Just (gconfigPkgId gconfig) /=
+          gconfigPkgId gconfig /=
           M.lookup pname pkgIds
         ghcOptsChanged = boptsGhcOptions bopts /= gconfigGhcOptions gconfig
         profilingChanged =

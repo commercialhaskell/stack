@@ -76,7 +76,7 @@ data GenConfig =
             ,gconfigExeProfiling :: !Bool
             ,gconfigGhcOptions :: ![Text]
             ,gconfigFlags :: !(Map FlagName Bool)
-            ,gconfigPkgId :: GhcPkgId}
+            ,gconfigPkgId :: Maybe GhcPkgId}
   deriving (Generic,Show)
 
 instance FromJSON GenConfig
@@ -90,7 +90,7 @@ defaultGenConfig =
               ,gconfigExeProfiling = False
               ,gconfigGhcOptions = []
               ,gconfigFlags = mempty
-              ,gconfigPkgId = fromJust (parseGhcPkgIdFromString "")}
+              ,gconfigPkgId = Nothing}
 
 -- | Run a Setup.hs action after building a package, before installing.
 data FinalAction
