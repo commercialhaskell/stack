@@ -220,6 +220,7 @@ installDependencies bopts deps' = do
     pkgDbs <- getPackageDatabases bconfig BTDeps
     menv <- getMinimalEnvOverride
     installed <- liftM toIdents $ getAllPackages menv pkgDbs
+    cabalPkgVer <- getCabalPkgVer menv
     let toInstall = M.difference deps installed
 
     installResource <- liftIO $ newResourceIO "cabal install" 1
@@ -252,6 +253,7 @@ installDependencies bopts deps' = do
                             , gconfigPkgId = error "gconfigPkgId"
                             }
                     return $ makePlan -- FIXME dedupe this code with buildLocals
+                        cabalPkgVer
                         M.empty
                         True
                         bopts
@@ -294,6 +296,7 @@ buildLocals bopts pinfos = do
      menv <- getMinimalEnvOverride
      pkgIds <- getPackageIds menv [localDB]
                 (map packageName (S.toList pinfos))
+     cabalPkgVer <- getCabalPkgVer menv
      pwd <- liftIO $ getCurrentDirectory >>= parseAbsDir
      docLoc <- liftIO getUserDocPath
      installResource <- liftIO $ newResourceIO "cabal install" 1
@@ -314,7 +317,8 @@ buildLocals bopts pinfos = do
                                       wantedTarget
                                       pinfo
                                       cfgVar
-                  return (makePlan pkgIds
+                  return (makePlan cabalPkgVer
+                                   pkgIds
                                    wantedTarget
                                    bopts
                                    (getBuildConfig env)
@@ -408,7 +412,8 @@ clean =
 -- Shake plan
 
 -- | Make a Shake plan for a package.
-makePlan :: Map PackageName GhcPkgId
+makePlan :: PackageIdentifier
+         -> Map PackageName GhcPkgId
          -> Bool
          -> BuildOpts
          -> BuildConfig
@@ -420,7 +425,7 @@ makePlan :: Map PackageName GhcPkgId
          -> Path Abs Dir
          -> MVar ConfigLock
          -> Rules ()
-makePlan pkgIds wanted bopts bconfig buildType gconfig pinfos pinfo installResource docLoc cfgVar =
+makePlan cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig pinfos pinfo installResource docLoc cfgVar =
   do when wanted (want [buildTarget])
      configureTarget %>
        \_ ->
@@ -429,6 +434,7 @@ makePlan pkgIds wanted bopts bconfig buildType gconfig pinfos pinfo installResou
             (setuphs, removeAfterwards) <- liftIO (ensureSetupHs dir)
             actionFinally
               (configurePackage
+                 cabalPkgVer
                  bconfig
                  setuphs
                  buildType
@@ -445,6 +451,7 @@ makePlan pkgIds wanted bopts bconfig buildType gconfig pinfos pinfo installResou
             (setuphs, removeAfterwards) <- liftIO (ensureSetupHs dir)
             actionFinally
               (buildPackage
+                 cabalPkgVer
                  bopts
                  bconfig
                  setuphs
@@ -535,18 +542,19 @@ writeFinalFiles gconfig bconfig buildType dir name = liftIO $
                     updateGenFile dir)
 
 -- | Build the given package with the given configuration.
-configurePackage :: BuildConfig
+configurePackage :: PackageIdentifier
+                 -> BuildConfig
                  -> Path Abs File -- ^ Setup.hs file
                  -> BuildType
                  -> Package
                  -> GenConfig
                  -> FinalAction
                  -> Action ()
-configurePackage bconfig setuphs buildType pinfo gconfig setupAction =
+configurePackage cabalPkgVer bconfig setuphs buildType pinfo gconfig setupAction =
   do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath pinfo))) :: IO (Either IOException ())))
      pkgDbs <- getPackageDatabases bconfig buildType
      installRoot <- getInstallRoot bconfig buildType
-     let runhaskell' = runhaskell pinfo setuphs bconfig buildType
+     let runhaskell' = runhaskell cabalPkgVer pinfo setuphs bconfig buildType
      runhaskell'
        (concat [["configure","--user"]
                ,["--package-db=clear","--package-db=global"]
@@ -567,12 +575,12 @@ configurePackage bconfig setuphs buildType pinfo gconfig setupAction =
                            else "-") <>
                        flagNameString name)
                     (M.toList (packageFlags pinfo))])
-       False
 
 data BuildType = BTDeps | BTLocals
 
 -- | Build the given package with the given configuration.
-buildPackage :: BuildOpts
+buildPackage :: PackageIdentifier
+             -> BuildOpts
              -> BuildConfig
              -> Path Abs File -- ^ Setup.hs file
              -> BuildType
@@ -583,19 +591,18 @@ buildPackage :: BuildOpts
              -> Resource
              -> Path Abs Dir
              -> Action ()
-buildPackage bopts bconfig setuphs buildType pinfos pinfo gconfig setupAction installResource docLoc =
+buildPackage cabalPkgVer bopts bconfig setuphs buildType pinfos pinfo gconfig setupAction installResource docLoc =
   do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath pinfo))) :: IO (Either IOException ())))
-     let runhaskell' = runhaskell pinfo setuphs bconfig buildType
+     let runhaskell' = runhaskell cabalPkgVer pinfo setuphs bconfig buildType
 
      runhaskell'
        (concat [["build"]
                ,["--ghc-options=-O2" | gconfigOptimize gconfig]
                ,["--ghc-options=-fforce-recomp" | gconfigForceRecomp gconfig]
                ,concat [["--ghc-options",T.unpack opt] | opt <- boptsGhcOptions bopts]])
-       False
 
      case setupAction of
-       DoTests -> runhaskell' ["test"] False
+       DoTests -> runhaskell' ["test"]
        DoHaddock ->
            do liftIO (removeDocLinks docLoc pinfo)
               ifcOpts <- liftIO (haddockInterfaceOpts docLoc pinfo pinfos)
@@ -606,7 +613,6 @@ buildPackage bopts bconfig setuphs buildType pinfos pinfo gconfig setupAction in
                          ,"--hyperlink-source"
                          ,"--html-location=../$pkg-$version/"
                          ,"--haddock-options=" ++ intercalate " " ifcOpts]
-                         False
               haddockLocs <-
                 liftIO (findFiles (packageDocDir pinfo)
                                   (\loc -> FilePath.takeExtensions (toFilePath loc) == "." ++ haddockExtension)
@@ -622,23 +628,23 @@ buildPackage bopts bconfig setuphs buildType pinfos pinfo gconfig setupAction in
                                  ,"--haddock"
                                  ,hoogleTxtPath
                                  ,hoogleDbPath])
-       DoBenchmarks -> runhaskell' ["bench"] True
+       DoBenchmarks -> runhaskell' ["bench"]
        _ -> return ()
-     withResource installResource 1 (runhaskell' ["install"] False)
+     withResource installResource 1 (runhaskell' ["install"])
      case setupAction of
        DoHaddock -> liftIO (createDocLinks docLoc pinfo)
        _ -> return ()
 
 -- | Run the Haskell command for the given package.
 runhaskell :: HasConfig config
-           => Package
+           => PackageIdentifier
+           -> Package
            -> Path Abs File -- ^ Setup.hs or Setup.lhs file
            -> config
            -> BuildType
            -> [String]
-           -> Bool
            -> Action ()
-runhaskell pinfo setuphs config' buildType args _printLive =
+runhaskell cabalPkgVer pinfo setuphs config' buildType args =
   do liftIO (createDirectoryIfMissing True
                                       (FL.toFilePath (stackageBuildDir pinfo)))
      putQuiet display
@@ -680,7 +686,8 @@ runhaskell pinfo setuphs config' buildType args _printLive =
             _ -> mempty
         dir = packageDir pinfo
         cp =
-          proc "runhaskell" (toFilePath setuphs : args)
+          proc "runhaskell" (("-package=" ++ packageIdentifierString cabalPkgVer)
+                              : toFilePath setuphs : args)
 
         menv = configEnvOverride (getConfig config') EnvSettings
                 { esIncludeLocals =
@@ -1029,7 +1036,6 @@ shakeFilesPath dir =
 isHiddenDir :: Path b Dir -> Bool
 isHiddenDir = isPrefixOf "." . toFilePath . dirname
 
---------------------------------------------------------------------------------
 -- | Check that the GHC on the PATH matches the expected GHC
 checkGHCVersion :: (MonadIO m, MonadThrow m, MonadReader env m, HasBuildConfig env)
                 => m ()
@@ -1043,3 +1049,14 @@ checkGHCVersion = do
   where
     isValidChar '.' = True
     isValidChar c = '0' <= c && c <= '9'
+
+-- | Get the version of Cabal from the global package database.
+getCabalPkgVer :: (MonadThrow m,MonadIO m,MonadLogger m)
+               => EnvOverride -> m PackageIdentifier
+getCabalPkgVer menv =
+  do db <- getGlobalDB menv
+     findPackageId menv
+                   [db]
+                   $(mkPackageName "Cabal") >>=
+       maybe (error ("FIXME: Couldn't find Cabal package from ghc-pkg! Database: " ++ toFilePath db))
+             (return . ghcPkgIdPackageIdentifier)
