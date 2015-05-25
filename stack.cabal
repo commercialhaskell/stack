@@ -38,7 +38,6 @@ library
                      Stack.Build
                      Stack.Build.Types
                      Stack.Build.Doc
-                     Stack.Build.Config
   other-modules:     Network.HTTP.Download
                      Path.Find
                      Path.IO

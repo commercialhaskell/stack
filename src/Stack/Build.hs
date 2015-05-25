@@ -52,7 +52,6 @@ import qualified Data.Streaming.Process as Process
 import           Data.Streaming.Process hiding (env)
 import qualified Data.Text as T
 import           Development.Shake hiding (doesFileExist,doesDirectoryExist,getDirectoryContents)
-import           Distribution.Package hiding (packageName,packageVersion,Package,PackageName,PackageIdentifier)
 import           Network.HTTP.Download
 import           Path as FL
 import           Path.Find
