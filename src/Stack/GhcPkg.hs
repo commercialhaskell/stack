@@ -9,7 +9,9 @@
 module Stack.GhcPkg
   (getAllPackages
   ,findPackageId
-  ,getPackageIds)
+  ,getPackageIds
+  ,getGlobalDB
+  ,EnvHelper (..))
   where
 
 import           Stack.Types
@@ -36,9 +38,9 @@ import           Data.Streaming.Process
 
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Path (Path, Abs, Dir, toFilePath, parent)
+import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsFile)
 import           Prelude hiding (FilePath)
-import           System.Directory (createDirectoryIfMissing, doesDirectoryExist)
+import           System.Directory (createDirectoryIfMissing, doesDirectoryExist, canonicalizePath)
 
 -- | A ghc-pkg exception.
 data GhcPkgException
@@ -47,6 +49,16 @@ data GhcPkgException
   | FindPackageIdFail PackageName ProcessExitedUnsuccessfully
   deriving (Typeable,Show)
 instance Exception GhcPkgException
+
+-- | Get the global package database
+getGlobalDB :: (MonadIO m, MonadReader env m, HasExternalEnv env, MonadLogger m, MonadThrow m)
+            => m (Path Abs Dir)
+getGlobalDB = do
+    -- This seems like a strange way to get the global package database
+    -- location, but I don't know of a better one
+    bs <- ghcPkg [] ["list", "--global"] >>= either throwM return
+    let fp = S8.unpack $ S8.takeWhile (/= ':') bs
+    liftIO (canonicalizePath fp) >>= liftM parent . parseAbsFile
 
 -- | Run the ghc-pkg executable
 ghcPkg :: (MonadIO m, MonadReader env m, HasExternalEnv env, MonadLogger m)

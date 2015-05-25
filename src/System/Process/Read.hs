@@ -6,6 +6,7 @@
 
 module System.Process.Read
   (HasExternalEnv(..)
+  ,EnvHelper(..)
   ,callProcess
   ,readProcessStdout
   ,tryProcessStdout
@@ -21,7 +22,6 @@ import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger (MonadLogger, logError)
 import           Control.Monad.Reader (MonadReader, asks, runReaderT)
 import qualified Data.ByteString as S
-import qualified Data.ByteString.Lazy as L
 import           Data.Conduit
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process hiding (callProcess)

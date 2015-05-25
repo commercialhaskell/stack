@@ -27,6 +27,7 @@ import           Stack.Build
 import           Stack.Fetch
 import           Stack.Build.Types
 import           Stack.Config
+import           Stack.GhcPkg (EnvHelper (..), getGlobalDB)
 import           Stack.Package
 import qualified Stack.PackageIndex
 import           Stack.Setup
@@ -88,11 +89,12 @@ setupEnv setGhcPackagePath bconfig = do
             -- FIXME make sure the directories exist?
             deps <- packageDatabaseDeps
             local <- packageDatabaseLocal
-            global <- return "FIXME get the global database by querying ghc-pkg presumably"
+            global <- runReaderT getGlobalDB $ EnvHelper $ Just
+                    $ map (T.unpack *** T.unpack) $ Map.toList env1
             let v = intercalate [searchPathSeparator]
                     [ toFilePath local
                     , toFilePath deps
-                    , global
+                    , toFilePath global
                     ]
             return $ Map.insert "GHC_PACKAGE_PATH" (T.pack v) env1
         else return env1
