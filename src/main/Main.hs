@@ -113,6 +113,19 @@ setupEnv bconfig = do
             $ (if esIncludeGhcPackagePath es
                     then Map.insert "GHC_PACKAGE_PATH" (mkGPP (esIncludeLocals es))
                     else id)
+            $ Map.insert "HASKELL_PACKAGE_SANDBOX"
+                (T.pack $ if esIncludeLocals es
+                    {- This is what we'd ideally want to provide, but
+                     - HASKELL_PACKAGE_SANDBOX isn't set up to respect it. Need
+                     - to figure out a better solution, maybe creating a
+                     - combined database and passing that in?
+                    then intercalate [searchPathSeparator]
+                            [ toFilePath localdb
+                            , toFilePath deps
+                            ]
+                    -}
+                    then toFilePath localdb
+                    else toFilePath deps)
             $ env0
     return bconfig { bcConfig = (bcConfig bconfig) { configEnvOverride = mkEnvOverride } }
   where
