@@ -12,9 +12,6 @@
 
 module Stack.Build
   (build
-  ,test
-  ,haddock
-  ,benchmark
   ,clean
   ,shakeFilesPath
   ,configDir
@@ -77,46 +74,6 @@ import           System.IO
 import           System.IO.Temp (withSystemTempDirectory)
 import           System.Posix.Files (createSymbolicLink,removeLink)
 import           System.Process.Read (readProcessStdout)
-
---------------------------------------------------------------------------------
--- Top-level commands
-
--- | Build and test using Shake.
-test :: (MonadIO m, MonadReader env m, HasHttpManager env, HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
-     => TestConfig
-     -> m ()
-test conf =
-  build (BuildOpts (tconfigTargets conf)
-                   False
-                   False
-                   Nothing
-                   DoTests
-                   False
-                   [])
-
--- | Build and haddock using Shake.
-haddock :: (MonadIO m, MonadReader env m, HasHttpManager env, HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
-        => HaddockConfig -> m ()
-haddock conf =
-  build (BuildOpts (hconfigTargets conf)
-                   False
-                   False
-                   Nothing
-                   DoHaddock
-                   False
-                   [])
-
--- | Build and benchmark using Shake.
-benchmark :: (MonadIO m, MonadReader env m, HasHttpManager env, HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
-          => BenchmarkConfig -> m ()
-benchmark conf =
-  build (BuildOpts (benchTargets conf)
-                   False
-                   False
-                   Nothing
-                   DoBenchmarks
-                   False
-                   [])
 
 -- | Build using Shake.
 build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)

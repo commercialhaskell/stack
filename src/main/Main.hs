@@ -45,7 +45,19 @@ main =
          logLevelOpt
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
-                        buildCmd
+                        (buildCmd DoNothing)
+                        buildOpts
+             addCommand "test"
+                        "Build and test the project(s) in this directory/configuration"
+                        (buildCmd DoTests)
+                        buildOpts
+             addCommand "bench"
+                        "Build and benchmark the project(s) in this directory/configuration"
+                        (buildCmd DoBenchmarks)
+                        buildOpts
+             addCommand "haddock"
+                        "Generate haddocks for the project(s) in this directory/configuration"
+                        (buildCmd DoHaddock)
                         buildOpts
              addCommand "setup"
                         "Get the appropriate ghc for your project"
@@ -108,13 +120,13 @@ setupEnv bconfig = do
         (map toFilePath dirs ++ maybe [] (return . T.unpack) mpath)
 
 -- | Build the project.
-buildCmd :: BuildOpts -> LogLevel -> IO ()
-buildCmd opts logLevel =
+buildCmd :: FinalAction -> BuildOpts -> LogLevel -> IO ()
+buildCmd finalAction opts logLevel =
   do config <-
        runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv)
      catch (runStackT logLevel config $ do
                  checkGHCVersion
-                 Stack.Build.build opts)
+                 Stack.Build.build opts { boptsFinalAction = finalAction})
            (error . printBuildException)
   where printBuildException e =
           case e of
