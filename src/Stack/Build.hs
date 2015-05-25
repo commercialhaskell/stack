@@ -87,6 +87,9 @@ build bopts = do
     installDependencies bopts dependencies
     buildLocals bopts (S.fromList locals)
 
+data LocalType = LTPackage | LTDep
+    deriving Show
+
 -- | Determine all of the local packages we wish to install. This does not
 -- include any dependencies.
 determineLocals
@@ -99,13 +102,14 @@ determineLocals bopts = do
 
     $logDebug "Unpacking packages as necessary"
     menv <- getMinimalEnvOverride
-    paths2 <- unpackPackageIdentsForBuild menv (configExtraDeps cfg) -- FIXME tag each of these paths to indicate it's a dep
-    let paths = configPackages cfg <> paths2 -- FIXME shouldn't some command line options tell us which of these we care about right now?
+    paths2 <- unpackPackageIdentsForBuild menv (configExtraDeps cfg)
+    let paths = M.fromList (map (, PTUser) $ Set.toList $ configPackages cfg) -- FIXME shouldn't some command line options tell us which of these we care about right now?
+             <> M.fromList (map (, PTDep) $ Set.toList paths2)
     $logDebug $ "Installing from local directories: " <> T.pack (show paths)
-    locals <- forM (Set.toList paths) $ \dir -> do
+    locals <- forM (M.toList paths) $ \(dir, ptype) -> do
         cabalfp <- getCabalFileName dir
         name <- parsePackageNameFromFilePath cabalfp
-        readPackage (packageConfig name bconfig) cabalfp
+        readPackage (packageConfig name bconfig) cabalfp ptype
     $logDebug $ "Local packages to install: " <> T.pack
         (show $ map (\p -> PackageIdentifier (packageName p) (packageVersion p)) locals)
     return locals
@@ -238,7 +242,7 @@ installDependencies bopts deps' = do
                     flags <- case M.lookup name deps' of
                         Nothing -> assert False $ return M.empty
                         Just (_, flags) -> return flags
-                    readPackage (packageConfig flags bconfig) cabalfp
+                    readPackage (packageConfig flags bconfig) cabalfp PTDep
                 plans <- forM (S.toList pinfos) $ \pinfo -> do
                     let gconfig = GenConfig -- FIXME
                             { gconfigOptimize = False
@@ -1189,7 +1193,8 @@ getPackageInfo finalAction flags pflags bconfig pkgDir =
      info <-
        runStdoutLoggingT
                           (readPackage (cfg pname ghcVersion)
-                                       cabal)
+                                       cabal
+                                       (error "FIXME this function will likely be disappearing soon anyway, right?"))
      existing <-
        fmap S.fromList
             (filterM (doesFileExist . FL.toFilePath)

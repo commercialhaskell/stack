@@ -255,7 +255,7 @@ checkBuildPlan name mbp cabalfp gpd = do
   where
     loop [] = return Nothing
     loop (flags:rest) = do
-        pkg <- resolvePackage pkgConfig cabalfp gpd
+        pkg <- resolvePackage pkgConfig cabalfp PTUser gpd
         passes <- checkDeps flags (packageDeps pkg) (mbpPackages mbp)
         if passes
             then return $ Just flags
