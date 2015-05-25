@@ -241,7 +241,7 @@ logLevelOpt =
                    metavar "VERBOSITY" <>
                    help "Verbosity: silent, error, warn, info, debug")) <|>
   flag defaultLogLevel
-       LevelInfo
+       LevelDebug
        (short 'v' <>
         help "Enable verbose mode: verbosity level \"info\"")
   where parse s =
