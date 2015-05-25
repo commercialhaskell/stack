@@ -17,6 +17,7 @@ module Stack.Package
   ,PackageType(..)
   ,PackageConfig(..)
   ,buildLogPath
+  ,configureLogPath
   ,packageDocDir
   ,stackageBuildDir
   ,PackageException (..))
@@ -82,8 +83,9 @@ instance Exception PackageException
 -- | Some package info.
 data Package =
   Package {packageName :: !PackageName                    -- ^ Name of the package.
-          ,packageVersion :: !Version              -- ^ Version of the package
+          ,packageVersion :: !Version                     -- ^ Version of the package
           ,packageDir :: !(Path Abs Dir)                  -- ^ Directory of the package.
+          ,packageCabalFile :: !(Path Abs File)           -- ^ The .cabal file
           ,packageFiles :: !(Set (Path Abs File))         -- ^ Files that the package depends on.
           ,packageDeps :: !(Map PackageName VersionRange) -- ^ Packages that the package depends on.
           ,packageTools :: ![Dependency]                  -- ^ A build tool name.
@@ -163,6 +165,7 @@ resolvePackage packageConfig cabalfp ptype gpkg = do
                             ,packageVersion = fromCabalVersion (pkgVersion pkgId)
                             ,packageDeps = deps'
                             ,packageDir = dir
+                            ,packageCabalFile = cabalfp
                             ,packageFiles = S.fromList files
                             ,packageTools = packageDescTools pkg
                             ,packageFlags = pkgFlags
@@ -445,6 +448,12 @@ buildLogPath :: Package -> Path Abs File
 buildLogPath package' =
   stackageBuildDir package' </>
   $(mkRelFile "build-log")
+
+-- | Path for the project's configure log.
+configureLogPath :: Package -> Path Abs File
+configureLogPath package' =
+  stackageBuildDir package' </>
+  $(mkRelFile "configure-log")
 
 -- | Get the build directory.
 stackageBuildDir :: Package -> Path Abs Dir

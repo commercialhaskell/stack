@@ -25,6 +25,12 @@ builtFileFromDir fp =
   distDirFromDir fp </>
   $(mkRelFile "stack.gen")
 
+-- | The filename used for completed configure indicators.
+configuredFileFromDir :: Path Abs Dir -> Path Abs File
+configuredFileFromDir fp =
+  distDirFromDir fp </>
+  $(mkRelFile "setup-config")
+
 -- | The filename used for completed build indicators.
 builtConfigFileFromDir :: Path Abs Dir -> Path Abs File
 builtConfigFileFromDir fp = fp </> builtConfigRelativeFile

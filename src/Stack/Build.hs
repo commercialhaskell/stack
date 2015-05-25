@@ -423,10 +423,26 @@ makePlan :: Map PackageName GhcPkgId
          -> MVar ConfigLock
          -> Rules ()
 makePlan pkgIds wanted bopts bconfig buildType gconfig pinfos pinfo installResource docLoc cfgVar =
-  do when wanted (want [target])
-     target %>
+  do when wanted (want [buildTarget])
+     configureTarget %>
        \_ ->
          do needDependencies pkgIds bopts pinfos pinfo cfgVar
+            need [toFilePath (packageCabalFile pinfo)]
+            (setuphs, removeAfterwards) <- liftIO (ensureSetupHs dir)
+            actionFinally
+              (configurePackage
+                 bconfig
+                 setuphs
+                 buildType
+                 pinfo
+                 gconfig
+                 (if wanted && packageType pinfo == PTUser
+                     then boptsFinalAction bopts
+                     else DoNothing))
+              removeAfterwards
+     buildTarget %>
+       \_ ->
+         do need [configureTarget]
             needSourceFiles
             (setuphs, removeAfterwards) <- liftIO (ensureSetupHs dir)
             actionFinally
@@ -448,8 +464,10 @@ makePlan pkgIds wanted bopts bconfig buildType gconfig pinfos pinfo installResou
   where needSourceFiles =
           need (map FL.toFilePath (S.toList (packageFiles pinfo)))
         dir = packageDir pinfo
-        target =
+        buildTarget =
           FL.toFilePath (builtFileFromDir dir)
+        configureTarget =
+          FL.toFilePath (configuredFileFromDir dir)
 
 -- | Specify that the given package needs the following other
 -- packages.
@@ -518,21 +536,15 @@ writeFinalFiles gconfig bconfig buildType dir name = liftIO $
                     -- configuration, no recompilation forcing is required.
                     updateGenFile dir)
 
-data BuildType = BTDeps | BTLocals
-
 -- | Build the given package with the given configuration.
-buildPackage :: BuildOpts
-             -> BuildConfig
-             -> Path Abs File -- ^ Setup.hs file
-             -> BuildType
-             -> Set Package
-             -> Package
-             -> GenConfig
-             -> FinalAction
-             -> Resource
-             -> Path Abs Dir
-             -> Action ()
-buildPackage bopts bconfig setuphs buildType pinfos pinfo gconfig setupAction installResource docLoc =
+configurePackage :: BuildConfig
+                 -> Path Abs File -- ^ Setup.hs file
+                 -> BuildType
+                 -> Package
+                 -> GenConfig
+                 -> FinalAction
+                 -> Action ()
+configurePackage bconfig setuphs buildType pinfo gconfig setupAction =
   do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath pinfo))) :: IO (Either IOException ())))
      pkgDbs <- getPackageDatabases bconfig buildType
      installRoot <- getInstallRoot bconfig buildType
@@ -558,6 +570,25 @@ buildPackage bopts bconfig setuphs buildType pinfos pinfo gconfig setupAction in
                        flagNameString name)
                     (M.toList (packageFlags pinfo))])
        False
+
+data BuildType = BTDeps | BTLocals
+
+-- | Build the given package with the given configuration.
+buildPackage :: BuildOpts
+             -> BuildConfig
+             -> Path Abs File -- ^ Setup.hs file
+             -> BuildType
+             -> Set Package
+             -> Package
+             -> GenConfig
+             -> FinalAction
+             -> Resource
+             -> Path Abs Dir
+             -> Action ()
+buildPackage bopts bconfig setuphs buildType pinfos pinfo gconfig setupAction installResource docLoc =
+  do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath pinfo))) :: IO (Either IOException ())))
+     let runhaskell' = runhaskell pinfo setuphs bconfig buildType
+
      runhaskell'
        (concat [["build"]
                ,["--ghc-options=-O2" | gconfigOptimize gconfig]
@@ -609,7 +640,7 @@ runhaskell :: HasConfig config
            -> [String]
            -> Bool
            -> Action ()
-runhaskell pinfo setuphs config' buildType args printLive =
+runhaskell pinfo setuphs config' buildType args _printLive =
   do liftIO (createDirectoryIfMissing True
                                       (FL.toFilePath (stackageBuildDir pinfo)))
      putQuiet display
