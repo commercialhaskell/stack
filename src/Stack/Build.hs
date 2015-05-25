@@ -557,13 +557,16 @@ buildPackage bopts bconfig setuphs buildType pinfos pinfo gconfig setupAction in
                            else "-") <>
                        flagNameString name)
                     (M.toList (packageFlags pinfo))])
+       False
      runhaskell'
        (concat [["build"]
                ,["--ghc-options=-O2" | gconfigOptimize gconfig]
                ,["--ghc-options=-fforce-recomp" | gconfigForceRecomp gconfig]
                ,concat [["--ghc-options",T.unpack opt] | opt <- boptsGhcOptions bopts]])
+       False
+
      case setupAction of
-       DoTests -> runhaskell' ["test"]
+       DoTests -> runhaskell' ["test"] False
        DoHaddock ->
            do liftIO (removeDocLinks docLoc pinfo)
               ifcOpts <- liftIO (haddockInterfaceOpts docLoc pinfo pinfos)
@@ -574,6 +577,7 @@ buildPackage bopts bconfig setuphs buildType pinfos pinfo gconfig setupAction in
                          ,"--hyperlink-source"
                          ,"--html-location=../$pkg-$version/"
                          ,"--haddock-options=" ++ intercalate " " ifcOpts]
+                         False
               haddockLocs <-
                 liftIO (findFiles (packageDocDir pinfo)
                                   (\loc -> FilePath.takeExtensions (toFilePath loc) == "." ++ haddockExtension)
@@ -589,9 +593,9 @@ buildPackage bopts bconfig setuphs buildType pinfos pinfo gconfig setupAction in
                                  ,"--haddock"
                                  ,hoogleTxtPath
                                  ,hoogleDbPath])
-       DoBenchmarks -> runhaskell' ["bench"]
+       DoBenchmarks -> runhaskell' ["bench"] True
        _ -> return ()
-     withResource installResource 1 (runhaskell' ["install"])
+     withResource installResource 1 (runhaskell' ["install"] False)
      case setupAction of
        DoHaddock -> liftIO (createDocLinks docLoc pinfo)
        _ -> return ()
@@ -603,8 +607,9 @@ runhaskell :: HasConfig config
            -> config
            -> BuildType
            -> [String]
+           -> Bool
            -> Action ()
-runhaskell pinfo setuphs config' buildType args =
+runhaskell pinfo setuphs config' buildType args printLive =
   do liftIO (createDirectoryIfMissing True
                                       (FL.toFilePath (stackageBuildDir pinfo)))
      putQuiet display
