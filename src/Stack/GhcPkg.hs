@@ -38,7 +38,7 @@ import           Data.Streaming.Process
 
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsFile)
+import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
 import           Prelude hiding (FilePath)
 import           System.Directory (createDirectoryIfMissing, doesDirectoryExist, canonicalizePath)
 
@@ -59,7 +59,7 @@ getGlobalDB menv = do
     -- location, but I don't know of a better one
     bs <- ghcPkg menv [] ["list", "--global"] >>= either throwM return
     let fp = S8.unpack $ S8.takeWhile (/= ':') bs
-    liftIO (canonicalizePath fp) >>= liftM parent . parseAbsFile
+    liftIO (canonicalizePath fp) >>= parseAbsDir
 
 -- | Run the ghc-pkg executable
 ghcPkg :: (MonadIO m, MonadLogger m)
