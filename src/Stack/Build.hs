@@ -428,7 +428,6 @@ makePlan pkgIds wanted bopts bconfig buildType gconfig pinfos pinfo installResou
      target %>
        \_ ->
          do needDependencies pkgIds bopts pinfos pinfo cfgVar
-            needTools pinfo
             needSourceFiles
             (setuphs, removeAfterwards) <- liftIO (ensureSetupHs dir)
             actionFinally
@@ -452,17 +451,6 @@ makePlan pkgIds wanted bopts bconfig buildType gconfig pinfos pinfo installResou
         dir = packageDir pinfo
         target =
           FL.toFilePath (builtFileFromDir dir)
-
--- | Check that the build tools are available in PATH.
-needTools :: Package -> Action ()
-needTools pinfo =
-  liftIO (mapM_ (\dep@(Dependency n _) ->
-                   do m <- findExecutable (packageNameString (fromCabalPackageName n))
-                      case m of
-                        Nothing ->
-                          liftIO (throwIO (MissingTool dep))
-                        _ -> return ())
-                (packageTools pinfo))
 
 -- | Specify that the given package needs the following other
 -- packages.
