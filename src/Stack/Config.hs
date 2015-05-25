@@ -316,8 +316,8 @@ loadProjectConfig = do
             mfp <- search currDir
             case mfp of
                 Just fp -> do
-                    $logInfo $ "Loading project config file " <>
-                               T.pack (maybe (toFilePath fp) toFilePath (stripDir currDir fp))
+                    $logDebug $ "Loading project config file " <>
+                                T.pack (maybe (toFilePath fp) toFilePath (stripDir currDir fp))
                     load fp
                 Nothing -> do
                     $logInfo $ "No project config file found, using defaults"

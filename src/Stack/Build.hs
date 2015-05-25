@@ -265,7 +265,7 @@ installDependencies bopts deps' = do
     docLoc <- liftIO getUserDocPath
 
     if M.null toInstall
-        then $logInfo "All dependencies are already installed"
+        then $logDebug "All dependencies are already installed"
         else do
             $logInfo $ "Installing dependencies: " <> T.pack (show $ M.keys toInstall)
             withTempUnpacked (M.keys toInstall) $ \newPkgDirs -> do
