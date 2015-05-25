@@ -231,7 +231,7 @@ installDependencies bopts deps' = do
     if M.null toInstall
         then $logDebug "All dependencies are already installed"
         else do
-            $logInfo $ "Installing dependencies: " <> T.pack (show $ M.keys toInstall)
+            $logInfo $ "Installing dependencies: " <> T.intercalate ", " (map packageIdentifierText (M.keys toInstall))
             withTempUnpacked (M.keys toInstall) $ \newPkgDirs -> do
                 $logInfo "All dependencies unpacked"
                 -- FIXME unregister conflicting?
