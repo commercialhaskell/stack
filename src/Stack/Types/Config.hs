@@ -203,7 +203,18 @@ installationRootDeps = do
     name <-
         case bcResolver bc of
             ResolverSnapshot name -> parseRelDir $ T.unpack $ renderSnapName name
-    return $ configStackRoot (bcConfig bc) </> $(mkRelDir "snapshots") </> name
+    ghc <- parseRelDir $ versionString $ bcGhcVersion bc
+    return $ configStackRoot (bcConfig bc) </> $(mkRelDir "snapshots") </> name </> ghc
+
+-- | Installation root for locals
+installationRootLocal :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
+installationRootLocal = do
+    bc <- asks getBuildConfig
+    name <-
+        case bcResolver bc of
+            ResolverSnapshot name -> parseRelDir $ T.unpack $ renderSnapName name
+    ghc <- parseRelDir $ versionString $ bcGhcVersion bc
+    return $ configProjectWorkDir (bcConfig bc) </> $(mkRelDir "install") </> name </> ghc
 
 -- | Package database for installing dependencies into
 packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
@@ -212,9 +223,10 @@ packageDatabaseDeps = do
     return $ root </> $(mkRelDir "pkgdb")
 
 -- | Package database for installing local packages into
-packageDatabaseLocal :: HasConfig env => env -> Path Abs Dir
-packageDatabaseLocal env =
-    configProjectWorkDir (getConfig env) </> $(mkRelDir "package-database")
+packageDatabaseLocal :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
+packageDatabaseLocal = do
+    root <- installationRootLocal
+    return $ root </> $(mkRelDir "pkgdb")
 
 -- | Where to store mini build plan caches
 configMiniBuildPlanCache :: (MonadThrow m, MonadReader env m, HasStackRoot env)
@@ -233,6 +245,5 @@ bindirSuffix = $(mkRelDir "bin")
 extraBinDirs :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m [Path Abs Dir]
 extraBinDirs = do
     deps <- installationRootDeps
-    config <- asks getConfig
-    let local = configProjectWorkDir config
+    local <- installationRootLocal
     return [local </> bindirSuffix, deps </> bindirSuffix]

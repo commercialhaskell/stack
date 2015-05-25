@@ -124,9 +124,6 @@ benchmark conf =
 build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
       => BuildOpts -> m ()
 build bopts = do
-    bconfig <- asks getBuildConfig
-    cfg <- asks getConfig
-
     -- FIXME currently this will install all dependencies for the entire
     -- project even if just building a subset of the project
     locals <- determineLocals bopts
@@ -194,12 +191,11 @@ getDependencyRanges locals = do
             fmap (M.singleton (packageName l)) (packageDeps l)
 
     -- Check and then strip out any dependencies provided by a local package
-    let stripLocal (errs, ranges) local =
+    let stripLocal (errs, ranges) local' =
             (errs', ranges')
           where
-            name = packageName local
-            version = packageVersion local
-            errs' = checkMismatches local (fromMaybe M.empty $ M.lookup name ranges)
+            name = packageName local'
+            errs' = checkMismatches local' (fromMaybe M.empty $ M.lookup name ranges)
                  ++ errs
             ranges' = M.delete name ranges
         checkMismatches :: Package
@@ -334,7 +330,8 @@ buildLocals
     -> m ()
 buildLocals bopts pinfos = do
      env <- ask
-     pkgIds <- getPackageIds [packageDatabaseLocal env]
+     localDB <- packageDatabaseLocal
+     pkgIds <- getPackageIds [localDB]
                 (map packageName (S.toList pinfos))
      pwd <- liftIO $ getCurrentDirectory >>= parseAbsDir
      docLoc <- liftIO getUserDocPath
@@ -369,12 +366,8 @@ buildLocals bopts pinfos = do
                                    cfgVar))
      if boptsDryrun bopts
         then liftIO $ dryRunPrint pinfos
-        else do
-            let config = getConfig env
-            runPlans bopts pinfos plans wanted docLoc
+        else runPlans bopts pinfos plans wanted docLoc
   where
-    toIdent p = PackageIdentifier (packageName p) (packageVersion p)
-
     wanted pwd pinfo = case boptsTargets bopts of
         [] -> FL.isParentOf pwd (packageDir pinfo) ||
               packageDir pinfo == pwd
@@ -529,14 +522,18 @@ needDependencies pkgIds bopts pinfos pinfo cfgVar =
 --------------------------------------------------------------------------------
 -- Build actions
 
-getPackageDatabases bconfig buildType = liftIO $ do
-    depDb <- runReaderT packageDatabaseDeps bconfig
-    return $ case buildType of
-        BTDeps -> [depDb]
-        BTLocals -> [depDb, packageDatabaseLocal bconfig]
+getPackageDatabases :: MonadIO m => BuildConfig -> BuildType -> m [Path Abs Dir]
+getPackageDatabases bconfig BTDeps =
+    liftIO $ liftM return $ runReaderT packageDatabaseDeps bconfig
+getPackageDatabases bconfig BTLocals = liftIO $ flip runReaderT bconfig $
+    sequence
+        [ packageDatabaseDeps
+        , packageDatabaseLocal
+        ]
 
+getInstallRoot :: MonadIO m => BuildConfig -> BuildType -> m (Path Abs Dir)
 getInstallRoot bconfig BTDeps = liftIO $ runReaderT installationRootDeps bconfig
-getInstallRoot bconfig BTLocals = return $ configProjectWorkDir bconfig
+getInstallRoot bconfig BTLocals = liftIO $ runReaderT installationRootLocal bconfig
 
 -- | Write the final generated files after a build successfully
 -- completes.

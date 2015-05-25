@@ -29,7 +29,7 @@ import           Control.Concurrent.Async (wait, withAsync)
 import           Control.Concurrent.STM   (atomically, newTVarIO, readTVar,
                                            writeTVar, TVar, modifyTVar, readTVarIO)
 import           Control.Exception (Exception, throwIO, SomeException, toException)
-import           Control.Monad (join, unless, when, void)
+import           Control.Monad (join, unless, when)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import Codec.Compression.GZip (decompress)
 import           Crypto.Hash              (Context, Digest, SHA512,

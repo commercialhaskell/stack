@@ -87,10 +87,10 @@ setupEnv setGhcPackagePath bconfig = do
         then flip runReaderT bconfig $ do
             -- FIXME make sure the directories exist?
             deps <- packageDatabaseDeps
-            let local = toFilePath $ packageDatabaseLocal bconfig
+            local <- packageDatabaseLocal
             global <- return "FIXME get the global database by querying ghc-pkg presumably"
             let v = intercalate [searchPathSeparator]
-                    [ local
+                    [ toFilePath local
                     , toFilePath deps
                     , global
                     ]
@@ -198,8 +198,6 @@ execCmd (cmd, args) logLevel = do
     exitWith ec
 
 -- | Parser for build arguments.
---
--- FIXME: Parse Snapshot version properly.
 buildOpts :: Parser BuildOpts
 buildOpts = BuildOpts <$> target <*> verbose <*> libProfiling <*> exeProfiling <*>
             optimize <*> finalAction <*> dryRun <*> ghcOpts
