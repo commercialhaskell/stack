@@ -189,6 +189,7 @@ getDependencies locals ranges = do
             mbp <- liftM (removeReverseDeps $ map packageName locals)
                  $ loadMiniBuildPlan snapName
             resolveBuildPlan mbp (M.keysSet ranges)
+        ResolverGhc _ _ -> return M.empty
 
     let checkDepRange (dep, users) =
             concatMap go $ M.toList users
@@ -1031,6 +1032,7 @@ getPackageInfos finalAction =
                               resolveBuildPlan bp (M.keysSet okPkgVers)
                             $logDebug "Resolved. Checking ..."
                             return mapping
+                        ResolverGhc _ _ -> error "FIXME this code will be deleted anyway"
                     !validated <-
                       liftM catMaybes (mapM (validateSuggestion globalPackages okPkgVers)
                         (M.toList mapping))

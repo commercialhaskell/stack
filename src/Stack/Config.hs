@@ -247,6 +247,7 @@ toBuildConfig config = do
             ResolverSnapshot snapName -> do
                 mbp <- runReaderT (loadMiniBuildPlan snapName) miniConfig
                 return $ mbpGhcVersion mbp
+            ResolverGhc x y -> return $ fromMajorVersion x y
 
     return BuildConfig
         { bcConfig = config

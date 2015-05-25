@@ -11,6 +11,7 @@ module Stack.Types.Version
   (Version
   ,Cabal.VersionRange -- FIXME in the future should have a newtype wrapper
   ,getMajorVersion
+  ,fromMajorVersion
   ,versionParser
   ,parseVersion
   ,parseVersionFromString
@@ -64,6 +65,10 @@ getMajorVersion (Version v) =
         0 -> (0, 0)
         1 -> (V.head v, 0)
         _ -> (V.head v, v V.! 1)
+
+-- | Convert a two-component version into a @Version@
+fromMajorVersion :: Word -> Word -> Version
+fromMajorVersion x y = Version $ V.fromList [x, y]
 
 instance Hashable Version where
   hashWithSalt i = hashWithSalt i . V.toList . unVersion

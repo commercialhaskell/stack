@@ -9,7 +9,7 @@ module Stack.Types.Config where
 
 import Control.Exception
 import Control.Monad (liftM)
-import Control.Monad.Catch (MonadThrow)
+import Control.Monad.Catch (MonadThrow, throwM)
 import Control.Monad.Reader (MonadReader, ask, asks)
 import Data.Aeson (FromJSON, parseJSON, withText)
 import Data.Map (Map)
@@ -18,7 +18,9 @@ import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Text.Read (decimal)
 import Data.Typeable
+import Data.Word (Word)
 import Path
 import Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
 import Stack.Types.Docker
@@ -83,8 +85,10 @@ data Resolver
   -- ^ Use an official snapshot from the Stackage project, either an LTS
   -- Haskell or Stackage Nightly
 
-  -- FIXME add ResolverDepSolver, which will (short term) use cabal --dry-run
-  -- and (long term) use Nathan's SAT solver
+  | ResolverGhc !Word !Word
+  -- ^ Require a specific GHC major version, but otherwise provide no build
+  -- plan. Intended for use cases where end user wishes to specify all upstream
+  -- dependencies manually, such as using a dependency solver.
   deriving (Show)
 
 instance FromJSON Resolver where
@@ -94,10 +98,28 @@ instance FromJSON Resolver where
 -- | Convert a Resolver into its @Text@ representation, as will be used by JSON/YAML
 renderResolver :: Resolver -> Text
 renderResolver (ResolverSnapshot name) = renderSnapName name
+renderResolver (ResolverGhc x y) = T.pack $ concat ["ghc-", show x, ".", show y]
 
 -- | Try to parse a @Resolver@, using same format as JSON/YAML/'renderResolver'
 parseResolver :: MonadThrow m => Text -> m Resolver
-parseResolver = liftM ResolverSnapshot . parseSnapName
+parseResolver t =
+    case parseSnapName t of
+        Right x -> return $ ResolverSnapshot x
+        Left _ ->
+            case parseGhc of
+                Just (x, y) -> return $ ResolverGhc x y
+                Nothing -> throwM $ ParseResolverException t
+  where
+    parseGhc = do
+        t1 <- T.stripPrefix "ghc-" t
+        Right (x, t2) <- Just $ decimal t1
+        t3 <- T.stripPrefix "." t2
+        Right (y, "") <- Just $ decimal t3
+        return (x, y)
+
+data ParseResolverException = ParseResolverException Text
+    deriving (Show, Typeable)
+instance Exception ParseResolverException
 
 -- | Class for environment values which have access to the stack root
 class HasStackRoot env where
@@ -202,9 +224,7 @@ configLocalUnpackDir config = configProjectWorkDir config </> $(mkRelDir "unpack
 installationRootDeps :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
 installationRootDeps = do
     bc <- asks getBuildConfig
-    name <-
-        case bcResolver bc of
-            ResolverSnapshot name -> parseRelDir $ T.unpack $ renderSnapName name
+    name <- parseRelDir $ T.unpack $ renderResolver $ bcResolver bc
     ghc <- parseRelDir $ versionString $ bcGhcVersion bc
     return $ configStackRoot (bcConfig bc) </> $(mkRelDir "snapshots") </> name </> ghc
 
@@ -212,9 +232,7 @@ installationRootDeps = do
 installationRootLocal :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
 installationRootLocal = do
     bc <- asks getBuildConfig
-    name <-
-        case bcResolver bc of
-            ResolverSnapshot name -> parseRelDir $ T.unpack $ renderSnapName name
+    name <- parseRelDir $ T.unpack $ renderResolver $ bcResolver bc
     ghc <- parseRelDir $ versionString $ bcGhcVersion bc
     return $ configProjectWorkDir (bcConfig bc) </> $(mkRelDir "install") </> name </> ghc
 
