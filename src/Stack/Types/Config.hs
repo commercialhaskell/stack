@@ -35,10 +35,13 @@ data Config =
   Config {configStackRoot        :: !(Path Abs Dir)
          -- ^ ~/.stack more often than not
          ,configDocker           :: !(Maybe Docker)
-         ,configPackagesPath     :: !(Set (Path Abs Dir))
+         ,configPackages         :: !(Set (Path Abs Dir))
          -- ^ Local packages identified by a path
-         ,configPackagesIdent    :: !(Set PackageIdentifier)
-         -- ^ Local packages identified by a package identifier
+         ,configExtraDeps        :: !(Map PackageName Version)
+         -- ^ Extra dependencies specified in configuration.
+         --
+         -- These dependencies will not be installed to a shared location, and
+         -- will override packages provided by the resolver.
          ,configGlobalFlags      :: !(Map FlagName Bool)
          ,configPackageFlags     :: !(Map PackageName (Map FlagName Bool))
          ,configDir              :: !(Path Abs Dir)

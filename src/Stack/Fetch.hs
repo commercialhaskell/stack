@@ -190,12 +190,13 @@ unpackPackages menv dest input = do
 unpackPackageIdentsForBuild
     :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m)
     => EnvOverride
-    -> Set PackageIdentifier
+    -> Map PackageName Version
     -> m (Set (Path Abs Dir))
 unpackPackageIdentsForBuild menv idents0 = do
     config <- askConfig
     let unpackDir = configLocalUnpackDir config
-    (idents, paths1) <- liftM partitionEithers $ forM (Set.toList idents0) $ \ident -> do
+    (idents, paths1) <- liftM partitionEithers $ forM (Map.toList idents0) $ \(name, version) -> do
+        let ident = PackageIdentifier name version
         rel <- parseRelDir $ packageIdentifierString ident
         let dir = unpackDir </> rel
         exists <- liftIO $ doesDirectoryExist $ toFilePath dir

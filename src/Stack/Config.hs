@@ -38,11 +38,9 @@ import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid
-import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Yaml as Yaml
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager)
 import           Path
@@ -136,12 +134,12 @@ instance FromJSON ConfigMonoid where
 data Project = Project
     { projectRoot :: !(Path Abs Dir)
     -- ^ The directory containing the project's stack.yaml
-    , projectPackagesPath :: ![FilePath]
+    , projectPackages :: ![FilePath]
     -- ^ Components of the package list which refer to local directories
     --
     -- Note that we use @FilePath@ and not @Path@s. The goal is: first parse
     -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
-    , projectPackagesIdent :: !(Set PackageIdentifier)
+    , projectExtraDeps :: !(Map PackageName Version)
     -- ^ Components of the package list referring to package/version combos,
     -- see: https://github.com/fpco/stack/issues/41
     , projectGlobalFlags :: !(Map FlagName Bool)
@@ -158,24 +156,42 @@ data Project = Project
 
 instance FromJSON (Path Abs Dir -> Project) where -- FIXME get rid of Path Abs Dir
     parseJSON = withObject "Project" $ \o -> do
-        ps <- o .:? "packages" .!= ["."]
-        let eps = map (\p ->
-                case parsePackageIdentifier $ encodeUtf8 p of
-                    Left _ -> Left $ T.unpack p
-                    Right pi' -> Right pi') ps
-        let (dirs, idents) = partitionEithers eps
+        dirs <- o .:? "packages" .!= ["."]
+        extraDeps' <- o .:? "extra-deps" .!= []
+        extraDeps <-
+            case partitionEithers $ goDeps extraDeps' of
+                ([], x) -> return $ Map.fromList x
+                (errs, _) -> fail $ unlines errs
+
         gf <- o .:? "flags" .!= mempty
         pf <- o .:? "package-flags" .!= mempty
         config <- parseJSON $ Object o
         return $ \root -> Project
             { projectRoot = root
-            , projectPackagesPath = dirs
-            , projectPackagesIdent = S.fromList idents
+            , projectPackages = dirs
+            , projectExtraDeps = extraDeps
             , projectGlobalFlags = gf
             , projectPackageFlags = pf
             , projectConfigExists = True
             , projectConfigMonoid = config
             }
+      where
+        goDeps =
+            map toSingle . Map.toList . Map.unionsWith S.union . map toMap
+          where
+            toMap i = Map.singleton
+                (packageIdentifierName i)
+                (S.singleton (packageIdentifierVersion i))
+
+        toSingle (k, s) =
+            case S.toList s of
+                [x] -> Right (k, x)
+                xs -> Left $ concat
+                    [ "Multiple versions for package "
+                    , packageNameString k
+                    , ": "
+                    , unwords $ map versionString xs
+                    ]
 
 -- | Note that this will be @Nothing@ on Windows, which is by design.
 defaultStackGlobalConfig :: Maybe (Path Abs File)
@@ -192,7 +208,7 @@ configFromConfigMonoid configStackRoot Project{..} ConfigMonoid{..} = do
                  DockerOpts x -> x
          configGlobalFlags = projectGlobalFlags
          configPackageFlags = projectPackageFlags
-         configPackagesIdent = projectPackagesIdent
+         configExtraDeps = projectExtraDeps
          configDir = projectRoot
          configUrls = configMonoidUrls
          configGpgVerifyIndex = fromMaybe False configMonoidGpgVerifyIndex
@@ -204,8 +220,8 @@ configFromConfigMonoid configStackRoot Project{..} ConfigMonoid{..} = do
                         DockerOpts Nothing -> True
                         DockerOpts (Just _) -> False
 
-     configPackagesPath' <- mapM (resolveDir projectRoot) projectPackagesPath
-     let configPackagesPath = S.fromList configPackagesPath'
+     configPackages' <- mapM (resolveDir projectRoot) projectPackages
+     let configPackages = S.fromList configPackages'
          configMaybeResolver = configMonoidResolver
      origEnv <- liftIO getEnvironment
      let configEnvOverride _ = EnvOverride $ Map.fromList $ map (T.pack *** T.pack) origEnv
@@ -325,8 +341,8 @@ loadProjectConfig = do
                     $logInfo $ "No project config file found, using defaults"
                     return Project
                         { projectRoot = currDir
-                        , projectPackagesPath = ["."]
-                        , projectPackagesIdent = mempty
+                        , projectPackages = ["."]
+                        , projectExtraDeps = mempty
                         , projectGlobalFlags = mempty
                         , projectPackageFlags = mempty
                         , projectConfigExists = False

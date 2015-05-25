@@ -99,8 +99,8 @@ determineLocals bopts = do
 
     $logDebug "Unpacking packages as necessary"
     menv <- getMinimalEnvOverride
-    paths2 <- unpackPackageIdentsForBuild menv (configPackagesIdent cfg)
-    let paths = configPackagesPath cfg <> paths2 -- FIXME shouldn't some command line options tell us which of these we care about right now?
+    paths2 <- unpackPackageIdentsForBuild menv (configExtraDeps cfg) -- FIXME tag each of these paths to indicate it's a dep
+    let paths = configPackages cfg <> paths2 -- FIXME shouldn't some command line options tell us which of these we care about right now?
     $logDebug $ "Installing from local directories: " <> T.pack (show paths)
     locals <- forM (Set.toList paths) $ \dir -> do
         cabalfp <- getCabalFileName dir
@@ -997,7 +997,7 @@ getPackageInfos finalAction =
              globalPackages <- error "getAllPackages" -- getAllPackages menv $ error "getPackageInfos: FIXME" -- [bcPackageDatabase bconfig]
 
              menv <- getMinimalEnvOverride
-             paths <- unpackPackageIdentsForBuild menv (configPackagesIdent cfg)
+             paths <- unpackPackageIdentsForBuild menv (configExtraDeps cfg)
 
              (infos,errs) <-
                runWriterT
@@ -1005,7 +1005,7 @@ getPackageInfos finalAction =
                                     (configGlobalFlags cfg)
                                     globalPackages
                                     bconfig
-                                    (configPackagesPath cfg <> paths)
+                                    (configPackages cfg <> paths)
                                     (configPackageFlags cfg))
              case errs of
                [] -> return infos
@@ -1056,7 +1056,7 @@ getPackageInfos finalAction =
                            $logDebug "Re-running build plan resolver ..."
                            go
                              False
-                             cfg {configPackagesPath = configPackagesPath cfg <>
+                             cfg {configPackages = configPackages cfg <>
                                                    S.fromList newPkgDirs
                                  ,configPackageFlags =
                                     configPackageFlags cfg <>

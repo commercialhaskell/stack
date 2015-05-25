@@ -20,6 +20,7 @@ module Stack.Types.PackageIdentifier
 import Control.Applicative ((<*))
 import Control.Exception (Exception)
 import Control.Monad.Catch (MonadThrow, throwM)
+import Data.Aeson
 import Data.Attoparsec.ByteString.Char8
 import Data.Binary (Binary)
 import Data.ByteString (ByteString)
@@ -28,6 +29,7 @@ import Data.Data
 import Data.Hashable
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Text.Encoding (encodeUtf8)
 import GHC.Generics
 import Prelude hiding (FilePath)
 import Stack.Types.PackageName
@@ -50,6 +52,14 @@ instance Binary PackageIdentifier
 
 instance Show PackageIdentifier where
   show = show . packageIdentifierString
+
+instance ToJSON PackageIdentifier where
+  toJSON = toJSON . packageIdentifierString
+instance FromJSON PackageIdentifier where
+  parseJSON = withText "PackageIdentifier" $ \t ->
+    case parsePackageIdentifier $ encodeUtf8 t of
+      Left e -> fail $ show (e, t)
+      Right x -> return x
 
 -- | Convert from a package identifier to a tuple.
 toTuple :: PackageIdentifier -> (PackageName,Version)
