@@ -58,9 +58,21 @@ import           Stack.Package
 import           System.Directory                (createDirectoryIfMissing)
 import           System.FilePath                 (takeDirectory)
 
-data BuildPlanException = UnknownPackages (Set PackageName)
-    deriving (Show, Typeable)
+data BuildPlanException = UnknownPackages (Map PackageName (Set PackageName))
+    deriving (Typeable)
 instance Exception BuildPlanException
+instance Show BuildPlanException where
+    show (UnknownPackages m) = unlines
+        $ "The following packages do not exist in the build plan:"
+        : map go (Map.toList m)
+      where
+        go (dep, users) | Set.null users = packageNameString dep
+        go (dep, users) = concat
+            [ packageNameString dep
+            , " (used by "
+            , unwords $ map packageNameString $ Set.toList users
+            , ")"
+            ]
 
 -- | Determine the necessary packages to install to have the given set of
 -- packages available.
@@ -70,17 +82,17 @@ instance Exception BuildPlanException
 -- This may fail if a target package is not present in the @BuildPlan@.
 resolveBuildPlan :: MonadThrow m
                  => MiniBuildPlan
-                 -> Set PackageName
+                 -> Map PackageName (Set PackageName) -- ^ required packages, and users of it
                  -> m (Map PackageName (Version, Map FlagName Bool))
 resolveBuildPlan mbp packages
-    | Set.null (rsUnknown rs) = return (rsToInstall rs)
+    | Map.null (rsUnknown rs) = return (rsToInstall rs)
     | otherwise = throwM $ UnknownPackages $ rsUnknown rs
   where
     rs = getDeps mbp packages
 
 data ResolveState = ResolveState
     { rsVisited   :: Set PackageName
-    , rsUnknown   :: Set PackageName
+    , rsUnknown   :: Map PackageName (Set PackageName)
     , rsToInstall :: Map PackageName (Version, Map FlagName Bool)
     }
 
@@ -131,27 +143,27 @@ toMiniBuildPlan bp = MiniBuildPlan
         | otherwise = Set.empty
 
 -- | Resolve all packages necessary to install for
-getDeps :: F.Foldable f => MiniBuildPlan -> f PackageName -> ResolveState
+getDeps :: MiniBuildPlan -> Map PackageName (Set PackageName) -> ResolveState
 getDeps mbp packages =
-    execState (F.mapM_ goName packages) ResolveState
+    execState (mapM_ (uncurry goName) $ Map.toList packages) ResolveState
         { rsVisited = Set.empty
-        , rsUnknown = Set.empty
+        , rsUnknown = Map.empty
         , rsToInstall = Map.empty
         }
   where
-    goName :: PackageName -> State ResolveState ()
-    goName name = do
+    goName :: PackageName -> Set PackageName -> State ResolveState ()
+    goName name users = do
         rs <- get
         when (name `Set.notMember` rsVisited rs) $ do
             put rs { rsVisited = Set.insert name $ rsVisited rs }
             case Map.lookup name $ mbpPackages mbp of
                 Just (version, flags, deps) -> do
-                    F.mapM_ goName deps
+                    F.mapM_ (flip goName $ Set.singleton name) deps
                     modify $ \rs' -> rs'
                         { rsToInstall = Map.insert name (version, flags) $ rsToInstall rs'
                         }
                 Nothing -> modify $ \rs' -> rs'
-                    { rsUnknown = Set.insert name $ rsUnknown rs'
+                    { rsUnknown = Map.insertWith Set.union name users $ rsUnknown rs'
                     }
 
 -- | Download the 'Snapshots' value from stackage.org.

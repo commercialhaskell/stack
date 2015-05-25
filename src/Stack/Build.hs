@@ -192,7 +192,7 @@ getDependencies locals ranges = do
             $logDebug $ "Checking resolver: " <> renderSnapName snapName
             mbp <- liftM (removeReverseDeps $ map packageName locals)
                  $ loadMiniBuildPlan snapName
-            resolveBuildPlan mbp (M.keysSet ranges)
+            resolveBuildPlan mbp (fmap M.keysSet ranges)
         ResolverGhc _ _ -> return M.empty
 
     let checkDepRange (dep, users) =
@@ -1033,7 +1033,7 @@ getPackageInfos finalAction =
                             -- FIXME use removeReverseDeps on bp for the target packages
                             $logInfo "Resolving build plan ..."
                             !mapping <-
-                              resolveBuildPlan bp (M.keysSet okPkgVers)
+                              resolveBuildPlan bp (fmap (const Set.empty) okPkgVers)
                             $logDebug "Resolved. Checking ..."
                             return mapping
                         ResolverGhc _ _ -> error "FIXME this code will be deleted anyway"
