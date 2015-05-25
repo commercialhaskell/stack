@@ -153,17 +153,19 @@ getDeps mbp packages =
   where
     goName :: PackageName -> Set PackageName -> State ResolveState ()
     goName name users = do
+        -- Even though we could check rsVisited first and short-circuit things
+        -- earlier, lookup in mbpPackages first so that we can produce more
+        -- usable error information on missing dependencies
         rs <- get
-        when (name `Set.notMember` rsVisited rs) $ do
-            put rs { rsVisited = Set.insert name $ rsVisited rs }
-            case Map.lookup name $ mbpPackages mbp of
-                Just (version, flags, deps) -> do
-                    F.mapM_ (flip goName $ Set.singleton name) deps
-                    modify $ \rs' -> rs'
-                        { rsToInstall = Map.insert name (version, flags) $ rsToInstall rs'
-                        }
-                Nothing -> modify $ \rs' -> rs'
-                    { rsUnknown = Map.insertWith Set.union name users $ rsUnknown rs'
+        case Map.lookup name $ mbpPackages mbp of
+            Nothing -> modify $ \rs' -> rs'
+                { rsUnknown = Map.insertWith Set.union name users $ rsUnknown rs'
+                }
+            Just (version, flags, deps) -> when (name `Set.notMember` rsVisited rs) $ do
+                put rs { rsVisited = Set.insert name $ rsVisited rs }
+                F.mapM_ (flip goName $ Set.singleton name) deps
+                modify $ \rs' -> rs'
+                    { rsToInstall = Map.insert name (version, flags) $ rsToInstall rs'
                     }
 
 -- | Download the 'Snapshots' value from stackage.org.
