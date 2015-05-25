@@ -450,7 +450,7 @@ buildLogPath package' =
 stackageBuildDir :: Package -> Path Abs Dir
 stackageBuildDir package' =
   distDirFromDir dir </>
-  $(mkRelDir "stackage-build")
+  $(mkRelDir "stack-build")
   where dir = packageDir package'
 
 -- | Package's documentation directory.
