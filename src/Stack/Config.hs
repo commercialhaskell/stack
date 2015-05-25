@@ -176,10 +176,9 @@ instance FromJSON (Path Abs Dir -> Project) where -- FIXME get rid of Path Abs D
             , projectConfigMonoid = config
             }
 
--- TODO: What about Windows?
--- FIXME: This will not build on Windows. (Good!)
-defaultStackGlobalConfig :: Path Abs File
-defaultStackGlobalConfig = $(mkAbsFile "/etc/stack/config")
+-- | Note that this will be @Nothing@ on Windows, which is by design.
+defaultStackGlobalConfig :: Maybe (Path Abs File)
+defaultStackGlobalConfig = parseAbsFile "/etc/stack/config"
 
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env)
@@ -293,9 +292,8 @@ getExtraConfigs stackRoot = liftIO $ do
         maybe (return Nothing) (fmap Just . parseAbsFile)
       $ lookup "STACK_GLOBAL_CONFIG" env
     filterM (liftIO . doesFileExist . toFilePath)
-        [ fromMaybe (stackRoot </> stackDotYaml) mstackConfig
-        , fromMaybe defaultStackGlobalConfig mstackGlobalConfig
-        ]
+        $ fromMaybe (stackRoot </> stackDotYaml) mstackConfig
+        : maybe [] return (mstackGlobalConfig <|> defaultStackGlobalConfig)
 
 -- | Load the value of a 'ConfigMonoid' from the given file.
 loadConfigMonoid :: MonadIO m => Path Abs File -> m ConfigMonoid
