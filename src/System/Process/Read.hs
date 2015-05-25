@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -28,6 +29,7 @@ import           Data.Conduit.Process hiding (callProcess)
 import           Data.Foldable (forM_)
 import           Data.Map (Map)
 import qualified Data.Map as Map
+import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Path (Path, Abs, Dir, File, toFilePath)
@@ -36,6 +38,7 @@ import           System.Exit (ExitCode(ExitSuccess), exitWith)
 
 -- | Override the environment received by a child process
 newtype EnvOverride = EnvOverride { unEnvOverride :: Map Text Text }
+  deriving Monoid
 
 -- | Helper conversion function
 envHelper :: EnvOverride -> Maybe [(String, String)]
