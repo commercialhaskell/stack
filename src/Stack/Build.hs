@@ -1057,6 +1057,7 @@ getCabalPkgVer menv =
   do db <- getGlobalDB menv
      findPackageId menv
                    [db]
-                   $(mkPackageName "Cabal") >>=
-       maybe (error ("FIXME: Couldn't find Cabal package from ghc-pkg! Database: " ++ toFilePath db))
+                   cabalName >>=
+       maybe (throwM (Couldn'tFindPkgId cabalName))
              (return . ghcPkgIdPackageIdentifier)
+  where cabalName = $(mkPackageName "Cabal")
