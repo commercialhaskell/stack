@@ -17,13 +17,11 @@ import Data.Map.Strict (Map)
 import Data.Maybe
 import Data.Monoid
 import Data.Text (Text)
-
-import Development.Shake (Verbosity)
 import Distribution.Package hiding (Package,PackageName)
 import GHC.Generics
 import Prelude hiding (FilePath)
-import Stack.Types
 import Stack.Package
+import Stack.Types
 
 data StackBuildException
   = MissingTool Dependency
@@ -43,7 +41,6 @@ instance Exception StackBuildException
 -- | Configuration for building.
 data BuildOpts =
   BuildOpts {boptsTargets :: ![Text]
-            ,boptsVerbosity :: !Verbosity
             ,boptsLibProfile :: !Bool
             ,boptsExeProfile :: !Bool
             ,boptsEnableOptimizations :: !(Maybe Bool)
@@ -56,19 +53,18 @@ data BuildOpts =
 -- | Configuration for testing.
 data TestConfig =
   TestConfig {tconfigTargets :: ![Text]
-             ,tconfigVerbosity :: !Verbosity}
+             }
   deriving (Show)
 
 -- | Configuration for haddocking.
 data HaddockConfig =
   HaddockConfig {hconfigTargets :: ![Text]
-                ,hconfigVerbosity :: !Verbosity}
+                }
   deriving (Show)
 
 -- | Configuration for benchmarking.
 data BenchmarkConfig =
   BenchmarkConfig {benchTargets :: ![Text]
-                  ,benchVerbosity :: !Verbosity
                   ,benchInDocker :: !Bool}
   deriving (Show)
 

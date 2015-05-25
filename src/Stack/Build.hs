@@ -51,8 +51,8 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Set as Set
 import qualified Data.Set.Monad as S
-import           Data.Streaming.Process hiding (env)
 import qualified Data.Streaming.Process as Process
+import           Data.Streaming.Process hiding (env)
 import qualified Data.Text as T
 import           Development.Shake hiding (doesFileExist,doesDirectoryExist,getDirectoryContents)
 import           Distribution.Package hiding (packageName,packageVersion,Package,PackageName,PackageIdentifier)
@@ -69,6 +69,7 @@ import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.Types
+import           Stack.Types.Internal
 import           System.Directory hiding (findFiles)
 import           System.Environment
 import qualified System.FilePath as FilePath
@@ -81,12 +82,11 @@ import           System.Process.Read (getExternalEnv, readProcessStdout)
 -- Top-level commands
 
 -- | Build and test using Shake.
-test :: (MonadIO m, MonadReader env m, HasHttpManager env, HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
+test :: (MonadIO m, MonadReader env m, HasHttpManager env, HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
      => TestConfig
      -> m ()
 test conf =
   build (BuildOpts (tconfigTargets conf)
-                   (tconfigVerbosity conf)
                    False
                    False
                    Nothing
@@ -95,11 +95,10 @@ test conf =
                    [])
 
 -- | Build and haddock using Shake.
-haddock :: (MonadIO m, MonadReader env m, HasHttpManager env, HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
+haddock :: (MonadIO m, MonadReader env m, HasHttpManager env, HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
         => HaddockConfig -> m ()
 haddock conf =
   build (BuildOpts (hconfigTargets conf)
-                   (hconfigVerbosity conf)
                    False
                    False
                    Nothing
@@ -108,11 +107,10 @@ haddock conf =
                    [])
 
 -- | Build and benchmark using Shake.
-benchmark :: (MonadIO m, MonadReader env m, HasHttpManager env, HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
+benchmark :: (MonadIO m, MonadReader env m, HasHttpManager env, HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
           => BenchmarkConfig -> m ()
 benchmark conf =
   build (BuildOpts (benchTargets conf)
-                   (benchVerbosity conf)
                    False
                    False
                    Nothing
@@ -121,7 +119,7 @@ benchmark conf =
                    [])
 
 -- | Build using Shake.
-build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
+build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
       => BuildOpts -> m ()
 build bopts = do
     -- FIXME currently this will install all dependencies for the entire
@@ -252,7 +250,7 @@ getDependencies locals ranges = do
 --
 -- FIXME: may need to tweak some of the flags for OS-specific stuff, think about how to do that
 installDependencies
-    :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
+    :: (MonadIO m,MonadReader env m,HasLogLevel env,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
     => BuildOpts
     -> Map PackageName (Version, Map FlagName Bool)
     -> m ()
@@ -324,7 +322,7 @@ installDependencies bopts deps' = do
 -- | Build all of the given local packages, assuming all necessary dependencies
 -- are already installed.
 buildLocals
-    :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
+    :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
     => BuildOpts
     -> Set Package
     -> m ()
@@ -376,7 +374,7 @@ buildLocals bopts pinfos = do
                    (mapMaybe (parsePackageNameFromString . T.unpack) packages)
 
 -- FIXME clean up this function to make it more nicely shareable
-runPlans :: (MonadIO m, MonadReader env m, HasConfig env)
+runPlans :: (MonadIO m,MonadReader env m,HasConfig env,HasLogLevel env)
          => BuildOpts
          -> Set Package
          -> [Rules ()]
@@ -384,10 +382,11 @@ runPlans :: (MonadIO m, MonadReader env m, HasConfig env)
          -> Path Abs Dir -- FIXME figure out local vs shared docs location
          -> m ()
 runPlans bopts pinfos plans wanted docLoc = do
+    logLevel <- asks getLogLevel
     config <- asks getConfig
     pwd <- liftIO $ getCurrentDirectory >>= parseAbsDir
     liftIO $ withArgs []
-                      (shakeArgs shakeOptions {shakeVerbosity = boptsVerbosity bopts
+                      (shakeArgs shakeOptions {shakeVerbosity = logLevelToShakeVerbosity logLevel
                                               ,shakeFiles =
                                                  FL.toFilePath (shakeFilesPath (configDir config))
                                               ,shakeThreads = defaultShakeThreads}
@@ -397,6 +396,13 @@ runPlans bopts pinfos plans wanted docLoc = do
                                           (buildDocIndex (wanted pwd)
                                                          docLoc
                                                          pinfos)))
+  where logLevelToShakeVerbosity l =
+          case l of
+            LevelDebug -> Chatty
+            LevelInfo -> Quiet
+            LevelWarn -> Quiet
+            LevelError -> Quiet
+            LevelOther _ -> Silent
 
 -- | Dry run output.
 dryRunPrint :: Set Package -> IO ()

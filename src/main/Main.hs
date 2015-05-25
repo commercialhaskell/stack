@@ -16,7 +16,7 @@ import           Data.List
 import qualified Data.Map as Map
 import           Data.Maybe
 import qualified Data.Text as T
-import           Development.Shake (Verbosity(..))
+
 import           Distribution.Text (display)
 import           Options.Applicative.Extra
 import           Options.Applicative.Simple
@@ -199,7 +199,7 @@ execCmd (cmd, args) logLevel = do
 
 -- | Parser for build arguments.
 buildOpts :: Parser BuildOpts
-buildOpts = BuildOpts <$> target <*> verbose <*> libProfiling <*> exeProfiling <*>
+buildOpts = BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> finalAction <*> dryRun <*> ghcOpts
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies"
@@ -208,13 +208,6 @@ buildOpts = BuildOpts <$> target <*> verbose <*> libProfiling <*> exeProfiling <
                (many (strArgument
                         (metavar "TARGET" <>
                          help "If none specified, use all packages defined in current directory")))
-        verbose =
-          fmap (\v ->
-                  if v
-                     then Chatty
-                     else Quiet)
-               (switch (long "verbose" <>
-                        short 'v'))
         libProfiling =
           boolFlags False
                     "library-profiling"
