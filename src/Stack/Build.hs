@@ -132,7 +132,7 @@ build bopts = do
     locals <- determineLocals bopts
     ranges <- getDependencyRanges locals
     dependencies <- getDependencies locals ranges
-    installDependencies bopts dependencies -- FIXME instead of doing this as a completely separate Shake build, we could consider generating the necessary Shake plans from here and passing them to buildLocals
+    installDependencies bopts dependencies
     buildLocals bopts (S.fromList locals)
 
 -- | Determine all of the local packages we wish to install. This does not
