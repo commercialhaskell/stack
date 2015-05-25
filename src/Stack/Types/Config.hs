@@ -7,7 +7,6 @@
 
 module Stack.Types.Config where
 
-import Control.Arrow ((***))
 import Control.Exception
 import Control.Monad (liftM)
 import Control.Monad.Catch (MonadThrow)
@@ -27,7 +26,7 @@ import Stack.Types.FlagName
 import Stack.Types.PackageIdentifier
 import Stack.Types.PackageName
 import Stack.Types.Version
-import System.Process.Read (HasExternalEnv (..))
+import System.Process.Read (EnvOverride)
 
 -- | The top-level Stackage configuration.
 data Config =
@@ -52,11 +51,18 @@ data Config =
          -- missing dependencies will result in a compilation failure. Useful
          -- to disable this flag, for example, when using a precompiled binary
          -- package database, such as via Docker.
-         ,configExternalEnv      :: !(Map Text Text) -- FIXME different env for ghc/shell that includes GHC_PACKAGE_PATH and one that doesn't? or maybe just hardcode removing it when necessary
+         ,configEnvOverride      :: !(EnvSettings -> EnvOverride)
          -- ^ Environment variables to be passed to external tools
          }
-  -- ^ Flags for each package's Cabal config.
-  deriving (Show)
+
+-- | Controls which version of the environment is used
+data EnvSettings = EnvSettings
+    { esIncludeLocals :: !Bool
+    -- ^ include local project bin directory, GHC_PACKAGE_PATH, etc
+    , esIncludeGhcPackagePath :: !Bool
+    -- ^ include the GHC_PACKAGE_PATH variable
+    }
+    deriving Show
 
 -- | A superset of 'Config' adding information on how to build code. The reason
 -- for this breakdown is because we will need some of the information from
@@ -108,13 +114,11 @@ class HasUrls env where
     {-# INLINE getUrls #-}
 
 -- | Class for environment values that can provide a 'Config'.
-class (HasStackRoot env, HasUrls env, HasExternalEnv env) => HasConfig env where
+class (HasStackRoot env, HasUrls env) => HasConfig env where
     getConfig :: env -> Config
     default getConfig :: HasBuildConfig env => env -> Config
     getConfig = bcConfig . getBuildConfig
     {-# INLINE getConfig #-}
-instance HasExternalEnv Config where
-    getExternalEnv = Just . map (T.unpack *** T.unpack) . Map.toList . configExternalEnv
 instance HasStackRoot Config
 instance HasUrls Config
 instance HasConfig Config where
@@ -127,8 +131,6 @@ class HasConfig env => HasBuildConfig env where
 instance HasStackRoot BuildConfig
 instance HasUrls BuildConfig
 instance HasConfig BuildConfig
-instance HasExternalEnv BuildConfig where
-    getExternalEnv = getExternalEnv . getConfig
 instance HasBuildConfig BuildConfig where
     getBuildConfig = id
     {-# INLINE getBuildConfig #-}
@@ -242,8 +244,23 @@ bindirSuffix :: Path Rel Dir
 bindirSuffix = $(mkRelDir "bin")
 
 -- | Get the extra bin directories (for the PATH). Puts more local first
-extraBinDirs :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m [Path Abs Dir]
+--
+-- Bool indicates whether or not to include the locals
+extraBinDirs :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
+             => m (Bool -> [Path Abs Dir])
 extraBinDirs = do
     deps <- installationRootDeps
     local <- installationRootLocal
-    return [local </> bindirSuffix, deps </> bindirSuffix]
+    return $ \locals -> if locals
+        then [local </> bindirSuffix, deps </> bindirSuffix]
+        else [deps </> bindirSuffix]
+
+-- | Get the minimal environment override, useful for just calling external
+-- processes like git or ghc
+getMinimalEnvOverride :: (MonadReader env m, HasConfig env) => m EnvOverride
+getMinimalEnvOverride = do
+    config <- asks getConfig
+    return $ configEnvOverride config EnvSettings
+                    { esIncludeLocals = False
+                    , esIncludeGhcPackagePath = False
+                    }

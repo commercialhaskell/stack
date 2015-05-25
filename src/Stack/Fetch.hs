@@ -67,6 +67,7 @@ import           System.FilePath (takeDirectory, (<.>), takeExtension)
 import qualified System.FilePath as FP
 import           System.IO                (IOMode (ReadMode, WriteMode),
                                            withBinaryFile)
+import System.Process.Read (EnvOverride)
 import Data.Monoid (Monoid (..))
 import Control.Applicative ((<|>))
 
@@ -159,10 +160,11 @@ instance Exception FetchException
 -- | Similar to 'fetchPackages', but optimized for command line input, where
 -- the values may be either package names or package identifiers.
 unpackPackages :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadThrow m,MonadLogger m)
-               => FilePath -- ^ destination
+               => EnvOverride
+               -> FilePath -- ^ destination
                -> [String] -- ^ names or identifiers
                -> m ()
-unpackPackages dest input = do
+unpackPackages menv dest input = do
     dest' <- liftIO (canonicalizePath dest) >>= parseAbsDir
     (names, idents1) <- case partitionEithers $ map parse input of
         ([], x) -> return $ partitionEithers x
@@ -170,8 +172,8 @@ unpackPackages dest input = do
     idents2 <-
         if null names
             then return []
-            else findNewestVersions names
-    dests <- fetchPackages $ map (, Just dest') $ idents1 ++ idents2
+            else findNewestVersions menv names
+    dests <- fetchPackages menv $ map (, Just dest') $ idents1 ++ idents2
     mapM_ (\dest'' -> $logInfo $ "Unpacked to " <> T.pack (toFilePath dest'')) dests
   where
     -- Possible future enhancement: parse names as name + version range
@@ -187,9 +189,10 @@ unpackPackages dest input = do
 -- unpack directory, and return the paths to all of the subdirectories.
 unpackPackageIdentsForBuild
     :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m)
-    => Set PackageIdentifier
+    => EnvOverride
+    -> Set PackageIdentifier
     -> m (Set (Path Abs Dir))
-unpackPackageIdentsForBuild idents0 = do
+unpackPackageIdentsForBuild menv idents0 = do
     config <- askConfig
     let unpackDir = configLocalUnpackDir config
     (idents, paths1) <- liftM partitionEithers $ forM (Set.toList idents0) $ \ident -> do
@@ -202,7 +205,7 @@ unpackPackageIdentsForBuild idents0 = do
     if null idents
         then return $ Set.fromList paths1
         else do
-            paths2 <- fetchPackages $ map (, Just unpackDir) idents
+            paths2 <- fetchPackages menv $ map (, Just unpackDir) idents
             return $ Set.fromList $ paths1 ++ paths2
 
 -- | Download the given name,version pairs into the directory expected by cabal.
@@ -220,14 +223,15 @@ unpackPackageIdentsForBuild idents0 = do
 --
 -- Since 0.1.0.0
 fetchPackages :: (F.Foldable f,Functor f,MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m)
-              => f (PackageIdentifier, Maybe (Path Abs Dir))
+              => EnvOverride
+              -> f (PackageIdentifier, Maybe (Path Abs Dir))
               -> m [Path Abs Dir]
-fetchPackages pkgs = do
+fetchPackages menv pkgs = do
    env <- ask
    let man = getHttpManager env
        config = getConfig env
        indexFP = toFilePath $ configPackageIndex config
-   requireIndex
+   requireIndex menv
    liftIO $ do
      outputVar <- newTVarIO []
      let packageLocation = configPackageTarball config

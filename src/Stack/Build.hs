@@ -76,7 +76,7 @@ import qualified System.FilePath as FilePath
 import           System.IO
 import           System.IO.Temp (withSystemTempDirectory)
 import           System.Posix.Files (createSymbolicLink,removeLink)
-import           System.Process.Read (getExternalEnv, readProcessStdout)
+import           System.Process.Read (readProcessStdout, envHelper)
 
 --------------------------------------------------------------------------------
 -- Top-level commands
@@ -141,7 +141,8 @@ determineLocals bopts = do
     bconfig <- asks getBuildConfig
 
     $logDebug "Unpacking packages as necessary"
-    paths2 <- unpackPackageIdentsForBuild (configPackagesIdent cfg)
+    menv <- getMinimalEnvOverride
+    paths2 <- unpackPackageIdentsForBuild menv (configPackagesIdent cfg)
     let paths = configPackagesPath cfg <> paths2 -- FIXME shouldn't some command line options tell us which of these we care about right now?
     $logDebug $ "Installing from local directories: " <> T.pack (show paths)
     locals <- forM (Set.toList paths) $ \dir -> do
@@ -257,7 +258,8 @@ installDependencies
 installDependencies bopts deps' = do
     bconfig <- asks getBuildConfig
     pkgDbs <- getPackageDatabases bconfig BTDeps
-    installed <- liftM toIdents $ getAllPackages pkgDbs
+    menv <- getMinimalEnvOverride
+    installed <- liftM toIdents $ getAllPackages menv pkgDbs
     let toInstall = M.difference deps installed
 
     installResource <- liftIO $ newResourceIO "cabal install" 1
@@ -329,7 +331,8 @@ buildLocals
 buildLocals bopts pinfos = do
      env <- ask
      localDB <- packageDatabaseLocal
-     pkgIds <- getPackageIds [localDB]
+     menv <- getMinimalEnvOverride
+     pkgIds <- getPackageIds menv [localDB]
                 (map packageName (S.toList pinfos))
      pwd <- liftIO $ getCurrentDirectory >>= parseAbsDir
      docLoc <- liftIO getUserDocPath
@@ -548,9 +551,11 @@ writeFinalFiles :: (MonadIO m)
                 -> Path Abs Dir -> PackageName -> m ()
 writeFinalFiles gconfig bconfig buildType dir name = liftIO $
          (do pkgDbs <- getPackageDatabases bconfig buildType
+             menv <- runReaderT getMinimalEnvOverride bconfig
              mpkigid <- runNoLoggingT
                       $ flip runReaderT bconfig
                       $ findPackageId
+                            menv
                             pkgDbs
                             name
              case mpkigid of
@@ -582,10 +587,8 @@ buildPackage bopts bconfig setuphs buildType pinfos pinfo gconfig setupAction in
   do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath pinfo))) :: IO (Either IOException ())))
      pkgDbs <- getPackageDatabases bconfig buildType
      installRoot <- getInstallRoot bconfig buildType
-     runhaskell
-       pinfo
-       setuphs
-       (getExternalEnv bconfig)
+     let runhaskell' = runhaskell pinfo setuphs bconfig buildType
+     runhaskell'
        (concat [["configure","--user"]
                ,["--package-db=clear","--package-db=global"]
                ,map (("--package-db=" ++) . toFilePath) pkgDbs
@@ -605,26 +608,17 @@ buildPackage bopts bconfig setuphs buildType pinfos pinfo gconfig setupAction in
                            else "-") <>
                        flagNameString name)
                     (M.toList (packageFlags pinfo))])
-     runhaskell
-       pinfo
-       setuphs
-       (getExternalEnv bconfig)
+     runhaskell'
        (concat [["build"]
                ,["--ghc-options=-O2" | gconfigOptimize gconfig]
                ,["--ghc-options=-fforce-recomp" | gconfigForceRecomp gconfig]
                ,concat [["--ghc-options",T.unpack opt] | opt <- boptsGhcOptions bopts]])
      case setupAction of
-       DoTests ->
-         runhaskell pinfo
-                    setuphs
-                    (getExternalEnv bconfig)
-                    ["test"]
+       DoTests -> runhaskell' ["test"]
        DoHaddock ->
            do liftIO (removeDocLinks docLoc pinfo)
               ifcOpts <- liftIO (haddockInterfaceOpts docLoc pinfo pinfos)
-              runhaskell pinfo
-                         setuphs
-                         (getExternalEnv bconfig)
+              runhaskell'
                          ["haddock"
                          ,"--html"
                          ,"--hoogle"
@@ -646,26 +640,22 @@ buildPackage bopts bconfig setuphs buildType pinfos pinfo gconfig setupAction in
                                  ,"--haddock"
                                  ,hoogleTxtPath
                                  ,hoogleDbPath])
-       DoBenchmarks ->
-         runhaskell pinfo
-                    setuphs
-                    (getExternalEnv bconfig)
-                    ["bench"]
+       DoBenchmarks -> runhaskell' ["bench"]
        _ -> return ()
-     withResource installResource 1
-                  (runhaskell pinfo
-                              setuphs
-                              (getExternalEnv bconfig)
-                              ["install"])
+     withResource installResource 1 (runhaskell' ["install"])
      case setupAction of
        DoHaddock -> liftIO (createDocLinks docLoc pinfo)
        _ -> return ()
 
 -- | Run the Haskell command for the given package.
-runhaskell :: Package
+runhaskell :: HasConfig config
+           => Package
            -> Path Abs File -- ^ Setup.hs or Setup.lhs file
-           -> Maybe [(String, String)] -> [String] -> Action ()
-runhaskell pinfo setuphs menv args =
+           -> config
+           -> BuildType
+           -> [String]
+           -> Action ()
+runhaskell pinfo setuphs config' buildType args =
   do liftIO (createDirectoryIfMissing True
                                       (FL.toFilePath (stackageBuildDir pinfo)))
      putQuiet display
@@ -674,7 +664,7 @@ runhaskell pinfo setuphs menv args =
      join (liftIO (catch (do withCheckedProcess
                                cp {cwd =
                                      Just (FL.toFilePath dir)
-                                  ,Process.env = menv
+                                  ,Process.env = envHelper menv
                                   ,std_err = Inherit}
                                (\ClosedStream stdout' stderr' ->
                                   do logFrom stdout' outRef
@@ -708,6 +698,14 @@ runhaskell pinfo setuphs menv args =
         dir = packageDir pinfo
         cp =
           proc "runhaskell" (toFilePath setuphs : args)
+
+        menv = configEnvOverride (getConfig config') EnvSettings
+                { esIncludeLocals =
+                    case buildType of
+                        BTDeps -> False
+                        BTLocals -> True
+                , esIncludeGhcPackagePath = False
+                }
 
 -- | Ensure Setup.hs exists in the given directory. Returns an action
 -- to remove it later.
@@ -1038,9 +1036,10 @@ getPackageInfos finalAction =
   where go retry cfg =
           do unless retry ($logInfo "Getting pack information, dependencies, etc. ...")
              bconfig <- asks getBuildConfig
-             globalPackages <- getAllPackages $ error "getPackageInfos: FIXME" -- [bcPackageDatabase bconfig]
+             globalPackages <- error "getAllPackages" -- getAllPackages menv $ error "getPackageInfos: FIXME" -- [bcPackageDatabase bconfig]
 
-             paths <- unpackPackageIdentsForBuild (configPackagesIdent cfg)
+             menv <- getMinimalEnvOverride
+             paths <- unpackPackageIdentsForBuild menv (configPackagesIdent cfg)
 
              (infos,errs) <-
                runWriterT
@@ -1059,7 +1058,8 @@ getPackageInfos finalAction =
                  | otherwise ->
                    liftIO (throwIO (DependencyIssues (nubBy (on (==) show) errs)))
         installDeps infos globalPackages cfg errs =
-          do requireIndex
+          do menv <- getMinimalEnvOverride
+             requireIndex menv
              results <- forM names checkPackageInIndex
              case lefts results of
                [] ->
@@ -1159,7 +1159,8 @@ checkPackageInIndex :: (MonadIO m, MonadLogger m,MonadThrow m
                     => (PackageName,(VersionRange,t))
                     -> m (Either PackageName (PackageName,VersionRange))
 checkPackageInIndex (name,(range,_)) =
-  do vers <- getPkgVersions name
+  do menv <- getMinimalEnvOverride
+     vers <- getPkgVersions menv name
      case () of
        ()
          | Set.null vers -> return (Right (name,range))
@@ -1269,7 +1270,8 @@ withTempUnpacked :: (MonadIO m,MonadThrow m,MonadLogger m,MonadMask m,MonadReade
                  -> m a
 withTempUnpacked pkgs inner = withSystemTempDirectory "stack-unpack" $ \tmp -> do
     dest <- parseAbsDir tmp
-    dirs <- fetchPackages $ map (, Just dest) pkgs
+    menv <- getMinimalEnvOverride
+    dirs <- fetchPackages menv $ map (, Just dest) pkgs
     inner dirs
 
 --------------------------------------------------------------------------------
@@ -1290,7 +1292,8 @@ isHiddenDir = isPrefixOf "." . toFilePath . dirname
 checkGHCVersion :: (MonadIO m, MonadThrow m, MonadReader env m, HasBuildConfig env)
                 => m ()
 checkGHCVersion = do
-    bs <- readProcessStdout "ghc" ["--numeric-version"]
+    menv <- getMinimalEnvOverride
+    bs <- readProcessStdout menv "ghc" ["--numeric-version"]
     actualVersion <- parseVersion $ S8.takeWhile isValidChar bs
     bconfig <- asks getBuildConfig
     when (getMajorVersion actualVersion /= getMajorVersion (bcGhcVersion bconfig))

@@ -52,6 +52,7 @@ import           Stack.Package
 import           Stack.Types
 import           System.Directory
 import           System.Environment
+import           System.Process.Read (EnvOverride (..))
 
 
 -- An uninterpreted representation of configuration options.
@@ -207,7 +208,7 @@ configFromConfigMonoid configStackRoot Project{..} ConfigMonoid{..} = do
      let configPackagesPath = S.fromList configPackagesPath'
          configMaybeResolver = configMonoidResolver
      origEnv <- liftIO getEnvironment
-     let configExternalEnv = Map.fromList $ map (T.pack *** T.pack) origEnv
+     let configEnvOverride _ = EnvOverride $ Map.fromList $ map (T.pack *** T.pack) origEnv
      return Config {..}
 
 toBuildConfig :: (HasHttpManager env, MonadReader env m, MonadCatch m, MonadIO m, MonadLogger m)

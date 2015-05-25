@@ -11,7 +11,8 @@ module Stack.GhcPkg
   ,findPackageId
   ,getPackageIds
   ,getGlobalDB
-  ,EnvHelper (..))
+  ,EnvOverride(..)
+  ,envHelper)
   where
 
 import           Stack.Types
@@ -23,7 +24,6 @@ import           Control.Monad (liftM, forM_, unless)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader)
 import           Data.Attoparsec.ByteString.Char8
 import qualified Data.Attoparsec.ByteString.Lazy as AttoLazy
 import qualified Data.ByteString.Char8 as S8
@@ -51,21 +51,23 @@ data GhcPkgException
 instance Exception GhcPkgException
 
 -- | Get the global package database
-getGlobalDB :: (MonadIO m, MonadReader env m, HasExternalEnv env, MonadLogger m, MonadThrow m)
-            => m (Path Abs Dir)
-getGlobalDB = do
+getGlobalDB :: (MonadIO m, MonadLogger m, MonadThrow m)
+            => EnvOverride
+            -> m (Path Abs Dir)
+getGlobalDB menv = do
     -- This seems like a strange way to get the global package database
     -- location, but I don't know of a better one
-    bs <- ghcPkg [] ["list", "--global"] >>= either throwM return
+    bs <- ghcPkg menv [] ["list", "--global"] >>= either throwM return
     let fp = S8.unpack $ S8.takeWhile (/= ':') bs
     liftIO (canonicalizePath fp) >>= liftM parent . parseAbsFile
 
 -- | Run the ghc-pkg executable
-ghcPkg :: (MonadIO m, MonadReader env m, HasExternalEnv env, MonadLogger m)
-       => [Path Abs Dir]
+ghcPkg :: (MonadIO m, MonadLogger m)
+       => EnvOverride
+       -> [Path Abs Dir]
        -> [String]
        -> m (Either ProcessExitedUnsuccessfully S8.ByteString)
-ghcPkg pkgDbs args = do
+ghcPkg menv pkgDbs args = do
     $logDebug $ "Calling ghc-pkg with: " <> T.pack (show args')
     eres <- go
     case eres of
@@ -78,7 +80,7 @@ ghcPkg pkgDbs args = do
                     -- seems to be sufficiently smart. But I don't feel like
                     -- finding out it isn't the hard way
                     liftIO $ createDirectoryIfMissing True $ toFilePath $ parent db
-                    _ <- tryProcessStdout "ghc-pkg" ["init", db']
+                    _ <- tryProcessStdout menv "ghc-pkg" ["init", db']
                     return ()
             go
         Right _ -> return eres
@@ -87,14 +89,15 @@ ghcPkg pkgDbs args = do
           "--no-user-package-db"
         : map (\x -> ("--package-db=" ++ toFilePath x)) pkgDbs
        ++ args
-    go = tryProcessStdout "ghc-pkg" args'
+    go = tryProcessStdout menv "ghc-pkg" args'
 
 -- | Get all available packages.
-getAllPackages :: (MonadCatch m,MonadIO m,MonadThrow m,MonadReader env m,HasExternalEnv env,MonadLogger m)
-               => [Path Abs Dir] -- ^ package databases
+getAllPackages :: (MonadCatch m,MonadIO m,MonadThrow m,MonadLogger m)
+               => EnvOverride
+               -> [Path Abs Dir] -- ^ package databases
                -> m (Map PackageName Version)
-getAllPackages pkgDbs =
-  do result <- ghcPkg pkgDbs ["--global", "list"]
+getAllPackages menv pkgDbs =
+  do result <- ghcPkg menv pkgDbs ["--global", "list"]
      case result of
        Left {} -> throw GetAllPackagesFail
        Right lbs ->
@@ -124,11 +127,12 @@ pkgsListParser =
              fmap toTuple packageIdentifierParser
 
 -- | Get the id of the package e.g. @foo-0.0.0-9c293923c0685761dcff6f8c3ad8f8ec@.
-findPackageId :: (MonadIO m, MonadReader env m, HasExternalEnv env, MonadLogger m)
-              => [Path Abs Dir] -- ^ package databases
+findPackageId :: (MonadIO m, MonadLogger m)
+              => EnvOverride
+              -> [Path Abs Dir] -- ^ package databases
               -> PackageName -> m (Maybe GhcPkgId)
-findPackageId pkgDbs name =
-  do result <- ghcPkg pkgDbs ["describe", packageNameString name]
+findPackageId menv pkgDbs name =
+  do result <- ghcPkg menv pkgDbs ["describe", packageNameString name]
      case result of
        Left{} -> return Nothing
        Right lbs ->
@@ -143,16 +147,17 @@ findPackageId pkgDbs name =
               _ -> return Nothing
 
 -- | Get all current package ids.
-getPackageIds :: (MonadIO m, MonadReader env m, HasExternalEnv env, MonadLogger m)
-              => [Path Abs Dir] -- ^ package databases
+getPackageIds :: (MonadIO m, MonadLogger m)
+              => EnvOverride
+              -> [Path Abs Dir] -- ^ package databases
               -> [PackageName]
               -> m (Map PackageName GhcPkgId)
-getPackageIds pkgDbs pkgs = collect pkgs >>= liftIO . evaluate
+getPackageIds menv pkgDbs pkgs = collect pkgs >>= liftIO . evaluate
   where collect =
           liftM (M.fromList . catMaybes) .
           mapM getTuple
         getTuple name =
-          do mpid <- findPackageId pkgDbs name
+          do mpid <- findPackageId menv pkgDbs name
              case mpid of
                Nothing -> return Nothing
                Just pid ->

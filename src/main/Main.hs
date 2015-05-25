@@ -25,7 +25,7 @@ import           Stack.Build
 import           Stack.Build.Types
 import           Stack.Config
 import           Stack.Fetch
-import           Stack.GhcPkg (EnvHelper (..), getGlobalDB)
+import           Stack.GhcPkg (EnvOverride (..), getGlobalDB, envHelper)
 import           Stack.Package
 import qualified Stack.PackageIndex
 import           Stack.Setup
@@ -75,32 +75,36 @@ setupCmd logLevel = do
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: (MonadIO m, MonadThrow m, MonadLogger m) -- FIXME move this logic into the library itself?
-         => Bool -- ^ setup GHC_PACKAGE_PATH? ideally we'd do this always, but Cabal doesn't like that
-         -> BuildConfig
+         => BuildConfig
          -> m BuildConfig
-setupEnv setGhcPackagePath bconfig = do
-    dirs <- runReaderT extraBinDirs bconfig
-    let env0 = configExternalEnv $ bcConfig bconfig
-        env1 = addPath dirs env0
-    env2 <- if setGhcPackagePath
-        then flip runReaderT bconfig $ do
-            -- FIXME make sure the directories exist?
-            deps <- packageDatabaseDeps
-            localdb <- packageDatabaseLocal
-            global <- runReaderT getGlobalDB $ EnvHelper $ Just
-                    $ map (T.unpack *** T.unpack) $ Map.toList env1
-            let v = intercalate [searchPathSeparator]
-                    [ toFilePath localdb
-                    , toFilePath deps
-                    , toFilePath global
-                    ]
-            return $ Map.insert "GHC_PACKAGE_PATH" (T.pack v) env1
-        else return env1
-    $logDebug $ "New env: " <> T.pack (show env2)
-    return bconfig { bcConfig = (bcConfig bconfig) { configExternalEnv = env2 } }
-  where
-    addPath dirs m = Map.insert "PATH" (mkPath dirs $ Map.lookup "PATH" m) m
+setupEnv bconfig = do
+    mkDirs <- runReaderT extraBinDirs bconfig
+    let EnvOverride env0 = configEnvOverride (bcConfig bconfig) EnvSettings
+            { esIncludeLocals = False
+            , esIncludeGhcPackagePath = False
+            }
+        mpath = Map.lookup "PATH" env0
+        depsPath = mkPath (mkDirs False) mpath
+        localsPath = mkPath (mkDirs True) mpath
 
+    -- FIXME make sure the directories exist?
+    deps <- runReaderT packageDatabaseDeps bconfig
+    localdb <- runReaderT packageDatabaseLocal bconfig
+    global <- getGlobalDB $ EnvOverride $ Map.insert "PATH" depsPath env0
+    let mkGPP locals = T.pack $ intercalate [searchPathSeparator]
+            $ (if locals then (toFilePath localdb:) else id)
+            [ toFilePath deps
+            , toFilePath global
+            ]
+
+    let mkEnvOverride es = EnvOverride
+            $ Map.insert "PATH" (if esIncludeLocals es then localsPath else depsPath)
+            $ (if esIncludeGhcPackagePath es
+                    then Map.insert "GHC_PACKAGE_PATH" (mkGPP (esIncludeLocals es))
+                    else id)
+            $ env0
+    return bconfig { bcConfig = (bcConfig bconfig) { configEnvOverride = mkEnvOverride } }
+  where
     mkPath dirs mpath = T.pack $ intercalate [searchPathSeparator]
         (map toFilePath dirs ++ maybe [] (return . T.unpack) mpath)
 
@@ -108,7 +112,7 @@ setupEnv setGhcPackagePath bconfig = do
 buildCmd :: BuildOpts -> LogLevel -> IO ()
 buildCmd opts logLevel =
   do config <-
-       runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv False)
+       runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv)
      catch (runStackT logLevel config $ do
                  checkGHCVersion
                  Stack.Build.build opts)
@@ -180,19 +184,27 @@ buildCmd opts logLevel =
 unpackCmd :: [String] -> LogLevel -> IO ()
 unpackCmd names logLevel = do
     config <- runStackLoggingT logLevel loadConfig
-    runStackT logLevel config (Stack.Fetch.unpackPackages "." names)
+    runStackT logLevel config $ do
+        menv <- getMinimalEnvOverride
+        Stack.Fetch.unpackPackages menv "." names
 
 -- | Update the package index
 updateCmd :: () -> LogLevel -> IO ()
 updateCmd () logLevel = do
     config <- runStackLoggingT logLevel loadConfig
-    runStackT logLevel config Stack.PackageIndex.updateIndex
+    runStackT logLevel config $ getMinimalEnvOverride >>= Stack.PackageIndex.updateIndex
 
 -- | Execute a command
 execCmd :: (String, [String]) -> LogLevel -> IO ()
 execCmd (cmd, args) logLevel = do
-    config <- runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv True)
-    let cp = (P.proc cmd args) { P.env = Just $ map (T.unpack *** T.unpack) $ Map.toList $ configExternalEnv $ bcConfig config }
+    config <- runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv)
+    let cp = (P.proc cmd args)
+            { P.env = envHelper $ configEnvOverride (bcConfig config)
+                    EnvSettings
+                        { esIncludeLocals = True
+                        , esIncludeGhcPackagePath = True
+                        }
+            }
     (Nothing, Nothing, Nothing, ph) <- P.createProcess cp
     ec <- P.waitForProcess ph
     exitWith ec

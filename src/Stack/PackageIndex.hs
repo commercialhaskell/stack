@@ -72,7 +72,7 @@ import           System.Directory
 import           System.FilePath                       (takeBaseName, (<.>))
 import           System.IO                             (IOMode (ReadMode, WriteMode),
                                                         withBinaryFile)
-import           System.Process.Read                   (runIn)
+import           System.Process.Read                   (runIn, EnvOverride)
 
 -- | A cabal file with name and version parsed from the filepath, and the
 -- package description itself ready to be parsed. It's left in unparsed form
@@ -87,8 +87,9 @@ data UnparsedCabalFile = UnparsedCabalFile
 
 -- | Stream a list of all the package identifiers
 readPackageIdents :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
-                  => m [PackageIdentifier]
-readPackageIdents = do
+                  => EnvOverride
+                  -> m [PackageIdentifier]
+readPackageIdents menv = do
     config <- askConfig
     let fp = toFilePath $ configPackageIndexCache config
         load = do
@@ -102,7 +103,7 @@ readPackageIdents = do
         Left e -> do
             $logDebug $ "Populate index cache, load failed with " <> T.pack (show e)
             let toIdent ucf = PackageIdentifier (ucfName ucf) (ucfVersion ucf)
-            pis <- sourcePackageIndex $$ CL.map toIdent =$ CL.consume
+            pis <- sourcePackageIndex menv $$ CL.map toIdent =$ CL.consume
             liftIO $ Binary.encodeFile fp pis
             return pis
         Right y -> return y
@@ -113,10 +114,11 @@ instance Exception BinaryParseException
 
 -- | Find the newest versions of all given package names.
 findNewestVersions :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
-                   => [PackageName]
+                   => EnvOverride
+                   -> [PackageName]
                    -> m [PackageIdentifier]
-findNewestVersions names0 = do
-    (m, discovered) <- liftM (F.foldl' add (Map.empty, Set.empty)) readPackageIdents
+findNewestVersions menv names0 = do
+    (m, discovered) <- liftM (F.foldl' add (Map.empty, Set.empty)) (readPackageIdents menv)
     let missing = Set.difference names discovered
     if Set.null missing
         then return $ map fromTuple $ Map.toList m
@@ -133,9 +135,10 @@ findNewestVersions names0 = do
 
 -- | Stream all of the cabal files from the 00-index tar file.
 sourcePackageIndex :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m)
-                   => Producer m UnparsedCabalFile
-sourcePackageIndex = do
-    requireIndex
+                   => EnvOverride
+                   -> Producer m UnparsedCabalFile
+sourcePackageIndex menv = do
+    requireIndex menv
     -- This uses full on lazy I/O instead of ResourceT to provide some
     -- protections. Caveat emptor
     config <- askConfig
@@ -202,11 +205,12 @@ instance Exception CabalParseException
 -- | Get all of the latest descriptions for name/version pairs matching the
 -- given criterion.
 getLatestDescriptions :: (MonadIO m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadThrow m)
-                      => (PackageName -> Version -> Bool)
+                      => EnvOverride
+                      -> (PackageName -> Version -> Bool)
                       -> (GenericPackageDescription -> IO desc)
                       -> m (Map PackageName desc)
-getLatestDescriptions f parseDesc = do
-    m <- sourcePackageIndex $$ CL.filter f' =$ CL.fold add mempty
+getLatestDescriptions menv f parseDesc = do
+    m <- sourcePackageIndex menv $$ CL.filter f' =$ CL.fold add mempty
     liftIO $ forM m $ \ucf -> ucfParse ucf >>= parseDesc
   where
     f' ucf = f (ucfName ucf) (ucfVersion ucf)
@@ -241,29 +245,32 @@ instance Exception PackageIndexException
 requireIndex :: (MonadIO m,MonadLogger m
                 ,MonadThrow m,MonadReader env m,HasHttpManager env
                 ,HasConfig env)
-             => m ()
-requireIndex = do
+             => EnvOverride
+             -> m ()
+requireIndex menv = do
     config <- askConfig
     let tarFile = configPackageIndex config
     exists <- liftIO $ doesFileExist $ toFilePath tarFile
-    unless exists updateIndex
+    unless exists (updateIndex menv)
 
 -- | Update the index tarball
 updateIndex :: (MonadIO m,MonadLogger m
                ,MonadThrow m,MonadReader env m,HasHttpManager env
                ,HasConfig env)
-            => m ()
-updateIndex =
+            => EnvOverride
+            -> m ()
+updateIndex menv =
   do $logInfo "Updating package index ..."
-     git <- isGitInstalled
+     git <- isGitInstalled menv
      if git
-        then updateIndexGit
+        then updateIndexGit menv
         else updateIndexHTTP
 
 -- | Update the index Git repo and the index tarball
 updateIndexGit :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasConfig env)
-               => m ()
-updateIndexGit = do
+               => EnvOverride
+               -> m ()
+updateIndexGit menv = do
      config <- askConfig
      let tarFile = configPackageIndex config
          idxPath = parent tarFile
@@ -293,13 +300,14 @@ updateIndexGit = do
               liftIO (doesDirectoryExist (toFilePath acfDir))
             unless repoExists
                    (do $logInfo ("Cloning repository for first from " <> gitUrl)
-                       runIn suDir gitPath cloneArgs Nothing)
-            runIn acfDir gitPath ["fetch","--tags","--depth=1"] Nothing
+                       runIn suDir gitPath menv cloneArgs Nothing)
+            runIn acfDir gitPath menv ["fetch","--tags","--depth=1"] Nothing
             _ <-
               (liftIO . tryIO) (removeFile (toFilePath tarFile))
             when (configGpgVerifyIndex config)
                  (do runIn acfDir
                            gitPath
+                           menv
                            ["tag","-v","current-hackage"]
                            (Just (unlines ["Signature verification failed. "
                                           ,"Please ensure you've set up your"
@@ -311,6 +319,7 @@ updateIndexGit = do
             deleteCache
             runIn acfDir
                   gitPath
+                  menv
                   ["archive"
                   ,"--format=tar"
                   ,"-o"
@@ -355,9 +364,9 @@ updateIndexHTTP = do
 
 -- | Fetch all the package versions for a given package
 getPkgVersions :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasConfig env,HasHttpManager env)
-               => PackageName -> m (Set Version)
-getPkgVersions pkg = do
-    idents <- readPackageIdents
+               => EnvOverride -> PackageName -> m (Set Version)
+getPkgVersions menv pkg = do
+    idents <- readPackageIdents menv
     return $ Set.fromList $ mapMaybe go idents
   where
     go (PackageIdentifier n v)
@@ -365,9 +374,10 @@ getPkgVersions pkg = do
         | otherwise = Nothing
 
 -- | Is the git executable installed?
-isGitInstalled :: MonadIO m
-               => m Bool
-isGitInstalled =
+isGitInstalled :: MonadIO m -- FIXME use the EnvOverride for finding git
+               => EnvOverride
+               -> m Bool
+isGitInstalled _FIXMEunused =
   return . isJust =<<
   liftIO (findExecutable "git")
 

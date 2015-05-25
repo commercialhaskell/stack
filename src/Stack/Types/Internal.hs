@@ -5,7 +5,6 @@ module Stack.Types.Internal where
 import Control.Monad.Logger (LogLevel)
 import Network.HTTP.Client.Conduit (Manager,HasHttpManager(..))
 import Stack.Types.Config
-import System.Process.Read (HasExternalEnv (..))
 
 -- | Monadic environment.
 data Env config =
@@ -21,8 +20,6 @@ instance HasConfig config => HasConfig (Env config) where
     getConfig = getConfig . envConfig
 instance HasBuildConfig config => HasBuildConfig (Env config) where
     getBuildConfig = getBuildConfig . envConfig
-instance HasExternalEnv config => HasExternalEnv (Env config) where
-    getExternalEnv = getExternalEnv . envConfig
 
 instance HasHttpManager (Env config) where
   getHttpManager = envManager
