@@ -15,11 +15,10 @@ module Stack.Build
   ,clean
   ,shakeFilesPath
   ,configDir
-  ,checkGHCVersion
-  ,getPackageInfos)
+  ,checkGHCVersion)
   where
 
-import           Control.Arrow
+
 import           Control.Concurrent.MVar
 import           Control.Exception
 import           Control.Monad
@@ -47,7 +46,7 @@ import           Data.Maybe
 import           Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Set as Set
-import qualified Data.Set.Monad as S
+
 import qualified Data.Streaming.Process as Process
 import           Data.Streaming.Process hiding (env)
 import qualified Data.Text as T
@@ -63,7 +62,7 @@ import           Stack.Constants
 import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
-import           Stack.PackageIndex
+
 import           Stack.Types
 import           Stack.Types.Internal
 import           System.Directory hiding (findFiles)
@@ -380,13 +379,12 @@ clean :: forall m env.
       => m ()
 clean =
   do env <- ask
-     pinfos <- runResourceT (getPackageInfos DoNothing)
      let config = getConfig env
-     forM_ (S.toList pinfos)
-           (\pinfo ->
-              do deleteGenFile (packageDir pinfo)
+     forM_ (S.toList (configPackages config))
+           (\pkgdir ->
+              do deleteGenFile pkgdir
                  let distDir =
-                       FL.toFilePath (distDirFromDir (packageDir pinfo))
+                       FL.toFilePath (distDirFromDir pkgdir)
                  liftIO $ do
                      exists <- doesDirectoryExist distDir
                      when exists (removeDirectoryRecursive distDir))
@@ -1003,249 +1001,6 @@ newConfig gconfig bopts pinfo =
       ,gconfigGhcOptions = boptsGhcOptions bopts
       ,gconfigFlags = packageFlags pinfo
       ,gconfigPkgId = gconfigPkgId gconfig}
-
---------------------------------------------------------------------------------
--- Package info/dependencies/etc
-
--- | Get packages' information.
---
--- Needs to be refactored, see: https://github.com/fpco/stack/issues/40
-getPackageInfos :: (MonadBaseControl IO m,MonadIO m,MonadLogger m,MonadThrow m
-                   ,MonadMask m
-                   ,HasHttpManager env,HasBuildConfig env,MonadReader env m)
-                => FinalAction
-                -> m (Set Package)
-getPackageInfos finalAction =
-    do cfg <- asks getConfig
-       go True cfg
-  where go retry cfg =
-          do unless retry ($logInfo "Getting pack information, dependencies, etc. ...")
-             bconfig <- asks getBuildConfig
-             globalPackages <- error "getAllPackages" -- getAllPackages menv $ error "getPackageInfos: FIXME" -- [bcPackageDatabase bconfig]
-
-             menv <- getMinimalEnvOverride
-             paths <- unpackPackageIdentsForBuild menv (configExtraDeps cfg)
-
-             (infos,errs) <-
-               runWriterT
-                 (buildDependencies finalAction
-                                    (configGlobalFlags cfg)
-                                    globalPackages
-                                    bconfig
-                                    (configPackages cfg <> paths)
-                                    (configPackageFlags cfg))
-             case errs of
-               [] -> return infos
-               _
-                 | configInstallDeps cfg
-                 , retry ->
-                   installDeps infos globalPackages cfg errs
-                 | otherwise ->
-                   liftIO (throwIO (DependencyIssues (nubBy (on (==) show) errs)))
-        installDeps infos globalPackages cfg errs =
-          do menv <- getMinimalEnvOverride
-             requireIndex menv
-             results <- forM names checkPackageInIndex
-             case lefts results of
-               [] ->
-                 do let okPkgVers = M.fromList (rights results)
-                    bc <- asks getBuildConfig
-                    !mapping <- case bcResolver bc of
-                        ResolverSnapshot snapName -> do
-                            bp <- loadMiniBuildPlan snapName
-                            -- FIXME use removeReverseDeps on bp for the target packages
-                            $logInfo "Resolving build plan ..."
-                            !mapping <-
-                              resolveBuildPlan bp (fmap (const Set.empty) okPkgVers)
-                            $logDebug "Resolved. Checking ..."
-                            return mapping
-                        ResolverGhc _ _ -> error "FIXME this code will be deleted anyway"
-                    !validated <-
-                      liftM catMaybes (mapM (validateSuggestion globalPackages okPkgVers)
-                        (M.toList mapping))
-                    $logDebug "Done checking."
-                    case validated of
-                      [] -> return infos
-                      toFetch -> do
-                        $logInfo "Fetching and unpacking third party packages ..."
-                        let toUnpack = map (\(name, (ver, _flags)) ->
-                                               fromTuple (name,ver))
-                                                toFetch
-                        withTempUnpacked toUnpack $ \newPkgDirs -> do
-                           -- Here is where we inject third-party
-                           -- dependencies and their flags and re-run
-                           -- this function.
-                           --
-                           -- FIXME: New approach: two stage builds described
-                           -- in:
-                           --
-                           -- https://github.com/fpco/stack/issues/42
-                           $logDebug "Re-running build plan resolver ..."
-                           go
-                             False
-                             cfg {configPackages = configPackages cfg <>
-                                                   S.fromList newPkgDirs
-                                 ,configPackageFlags =
-                                    configPackageFlags cfg <>
-                                    mconcat (map (\(name, (_version, flags)) ->
-                                                    M.singleton name flags)
-                                                 validated)}
-               erroneous ->
-                 liftIO (throwIO (DependencyIssues
-                                    (map snd (mapMaybe (flip lookup names) erroneous))))
-          where names = getMissingDeps errs
-
--- | Extract the missing dependencies and their version ranges, but
--- keeping hold of the original exception for later use.
-getMissingDeps :: [StackBuildException] -> [(PackageName,(VersionRange,StackBuildException))]
-getMissingDeps =
-  mapMaybe (\x ->
-              case x of
-                MissingDep _ name range ->
-                  Just (name,(range,x))
-                _ -> Nothing)
-
--- | Validate that
---
--- * within the global package database,
--- * and with the locally (.cabal) specified dependencies with their
---   version ranges,
--- * the given package-version pair is within range of the locally
---   specified dependencies,
--- * or, if it's not in there, then if it's already in the installed
---   package database, check that the versions match up,
--- * if it's not in the installed package database, at this point
---   consider it good for installation.
---
-validateSuggestion :: MonadIO m
-                   => Map PackageName Version
-                   -> Map PackageName VersionRange
-                   -> (PackageName, (Version, Map FlagName Bool))
-                   -> m (Maybe (PackageName, (Version, Map FlagName Bool)))
-validateSuggestion globalPackages okPkgVers =
-  (\suggestion@(name, (suggestedVer, _)) ->
-     case M.lookup name okPkgVers of
-       Just range
-         | not (withinRange suggestedVer range) ->
-           liftIO (throwIO (StackageDepVerMismatch name suggestedVer range))
-       _ ->
-         case M.lookup name globalPackages of
-           Just installedVer
-             | installedVer == suggestedVer ->
-               return Nothing
-             | otherwise ->
-               liftIO (throwIO (StackageVersionMismatch name suggestedVer installedVer))
-           Nothing ->
-             return (Just suggestion))
-
--- | Check that a package is actually available in the general (Hackage) package
--- index.
-checkPackageInIndex :: (MonadIO m, MonadLogger m,MonadThrow m
-                       ,MonadReader env m,HasConfig env,HasHttpManager env)
-                    => (PackageName,(VersionRange,t))
-                    -> m (Either PackageName (PackageName,VersionRange))
-checkPackageInIndex (name,(range,_)) =
-  do menv <- getMinimalEnvOverride
-     vers <- getPkgVersions menv name
-     case () of
-       ()
-         | Set.null vers -> return (Right (name,range))
-         | any (flip withinRange range)
-               (S.toList vers) ->
-           return (Right (name,range))
-         | otherwise -> return (Left name)
-
--- | Build a map of package names to dependencies.
-buildDependencies :: MonadIO m
-                  => FinalAction
-                  -> Map FlagName Bool
-                  -> Map PackageName Version
-                  -> BuildConfig
-                  -> Set (Path Abs Dir)
-                  -> Map PackageName (Map FlagName Bool)
-                  -> WriterT [StackBuildException] m (Set Package)
-buildDependencies finalAction flags globals bconfig packages pflags =
-  do pkgs <-
-       liftIO (S.mapM (getPackageInfo finalAction flags pflags bconfig) packages)
-     S.mapM (sievePackages
-               globals
-               (M.fromList
-                  (map (packageName &&& packageVersion)
-                       (S.toList pkgs))))
-            pkgs
-
--- | Remove third-party package dependencies, e.g. mtl, bytestring,
--- etc.
-sievePackages :: MonadIO m
-              => Map PackageName Version
-              -> Map PackageName Version
-              -> Package
-              -> WriterT [StackBuildException] m Package
-sievePackages globalNameVersions localNameVersions p =
-  do deps <-
-       filterM (\(name,range) ->
-                  case M.lookup name localNameVersions of
-                    Just ver | withinRange ver range -> return True
-                             | otherwise -> do tell [MissingDep p name range]
-                                               return False
-                    Nothing -> case M.lookup name globalNameVersions of
-                                 Just ver
-                                   | withinRange ver range ->
-                                     return False
-                                   | otherwise ->
-                                     do tell [MissingDep p name range]
-                                        return False
-                                 Nothing ->
-                                   do tell [MissingDep p name range]
-                                      return False)
-               (M.toList (packageDeps p))
-     return (p {packageDeps = M.fromList deps})
-
--- | Get the package name and dependencies from the given package
--- directory.
-getPackageInfo :: FinalAction
-               -> Map FlagName Bool
-               -> Map PackageName (Map FlagName Bool)
-               -> BuildConfig
-               -> Path Abs Dir
-               -> IO Package
-getPackageInfo finalAction flags pflags bconfig pkgDir =
-  do cabal <- getCabalFileName pkgDir
-     pname <- parsePackageNameFromFilePath cabal
-     let ghcVersion = bcGhcVersion bconfig
-     info <-
-       runStdoutLoggingT
-                          (readPackage (cfg pname ghcVersion)
-                                       cabal
-                                       (error "FIXME this function will likely be disappearing soon anyway, right?"))
-     existing <-
-       fmap S.fromList
-            (filterM (doesFileExist . FL.toFilePath)
-                     (S.toList (packageFiles info)))
-     return info {packageFiles = existing}
-  where cfg pname ghcVersion =
-          PackageConfig {packageConfigEnableTests =
-                           case finalAction of
-                             DoTests -> True
-                             _ -> False
-                        ,packageConfigEnableBenchmarks =
-                           case finalAction of
-                             DoBenchmarks -> True
-                             _ -> False
-                        ,packageConfigFlags =
-                           composeFlags pname pflags flags
-                        ,packageConfigGhcVersion = ghcVersion}
-
--- | Compose the package flags with the global flags in a left-biased
--- form, i.e., package-specific flags will be preferred over global
--- flags.
-composeFlags :: PackageName
-             -> Map PackageName (Map FlagName Bool)
-             -> Map FlagName Bool
-             -> Map FlagName Bool
-composeFlags pname pflags gflags = collapse pflags <> gflags
-  where collapse :: Map PackageName (Map FlagName Bool) -> Map FlagName Bool
-        collapse = fromMaybe mempty . M.lookup pname
 
 --------------------------------------------------------------------------------
 -- Package fetching
