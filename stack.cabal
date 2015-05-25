@@ -13,7 +13,7 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:    src/
-  ghc-options:       -Wall -O2
+  ghc-options:       -Wall -O0
   exposed-modules:   Stack.BuildPlan
                      Stack.Config
                      Stack.Constants
@@ -44,6 +44,8 @@ library
                      System.Process.PagerEditor
                      System.Process.Read
                      Paths_stack
+                     Data.Attoparsec.Combinators
+                     Data.Set.Monad
   build-depends:     Cabal >= 1.18.1.5
                    , aeson >= 0.8.0.2
                    , async >= 2.0.2

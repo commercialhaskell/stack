@@ -13,10 +13,8 @@ import           Control.Monad.Catch (MonadThrow)
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Data.List
-import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Development.Shake (Verbosity(..))
 import           Distribution.Text (display)
@@ -24,9 +22,9 @@ import           Options.Applicative.Extra
 import           Options.Applicative.Simple
 import           Path
 import           Stack.Build
-import           Stack.Fetch
 import           Stack.Build.Types
 import           Stack.Config
+import           Stack.Fetch
 import           Stack.GhcPkg (EnvHelper (..), getGlobalDB)
 import           Stack.Package
 import qualified Stack.PackageIndex
@@ -88,11 +86,11 @@ setupEnv setGhcPackagePath bconfig = do
         then flip runReaderT bconfig $ do
             -- FIXME make sure the directories exist?
             deps <- packageDatabaseDeps
-            local <- packageDatabaseLocal
+            localdb <- packageDatabaseLocal
             global <- runReaderT getGlobalDB $ EnvHelper $ Just
                     $ map (T.unpack *** T.unpack) $ Map.toList env1
             let v = intercalate [searchPathSeparator]
-                    [ toFilePath local
+                    [ toFilePath localdb
                     , toFilePath deps
                     , toFilePath global
                     ]
