@@ -440,7 +440,7 @@ makePlan pkgIds wanted bopts bconfig buildType gconfig pinfos pinfo installResou
                  pinfos
                  pinfo
                  gconfig
-                 (if wanted
+                 (if wanted && packageType pinfo == PTUser
                      then boptsFinalAction bopts
                      else DoNothing)
                  installResource

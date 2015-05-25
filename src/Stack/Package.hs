@@ -93,7 +93,7 @@ data Package =
 
 -- | Is this package a user target package, or a dependency?
 data PackageType = PTUser | PTDep
- deriving (Show,Typeable)
+ deriving (Show,Typeable,Eq)
 
 -- | Package build configuration
 data PackageConfig =
