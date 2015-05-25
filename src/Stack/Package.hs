@@ -64,7 +64,6 @@ data PackageException
   | PackageNoConfigFile
   | PackageNoCabalFile (Path Abs Dir)
   | PackageInvalidCabalFile (Path Abs File) PError
-  | PackageNoDeps (Path Abs File)
   | PackageDepCycle PackageName
   | PackageMissingDep Package PackageName VersionRange
   | PackageDependencyIssues [PackageException]
@@ -149,10 +148,7 @@ resolvePackage packageConfig cabalfp ptype gpkg = do
          pkg =
            resolvePackageDescription packageConfig gpkg
      case packageDependencies pkg of
-       deps
-         | M.null deps ->
-           throwM (PackageNoDeps cabalfp)
-         | otherwise ->
+       deps ->
            do let dir = FL.parent cabalfp
               pkgFiles <-
                 liftIO (packageDescFiles dir pkg)
