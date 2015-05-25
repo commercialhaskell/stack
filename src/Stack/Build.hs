@@ -76,7 +76,7 @@ import qualified System.FilePath as FilePath
 import           System.IO
 import           System.IO.Temp (withSystemTempDirectory)
 import           System.Posix.Files (createSymbolicLink,removeLink)
-import           System.Process.Read (readProcessStdout, envHelper)
+import           System.Process.Read (readProcessStdout)
 
 --------------------------------------------------------------------------------
 -- Top-level commands

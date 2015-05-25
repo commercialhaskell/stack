@@ -7,7 +7,6 @@
 
 module Main where
 
-import           Control.Arrow ((***))
 import           Control.Exception
 import           Control.Monad.Catch (MonadThrow)
 import           Control.Monad.Logger
