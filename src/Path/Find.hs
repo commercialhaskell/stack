@@ -6,21 +6,15 @@
 module Path.Find
   (findFileUp
   ,findDirUp
-  ,findFiles
-  ,resolveDir
-  ,resolveFile
-  ,ResolveException(..))
+  ,findFiles)
   where
 
 import Control.Monad
-import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Data.List
 import Data.Maybe
-import Data.Typeable (Typeable)
 import Path as FL
-import System.Directory (getDirectoryContents,doesDirectoryExist,doesFileExist,canonicalizePath)
-import qualified System.FilePath as FP
+import System.Directory (getDirectoryContents,doesDirectoryExist)
 
 -- | Find the location of a file matching the given predicate.
 findFileUp :: MonadIO m
@@ -80,33 +74,3 @@ findFiles dir p traverse =
                      else return [])
      return (concat (filter p (mapMaybe parseAbsFile entries) :
                      subResults))
-
-data ResolveException
-    = ResolveDirFailed (Path Abs Dir) FilePath FilePath
-    | ResolveFileFailed (Path Abs Dir) FilePath FilePath
-    deriving (Show, Typeable)
-instance Exception ResolveException
-
--- | Appends a stringly-typed relative path to an absolute path, and then
--- canonicalizes it.
-resolveDir :: (MonadIO m, MonadThrow m) => Path Abs Dir -> FilePath -> m (Path Abs Dir)
-resolveDir x y = do
-    let fp = toFilePath x FP.</> y
-    exists <- liftIO $ doesDirectoryExist fp
-    if exists
-        then do
-            dir <- liftIO $ canonicalizePath fp
-            parseAbsDir dir
-        else throwM $ ResolveDirFailed x y fp
-
--- | Appends a stringly-typed relative path to an absolute path, and then
--- canonicalizes it.
-resolveFile :: (MonadIO m, MonadThrow m) => Path Abs Dir -> FilePath -> m (Path Abs File)
-resolveFile x y = do
-    let fp = toFilePath x FP.</> y
-    exists <- liftIO $ doesFileExist fp
-    if exists
-        then do
-            file <- liftIO $ canonicalizePath fp
-            parseAbsFile file
-        else throwM $ ResolveFileFailed x y fp

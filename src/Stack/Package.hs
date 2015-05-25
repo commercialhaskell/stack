@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -25,7 +26,8 @@ import           Control.Exception hiding (try)
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger (MonadLogger)
+import           Control.Monad.Logger (MonadLogger,logWarn)
+import           Control.Monad.Reader
 import qualified Data.ByteString as S
 import           Data.Data
 import           Data.Either
@@ -34,6 +36,7 @@ import           Data.List
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Maybe
+import           Data.Maybe.Extra
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as S
@@ -52,10 +55,10 @@ import           Distribution.Simple.Utils
 import           Distribution.System
 import           Path as FL
 import           Path.Find
+import           Path.IO
 import           Prelude hiding (FilePath)
 import           Stack.Constants
 import           Stack.Types
-
 import qualified System.FilePath as FilePath
 
 -- | All exceptions thrown by the library.
@@ -151,7 +154,7 @@ resolvePackage packageConfig cabalfp ptype gpkg = do
        deps ->
            do let dir = FL.parent cabalfp
               pkgFiles <-
-                liftIO (packageDescFiles dir pkg)
+                runReaderT (packageDescFiles pkg) cabalfp
               let files = cabalfp : pkgFiles
                   deps' =
                     M.filterWithKey (const . (/= name))
@@ -199,41 +202,47 @@ allBuildInfo' pkg_descr = [ bi | Just lib <- [library pkg_descr]
                               , benchmarkEnabled tst ]
 
 -- | Get all files referenced by the package.
-packageDescFiles :: Path Abs Dir -> PackageDescription -> IO [Path Abs File]
-packageDescFiles dir pkg =
-  do libfiles <- fmap concat
-                      (mapM (libraryFiles dir)
-                            (maybe [] return (library pkg)))
-     exefiles <- fmap concat
-                      (mapM (executableFiles dir)
-                            (executables pkg))
-     dfiles <- resolveGlobFiles dir
-                                (map (dataDir pkg FilePath.</>) (dataFiles pkg))
-     srcfiles <- resolveGlobFiles dir
-                                  (extraSrcFiles pkg)
+packageDescFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m)
+                 => PackageDescription -> m [Path Abs File]
+packageDescFiles pkg =
+  do libfiles <-
+       liftM concat
+             (mapM libraryFiles
+                   (maybe [] return (library pkg)))
+     exefiles <-
+       liftM concat
+             (mapM executableFiles
+                   (executables pkg))
+     dfiles <-
+       resolveGlobFiles (map (dataDir pkg FilePath.</>) (dataFiles pkg))
+     srcfiles <-
+       resolveGlobFiles (extraSrcFiles pkg)
      -- extraTmpFiles purposely not included here, as those are files generated
      -- by the build script. Another possible implementation: include them, but
      -- don't error out if not present
-
-     docfiles <- resolveGlobFiles dir
-                                  (extraDocFiles pkg)
+     docfiles <-
+       resolveGlobFiles (extraDocFiles pkg)
      return (concat [libfiles,exefiles,dfiles,srcfiles,docfiles])
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
-resolveGlobFiles :: Path Abs Dir -> [String] -> IO [Path Abs File]
-resolveGlobFiles dir = fmap concat . mapM resolve
+resolveGlobFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m)
+                 => [String] -> m [Path Abs File]
+resolveGlobFiles = liftM (catMaybes . concat) . mapM resolve
   where resolve name =
           if any (== '*') name
              then explode name
-             else liftM return (resolveFile dir name)
+             else liftM return (resolveFileOrWarn name)
         explode name = do
-            names <- matchDirFileGlob (FL.toFilePath dir) name
-            mapM (resolveFile dir) names
+            dir <- asks parent
+            names <- liftIO (matchDirFileGlob (FL.toFilePath dir) name)
+            mapM resolveFileOrWarn names
 
 -- | Get all files referenced by the executable.
-executableFiles :: Path Abs Dir -> Executable -> IO [Path Abs File]
-executableFiles dir exe =
-  do dirs <- mapM (resolveDir dir) (hsSourceDirs build)
+executableFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m)
+                => Executable -> m [Path Abs File]
+executableFiles exe =
+  do dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
+     dir <- asks parent
      exposed <-
        resolveFiles
          (dirs ++ [dir])
@@ -244,9 +253,11 @@ executableFiles dir exe =
   where build = buildInfo exe
 
 -- | Get all files referenced by the library.
-libraryFiles :: Path Abs Dir -> Library -> IO [Path Abs File]
-libraryFiles dir lib =
-  do dirs <- mapM (resolveDir dir) (hsSourceDirs build)
+libraryFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m)
+             => Library -> m [Path Abs File]
+libraryFiles lib =
+  do dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
+     dir <- asks parent
      exposed <- resolveFiles
                   (dirs ++ [dir])
                   (map Left (exposedModules lib))
@@ -256,14 +267,15 @@ libraryFiles dir lib =
   where build = libBuildInfo lib
 
 -- | Get all files in a build.
-buildFiles :: Path Abs Dir -> BuildInfo -> IO [Path Abs File]
+buildFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m)
+           => Path Abs Dir -> BuildInfo -> m [Path Abs File]
 buildFiles dir build = do
-    dirs <- mapM (resolveDir dir) (hsSourceDirs build)
+    dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     other <- resolveFiles
                 (dirs ++ [dir])
                 (map Left (otherModules build))
                 haskellFileExts
-    cSources' <- mapM (resolveFile dir) (cSources build)
+    cSources' <- mapMaybeM resolveFileOrWarn (cSources build)
     return (other ++ cSources')
 
 -- | Get all dependencies of a package, including library,
@@ -386,12 +398,13 @@ depRange = \(Dependency _ r) -> r
 -- | Try to resolve the list of base names in the given directory by
 -- looking for unique instances of base names applied with the given
 -- extensions.
-resolveFiles :: [Path Abs Dir] -- ^ Directories to look in.
+resolveFiles :: MonadIO m
+             => [Path Abs Dir] -- ^ Directories to look in.
              -> [Either ModuleName String] -- ^ Base names.
              -> [Text] -- ^ Extentions.
-             -> IO [Path Abs File]
+             -> m [Path Abs File]
 resolveFiles dirs names exts =
-  fmap catMaybes (forM names makeNameCandidates)
+  liftM catMaybes (forM names (liftIO . makeNameCandidates))
   where makeNameCandidates name =
           fmap (listToMaybe . rights . concat)
                (mapM (makeDirCandidates name) dirs)
@@ -445,3 +458,41 @@ packageDocDir :: Package -> Path Abs Dir
 packageDocDir package' =
   distDirFromDir (packageDir package') </>
   $(mkRelDir "doc/")
+
+-- | Resolve the file, if it can't be resolved, warn for the user
+-- (purely to be helpful).
+resolveFileOrWarn :: (MonadThrow m,MonadIO m,MonadLogger m,MonadReader (Path Abs File) m)
+                  => FilePath.FilePath
+                  -> m (Maybe (Path Abs File))
+resolveFileOrWarn y =
+  do cwd <- getWorkingDir
+     file <- ask
+     dir <- asks parent
+     result <- resolveFileMaybe dir y
+     case result of
+       Nothing ->
+         $logWarn ("Warning: File listed in " <>
+                   T.pack (maybe (FL.toFilePath file) FL.toFilePath (stripDir cwd file)) <>
+                   " file does not exist: " <>
+                   T.pack y)
+       _ -> return ()
+     return result
+
+-- | Resolve the directory, if it can't be resolved, warn for the user
+-- (purely to be helpful).
+resolveDirOrWarn :: (MonadThrow m,MonadIO m,MonadLogger m,MonadReader (Path Abs File) m)
+                 => FilePath.FilePath
+                 -> m (Maybe (Path Abs Dir))
+resolveDirOrWarn y =
+  do cwd <- getWorkingDir
+     file <- ask
+     dir <- asks parent
+     result <- resolveDirMaybe dir y
+     case result of
+       Nothing ->
+         $logWarn ("Warning: Directory listed in " <>
+                   T.pack (maybe (FL.toFilePath file) FL.toFilePath (stripDir cwd file)) <>
+                   " file does not exist: " <>
+                   T.pack y)
+       _ -> return ()
+     return result

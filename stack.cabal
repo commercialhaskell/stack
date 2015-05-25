@@ -41,11 +41,13 @@ library
                      Stack.Build.Config
   other-modules:     Network.HTTP.Download
                      Path.Find
+                     Path.IO
                      System.Process.PagerEditor
                      System.Process.Read
                      Paths_stack
                      Data.Attoparsec.Combinators
                      Data.Set.Monad
+                     Data.Maybe.Extra
   build-depends:     Cabal >= 1.18.1.5
                    , aeson >= 0.8.0.2
                    , async >= 2.0.2

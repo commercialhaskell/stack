@@ -44,14 +44,13 @@ import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager)
 import           Path
-import           Path.Find (resolveDir)
+import           Path.IO
 import           Stack.BuildPlan
 import           Stack.Package
 import           Stack.Types
 import           System.Directory
 import           System.Environment
 import           System.Process.Read (EnvOverride (..))
-
 
 -- An uninterpreted representation of configuration options.
 -- Configurations may be "cascaded" using mappend (left-biased).
@@ -330,7 +329,7 @@ loadProjectConfig = do
             $logInfo "Getting project config file from STACK_YAML environment"
             parseAbsFile fp >>= load
         Nothing -> do
-            currDir <- liftIO (canonicalizePath ".") >>= parseAbsDir
+            currDir <- getWorkingDir
             mfp <- search currDir
             case mfp of
                 Just fp -> do
