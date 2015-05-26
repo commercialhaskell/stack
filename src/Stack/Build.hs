@@ -1020,7 +1020,7 @@ newConfig gconfig bopts pinfo =
 -- Package fetching
 
 -- | Fetch and unpack the package.
-withTempUnpacked :: (MonadIO m,MonadThrow m,MonadLogger m,MonadMask m,MonadReader env m,HasHttpManager env,HasConfig env)
+withTempUnpacked :: (MonadIO m,MonadThrow m,MonadLogger m,MonadMask m,MonadReader env m,HasHttpManager env,HasConfig env,MonadBaseControl IO m)
                  => [PackageIdentifier]
                  -> ([Path Abs Dir] -> m a)
                  -> m a

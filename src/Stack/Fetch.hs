@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -23,9 +25,9 @@ import           Stack.PackageIndex (findNewestVersions)
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Check as Tar
 import           Control.Applicative ((*>), (<$>), (<*>))
-
-import           Control.Concurrent.Async (Concurrently (..))
-import           Control.Concurrent.Async (wait, withAsync)
+import Control.Monad.Trans.Control
+import           Control.Concurrent.Async.Lifted (Concurrently (..))
+import           Control.Concurrent.Async.Lifted (wait, withAsync)
 import           Control.Concurrent.STM   (atomically, newTVarIO, readTVar,
                                            writeTVar, TVar, modifyTVar, readTVarIO)
 import           Control.Exception (Exception, throwIO, SomeException, toException)
@@ -94,8 +96,8 @@ instance Monoid Package where
         , packageCabal = if S.null (packageCabal l) then packageCabal r else packageCabal l
         }
 
-getPackageInfo :: FilePath -> Set PackageIdentifier -> IO (Map PackageIdentifier Package)
-getPackageInfo indexTar pkgs0 = withBinaryFile indexTar ReadMode $ \h -> do
+getPackageInfo :: MonadIO m => FilePath -> Set PackageIdentifier -> m (Map PackageIdentifier Package)
+getPackageInfo indexTar pkgs0 = liftIO $ withBinaryFile indexTar ReadMode $ \h -> do
     lbs <- L.hGetContents h
     loop pkgs0 pkgs0 Map.empty False $ Tar.read lbs
   where
@@ -159,7 +161,7 @@ instance Exception FetchException
 
 -- | Similar to 'fetchPackages', but optimized for command line input, where
 -- the values may be either package names or package identifiers.
-unpackPackages :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadThrow m,MonadLogger m)
+unpackPackages :: (MonadIO m,MonadBaseControl IO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadThrow m,MonadLogger m)
                => EnvOverride
                -> FilePath -- ^ destination
                -> [String] -- ^ names or identifiers
@@ -188,7 +190,7 @@ unpackPackages menv dest input = do
 -- | Ensure that all of the given package idents are unpacked into the build
 -- unpack directory, and return the paths to all of the subdirectories.
 unpackPackageIdentsForBuild
-    :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m)
+    :: (MonadBaseControl IO m, MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m)
     => EnvOverride
     -> Map PackageName Version
     -> m (Set (Path Abs Dir))
@@ -223,7 +225,7 @@ unpackPackageIdentsForBuild menv idents0 = do
 -- @
 --
 -- Since 0.1.0.0
-fetchPackages :: (F.Foldable f,Functor f,MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m)
+fetchPackages :: (F.Foldable f,Functor f,MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m,MonadBaseControl IO m)
               => EnvOverride
               -> f (PackageIdentifier, Maybe (Path Abs Dir))
               -> m [Path Abs Dir]
@@ -233,31 +235,32 @@ fetchPackages menv pkgs = do
        config = getConfig env
        indexFP = toFilePath $ configPackageIndex config
    requireIndex menv
-   liftIO $ do
-     outputVar <- newTVarIO []
-     let packageLocation = configPackageTarball config
-     withAsync (getPackageInfo indexFP $
-                Set.fromList $
-                map fst $
-                F.toList pkgs) $ \a -> do
-         parMapM_ connectionCount (go packageLocation man (wait a) outputVar) pkgs
-     readTVarIO outputVar
+   outputVar <- liftIO (newTVarIO [])
+   let packageLocation = configPackageTarball config
+
+   withAsync (getPackageInfo indexFP $
+              Set.fromList $
+              map fst $
+              F.toList pkgs) $ \a -> do
+       parMapM_ connectionCount (go packageLocation man (wait a) outputVar) pkgs
+   liftIO (readTVarIO outputVar)
   where
     connectionCount = 8 -- FIXME put in Config
     unlessM p f = do
         p' <- p
         unless p' f
 
-    go :: (PackageIdentifier -> IO (Path Abs File))
+    go :: (MonadIO m,Functor m,MonadThrow m,MonadLogger m)
+       => (PackageIdentifier -> m (Path Abs File))
        -> Manager
-       -> IO (Map PackageIdentifier Package)
+       -> m (Map PackageIdentifier Package)
        -> TVar [Path Abs Dir]
        -> (PackageIdentifier, Maybe (Path Abs Dir))
-       -> IO ()
+       -> m ()
     go packageLocation man getPackageInfo' outputVar (ident, mdest) = do
         fp <- fmap toFilePath $ packageLocation ident
-        unlessM (doesFileExist fp) $ do
-            -- FIXME $logInfo $ "Downloading " <> packageIdentifierText ident
+        unlessM (liftIO (doesFileExist fp)) $ do
+            $logInfo $ "Downloading " <> packageIdentifierText ident
             packageInfo <- getPackageInfo'
             let (msha512, url, msize) =
                     case Map.lookup ident packageInfo of
@@ -269,7 +272,7 @@ fetchPackages menv pkgs = do
                                 x:_ -> T.unpack x
                             , packageSize p
                             )
-            createDirectoryIfMissing True $ takeDirectory fp
+            liftIO $ createDirectoryIfMissing True $ takeDirectory fp
             req <- parseUrl url
             let req' = req
                     { checkStatus = \s' x y ->
@@ -278,7 +281,7 @@ fetchPackages menv pkgs = do
                             then Nothing
                             else checkStatus req s' x y
                     }
-            withResponse req' man $ \res -> if statusCode (responseStatus res) == 200
+            ok <- liftIO $ withResponse req' man $ \res -> if statusCode (responseStatus res) == 200
                 then do
                     let tmp = fp <.> "tmp"
                     withBinaryFile tmp WriteMode $ \h -> do
@@ -309,9 +312,10 @@ fetchPackages menv pkgs = do
                                             _ -> loop total' $! hashUpdate ctx bs
                         loop 0 hashInit
                     renameFile tmp fp
-                else do
-                    return ()
-                    -- FIXME $logError $ "Error downloading " <> packageIdentifierText ident
+                    return True
+                else return False
+            when (not ok)
+                 ($logError $ "Error downloading " <> packageIdentifierText ident)
 
         case mdest of
             Nothing -> return ()
@@ -325,12 +329,12 @@ fetchPackages menv pkgs = do
 
                 let dest = toFilePath dest'
                     innerDest = dest FP.</> packageIdentifierString ident
-                exists <- doesDirectoryExist innerDest
+                exists <- liftIO (doesDirectoryExist innerDest)
                 when exists $ throwM $ UnpackDirectoryAlreadyExists innerDest
 
-                createDirectoryIfMissing True dest
+                liftIO $ createDirectoryIfMissing True dest
 
-                withBinaryFile fp ReadMode $ \h -> do
+                liftIO $ withBinaryFile fp ReadMode $ \h -> do
                     -- Avoid using L.readFile, which is more likely to leak
                     -- resources
                     lbs <- L.hGetContents h
@@ -367,16 +371,15 @@ validHash url (Just sha512) ctx
   where
     dig = hashFinalize ctx
 
-parMapM_ :: F.Foldable f
+parMapM_ :: (F.Foldable f,MonadIO m,MonadBaseControl IO m)
          => Int
-         -> (a -> IO ())
+         -> (a -> m ())
          -> f a
-         -> IO ()
+         -> m ()
 parMapM_ (max 1 -> 1) f xs = F.mapM_ f xs
 parMapM_ cnt f xs0 = do
-    var <- newTVarIO $ F.toList xs0
-    let worker :: IO ()
-        worker = fix $ \loop -> join $ atomically $ do
+    var <- liftIO (newTVarIO $ F.toList xs0)
+    let worker = fix $ \loop -> join $ liftIO $ atomically $ do
             xs <- readTVar var
             case xs of
                 [] -> return $ return ()
