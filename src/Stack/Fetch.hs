@@ -132,7 +132,7 @@ getPackageInfo indexTar pkgs0 = liftIO $ withBinaryFile indexTar ReadMode $ \h -
         }
 
     getName ext name =
-        case T.splitOn "/" $ T.pack name of
+        case T.splitOn "/" $ T.replace "\\" "/" $ T.pack name of
             [pkg, ver, fp]
               | T.stripSuffix ext fp == Just pkg ->
                 do name' <- parsePackageNameFromString (T.unpack pkg)
