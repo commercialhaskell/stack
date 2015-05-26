@@ -27,7 +27,7 @@ import           Stack.Fetch
 import           Stack.GhcPkg (EnvOverride (..), getGlobalDB, envHelper)
 import           Stack.Package
 import qualified Stack.PackageIndex
-import           Stack.Setup
+import           Stack.Setup (setupEnv)
 import           Stack.Types
 import           Stack.Types.StackT
 import           System.Exit (exitWith)
@@ -81,64 +81,15 @@ main =
 
 setupCmd :: LogLevel -> IO ()
 setupCmd logLevel = do
-  bc <- runStackLoggingT logLevel (loadConfig >>= toBuildConfig)
-  runStackT logLevel bc $ setup $ bcGhcVersion bc
-
--- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
-setupEnv :: (MonadIO m, MonadThrow m, MonadLogger m) -- FIXME move this logic into the library itself?
-         => BuildConfig
-         -> m BuildConfig
-setupEnv bconfig = do
-    mkDirs <- runReaderT extraBinDirs bconfig
-    let EnvOverride env0 = configEnvOverride (bcConfig bconfig) EnvSettings
-            { esIncludeLocals = False
-            , esIncludeGhcPackagePath = False
-            }
-        mpath = Map.lookup "PATH" env0
-        depsPath = mkPath (mkDirs False) mpath
-        localsPath = mkPath (mkDirs True) mpath
-
-    -- FIXME make sure the directories exist?
-    deps <- runReaderT packageDatabaseDeps bconfig
-    localdb <- runReaderT packageDatabaseLocal bconfig
-    global <- getGlobalDB $ EnvOverride $ Map.insert "PATH" depsPath env0
-    let mkGPP locals = T.pack $ intercalate [searchPathSeparator]
-            $ (if locals then (toFilePath localdb:) else id)
-            [ toFilePath deps
-            , toFilePath global
-            ]
-
-    let mkEnvOverride es = EnvOverride
-            $ Map.insert "PATH" (if esIncludeLocals es then localsPath else depsPath)
-            $ (if esIncludeGhcPackagePath es
-                    then Map.insert "GHC_PACKAGE_PATH" (mkGPP (esIncludeLocals es))
-                    else id)
-            $ Map.insert "HASKELL_PACKAGE_SANDBOX"
-                (T.pack $ if esIncludeLocals es
-                    {- This is what we'd ideally want to provide, but
-                     - HASKELL_PACKAGE_SANDBOX isn't set up to respect it. Need
-                     - to figure out a better solution, maybe creating a
-                     - combined database and passing that in?
-                    then intercalate [searchPathSeparator]
-                            [ toFilePath localdb
-                            , toFilePath deps
-                            ]
-                    -}
-                    then toFilePath localdb
-                    else toFilePath deps)
-            $ env0
-    return bconfig { bcConfig = (bcConfig bconfig) { configEnvOverride = mkEnvOverride } }
-  where
-    mkPath dirs mpath = T.pack $ intercalate [searchPathSeparator]
-        (map toFilePath dirs ++ maybe [] (return . T.unpack) mpath)
+  _ <- runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv)
+  return ()
 
 -- | Build the project.
 buildCmd :: FinalAction -> BuildOpts -> LogLevel -> IO ()
 buildCmd finalAction opts logLevel =
   do config <-
        runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv)
-     catch (runStackT logLevel config $ do
-                 checkGHCVersion
+     catch (runStackT logLevel config $
                  Stack.Build.build opts { boptsFinalAction = finalAction})
            (error . printBuildException)
   where printBuildException e =

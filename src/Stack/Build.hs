@@ -14,8 +14,7 @@ module Stack.Build
   (build
   ,clean
   ,shakeFilesPath
-  ,configDir
-  ,checkGHCVersion)
+  ,configDir)
   where
 
 
@@ -1037,20 +1036,6 @@ shakeFilesPath dir =
 -- | Returns true for paths whose last directory component begins with ".".
 isHiddenDir :: Path b Dir -> Bool
 isHiddenDir = isPrefixOf "." . toFilePath . dirname
-
--- | Check that the GHC on the PATH matches the expected GHC
-checkGHCVersion :: (MonadIO m, MonadThrow m, MonadReader env m, HasBuildConfig env)
-                => m ()
-checkGHCVersion = do
-    menv <- getMinimalEnvOverride
-    bs <- readProcessStdout menv "ghc" ["--numeric-version"]
-    actualVersion <- parseVersion $ S8.takeWhile isValidChar bs
-    bconfig <- asks getBuildConfig
-    when (getMajorVersion actualVersion /= getMajorVersion (bcGhcVersion bconfig))
-        $ throwM $ GHCVersionMismatch actualVersion (bcGhcVersion bconfig)
-  where
-    isValidChar '.' = True
-    isValidChar c = '0' <= c && c <= '9'
 
 -- | Get the version of Cabal from the global package database.
 getCabalPkgVer :: (MonadThrow m,MonadIO m,MonadLogger m)

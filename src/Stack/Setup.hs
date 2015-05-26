@@ -9,10 +9,7 @@
 
 -- TODO: use Network.HTTP.Download
 module Stack.Setup
-  ( setup
-  , isSetup
-  , Paths(..)
-  , getPaths
+  ( setupEnv
   ) where
 
 -- Copied imports from stackage-setup
@@ -58,10 +55,84 @@ import System.Process (callProcess, readProcess)
 
 -- Imports and new definitions for Stack.Setup
 -------------------------------------------------------------------
-import Stack.Types.Version
+import Stack.Types
+import Control.Monad.Reader (asks)
+import           Stack.Build.Types
+import qualified Data.ByteString.Char8 as S8
 import qualified Stack.Types as Stack
 import Path (Path, Abs, Dir)
 import Control.Monad.Logger
+import qualified Data.Text as T
+import Data.List (intercalate)
+import Path (toFilePath)
+import qualified Data.Map as Map
+import System.Process.Read hiding (callProcess) -- FIXME don't hide
+import Stack.GhcPkg
+
+-- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
+setupEnv :: (MonadIO m, MonadThrow m, MonadLogger m)
+         => BuildConfig
+         -> m BuildConfig
+setupEnv bconfig = do
+    -- FIXME add functionality to look for locally installed GHCs, install new ones
+    mkDirs <- runReaderT extraBinDirs bconfig
+    let EnvOverride env0 = configEnvOverride (bcConfig bconfig) EnvSettings
+            { esIncludeLocals = False
+            , esIncludeGhcPackagePath = False
+            }
+        mpath = Map.lookup "PATH" env0
+        depsPath = mkPath (mkDirs False) mpath
+        localsPath = mkPath (mkDirs True) mpath
+
+    runReaderT checkGHCVersion bconfig
+
+    -- FIXME make sure the directories exist?
+    deps <- runReaderT packageDatabaseDeps bconfig
+    localdb <- runReaderT packageDatabaseLocal bconfig
+    global <- getGlobalDB $ EnvOverride $ Map.insert "PATH" depsPath env0
+    let mkGPP locals = T.pack $ intercalate [searchPathSeparator]
+            $ (if locals then (toFilePath localdb:) else id)
+            [ toFilePath deps
+            , toFilePath global
+            ]
+
+    let mkEnvOverride es = EnvOverride
+            $ Map.insert "PATH" (if esIncludeLocals es then localsPath else depsPath)
+            $ (if esIncludeGhcPackagePath es
+                    then Map.insert "GHC_PACKAGE_PATH" (mkGPP (esIncludeLocals es))
+                    else id)
+            $ Map.insert "HASKELL_PACKAGE_SANDBOX"
+                (T.pack $ if esIncludeLocals es
+                    {- This is what we'd ideally want to provide, but
+                     - HASKELL_PACKAGE_SANDBOX isn't set up to respect it. Need
+                     - to figure out a better solution, maybe creating a
+                     - combined database and passing that in?
+                    then intercalate [searchPathSeparator]
+                            [ toFilePath localdb
+                            , toFilePath deps
+                            ]
+                    -}
+                    then toFilePath localdb
+                    else toFilePath deps)
+            $ env0
+    return bconfig { bcConfig = (bcConfig bconfig) { configEnvOverride = mkEnvOverride } }
+  where
+    mkPath dirs mpath = T.pack $ intercalate [searchPathSeparator]
+        (map toFilePath dirs ++ maybe [] (return . T.unpack) mpath)
+
+-- | Check that the GHC on the PATH matches the expected GHC
+checkGHCVersion :: (MonadIO m, MonadThrow m, MonadReader env m, HasBuildConfig env)
+                => m ()
+checkGHCVersion = do
+    menv <- getMinimalEnvOverride
+    bs <- readProcessStdout menv "ghc" ["--numeric-version"]
+    actualVersion <- parseVersion $ S8.takeWhile isValidChar bs
+    bconfig <- asks getBuildConfig
+    when (getMajorVersion actualVersion /= getMajorVersion (bcGhcVersion bconfig))
+        $ throwM $ GHCVersionMismatch actualVersion (bcGhcVersion bconfig)
+  where
+    isValidChar '.' = True
+    isValidChar c = '0' <= c && c <= '9'
 
 data SetupException
   = GhcVersionNotRecognized Version
@@ -116,14 +187,14 @@ main target = do
     $ oldSetup target
 
 data R = R
-  { rConfig :: Config
+  { rConfig :: ConfigSetup
   , rManager :: Manager
   }
 
 instance HasHttpManager R where
   getHttpManager = rManager
 
-data Config = Config
+data ConfigSetup = ConfigSetup
   { configStackageRoot :: FilePath
   , configStackageHost :: String
   }
@@ -166,14 +237,14 @@ procIsMissing process = do
 
 
 getStackageRoot :: GetConfig m => m FilePath
-getStackageRoot = liftM configStackageRoot getConfig
+getStackageRoot = liftM configStackageRoot getConfigSetup
 
 getStackageHost :: GetConfig m => m String
-getStackageHost = liftM configStackageHost getConfig
+getStackageHost = liftM configStackageHost getConfigSetup
 
-class HasConfig env where
-  accessConfig :: env -> Config
-instance HasConfig R where
+class HasConfigSetup env where
+  accessConfig :: env -> ConfigSetup
+instance HasConfigSetup R where
   accessConfig = rConfig
 
 -- TODO: check environment properly
@@ -219,23 +290,23 @@ getStackageHostIO stackageRoot = do
       Right stackageConfig -> return (_stackageHost stackageConfig)
 
 
-getConfigIO :: IO Config
+getConfigIO :: IO ConfigSetup
 getConfigIO = do
   configStackageRoot <- getStackageRootIO
   configStackageHost <- getStackageHostIO configStackageRoot
-  return Config{..}
+  return ConfigSetup{..}
 
 class Monad m => GetConfig m where
-  getConfig :: m Config
+  getConfigSetup :: m ConfigSetup
 instance GetConfig IO where
-  getConfig = getConfigIO
-instance (HasConfig env, Monad m)
+  getConfigSetup = getConfigIO
+instance (HasConfigSetup env, Monad m)
   => GetConfig (ReaderT env m) where
-  getConfig = liftM accessConfig ask
+  getConfigSetup = liftM accessConfig ask
 
 
 withConfig :: (MonadIO m)
-  => ReaderT Config m a -> m a
+  => ReaderT ConfigSetup m a -> m a
 withConfig m = do
   config <- liftIO getConfigIO
   runReaderT m config
