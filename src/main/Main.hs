@@ -79,20 +79,24 @@ main =
 
 setupCmd :: LogLevel -> IO ()
 setupCmd logLevel = do
-  _ <- runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv True)
+  manager <- newTLSManager
+  _ <- runStackLoggingT manager logLevel (loadConfig >>= toBuildConfig >>= setupEnv True manager)
   return ()
 
 cleanCmd :: () -> LogLevel -> IO ()
 cleanCmd _ logLevel = do
-  config <- runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv False)
-  runStackT logLevel config clean
+  manager <- newTLSManager
+  config <- runStackLoggingT manager logLevel (loadConfig >>= toBuildConfig >>= setupEnv False manager)
+  runStackT manager logLevel config clean
 
 -- | Build the project.
 buildCmd :: FinalAction -> BuildOpts -> LogLevel -> IO ()
 buildCmd finalAction opts logLevel =
-  do config <-
-       runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv False)
-     catch (runStackT logLevel config $
+  catch
+  (do manager <- newTLSManager
+      config <-
+       runStackLoggingT manager logLevel (loadConfig >>= toBuildConfig >>= setupEnv False manager)
+      runStackT manager logLevel config $
                  Stack.Build.build opts { boptsFinalAction = finalAction})
            (error . printBuildException)
   where printBuildException e =
@@ -168,21 +172,24 @@ buildCmd finalAction opts logLevel =
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> LogLevel -> IO ()
 unpackCmd names logLevel = do
-    config <- runStackLoggingT logLevel loadConfig
-    runStackT logLevel config $ do
+    manager <- newTLSManager
+    config <- runStackLoggingT manager logLevel loadConfig
+    runStackT manager logLevel config $ do
         menv <- getMinimalEnvOverride
         Stack.Fetch.unpackPackages menv "." names
 
 -- | Update the package index
 updateCmd :: () -> LogLevel -> IO ()
 updateCmd () logLevel = do
-    config <- runStackLoggingT logLevel loadConfig
-    runStackT logLevel config $ getMinimalEnvOverride >>= Stack.PackageIndex.updateIndex
+    manager <- newTLSManager
+    config <- runStackLoggingT manager logLevel loadConfig
+    runStackT manager logLevel config $ getMinimalEnvOverride >>= Stack.PackageIndex.updateIndex
 
 -- | Execute a command
 execCmd :: (String, [String]) -> LogLevel -> IO ()
 execCmd (cmd, args) logLevel = do
-    config <- runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv False)
+    manager <- newTLSManager
+    config <- runStackLoggingT manager logLevel (loadConfig >>= toBuildConfig >>= setupEnv False manager)
     let cp = (P.proc cmd args)
             { P.env = envHelper $ configEnvOverride (bcConfig config)
                     EnvSettings

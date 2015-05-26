@@ -16,7 +16,8 @@ module Stack.Types.StackT
   (StackT
   ,StackLoggingT
   ,runStackT
-  ,runStackLoggingT)
+  ,runStackLoggingT
+  ,newTLSManager)
   where
 
 import           Control.Applicative
@@ -66,10 +67,8 @@ instance (MonadIO m) => MonadLogger (StackT config m) where
 
 -- | Run a Stack action.
 runStackT :: (MonadIO m,MonadBaseControl IO m)
-          => LogLevel -> config -> StackT config m a -> m a
-runStackT logLevel config m =
-  do manager <-
-       liftIO (newManager conduitManagerSettings)
+          => Manager -> LogLevel -> config -> StackT config m a -> m a
+runStackT manager logLevel config m =
      runReaderT (unStackT m)
                 (Env config logLevel manager)
 
@@ -94,12 +93,14 @@ instance HasHttpManager (LogLevel,Manager) where
 
 -- | Run the logging monad.
 runStackLoggingT :: MonadIO m
-                 => LogLevel -> StackLoggingT m a -> m a
-runStackLoggingT logLevel m =
-  do manager <-
-       liftIO (newManager conduitManagerSettings)
+                 => Manager -> LogLevel -> StackLoggingT m a -> m a
+runStackLoggingT manager logLevel m =
      runReaderT (unStackLoggingT m)
                 (logLevel,manager)
+
+-- | Convenience for getting a 'Manager'
+newTLSManager :: MonadIO m => m Manager
+newTLSManager = liftIO $ newManager conduitManagerSettings
 
 --------------------------------------------------------------------------------
 -- Logging functionality

@@ -65,12 +65,13 @@ import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal
-import           System.Directory hiding (findFiles)
+import           System.Directory hiding (findFiles, findExecutable)
 import           System.Environment
 import qualified System.FilePath as FilePath
 import           System.IO
 import           System.IO.Temp (withSystemTempDirectory)
 import           System.Posix.Files (createSymbolicLink,removeLink)
+import           System.Process.Read (readProcessStdout, findExecutable)
 
 -- | Build using Shake.
 build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
@@ -655,9 +656,10 @@ runhaskell cabalPkgVer pinfo setuphs config' buildType args =
      let withSink inner =
             withBinaryFile (FL.toFilePath (buildLogPath pinfo)) AppendMode
             $ \h -> inner (sinkHandle h)
+     exeName <- liftIO $ join $ findExecutable menv "runhaskell"
      join (liftIO (catch (do withSink $ \sink -> withCheckedProcess
-                               cp {cwd =
-                                     Just (FL.toFilePath dir)
+                               (cp exeName)
+                                  {cwd = Just (FL.toFilePath dir)
                                   ,Process.env = envHelper menv
                                   ,std_err = Inherit}
                                (\ClosedStream stdout' stderr' -> runConcurrently $
@@ -688,8 +690,9 @@ runhaskell cabalPkgVer pinfo setuphs config' buildType args =
             (cname:_) -> cname
             _ -> mempty
         dir = packageDir pinfo
-        cp =
-          proc "runhaskell" (("-package=" ++ packageIdentifierString cabalPkgVer)
+        cp exeName =
+          proc (toFilePath exeName)
+            (("-package=" ++ packageIdentifierString cabalPkgVer)
                               : toFilePath setuphs : args)
 
         menv = configEnvOverride (getConfig config') EnvSettings

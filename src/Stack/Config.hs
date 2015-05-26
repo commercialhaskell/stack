@@ -218,6 +218,7 @@ configFromConfigMonoid configStackRoot Project{..} ConfigMonoid{..} = do
                     case configMonoidDockerOpts of
                         DockerOpts Nothing -> True
                         DockerOpts (Just _) -> False
+         configLocalGHCs = configStackRoot </> $(mkRelDir "ghc") -- On Windows, use APPLOCALDATA\Programs?
 
      configPackages' <- mapM (resolveDir projectRoot) projectPackages
      let configPackages = S.fromList configPackages'

@@ -43,7 +43,7 @@ import           Data.Conduit.Zlib                     (ungzip)
 import qualified Data.Foldable                         as F
 import           Data.Map                              (Map)
 import qualified Data.Map                              as Map
-import           Data.Maybe                            (fromMaybe, isJust, mapMaybe)
+import           Data.Maybe                            (fromMaybe, mapMaybe)
 import           Data.Monoid                           (mempty, (<>))
 import           Data.Set                              (Set)
 import qualified Data.Set                              as Set
@@ -64,7 +64,6 @@ import           Distribution.ParseUtils               (PError)
 import qualified Distribution.Text                     as DT
 import           Network.HTTP.Download
 import           Path                                  (mkRelDir, parent,
-                                                        parseAbsFile,
                                                         parseRelDir, toFilePath,
                                                         (</>))
 import           Stack.Types
@@ -72,7 +71,7 @@ import           System.Directory
 import           System.FilePath                       (takeBaseName, (<.>))
 import           System.IO                             (IOMode (ReadMode, WriteMode),
                                                         withBinaryFile)
-import           System.Process.Read                   (runIn, EnvOverride)
+import           System.Process.Read                   (runIn, EnvOverride, doesExecutableExist)
 
 -- | A cabal file with name and version parsed from the filepath, and the
 -- package description itself ready to be parsed. It's left in unparsed form
@@ -275,12 +274,7 @@ updateIndexGit menv = do
      let tarFile = configPackageIndex config
          idxPath = parent tarFile
      liftIO (createDirectoryIfMissing True (toFilePath idxPath))
-     path <- liftIO (findExecutable "git")
-     case path of
-       Nothing ->
-         error "Please install git and provide the executable on your PATH"
-       Just fp ->
-         do gitPath <- parseAbsFile fp
+     do
             gitUrl <- askPackageIndexGitUrl
             repoName <- parseRelDir $ takeBaseName $ T.unpack gitUrl
             let cloneArgs =
@@ -300,13 +294,13 @@ updateIndexGit menv = do
               liftIO (doesDirectoryExist (toFilePath acfDir))
             unless repoExists
                    (do $logInfo ("Cloning repository for first from " <> gitUrl)
-                       runIn suDir gitPath menv cloneArgs Nothing)
-            runIn acfDir gitPath menv ["fetch","--tags","--depth=1"] Nothing
+                       runIn suDir "git" menv cloneArgs Nothing)
+            runIn acfDir "git" menv ["fetch","--tags","--depth=1"] Nothing
             _ <-
               (liftIO . tryIO) (removeFile (toFilePath tarFile))
             when (configGpgVerifyIndex config)
                  (do runIn acfDir
-                           gitPath
+                           "git"
                            menv
                            ["tag","-v","current-hackage"]
                            (Just (unlines ["Signature verification failed. "
@@ -318,7 +312,7 @@ updateIndexGit menv = do
                        (T.pack . toFilePath) tarFile)
             deleteCache
             runIn acfDir
-                  gitPath
+                  "git"
                   menv
                   ["archive"
                   ,"--format=tar"
@@ -377,9 +371,7 @@ getPkgVersions menv pkg = do
 isGitInstalled :: MonadIO m -- FIXME use the EnvOverride for finding git
                => EnvOverride
                -> m Bool
-isGitInstalled _FIXMEunused =
-  return . isJust =<<
-  liftIO (findExecutable "git")
+isGitInstalled = flip doesExecutableExist "git"
 
 -- | Delete the package index cache
 deleteCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m) => m ()

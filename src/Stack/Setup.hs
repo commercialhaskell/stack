@@ -16,8 +16,9 @@ module Stack.Setup
 ---------------------------------------------------------------------
 import Control.Applicative ((<$>), (<*))
 import Control.Exception (Exception, bracket_, onException, IOException)
+import Control.Exception.Enclosed (handleIO, tryIO)
 import Control.Monad (when, liftM)
-import Control.Monad.Catch (MonadThrow, throwM, catch)
+import Control.Monad.Catch (MonadThrow, throwM, catch, MonadMask)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ReaderT (..), ask)
 import Control.Monad.Trans.Control (MonadBaseControl)
@@ -31,6 +32,7 @@ import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as LByteString
 import qualified Data.Char as Char
 import Data.Conduit (($$), ZipSink (..))
+import Data.Word (Word)
 import Data.Conduit.Binary (sinkFile)
 import Data.Foldable (forM_)
 import Data.HashMap.Strict (HashMap)
@@ -51,30 +53,42 @@ import System.FilePath (searchPathSeparator, getSearchPath, (</>), (<.>))
 import System.Environment (lookupEnv, setEnv)
 import System.Exit (exitFailure)
 import System.IO (stderr, hPutStrLn)
+import System.IO.Temp (withSystemTempDirectory)
 import System.Process (callProcess, readProcess)
 
 -- Imports and new definitions for Stack.Setup
 -------------------------------------------------------------------
 import Stack.Types
 
+import Distribution.System (OS (..), Arch (..), buildOS, buildArch)
+import Control.Monad.Reader (asks)
 import           Stack.Build.Types
 import qualified Data.ByteString.Char8 as S8
 import qualified Stack.Types as Stack
-import Path (Path, Abs, Dir)
+import Path (Path, Abs, Dir, parseRelDir, parseAbsDir, mkRelFile)
+import qualified Path
 import Control.Monad.Logger
 import qualified Data.Text as T
 import Data.List (intercalate)
 import Path (toFilePath)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
+import Data.Set (Set)
 import System.Process.Read hiding (callProcess) -- FIXME don't hide
 import Stack.GhcPkg
+import qualified System.FilePath as FP
+import Data.Maybe (catMaybes, listToMaybe)
+import Data.List (sortBy)
+import Data.Ord (comparing)
+import Network.HTTP.Download (download)
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
-setupEnv :: (MonadIO m, MonadThrow m, MonadLogger m)
+setupEnv :: (MonadIO m, MonadMask m, MonadLogger m)
          => Bool -- ^ install GHC if missing?
+         -> Manager
          -> BuildConfig
          -> m BuildConfig
-setupEnv installIfMissing bconfig = do
+setupEnv installIfMissing manager bconfig = do
     -- Check the available GHCs
     let menv0 = configEnvOverride (bcConfig bconfig) EnvSettings
             { esIncludeLocals = False
@@ -93,7 +107,7 @@ setupEnv installIfMissing bconfig = do
     mghcBin <- if needLocal
         then do
             $logDebug "Looking for a local copy of GHC"
-            mghcBin <- getLocalGHC expected
+            mghcBin <- getLocalGHC bconfig expected
             case mghcBin of
                 Just ghcBin -> do
                     $logDebug $ "Local copy found at: " <> T.pack ghcBin
@@ -101,7 +115,7 @@ setupEnv installIfMissing bconfig = do
                 Nothing
                     | installIfMissing -> do
                         $logDebug $ "None found, installing: " <> versionText expected
-                        ghcBin <- installLocalGHC expected
+                        ghcBin <- installLocalGHC manager bconfig expected
                         return $ Just ghcBin
                     | otherwise ->
                         throwM $ GHCVersionMismatch minstalled (bcGhcVersion bconfig)
@@ -166,43 +180,123 @@ setupEnv installIfMissing bconfig = do
 -- | Get the major version of the installed GHC, if available
 getInstalledGHC :: (MonadIO m) => EnvOverride -> m (Maybe Version)
 getInstalledGHC menv = do
-    eres <- tryProcessStdout menv "ghc" ["--numeric-version"]
-    return $ do
-        Right bs <- Just eres
-        parseVersion $ S8.takeWhile isValidChar bs
+    exists <- doesExecutableExist menv "ghc"
+    if exists
+        then do
+            eres <- liftIO $ tryProcessStdout menv "ghc" ["--numeric-version"]
+            return $ do
+                Right bs <- Just eres
+                parseVersion $ S8.takeWhile isValidChar bs
+        else return Nothing
   where
     isValidChar '.' = True
     isValidChar c = '0' <= c && c <= '9'
 
 -- | Get the bin directory for a local copy of GHC meeting the given version
 -- requirement, if it exists
-getLocalGHC :: Version -> m (Maybe FilePath)
-getLocalGHC version = error "getLocalGHC"
+getLocalGHC :: (HasConfig config, MonadIO m)
+            => config
+            -> Version
+            -> m (Maybe FilePath)
+getLocalGHC config' expected = liftIO $ do
+    let dir = toFilePath $ configLocalGHCs $ getConfig config'
+    contents <- handleIO (const $ return []) (getDirectoryContents dir)
+    pairs <- fmap catMaybes $ mapM (toMaybePair dir) contents
+    return $ listToMaybe $ reverse $ map snd $ sortBy (comparing fst) pairs
+  where
+    expectedMajor = getMajorVersion expected
+    toMaybePair root name
+        | Just noGhc <- List.stripPrefix "ghc-" name
+        , Just version <- parseVersionFromString noGhc
+        , getMajorVersion version == expectedMajor
+        , version >= expected = do
+            let bin = root FP.</> name FP.</> "bin"
+                ghc = bin FP.</> "ghc"
+            exists <- doesFileExist ghc
+            return $ if exists
+                then Just (version, bin)
+                else Nothing
+        | otherwise = return Nothing
 
 -- | Install a local copy of GHC in the given major version with at least the
 -- given version. In other words, if 7.8.3 is specified, 7.8.4 may be selected.
 -- Return the bin directory.
-installLocalGHC :: Version -> m FilePath
-installLocalGHC version = error "installLocalGHC"
+installLocalGHC :: (MonadIO m, MonadLogger m, HasConfig env, MonadThrow m, MonadMask m)
+                => Manager -> env -> Version -> m FilePath
+installLocalGHC manager config' version = do
+    rel <- parseRelDir $ "ghc-" <> versionString version
+    let dest = configLocalGHCs (getConfig config') Path.</> rel
+    $logDebug $ "Attempting to install GHC " <> versionText version <>
+                " to " <> T.pack (toFilePath dest)
+    flip runReaderT config' $ case (buildOS, buildArch) of
+        (Linux, X86_64) -> linux64 manager version dest
+        (os, arch) -> throwM $ UnsupportedSetupCombo os arch
+    return $ toFilePath dest FP.</> "bin"
+
+data SetupException = UnsupportedSetupCombo OS Arch
+                    | MissingDependencies [String]
+                    | UnknownGHCVersion Version (Set (Word, Word))
+    deriving Typeable
+instance Exception SetupException
+instance Show SetupException where
+    show (UnsupportedSetupCombo os arch) = concat
+        [ "I don't know how to install GHC for "
+        , show (os, arch)
+        , ", please install manually"
+        ]
+    show (MissingDependencies tools) =
+        "The following executables are missing and must be installed:" ++
+        intercalate ", " tools
+    show (UnknownGHCVersion version known) = concat
+        [ "No information found for GHC version "
+        , versionString version
+        , ". Known GHC major versions: "
+        , intercalate ", " (map (versionString . uncurry fromMajorVersion) $ Set.toList known)
+        ]
+
+-- | Install GHC for 64-bit Linux
+linux64 :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, MonadMask m)
+        => Manager
+        -> Version
+        -> Path Abs Dir
+        -> m ()
+linux64 manager version dest = do
+    menv <- getMinimalEnvOverride
+    checkDependencies ["make", "tar", "xz"]
+    case Map.lookup (getMajorVersion version) m of
+        Nothing -> throwM $ UnknownGHCVersion version (Map.keysSet m)
+        Just (url, dirPiece) -> do
+            req <- parseUrl url
+            withSystemTempDirectory "stack-setup" $ \root' -> do
+                root <- parseAbsDir root'
+                let file = root Path.</> $(mkRelFile "ghc.tar.xz")
+                dir <- liftM (root Path.</>) $ parseRelDir dirPiece
+                $logInfo $ T.pack $ "Downloading from: " ++ url
+                runReaderT (download req file) manager
+                $logInfo "Unpacking"
+                runIn root "tar" menv ["xf", toFilePath file] Nothing
+                $logInfo "Configuring"
+                runIn dir "./configure" menv ["--prefix=" ++ toFilePath dest] Nothing
+                $logInfo "Installing"
+                runIn dir "make" menv ["install"] Nothing
+                $logInfo "GHC installed!"
+  where
+    -- FIXME move information to a config file that can be downloaded
+    m = Map.fromList
+        [ ((7, 8),
+            ( "http://download.fpcomplete.com/stackage-cli/linux64/ghc-7.8.4-x86_64-unknown-linux-deb7.tar.xz"
+            , "ghc-7.8.4"
+            -- FIXME include sha1 for verification of download
+            ))
+        ]
 
 -- FIXME cleanup below here
 
-data SetupException
+data SetupException'
   = GhcVersionNotRecognized Version
   | AlreadySetup Version
   deriving (Show, Typeable)
-instance Exception SetupException
-
-setup :: (MonadThrow m, MonadIO m, MonadReader env m, Stack.HasConfig env, MonadLogger m)
-  => Version -> m ()
-setup ghcVersion = do
-  b <- isSetup ghcVersion
-  if b
-    then do
-      $logWarn ("ghc-" <> Text.pack (show ghcVersion) <> " is already set up")
-    else do
-      -- TODO: a better implementation
-      liftIO $ main ("ghc-" ++ show ghcVersion)
+instance Exception SetupException'
 
 isSetup :: (MonadIO m, MonadReader env m, Stack.HasConfig env, MonadLogger m)
   => Version -> m Bool
@@ -231,14 +325,6 @@ userAgent = "stackage-setup"
 stackageHostDefault :: String
 stackageHostDefault = "https://www.stackage.org"
 
-
-main :: SetupTarget -> IO ()
-main target = do
-  withManagerSettings tlsManagerSettings
-    $ withConfig
-    $ curryReaderT R
-    $ oldSetup target
-
 data R = R
   { rConfig :: ConfigSetup
   , rManager :: Manager
@@ -260,34 +346,20 @@ instance FromJSON StackageConfig where
     _stackageHost <- obj .:? "stackage-host" .!= stackageHostDefault
     return StackageConfig{..}
 
--- Check if given processes appear to be present.
--- Halts the program with exit failure if any are missing.
--- TODO: make cross platform
-checkDependencies :: [String] -> IO ()
-checkDependencies deps = do
-  missing <- mapM checkIsMissing deps
-  when (or missing) $ do
-    hPutStrLn stderr $ "Please install missing dependencies and try again."
-    exitFailure
-
--- return True if it appears to be missing
-checkIsMissing :: String -> IO Bool
-checkIsMissing process = do
-  isMissing <- procIsMissing process
-    `catch` \(_ :: IOException) -> return True
-  if isMissing
-    then do
-      hPutStrLn stderr $
-        "Couldn't find required dependency: " <> process
-      return True
-    else return False
-
--- return True if it appears to be missing
-procIsMissing :: String -> IO Bool
-procIsMissing process = do
-  output <- readProcess process ["--version"] ""
-  return $ null output
-
+-- | Check if given processes appear to be present, throwing an exception if
+-- missing.
+checkDependencies :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env)
+                  => [String] -> m ()
+checkDependencies tools = do
+    menv <- getMinimalEnvOverride
+    missing <- liftM catMaybes $ mapM (check menv) tools
+    if null missing
+        then return ()
+        else throwM $ MissingDependencies missing
+  where
+    check menv tool = do
+        exists <- doesExecutableExist menv tool
+        return $ if exists then Nothing else Just tool
 
 getStackageRoot :: GetConfig m => m FilePath
 getStackageRoot = liftM configStackageRoot getConfigSetup
@@ -511,37 +583,6 @@ lookupGhcMajorVersion snapshot = do
   let lbs = responseBody response
   return $ LText.unpack $ LText.decodeUtf8 lbs
 
-
-oldSetup ::
-  ( HasHttpManager env
-  , MonadReader env m
-  , GetConfig m
-  , MonadThrow m
-  , MonadIO m
-  , MonadBaseControl IO m
-  ) => SetupTarget -> m ()
-oldSetup target = do
-  ghcMajorVersion <- getGhcMajorVersion target
-  liftIO $ putStrLn $ "Selecting ghc-" <> ghcMajorVersion
-  links <- getLinks ghcMajorVersion
-
-  stackageRoot <- getStackageRoot
-  forM_ links $ \d@Download{..} -> do
-    let dir = stackageRoot </> downloadDir downloadName
-    liftIO $ createDirectoryIfMissing True dir
-
-    let versionedDir = dir </> downloadPath downloadName downloadVersion
-    exists <- liftIO $ doesDirectoryExist versionedDir
-
-    if (not exists)
-      then do
-        liftIO $ checkDependencies (depsFor downloadName)
-        download downloadUrl downloadSha1 dir
-        postDownload d dir versionedDir
-      else liftIO $ putStrLn $ Text.unpack $ "Already have: " <> downloadName <> "-" <> downloadVersion
-
-    augmentPath (versionedDir </> "bin")
-
 data NotSetup = NotSetup
   deriving (Show, Typeable)
 instance Exception NotSetup
@@ -735,14 +776,14 @@ rememberingOldCabal action = do
     else action
 
 -- TODO: use Text more than String
-download ::
+download' ::
   ( MonadIO m
   , MonadBaseControl IO m
   , MonadThrow m
   , MonadReader env m
   , HasHttpManager env
   ) => String -> String -> FilePath -> m ()
-download url sha1 dir = do
+download' url sha1 dir = do
   -- TODO: deal with partial function last
   let fname = List.drop (List.last slashes + 1) url
       slashes = List.findIndices (== '/') url

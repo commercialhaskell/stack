@@ -58,6 +58,8 @@ data Config =
          -- package database, such as via Docker.
          ,configEnvOverride      :: !(EnvSettings -> EnvOverride)
          -- ^ Environment variables to be passed to external tools
+         ,configLocalGHCs        :: !(Path Abs Dir)
+         -- ^ Path containing local GHC installations
          }
 
 -- | Controls which version of the environment is used
