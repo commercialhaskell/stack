@@ -58,8 +58,14 @@ getGlobalDB menv = do
     -- This seems like a strange way to get the global package database
     -- location, but I don't know of a better one
     bs <- ghcPkg menv [] ["list", "--global"] >>= either throwM return
-    let fp = S8.unpack $ S8.takeWhile (/= ':') bs
+    let fp = S8.unpack $ stripTrailingColon $ firstLine bs
     liftIO (canonicalizePath fp) >>= parseAbsDir
+  where
+    stripTrailingColon bs
+        | S8.null bs = bs
+        | S8.last bs == ':' = S8.init bs
+        | otherwise = bs
+    firstLine = S8.takeWhile (\c -> c /= '\r' && c /= '\n')
 
 -- | Run the ghc-pkg executable
 ghcPkg :: (MonadIO m, MonadLogger m)
@@ -143,12 +149,14 @@ findPackageId menv pkgDbs name =
          do let mpid =
                   fmap T.encodeUtf8
                        (listToMaybe
-                          (mapMaybe (T.stripPrefix "id: ")
+                          (mapMaybe (fmap stripCR . T.stripPrefix "id: ")
                                     (map T.decodeUtf8 (S8.lines lbs))))
             case mpid of
               Just !pid ->
                 return (parseGhcPkgId pid)
               _ -> return Nothing
+  where
+    stripCR t = fromMaybe t (T.stripSuffix "\r" t)
 
 -- | Get all current package ids.
 getPackageIds :: (MonadIO m, MonadLogger m)
