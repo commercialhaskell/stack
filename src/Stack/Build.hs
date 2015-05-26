@@ -18,6 +18,7 @@ module Stack.Build
   where
 
 import qualified Control.Applicative as A
+import           Control.Arrow
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.MVar
 import           Control.Exception
@@ -69,7 +70,6 @@ import qualified System.FilePath as FilePath
 import           System.IO
 import           System.IO.Temp (withSystemTempDirectory)
 import           System.Posix.Files (createSymbolicLink,removeLink)
-import           System.Process.Read (readProcessStdout)
 
 -- | Build using Shake.
 build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
@@ -106,8 +106,8 @@ determineLocals bopts = do
         cabalfp <- getCabalFileName dir
         name <- parsePackageNameFromFilePath cabalfp
         readPackage (packageConfig name bconfig) cabalfp ptype
-    $logDebug $ "Local packages to install: " <> T.pack
-        (show $ map (\p -> PackageIdentifier (packageName p) (packageVersion p)) locals)
+    $logDebug $ "Local packages to install: " <> T.intercalate ", "
+        (map (packageIdentifierText . fromTuple . (packageName &&& packageVersion)) locals)
     return locals
   where
     finalAction = boptsFinalAction bopts
