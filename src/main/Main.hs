@@ -70,13 +70,22 @@ main =
                         execCmd
                         ((,)
                             <$> strArgument (metavar "CMD")
-                            <*> many (strArgument (metavar "[ARGS]"))))
+                            <*> many (strArgument (metavar "[ARGS]")))
+             addCommand "clean"
+                        "Clean the local packages"
+                        cleanCmd
+                        (pure ()))
      run level
 
 setupCmd :: LogLevel -> IO ()
 setupCmd logLevel = do
   _ <- runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv True)
   return ()
+
+cleanCmd :: () -> LogLevel -> IO ()
+cleanCmd _ logLevel = do
+  config <- runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv False)
+  runStackT logLevel config clean
 
 -- | Build the project.
 buildCmd :: FinalAction -> BuildOpts -> LogLevel -> IO ()
