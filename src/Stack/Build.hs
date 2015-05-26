@@ -35,7 +35,7 @@ import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.Conduit (($$),($=))
-import           Data.Conduit.Binary (sinkHandle,sourceHandle)
+import           Data.Conduit.Binary (sinkHandle)
 import qualified Data.Conduit.List as CL
 import           Data.Either
 import           Data.Function
@@ -83,9 +83,6 @@ build bopts = do
     dependencies <- getDependencies locals ranges
     installDependencies bopts dependencies
     buildLocals bopts (S.fromList locals)
-
-data LocalType = LTPackage | LTDep
-    deriving Show
 
 -- | Determine all of the local packages we wish to install. This does not
 -- include any dependencies.
