@@ -15,9 +15,11 @@ stack is a build tool for Haskell code. It is:
 * modular, taking advantage of existing high quality projects like [LTS
   Haskell](https://github.com/fpco/lts-haskell),
   [Stackage](https://www.stackage.org/),
-  [all-cabal-hashes](https://github.com/commercialhaskell/all-cabal-hashes) and
+  [all-cabal-hashes](https://github.com/commercialhaskell/all-cabal-hashes),
   [the S3 Haskell package
-  mirror](https://www.fpcomplete.com/blog/2015/03/hackage-mirror)
+  mirror](https://www.fpcomplete.com/blog/2015/03/hackage-mirror),
+  [shake](http://shakebuild.com/) and the
+  [Cabal library](http://www.stackage.org/package/Cabal)
 
 * explicit about changes to your install plan; updating the list of available
   packages will never cause `stack` to suddenly corrupt and reinstall your
@@ -43,7 +45,7 @@ Some commonly used commands:
   necessary package dependencies to a shared location, and build your package
 
 * `stack test` and `stack bench` are the same as `stack build`, but
-  additionally run test suites or benchmarks when complete.
+  additionally run test suites or benchmarks when complete
 
 * `stack setup` will install whatever version of GHC necessary to build your
   project (NOTE: stack will automatically check what version of GHC your
@@ -135,7 +137,7 @@ snapshot being used already provides the wai package (and others). In this
 case, stack will prune the dependency tree to disallow usage of wai and any of
 its users from the LTS snapshot. This ensures that when building your code,
 there is only one copy of the wai library in play- the local one. In the
-stack.yaml example above, we needed to explicit include fast-logger and
+stack.yaml example above, we needed to explicitly include fast-logger and
 wai-logger since they depend on some of the packages being built locally.
 
 If this "corner case" seems a bit confusing, don't worry about it too much,
@@ -200,3 +202,22 @@ cannot occur, which should help guide you through the steps necessary for the
 second and third option above. Also, note that those options can be
 mixed-and-matched, e.g. you may decide to relax some version bounds in your
 .cabal file, while also adding some extra-deps.
+
+### Explicit breakage
+
+As mentioned above, updating your list of packages will not cause stack to
+invalidate any existing package databases. That's because stack is always
+explicit about build plans, via:
+
+1. the selected snapshot
+2. the extra-deps
+3. local packages
+
+The only way to change a plan for packages to be installed is by modifying one
+of the above. This means that breakage of a set of installed packages is an
+*explicit* and *contained* activity. Specifically, you get the following
+guarantees:
+
+* Since snapshots are immutable, the snapshot package database will not be invalidated by any action. If you change the snapshot you're using, however, you may need to build those packages from scratch.
+* If you modify your extra-deps, stack may need to unregister and reinstall them.
+* Any changes to your local packages trigger a rebuild of that package and its dependencies.
