@@ -933,7 +933,7 @@ updateGenFile dir = liftIO $
 -- | Delete the gen file, which will cause a rebuild.
 deleteGenFile :: MonadIO m => Path Abs Dir -> m ()
 deleteGenFile dir = liftIO $
-  catch (removeFile (FL.toFilePath (builtFileFromDir dir)))
+  catch (removeFile (FL.toFilePath (configuredFileFromDir dir)))
         (\(_ :: IOException) -> return ())
 
 -- | Save generated configuration.
