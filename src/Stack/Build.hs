@@ -103,14 +103,23 @@ determineLocals bopts = do
     locals <- forM (M.toList paths) $ \(dir, ptype) -> do
         cabalfp <- getCabalFileName dir
         name <- parsePackageNameFromFilePath cabalfp
-        readPackage (packageConfig name bconfig) cabalfp ptype
+        readPackage (packageConfig name bconfig ptype) cabalfp ptype
     $logDebug $ "Local packages to install: " <> T.intercalate ", "
         (map (packageIdentifierText . fromTuple . (packageName &&& packageVersion)) locals)
     return locals
   where
     finalAction = boptsFinalAction bopts
 
-    packageConfig name bconfig = PackageConfig
+    packageConfig name bconfig PTDep = PackageConfig
+        { packageConfigEnableTests = False
+        , packageConfigEnableBenchmarks = False
+        , packageConfigFlags =
+               fromMaybe M.empty (M.lookup name $ configPackageFlags config)
+            <> configGlobalFlags config
+        , packageConfigGhcVersion = bcGhcVersion bconfig
+        }
+      where config = bcConfig bconfig
+    packageConfig name bconfig PTUser = PackageConfig
         { packageConfigEnableTests =
             case finalAction of
                 DoTests -> True
@@ -307,9 +316,7 @@ buildLocals bopts pinfos = do
                        (liftIO (deleteGenFile (packageDir pinfo)))
                   gconfig <- liftIO $
                     readGenConfigFile pkgIds
-                                      (packageName pinfo)
                                       bopts
-                                      (packageDir pinfo)
                                       wantedTarget
                                       pinfo
                                       cfgVar
@@ -485,9 +492,7 @@ needDependencies pkgIds bopts pinfos pinfo cfgVar =
                      let dir' = packageDir pinfo'
                          genFile = builtFileFromDir dir'
                      in do void (liftIO (readGenConfigFile pkgIds
-                                                           (packageName pinfo')
                                                            bopts
-                                                           dir'
                                                            False
                                                            pinfo'
                                                            cfgVar))
@@ -896,16 +901,17 @@ genFileInvalidated pkgIds bopts gconfig pname pinfo =
 genFileChanged :: Map PackageName GhcPkgId
                -> BuildOpts
                -> GenConfig
-               -> PackageName
                -> Package
                -> Bool
-genFileChanged pkgIds bopts gconfig pname pinfo =
+genFileChanged pkgIds bopts gconfig pinfo =
   or [installedPkgIdChanged
-     ,optimizationsChanged
-     ,profilingChanged
-     ,ghcOptsChanged
-     ,flagsChanged]
-  where installedPkgIdChanged =
+     ,optimizationsChanged && not isDependency
+     ,profilingChanged && not isDependency
+     ,ghcOptsChanged && not isDependency
+     ,flagsChanged && not isDependency]
+  where pname = packageName pinfo
+        isDependency = packageType pinfo == PTDep
+        installedPkgIdChanged =
           gconfigPkgId gconfig /=
           M.lookup pname pkgIds
         ghcOptsChanged = boptsGhcOptions bopts /= gconfigGhcOptions gconfig
@@ -942,15 +948,15 @@ writeGenConfigFile dir gconfig = liftIO $
 -- | Read the generated config file, or return a default based on the
 -- build configuration.
 readGenConfigFile :: Map PackageName GhcPkgId
-                  -> PackageName
                   -> BuildOpts
-                  -> Path Abs Dir
                   -> Bool
                   -> Package
                   -> MVar ConfigLock
                   -> IO GenConfig
-readGenConfigFile pkgIds name bopts dir wanted pinfo cfgVar = withMVar cfgVar (const go)
-  where go =
+readGenConfigFile pkgIds bopts wanted pinfo cfgVar = withMVar cfgVar (const go)
+  where name = packageName pinfo
+        dir = packageDir pinfo
+        go =
           do bytes <-
                catch (fmap Just
                            (S.readFile (FL.toFilePath fp)))
@@ -958,7 +964,7 @@ readGenConfigFile pkgIds name bopts dir wanted pinfo cfgVar = withMVar cfgVar (c
                         return Nothing)
              case bytes >>= decode . L.fromStrict of
                Just gconfig ->
-                 if genFileChanged pkgIds bopts gconfig name pinfo
+                 if genFileChanged pkgIds bopts gconfig pinfo
                     then
                          -- If the build config has changed such that the gen
                          -- config needs to be regenerated...
