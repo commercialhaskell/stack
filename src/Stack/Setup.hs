@@ -71,20 +71,63 @@ import Stack.GhcPkg
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: (MonadIO m, MonadThrow m, MonadLogger m)
-         => BuildConfig
+         => Bool -- ^ install GHC if missing?
+         -> BuildConfig
          -> m BuildConfig
-setupEnv bconfig = do
-    -- FIXME add functionality to look for locally installed GHCs, install new ones
-    mkDirs <- runReaderT extraBinDirs bconfig
-    let EnvOverride env0 = configEnvOverride (bcConfig bconfig) EnvSettings
+setupEnv installIfMissing bconfig = do
+    -- Check the available GHCs
+    let menv0 = configEnvOverride (bcConfig bconfig) EnvSettings
             { esIncludeLocals = False
             , esIncludeGhcPackagePath = False
             }
-        mpath = Map.lookup "PATH" env0
+        expected = bcGhcVersion bconfig
+    minstalled <- getInstalledGHC menv0
+    let needLocal = case minstalled of
+            Nothing -> True
+            Just installed ->
+                -- we allow a newer version of GHC within the same major series
+                getMajorVersion installed /= getMajorVersion expected ||
+                expected > installed
+
+    -- If we need to install a GHC, try to do so
+    mghcBin <- if needLocal
+        then do
+            $logDebug "Looking for a local copy of GHC"
+            mghcBin <- getLocalGHC expected
+            case mghcBin of
+                Just ghcBin -> do
+                    $logDebug $ "Local copy found at: " <> T.pack ghcBin
+                    return $ Just ghcBin
+                Nothing
+                    | installIfMissing -> do
+                        $logDebug $ "None found, installing: " <> versionText expected
+                        ghcBin <- installLocalGHC expected
+                        return $ Just ghcBin
+                    | otherwise ->
+                        throwM $ GHCVersionMismatch minstalled (bcGhcVersion bconfig)
+        else return Nothing
+
+    -- Modify the initial environment to include the GHC path, if a local GHC
+    -- is being used
+    let env0 = case (menv0, mghcBin) of
+            (EnvOverride x, Nothing) -> x
+            (EnvOverride x, Just ghcBin) ->
+                let mpath = Map.lookup "PATH" x
+                    path =
+                        case mpath of
+                            Nothing -> T.pack ghcBin
+                            Just y -> T.pack $ concat
+                                [ ghcBin
+                                , [searchPathSeparator]
+                                , T.unpack y
+                                ]
+                 in Map.insert "PATH" path x
+
+    -- extra installation bin directories
+    mkDirs <- runReaderT extraBinDirs bconfig
+    let mpath = Map.lookup "PATH" env0
         depsPath = mkPath (mkDirs False) mpath
         localsPath = mkPath (mkDirs True) mpath
-
-    runReaderT checkGHCVersion bconfig
 
     -- FIXME make sure the directories exist?
     deps <- runReaderT packageDatabaseDeps bconfig
@@ -120,19 +163,28 @@ setupEnv bconfig = do
     mkPath dirs mpath = T.pack $ intercalate [searchPathSeparator]
         (map toFilePath dirs ++ maybe [] (return . T.unpack) mpath)
 
--- | Check that the GHC on the PATH matches the expected GHC
-checkGHCVersion :: (MonadIO m, MonadThrow m, MonadReader env m, HasBuildConfig env)
-                => m ()
-checkGHCVersion = do
-    menv <- getMinimalEnvOverride
-    bs <- readProcessStdout menv "ghc" ["--numeric-version"]
-    actualVersion <- parseVersion $ S8.takeWhile isValidChar bs
-    bconfig <- asks getBuildConfig
-    when (getMajorVersion actualVersion /= getMajorVersion (bcGhcVersion bconfig))
-        $ throwM $ GHCVersionMismatch actualVersion (bcGhcVersion bconfig)
+-- | Get the major version of the installed GHC, if available
+getInstalledGHC menv = do
+    eres <- tryProcessStdout menv "ghc" ["--numeric-version"]
+    return $ do
+        Right bs <- Just eres
+        parseVersion $ S8.takeWhile isValidChar bs
   where
     isValidChar '.' = True
     isValidChar c = '0' <= c && c <= '9'
+
+-- | Get the bin directory for a local copy of GHC meeting the given version
+-- requirement, if it exists
+getLocalGHC :: Version -> m (Maybe FilePath)
+getLocalGHC version = error "getLocalGHC"
+
+-- | Install a local copy of GHC in the given major version with at least the
+-- given version. In other words, if 7.8.3 is specified, 7.8.4 may be selected.
+-- Return the bin directory.
+installLocalGHC :: Version -> m FilePath
+installLocalGHC version = error "installLocalGHC"
+
+-- FIXME cleanup below here
 
 data SetupException
   = GhcVersionNotRecognized Version

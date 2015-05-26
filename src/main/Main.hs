@@ -81,14 +81,14 @@ main =
 
 setupCmd :: LogLevel -> IO ()
 setupCmd logLevel = do
-  _ <- runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv)
+  _ <- runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv True)
   return ()
 
 -- | Build the project.
 buildCmd :: FinalAction -> BuildOpts -> LogLevel -> IO ()
 buildCmd finalAction opts logLevel =
   do config <-
-       runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv)
+       runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv False)
      catch (runStackT logLevel config $
                  Stack.Build.build opts { boptsFinalAction = finalAction})
            (error . printBuildException)
@@ -149,11 +149,18 @@ buildCmd finalAction opts logLevel =
               ("Dependency issues:\n" ++
                intercalate "\n"
                            (map printBuildException es))
-            GHCVersionMismatch actual expected ->
-              ("GHC version mismatched, found " ++
-               versionString actual ++
-               ", but expected " ++
-               versionString expected)
+            GHCVersionMismatch Nothing expected -> concat
+                [ "No GHC found, expected version "
+                , versionString expected
+                , ". Try running stack setup"
+                ]
+            GHCVersionMismatch (Just actual) expected -> concat
+                [ "GHC version mismatched, found "
+                , versionString actual
+                , ", but expected "
+                , versionString expected
+                , ". Try running stack setup"
+                ]
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> LogLevel -> IO ()
@@ -172,7 +179,7 @@ updateCmd () logLevel = do
 -- | Execute a command
 execCmd :: (String, [String]) -> LogLevel -> IO ()
 execCmd (cmd, args) logLevel = do
-    config <- runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv)
+    config <- runStackLoggingT logLevel (loadConfig >>= toBuildConfig >>= setupEnv False)
     let cp = (P.proc cmd args)
             { P.env = envHelper $ configEnvOverride (bcConfig config)
                     EnvSettings
