@@ -62,7 +62,7 @@ throughout this document:
 
 1. You download the `stack` executable from (**FIXME** explain where it gets downloaded from) and put it on your `PATH`
 2. Go to an existing Haskell project with a .cabal file (we'll explain multi-package projects below)
-3. Run `stack build`. This will notice that you don't have a `stack.yaml` project configuration file, and create one for you. It will identify the most compatible snapshot (either LTS Haskell or Stackage Nightly), and set the current directory as the only package in the project.
+3. Run `stack build`. This will notice that you don't have a `stack.yaml` project configuration file, and create one for you. It will identify the most compatible snapshot (either LTS Haskell or Stackage Nightly), and set the current directory as the only package in the project. (See section below on snapshot auto-selection for more details.)
 4. Once the stack.yaml file is written, stack will check if you have the correct version of GHC on your PATH. If so, it will use it and continue. Otherwise, it will recommend that your run `stack setup` to download and install that GHC version. You can then run `stack build` again to continue.
     * NOTE: if you already have the appropriate GHC installed, running `stack setup` is a no-op, making it safe for usage in automated scripts
 5. stack analyzes your package's cabal file, finds all necessary dependencies, and then installs the appropriate versions based on your selected snapshot. These packages are installed to a snapshot-specific package database, meaning that other projects using the same snapshot can use them, but other projects using a different snapshot will be unaffected by them
@@ -177,3 +177,25 @@ start in the current directory, and keep going to the parent until it finds a
 sometimes want to override that behavior and point to a specific project in
 order to use its databases and bin directories. To do so, simply set the
 `STACK_YAML` environment variable to point to the relevant `stack.yaml` file.
+
+### Snapshot auto-detection
+
+When you run `stack build` with no stack.yaml, it will create a basic
+configuration with a single package (the current directory) and an
+auto-detected snapshot. The algorithm it uses for selecting this snapshot is:
+
+* Try the lastest two LTS major versions at their most recent minor version release, and the most recent Stackage Nightly. For example, at the time of writing, this would be lts-2.10, lts-1.15, and nightly-2015-05-26
+* For each of these, test the version bounds in the package's .cabal file to see if they are compatible with the snapshot, choosing the first one that matches
+* If no snapshot matches, uses the most recent LTS snapshot, even though it will not compile
+
+If you end up in the no compatible snapshot case, you typically have three options to fix things:
+
+* Manually specify a different snapshot that you know to be compatible. If you can do that, great, but typically if the auto-detection fails, it means that there's no compatible snapshot
+* Modify version bounds in your .cabal file to be compatible with the selected snapshot
+* Add `extra-deps` to your stack.yaml file to fix compatibility problems
+
+Remember that running `stack build` will give you information on why your build
+cannot occur, which should help guide you through the steps necessary for the
+second and third option above. Also, note that those options can be
+mixed-and-matched, e.g. you may decide to relax some version bounds in your
+.cabal file, while also adding some extra-deps.
