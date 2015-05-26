@@ -8,18 +8,13 @@
 module Main where
 
 import           Control.Exception
-import           Control.Monad.Catch (MonadThrow)
 import           Control.Monad.Logger
-import           Control.Monad.Reader
 import           Data.List
-import qualified Data.Map as Map
 import           Data.Maybe
 import qualified Data.Text as T
-
 import           Distribution.Text (display)
 import           Options.Applicative.Extra
 import           Options.Applicative.Simple
-import           Path
 import           Stack.Build
 import           Stack.Build.Types
 import           Stack.Config
@@ -31,7 +26,6 @@ import           Stack.Setup (setupEnv)
 import           Stack.Types
 import           Stack.Types.StackT
 import           System.Exit (exitWith)
-import           System.FilePath (searchPathSeparator)
 import qualified System.Process as P
 
 -- | Commandline dispatcher.

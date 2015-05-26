@@ -56,7 +56,7 @@ import System.Process (callProcess, readProcess)
 -- Imports and new definitions for Stack.Setup
 -------------------------------------------------------------------
 import Stack.Types
-import Control.Monad.Reader (asks)
+
 import           Stack.Build.Types
 import qualified Data.ByteString.Char8 as S8
 import qualified Stack.Types as Stack
@@ -164,6 +164,7 @@ setupEnv installIfMissing bconfig = do
         (map toFilePath dirs ++ maybe [] (return . T.unpack) mpath)
 
 -- | Get the major version of the installed GHC, if available
+getInstalledGHC :: (MonadIO m) => EnvOverride -> m (Maybe Version)
 getInstalledGHC menv = do
     eres <- tryProcessStdout menv "ghc" ["--numeric-version"]
     return $ do
