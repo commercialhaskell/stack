@@ -467,7 +467,7 @@ makePlan cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig pinfos pinfo 
                  installResource
                  docLoc)
               removeAfterwards
-            writeFinalFiles gconfig bconfig buildType dir (packageName pinfo)
+            writeFinalFiles gconfig bconfig buildType dir pinfo
   where needSourceFiles =
           need (map FL.toFilePath (S.toList (packageFiles pinfo)))
         dir = packageDir pinfo
@@ -522,26 +522,25 @@ getInstallRoot bconfig BTLocals = liftIO $ runReaderT installationRootLocal bcon
 -- completes.
 writeFinalFiles :: (MonadIO m)
                 => GenConfig -> BuildConfig -> BuildType
-                -> Path Abs Dir -> PackageName -> m ()
-writeFinalFiles gconfig bconfig buildType dir name = liftIO $
+                -> Path Abs Dir -> Package -> m ()
+writeFinalFiles gconfig bconfig buildType dir pinfo = liftIO $
          (do pkgDbs <- getPackageDatabases bconfig buildType
              menv <- runReaderT getMinimalEnvOverride bconfig
-             mpkigid <- runNoLoggingT
+             mpkgid <- runNoLoggingT
                       $ flip runReaderT bconfig
                       $ findPackageId
                             menv
                             pkgDbs
-                            name
-             case mpkigid of
-               Nothing -> throwIO (Couldn'tFindPkgId name)
-               Just pkgid ->
-                 do writeGenConfigFile
+                            (packageName pinfo)
+             when (packageHasLibrary pinfo && isNothing mpkgid)
+                (throwIO (Couldn'tFindPkgId (packageName pinfo)))
+             writeGenConfigFile
                       dir
                       gconfig {gconfigForceRecomp = False
-                              ,gconfigPkgId = Just pkgid}
+                              ,gconfigPkgId = mpkgid}
                     -- After a build has completed successfully for a given
                     -- configuration, no recompilation forcing is required.
-                    updateGenFile dir)
+             updateGenFile dir)
 
 -- | Build the given package with the given configuration.
 configurePackage :: PackageIdentifier

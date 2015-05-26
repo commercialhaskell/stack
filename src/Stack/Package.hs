@@ -92,6 +92,7 @@ data Package =
           ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
           ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
           ,packageType :: !PackageType
+          ,packageHasLibrary :: !Bool                     -- ^ does the package have a buildable library stanza?
           }
  deriving (Show,Typeable)
 
@@ -171,7 +172,12 @@ resolvePackage packageConfig cabalfp ptype gpkg = do
                             ,packageFlags = pkgFlags
                             ,packageAllDeps =
                                S.fromList (M.keys deps')
-                            ,packageType = ptype})
+                            ,packageType = ptype
+                            ,packageHasLibrary = maybe
+                                False
+                                (buildable . libBuildInfo)
+                                (library pkg)
+                            })
 
 -- | Get all dependencies of the package (buildable targets only).
 packageDependencies :: PackageDescription -> Map PackageName VersionRange
