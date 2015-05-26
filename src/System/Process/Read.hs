@@ -140,7 +140,7 @@ doesExecutableExist menv name = liftM isJust $ findExecutable menv name
 -- | Find the complete path for the executable
 findExecutable :: (MonadIO m, MonadThrow n) => EnvOverride -> String -> m (n (Path Abs File))
 findExecutable (EnvOverride m) name =
-    liftIO $ case Map.lookup "PATH" m of
+    liftIO $ case Map.lookup "PATH" m' of
         Nothing -> return $ throwM NoPathFound
         Just path ->
             let loop [] = return $ throwM $ ExecutableNotFound name path
@@ -154,10 +154,13 @@ findExecutable (EnvOverride m) name =
                         else loop dirs
              in loop $ FP.splitSearchPath $ T.unpack path
   where
-    exeExtension =
+    (exeExtension, m') =
         case buildOS of
-            Windows -> ".exe"
-            _ -> ""
+            Windows -> (".exe", upperKey m)
+            _ -> ("", m)
+
+    -- Hurray case insensitivity on Windows!
+    upperKey = Map.mapKeysWith const T.toUpper
 
 data FindExecutableException
     = NoPathFound
