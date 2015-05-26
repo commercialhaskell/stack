@@ -331,7 +331,7 @@ buildLocals bopts pinfos = do
                                    docLoc
                                    cfgVar))
      if boptsDryrun bopts
-        then liftIO $ dryRunPrint pinfos
+        then dryRunPrint pinfos
         else runPlans bopts pinfos plans wanted docLoc
   where
     wanted pwd pinfo = case boptsTargets bopts of
@@ -373,10 +373,12 @@ runPlans bopts pinfos plans wanted docLoc = do
             LevelOther _ -> Silent
 
 -- | Dry run output.
-dryRunPrint :: Set Package -> IO ()
+dryRunPrint :: MonadLogger m => Set Package -> m ()
 dryRunPrint pinfos =
-  do putStrLn "The following packages will be built and installed:"
-     forM_ (S.toList pinfos) (\pinfo -> putStrLn (packageNameString (packageName pinfo)))
+  do $logInfo "The following packages will be built and installed:"
+     forM_ (S.toList pinfos)
+           (\pinfo ->
+              $logInfo (packageIdentifierText (fromTuple (packageName pinfo,packageVersion pinfo))))
 
 -- | Reset the build (remove Shake database and .gen files).
 clean :: forall m env.
