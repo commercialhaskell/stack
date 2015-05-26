@@ -36,7 +36,8 @@ we have a release** and put it on your PATH. You can then run `stack build`
 from any package directory. `stack` leverages the `Cabal` library and supports
 all of your existing projects with `.cabal` files. It will automatically
 inspect your project and find a suitable LTS Haskell or Stackage Nightly
-snapshot to build against, if available. Some commonly used commands:
+snapshot to build against, if available (see "snapshot auto-detection" below).
+Some commonly used commands:
 
 * `stack build` will create a stack.yaml file if necessary (see below), install
   necessary package dependencies to a shared location, and build your package
