@@ -54,6 +54,7 @@ import           Development.Shake hiding (doesFileExist,doesDirectoryExist,getD
 import           Network.HTTP.Download
 import           Path as FL
 import           Path.Find
+import           Path.IO
 import           Prelude hiding (FilePath,writeFile)
 import           Stack.Build.Doc
 import           Stack.Build.Types
@@ -349,7 +350,7 @@ runPlans :: (MonadIO m,MonadReader env m,HasConfig env,HasLogLevel env)
 runPlans bopts pinfos plans wanted docLoc = do
     logLevel <- asks getLogLevel
     config <- asks getConfig
-    pwd <- liftIO $ getCurrentDirectory >>= parseAbsDir
+    pwd <- getWorkingDir
     liftIO $ withArgs []
                       (shakeArgs shakeOptions {shakeVerbosity = logLevelToShakeVerbosity logLevel
                                               ,shakeFiles =
