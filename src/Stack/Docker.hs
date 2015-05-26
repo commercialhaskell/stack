@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, TupleSections, RankNTypes #-}
+{-# LANGUAGE CPP, NamedFieldPuns, TupleSections, RankNTypes #-}
 
 -- | Run commands in Docker containers
 module Stack.Docker
@@ -48,11 +48,14 @@ import           System.Directory
 import           System.Environment (lookupEnv,unsetEnv)
 import           System.Exit (ExitCode(ExitSuccess,ExitFailure),exitWith)
 import           System.IO (hPutStrLn,stderr,stdin,stdout,hIsTerminalDevice)
-import           System.Posix.Signals (installHandler,sigTERM,Handler(Catch))
 import qualified System.Process as Proc
 import           System.Process.PagerEditor (editByteString)
 import           Text.ParserCombinators.ReadP (readP_to_S)
 import           Text.Printf (printf)
+
+#ifndef mingw32_HOST_OS
+import           System.Posix.Signals (installHandler,sigTERM,Handler(Catch))
+#endif
 
 dockerDir :: a -- FIXME need to figure out where to get this from, possibly configDir
 dockerDir = error "dockerDir used but not implemented!"
@@ -524,7 +527,9 @@ runInContainerAndExit cmnd args =
 execProcessAndExit :: FilePath -> [String] -> IO () -> IO ()
 execProcessAndExit cmnd args successPostAction =
   do (_, _, _, h) <- Proc.createProcess (Proc.proc cmnd args){Proc.delegate_ctlc = True}
+#ifndef mingw32_HOST_OS
      _ <- installHandler sigTERM (Catch (Proc.terminateProcess h)) Nothing
+#endif
      exitCode <- Proc.waitForProcess h
      when (exitCode == ExitSuccess)
           successPostAction

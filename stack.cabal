@@ -13,7 +13,7 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:    src/
-  ghc-options:       -Wall -O0
+  ghc-options:       -Wall -O0 -pgmPcpphs -optP--cpp
   exposed-modules:   Stack.BuildPlan
                      Stack.Config
                      Stack.Constants
@@ -96,13 +96,14 @@ library
                    , time >= 1.4.2
                    , transformers >= 0.3.0.0
                    , transformers-base >= 0.4.4
-                   , unix >= 2.7.0.1
                    , unordered-containers >= 0.2.5.1
                    , vector >= 0.10.12.3
                    , vector-binary-instances
                    , void >= 0.7
                    , yaml >= 0.8.10.1
                    , zlib >= 0.5.4.2
+  if !os(windows)
+    build-depends: unix >= 2.7.0.1
   default-language:    Haskell2010
 
 executable stack

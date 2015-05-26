@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE DataKinds #-}
@@ -70,8 +71,11 @@ import           System.Environment
 import qualified System.FilePath as FilePath
 import           System.IO
 import           System.IO.Temp (withSystemTempDirectory)
-import           System.Posix.Files (createSymbolicLink,removeLink)
 import           System.Process.Read (findExecutable)
+
+#ifndef mingw32_HOST_OS
+import           System.Posix.Files (createSymbolicLink,removeLink)
+#endif
 
 -- | Build using Shake.
 build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
@@ -776,8 +780,12 @@ buildDocIndex wanted docLoc pinfos =
                                     else [])
                       (S.toList pinfos))
 
--- | Remove existing links docs for package from @~/.cabal/fpdoc@.
+-- | Remove existing links docs for package from @~/.shake/doc@.
 removeDocLinks :: Path Abs Dir -> Package -> IO ()
+#ifdef mingw32_HOST_OS
+removeDocLinks _ _ =
+  return ()
+#else /* mingw32_HOST_OS */
 removeDocLinks docLoc pinfo =
   do createDirectoryIfMissing True
                               (FL.toFilePath docLoc)
@@ -793,9 +801,14 @@ removeDocLinks docLoc pinfo =
                       when (p == packageName pinfo)
                            (removeLink docPath)
                     Nothing -> return ())
+#endif /* not defined(mingw32_HOST_OS) */
 
--- | Add link for package to @~/.cabal/fpdoc@.
+-- | Add link for package to @~/.shake/doc@.
 createDocLinks :: Path Abs Dir -> Package -> IO ()
+#ifdef mingw32_HOST_OS
+createDocLinks _ _ =
+  return ()
+#else /* mingw32_HOST_OS */
 createDocLinks docLoc pinfo =
   do let pkgVer =
            joinPkgVer (packageName pinfo,(packageVersion pinfo))
@@ -829,6 +842,7 @@ createDocLinks docLoc pinfo =
                                    pkgDestDocPath
            Nothing -> return ()
        _ -> return ()
+#endif /* not defined(mingw32_HOST_OS) */
 
 -- | Get @-i@ arguments for haddock for dependencies.
 haddockInterfaceOpts :: Path Abs Dir -> Package -> Set Package -> IO [String]
