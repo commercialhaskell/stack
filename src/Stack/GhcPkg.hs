@@ -12,15 +12,13 @@ module Stack.GhcPkg
   ,getPackageIds
   ,getGlobalDB
   ,EnvOverride(..)
-  ,envHelper)
+  ,envHelper
+  ,unregisterPackage)
   where
-
-import           Stack.Types
-import           System.Process.Read
 
 import           Control.Applicative
 import           Control.Exception hiding (catch)
-import           Control.Monad (liftM, forM_, unless)
+import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -35,12 +33,13 @@ import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Monoid ((<>))
 import           Data.Streaming.Process
-
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
 import           Prelude hiding (FilePath)
+import           Stack.Types
 import           System.Directory (createDirectoryIfMissing, doesDirectoryExist, canonicalizePath)
+import           System.Process.Read
 
 -- | A ghc-pkg exception.
 data GhcPkgException
@@ -174,3 +173,12 @@ getPackageIds menv pkgDbs pkgs = collect pkgs >>= liftIO . evaluate
                Nothing -> return Nothing
                Just pid ->
                  return (Just (name,pid))
+
+-- | Unregister the given package.
+unregisterPackage :: (MonadIO m,MonadLogger m,MonadThrow m)
+                  => EnvOverride -> PackageIdentifier -> m ()
+unregisterPackage menv ident =
+    liftM
+        (const ())
+        (ghcPkg menv [] ["unregister", "--force", packageIdentifierString ident] >>=
+         either throwM return)
