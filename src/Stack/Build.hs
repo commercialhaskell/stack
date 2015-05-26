@@ -246,21 +246,21 @@ installDependencies bopts deps' = do
                 $logInfo "All dependencies unpacked"
                 -- FIXME unregister conflicting?
 
-                pinfos <- liftM S.fromList $ forM newPkgDirs $ \dir -> do
+                packages <- liftM S.fromList $ forM newPkgDirs $ \dir -> do
                     cabalfp <- getCabalFileName dir
                     name <- parsePackageNameFromFilePath cabalfp
                     flags <- case M.lookup name deps' of
                         Nothing -> assert False $ return M.empty
                         Just (_, flags) -> return flags
                     readPackage (packageConfig flags bconfig) cabalfp PTDep
-                plans <- forM (S.toList pinfos) $ \pinfo -> do
+                plans <- forM (S.toList packages) $ \package -> do
                     let gconfig = GenConfig -- FIXME
                             { gconfigOptimize = False
                             , gconfigForceRecomp = False
                             , gconfigLibProfiling = True
                             , gconfigExeProfiling = False
                             , gconfigGhcOptions = []
-                            , gconfigFlags = packageFlags pinfo
+                            , gconfigFlags = packageFlags package
                             , gconfigPkgId = error "gconfigPkgId"
                             }
                     return $ makePlan -- FIXME dedupe this code with buildLocals
@@ -271,8 +271,8 @@ installDependencies bopts deps' = do
                         bconfig
                         BTDeps
                         gconfig
-                        pinfos
-                        pinfo
+                        packages
+                        package
                         installResource
                         docLoc
                         cfgVar
@@ -280,7 +280,7 @@ installDependencies bopts deps' = do
                 if boptsDryrun bopts
                     then $logInfo "Dry run, not doing anything with dependencies"
                     else runPlans bopts
-                            pinfos
+                            packages
                             plans (\_ _ -> True) docLoc -- FIXME think about haddocks here
   where
     deps = M.fromList $ map (\(name, (version, flags)) -> (PackageIdentifier name version, flags))
@@ -301,12 +301,12 @@ buildLocals
     => BuildOpts
     -> Set Package
     -> m ()
-buildLocals bopts pinfos = do
+buildLocals bopts packages = do
      env <- ask
      localDB <- packageDatabaseLocal
      menv <- getMinimalEnvOverride
      pkgIds <- getPackageIds menv [localDB]
-                (map packageName (S.toList pinfos))
+                (map packageName (S.toList packages))
      cabalPkgVer <- getCabalPkgVer menv
      pwd <- liftIO $ getCurrentDirectory >>= parseAbsDir
      docLoc <- liftIO getUserDocPath
@@ -314,17 +314,17 @@ buildLocals bopts pinfos = do
      cfgVar <- liftIO $ newMVar ConfigLock
 
      plans <-
-       forM (S.toList pinfos)
-            (\pinfo ->
+       forM (S.toList packages)
+            (\package ->
                do let wantedTarget =
-                        wanted pwd pinfo
+                        wanted pwd package
                   when (wantedTarget && boptsFinalAction bopts /= DoNothing)
-                       (liftIO (deleteGenFile (packageDir pinfo)))
+                       (liftIO (deleteGenFile (packageDir package)))
                   gconfig <- liftIO $
                     readGenConfigFile pkgIds
                                       bopts
                                       wantedTarget
-                                      pinfo
+                                      package
                                       cfgVar
                   return (makePlan cabalPkgVer
                                    pkgIds
@@ -333,21 +333,21 @@ buildLocals bopts pinfos = do
                                    (getBuildConfig env)
                                    BTLocals
                                    gconfig
-                                   pinfos
-                                   pinfo
+                                   packages
+                                   package
                                    installResource
                                    docLoc
                                    cfgVar))
      if boptsDryrun bopts
-        then dryRunPrint pinfos
-        else runPlans bopts pinfos plans wanted docLoc
+        then dryRunPrint packages
+        else runPlans bopts packages plans wanted docLoc
   where
-    wanted pwd pinfo = case boptsTargets bopts of
-        [] -> FL.isParentOf pwd (packageDir pinfo) ||
-              packageDir pinfo == pwd
-        packages ->
-              elem (packageName pinfo)
-                   (mapMaybe (parsePackageNameFromString . T.unpack) packages)
+    wanted pwd package = case boptsTargets bopts of
+        [] -> FL.isParentOf pwd (packageDir package) ||
+              packageDir package == pwd
+        targets ->
+              elem (packageName package)
+                   (mapMaybe (parsePackageNameFromString . T.unpack) targets)
 
 -- FIXME clean up this function to make it more nicely shareable
 runPlans :: (MonadIO m,MonadReader env m,HasConfig env,HasLogLevel env)
@@ -357,7 +357,7 @@ runPlans :: (MonadIO m,MonadReader env m,HasConfig env,HasLogLevel env)
          -> (Path Abs Dir -> Package -> Bool)
          -> Path Abs Dir -- FIXME figure out local vs shared docs location
          -> m ()
-runPlans bopts pinfos plans wanted docLoc = do
+runPlans bopts packages plans wanted docLoc = do
     logLevel <- asks getLogLevel
     config <- asks getConfig
     pwd <- getWorkingDir
@@ -371,7 +371,7 @@ runPlans bopts pinfos plans wanted docLoc = do
                                            DoHaddock)
                                           (buildDocIndex (wanted pwd)
                                                          docLoc
-                                                         pinfos)))
+                                                         packages)))
   where logLevelToShakeVerbosity l =
           case l of
             LevelDebug -> Chatty
@@ -382,12 +382,12 @@ runPlans bopts pinfos plans wanted docLoc = do
 
 -- | Dry run output.
 dryRunPrint :: MonadLogger m => Set Package -> m ()
-dryRunPrint pinfos =
+dryRunPrint packages =
   do $logInfo "The following packages will be built and installed:"
-     forM_ (S.toList pinfos)
-           (\pinfo ->
+     forM_ (S.toList packages)
+           (\package ->
               $logInfo (packageIdentifierText
-                          (fromTuple (packageName pinfo,packageVersion pinfo))))
+                          (fromTuple (packageName package,packageVersion package))))
 
 -- | Reset the build (remove Shake database and .gen files).
 clean :: forall m env.
@@ -437,12 +437,12 @@ makePlan :: PackageIdentifier
          -> Path Abs Dir
          -> MVar ConfigLock
          -> Rules ()
-makePlan cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig pinfos pinfo installResource docLoc cfgVar =
+makePlan cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig packages package installResource docLoc cfgVar =
   do when wanted (want [buildTarget])
      configureTarget %>
        \_ ->
-         do needDependencies pkgIds bopts pinfos pinfo cfgVar
-            need [toFilePath (packageCabalFile pinfo)]
+         do needDependencies pkgIds bopts packages package cfgVar
+            need [toFilePath (packageCabalFile package)]
             (setuphs, removeAfterwards) <- liftIO (ensureSetupHs dir)
             actionFinally
               (configurePackage
@@ -450,9 +450,9 @@ makePlan cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig pinfos pinfo 
                  bconfig
                  setuphs
                  buildType
-                 pinfo
+                 package
                  gconfig
-                 (if wanted && packageType pinfo == PTUser
+                 (if wanted && packageType package == PTUser
                      then boptsFinalAction bopts
                      else DoNothing))
               removeAfterwards
@@ -468,19 +468,19 @@ makePlan cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig pinfos pinfo 
                  bconfig
                  setuphs
                  buildType
-                 pinfos
-                 pinfo
+                 packages
+                 package
                  gconfig
-                 (if wanted && packageType pinfo == PTUser
+                 (if wanted && packageType package == PTUser
                      then boptsFinalAction bopts
                      else DoNothing)
                  installResource
                  docLoc)
               removeAfterwards
-            writeFinalFiles gconfig bconfig buildType dir pinfo
+            writeFinalFiles gconfig bconfig buildType dir package
   where needSourceFiles =
-          need (map FL.toFilePath (S.toList (packageFiles pinfo)))
-        dir = packageDir pinfo
+          need (map FL.toFilePath (S.toList (packageFiles package)))
+        dir = packageDir package
         buildTarget =
           FL.toFilePath (builtFileFromDir dir)
         configureTarget =
@@ -494,20 +494,20 @@ needDependencies :: Map PackageName GhcPkgId
                  -> Package
                  -> MVar ConfigLock
                  -> Action ()
-needDependencies pkgIds bopts pinfos pinfo cfgVar =
-  do deps <- mapM (\pinfo' ->
-                     let dir' = packageDir pinfo'
+needDependencies pkgIds bopts packages package cfgVar =
+  do deps <- mapM (\package' ->
+                     let dir' = packageDir package'
                          genFile = builtFileFromDir dir'
                      in do void (liftIO (readGenConfigFile pkgIds
                                                            bopts
                                                            False
-                                                           pinfo'
+                                                           package'
                                                            cfgVar))
                            return (FL.toFilePath genFile))
                   (mapMaybe (\name ->
                                find ((== name) . packageName)
-                                    (S.toList pinfos))
-                            (M.keys (packageDeps pinfo)))
+                                    (S.toList packages))
+                            (M.keys (packageDeps package)))
      need deps
 
 --------------------------------------------------------------------------------
@@ -531,7 +531,7 @@ getInstallRoot bconfig BTLocals = liftIO $ runReaderT installationRootLocal bcon
 writeFinalFiles :: (MonadIO m)
                 => GenConfig -> BuildConfig -> BuildType
                 -> Path Abs Dir -> Package -> m ()
-writeFinalFiles gconfig bconfig buildType dir pinfo = liftIO $
+writeFinalFiles gconfig bconfig buildType dir package = liftIO $
          (do pkgDbs <- getPackageDatabases bconfig buildType
              menv <- runReaderT getMinimalEnvOverride bconfig
              mpkgid <- runNoLoggingT
@@ -539,9 +539,9 @@ writeFinalFiles gconfig bconfig buildType dir pinfo = liftIO $
                       $ findPackageId
                             menv
                             pkgDbs
-                            (packageName pinfo)
-             when (packageHasLibrary pinfo && isNothing mpkgid)
-                (throwIO (Couldn'tFindPkgId (packageName pinfo)))
+                            (packageName package)
+             when (packageHasLibrary package && isNothing mpkgid)
+                (throwIO (Couldn'tFindPkgId (packageName package)))
              writeGenConfigFile
                       dir
                       gconfig {gconfigForceRecomp = False
@@ -559,11 +559,11 @@ configurePackage :: PackageIdentifier
                  -> GenConfig
                  -> FinalAction
                  -> Action ()
-configurePackage cabalPkgVer bconfig setuphs buildType pinfo gconfig setupAction =
-  do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath pinfo))) :: IO (Either IOException ())))
+configurePackage cabalPkgVer bconfig setuphs buildType package gconfig setupAction =
+  do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath package))) :: IO (Either IOException ())))
      pkgDbs <- getPackageDatabases bconfig buildType
      installRoot <- getInstallRoot bconfig buildType
-     let runhaskell' = runhaskell cabalPkgVer pinfo setuphs bconfig buildType
+     let runhaskell' = runhaskell cabalPkgVer package setuphs bconfig buildType
      runhaskell'
        (concat [["configure","--user"]
                ,["--package-db=clear","--package-db=global"]
@@ -583,7 +583,7 @@ configurePackage cabalPkgVer bconfig setuphs buildType pinfo gconfig setupAction
                            then ""
                            else "-") <>
                        flagNameString name)
-                    (M.toList (packageFlags pinfo))])
+                    (M.toList (packageFlags package))])
 
 data BuildType = BTDeps | BTLocals
 
@@ -600,9 +600,9 @@ buildPackage :: PackageIdentifier
              -> Resource
              -> Path Abs Dir
              -> Action ()
-buildPackage cabalPkgVer bopts bconfig setuphs buildType pinfos pinfo gconfig setupAction installResource docLoc =
-  do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath pinfo))) :: IO (Either IOException ())))
-     let runhaskell' = runhaskell cabalPkgVer pinfo setuphs bconfig buildType
+buildPackage cabalPkgVer bopts bconfig setuphs buildType packages package gconfig setupAction installResource docLoc =
+  do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath package))) :: IO (Either IOException ())))
+     let runhaskell' = runhaskell cabalPkgVer package setuphs bconfig buildType
 
      runhaskell'
        (concat [["build"]
@@ -613,8 +613,8 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType pinfos pinfo gconfig se
      case setupAction of
        DoTests -> runhaskell' ["test"]
        DoHaddock ->
-           do liftIO (removeDocLinks docLoc pinfo)
-              ifcOpts <- liftIO (haddockInterfaceOpts docLoc pinfo pinfos)
+           do liftIO (removeDocLinks docLoc package)
+              ifcOpts <- liftIO (haddockInterfaceOpts docLoc package packages)
               runhaskell'
                          ["haddock"
                          ,"--html"
@@ -623,7 +623,7 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType pinfos pinfo gconfig se
                          ,"--html-location=../$pkg-$version/"
                          ,"--haddock-options=" ++ intercalate " " ifcOpts]
               haddockLocs <-
-                liftIO (findFiles (packageDocDir pinfo)
+                liftIO (findFiles (packageDocDir package)
                                   (\loc -> FilePath.takeExtensions (toFilePath loc) == "." ++ haddockExtension)
                                   (not . isHiddenDir))
               forM_ haddockLocs $ \haddockLoc ->
@@ -641,7 +641,7 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType pinfos pinfo gconfig se
        _ -> return ()
      withResource installResource 1 (runhaskell' ["install"])
      case setupAction of
-       DoHaddock -> liftIO (createDocLinks docLoc pinfo)
+       DoHaddock -> liftIO (createDocLinks docLoc package)
        _ -> return ()
 
 -- | Run the Haskell command for the given package.
@@ -653,14 +653,14 @@ runhaskell :: HasConfig config
            -> BuildType
            -> [String]
            -> Action ()
-runhaskell cabalPkgVer pinfo setuphs config' buildType args =
+runhaskell cabalPkgVer package setuphs config' buildType args =
   do liftIO (createDirectoryIfMissing True
-                                      (FL.toFilePath (stackageBuildDir pinfo)))
+                                      (FL.toFilePath (stackageBuildDir package)))
      putQuiet display
      outRef <- liftIO (newIORef mempty)
      errRef <- liftIO (newIORef mempty)
      let withSink inner =
-            withBinaryFile (FL.toFilePath (buildLogPath pinfo)) AppendMode
+            withBinaryFile (FL.toFilePath (buildLogPath package)) AppendMode
             $ \h -> inner (sinkHandle h)
      exeName <- liftIO $ join $ findExecutable menv "runhaskell"
      join (liftIO (catch (do withSink $ \sink -> withCheckedProcess
@@ -690,12 +690,12 @@ runhaskell cabalPkgVer pinfo setuphs config' buildType args =
                                       return chunk) $$
                         sink
         display =
-          packageNameString (packageName pinfo) <>
+          packageNameString (packageName package) <>
           ": " <>
           case args of
             (cname:_) -> cname
             _ -> mempty
-        dir = packageDir pinfo
+        dir = packageDir package
         cp exeName =
           proc (toFilePath exeName)
             (("-package=" ++ packageIdentifierString cabalPkgVer)
@@ -724,7 +724,7 @@ ensureSetupHs dir =
 
 -- | Build the haddock documentation index and contents.
 buildDocIndex :: (Package -> Bool) -> Path Abs Dir -> Set Package -> Rules ()
-buildDocIndex wanted docLoc pinfos =
+buildDocIndex wanted docLoc packages =
   do runHaddock "--gen-contents" $(mkRelFile "index.html")
      runHaddock "--gen-index" $(mkRelFile "doc-index.html")
      combineHoogle
@@ -734,15 +734,15 @@ buildDocIndex wanted docLoc pinfos =
          want [destPath]
          destPath %> \_ ->
            do needDeps
-              ifcOpts <- liftIO (fmap concat (mapM toInterfaceOpt (S.toList pinfos)))
+              ifcOpts <- liftIO (fmap concat (mapM toInterfaceOpt (S.toList packages)))
               command [Cwd (FL.toFilePath docLoc)]
                       "haddock"
                       (genOpt:ifcOpts)
-    toInterfaceOpt pinfo =
-      do let pv = joinPkgVer (packageName pinfo,packageVersion pinfo)
+    toInterfaceOpt package =
+      do let pv = joinPkgVer (packageName package,packageVersion package)
              srcPath = (toFilePath docLoc) ++ "/" ++
                        pv ++ "/" ++
-                       packageNameString (packageName pinfo) ++ "." ++
+                       packageNameString (packageName package) ++ "." ++
                        haddockExtension
          exists <- doesFileExist srcPath
          return (if exists
@@ -758,28 +758,28 @@ buildDocIndex wanted docLoc pinfos =
          want [destPath]
          destPath %> \_ ->
            do needDeps
-              srcHoogleDbs <- liftIO (fmap concat (mapM toSrcHoogleDb (S.toList pinfos)))
+              srcHoogleDbs <- liftIO (fmap concat (mapM toSrcHoogleDb (S.toList packages)))
               command [EchoStdout False]
                       "hoogle"
                       ("combine" :
                        "-o" :
                        FL.toFilePath destHoogleDbLoc :
                        srcHoogleDbs)
-    toSrcHoogleDb pinfo =
+    toSrcHoogleDb package =
       do let srcPath = toFilePath docLoc ++ "/" ++
-                       joinPkgVer (packageName pinfo,packageVersion pinfo) ++ "/" ++
-                       packageNameString (packageName pinfo) ++ "." ++
+                       joinPkgVer (packageName package,packageVersion package) ++ "/" ++
+                       packageNameString (packageName package) ++ "." ++
                        hoogleDbExtension
          exists <- doesFileExist srcPath
          return (if exists
                     then [srcPath]
                     else [])
     needDeps =
-      need (concatMap (\pinfo -> if wanted pinfo
-                                    then let dir = packageDir pinfo
+      need (concatMap (\package -> if wanted package
+                                    then let dir = packageDir package
                                          in [FL.toFilePath (builtFileFromDir dir)]
                                     else [])
-                      (S.toList pinfos))
+                      (S.toList packages))
 
 -- | Remove existing links docs for package from @~/.shake/doc@.
 removeDocLinks :: Path Abs Dir -> Package -> IO ()
@@ -787,7 +787,7 @@ removeDocLinks :: Path Abs Dir -> Package -> IO ()
 removeDocLinks _ _ =
   return ()
 #else /* mingw32_HOST_OS */
-removeDocLinks docLoc pinfo =
+removeDocLinks docLoc package =
   do createDirectoryIfMissing True
                               (FL.toFilePath docLoc)
      userDocLs <-
@@ -799,7 +799,7 @@ removeDocLinks docLoc pinfo =
             when isDir
                  (case breakPkgVer (FilePath.takeFileName docPath) of
                     Just (p,_) ->
-                      when (p == packageName pinfo)
+                      when (p == packageName package)
                            (removeLink docPath)
                     Nothing -> return ())
 #endif /* not defined(mingw32_HOST_OS) */
@@ -810,9 +810,9 @@ createDocLinks :: Path Abs Dir -> Package -> IO ()
 createDocLinks _ _ =
   return ()
 #else /* mingw32_HOST_OS */
-createDocLinks docLoc pinfo =
+createDocLinks docLoc package =
   do let pkgVer =
-           joinPkgVer (packageName pinfo,(packageVersion pinfo))
+           joinPkgVer (packageName package,(packageVersion package))
      pkgVerLoc <- liftIO (parseRelDir pkgVer)
      let pkgDestDocLoc = docLoc </> pkgVerLoc
          pkgDestDocPath =
@@ -847,14 +847,14 @@ createDocLinks docLoc pinfo =
 
 -- | Get @-i@ arguments for haddock for dependencies.
 haddockInterfaceOpts :: Path Abs Dir -> Package -> Set Package -> IO [String]
-haddockInterfaceOpts userDocLoc pinfo pinfos =
+haddockInterfaceOpts userDocLoc package packages =
   do mglobalDocLoc <- getGlobalDocPath
      globalPkgVers <-
        case mglobalDocLoc of
          Nothing -> return M.empty
          Just globalDocLoc -> getDocPackages globalDocLoc
      let toInterfaceOpt pn =
-           case find (\dpi -> packageName dpi == pn) (S.toList pinfos) of
+           case find (\dpi -> packageName dpi == pn) (S.toList packages) of
              Nothing ->
                return (case (M.lookup pn globalPkgVers,mglobalDocLoc) of
                          (Just (v:_),Just globalDocLoc) ->
@@ -882,7 +882,7 @@ haddockInterfaceOpts userDocLoc pinfo pinfos =
      --TODO: use not only direct dependencies, but dependencies of dependencies etc.
      --(e.g. redis-fp doesn't include @text@ in its dependencies which means the 'Text'
      --datatype isn't linked in its haddocks)
-     fmap concat (mapM toInterfaceOpt (S.toList (packageAllDeps pinfo)))
+     fmap concat (mapM toInterfaceOpt (S.toList (packageAllDeps package)))
 
 --------------------------------------------------------------------------------
 -- Generated files
@@ -894,7 +894,7 @@ genFileInvalidated :: Map PackageName GhcPkgId
                    -> PackageName
                    -> Package
                    -> Bool
-genFileInvalidated pkgIds bopts gconfig pname pinfo =
+genFileInvalidated pkgIds bopts gconfig pname package =
   or [installedPkgIdChanged
      ,optimizationsChanged
      ,profilingChanged
@@ -914,7 +914,7 @@ genFileInvalidated pkgIds bopts gconfig pname pinfo =
             Just optimize
               | optimize /= gconfigOptimize gconfig && optimize -> True
             _ -> False
-        flagsChanged = packageFlags pinfo /= gconfigFlags gconfig
+        flagsChanged = packageFlags package /= gconfigFlags gconfig
 
 -- | Should the generated config be updated?
 genFileChanged :: Map PackageName GhcPkgId
@@ -922,14 +922,14 @@ genFileChanged :: Map PackageName GhcPkgId
                -> GenConfig
                -> Package
                -> Bool
-genFileChanged pkgIds bopts gconfig pinfo =
+genFileChanged pkgIds bopts gconfig package =
   or [installedPkgIdChanged
      ,optimizationsChanged && not isDependency
      ,profilingChanged && not isDependency
      ,ghcOptsChanged && not isDependency
      ,flagsChanged]
-  where pname = packageName pinfo
-        isDependency = packageType pinfo == PTDep
+  where pname = packageName package
+        isDependency = packageType package == PTDep
         installedPkgIdChanged =
           gconfigPkgId gconfig /=
           M.lookup pname pkgIds
@@ -942,7 +942,7 @@ genFileChanged pkgIds bopts gconfig pinfo =
         optimizationsChanged =
           maybe False (/= gconfigOptimize gconfig) (boptsEnableOptimizations bopts)
         flagsChanged =
-          packageFlags pinfo /=
+          packageFlags package /=
           gconfigFlags gconfig
 
 -- | Write out the gen file for the build dir.
@@ -972,9 +972,9 @@ readGenConfigFile :: Map PackageName GhcPkgId
                   -> Package
                   -> MVar ConfigLock
                   -> IO GenConfig
-readGenConfigFile pkgIds bopts wanted pinfo cfgVar = withMVar cfgVar (const go)
-  where name = packageName pinfo
-        dir = packageDir pinfo
+readGenConfigFile pkgIds bopts wanted package cfgVar = withMVar cfgVar (const go)
+  where name = packageName package
+        dir = packageDir package
         go =
           do bytes <-
                catch (fmap Just
@@ -983,16 +983,16 @@ readGenConfigFile pkgIds bopts wanted pinfo cfgVar = withMVar cfgVar (const go)
                         return Nothing)
              case bytes >>= decode . L.fromStrict of
                Just gconfig ->
-                 if genFileChanged pkgIds bopts gconfig pinfo
+                 if genFileChanged pkgIds bopts gconfig package
                     then
                          -- If the build config has changed such that the gen
                          -- config needs to be regenerated...
                          do let invalidated =
-                                  genFileInvalidated pkgIds bopts gconfig name pinfo
+                                  genFileInvalidated pkgIds bopts gconfig name package
                             when (invalidated || wanted)
                                  (deleteGenFile dir)
                             let gconfig' =
-                                  (newConfig gconfig bopts pinfo) {gconfigForceRecomp = invalidated}
+                                  (newConfig gconfig bopts package) {gconfigForceRecomp = invalidated}
                             -- When a file has been invalidated it means the
                             -- configuration has changed such that things need
                             -- to be recompiled, hence the above setting of force
@@ -1008,7 +1008,7 @@ readGenConfigFile pkgIds bopts wanted pinfo cfgVar = withMVar cfgVar (const go)
                           bytes
                     deleteGenFile dir
                     let gconfig' =
-                          newConfig defaultGenConfig bopts pinfo
+                          newConfig defaultGenConfig bopts package
                     writeGenConfigFile dir gconfig'
                     return gconfig' -- Probably doesn't exist or is out of date (not parseable.)
         fp = builtConfigFileFromDir dir
@@ -1018,7 +1018,7 @@ newConfig :: GenConfig -- ^ Build configuration.
           -> BuildOpts -- ^ A base gen configuration.
           -> Package
           -> GenConfig
-newConfig gconfig bopts pinfo =
+newConfig gconfig bopts package =
   defaultGenConfig
       {gconfigOptimize =
          maybe (gconfigOptimize gconfig)
@@ -1029,7 +1029,7 @@ newConfig gconfig bopts pinfo =
       ,gconfigExeProfiling = boptsExeProfile bopts ||
                              gconfigExeProfiling gconfig
       ,gconfigGhcOptions = boptsGhcOptions bopts
-      ,gconfigFlags = packageFlags pinfo
+      ,gconfigFlags = packageFlags package
       ,gconfigPkgId = gconfigPkgId gconfig}
 
 --------------------------------------------------------------------------------
