@@ -17,7 +17,6 @@ module Stack.Build
   ,configDir)
   where
 
-
 import qualified Control.Applicative as A
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.MVar
@@ -47,7 +46,6 @@ import           Data.Maybe
 import           Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Set as Set
-
 import qualified Data.Streaming.Process as Process
 import           Data.Streaming.Process hiding (env)
 import qualified Data.Text as T
@@ -63,7 +61,6 @@ import           Stack.Constants
 import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
-
 import           Stack.Types
 import           Stack.Types.Internal
 import           System.Directory hiding (findFiles)
