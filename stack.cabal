@@ -135,7 +135,12 @@ test-suite stack-test
   hs-source-dirs: src/test
   main-is:        Test.hs
   other-modules:  Spec
+                , Stack.ConfigSpec
   ghc-options:    -Wall -O2
   build-depends:  base >=4.7 && <5
                 , hspec
+                , directory
+                , temporary
+                , stack
+                , monad-logger
   default-language:    Haskell2010
