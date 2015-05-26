@@ -386,7 +386,8 @@ dryRunPrint pinfos =
   do $logInfo "The following packages will be built and installed:"
      forM_ (S.toList pinfos)
            (\pinfo ->
-              $logInfo (packageIdentifierText (fromTuple (packageName pinfo,packageVersion pinfo))))
+              $logInfo (packageIdentifierText
+                          (fromTuple (packageName pinfo,packageVersion pinfo))))
 
 -- | Reset the build (remove Shake database and .gen files).
 clean :: forall m env.
