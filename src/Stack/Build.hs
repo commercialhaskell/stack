@@ -71,7 +71,7 @@ import qualified System.FilePath as FilePath
 import           System.IO
 import           System.IO.Temp (withSystemTempDirectory)
 import           System.Posix.Files (createSymbolicLink,removeLink)
-import           System.Process.Read (readProcessStdout, findExecutable)
+import           System.Process.Read (findExecutable)
 
 -- | Build using Shake.
 build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
@@ -82,6 +82,7 @@ build bopts = do
     locals <- determineLocals bopts
     ranges <- getDependencyRanges locals
     dependencies <- getDependencies locals ranges
+
     installDependencies bopts dependencies
     buildLocals bopts (S.fromList locals)
 

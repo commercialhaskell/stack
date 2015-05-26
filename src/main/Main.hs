@@ -19,7 +19,7 @@ import           Stack.Build
 import           Stack.Build.Types
 import           Stack.Config
 import           Stack.Fetch
-import           Stack.GhcPkg (EnvOverride (..), getGlobalDB, envHelper)
+import           Stack.GhcPkg (envHelper)
 import           Stack.Package
 import qualified Stack.PackageIndex
 import           Stack.Setup (setupEnv)
