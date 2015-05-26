@@ -111,7 +111,10 @@ getAllPackages menv pkgDbs =
 -- | Parser for ghc-pkg's list output.
 pkgsListParser :: Parser (Map PackageName Version)
 pkgsListParser =
-  fmap (M.fromList . concat) sections
+  -- Use unionsWith max to account for cases where the snapshot introduces a
+  -- newer version of a global package, see:
+  -- https://github.com/fpco/stack/issues/78
+  fmap (M.unionsWith max . map M.fromList) sections
   where sections =
           many (heading *>
                 (many (pkg <* endOfLine)) <*
