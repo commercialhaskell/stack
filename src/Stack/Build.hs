@@ -908,7 +908,7 @@ genFileChanged pkgIds bopts gconfig pinfo =
      ,optimizationsChanged && not isDependency
      ,profilingChanged && not isDependency
      ,ghcOptsChanged && not isDependency
-     ,flagsChanged && not isDependency]
+     ,flagsChanged]
   where pname = packageName pinfo
         isDependency = packageType pinfo == PTDep
         installedPkgIdChanged =
