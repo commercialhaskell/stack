@@ -129,3 +129,13 @@ executable stack
                 , stack
                 , text >= 1.2.0.4
   default-language:    Haskell2010
+
+test-suite stack-test
+  type:           exitcode-stdio-1.0
+  hs-source-dirs: src/test
+  main-is:        Test.hs
+  other-modules:  Spec
+  ghc-options:    -Wall -O2
+  build-depends:  base >=4.7 && <5
+                , hspec
+  default-language:    Haskell2010
