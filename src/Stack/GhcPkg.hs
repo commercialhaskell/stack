@@ -203,9 +203,9 @@ packageVersionsParser sectionPredicate f =
         space
         fmap
             (bimap toTuple toTuple)
-            ((Right <$> packageIdentifierParser) <|>
-             (Right <$> ("(" *> packageIdentifierParser <* ")")) <|>
-             (Left <$> ("{" *> packageIdentifierParser <* "}"))) -- hidden packages
+            ((Right <$> packageIdentifierParser) <|> -- normal packages
+             (Right <$> ("(" *> packageIdentifierParser <* ")")) <|> -- hidden packages
+             (Left <$> ("{" *> packageIdentifierParser <* "}"))) -- broken packages
 
 -- | Get the id of the package e.g. @foo-0.0.0-9c293923c0685761dcff6f8c3ad8f8ec@.
 findGhcPkgId :: (MonadIO m, MonadLogger m)
