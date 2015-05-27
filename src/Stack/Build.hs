@@ -18,7 +18,7 @@ module Stack.Build
   where
 
 import qualified Control.Applicative as A
-import           Control.Arrow
+
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.MVar
 import           Control.Exception
@@ -144,7 +144,7 @@ determineLocals bopts = do
         name <- parsePackageNameFromFilePath cabalfp
         readPackage (packageConfig name bconfig ptype) cabalfp ptype
     $logDebug $ "Local packages to install: " <> T.intercalate ", "
-        (map (packageIdentifierText . fromTuple . (packageName &&& packageVersion)) locals)
+        (map (packageIdentifierText . packageIdentifier) locals)
     return locals
   where
     finalAction = boptsFinalAction bopts
