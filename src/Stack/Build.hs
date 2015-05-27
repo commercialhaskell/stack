@@ -700,7 +700,7 @@ buildPackage :: MonadAction m
 buildPackage cabalPkgVer bopts bconfig setuphs buildType packages package gconfig setupAction installResource docLoc =
   do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath package))) :: IO (Either IOException ())))
      let runhaskell' live = runhaskell live cabalPkgVer package setuphs bconfig buildType
-         singularBuild = S.size (bcPackages bconfig) == 1
+         singularBuild = S.size (bcPackages bconfig) == 1 && packageType package == PTUser
      runhaskell'
        singularBuild
        (concat [["build"]
@@ -792,9 +792,7 @@ runhaskell liveOutput cabalPkgVer package setuphs config' buildType args =
          withBinaryFile (FL.toFilePath (buildLogPath package)) AppendMode
          $ \h -> inner (stdoutToo $= sinkHandle h)
       where stdoutToo =
-                if liveOutput
-                   then CL.mapM_ S8.putStr
-                   else awaitForever yield
+                CL.mapM_ (if liveOutput then S8.putStr else (const (return ())))
     logFrom src sink ref =
         src $=
         CL.mapM (\chunk ->
