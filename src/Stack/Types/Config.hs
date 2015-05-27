@@ -215,6 +215,10 @@ configPackageTarball config ident = do
 configProjectWorkDir :: HasBuildConfig env => env -> Path Abs Dir
 configProjectWorkDir env = bcRoot (getBuildConfig env) </> $(mkRelDir ".stack-work")
 
+-- | Path to .shake files.
+configShakeFilesDir :: HasBuildConfig env => env -> Path Abs Dir
+configShakeFilesDir env = configProjectWorkDir env </> $(mkRelDir "shake")
+
 -- | Where to unpack packages for local build
 configLocalUnpackDir :: HasBuildConfig env => env -> Path Abs Dir
 configLocalUnpackDir env = configProjectWorkDir env </> $(mkRelDir "unpacked")

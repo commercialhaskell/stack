@@ -40,7 +40,7 @@ import qualified Filesystem.Path.CurrentOS as FP
 import qualified Path as FL
 import           Path.Find (findFileUp)
 import           Paths_stack (version)
-import           Stack.Build (shakeFilesPath)
+import           Stack.Build
 import           Stack.Constants (configFileName)
 import           Stack.Types hiding (Version, parseVersion) -- FIXME don't hide this
 import           Stack.Docker.GlobalDB (updateDockerImageLastUsed,getDockerImagesLastUsed,pruneDockerImagesLastUsed)
@@ -59,6 +59,9 @@ import           System.Posix.Signals (installHandler,sigTERM,Handler(Catch))
 
 dockerDir :: a -- FIXME need to figure out where to get this from, possibly configDir
 dockerDir = error "dockerDir used but not implemented!"
+
+dockerShakeDir :: a -- FIXME need to figure out where to get this from, possibly configShakeFilesDir
+dockerShakeDir = error "dockerShakeDir used but not implemented!"
 
 -- | 'True' if we are currently running inside a Docker container.
 getInContainer :: IO Bool
@@ -486,7 +489,7 @@ runAction Nothing inner =
         (action inner)
 runAction (Just cfg) inner =
   shake shakeOptions{shakeVerbosity = Quiet
-                    ,shakeFiles = FL.toFilePath (shakeFilesPath (dockerDir cfg))}
+                    ,shakeFiles = FL.toFilePath (dockerShakeDir cfg)}
         (action inner)
 
 -- | Check docker version (throws exception if incorrect)

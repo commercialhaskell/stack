@@ -13,12 +13,10 @@
 
 module Stack.Build
   (build
-  ,clean
-  ,shakeFilesPath)
+  ,clean)
   where
 
 import qualified Control.Applicative as A
-
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.MVar
 import           Control.Exception
@@ -409,12 +407,12 @@ runPlans :: (MonadIO m,MonadReader env m,HasBuildConfig env,HasLogLevel env)
          -> m ()
 runPlans bopts packages plans wanted docLoc = do
     logLevel <- asks getLogLevel
-    bconfig <- asks getBuildConfig
+    shakeDir <- asks configShakeFilesDir
     pwd <- getWorkingDir
     liftIO $ withArgs []
                       (shakeArgs shakeOptions {shakeVerbosity = logLevelToShakeVerbosity logLevel
                                               ,shakeFiles =
-                                                 FL.toFilePath (shakeFilesPath (bcRoot bconfig))
+                                                 FL.toFilePath shakeDir
                                               ,shakeThreads =
                                                 -- See: https://github.com/fpco/stack/issues/84
                                                 case buildOS of
@@ -458,7 +456,6 @@ clean :: forall m env.
       => m ()
 clean =
   do env <- ask
-     let root = bcRoot $ getBuildConfig env
      forM_ (S.toList (bcPackages $ getBuildConfig env))
            (\pkgdir ->
               do deleteGenFile pkgdir
@@ -467,15 +464,16 @@ clean =
                  liftIO $ do
                      exists <- doesDirectoryExist distDir
                      when exists (removeDirectoryRecursive distDir))
-     let listDir = FL.parent (shakeFilesPath root)
+     shakeDir <- asks configShakeFilesDir
+     let listDir = FL.parent shakeDir
      ls <- liftIO $
        fmap (map (FL.toFilePath listDir ++))
             (getDirectoryContents (FL.toFilePath listDir))
-     mapM_ (rmShakeMetadata root) ls
-  where rmShakeMetadata cfg p = liftIO $
+     mapM_ (rmShakeMetadata shakeDir) ls
+  where rmShakeMetadata shakeDir p = liftIO $
           when (isPrefixOf
                   (FilePath.takeFileName
-                     (FL.toFilePath (shakeFilesPath cfg) ++
+                     (FL.toFilePath shakeDir ++
                       "."))
                   (FilePath.takeFileName p))
                (do isDir <- doesDirectoryExist p
@@ -1111,12 +1109,6 @@ withTempUnpacked pkgs inner = withSystemTempDirectory "stack-unpack" $ \tmp -> d
 
 --------------------------------------------------------------------------------
 -- Paths
-
--- | Path to .shake files.
-shakeFilesPath :: Path Abs Dir -> Path Abs File
-shakeFilesPath dir =
-  dir </>
-  $(mkRelFile ".shake")
 
 -- | Returns true for paths whose last directory component begins with ".".
 isHiddenDir :: Path b Dir -> Bool
