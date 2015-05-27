@@ -112,27 +112,31 @@ getPackageVersionMap menv pkgDbs =
     getPackageVersions
         menv
         pkgDbs
+        (flip elem pkgDbs)
         (M.unionsWith max)
 
 -- | In the given databases, get every version of every package.
 getPackageVersionsMap :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
                       => EnvOverride
-                      -> [Path Abs Dir] -- ^ package databases
+                      -> [Path Abs Dir]         -- ^ Package databases to enable.
+                      -> (Path Abs Dir -> Bool) -- ^ Return only packages matching this database predicate.
                       -> m (Set PackageIdentifier)
-getPackageVersionsMap menv pkgDbs =
+getPackageVersionsMap menv pkgDbs predicate =
     getPackageVersions
         menv
         pkgDbs
+        predicate
         (S.fromList .
          concatMap (map fromTuple . M.toList))
 
 -- | In the given databases, get all available packages.
 getPackageVersions :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
                    => EnvOverride
-                   -> [Path Abs Dir] -- ^ package databases
+                   -> [Path Abs Dir]         -- ^ Package databases to enable.
+                   -> (Path Abs Dir -> Bool) -- ^ Return only packages matching this database predicate.
                    -> ([Map PackageName Version] -> a)
                    -> m a
-getPackageVersions menv pkgDbs f = do
+getPackageVersions menv pkgDbs predicate f = do
     result <-
         ghcPkg menv pkgDbs ["list"]
     case result of
@@ -140,7 +144,7 @@ getPackageVersions menv pkgDbs f = do
             throw GetAllPackagesFail
         Right lbs ->
             case AttoLazy.parse
-                     (packageVersionsParser (flip elem pkgDbs) f)
+                     (packageVersionsParser predicate f)
                      (L.fromStrict lbs) of
                 AttoLazy.Fail _ _ _ ->
                     throw GetAllPackagesFail
