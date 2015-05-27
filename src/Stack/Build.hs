@@ -104,7 +104,7 @@ getPackagesToRemove toInstall = do
             [localDB, depDB, globalDB]
     installed <-
         getPackageVersionsMap menv allDBs (== localDB)
-    $logInfo
+    $logDebug
         ("Package databases: " <>
          T.pack (show allDBs))
     return
