@@ -16,7 +16,8 @@ module System.Process.Read
   ,EnvOverride(..)
   ,envHelper
   ,doesExecutableExist
-  ,findExecutable)
+  ,findExecutable
+  ,getEnvOverride)
   where
 
 import           Control.Applicative ((*>))
@@ -43,6 +44,7 @@ import           Distribution.System (OS (Windows), buildOS)
 import           Path (Path, Abs, Dir, toFilePath, File, parseAbsFile)
 import           System.Directory (createDirectoryIfMissing, doesFileExist, canonicalizePath)
 import qualified System.FilePath as FP
+import           System.Environment (getEnvironment)
 import           System.Exit (ExitCode(ExitSuccess), exitWith)
 
 -- | Override the environment received by a child process
@@ -140,7 +142,7 @@ doesExecutableExist menv name = liftM isJust $ findExecutable menv name
 -- | Find the complete path for the executable
 findExecutable :: (MonadIO m, MonadThrow n) => EnvOverride -> String -> m (n (Path Abs File))
 findExecutable (EnvOverride m) name =
-    liftIO $ case Map.lookup "PATH" m' of
+    liftIO $ case Map.lookup "PATH" m of
         Nothing -> return $ throwM NoPathFound
         Just path ->
             let loop [] = return $ throwM $ ExecutableNotFound name path
@@ -154,13 +156,26 @@ findExecutable (EnvOverride m) name =
                         else loop dirs
              in loop $ FP.splitSearchPath $ T.unpack path
   where
-    (exeExtension, m') =
+    exeExtension =
         case buildOS of
-            Windows -> (".exe", upperKey m)
-            _ -> ("", m)
+            Windows -> ".exe"
+            _ -> ""
 
-    -- Hurray case insensitivity on Windows!
-    upperKey = Map.mapKeysWith const T.toUpper
+-- | Load up an EnvOverride from the standard environment
+getEnvOverride :: MonadIO m => m EnvOverride
+getEnvOverride = liftIO
+    $ fmap (EnvOverride . Map.fromList . map (goKey . T.pack *** T.pack))
+    $ getEnvironment
+  where
+    -- Fix case insensitivity of the PATH environment variable on Windows.
+    -- Use buildOS instead of CPP so that the Windows code path is at least
+    -- type checked regularly
+    goKey =
+        case buildOS of
+            Windows -> \t ->
+                let t' = T.toUpper t
+                 in if t' == "PATH" then t' else t
+            _ -> id
 
 data FindExecutableException
     = NoPathFound

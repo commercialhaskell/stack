@@ -26,7 +26,6 @@ module Stack.Config
   ) where
 
 import           Control.Applicative
-import           Control.Arrow ((***))
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -50,7 +49,7 @@ import           Stack.Package
 import           Stack.Types
 import           System.Directory
 import           System.Environment
-import           System.Process.Read (EnvOverride (..))
+import           System.Process.Read (getEnvOverride)
 
 -- An uninterpreted representation of configuration options.
 -- Configurations may be "cascaded" using mappend (left-biased).
@@ -223,8 +222,8 @@ configFromConfigMonoid configStackRoot Project{..} ConfigMonoid{..} = do
      configPackages' <- mapM (resolveDir projectRoot) projectPackages
      let configPackages = S.fromList configPackages'
          configMaybeResolver = configMonoidResolver
-     origEnv <- liftIO getEnvironment
-     let configEnvOverride _ = EnvOverride $ Map.fromList $ map (T.pack *** T.pack) origEnv
+     origEnv <- getEnvOverride
+     let configEnvOverride _ = origEnv
      return Config {..}
 
 toBuildConfig :: (HasHttpManager env, MonadReader env m, MonadCatch m, MonadIO m, MonadLogger m)
