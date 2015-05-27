@@ -140,7 +140,7 @@ getPackageVersions menv pkgDbs f = do
             throw GetAllPackagesFail
         Right lbs ->
             case AttoLazy.parse
-                     (packageVersionsParser f)
+                     (packageVersionsParser (flip elem pkgDbs) f)
                      (L.fromStrict lbs) of
                 AttoLazy.Fail _ _ _ ->
                     throw GetAllPackagesFail
@@ -148,17 +148,30 @@ getPackageVersions menv pkgDbs f = do
                     liftIO (evaluate r)
 
 -- | Parser for ghc-pkg's list output.
-packageVersionsParser :: ([Map PackageName Version] -> a) -> Parser a
-packageVersionsParser f =
-    fmap (f . map M.fromList) sections
+packageVersionsParser :: (Path Abs Dir -> Bool) -> ([Map PackageName Version] -> a) -> Parser a
+packageVersionsParser sectionPredicate f =
+    fmap
+        (f .
+         map M.fromList .
+         mapMaybe
+             (\(fp,pkgs) ->
+                   do dir <- parseAbsDir fp
+                      guard (sectionPredicate dir)
+                      return pkgs))
+        sections
   where
     sections =
         many
-            (heading *>
-             (many (pkg <* endOfLine)) <*
-             optional endOfLine)
+            (do fp <- heading
+                pkgs <- many (pkg <* endOfLine)
+                optional endOfLine
+                return (fp, pkgs))
     heading =
-        many1 (satisfy (not . (== '\n'))) <*
+        fmap
+            (reverse .
+             dropWhile (== ':') .
+             reverse)
+            (many1 (satisfy (not . (== '\n')))) <*
         endOfLine
     pkg = do
         space
