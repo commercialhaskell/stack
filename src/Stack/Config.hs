@@ -64,9 +64,6 @@ data ConfigMonoid =
     -- ^ Controls how package index updating occurs
     , configMonoidResolver       :: !(Maybe Resolver)
     -- ^ How we resolve which dependencies to use
-    , configMonoidInstallDeps    :: !(Maybe Bool)
-    -- ^ Whether or not we should install dependencies. When using Docker,
-    -- default is False, otherwise default is True
     }
   deriving Show
 
@@ -105,14 +102,12 @@ instance Monoid ConfigMonoid where
     , configMonoidUrls = mempty
     , configMonoidGpgVerifyIndex = Nothing
     , configMonoidResolver = Nothing
-    , configMonoidInstallDeps = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
     , configMonoidUrls = configMonoidUrls l <> configMonoidUrls r
     , configMonoidGpgVerifyIndex = configMonoidGpgVerifyIndex l <|> configMonoidGpgVerifyIndex r
     , configMonoidResolver = configMonoidResolver l <|> configMonoidResolver r
-    , configMonoidInstallDeps = configMonoidInstallDeps l <|> configMonoidInstallDeps r
     }
 
 instance FromJSON ConfigMonoid where
@@ -123,7 +118,6 @@ instance FromJSON ConfigMonoid where
          configMonoidUrls <- obj .:? "urls" .!= mempty
          configMonoidGpgVerifyIndex <- obj .:? "gpg-verify-index"
          configMonoidResolver <- obj .:? "resolver"
-         configMonoidInstallDeps <- obj .:? "install-dependencies"
          let configMonoidDockerOpts = DockerOpts getTheDocker
          return ConfigMonoid {..}
 

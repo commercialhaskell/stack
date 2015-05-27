@@ -51,11 +51,6 @@ data Config =
          ,configMaybeResolver    :: !(Maybe Resolver)
          -- ^ May not actually be available in the config. See 'BuildConfig'
          -- where this is guaranteed to be resolved.
-         ,configInstallDeps      :: !Bool
-         -- ^ Whether or not dependencies should be installed. If @False@, any
-         -- missing dependencies will result in a compilation failure. Useful
-         -- to disable this flag, for example, when using a precompiled binary
-         -- package database, such as via Docker.
          ,configEnvOverride      :: !(EnvSettings -> EnvOverride)
          -- ^ Environment variables to be passed to external tools
          ,configLocalGHCs        :: !(Path Abs Dir)
