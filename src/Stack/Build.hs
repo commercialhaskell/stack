@@ -88,21 +88,33 @@ build bopts = do
     dependencies <- getDependencies locals ranges
 
     installDependencies bopts dependencies
-    toRemove <- getPackagesToRemove (Set.map packageName (S.fromList locals))
+    toRemove <- getPackagesToRemove (Set.map packageIdentifier (S.fromList locals))
     buildLocals bopts (S.fromList locals) toRemove
 
 -- | Get currently user-local-db-installed packages that need to be
 -- removed before we install the new package set.
 getPackagesToRemove :: (MonadIO m, MonadLogger m, MonadReader env m, HasBuildConfig env, MonadThrow m, MonadCatch m)
-                    => Set PackageName -> m (Set PackageIdentifier)
+                    => Set PackageIdentifier -> m (Set PackageIdentifier)
 getPackagesToRemove toInstall = do
-    localDB <- packageDatabaseLocal
     menv <- getMinimalEnvOverride
-    pkgIds <-
-        getPackageVersionMap
-            menv
-            [localDB]
-    return mempty
+    localDB <- packageDatabaseLocal
+    depDB <- packageDatabaseDeps
+    globalDB <- getGlobalDB menv
+    let allDBs =
+            [localDB, depDB, globalDB]
+    installed <-
+        getPackageVersionsMap menv allDBs (== localDB)
+    $logInfo
+        ("Package databases: " <>
+         T.pack (show allDBs))
+    return
+        (Set.filter
+             (\ident ->
+                   Set.member
+                       (packageIdentifierName ident)
+                       (Set.map packageIdentifierName toInstall) &&
+                   not (Set.member ident toInstall))
+             installed)
 
 -- | Determine all of the local packages we wish to install. This does not
 -- include any dependencies.
@@ -363,7 +375,7 @@ buildLocals bopts packagesToInstall packagesToRemove = do
                                    docLoc
                                    cfgVar))
      if boptsDryrun bopts
-        then dryRunPrint packagesToInstall
+        then dryRunPrint packagesToInstall packagesToRemove
         else runPlans bopts packagesToInstall plans wanted docLoc
   where
     wanted pwd package = case boptsTargets bopts of
@@ -409,13 +421,25 @@ runPlans bopts packages plans wanted docLoc = do
             LevelOther _ -> Silent
 
 -- | Dry run output.
-dryRunPrint :: MonadLogger m => Set Package -> m ()
-dryRunPrint packages =
-  do $logInfo "The following packages will be built and installed:"
-     forM_ (S.toList packages)
-           (\package ->
-              $logInfo (packageIdentifierText
-                          (fromTuple (packageName package,packageVersion package))))
+dryRunPrint :: MonadLogger m => Set Package -> Set PackageIdentifier -> m ()
+dryRunPrint toInstall toRemove = do
+    unless
+        (Set.null toRemove)
+        (do $logInfo "The following packages will be unregistered:"
+            forM_
+                (S.toList toRemove)
+                ($logInfo .
+                 packageIdentifierText))
+    unless
+        (Set.null toInstall)
+        (do $logInfo "The following packages will be built and installed:"
+            forM_
+                (S.toList toInstall)
+                (\package ->
+                      $logInfo
+                          (packageIdentifierText
+                               (fromTuple
+                                    (packageName package, packageVersion package)))))
 
 -- | Reset the build (remove Shake database and .gen files).
 clean :: forall m env.
