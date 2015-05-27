@@ -28,7 +28,6 @@ import qualified Codec.Archive.Tar.Check as Tar
 import           Control.Applicative ((*>), (<$>), (<*>))
 import Control.Monad.Trans.Control
 import           Control.Concurrent.Async.Lifted (Concurrently (..))
-import           Control.Concurrent.Async.Lifted (wait, withAsync)
 import           Control.Concurrent.STM   (atomically, newTVarIO, readTVar,
                                            writeTVar, TVar, modifyTVar, readTVarIO)
 import           Control.Exception (Exception, throwIO, SomeException, toException)
@@ -60,7 +59,7 @@ import           Network.HTTP.Client      (Manager, brRead, checkStatus,
                                            responseStatus, withResponse)
 import           Network.HTTP.Types (statusCode)
 import           Stack.Constants
-import           Stack.PackageIndex (requireIndex)
+import           Stack.PackageIndex (requireIndex, updateIndex)
 
 import Path
 import           System.Directory         (createDirectoryIfMissing,
@@ -97,19 +96,21 @@ instance Monoid Package where
         , packageCabal = if S.null (packageCabal l) then packageCabal r else packageCabal l
         }
 
-getPackageInfo :: MonadIO m => FilePath -> Set PackageIdentifier -> m (Map PackageIdentifier Package)
+-- | Returns the set of missing packages
+getPackageInfo :: MonadIO m
+               => FilePath
+               -> Set PackageIdentifier
+               -> m (Map PackageIdentifier Package, Set PackageIdentifier)
 getPackageInfo indexTar pkgs0 = liftIO $ withBinaryFile indexTar ReadMode $ \h -> do
     lbs <- L.hGetContents h
     loop pkgs0 pkgs0 Map.empty False $ Tar.read lbs
   where
     loop pkgsJ pkgsC m sawJSON Tar.Done = do
-        let pkgs = mappend pkgsJ pkgsC
-        when (not (Set.null pkgs) && sawJSON) $
-            putStrLn $ "Warning: packages not found in index: " ++ show (Set.toList pkgs)
-        return m
+        let pkgs = mappend (if sawJSON then pkgsJ else Set.empty) pkgsC
+        return (m, pkgs)
     loop _ _ _m _ (Tar.Fail e) = throwIO $ Couldn'tReadIndexTarball indexTar e
     loop pkgsJ pkgsC m _ (Tar.Next _ _)
-        | Set.null pkgsJ && Set.null pkgsC = return m
+        | Set.null pkgsJ && Set.null pkgsC = return (m, Set.empty)
     loop pkgsJ pkgsC m sawJSON (Tar.Next e es) = case Tar.entryContent e of
         Tar.NormalFile lbs _
             | Just pair <- getName ".json" (Tar.entryPath e)
@@ -239,11 +240,26 @@ fetchPackages menv pkgs = do
    outputVar <- liftIO (newTVarIO [])
    let packageLocation = configPackageTarball config
 
-   withAsync (getPackageInfo indexFP $
-              Set.fromList $
-              map fst $
-              F.toList pkgs) $ \a -> do
-       parMapM_ connectionCount (go packageLocation man (wait a) outputVar) pkgs
+   let getPackageInfo' = getPackageInfo indexFP
+                       $ Set.fromList
+                       $ map fst
+                       $ F.toList pkgs
+
+   (pkgInfo0, missing0) <- getPackageInfo'
+   pkgInfo <-
+       if Set.null missing0
+           then return pkgInfo0
+           else do
+               $logInfo "Some cabal files not found, updating index"
+               updateIndex menv
+               (pkgInfo, missing) <- getPackageInfo'
+               unless (Set.null missing) $ $logWarn $
+                    "Some cabal files not found: " <>
+                    T.intercalate ", "
+                    (map packageIdentifierText $ Set.toList missing)
+               return pkgInfo
+
+   parMapM_ connectionCount (go packageLocation man (return pkgInfo) outputVar) pkgs
    liftIO (readTVarIO outputVar)
   where
     connectionCount = 8 -- FIXME put in Config
