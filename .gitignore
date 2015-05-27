@@ -10,3 +10,5 @@ tags
 cabal.sandbox.config
 *.swp
 /.cabal-sandbox/
+.shake/
+.stack-work/
