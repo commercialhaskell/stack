@@ -218,11 +218,25 @@ loadMiniBuildPlan name = do
         _ -> do
             $logDebug $ "loadMiniBuildPlan from cache failed: " <> T.pack (show (name, eres))
             bp <- loadBuildPlan name
-            let mbp = toMiniBuildPlan bp
+            let mbp = buildPlanFixes $ toMiniBuildPlan bp
             liftIO $ do
                 createDirectoryIfMissing True dir
                 Binary.encodeFile fp mbp
             return mbp
+
+-- | Some hard-coded fixes for build plans, hopefully to be irrelevant over
+-- time.
+buildPlanFixes :: MiniBuildPlan -> MiniBuildPlan
+buildPlanFixes mbp = mbp
+    { mbpPackages = Map.fromList $ map go $ Map.toList $ mbpPackages mbp
+    }
+  where
+    go (name, (version, flags, deps)) =
+        (name, (version, goF (packageNameString name) flags, deps))
+
+    goF "persistent-sqlite" = Map.insert $(mkFlagName "systemlib") False
+    goF "yaml" = Map.insert $(mkFlagName "system-libyaml") False
+    goF _ = id
 
 -- | Load the 'BuildPlan' for the given snapshot. Will load from a local copy
 -- if available, otherwise downloading from Github.
