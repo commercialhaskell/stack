@@ -24,9 +24,8 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Control
-import           Data.Text (Text)
 import qualified Data.Text as T
-import           Development.Shake (Rules,Resource,Rules,ShakeOptions,Action,Verbosity)
+import           Development.Shake (Rules,Resource,Rules,Action)
 import qualified Development.Shake as S
 import           Path
 import           System.Environment
@@ -48,10 +47,10 @@ shakeArgs dir threads m =
         (\run ->
               (shake (opts run) m))
   where
-    shake opts =
+    shake opts_ =
         liftIO .
         withArgs [] .
-        S.shakeArgs opts
+        S.shakeArgs opts_
     opts run =
         S.shakeOptions
         { S.shakeOutput = output run
