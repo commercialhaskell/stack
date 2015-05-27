@@ -1,0 +1,2 @@
+:set -package optparse-applicative -package optparse-simple -package binary
+:set -isrc/main -isrc
