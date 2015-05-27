@@ -71,7 +71,7 @@ data ConfigMonoid =
   deriving Show
 
 -- | Get the default resolver value
-getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasStackRoot env, HasUrls env, HasHttpManager env, MonadLogger m)
+getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env, HasUrls env, HasHttpManager env, MonadLogger m)
                    => Path Abs Dir
                    -> m Resolver
 getDefaultResolver dir = do
@@ -231,10 +231,7 @@ toBuildConfig :: (HasHttpManager env, MonadReader env m, MonadCatch m, MonadIO m
               -> m BuildConfig
 toBuildConfig config = do
     env <- ask
-    let miniConfig = MiniConfig
-            (getHttpManager env)
-            (configStackRoot config)
-            (configUrls config)
+    let miniConfig = MiniConfig (getHttpManager env) config
     resolver <- case configMaybeResolver config of
         Just r -> return r
         Nothing -> do
@@ -260,7 +257,7 @@ toBuildConfig config = do
     ghcVersion <-
         case resolver of
             ResolverSnapshot snapName -> do
-                mbp <- runReaderT (loadMiniBuildPlan snapName) miniConfig
+                mbp <- runReaderT (loadMiniBuildPlan snapName Map.empty) miniConfig
                 return $ mbpGhcVersion mbp
             ResolverGhc x y -> return $ fromMajorVersion x y
 
@@ -270,13 +267,13 @@ toBuildConfig config = do
         , bcGhcVersion = ghcVersion
         }
 
-data MiniConfig = MiniConfig Manager (Path Abs Dir) (Map Text Text)
-instance HasStackRoot MiniConfig where
-    getStackRoot (MiniConfig _ root _) = root
+data MiniConfig = MiniConfig Manager Config
+instance HasConfig MiniConfig where
+    getConfig (MiniConfig _ c) = c
+instance HasStackRoot MiniConfig
 instance HasHttpManager MiniConfig where
-    getHttpManager (MiniConfig man _ _) = man
-instance HasUrls MiniConfig where
-    getUrls (MiniConfig _ _ urls) = urls
+    getHttpManager (MiniConfig man _) = man
+instance HasUrls MiniConfig
 
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.

@@ -196,12 +196,16 @@ getDependencies
     -> Map PackageName (Map PackageName VersionRange) -- ^ ranges
     -> m (Map PackageName (Version, Map FlagName Bool))
 getDependencies locals ranges = do
+    -- Get global packages
+    menv <- getMinimalEnvOverride
+    globals <- getAllPackages menv []
+
     bconfig <- asks getBuildConfig
     dependencies <- case bcResolver bconfig of
         ResolverSnapshot snapName -> do
             $logDebug $ "Checking resolver: " <> renderSnapName snapName
             mbp <- liftM (removeReverseDeps $ map packageName locals)
-                 $ loadMiniBuildPlan snapName
+                 $ loadMiniBuildPlan snapName globals
             (deps, users) <- resolveBuildPlan mbp (fmap M.keysSet ranges)
             forM_ (M.toList users) $ \(name, users') -> $logDebug $
                 T.concat
@@ -211,7 +215,7 @@ getDependencies locals ranges = do
                                          $ Set.toList users'
                     ]
             return deps
-        ResolverGhc _ _ -> return M.empty
+        ResolverGhc _ _ -> return $ fmap (, M.empty) globals
 
     let checkDepRange (dep, users) =
             concatMap go $ M.toList users

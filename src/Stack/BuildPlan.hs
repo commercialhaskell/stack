@@ -52,6 +52,7 @@ import           Distribution.PackageDescription (GenericPackageDescription,
 import           GHC.Generics                    (Generic)
 import           Network.HTTP.Download
 import           Path
+import           Stack.GhcPkg
 import           Stack.Types
 import           Stack.Constants
 import           Stack.Package
@@ -213,14 +214,15 @@ instance FromJSON Snapshots where
 loadMiniBuildPlan
     :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasStackRoot env)
     => SnapName
+    -> Map PackageName Version -- ^ packages in global database
     -> m MiniBuildPlan
-loadMiniBuildPlan name = do
+loadMiniBuildPlan name globals = do
     path <- configMiniBuildPlanCache name
     let fp = toFilePath path
         dir = toFilePath $ parent path
 
     eres <- liftIO $ tryIO $ Binary.decodeFileOrFail fp
-    case eres of
+    mbp <- case eres of
         Right (Right mbp) -> return mbp
         _ -> do
             $logDebug $ "loadMiniBuildPlan from cache failed: " <> T.pack (show (name, eres))
@@ -230,6 +232,10 @@ loadMiniBuildPlan name = do
                 createDirectoryIfMissing True dir
                 Binary.encodeFile fp mbp
             return mbp
+    return mbp
+        { mbpPackages = mbpPackages mbp `Map.union`
+            fmap (\v -> (v, Map.empty, Set.empty)) globals
+        }
 
 -- | Some hard-coded fixes for build plans, hopefully to be irrelevant over
 -- time.
@@ -352,7 +358,7 @@ checkDeps flags deps packages = do
 
 -- | Find a snapshot and set of flags that is compatible with the given
 -- 'GenericPackageDescription'. Returns 'Nothing' if no such snapshot is found.
-findBuildPlan :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasStackRoot env, HasUrls env)
+findBuildPlan :: (MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env)
               => Path Abs File
               -> GenericPackageDescription
               -> m (Maybe (SnapName, Map FlagName Bool))
@@ -364,7 +370,10 @@ findBuildPlan cabalfp gpd = do
             ++ [Nightly $ snapshotsNightly snapshots]
         loop [] = return Nothing
         loop (name:names') = do
-            mbp <- loadMiniBuildPlan name
+            menv <- getMinimalEnvOverride
+            globals <- getAllPackages menv []
+
+            mbp <- loadMiniBuildPlan name globals
             mflags <- checkBuildPlan name mbp cabalfp gpd
             case mflags of
                 Nothing -> loop names'
