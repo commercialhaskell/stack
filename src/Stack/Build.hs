@@ -647,6 +647,8 @@ configurePackage cabalPkgVer bconfig setuphs buildType package gconfig setupActi
                        flagNameString name)
                     (M.toList (packageFlags package))])
 
+-- | Whether we're building dependencies (separate database and build
+-- process), or locally specified packages.
 data BuildType = BTDeps | BTLocals
 
 -- | Build the given package with the given configuration.
