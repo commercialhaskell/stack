@@ -33,6 +33,7 @@ import           Data.Aeson
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
+import           Data.Conduit
 import           Data.Conduit (($$),($=))
 import           Data.Conduit.Binary (sinkHandle)
 import qualified Data.Conduit.List as CL
@@ -655,7 +656,8 @@ configurePackage cabalPkgVer bconfig setuphs buildType package gconfig setupActi
   do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath package))) :: IO (Either IOException ())))
      pkgDbs <- getPackageDatabases bconfig buildType
      installRoot <- getInstallRoot bconfig buildType
-     let runhaskell' = runhaskell cabalPkgVer package setuphs bconfig buildType
+     let runhaskell' = runhaskell False
+                                  cabalPkgVer package setuphs bconfig buildType
      runhaskell'
        (concat [["configure","--user"]
                ,["--package-db=clear","--package-db=global"]
@@ -697,19 +699,22 @@ buildPackage :: MonadAction m
              -> m ()
 buildPackage cabalPkgVer bopts bconfig setuphs buildType packages package gconfig setupAction installResource docLoc =
   do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath package))) :: IO (Either IOException ())))
-     let runhaskell' = runhaskell cabalPkgVer package setuphs bconfig buildType
+     let runhaskell' live = runhaskell live cabalPkgVer package setuphs bconfig buildType
+         singularBuild = S.size (bcPackages bconfig) == 1
      runhaskell'
+       singularBuild
        (concat [["build"]
                ,["--ghc-options=-O2" | gconfigOptimize gconfig]
                ,["--ghc-options=-fforce-recomp" | gconfigForceRecomp gconfig]
                ,concat [["--ghc-options",T.unpack opt] | opt <- boptsGhcOptions bopts]])
 
      case setupAction of
-       DoTests -> runhaskell' ["test"]
+       DoTests -> runhaskell' singularBuild ["test"]
        DoHaddock ->
            do liftIO (removeDocLinks docLoc package)
               ifcOpts <- liftIO (haddockInterfaceOpts docLoc package packages)
               runhaskell'
+                         singularBuild
                          ["haddock"
                          ,"--html"
                          ,"--hoogle"
@@ -732,77 +737,87 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType packages package gconfi
                              ,"--haddock"
                              ,hoogleTxtPath
                              ,hoogleDbPath])
-       DoBenchmarks -> runhaskell' ["bench"]
+       DoBenchmarks -> runhaskell' singularBuild ["bench"]
        _ -> return ()
-     withResource installResource 1 (runhaskell' ["install"])
+     withResource installResource 1 (runhaskell' False ["install"])
      case setupAction of
        DoHaddock -> liftIO (createDocLinks docLoc package)
        _ -> return ()
 
 -- | Run the Haskell command for the given package.
-runhaskell :: (HasConfig config,MonadAction m)
-           => PackageIdentifier
+runhaskell :: (HasConfig config,HasBuildConfig config,MonadAction m)
+           => Bool
+           -> PackageIdentifier
            -> Package
            -> Path Abs File -- ^ Setup.hs or Setup.lhs file
            -> config
            -> BuildType
            -> [String]
            -> m ()
-runhaskell cabalPkgVer package setuphs config' buildType args =
+runhaskell liveOutput cabalPkgVer package setuphs config' buildType args =
   do liftIO (createDirectoryIfMissing True
                                       (FL.toFilePath (stackageBuildDir package)))
-     $logInfo (T.pack display)
+     $logInfo display
      outRef <- liftIO (newIORef mempty)
      errRef <- liftIO (newIORef mempty)
-     let withSink inner =
-            withBinaryFile (FL.toFilePath (buildLogPath package)) AppendMode
-            $ \h -> inner (sinkHandle h)
-     exeName <- liftIO $ join $ findExecutable menv "runhaskell"
-     join (liftIO (catch (do withSink $ \sink -> withCheckedProcess
-                               (cp exeName)
-                                  {cwd = Just (FL.toFilePath dir)
-                                  ,Process.env = envHelper menv
-                                  ,std_err = Inherit}
-                               (\ClosedStream stdout' stderr' -> runConcurrently $
-                                     Concurrently (logFrom stdout' sink outRef) A.*>
-                                     Concurrently (logFrom stderr' sink errRef))
-                             return (return ()))
+     join (liftIO (catch (runWithRefs outRef errRef)
                          (\e@ProcessExitedUnsuccessfully{} ->
-                            return (do $logError (T.pack (display <> ": ERROR"))
-                                       errs <- liftIO (readIORef errRef)
-                                       outs <- liftIO (readIORef outRef)
-                                       unless (S8.null outs)
-                                              (do $logError "Stdout was:"
-                                                  $logError (T.decodeUtf8 outs))
-                                       unless (S8.null errs)
-                                              (do $logError "Stderr was:"
-                                                  $logError (T.decodeUtf8 errs))
-                                       liftIO (throwIO e)))))
-  where logFrom src sink ref =
-                        src $=
-                        CL.mapM (\chunk ->
-                                   do liftIO (modifyIORef' ref (<> chunk))
-                                      return chunk) $$
-                        sink
-        display =
-          packageIdentifierString (packageIdentifier package) <>
-          ": " <>
-          case args of
-            (cname:_) -> cname
-            _ -> mempty
-        dir = packageDir package
-        cp exeName =
-          proc (toFilePath exeName)
-            (("-package=" ++ packageIdentifierString cabalPkgVer)
-                              : toFilePath setuphs : args)
-
-        menv = configEnvOverride (getConfig config') EnvSettings
-                { esIncludeLocals =
-                    case buildType of
-                        BTDeps -> False
-                        BTLocals -> True
-                , esIncludeGhcPackagePath = False
-                }
+                              return (dumpLog outRef errRef e))))
+  where
+    runWithRefs outRef errRef = do
+        exeName <- liftIO $ join $ findExecutable menv "runhaskell"
+        withSink $ \sink -> withCheckedProcess
+          (cp exeName)
+             {cwd = Just (FL.toFilePath (packageDir package))
+             ,Process.env = envHelper menv
+             ,std_err = Inherit}
+          (\ClosedStream stdout' stderr' -> runConcurrently $
+                Concurrently (logFrom stdout' sink outRef) A.*>
+                Concurrently (logFrom stderr' sink errRef))
+        return (return ())
+    dumpLog outRef errRef e =
+        if liveOutput
+           then return ()
+           else do $logError (display <> ": ERROR")
+                   errs <- liftIO (readIORef errRef)
+                   outs <- liftIO (readIORef outRef)
+                   unless (S8.null outs)
+                          (do $logError "Stdout was:"
+                              $logError (T.decodeUtf8 outs))
+                   unless (S8.null errs)
+                          (do $logError "Stderr was:"
+                              $logError (T.decodeUtf8 errs))
+                   liftIO (throwIO e)
+    withSink inner =
+         withBinaryFile (FL.toFilePath (buildLogPath package)) AppendMode
+         $ \h -> inner (stdoutToo $= sinkHandle h)
+      where stdoutToo =
+                if liveOutput
+                   then CL.mapM_ S8.putStr
+                   else awaitForever yield
+    logFrom src sink ref =
+        src $=
+        CL.mapM (\chunk ->
+                   do liftIO (modifyIORef' ref (<> chunk))
+                      return chunk) $$
+        sink
+    display =
+      packageIdentifierText (packageIdentifier package) <>
+      ": " <>
+      case args of
+        (cname:_) -> T.pack cname
+        _ -> mempty
+    cp exeName =
+      proc (toFilePath exeName)
+        (("-package=" ++ packageIdentifierString cabalPkgVer)
+                          : toFilePath setuphs : args)
+    menv = configEnvOverride (getConfig config') EnvSettings
+            { esIncludeLocals =
+                case buildType of
+                    BTDeps -> False
+                    BTLocals -> True
+            , esIncludeGhcPackagePath = False
+            }
 
 -- | Ensure Setup.hs exists in the given directory. Returns an action
 -- to remove it later.
