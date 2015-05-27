@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -31,7 +32,10 @@ import Control.Monad.Reader (MonadReader, ReaderT (..))
 -- import qualified Data.ByteString as S
 -- import qualified Data.ByteString.Lazy as LByteString
 -- import qualified Data.Char as Char
--- import Data.Conduit (($$), ZipSink (..))
+import Data.Conduit (($$))
+import qualified Data.Conduit.List as CL
+import Control.Applicative ((<$>), (<*>))
+import Data.Aeson
 import Data.Word (Word)
 -- import Data.Conduit.Binary (sinkFile)
 -- import Data.Foldable (forM_)
@@ -39,6 +43,7 @@ import Data.Word (Word)
 -- import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as List
 import Data.Monoid
+import qualified Data.Yaml as Yaml
 import Data.Text (Text)
 -- import qualified Data.Text as Text
 -- import qualified Data.Text.Lazy as LText
@@ -86,42 +91,47 @@ import Data.Ord (comparing)
 import Network.HTTP.Download (download)
 
 data DownloadPair = DownloadPair Version Text
+instance FromJSON DownloadPair where
+    parseJSON = withObject "DownloadPair" $ \o -> DownloadPair
+        <$> o .: "version"
+        <*> o .: "url"
 
-type GhcMap = Map (Word, Word) DownloadPair
+data MajorVersion = MajorVersion !Word !Word
+    deriving (Typeable, Eq, Ord)
+instance Show MajorVersion where
+    show (MajorVersion x y) = concat [show x, ".", show y]
+instance FromJSON a => FromJSON (Map MajorVersion a) where
+    parseJSON val = do
+        m <- parseJSON val
+        fmap Map.fromList $ mapM go $ Map.toList m
+      where
+        go (k, v) = do
+            (x, y) <- either (fail . show) (return . getMajorVersion)
+                    $ parseVersionFromString k
+            return (MajorVersion x y, v)
 
 data SetupInfo = SetupInfo
     { siSevenzExe :: Text
     , siSevenzDll :: Text
     , siPortableGit :: DownloadPair
-    , siGHCs :: Map Text GhcMap
+    , siGHCs :: Map Text (Map MajorVersion DownloadPair)
     }
+instance FromJSON SetupInfo where
+    parseJSON = withObject "SetupInfo" $ \o -> SetupInfo
+        <$> o .: "sevenzexe"
+        <*> o .: "sevenzdll"
+        <*> o .: "portable-git"
+        <*> o .: "ghc"
 
-defaultSetupInfo :: SetupInfo
-defaultSetupInfo = SetupInfo
-    { siSevenzExe = "https://github.com/fpco/minghc/blob/master/bin/7z.exe?raw=true"
-    , siSevenzDll = "https://github.com/fpco/minghc/blob/master/bin/7z.dll?raw=true"
-    , siPortableGit = DownloadPair
-        $(mkVersion "2.4.0.1")
-        "https://github.com/git-for-windows/git/releases/download/v2.4.0.windows.1/PortableGit-2.4.0.1-dev-preview-32-bit.7z.exe"
-    , siGHCs = Map.fromList
-        [ ("linux64", Map.fromList
-            [ ((7, 8), DownloadPair
-                $(mkVersion "7.8.4")
-                "http://download.fpcomplete.com/stackage-cli/linux64/ghc-7.8.4-x86_64-unknown-linux-deb7.tar.xz"
-                )
-            ])
-        , ("windows", Map.fromList
-            [ ((7, 8), DownloadPair
-                $(mkVersion "7.8.4")
-                "https://www.haskell.org/ghc/dist/7.8.4/ghc-7.8.4-i386-unknown-mingw32.tar.xz"
-                )
-            , ((7, 10), DownloadPair
-                $(mkVersion "7.10.1")
-                "https://www.haskell.org/ghc/dist/7.10.1/ghc-7.10.1-i386-unknown-mingw32.tar.xz"
-                )
-            ])
-        ]
-    }
+-- | Download the most recent SetupInfo
+getSetupInfo :: (MonadIO m, MonadThrow m) => Manager -> m SetupInfo
+getSetupInfo manager = do
+    bss <- liftIO $ flip runReaderT manager
+         $ withResponse req $ \res -> responseBody res $$ CL.consume
+    let bs = S8.concat bss
+    either throwM return $ Yaml.decodeEither' bs
+  where
+    req = "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/stack-setup.yaml"
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: (MonadIO m, MonadMask m, MonadLogger m)
@@ -148,7 +158,7 @@ setupEnv installIfMissing manager bconfig = do
     mghcBin <- if needLocal
         then do
             $logDebug "Looking for a local copy of GHC"
-            mghcBin <- getLocalGHC manager bconfig expected
+            mghcBin <- getLocalGHC bconfig expected
             case mghcBin of
                 Just ghcBin -> do
                     $logDebug $ "Local copy found at: " <> T.intercalate ", " (map T.pack ghcBin)
@@ -231,11 +241,10 @@ getInstalledGHC menv = do
 -- | Get the bin directory for a local copy of GHC meeting the given version
 -- requirement, if it exists
 getLocalGHC :: (HasConfig config, MonadIO m, MonadLogger m, MonadThrow m)
-            => Manager
-            -> config
+            => config
             -> Version
             -> m (Maybe [FilePath])
-getLocalGHC manager config' expected = do
+getLocalGHC config' expected = do
     let dir = toFilePath $ configLocalGHCs $ getConfig config'
     contents <- liftIO $ handleIO (const $ return []) (getDirectoryContents dir)
     pairs <- liftIO $ fmap catMaybes $ mapM (toMaybePair dir) contents
@@ -306,7 +315,7 @@ installLocalGHC :: (MonadIO m, MonadLogger m, HasConfig env, MonadThrow m, Monad
 installLocalGHC manager config' version = do
     rel <- parseRelDir $ "ghc-" <> versionString version
     let dest = configLocalGHCs (getConfig config') Path.</> rel
-        si = defaultSetupInfo
+    si <- getSetupInfo manager
     $logDebug $ "Attempting to install GHC " <> versionText version <>
                 " to " <> T.pack (toFilePath dest)
     flip runReaderT config' $ case (buildOS, buildArch) of
@@ -316,7 +325,7 @@ installLocalGHC manager config' version = do
 
 data SetupException = UnsupportedSetupCombo OS Arch
                     | MissingDependencies [String]
-                    | UnknownGHCVersion Version (Set (Word, Word))
+                    | UnknownGHCVersion Version (Set MajorVersion)
                     | UnknownOSKey Text
     deriving Typeable
 instance Exception SetupException
@@ -333,19 +342,28 @@ instance Show SetupException where
         [ "No information found for GHC version "
         , versionString version
         , ". Known GHC major versions: "
-        , intercalate ", " (map (versionString . uncurry fromMajorVersion) $ Set.toList known)
+        , intercalate ", " (map show $ Set.toList known)
         ]
     show (UnknownOSKey oskey) =
         "Unable to find installation URLs for OS key: " ++
         T.unpack oskey
 
+-- | Get the DownloadPair for the given OS and GHC version
+getGHCPair :: MonadThrow m
+           => SetupInfo
+           -> Text -- ^ OS key
+           -> Version -- ^ GHC version
+           -> m DownloadPair
 getGHCPair si osKey version =
     case Map.lookup osKey $ siGHCs si of
         Nothing -> throwM $ UnknownOSKey osKey
         Just m ->
-            case Map.lookup (getMajorVersion version) m of
+            case Map.lookup major m of
                 Nothing -> throwM $ UnknownGHCVersion version (Map.keysSet m)
                 Just pair -> return pair
+  where
+    (x, y) = getMajorVersion version
+    major = MajorVersion x y
 
 -- | Install GHC for 64-bit Linux
 posix :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, MonadMask m)
@@ -441,11 +459,11 @@ windows :: (MonadLogger m, MonadThrow m, MonadIO m)
         -> Path Abs Dir -- ^ GHC install root (Programs\ghc-X.Y.Z)
         -> Path Abs Dir -- ^ installation root (Programs\)
         -> m [FilePath]
-windows si manager version dest progDir = do
+windows si manager reqVersion dest progDir = do
     let root = toFilePath progDir
     contents <- liftIO $ handleIO (const $ return []) (getDirectoryContents root)
     gitDirs' <- getGitDirs (Just (si, manager)) root contents
-    DownloadPair version url <- getGHCPair si "windows" version
+    DownloadPair version url <- getGHCPair si "windows" reqVersion
     let dirPiece = "ghc-" <> versionString version
     req <- parseUrl $ T.unpack url
     piece <- Path.parseRelFile $ dirPiece ++ ".tar.xz"
