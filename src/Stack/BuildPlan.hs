@@ -157,11 +157,20 @@ addDeps :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, Mon
         -> m (Map PackageName (Version, Map FlagName Bool, Set PackageName))
 addDeps ghcVersion toCalc = do
     menv <- getMinimalEnvOverride
-    idents <- sourcePackageIndex menv $$ CL.foldM go idents0
-    case partitionEithers $ map hoistEither $ Map.toList idents of
-        ([], pairs) -> return $ Map.fromList pairs
-        (missing, _) -> throwM $ Couldn'tFindInIndex $ Set.fromList missing -- consider updating and trying again
+    eres <- tryAddDeps menv
+    case eres of
+        Left _ -> do
+            $logInfo "Missing packages in index, updating and trying again"
+            updateIndex menv
+            tryAddDeps menv >>= either throwM return
+        Right res -> return res
   where
+    tryAddDeps menv = do
+        idents <- sourcePackageIndex menv $$ CL.foldM go idents0
+        return $ case partitionEithers $ map hoistEither $ Map.toList idents of
+            ([], pairs) -> Right $ Map.fromList pairs
+            (missing, _) -> Left $ Couldn'tFindInIndex $ Set.fromList missing
+
     idents0 = Map.fromList
         $ map (\(n, (v, f)) -> (PackageIdentifier n v, Left f))
         $ Map.toList toCalc
