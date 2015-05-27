@@ -41,6 +41,7 @@ import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
+import           Distribution.System (OS (Windows), buildOS)
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager)
 import           Path
 import           Path.IO
@@ -49,7 +50,7 @@ import           Stack.Package
 import           Stack.Types
 import           System.Directory
 import           System.Environment
-import           System.Process.Read (getEnvOverride)
+import           System.Process.Read (getEnvOverride, EnvOverride (..))
 
 -- An uninterpreted representation of configuration options.
 -- Configurations may be "cascaded" using mappend (left-biased).
@@ -204,21 +205,35 @@ configFromConfigMonoid configStackRoot Project{..} ConfigMonoid{..} = do
          configDir = projectRoot
          configUrls = configMonoidUrls
          configGpgVerifyIndex = fromMaybe False configMonoidGpgVerifyIndex
-         configInstallDeps =
-            case configMonoidInstallDeps of
-                Just b -> b
-                Nothing ->
-                    case configMonoidDockerOpts of
-                        DockerOpts Nothing -> True
-                        DockerOpts (Just _) -> False
-         configLocalGHCs = configStackRoot </> $(mkRelDir "ghc") -- On Windows, use APPLOCALDATA\Programs?
+
+     origEnv <- getEnvOverride
+     let configEnvOverride _ = origEnv
+
+     configLocalGHCs <-
+        case buildOS of
+            Windows -> do
+                progsDir <- getWindowsProgsDir configStackRoot origEnv
+                return $ progsDir </> $(mkRelDir "stack")
+            _ -> return $ configStackRoot </> $(mkRelDir "ghc")
 
      configPackages' <- mapM (resolveDir projectRoot) projectPackages
      let configPackages = S.fromList configPackages'
          configMaybeResolver = configMonoidResolver
-     origEnv <- getEnvOverride
-     let configEnvOverride _ = origEnv
      return Config {..}
+
+-- | Get the directory on Windows where we should install extra programs. For
+-- more information, see discussion at:
+-- https://github.com/fpco/minghc/issues/43#issuecomment-99737383
+getWindowsProgsDir :: MonadThrow m
+                   => Path Abs Dir
+                   -> EnvOverride
+                   -> m (Path Abs Dir)
+getWindowsProgsDir stackRoot (EnvOverride m) =
+    case Map.lookup "LOCALAPPDATA" m of
+        Just t -> do
+            lad <- parseAbsDir $ T.unpack t
+            return $ lad </> $(mkRelDir "Programs")
+        Nothing -> return $ stackRoot </> $(mkRelDir "Programs")
 
 toBuildConfig :: (HasHttpManager env, MonadReader env m, MonadCatch m, MonadIO m, MonadLogger m)
               => Config

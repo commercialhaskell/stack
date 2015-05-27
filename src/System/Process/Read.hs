@@ -35,6 +35,7 @@ import           Data.Conduit.Process hiding (callProcess)
 import           Data.Foldable (forM_)
 import           Data.Map (Map)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import           Data.Maybe (isJust)
 import           Data.Monoid
 import           Data.Text (Text)
@@ -174,8 +175,14 @@ getEnvOverride = liftIO
         case buildOS of
             Windows -> \t ->
                 let t' = T.toUpper t
-                 in if t' == "PATH" then t' else t
+                 in if t' `Set.member` neededUppers then t' else t
             _ -> id
+
+    neededUppers = Set.fromList
+        [ "PATH"
+        , "LOCALAPPDATA"
+        , "APPDATA"
+        ]
 
 data FindExecutableException
     = NoPathFound
