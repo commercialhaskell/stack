@@ -88,7 +88,14 @@ build bopts = do
     dependencies <- getDependencies locals ranges
 
     installDependencies bopts dependencies
-    buildLocals bopts (S.fromList locals)
+    toRemove <- getPackagesToRemove (Set.map packageName (S.fromList locals))
+    buildLocals bopts (S.fromList locals) toRemove
+
+-- | Get currently user-local-db-installed packages that need to be
+-- removed before we install the new package set.
+getPackagesToRemove :: (MonadIO m, MonadLogger m, MonadReader env m, HasBuildConfig env, MonadThrow m, MonadCatch m)
+                    => Set PackageName -> m (Set PackageIdentifier)
+getPackagesToRemove toInstall = return mempty
 
 -- | Determine all of the local packages we wish to install. This does not
 -- include any dependencies.
@@ -310,13 +317,14 @@ buildLocals
     :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
     => BuildOpts
     -> Set Package
+    -> Set PackageIdentifier
     -> m ()
-buildLocals bopts packages = do
+buildLocals bopts packagesToInstall packagesToRemove = do
      env <- ask
      localDB <- packageDatabaseLocal
      menv <- getMinimalEnvOverride
-     pkgIds <- getPackageIds menv [localDB]
-                (map packageName (S.toList packages))
+     pkgIds <- getGhcPkgIds menv [localDB]
+                (map packageName (S.toList packagesToInstall))
      cabalPkgVer <- getCabalPkgVer menv
      pwd <- liftIO $ getCurrentDirectory >>= parseAbsDir
      docLoc <- liftIO getUserDocPath
@@ -324,7 +332,7 @@ buildLocals bopts packages = do
      cfgVar <- liftIO $ newMVar ConfigLock
 
      plans <-
-       forM (S.toList packages)
+       forM (S.toList packagesToInstall)
             (\package ->
                do let wantedTarget =
                         wanted pwd package
@@ -343,14 +351,14 @@ buildLocals bopts packages = do
                                    (getBuildConfig env)
                                    BTLocals
                                    gconfig
-                                   packages
+                                   packagesToInstall
                                    package
                                    installResource
                                    docLoc
                                    cfgVar))
      if boptsDryrun bopts
-        then dryRunPrint packages
-        else runPlans bopts packages plans wanted docLoc
+        then dryRunPrint packagesToInstall
+        else runPlans bopts packagesToInstall plans wanted docLoc
   where
     wanted pwd package = case boptsTargets bopts of
         [] -> FL.isParentOf pwd (packageDir package) ||
@@ -551,7 +559,7 @@ writeFinalFiles gconfig bconfig buildType dir package = liftIO $
              menv <- runReaderT getMinimalEnvOverride bconfig
              mpkgid <- runNoLoggingT
                       $ flip runReaderT bconfig
-                      $ findPackageId
+                      $ findGhcPkgId
                             menv
                             pkgDbs
                             (packageName package)
@@ -1077,11 +1085,15 @@ isHiddenDir = isPrefixOf "." . toFilePath . dirname
 -- | Get the version of Cabal from the global package database.
 getCabalPkgVer :: (MonadThrow m,MonadIO m,MonadLogger m)
                => EnvOverride -> m PackageIdentifier
-getCabalPkgVer menv =
-  do db <- getGlobalDB menv
-     findPackageId menv
-                   [db]
-                   cabalName >>=
-       maybe (throwM (Couldn'tFindPkgId cabalName))
-             (return . ghcPkgIdPackageIdentifier)
-  where cabalName = $(mkPackageName "Cabal")
+getCabalPkgVer menv = do
+    db <- getGlobalDB menv
+    findGhcPkgId
+        menv
+        [db]
+        cabalName >>=
+        maybe
+            (throwM (Couldn'tFindPkgId cabalName))
+            (return . ghcPkgIdPackageIdentifier)
+  where
+    cabalName =
+        $(mkPackageName "Cabal")

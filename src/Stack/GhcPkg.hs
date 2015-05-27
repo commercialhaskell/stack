@@ -8,8 +8,8 @@
 
 module Stack.GhcPkg
   (getAllPackages
-  ,findPackageId
-  ,getPackageIds
+  ,findGhcPkgId
+  ,getGhcPkgIds
   ,getGlobalDB
   ,EnvOverride(..)
   ,envHelper
@@ -136,43 +136,54 @@ pkgsListParser =
                 ("(" *> packageIdentifierParser <* ")")) -- hidden packages
 
 -- | Get the id of the package e.g. @foo-0.0.0-9c293923c0685761dcff6f8c3ad8f8ec@.
-findPackageId :: (MonadIO m, MonadLogger m)
-              => EnvOverride
-              -> [Path Abs Dir] -- ^ package databases
-              -> PackageName -> m (Maybe GhcPkgId)
-findPackageId menv pkgDbs name =
-  do result <- ghcPkg menv pkgDbs ["describe", packageNameString name]
-     case result of
-       Left{} -> return Nothing
-       Right lbs ->
-         do let mpid =
-                  fmap T.encodeUtf8
-                       (listToMaybe
-                          (mapMaybe (fmap stripCR . T.stripPrefix "id: ")
-                                    (map T.decodeUtf8 (S8.lines lbs))))
+findGhcPkgId :: (MonadIO m, MonadLogger m)
+             => EnvOverride
+             -> [Path Abs Dir] -- ^ package databases
+             -> PackageName
+             -> m (Maybe GhcPkgId)
+findGhcPkgId menv pkgDbs name = do
+    result <-
+        ghcPkg menv pkgDbs ["describe", packageNameString name]
+    case result of
+        Left{} ->
+            return Nothing
+        Right lbs -> do
+            let mpid =
+                    fmap
+                        T.encodeUtf8
+                        (listToMaybe
+                             (mapMaybe
+                                  (fmap stripCR .
+                                   T.stripPrefix "id: ")
+                                  (map T.decodeUtf8 (S8.lines lbs))))
             case mpid of
-              Just !pid ->
-                return (parseGhcPkgId pid)
-              _ -> return Nothing
+                Just !pid ->
+                    return (parseGhcPkgId pid)
+                _ ->
+                    return Nothing
   where
-    stripCR t = fromMaybe t (T.stripSuffix "\r" t)
+    stripCR t =
+        fromMaybe t (T.stripSuffix "\r" t)
 
 -- | Get all current package ids.
-getPackageIds :: (MonadIO m, MonadLogger m)
-              => EnvOverride
-              -> [Path Abs Dir] -- ^ package databases
-              -> [PackageName]
-              -> m (Map PackageName GhcPkgId)
-getPackageIds menv pkgDbs pkgs = collect pkgs >>= liftIO . evaluate
-  where collect =
-          liftM (M.fromList . catMaybes) .
-          mapM getTuple
-        getTuple name =
-          do mpid <- findPackageId menv pkgDbs name
-             case mpid of
-               Nothing -> return Nothing
-               Just pid ->
-                 return (Just (name,pid))
+getGhcPkgIds :: (MonadIO m, MonadLogger m)
+             => EnvOverride
+             -> [Path Abs Dir] -- ^ package databases
+             -> [PackageName]
+             -> m (Map PackageName GhcPkgId)
+getGhcPkgIds menv pkgDbs pkgs =
+    collect pkgs >>= liftIO . evaluate
+  where
+    collect =
+        liftM (M.fromList . catMaybes) .
+        mapM getTuple
+    getTuple name = do
+        mpid <- findGhcPkgId menv pkgDbs name
+        case mpid of
+            Nothing ->
+                return Nothing
+            Just pid ->
+                return (Just (name, pid))
 
 -- | Unregister the given package.
 unregisterPackage :: (MonadIO m,MonadLogger m,MonadThrow m)
