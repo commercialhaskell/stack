@@ -27,14 +27,12 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
-import           Control.Monad.Trans.Unlift
 import           Control.Monad.Writer
 import           Data.Aeson
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.Conduit
-import           Data.Conduit (($$),($=))
 import           Data.Conduit.Binary (sinkHandle)
 import qualified Data.Conduit.List as CL
 import           Data.Either
@@ -71,7 +69,6 @@ import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Types.StackT
 import           System.Directory hiding (findFiles, findExecutable)
-import           System.Environment
 import qualified System.FilePath as FilePath
 import           System.IO
 import           System.IO.Temp (withSystemTempDirectory)
