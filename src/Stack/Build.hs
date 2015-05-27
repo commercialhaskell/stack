@@ -95,7 +95,14 @@ build bopts = do
 -- removed before we install the new package set.
 getPackagesToRemove :: (MonadIO m, MonadLogger m, MonadReader env m, HasBuildConfig env, MonadThrow m, MonadCatch m)
                     => Set PackageName -> m (Set PackageIdentifier)
-getPackagesToRemove toInstall = return mempty
+getPackagesToRemove toInstall = do
+    localDB <- packageDatabaseLocal
+    menv <- getMinimalEnvOverride
+    pkgIds <-
+        getPackageVersionMap
+            menv
+            [localDB]
+    return mempty
 
 -- | Determine all of the local packages we wish to install. This does not
 -- include any dependencies.
@@ -247,7 +254,7 @@ installDependencies bopts deps' = do
     bconfig <- asks getBuildConfig
     pkgDbs <- getPackageDatabases bconfig BTDeps
     menv <- getMinimalEnvOverride
-    installed <- liftM toIdents $ getAllPackages menv pkgDbs
+    installed <- liftM toIdents $ getPackageVersionMap menv pkgDbs
     cabalPkgVer <- getCabalPkgVer menv
     let toInstall = M.difference deps installed
 

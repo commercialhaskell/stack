@@ -7,7 +7,7 @@
 -- | Functions for the GHC package database.
 
 module Stack.GhcPkg
-  (getAllPackages
+  (getPackageVersionMap
   ,findGhcPkgId
   ,getGhcPkgIds
   ,getGlobalDB
@@ -97,21 +97,24 @@ ghcPkg menv pkgDbs args = do
     go = tryProcessStdout menv "ghc-pkg" args'
 
 -- | Get all available packages.
-getAllPackages :: (MonadCatch m,MonadIO m,MonadThrow m,MonadLogger m)
-               => EnvOverride
-               -> [Path Abs Dir] -- ^ package databases
-               -> m (Map PackageName Version)
-getAllPackages menv pkgDbs =
-  do result <- ghcPkg menv pkgDbs ["--global", "list"]
-     case result of
-       Left {} -> throw GetAllPackagesFail
-       Right lbs ->
-         case AttoLazy.parse pkgsListParser
-                             (L.fromStrict lbs) of
-           AttoLazy.Fail _ _ _ ->
-             throw GetAllPackagesFail
-           AttoLazy.Done _ r ->
-             liftIO (evaluate r)
+getPackageVersionMap :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
+                     => EnvOverride
+                     -> [Path Abs Dir] -- ^ package databases
+                     -> m (Map PackageName Version)
+getPackageVersionMap menv pkgDbs = do
+    result <-
+        ghcPkg menv pkgDbs ["--global", "list"]
+    case result of
+        Left{} ->
+            throw GetAllPackagesFail
+        Right lbs ->
+            case AttoLazy.parse
+                     pkgsListParser
+                     (L.fromStrict lbs) of
+                AttoLazy.Fail _ _ _ ->
+                    throw GetAllPackagesFail
+                AttoLazy.Done _ r ->
+                    liftIO (evaluate r)
 
 -- | Parser for ghc-pkg's list output.
 pkgsListParser :: Parser (Map PackageName Version)
