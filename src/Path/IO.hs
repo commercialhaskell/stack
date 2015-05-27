@@ -4,6 +4,7 @@
 
 module Path.IO
   (getWorkingDir
+  ,listDirectory
   ,resolveDir
   ,resolveFile
   ,resolveDirMaybe
@@ -15,6 +16,8 @@ import           Control.Exception
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
+import           Data.Either
+import           Data.Maybe
 import           Data.Typeable
 import           Path
 import           System.Directory
@@ -80,3 +83,25 @@ resolveFileMaybe x y = do
             file <- liftIO $ canonicalizePath fp
             liftM Just (parseAbsFile file)
         else return Nothing
+
+-- | List objects in a directory, excluding "@.@" and "@..@".  Entries are not sorted.
+listDirectory :: (MonadIO m,MonadThrow m) => Path Abs Dir -> m ([Path Abs Dir],[Path Abs File])
+listDirectory dir =
+  do entriesFP <- liftIO (getDirectoryContents dirFP)
+     maybeEntries <-
+       forM (map (dirFP ++) entriesFP)
+            (\entryFP ->
+               do isDir <- liftIO (doesDirectoryExist entryFP)
+                  if isDir
+                     then case parseAbsDir entryFP of
+                            Nothing -> return Nothing
+                            Just entryDir ->
+                              if dir `isParentOf` entryDir
+                                 then return (Just (Left entryDir))
+                                 else return Nothing
+                     else case parseAbsFile entryFP of
+                            Nothing -> return Nothing
+                            Just entryFile -> return (Just (Right entryFile)))
+     let entries = catMaybes maybeEntries
+     return (lefts entries,rights entries)
+  where dirFP = toFilePath dir
