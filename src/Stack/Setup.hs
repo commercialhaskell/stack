@@ -17,7 +17,7 @@ module Stack.Setup
 -- import Control.Applicative ((<$>), (<*))
 import Control.Exception (Exception)
 import Control.Exception.Enclosed (handleIO)
-import Control.Monad (liftM)
+import Control.Monad (liftM, when)
 import Control.Monad.Catch (MonadThrow, throwM, MonadMask)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ReaderT (..))
@@ -49,11 +49,13 @@ import Network.HTTP.Client.Conduit
 -- import Network.HTTP.Client.TLS (tlsManagerSettings)
 -- import Network.HTTP.Types (hUserAgent)
 import System.Directory
+import System.Exit (ExitCode (ExitSuccess))
 import System.FilePath (searchPathSeparator)
 -- import System.Environment (lookupEnv, setEnv)
 -- import System.Exit (exitFailure)
 -- import System.IO (stderr, hPutStrLn)
 import System.IO.Temp (withSystemTempDirectory)
+import System.Process (rawSystem)
 -- import System.Process (callProcess, readProcess)
 
 -- Imports and new definitions for Stack.Setup
@@ -107,10 +109,10 @@ setupEnv installIfMissing manager bconfig = do
     mghcBin <- if needLocal
         then do
             $logDebug "Looking for a local copy of GHC"
-            mghcBin <- getLocalGHC bconfig expected
+            mghcBin <- getLocalGHC manager bconfig expected
             case mghcBin of
                 Just ghcBin -> do
-                    $logDebug $ "Local copy found at: " <> T.pack ghcBin
+                    $logDebug $ "Local copy found at: " <> T.intercalate ", " (map T.pack ghcBin)
                     return $ Just ghcBin
                 Nothing
                     | installIfMissing -> do
@@ -127,14 +129,8 @@ setupEnv installIfMissing manager bconfig = do
             (EnvOverride x, Nothing) -> x
             (EnvOverride x, Just ghcBin) ->
                 let mpath = Map.lookup "PATH" x
-                    path =
-                        case mpath of
-                            Nothing -> T.pack ghcBin
-                            Just y -> T.pack $ concat
-                                [ ghcBin
-                                , [searchPathSeparator]
-                                , T.unpack y
-                                ]
+                    path = T.intercalate (T.singleton searchPathSeparator)
+                        $ map T.pack ghcBin ++ maybe [] return mpath
                  in Map.insert "PATH" path x
 
     -- extra installation bin directories
@@ -195,15 +191,26 @@ getInstalledGHC menv = do
 
 -- | Get the bin directory for a local copy of GHC meeting the given version
 -- requirement, if it exists
-getLocalGHC :: (HasConfig config, MonadIO m)
-            => config
+getLocalGHC :: (HasConfig config, MonadIO m, MonadLogger m, MonadThrow m)
+            => Manager
+            -> config
             -> Version
-            -> m (Maybe FilePath)
-getLocalGHC config' expected = liftIO $ do
+            -> m (Maybe [FilePath])
+getLocalGHC manager config' expected = do
     let dir = toFilePath $ configLocalGHCs $ getConfig config'
-    contents <- handleIO (const $ return []) (getDirectoryContents dir)
-    pairs <- fmap catMaybes $ mapM (toMaybePair dir) contents
-    return $ listToMaybe $ reverse $ map snd $ sortBy (comparing fst) pairs
+    contents <- liftIO $ handleIO (const $ return []) (getDirectoryContents dir)
+    pairs <- liftIO $ fmap catMaybes $ mapM (toMaybePair dir) contents
+    case listToMaybe $ reverse $ map snd $ sortBy (comparing fst) pairs of
+        Nothing -> return Nothing
+        Just (ghcDir, ghcBin) ->
+            case buildOS of
+                Windows -> do
+                    gitDirs' <- getGitDirs manager False dir contents
+                    return $ Just
+                        $ ghcBin
+                        : (ghcDir FP.</> "mingw" FP.</> "bin")
+                        : gitDirs'
+                _ -> return $ Just [ghcBin]
   where
     expectedMajor = getMajorVersion expected
     toMaybePair root name
@@ -211,11 +218,45 @@ getLocalGHC config' expected = liftIO $ do
         , Just version <- parseVersionFromString noGhc
         , getMajorVersion version == expectedMajor
         , version >= expected = do
-            let bin = root FP.</> name FP.</> "bin"
-                ghc = bin FP.</> "ghc"
+            let dir = root FP.</> name
+                bin = dir FP.</> "bin"
+                ghc = bin FP.</> "ghc" ++ exeSuffix
             exists <- doesFileExist ghc
             return $ if exists
-                then Just (version, bin)
+                then Just (version, (dir, bin))
+                else Nothing
+        | otherwise = return Nothing
+
+    exeSuffix =
+        case buildOS of
+            Windows -> ".exe"
+            _ -> ""
+
+-- | Get the installation directories for Git on Windows
+getGitDirs :: (MonadIO m, MonadLogger m, MonadThrow m)
+           => Manager
+           -> Bool -- ^ should we install if missing?
+           -> FilePath -- ^ root installation directory
+           -> [FilePath] -- ^ contents of that directory
+           -> m [FilePath] -- ^ extra directories for the PATH
+getGitDirs manager toSetup root contents = do
+    pairs <- liftM catMaybes $ mapM toMaybePair contents
+    case listToMaybe $ reverse $ map snd $ sortBy (comparing fst) pairs of
+        Just dirs -> return dirs
+        Nothing
+            | toSetup -> setupGit manager root
+            | otherwise -> do
+                $logWarn "Using local GHC installation, but no local Git available"
+                return []
+  where
+    toMaybePair name
+        | Just noGit <- List.stripPrefix "git-" name
+        , Just version <- parseVersionFromString noGit = do
+            let dir = root FP.</> name
+                dirs = gitDirs dir
+            exists <- liftIO $ doesDirectoryExist $ head dirs
+            return $ if exists
+                then Just (version, gitDirs dir)
                 else Nothing
         | otherwise = return Nothing
 
@@ -223,7 +264,7 @@ getLocalGHC config' expected = liftIO $ do
 -- given version. In other words, if 7.8.3 is specified, 7.8.4 may be selected.
 -- Return the bin directory.
 installLocalGHC :: (MonadIO m, MonadLogger m, HasConfig env, MonadThrow m, MonadMask m)
-                => Manager -> env -> Version -> m FilePath
+                => Manager -> env -> Version -> m [FilePath]
 installLocalGHC manager config' version = do
     rel <- parseRelDir $ "ghc-" <> versionString version
     let dest = configLocalGHCs (getConfig config') Path.</> rel
@@ -231,8 +272,8 @@ installLocalGHC manager config' version = do
                 " to " <> T.pack (toFilePath dest)
     flip runReaderT config' $ case (buildOS, buildArch) of
         (Linux, X86_64) -> linux64 manager version dest
+        (Windows, _) -> windows manager version dest (configLocalGHCs $ getConfig config')
         (os, arch) -> throwM $ UnsupportedSetupCombo os arch
-    return $ toFilePath dest FP.</> "bin"
 
 data SetupException = UnsupportedSetupCombo OS Arch
                     | MissingDependencies [String]
@@ -260,7 +301,7 @@ linux64 :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThr
         => Manager
         -> Version
         -> Path Abs Dir
-        -> m ()
+        -> m [FilePath]
 linux64 manager version dest = do
     menv <- getMinimalEnvOverride
     checkDependencies ["make", "tar", "xz"]
@@ -281,11 +322,108 @@ linux64 manager version dest = do
                 $logInfo "Installing"
                 runIn dir "make" menv ["install"] Nothing
                 $logInfo "GHC installed!"
+            return [toFilePath dest FP.</> "bin"]
   where
     -- FIXME move information to a config file that can be downloaded
     m = Map.fromList
         [ ((7, 8),
             ( "http://download.fpcomplete.com/stackage-cli/linux64/ghc-7.8.4-x86_64-unknown-linux-deb7.tar.xz"
+            , "ghc-7.8.4"
+            -- FIXME include sha1 for verification of download
+            ))
+        ]
+
+-- | Download 7z as necessary, and get a function for unpacking things.
+--
+-- Returned function takes an unpack directory and archive.
+setup7z :: (MonadReader env m, HasHttpManager env, MonadThrow m, MonadIO m, MonadIO n)
+        => FilePath -- ^ install root (Programs\)
+        -> m (FilePath -> FilePath -> n ())
+setup7z root = do
+    go dllurl dll
+    go exeurl exe
+    return $ \outdir archive -> liftIO $ do
+        ec <- rawSystem exe
+            [ "x"
+            , "-o" ++ outdir
+            , "-y"
+            , archive
+            ]
+        when (ec /= ExitSuccess)
+            $ error $ "Problem while decompressing " ++ archive
+  where
+    dir = root FP.</> "7z"
+
+    go url fp = do
+        path <- Path.parseAbsFile fp
+        req <- parseUrl url
+        download req path
+
+    exeurl = "https://github.com/fpco/minghc/blob/master/bin/7z.exe?raw=true"
+    exe = dir FP.</> "7z.exe"
+
+    dllurl = "https://github.com/fpco/minghc/blob/master/bin/7z.dll?raw=true"
+    dll = dir FP.</> "7z.dll"
+
+-- | Install PortableGit and get a list of directories to add to PATH
+setupGit :: (MonadLogger m, MonadThrow m, MonadIO m)
+         => Manager
+         -> FilePath -- ^ root to install into (Programs\)
+         -> m [FilePath]
+setupGit manager root = do
+    $logInfo "Downloading PortableGit"
+    run7z <- runReaderT (setup7z root) manager
+    req <- parseUrl url
+    dest <- Path.parseAbsFile $ dir FP.<.> "7z"
+    runReaderT (download req dest) manager
+    liftIO $ createDirectoryIfMissing True dir
+    run7z dir $ toFilePath dest
+    return $ gitDirs dir
+  where
+    dir = root FP.</> name
+    name = "git-2.4.0.1"
+    url = "https://github.com/git-for-windows/git/releases/download/v2.4.0.windows.1/PortableGit-2.4.0.1-dev-preview-32-bit.7z.exe"
+
+-- | Windows: Turn a base Git installation directory into a list of bin paths.
+gitDirs :: FilePath -> [FilePath]
+gitDirs dir =
+    [ dir FP.</> "cmd"
+    , dir FP.</> "usr" FP.</> "bin"
+    ]
+
+-- | Perform necessary installation for Windows
+windows :: (MonadLogger m, MonadThrow m, MonadIO m)
+        => Manager
+        -> Version
+        -> Path Abs Dir -- ^ GHC install root (Programs\ghc-X.Y.Z)
+        -> Path Abs Dir -- ^ installation root (Programs\)
+        -> m [FilePath]
+windows manager version dest progDir = do
+    let root = toFilePath progDir
+    contents <- liftIO $ handleIO (const $ return []) (getDirectoryContents root)
+    gitDirs' <- getGitDirs manager True root contents
+    case Map.lookup (getMajorVersion version) m of
+        Nothing -> throwM $ UnknownGHCVersion version (Map.keysSet m)
+        Just (url, dirPiece) -> do
+            req <- parseUrl url
+            piece <- Path.parseRelFile $ dirPiece ++ ".tar.xz"
+            let destXZ = progDir Path.</> piece
+            $logInfo $ "Downloading GHC from: " <> T.pack url
+            runReaderT (download req destXZ) manager
+            run7z <- runReaderT (setup7z root) manager
+            run7z (toFilePath progDir) (toFilePath destXZ)
+            run7z (toFilePath progDir)
+                  (toFilePath progDir FP.</> dirPiece FP.<.> "tar")
+            return $
+                [ toFilePath $ dest Path.</> $(Path.mkRelDir "bin")
+                , toFilePath $ dest Path.</> $(Path.mkRelDir "mingw")
+                                    Path.</> $(Path.mkRelDir "bin")
+                ] ++ gitDirs'
+  where
+    -- FIXME move information to a config file that can be downloaded
+    m = Map.fromList
+        [ ((7, 8),
+            ( "https://www.haskell.org/ghc/dist/7.8.4/ghc-7.8.4-i386-unknown-mingw32.tar.xz"
             , "ghc-7.8.4"
             -- FIXME include sha1 for verification of download
             ))

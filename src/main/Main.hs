@@ -8,6 +8,7 @@
 module Main where
 
 import           Control.Exception
+import           Control.Monad (join)
 import           Control.Monad.Logger
 import           Data.List
 import           Data.Maybe
@@ -15,6 +16,7 @@ import qualified Data.Text as T
 import           Distribution.Text (display)
 import           Options.Applicative.Extra
 import           Options.Applicative.Simple
+import           Path (toFilePath)
 import           Stack.Build
 import           Stack.Build.Types
 import           Stack.Config
@@ -27,6 +29,7 @@ import           Stack.Types
 import           Stack.Types.StackT
 import           System.Exit (exitWith)
 import qualified System.Process as P
+import qualified System.Process.Read
 
 -- | Commandline dispatcher.
 main :: IO ()
@@ -208,12 +211,14 @@ execCmd :: (String, [String]) -> LogLevel -> IO ()
 execCmd (cmd, args) logLevel = do
     manager <- newTLSManager
     config <- runStackLoggingT manager logLevel (loadBuildConfig >>= setupEnv False manager)
-    let cp = (P.proc cmd args)
-            { P.env = envHelper $ configEnvOverride (bcConfig config)
+    let menv = configEnvOverride (bcConfig config)
                     EnvSettings
                         { esIncludeLocals = True
                         , esIncludeGhcPackagePath = True
                         }
+    cmd' <- join $ System.Process.Read.findExecutable menv cmd
+    let cp = (P.proc (toFilePath cmd') args)
+            { P.env = envHelper menv
             }
     (Nothing, Nothing, Nothing, ph) <- P.createProcess cp
     ec <- P.waitForProcess ph

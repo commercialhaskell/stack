@@ -38,11 +38,11 @@ library
                      Stack.Build
                      Stack.Build.Types
                      Stack.Build.Doc
+                     System.Process.Read
   other-modules:     Network.HTTP.Download
                      Path.Find
                      Path.IO
                      System.Process.PagerEditor
-                     System.Process.Read
                      Paths_stack
                      Data.Attoparsec.Combinators
                      Data.Set.Monad
