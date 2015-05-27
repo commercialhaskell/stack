@@ -19,6 +19,7 @@ module Stack.Fetch
 import           Control.Monad.IO.Class
 import           Control.Monad (forM, liftM)
 import           Control.Monad.Logger
+import           Control.Monad.Reader (asks)
 import           Data.Monoid ((<>))
 import           Stack.Types
 import           Stack.PackageIndex (findNewestVersions)
@@ -190,13 +191,13 @@ unpackPackages menv dest input = do
 -- | Ensure that all of the given package idents are unpacked into the build
 -- unpack directory, and return the paths to all of the subdirectories.
 unpackPackageIdentsForBuild
-    :: (MonadBaseControl IO m, MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m)
+    :: (MonadBaseControl IO m, MonadIO m, MonadReader env m, HasHttpManager env, HasBuildConfig env, MonadThrow m, MonadLogger m)
     => EnvOverride
     -> Map PackageName Version
     -> m (Set (Path Abs Dir))
 unpackPackageIdentsForBuild menv idents0 = do
-    config <- askConfig
-    let unpackDir = configLocalUnpackDir config
+    bconfig <- asks getBuildConfig
+    let unpackDir = configLocalUnpackDir bconfig
     (idents, paths1) <- liftM partitionEithers $ forM (Map.toList idents0) $ \(name, version) -> do
         let ident = PackageIdentifier name version
         rel <- parseRelDir $ packageIdentifierString ident

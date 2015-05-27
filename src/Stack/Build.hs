@@ -14,8 +14,7 @@
 module Stack.Build
   (build
   ,clean
-  ,shakeFilesPath
-  ,configDir)
+  ,shakeFilesPath)
   where
 
 import qualified Control.Applicative as A
@@ -103,8 +102,8 @@ determineLocals bopts = do
 
     $logDebug "Unpacking packages as necessary"
     menv <- getMinimalEnvOverride
-    paths2 <- unpackPackageIdentsForBuild menv (configExtraDeps cfg)
-    let paths = M.fromList (map (, PTUser) $ Set.toList $ configPackages cfg) -- FIXME shouldn't some command line options tell us which of these we care about right now?
+    paths2 <- unpackPackageIdentsForBuild menv (bcExtraDeps bconfig)
+    let paths = M.fromList (map (, PTUser) $ Set.toList $ bcPackages bconfig) -- FIXME shouldn't some command line options tell us which of these we care about right now?
              <> M.fromList (map (, PTDep) $ Set.toList paths2)
     $logDebug $ "Installing from local directories: " <> T.pack (show paths)
     locals <- forM (M.toList paths) $ \(dir, ptype) -> do
@@ -121,7 +120,7 @@ determineLocals bopts = do
         { packageConfigEnableTests = False
         , packageConfigEnableBenchmarks = False
         , packageConfigFlags =
-               fromMaybe M.empty (M.lookup name $ configFlags config)
+               fromMaybe M.empty (M.lookup name $ bcFlags bconfig)
         , packageConfigGhcVersion = bcGhcVersion bconfig
         }
       where config = bcConfig bconfig
@@ -135,7 +134,7 @@ determineLocals bopts = do
                 DoBenchmarks -> True
                 _ -> False
         , packageConfigFlags =
-               fromMaybe M.empty (M.lookup name $ configFlags config)
+               fromMaybe M.empty (M.lookup name $ bcFlags bconfig)
         , packageConfigGhcVersion = bcGhcVersion bconfig
         }
       where
@@ -361,7 +360,7 @@ buildLocals bopts packages = do
                    (mapMaybe (parsePackageNameFromString . T.unpack) targets)
 
 -- FIXME clean up this function to make it more nicely shareable
-runPlans :: (MonadIO m,MonadReader env m,HasConfig env,HasLogLevel env)
+runPlans :: (MonadIO m,MonadReader env m,HasBuildConfig env,HasLogLevel env)
          => BuildOpts
          -> Set Package
          -> [Rules ()]
@@ -370,12 +369,13 @@ runPlans :: (MonadIO m,MonadReader env m,HasConfig env,HasLogLevel env)
          -> m ()
 runPlans bopts packages plans wanted docLoc = do
     logLevel <- asks getLogLevel
+    bconfig <- asks getBuildConfig
     config <- asks getConfig
     pwd <- getWorkingDir
     liftIO $ withArgs []
                       (shakeArgs shakeOptions {shakeVerbosity = logLevelToShakeVerbosity logLevel
                                               ,shakeFiles =
-                                                 FL.toFilePath (shakeFilesPath (configDir config))
+                                                 FL.toFilePath (shakeFilesPath (bcRoot bconfig))
                                               ,shakeThreads =
                                                 -- See: https://github.com/fpco/stack/issues/84
                                                 case buildOS of
@@ -410,8 +410,8 @@ clean :: forall m env.
       => m ()
 clean =
   do env <- ask
-     let config = getConfig env
-     forM_ (S.toList (configPackages config))
+     let root = bcRoot $ getBuildConfig env
+     forM_ (S.toList (bcPackages $ getBuildConfig env))
            (\pkgdir ->
               do deleteGenFile pkgdir
                  let distDir =
@@ -419,11 +419,11 @@ clean =
                  liftIO $ do
                      exists <- doesDirectoryExist distDir
                      when exists (removeDirectoryRecursive distDir))
-     let listDir = FL.parent (shakeFilesPath (configDir config))
+     let listDir = FL.parent (shakeFilesPath root)
      ls <- liftIO $
        fmap (map (FL.toFilePath listDir ++))
             (getDirectoryContents (FL.toFilePath listDir))
-     mapM_ (rmShakeMetadata (configDir config)) ls
+     mapM_ (rmShakeMetadata root) ls
   where rmShakeMetadata cfg p = liftIO $
           when (isPrefixOf
                   (FilePath.takeFileName

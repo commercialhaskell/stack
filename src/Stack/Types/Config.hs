@@ -11,7 +11,7 @@ import Control.Exception
 import Control.Monad (liftM)
 import Control.Monad.Catch (MonadThrow, throwM)
 import Control.Monad.Reader (MonadReader, ask, asks)
-import Data.Aeson (FromJSON, parseJSON, withText)
+import Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, withText)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
@@ -35,21 +35,8 @@ data Config =
   Config {configStackRoot        :: !(Path Abs Dir)
          -- ^ ~/.stack more often than not
          ,configDocker           :: !(Maybe Docker)
-         ,configPackages         :: !(Set (Path Abs Dir))
-         -- ^ Local packages identified by a path
-         ,configExtraDeps        :: !(Map PackageName Version)
-         -- ^ Extra dependencies specified in configuration.
-         --
-         -- These dependencies will not be installed to a shared location, and
-         -- will override packages provided by the resolver.
-         ,configFlags            :: !(Map PackageName (Map FlagName Bool))
-         ,configDir              :: !(Path Abs Dir)
-         -- ^ Directory containing the project's stack.yaml file
          ,configUrls             :: !(Map Text Text)
          ,configGpgVerifyIndex   :: !Bool
-         ,configMaybeResolver    :: !(Maybe Resolver)
-         -- ^ May not actually be available in the config. See 'BuildConfig'
-         -- where this is guaranteed to be resolved.
          ,configEnvOverride      :: !(EnvSettings -> EnvOverride)
          -- ^ Environment variables to be passed to external tools
          ,configLocalGHCs        :: !(Path Abs Dir)
@@ -76,6 +63,17 @@ data BuildConfig = BuildConfig
     , bcGhcVersion :: !Version
       -- ^ Version of GHC we'll be using for this build, @Nothing@ if no
       -- preference
+    , bcPackages   :: !(Set (Path Abs Dir))
+      -- ^ Local packages identified by a path
+    , bcExtraDeps  :: !(Map PackageName Version)
+      -- ^ Extra dependencies specified in configuration.
+      --
+      -- These dependencies will not be installed to a shared location, and
+      -- will override packages provided by the resolver.
+    , bcRoot       :: !(Path Abs Dir)
+      -- ^ Directory containing the project's stack.yaml file
+    , bcFlags      :: !(Map PackageName (Map FlagName Bool))
+      -- ^ Per-package flag overrides
     }
 
 -- | How we resolve which dependencies to install given a set of packages.
@@ -90,6 +88,8 @@ data Resolver
   -- dependencies manually, such as using a dependency solver.
   deriving (Show)
 
+instance ToJSON Resolver where
+    toJSON = toJSON . renderResolver
 instance FromJSON Resolver where
     parseJSON = withText "Resolver" $
         either (fail . show) return . parseResolver
@@ -212,12 +212,12 @@ configPackageTarball config ident = do
     return $ configStackRoot config </> $(mkRelDir "packages") </> name </> ver </> base
 
 -- | Per-project work dir
-configProjectWorkDir :: HasConfig env => env -> Path Abs Dir
-configProjectWorkDir env = configDir (getConfig env) </> $(mkRelDir ".stack-work")
+configProjectWorkDir :: HasBuildConfig env => env -> Path Abs Dir
+configProjectWorkDir env = bcRoot (getBuildConfig env) </> $(mkRelDir ".stack-work")
 
 -- | Where to unpack packages for local build
-configLocalUnpackDir :: Config -> Path Abs Dir
-configLocalUnpackDir config = configProjectWorkDir config </> $(mkRelDir "unpacked")
+configLocalUnpackDir :: HasBuildConfig env => env -> Path Abs Dir
+configLocalUnpackDir env = configProjectWorkDir env </> $(mkRelDir "unpacked")
 
 -- | Installation root for dependencies
 installationRootDeps :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
@@ -233,7 +233,7 @@ installationRootLocal = do
     bc <- asks getBuildConfig
     name <- parseRelDir $ T.unpack $ renderResolver $ bcResolver bc
     ghc <- parseRelDir $ versionString $ bcGhcVersion bc
-    return $ configProjectWorkDir (bcConfig bc) </> $(mkRelDir "install") </> name </> ghc
+    return $ configProjectWorkDir bc </> $(mkRelDir "install") </> name </> ghc
 
 -- | Package database for installing dependencies into
 packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)

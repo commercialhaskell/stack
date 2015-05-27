@@ -9,6 +9,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TupleSections #-}
 
 -- | The general Stack configuration that starts everything off. This should
 -- be smart to falback if there is no stack.yaml, instead relying on
@@ -22,7 +23,7 @@
 -- a warning that "you should run `stk init` to make things better".
 module Stack.Config
   ( loadConfig
-  , toBuildConfig
+  , loadBuildConfig
   ) where
 
 import           Control.Applicative
@@ -34,7 +35,10 @@ import           Control.Monad.Reader (MonadReader, ask, runReaderT)
 import           Data.Aeson
 import           Data.Either (partitionEithers)
 import           Data.Map (Map)
+import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
+import qualified Distribution.Package as C
+import qualified Distribution.PackageDescription as C
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Set as S
@@ -63,15 +67,13 @@ data ConfigMonoid =
     -- helper functions.
     , configMonoidGpgVerifyIndex :: !(Maybe Bool)
     -- ^ Controls how package index updating occurs
-    , configMonoidResolver       :: !(Maybe Resolver)
-    -- ^ How we resolve which dependencies to use
     }
   deriving Show
 
 -- | Get the default resolver value
 getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env, HasUrls env, HasHttpManager env, MonadLogger m)
                    => Path Abs Dir
-                   -> m Resolver
+                   -> m (Resolver, Map PackageName (Map FlagName Bool))
 getDefaultResolver dir = do
     ecabalfp <- try $ getCabalFileName dir
     msnap <- case ecabalfp of
@@ -81,10 +83,20 @@ getDefaultResolver dir = do
         Right cabalfp -> do
             gpd <- readPackageUnresolved cabalfp
             mpair <- findBuildPlan cabalfp gpd
-            return mpair
+            let name =
+                    case C.package $ C.packageDescription gpd of
+                        C.PackageIdentifier cname _ ->
+                            fromCabalPackageName cname
+            return $ fmap (, name) mpair
     case msnap of
-        Just (snap, _FIXMEflags) -> return $ ResolverSnapshot snap
-        Nothing -> return $ ResolverSnapshot $ LTS 2 9 -- FIXME
+        Just ((snap, flags), name) ->
+            return (ResolverSnapshot snap, Map.singleton name flags)
+        Nothing -> do
+            s <- getSnapshots
+            let snap = case IntMap.maxViewWithKey (snapshotsLts s) of
+                    Just ((x, y), _) -> LTS x y
+                    Nothing -> Nightly $ snapshotsNightly s
+            return (ResolverSnapshot snap, Map.empty)
 
 -- | Dummy type to support this monoid business.
 newtype DockerOpts = DockerOpts (Maybe Docker)
@@ -102,13 +114,11 @@ instance Monoid ConfigMonoid where
     { configMonoidDockerOpts = mempty
     , configMonoidUrls = mempty
     , configMonoidGpgVerifyIndex = Nothing
-    , configMonoidResolver = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
     , configMonoidUrls = configMonoidUrls l <> configMonoidUrls r
     , configMonoidGpgVerifyIndex = configMonoidGpgVerifyIndex l <|> configMonoidGpgVerifyIndex r
-    , configMonoidResolver = configMonoidResolver l <|> configMonoidResolver r
     }
 
 instance FromJSON ConfigMonoid where
@@ -118,16 +128,13 @@ instance FromJSON ConfigMonoid where
       do getTheDocker <- obj .:? "docker"
          configMonoidUrls <- obj .:? "urls" .!= mempty
          configMonoidGpgVerifyIndex <- obj .:? "gpg-verify-index"
-         configMonoidResolver <- obj .:? "resolver"
          let configMonoidDockerOpts = DockerOpts getTheDocker
          return ConfigMonoid {..}
 
 -- | A project is a collection of packages. We can have multiple stack.yaml
 -- files, but only one of them may contain project information.
 data Project = Project
-    { projectRoot :: !(Path Abs Dir)
-    -- ^ The directory containing the project's stack.yaml
-    , projectPackages :: ![FilePath]
+    { projectPackages :: ![FilePath]
     -- ^ Components of the package list which refer to local directories
     --
     -- Note that we use @FilePath@ and not @Path@s. The goal is: first parse
@@ -137,16 +144,20 @@ data Project = Project
     -- see: https://github.com/fpco/stack/issues/41
     , projectFlags :: !(Map PackageName (Map FlagName Bool))
     -- ^ Per-package flag overrides
-    , projectConfigExists :: !Bool
-    -- ^ If 'True', then we actually loaded this from a real config file. If
-    -- 'False', then we just made up a default.
-    , projectConfigMonoid :: !ConfigMonoid
-    -- ^ Extra config values found
+    , projectResolver :: !Resolver
+    -- ^ How we resolve which dependencies to use
     }
   deriving Show
 
-instance FromJSON (Path Abs Dir -> Project) where -- FIXME get rid of Path Abs Dir
-    parseJSON = withObject "Project" $ \o -> do
+instance ToJSON Project where
+    toJSON p = object
+        [ "packages"   .= projectPackages p
+        , "extra-deps" .= map fromTuple (Map.toList $ projectExtraDeps p)
+        , "flags"      .= projectFlags p
+        , "resolver"   .= projectResolver p
+        ]
+instance FromJSON (Project, ConfigMonoid) where
+    parseJSON = withObject "Project, ConfigMonoid" $ \o -> do
         dirs <- o .:? "packages" .!= ["."]
         extraDeps' <- o .:? "extra-deps" .!= []
         extraDeps <-
@@ -155,15 +166,15 @@ instance FromJSON (Path Abs Dir -> Project) where -- FIXME get rid of Path Abs D
                 (errs, _) -> fail $ unlines errs
 
         flags <- o .:? "flags" .!= mempty
+        resolver <- o .: "resolver"
         config <- parseJSON $ Object o
-        return $ \root -> Project
-            { projectRoot = root
-            , projectPackages = dirs
-            , projectExtraDeps = extraDeps
-            , projectFlags = flags
-            , projectConfigExists = True
-            , projectConfigMonoid = config
-            }
+        let project = Project
+                { projectPackages = dirs
+                , projectExtraDeps = extraDeps
+                , projectFlags = flags
+                , projectResolver = resolver
+                }
+        return (project, config)
       where
         goDeps =
             map toSingle . Map.toList . Map.unionsWith S.union . map toMap
@@ -189,15 +200,11 @@ defaultStackGlobalConfig = parseAbsFile "/etc/stack/config"
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env)
   => Path Abs Dir -- ^ stack root, e.g. ~/.stack
-  -> Project
   -> ConfigMonoid
   -> m Config
-configFromConfigMonoid configStackRoot Project{..} ConfigMonoid{..} = do
+configFromConfigMonoid configStackRoot ConfigMonoid{..} = do
      let configDocker = case configMonoidDockerOpts of
                  DockerOpts x -> x
-         configFlags = projectFlags
-         configExtraDeps = projectExtraDeps
-         configDir = projectRoot
          configUrls = configMonoidUrls
          configGpgVerifyIndex = fromMaybe False configMonoidGpgVerifyIndex
 
@@ -211,9 +218,6 @@ configFromConfigMonoid configStackRoot Project{..} ConfigMonoid{..} = do
                 return $ progsDir </> $(mkRelDir "stack")
             _ -> return $ configStackRoot </> $(mkRelDir "ghc")
 
-     configPackages' <- mapM (resolveDir projectRoot) projectPackages
-     let configPackages = S.fromList configPackages'
-         configMaybeResolver = configMonoidResolver
      return Config {..}
 
 -- | Get the directory on Windows where we should install extra programs. For
@@ -230,47 +234,6 @@ getWindowsProgsDir stackRoot (EnvOverride m) =
             return $ lad </> $(mkRelDir "Programs")
         Nothing -> return $ stackRoot </> $(mkRelDir "Programs")
 
-toBuildConfig :: (HasHttpManager env, MonadReader env m, MonadCatch m, MonadIO m, MonadLogger m)
-              => Config
-              -> m BuildConfig
-toBuildConfig config = do
-    env <- ask
-    let miniConfig = MiniConfig (getHttpManager env) config
-    resolver <- case configMaybeResolver config of
-        Just r -> return r
-        Nothing -> do
-            r <- runReaderT (getDefaultResolver $ configDir config) miniConfig
-            let dest = toFilePath $ configDir config </> stackDotYaml
-            exists <- liftIO $ doesFileExist dest
-            if exists
-                then do
-                    $logWarn $ T.concat
-                        [ "No resolver value found in your config files. "
-                        , "Without a value stated, your build will be slower and unstable. "
-                        , "Please consider adding the following line to your config file:"
-                        ]
-                    $logWarn $ "    resolver: " <> renderResolver r
-                else do
-                    $logInfo $ "Writing default config file to: " <> T.pack dest
-                    liftIO $ Yaml.encodeFile dest $ object
-                        [ "packages" .= ["." :: Text]
-                        , "resolver" .= renderResolver r
-                        ]
-            return r
-
-    ghcVersion <-
-        case resolver of
-            ResolverSnapshot snapName -> do
-                mbp <- runReaderT (loadMiniBuildPlan snapName Map.empty) miniConfig
-                return $ mbpGhcVersion mbp
-            ResolverGhc x y -> return $ fromMajorVersion x y
-
-    return BuildConfig
-        { bcConfig = config
-        , bcResolver = resolver
-        , bcGhcVersion = ghcVersion
-        }
-
 data MiniConfig = MiniConfig Manager Config
 instance HasConfig MiniConfig where
     getConfig (MiniConfig _ c) = c
@@ -284,16 +247,77 @@ instance HasUrls MiniConfig
 loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env)
            => m Config
 loadConfig = do
+    stackRoot <- determineStackRoot
+    extraConfigs <- getExtraConfigs stackRoot
+    mproject <- getProjectConfig
+    let fps = maybe id (:) mproject extraConfigs
+    configs <- mapM loadConfigMonoid fps
+    configFromConfigMonoid stackRoot $ mconcat configs
+
+-- | Load the configuration, like in @loadConfig@, but gets project-specific
+-- values.
+loadBuildConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env)
+                => m BuildConfig
+loadBuildConfig = do
+    stackRoot <- determineStackRoot
+    extraConfigs <- getExtraConfigs stackRoot >>= mapM loadConfigMonoid
+    mproject <- loadProjectConfig
+    config <- configFromConfigMonoid stackRoot $ mconcat $
+        case mproject of
+            Nothing -> extraConfigs
+            Just (_, _, config) -> config : extraConfigs
+
+    env <- ask
+    let miniConfig = MiniConfig (getHttpManager env) config
+    (project, stackYamlFP) <- case mproject of
+        Just (project, fp, _) -> return (project, fp)
+        Nothing -> do
+            currDir <- getWorkingDir
+            (r, flags) <- runReaderT (getDefaultResolver currDir) miniConfig
+            let dest = currDir </> stackDotYaml
+                dest' = toFilePath dest
+            exists <- liftIO $ doesFileExist dest'
+            when exists $ error "Invariant violated: in toBuildConfig's Nothing branch, and the stack.yaml file exists"
+            $logInfo $ "Writing default config file to: " <> T.pack dest'
+            let p = Project
+                    { projectPackages = ["."]
+                    , projectExtraDeps = Map.empty
+                    , projectFlags = flags
+                    , projectResolver = r
+                    }
+            liftIO $ Yaml.encodeFile dest' p
+            return (p, dest)
+
+    ghcVersion <-
+        case projectResolver project of
+            ResolverSnapshot snapName -> do
+                mbp <- runReaderT (loadMiniBuildPlan snapName Map.empty) miniConfig
+                return $ mbpGhcVersion mbp
+            ResolverGhc x y -> return $ fromMajorVersion x y
+
+    let root = parent stackYamlFP
+    packages' <- mapM (resolveDir root) (projectPackages project)
+    let packages = S.fromList packages'
+
+    return BuildConfig
+        { bcConfig = config
+        , bcResolver = projectResolver project
+        , bcGhcVersion = ghcVersion
+        , bcPackages = packages
+        , bcExtraDeps = projectExtraDeps project
+        , bcRoot = root
+        , bcFlags = projectFlags project
+        }
+
+-- | Get the stack root, e.g. ~/.stack
+determineStackRoot :: (MonadIO m, MonadThrow m) => m (Path Abs Dir)
+determineStackRoot = do
     env <- liftIO getEnvironment
-    stackRoot <- (>>= parseAbsDir) $
+    root <-
         case lookup "STACK_ROOT" env of
             Nothing -> liftIO $ getAppUserDataDirectory "stack"
             Just x -> return x
-
-    extraConfigs <- getExtraConfigs stackRoot >>= mapM loadConfigMonoid
-    project <- loadProjectConfig
-    let config = mconcat (projectConfigMonoid project:extraConfigs)
-    configFromConfigMonoid stackRoot project config
+    parseAbsDir root
 
 -- | Determine the extra config file locations which exist.
 --
@@ -319,41 +343,19 @@ loadConfigMonoid path =
     liftIO $ Yaml.decodeFileEither (toFilePath path)
          >>= either throwM return
 
--- | Find the project config file location, respecting environment variables
--- and otherwise traversing parents. If no config is found, we supply a default
--- based on current directory.
-loadProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m) => m Project
-loadProjectConfig = do
+-- | Get the location of the project config file, if it exists
+getProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)
+                 => m (Maybe (Path Abs File))
+getProjectConfig = do
     env <- liftIO getEnvironment
     case lookup "STACK_YAML" env of
         Just fp -> do
             $logInfo "Getting project config file from STACK_YAML environment"
-            parseAbsFile fp >>= load
+            liftM Just $ parseAbsFile fp
         Nothing -> do
             currDir <- getWorkingDir
-            mfp <- search currDir
-            case mfp of
-                Just fp -> do
-                    $logDebug $ "Loading project config file " <>
-                                T.pack (maybe (toFilePath fp) toFilePath (stripDir currDir fp))
-                    load fp
-                Nothing -> do
-                    $logInfo $ "No project config file found, using defaults"
-                    return Project
-                        { projectRoot = currDir
-                        , projectPackages = ["."]
-                        , projectExtraDeps = mempty
-                        , projectFlags = mempty
-                        , projectConfigExists = False
-                        , projectConfigMonoid = mempty
-                        }
+            search currDir
   where
-    load fp = do
-        mkProject <-
-            liftIO (Yaml.decodeFileEither (toFilePath fp))
-               >>= either throwM return
-        return $ mkProject $ parent fp
-
     search dir = do
         let fp = dir </> stackDotYaml
             fp' = toFilePath fp
@@ -367,6 +369,29 @@ loadProjectConfig = do
                     -- fully traversed, give up
                     then return Nothing
                     else search dir'
+
+-- | Find the project config file location, respecting environment variables
+-- and otherwise traversing parents. If no config is found, we supply a default
+-- based on current directory.
+loadProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)
+                  => m (Maybe (Project, Path Abs File, ConfigMonoid))
+loadProjectConfig = do
+    mfp <- getProjectConfig
+    case mfp of
+        Just fp -> do
+            currDir <- getWorkingDir
+            $logDebug $ "Loading project config file " <>
+                        T.pack (maybe (toFilePath fp) toFilePath (stripDir currDir fp))
+            load fp
+        Nothing -> do
+            $logInfo $ "No project config file found, using defaults"
+            return Nothing
+  where
+    load fp = do
+        (project, config) <-
+            liftIO (Yaml.decodeFileEither (toFilePath fp))
+               >>= either throwM return
+        return $ Just (project, fp, config)
 
 -- | The filename used for the stack config file.
 stackDotYaml :: Path Rel File

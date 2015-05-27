@@ -80,13 +80,13 @@ main =
 setupCmd :: LogLevel -> IO ()
 setupCmd logLevel = do
   manager <- newTLSManager
-  _ <- runStackLoggingT manager logLevel (loadConfig >>= toBuildConfig >>= setupEnv True manager)
+  _ <- runStackLoggingT manager logLevel (loadBuildConfig >>= setupEnv True manager)
   return ()
 
 cleanCmd :: () -> LogLevel -> IO ()
 cleanCmd _ logLevel = do
   manager <- newTLSManager
-  config <- runStackLoggingT manager logLevel (loadConfig >>= toBuildConfig >>= setupEnv False manager)
+  config <- runStackLoggingT manager logLevel (loadBuildConfig >>= setupEnv False manager)
   runStackT manager logLevel config clean
 
 -- | Build the project.
@@ -95,7 +95,7 @@ buildCmd finalAction opts logLevel =
   catch
   (do manager <- newTLSManager
       config <-
-       runStackLoggingT manager logLevel (loadConfig >>= toBuildConfig >>= setupEnv False manager)
+       runStackLoggingT manager logLevel (loadBuildConfig >>= setupEnv False manager)
       runStackT manager logLevel config $
                  Stack.Build.build opts { boptsFinalAction = finalAction})
            (error . printBuildException)
@@ -189,7 +189,7 @@ updateCmd () logLevel = do
 execCmd :: (String, [String]) -> LogLevel -> IO ()
 execCmd (cmd, args) logLevel = do
     manager <- newTLSManager
-    config <- runStackLoggingT manager logLevel (loadConfig >>= toBuildConfig >>= setupEnv False manager)
+    config <- runStackLoggingT manager logLevel (loadBuildConfig >>= setupEnv False manager)
     let cp = (P.proc cmd args)
             { P.env = envHelper $ configEnvOverride (bcConfig config)
                     EnvSettings
