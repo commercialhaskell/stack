@@ -83,9 +83,11 @@ instance Show BuildPlanException where
 resolveBuildPlan :: MonadThrow m
                  => MiniBuildPlan
                  -> Map PackageName (Set PackageName) -- ^ required packages, and users of it
-                 -> m (Map PackageName (Version, Map FlagName Bool))
+                 -> m ( Map PackageName (Version, Map FlagName Bool)
+                      , Map PackageName (Set PackageName)
+                      )
 resolveBuildPlan mbp packages
-    | Map.null (rsUnknown rs) = return (rsToInstall rs)
+    | Map.null (rsUnknown rs) = return (rsToInstall rs, rsUsedBy rs)
     | otherwise = throwM $ UnknownPackages $ rsUnknown rs
   where
     rs = getDeps mbp packages
@@ -94,6 +96,7 @@ data ResolveState = ResolveState
     { rsVisited   :: Set PackageName
     , rsUnknown   :: Map PackageName (Set PackageName)
     , rsToInstall :: Map PackageName (Version, Map FlagName Bool)
+    , rsUsedBy    :: Map PackageName (Set PackageName)
     }
 
 data MiniBuildPlan = MiniBuildPlan
@@ -149,6 +152,7 @@ getDeps mbp packages =
         { rsVisited = Set.empty
         , rsUnknown = Map.empty
         , rsToInstall = Map.empty
+        , rsUsedBy = Map.empty
         }
   where
     goName :: PackageName -> Set PackageName -> State ResolveState ()
@@ -157,6 +161,9 @@ getDeps mbp packages =
         -- earlier, lookup in mbpPackages first so that we can produce more
         -- usable error information on missing dependencies
         rs <- get
+        put rs
+            { rsUsedBy = Map.insertWith Set.union name users $ rsUsedBy rs
+            }
         case Map.lookup name $ mbpPackages mbp of
             Nothing -> modify $ \rs' -> rs'
                 { rsUnknown = Map.insertWith Set.union name users $ rsUnknown rs'

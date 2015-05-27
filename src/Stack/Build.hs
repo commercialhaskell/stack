@@ -201,7 +201,15 @@ getDependencies locals ranges = do
             $logDebug $ "Checking resolver: " <> renderSnapName snapName
             mbp <- liftM (removeReverseDeps $ map packageName locals)
                  $ loadMiniBuildPlan snapName
-            resolveBuildPlan mbp (fmap M.keysSet ranges)
+            (deps, users) <- resolveBuildPlan mbp (fmap M.keysSet ranges)
+            forM_ (M.toList users) $ \(name, users') -> $logDebug $
+                T.concat
+                    [ packageNameText name
+                    , " used by "
+                    , T.intercalate ", " $ map packageNameText
+                                         $ Set.toList users'
+                    ]
+            return deps
         ResolverGhc _ _ -> return M.empty
 
     let checkDepRange (dep, users) =
