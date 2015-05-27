@@ -192,6 +192,7 @@ packageVersionsParser sectionPredicate f =
         fmap
             (reverse .
              dropWhile (== ':') .
+             dropWhile (== '\r') .
              reverse)
             (many1 (satisfy (not . (== '\n')))) <*
         endOfLine
