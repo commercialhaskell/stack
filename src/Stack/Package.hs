@@ -22,7 +22,8 @@ module Stack.Package
   ,stackageBuildDir
   ,PackageException (..)
   ,resolvePackageDescription
-  ,packageDependencies)
+  ,packageDependencies
+  ,packageIdentifier)
   where
 
 import           Control.Exception hiding (try)
@@ -62,6 +63,7 @@ import           Path.IO
 import           Prelude hiding (FilePath)
 import           Stack.Constants
 import           Stack.Types
+import qualified Stack.Types.PackageIdentifier
 import qualified System.FilePath as FilePath
 
 -- | All exceptions thrown by the library.
@@ -97,6 +99,13 @@ data Package =
           ,packageHasLibrary :: !Bool                     -- ^ does the package have a buildable library stanza?
           }
  deriving (Show,Typeable)
+
+-- | Get the identifier of the package.
+packageIdentifier :: Package -> Stack.Types.PackageIdentifier.PackageIdentifier
+packageIdentifier pkg =
+    Stack.Types.PackageIdentifier.PackageIdentifier
+        (packageName pkg)
+        (packageVersion pkg)
 
 -- | Is this package a user target package, or a dependency?
 data PackageType = PTUser | PTDep
