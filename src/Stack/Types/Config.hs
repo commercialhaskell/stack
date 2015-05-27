@@ -34,7 +34,7 @@ import System.Process.Read (EnvOverride)
 data Config =
   Config {configStackRoot        :: !(Path Abs Dir)
          -- ^ ~/.stack more often than not
-         ,configDocker           :: !(Maybe Docker)
+         ,configDocker           :: !Docker
          ,configUrls             :: !(Map Text Text)
          ,configGpgVerifyIndex   :: !Bool
          ,configEnvOverride      :: !(EnvSettings -> EnvOverride)

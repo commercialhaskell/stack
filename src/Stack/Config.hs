@@ -24,6 +24,7 @@
 module Stack.Config
   ( loadConfig
   , loadBuildConfig
+  , stackDotYaml
   ) where
 
 import           Control.Applicative
@@ -99,15 +100,14 @@ getDefaultResolver dir = do
             return (ResolverSnapshot snap, Map.empty)
 
 -- | Dummy type to support this monoid business.
-newtype DockerOpts = DockerOpts (Maybe Docker)
+newtype DockerOpts = DockerOpts Docker
   deriving (Show)
 
 -- | Left-biased instance.
 instance Monoid DockerOpts where
-  mappend (DockerOpts Nothing) x = x
-  mappend x (DockerOpts Nothing) = x
+  --EKB FIXME: implement proper configuration inheritance
   mappend x _ = x
-  mempty = DockerOpts Nothing
+  mempty = DockerOpts defaultDocker
 
 instance Monoid ConfigMonoid where
   mempty = ConfigMonoid
@@ -125,7 +125,7 @@ instance FromJSON ConfigMonoid where
   parseJSON =
     withObject "ConfigMonoid" $
     \obj ->
-      do getTheDocker <- obj .:? "docker"
+      do getTheDocker <- obj .:? "docker" .!= defaultDocker
          configMonoidUrls <- obj .:? "urls" .!= mempty
          configMonoidGpgVerifyIndex <- obj .:? "gpg-verify-index"
          let configMonoidDockerOpts = DockerOpts getTheDocker

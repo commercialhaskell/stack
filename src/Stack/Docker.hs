@@ -2,6 +2,7 @@
 
 -- | Run commands in Docker containers
 module Stack.Docker
+  --EKB FIXME: trim the exports, remove unused functions, clarify remaining names.
   (resetOnHost
   ,resetInContainer
   ,getInContainer
@@ -16,8 +17,10 @@ module Stack.Docker
   ,pull
   ,execProcessAndExit
   ,checkHostStackageDockerVersion
-  ,dockerPullCmdName)
-  where
+  ,dockerPullCmdName
+  ,rerunWithOptionalContainer
+  ,rerunCmdWithOptionalContainer
+  ) where
 
 import           Control.Applicative
 import           Control.Monad
@@ -38,16 +41,14 @@ import qualified Filesystem as FS
 import           Filesystem.Path.CurrentOS ((</>))
 import qualified Filesystem.Path.CurrentOS as FP
 import qualified Path as FL
-import           Path.Find (findFileUp)
 import           Paths_stack (version)
-import           Stack.Build
-import           Stack.Constants (configFileName)
+import           Stack.Config (stackDotYaml)
 import           Stack.Types hiding (Version, parseVersion) -- FIXME don't hide this
 import           Stack.Docker.GlobalDB (updateDockerImageLastUsed,getDockerImagesLastUsed,pruneDockerImagesLastUsed)
-import           System.Directory
-import           System.Environment (lookupEnv,unsetEnv)
+import           System.Environment (lookupEnv,unsetEnv,getProgName,getArgs)
 import           System.Exit (ExitCode(ExitSuccess,ExitFailure),exitWith)
 import           System.IO (hPutStrLn,stderr,stdin,stdout,hIsTerminalDevice)
+import           System.FilePath (takeBaseName,takeDirectory,takeFileName)
 import qualified System.Process as Proc
 import           System.Process.PagerEditor (editByteString)
 import           Text.ParserCombinators.ReadP (readP_to_S)
@@ -57,11 +58,25 @@ import           Text.Printf (printf)
 import           System.Posix.Signals (installHandler,sigTERM,Handler(Catch))
 #endif
 
-dockerDir :: a -- FIXME need to figure out where to get this from, possibly configDir
-dockerDir = error "dockerDir used but not implemented!"
+-- | If Docker is enabled, re-runs the currently running OS command in a Docker container.
+-- Otherwise, runs the inner action.
+rerunWithOptionalContainer :: BuildConfig -> IO () -> IO ()
+rerunWithOptionalContainer bconfig inner =
+  rerunCmdWithOptionalContainer bconfig
+                                ((,) <$> (takeBaseName <$> getProgName) <*> getArgs)
+                                inner
 
-dockerShakeDir :: a -- FIXME need to figure out where to get this from, possibly configShakeFilesDir
-dockerShakeDir = error "dockerShakeDir used but not implemented!"
+-- | If Docker is enabled, re-runs the OS command returned by the second argument in a
+-- Docker container.  Otherwise, runs the inner action.
+rerunCmdWithOptionalContainer :: BuildConfig -> IO (FilePath, [String]) -> IO () -> IO ()
+rerunCmdWithOptionalContainer bconfig getCmdArgs inner =
+  do inContainer <- getInContainer
+     if inContainer || not (dockerEnable docker)
+        then inner
+        else do (cmd_,args) <- getCmdArgs
+                runContainerAndExit bconfig cmd_ args [] (return ())
+  where docker = configDocker config
+        config = bcConfig bconfig
 
 -- | 'True' if we are currently running inside a Docker container.
 getInContainer :: IO Bool
@@ -72,24 +87,24 @@ getInContainer =
        Just _ -> return True
 
 -- | Run a command in a new Docker container, then exit the process.
-runContainerAndExit :: Docker
+runContainerAndExit :: BuildConfig
                     -> FilePath
                     -> [String]
                     -> [(String,String)]
                     -> IO ()
                     -> IO ()
-runContainerAndExit config cmnd args envVars successPostAction =
-  runAction (Just config)
-            (runContainerAndExitAction config cmnd args envVars successPostAction)
+runContainerAndExit bconfig cmnd args envVars successPostAction =
+  runAction (Just bconfig)
+            (runContainerAndExitAction bconfig cmnd args envVars successPostAction)
 
 -- | Shake action to run a command in a new Docker container.
-runContainerAndExitAction :: Docker
+runContainerAndExitAction :: BuildConfig
                           -> FilePath
                           -> [String]
                           -> [(String,String)]
                           -> IO ()
                           -> Action ()
-runContainerAndExitAction config
+runContainerAndExitAction bconfig
                           cmnd
                           args
                           envVars
@@ -98,43 +113,38 @@ runContainerAndExitAction config
      (Stdout uidOut) <- cmd "id -u"
      (Stdout gidOut) <- cmd "id -g"
      (dockerHost,dockerCertPath,dockerTlsVerify,isStdinTerminal,isStdoutTerminal,isStderrTerminal
-       ,pwdFP,maybeSandboxDir) <-
-       liftIO ((,,,,,,,) <$>
+       ,pwdFP) <-
+       liftIO ((,,,,,,) <$>
                lookupEnv "DOCKER_HOST" <*>
                lookupEnv "DOCKER_CERT_PATH" <*>
                lookupEnv "DOCKER_TLS_VERIFY" <*>
                hIsTerminalDevice stdin <*>
                hIsTerminalDevice stdout <*>
                hIsTerminalDevice stderr <*>
-               FS.getWorkingDirectory <*>
-               getSandboxDir)
+               FS.getWorkingDirectory)
      when (maybe False (isPrefixOf "tcp://") dockerHost &&
            maybe False (isInfixOf "boot2docker") dockerCertPath)
           (liftIO (hPutStrLn stderr
              ("WARNING: using boot2docker is NOT supported, and not likely to perform well.")))
-     sandboxDirFP <- case maybeSandboxDir of
-       Just dir -> return dir
-       Nothing -> do let sandboxDirFP = FP.decodeString (FL.toFilePath (dockerDir config))
-                                        </> dockerSandboxName
-                     liftIO (FS.createTree sandboxDirFP)
-                     return sandboxDirFP
-     let image = dockerImageName config
+     let image = dockerImageName docker
      maybeImageInfo <- inspect image
      imageInfo <- case maybeImageInfo of
        Just ii -> return ii
        Nothing
-         | dockerAutoPull config ->
-             do pullImage config image
+         | dockerAutoPull docker ->
+             do pullImage docker image
                 mii2 <- inspect image
                 case mii2 of
                   Just ii2 -> return ii2
-                  Nothing -> error ("`docker inspect' failed for image after pull: " ++ image)
+                  Nothing -> error ("'docker inspect' failed for image after pull: " ++ image)
          | otherwise ->
-             error ("The Docker image referenced by " ++ FL.toFilePath configFileName ++
-                    " has not\nbeen downloaded:\n\n" ++
-                    "Run 'stack docker " ++ dockerPullCmdName ++
-                    "' to download it, then try again.")
+             do progName <- liftIO getProgName
+                error ("The Docker image referenced by '" ++ FL.toFilePath stackDotYaml ++
+                       "'' has not\nbeen downloaded:\n\n" ++
+                       "Run '" ++ takeBaseName progName ++ " docker " ++ dockerPullCmdName ++
+                       "' to download it, then try again.")
      let pwdS = FP.encodeString pwdFP
+         sandboxDirFP = sandboxDir bconfig
          sandboxDirS = FP.encodeString sandboxDirFP
          workRootDir = FP.encodeString (FP.directory (sandboxDirFP))
          (uid,gid) = (dropWhileEnd isSpace uidOut, dropWhileEnd isSpace gidOut)
@@ -144,7 +154,7 @@ runContainerAndExitAction config
              Just x -> (x,False)
              Nothing ->
                --TODO: remove this and oldImage after lts-1.x images no longer in use
-               let sandboxName = maybe (dockerRepo config) id (lookupImageEnv "SANDBOX_NAME" imageEnvVars)
+               let sandboxName = maybe (dockerRepo docker) id (lookupImageEnv "SANDBOX_NAME" imageEnvVars)
                    maybeImageCabalRemoteRepoName = lookupImageEnv "CABAL_REMOTE_REPO_NAME" imageEnvVars
                    maybeImageStackageSlug = lookupImageEnv "STACKAGE_SLUG" imageEnvVars
                    maybeImageStackageDate = lookupImageEnv "STACKAGE_DATE" imageEnvVars
@@ -161,7 +171,7 @@ runContainerAndExitAction config
          sandboxRepoDirFP = sandboxDirFP </> sandboxIDFP
          sandboxRepoDirS = FP.encodeString sandboxRepoDirFP
          sandboxSubdirsFP = map (\d -> sandboxRepoDirFP </> FP.decodeString d)
-                                sandboxedHomeSubdirectories
+                                (sandboxedHomeSubdirectories config)
          sandboxSubdirsS = map FP.encodeString sandboxSubdirsFP
          isTerm = isStdinTerminal && isStdoutTerminal && isStderrTerminal
          execDockerProcess =
@@ -184,32 +194,32 @@ runContainerAndExitAction config
                      then ["-e",sandboxIDEnvVar ++ "=" ++ sandboxID
                           ,"--entrypoint=/root/entrypoint.sh"]
                      else []
-                  ,case (dockerPassHost config,dockerHost) of
+                  ,case (dockerPassHost docker,dockerHost) of
                      (True,Just x@('u':'n':'i':'x':':':'/':'/':s)) -> ["-e","DOCKER_HOST=" ++ x
                                                                       ,"-v",s ++ ":" ++ s]
                      (True,Just x) -> ["-e","DOCKER_HOST=" ++ x]
                      (True,Nothing) -> ["-v","/var/run/docker.sock:/var/run/docker.sock"]
                      (False,_) -> []
-                  ,case (dockerPassHost config,dockerCertPath) of
+                  ,case (dockerPassHost docker,dockerCertPath) of
                      (True,Just x) -> ["-e","DOCKER_CERT_PATH=" ++ x
                                       ,"-v",x ++ ":" ++ x]
                      _ -> []
-                  ,case (dockerPassHost config,dockerTlsVerify) of
+                  ,case (dockerPassHost docker,dockerTlsVerify) of
                      (True,Just x )-> ["-e","DOCKER_TLS_VERIFY=" ++ x]
                      _ -> []
                   ,concatMap sandboxSubdirArg sandboxSubdirsS
-                  ,concatMap mountArg (dockerMountDefault config)
-                  ,concatMap mountArg (dockerMountExtra config)
-                  ,case dockerContainerName config of
+                  ,concatMap mountArg (dockerMountDefault docker)
+                  ,concatMap mountArg (dockerMountExtra docker)
+                  ,case dockerContainerName docker of
                      Just name -> ["--name=" ++ name]
                      Nothing -> []
-                  ,if dockerDetach config
+                  ,if dockerDetach docker
                       then ["-d"]
-                      else concat [["--rm" | not (dockerPersist config)]
+                      else concat [["--rm" | not (dockerPersist docker)]
                                   ,["-t" | isTerm]
                                   ,["-i" | isTerm]]
-                  ,dockerRunArgsDefault config
-                  ,concat (dockerRunArgsExtra config)
+                  ,dockerRunArgsDefault docker
+                  ,concat (dockerRunArgsExtra docker)
                   ,[image
                    ,hostVersionEnvVar ++ "=" ++ showVersion version
                    ,requireVersionEnvVar ++ "=" ++ showVersion requireContainerVersion]
@@ -217,8 +227,9 @@ runContainerAndExitAction config
                   ,[cmnd]
                   ,args])
                 successPostAction
-     liftIO (do updateDockerImageLastUsed (iiId imageInfo)
-                                          (FL.toFilePath (dockerDir config))
+     liftIO (do updateDockerImageLastUsed config
+                                          (iiId imageInfo)
+                                          (FL.toFilePath (bcRoot bconfig))
                 execDockerProcess)
 
   where
@@ -234,14 +245,21 @@ runContainerAndExitAction config
     sandboxSubdirArg :: String -> [String]
     sandboxSubdirArg subdir = ["-v",subdir++ ":" ++ subdir]
 
+    docker :: Docker
+    docker = configDocker config
+
+    config :: Config
+    config = bcConfig bconfig
+
 -- | Clean-up old docker images and containers.
-cleanup :: Cleanup -> IO ()
-cleanup opts = runAction Nothing (cleanupAction opts)
+cleanup :: Config -> Cleanup -> IO ()
+cleanup config opts = runAction Nothing (cleanupAction config opts)
 
 -- | Cleanup action
-cleanupAction :: Cleanup -> Action ()
-cleanupAction opts =
+cleanupAction :: Config -> Cleanup -> Action ()
+cleanupAction config opts =
   do checkDockerVersion
+     progName <- liftIO (takeBaseName <$> getProgName)
      (Stdout imagesOut) <- cmd "docker images --no-trunc -f dangling=false"
      (Stdout danglingImagesOut) <- cmd "docker images --no-trunc -f dangling=true"
      (Stdout runningContainersOut) <- cmd "docker ps -a --no-trunc -f status=running"
@@ -259,9 +277,10 @@ cleanupAction opts =
                              map fst stoppedContainers ++
                              map fst runningContainers)
      plan <- liftIO
-       (do imagesLastUsed <- getDockerImagesLastUsed
+       (do imagesLastUsed <- getDockerImagesLastUsed config
            curTime <- getZonedTime
-           let planWriter = buildPlan curTime
+           let planWriter = buildPlan progName
+                                      curTime
                                       imagesLastUsed
                                       imageRepos
                                       danglingImageHashes
@@ -278,7 +297,7 @@ cleanupAction opts =
        Loud
        (mapM_ performPlanLine (reverse (filter filterPlanLine (lines (LBS.unpack plan)))))
      (Stdout allImageHashesOut) <- cmd "docker images -aq --no-trunc"
-     liftIO (pruneDockerImagesLastUsed (lines allImageHashesOut))
+     liftIO (pruneDockerImagesLastUsed config (lines allImageHashesOut))
   where
     filterPlanLine line =
       case line of
@@ -289,7 +308,7 @@ cleanupAction opts =
            [] -> return (Exit ExitSuccess)
            (c:_):t:v:_ | toUpper c == 'R' && t == imageStr -> cmd "docker rmi" [v]
                        | toUpper c == 'R' && t == containerStr -> cmd "docker rm -f " [v]
-           _ -> error ("Invalid line in cleanup commands: `" ++ line ++ "'")
+           _ -> error ("Invalid line in cleanup commands: '" ++ line ++ "'")
          return ()
     parseImagesOut = Map.fromListWith (++) . map parseImageRepo . drop 1 . lines
       where parseImageRepo :: String -> (String, [String])
@@ -299,13 +318,14 @@ cleanupAction opts =
                   | repo == "<none>" -> (hash,[])
                   | tag == "<none>" -> (hash,[repo])
                   | otherwise -> (hash,[repo ++ ":" ++ tag])
-                _ -> error ("Invalid `docker images' output line: " ++ line)
+                _ -> error ("Invalid 'docker images' output line: " ++ line)
     parseContainersOut = map parseContainer . drop 1 . lines
       where parseContainer line =
               case words line of
                 hash:image:rest -> (hash,(image,last rest))
-                _ -> error ("Invalid `docker ps' output line: " ++ line)
-    buildPlan curTime
+                _ -> error ("Invalid 'docker ps' output line: " ++ line)
+    buildPlan progName
+              curTime
               imagesLastUsed
               imageRepos
               danglingImageHashes
@@ -318,8 +338,8 @@ cleanupAction opts =
                            \#\n\
                            \# When you leave the editor, the lines in this plan will be processed.\n\
                            \#\n\
-                           \# Lines that begin with `R' denote an image or container that will be.\n\
-                           \# removed.  You may change the first character to/from `R' to remove/keep\n\
+                           \# Lines that begin with 'R' denote an image or container that will be.\n\
+                           \# removed.  You may change the first character to/from 'R' to remove/keep\n\
                            \# and image or container that would otherwise be kept/removed.\n\
                            \#\n\
                            \# To cancel the cleanup, delete all lines in this file.\n\
@@ -331,11 +351,12 @@ cleanupAction opts =
                 buildDefault dcRemoveDanglingImagesCreatedDaysAgo "Dangling images created"
                 buildDefault dcRemoveStoppedContainersCreatedDaysAgo "Stopped containers created"
                 buildDefault dcRemoveRunningContainersCreatedDaysAgo "Running containers created"
-                buildStrLn "#\n\
-                           \# The default plan can be adjusted using command-line arguments.\n\
-                           \# Run `stack docker cleanup --help' for details.\n\
-                           \#"
-           _ -> buildStrLn "# Lines that begin with `R' denote an image or container that will be.\n\
+                           --EKB FIXME: `docker cleanup` should come from shared constants.
+                buildStrLn ("#\n\
+                            \# The default plan can be adjusted using command-line arguments.\n\
+                            \# Run '" ++ takeBaseName progName ++ " docker cleanup --help' for details.\n\
+                            \#")
+           _ -> buildStrLn "# Lines that begin with 'R' denote an image or container that will be.\n\
                            \# removed."
          buildSection "KNOWN IMAGES (pulled/used by stack)"
                       imagesLastUsed
@@ -446,7 +467,7 @@ inspects images =
        ExitSuccess ->
          -- filtering with 'isAscii' to workaround @docker inspect@ output containing invalid UTF-8
          case eitherDecode (LBS.pack (filter isAscii inspectOut)) of
-           Left msg -> error ("Invalid `docker inspect' output: " ++ msg ++ ".")
+           Left msg -> error ("Invalid 'docker inspect' output: " ++ msg ++ ".")
            Right results -> return (Map.fromList (map (\r -> (iiId r,r)) results))
        ExitFailure _ -> return Map.empty
 
@@ -457,40 +478,42 @@ inspect image =
      case Map.toList results of
        [] -> return Nothing
        [(_,i)] -> return (Just i)
-       _ -> error ("Invalid `docker inspect' output: expect a single result.")
+       _ -> error ("Invalid 'docker inspect' output: expect a single result.")
 
 -- | Pull Docker image from registry.
 pullImage :: Docker -> String -> Action ()
-pullImage config image =
+pullImage docker image =
   liftIO (do hPutStrLn stderr ("\nPulling from registry: " ++ image)
-             when (dockerRegistryLogin config)
+             when (dockerRegistryLogin docker)
                   (do hPutStrLn stderr "You may need to log in."
                       Proc.callProcess
                         "docker"
                         (concat
                            [["login"]
-                           ,maybe [] (\u -> ["--username=" ++ u]) (dockerRegistryUsername config)
-                           ,maybe [] (\p -> ["--password=" ++ p]) (dockerRegistryPassword config)
+                           ,maybe [] (\u -> ["--username=" ++ u]) (dockerRegistryUsername docker)
+                           ,maybe [] (\p -> ["--password=" ++ p]) (dockerRegistryPassword docker)
                            ,[takeWhile (/= '/') image]]))
              Proc.callProcess "docker" ["pull", image])
 
 -- | Pull latest version of configured Docker image from registry.
-pull :: Docker -> IO ()
-pull config =
+pull :: BuildConfig -> IO ()
+pull bconfig =
   runAction
-    (Just config)
+    (Just bconfig)
     (do checkDockerVersion
-        pullImage config (dockerImageName config))
+        pullImage docker (dockerImageName docker))
+  where docker = configDocker config
+        config = bcConfig bconfig
 
 -- | Run a Shake action.
-runAction :: Maybe Docker -> Action () -> IO ()
+runAction :: Maybe BuildConfig -> Action () -> IO ()
 runAction Nothing inner =
   shake shakeOptions{shakeVerbosity = Quiet}
         (action inner)
-runAction (Just cfg) inner =
-  shake shakeOptions{shakeVerbosity = Quiet
-                    ,shakeFiles = FL.toFilePath (dockerShakeDir cfg)}
-        (action inner)
+runAction (Just bconfig) inner =
+  do shake shakeOptions{shakeVerbosity = Quiet
+                       ,shakeFiles = FL.toFilePath (configShakeFilesDir bconfig)}
+           (action inner)
 
 -- | Check docker version (throws exception if incorrect)
 checkDockerVersion :: Action ()
@@ -502,21 +525,21 @@ checkDockerVersion =
          case parseVersion' v of
            Just v'
              | v' < minimumDockerVersion ->
-               error (concat ["Minimum docker version `"
+               error (concat ["Minimum docker version '"
                              ,showVersion minimumDockerVersion
-                             ,"' is required (you have `"
+                             ,"' is required (you have '"
                              ,showVersion v'
                              ,"')."])
              | v' `elem` prohibitedDockerVersions ->
-               error (concat ["These Docker versions are prohibited (you have `"
+               error (concat ["These Docker versions are prohibited (you have '"
                              ,showVersion v'
                              ,"'): "
                              ,concat (intersperse ", " (map showVersion prohibitedDockerVersions))
                              ,"."])
              | otherwise ->
                return ()
-           _ -> error "Cannot get Docker version (invalid `docker --version' output)."
-       _ -> error "Cannot get Docker version (invalid `docker --version' output)."
+           _ -> error "Cannot get Docker version (invalid 'docker --version' output)."
+       _ -> error "Cannot get Docker version (invalid 'docker --version' output)."
   where minimumDockerVersion = Version [1,3,0] []
         prohibitedDockerVersions = [Version [1,2,0] []]
 
@@ -539,24 +562,20 @@ execProcessAndExit cmnd args successPostAction =
      exitWith exitCode
 
 -- | Perform the docker sandbox reset tasks that are performed on the host.
-resetOnHost :: Bool -> IO ()
-resetOnHost keepHome =
-  do maybeSandboxDir <- getSandboxDir
-     case maybeSandboxDir of
-       Just sandboxDir -> removeDirectoryContents sandboxDir
-                                                  [homeDirName | keepHome]
-       Nothing -> return ()
+resetOnHost :: BuildConfig -> Bool -> IO ()
+resetOnHost bconfig keepHome =
+  removeDirectoryContents (sandboxDir bconfig) [homeDirName | keepHome]
 
 -- | Perform the Docker sandbox reset tasks that are performed from within a container.
-resetInContainer :: IO ()
-resetInContainer =
+resetInContainer :: Config -> IO ()
+resetInContainer config =
   do inContainer <- getInContainer
      if inContainer
         then do home <- FS.getHomeDirectory
-                forM_ sandboxedHomeSubdirectories
+                forM_ (sandboxedHomeSubdirectories config)
                       (removeSubdir home)
         else hPutStrLn stderr
-                       ("WARNING: Not removing " ++ show sandboxedHomeSubdirectories ++
+                       ("WARNING: Not removing " ++ show (sandboxedHomeSubdirectories config) ++
                         " from home directory since running with Docker disabled.")
   where
     removeSubdir home d =
@@ -577,27 +596,26 @@ warnNoContainer cmdName =
   do inContainer <- getInContainer
      if inContainer
         then hPutStrLn stderr
-                       ("WARNING: Running `" ++ cmdName ++
+                       ("WARNING: Running '" ++ cmdName ++
                        "' when already in a Docker container.")
         else hPutStrLn stderr
-                       ("WARNING: Running `" ++ cmdName ++
+                       ("WARNING: Running '" ++ cmdName ++
                        "' even though Docker is disabled.")
 
--- | Find location of the @.docker-sandbox@  directory.
-getSandboxDir :: IO (Maybe FP.FilePath)
-getSandboxDir =
-  do pwd <- getCurrentDirectory >>= FL.parseAbsDir
-     fmap (fmap (FP.decodeString . FL.toFilePath))
-          (findFileUp
-             pwd
-             (\fp ->
-                FP.filename (FP.decodeString (FL.toFilePath fp)) ==
-                dockerSandboxName)
-             Nothing)
+-- | Location of the @.docker-sandbox@  directory.
+sandboxDir :: BuildConfig -> FP.FilePath
+sandboxDir bconfig =
+  FP.decodeString (FL.toFilePath (bcRoot bconfig)) </> dockerSandboxName
 
 -- | Subdirectories of the home directory to sandbox between GHC/Stackage versions.
-sandboxedHomeSubdirectories :: [FilePath]
-sandboxedHomeSubdirectories = [".ghc", ".cabal", ".ghcjs", ".stack"]
+sandboxedHomeSubdirectories :: Config -> [FilePath]
+sandboxedHomeSubdirectories config =
+  [".ghc"
+  ,".cabal"
+  ,".ghcjs"
+   --EKB FIXME: this isn't going to work with reading a user config file from
+   -- outside the Docker sandbox.
+  ,takeFileName (takeDirectory (FL.toFilePath (configStackRoot config)))]
 
 -- | Name of @.docker-sandbox@ directory.
 dockerSandboxName :: FP.FilePath
@@ -627,10 +645,11 @@ removeDirectoryContents path exclude =
 checkHostStackageDockerVersion :: Version -> IO ()
 checkHostStackageDockerVersion minVersion =
   do maybeHostVer <- lookupEnv hostVersionEnvVar
+     progName <- takeBaseName <$> getProgName
      case parseVersion' =<< maybeHostVer of
        Just hostVer
          | hostVer < minVersion ->
-             error ("Your host's version of 'stack' is too old.\nVersion " ++
+             error ("Your host's version of '" ++ progName ++ "' is too old for this Docker image.\nVersion " ++
                     showVersion minVersion ++
                     " is required; you have " ++
                     showVersion hostVer ++
@@ -639,7 +658,7 @@ checkHostStackageDockerVersion minVersion =
        Nothing ->
           do inContainer <- getInContainer
              if inContainer
-                then error ("Your host's version of 'stack' is too old.\nVersion " ++
+                then error ("Your host's version of '" ++ progName ++ "' is too old.\nVersion " ++
                             showVersion minVersion ++ " is required.")
                 else return ()
 
@@ -647,18 +666,25 @@ checkHostStackageDockerVersion minVersion =
 -- | Check host and container 'stack' versions are compatible.
 checkVersions :: IO ()
 checkVersions =
-  do checkHostStackageDockerVersion requireHostVersion
-     maybeReqVer <- lookupEnv requireVersionEnvVar
-     case parseVersion' =<< maybeReqVer of
-       Just reqVer
-         | version < reqVer ->
-             error ("Your Docker image's version of 'stack' is too old.\nVersion " ++
-                    showVersion reqVer ++
-                    " is required; you have " ++
-                    showVersion version ++
-                    ".\nPlease update your 'stack.config' to use a newer image.")
-         | otherwise -> return ()
-       _ -> return ()
+  do inContainer <- getInContainer
+     when inContainer
+       (do checkHostStackageDockerVersion requireHostVersion
+           maybeReqVer <- lookupEnv requireVersionEnvVar
+           progName <- takeBaseName <$> getProgName
+           case parseVersion' =<< maybeReqVer of
+             Just reqVer
+               | version < reqVer ->
+                   error ("This Docker image's version of '" ++
+                          progName ++
+                          "' is too old.\nVersion " ++
+                          showVersion reqVer ++
+                          " is required; you have " ++
+                          showVersion version ++
+                          ".\nPlease update your '" ++
+                          FL.toFilePath stackDotYaml ++
+                          "' to use a newer image.")
+               | otherwise -> return ()
+             _ -> return ())
 
 -- | Parse a version number.
 parseVersion' :: String -> Maybe Version
@@ -669,23 +695,23 @@ parseVersion' v =
 
 -- | Construct full configured Docker image name/ID.
 dockerImageName :: Docker -> String
-dockerImageName config =
-  case dockerImage config of
+dockerImageName docker =
+  case dockerImage docker of
     Just i -> i
-    Nothing -> concat [dockerRepoOwner config
-                      ,if null (dockerRepoOwner config) then "" else "/"
-                      ,dockerRepo config
-                      ,dockerRepoSuffix config
-                      ,maybe "" (const ":") (dockerImageTag config)
-                      ,maybe "" id (dockerImageTag config)]
+    Nothing -> concat [dockerRepoOwner docker
+                      ,if null (dockerRepoOwner docker) then "" else "/"
+                      ,dockerRepo docker
+                      ,dockerRepoSuffix docker
+                      ,maybe "" (const ":") (dockerImageTag docker)
+                      ,maybe "" id (dockerImageTag docker)]
 
 -- | Environment variable to the host's stack version.
 hostVersionEnvVar :: String
-hostVersionEnvVar = "STACKAGE_DOCKER_HOST_VERSION"
+hostVersionEnvVar = "STACK_DOCKER_HOST_VERSION"
 
 -- | Environment variable to pass required container stack version.
 requireVersionEnvVar :: String
-requireVersionEnvVar = "STACKAGE_DOCKER_REQUIRE_VERSION"
+requireVersionEnvVar = "STACK_DOCKER_REQUIRE_VERSION"
 
 -- | Environment variable that contains the sandbox ID.
 sandboxIDEnvVar :: String
@@ -697,11 +723,11 @@ dockerPullCmdName = "docker-pull"
 
 -- | Version of 'stack' required to be installed in container.
 requireContainerVersion :: Version
-requireContainerVersion = Version [0,0,4] []
+requireContainerVersion = Version [0,0,0] []
 
 -- | Version of 'stack' required to be installed on the host.
 requireHostVersion :: Version
-requireHostVersion = Version [0,1,1] []
+requireHostVersion = Version [0,0,0] []
 
 -- | Options for 'cleanup'.
 data Cleanup = Cleanup

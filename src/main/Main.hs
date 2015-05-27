@@ -20,6 +20,7 @@ import           Path (toFilePath)
 import           Stack.Build
 import           Stack.Build.Types
 import           Stack.Config
+import qualified Stack.Docker as Docker
 import           Stack.Fetch
 import           Stack.GhcPkg (envHelper)
 import           Stack.Package
@@ -34,7 +35,8 @@ import qualified System.Process.Read
 -- | Commandline dispatcher.
 main :: IO ()
 main =
-  do (level,run) <-
+  do Docker.checkVersions
+     (level,run) <-
        simpleOptions
          "ver"
          "header"
@@ -101,25 +103,33 @@ main =
 setupCmd :: LogLevel -> IO ()
 setupCmd logLevel = do
   manager <- newTLSManager
-  _ <- runStackLoggingT manager logLevel (loadBuildConfig >>= setupEnv True manager)
-  return ()
+  config <- runStackLoggingT manager logLevel loadBuildConfig
+  Docker.rerunWithOptionalContainer
+    config
+    (do _ <- runStackLoggingT manager logLevel (setupEnv True manager config)
+        return ())
 
 cleanCmd :: () -> LogLevel -> IO ()
 cleanCmd _ logLevel = do
   manager <- newTLSManager
-  config <- runStackLoggingT manager logLevel (loadBuildConfig >>= setupEnv False manager)
-  runStackT manager logLevel config clean
+  config0 <- runStackLoggingT manager logLevel loadBuildConfig
+  Docker.rerunWithOptionalContainer
+    config0
+    (do config <- runStackLoggingT manager logLevel (setupEnv False manager config0)
+        runStackT manager logLevel config clean)
 
 -- | Build the project.
 buildCmd :: FinalAction -> BuildOpts -> LogLevel -> IO ()
 buildCmd finalAction opts logLevel =
   catch
   (do manager <- newTLSManager
-      config <-
-       runStackLoggingT manager logLevel (loadBuildConfig >>= setupEnv False manager)
-      runStackT manager logLevel config $
-                 Stack.Build.build opts { boptsFinalAction = finalAction})
-           (error . printBuildException)
+      config0 <- runStackLoggingT manager logLevel loadBuildConfig
+      Docker.rerunWithOptionalContainer
+        config0
+        (do config <- runStackLoggingT manager logLevel (setupEnv False manager config0)
+            runStackT manager logLevel config $
+                       Stack.Build.build opts { boptsFinalAction = finalAction}))
+             (error . printBuildException)
   where printBuildException e =
           case e of
             MissingTool dep -> "Missing build tool: " <> display dep
@@ -194,35 +204,43 @@ buildCmd finalAction opts logLevel =
 unpackCmd :: [String] -> LogLevel -> IO ()
 unpackCmd names logLevel = do
     manager <- newTLSManager
-    config <- runStackLoggingT manager logLevel loadConfig
-    runStackT manager logLevel config $ do
-        menv <- getMinimalEnvOverride
-        Stack.Fetch.unpackPackages menv "." names
+    config <- runStackLoggingT manager logLevel loadBuildConfig
+    Docker.rerunWithOptionalContainer
+      config
+      (runStackT manager logLevel config $ do
+         menv <- getMinimalEnvOverride
+         Stack.Fetch.unpackPackages menv "." names)
 
 -- | Update the package index
 updateCmd :: () -> LogLevel -> IO ()
 updateCmd () logLevel = do
     manager <- newTLSManager
-    config <- runStackLoggingT manager logLevel loadConfig
-    runStackT manager logLevel config $ getMinimalEnvOverride >>= Stack.PackageIndex.updateIndex
+    config <- runStackLoggingT manager logLevel loadBuildConfig
+    Docker.rerunWithOptionalContainer
+      config
+      (runStackT manager logLevel config $ getMinimalEnvOverride >>= Stack.PackageIndex.updateIndex)
 
 -- | Execute a command
 execCmd :: (String, [String]) -> LogLevel -> IO ()
 execCmd (cmd, args) logLevel = do
     manager <- newTLSManager
-    config <- runStackLoggingT manager logLevel (loadBuildConfig >>= setupEnv False manager)
-    let menv = configEnvOverride (bcConfig config)
-                    EnvSettings
-                        { esIncludeLocals = True
-                        , esIncludeGhcPackagePath = True
-                        }
-    cmd' <- join $ System.Process.Read.findExecutable menv cmd
-    let cp = (P.proc (toFilePath cmd') args)
-            { P.env = envHelper menv
-            }
-    (Nothing, Nothing, Nothing, ph) <- P.createProcess cp
-    ec <- P.waitForProcess ph
-    exitWith ec
+    config0 <- runStackLoggingT manager logLevel loadBuildConfig
+    --EKB FIXME: add a `docker exec` subcommand that just reruns in docker without needing `stack` in image
+    Docker.rerunWithOptionalContainer
+      config0
+      (do config <- runStackLoggingT manager logLevel (setupEnv False manager config0)
+          let menv = configEnvOverride (bcConfig config)
+                          EnvSettings
+                              { esIncludeLocals = True
+                              , esIncludeGhcPackagePath = True
+                              }
+          cmd' <- join $ System.Process.Read.findExecutable menv cmd
+          let cp = (P.proc (toFilePath cmd') args)
+                  { P.env = envHelper menv
+                  }
+          (Nothing, Nothing, Nothing, ph) <- P.createProcess cp
+          ec <- P.waitForProcess ph
+          exitWith ec)
 
 -- | Parser for build arguments.
 buildOpts :: Parser BuildOpts

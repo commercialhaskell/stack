@@ -24,8 +24,9 @@ import           Data.Time.Clock (UTCTime,getCurrentTime)
 import           Database.Persist
 import           Database.Persist.Sqlite
 import           Database.Persist.TH
-import           System.Directory (getHomeDirectory,createDirectoryIfMissing)
-import           System.FilePath ((</>))
+import           Path (toFilePath, (</>), mkRelFile)
+import           System.Directory (createDirectoryIfMissing)
+import           Stack.Types.Config
 
 share [mkPersist sqlSettings, mkMigrate "migrateTables"] [persistLowerCase|
 DockerImageProject
@@ -37,16 +38,16 @@ DockerImageProject
 |]
 
 -- | Update last used time and project for a Docker image hash.
-updateDockerImageLastUsed :: String -> FilePath -> IO ()
-updateDockerImageLastUsed imageId projectPath =
+updateDockerImageLastUsed :: Config -> String -> FilePath -> IO ()
+updateDockerImageLastUsed config imageId projectPath =
   do curTime <- getCurrentTime
-     _ <- withGlobalDB (upsert (DockerImageProject imageId projectPath curTime) [])
+     _ <- withGlobalDB config (upsert (DockerImageProject imageId projectPath curTime) [])
      return ()
 
 -- | Get a list of Docker image hashes and when they were last used.
-getDockerImagesLastUsed :: IO [DockerImageLastUsed]
-getDockerImagesLastUsed =
-  do imageProjects <- withGlobalDB (selectList [] [Asc DockerImageProjectLastUsedTime])
+getDockerImagesLastUsed :: Config -> IO [DockerImageLastUsed]
+getDockerImagesLastUsed config =
+  do imageProjects <- withGlobalDB config (selectList [] [Asc DockerImageProjectLastUsedTime])
      return (sortBy (flip sortImage)
                     (Map.toDescList (Map.fromListWith (++)
                                                       (map mapImageProject imageProjects))))
@@ -60,21 +61,20 @@ getDockerImagesLastUsed =
 
 -- | Given a list of all existing Docker images, remove any that no longer exist from
 -- the database.
-pruneDockerImagesLastUsed :: [String] -> IO ()
-pruneDockerImagesLastUsed existingHashes =
-  withGlobalDB (do l <- selectList [] []
-                   forM_ l (\(Entity k (DockerImageProject{dockerImageProjectImageHash = h})) ->
-                              if h `elem` existingHashes
-                                then return ()
-                                else delete k))
+pruneDockerImagesLastUsed :: Config -> [String] -> IO ()
+pruneDockerImagesLastUsed config existingHashes =
+  withGlobalDB config go
+  where go = do l <- selectList [] []
+                forM_ l (\(Entity k (DockerImageProject{dockerImageProjectImageHash = h})) ->
+                           if h `elem` existingHashes
+                             then return ()
+                             else delete k)
 
 -- | Run an action with the global database.  This performs any needed migrations as well.
-withGlobalDB :: forall a. SqlPersistT (NoLoggingT (ResourceT IO)) a -> IO a
-withGlobalDB action =
-  do home <- getHomeDirectory
-     let dir = home </> ".stackage-build" </> "global"
-         db = dir </> "stackage-build.db"
-     createDirectoryIfMissing True dir
+withGlobalDB :: forall a. Config -> SqlPersistT (NoLoggingT (ResourceT IO)) a -> IO a
+withGlobalDB config action =
+  do let db = toFilePath (configStackRoot config </> $(mkRelFile "global.db"))
+     createDirectoryIfMissing True (toFilePath (configStackRoot config))
      runSqlite (T.pack db)
                (do _ <- runMigrationSilent migrateTables
                    action)
@@ -86,7 +86,7 @@ withGlobalDB action =
              if "ErrorReadOnly" `isInfixOf` str
                  then fail $ str' ++
                      " This likely indicates that your DB file, " ++
-                     db ++  ", has incorrect permissions or ownership."
+                     db ++ ", has incorrect permissions or ownership."
                  else throwIO (ex :: IOException)
 
 -- | Date and project path where Docker image hash last used.
