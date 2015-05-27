@@ -20,7 +20,9 @@ module Stack.Package
   ,configureLogPath
   ,packageDocDir
   ,stackageBuildDir
-  ,PackageException (..))
+  ,PackageException (..)
+  ,resolvePackageDescription
+  ,packageDependencies)
   where
 
 import           Control.Exception hiding (try)

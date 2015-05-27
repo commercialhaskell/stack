@@ -22,7 +22,7 @@ module Stack.BuildPlan
 
 import           Control.Applicative             ((<$>), (<*>))
 import           Control.Exception.Enclosed      (tryIO)
-import           Control.Monad                   (when)
+import           Control.Monad                   (when, liftM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -31,10 +31,14 @@ import           Control.Monad.State.Strict      (State, execState, get, modify,
 import           Data.Aeson                      (FromJSON (..))
 import           Data.Aeson                      (withObject, withText, (.:))
 import qualified Data.Binary                     as Binary
+import           Data.Conduit
+import qualified Data.Conduit.List               as CL
+import           Data.Either                     (partitionEithers)
 import qualified Data.Foldable                   as F
 import qualified Data.HashMap.Strict             as HM
 import           Data.IntMap                     (IntMap)
 import qualified Data.IntMap                     as IntMap
+import           Data.List                       (intercalate)
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
 import           Data.Maybe                      (mapMaybe)
@@ -56,10 +60,13 @@ import           Stack.GhcPkg
 import           Stack.Types
 import           Stack.Constants
 import           Stack.Package
+import           Stack.PackageIndex
 import           System.Directory                (createDirectoryIfMissing)
 import           System.FilePath                 (takeDirectory)
 
-data BuildPlanException = UnknownPackages (Map PackageName (Set PackageName))
+data BuildPlanException
+    = UnknownPackages (Map PackageName (Set PackageName))
+    | Couldn'tFindInIndex (Set PackageIdentifier)
     deriving (Typeable)
 instance Exception BuildPlanException
 instance Show BuildPlanException where
@@ -71,9 +78,12 @@ instance Show BuildPlanException where
         go (dep, users) = concat
             [ packageNameString dep
             , " (used by "
-            , unwords $ map packageNameString $ Set.toList users
+            , intercalate ", " $ map packageNameString $ Set.toList users
             , ")"
             ]
+    show (Couldn'tFindInIndex idents) =
+        "Couldn't find the following packages in the index: " ++
+        intercalate ", " (map packageIdentifierString $ Set.toList idents)
 
 -- | Determine the necessary packages to install to have the given set of
 -- packages available.
@@ -122,29 +132,65 @@ removeReverseDeps toRemove mbp = mbp
   where
     toRemoveMap = Map.unions $ map (\x -> Map.singleton x ()) $ F.toList toRemove
 
-toMiniBuildPlan :: BuildPlan -> MiniBuildPlan
-toMiniBuildPlan bp = MiniBuildPlan
-    { mbpGhcVersion = siGhcVersion $ bpSystemInfo bp
-    , mbpPackages = Map.union cores extras
-    }
+toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env)
+                => BuildPlan -> m MiniBuildPlan
+toMiniBuildPlan bp = do
+    extras <- addDeps ghcVersion $ fmap goPP $ bpPackages bp
+    return MiniBuildPlan
+        { mbpGhcVersion = ghcVersion
+        , mbpPackages = Map.union cores extras
+        }
   where
-    -- We never build the test suites or benchmarks of dependencies
-    includeDep di = CompLibrary `Set.member` diComponents di
-                 || CompExecutable `Set.member` diComponents di
-
+    ghcVersion = siGhcVersion $ bpSystemInfo bp
     cores = fmap (\v -> (v, Map.empty, Set.empty)) $ siCorePackages $ bpSystemInfo bp
-    extras = fmap goPP $ bpPackages bp
 
     goPP pp =
         ( ppVersion pp
         , pcFlagOverrides $ ppConstraints pp
-        , Set.unions $ map goDI $ Map.toList $ sdPackages $ ppDesc pp
         -- FIXME add tool info
         )
 
-    goDI (name, di)
-        | includeDep di = Set.singleton name
-        | otherwise = Set.empty
+-- | Add in the resolved dependencies from the package index
+addDeps :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env)
+        => Version -- ^ GHC version
+        -> Map PackageName (Version, Map FlagName Bool)
+        -> m (Map PackageName (Version, Map FlagName Bool, Set PackageName))
+addDeps ghcVersion toCalc = do
+    menv <- getMinimalEnvOverride
+    idents <- sourcePackageIndex menv $$ CL.foldM go idents0
+    case partitionEithers $ map hoistEither $ Map.toList idents of
+        ([], pairs) -> return $ Map.fromList pairs
+        (missing, _) -> throwM $ Couldn'tFindInIndex $ Set.fromList missing -- consider updating and trying again
+  where
+    idents0 = Map.fromList
+        $ map (\(n, (v, f)) -> (PackageIdentifier n v, Left f))
+        $ Map.toList toCalc
+
+    hoistEither (ident, Left _) = Left ident
+    hoistEither (PackageIdentifier name version, Right (flags, deps)) =
+        Right (name, (version, flags, deps))
+
+    go m ucf =
+        case Map.lookup ident m of
+            Just (Left flags) -> do
+                gpd <- ucfParse ucf
+                let packageConfig = PackageConfig
+                        { packageConfigEnableTests = False
+                        , packageConfigEnableBenchmarks = False
+                        , packageConfigFlags = flags
+                        , packageConfigGhcVersion = ghcVersion
+                        }
+                    pd = resolvePackageDescription packageConfig gpd
+                    deps = Map.filterWithKey
+                        (const . (/= ucfName ucf))
+                        (packageDependencies pd)
+                return $ Map.insert
+                    ident
+                    (Right (flags, Map.keysSet deps))
+                    m
+            _ -> return m
+      where
+        ident = PackageIdentifier (ucfName ucf) (ucfVersion ucf)
 
 -- | Resolve all packages necessary to install for
 getDeps :: MiniBuildPlan -> Map PackageName (Set PackageName) -> ResolveState
@@ -212,7 +258,7 @@ instance FromJSON Snapshots where
 
 -- | Load up a 'MiniBuildPlan', preferably from cache
 loadMiniBuildPlan
-    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasStackRoot env)
+    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env)
     => SnapName
     -> Map PackageName Version -- ^ packages in global database
     -> m MiniBuildPlan
@@ -227,7 +273,7 @@ loadMiniBuildPlan name globals = do
         _ -> do
             $logDebug $ "loadMiniBuildPlan from cache failed: " <> T.pack (show (name, eres))
             bp <- loadBuildPlan name
-            let mbp = buildPlanFixes $ toMiniBuildPlan bp
+            mbp <- liftM buildPlanFixes $ toMiniBuildPlan bp
             liftIO $ do
                 createDirectoryIfMissing True dir
                 Binary.encodeFile fp mbp
