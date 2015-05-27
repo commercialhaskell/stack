@@ -60,8 +60,8 @@ haddockExtension :: String
 haddockExtension = "haddock"
 
 -- | User documentation directory.
-userDocsDir :: Path Abs Dir -> Path Abs Dir
-userDocsDir homeDir = homeDir </> $(mkRelDir ".stack/doc/")
+userDocsDir :: Config -> Path Abs Dir
+userDocsDir config = configStackRoot config </> $(mkRelDir "doc/")
 
 -- | Package's build artifacts directory.
 distDirFromDir :: Path Abs Dir -> Path Abs Dir

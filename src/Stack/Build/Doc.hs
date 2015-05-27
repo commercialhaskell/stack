@@ -16,8 +16,8 @@ import           Path
 import           Stack.Constants
 import           Stack.Types
 import           System.Directory
-import           System.FilePath (takeFileName)
 import           System.Environment (lookupEnv)
+import           System.FilePath (takeFileName)
 
 -- | Get all packages included in documentation from directory.
 getDocPackages :: Path Abs Dir -> IO (Map PackageName [Version])
@@ -52,25 +52,22 @@ breakPkgVer pkgPath =
 joinPkgVer :: (PackageName,Version) -> FilePath
 joinPkgVer (pkg,ver) = (packageNameString pkg ++ "-" ++ versionString ver)
 
--- | Get location of user-generated documentation.
-getUserDocPath :: IO (Path Abs Dir)
-getUserDocPath = do
-    homeDir <- parseAbsDir =<< getHomeDirectory
-    return (userDocsDir homeDir)
-
+--EKB FIXME: doc generation for stack-doc-server
 -- | Get location of user-generated documentation if it exists.
-getExistingUserDocPath :: IO (Maybe (Path Abs Dir))
-getExistingUserDocPath = do
-    docPath <- getUserDocPath
+getExistingUserDocPath :: Config -> IO (Maybe (Path Abs Dir))
+getExistingUserDocPath config = do
+    let docPath = userDocsDir config
     docExists <- doesDirectoryExist (toFilePath docPath)
     if docExists
         then return (Just docPath)
         else return Nothing
 
+--EKB FIXME: doc generation for stack-doc-server
 -- | Get location of global package docs.
 getGlobalDocPath :: IO (Maybe (Path Abs Dir))
 getGlobalDocPath = do
-    maybeRootEnv <- lookupEnv "STACKAGE_DOC_ROOT"
+    --EKB FIXME: move this location into Config
+    maybeRootEnv <- lookupEnv "STACK_DOC_ROOT"
     case maybeRootEnv of
         Nothing -> return Nothing
         Just rootEnv -> do
@@ -78,6 +75,7 @@ getGlobalDocPath = do
             pkgDocExists <- doesDirectoryExist (toFilePath pkgDocPath)
             return (if pkgDocExists then Just pkgDocPath else Nothing)
 
+--EKB FIXME: doc generation for stack-doc-server
 -- | Get location of GHC docs.
 getGhcDocPath :: IO (Maybe (Path Abs Dir))
 getGhcDocPath = do

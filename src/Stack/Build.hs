@@ -54,11 +54,8 @@ import           Distribution.System (OS (Windows), buildOS)
 import           Network.HTTP.Conduit (Manager)
 import           Network.HTTP.Download
 import           Path as FL
-import           Path.Find
-import           Path.IO
 import           Prelude hiding (FilePath,writeFile)
 import           Shake
-import           Stack.Build.Doc
 import           Stack.Build.Types
 import           Stack.BuildPlan
 import           Stack.Constants
@@ -74,9 +71,11 @@ import           System.IO
 import           System.IO.Temp (withSystemTempDirectory)
 import           System.Process.Read
 
+{- EKB FIXME: doc generation for stack-doc-server
 #ifndef mingw32_HOST_OS
 import           System.Posix.Files (createSymbolicLink,removeLink)
 #endif
+--}
 
 -- | Build using Shake.
 build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
@@ -281,7 +280,6 @@ installDependencies bopts deps' = do
 
     installResource <- newResource "cabal install" 1
     cfgVar <- liftIO $ newMVar ConfigLock
-    docLoc <- liftIO getUserDocPath
 
     if M.null toInstall
         then $logDebug "All dependencies are already installed"
@@ -323,11 +321,13 @@ installDependencies bopts deps' = do
                            packages
                            package
                            installResource
-                           docLoc
+                           (userDocsDir (bcConfig bconfig))
                            cfgVar
                    runPlans bopts
                       packages
-                      plans (\_ _ -> Wanted) docLoc -- FIXME think about haddocks here
+                      plans
+                      (\_ _ -> Wanted)
+                      (userDocsDir (bcConfig bconfig))
   where
     deps = M.fromList $ map (\(name, (version, flags)) -> (PackageIdentifier name version, flags))
                       $ M.toList deps'
@@ -350,6 +350,7 @@ buildLocals
     -> m ()
 buildLocals bopts packagesToInstall packagesToRemove = do
      env <- ask
+     bconfig <- asks getBuildConfig
      mgr <- asks getHttpManager
      logLevel <- asks getLogLevel
      menv <- getMinimalEnvOverride
@@ -366,7 +367,6 @@ buildLocals bopts packagesToInstall packagesToRemove = do
                 (map packageName (S.toList packagesToInstall))
      cabalPkgVer <- getCabalPkgVer menv
      pwd <- liftIO $ getCurrentDirectory >>= parseAbsDir
-     docLoc <- liftIO getUserDocPath
      installResource <- newResource "cabal install" 1
      cfgVar <- liftIO $ newMVar ConfigLock
      plans <-
@@ -394,12 +394,12 @@ buildLocals bopts packagesToInstall packagesToRemove = do
                                    packagesToInstall
                                    package
                                    installResource
-                                   docLoc
+                                   (userDocsDir (bcConfig bconfig))
                                    cfgVar))
 
      if boptsDryrun bopts
         then dryRunPrint "local packages" packagesToRemove (Set.map packageIdentifier packagesToInstall)
-        else runPlans bopts packagesToInstall plans wanted docLoc
+        else runPlans bopts packagesToInstall plans wanted (userDocsDir (bcConfig bconfig))
   where
     wanted pwd package = boolToWanted $ case boptsTargets bopts of
         [] -> FL.isParentOf pwd (packageDir package) ||
@@ -415,13 +415,10 @@ runPlans :: (MonadIO m, MonadReader env m, HasBuildConfig env, HasLogLevel env, 
          -> Set Package
          -> [Rules ()]
          -> (Path Abs Dir -> Package -> Wanted)
-         -> Path Abs Dir -- FIXME figure out local vs shared docs location
+         -> Path Abs Dir
          -> m ()
-runPlans bopts packages plans wanted docLoc = do
-    logLevel <- asks getLogLevel
-    mgr <- asks getHttpManager
+runPlans _bopts _packages plans _wanted _docLoc = do
     shakeDir <- asks configShakeFilesDir
-    pwd <- getWorkingDir
     shakeArgs
         shakeDir
         (case buildOS of
@@ -430,6 +427,7 @@ runPlans bopts packages plans wanted docLoc = do
              _ ->
                  defaultShakeThreads)
         (do sequence_ plans
+            {- EKB FIXME: doc generation for stack-doc-server
             when
                 (boptsFinalAction bopts == DoHaddock)
                 (buildDocIndex
@@ -437,7 +435,9 @@ runPlans bopts packages plans wanted docLoc = do
                      docLoc
                      packages
                      mgr
-                     logLevel))
+                     logLevel)
+                                      --}
+                              )
 
 -- | Dry run output.
 dryRunPrint :: MonadLogger m => Text -> Set PackageIdentifier -> Set PackageIdentifier -> m ()
@@ -694,7 +694,7 @@ buildPackage :: MonadAction m
              -> Resource
              -> Path Abs Dir
              -> m ()
-buildPackage cabalPkgVer bopts bconfig setuphs buildType packages package gconfig setupAction installResource docLoc =
+buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconfig setupAction installResource _docLoc =
   do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath package))) :: IO (Either IOException ())))
      let runhaskell' live = runhaskell live cabalPkgVer package setuphs bconfig buildType
          singularBuild = S.size (bcPackages bconfig) == 1 && packageType package == PTUser
@@ -708,19 +708,26 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType packages package gconfi
      case setupAction of
        DoTests -> runhaskell' singularBuild ["test"]
        DoHaddock ->
-           do liftIO (removeDocLinks docLoc package)
+           do
+              {- EKB FIXME: doc generation for stack-doc-server
+#ifndef mingw32_HOST_OS
+              liftIO (removeDocLinks docLoc package)
+#endif
               ifcOpts <- liftIO (haddockInterfaceOpts docLoc package packages)
+              --}
               runhaskell'
                          singularBuild
                          ["haddock"
                          ,"--html"
                          ,"--hoogle"
-                         ,"--hyperlink-source"
+                         ,"--hyperlink-source"]
+              {- EKB FIXME: doc generation for stack-doc-server
                          ,"--html-location=../$pkg-$version/"
-                         ,"--haddock-options=" ++ intercalate " " ifcOpts]
+                         ,"--haddock-options=" ++ intercalate " " ifcOpts ]
               haddockLocs <-
                 liftIO (findFiles (packageDocDir package)
-                                  (\loc -> FilePath.takeExtensions (toFilePath loc) == "." ++ haddockExtension)
+                                  (\loc -> FilePath.takeExtensions (toFilePath loc) ==
+                                           "." ++ haddockExtension)
                                   (not . isHiddenDir))
               forM_ haddockLocs $ \haddockLoc ->
                 do let hoogleTxtPath = FilePath.replaceExtension (toFilePath haddockLoc) "txt"
@@ -734,12 +741,17 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType packages package gconfi
                              ,"--haddock"
                              ,hoogleTxtPath
                              ,hoogleDbPath])
+              --}
        DoBenchmarks -> runhaskell' singularBuild ["bench"]
        _ -> return ()
      withResource installResource 1 (runhaskell' False ["install"])
+     {- EKB FIXME: doc generation for stack-doc-server
+#ifndef mingw32_HOST_OS
      case setupAction of
        DoHaddock -> liftIO (createDocLinks docLoc package)
        _ -> return ()
+#endif
+     --}
 
 -- | Run the Haskell command for the given package.
 runhaskell :: (HasConfig config,HasBuildConfig config,MonadAction m)
@@ -827,6 +839,7 @@ ensureSetupHs dir =
   where fp1 = dir </> $(mkRelFile "Setup.hs")
         fp2 = dir </> $(mkRelFile "Setup.lhs")
 
+{- EKB FIXME: doc generation for stack-doc-server
 -- | Build the haddock documentation index and contents.
 buildDocIndex :: (Package -> Wanted)
               -> Path Abs Dir
@@ -897,13 +910,11 @@ buildDocIndex wanted docLoc packages mgr logLevel =
                                     else [])
                       (S.toList packages))
 
+#ifndef mingw32_HOST_OS
 -- | Remove existing links docs for package from @~/.shake/doc@.
 removeDocLinks :: Path Abs Dir -> Package -> IO ()
-#ifdef mingw32_HOST_OS
-removeDocLinks _ _ =
-  return ()
-#else /* mingw32_HOST_OS */
 removeDocLinks docLoc package =
+  --EKB FIXME: only when running in Docker, for now.
   do createDirectoryIfMissing True
                               (FL.toFilePath docLoc)
      userDocLs <-
@@ -918,35 +929,36 @@ removeDocLinks docLoc package =
                       when (p == packageName package)
                            (removeLink docPath)
                     Nothing -> return ())
-#endif /* not defined(mingw32_HOST_OS) */
 
 -- | Add link for package to @~/.shake/doc@.
 createDocLinks :: Path Abs Dir -> Package -> IO ()
-#ifdef mingw32_HOST_OS
-createDocLinks _ _ =
-  return ()
-#else /* mingw32_HOST_OS */
 createDocLinks docLoc package =
+  --EKB FIXME: only when running in Docker, for now.
   do let pkgVer =
            joinPkgVer (packageName package,(packageVersion package))
      pkgVerLoc <- liftIO (parseRelDir pkgVer)
      let pkgDestDocLoc = docLoc </> pkgVerLoc
          pkgDestDocPath =
            FilePath.dropTrailingPathSeparator (FL.toFilePath pkgDestDocLoc)
+         cabalDocLoc = parent docLoc </>
+                      --EKB FIXME: this does not work with .stack-work
+                       $(mkRelDir "share/doc/")
      haddockLocs <-
-       findFiles (fromMaybe (error "Couldn't make haddock directory.")
-                            (parseAbsDir (toFilePath docLoc ++ "../share/doc/"))) -- FIXME: Implement this better with e.g. dropDir "x/y/" -> "x/".
-                 (\fileLoc ->
-                    FilePath.takeExtensions (toFilePath fileLoc) ==
-                    "." ++ haddockExtension &&
-                    dirname (parent fileLoc) ==
-                    $(mkRelDir "html/") &&
-                    toFilePath (dirname (parent (parent fileLoc))) ==
-                    (pkgVer ++ "/"))
-                 (\dirLoc ->
-                    not (isHiddenDir dirLoc) &&
-                    dirname (parent (parent dirLoc)) /=
-                    $(mkRelDir "html/"))
+       do cabalDocExists <- doesDirectoryExist (toFilePath cabalDocLoc)
+          if cabalDocExists
+             then findFiles cabalDocLoc
+                            (\fileLoc ->
+                               FilePath.takeExtensions (toFilePath fileLoc) ==
+                               "." ++ haddockExtension &&
+                               dirname (parent fileLoc) ==
+                               $(mkRelDir "html/") &&
+                               toFilePath (dirname (parent (parent fileLoc))) ==
+                               (pkgVer ++ "/"))
+                            (\dirLoc ->
+                               not (isHiddenDir dirLoc) &&
+                               dirname (parent (parent dirLoc)) /=
+                               $(mkRelDir "html/"))
+             else return []
      case haddockLocs of
        [haddockLoc] ->
          case FL.stripDir (parent docLoc)
@@ -999,6 +1011,7 @@ haddockInterfaceOpts userDocLoc package packages =
      --(e.g. redis-fp doesn't include @text@ in its dependencies which means the 'Text'
      --datatype isn't linked in its haddocks)
      fmap concat (mapM toInterfaceOpt (S.toList (packageAllDeps package)))
+--}
 
 --------------------------------------------------------------------------------
 -- Generated files
@@ -1166,9 +1179,11 @@ withTempUnpacked pkgs inner = withSystemTempDirectory "stack-unpack" $ \tmp -> d
 --------------------------------------------------------------------------------
 -- Paths
 
+{- EKB FIXME: doc generation for stack-doc-server
 -- | Returns true for paths whose last directory component begins with ".".
 isHiddenDir :: Path b Dir -> Bool
 isHiddenDir = isPrefixOf "." . toFilePath . dirname
+--}
 
 -- | Get the version of Cabal from the global package database.
 getCabalPkgVer :: (MonadThrow m,MonadIO m,MonadLogger m)
