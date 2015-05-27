@@ -118,13 +118,13 @@ getPackageVersionMap menv pkgDbs =
 getPackageVersionsMap :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
                       => EnvOverride
                       -> [Path Abs Dir] -- ^ package databases
-                      -> m (Map PackageName (Set Version))
+                      -> m (Set PackageIdentifier)
 getPackageVersionsMap menv pkgDbs =
     getPackageVersions
         menv
         pkgDbs
-        (M.unionsWith (<>) .
-         map (M.map S.singleton))
+        (S.fromList .
+         concatMap (map fromTuple . M.toList))
 
 -- | Get all available packages.
 getPackageVersions :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
