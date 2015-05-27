@@ -140,6 +140,8 @@ test-suite stack-test
   build-depends:  base >=4.7 && <5
                 , hspec
                 , directory
+                , filepath
+                , path
                 , temporary
                 , stack
                 , monad-logger
