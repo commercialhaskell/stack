@@ -121,8 +121,7 @@ determineLocals bopts = do
         { packageConfigEnableTests = False
         , packageConfigEnableBenchmarks = False
         , packageConfigFlags =
-               fromMaybe M.empty (M.lookup name $ configPackageFlags config)
-            <> configGlobalFlags config
+               fromMaybe M.empty (M.lookup name $ configFlags config)
         , packageConfigGhcVersion = bcGhcVersion bconfig
         }
       where config = bcConfig bconfig
@@ -136,8 +135,7 @@ determineLocals bopts = do
                 DoBenchmarks -> True
                 _ -> False
         , packageConfigFlags =
-               fromMaybe M.empty (M.lookup name $ configPackageFlags config)
-            <> configGlobalFlags config
+               fromMaybe M.empty (M.lookup name $ configFlags config)
         , packageConfigGhcVersion = bcGhcVersion bconfig
         }
       where

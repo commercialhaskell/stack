@@ -135,10 +135,8 @@ data Project = Project
     , projectExtraDeps :: !(Map PackageName Version)
     -- ^ Components of the package list referring to package/version combos,
     -- see: https://github.com/fpco/stack/issues/41
-    , projectGlobalFlags :: !(Map FlagName Bool)
-    -- ^ Applied to all packages
-    , projectPackageFlags :: !(Map PackageName (Map FlagName Bool))
-    -- ^ Applied to an individual package, overriding global flags
+    , projectFlags :: !(Map PackageName (Map FlagName Bool))
+    -- ^ Per-package flag overrides
     , projectConfigExists :: !Bool
     -- ^ If 'True', then we actually loaded this from a real config file. If
     -- 'False', then we just made up a default.
@@ -156,15 +154,13 @@ instance FromJSON (Path Abs Dir -> Project) where -- FIXME get rid of Path Abs D
                 ([], x) -> return $ Map.fromList x
                 (errs, _) -> fail $ unlines errs
 
-        gf <- o .:? "flags" .!= mempty
-        pf <- o .:? "package-flags" .!= mempty
+        flags <- o .:? "flags" .!= mempty
         config <- parseJSON $ Object o
         return $ \root -> Project
             { projectRoot = root
             , projectPackages = dirs
             , projectExtraDeps = extraDeps
-            , projectGlobalFlags = gf
-            , projectPackageFlags = pf
+            , projectFlags = flags
             , projectConfigExists = True
             , projectConfigMonoid = config
             }
@@ -199,8 +195,7 @@ configFromConfigMonoid :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader e
 configFromConfigMonoid configStackRoot Project{..} ConfigMonoid{..} = do
      let configDocker = case configMonoidDockerOpts of
                  DockerOpts x -> x
-         configGlobalFlags = projectGlobalFlags
-         configPackageFlags = projectPackageFlags
+         configFlags = projectFlags
          configExtraDeps = projectExtraDeps
          configDir = projectRoot
          configUrls = configMonoidUrls
@@ -348,8 +343,7 @@ loadProjectConfig = do
                         { projectRoot = currDir
                         , projectPackages = ["."]
                         , projectExtraDeps = mempty
-                        , projectGlobalFlags = mempty
-                        , projectPackageFlags = mempty
+                        , projectFlags = mempty
                         , projectConfigExists = False
                         , projectConfigMonoid = mempty
                         }

@@ -42,8 +42,7 @@ data Config =
          --
          -- These dependencies will not be installed to a shared location, and
          -- will override packages provided by the resolver.
-         ,configGlobalFlags      :: !(Map FlagName Bool)
-         ,configPackageFlags     :: !(Map PackageName (Map FlagName Bool))
+         ,configFlags            :: !(Map PackageName (Map FlagName Bool))
          ,configDir              :: !(Path Abs Dir)
          -- ^ Directory containing the project's stack.yaml file
          ,configUrls             :: !(Map Text Text)
