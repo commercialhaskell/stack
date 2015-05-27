@@ -111,7 +111,6 @@ determineLocals
     => BuildOpts
     -> m [Package]
 determineLocals bopts = do
-    cfg <- askConfig
     bconfig <- asks getBuildConfig
 
     $logDebug "Unpacking packages as necessary"
@@ -137,7 +136,6 @@ determineLocals bopts = do
                fromMaybe M.empty (M.lookup name $ bcFlags bconfig)
         , packageConfigGhcVersion = bcGhcVersion bconfig
         }
-      where config = bcConfig bconfig
     packageConfig name bconfig PTUser = PackageConfig
         { packageConfigEnableTests =
             case finalAction of
@@ -151,8 +149,6 @@ determineLocals bopts = do
                fromMaybe M.empty (M.lookup name $ bcFlags bconfig)
         , packageConfigGhcVersion = bcGhcVersion bconfig
         }
-      where
-        config = bcConfig bconfig
 
 -- | Get the version ranges for all dependencies. This takes care of checking
 -- for consistency amongst the local packages themselves, and removing locally
@@ -385,7 +381,6 @@ runPlans :: (MonadIO m,MonadReader env m,HasBuildConfig env,HasLogLevel env)
 runPlans bopts packages plans wanted docLoc = do
     logLevel <- asks getLogLevel
     bconfig <- asks getBuildConfig
-    config <- asks getConfig
     pwd <- getWorkingDir
     liftIO $ withArgs []
                       (shakeArgs shakeOptions {shakeVerbosity = logLevelToShakeVerbosity logLevel
