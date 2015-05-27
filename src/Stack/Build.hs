@@ -386,6 +386,7 @@ buildLocals bopts packagesToInstall packagesToRemove = do
                                    installResource
                                    docLoc
                                    cfgVar))
+
      if boptsDryrun bopts
         then dryRunPrint "local packages" packagesToRemove (Set.map packageIdentifier packagesToInstall)
         else runPlans bopts packagesToInstall plans wanted docLoc
@@ -879,8 +880,8 @@ createDocLinks docLoc package =
          pkgDestDocPath =
            FilePath.dropTrailingPathSeparator (FL.toFilePath pkgDestDocLoc)
      haddockLocs <-
-       findFiles (docLoc </>
-                  $(mkRelDir "../share/doc/"))
+       findFiles (fromMaybe (error "Couldn't make haddock directory.")
+                            (parseAbsDir (toFilePath docLoc ++ "../share/doc/"))) -- FIXME: Implement this better with e.g. dropDir "x/y/" -> "x/".
                  (\fileLoc ->
                     FilePath.takeExtensions (toFilePath fileLoc) ==
                     "." ++ haddockExtension &&
