@@ -309,7 +309,7 @@ installDependencies bopts deps' = do
                        return $ makePlan -- FIXME dedupe this code with buildLocals
                            cabalPkgVer
                            M.empty
-                           True
+                           Wanted
                            bopts
                            bconfig
                            BTDeps
@@ -321,7 +321,7 @@ installDependencies bopts deps' = do
                            cfgVar
                    runPlans bopts
                       packages
-                      plans (\_ _ -> True) docLoc -- FIXME think about haddocks here
+                      plans (\_ _ -> Wanted) docLoc -- FIXME think about haddocks here
   where
     deps = M.fromList $ map (\(name, (version, flags)) -> (PackageIdentifier name version, flags))
                       $ M.toList deps'
@@ -366,7 +366,7 @@ buildLocals bopts packagesToInstall packagesToRemove = do
             (\package ->
                do let wantedTarget =
                         wanted pwd package
-                  when (wantedTarget && boptsFinalAction bopts /= DoNothing)
+                  when (wantedTarget == Wanted && boptsFinalAction bopts /= DoNothing)
                        (liftIO (deleteGenFile (packageDir package)))
                   gconfig <- liftIO $
                     readGenConfigFile pkgIds
@@ -391,19 +391,20 @@ buildLocals bopts packagesToInstall packagesToRemove = do
         then dryRunPrint "local packages" packagesToRemove (Set.map packageIdentifier packagesToInstall)
         else runPlans bopts packagesToInstall plans wanted docLoc
   where
-    wanted pwd package = case boptsTargets bopts of
+    wanted pwd package = boolToWanted $ case boptsTargets bopts of
         [] -> FL.isParentOf pwd (packageDir package) ||
               packageDir package == pwd
         targets ->
               elem (packageName package)
                    (mapMaybe (parsePackageNameFromString . T.unpack) targets)
+      where boolToWanted True = Wanted; boolToWanted _ = NotWanted
 
 -- FIXME clean up this function to make it more nicely shareable
 runPlans :: (MonadIO m,MonadReader env m,HasBuildConfig env,HasLogLevel env)
          => BuildOpts
          -> Set Package
          -> [Rules ()]
-         -> (Path Abs Dir -> Package -> Bool)
+         -> (Path Abs Dir -> Package -> Wanted)
          -> Path Abs Dir -- FIXME figure out local vs shared docs location
          -> m ()
 runPlans bopts packages plans wanted docLoc = do
@@ -485,10 +486,16 @@ clean =
 --------------------------------------------------------------------------------
 -- Shake plan
 
+-- | Whether the target is wanted or not.
+data Wanted
+  = NotWanted
+  | Wanted
+  deriving (Eq)
+
 -- | Make a Shake plan for a package.
 makePlan :: PackageIdentifier
          -> Map PackageName GhcPkgId
-         -> Bool
+         -> Wanted
          -> BuildOpts
          -> BuildConfig
          -> BuildType
@@ -500,10 +507,11 @@ makePlan :: PackageIdentifier
          -> MVar ConfigLock
          -> Rules ()
 makePlan cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig packages package installResource docLoc cfgVar =
-  do when wanted (want [buildTarget])
+  do when (wanted == Wanted) (want [buildTarget])
      configureTarget %>
        \_ ->
-         do needDependencies pkgIds bopts packages package cfgVar
+         do {-runStackLoggingT mgr logLevel (return ())-}
+            needDependencies pkgIds bopts packages package cfgVar
             need [toFilePath (packageCabalFile package)]
             (setuphs, removeAfterwards) <- liftIO (ensureSetupHs dir)
             actionFinally
@@ -514,7 +522,7 @@ makePlan cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig packages pack
                  buildType
                  package
                  gconfig
-                 (if wanted && packageType package == PTUser
+                 (if wanted == Wanted && packageType package == PTUser
                      then boptsFinalAction bopts
                      else DoNothing))
               removeAfterwards
@@ -533,7 +541,7 @@ makePlan cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig packages pack
                  packages
                  package
                  gconfig
-                 (if wanted && packageType package == PTUser
+                 (if wanted == Wanted && packageType package == PTUser
                      then boptsFinalAction bopts
                      else DoNothing)
                  installResource
@@ -562,7 +570,7 @@ needDependencies pkgIds bopts packages package cfgVar =
                          genFile = builtFileFromDir dir'
                      in do void (liftIO (readGenConfigFile pkgIds
                                                            bopts
-                                                           False
+                                                           NotWanted
                                                            package'
                                                            cfgVar))
                            return (FL.toFilePath genFile))
@@ -787,7 +795,7 @@ ensureSetupHs dir =
         fp2 = dir </> $(mkRelFile "Setup.lhs")
 
 -- | Build the haddock documentation index and contents.
-buildDocIndex :: (Package -> Bool) -> Path Abs Dir -> Set Package -> Rules ()
+buildDocIndex :: (Package -> Wanted) -> Path Abs Dir -> Set Package -> Rules ()
 buildDocIndex wanted docLoc packages =
   do runHaddock "--gen-contents" $(mkRelFile "index.html")
      runHaddock "--gen-index" $(mkRelFile "doc-index.html")
@@ -839,7 +847,7 @@ buildDocIndex wanted docLoc packages =
                     then [srcPath]
                     else [])
     needDeps =
-      need (concatMap (\package -> if wanted package
+      need (concatMap (\package -> if wanted package == Wanted
                                     then let dir = packageDir package
                                          in [FL.toFilePath (builtFileFromDir dir)]
                                     else [])
@@ -1032,7 +1040,7 @@ writeGenConfigFile dir gconfig = liftIO $
 -- build configuration.
 readGenConfigFile :: Map PackageName GhcPkgId
                   -> BuildOpts
-                  -> Bool
+                  -> Wanted
                   -> Package
                   -> MVar ConfigLock
                   -> IO GenConfig
@@ -1053,7 +1061,7 @@ readGenConfigFile pkgIds bopts wanted package cfgVar = withMVar cfgVar (const go
                          -- config needs to be regenerated...
                          do let invalidated =
                                   genFileInvalidated pkgIds bopts gconfig name package
-                            when (invalidated || wanted)
+                            when (invalidated || wanted == Wanted)
                                  (deleteGenFile dir)
                             let gconfig' =
                                   (newConfig gconfig bopts package) {gconfigForceRecomp = invalidated}
