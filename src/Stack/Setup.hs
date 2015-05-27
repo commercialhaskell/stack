@@ -143,14 +143,15 @@ setupEnv installIfMissing manager bconfig = do
         depsPath = mkPath (mkDirs False) mpath
         localsPath = mkPath (mkDirs True) mpath
 
-    -- FIXME make sure the directories exist?
     deps <- runReaderT packageDatabaseDeps bconfig
+    depsExists <- liftIO $ doesDirectoryExist $ toFilePath deps
     localdb <- runReaderT packageDatabaseLocal bconfig
+    localdbExists <- liftIO $ doesDirectoryExist $ toFilePath localdb
     global <- getGlobalDB $ EnvOverride $ Map.insert "PATH" depsPath env0
-    let mkGPP locals = T.pack $ intercalate [searchPathSeparator]
-            $ (if locals then (toFilePath localdb:) else id)
-            [ toFilePath deps
-            , toFilePath global
+    let mkGPP locals = T.pack $ intercalate [searchPathSeparator] $ concat
+            [ [toFilePath localdb | locals && localdbExists]
+            , [toFilePath deps | depsExists]
+            , [toFilePath global]
             ]
 
     let mkEnvOverride es = EnvOverride
