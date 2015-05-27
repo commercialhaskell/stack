@@ -52,6 +52,7 @@ import qualified Data.Streaming.Process as Process
 import           Data.Streaming.Process hiding (env)
 import qualified Data.Text as T
 import           Development.Shake hiding (doesFileExist,doesDirectoryExist,getDirectoryContents)
+import           Distribution.System (OS (Windows), buildOS)
 import           Network.HTTP.Download
 import           Path as FL
 import           Path.Find
@@ -373,7 +374,11 @@ runPlans bopts packages plans wanted docLoc = do
                       (shakeArgs shakeOptions {shakeVerbosity = logLevelToShakeVerbosity logLevel
                                               ,shakeFiles =
                                                  FL.toFilePath (shakeFilesPath (configDir config))
-                                              ,shakeThreads = defaultShakeThreads}
+                                              ,shakeThreads =
+                                                -- See: https://github.com/fpco/stack/issues/84
+                                                case buildOS of
+                                                    Windows -> 1
+                                                    _ -> defaultShakeThreads}
                                  (do sequence_ plans
                                      when (boptsFinalAction bopts ==
                                            DoHaddock)
