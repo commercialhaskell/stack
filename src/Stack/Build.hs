@@ -47,10 +47,10 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Set as Set
 import qualified Data.Streaming.Process as Process
-import           Data.Streaming.Process hiding (env)
+import           Data.Streaming.Process hiding (env,callProcess)
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Development.Shake hiding (doesFileExist,doesDirectoryExist,getDirectoryContents)
+import qualified Data.Text.Encoding as T
 import           Distribution.System (OS (Windows), buildOS)
 import           Network.HTTP.Conduit (Manager)
 import           Network.HTTP.Download
@@ -58,6 +58,7 @@ import           Path as FL
 import           Path.Find
 import           Path.IO
 import           Prelude hiding (FilePath,writeFile)
+import           Shake
 import           Stack.Build.Doc
 import           Stack.Build.Types
 import           Stack.BuildPlan
@@ -73,7 +74,7 @@ import           System.Environment
 import qualified System.FilePath as FilePath
 import           System.IO
 import           System.IO.Temp (withSystemTempDirectory)
-import           System.Process.Read (findExecutable)
+import           System.Process.Read
 
 #ifndef mingw32_HOST_OS
 import           System.Posix.Files (createSymbolicLink,removeLink)
@@ -280,7 +281,7 @@ installDependencies bopts deps' = do
     cabalPkgVer <- getCabalPkgVer menv
     let toInstall = M.difference deps installed
 
-    installResource <- liftIO $ newResourceIO "cabal install" 1
+    installResource <- newResource "cabal install" 1
     cfgVar <- liftIO $ newMVar ConfigLock
     docLoc <- liftIO getUserDocPath
 
@@ -368,7 +369,7 @@ buildLocals bopts packagesToInstall packagesToRemove = do
      cabalPkgVer <- getCabalPkgVer menv
      pwd <- liftIO $ getCurrentDirectory >>= parseAbsDir
      docLoc <- liftIO getUserDocPath
-     installResource <- liftIO $ newResourceIO "cabal install" 1
+     installResource <- newResource "cabal install" 1
      cfgVar <- liftIO $ newMVar ConfigLock
      plans <-
        forM (S.toList packagesToInstall)
@@ -377,12 +378,12 @@ buildLocals bopts packagesToInstall packagesToRemove = do
                         wanted pwd package
                   when (wantedTarget == Wanted && boptsFinalAction bopts /= DoNothing)
                        (liftIO (deleteGenFile (packageDir package)))
-                  gconfig <- liftIO $
-                    readGenConfigFile pkgIds
-                                      bopts
-                                      wantedTarget
-                                      package
-                                      cfgVar
+                  gconfig <- readGenConfigFile
+                      pkgIds
+                      bopts
+                      wantedTarget
+                      package
+                      cfgVar
                   return (makePlan mgr
                                    logLevel
                                    cabalPkgVer
@@ -411,7 +412,7 @@ buildLocals bopts packagesToInstall packagesToRemove = do
       where boolToWanted True = Wanted; boolToWanted _ = NotWanted
 
 -- FIXME clean up this function to make it more nicely shareable
-runPlans :: (MonadIO m,MonadReader env m,HasBuildConfig env,HasLogLevel env)
+runPlans :: (MonadIO m, MonadReader env m, HasBuildConfig env, HasLogLevel env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
          => BuildOpts
          -> Set Package
          -> [Rules ()]
@@ -420,30 +421,25 @@ runPlans :: (MonadIO m,MonadReader env m,HasBuildConfig env,HasLogLevel env)
          -> m ()
 runPlans bopts packages plans wanted docLoc = do
     logLevel <- asks getLogLevel
+    mgr <- asks getHttpManager
     shakeDir <- asks configShakeFilesDir
     pwd <- getWorkingDir
-    liftIO $ withArgs []
-                      (shakeArgs shakeOptions {shakeVerbosity = logLevelToShakeVerbosity logLevel
-                                              ,shakeFiles =
-                                                 FL.toFilePath shakeDir
-                                              ,shakeThreads =
-                                                -- See: https://github.com/fpco/stack/issues/84
-                                                case buildOS of
-                                                    Windows -> 1
-                                                    _ -> defaultShakeThreads}
-                                 (do sequence_ plans
-                                     when (boptsFinalAction bopts ==
-                                           DoHaddock)
-                                          (buildDocIndex (wanted pwd)
-                                                         docLoc
-                                                         packages)))
-  where logLevelToShakeVerbosity l =
-          case l of
-            LevelDebug -> Chatty
-            LevelInfo -> Quiet
-            LevelWarn -> Quiet
-            LevelError -> Quiet
-            LevelOther _ -> Silent
+    shakeArgs
+        shakeDir
+        (case buildOS of
+             Windows ->
+                 1 -- See: https://github.com/fpco/stack/issues/84
+             _ ->
+                 defaultShakeThreads)
+        (do sequence_ plans
+            when
+                (boptsFinalAction bopts == DoHaddock)
+                (buildDocIndex
+                     (wanted pwd)
+                     docLoc
+                     packages
+                     mgr
+                     logLevel))
 
 -- | Dry run output.
 dryRunPrint :: MonadLogger m => Text -> Set PackageIdentifier -> Set PackageIdentifier -> m ()
@@ -523,8 +519,8 @@ makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig 
     when
         (wanted == Wanted)
         (want [buildTarget])
-    configureTarget %> const configureAction
-    buildTarget %> const buildAction
+    configureTarget %> const (runWithLogging configureAction)
+    buildTarget %> const (runWithLogging buildAction)
   where
     needSourceFiles =
         need (map FL.toFilePath (S.toList (packageFiles package)))
@@ -546,17 +542,16 @@ makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig 
         (setuphs,removeAfterwards) <-
             liftIO (ensureSetupHs dir)
         actionFinally
-            (runWithLogging
-                 (configurePackage
-                      cabalPkgVer
-                      bconfig
-                      setuphs
-                      buildType
-                      package
-                      gconfig
-                      (if wanted == Wanted && packageType package == PTUser
-                           then boptsFinalAction bopts
-                           else DoNothing)))
+            (configurePackage
+                 cabalPkgVer
+                 bconfig
+                 setuphs
+                 buildType
+                 package
+                 gconfig
+                 (if wanted == Wanted && packageType package == PTUser
+                      then boptsFinalAction bopts
+                      else DoNothing))
             removeAfterwards
     buildAction = do
         need [configureTarget]
@@ -564,41 +559,41 @@ makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig 
         (setuphs,removeAfterwards) <-
             liftIO (ensureSetupHs dir)
         actionFinally
-            (runWithLogging
-                 (buildPackage
-                      cabalPkgVer
-                      bopts
-                      bconfig
-                      setuphs
-                      buildType
-                      packages
-                      package
-                      gconfig
-                      (if wanted == Wanted && packageType package == PTUser
-                           then boptsFinalAction bopts
-                           else DoNothing)
-                      installResource
-                      docLoc))
+            (buildPackage
+                 cabalPkgVer
+                 bopts
+                 bconfig
+                 setuphs
+                 buildType
+                 packages
+                 package
+                 gconfig
+                 (if wanted == Wanted && packageType package == PTUser
+                      then boptsFinalAction bopts
+                      else DoNothing)
+                 installResource
+                 docLoc)
             removeAfterwards
         writeFinalFiles gconfig bconfig buildType dir package
 
 -- | Specify that the given package needs the following other
 -- packages.
-needDependencies :: Map PackageName GhcPkgId
+needDependencies :: MonadAction m
+                 => Map PackageName GhcPkgId
                  -> BuildOpts
                  -> Set Package
                  -> Package
                  -> MVar ConfigLock
-                 -> Action ()
+                 -> m ()
 needDependencies pkgIds bopts packages package cfgVar =
   do deps <- mapM (\package' ->
                      let dir' = packageDir package'
                          genFile = builtFileFromDir dir'
-                     in do void (liftIO (readGenConfigFile pkgIds
-                                                           bopts
-                                                           NotWanted
-                                                           package'
-                                                           cfgVar))
+                     in do void (readGenConfigFile pkgIds
+                                                   bopts
+                                                   NotWanted
+                                                   package'
+                                                   cfgVar)
                            return (FL.toFilePath genFile))
                   (mapMaybe (\name ->
                                find ((== name) . packageName)
@@ -647,14 +642,15 @@ writeFinalFiles gconfig bconfig buildType dir package = liftIO $
              updateGenFile dir)
 
 -- | Build the given package with the given configuration.
-configurePackage :: PackageIdentifier
+configurePackage :: (MonadAction m)
+                 => PackageIdentifier
                  -> BuildConfig
                  -> Path Abs File -- ^ Setup.hs file
                  -> BuildType
                  -> Package
                  -> GenConfig
                  -> FinalAction
-                 -> StackLoggingT Action ()
+                 -> m ()
 configurePackage cabalPkgVer bconfig setuphs buildType package gconfig setupAction =
   do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath package))) :: IO (Either IOException ())))
      pkgDbs <- getPackageDatabases bconfig buildType
@@ -686,7 +682,8 @@ configurePackage cabalPkgVer bconfig setuphs buildType package gconfig setupActi
 data BuildType = BTDeps | BTLocals
 
 -- | Build the given package with the given configuration.
-buildPackage :: PackageIdentifier
+buildPackage :: MonadAction m
+             => PackageIdentifier
              -> BuildOpts
              -> BuildConfig
              -> Path Abs File -- ^ Setup.hs file
@@ -697,7 +694,7 @@ buildPackage :: PackageIdentifier
              -> FinalAction
              -> Resource
              -> Path Abs Dir
-             -> StackLoggingT Action ()
+             -> m ()
 buildPackage cabalPkgVer bopts bconfig setuphs buildType packages package gconfig setupAction installResource docLoc =
   do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath package))) :: IO (Either IOException ())))
      let runhaskell' = runhaskell cabalPkgVer package setuphs bconfig buildType
@@ -728,33 +725,33 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType packages package gconfi
                        hoogleDbPath = FilePath.replaceExtension hoogleTxtPath hoogleDbExtension
                    hoogleExists <- liftIO (doesFileExist hoogleTxtPath)
                    when hoogleExists
-                        (lift (command [EchoStdout False]
-                                       "hoogle"
-                                       ["convert"
-                                       ,"--haddock"
-                                       ,hoogleTxtPath
-                                       ,hoogleDbPath]))
+                        (callProcess
+                             mempty -- FIXME: ?
+                             "hoogle"
+                             ["convert"
+                             ,"--haddock"
+                             ,hoogleTxtPath
+                             ,hoogleDbPath])
        DoBenchmarks -> runhaskell' ["bench"]
        _ -> return ()
-     run <- askRun
-     lift (withResource installResource 1 (run (runhaskell' ["install"])))
+     withResource installResource 1 (runhaskell' ["install"])
      case setupAction of
        DoHaddock -> liftIO (createDocLinks docLoc package)
        _ -> return ()
 
 -- | Run the Haskell command for the given package.
-runhaskell :: HasConfig config
+runhaskell :: (HasConfig config,MonadAction m)
            => PackageIdentifier
            -> Package
            -> Path Abs File -- ^ Setup.hs or Setup.lhs file
            -> config
            -> BuildType
            -> [String]
-           -> StackLoggingT Action ()
+           -> m ()
 runhaskell cabalPkgVer package setuphs config' buildType args =
   do liftIO (createDirectoryIfMissing True
                                       (FL.toFilePath (stackageBuildDir package)))
-     lift (putQuiet display)
+     $logInfo (T.pack display)
      outRef <- liftIO (newIORef mempty)
      errRef <- liftIO (newIORef mempty)
      let withSink inner =
@@ -771,15 +768,15 @@ runhaskell cabalPkgVer package setuphs config' buildType args =
                                      Concurrently (logFrom stderr' sink errRef))
                              return (return ()))
                          (\e@ProcessExitedUnsuccessfully{} ->
-                            return (do lift (putQuiet (display <> ": ERROR"))
+                            return (do $logError (T.pack (display <> ": ERROR"))
                                        errs <- liftIO (readIORef errRef)
                                        outs <- liftIO (readIORef outRef)
                                        unless (S8.null outs)
-                                              (lift (do putQuiet "Stdout was:"
-                                                        putQuiet (S8.unpack outs)))
+                                              (do $logError "Stdout was:"
+                                                  $logError (T.decodeUtf8 outs))
                                        unless (S8.null errs)
-                                              (lift (do putQuiet "Stderr was:"
-                                                        putQuiet (S8.unpack errs)))
+                                              (do $logError "Stderr was:"
+                                                  $logError (T.decodeUtf8 errs))
                                        liftIO (throwIO e)))))
   where logFrom src sink ref =
                         src $=
@@ -821,21 +818,30 @@ ensureSetupHs dir =
         fp2 = dir </> $(mkRelFile "Setup.lhs")
 
 -- | Build the haddock documentation index and contents.
-buildDocIndex :: (Package -> Wanted) -> Path Abs Dir -> Set Package -> Rules ()
-buildDocIndex wanted docLoc packages =
+buildDocIndex :: (Package -> Wanted)
+              -> Path Abs Dir
+              -> Set Package
+              -> Manager
+              -> LogLevel
+              -> Rules ()
+buildDocIndex wanted docLoc packages mgr logLevel =
   do runHaddock "--gen-contents" $(mkRelFile "index.html")
      runHaddock "--gen-index" $(mkRelFile "doc-index.html")
      combineHoogle
   where
+    runWithLogging = runStackLoggingT mgr logLevel
     runHaddock genOpt destFilename =
       do let destPath = toFilePath (docLoc </> destFilename)
          want [destPath]
          destPath %> \_ ->
-           do needDeps
-              ifcOpts <- liftIO (fmap concat (mapM toInterfaceOpt (S.toList packages)))
-              command [Cwd (FL.toFilePath docLoc)]
-                      "haddock"
-                      (genOpt:ifcOpts)
+           runWithLogging
+               (do needDeps
+                   ifcOpts <- liftIO (fmap concat (mapM toInterfaceOpt (S.toList packages)))
+                   runIn docLoc
+                         "haddock"
+                         mempty
+                         (genOpt:ifcOpts)
+                         Nothing)
     toInterfaceOpt package =
       do let pv = joinPkgVer (packageName package,packageVersion package)
              srcPath = (toFilePath docLoc) ++ "/" ++
@@ -855,14 +861,16 @@ buildDocIndex wanted docLoc packages =
              destPath = FL.toFilePath destHoogleDbLoc
          want [destPath]
          destPath %> \_ ->
-           do needDeps
-              srcHoogleDbs <- liftIO (fmap concat (mapM toSrcHoogleDb (S.toList packages)))
-              command [EchoStdout False]
-                      "hoogle"
-                      ("combine" :
-                       "-o" :
-                       FL.toFilePath destHoogleDbLoc :
-                       srcHoogleDbs)
+           runWithLogging
+               (do needDeps
+                   srcHoogleDbs <- liftIO (fmap concat (mapM toSrcHoogleDb (S.toList packages)))
+                   callProcess
+                        mempty -- FIXME: ?
+                        "hoogle"
+                        ("combine" :
+                         "-o" :
+                         FL.toFilePath destHoogleDbLoc :
+                         srcHoogleDbs))
     toSrcHoogleDb package =
       do let srcPath = toFilePath docLoc ++ "/" ++
                        joinPkgVer (packageName package,packageVersion package) ++ "/" ++
@@ -1064,13 +1072,14 @@ writeGenConfigFile dir gconfig = liftIO $
 
 -- | Read the generated config file, or return a default based on the
 -- build configuration.
-readGenConfigFile :: Map PackageName GhcPkgId
+readGenConfigFile :: MonadIO m
+                  => Map PackageName GhcPkgId
                   -> BuildOpts
                   -> Wanted
                   -> Package
                   -> MVar ConfigLock
-                  -> IO GenConfig
-readGenConfigFile pkgIds bopts wanted package cfgVar = withMVar cfgVar (const go)
+                  -> m GenConfig
+readGenConfigFile pkgIds bopts wanted package cfgVar = liftIO (withMVar cfgVar (const go))
   where name = packageName package
         dir = packageDir package
         go =
