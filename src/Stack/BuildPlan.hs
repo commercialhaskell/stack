@@ -426,7 +426,7 @@ findBuildPlan cabalfp gpd = do
         loop [] = return Nothing
         loop (name:names') = do
             menv <- getMinimalEnvOverride
-            globals <- getAllPackages menv []
+            globals <- getPackageVersionMap menv []
 
             mbp <- loadMiniBuildPlan name globals
             mflags <- checkBuildPlan name mbp cabalfp gpd

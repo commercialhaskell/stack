@@ -8,6 +8,7 @@
 
 module Stack.GhcPkg
   (getPackageVersionMap
+  ,getPackageVersionsMap
   ,findGhcPkgId
   ,getGhcPkgIds
   ,getGlobalDB
@@ -32,6 +33,8 @@ import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Monoid ((<>))
+import           Data.Set (Set)
+import qualified Data.Set as S
 import           Data.Streaming.Process
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -96,12 +99,40 @@ ghcPkg menv pkgDbs args = do
        ++ args
     go = tryProcessStdout menv "ghc-pkg" args'
 
--- | Get all available packages.
+-- | Get a single version for all packages, chooses the latest version
+-- of each package.
 getPackageVersionMap :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
                      => EnvOverride
                      -> [Path Abs Dir] -- ^ package databases
                      -> m (Map PackageName Version)
-getPackageVersionMap menv pkgDbs = do
+getPackageVersionMap menv pkgDbs =
+    getPackageVersions
+        menv
+        pkgDbs
+        (M.unionsWith max)
+
+-- | Get every version of every package.
+getPackageVersionsMap :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
+                      => EnvOverride
+                      -> [Path Abs Dir] -- ^ package databases
+                      -> m (Map PackageName (Set Version))
+getPackageVersionsMap menv pkgDbs =
+    -- Use unionsWith max to account for cases where the snapshot introduces a
+    -- newer version of a global package, see:
+    -- https://github.com/fpco/stack/issues/78
+    getPackageVersions
+        menv
+        pkgDbs
+        (M.unionsWith (<>) .
+         map (M.map S.singleton))
+
+-- | Get all available packages.
+getPackageVersions :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
+                   => EnvOverride
+                   -> [Path Abs Dir] -- ^ package databases
+                   -> ([Map PackageName Version] -> a)
+                   -> m a
+getPackageVersions menv pkgDbs f = do
     result <-
         ghcPkg menv pkgDbs ["--global", "list"]
     case result of
@@ -109,7 +140,7 @@ getPackageVersionMap menv pkgDbs = do
             throw GetAllPackagesFail
         Right lbs ->
             case AttoLazy.parse
-                     pkgsListParser
+                     (packageVersionsParser f)
                      (L.fromStrict lbs) of
                 AttoLazy.Fail _ _ _ ->
                     throw GetAllPackagesFail
@@ -117,26 +148,27 @@ getPackageVersionMap menv pkgDbs = do
                     liftIO (evaluate r)
 
 -- | Parser for ghc-pkg's list output.
-pkgsListParser :: Parser (Map PackageName Version)
-pkgsListParser =
-  -- Use unionsWith max to account for cases where the snapshot introduces a
-  -- newer version of a global package, see:
-  -- https://github.com/fpco/stack/issues/78
-  fmap (M.unionsWith max . map M.fromList) sections
-  where sections =
-          many (heading *>
-                (many (pkg <* endOfLine)) <*
-                optional endOfLine)
-        heading =
-          many1 (satisfy (not . (== '\n'))) <*
-          endOfLine
-        pkg =
-          do space
-             space
-             space
-             space
-             fmap toTuple (packageIdentifierParser <|>
-                ("(" *> packageIdentifierParser <* ")")) -- hidden packages
+packageVersionsParser :: ([Map PackageName Version] -> a) -> Parser a
+packageVersionsParser f =
+    fmap (f . map M.fromList) sections
+  where
+    sections =
+        many
+            (heading *>
+             (many (pkg <* endOfLine)) <*
+             optional endOfLine)
+    heading =
+        many1 (satisfy (not . (== '\n'))) <*
+        endOfLine
+    pkg = do
+        space
+        space
+        space
+        space
+        fmap
+            toTuple
+            (packageIdentifierParser <|>
+             ("(" *> packageIdentifierParser <* ")")) -- hidden packages
 
 -- | Get the id of the package e.g. @foo-0.0.0-9c293923c0685761dcff6f8c3ad8f8ec@.
 findGhcPkgId :: (MonadIO m, MonadLogger m)

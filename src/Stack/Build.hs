@@ -209,7 +209,7 @@ getDependencies
 getDependencies locals ranges = do
     -- Get global packages
     menv <- getMinimalEnvOverride
-    globals <- getAllPackages menv []
+    globals <- getPackageVersionMap menv []
 
     bconfig <- asks getBuildConfig
     dependencies <- case bcResolver bconfig of
