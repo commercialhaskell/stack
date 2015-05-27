@@ -49,6 +49,7 @@ import qualified Data.Set as S
 import qualified Data.Set as Set
 import qualified Data.Streaming.Process as Process
 import           Data.Streaming.Process hiding (env)
+import           Data.Text (Text)
 import qualified Data.Text as T
 import           Development.Shake hiding (doesFileExist,doesDirectoryExist,getDirectoryContents)
 import           Distribution.System (OS (Windows), buildOS)
@@ -276,47 +277,46 @@ installDependencies bopts deps' = do
     if M.null toInstall
         then $logDebug "All dependencies are already installed"
         else do
-            $logInfo $ "Installing dependencies: " <> T.intercalate ", " (map packageIdentifierText (M.keys toInstall))
-            withTempUnpacked (M.keys toInstall) $ \newPkgDirs -> do
-                $logInfo "All dependencies unpacked"
-                -- FIXME unregister conflicting?
-
-                packages <- liftM S.fromList $ forM newPkgDirs $ \dir -> do
-                    cabalfp <- getCabalFileName dir
-                    name <- parsePackageNameFromFilePath cabalfp
-                    flags <- case M.lookup name deps' of
-                        Nothing -> assert False $ return M.empty
-                        Just (_, flags) -> return flags
-                    readPackage (packageConfig flags bconfig) cabalfp PTDep
-                plans <- forM (S.toList packages) $ \package -> do
-                    let gconfig = GenConfig -- FIXME
-                            { gconfigOptimize = False
-                            , gconfigForceRecomp = False
-                            , gconfigLibProfiling = True
-                            , gconfigExeProfiling = False
-                            , gconfigGhcOptions = []
-                            , gconfigFlags = packageFlags package
-                            , gconfigPkgId = error "gconfigPkgId"
-                            }
-                    return $ makePlan -- FIXME dedupe this code with buildLocals
-                        cabalPkgVer
-                        M.empty
-                        True
-                        bopts
-                        bconfig
-                        BTDeps
-                        gconfig
-                        packages
-                        package
-                        installResource
-                        docLoc
-                        cfgVar
-
-                if boptsDryrun bopts
-                    then $logInfo "Dry run, not doing anything with dependencies"
-                    else runPlans bopts
-                            packages
-                            plans (\_ _ -> True) docLoc -- FIXME think about haddocks here
+            if boptsDryrun bopts
+               then dryRunPrint "dependencies" mempty (S.fromList (M.keys toInstall))
+               else do
+                 $logInfo $ "Installing dependencies: " <> T.intercalate ", " (map packageIdentifierText (M.keys toInstall))
+                 withTempUnpacked (M.keys toInstall) $ \newPkgDirs -> do
+                   $logInfo "All dependencies unpacked"
+                   -- FIXME unregister conflicting?
+                   packages <- liftM S.fromList $ forM newPkgDirs $ \dir -> do
+                       cabalfp <- getCabalFileName dir
+                       name <- parsePackageNameFromFilePath cabalfp
+                       flags <- case M.lookup name deps' of
+                           Nothing -> assert False $ return M.empty
+                           Just (_, flags) -> return flags
+                       readPackage (packageConfig flags bconfig) cabalfp PTDep
+                   plans <- forM (S.toList packages) $ \package -> do
+                       let gconfig = GenConfig -- FIXME
+                               { gconfigOptimize = False
+                               , gconfigForceRecomp = False
+                               , gconfigLibProfiling = True
+                               , gconfigExeProfiling = False
+                               , gconfigGhcOptions = []
+                               , gconfigFlags = packageFlags package
+                               , gconfigPkgId = error "gconfigPkgId"
+                               }
+                       return $ makePlan -- FIXME dedupe this code with buildLocals
+                           cabalPkgVer
+                           M.empty
+                           True
+                           bopts
+                           bconfig
+                           BTDeps
+                           gconfig
+                           packages
+                           package
+                           installResource
+                           docLoc
+                           cfgVar
+                   runPlans bopts
+                      packages
+                      plans (\_ _ -> True) docLoc -- FIXME think about haddocks here
   where
     deps = M.fromList $ map (\(name, (version, flags)) -> (PackageIdentifier name version, flags))
                       $ M.toList deps'
@@ -375,7 +375,7 @@ buildLocals bopts packagesToInstall packagesToRemove = do
                                    docLoc
                                    cfgVar))
      if boptsDryrun bopts
-        then dryRunPrint packagesToInstall packagesToRemove
+        then dryRunPrint "local packages" packagesToRemove (Set.map packageIdentifier packagesToInstall)
         else runPlans bopts packagesToInstall plans wanted docLoc
   where
     wanted pwd package = case boptsTargets bopts of
@@ -421,25 +421,22 @@ runPlans bopts packages plans wanted docLoc = do
             LevelOther _ -> Silent
 
 -- | Dry run output.
-dryRunPrint :: MonadLogger m => Set Package -> Set PackageIdentifier -> m ()
-dryRunPrint toInstall toRemove = do
+dryRunPrint :: MonadLogger m => Text -> Set PackageIdentifier -> Set PackageIdentifier -> m ()
+dryRunPrint label toRemove toInstall = do
     unless
         (Set.null toRemove)
-        (do $logInfo "The following packages will be unregistered:"
+        (do $logInfo ("The following " <> label <> " will be unregistered:")
             forM_
                 (S.toList toRemove)
                 ($logInfo .
                  packageIdentifierText))
     unless
         (Set.null toInstall)
-        (do $logInfo "The following packages will be built and installed:"
+        (do $logInfo ("The following " <> label <> " will be installed:")
             forM_
                 (S.toList toInstall)
-                (\package ->
-                      $logInfo
-                          (packageIdentifierText
-                               (fromTuple
-                                    (packageName package, packageVersion package)))))
+                ($logInfo .
+                 packageIdentifierText))
 
 -- | Reset the build (remove Shake database and .gen files).
 clean :: forall m env.
