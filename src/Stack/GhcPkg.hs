@@ -106,6 +106,9 @@ getPackageVersionMap :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
                      -> [Path Abs Dir] -- ^ package databases
                      -> m (Map PackageName Version)
 getPackageVersionMap menv pkgDbs =
+    -- Use unionsWith max to account for cases where the snapshot introduces a
+    -- newer version of a global package, see:
+    -- https://github.com/fpco/stack/issues/78
     getPackageVersions
         menv
         pkgDbs
@@ -117,9 +120,6 @@ getPackageVersionsMap :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
                       -> [Path Abs Dir] -- ^ package databases
                       -> m (Map PackageName (Set Version))
 getPackageVersionsMap menv pkgDbs =
-    -- Use unionsWith max to account for cases where the snapshot introduces a
-    -- newer version of a global package, see:
-    -- https://github.com/fpco/stack/issues/78
     getPackageVersions
         menv
         pkgDbs
