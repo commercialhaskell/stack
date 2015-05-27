@@ -27,6 +27,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
+import           Control.Monad.Trans.Unlift
 import           Control.Monad.Writer
 import           Data.Aeson
 import qualified Data.ByteString as S
@@ -51,6 +52,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import           Development.Shake hiding (doesFileExist,doesDirectoryExist,getDirectoryContents)
 import           Distribution.System (OS (Windows), buildOS)
+import           Network.HTTP.Conduit (Manager)
 import           Network.HTTP.Download
 import           Path as FL
 import           Path.Find
@@ -65,6 +67,7 @@ import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal
+import           Stack.Types.StackT
 import           System.Directory hiding (findFiles, findExecutable)
 import           System.Environment
 import qualified System.FilePath as FilePath
@@ -267,6 +270,8 @@ installDependencies
     -> m ()
 installDependencies bopts deps' = do
     bconfig <- asks getBuildConfig
+    mgr <- asks getHttpManager
+    logLevel <- asks getLogLevel
     pkgDbs <- getPackageDatabases bconfig BTDeps
     menv <- getMinimalEnvOverride
 
@@ -307,6 +312,8 @@ installDependencies bopts deps' = do
                                , gconfigPkgId = error "gconfigPkgId"
                                }
                        return $ makePlan -- FIXME dedupe this code with buildLocals
+                           mgr
+                           logLevel
                            cabalPkgVer
                            M.empty
                            Wanted
@@ -344,6 +351,8 @@ buildLocals
     -> m ()
 buildLocals bopts packagesToInstall packagesToRemove = do
      env <- ask
+     mgr <- asks getHttpManager
+     logLevel <- asks getLogLevel
      menv <- getMinimalEnvOverride
      localDB <- packageDatabaseLocal
      depDB <- packageDatabaseDeps
@@ -374,7 +383,9 @@ buildLocals bopts packagesToInstall packagesToRemove = do
                                       wantedTarget
                                       package
                                       cfgVar
-                  return (makePlan cabalPkgVer
+                  return (makePlan mgr
+                                   logLevel
+                                   cabalPkgVer
                                    pkgIds
                                    wantedTarget
                                    bopts
@@ -493,7 +504,9 @@ data Wanted
   deriving (Eq)
 
 -- | Make a Shake plan for a package.
-makePlan :: PackageIdentifier
+makePlan :: Manager
+         -> LogLevel
+         -> PackageIdentifier
          -> Map PackageName GhcPkgId
          -> Wanted
          -> BuildOpts
@@ -506,55 +519,68 @@ makePlan :: PackageIdentifier
          -> Path Abs Dir
          -> MVar ConfigLock
          -> Rules ()
-makePlan cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig packages package installResource docLoc cfgVar =
-  do when (wanted == Wanted) (want [buildTarget])
-     configureTarget %>
-       \_ ->
-         do {-runStackLoggingT mgr logLevel (return ())-}
-            needDependencies pkgIds bopts packages package cfgVar
-            need [toFilePath (packageCabalFile package)]
-            (setuphs, removeAfterwards) <- liftIO (ensureSetupHs dir)
-            actionFinally
-              (configurePackage
-                 cabalPkgVer
-                 bconfig
-                 setuphs
-                 buildType
-                 package
-                 gconfig
-                 (if wanted == Wanted && packageType package == PTUser
-                     then boptsFinalAction bopts
-                     else DoNothing))
-              removeAfterwards
-     buildTarget %>
-       \_ ->
-         do need [configureTarget]
-            needSourceFiles
-            (setuphs, removeAfterwards) <- liftIO (ensureSetupHs dir)
-            actionFinally
-              (buildPackage
-                 cabalPkgVer
-                 bopts
-                 bconfig
-                 setuphs
-                 buildType
-                 packages
-                 package
-                 gconfig
-                 (if wanted == Wanted && packageType package == PTUser
-                     then boptsFinalAction bopts
-                     else DoNothing)
-                 installResource
-                 docLoc)
-              removeAfterwards
-            writeFinalFiles gconfig bconfig buildType dir package
-  where needSourceFiles =
-          need (map FL.toFilePath (S.toList (packageFiles package)))
-        dir = packageDir package
-        buildTarget =
-          FL.toFilePath (builtFileFromDir dir)
-        configureTarget =
-          FL.toFilePath (configuredFileFromDir dir)
+makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig packages package installResource docLoc cfgVar = do
+    when
+        (wanted == Wanted)
+        (want [buildTarget])
+    configureTarget %> const configureAction
+    buildTarget %> const buildAction
+  where
+    needSourceFiles =
+        need (map FL.toFilePath (S.toList (packageFiles package)))
+    dir =
+        packageDir package
+    buildTarget =
+        FL.toFilePath
+            (builtFileFromDir dir)
+    configureTarget =
+        FL.toFilePath
+            (configuredFileFromDir dir)
+    runWithLogging =
+        runStackLoggingT mgr logLevel
+    configureAction = do
+        needDependencies pkgIds bopts packages package cfgVar
+        need
+            [ toFilePath
+                  (packageCabalFile package)]
+        (setuphs,removeAfterwards) <-
+            liftIO (ensureSetupHs dir)
+        actionFinally
+            (runWithLogging
+                 (configurePackage
+                      cabalPkgVer
+                      bconfig
+                      setuphs
+                      buildType
+                      package
+                      gconfig
+                      (if wanted == Wanted && packageType package == PTUser
+                           then boptsFinalAction bopts
+                           else DoNothing)))
+            removeAfterwards
+    buildAction = do
+        need [configureTarget]
+        needSourceFiles
+        (setuphs,removeAfterwards) <-
+            liftIO (ensureSetupHs dir)
+        actionFinally
+            (runWithLogging
+                 (buildPackage
+                      cabalPkgVer
+                      bopts
+                      bconfig
+                      setuphs
+                      buildType
+                      packages
+                      package
+                      gconfig
+                      (if wanted == Wanted && packageType package == PTUser
+                           then boptsFinalAction bopts
+                           else DoNothing)
+                      installResource
+                      docLoc))
+            removeAfterwards
+        writeFinalFiles gconfig bconfig buildType dir package
 
 -- | Specify that the given package needs the following other
 -- packages.
@@ -628,7 +654,7 @@ configurePackage :: PackageIdentifier
                  -> Package
                  -> GenConfig
                  -> FinalAction
-                 -> Action ()
+                 -> StackLoggingT Action ()
 configurePackage cabalPkgVer bconfig setuphs buildType package gconfig setupAction =
   do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath package))) :: IO (Either IOException ())))
      pkgDbs <- getPackageDatabases bconfig buildType
@@ -671,11 +697,10 @@ buildPackage :: PackageIdentifier
              -> FinalAction
              -> Resource
              -> Path Abs Dir
-             -> Action ()
+             -> StackLoggingT Action ()
 buildPackage cabalPkgVer bopts bconfig setuphs buildType packages package gconfig setupAction installResource docLoc =
   do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath package))) :: IO (Either IOException ())))
      let runhaskell' = runhaskell cabalPkgVer package setuphs bconfig buildType
-
      runhaskell'
        (concat [["build"]
                ,["--ghc-options=-O2" | gconfigOptimize gconfig]
@@ -703,15 +728,16 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType packages package gconfi
                        hoogleDbPath = FilePath.replaceExtension hoogleTxtPath hoogleDbExtension
                    hoogleExists <- liftIO (doesFileExist hoogleTxtPath)
                    when hoogleExists
-                        (command [EchoStdout False]
-                                 "hoogle"
-                                 ["convert"
-                                 ,"--haddock"
-                                 ,hoogleTxtPath
-                                 ,hoogleDbPath])
+                        (lift (command [EchoStdout False]
+                                       "hoogle"
+                                       ["convert"
+                                       ,"--haddock"
+                                       ,hoogleTxtPath
+                                       ,hoogleDbPath]))
        DoBenchmarks -> runhaskell' ["bench"]
        _ -> return ()
-     withResource installResource 1 (runhaskell' ["install"])
+     run <- askRun
+     lift (withResource installResource 1 (run (runhaskell' ["install"])))
      case setupAction of
        DoHaddock -> liftIO (createDocLinks docLoc package)
        _ -> return ()
@@ -724,11 +750,11 @@ runhaskell :: HasConfig config
            -> config
            -> BuildType
            -> [String]
-           -> Action ()
+           -> StackLoggingT Action ()
 runhaskell cabalPkgVer package setuphs config' buildType args =
   do liftIO (createDirectoryIfMissing True
                                       (FL.toFilePath (stackageBuildDir package)))
-     putQuiet display
+     lift (putQuiet display)
      outRef <- liftIO (newIORef mempty)
      errRef <- liftIO (newIORef mempty)
      let withSink inner =
@@ -745,15 +771,15 @@ runhaskell cabalPkgVer package setuphs config' buildType args =
                                      Concurrently (logFrom stderr' sink errRef))
                              return (return ()))
                          (\e@ProcessExitedUnsuccessfully{} ->
-                            return (do putQuiet (display <> ": ERROR")
+                            return (do lift (putQuiet (display <> ": ERROR"))
                                        errs <- liftIO (readIORef errRef)
                                        outs <- liftIO (readIORef outRef)
                                        unless (S8.null outs)
-                                              (do putQuiet "Stdout was:"
-                                                  putQuiet (S8.unpack outs))
+                                              (lift (do putQuiet "Stdout was:"
+                                                        putQuiet (S8.unpack outs)))
                                        unless (S8.null errs)
-                                              (do putQuiet "Stderr was:"
-                                                  putQuiet (S8.unpack errs))
+                                              (lift (do putQuiet "Stderr was:"
+                                                        putQuiet (S8.unpack errs)))
                                        liftIO (throwIO e)))))
   where logFrom src sink ref =
                         src $=

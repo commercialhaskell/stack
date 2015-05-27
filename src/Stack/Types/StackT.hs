@@ -27,6 +27,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
+import           Control.Monad.Trans.Unlift
 import qualified Data.ByteString.Char8 as S8
 import           Data.Char
 import           Data.Text (Text)
@@ -80,6 +81,18 @@ runStackT manager logLevel config m =
 newtype StackLoggingT m a =
   StackLoggingT {unStackLoggingT :: ReaderT (LogLevel,Manager) m a}
   deriving (Functor,Applicative,Monad,MonadIO,MonadThrow,MonadReader (LogLevel,Manager),MonadCatch,MonadMask,MonadTrans)
+
+deriving instance (MonadBase b m) => MonadBase b (StackLoggingT m)
+
+instance MonadBaseControl b m => MonadBaseControl b (StackLoggingT m) where
+    type StM (StackLoggingT m) a = ComposeSt StackLoggingT m a
+    liftBaseWith     = defaultLiftBaseWith
+    restoreM         = defaultRestoreM
+
+instance MonadTransControl StackLoggingT where
+    type StT StackLoggingT a = StT (ReaderT (LogLevel,Manager)) a
+    liftWith = defaultLiftWith StackLoggingT unStackLoggingT
+    restoreT = defaultRestoreT StackLoggingT
 
 -- | Takes the configured log level into account.
 instance (MonadIO m) => MonadLogger (StackLoggingT m) where
