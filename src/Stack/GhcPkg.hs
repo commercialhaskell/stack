@@ -99,8 +99,8 @@ ghcPkg menv pkgDbs args = do
        ++ args
     go = tryProcessStdout menv "ghc-pkg" args'
 
--- | Get a single version for all packages, chooses the latest version
--- of each package.
+-- | In the given databases, get a single version for all packages, chooses the
+-- latest version of each package.
 getPackageVersionMap :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
                      => EnvOverride
                      -> [Path Abs Dir] -- ^ package databases
@@ -114,7 +114,7 @@ getPackageVersionMap menv pkgDbs =
         pkgDbs
         (M.unionsWith max)
 
--- | Get every version of every package.
+-- | In the given databases, get every version of every package.
 getPackageVersionsMap :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
                       => EnvOverride
                       -> [Path Abs Dir] -- ^ package databases
@@ -126,7 +126,7 @@ getPackageVersionsMap menv pkgDbs =
         (S.fromList .
          concatMap (map fromTuple . M.toList))
 
--- | Get all available packages.
+-- | In the given databases, get all available packages.
 getPackageVersions :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
                    => EnvOverride
                    -> [Path Abs Dir] -- ^ package databases
@@ -134,7 +134,7 @@ getPackageVersions :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
                    -> m a
 getPackageVersions menv pkgDbs f = do
     result <-
-        ghcPkg menv pkgDbs ["--global", "list"]
+        ghcPkg menv pkgDbs ["list"]
     case result of
         Left{} ->
             throw GetAllPackagesFail

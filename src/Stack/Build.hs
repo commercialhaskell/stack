@@ -205,7 +205,8 @@ getDependencies
 getDependencies locals ranges = do
     -- Get global packages
     menv <- getMinimalEnvOverride
-    globals <- getPackageVersionMap menv []
+    globalDB <- getGlobalDB menv
+    globals <- getPackageVersionMap menv [globalDB]
 
     bconfig <- asks getBuildConfig
     dependencies <- case bcResolver bconfig of
@@ -250,7 +251,9 @@ installDependencies bopts deps' = do
     bconfig <- asks getBuildConfig
     pkgDbs <- getPackageDatabases bconfig BTDeps
     menv <- getMinimalEnvOverride
-    installed <- liftM toIdents $ getPackageVersionMap menv pkgDbs
+
+    globalDB <- getGlobalDB menv
+    installed <- liftM toIdents $ getPackageVersionMap menv (globalDB : pkgDbs)
     cabalPkgVer <- getCabalPkgVer menv
     let toInstall = M.difference deps installed
 
