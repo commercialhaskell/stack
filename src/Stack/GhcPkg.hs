@@ -8,13 +8,13 @@
 
 module Stack.GhcPkg
   (getPackageVersionMap
-  ,getPackageVersionsMap
+  ,getPackageVersionsSet
   ,findGhcPkgId
   ,getGhcPkgIds
   ,getGlobalDB
   ,EnvOverride(..)
   ,envHelper
-  ,unregisterPackage)
+  ,unregisterPackages)
   where
 
 import           Control.Applicative
@@ -25,9 +25,11 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Data.Attoparsec.ByteString.Char8
 import qualified Data.Attoparsec.ByteString.Lazy as AttoLazy
+import           Data.Bifunctor
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.Data
+import           Data.Either
 import           Data.List
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
@@ -35,6 +37,7 @@ import           Data.Maybe
 import           Data.Monoid ((<>))
 import           Data.Set (Set)
 import qualified Data.Set as S
+import qualified Data.Set.Monad as Set
 import           Data.Streaming.Process
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -113,28 +116,42 @@ getPackageVersionMap menv pkgDbs =
         menv
         pkgDbs
         (flip elem pkgDbs)
-        (M.unionsWith max)
+        (M.unionsWith max . map (M.fromList . rights))
 
 -- | In the given databases, get every version of every package.
-getPackageVersionsMap :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
+getPackageVersionsSet :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
                       => EnvOverride
                       -> [Path Abs Dir]         -- ^ Package databases to enable.
                       -> (Path Abs Dir -> Bool) -- ^ Return only packages matching this database predicate.
                       -> m (Set PackageIdentifier)
-getPackageVersionsMap menv pkgDbs predicate =
+getPackageVersionsSet menv pkgDbs predicate =
     getPackageVersions
         menv
         pkgDbs
         predicate
         (S.fromList .
-         concatMap (map fromTuple . M.toList))
+         concatMap (map fromTuple . rights))
+
+-- | In the given databases, get every version of every package.
+getBrokenPackages :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
+                  => EnvOverride
+                  -> [Path Abs Dir]         -- ^ Package databases to enable.
+                  -> (Path Abs Dir -> Bool) -- ^ Return only packages matching this database predicate.
+                  -> m (Set PackageIdentifier)
+getBrokenPackages menv pkgDbs predicate =
+    getPackageVersions
+        menv
+        pkgDbs
+        predicate
+        (S.fromList .
+         concatMap (map fromTuple . lefts))
 
 -- | In the given databases, get all available packages.
 getPackageVersions :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
                    => EnvOverride
                    -> [Path Abs Dir]         -- ^ Package databases to enable.
                    -> (Path Abs Dir -> Bool) -- ^ Return only packages matching this database predicate.
-                   -> ([Map PackageName Version] -> a)
+                   -> ([[Either (PackageName, Version) (PackageName, Version)]] -> a)
                    -> m a
 getPackageVersions menv pkgDbs predicate f = do
     result <-
@@ -152,11 +169,12 @@ getPackageVersions menv pkgDbs predicate f = do
                     liftIO (evaluate r)
 
 -- | Parser for ghc-pkg's list output.
-packageVersionsParser :: (Path Abs Dir -> Bool) -> ([Map PackageName Version] -> a) -> Parser a
+packageVersionsParser :: (Path Abs Dir -> Bool)
+                      -> ([[Either (PackageName, Version) (PackageName, Version)]] -> a)
+                      -> Parser a
 packageVersionsParser sectionPredicate f =
     fmap
         (f .
-         map M.fromList .
          mapMaybe
              (\(fp,pkgs) ->
                    do dir <- parseAbsDir fp
@@ -183,9 +201,10 @@ packageVersionsParser sectionPredicate f =
         space
         space
         fmap
-            toTuple
-            (packageIdentifierParser <|>
-             ("(" *> packageIdentifierParser <* ")")) -- hidden packages
+            (bimap toTuple toTuple)
+            ((Right <$> packageIdentifierParser) <|>
+             (Right <$> ("(" *> packageIdentifierParser <* ")")) <|>
+             (Left <$> ("{" *> packageIdentifierParser <* "}"))) -- hidden packages
 
 -- | Get the id of the package e.g. @foo-0.0.0-9c293923c0685761dcff6f8c3ad8f8ec@.
 findGhcPkgId :: (MonadIO m, MonadLogger m)
@@ -237,11 +256,25 @@ getGhcPkgIds menv pkgDbs pkgs =
             Just pid ->
                 return (Just (name, pid))
 
+-- | Unregister the given package(s) and any dependent packages which
+-- become broken as a result.
+unregisterPackages :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m)
+                   => EnvOverride
+                   -> [Path Abs Dir]
+                   -> (Path Abs Dir -> Bool)
+                   -> Set PackageIdentifier
+                   -> m ()
+unregisterPackages menv pkgDbs predicate idents = do
+    Set.mapM_ (unregisterPackage menv pkgDbs) idents
+    broken <- getBrokenPackages menv pkgDbs predicate
+    Set.mapM_ (unregisterPackage menv pkgDbs) broken
+
 -- | Unregister the given package.
-unregisterPackage :: (MonadIO m,MonadLogger m,MonadThrow m)
-                  => EnvOverride -> PackageIdentifier -> m ()
-unregisterPackage menv ident =
-    liftM
-        (const ())
-        (ghcPkg menv [] ["unregister", "--force", packageIdentifierString ident] >>=
-         either throwM return)
+unregisterPackage :: (MonadIO m, MonadLogger m, MonadThrow m)
+                  => EnvOverride -> [Path Abs Dir] -> PackageIdentifier -> m ()
+unregisterPackage menv pkgDbs ident =
+    do $logInfo (packageIdentifierText ident <> ": unregistering")
+       liftM
+           (const ())
+           (ghcPkg menv pkgDbs ["unregister", "--force", packageIdentifierString ident] >>=
+            either throwM return)

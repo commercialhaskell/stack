@@ -104,18 +104,25 @@ getPackagesToRemove toInstall = do
     let allDBs =
             [localDB, depDB, globalDB]
     installed <-
-        getPackageVersionsMap menv allDBs (== localDB)
+        getPackageVersionsSet menv allDBs (== localDB)
+    $logDebug
+        ("Installed: " <>
+         T.pack (show installed))
     $logDebug
         ("Package databases: " <>
          T.pack (show allDBs))
-    return
-        (Set.filter
-             (\ident ->
-                   Set.member
-                       (packageIdentifierName ident)
-                       (Set.map packageIdentifierName toInstall) &&
-                   not (Set.member ident toInstall))
-             installed)
+    let toRemove =
+            Set.filter
+                (\ident ->
+                      Set.member
+                          (packageIdentifierName ident)
+                          (Set.map packageIdentifierName toInstall) &&
+                      not (Set.member ident toInstall))
+                installed
+    $logDebug
+        ("To remove: " <>
+         T.pack (show toRemove))
+    return toRemove
 
 -- | Determine all of the local packages we wish to install. This does not
 -- include any dependencies.
@@ -339,8 +346,16 @@ buildLocals
     -> m ()
 buildLocals bopts packagesToInstall packagesToRemove = do
      env <- ask
-     localDB <- packageDatabaseLocal
      menv <- getMinimalEnvOverride
+     localDB <- packageDatabaseLocal
+     depDB <- packageDatabaseDeps
+     globalDB <- getGlobalDB menv
+     -- Note that this unregistering must come before getting the list
+     -- of 'pkgIds' below, because those ids are used for calculation
+     -- of when a user package has been unregistered in the package
+     -- database and therefore should be rebuilt and installed.
+     unless (boptsDryrun bopts)
+            (unregisterPackages menv [localDB,globalDB,depDB] (==localDB) packagesToRemove)
      pkgIds <- getGhcPkgIds menv [localDB]
                 (map packageName (S.toList packagesToInstall))
      cabalPkgVer <- getCabalPkgVer menv
@@ -348,7 +363,6 @@ buildLocals bopts packagesToInstall packagesToRemove = do
      docLoc <- liftIO getUserDocPath
      installResource <- liftIO $ newResourceIO "cabal install" 1
      cfgVar <- liftIO $ newMVar ConfigLock
-
      plans <-
        forM (S.toList packagesToInstall)
             (\package ->
@@ -739,7 +753,7 @@ runhaskell cabalPkgVer package setuphs config' buildType args =
                                       return chunk) $$
                         sink
         display =
-          packageNameString (packageName package) <>
+          packageIdentifierString (packageIdentifier package) <>
           ": " <>
           case args of
             (cname:_) -> cname
