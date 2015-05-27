@@ -132,7 +132,7 @@ getPackageVersionsSet menv pkgDbs predicate =
         (S.fromList .
          concatMap (map fromTuple . rights))
 
--- | In the given databases, get every version of every package.
+-- | In the given databases, broken packages according to the given predicate.
 getBrokenPackages :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
                   => EnvOverride
                   -> [Path Abs Dir]         -- ^ Package databases to enable.
