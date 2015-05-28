@@ -429,7 +429,8 @@ windows si manager reqVersion dest progDir = do
     let root = toFilePath progDir
     contents <- liftIO $ handleIO (const $ return []) (getDirectoryContents root)
     gitDirs' <- getGitDirs (Just (si, manager)) root contents
-    DownloadPair version url <- getGHCPair si "windows" reqVersion
+    -- Note: we always use 32-bit Windows as the 64-bit version has problems
+    DownloadPair version url <- getGHCPair si "windows32" reqVersion
     let dirPiece = "ghc-" <> versionString version
     req <- parseUrl $ T.unpack url
     piece <- Path.parseRelFile $ dirPiece ++ ".tar.xz"
