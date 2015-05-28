@@ -821,6 +821,10 @@ runhaskell liveOutput cabalPkgVer package setuphs config' buildType args =
     cp exeName =
       proc (toFilePath exeName)
         (("-package=" ++ packageIdentifierString cabalPkgVer)
+         : "-clear-package-db"
+         : "-global-package-db"
+         -- TODO: Perhaps we want to include the snapshot package database here
+         -- as well
                           : toFilePath setuphs : args)
     menv = configEnvOverride (getConfig config') EnvSettings
             { esIncludeLocals =
