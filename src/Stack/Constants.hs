@@ -52,19 +52,19 @@ builtConfigRelativeFile =
 defaultShakeThreads :: Int
 defaultShakeThreads = 4
 
--- | Hoogle database file.
-hoogleDatabaseFile :: Path Abs Dir -> Path Abs File
-hoogleDatabaseFile docLoc =
-  docLoc </>
-  $(mkRelFile "default.hoo")
+-- -- | Hoogle database file.
+-- hoogleDatabaseFile :: Path Abs Dir -> Path Abs File
+-- hoogleDatabaseFile docLoc =
+--   docLoc </>
+--   $(mkRelFile "default.hoo")
 
--- | Extension for hoogle databases.
-hoogleDbExtension :: String
-hoogleDbExtension = "hoo"
+-- -- | Extension for hoogle databases.
+-- hoogleDbExtension :: String
+-- hoogleDbExtension = "hoo"
 
--- | Extension of haddock files
-haddockExtension :: String
-haddockExtension = "haddock"
+-- -- | Extension of haddock files
+-- haddockExtension :: String
+-- haddockExtension = "haddock"
 
 -- | User documentation directory.
 userDocsDir :: Config -> Path Abs Dir
@@ -78,15 +78,15 @@ distDirFromDir fp = fp </> distRelativeDir
 distRelativeDir :: Path Rel Dir
 distRelativeDir = $(mkRelDir "dist/")
 
-pkgIndexDir :: Config -> Path Abs Dir
-pkgIndexDir config =
-  configStackRoot config </>
-  $(mkRelDir "package-index")
+-- pkgIndexDir :: Config -> Path Abs Dir
+-- pkgIndexDir config =
+--   configStackRoot config </>
+--   $(mkRelDir "package-index")
 
-pkgIndexFile :: Config -> Path Abs File
-pkgIndexFile config =
-  pkgIndexDir config </>
-  $(mkRelFile "00-index.tar")
+-- pkgIndexFile :: Config -> Path Abs File
+-- pkgIndexFile config =
+--   pkgIndexDir config </>
+--   $(mkRelFile "00-index.tar")
 
 -- | URL prefix for downloading packages
 packageDownloadPrefix :: Text

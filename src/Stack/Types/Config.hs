@@ -19,25 +19,15 @@ import           Data.Set (Set)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Typeable
-import           Data.Typeable
-import           Distribution.System (Platform)
 import           Distribution.System (Platform)
 import qualified Distribution.Text
 import           Path
-import           Path
-import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
 import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
 import           Stack.Types.Docker
-import           Stack.Types.Docker
-import           Stack.Types.FlagName
 import           Stack.Types.FlagName
 import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageIdentifier
-import           Stack.Types.PackageName
 import           Stack.Types.PackageName
 import           Stack.Types.Version
-import           Stack.Types.Version
-import           System.Process.Read (EnvOverride)
 import           System.Process.Read (EnvOverride)
 
 -- | The top-level Stackage configuration.
