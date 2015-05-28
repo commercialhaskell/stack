@@ -227,12 +227,14 @@ configFromConfigMonoid configStackRoot ConfigMonoid{..} = do
      origEnv <- getEnvOverride configPlatform
      let configEnvOverride _ = return origEnv
 
+     platform <- runReaderT platformRelDir configPlatform
+
      configLocalGHCs <-
         case configPlatform of
             Platform _ Windows -> do
                 progsDir <- getWindowsProgsDir configStackRoot origEnv
-                return $ progsDir </> $(mkRelDir "stack")
-            _ -> return $ configStackRoot </> $(mkRelDir "ghc")
+                return $ progsDir </> $(mkRelDir "stack") </> platform
+            _ -> return $ configStackRoot </> $(mkRelDir "ghc") </> platform
 
      return Config {..}
 
@@ -257,6 +259,7 @@ instance HasStackRoot MiniConfig
 instance HasHttpManager MiniConfig where
     getHttpManager (MiniConfig man _) = man
 instance HasUrls MiniConfig
+instance HasPlatform MiniConfig
 
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.

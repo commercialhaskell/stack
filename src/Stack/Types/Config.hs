@@ -20,6 +20,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Typeable
 import Distribution.System (Platform)
+import qualified Distribution.Text
 import Path
 import Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
 import Stack.Types.Docker
@@ -134,14 +135,24 @@ class HasUrls env where
     getUrls = configUrls . getConfig
     {-# INLINE getUrls #-}
 
+-- | Class for environment values which have a Platform
+class HasPlatform env where
+    getPlatform :: env -> Platform
+    default getPlatform :: HasConfig env => env -> Platform
+    getPlatform = configPlatform . getConfig
+    {-# INLINE getPlatform #-}
+instance HasPlatform Platform where
+    getPlatform = id
+
 -- | Class for environment values that can provide a 'Config'.
-class (HasStackRoot env, HasUrls env) => HasConfig env where
+class (HasStackRoot env, HasUrls env, HasPlatform env) => HasConfig env where
     getConfig :: env -> Config
     default getConfig :: HasBuildConfig env => env -> Config
     getConfig = bcConfig . getBuildConfig
     {-# INLINE getConfig #-}
 instance HasStackRoot Config
 instance HasUrls Config
+instance HasPlatform Config
 instance HasConfig Config where
     getConfig = id
     {-# INLINE getConfig #-}
@@ -151,6 +162,7 @@ class HasConfig env => HasBuildConfig env where
     getBuildConfig :: env -> BuildConfig
 instance HasStackRoot BuildConfig
 instance HasUrls BuildConfig
+instance HasPlatform BuildConfig
 instance HasConfig BuildConfig
 instance HasBuildConfig BuildConfig where
     getBuildConfig = id
@@ -215,6 +227,10 @@ configPackageTarball config ident = do
 configProjectWorkDir :: HasBuildConfig env => env -> Path Abs Dir
 configProjectWorkDir env = bcRoot (getBuildConfig env) </> $(mkRelDir ".stack-work")
 
+-- | Relative directory for the platform identifier
+platformRelDir :: (MonadReader env m, HasPlatform env, MonadThrow m) => m (Path Rel Dir)
+platformRelDir = asks getPlatform >>= parseRelDir . Distribution.Text.display
+
 -- | Path to .shake files.
 configShakeFilesDir :: HasBuildConfig env => env -> Path Abs Dir
 configShakeFilesDir env = configProjectWorkDir env </> $(mkRelDir "shake")
@@ -224,10 +240,11 @@ configLocalUnpackDir :: HasBuildConfig env => env -> Path Abs Dir
 configLocalUnpackDir env = configProjectWorkDir env </> $(mkRelDir "unpacked")
 
 -- | Directory containing snapshots
-snapshotsDir :: (MonadReader env m, HasConfig env) => m (Path Abs Dir)
+snapshotsDir :: (MonadReader env m, HasConfig env, MonadThrow m) => m (Path Abs Dir)
 snapshotsDir = do
     config <- asks getConfig
-    return $ configStackRoot config </> $(mkRelDir "snapshots")
+    platform <- platformRelDir
+    return $ configStackRoot config </> $(mkRelDir "snapshots") </> platform
 
 -- | Installation root for dependencies
 installationRootDeps :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
@@ -244,7 +261,8 @@ installationRootLocal = do
     bc <- asks getBuildConfig
     name <- parseRelDir $ T.unpack $ renderResolver $ bcResolver bc
     ghc <- parseRelDir $ versionString $ bcGhcVersion bc
-    return $ configProjectWorkDir bc </> $(mkRelDir "install") </> name </> ghc
+    platform <- platformRelDir
+    return $ configProjectWorkDir bc </> $(mkRelDir "install") </> platform </> name </> ghc
 
 -- | Package database for installing dependencies into
 packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
@@ -259,13 +277,15 @@ packageDatabaseLocal = do
     return $ root </> $(mkRelDir "pkgdb")
 
 -- | Where to store mini build plan caches
-configMiniBuildPlanCache :: (MonadThrow m, MonadReader env m, HasStackRoot env)
+configMiniBuildPlanCache :: (MonadThrow m, MonadReader env m, HasStackRoot env, HasPlatform env)
                          => SnapName
                          -> m (Path Abs File)
 configMiniBuildPlanCache name = do
     root <- asks getStackRoot
+    platform <- platformRelDir
     file <- parseRelFile $ T.unpack (renderSnapName name) ++ ".cache"
-    return (root </> $(mkRelDir "build-plan-cache") </> file)
+    -- Yes, cached plans differ based on platform
+    return (root </> $(mkRelDir "build-plan-cache") </> platform </> file)
 
 -- | Suffix applied to an installation root to get the bin dir
 bindirSuffix :: Path Rel Dir
