@@ -810,7 +810,7 @@ runhaskell liveOutput cabalPkgVer package setuphs config' buildType args =
                 Concurrently (logFrom stdout' sink outRef) A.*>
                 Concurrently (logFrom stderr' sink errRef))
         return (return ())
-    dumpLog outRef errRef e =
+    dumpLog outRef errRef e = do
         if liveOutput
            then return ()
            else do $logError (display <> ": ERROR")
@@ -822,7 +822,7 @@ runhaskell liveOutput cabalPkgVer package setuphs config' buildType args =
                    unless (S8.null errs)
                           (do $logError "Stderr was:"
                               $logError (T.decodeUtf8 errs))
-                   liftIO (throwIO e)
+        liftIO (throwIO e)
     withSink inner = do
          logPath <- liftIO $ runReaderT (buildLogPath package) config'
          liftIO $ createDirectoryIfMissing True $ FL.toFilePath
