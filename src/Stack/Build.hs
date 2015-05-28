@@ -780,8 +780,7 @@ runhaskell liveOutput cabalPkgVer package setuphs config' buildType args =
         withSink $ \sink -> withCheckedProcess
           (cp exeName)
              {cwd = Just (FL.toFilePath (packageDir package))
-             ,Process.env = envHelper menv
-             ,std_err = Inherit}
+             ,Process.env = envHelper menv}
           (\ClosedStream stdout' stderr' -> runConcurrently $
                 Concurrently (logFrom stdout' sink outRef) A.*>
                 Concurrently (logFrom stderr' sink errRef))
