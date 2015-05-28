@@ -368,7 +368,7 @@ getPkgVersions menv pkg = do
         | otherwise = Nothing
 
 -- | Is the git executable installed?
-isGitInstalled :: MonadIO m -- FIXME use the EnvOverride for finding git
+isGitInstalled :: MonadIO m
                => EnvOverride
                -> m Bool
 isGitInstalled = flip doesExecutableExist "git"

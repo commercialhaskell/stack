@@ -173,7 +173,7 @@ determineLocals bopts = do
     $logDebug "Unpacking packages as necessary"
     menv <- getMinimalEnvOverride
     paths2 <- unpackPackageIdentsForBuild menv (bcExtraDeps bconfig)
-    let paths = M.fromList (map (, PTUser) $ Set.toList $ bcPackages bconfig) -- FIXME shouldn't some command line options tell us which of these we care about right now?
+    let paths = M.fromList (map (, PTUser) $ Set.toList $ bcPackages bconfig)
              <> M.fromList (map (, PTDep) $ Set.toList paths2)
     $logDebug $ "Installing from local directories: " <> T.pack (show paths)
     locals <- forM (M.toList paths) $ \(dir, ptype) -> do
@@ -297,8 +297,6 @@ getDependencies locals ranges = do
     return dependencies
 
 -- | Install the given set of dependencies into the dependency database, if missing.
---
--- FIXME: may need to tweak some of the flags for OS-specific stuff, think about how to do that
 installDependencies
     :: (MonadIO m,MonadReader env m,HasLogLevel env,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
     => BuildOpts
@@ -328,7 +326,6 @@ installDependencies bopts deps' = do
                  $logInfo $ "Installing dependencies: " <> T.intercalate ", " (map packageIdentifierText (M.keys toInstall))
                  withTempUnpacked (M.keys toInstall) $ \newPkgDirs -> do
                    $logInfo "All dependencies unpacked"
-                   -- FIXME unregister conflicting?
                    packages <- liftM S.fromList $ forM newPkgDirs $ \dir -> do
                        cabalfp <- getCabalFileName dir
                        name <- parsePackageNameFromFilePath cabalfp

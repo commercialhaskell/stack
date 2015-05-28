@@ -147,7 +147,6 @@ toMiniBuildPlan bp = do
     goPP pp =
         ( ppVersion pp
         , pcFlagOverrides $ ppConstraints pp
-        -- FIXME add tool info
         )
 
 -- | Add in the resolved dependencies from the package index
@@ -190,6 +189,8 @@ addDeps ghcVersion toCalc = do
                         , packageConfigGhcVersion = ghcVersion
                         }
                     pd = resolvePackageDescription packageConfig gpd
+                    -- FIXME add build tool info, see:
+                    -- https://github.com/fpco/stack/issues/71
                     deps = Map.filterWithKey
                         (const . (/= ucfName ucf))
                         (packageDependencies pd)
