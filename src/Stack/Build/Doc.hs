@@ -13,7 +13,6 @@ import qualified Data.Map.Strict as M
 import           Data.Maybe
 import qualified Data.Text as T
 import           Path
-import           Stack.Constants
 import           Stack.Types
 import           System.Directory
 import           System.Environment (lookupEnv)

@@ -3,7 +3,17 @@
 
 -- | Constants used throughout the project.
 
-module Stack.Constants where
+module Stack.Constants
+    (distRelativeDir
+    ,haskellFileExts
+    ,distDirFromDir
+    ,packageDownloadPrefix
+    ,rawGithubUrl
+    ,defaultShakeThreads
+    ,builtFileFromDir
+    ,configuredFileFromDir
+    ,builtConfigFileFromDir)
+    where
 
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -13,10 +23,6 @@ import Prelude
 -- | Extensions used for Haskell files.
 haskellFileExts :: [Text]
 haskellFileExts = ["hs","hsc","lhs"]
-
--- | Default name used for config path.
-configFileName :: Path Rel File
-configFileName = $(mkRelFile "stack.config")
 
 -- | The filename used for completed build indicators.
 builtFileFromDir :: Path Abs Dir -> Path Abs File
@@ -43,20 +49,6 @@ builtConfigRelativeFile =
 -- | Default shake thread count for parallel builds.
 defaultShakeThreads :: Int
 defaultShakeThreads = 4
-
--- | Hoogle database file.
-hoogleDatabaseFile :: Path Abs Dir -> Path Abs File
-hoogleDatabaseFile docLoc =
-  docLoc </>
-  $(mkRelFile "default.hoo")
-
--- | Extension for hoogle databases.
-hoogleDbExtension :: String
-hoogleDbExtension = "hoo"
-
--- | Extension of haddock files
-haddockExtension :: String
-haddockExtension = "haddock"
 
 -- | Package's build artifacts directory.
 distDirFromDir :: Path Abs Dir -> Path Abs Dir
@@ -86,3 +78,17 @@ rawGithubUrl org repo branch file = T.concat
     , "/"
     , file
     ]
+
+-- -- | Hoogle database file.
+-- hoogleDatabaseFile :: Path Abs Dir -> Path Abs File
+-- hoogleDatabaseFile docLoc =
+--   docLoc </>
+--   $(mkRelFile "default.hoo")
+
+-- -- | Extension for hoogle databases.
+-- hoogleDbExtension :: String
+-- hoogleDbExtension = "hoo"
+
+-- -- | Extension of haddock files
+-- haddockExtension :: String
+-- haddockExtension = "haddock"
