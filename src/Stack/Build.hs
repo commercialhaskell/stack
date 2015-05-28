@@ -744,7 +744,7 @@ cleanPackage package =
     removeDirectoryRecursive
         (toFilePath
              (packageDir package </>
-              $(mkRelDir "dist")))
+              distRelativeDir))
 
 -- | Whether we're building dependencies (separate database and build
 -- process), or locally specified packages.
