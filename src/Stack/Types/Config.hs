@@ -18,9 +18,7 @@ import Data.Maybe (fromMaybe)
 import Data.Set (Set)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text.Read (decimal)
 import Data.Typeable
-import Data.Word (Word)
 import Path
 import Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
 import Stack.Types.Docker
