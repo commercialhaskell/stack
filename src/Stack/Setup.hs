@@ -352,7 +352,8 @@ posix si osKey manager reqVersion dest = do
         $logInfo "Unpacking"
         runIn root "tar" menv ["xf", toFilePath file] Nothing
         $logInfo "Configuring"
-        runIn dir "./configure" menv ["--prefix=" ++ toFilePath dest] Nothing
+        runIn dir (toFilePath $ dir Path.</> $(mkRelFile "configure"))
+              menv ["--prefix=" ++ toFilePath dest] Nothing
         $logInfo "Installing"
         runIn dir "make" menv ["install"] Nothing
         $logInfo "GHC installed!"
