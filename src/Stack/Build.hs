@@ -363,7 +363,6 @@ installDependencies bopts deps' = do
                    plans <- forM (S.toList packages) $ \package -> do
                        let gconfig = GenConfig -- FIXME
                                { gconfigOptimize = False
-                               , gconfigForceRecomp = False
                                , gconfigLibProfiling = True
                                , gconfigExeProfiling = False
                                , gconfigGhcOptions = []
@@ -695,8 +694,7 @@ writeFinalFiles gconfig bconfig buildType dir package = liftIO $
 
              writeGenConfigFile
                       dir
-                      gconfig {gconfigForceRecomp = False
-                              ,gconfigPkgId = mpkgid}
+                      gconfig {gconfigPkgId = mpkgid}
                     -- After a build has completed successfully for a given
                     -- configuration, no recompilation forcing is required.
              updateGenFile dir)
@@ -780,7 +778,6 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconf
        singularBuild
        (concat [["build"]
                ,["--ghc-options=-O2" | gconfigOptimize gconfig]
-               ,["--ghc-options=-fforce-recomp" | gconfigForceRecomp gconfig]
                ,concat [["--ghc-options",T.unpack opt] | opt <- boptsGhcOptions bopts]])
 
      case setupAction of
