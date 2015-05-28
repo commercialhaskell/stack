@@ -36,9 +36,9 @@ import System.IO.Temp (withSystemTempDirectory)
 import System.Process (rawSystem)
 import Stack.Types
 import Distribution.System (OS (..), Arch (..), Platform (..))
-import           Stack.Build.Types
+import Stack.Build.Types
 import qualified Data.ByteString.Char8 as S8
-import Path (Path, Abs, Dir, parseRelDir, parseAbsDir, mkRelFile)
+import Path (Path, Abs, Dir, parseRelDir, parseAbsDir, parseRelFile, mkRelFile)
 import qualified Path
 import Control.Monad.Logger
 import qualified Data.Text as T
@@ -343,13 +343,19 @@ posix :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow
       -> m [FilePath]
 posix si osKey manager reqVersion dest = do
     menv <- getMinimalEnvOverride
-    checkDependencies ["make", "tar", "xz"]
     DownloadPair version url <- getGHCPair si osKey reqVersion
+    let ghcExtension = FP.takeExtension (T.unpack url)
+        zipTool = case ghcExtension of
+                    ".xz"  -> ["xz"]
+                    ".bz2" -> ["bzip2"]
+                    _      -> []
+    checkDependencies (concat [["make", "tar"], zipTool])
     let dirPiece = "ghc-" <> versionString version
     req <- parseUrl $ T.unpack url
     withSystemTempDirectory "stack-setup" $ \root' -> do
         root <- parseAbsDir root'
-        let file = root Path.</> $(mkRelFile "ghc.tar.xz")
+        ghcFilename <- parseRelFile ("ghc.tar" ++ ghcExtension)
+        let file = root Path.</> ghcFilename
         dir <- liftM (root Path.</>) $ parseRelDir dirPiece
         $logInfo $ "Downloading from: " <> url
         runReaderT (download req file) manager
