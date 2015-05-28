@@ -17,9 +17,6 @@ module Stack.Package
   ,PackageType(..)
   ,PackageConfig(..)
   ,buildLogPath
-  ,configureLogPath
-  ,packageDocDir
-  ,stackageBuildDir
   ,PackageException (..)
   ,resolvePackageDescription
   ,packageToolDependencies
@@ -486,24 +483,11 @@ buildLogPath package' = do
     ]
   return $ stack </> $(mkRelDir "logs") </> fp
 
--- | Path for the project's configure log.
-configureLogPath :: Package -> Path Abs File
-configureLogPath package' =
-  stackageBuildDir package' </>
-  $(mkRelFile "configure-log")
-
--- | Get the build directory.
-stackageBuildDir :: Package -> Path Abs Dir
-stackageBuildDir package' =
-  distDirFromDir dir </>
-  $(mkRelDir "stack-build")
-  where dir = packageDir package'
-
--- | Package's documentation directory.
-packageDocDir :: Package -> Path Abs Dir
-packageDocDir package' =
-  distDirFromDir (packageDir package') </>
-  $(mkRelDir "doc/")
+-- -- | Package's documentation directory.
+-- packageDocDir :: Package -> Path Abs Dir
+-- packageDocDir package' =
+--   distDirFromDir (packageDir package') </>
+--   $(mkRelDir "doc/")
 
 -- | Resolve the file, if it can't be resolved, warn for the user
 -- (purely to be helpful).

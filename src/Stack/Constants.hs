@@ -4,15 +4,10 @@
 -- | Constants used throughout the project.
 
 module Stack.Constants
-    (distRelativeDir
-    ,haskellFileExts
-    ,distDirFromDir
+    (haskellFileExts
     ,packageDownloadPrefix
     ,rawGithubUrl
-    ,defaultShakeThreads
-    ,builtFileFromDir
-    ,configuredFileFromDir
-    ,builtConfigFileFromDir)
+    ,defaultShakeThreads)
     where
 
 import Data.Text (Text)
@@ -24,39 +19,9 @@ import Prelude
 haskellFileExts :: [Text]
 haskellFileExts = ["hs","hsc","lhs"]
 
--- | The filename used for completed build indicators.
-builtFileFromDir :: Path Abs Dir -> Path Abs File
-builtFileFromDir fp =
-  distDirFromDir fp </>
-  $(mkRelFile "stack-built")
-
--- | The filename used for completed configure indicators.
-configuredFileFromDir :: Path Abs Dir -> Path Abs File
-configuredFileFromDir fp =
-  distDirFromDir fp </>
-  $(mkRelFile "setup-config")
-
--- | The filename used for completed build indicators.
-builtConfigFileFromDir :: Path Abs Dir -> Path Abs File
-builtConfigFileFromDir fp = fp </> builtConfigRelativeFile
-
--- | Relative location of completed build indicators.
-builtConfigRelativeFile :: Path Rel File
-builtConfigRelativeFile =
-  distRelativeDir </>
-  $(mkRelFile "stack-config")
-
 -- | Default shake thread count for parallel builds.
 defaultShakeThreads :: Int
 defaultShakeThreads = 4
-
--- | Package's build artifacts directory.
-distDirFromDir :: Path Abs Dir -> Path Abs Dir
-distDirFromDir fp = fp </> distRelativeDir
-
--- | Relative location of build artifacts.
-distRelativeDir :: Path Rel Dir
-distRelativeDir = $(mkRelDir "dist/")
 
 -- | URL prefix for downloading packages
 packageDownloadPrefix :: Text
