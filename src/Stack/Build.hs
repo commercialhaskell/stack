@@ -370,8 +370,6 @@ installDependencies bopts deps' = do
                                , gconfigFlags = packageFlags package
                                , gconfigPkgId = error "gconfigPkgId"
                                }
-                       env <- ask
-                       cabalBuildDir <- configCabalBuildDir env (packageIdentifier package)
                        return $ makePlan -- FIXME dedupe this code with buildLocals
                            mgr
                            logLevel
@@ -388,7 +386,6 @@ installDependencies bopts deps' = do
                            installResource
                            (userDocsDir (bcConfig bconfig))
                            cfgVar
-                           cabalBuildDir
                    runPlans bopts
                       (M.fromList $ map (, Wanted) $ Set.toList packages)
                       plans
@@ -439,7 +436,7 @@ buildLocals bopts packagesToInstall packagesToRemove = do
        forM (M.toList packagesToInstall)
             (\(package, wantedTarget) ->
                do when (wantedTarget == Wanted && boptsFinalAction bopts /= DoNothing)
-                       (deleteGenFile bconfig package)
+                       (liftIO (deleteGenFile (packageDir package)))
                   gconfig <- readGenConfigFile
                       pkgIds
                       bopts
@@ -447,7 +444,6 @@ buildLocals bopts packagesToInstall packagesToRemove = do
                       package
                       cfgVar
                       bconfig
-                  cabalBuildDir <- configCabalBuildDir env (packageIdentifier package)
                   return (makePlan mgr
                                    logLevel
                                    cabalPkgVer
@@ -462,8 +458,7 @@ buildLocals bopts packagesToInstall packagesToRemove = do
                                    configureResource
                                    installResource
                                    (userDocsDir (bcConfig bconfig))
-                                   cfgVar
-                                   cabalBuildDir))
+                                   cfgVar))
 
      if boptsDryrun bopts
         then dryRunPrint "local packages" packagesToRemove (Set.map packageIdentifier (M.keysSet packagesToInstall))
@@ -517,15 +512,15 @@ clean :: forall m env.
          (MonadIO m, MonadReader env m, HasHttpManager env, HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
       => m ()
 clean =
-  do _env <- ask
-     -- FIXME: clean
-     {-forM_ (S.toList (bcPackages $ getBuildConfig env))
+  do env <- ask
+     forM_ (S.toList (bcPackages $ getBuildConfig env))
            (\pkgdir ->
               do deleteGenFile pkgdir
-                 distDir <- configCabalBuildDir env (packageIdentifier package)
+                 let distDir =
+                       FL.toFilePath (distDirFromDir pkgdir)
                  liftIO $ do
                      exists <- doesDirectoryExist distDir
-                     when exists (removeDirectoryRecursive distDir))-}
+                     when exists (removeDirectoryRecursive distDir))
      shakeDir <- asks configShakeFilesDir
      let listDir = FL.parent shakeDir
      ls <- liftIO $
@@ -568,9 +563,8 @@ makePlan :: Manager
          -> Resource
          -> Path Abs Dir
          -> MVar ConfigLock
-         -> Path Abs Dir
          -> Rules ()
-makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig packages package configureResource installResource docLoc cfgVar cabalBuildDir = do
+makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig packages package installResource docLoc cfgVar = do
     when
         (wanted == Wanted)
         (want [buildTarget])
@@ -584,9 +578,11 @@ makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig 
     dir =
         packageDir package
     buildTarget =
-        toFilePath (cabalBuildDir </> configStackBuiltFile)
+        FL.toFilePath
+            (builtFileFromDir dir)
     configureTarget =
-        toFilePath (cabalBuildDir </> configCabalConfigFile)
+        FL.toFilePath
+            (configuredFileFromDir dir)
     runWithLogging =
         runStackLoggingT mgr logLevel
     configureAction = do
@@ -630,7 +626,7 @@ makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig 
                  installResource
                  docLoc)
             removeAfterwards
-        writeFinalFiles gconfig bconfig buildType package
+        writeFinalFiles gconfig bconfig buildType dir package
 
 -- | Specify that the given package needs the following other
 -- packages.
@@ -644,15 +640,15 @@ needDependencies :: MonadAction m
                  -> m ()
 needDependencies pkgIds bopts packages package cfgVar bconfig =
   do deps <- mapM (\package' ->
-                     do cabalBuildDir <- liftIO (configCabalBuildDir bconfig (packageIdentifier package'))
-                        let genFile = cabalBuildDir </> configStackBuiltFile
-                        void (readGenConfigFile pkgIds
-                                                bopts
-                                                NotWanted
-                                                package'
-                                                cfgVar
-                                                bconfig)
-                        return (FL.toFilePath genFile))
+                     let dir' = packageDir package'
+                         genFile = builtFileFromDir dir'
+                     in do void (readGenConfigFile pkgIds
+                                                   bopts
+                                                   NotWanted
+                                                   package'
+                                                   cfgVar
+                                                   bconfig)
+                           return (FL.toFilePath genFile))
                   (mapMaybe (\name ->
                                find ((== name) . packageName)
                                     (S.toList packages))
@@ -678,8 +674,9 @@ getInstallRoot bconfig BTLocals = liftIO $ runReaderT installationRootLocal bcon
 -- | Write the final generated files after a build successfully
 -- completes.
 writeFinalFiles :: (MonadIO m)
-                => GenConfig -> BuildConfig -> BuildType -> Package -> m ()
-writeFinalFiles gconfig bconfig buildType package = liftIO $
+                => GenConfig -> BuildConfig -> BuildType
+                -> Path Abs Dir -> Package -> m ()
+writeFinalFiles gconfig bconfig buildType dir package = liftIO $
          (do pkgDbs <- getPackageDatabases bconfig buildType
              menv <- runReaderT getMinimalEnvOverride bconfig
              mpkgid <- runNoLoggingT
@@ -701,13 +698,12 @@ writeFinalFiles gconfig bconfig buildType package = liftIO $
                  writeFile (toFilePath dest) "Installed"
 
              writeGenConfigFile
-                      package
+                      dir
                       gconfig {gconfigForceRecomp = False
                               ,gconfigPkgId = mpkgid}
-                      bconfig
                     -- After a build has completed successfully for a given
                     -- configuration, no recompilation forcing is required.
-             updateGenFile bconfig package)
+             updateGenFile dir)
 
 -- | Build the given package with the given configuration.
 configurePackage :: (MonadAction m)
@@ -727,11 +723,6 @@ configurePackage cabalPkgVer bconfig configureResource setuphs buildType package
      installRoot <- getInstallRoot bconfig buildType
      let runhaskell' = runhaskell False
                                   cabalPkgVer package setuphs bconfig buildType
-     cabalBuildDir <-
-         configCabalBuildDir
-             bconfig
-             (packageIdentifier package)
-
      -- Uncertain as to why we cannot run configures in parallel. This appears
      -- to be a Cabal library bug. Original issue:
      -- https://github.com/fpco/stack/issues/84. Ideally we'd be able to remove
@@ -744,7 +735,7 @@ configurePackage cabalPkgVer bconfig configureResource setuphs buildType package
                 ,"--bindir=" ++ toFilePath (installRoot </> bindirSuffix)
                 ,"--datadir=" ++ toFilePath (installRoot </> $(mkRelDir "share"))
                 ,"--docdir=" ++ toFilePath (installRoot </> $(mkRelDir "doc"))
-                ,"--builddir=" ++ toFilePath cabalBuildDir]
+                ]
                ,["--enable-library-profiling" | gconfigLibProfiling gconfig]
                ,["--enable-executable-profiling" | gconfigExeProfiling gconfig]
                ,["--enable-tests" | setupAction == DoTests]
@@ -758,15 +749,12 @@ configurePackage cabalPkgVer bconfig configureResource setuphs buildType package
                     (M.toList (packageFlags package))])
 
 -- | Remove the dist/ dir of a package.
-cleanPackage :: (MonadIO m,MonadThrow m) => Package -> BuildConfig -> m ()
-cleanPackage package bconfig = do
-    dir <-
-        configCabalBuildDir
-            bconfig
-            (packageIdentifier package)
+cleanPackage :: (MonadIO m) => Package -> BuildConfig -> m ()
+cleanPackage package bconfig =
     liftIO
         (removeDirectoryRecursive
-             (toFilePath dir))
+             (toFilePath
+                  (configCabalBuildDir bconfig)))
 
 -- | Whether we're building dependencies (separate database and build
 -- process), or locally specified packages.
@@ -790,13 +778,7 @@ buildPackage :: MonadAction m
 buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconfig setupAction installResource _docLoc =
   do logPath <- liftIO $ runReaderT (buildLogPath package) bconfig
      liftIO (void (try (removeFile (FL.toFilePath logPath)) :: IO (Either IOException ())))
-     cabalBuildDir <-
-         configCabalBuildDir
-             bconfig
-             (packageIdentifier package)
-     let runhaskell' live opts =
-           runhaskell live cabalPkgVer package setuphs bconfig buildType
-                      (opts ++ ["--builddir=" ++ toFilePath cabalBuildDir])
+     let runhaskell' live = runhaskell live cabalPkgVer package setuphs bconfig buildType
          singularBuild = S.size (bcPackages bconfig) == 1 && packageType package == PTUser
      runhaskell'
        singularBuild
@@ -854,7 +836,7 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconf
      --}
 
 -- | Run the Haskell command for the given package.
-runhaskell :: (HasBuildConfig config,MonadAction m,MonadLogger m)
+runhaskell :: (HasBuildConfig config,MonadAction m)
            => Bool
            -> PackageIdentifier
            -> Package
@@ -864,17 +846,18 @@ runhaskell :: (HasBuildConfig config,MonadAction m,MonadLogger m)
            -> [String]
            -> m ()
 runhaskell liveOutput cabalPkgVer package setuphs config' buildType args =
-  do $logInfo display
+  do liftIO (createDirectoryIfMissing True
+                                      (FL.toFilePath (stackageBuildDir package)))
+     $logInfo display
      outRef <- liftIO (newIORef mempty)
      errRef <- liftIO (newIORef mempty)
-     menv <- liftIO iomenv
-     exeName <- liftIO $ join $ findExecutable menv "runhaskell"
-     join (liftIO (catch (runWithRefs exeName outRef errRef)
+     join (liftIO (catch (runWithRefs outRef errRef)
                          (\e@ProcessExitedUnsuccessfully{} ->
                               return (dumpLog outRef errRef e))))
   where
-    runWithRefs exeName outRef errRef = do
-        menv <- iomenv
+    runWithRefs outRef errRef = do
+        menv <- liftIO $ iomenv
+        exeName <- liftIO $ join $ findExecutable menv "runhaskell"
         withSink $ \sink -> withCheckedProcess
           (cp exeName)
              {cwd = Just (FL.toFilePath (packageDir package))
@@ -1193,60 +1176,27 @@ genFileChanged pkgIds bopts gconfig package =
           gconfigFlags gconfig
 
 -- | Write out the gen file for the build dir.
-updateGenFile :: (MonadIO m, HasBuildConfig env, MonadThrow m)
-              => env -> Package -> m ()
-updateGenFile bconfig pkg = do
-    cabalBuildDir <-
-        configCabalBuildDir
-            bconfig
-            (packageIdentifier pkg)
-    liftIO $
-        do createDirectoryIfMissing
-               True
-               (FL.toFilePath cabalBuildDir)
-           L.writeFile
-               (FL.toFilePath
-                    (cabalBuildDir </> configStackBuiltFile))
-               ""
+updateGenFile :: MonadIO m => Path Abs Dir -> m ()
+updateGenFile dir = liftIO $
+  L.writeFile (FL.toFilePath (builtFileFromDir dir))
+              ""
 
 -- | Delete the gen file, which will cause a rebuild.
-deleteGenFile :: (MonadIO m, HasBuildConfig env, MonadThrow m)
-              => env -> Package -> m ()
-deleteGenFile bconfig pkg =
-    do cabalBuildDir <-
-           configCabalBuildDir
-               bconfig
-               (packageIdentifier pkg)
-       liftIO
-           (catch
-                (removeFile
-                     (FL.toFilePath
-                          (cabalBuildDir </> configCabalConfigFile)))
-                (\(_ :: IOException) ->
-                      return ()))
+deleteGenFile :: MonadIO m => Path Abs Dir -> m ()
+deleteGenFile dir = liftIO $
+  catch (removeFile (FL.toFilePath (configuredFileFromDir dir)))
+        (\(_ :: IOException) -> return ())
 
 -- | Save generated configuration.
-writeGenConfigFile :: (MonadIO m, MonadThrow m)
-                   => Package -> GenConfig -> BuildConfig -> m ()
-writeGenConfigFile pkg gconfig bconfig = do
-    cabalBuildDir <-
-        configCabalBuildDir
-            bconfig
-            (packageIdentifier pkg)
-    let configFile =
-            cabalBuildDir </> configStackConfigFile
-    liftIO
-        (do createDirectoryIfMissing
-                True
-                (FL.toFilePath
-                     (FL.parent configFile))
-            L.writeFile
-                (FL.toFilePath configFile)
-                (encode gconfig))
+writeGenConfigFile :: MonadIO m => Path Abs Dir -> GenConfig -> m ()
+writeGenConfigFile dir gconfig = liftIO $
+  do createDirectoryIfMissing True (FL.toFilePath (FL.parent (builtConfigFileFromDir dir)))
+     L.writeFile (FL.toFilePath (builtConfigFileFromDir dir))
+                 (encode gconfig)
 
 -- | Read the generated config file, or return a default based on the
 -- build configuration.
-readGenConfigFile :: (MonadIO m,MonadThrow m)
+readGenConfigFile :: (MonadIO m)
                   => Map PackageName GhcPkgId
                   -> BuildOpts
                   -> Wanted
@@ -1254,11 +1204,10 @@ readGenConfigFile :: (MonadIO m,MonadThrow m)
                   -> MVar ConfigLock
                   -> BuildConfig
                   -> m GenConfig
-readGenConfigFile pkgIds bopts wanted package cfgVar bconfig =
-  do cabalBuildDir <- configCabalBuildDir bconfig (packageIdentifier package)
-     liftIO (withMVar cfgVar (const (go (cabalBuildDir </> configStackConfigFile))))
+readGenConfigFile pkgIds bopts wanted package cfgVar bconfig = liftIO (withMVar cfgVar (const go))
   where name = packageName package
-        go fp =
+        dir = packageDir package
+        go =
           do bytes <-
                catch (fmap Just
                            (S.readFile (FL.toFilePath fp)))
@@ -1273,7 +1222,7 @@ readGenConfigFile pkgIds bopts wanted package cfgVar bconfig =
                          do let invalidated =
                                   genFileInvalidated pkgIds bopts gconfig name package
                             when (invalidated || wanted == Wanted)
-                                 (deleteGenFile bconfig package)
+                                 (deleteGenFile dir)
                             let gconfig' =
                                   (newConfig gconfig bopts package)
                             -- When a file has been invalidated it means the
@@ -1281,7 +1230,7 @@ readGenConfigFile pkgIds bopts wanted package cfgVar bconfig =
                             -- to be recompiled, hence the above setting of force
                             -- recomp.
                             cleanPackage package bconfig
-                            writeGenConfigFile package gconfig' bconfig
+                            writeGenConfigFile dir gconfig'
                             return gconfig'
                     else return gconfig -- No change, the generated config is consistent with the build config.
                Nothing ->
@@ -1290,11 +1239,12 @@ readGenConfigFile pkgIds bopts wanted package cfgVar bconfig =
                                             packageNameString name ++
                                             ", migrating to latest configuration format. This will force a rebuild.")))
                           bytes
-                    deleteGenFile bconfig package
+                    deleteGenFile dir
                     let gconfig' =
                           newConfig defaultGenConfig bopts package
-                    writeGenConfigFile package gconfig' bconfig
+                    writeGenConfigFile dir gconfig'
                     return gconfig' -- Probably doesn't exist or is out of date (not parseable.)
+        fp = builtConfigFileFromDir dir
 
 -- | Update a gen configuration using the build configuration.
 newConfig :: GenConfig -- ^ Build configuration.

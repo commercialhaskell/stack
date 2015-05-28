@@ -22,6 +22,7 @@ import           Data.Typeable
 import           Distribution.System (Platform)
 import qualified Distribution.Text
 import           Path
+import           Stack.Constants
 import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
 import           Stack.Types.Docker
 import           Stack.Types.FlagName
@@ -232,25 +233,8 @@ platformRelDir :: (MonadReader env m, HasPlatform env, MonadThrow m) => m (Path 
 platformRelDir = asks getPlatform >>= parseRelDir . Distribution.Text.display
 
 -- | Path to .shake files.
-configCabalBuildDir :: (MonadThrow m,HasBuildConfig env)
-                    => env -> PackageIdentifier -> m (Path Abs Dir)
-configCabalBuildDir env ident = do
-    identDir <-
-        parseRelDir
-            (packageIdentifierString ident)
-    return (configProjectWorkDir env </> $(mkRelDir "dist") </> identDir)
-
--- | Get the build artifact for the given package identifier.
-configStackBuiltFile :: Path Rel File
-configStackBuiltFile = $(mkRelFile "stack-built")
-
--- | The filename used for completed configure indicators.
-configCabalConfigFile :: Path Rel File
-configCabalConfigFile = $(mkRelFile "setup-config")
-
--- | Get the configuration artifact for the given package identifier.
-configStackConfigFile :: Path Rel File
-configStackConfigFile = $(mkRelFile "stack-config")
+configCabalBuildDir :: HasBuildConfig env => env -> Path Abs Dir
+configCabalBuildDir env = configProjectWorkDir env </> distRelativeDir
 
 -- | Path to .shake files.
 configShakeFilesDir :: HasBuildConfig env => env -> Path Abs Dir
