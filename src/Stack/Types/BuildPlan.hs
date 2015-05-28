@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
@@ -29,6 +30,9 @@ import           Control.Monad.Catch             (MonadThrow, throwM)
 import           Data.Aeson                      (FromJSON (..), ToJSON (..),
                                                   object, withObject, withText,
                                                   (.!=), (.:), (.:?), (.=))
+import           Data.Binary                     (Binary)
+import           Data.ByteString                 (ByteString)
+import qualified Data.ByteString.Char8           as S8
 import           Data.Hashable                   (Hashable)
 import qualified Data.HashMap.Strict             as HashMap
 import           Data.Map                        (Map)
@@ -39,6 +43,7 @@ import           Data.Set                        (Set)
 import           Data.String                     (IsString, fromString)
 import           Data.Text                       (Text, pack, unpack)
 import qualified Data.Text                       as T
+import           Data.Text.Encoding              (encodeUtf8)
 import Data.Text.Read (decimal)
 import           Data.Time                       (Day)
 import qualified Data.Traversable                as T
@@ -47,6 +52,7 @@ import           Data.Vector                     (Vector)
 import           Distribution.System             (Arch, OS)
 import qualified Distribution.Text               as DT
 import qualified Distribution.Version            as C
+import           GHC.Generics                    (Generic)
 import           Safe (readMay)
 import           Stack.Types.FlagName
 import           Stack.Types.PackageName
@@ -224,8 +230,13 @@ newtype Maintainer = Maintainer { unMaintainer :: Text }
     deriving (Show, Eq, Ord, Hashable, ToJSON, FromJSON, IsString)
 
 -- | Name of an executable.
-newtype ExeName = ExeName { unExeName :: Text }
-    deriving (Show, Eq, Ord, Hashable, ToJSON, FromJSON, IsString)
+newtype ExeName = ExeName { unExeName :: ByteString }
+    deriving (Show, Eq, Ord, Hashable, IsString, Generic)
+instance Binary ExeName
+instance ToJSON ExeName where
+    toJSON = toJSON . S8.unpack . unExeName
+instance FromJSON ExeName where
+    parseJSON = withText "ExeName" $ return . ExeName . encodeUtf8
 
 -- | A simplified package description that tracks:
 --
@@ -339,6 +350,6 @@ data BuildPlanTypesException
 instance Exception BuildPlanTypesException
 
 instance ToJSON a => ToJSON (Map ExeName a) where
-  toJSON = toJSON . Map.mapKeysWith const unExeName
+  toJSON = toJSON . Map.mapKeysWith const (S8.unpack . unExeName)
 instance FromJSON a => FromJSON (Map ExeName a) where
-    parseJSON = fmap (Map.mapKeysWith const ExeName) . parseJSON
+    parseJSON = fmap (Map.mapKeysWith const (ExeName . encodeUtf8)) . parseJSON

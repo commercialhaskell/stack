@@ -26,7 +26,7 @@ import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.Catch (MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader
+import           Control.Monad.Reader (asks, runReaderT)
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Writer
 import           Data.Aeson
@@ -52,6 +52,7 @@ import           Data.Streaming.Process hiding (env,callProcess)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import           Distribution.Package (Dependency (..))
 import           Distribution.System (OS (Windows), buildOS)
 import           Network.HTTP.Conduit (Manager)
 import           Network.HTTP.Download
@@ -272,7 +273,22 @@ getDependencies locals ranges = do
             $logDebug $ "Checking resolver: " <> renderSnapName snapName
             mbp <- liftM (removeReverseDeps $ map packageName locals)
                  $ loadMiniBuildPlan snapName globals
-            (deps, users) <- resolveBuildPlan mbp (fmap M.keysSet ranges)
+
+            let toolMap = getToolMap mbp
+                toolDeps = M.unionsWith Set.union
+                         $ flip concatMap locals
+                         $ \local -> flip concatMap (packageTools local)
+                         $ \(Dependency name' _) ->
+                             let name = packageNameByteString $ fromCabalPackageName name'
+                              in case M.lookup name toolMap of
+                                     Nothing -> []
+                                     Just pkgs -> map
+                                        (\pkg -> M.singleton pkg (Set.singleton $ packageName local))
+                                        (Set.toList pkgs)
+
+            (deps, users) <- resolveBuildPlan mbp $ M.unionWith Set.union
+                (fmap M.keysSet ranges)
+                toolDeps
             forM_ (M.toList users) $ \(name, users') -> $logDebug $
                 T.concat
                     [ packageNameText name

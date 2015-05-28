@@ -22,6 +22,7 @@ module Stack.Package
   ,stackageBuildDir
   ,PackageException (..)
   ,resolvePackageDescription
+  ,packageToolDependencies
   ,packageDependencies
   ,packageIdentifier)
   where
@@ -196,6 +197,14 @@ packageDependencies =
   M.fromList .
   concatMap (map (\dep -> ((depName dep),depRange dep)) .
              targetBuildDepends) .
+  allBuildInfo'
+
+-- | Get all build tool dependencies of the package (buildable targets only).
+packageToolDependencies :: PackageDescription -> Map S.ByteString VersionRange
+packageToolDependencies =
+  M.fromList .
+  concatMap (map (\dep -> ((packageNameByteString $ depName dep),depRange dep)) .
+             buildTools) .
   allBuildInfo'
 
 -- | Get all dependencies of the package (buildable targets only).

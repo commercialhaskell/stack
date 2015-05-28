@@ -14,6 +14,7 @@ module Stack.Types.PackageName
   ,packageNameParser
   ,parsePackageName
   ,parsePackageNameFromString
+  ,packageNameByteString
   ,packageNameString
   ,packageNameText
   ,fromCabalPackageName
@@ -104,6 +105,10 @@ parsePackageName x = go x
 parsePackageNameFromString :: MonadThrow m => String -> m PackageName
 parsePackageNameFromString =
   parsePackageName . S8.pack
+
+-- | Produce a bytestring representation of a package name.
+packageNameByteString :: PackageName -> ByteString
+packageNameByteString (PackageName n) = n
 
 -- | Produce a string representation of a package name.
 packageNameString :: PackageName -> String
