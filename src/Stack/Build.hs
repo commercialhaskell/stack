@@ -435,7 +435,8 @@ buildLocals bopts packagesToInstall packagesToRemove = do
      plans <-
        forM (M.toList packagesToInstall)
             (\(package, wantedTarget) ->
-               do when (wantedTarget == Wanted && boptsFinalAction bopts /= DoNothing)
+               do when (wantedTarget == Wanted && boptsFinalAction bopts /= DoNothing &&
+                        packageType package == PTUser)
                        (liftIO (deleteGenFile (packageDir package)))
                   gconfig <- readGenConfigFile
                       pkgIds
