@@ -341,6 +341,7 @@ installDependencies bopts deps' = do
             then M.empty
             else M.singleton ident flags
 
+    configureResource <- newResource "cabal configure" 1
     installResource <- newResource "cabal install" 1
     cfgVar <- liftIO $ newMVar ConfigLock
 
@@ -382,6 +383,7 @@ installDependencies bopts deps' = do
                            gconfig
                            packages
                            package
+                           configureResource
                            installResource
                            (userDocsDir (bcConfig bconfig))
                            cfgVar
@@ -428,6 +430,7 @@ buildLocals bopts packagesToInstall packagesToRemove = do
      pkgIds <- getGhcPkgIds menv [localDB]
                 (map packageName (M.keys packagesToInstall))
      cabalPkgVer <- getCabalPkgVer menv
+     configureResource <- newResource "cabal configure" 1
      installResource <- newResource "cabal install" 1
      cfgVar <- liftIO $ newMVar ConfigLock
      plans <-
@@ -452,6 +455,7 @@ buildLocals bopts packagesToInstall packagesToRemove = do
                                    gconfig
                                    (M.keysSet packagesToInstall)
                                    package
+                                   configureResource
                                    installResource
                                    (userDocsDir (bcConfig bconfig))
                                    cfgVar))
@@ -561,10 +565,11 @@ makePlan :: Manager
          -> Set Package
          -> Package
          -> Resource
+         -> Resource
          -> Path Abs Dir
          -> MVar ConfigLock
          -> Rules ()
-makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig packages package installResource docLoc cfgVar = do
+makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig packages package configureResource installResource docLoc cfgVar = do
     when
         (wanted == Wanted)
         (want [buildTarget])
@@ -594,6 +599,7 @@ makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig 
             (configurePackage
                  cabalPkgVer
                  bconfig
+                 configureResource
                  setuphs
                  buildType
                  package
@@ -704,20 +710,26 @@ writeFinalFiles gconfig bconfig buildType dir package = liftIO $
 configurePackage :: (MonadAction m)
                  => PackageIdentifier
                  -> BuildConfig
+                 -> Resource
                  -> Path Abs File -- ^ Setup.hs file
                  -> BuildType
                  -> Package
                  -> GenConfig
                  -> FinalAction
                  -> m ()
-configurePackage cabalPkgVer bconfig setuphs buildType package gconfig setupAction =
+configurePackage cabalPkgVer bconfig configureResource setuphs buildType package gconfig setupAction =
   do logPath <- liftIO $ runReaderT (buildLogPath package) bconfig
      liftIO (void (try (removeFile (FL.toFilePath logPath)) :: IO (Either IOException ())))
      pkgDbs <- getPackageDatabases bconfig buildType
      installRoot <- getInstallRoot bconfig buildType
      let runhaskell' = runhaskell False
                                   cabalPkgVer package setuphs bconfig buildType
-     runhaskell'
+
+     -- Uncertain as to why we cannot run configures in parallel. This appears
+     -- to be a Cabal library bug. Original issue:
+     -- https://github.com/fpco/stack/issues/84. Ideally we'd be able to remove
+     -- this call to withResource.
+     withResource configureResource 1 $ runhaskell'
        (concat [["configure","--user"]
                ,["--package-db=clear","--package-db=global"]
                ,map (("--package-db=" ++) . toFilePath) pkgDbs
