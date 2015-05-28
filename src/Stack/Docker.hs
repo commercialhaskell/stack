@@ -334,30 +334,36 @@ cleanupAction config opts =
               inspectMap =
       do case dcAction opts of
            CleanupInteractive ->
-             do buildStrLn "# STACK DOCKER CLEANUP PLAN\n\
-                           \#\n\
-                           \# When you leave the editor, the lines in this plan will be processed.\n\
-                           \#\n\
-                           \# Lines that begin with 'R' denote an image or container that will be.\n\
-                           \# removed.  You may change the first character to/from 'R' to remove/keep\n\
-                           \# and image or container that would otherwise be kept/removed.\n\
-                           \#\n\
-                           \# To cancel the cleanup, delete all lines in this file.\n\
-                           \#\n\
-                           \# By default, the following images/containers will be removed:\n\
-                           \#"
+             do buildStrLn
+                  (unlines
+                     ["# STACK DOCKER CLEANUP PLAN"
+                     ,"#"
+                     ,"# When you leave the editor, the lines in this plan will be processed."
+                     ,"#"
+                     ,"# Lines that begin with 'R' denote an image or container that will be."
+                     ,"# removed.  You may change the first character to/from 'R' to remove/keep"
+                     ,"# and image or container that would otherwise be kept/removed."
+                     ,"#"
+                     ,"# To cancel the cleanup, delete all lines in this file."
+                     ,"#"
+                     ,"# By default, the following images/containers will be removed:"
+                     ,"#"])
                 buildDefault dcRemoveKnownImagesLastUsedDaysAgo "Known images last used"
                 buildDefault dcRemoveUnknownImagesCreatedDaysAgo "Unknown images created"
                 buildDefault dcRemoveDanglingImagesCreatedDaysAgo "Dangling images created"
                 buildDefault dcRemoveStoppedContainersCreatedDaysAgo "Stopped containers created"
                 buildDefault dcRemoveRunningContainersCreatedDaysAgo "Running containers created"
                            --EKB FIXME: `docker cleanup` should come from shared constants.
-                buildStrLn ("#\n\
-                            \# The default plan can be adjusted using command-line arguments.\n\
-                            \# Run '" ++ takeBaseName progName ++ " docker cleanup --help' for details.\n\
-                            \#")
-           _ -> buildStrLn "# Lines that begin with 'R' denote an image or container that will be.\n\
-                           \# removed."
+                buildStrLn
+                  (unlines
+                     ["#"
+                     ,"# The default plan can be adjusted using command-line arguments."
+                     ,"# Run '" ++ takeBaseName progName ++ " docker cleanup --help' for details."
+                     ,"#"])
+           _ -> buildStrLn
+                  (unlines
+                    ["# Lines that begin with 'R' denote an image or container that will be."
+                    ,"# removed."])
          buildSection "KNOWN IMAGES (pulled/used by stack)"
                       imagesLastUsed
                       buildKnownImage
