@@ -700,6 +700,14 @@ configurePackage cabalPkgVer bconfig setuphs buildType package gconfig setupActi
                        flagNameString name)
                     (M.toList (packageFlags package))])
 
+-- | Remove the dist/ dir of a package.
+cleanPackage :: Package -> IO ()
+cleanPackage package =
+    removeDirectoryRecursive
+        (toFilePath
+             (packageDir package </>
+              $(mkRelDir "dist")))
+
 -- | Whether we're building dependencies (separate database and build
 -- process), or locally specified packages.
 data BuildType = BTDeps | BTLocals
@@ -1166,11 +1174,12 @@ readGenConfigFile pkgIds bopts wanted package cfgVar = liftIO (withMVar cfgVar (
                             when (invalidated || wanted == Wanted)
                                  (deleteGenFile dir)
                             let gconfig' =
-                                  (newConfig gconfig bopts package) {gconfigForceRecomp = invalidated}
+                                  (newConfig gconfig bopts package)
                             -- When a file has been invalidated it means the
                             -- configuration has changed such that things need
                             -- to be recompiled, hence the above setting of force
                             -- recomp.
+                            cleanPackage package
                             writeGenConfigFile dir gconfig'
                             return gconfig'
                     else return gconfig -- No change, the generated config is consistent with the build config.
