@@ -221,13 +221,20 @@ configShakeFilesDir env = configProjectWorkDir env </> $(mkRelDir "shake")
 configLocalUnpackDir :: HasBuildConfig env => env -> Path Abs Dir
 configLocalUnpackDir env = configProjectWorkDir env </> $(mkRelDir "unpacked")
 
+-- | Directory containing snapshots
+snapshotsDir :: (MonadReader env m, HasConfig env) => m (Path Abs Dir)
+snapshotsDir = do
+    config <- asks getConfig
+    return $ configStackRoot config </> $(mkRelDir "snapshots")
+
 -- | Installation root for dependencies
 installationRootDeps :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
 installationRootDeps = do
+    snapshots <- snapshotsDir
     bc <- asks getBuildConfig
     name <- parseRelDir $ T.unpack $ renderResolver $ bcResolver bc
     ghc <- parseRelDir $ versionString $ bcGhcVersion bc
-    return $ configStackRoot (bcConfig bc) </> $(mkRelDir "snapshots") </> name </> ghc
+    return $ snapshots </> name </> ghc
 
 -- | Installation root for locals
 installationRootLocal :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)

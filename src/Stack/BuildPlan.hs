@@ -25,7 +25,7 @@ module Stack.BuildPlan
 
 import           Control.Applicative             ((<$>), (<*>))
 import           Control.Arrow                   ((&&&))
-import           Control.Exception.Enclosed      (tryIO)
+import           Control.Exception.Enclosed      (tryIO, handleIO)
 import           Control.Monad                   (when, liftM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -44,7 +44,7 @@ import qualified Data.Foldable                   as F
 import qualified Data.HashMap.Strict             as HM
 import           Data.IntMap                     (IntMap)
 import qualified Data.IntMap                     as IntMap
-import           Data.List                       (intercalate)
+import           Data.List                       (intercalate, sort)
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
 import           Data.Maybe                      (mapMaybe)
@@ -68,7 +68,7 @@ import           Stack.Types
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageIndex
-import           System.Directory                (createDirectoryIfMissing)
+import           System.Directory                (createDirectoryIfMissing, getDirectoryContents)
 import           System.FilePath                 (takeDirectory)
 
 data BuildPlanException
@@ -491,11 +491,27 @@ findBuildPlan :: (MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m, Has
               -> GenericPackageDescription
               -> m (Maybe (SnapName, Map FlagName Bool))
 findBuildPlan cabalfp gpd = do
+    -- Get the most recent LTS and Nightly in the snapshots directory and
+    -- prefer them over anything else, since odds are high that something
+    -- already exists for them.
+    existing <-
+        liftM (reverse . sort . mapMaybe (parseSnapName . T.pack)) $
+        snapshotsDir >>=
+        liftIO . handleIO (const $ return [])
+               . getDirectoryContents . toFilePath
+    let isLTS LTS{} = True
+        isLTS Nightly{} = False
+        isNightly Nightly{} = True
+        isNightly LTS{} = False
+
     snapshots <- getSnapshots
-    let names =
-            map (uncurry LTS)
+    let names = concat
+            [ take 2 $ filter isLTS existing
+            , take 2 $ filter isNightly existing
+            , map (uncurry LTS)
                 (take 2 $ reverse $ IntMap.toList $ snapshotsLts snapshots)
-            ++ [Nightly $ snapshotsNightly snapshots]
+            , [Nightly $ snapshotsNightly snapshots]
+            ]
         loop [] = return Nothing
         loop (name:names') = do
             menv <- getMinimalEnvOverride
