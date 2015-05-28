@@ -2,7 +2,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -46,7 +45,7 @@ import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
-import           Distribution.System (OS (Windows), buildOS)
+import           Distribution.System (OS (Windows), Platform (..), buildPlatform)
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager)
 import           Path
 import           Path.IO
@@ -159,6 +158,9 @@ data Project = Project
     }
   deriving Show
 
+data ProjectAndConfigMonoid
+  = ProjectAndConfigMonoid !Project !ConfigMonoid
+
 instance ToJSON Project where
     toJSON p = object
         [ "packages"   .= projectPackages p
@@ -166,7 +168,7 @@ instance ToJSON Project where
         , "flags"      .= projectFlags p
         , "resolver"   .= projectResolver p
         ]
-instance FromJSON (Project, ConfigMonoid) where
+instance FromJSON ProjectAndConfigMonoid where
     parseJSON = withObject "Project, ConfigMonoid" $ \o -> do
         dirs <- o .:? "packages" .!= ["."]
         extraDeps' <- o .:? "extra-deps" .!= []
@@ -184,7 +186,7 @@ instance FromJSON (Project, ConfigMonoid) where
                 , projectFlags = flags
                 , projectResolver = resolver
                 }
-        return (project, config)
+        return $ ProjectAndConfigMonoid project config
       where
         goDeps =
             map toSingle . Map.toList . Map.unionsWith S.union . map toMap
@@ -220,15 +222,21 @@ configFromConfigMonoid configStackRoot ConfigMonoid{..} = do
          configConnectionCount = fromMaybe 8 configMonoidConnectionCount
          configHideTHLoading = fromMaybe True configMonoidHideTHLoading
 
-     origEnv <- getEnvOverride
+         -- Only place in the codebase where platform is hard-coded. In theory
+         -- in the future, allow it to be configured.
+         configPlatform = buildPlatform
+
+     origEnv <- getEnvOverride configPlatform
      let configEnvOverride _ = return origEnv
 
+     platform <- runReaderT platformRelDir configPlatform
+
      configLocalGHCs <-
-        case buildOS of
-            Windows -> do
+        case configPlatform of
+            Platform _ Windows -> do
                 progsDir <- getWindowsProgsDir configStackRoot origEnv
-                return $ progsDir </> $(mkRelDir "stack")
-            _ -> return $ configStackRoot </> $(mkRelDir "ghc")
+                return $ progsDir </> $(mkRelDir "stack") </> platform
+            _ -> return $ configStackRoot </> $(mkRelDir "ghc") </> platform
 
      return Config {..}
 
@@ -253,6 +261,7 @@ instance HasStackRoot MiniConfig
 instance HasHttpManager MiniConfig where
     getHttpManager (MiniConfig man _) = man
 instance HasUrls MiniConfig
+instance HasPlatform MiniConfig
 
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.
@@ -400,7 +409,7 @@ loadProjectConfig = do
             return Nothing
   where
     load fp = do
-        (project, config) <-
+        ProjectAndConfigMonoid project config <-
             liftIO (Yaml.decodeFileEither (toFilePath fp))
                >>= either throwM return
         return $ Just (project, fp, config)

@@ -22,6 +22,7 @@ module Stack.Package
   ,stackageBuildDir
   ,PackageException (..)
   ,resolvePackageDescription
+  ,packageToolDependencies
   ,packageDependencies
   ,packageIdentifier)
   where
@@ -56,7 +57,7 @@ import           Distribution.Package hiding (Package,PackageName,packageName,pa
 import           Distribution.PackageDescription hiding (FlagName)
 import           Distribution.PackageDescription.Parse
 import           Distribution.Simple.Utils
-import           Distribution.System
+import           Distribution.System (OS, Arch, Platform (..))
 import           Path as FL
 import           Path.Find
 import           Path.IO
@@ -117,6 +118,7 @@ data PackageConfig =
                 ,packageConfigEnableBenchmarks :: !Bool   -- ^ Are benchmarks enabled?
                 ,packageConfigFlags :: !(Map FlagName Bool)   -- ^ Package config flags.
                 ,packageConfigGhcVersion :: !Version      -- ^ GHC version
+                ,packageConfigPlatform :: !Platform       -- ^ host platform
                 }
  deriving (Show,Typeable)
 
@@ -196,6 +198,14 @@ packageDependencies =
   M.fromList .
   concatMap (map (\dep -> ((depName dep),depRange dep)) .
              targetBuildDepends) .
+  allBuildInfo'
+
+-- | Get all build tool dependencies of the package (buildable targets only).
+packageToolDependencies :: PackageDescription -> Map S.ByteString VersionRange
+packageToolDependencies =
+  M.fromList .
+  concatMap (map (\dep -> ((packageNameByteString $ depName dep),depRange dep)) .
+             buildTools) .
   allBuildInfo'
 
 -- | Get all dependencies of the package (buildable targets only).
@@ -324,6 +334,7 @@ resolvePackageDescription packageConfig (GenericPackageDescription desc defaultF
 
         rc = mkResolveConditions
                 (packageConfigGhcVersion packageConfig)
+                (packageConfigPlatform packageConfig)
                 flags
 
         updateLibDeps lib deps =
@@ -359,13 +370,14 @@ data ResolveConditions = ResolveConditions
 
 -- | Generic a @ResolveConditions@ using sensible defaults.
 mkResolveConditions :: Version -- ^ GHC version
+                    -> Platform -- ^ installation target platform
                     -> Map FlagName Bool -- ^ enabled flags
                     -> ResolveConditions
-mkResolveConditions ghcVersion flags = ResolveConditions
+mkResolveConditions ghcVersion (Platform arch os) flags = ResolveConditions
     { rcFlags = flags
     , rcGhcVersion = ghcVersion
-    , rcOS = buildOS
-    , rcArch = buildArch
+    , rcOS = os
+    , rcArch = arch
     }
 
 -- | Resolve the condition tree for the library.

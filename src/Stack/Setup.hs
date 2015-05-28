@@ -35,10 +35,10 @@ import System.FilePath (searchPathSeparator)
 import System.IO.Temp (withSystemTempDirectory)
 import System.Process (rawSystem)
 import Stack.Types
-import Distribution.System (OS (..), Arch (..), buildOS, buildArch)
-import           Stack.Build.Types
+import Distribution.System (OS (..), Arch (..), Platform (..))
+import Stack.Build.Types
 import qualified Data.ByteString.Char8 as S8
-import Path (Path, Abs, Dir, parseRelDir, parseAbsDir, mkRelFile)
+import Path (Path, Abs, Dir, parseRelDir, parseAbsDir, parseRelFile, mkRelFile)
 import qualified Path
 import Control.Monad.Logger
 import qualified Data.Text as T
@@ -98,6 +98,7 @@ setupEnv installIfMissing manager bconfig = do
             , esIncludeGhcPackagePath = False
             }
     let expected = bcGhcVersion bconfig
+        platform = configPlatform (getConfig bconfig)
     minstalled <- getInstalledGHC menv0
     let needLocal = case minstalled of
             Nothing -> True
@@ -145,7 +146,7 @@ setupEnv installIfMissing manager bconfig = do
     depsExists <- liftIO $ doesDirectoryExist $ toFilePath deps
     localdb <- runReaderT packageDatabaseLocal bconfig
     localdbExists <- liftIO $ doesDirectoryExist $ toFilePath localdb
-    global <- mkEnvOverride (Map.insert "PATH" depsPath env0) >>= getGlobalDB
+    global <- mkEnvOverride platform (Map.insert "PATH" depsPath env0) >>= getGlobalDB
     let mkGPP locals = T.pack $ intercalate [searchPathSeparator] $ concat
             [ [toFilePath localdb | locals && localdbExists]
             , [toFilePath deps | depsExists]
@@ -158,7 +159,7 @@ setupEnv installIfMissing manager bconfig = do
             case Map.lookup es m of
                 Just eo -> return eo
                 Nothing -> do
-                    eo <- mkEnvOverride
+                    eo <- mkEnvOverride platform
                         $ Map.insert "PATH" (if esIncludeLocals es then localsPath else depsPath)
                         $ (if esIncludeGhcPackagePath es
                                 then Map.insert "GHC_PACKAGE_PATH" (mkGPP (esIncludeLocals es))
@@ -213,8 +214,8 @@ getLocalGHC config' expected = do
     case listToMaybe $ reverse $ map snd $ sortBy (comparing fst) pairs of
         Nothing -> return Nothing
         Just (ghcDir, ghcBin) ->
-            case buildOS of
-                Windows -> do
+            case configPlatform $ getConfig config' of
+                Platform _ Windows -> do
                     gitDirs' <- getGitDirs Nothing dir contents
                     return $ Just
                         $ ghcBin
@@ -238,8 +239,8 @@ getLocalGHC config' expected = do
         | otherwise = return Nothing
 
     exeSuffix =
-        case buildOS of
-            Windows -> ".exe"
+        case configPlatform $ getConfig config' of
+            Platform _ Windows -> ".exe"
             _ -> ""
 
 -- | Get the installation directories for Git on Windows
@@ -281,14 +282,17 @@ installLocalGHC manager config' version = do
     $logDebug $ "Attempting to install GHC " <> versionText version <>
                 " to " <> T.pack (toFilePath dest)
     let posix' oskey = posix si oskey manager version dest
-    flip runReaderT config' $ case (buildOS, buildArch) of
-        (Linux, I386) -> posix' "linux32"
-        (Linux, X86_64) -> posix' "linux64"
-        (OSX, _) -> posix' "macosx"
-        (FreeBSD, I386) -> posix' "freebsd32"
-        (FreeBSD, X86_64) -> posix' "freebsd64"
-        (Windows, _) -> windows si manager version dest (configLocalGHCs $ getConfig config')
-        (os, arch) -> throwM $ UnsupportedSetupCombo os arch
+        windows' = windows si manager version dest (configLocalGHCs $ getConfig config')
+    flip runReaderT config' $ case configPlatform $ getConfig config' of
+        Platform I386 Linux -> posix' "linux32"
+        Platform X86_64 Linux -> posix' "linux64"
+        Platform I386 OSX -> posix' "macosx"
+        Platform X86_64 OSX -> posix' "macosx"
+        Platform I386 FreeBSD -> posix' "freebsd32"
+        Platform X86_64 FreeBSD -> posix' "freebsd64"
+        Platform I386 Windows -> windows'
+        Platform X86_64 Windows -> windows'
+        Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
 data SetupException = UnsupportedSetupCombo OS Arch
                     | MissingDependencies [String]
@@ -339,20 +343,27 @@ posix :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow
       -> m [FilePath]
 posix si osKey manager reqVersion dest = do
     menv <- getMinimalEnvOverride
-    checkDependencies ["make", "tar", "xz"]
     DownloadPair version url <- getGHCPair si osKey reqVersion
+    let ghcExtension = FP.takeExtension (T.unpack url)
+        zipTool = case ghcExtension of
+                    ".xz"  -> ["xz"]
+                    ".bz2" -> ["bzip2"]
+                    _      -> []
+    checkDependencies (concat [["make", "tar"], zipTool])
     let dirPiece = "ghc-" <> versionString version
     req <- parseUrl $ T.unpack url
     withSystemTempDirectory "stack-setup" $ \root' -> do
         root <- parseAbsDir root'
-        let file = root Path.</> $(mkRelFile "ghc.tar.xz")
+        ghcFilename <- parseRelFile ("ghc.tar" ++ ghcExtension)
+        let file = root Path.</> ghcFilename
         dir <- liftM (root Path.</>) $ parseRelDir dirPiece
         $logInfo $ "Downloading from: " <> url
         runReaderT (download req file) manager
         $logInfo "Unpacking"
         runIn root "tar" menv ["xf", toFilePath file] Nothing
         $logInfo "Configuring"
-        runIn dir "./configure" menv ["--prefix=" ++ toFilePath dest] Nothing
+        runIn dir (toFilePath $ dir Path.</> $(mkRelFile "configure"))
+              menv ["--prefix=" ++ toFilePath dest] Nothing
         $logInfo "Installing"
         runIn dir "make" menv ["install"] Nothing
         $logInfo "GHC installed!"

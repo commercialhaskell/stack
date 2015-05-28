@@ -73,7 +73,6 @@ data BenchmarkConfig =
 -- | Generated config for a package build.
 data GenConfig =
   GenConfig {gconfigOptimize :: !Bool
-            ,gconfigForceRecomp :: !Bool
             ,gconfigLibProfiling :: !Bool
             ,gconfigExeProfiling :: !Bool
             ,gconfigGhcOptions :: ![Text]
@@ -87,7 +86,6 @@ instance ToJSON GenConfig
 defaultGenConfig :: GenConfig
 defaultGenConfig =
     GenConfig {gconfigOptimize = False
-              ,gconfigForceRecomp = False
               ,gconfigLibProfiling = False
               ,gconfigExeProfiling = False
               ,gconfigGhcOptions = []

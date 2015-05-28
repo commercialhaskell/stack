@@ -3,6 +3,7 @@
 {-# LANGUAGE EmptyDataDecls     #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE TupleSections      #-}
 
 
 -- | Resolving a build plan for a set of packages in a given Stackage
@@ -18,19 +19,25 @@ module Stack.BuildPlan
     , resolveBuildPlan
     , findBuildPlan
     , removeReverseDeps
+    , ToolMap
+    , getToolMap
     ) where
 
 import           Control.Applicative             ((<$>), (<*>))
-import           Control.Exception.Enclosed      (tryIO)
+import           Control.Arrow                   ((&&&))
+import           Control.Exception.Enclosed      (tryIO, handleIO)
 import           Control.Monad                   (when, liftM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import           Control.Monad.Reader            (asks)
 import           Control.Monad.State.Strict      (State, execState, get, modify,
                                                   put)
 import           Data.Aeson                      (FromJSON (..))
 import           Data.Aeson                      (withObject, withText, (.:))
 import qualified Data.Binary                     as Binary
+import           Data.ByteString                 (ByteString)
+import qualified Data.ByteString.Char8           as S8
 import           Data.Conduit
 import qualified Data.Conduit.List               as CL
 import           Data.Either                     (partitionEithers)
@@ -38,7 +45,7 @@ import qualified Data.Foldable                   as F
 import qualified Data.HashMap.Strict             as HM
 import           Data.IntMap                     (IntMap)
 import qualified Data.IntMap                     as IntMap
-import           Data.List                       (intercalate)
+import           Data.List                       (intercalate, sort)
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
 import           Data.Maybe                      (mapMaybe)
@@ -52,7 +59,8 @@ import           Data.Typeable                   (Typeable)
 import           Data.Yaml                       (decodeFileEither)
 import           Distribution.PackageDescription (GenericPackageDescription,
                                                   flagDefault, flagManual,
-                                                  flagName, genPackageFlags)
+                                                  flagName, genPackageFlags,
+                                                  executables, exeName)
 import           GHC.Generics                    (Generic)
 import           Network.HTTP.Download
 import           Path
@@ -61,7 +69,7 @@ import           Stack.Types
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageIndex
-import           System.Directory                (createDirectoryIfMissing)
+import           System.Directory                (createDirectoryIfMissing, getDirectoryContents)
 import           System.FilePath                 (takeDirectory)
 
 data BuildPlanException
@@ -110,9 +118,26 @@ data ResolveState = ResolveState
     , rsUsedBy    :: Map PackageName (Set PackageName)
     }
 
+-- | Information on a single package for the 'MiniBuildPlan'.
+data MiniPackageInfo = MiniPackageInfo
+    { mpiVersion :: !Version
+    , mpiFlags :: !(Map FlagName Bool)
+    , mpiPackageDeps :: !(Set PackageName)
+    , mpiToolDeps :: !(Set ByteString)
+    -- ^ Due to ambiguity in Cabal, it is unclear whether this refers to the
+    -- executable name, the package name, or something else. We have to guess
+    -- based on what's available, which is why we store this is an unwrapped
+    -- 'ByteString'.
+    , mpiExes :: !(Set ExeName)
+    -- ^ Executables provided by this package
+    }
+    deriving (Generic, Show)
+instance Binary.Binary MiniPackageInfo
+
+-- | A simplified version of the 'BuildPlan' + cabal file.
 data MiniBuildPlan = MiniBuildPlan
     { mbpGhcVersion :: !Version
-    , mbpPackages :: !(Map PackageName (Version, Map FlagName Bool, Set PackageName))
+    , mbpPackages :: !(Map PackageName MiniPackageInfo)
     }
     deriving (Generic, Show)
 instance Binary.Binary MiniBuildPlan
@@ -142,7 +167,13 @@ toMiniBuildPlan bp = do
         }
   where
     ghcVersion = siGhcVersion $ bpSystemInfo bp
-    cores = fmap (\v -> (v, Map.empty, Set.empty)) $ siCorePackages $ bpSystemInfo bp
+    cores = fmap (\v -> MiniPackageInfo
+                { mpiVersion = v
+                , mpiFlags = Map.empty
+                , mpiPackageDeps = Set.empty
+                , mpiToolDeps = Set.empty
+                , mpiExes = Set.empty
+                }) $ siCorePackages $ bpSystemInfo bp
 
     goPP pp =
         ( ppVersion pp
@@ -153,7 +184,7 @@ toMiniBuildPlan bp = do
 addDeps :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env)
         => Version -- ^ GHC version
         -> Map PackageName (Version, Map FlagName Bool)
-        -> m (Map PackageName (Version, Map FlagName Bool, Set PackageName))
+        -> m (Map PackageName MiniPackageInfo)
 addDeps ghcVersion toCalc = do
     menv <- getMinimalEnvOverride
     eres <- tryAddDeps menv
@@ -165,7 +196,8 @@ addDeps ghcVersion toCalc = do
         Right res -> return res
   where
     tryAddDeps menv = do
-        idents <- sourcePackageIndex menv $$ CL.foldM go idents0
+        platform <- asks (configPlatform . getConfig)
+        idents <- sourcePackageIndex menv $$ CL.foldM (go platform) idents0
         return $ case partitionEithers $ map hoistEither $ Map.toList idents of
             ([], pairs) -> Right $ Map.fromList pairs
             (missing, _) -> Left $ Couldn'tFindInIndex $ Set.fromList missing
@@ -175,10 +207,16 @@ addDeps ghcVersion toCalc = do
         $ Map.toList toCalc
 
     hoistEither (ident, Left _) = Left ident
-    hoistEither (PackageIdentifier name version, Right (flags, deps)) =
-        Right (name, (version, flags, deps))
+    hoistEither (PackageIdentifier name version, Right (flags, pdeps, tdeps, exes)) =
+        Right (name, MiniPackageInfo
+            { mpiVersion = version
+            , mpiFlags = flags
+            , mpiPackageDeps = pdeps
+            , mpiToolDeps = tdeps
+            , mpiExes = exes
+            })
 
-    go m ucf =
+    go platform m ucf =
         case Map.lookup ident m of
             Just (Left flags) -> do
                 gpd <- ucfParse ucf
@@ -187,16 +225,22 @@ addDeps ghcVersion toCalc = do
                         , packageConfigEnableBenchmarks = False
                         , packageConfigFlags = flags
                         , packageConfigGhcVersion = ghcVersion
+                        , packageConfigPlatform = platform
                         }
                     pd = resolvePackageDescription packageConfig gpd
-                    -- FIXME add build tool info, see:
-                    -- https://github.com/fpco/stack/issues/71
-                    deps = Map.filterWithKey
+                    pdeps = Map.filterWithKey
                         (const . (/= ucfName ucf))
                         (packageDependencies pd)
+                    tdeps = Map.keysSet (packageToolDependencies pd)
+                    exes = Set.fromList $ map (ExeName . S8.pack . exeName) $ executables pd
                 return $ Map.insert
                     ident
-                    (Right (flags, Map.keysSet deps))
+                    (Right
+                        ( flags
+                        , Map.keysSet pdeps
+                        , tdeps
+                        , exes
+                        ))
                     m
             _ -> return m
       where
@@ -212,6 +256,8 @@ getDeps mbp packages =
         , rsUsedBy = Map.empty
         }
   where
+    toolMap = getToolMap mbp
+
     goName :: PackageName -> Set PackageName -> State ResolveState ()
     goName name users = do
         -- Even though we could check rsVisited first and short-circuit things
@@ -225,12 +271,33 @@ getDeps mbp packages =
             Nothing -> modify $ \rs' -> rs'
                 { rsUnknown = Map.insertWith Set.union name users $ rsUnknown rs'
                 }
-            Just (version, flags, deps) -> when (name `Set.notMember` rsVisited rs) $ do
+            Just mpi -> when (name `Set.notMember` rsVisited rs) $ do
                 put rs { rsVisited = Set.insert name $ rsVisited rs }
+                let depsForTools = Set.unions $ mapMaybe (flip Map.lookup toolMap) (Set.toList $ mpiToolDeps mpi)
+                let deps = Set.filter (/= name) (mpiPackageDeps mpi <> depsForTools)
                 F.mapM_ (flip goName $ Set.singleton name) deps
                 modify $ \rs' -> rs'
-                    { rsToInstall = Map.insert name (version, flags) $ rsToInstall rs'
+                    { rsToInstall = Map.insert name (mpiVersion mpi, mpiFlags mpi) $ rsToInstall rs'
                     }
+
+-- | Look up with packages provide which tools.
+type ToolMap = Map ByteString (Set PackageName)
+
+-- | Map from tool name to package providing it
+getToolMap :: MiniBuildPlan -> Map ByteString (Set PackageName)
+getToolMap mbp = Map.unionsWith Set.union
+    -- First grab all of the package names, for times where a build tool is
+    -- identified by package name
+    $ Map.fromList (map (packageNameByteString &&& Set.singleton) (Map.keys ps))
+    -- And then get all of the explicit executable names
+    : concatMap goPair (Map.toList ps)
+  where
+    ps = mbpPackages mbp
+
+    goPair (pname, mpi) =
+        map (flip Map.singleton (Set.singleton pname) . unExeName)
+      $ Set.toList
+      $ mpiExes mpi
 
 -- | Download the 'Snapshots' value from stackage.org.
 getSnapshots :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env, HasStackRoot env, HasUrls env)
@@ -290,7 +357,13 @@ loadMiniBuildPlan name globals = do
             return mbp
     return mbp
         { mbpPackages = mbpPackages mbp `Map.union`
-            fmap (\v -> (v, Map.empty, Set.empty)) globals
+            fmap (\v -> MiniPackageInfo
+                { mpiVersion = v
+                , mpiFlags = Map.empty
+                , mpiPackageDeps = Set.empty
+                , mpiToolDeps = Set.empty
+                , mpiExes = Set.empty
+                }) globals
         }
 
 -- | Some hard-coded fixes for build plans, hopefully to be irrelevant over
@@ -300,8 +373,10 @@ buildPlanFixes mbp = mbp
     { mbpPackages = Map.fromList $ map go $ Map.toList $ mbpPackages mbp
     }
   where
-    go (name, (version, flags, deps)) =
-        (name, (version, goF (packageNameString name) flags, deps))
+    go (name, mpi) =
+        (name, mpi
+            { mpiFlags = goF (packageNameString name) (mpiFlags mpi)
+            })
 
     goF "persistent-sqlite" = Map.insert $(mkFlagName "systemlib") False
     goF "yaml" = Map.insert $(mkFlagName "system-libyaml") False
@@ -340,7 +415,7 @@ loadBuildPlan name = do
 -- @GenericPackageDescription@ to compile against the given @BuildPlan@. Will
 -- only modify non-manual flags, and will prefer default values for flags.
 -- Returns @Nothing@ if no combination exists.
-checkBuildPlan :: (MonadLogger m, MonadThrow m, MonadIO m)
+checkBuildPlan :: (MonadLogger m, MonadThrow m, MonadIO m, MonadReader env m, HasConfig env)
                => SnapName -- ^ used only for debugging purposes
                -> MiniBuildPlan
                -> Path Abs File -- ^ cabal file path, used only for debugging purposes
@@ -348,21 +423,23 @@ checkBuildPlan :: (MonadLogger m, MonadThrow m, MonadIO m)
                -> m (Maybe (Map FlagName Bool))
 checkBuildPlan name mbp cabalfp gpd = do
     $logInfo $ "Checking against build plan " <> renderSnapName name
-    loop flagOptions
+    platform <- asks (configPlatform . getConfig)
+    loop platform flagOptions
   where
-    loop [] = return Nothing
-    loop (flags:rest) = do
+    loop _ [] = return Nothing
+    loop platform (flags:rest) = do
         pkg <- resolvePackage pkgConfig cabalfp PTUser gpd
         passes <- checkDeps flags (packageDeps pkg) (mbpPackages mbp)
         if passes
             then return $ Just flags
-            else loop rest
+            else loop platform rest
       where
         pkgConfig = PackageConfig
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True
             , packageConfigFlags = flags
             , packageConfigGhcVersion = ghcVersion
+            , packageConfigPlatform = platform
             }
 
     ghcVersion = mbpGhcVersion mbp
@@ -387,7 +464,7 @@ checkBuildPlan name mbp cabalfp gpd = do
 checkDeps :: MonadLogger m
           => Map FlagName Bool -- ^ used only for debugging purposes
           -> Map PackageName VersionRange
-          -> Map PackageName (Version, ignored1, ignored2)
+          -> Map PackageName MiniPackageInfo
           -> m Bool
 checkDeps flags deps packages = do
     let errs = mapMaybe go $ Map.toList deps
@@ -400,9 +477,9 @@ checkDeps flags deps packages = do
   where
     go :: (PackageName, VersionRange) -> Maybe Text
     go (name, range) =
-        case Map.lookup name packages of
+        case fmap mpiVersion $ Map.lookup name packages of
             Nothing -> Just $ "Package not present: " <> packageNameText name
-            Just (v, _, _)
+            Just v
                 | withinRange v range -> Nothing
                 | otherwise -> Just $ T.concat
                     [ packageNameText name
@@ -419,11 +496,27 @@ findBuildPlan :: (MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m, Has
               -> GenericPackageDescription
               -> m (Maybe (SnapName, Map FlagName Bool))
 findBuildPlan cabalfp gpd = do
+    -- Get the most recent LTS and Nightly in the snapshots directory and
+    -- prefer them over anything else, since odds are high that something
+    -- already exists for them.
+    existing <-
+        liftM (reverse . sort . mapMaybe (parseSnapName . T.pack)) $
+        snapshotsDir >>=
+        liftIO . handleIO (const $ return [])
+               . getDirectoryContents . toFilePath
+    let isLTS LTS{} = True
+        isLTS Nightly{} = False
+        isNightly Nightly{} = True
+        isNightly LTS{} = False
+
     snapshots <- getSnapshots
-    let names =
-            map (uncurry LTS)
+    let names = concat
+            [ take 2 $ filter isLTS existing
+            , take 2 $ filter isNightly existing
+            , map (uncurry LTS)
                 (take 2 $ reverse $ IntMap.toList $ snapshotsLts snapshots)
-            ++ [Nightly $ snapshotsNightly snapshots]
+            , [Nightly $ snapshotsNightly snapshots]
+            ]
         loop [] = return Nothing
         loop (name:names') = do
             menv <- getMinimalEnvOverride

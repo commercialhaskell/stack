@@ -26,7 +26,7 @@ import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.Catch (MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader
+import           Control.Monad.Reader (asks, runReaderT)
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Writer
 import           Data.Aeson
@@ -52,7 +52,7 @@ import           Data.Streaming.Process hiding (env,callProcess)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Distribution.System (OS (Windows), buildOS)
+import           Distribution.Package (Dependency (..))
 import           Network.HTTP.Conduit (Manager)
 import           Network.HTTP.Download
 import           Path as FL
@@ -193,6 +193,7 @@ determineLocals bopts = do
         , packageConfigFlags =
                fromMaybe M.empty (M.lookup name $ bcFlags bconfig)
         , packageConfigGhcVersion = bcGhcVersion bconfig
+        , packageConfigPlatform = configPlatform (getConfig bconfig)
         }
     packageConfig name bconfig PTUser = PackageConfig
         { packageConfigEnableTests =
@@ -206,6 +207,7 @@ determineLocals bopts = do
         , packageConfigFlags =
                fromMaybe M.empty (M.lookup name $ bcFlags bconfig)
         , packageConfigGhcVersion = bcGhcVersion bconfig
+        , packageConfigPlatform = configPlatform (getConfig bconfig)
         }
 
 -- | Get the version ranges for all dependencies. This takes care of checking
@@ -272,7 +274,22 @@ getDependencies locals ranges = do
             $logDebug $ "Checking resolver: " <> renderSnapName snapName
             mbp <- liftM (removeReverseDeps $ map packageName locals)
                  $ loadMiniBuildPlan snapName globals
-            (deps, users) <- resolveBuildPlan mbp (fmap M.keysSet ranges)
+
+            let toolMap = getToolMap mbp
+                toolDeps = M.unionsWith Set.union
+                         $ flip concatMap locals
+                         $ \local -> flip concatMap (packageTools local)
+                         $ \(Dependency name' _) ->
+                             let name = packageNameByteString $ fromCabalPackageName name'
+                              in case M.lookup name toolMap of
+                                     Nothing -> []
+                                     Just pkgs -> map
+                                        (\pkg -> M.singleton pkg (Set.singleton $ packageName local))
+                                        (Set.toList pkgs)
+
+            (deps, users) <- resolveBuildPlan mbp $ M.unionWith Set.union
+                (fmap M.keysSet ranges)
+                toolDeps
             forM_ (M.toList users) $ \(name, users') -> $logDebug $
                 T.concat
                     [ packageNameText name
@@ -313,8 +330,17 @@ installDependencies bopts deps' = do
     globalDB <- getGlobalDB menv
     installed <- liftM toIdents $ getPackageVersionMap menv (globalDB : pkgDbs)
     cabalPkgVer <- getCabalPkgVer menv
-    let toInstall = M.difference deps installed
+    let toInstall' = M.difference deps installed
 
+    -- Get rid of non-library dependencies which are already installed
+    toInstall <- liftM M.unions $ forM (M.toList toInstall') $ \(ident, flags) -> do
+        dest <- configPackageInstalled ident
+        exists <- liftIO $ doesFileExist $ toFilePath dest
+        return $ if exists
+            then M.empty
+            else M.singleton ident flags
+
+    configureResource <- newResource "cabal configure" 1
     installResource <- newResource "cabal install" 1
     cfgVar <- liftIO $ newMVar ConfigLock
 
@@ -337,7 +363,6 @@ installDependencies bopts deps' = do
                    plans <- forM (S.toList packages) $ \package -> do
                        let gconfig = GenConfig -- FIXME
                                { gconfigOptimize = False
-                               , gconfigForceRecomp = False
                                , gconfigLibProfiling = True
                                , gconfigExeProfiling = False
                                , gconfigGhcOptions = []
@@ -356,6 +381,7 @@ installDependencies bopts deps' = do
                            gconfig
                            packages
                            package
+                           configureResource
                            installResource
                            (userDocsDir (bcConfig bconfig))
                            cfgVar
@@ -373,6 +399,7 @@ installDependencies bopts deps' = do
         , packageConfigEnableBenchmarks = False
         , packageConfigFlags = flags
         , packageConfigGhcVersion = bcGhcVersion bconfig
+        , packageConfigPlatform = configPlatform (getConfig bconfig)
         }
 
 -- | Build all of the given local packages, assuming all necessary dependencies
@@ -401,12 +428,14 @@ buildLocals bopts packagesToInstall packagesToRemove = do
      pkgIds <- getGhcPkgIds menv [localDB]
                 (map packageName (M.keys packagesToInstall))
      cabalPkgVer <- getCabalPkgVer menv
+     configureResource <- newResource "cabal configure" 1
      installResource <- newResource "cabal install" 1
      cfgVar <- liftIO $ newMVar ConfigLock
      plans <-
        forM (M.toList packagesToInstall)
             (\(package, wantedTarget) ->
-               do when (wantedTarget == Wanted && boptsFinalAction bopts /= DoNothing)
+               do when (wantedTarget == Wanted && boptsFinalAction bopts /= DoNothing &&
+                        packageType package == PTUser)
                        (liftIO (deleteGenFile (packageDir package)))
                   gconfig <- readGenConfigFile
                       pkgIds
@@ -425,6 +454,7 @@ buildLocals bopts packagesToInstall packagesToRemove = do
                                    gconfig
                                    (M.keysSet packagesToInstall)
                                    package
+                                   configureResource
                                    installResource
                                    (userDocsDir (bcConfig bconfig))
                                    cfgVar))
@@ -444,11 +474,7 @@ runPlans _bopts _packages plans _docLoc = do
     shakeDir <- asks configShakeFilesDir
     shakeArgs
         shakeDir
-        (case buildOS of
-             Windows ->
-                 1 -- See: https://github.com/fpco/stack/issues/84
-             _ ->
-                 defaultShakeThreads)
+        defaultShakeThreads
         (do sequence_ plans
             {- EKB FIXME: doc generation for stack-doc-server
             when
@@ -533,10 +559,11 @@ makePlan :: Manager
          -> Set Package
          -> Package
          -> Resource
+         -> Resource
          -> Path Abs Dir
          -> MVar ConfigLock
          -> Rules ()
-makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig packages package installResource docLoc cfgVar = do
+makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig packages package installResource configureResource docLoc cfgVar = do
     when
         (wanted == Wanted)
         (want [buildTarget])
@@ -566,6 +593,7 @@ makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig 
             (configurePackage
                  cabalPkgVer
                  bconfig
+                 configureResource
                  setuphs
                  buildType
                  package
@@ -654,10 +682,19 @@ writeFinalFiles gconfig bconfig buildType dir package = liftIO $
                             (packageName package)
              when (packageHasLibrary package && isNothing mpkgid)
                 (throwIO (Couldn'tFindPkgId (packageName package)))
+
+             -- Write out some record that we installed the package
+             when (buildType == BTDeps && not (packageHasLibrary package)) $ do
+                 dest <- flip runReaderT bconfig
+                       $ configPackageInstalled $ PackageIdentifier
+                            (packageName package)
+                            (packageVersion package)
+                 createDirectoryIfMissing True $ toFilePath $ parent dest
+                 writeFile (toFilePath dest) "Installed"
+
              writeGenConfigFile
                       dir
-                      gconfig {gconfigForceRecomp = False
-                              ,gconfigPkgId = mpkgid}
+                      gconfig {gconfigPkgId = mpkgid}
                     -- After a build has completed successfully for a given
                     -- configuration, no recompilation forcing is required.
              updateGenFile dir)
@@ -666,20 +703,25 @@ writeFinalFiles gconfig bconfig buildType dir package = liftIO $
 configurePackage :: (MonadAction m)
                  => PackageIdentifier
                  -> BuildConfig
+                 -> Resource
                  -> Path Abs File -- ^ Setup.hs file
                  -> BuildType
                  -> Package
                  -> GenConfig
                  -> FinalAction
                  -> m ()
-configurePackage cabalPkgVer bconfig setuphs buildType package gconfig setupAction =
+configurePackage cabalPkgVer bconfig configureResource setuphs buildType package gconfig setupAction =
   do logPath <- liftIO $ runReaderT (buildLogPath package) bconfig
      liftIO (void (try (removeFile (FL.toFilePath logPath)) :: IO (Either IOException ())))
      pkgDbs <- getPackageDatabases bconfig buildType
      installRoot <- getInstallRoot bconfig buildType
      let runhaskell' = runhaskell False
                                   cabalPkgVer package setuphs bconfig buildType
-     runhaskell'
+     -- Uncertain as to why we cannot run configures in parallel. This appears
+     -- to be a Cabal library bug. Original issue:
+     -- https://github.com/fpco/stack/issues/84. Ideally we'd be able to remove
+     -- this call to withResource.
+     withResource configureResource 1 $ runhaskell'
        (concat [["configure","--user"]
                ,["--package-db=clear","--package-db=global"]
                ,map (("--package-db=" ++) . toFilePath) pkgDbs
@@ -706,11 +748,12 @@ cleanPackage package =
     removeDirectoryRecursive
         (toFilePath
              (packageDir package </>
-              $(mkRelDir "dist")))
+              distRelativeDir))
 
 -- | Whether we're building dependencies (separate database and build
 -- process), or locally specified packages.
 data BuildType = BTDeps | BTLocals
+    deriving (Eq)
 
 -- | Build the given package with the given configuration.
 buildPackage :: MonadAction m
@@ -735,17 +778,18 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconf
        singularBuild
        (concat [["build"]
                ,["--ghc-options=-O2" | gconfigOptimize gconfig]
-               ,["--ghc-options=-fforce-recomp" | gconfigForceRecomp gconfig]
-               ,concat [["--ghc-options",T.unpack opt] | opt <- boptsGhcOptions bopts]])
+               ,concat [["--ghc-options",T.unpack opt]
+                        | opt <- boptsGhcOptions bopts
+                        , packageType package == PTUser]])
 
      case setupAction of
        DoTests -> runhaskell' singularBuild ["test"]
        DoHaddock ->
            do
               {- EKB FIXME: doc generation for stack-doc-server
-#ifndef mingw32_HOST_OS
+ #ifndef mingw32_HOST_OS
               liftIO (removeDocLinks docLoc package)
-#endif
+ #endif
               ifcOpts <- liftIO (haddockInterfaceOpts docLoc package packages)
               --}
               runhaskell'
@@ -779,11 +823,11 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconf
        _ -> return ()
      withResource installResource 1 (runhaskell' False ["install"])
      {- EKB FIXME: doc generation for stack-doc-server
-#ifndef mingw32_HOST_OS
+ #ifndef mingw32_HOST_OS
      case setupAction of
        DoHaddock -> liftIO (createDocLinks docLoc package)
        _ -> return ()
-#endif
+ #endif
      --}
 
 -- | Run the Haskell command for the given package.
