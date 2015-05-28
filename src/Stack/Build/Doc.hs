@@ -14,6 +14,7 @@ import           Data.Maybe
 import qualified Data.Text as T
 import           Path
 import           Stack.Types
+import           Stack.Constants
 import           System.Directory
 import           System.Environment (lookupEnv)
 import           System.FilePath (takeFileName)

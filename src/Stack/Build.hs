@@ -443,7 +443,6 @@ buildLocals bopts packagesToInstall packagesToRemove = do
                       wantedTarget
                       package
                       cfgVar
-                      bconfig
                   return (makePlan mgr
                                    logLevel
                                    cabalPkgVer
@@ -568,10 +567,8 @@ makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig 
     when
         (wanted == Wanted)
         (want [buildTarget])
-    configureTarget %>
-        const (runWithLogging configureAction)
-    buildTarget %>
-        const (runWithLogging buildAction)
+    configureTarget %> const (runWithLogging configureAction)
+    buildTarget %> const (runWithLogging buildAction)
   where
     needSourceFiles =
         need (map FL.toFilePath (S.toList (packageFiles package)))
@@ -586,7 +583,7 @@ makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig 
     runWithLogging =
         runStackLoggingT mgr logLevel
     configureAction = do
-        needDependencies pkgIds bopts packages package cfgVar bconfig
+        needDependencies pkgIds bopts packages package cfgVar
         need
             [ toFilePath
                   (packageCabalFile package)]
@@ -636,9 +633,8 @@ needDependencies :: MonadAction m
                  -> Set Package
                  -> Package
                  -> MVar ConfigLock
-                 -> BuildConfig
                  -> m ()
-needDependencies pkgIds bopts packages package cfgVar bconfig =
+needDependencies pkgIds bopts packages package cfgVar =
   do deps <- mapM (\package' ->
                      let dir' = packageDir package'
                          genFile = builtFileFromDir dir'
@@ -646,8 +642,7 @@ needDependencies pkgIds bopts packages package cfgVar bconfig =
                                                    bopts
                                                    NotWanted
                                                    package'
-                                                   cfgVar
-                                                   bconfig)
+                                                   cfgVar)
                            return (FL.toFilePath genFile))
                   (mapMaybe (\name ->
                                find ((== name) . packageName)
@@ -749,12 +744,12 @@ configurePackage cabalPkgVer bconfig configureResource setuphs buildType package
                     (M.toList (packageFlags package))])
 
 -- | Remove the dist/ dir of a package.
-cleanPackage :: (MonadIO m) => Package -> BuildConfig -> m ()
-cleanPackage package bconfig =
-    liftIO
-        (removeDirectoryRecursive
-             (toFilePath
-                  (configCabalBuildDir bconfig)))
+cleanPackage :: Package -> IO ()
+cleanPackage package =
+    removeDirectoryRecursive
+        (toFilePath
+             (packageDir package </>
+              distRelativeDir))
 
 -- | Whether we're building dependencies (separate database and build
 -- process), or locally specified packages.
@@ -1196,15 +1191,14 @@ writeGenConfigFile dir gconfig = liftIO $
 
 -- | Read the generated config file, or return a default based on the
 -- build configuration.
-readGenConfigFile :: (MonadIO m)
+readGenConfigFile :: MonadIO m
                   => Map PackageName GhcPkgId
                   -> BuildOpts
                   -> Wanted
                   -> Package
                   -> MVar ConfigLock
-                  -> BuildConfig
                   -> m GenConfig
-readGenConfigFile pkgIds bopts wanted package cfgVar bconfig = liftIO (withMVar cfgVar (const go))
+readGenConfigFile pkgIds bopts wanted package cfgVar = liftIO (withMVar cfgVar (const go))
   where name = packageName package
         dir = packageDir package
         go =
@@ -1229,7 +1223,7 @@ readGenConfigFile pkgIds bopts wanted package cfgVar bconfig = liftIO (withMVar 
                             -- configuration has changed such that things need
                             -- to be recompiled, hence the above setting of force
                             -- recomp.
-                            cleanPackage package bconfig
+                            cleanPackage package
                             writeGenConfigFile dir gconfig'
                             return gconfig'
                     else return gconfig -- No change, the generated config is consistent with the build config.
