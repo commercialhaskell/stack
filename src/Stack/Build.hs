@@ -787,9 +787,9 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconf
        DoHaddock ->
            do
               {- EKB FIXME: doc generation for stack-doc-server
-#ifndef mingw32_HOST_OS
+ #ifndef mingw32_HOST_OS
               liftIO (removeDocLinks docLoc package)
-#endif
+ #endif
               ifcOpts <- liftIO (haddockInterfaceOpts docLoc package packages)
               --}
               runhaskell'
@@ -823,11 +823,11 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconf
        _ -> return ()
      withResource installResource 1 (runhaskell' False ["install"])
      {- EKB FIXME: doc generation for stack-doc-server
-#ifndef mingw32_HOST_OS
+ #ifndef mingw32_HOST_OS
      case setupAction of
        DoHaddock -> liftIO (createDocLinks docLoc package)
        _ -> return ()
-#endif
+ #endif
      --}
 
 -- | Run the Haskell command for the given package.
