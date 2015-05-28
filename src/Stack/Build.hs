@@ -477,7 +477,6 @@ runPlans :: (MonadIO m, MonadReader env m, HasBuildConfig env, HasLogLevel env, 
          -> Path Abs Dir
          -> m ()
 runPlans _bopts _packages plans _docLoc = do
-    config <- asks getConfig
     shakeDir <- asks configShakeFilesDir
     shakeArgs
         shakeDir
