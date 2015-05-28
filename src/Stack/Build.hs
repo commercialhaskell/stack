@@ -329,7 +329,15 @@ installDependencies bopts deps' = do
     globalDB <- getGlobalDB menv
     installed <- liftM toIdents $ getPackageVersionMap menv (globalDB : pkgDbs)
     cabalPkgVer <- getCabalPkgVer menv
-    let toInstall = M.difference deps installed
+    let toInstall' = M.difference deps installed
+
+    -- Get rid of non-library dependencies which are already installed
+    toInstall <- liftM M.unions $ forM (M.toList toInstall') $ \(ident, flags) -> do
+        dest <- configPackageInstalled ident
+        exists <- liftIO $ doesFileExist $ toFilePath dest
+        return $ if exists
+            then M.empty
+            else M.singleton ident flags
 
     installResource <- newResource "cabal install" 1
     cfgVar <- liftIO $ newMVar ConfigLock
@@ -670,6 +678,16 @@ writeFinalFiles gconfig bconfig buildType dir package = liftIO $
                             (packageName package)
              when (packageHasLibrary package && isNothing mpkgid)
                 (throwIO (Couldn'tFindPkgId (packageName package)))
+
+             -- Write out some record that we installed the package
+             when (buildType == BTDeps && not (packageHasLibrary package)) $ do
+                 dest <- flip runReaderT bconfig
+                       $ configPackageInstalled $ PackageIdentifier
+                            (packageName package)
+                            (packageVersion package)
+                 createDirectoryIfMissing True $ toFilePath $ parent dest
+                 writeFile (toFilePath dest) "Installed"
+
              writeGenConfigFile
                       dir
                       gconfig {gconfigForceRecomp = False
@@ -719,6 +737,7 @@ configurePackage cabalPkgVer bconfig setuphs buildType package gconfig setupActi
 -- | Whether we're building dependencies (separate database and build
 -- process), or locally specified packages.
 data BuildType = BTDeps | BTLocals
+    deriving (Eq)
 
 -- | Build the given package with the given configuration.
 buildPackage :: MonadAction m
