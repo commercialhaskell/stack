@@ -650,7 +650,8 @@ configurePackage :: (MonadAction m)
                  -> FinalAction
                  -> m ()
 configurePackage cabalPkgVer bconfig setuphs buildType package gconfig setupAction =
-  do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath package))) :: IO (Either IOException ())))
+  do logPath <- liftIO $ runReaderT (buildLogPath package) bconfig
+     liftIO (void (try (removeFile (FL.toFilePath logPath)) :: IO (Either IOException ())))
      pkgDbs <- getPackageDatabases bconfig buildType
      installRoot <- getInstallRoot bconfig buildType
      let runhaskell' = runhaskell False
@@ -695,7 +696,8 @@ buildPackage :: MonadAction m
              -> Path Abs Dir
              -> m ()
 buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconfig setupAction installResource _docLoc =
-  do liftIO (void (try (removeFile (FL.toFilePath (buildLogPath package))) :: IO (Either IOException ())))
+  do logPath <- liftIO $ runReaderT (buildLogPath package) bconfig
+     liftIO (void (try (removeFile (FL.toFilePath logPath)) :: IO (Either IOException ())))
      let runhaskell' live = runhaskell live cabalPkgVer package setuphs bconfig buildType
          singularBuild = S.size (bcPackages bconfig) == 1 && packageType package == PTUser
      runhaskell'
@@ -754,7 +756,7 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconf
      --}
 
 -- | Run the Haskell command for the given package.
-runhaskell :: (HasConfig config,HasBuildConfig config,MonadAction m)
+runhaskell :: (HasBuildConfig config,MonadAction m)
            => Bool
            -> PackageIdentifier
            -> Package
@@ -797,9 +799,12 @@ runhaskell liveOutput cabalPkgVer package setuphs config' buildType args =
                           (do $logError "Stderr was:"
                               $logError (T.decodeUtf8 errs))
                    liftIO (throwIO e)
-    withSink inner =
-         withBinaryFile (FL.toFilePath (buildLogPath package)) AppendMode
-         $ \h -> inner (stdoutToo $= sinkHandle h)
+    withSink inner = do
+         logPath <- liftIO $ runReaderT (buildLogPath package) config'
+         liftIO $ createDirectoryIfMissing True $ FL.toFilePath
+                $ parent logPath
+         withBinaryFile (FL.toFilePath logPath) AppendMode
+           $ \h -> inner (stdoutToo $= sinkHandle h)
       where stdoutToo =
                 CL.mapM_ (if liveOutput then S8.putStr else (const (return ())))
     logFrom src sink ref =

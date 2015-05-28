@@ -460,11 +460,19 @@ getCabalFileName pkgDir = do
         _:_ -> throwM $ PackageMultipleCabalFilesFound pkgDir files
   where hasExtension fp x = FilePath.takeExtensions fp == "." ++ x
 
--- | Path for the project's build log.
-buildLogPath :: Package -> Path Abs File
-buildLogPath package' =
-  stackageBuildDir package' </>
-  $(mkRelFile "build-log")
+-- | Path for the package's build log.
+buildLogPath :: (MonadReader env m, HasBuildConfig env, MonadThrow m)
+             => Package -> m (Path Abs File)
+buildLogPath package' = do
+  env <- ask
+  let stack = configProjectWorkDir env
+  fp <- parseRelFile $ concat
+    [ packageNameString $ packageName package'
+    , "-"
+    , versionString $ packageVersion package'
+    , ".log"
+    ]
+  return $ stack </> $(mkRelDir "logs") </> fp
 
 -- | Path for the project's configure log.
 configureLogPath :: Package -> Path Abs File
