@@ -106,7 +106,8 @@ library
                    , zlib >= 0.5.4.2
                    , monad-unlift >= 0.1.1.0
   if !os(windows)
-    build-depends: unix >= 2.7.0.1
+    build-depends:   unix >= 2.7.0.1
+  build-tools:       cpphs
   default-language:    Haskell2010
 
 executable stack
