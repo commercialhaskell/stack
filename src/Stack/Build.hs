@@ -778,7 +778,9 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconf
        singularBuild
        (concat [["build"]
                ,["--ghc-options=-O2" | gconfigOptimize gconfig]
-               ,concat [["--ghc-options",T.unpack opt] | opt <- boptsGhcOptions bopts]])
+               ,concat [["--ghc-options",T.unpack opt]
+                        | opt <- boptsGhcOptions bopts
+                        , packageType package == PTUser]])
 
      case setupAction of
        DoTests -> runhaskell' singularBuild ["test"]
