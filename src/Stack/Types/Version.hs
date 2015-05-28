@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
@@ -10,8 +11,10 @@
 module Stack.Types.Version
   (Version
   ,Cabal.VersionRange -- FIXME in the future should have a newtype wrapper
+  ,MajorVersion (..)
   ,getMajorVersion
   ,fromMajorVersion
+  ,parseMajorVersionFromString
   ,versionParser
   ,parseVersion
   ,parseVersionFromString
@@ -34,6 +37,8 @@ import qualified Data.ByteString.Char8 as S8
 import           Data.Data
 import           Data.Hashable
 import           Data.List
+import           Data.Map (Map)
+import qualified Data.Map as Map
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Vector.Binary ()
@@ -50,6 +55,7 @@ import qualified Distribution.Version as Cabal
 -- | A parse fail.
 data VersionParseFail =
   VersionParseFail ByteString
+  | NotAMajorVersion Version
   deriving (Show,Typeable)
 instance Exception VersionParseFail
 
@@ -58,17 +64,47 @@ newtype Version =
   Version {unVersion :: Vector Word}
   deriving (Eq,Ord,Typeable,Data,Generic,Binary)
 
+-- | The first two components of a version.
+data MajorVersion = MajorVersion !Word !Word
+    deriving (Typeable, Eq, Ord)
+instance Show MajorVersion where
+    show (MajorVersion x y) = concat [show x, ".", show y]
+instance ToJSON MajorVersion where
+    toJSON = toJSON . fromMajorVersion
+
+-- | Parse major version from @String@
+parseMajorVersionFromString :: MonadThrow m => String -> m MajorVersion
+parseMajorVersionFromString s = do
+    Version v <- parseVersionFromString s
+    if V.length v == 2
+        then return $ getMajorVersion (Version v)
+        else throwM $ NotAMajorVersion (Version v)
+
+instance FromJSON MajorVersion where
+    parseJSON = withText "MajorVersion"
+              $ either (fail . show) return
+              . parseMajorVersionFromString
+              . T.unpack
+instance FromJSON a => FromJSON (Map MajorVersion a) where
+    parseJSON val = do
+        m <- parseJSON val
+        fmap Map.fromList $ mapM go $ Map.toList m
+      where
+        go (k, v) = do
+            k' <- either (fail . show) return $ parseMajorVersionFromString k
+            return (k', v)
+
 -- | Returns the first two components, defaulting to 0 if not present
-getMajorVersion :: Version -> (Word, Word)
+getMajorVersion :: Version -> MajorVersion
 getMajorVersion (Version v) =
     case V.length v of
-        0 -> (0, 0)
-        1 -> (V.head v, 0)
-        _ -> (V.head v, v V.! 1)
+        0 -> MajorVersion 0 0
+        1 -> MajorVersion (V.head v) 0
+        _ -> MajorVersion (V.head v) (v V.! 1)
 
 -- | Convert a two-component version into a @Version@
-fromMajorVersion :: Word -> Word -> Version
-fromMajorVersion x y = Version $ V.fromList [x, y]
+fromMajorVersion :: MajorVersion -> Version
+fromMajorVersion (MajorVersion x y) = Version $ V.fromList [x, y]
 
 instance Hashable Version where
   hashWithSalt i = hashWithSalt i . V.toList . unVersion

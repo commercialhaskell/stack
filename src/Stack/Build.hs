@@ -280,7 +280,7 @@ getDependencies locals ranges = do
                                          $ Set.toList users'
                     ]
             return deps
-        ResolverGhc _ _ -> return $ fmap (, M.empty) globals
+        ResolverGhc _ -> return $ fmap (, M.empty) globals
 
     let checkDepRange (dep, users) =
             concatMap go $ M.toList users

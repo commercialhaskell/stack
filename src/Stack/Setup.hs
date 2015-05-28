@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -24,7 +23,6 @@ import qualified Data.Conduit.List as CL
 import Control.Applicative ((<$>), (<*>))
 import Data.Aeson
 import Data.IORef
-import Data.Word (Word)
 import qualified Data.List as List
 import Data.Monoid
 import qualified Data.Yaml as Yaml
@@ -63,20 +61,6 @@ instance FromJSON DownloadPair where
     parseJSON = withObject "DownloadPair" $ \o -> DownloadPair
         <$> o .: "version"
         <*> o .: "url"
-
-data MajorVersion = MajorVersion !Word !Word
-    deriving (Typeable, Eq, Ord)
-instance Show MajorVersion where
-    show (MajorVersion x y) = concat [show x, ".", show y]
-instance FromJSON a => FromJSON (Map MajorVersion a) where
-    parseJSON val = do
-        m <- parseJSON val
-        fmap Map.fromList $ mapM go $ Map.toList m
-      where
-        go (k, v) = do
-            (x, y) <- either (fail . show) (return . getMajorVersion)
-                    $ parseVersionFromString k
-            return (MajorVersion x y, v)
 
 data SetupInfo = SetupInfo
     { siSevenzExe :: Text
@@ -341,12 +325,9 @@ getGHCPair si osKey version =
     case Map.lookup osKey $ siGHCs si of
         Nothing -> throwM $ UnknownOSKey osKey
         Just m ->
-            case Map.lookup major m of
+            case Map.lookup (getMajorVersion version) m of
                 Nothing -> throwM $ UnknownGHCVersion version (Map.keysSet m)
                 Just pair -> return pair
-  where
-    (x, y) = getMajorVersion version
-    major = MajorVersion x y
 
 -- | Install GHC for 64-bit Linux
 posix :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, MonadMask m)

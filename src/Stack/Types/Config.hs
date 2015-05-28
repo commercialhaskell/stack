@@ -84,7 +84,7 @@ data Resolver
   -- ^ Use an official snapshot from the Stackage project, either an LTS
   -- Haskell or Stackage Nightly
 
-  | ResolverGhc !Word !Word
+  | ResolverGhc {-# UNPACK #-} !MajorVersion
   -- ^ Require a specific GHC major version, but otherwise provide no build
   -- plan. Intended for use cases where end user wishes to specify all upstream
   -- dependencies manually, such as using a dependency solver.
@@ -99,7 +99,7 @@ instance FromJSON Resolver where
 -- | Convert a Resolver into its @Text@ representation, as will be used by JSON/YAML
 renderResolver :: Resolver -> Text
 renderResolver (ResolverSnapshot name) = renderSnapName name
-renderResolver (ResolverGhc x y) = T.pack $ concat ["ghc-", show x, ".", show y]
+renderResolver (ResolverGhc (MajorVersion x y)) = T.pack $ concat ["ghc-", show x, ".", show y]
 
 -- | Try to parse a @Resolver@, using same format as JSON/YAML/'renderResolver'
 parseResolver :: MonadThrow m => Text -> m Resolver
@@ -108,15 +108,10 @@ parseResolver t =
         Right x -> return $ ResolverSnapshot x
         Left _ ->
             case parseGhc of
-                Just (x, y) -> return $ ResolverGhc x y
+                Just m -> return $ ResolverGhc m
                 Nothing -> throwM $ ParseResolverException t
   where
-    parseGhc = do
-        t1 <- T.stripPrefix "ghc-" t
-        Right (x, t2) <- Just $ decimal t1
-        t3 <- T.stripPrefix "." t2
-        Right (y, "") <- Just $ decimal t3
-        return (x, y)
+    parseGhc = T.stripPrefix "ghc-" t >>= parseMajorVersionFromString . T.unpack
 
 data ParseResolverException = ParseResolverException Text
     deriving (Show, Typeable)

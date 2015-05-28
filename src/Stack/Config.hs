@@ -299,7 +299,7 @@ loadBuildConfig = do
             ResolverSnapshot snapName -> do
                 mbp <- runReaderT (loadMiniBuildPlan snapName Map.empty) miniConfig
                 return $ mbpGhcVersion mbp
-            ResolverGhc x y -> return $ fromMajorVersion x y
+            ResolverGhc m -> return $ fromMajorVersion m
 
     let root = parent stackYamlFP
     packages' <- mapM (resolveDir root) (projectPackages project)
