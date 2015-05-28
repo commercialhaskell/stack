@@ -53,7 +53,6 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Distribution.Package (Dependency (..))
-import           Distribution.System (OS (Windows), Platform (..))
 import           Network.HTTP.Conduit (Manager)
 import           Network.HTTP.Download
 import           Path as FL
@@ -482,11 +481,7 @@ runPlans _bopts _packages plans _docLoc = do
     shakeDir <- asks configShakeFilesDir
     shakeArgs
         shakeDir
-        (case configPlatform config of
-             Platform _ Windows ->
-                 1 -- See: https://github.com/fpco/stack/issues/84
-             _ ->
-                 defaultShakeThreads)
+        defaultShakeThreads
         (do sequence_ plans
             {- EKB FIXME: doc generation for stack-doc-server
             when
