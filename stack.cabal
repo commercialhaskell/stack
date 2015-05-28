@@ -39,6 +39,7 @@ library
                      Stack.Build.Types
                      Stack.Build.Doc
                      System.Process.Read
+                     Network.HTTP.Download.Verified
   other-modules:     Network.HTTP.Download
                      Path.Find
                      Path.IO
@@ -55,6 +56,7 @@ library
                    , base >= 4 && <5
                    , bifunctors >= 4.2.1
                    , binary >= 0.7
+                   , base64-bytestring
                    , bytestring
                    , conduit >= 1.2.4
                    , conduit-extra >= 1.1.7.1
@@ -148,4 +150,6 @@ test-suite stack-test
                 , temporary
                 , stack
                 , monad-logger
+                , http-conduit
+                , cryptohash
   default-language:    Haskell2010
