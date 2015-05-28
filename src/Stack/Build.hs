@@ -806,7 +806,7 @@ runhaskell liveOutput cabalPkgVer package setuphs config' buildType args =
          withBinaryFile (FL.toFilePath logPath) AppendMode
            $ \h -> inner (stdoutToo $= sinkHandle h)
       where stdoutToo =
-                CL.mapM_ (if liveOutput then S8.putStr else (const (return ())))
+                CL.iterM (if liveOutput then S8.putStr else (const (return ())))
     logFrom src sink ref =
         src $=
         CL.mapM (\chunk ->
