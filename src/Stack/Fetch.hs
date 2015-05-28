@@ -259,10 +259,12 @@ fetchPackages menv pkgs = do
                     (map packageIdentifierText $ Set.toList missing)
                return pkgInfo
 
-   parMapM_ connectionCount (go packageLocation man (return pkgInfo) outputVar) pkgs
+   parMapM_
+    (configConnectionCount config)
+    (go packageLocation man (return pkgInfo) outputVar)
+    pkgs
    liftIO (readTVarIO outputVar)
   where
-    connectionCount = 8 -- FIXME put in Config
     unlessM p f = do
         p' <- p
         unless p' f

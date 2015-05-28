@@ -68,6 +68,8 @@ data ConfigMonoid =
     -- helper functions.
     , configMonoidGpgVerifyIndex :: !(Maybe Bool)
     -- ^ Controls how package index updating occurs
+    , configMonoidConnectionCount :: !(Maybe Int)
+    -- ^ See: 'configConnectionCount'
     }
   deriving Show
 
@@ -114,11 +116,13 @@ instance Monoid ConfigMonoid where
     { configMonoidDockerOpts = mempty
     , configMonoidUrls = mempty
     , configMonoidGpgVerifyIndex = Nothing
+    , configMonoidConnectionCount = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
     , configMonoidUrls = configMonoidUrls l <> configMonoidUrls r
     , configMonoidGpgVerifyIndex = configMonoidGpgVerifyIndex l <|> configMonoidGpgVerifyIndex r
+    , configMonoidConnectionCount = configMonoidConnectionCount l <|> configMonoidConnectionCount r
     }
 
 instance FromJSON ConfigMonoid where
@@ -128,6 +132,7 @@ instance FromJSON ConfigMonoid where
       do getTheDocker <- obj .:? "docker" .!= defaultDocker
          configMonoidUrls <- obj .:? "urls" .!= mempty
          configMonoidGpgVerifyIndex <- obj .:? "gpg-verify-index"
+         configMonoidConnectionCount <- obj .:? "connection-count"
          let configMonoidDockerOpts = DockerOpts getTheDocker
          return ConfigMonoid {..}
 
@@ -207,6 +212,7 @@ configFromConfigMonoid configStackRoot ConfigMonoid{..} = do
                  DockerOpts x -> x
          configUrls = configMonoidUrls
          configGpgVerifyIndex = fromMaybe False configMonoidGpgVerifyIndex
+         configConnectionCount = fromMaybe 8 configMonoidConnectionCount
 
      origEnv <- getEnvOverride
      let configEnvOverride _ = origEnv

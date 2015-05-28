@@ -41,6 +41,8 @@ data Config =
          -- ^ Environment variables to be passed to external tools
          ,configLocalGHCs        :: !(Path Abs Dir)
          -- ^ Path containing local GHC installations
+         ,configConnectionCount  :: !Int
+         -- ^ How many concurrent connections are allowed when downloading
          }
 
 -- | Controls which version of the environment is used
