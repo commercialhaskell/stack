@@ -17,6 +17,7 @@ module Stack.Build
   where
 
 import qualified Control.Applicative as A
+import           Control.Arrow ((&&&))
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.MVar
 import           Control.Exception
@@ -84,12 +85,49 @@ build bopts = do
     -- FIXME currently this will install all dependencies for the entire
     -- project even if just building a subset of the project
     locals <- determineLocals bopts
+    localsWanted <- checkWanted locals bopts
     ranges <- getDependencyRanges locals
     dependencies <- getDependencies locals ranges
 
     installDependencies bopts dependencies
     toRemove <- getPackagesToRemove (Set.map packageIdentifier (S.fromList locals))
-    buildLocals bopts (S.fromList locals) toRemove
+    buildLocals bopts localsWanted toRemove
+
+-- | Given a list of local packages and some options, determine which ones are
+-- wanted.
+checkWanted :: (MonadIO m, MonadThrow m)
+            => [Package] -> BuildOpts -> m (Map Package Wanted)
+checkWanted packages bopts = do
+    targets <- mapM parseTarget $
+        case boptsTargets bopts of
+            [] -> ["."]
+            x -> x
+    (dirs, names0) <- case partitionEithers targets of
+        ([], targets') -> return $ partitionEithers targets'
+        (bad, _) -> throwM $ Couldn'tParseTargets bad
+
+    -- Check for unknown names
+    let names = Set.fromList names0
+        known = Set.fromList $ map packageName packages
+        unknown = Set.difference names known
+    unless (Set.null unknown) $ throwM $ UnknownTargets $ Set.toList unknown
+
+    return $ M.fromList $ map (id &&& wanted dirs names) packages
+  where
+    parseTarget t = do
+        let s = T.unpack t
+        isDir <- liftIO $ doesDirectoryExist s
+        if isDir
+            then liftM (Right . Left) $ liftIO (canonicalizePath s) >>= parseAbsDir
+            else return $ case parsePackageNameFromString s of
+                     Left _ -> Left t
+                     Right pname -> Right $ Right pname
+    wanted dirs names package = boolToWanted $
+        packageName package `Set.member` names ||
+        any (`FL.isParentOf` packageDir package) dirs ||
+        any (== packageDir package) dirs
+      where
+        boolToWanted True = Wanted; boolToWanted _ = NotWanted
 
 -- | Get currently user-local-db-installed packages that need to be
 -- removed before we install the new package set.
@@ -324,9 +362,8 @@ installDependencies bopts deps' = do
                            (userDocsDir (bcConfig bconfig))
                            cfgVar
                    runPlans bopts
-                      packages
+                      (M.fromList $ map (, Wanted) $ Set.toList packages)
                       plans
-                      (\_ _ -> Wanted)
                       (userDocsDir (bcConfig bconfig))
   where
     deps = M.fromList $ map (\(name, (version, flags)) -> (PackageIdentifier name version, flags))
@@ -345,7 +382,7 @@ installDependencies bopts deps' = do
 buildLocals
     :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
     => BuildOpts
-    -> Set Package
+    -> Map Package Wanted
     -> Set PackageIdentifier
     -> m ()
 buildLocals bopts packagesToInstall packagesToRemove = do
@@ -364,17 +401,14 @@ buildLocals bopts packagesToInstall packagesToRemove = do
      unless (boptsDryrun bopts)
             (unregisterPackages menv [localDB,globalDB,depDB] (==localDB) packagesToRemove)
      pkgIds <- getGhcPkgIds menv [localDB]
-                (map packageName (S.toList packagesToInstall))
+                (map packageName (M.keys packagesToInstall))
      cabalPkgVer <- getCabalPkgVer menv
-     pwd <- liftIO $ getCurrentDirectory >>= parseAbsDir
      installResource <- newResource "cabal install" 1
      cfgVar <- liftIO $ newMVar ConfigLock
      plans <-
-       forM (S.toList packagesToInstall)
-            (\package ->
-               do let wantedTarget =
-                        wanted pwd package
-                  when (wantedTarget == Wanted && boptsFinalAction bopts /= DoNothing)
+       forM (M.toList packagesToInstall)
+            (\(package, wantedTarget) ->
+               do when (wantedTarget == Wanted && boptsFinalAction bopts /= DoNothing)
                        (liftIO (deleteGenFile (packageDir package)))
                   gconfig <- readGenConfigFile
                       pkgIds
@@ -391,33 +425,24 @@ buildLocals bopts packagesToInstall packagesToRemove = do
                                    (getBuildConfig env)
                                    BTLocals
                                    gconfig
-                                   packagesToInstall
+                                   (M.keysSet packagesToInstall)
                                    package
                                    installResource
                                    (userDocsDir (bcConfig bconfig))
                                    cfgVar))
 
      if boptsDryrun bopts
-        then dryRunPrint "local packages" packagesToRemove (Set.map packageIdentifier packagesToInstall)
-        else runPlans bopts packagesToInstall plans wanted (userDocsDir (bcConfig bconfig))
-  where
-    wanted pwd package = boolToWanted $ case boptsTargets bopts of
-        [] -> FL.isParentOf pwd (packageDir package) ||
-              packageDir package == pwd
-        targets ->
-              elem (packageName package)
-                   (mapMaybe (parsePackageNameFromString . T.unpack) targets)
-      where boolToWanted True = Wanted; boolToWanted _ = NotWanted
+        then dryRunPrint "local packages" packagesToRemove (Set.map packageIdentifier (M.keysSet packagesToInstall))
+        else runPlans bopts packagesToInstall plans (userDocsDir (bcConfig bconfig))
 
 -- FIXME clean up this function to make it more nicely shareable
 runPlans :: (MonadIO m, MonadReader env m, HasBuildConfig env, HasLogLevel env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
          => BuildOpts
-         -> Set Package
+         -> Map Package Wanted
          -> [Rules ()]
-         -> (Path Abs Dir -> Package -> Wanted)
          -> Path Abs Dir
          -> m ()
-runPlans _bopts _packages plans _wanted _docLoc = do
+runPlans _bopts _packages plans _docLoc = do
     shakeDir <- asks configShakeFilesDir
     shakeArgs
         shakeDir

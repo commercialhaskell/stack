@@ -34,6 +34,8 @@ data StackBuildException
   | StackageVersionMismatch PackageName Version Version
   | DependencyIssues [StackBuildException]
   | GHCVersionMismatch (Maybe Version) Version
+  | Couldn'tParseTargets [Text]
+  | UnknownTargets [PackageName]
   deriving (Typeable,Show)
 
 instance Exception StackBuildException

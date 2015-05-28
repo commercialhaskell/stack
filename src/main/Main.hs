@@ -199,6 +199,12 @@ buildCmd finalAction opts logLevel =
                 , versionString expected
                 , ". Try running stack setup"
                 ]
+            Couldn'tParseTargets targets -> unlines
+                $ "The following targets could not be parsed as package names or directories:"
+                : map T.unpack targets
+            UnknownTargets targets ->
+                "The following target packages were not found: " ++
+                intercalate ", " (map packageNameString targets)
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> LogLevel -> IO ()
