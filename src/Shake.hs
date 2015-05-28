@@ -20,7 +20,9 @@ module Shake
   ,(S.%>))
   where
 
+import           Control.Exception
 import           Control.Monad
+import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Control
@@ -31,9 +33,12 @@ import           Path
 import           System.Environment
 
 -- | A Shake build action.
-class (MonadIO m,Functor m,MonadLogger m) => MonadAction m where
+class (MonadIO m,Functor m,MonadLogger m,MonadThrow m) => MonadAction m where
   liftAction :: Action a -> m a
   unliftAction :: m (m a -> Action a)
+
+instance MonadThrow Action where
+    throwM = liftIO . throw
 
 -- | Run a build system using command line arguments for
 -- configuration.

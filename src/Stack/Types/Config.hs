@@ -7,28 +7,28 @@
 
 module Stack.Types.Config where
 
-import Control.Exception
-import Control.Monad (liftM)
-import Control.Monad.Catch (MonadThrow, throwM)
-import Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
-import Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, withText)
-import Data.Map (Map)
+import           Control.Exception
+import           Control.Monad (liftM)
+import           Control.Monad.Catch (MonadThrow, throwM)
+import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
+import           Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, withText)
+import           Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe)
-import Data.Set (Set)
-import Data.Text (Text)
+import           Data.Maybe (fromMaybe)
+import           Data.Set (Set)
+import           Data.Text (Text)
 import qualified Data.Text as T
-import Data.Typeable
-import Distribution.System (Platform)
+import           Data.Typeable
+import           Distribution.System (Platform)
 import qualified Distribution.Text
-import Path
-import Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
-import Stack.Types.Docker
-import Stack.Types.FlagName
-import Stack.Types.PackageIdentifier
-import Stack.Types.PackageName
-import Stack.Types.Version
-import System.Process.Read (EnvOverride)
+import           Path
+import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
+import           Stack.Types.Docker
+import           Stack.Types.FlagName
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageName
+import           Stack.Types.Version
+import           System.Process.Read (EnvOverride)
 
 -- | The top-level Stackage configuration.
 data Config =
@@ -232,6 +232,27 @@ platformRelDir :: (MonadReader env m, HasPlatform env, MonadThrow m) => m (Path 
 platformRelDir = asks getPlatform >>= parseRelDir . Distribution.Text.display
 
 -- | Path to .shake files.
+configCabalBuildDir :: (MonadThrow m,HasBuildConfig env)
+                    => env -> PackageIdentifier -> m (Path Abs Dir)
+configCabalBuildDir env ident = do
+    identDir <-
+        parseRelDir
+            (packageIdentifierString ident)
+    return (configProjectWorkDir env </> $(mkRelDir "dist") </> identDir)
+
+-- | Get the build artifact for the given package identifier.
+configStackBuiltFile :: Path Rel File
+configStackBuiltFile = $(mkRelFile "stack-built")
+
+-- | The filename used for completed configure indicators.
+configCabalConfigFile :: Path Rel File
+configCabalConfigFile = $(mkRelFile "setup-config")
+
+-- | Get the configuration artifact for the given package identifier.
+configStackConfigFile :: Path Rel File
+configStackConfigFile = $(mkRelFile "stack-config")
+
+-- | Path to .shake files.
 configShakeFilesDir :: HasBuildConfig env => env -> Path Abs Dir
 configShakeFilesDir env = configProjectWorkDir env </> $(mkRelDir "shake")
 
@@ -245,6 +266,20 @@ snapshotsDir = do
     config <- asks getConfig
     platform <- platformRelDir
     return $ configStackRoot config </> $(mkRelDir "snapshots") </> platform
+
+-- | User documentation directory.
+userDocsDir :: Config -> Path Abs Dir
+userDocsDir config = configStackRoot config </> $(mkRelDir "doc/")
+
+pkgIndexDir :: Config -> Path Abs Dir
+pkgIndexDir config =
+  configStackRoot config </>
+  $(mkRelDir "package-index")
+
+pkgIndexFile :: Config -> Path Abs File
+pkgIndexFile config =
+  pkgIndexDir config </>
+  $(mkRelFile "00-index.tar")
 
 -- | Installation root for dependencies
 installationRootDeps :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
