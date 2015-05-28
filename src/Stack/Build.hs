@@ -35,6 +35,7 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.Conduit
 import           Data.Conduit.Binary (sinkHandle)
+import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Either
 import           Data.Function
@@ -825,10 +826,15 @@ runhaskell liveOutput cabalPkgVer package setuphs config' buildType args =
          logPath <- liftIO $ runReaderT (buildLogPath package) config'
          liftIO $ createDirectoryIfMissing True $ FL.toFilePath
                 $ parent logPath
-         withBinaryFile (FL.toFilePath logPath) AppendMode
-           $ \h -> inner (stdoutToo $= sinkHandle h)
-      where stdoutToo =
-                CL.iterM (if liveOutput then S8.putStr else (const (return ())))
+         withBinaryFile (FL.toFilePath logPath) AppendMode (inner . stdoutToo)
+      where stdoutToo h
+                | not liveOutput = sinkHandle h
+                | configHideTHLoading (getConfig config') =
+                        CL.iterM (S8.hPut h)
+                    =$= CB.lines
+                    =$= CL.filter (not . isTHLoading)
+                    =$= CL.mapM_ S8.putStrLn
+                | otherwise = CL.iterM S8.putStr =$= sinkHandle h
     logFrom src sink ref =
         src $=
         CL.mapM (\chunk ->
@@ -856,6 +862,13 @@ runhaskell liveOutput cabalPkgVer package setuphs config' buildType args =
                     BTLocals -> True
             , esIncludeGhcPackagePath = False
             }
+
+-- | Is this line a Template Haskell "Loading package" line
+-- ByteString
+isTHLoading :: S8.ByteString -> Bool
+isTHLoading bs =
+    "Loading package " `S8.isPrefixOf` bs &&
+    ("done." `S8.isSuffixOf` bs || "done.\r" `S8.isSuffixOf` bs)
 
 -- | Ensure Setup.hs exists in the given directory. Returns an action
 -- to remove it later.

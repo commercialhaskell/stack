@@ -41,6 +41,9 @@ data Config =
          -- ^ Path containing local GHC installations
          ,configConnectionCount  :: !Int
          -- ^ How many concurrent connections are allowed when downloading
+         ,configHideTHLoading    :: !Bool
+         -- ^ Hide the Template Haskell "Loading package ..." messages from the
+         -- console
          }
 
 -- | Controls which version of the environment is used

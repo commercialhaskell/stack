@@ -70,6 +70,8 @@ data ConfigMonoid =
     -- ^ Controls how package index updating occurs
     , configMonoidConnectionCount :: !(Maybe Int)
     -- ^ See: 'configConnectionCount'
+    , configMonoidHideTHLoading :: !(Maybe Bool)
+    -- ^ See: 'configHideTHLoading'
     }
   deriving Show
 
@@ -117,12 +119,14 @@ instance Monoid ConfigMonoid where
     , configMonoidUrls = mempty
     , configMonoidGpgVerifyIndex = Nothing
     , configMonoidConnectionCount = Nothing
+    , configMonoidHideTHLoading = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
     , configMonoidUrls = configMonoidUrls l <> configMonoidUrls r
     , configMonoidGpgVerifyIndex = configMonoidGpgVerifyIndex l <|> configMonoidGpgVerifyIndex r
     , configMonoidConnectionCount = configMonoidConnectionCount l <|> configMonoidConnectionCount r
+    , configMonoidHideTHLoading = configMonoidHideTHLoading l <|> configMonoidHideTHLoading r
     }
 
 instance FromJSON ConfigMonoid where
@@ -133,6 +137,7 @@ instance FromJSON ConfigMonoid where
          configMonoidUrls <- obj .:? "urls" .!= mempty
          configMonoidGpgVerifyIndex <- obj .:? "gpg-verify-index"
          configMonoidConnectionCount <- obj .:? "connection-count"
+         configMonoidHideTHLoading <- obj .:? "hide-th-loading"
          let configMonoidDockerOpts = DockerOpts getTheDocker
          return ConfigMonoid {..}
 
@@ -213,6 +218,7 @@ configFromConfigMonoid configStackRoot ConfigMonoid{..} = do
          configUrls = configMonoidUrls
          configGpgVerifyIndex = fromMaybe False configMonoidGpgVerifyIndex
          configConnectionCount = fromMaybe 8 configMonoidConnectionCount
+         configHideTHLoading = fromMaybe True configMonoidHideTHLoading
 
      origEnv <- getEnvOverride
      let configEnvOverride _ = return origEnv
