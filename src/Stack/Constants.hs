@@ -28,7 +28,7 @@ haskellFileExts = ["hs","hsc","lhs"]
 builtFileFromDir :: Path Abs Dir -> Path Abs File
 builtFileFromDir fp =
   distDirFromDir fp </>
-  $(mkRelFile "stack.gen")
+  $(mkRelFile "stack-built")
 
 -- | The filename used for completed configure indicators.
 configuredFileFromDir :: Path Abs Dir -> Path Abs File
@@ -44,7 +44,7 @@ builtConfigFileFromDir fp = fp </> builtConfigRelativeFile
 builtConfigRelativeFile :: Path Rel File
 builtConfigRelativeFile =
   distRelativeDir </>
-  $(mkRelFile "stack.config")
+  $(mkRelFile "stack-config")
 
 -- | Default shake thread count for parallel builds.
 defaultShakeThreads :: Int
