@@ -564,7 +564,7 @@ makePlan :: Manager
          -> Path Abs Dir
          -> MVar ConfigLock
          -> Rules ()
-makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig packages package installResource docLoc cfgVar = do
+makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig packages package installResource configureResource docLoc cfgVar = do
     when
         (wanted == Wanted)
         (want [buildTarget])
