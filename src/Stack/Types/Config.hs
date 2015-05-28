@@ -10,7 +10,7 @@ module Stack.Types.Config where
 import Control.Exception
 import Control.Monad (liftM)
 import Control.Monad.Catch (MonadThrow, throwM)
-import Control.Monad.Reader (MonadReader, ask, asks)
+import Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
 import Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, withText)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -37,7 +37,7 @@ data Config =
          ,configDocker           :: !Docker
          ,configUrls             :: !(Map Text Text)
          ,configGpgVerifyIndex   :: !Bool
-         ,configEnvOverride      :: !(EnvSettings -> EnvOverride)
+         ,configEnvOverride      :: !(EnvSettings -> IO EnvOverride)
          -- ^ Environment variables to be passed to external tools
          ,configLocalGHCs        :: !(Path Abs Dir)
          -- ^ Path containing local GHC installations
@@ -52,7 +52,7 @@ data EnvSettings = EnvSettings
     , esIncludeGhcPackagePath :: !Bool
     -- ^ include the GHC_PACKAGE_PATH variable
     }
-    deriving Show
+    deriving (Show, Eq, Ord)
 
 -- | A superset of 'Config' adding information on how to build code. The reason
 -- for this breakdown is because we will need some of the information from
@@ -280,10 +280,10 @@ extraBinDirs = do
 
 -- | Get the minimal environment override, useful for just calling external
 -- processes like git or ghc
-getMinimalEnvOverride :: (MonadReader env m, HasConfig env) => m EnvOverride
+getMinimalEnvOverride :: (MonadReader env m, HasConfig env, MonadIO m) => m EnvOverride
 getMinimalEnvOverride = do
     config <- asks getConfig
-    return $ configEnvOverride config EnvSettings
+    liftIO $ configEnvOverride config EnvSettings
                     { esIncludeLocals = False
                     , esIncludeGhcPackagePath = False
                     }

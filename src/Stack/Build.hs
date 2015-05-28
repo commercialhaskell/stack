@@ -798,6 +798,7 @@ runhaskell liveOutput cabalPkgVer package setuphs config' buildType args =
                               return (dumpLog outRef errRef e))))
   where
     runWithRefs outRef errRef = do
+        menv <- liftIO $ iomenv
         exeName <- liftIO $ join $ findExecutable menv "runhaskell"
         withSink $ \sink -> withCheckedProcess
           (cp exeName)
@@ -848,7 +849,7 @@ runhaskell liveOutput cabalPkgVer package setuphs config' buildType args =
          -- TODO: Perhaps we want to include the snapshot package database here
          -- as well
                           : toFilePath setuphs : args)
-    menv = configEnvOverride (getConfig config') EnvSettings
+    iomenv = configEnvOverride (getConfig config') EnvSettings
             { esIncludeLocals =
                 case buildType of
                     BTDeps -> False

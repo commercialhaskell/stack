@@ -235,7 +235,7 @@ execCmd (cmd, args) logLevel = do
     Docker.rerunWithOptionalContainer
       config0
       (do config <- runStackLoggingT manager logLevel (setupEnv False manager config0)
-          let menv = configEnvOverride (bcConfig config)
+          menv <- configEnvOverride (bcConfig config)
                           EnvSettings
                               { esIncludeLocals = True
                               , esIncludeGhcPackagePath = True

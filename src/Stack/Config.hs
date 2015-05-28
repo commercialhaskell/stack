@@ -55,7 +55,7 @@ import           Stack.Package
 import           Stack.Types
 import           System.Directory
 import           System.Environment
-import           System.Process.Read (getEnvOverride, EnvOverride (..))
+import           System.Process.Read (getEnvOverride, EnvOverride, unEnvOverride)
 
 -- An uninterpreted representation of configuration options.
 -- Configurations may be "cascaded" using mappend (left-biased).
@@ -215,7 +215,7 @@ configFromConfigMonoid configStackRoot ConfigMonoid{..} = do
          configConnectionCount = fromMaybe 8 configMonoidConnectionCount
 
      origEnv <- getEnvOverride
-     let configEnvOverride _ = origEnv
+     let configEnvOverride _ = return origEnv
 
      configLocalGHCs <-
         case buildOS of
@@ -233,8 +233,8 @@ getWindowsProgsDir :: MonadThrow m
                    => Path Abs Dir
                    -> EnvOverride
                    -> m (Path Abs Dir)
-getWindowsProgsDir stackRoot (EnvOverride m) =
-    case Map.lookup "LOCALAPPDATA" m of
+getWindowsProgsDir stackRoot m =
+    case Map.lookup "LOCALAPPDATA" $ unEnvOverride m of
         Just t -> do
             lad <- parseAbsDir $ T.unpack t
             return $ lad </> $(mkRelDir "Programs")

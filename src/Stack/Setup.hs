@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -22,6 +23,7 @@ import Data.Conduit (($$))
 import qualified Data.Conduit.List as CL
 import Control.Applicative ((<$>), (<*>))
 import Data.Aeson
+import Data.IORef
 import Data.Word (Word)
 import qualified Data.List as List
 import Data.Monoid
@@ -107,11 +109,11 @@ setupEnv :: (MonadIO m, MonadMask m, MonadLogger m)
          -> m BuildConfig
 setupEnv installIfMissing manager bconfig = do
     -- Check the available GHCs
-    let menv0 = configEnvOverride (bcConfig bconfig) EnvSettings
+    menv0 <- liftIO $ configEnvOverride (bcConfig bconfig) EnvSettings
             { esIncludeLocals = False
             , esIncludeGhcPackagePath = False
             }
-        expected = bcGhcVersion bconfig
+    let expected = bcGhcVersion bconfig
     minstalled <- getInstalledGHC menv0
     let needLocal = case minstalled of
             Nothing -> True
@@ -140,10 +142,11 @@ setupEnv installIfMissing manager bconfig = do
 
     -- Modify the initial environment to include the GHC path, if a local GHC
     -- is being used
-    let env0 = case (menv0, mghcBin) of
-            (EnvOverride x, Nothing) -> x
-            (EnvOverride x, Just ghcBin) ->
-                let mpath = Map.lookup "PATH" x
+    let env0 = case mghcBin of
+            Nothing -> unEnvOverride menv0
+            Just ghcBin ->
+                let x = unEnvOverride menv0
+                    mpath = Map.lookup "PATH" x
                     path = T.intercalate (T.singleton searchPathSeparator)
                         $ map T.pack ghcBin ++ maybe [] return mpath
                  in Map.insert "PATH" path x
@@ -158,33 +161,42 @@ setupEnv installIfMissing manager bconfig = do
     depsExists <- liftIO $ doesDirectoryExist $ toFilePath deps
     localdb <- runReaderT packageDatabaseLocal bconfig
     localdbExists <- liftIO $ doesDirectoryExist $ toFilePath localdb
-    global <- getGlobalDB $ EnvOverride $ Map.insert "PATH" depsPath env0
+    global <- mkEnvOverride (Map.insert "PATH" depsPath env0) >>= getGlobalDB
     let mkGPP locals = T.pack $ intercalate [searchPathSeparator] $ concat
             [ [toFilePath localdb | locals && localdbExists]
             , [toFilePath deps | depsExists]
             , [toFilePath global]
             ]
 
-    let mkEnvOverride es = EnvOverride
-            $ Map.insert "PATH" (if esIncludeLocals es then localsPath else depsPath)
-            $ (if esIncludeGhcPackagePath es
-                    then Map.insert "GHC_PACKAGE_PATH" (mkGPP (esIncludeLocals es))
-                    else id)
-            $ Map.insert "HASKELL_PACKAGE_SANDBOX"
-                (T.pack $ if esIncludeLocals es
-                    {- This is what we'd ideally want to provide, but
-                     - HASKELL_PACKAGE_SANDBOX isn't set up to respect it. Need
-                     - to figure out a better solution, maybe creating a
-                     - combined database and passing that in?
-                    then intercalate [searchPathSeparator]
-                            [ toFilePath localdb
-                            , toFilePath deps
-                            ]
-                    -}
-                    then toFilePath localdb
-                    else toFilePath deps)
-            $ env0
-    return bconfig { bcConfig = (bcConfig bconfig) { configEnvOverride = mkEnvOverride } }
+    envRef <- liftIO $ newIORef Map.empty
+    let getEnvOverride' es = do
+            m <- readIORef envRef
+            case Map.lookup es m of
+                Just eo -> return eo
+                Nothing -> do
+                    eo <- mkEnvOverride
+                        $ Map.insert "PATH" (if esIncludeLocals es then localsPath else depsPath)
+                        $ (if esIncludeGhcPackagePath es
+                                then Map.insert "GHC_PACKAGE_PATH" (mkGPP (esIncludeLocals es))
+                                else id)
+                        $ Map.insert "HASKELL_PACKAGE_SANDBOX"
+                            (T.pack $ if esIncludeLocals es
+                                {- This is what we'd ideally want to provide, but
+                                 - HASKELL_PACKAGE_SANDBOX isn't set up to respect it. Need
+                                 - to figure out a better solution, maybe creating a
+                                 - combined database and passing that in?
+                                then intercalate [searchPathSeparator]
+                                        [ toFilePath localdb
+                                        , toFilePath deps
+                                        ]
+                                -}
+                                then toFilePath localdb
+                                else toFilePath deps)
+                        $ env0
+                    !() <- atomicModifyIORef envRef $ \m' ->
+                        (Map.insert es eo m', ())
+                    return eo
+    return bconfig { bcConfig = (bcConfig bconfig) { configEnvOverride = getEnvOverride' } }
   where
     mkPath dirs mpath = T.pack $ intercalate [searchPathSeparator]
         (map toFilePath dirs ++ maybe [] (return . T.unpack) mpath)

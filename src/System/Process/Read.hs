@@ -1,5 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -13,7 +13,9 @@ module System.Process.Read
   ,tryProcessStdout
   ,sinkProcessStdout
   ,runIn
-  ,EnvOverride(..)
+  ,EnvOverride
+  ,unEnvOverride
+  ,mkEnvOverride
   ,envHelper
   ,doesExecutableExist
   ,findExecutable
@@ -21,7 +23,7 @@ module System.Process.Read
   where
 
 import           Control.Applicative ((*>))
-import           Control.Arrow ((***))
+import           Control.Arrow ((***), first)
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Exception
 import           Control.Monad (when, join, liftM)
@@ -33,6 +35,7 @@ import           Data.Conduit
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process hiding (callProcess)
 import           Data.Foldable (forM_)
+import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -49,14 +52,39 @@ import           System.Environment (getEnvironment)
 import           System.Exit (ExitCode(ExitSuccess), exitWith)
 
 -- | Override the environment received by a child process
---
--- FIXME: make this an abstract type that caches path lookups
-newtype EnvOverride = EnvOverride { unEnvOverride :: Map Text Text }
-  deriving Monoid
+data EnvOverride = EnvOverride
+    { eoTextMap :: Map Text Text
+    , eoStringList :: [(String, String)]
+    , eoPath :: [FilePath]
+    , eoExeCache :: IORef (Map FilePath (Either FindExecutableException (Path Abs File)))
+    }
+
+-- | Get the environment variables from @EnvOverride@
+unEnvOverride :: EnvOverride -> Map Text Text
+unEnvOverride = eoTextMap
+
+-- | Create a new @EnvOverride@
+mkEnvOverride :: MonadIO m => Map Text Text -> m EnvOverride
+mkEnvOverride tm' = do
+    ref <- liftIO $ newIORef Map.empty
+    return EnvOverride
+        { eoTextMap = tm
+        , eoStringList = map (T.unpack *** T.unpack) $ Map.toList tm
+        , eoPath = maybe [] (FP.splitSearchPath . T.unpack) (Map.lookup "PATH" tm)
+        , eoExeCache = ref
+        }
+  where
+    -- Fix case insensitivity of the PATH environment variable on Windows.
+    -- Use buildOS instead of CPP so that the Windows code path is at least
+    -- type checked regularly
+    tm =
+        case buildOS of
+            Windows -> Map.fromList $ map (first T.toUpper) $ Map.toList tm'
+            _ -> tm'
 
 -- | Helper conversion function
 envHelper :: EnvOverride -> Maybe [(String, String)]
-envHelper = Just . map (T.unpack *** T.unpack) . Map.toList . unEnvOverride
+envHelper = Just . eoStringList
 
 -- | Try to produce a strict 'S.ByteString' from the stdout of a
 -- process.
@@ -142,11 +170,12 @@ doesExecutableExist menv name = liftM isJust $ findExecutable menv name
 
 -- | Find the complete path for the executable
 findExecutable :: (MonadIO m, MonadThrow n) => EnvOverride -> String -> m (n (Path Abs File))
-findExecutable (EnvOverride m) name =
-    liftIO $ case Map.lookup "PATH" m of
-        Nothing -> return $ throwM NoPathFound
-        Just path ->
-            let loop [] = return $ throwM $ ExecutableNotFound name path
+findExecutable eo name = liftIO $ do
+    m <- readIORef $ eoExeCache eo
+    epath <- case Map.lookup name m of
+        Just epath -> return epath
+        Nothing -> do
+            let loop [] = return $ Left $ ExecutableNotFound name (eoPath eo)
                 loop (dir:dirs) = do
                     let fp = dir FP.</> name ++ exeExtension
                     exists <- doesFileExist fp
@@ -155,7 +184,11 @@ findExecutable (EnvOverride m) name =
                             fp' <- canonicalizePath fp >>= parseAbsFile
                             return $ return fp'
                         else loop dirs
-             in loop $ FP.splitSearchPath $ T.unpack path
+            epath <- loop $ eoPath eo
+            !() <- atomicModifyIORef (eoExeCache eo) $ \m' ->
+                (Map.insert name epath m', ())
+            return epath
+    return $ either throwM return epath
   where
     exeExtension =
         case buildOS of
@@ -164,29 +197,13 @@ findExecutable (EnvOverride m) name =
 
 -- | Load up an EnvOverride from the standard environment
 getEnvOverride :: MonadIO m => m EnvOverride
-getEnvOverride = liftIO
-    $ fmap (EnvOverride . Map.fromList . map (goKey . T.pack *** T.pack))
-    $ getEnvironment
-  where
-    -- Fix case insensitivity of the PATH environment variable on Windows.
-    -- Use buildOS instead of CPP so that the Windows code path is at least
-    -- type checked regularly
-    goKey =
-        case buildOS of
-            Windows -> \t ->
-                let t' = T.toUpper t
-                 in if t' `Set.member` neededUppers then t' else t
-            _ -> id
-
-    neededUppers = Set.fromList
-        [ "PATH"
-        , "LOCALAPPDATA"
-        , "APPDATA"
-        ]
+getEnvOverride =
+    liftIO $
+    getEnvironment >>= mkEnvOverride . Map.fromList . map (T.pack *** T.pack)
 
 data FindExecutableException
     = NoPathFound
-    | ExecutableNotFound String T.Text
+    | ExecutableNotFound String [FilePath]
     deriving Typeable
 instance Exception FindExecutableException
 instance Show FindExecutableException where
@@ -195,5 +212,5 @@ instance Show FindExecutableException where
         [ "Executable named "
         , name
         , " not found on path: "
-        , T.unpack path
+        , show path
         ]

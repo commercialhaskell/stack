@@ -12,7 +12,7 @@ module Stack.GhcPkg
   ,findGhcPkgId
   ,getGhcPkgIds
   ,getGlobalDB
-  ,EnvOverride(..)
+  ,EnvOverride
   ,envHelper
   ,unregisterPackages)
   where
