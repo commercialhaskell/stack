@@ -35,7 +35,7 @@ import System.FilePath (searchPathSeparator)
 import System.IO.Temp (withSystemTempDirectory)
 import System.Process (rawSystem)
 import Stack.Types
-import Distribution.System (OS (..), Arch (..), buildOS, buildArch)
+import Distribution.System (OS (..), Arch (..), Platform (..))
 import           Stack.Build.Types
 import qualified Data.ByteString.Char8 as S8
 import Path (Path, Abs, Dir, parseRelDir, parseAbsDir, mkRelFile)
@@ -98,6 +98,7 @@ setupEnv installIfMissing manager bconfig = do
             , esIncludeGhcPackagePath = False
             }
     let expected = bcGhcVersion bconfig
+        platform = configPlatform (getConfig bconfig)
     minstalled <- getInstalledGHC menv0
     let needLocal = case minstalled of
             Nothing -> True
@@ -145,7 +146,7 @@ setupEnv installIfMissing manager bconfig = do
     depsExists <- liftIO $ doesDirectoryExist $ toFilePath deps
     localdb <- runReaderT packageDatabaseLocal bconfig
     localdbExists <- liftIO $ doesDirectoryExist $ toFilePath localdb
-    global <- mkEnvOverride (Map.insert "PATH" depsPath env0) >>= getGlobalDB
+    global <- mkEnvOverride platform (Map.insert "PATH" depsPath env0) >>= getGlobalDB
     let mkGPP locals = T.pack $ intercalate [searchPathSeparator] $ concat
             [ [toFilePath localdb | locals && localdbExists]
             , [toFilePath deps | depsExists]
@@ -158,7 +159,7 @@ setupEnv installIfMissing manager bconfig = do
             case Map.lookup es m of
                 Just eo -> return eo
                 Nothing -> do
-                    eo <- mkEnvOverride
+                    eo <- mkEnvOverride platform
                         $ Map.insert "PATH" (if esIncludeLocals es then localsPath else depsPath)
                         $ (if esIncludeGhcPackagePath es
                                 then Map.insert "GHC_PACKAGE_PATH" (mkGPP (esIncludeLocals es))
@@ -213,8 +214,8 @@ getLocalGHC config' expected = do
     case listToMaybe $ reverse $ map snd $ sortBy (comparing fst) pairs of
         Nothing -> return Nothing
         Just (ghcDir, ghcBin) ->
-            case buildOS of
-                Windows -> do
+            case configPlatform $ getConfig config' of
+                Platform _ Windows -> do
                     gitDirs' <- getGitDirs Nothing dir contents
                     return $ Just
                         $ ghcBin
@@ -238,8 +239,8 @@ getLocalGHC config' expected = do
         | otherwise = return Nothing
 
     exeSuffix =
-        case buildOS of
-            Windows -> ".exe"
+        case configPlatform $ getConfig config' of
+            Platform _ Windows -> ".exe"
             _ -> ""
 
 -- | Get the installation directories for Git on Windows
@@ -281,14 +282,17 @@ installLocalGHC manager config' version = do
     $logDebug $ "Attempting to install GHC " <> versionText version <>
                 " to " <> T.pack (toFilePath dest)
     let posix' oskey = posix si oskey manager version dest
-    flip runReaderT config' $ case (buildOS, buildArch) of
-        (Linux, I386) -> posix' "linux32"
-        (Linux, X86_64) -> posix' "linux64"
-        (OSX, _) -> posix' "macosx"
-        (FreeBSD, I386) -> posix' "freebsd32"
-        (FreeBSD, X86_64) -> posix' "freebsd64"
-        (Windows, _) -> windows si manager version dest (configLocalGHCs $ getConfig config')
-        (os, arch) -> throwM $ UnsupportedSetupCombo os arch
+        windows' = windows si manager version dest (configLocalGHCs $ getConfig config')
+    flip runReaderT config' $ case configPlatform $ getConfig config' of
+        Platform I386 Linux -> posix' "linux32"
+        Platform X86_64 Linux -> posix' "linux64"
+        Platform I386 OSX -> posix' "macosx"
+        Platform X86_64 OSX -> posix' "macosx"
+        Platform I386 FreeBSD -> posix' "freebsd32"
+        Platform X86_64 FreeBSD -> posix' "freebsd64"
+        Platform I386 Windows -> windows'
+        Platform X86_64 Windows -> windows'
+        Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
 data SetupException = UnsupportedSetupCombo OS Arch
                     | MissingDependencies [String]

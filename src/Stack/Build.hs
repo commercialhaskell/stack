@@ -53,7 +53,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Distribution.Package (Dependency (..))
-import           Distribution.System (OS (Windows), buildOS)
+import           Distribution.System (OS (Windows), Platform (..))
 import           Network.HTTP.Conduit (Manager)
 import           Network.HTTP.Download
 import           Path as FL
@@ -194,6 +194,7 @@ determineLocals bopts = do
         , packageConfigFlags =
                fromMaybe M.empty (M.lookup name $ bcFlags bconfig)
         , packageConfigGhcVersion = bcGhcVersion bconfig
+        , packageConfigPlatform = configPlatform (getConfig bconfig)
         }
     packageConfig name bconfig PTUser = PackageConfig
         { packageConfigEnableTests =
@@ -207,6 +208,7 @@ determineLocals bopts = do
         , packageConfigFlags =
                fromMaybe M.empty (M.lookup name $ bcFlags bconfig)
         , packageConfigGhcVersion = bcGhcVersion bconfig
+        , packageConfigPlatform = configPlatform (getConfig bconfig)
         }
 
 -- | Get the version ranges for all dependencies. This takes care of checking
@@ -397,6 +399,7 @@ installDependencies bopts deps' = do
         , packageConfigEnableBenchmarks = False
         , packageConfigFlags = flags
         , packageConfigGhcVersion = bcGhcVersion bconfig
+        , packageConfigPlatform = configPlatform (getConfig bconfig)
         }
 
 -- | Build all of the given local packages, assuming all necessary dependencies
@@ -465,11 +468,12 @@ runPlans :: (MonadIO m, MonadReader env m, HasBuildConfig env, HasLogLevel env, 
          -> Path Abs Dir
          -> m ()
 runPlans _bopts _packages plans _docLoc = do
+    config <- asks getConfig
     shakeDir <- asks configShakeFilesDir
     shakeArgs
         shakeDir
-        (case buildOS of
-             Windows ->
+        (case configPlatform config of
+             Platform _ Windows ->
                  1 -- See: https://github.com/fpco/stack/issues/84
              _ ->
                  defaultShakeThreads)

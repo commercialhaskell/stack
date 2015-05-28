@@ -30,6 +30,7 @@ import           Control.Monad                   (when, liftM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import           Control.Monad.Reader            (asks)
 import           Control.Monad.State.Strict      (State, execState, get, modify,
                                                   put)
 import           Data.Aeson                      (FromJSON (..))
@@ -195,7 +196,8 @@ addDeps ghcVersion toCalc = do
         Right res -> return res
   where
     tryAddDeps menv = do
-        idents <- sourcePackageIndex menv $$ CL.foldM go idents0
+        platform <- asks (configPlatform . getConfig)
+        idents <- sourcePackageIndex menv $$ CL.foldM (go platform) idents0
         return $ case partitionEithers $ map hoistEither $ Map.toList idents of
             ([], pairs) -> Right $ Map.fromList pairs
             (missing, _) -> Left $ Couldn'tFindInIndex $ Set.fromList missing
@@ -214,7 +216,7 @@ addDeps ghcVersion toCalc = do
             , mpiExes = exes
             })
 
-    go m ucf =
+    go platform m ucf =
         case Map.lookup ident m of
             Just (Left flags) -> do
                 gpd <- ucfParse ucf
@@ -223,6 +225,7 @@ addDeps ghcVersion toCalc = do
                         , packageConfigEnableBenchmarks = False
                         , packageConfigFlags = flags
                         , packageConfigGhcVersion = ghcVersion
+                        , packageConfigPlatform = platform
                         }
                     pd = resolvePackageDescription packageConfig gpd
                     pdeps = Map.filterWithKey
@@ -412,7 +415,7 @@ loadBuildPlan name = do
 -- @GenericPackageDescription@ to compile against the given @BuildPlan@. Will
 -- only modify non-manual flags, and will prefer default values for flags.
 -- Returns @Nothing@ if no combination exists.
-checkBuildPlan :: (MonadLogger m, MonadThrow m, MonadIO m)
+checkBuildPlan :: (MonadLogger m, MonadThrow m, MonadIO m, MonadReader env m, HasConfig env)
                => SnapName -- ^ used only for debugging purposes
                -> MiniBuildPlan
                -> Path Abs File -- ^ cabal file path, used only for debugging purposes
@@ -420,21 +423,23 @@ checkBuildPlan :: (MonadLogger m, MonadThrow m, MonadIO m)
                -> m (Maybe (Map FlagName Bool))
 checkBuildPlan name mbp cabalfp gpd = do
     $logInfo $ "Checking against build plan " <> renderSnapName name
-    loop flagOptions
+    platform <- asks (configPlatform . getConfig)
+    loop platform flagOptions
   where
-    loop [] = return Nothing
-    loop (flags:rest) = do
+    loop _ [] = return Nothing
+    loop platform (flags:rest) = do
         pkg <- resolvePackage pkgConfig cabalfp PTUser gpd
         passes <- checkDeps flags (packageDeps pkg) (mbpPackages mbp)
         if passes
             then return $ Just flags
-            else loop rest
+            else loop platform rest
       where
         pkgConfig = PackageConfig
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True
             , packageConfigFlags = flags
             , packageConfigGhcVersion = ghcVersion
+            , packageConfigPlatform = platform
             }
 
     ghcVersion = mbpGhcVersion mbp

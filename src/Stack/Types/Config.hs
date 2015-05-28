@@ -19,6 +19,7 @@ import Data.Set (Set)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Typeable
+import Distribution.System (Platform)
 import Path
 import Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
 import Stack.Types.Docker
@@ -44,6 +45,7 @@ data Config =
          ,configHideTHLoading    :: !Bool
          -- ^ Hide the Template Haskell "Loading package ..." messages from the
          -- console
+         ,configPlatform         :: !Platform
          }
 
 -- | Controls which version of the environment is used
