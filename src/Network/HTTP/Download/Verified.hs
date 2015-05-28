@@ -10,8 +10,10 @@ import qualified Data.List as List
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Conduit.Binary as CB
+import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
 
-import Control.Exception
+import Control.Exception (Exception)
 import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.IO.Class
@@ -21,7 +23,7 @@ import Crypto.Hash
 import Crypto.Hash.Conduit (sinkHash)
 import Data.ByteString (ByteString)
 import Data.Conduit
-import Data.Conduit.Binary (sinkHandle)
+import Data.Conduit.Binary (sourceHandle, sinkHandle)
 import Data.Typeable (Typeable)
 import Network.HTTP.Client.Conduit
 import Network.HTTP.Types.Header (hContentLength, hContentMD5)
@@ -53,6 +55,12 @@ data VerifiedDownloadException
   deriving (Show, Typeable)
 instance Exception VerifiedDownloadException
 
+data VerifyFileException
+    = WrongFileSize
+          Int -- expected
+          Integer -- actual (as listed by hFileSize)
+  deriving (Show, Typeable)
+instance Exception VerifyFileException
 
 -- | Make sure that the hash digest for a finite stream of bytes
 -- is as expected.
@@ -68,7 +76,6 @@ sinkCheckHash a expectedDigestString = do
     let actualDigestString = show digest
     when (actualDigestString /= expectedDigestString) $
         throwM $ WrongDigest (show a) expectedDigestString actualDigestString
-    return ()
 
 
 -- | Copied and extended version of Network.HTTP.Download.download.
@@ -91,30 +98,61 @@ sinkCheckHash a expectedDigestString = do
 verifiedDownload :: (HashAlgorithm a, Show a, MonadReader env m, HasHttpManager env, MonadIO m, MonadThrow m)
          => VerifiedRequest a
          -> Path Abs File -- ^ destination
-         -> m ()
+         -> m Bool -- ^ Whether a download was performed
 verifiedDownload VerifiedRequest{..} destpath = do
     let req = vrRequest
     env <- ask
-    liftIO $ unlessM (doesFileExist fp) $ do
+    liftIO $ whenM' getShouldDownload $ do
         createDirectoryIfMissing True dir
         withBinaryFile fptmp WriteMode $ \h ->
             flip runReaderT env $
                 withResponse req (go h)
         renameFile fptmp fp
   where
-    unlessM mp m = do
+    whenM' mp m = do
         p <- mp
-        if p then return () else m
+        if p then m >> return True else return False
 
     fp = toFilePath destpath
     fptmp = fp <.> "tmp"
     dir = toFilePath $ parent destpath
 
+    getShouldDownload = do
+        fileExists <- doesFileExist fp
+        if fileExists
+            -- only download if file does not match expectations
+            then not <$> fileMatchesExpectations
+            -- or if it doesn't exist yet
+            else return True
+
+    -- precondition: file exists
+    -- TODO: add logging
+    fileMatchesExpectations =
+        (checkExpectations >> return True)
+          `catch` \(_ :: VerifyFileException) -> return False
+          `catch` \(_ :: VerifiedDownloadException) -> return False
+      where
+        checkExpectations = bracket (openFile fp ReadMode) hClose $ \h -> do
+            fileSizeInteger <- hFileSize h
+            when (fileSizeInteger > toInteger (maxBound :: Int)) $
+              throwM $ WrongFileSize vrDownloadBytes fileSizeInteger
+            let fileSize = fromInteger fileSizeInteger
+            when (fileSize /= vrDownloadBytes) $
+              throwM $ WrongFileSize vrDownloadBytes fileSizeInteger
+            sourceHandle h $$ getZipSink sinkCheckGivenHash
+
+    sinkCheckGivenHash :: MonadThrow m => ZipSink ByteString m ()
+    sinkCheckGivenHash = ZipSink $
+      sinkCheckHash vrHashAlgorithm vrExpectedHexDigest
+
     go h res = do
         let headers = responseHeaders res
         case List.lookup hContentLength headers of
-            Just lengthBS | BC.unpack lengthBS /= show vrDownloadBytes ->
-              throwM $ WrongContentLength vrDownloadBytes lengthBS
+            Just lengthBS -> do
+              let lengthText = Text.strip $ Text.decodeUtf8 lengthBS
+                  lengthStr = Text.unpack lengthText
+              when (lengthStr /= show vrDownloadBytes) $
+                throwM $ WrongContentLength vrDownloadBytes lengthBS
             _ -> return ()
         let checkHash = (case List.lookup hContentMD5 headers of
                 Just md5BS ->
@@ -122,7 +160,7 @@ verifiedDownload VerifiedRequest{..} destpath = do
                     in ZipSink (sinkCheckHash MD5 md5ExpectedHexDigest)
                 Nothing ->
                     pure ()
-                ) *> ZipSink (sinkCheckHash vrHashAlgorithm vrExpectedHexDigest)
+                ) *> sinkCheckGivenHash
 
         responseBody res
             $= CB.isolate vrDownloadBytes
