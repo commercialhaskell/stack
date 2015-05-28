@@ -9,7 +9,6 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Path as FL
 import Prelude
-import Stack.Types.Config
 
 -- | Extensions used for Haskell files.
 haskellFileExts :: [Text]
@@ -59,10 +58,6 @@ hoogleDbExtension = "hoo"
 haddockExtension :: String
 haddockExtension = "haddock"
 
--- | User documentation directory.
-userDocsDir :: Config -> Path Abs Dir
-userDocsDir config = configStackRoot config </> $(mkRelDir "doc/")
-
 -- | Package's build artifacts directory.
 distDirFromDir :: Path Abs Dir -> Path Abs Dir
 distDirFromDir fp = fp </> distRelativeDir
@@ -70,16 +65,6 @@ distDirFromDir fp = fp </> distRelativeDir
 -- | Relative location of build artifacts.
 distRelativeDir :: Path Rel Dir
 distRelativeDir = $(mkRelDir "dist/")
-
-pkgIndexDir :: Config -> Path Abs Dir
-pkgIndexDir config =
-  configStackRoot config </>
-  $(mkRelDir "package-index")
-
-pkgIndexFile :: Config -> Path Abs File
-pkgIndexFile config =
-  pkgIndexDir config </>
-  $(mkRelFile "00-index.tar")
 
 -- | URL prefix for downloading packages
 packageDownloadPrefix :: Text

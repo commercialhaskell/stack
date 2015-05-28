@@ -7,27 +7,37 @@
 
 module Stack.Types.Config where
 
-import Control.Exception
-import Control.Monad (liftM)
-import Control.Monad.Catch (MonadThrow, throwM)
-import Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
-import Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, withText)
-import Data.Map (Map)
+import           Control.Exception
+import           Control.Monad (liftM)
+import           Control.Monad.Catch (MonadThrow, throwM)
+import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
+import           Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, withText)
+import           Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe)
-import Data.Set (Set)
-import Data.Text (Text)
+import           Data.Maybe (fromMaybe)
+import           Data.Set (Set)
+import           Data.Text (Text)
 import qualified Data.Text as T
-import Data.Typeable
-import Distribution.System (Platform)
-import Path
-import Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
-import Stack.Types.Docker
-import Stack.Types.FlagName
-import Stack.Types.PackageIdentifier
-import Stack.Types.PackageName
-import Stack.Types.Version
-import System.Process.Read (EnvOverride)
+import           Data.Typeable
+import           Data.Typeable
+import           Distribution.System (Platform)
+import           Path
+import           Path
+import           Stack.Constants
+import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
+import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
+import           Stack.Types.Docker
+import           Stack.Types.Docker
+import           Stack.Types.FlagName
+import           Stack.Types.FlagName
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageName
+import           Stack.Types.PackageName
+import           Stack.Types.Version
+import           Stack.Types.Version
+import           System.Process.Read (EnvOverride)
+import           System.Process.Read (EnvOverride)
 
 -- | The top-level Stackage configuration.
 data Config =
@@ -216,6 +226,10 @@ configProjectWorkDir :: HasBuildConfig env => env -> Path Abs Dir
 configProjectWorkDir env = bcRoot (getBuildConfig env) </> $(mkRelDir ".stack-work")
 
 -- | Path to .shake files.
+configCabalBuildDir :: HasBuildConfig env => env -> Path Abs Dir
+configCabalBuildDir env = configProjectWorkDir env </> distRelativeDir
+
+-- | Path to .shake files.
 configShakeFilesDir :: HasBuildConfig env => env -> Path Abs Dir
 configShakeFilesDir env = configProjectWorkDir env </> $(mkRelDir "shake")
 
@@ -228,6 +242,20 @@ snapshotsDir :: (MonadReader env m, HasConfig env) => m (Path Abs Dir)
 snapshotsDir = do
     config <- asks getConfig
     return $ configStackRoot config </> $(mkRelDir "snapshots")
+
+-- | User documentation directory.
+userDocsDir :: Config -> Path Abs Dir
+userDocsDir config = configStackRoot config </> $(mkRelDir "doc/")
+
+pkgIndexDir :: Config -> Path Abs Dir
+pkgIndexDir config =
+  configStackRoot config </>
+  $(mkRelDir "package-index")
+
+pkgIndexFile :: Config -> Path Abs File
+pkgIndexFile config =
+  pkgIndexDir config </>
+  $(mkRelFile "00-index.tar")
 
 -- | Installation root for dependencies
 installationRootDeps :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
