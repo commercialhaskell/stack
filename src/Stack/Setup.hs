@@ -284,8 +284,13 @@ installLocalGHC manager config' version = do
     si <- getSetupInfo manager
     $logDebug $ "Attempting to install GHC " <> versionText version <>
                 " to " <> T.pack (toFilePath dest)
+    let posix' oskey = posix si oskey manager version dest
     flip runReaderT config' $ case (buildOS, buildArch) of
-        (Linux, X86_64) -> posix si "linux64" manager version dest
+        (Linux, I386) -> posix' "linux32"
+        (Linux, X86_64) -> posix' "linux64"
+        (OSX, _) -> posix' "macosx"
+        (FreeBSD, I386) -> posix' "freebsd32"
+        (FreeBSD, X86_64) -> posix' "freebsd64"
         (Windows, _) -> windows si manager version dest (configLocalGHCs $ getConfig config')
         (os, arch) -> throwM $ UnsupportedSetupCombo os arch
 
