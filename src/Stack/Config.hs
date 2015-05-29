@@ -21,7 +21,8 @@
 -- probably default to behaving like cabal, possibly with spitting out
 -- a warning that "you should run `stk init` to make things better".
 module Stack.Config
-  ( loadConfig
+  ( getProjectConfig
+  , loadConfig
   , loadBuildConfig
   , stackDotYaml
   ) where
