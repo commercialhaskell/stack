@@ -31,6 +31,27 @@ Running `stack` will give you a list of commands, some of the most common are:
 * stack uses [LTS Haskell](https://github.com/fpco/lts-haskell) and [Stackage Nightly](https://github.com/fpco/stackage-nightly) by default to provide for robust dependency resolution
 * The [Shake build system](http://shakebuild.com/) provides the core build execution infrastructure
 
+The stack.yaml file is pretty self-explanatory, here's a real-life example from [the WAI project](https://github.com/yesodweb/wai):
+
+```yaml
+resolver: lts-2.9
+packages:
+- ./wai
+- ./wai-extra
+- ./warp
+- ./warp-tls
+- ./wai-app-static
+- ./wai-handler-fastcgi
+- ./wai-handler-launch
+- ./wai-websockets
+- ./wai-conduit
+- ./mime-types
+- ./auto-update
+extra-deps:
+- fast-logger-2.3.1
+- wai-logger-2.2.4
+```
+
 ### FAQ
 
 So that this doesn't become repetitive: for the reasons behind the answers
