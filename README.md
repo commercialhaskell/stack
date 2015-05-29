@@ -72,6 +72,11 @@ option will be required. Also, `stack setup` is a no-op when an appropriate GHC
 is already available, so it's safe to run it from an automated script, for
 example.
 
+__How do I get extra build tools?__
+
+stack will automatically install build tools required by your packages or their
+dependencies, in particular alex and happy.
+
 __How does stack choose which snapshot to use when creating a new config file?__
 
 It checks the two most recent LTS Haskell major versions and the most recent
