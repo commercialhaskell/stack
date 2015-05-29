@@ -53,6 +53,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Distribution.Package (Dependency (..))
+import           Distribution.Version (intersectVersionRanges)
 import           Network.HTTP.Conduit (Manager)
 import           Network.HTTP.Download
 import           Path as FL
@@ -88,7 +89,12 @@ build bopts = do
     locals <- determineLocals bopts
     localsWanted <- checkWanted locals bopts
     ranges <- getDependencyRanges locals
-    dependencies <- getDependencies locals ranges
+    dependencies <- getDependencies locals $
+        M.unionWith (M.unionWith intersectVersionRanges)
+            ranges
+            (case boptsTargets bopts of
+                Left _ -> M.empty
+                Right names -> M.fromList $ map (, M.empty) names)
 
     installDependencies bopts dependencies
     toRemove <- getPackagesToRemove (Set.map packageIdentifier (S.fromList locals))
@@ -101,8 +107,9 @@ checkWanted :: (MonadIO m, MonadThrow m)
 checkWanted packages bopts = do
     targets <- mapM parseTarget $
         case boptsTargets bopts of
-            [] -> ["."]
-            x -> x
+            Left [] -> ["."]
+            Left x -> x
+            Right _ -> []
     (dirs, names0) <- case partitionEithers targets of
         ([], targets') -> return $ partitionEithers targets'
         (bad, _) -> throwM $ Couldn'tParseTargets bad
