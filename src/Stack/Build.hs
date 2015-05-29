@@ -69,7 +69,6 @@ import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Types.StackT
 import           System.Directory hiding (findFiles, findExecutable)
-import qualified System.FilePath as FilePath
 import           System.IO
 import           System.IO.Temp (withSystemTempDirectory)
 import           System.Process.Read
@@ -529,21 +528,7 @@ clean =
                      exists <- doesDirectoryExist distDir
                      when exists (removeDirectoryRecursive distDir))
      shakeDir <- asks configShakeFilesDir
-     let listDir = FL.parent shakeDir
-     ls <- liftIO $
-       fmap (map (FL.toFilePath listDir ++))
-            (getDirectoryContents (FL.toFilePath listDir))
-     mapM_ (rmShakeMetadata shakeDir) ls
-  where rmShakeMetadata shakeDir p = liftIO $
-          when (isPrefixOf
-                  (FilePath.takeFileName
-                     (FL.toFilePath shakeDir ++
-                      "."))
-                  (FilePath.takeFileName p))
-               (do isDir <- doesDirectoryExist p
-                   if isDir
-                      then removeDirectoryRecursive p
-                      else removeFile p)
+     liftIO (removeDirectoryRecursive (toFilePath shakeDir))
 
 --------------------------------------------------------------------------------
 -- Shake plan
