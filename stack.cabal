@@ -1,7 +1,11 @@
 name:                stack
 version:             0.0.0
 synopsis:            The Haskell Tool Stack
-description:         The Haskell Tool Stack
+description:         Please see the README.md for usage information, and
+                     ARCHITECTURE.md for internal details.  Also, note that
+                     the API for the library is not currently stable, and may
+                     change significantly, even between minor releases. It is
+                     currently only intended for use by the executable.
 license:             BSD3
 license-file:        LICENSE
 author:              Chris Done
@@ -10,6 +14,7 @@ copyright:           2015 FP Complete
 category:            Development
 build-type:          Simple
 cabal-version:       >=1.10
+extra-source-files:  README.md ARCHITECTURE.md ChangeLog.md
 
 library
   hs-source-dirs:    src/
