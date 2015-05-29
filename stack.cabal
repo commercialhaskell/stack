@@ -96,8 +96,6 @@ library
                    , shake >= 0.15
                    , stm >= 2.4.4
                    , streaming-commons >= 0.1.10.0
-                   , system-fileio >= 0.3.16.2
-                   , system-filepath >= 0.4.13.2
                    , tar >= 0.4.1.0
                    , template-haskell
                    , temporary >= 1.2.0.3

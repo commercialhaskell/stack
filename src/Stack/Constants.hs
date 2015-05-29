@@ -13,7 +13,8 @@ module Stack.Constants
     ,builtFileFromDir
     ,configuredFileFromDir
     ,builtConfigFileFromDir
-    ,userDocsDir)
+    ,userDocsDir
+    ,projectDockerSandboxDir)
     where
 
 import Data.Text (Text)
@@ -122,3 +123,7 @@ rawGithubUrl org repo branch file = T.concat
 -- -- | Extension of haddock files
 -- haddockExtension :: String
 -- haddockExtension = "haddock"
+
+-- | Docker sandbox from project root.
+projectDockerSandboxDir :: Path Abs Dir -> Path Abs Dir
+projectDockerSandboxDir projectRoot = projectRoot </> $(mkRelDir ".docker-sandbox/")

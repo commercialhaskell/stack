@@ -6,9 +6,7 @@
 -- | Run commands in Docker containers
 module Stack.Docker
   --EKB FIXME: trim the exports, remove unused functions, clarify remaining names.
-  (resetOnHost
-  ,resetInContainer
-  ,getInContainer
+  (getInContainer
   ,runContainerAndExit
   ,runInContainerAndExit
   ,warnIfNoContainer
@@ -41,19 +39,19 @@ import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZon
 import           Data.Version (Version(..),parseVersion,showVersion)
 import           Development.Shake
 --EKB FIXME: remove dependency on system-fileio and system-filepath
-import qualified Filesystem as FS
-import           Filesystem.Path.CurrentOS ((</>))
-import qualified Filesystem.Path.CurrentOS as FP
 import           Network.HTTP.Conduit (Manager)
-import qualified Path as FL
+import           Path
+import           Path.IO (getWorkingDir)
 import           Paths_stack (version)
 import           Stack.Config (stackDotYaml,loadConfig,getProjectConfig)
+import           Stack.Constants (projectDockerSandboxDir)
 import           Stack.Types hiding (Version, parseVersion) -- FIXME don't hide this
 import           Stack.Types.StackT (runStackLoggingT)
 import           Stack.Docker.GlobalDB (updateDockerImageLastUsed,getDockerImagesLastUsed,pruneDockerImagesLastUsed)
+import           System.Directory (createDirectoryIfMissing)
 import           System.Environment (lookupEnv,unsetEnv,getProgName,getArgs)
 import           System.Exit (ExitCode(ExitSuccess,ExitFailure),exitWith)
-import           System.FilePath (takeBaseName,takeDirectory,takeFileName)
+import           System.FilePath (takeBaseName)
 import           System.IO (hPutStrLn,stderr,stdin,stdout,hIsTerminalDevice)
 import           Control.Monad.Logger (LogLevel)
 import qualified System.Process as Proc
@@ -115,19 +113,19 @@ runContainerAndExitAction :: Config
                           -> [String]
                           -> [(String,String)]
                           -> IO ()
-                          -> FP.FilePath
+                          -> Path Abs Dir
                           -> Action ()
 runContainerAndExitAction config
                           cmnd
                           args
                           envVars
                           successPostAction
-                          sandboxDirFP =
+                          projectRoot =
   do checkDockerVersion
      (Stdout uidOut) <- cmd "id -u"
      (Stdout gidOut) <- cmd "id -g"
      (dockerHost,dockerCertPath,dockerTlsVerify,isStdinTerminal,isStdoutTerminal,isStderrTerminal
-       ,pwdFP) <-
+       ,pwd) <-
        liftIO ((,,,,,,) <$>
                lookupEnv "DOCKER_HOST" <*>
                lookupEnv "DOCKER_CERT_PATH" <*>
@@ -135,7 +133,7 @@ runContainerAndExitAction config
                hIsTerminalDevice stdin <*>
                hIsTerminalDevice stdout <*>
                hIsTerminalDevice stderr <*>
-               FS.getWorkingDirectory)
+               getWorkingDir)
      when (maybe False (isPrefixOf "tcp://") dockerHost &&
            maybe False (isInfixOf "boot2docker") dockerCertPath)
           (liftIO (hPutStrLn stderr
@@ -153,14 +151,11 @@ runContainerAndExitAction config
                   Nothing -> error ("'docker inspect' failed for image after pull: " ++ image)
          | otherwise ->
              do progName <- liftIO getProgName
-                error ("The Docker image referenced by '" ++ FL.toFilePath stackDotYaml ++
+                error ("The Docker image referenced by '" ++ toFilePath stackDotYaml ++
                        "'' has not\nbeen downloaded:\n\n" ++
                        "Run '" ++ takeBaseName progName ++ " docker " ++ dockerPullCmdName ++
                        "' to download it, then try again.")
-     let pwdS = FP.encodeString pwdFP
-         sandboxDirS = FP.encodeString sandboxDirFP
-         workRootDir = FP.encodeString (FP.directory (sandboxDirFP))
-         (uid,gid) = (dropWhileEnd isSpace uidOut, dropWhileEnd isSpace gidOut)
+     let (uid,gid) = (dropWhileEnd isSpace uidOut, dropWhileEnd isSpace gidOut)
          imageEnvVars = map (break (== '=')) (icEnv (iiConfig imageInfo))
          (sandboxID,oldImage) =
            case lookupImageEnv sandboxIDEnvVar imageEnvVars of
@@ -176,33 +171,31 @@ runContainerAndExitAction config
                      (_,Just stackageDate) -> sandboxName ++ "_" ++ stackageDate
                      _ -> sandboxName ++ maybe "" ("_" ++) maybeImageCabalRemoteRepoName
                   ,True)
-         sandboxIDFP = FP.decodeString sandboxID
-         sandboxSandboxDirFP = sandboxDirFP </> FP.decodeString ".sandbox" </> sandboxIDFP
-         sandboxSandboxDirS = FP.encodeString sandboxSandboxDirFP
-         sandboxHomeDirFP = sandboxDirFP </> homeDirName
-         sandboxHomeDirS = FP.encodeString sandboxHomeDirFP
-         sandboxRepoDirFP = sandboxDirFP </> sandboxIDFP
-         sandboxRepoDirS = FP.encodeString sandboxRepoDirFP
-         sandboxSubdirsFP = map (\d -> sandboxRepoDirFP </> FP.decodeString d)
+     sandboxIDDir <- liftIO (parseRelDir (sandboxID ++ "/"))
+     let sandboxDir = projectDockerSandboxDir projectRoot
+         sandboxSandboxDir = sandboxDir </> $(mkRelDir ".sandbox/") </> sandboxIDDir
+         sandboxHomeDir = sandboxDir </> homeDirName
+         sandboxRepoDir = sandboxDir </> sandboxIDDir
+         sandboxSubdirs = map (\d -> sandboxRepoDir </> d)
                                 (sandboxedHomeSubdirectories config)
-         sandboxSubdirsS = map FP.encodeString sandboxSubdirsFP
          isTerm = isStdinTerminal && isStdoutTerminal && isStderrTerminal
          execDockerProcess =
-           do mapM_ FS.createTree ([sandboxHomeDirFP
-                                   ,sandboxSandboxDirFP] ++
-                                   sandboxSubdirsFP)
+           do mapM_ (createDirectoryIfMissing True)
+                    (concat [[toFilePath sandboxHomeDir
+                             ,toFilePath sandboxSandboxDir] ++
+                             map toFilePath sandboxSubdirs])
               execProcessAndExit "docker"
                 (concat
                   [["run"
                    ,"--net=host"
                    ,"-e","WORK_UID=" ++ uid
                    ,"-e","WORK_GID=" ++ gid
-                   ,"-e","WORK_WD=" ++ pwdS
-                   ,"-e","WORK_HOME=" ++ FP.encodeString sandboxRepoDirFP
-                   ,"-e","WORK_ROOT=" ++ workRootDir
-                   ,"-v",workRootDir ++ ":" ++ workRootDir
-                   ,"-v",sandboxSandboxDirS ++ ":" ++ sandboxDirS
-                   ,"-v",sandboxHomeDirS ++ ":" ++ sandboxRepoDirS]
+                   ,"-e","WORK_WD=" ++ toFilePath pwd
+                   ,"-e","WORK_HOME=" ++ toFilePath sandboxRepoDir
+                   ,"-e","WORK_ROOT=" ++ toFilePath projectRoot
+                   ,"-v",toFilePath projectRoot ++ ":" ++ toFilePath projectRoot
+                   ,"-v",toFilePath sandboxSandboxDir ++ ":" ++ toFilePath sandboxDir
+                   ,"-v",toFilePath sandboxHomeDir ++ ":" ++ toFilePath sandboxRepoDir]
                   ,if oldImage
                      then ["-e",sandboxIDEnvVar ++ "=" ++ sandboxID
                           ,"--entrypoint=/root/entrypoint.sh"]
@@ -220,7 +213,7 @@ runContainerAndExitAction config
                   ,case (dockerPassHost docker,dockerTlsVerify) of
                      (True,Just x )-> ["-e","DOCKER_TLS_VERIFY=" ++ x]
                      _ -> []
-                  ,concatMap sandboxSubdirArg sandboxSubdirsS
+                  ,concatMap sandboxSubdirArg sandboxSubdirs
                   ,concatMap mountArg (dockerMountDefault docker)
                   ,concatMap mountArg (dockerMountExtra docker)
                   ,case dockerContainerName docker of
@@ -242,7 +235,7 @@ runContainerAndExitAction config
                 successPostAction
      liftIO (do updateDockerImageLastUsed config
                                           (iiId imageInfo)
-                                          (FP.encodeString (FP.parent sandboxDirFP))
+                                          (toFilePath projectRoot)
                 execDockerProcess)
 
   where
@@ -255,8 +248,8 @@ runContainerAndExitAction config
     mountArg :: Mount -> [String]
     mountArg (Mount host container) = ["-v",host ++ ":" ++ container]
 
-    sandboxSubdirArg :: String -> [String]
-    sandboxSubdirArg subdir = ["-v",subdir++ ":" ++ subdir]
+    sandboxSubdirArg :: Path Abs Dir -> [String]
+    sandboxSubdirArg subdir = ["-v",toFilePath subdir++ ":" ++ toFilePath subdir]
 
     docker :: Docker
     docker = configDocker config
@@ -522,15 +515,15 @@ pull manager logLevel config =
   where docker = configDocker config
 
 -- | Run a Shake action.
-runAction :: Manager -> LogLevel -> (FP.FilePath -> Action ()) -> IO ()
+runAction :: Manager -> LogLevel -> (Path Abs Dir -> Action ()) -> IO ()
 runAction manager logLevel inner =
-  do mfp <- runStackLoggingT manager logLevel getProjectConfig
-     let sandboxDir = case mfp of
-           Just fp -> FP.decodeString (FL.toFilePath (FL.parent fp FL.</> $(FL.mkRelFile ".docker-sandbox")))
+  do mcfg <- runStackLoggingT manager logLevel getProjectConfig
+     let projectRoot = case mcfg of
+           Just cfg -> parent cfg
            Nothing -> error "Cannot determine Docker sandbox directory."
      shake shakeOptions{shakeVerbosity = Quiet
-                       ,shakeFiles = FP.encodeString (sandboxDir)}
-           (action (inner sandboxDir))
+                       ,shakeFiles = toFilePath (projectDockerSandboxDir projectRoot)}
+           (action (inner projectRoot))
 
 -- | Check docker version (throws exception if incorrect)
 checkDockerVersion :: Action ()
@@ -578,10 +571,11 @@ execProcessAndExit cmnd args successPostAction =
           successPostAction
      exitWith exitCode
 
+{- EKB FIXME: restore reset command
 -- | Perform the docker sandbox reset tasks that are performed on the host.
 resetOnHost :: Manager -> LogLevel -> Bool -> IO ()
 resetOnHost manager logLevel keepHome =
-  runAction manager logLevel (\sandboxDir -> liftIO (removeDirectoryContents sandboxDir [homeDirName | keepHome]))
+  runAction manager logLevel (\projectRoot -> liftIO (removeDirectoryContents sandboxDir [homeDirName | keepHome]))
 
 -- | Perform the Docker sandbox reset tasks that are performed from within a container.
 resetInContainer :: Config -> IO ()
@@ -596,10 +590,27 @@ resetInContainer config =
                         " from home directory since running with Docker disabled.")
   where
     removeSubdir home d =
-      removeDirectoryContents (home </> FP.decodeString d)
-                              (if d == ".cabal" then [FP.decodeString "config"
-                                                     ,FP.decodeString "packages"]
-                                                else [])
+      removeDirectoryContents (home </> d)
+                              (if d == $(mkRelDir ".cabal/") then [$(mkRelFile "config")
+                                                                  ,$(mkRelDir "packages")]
+                                                             else [])
+
+-- | Remove the contents of a directory, without removing the directory itself.
+-- This is used instead of 'FS.removeTree' to clear bind-mounted directories, since
+-- removing the root of the bind-mount won't work.
+removeDirectoryContents :: Path Abs Dir -- ^ Directory to remove contents of
+                        -> [FP.FilePath] -- ^ Directory names to exclude from removal
+                        -> IO ()
+removeDirectoryContents path exclude =
+  do isRootDir <- FS.isDirectory path
+     when isRootDir
+          (do ls <- FS.listDirectory path
+              forM_ ls (\l -> unless (FP.filename l `elem` exclude)
+                                     (do isDir <- FS.isDirectory l
+                                         if isDir
+                                           then FS.removeTree l
+                                           else FS.removeFile l)))
+--}
 
 -- | Display a warning to the user if running without Docker enabled.
 warnIfNoContainer :: String -> IO ()
@@ -620,35 +631,19 @@ warnNoContainer cmdName =
                        "' even though Docker is disabled.")
 
 -- | Subdirectories of the home directory to sandbox between GHC/Stackage versions.
-sandboxedHomeSubdirectories :: Config -> [FilePath]
+sandboxedHomeSubdirectories :: Config -> [Path Rel Dir]
 sandboxedHomeSubdirectories config =
-  [".ghc"
-  ,".cabal"
-  ,".ghcjs"
+  [$(mkRelDir ".ghc/")
+  ,$(mkRelDir ".cabal/")
+  ,$(mkRelDir ".ghcjs/")
    --EKB FIXME: this isn't going to work with reading a user config file from
    -- outside the Docker sandbox.
    --EKB FIXME: this probably shouldn't be per-image.
-  ,takeFileName (takeDirectory (FL.toFilePath (configStackRoot config)))]
+  ,dirname (configStackRoot config)]
 
 -- | Name of home directory within @.docker-sandbox@.
-homeDirName :: FP.FilePath
-homeDirName = FP.decodeString ".home"
-
--- | Remove the contents of a directory, without removing the directory itself.
--- This is used instead of 'FS.removeTree' to clear bind-mounted directories, since
--- removing the root of the bind-mount won't work.
-removeDirectoryContents :: FP.FilePath -- ^ Directory to remove contents of
-                        -> [FP.FilePath] -- ^ Directory names to exclude from removal
-                        -> IO ()
-removeDirectoryContents path exclude =
-  do isRootDir <- FS.isDirectory path
-     when isRootDir
-          (do ls <- FS.listDirectory path
-              forM_ ls (\l -> unless (FP.filename l `elem` exclude)
-                                     (do isDir <- FS.isDirectory l
-                                         if isDir
-                                           then FS.removeTree l
-                                           else FS.removeFile l)))
+homeDirName :: Path Rel Dir
+homeDirName = $(mkRelDir ".home/")
 
 -- | Check host 'stack' version
 checkHostStackageDockerVersion :: Version -> IO ()
@@ -690,7 +685,7 @@ checkVersions =
                           " is required; you have " ++
                           showVersion version ++
                           ".\nPlease update your '" ++
-                          FL.toFilePath stackDotYaml ++
+                          toFilePath stackDotYaml ++
                           "' to use a newer image.")
                | otherwise -> return ()
              _ -> return ())
