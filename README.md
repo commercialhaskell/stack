@@ -29,6 +29,7 @@ Running `stack` will give you a list of commands, some of the most common are:
 * Every *project* contains a `stack.yaml` configuration file, which `stack build` will autogenerate for you
 * A project can have multiple *packages* if desired
 * stack uses [LTS Haskell](https://github.com/fpco/lts-haskell) and [Stackage Nightly](https://github.com/fpco/stackage-nightly) by default to provide for robust dependency resolution
+* The [Shake build system](http://shakebuild.com/) provides the core build execution infrastructure
 
 ### FAQ
 
