@@ -207,7 +207,7 @@ buildCmd finalAction opts logLevel =
               display range <>
               "), but " <>
               versionString version <>
-              " is provided locally"
+              " is provided by your snapshot"
             StackageDepVerMismatch name ver range ->
               ("The package '" <> packageNameString name <>
                "' in this Stackage snapshot is " <> versionString ver <>
