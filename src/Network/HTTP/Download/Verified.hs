@@ -13,7 +13,6 @@ import qualified Data.Conduit.Binary as CB
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 
-import Control.Exception (Exception)
 import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.IO.Class
