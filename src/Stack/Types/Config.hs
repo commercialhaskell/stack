@@ -204,40 +204,49 @@ askPackageIndexHttpUrl :: (MonadReader env m, HasUrls env) => m Text
 askPackageIndexHttpUrl = askUrl "package-index-http-url" "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"
 
 -- | Location of the 00-index.cache file
-configPackageIndexCache :: Config -> Path Abs File
-configPackageIndexCache config = configStackRoot config </> $(mkRelFile "00-index.cache")
+configPackageIndexCache :: (MonadReader env m, HasConfig env) => m (Path Abs File)
+configPackageIndexCache = do
+    config <- asks getConfig
+    return (configStackRoot config </> $(mkRelFile "00-index.cache"))
 
 -- | Location of the 00-index.tar file
-configPackageIndex :: Config -> Path Abs File
-configPackageIndex config = configStackRoot config </> $(mkRelFile "00-index.tar")
+configPackageIndex :: (MonadReader env m, HasConfig env) => m (Path Abs File)
+configPackageIndex = do
+    config <- asks getConfig
+    return (configStackRoot config </> $(mkRelFile "00-index.tar"))
 
 -- | Location of the 00-index.tar.gz file
-configPackageIndexGz :: Config -> Path Abs File
-configPackageIndexGz config = configStackRoot config </> $(mkRelFile "00-index.tar.gz")
+configPackageIndexGz :: (MonadReader env m, HasConfig env) => m (Path Abs File)
+configPackageIndexGz = do
+    config <- asks getConfig
+    return (configStackRoot config </> $(mkRelFile "00-index.tar.gz"))
 
 -- | Location of a package tarball
-configPackageTarball :: MonadThrow m => Config -> PackageIdentifier -> m (Path Abs File)
-configPackageTarball config ident = do
+configPackageTarball :: (MonadReader env m, HasConfig env, MonadThrow m) => PackageIdentifier -> m (Path Abs File)
+configPackageTarball ident = do
+    config <- asks getConfig
     name <- parseRelDir $ packageNameString $ packageIdentifierName ident
     ver <- parseRelDir $ versionString $ packageIdentifierVersion ident
     base <- parseRelFile $ packageIdentifierString ident ++ ".tar.gz"
     return $ configStackRoot config </> $(mkRelDir "packages") </> name </> ver </> base
 
 -- | Per-project work dir
-configProjectWorkDir :: HasBuildConfig env => env -> Path Abs Dir
-configProjectWorkDir env = bcRoot (getBuildConfig env) </> $(mkRelDir ".stack-work")
+configProjectWorkDir :: (HasBuildConfig env, MonadReader env m) => m (Path Abs Dir)
+configProjectWorkDir = do
+    bc <- asks getBuildConfig
+    return (bcRoot bc </> $(mkRelDir ".stack-work"))
 
 -- | Relative directory for the platform identifier
 platformRelDir :: (MonadReader env m, HasPlatform env, MonadThrow m) => m (Path Rel Dir)
 platformRelDir = asks getPlatform >>= parseRelDir . Distribution.Text.display
 
 -- | Path to .shake files.
-configShakeFilesDir :: HasBuildConfig env => env -> Path Abs Dir
-configShakeFilesDir env = configProjectWorkDir env </> $(mkRelDir "shake")
+configShakeFilesDir :: (MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
+configShakeFilesDir = liftM (</> $(mkRelDir "shake")) configProjectWorkDir
 
 -- | Where to unpack packages for local build
-configLocalUnpackDir :: HasBuildConfig env => env -> Path Abs Dir
-configLocalUnpackDir env = configProjectWorkDir env </> $(mkRelDir "unpacked")
+configLocalUnpackDir :: (MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
+configLocalUnpackDir = liftM (</> $(mkRelDir "unpacked")) configProjectWorkDir
 
 -- | Directory containing snapshots
 snapshotsDir :: (MonadReader env m, HasConfig env, MonadThrow m) => m (Path Abs Dir)

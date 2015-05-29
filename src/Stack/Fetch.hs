@@ -19,7 +19,7 @@ module Stack.Fetch
 import           Control.Monad.IO.Class
 import           Control.Monad (forM, liftM)
 import           Control.Monad.Logger
-import           Control.Monad.Reader (asks)
+import           Control.Monad.Reader (asks, runReaderT)
 import           Data.Monoid ((<>))
 import           Stack.Types
 import           Stack.PackageIndex (findNewestVersions)
@@ -235,10 +235,10 @@ fetchPackages menv pkgs = do
    env <- ask
    let man = getHttpManager env
        config = getConfig env
-       indexFP = toFilePath $ configPackageIndex config
+   indexFP <- liftM toFilePath configPackageIndex
    requireIndex menv
    outputVar <- liftIO (newTVarIO [])
-   let packageLocation = configPackageTarball config
+   let packageLocation = flip runReaderT config . configPackageTarball
 
    let getPackageInfo' = getPackageInfo indexFP
                        $ Set.fromList
