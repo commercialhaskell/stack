@@ -528,7 +528,9 @@ clean =
                      exists <- doesDirectoryExist distDir
                      when exists (removeDirectoryRecursive distDir))
      shakeDir <- asks configShakeFilesDir
-     liftIO (removeDirectoryRecursive (toFilePath shakeDir))
+     liftIO (do exists <- doesDirectoryExist (toFilePath shakeDir)
+                when exists
+                     (removeDirectoryRecursive (toFilePath shakeDir)))
 
 --------------------------------------------------------------------------------
 -- Shake plan
