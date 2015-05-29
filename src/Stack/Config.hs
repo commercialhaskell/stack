@@ -21,9 +21,7 @@
 -- probably default to behaving like cabal, possibly with spitting out
 -- a warning that "you should run `stk init` to make things better".
 module Stack.Config
-  ( getProjectConfig
-  , loadConfig
-  , loadBuildConfig
+  ( loadConfig
   , stackDotYaml
   ) where
 
@@ -268,20 +266,8 @@ instance HasPlatform MiniConfig
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.
 loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env)
-           => m Config
+           => m (LoadConfig m)
 loadConfig = do
-    stackRoot <- determineStackRoot
-    extraConfigs <- getExtraConfigs stackRoot
-    mproject <- getProjectConfig
-    let fps = maybe id (:) mproject extraConfigs
-    configs <- mapM loadConfigMonoid fps
-    configFromConfigMonoid stackRoot $ mconcat configs
-
--- | Load the configuration, like in @loadConfig@, but gets project-specific
--- values.
-loadBuildConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env)
-                => m BuildConfig
-loadBuildConfig = do
     stackRoot <- determineStackRoot
     extraConfigs <- getExtraConfigs stackRoot >>= mapM loadConfigMonoid
     mproject <- loadProjectConfig
@@ -289,7 +275,19 @@ loadBuildConfig = do
         case mproject of
             Nothing -> extraConfigs
             Just (_, _, config) -> config : extraConfigs
+    return $ LoadConfig
+        { lcConfig          = config
+        , lcLoadBuildConfig = loadBuildConfig mproject config
+        , lcProjectRoot     = maybe Nothing (\(_, fp, _) -> Just (parent fp)) mproject
+        }
 
+-- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
+-- values.
+loadBuildConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env)
+                => Maybe (Project, Path Abs File, ConfigMonoid)
+                -> Config
+                -> m BuildConfig
+loadBuildConfig mproject config = do
     env <- ask
     let miniConfig = MiniConfig (getHttpManager env) config
     (project, stackYamlFP) <- case mproject of
@@ -364,7 +362,7 @@ getExtraConfigs stackRoot = liftIO $ do
         : maybe [] return (mstackGlobalConfig <|> defaultStackGlobalConfig)
 
 -- | Load the value of a 'ConfigMonoid' from the given file.
-loadConfigMonoid :: MonadIO m => Path Abs File -> m ConfigMonoid
+loadConfigMonoid :: (FromJSON a,MonadIO m) => Path Abs File -> m a
 loadConfigMonoid path =
     liftIO $ Yaml.decodeFileEither (toFilePath path)
          >>= either throwM return
@@ -409,14 +407,10 @@ loadProjectConfig = do
             $logDebug $ "Loading project config file " <>
                         T.pack (maybe (toFilePath fp) toFilePath (stripDir currDir fp))
             load fp
-        Nothing -> do
-            $logInfo $ "No project config file found, using defaults"
-            return Nothing
+        Nothing -> return Nothing
   where
     load fp = do
-        ProjectAndConfigMonoid project config <-
-            liftIO (Yaml.decodeFileEither (toFilePath fp))
-               >>= either throwM return
+        ProjectAndConfigMonoid project config <- loadConfigMonoid fp
         return $ Just (project, fp, config)
 
 -- | The filename used for the stack config file.

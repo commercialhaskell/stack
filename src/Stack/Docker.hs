@@ -38,22 +38,18 @@ import qualified Data.Text as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
 import           Data.Version (Version(..),parseVersion,showVersion)
 import           Development.Shake
---EKB FIXME: remove dependency on system-fileio and system-filepath
-import           Network.HTTP.Conduit (Manager)
 import           Path
 import           Path.IO (getWorkingDir)
 import           Paths_stack (version)
-import           Stack.Config (stackDotYaml,loadConfig,getProjectConfig)
+import           Stack.Config (stackDotYaml)
 import           Stack.Constants (projectDockerSandboxDir)
 import           Stack.Types hiding (Version, parseVersion) -- FIXME don't hide this
-import           Stack.Types.StackT (runStackLoggingT)
 import           Stack.Docker.GlobalDB (updateDockerImageLastUsed,getDockerImagesLastUsed,pruneDockerImagesLastUsed)
 import           System.Directory (createDirectoryIfMissing)
 import           System.Environment (lookupEnv,unsetEnv,getProgName,getArgs)
 import           System.Exit (ExitCode(ExitSuccess,ExitFailure),exitWith)
 import           System.FilePath (takeBaseName)
 import           System.IO (hPutStrLn,stderr,stdin,stdout,hIsTerminalDevice)
-import           Control.Monad.Logger (LogLevel)
 import qualified System.Process as Proc
 import           System.Process.PagerEditor (editByteString)
 import           Text.ParserCombinators.ReadP (readP_to_S)
@@ -65,27 +61,22 @@ import           System.Posix.Signals (installHandler,sigTERM,Handler(Catch))
 
 -- | If Docker is enabled, re-runs the currently running OS command in a Docker container.
 -- Otherwise, runs the inner action.
-rerunWithOptionalContainer :: Manager -> LogLevel -> (Config -> IO ()) -> IO ()
-rerunWithOptionalContainer manager logLevel inner =
-  rerunCmdWithOptionalContainer manager
-                                logLevel
+rerunWithOptionalContainer :: Config -> Maybe (Path Abs Dir) -> IO () -> IO ()
+rerunWithOptionalContainer config mprojectRoot inner =
+  rerunCmdWithOptionalContainer config
+                                mprojectRoot
                                 ((,) <$> (takeBaseName <$> getProgName) <*> getArgs)
                                 inner
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
 -- Docker container.  Otherwise, runs the inner action.
-rerunCmdWithOptionalContainer :: Manager
-                              -> LogLevel
-                              -> IO (FilePath, [String])
-                              -> (Config -> IO ())
-                              -> IO ()
-rerunCmdWithOptionalContainer manager logLevel getCmdArgs inner =
+rerunCmdWithOptionalContainer :: Config -> Maybe (Path Abs Dir) -> IO (FilePath, [String]) -> IO () -> IO ()
+rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs inner =
   do inContainer <- getInContainer
-     config <- runStackLoggingT manager logLevel loadConfig
      if inContainer || not (dockerEnable (configDocker config))
-        then inner config
+        then inner
         else do (cmd_,args) <- getCmdArgs
-                runContainerAndExit manager logLevel config cmd_ args [] (return ())
+                runContainerAndExit config mprojectRoot cmd_ args [] (return ())
 
 -- | 'True' if we are currently running inside a Docker container.
 getInContainer :: IO Bool
@@ -96,16 +87,15 @@ getInContainer =
        Just _ -> return True
 
 -- | Run a command in a new Docker container, then exit the process.
-runContainerAndExit :: Manager
-                    -> LogLevel
-                    -> Config
+runContainerAndExit :: Config
+                    -> Maybe (Path Abs Dir)
                     -> FilePath
                     -> [String]
                     -> [(String,String)]
                     -> IO ()
                     -> IO ()
-runContainerAndExit manager logLevel config cmnd args envVars successPostAction =
-  runAction manager logLevel (runContainerAndExitAction config cmnd args envVars successPostAction)
+runContainerAndExit config mprojectRoot cmnd args envVars successPostAction =
+  runAction mprojectRoot (runContainerAndExitAction config cmnd args envVars successPostAction)
 
 -- | Shake action to run a command in a new Docker container.
 runContainerAndExitAction :: Config
@@ -255,9 +245,9 @@ runContainerAndExitAction config
     docker = configDocker config
 
 -- | Clean-up old docker images and containers.
-cleanup :: Manager -> LogLevel -> Config -> Cleanup -> IO ()
-cleanup manager logLevel config opts =
-  runAction manager logLevel (\_ -> cleanupAction config opts)
+cleanup :: Config -> Maybe (Path Abs Dir) -> Cleanup -> IO ()
+cleanup config projectRoot opts =
+  runAction projectRoot (\_ -> cleanupAction config opts)
 
 -- | Cleanup action
 cleanupAction :: Config -> Cleanup -> Action ()
@@ -506,22 +496,21 @@ pullImage docker image =
              Proc.callProcess "docker" ["pull", image])
 
 -- | Pull latest version of configured Docker image from registry.
-pull :: Manager -> LogLevel -> Config -> IO ()
-pull manager logLevel config =
-  runAction manager
-            logLevel
+pull :: Config -> Maybe (Path Abs Dir) -> IO ()
+pull config mprojectRoot =
+  runAction mprojectRoot
             (\_ -> do checkDockerVersion
                       pullImage docker (dockerImageName docker))
   where docker = configDocker config
 
 -- | Run a Shake action.
-runAction :: Manager -> LogLevel -> (Path Abs Dir -> Action ()) -> IO ()
-runAction manager logLevel inner =
-  do mcfg <- runStackLoggingT manager logLevel getProjectConfig
-     let projectRoot = case mcfg of
-           Just cfg -> parent cfg
-           Nothing -> error "Cannot determine Docker sandbox directory."
-     shake shakeOptions{shakeVerbosity = Quiet
+runAction :: Maybe (Path Abs Dir) -> (Path Abs Dir -> Action ()) -> IO ()
+runAction maybeProjectRoot inner =
+  let projectRoot =
+        case maybeProjectRoot of
+          Just r -> r
+          Nothing -> error "Cannot determine project root directory for Docker sandbox."
+  in shake shakeOptions{shakeVerbosity = Quiet
                        ,shakeFiles = toFilePath (projectDockerSandboxDir projectRoot)}
            (action (inner projectRoot))
 

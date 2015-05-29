@@ -82,6 +82,17 @@ data BuildConfig = BuildConfig
       -- ^ Per-package flag overrides
     }
 
+-- | Value returned by 'Stack.Config.loadConfig'.
+data LoadConfig m = LoadConfig
+    { lcConfig          :: !Config
+      -- ^ Top-level Stack configuration.
+    , lcLoadBuildConfig :: !(m BuildConfig)
+        -- ^ Action to load the remaining 'BuildConfig'.  This action will create a project if one
+        -- does not already exist.
+    , lcProjectRoot     :: !(Maybe (Path Abs Dir))
+        -- ^ The project root directory, if in a project.
+    }
+
 -- | How we resolve which dependencies to install given a set of packages.
 data Resolver
   = ResolverSnapshot SnapName
