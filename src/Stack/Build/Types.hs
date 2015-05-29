@@ -42,7 +42,9 @@ instance Exception StackBuildException
 
 -- | Configuration for building.
 data BuildOpts =
-  BuildOpts {boptsTargets :: ![Text]
+  BuildOpts {boptsTargets :: !(Either [Text] [PackageName])
+             -- ^ Right value indicates that we're only installing
+             -- dependencies, no local packages
             ,boptsLibProfile :: !Bool
             ,boptsExeProfile :: !Bool
             ,boptsEnableOptimizations :: !(Maybe Bool)

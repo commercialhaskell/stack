@@ -16,6 +16,7 @@ import qualified Data.Text as T
 import           Distribution.Text (display)
 import           Options.Applicative.Extra
 import           Options.Applicative.Simple
+import           Options.Applicative.Types (readerAsk)
 import           Path (toFilePath)
 import           Stack.Build
 import           Stack.Build.Types
@@ -98,7 +99,15 @@ main =
              addCommand "clean"
                         "Clean the local packages"
                         cleanCmd
-                        (pure ()))
+                        (pure ())
+             addCommand "deps"
+                        "Install dependencies"
+                        depsCmd
+                        ((,)
+                            <$> (some (argument readPackageName
+                                        (metavar "[PACKAGES]")))
+                            <*> fmap (fromMaybe False)
+                               (maybeBoolFlags "dry-run" "Don't build anything, just prepare to")))
      run level
 
 setupCmd :: LogLevel -> IO ()
@@ -118,6 +127,31 @@ cleanCmd _ logLevel = do
     logLevel
     (\_ -> do config <- runStackLoggingT manager logLevel (loadBuildConfig >>= setupEnv False manager)
               runStackT manager logLevel config clean)
+
+-- | Install dependencies
+depsCmd :: ([PackageName], Bool) -> LogLevel -> IO ()
+depsCmd (names, dryRun) logLevel = do
+    manager <- newTLSManager
+    Docker.rerunWithOptionalContainer manager logLevel $ \_ -> do
+        config <- runStackLoggingT manager logLevel
+            (loadBuildConfig >>= setupEnv False manager)
+        runStackT manager logLevel config $ Stack.Build.build BuildOpts
+            { boptsTargets = Right names
+            , boptsLibProfile = False
+            , boptsExeProfile = False
+            , boptsEnableOptimizations = Nothing
+            , boptsFinalAction = DoNothing
+            , boptsDryrun = dryRun
+            , boptsGhcOptions = []
+            }
+
+-- | Parser for package names
+readPackageName :: ReadM PackageName
+readPackageName = do
+    s <- readerAsk
+    case parsePackageNameFromString s of
+        Nothing -> readerError $ "Invalid package name: " ++ s
+        Just x -> return x
 
 -- | Build the project.
 buildCmd :: FinalAction -> BuildOpts -> LogLevel -> IO ()
@@ -253,7 +287,7 @@ buildOpts = BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies"
         target =
-          fmap (map T.pack)
+          fmap (Left . map T.pack)
                (many (strArgument
                         (metavar "TARGET" <>
                          help "If none specified, use all packages defined in current directory")))

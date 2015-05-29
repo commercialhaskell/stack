@@ -78,9 +78,10 @@ data ConfigMonoid =
 -- | Get the default resolver value
 getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env, HasUrls env, HasHttpManager env, MonadLogger m)
                    => Path Abs Dir
-                   -> m (Resolver, Map PackageName (Map FlagName Bool))
+                   -> m (Resolver, Map PackageName (Map FlagName Bool), Bool)
 getDefaultResolver dir = do
     ecabalfp <- try $ getCabalFileName dir
+    let cabalFileExists = either (const False) (const True) ecabalfp
     msnap <- case ecabalfp of
         Left e -> do
             $logWarn $ T.pack $ show (e :: PackageException)
@@ -95,13 +96,13 @@ getDefaultResolver dir = do
             return $ fmap (, name) mpair
     case msnap of
         Just ((snap, flags), name) ->
-            return (ResolverSnapshot snap, Map.singleton name flags)
+            return (ResolverSnapshot snap, Map.singleton name flags, cabalFileExists)
         Nothing -> do
             s <- getSnapshots
             let snap = case IntMap.maxViewWithKey (snapshotsLts s) of
                     Just ((x, y), _) -> LTS x y
                     Nothing -> Nightly $ snapshotsNightly s
-            return (ResolverSnapshot snap, Map.empty)
+            return (ResolverSnapshot snap, Map.empty, cabalFileExists)
 
 -- | Dummy type to support this monoid business.
 newtype DockerOpts = DockerOpts Docker
@@ -295,14 +296,17 @@ loadBuildConfig = do
         Just (project, fp, _) -> return (project, fp)
         Nothing -> do
             currDir <- getWorkingDir
-            (r, flags) <- runReaderT (getDefaultResolver currDir) miniConfig
+            (r, flags, cabalFileExists) <- runReaderT (getDefaultResolver currDir) miniConfig
             let dest = currDir </> stackDotYaml
                 dest' = toFilePath dest
             exists <- liftIO $ doesFileExist dest'
             when exists $ error "Invariant violated: in toBuildConfig's Nothing branch, and the stack.yaml file exists"
             $logInfo $ "Writing default config file to: " <> T.pack dest'
             let p = Project
-                    { projectPackages = ["."]
+                    { projectPackages =
+                        if cabalFileExists
+                            then []
+                            else ["."]
                     , projectExtraDeps = Map.empty
                     , projectFlags = flags
                     , projectResolver = r
