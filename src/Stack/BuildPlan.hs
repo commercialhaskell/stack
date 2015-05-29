@@ -25,7 +25,7 @@ module Stack.BuildPlan
 import           Control.Applicative             ((<$>), (<*>))
 import           Control.Arrow                   ((&&&))
 import           Control.Exception.Enclosed      (tryIO, handleIO)
-import           Control.Monad                   (when, liftM)
+import           Control.Monad                   (liftM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -54,6 +54,7 @@ import qualified Data.Set                        as Set
 import           Data.Text                       (Text)
 import qualified Data.Text                       as T
 import           Data.Time                       (Day)
+import qualified Data.Traversable                as Tr
 import           Data.Typeable                   (Typeable)
 import           Data.Yaml                       (decodeFileEither)
 import           Distribution.PackageDescription (GenericPackageDescription,
@@ -100,10 +101,12 @@ instance Show BuildPlanException where
         shadowed' :: [String]
         shadowed'
             | Map.null shadowed = []
-            | otherwise =
-              "The following packages are shadowed by local packages."
-            : "Recommended action: add their dependencies to your extra-deps"
-            : map go (Map.toList shadowed)
+            | otherwise = concat
+                [ ["The following packages are shadowed by local packages:"]
+                , map go (Map.toList shadowed)
+                , ["Recommended action: add the following your extra-deps:"]
+                , extraDeps
+                ]
           where
             go (dep, users) | Set.null users = concat
                 [ packageNameString dep
@@ -112,9 +115,16 @@ instance Show BuildPlanException where
             go (dep, users) = concat
                 [ packageNameString dep
                 , " (used by "
-                , intercalate ", " $ map packageIdentifierString $ Set.toList users
+                , intercalate ", "
+                    $ map (packageNameString . packageIdentifierName)
+                    $ Set.toList users
                 , ")"
                 ]
+
+            extraDeps = map (\ident -> "- " ++ packageIdentifierString ident)
+                      $ Set.toList
+                      $ Set.unions
+                      $ Map.elems shadowed
 
     show (Couldn'tFindInIndex idents) =
         "Couldn't find the following packages in the index: " ++
@@ -140,7 +150,7 @@ resolveBuildPlan mbp isShadowed packages
     rs = getDeps mbp isShadowed packages
 
 data ResolveState = ResolveState
-    { rsVisited   :: Set PackageName
+    { rsVisited   :: Map PackageName (Set PackageName) -- ^ set of shadowed dependencies
     , rsUnknown   :: Map PackageName (Set PackageName)
     , rsShadowed  :: Map PackageName (Set PackageIdentifier)
     , rsToInstall :: Map PackageName (Version, Map FlagName Bool)
@@ -267,7 +277,7 @@ getDeps :: MiniBuildPlan
         -> ResolveState
 getDeps mbp isShadowed packages =
     execState (mapM_ (uncurry goName) $ Map.toList packages) ResolveState
-        { rsVisited = Set.empty
+        { rsVisited = Map.empty
         , rsUnknown = Map.empty
         , rsShadowed = Map.empty
         , rsToInstall = Map.empty
@@ -276,7 +286,8 @@ getDeps mbp isShadowed packages =
   where
     toolMap = getToolMap mbp
 
-    goName :: PackageName -> Set PackageName -> State ResolveState ()
+    -- | Returns a set of shadowed packages we depend on.
+    goName :: PackageName -> Set PackageName -> State ResolveState (Set PackageName)
     goName name users = do
         -- Even though we could check rsVisited first and short-circuit things
         -- earlier, lookup in mbpPackages first so that we can produce more
@@ -286,26 +297,41 @@ getDeps mbp isShadowed packages =
             { rsUsedBy = Map.insertWith Set.union name users $ rsUsedBy rs
             }
         case Map.lookup name $ mbpPackages mbp of
-            Nothing -> modify $ \rs' -> rs'
-                { rsUnknown = Map.insertWith Set.union name users $ rsUnknown rs'
-                }
-            Just mpi -> when (name `Set.notMember` rsVisited rs) $ do
-                put rs { rsVisited = Set.insert name $ rsVisited rs }
+            Nothing -> do
+                modify $ \rs' -> rs'
+                    { rsUnknown = Map.insertWith Set.union name users $ rsUnknown rs'
+                    }
+                return Set.empty
+            Just mpi -> case Map.lookup name (rsVisited rs) of
+              Just shadowed -> return shadowed
+              Nothing -> do
+                put rs { rsVisited = Map.insert name Set.empty $ rsVisited rs }
                 let depsForTools = Set.unions $ mapMaybe (flip Map.lookup toolMap) (Set.toList $ mpiToolDeps mpi)
                 let deps = Set.filter (/= name) (mpiPackageDeps mpi <> depsForTools)
-                F.forM_ deps $ \dep ->
+                shadowed <- fmap F.fold $ Tr.forM (Set.toList deps) $ \dep ->
                     if isShadowed dep
-                        then modify $ \rs' -> rs'
-                            { rsShadowed = Map.insertWith
-                                Set.union
-                                dep
-                                (Set.singleton $ PackageIdentifier name (mpiVersion mpi))
-                                (rsShadowed rs')
-                            }
-                        else goName dep (Set.singleton name)
+                        then do
+                            modify $ \rs' -> rs'
+                                { rsShadowed = Map.insertWith
+                                    Set.union
+                                    dep
+                                    (Set.singleton $ PackageIdentifier name (mpiVersion mpi))
+                                    (rsShadowed rs')
+                                }
+                            return $ Set.singleton dep
+                        else do
+                            shadowed <- goName dep (Set.singleton name)
+                            let m = Map.fromList $ map (\x -> (x, Set.singleton $ PackageIdentifier name (mpiVersion mpi)))
+                                        $ Set.toList shadowed
+                            modify $ \rs' -> rs'
+                                { rsShadowed = Map.unionWith Set.union m $ rsShadowed rs'
+                                }
+                            return shadowed
                 modify $ \rs' -> rs'
                     { rsToInstall = Map.insert name (mpiVersion mpi, mpiFlags mpi) $ rsToInstall rs'
+                    , rsVisited = Map.insert name shadowed $ rsVisited rs'
                     }
+                return shadowed
 
 -- | Look up with packages provide which tools.
 type ToolMap = Map ByteString (Set PackageName)
