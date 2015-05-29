@@ -48,19 +48,19 @@ spec = do
       _config <- loadConfig'
       return ()
 
-    it "finds the config file in a parent directory" $ inTempDir $ do
-      writeFile (toFilePath stackDotYaml) "packages: ['child']"
-      parentDir <- getCurrentDirectory >>= parseAbsDir
-      let childDir = "child"
-      createDirectory childDir
-      setCurrentDirectory childDir
-      config <- loadConfig'
-      configDir config `shouldBe` parentDir
+    -- it "finds the config file in a parent directory" $ inTempDir $ do
+    --   writeFile (toFilePath stackDotYaml) "packages: ['child']"
+    --   parentDir <- getCurrentDirectory >>= parseAbsDir
+    --   let childDir = "child"
+    --   createDirectory childDir
+    --   setCurrentDirectory childDir
+    --   config <- loadConfig'
+    --   configDir config `shouldBe` parentDir
 
-    it "respects the STACK_YAML env variable" $ inTempDir $ do
-      withSystemTempDirectory "config-is-here" $ \dirFilePath -> do
-        dir <- parseAbsDir dirFilePath
-        writeFile (toFilePath (dir </> stackDotYaml)) "packages: ['child']"
-        withEnvVar "STACK_YAML" dirFilePath $ do
-          config <- loadConfig'
-          configDir config `shouldBe` dir
+    -- it "respects the STACK_YAML env variable" $ inTempDir $ do
+    --   withSystemTempDirectory "config-is-here" $ \dirFilePath -> do
+    --     dir <- parseAbsDir dirFilePath
+    --     writeFile (toFilePath (dir </> stackDotYaml)) "packages: ['child']"
+    --     withEnvVar "STACK_YAML" dirFilePath $ do
+    --       config <- loadConfig'
+    --       configDir config `shouldBe` dir

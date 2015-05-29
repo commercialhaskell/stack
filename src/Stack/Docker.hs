@@ -1,4 +1,7 @@
-{-# LANGUAGE CPP, NamedFieldPuns, TupleSections, RankNTypes #-}
+{-# LANGUAGE CPP, NamedFieldPuns, RankNTypes, TemplateHaskell, TupleSections #-}
+
+--EKB FIXME: get this all using proper logging infrastructure
+--EKB FIXME: throw exceptions instead of using `error`
 
 -- | Run commands in Docker containers
 module Stack.Docker
@@ -37,18 +40,22 @@ import qualified Data.Text as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
 import           Data.Version (Version(..),parseVersion,showVersion)
 import           Development.Shake
+--EKB FIXME: remove dependency on system-fileio and system-filepath
 import qualified Filesystem as FS
 import           Filesystem.Path.CurrentOS ((</>))
 import qualified Filesystem.Path.CurrentOS as FP
+import           Network.HTTP.Conduit (Manager)
 import qualified Path as FL
 import           Paths_stack (version)
-import           Stack.Config (stackDotYaml)
+import           Stack.Config (stackDotYaml,loadConfig,getProjectConfig)
 import           Stack.Types hiding (Version, parseVersion) -- FIXME don't hide this
+import           Stack.Types.StackT (runStackLoggingT)
 import           Stack.Docker.GlobalDB (updateDockerImageLastUsed,getDockerImagesLastUsed,pruneDockerImagesLastUsed)
 import           System.Environment (lookupEnv,unsetEnv,getProgName,getArgs)
 import           System.Exit (ExitCode(ExitSuccess,ExitFailure),exitWith)
-import           System.IO (hPutStrLn,stderr,stdin,stdout,hIsTerminalDevice)
 import           System.FilePath (takeBaseName,takeDirectory,takeFileName)
+import           System.IO (hPutStrLn,stderr,stdin,stdout,hIsTerminalDevice)
+import           Control.Monad.Logger (LogLevel)
 import qualified System.Process as Proc
 import           System.Process.PagerEditor (editByteString)
 import           Text.ParserCombinators.ReadP (readP_to_S)
@@ -60,23 +67,27 @@ import           System.Posix.Signals (installHandler,sigTERM,Handler(Catch))
 
 -- | If Docker is enabled, re-runs the currently running OS command in a Docker container.
 -- Otherwise, runs the inner action.
-rerunWithOptionalContainer :: BuildConfig -> IO () -> IO ()
-rerunWithOptionalContainer bconfig inner =
-  rerunCmdWithOptionalContainer bconfig
+rerunWithOptionalContainer :: Manager -> LogLevel -> (Config -> IO ()) -> IO ()
+rerunWithOptionalContainer manager logLevel inner =
+  rerunCmdWithOptionalContainer manager
+                                logLevel
                                 ((,) <$> (takeBaseName <$> getProgName) <*> getArgs)
                                 inner
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
 -- Docker container.  Otherwise, runs the inner action.
-rerunCmdWithOptionalContainer :: BuildConfig -> IO (FilePath, [String]) -> IO () -> IO ()
-rerunCmdWithOptionalContainer bconfig getCmdArgs inner =
+rerunCmdWithOptionalContainer :: Manager
+                              -> LogLevel
+                              -> IO (FilePath, [String])
+                              -> (Config -> IO ())
+                              -> IO ()
+rerunCmdWithOptionalContainer manager logLevel getCmdArgs inner =
   do inContainer <- getInContainer
-     if inContainer || not (dockerEnable docker)
-        then inner
+     config <- runStackLoggingT manager logLevel loadConfig
+     if inContainer || not (dockerEnable (configDocker config))
+        then inner config
         else do (cmd_,args) <- getCmdArgs
-                runContainerAndExit bconfig cmd_ args [] (return ())
-  where docker = configDocker config
-        config = bcConfig bconfig
+                runContainerAndExit manager logLevel config cmd_ args [] (return ())
 
 -- | 'True' if we are currently running inside a Docker container.
 getInContainer :: IO Bool
@@ -87,28 +98,31 @@ getInContainer =
        Just _ -> return True
 
 -- | Run a command in a new Docker container, then exit the process.
-runContainerAndExit :: BuildConfig
+runContainerAndExit :: Manager
+                    -> LogLevel
+                    -> Config
                     -> FilePath
                     -> [String]
                     -> [(String,String)]
                     -> IO ()
                     -> IO ()
-runContainerAndExit bconfig cmnd args envVars successPostAction =
-  runAction (Just bconfig)
-            (runContainerAndExitAction bconfig cmnd args envVars successPostAction)
+runContainerAndExit manager logLevel config cmnd args envVars successPostAction =
+  runAction manager logLevel (runContainerAndExitAction config cmnd args envVars successPostAction)
 
 -- | Shake action to run a command in a new Docker container.
-runContainerAndExitAction :: BuildConfig
+runContainerAndExitAction :: Config
                           -> FilePath
                           -> [String]
                           -> [(String,String)]
                           -> IO ()
+                          -> FP.FilePath
                           -> Action ()
-runContainerAndExitAction bconfig
+runContainerAndExitAction config
                           cmnd
                           args
                           envVars
-                          successPostAction =
+                          successPostAction
+                          sandboxDirFP =
   do checkDockerVersion
      (Stdout uidOut) <- cmd "id -u"
      (Stdout gidOut) <- cmd "id -g"
@@ -144,7 +158,6 @@ runContainerAndExitAction bconfig
                        "Run '" ++ takeBaseName progName ++ " docker " ++ dockerPullCmdName ++
                        "' to download it, then try again.")
      let pwdS = FP.encodeString pwdFP
-         sandboxDirFP = sandboxDir bconfig
          sandboxDirS = FP.encodeString sandboxDirFP
          workRootDir = FP.encodeString (FP.directory (sandboxDirFP))
          (uid,gid) = (dropWhileEnd isSpace uidOut, dropWhileEnd isSpace gidOut)
@@ -229,7 +242,7 @@ runContainerAndExitAction bconfig
                 successPostAction
      liftIO (do updateDockerImageLastUsed config
                                           (iiId imageInfo)
-                                          (FL.toFilePath (bcRoot bconfig))
+                                          (FP.encodeString (FP.parent sandboxDirFP))
                 execDockerProcess)
 
   where
@@ -248,12 +261,10 @@ runContainerAndExitAction bconfig
     docker :: Docker
     docker = configDocker config
 
-    config :: Config
-    config = bcConfig bconfig
-
 -- | Clean-up old docker images and containers.
-cleanup :: Config -> Cleanup -> IO ()
-cleanup config opts = runAction Nothing (cleanupAction config opts)
+cleanup :: Manager -> LogLevel -> Config -> Cleanup -> IO ()
+cleanup manager logLevel config opts =
+  runAction manager logLevel (\_ -> cleanupAction config opts)
 
 -- | Cleanup action
 cleanupAction :: Config -> Cleanup -> Action ()
@@ -334,30 +345,36 @@ cleanupAction config opts =
               inspectMap =
       do case dcAction opts of
            CleanupInteractive ->
-             do buildStrLn "# STACK DOCKER CLEANUP PLAN\n\
-                           \#\n\
-                           \# When you leave the editor, the lines in this plan will be processed.\n\
-                           \#\n\
-                           \# Lines that begin with 'R' denote an image or container that will be.\n\
-                           \# removed.  You may change the first character to/from 'R' to remove/keep\n\
-                           \# and image or container that would otherwise be kept/removed.\n\
-                           \#\n\
-                           \# To cancel the cleanup, delete all lines in this file.\n\
-                           \#\n\
-                           \# By default, the following images/containers will be removed:\n\
-                           \#"
+             do buildStrLn
+                  (unlines
+                     ["# STACK DOCKER CLEANUP PLAN"
+                     ,"#"
+                     ,"# When you leave the editor, the lines in this plan will be processed."
+                     ,"#"
+                     ,"# Lines that begin with 'R' denote an image or container that will be."
+                     ,"# removed.  You may change the first character to/from 'R' to remove/keep"
+                     ,"# and image or container that would otherwise be kept/removed."
+                     ,"#"
+                     ,"# To cancel the cleanup, delete all lines in this file."
+                     ,"#"
+                     ,"# By default, the following images/containers will be removed:"
+                     ,"#"])
                 buildDefault dcRemoveKnownImagesLastUsedDaysAgo "Known images last used"
                 buildDefault dcRemoveUnknownImagesCreatedDaysAgo "Unknown images created"
                 buildDefault dcRemoveDanglingImagesCreatedDaysAgo "Dangling images created"
                 buildDefault dcRemoveStoppedContainersCreatedDaysAgo "Stopped containers created"
                 buildDefault dcRemoveRunningContainersCreatedDaysAgo "Running containers created"
                            --EKB FIXME: `docker cleanup` should come from shared constants.
-                buildStrLn ("#\n\
-                            \# The default plan can be adjusted using command-line arguments.\n\
-                            \# Run '" ++ takeBaseName progName ++ " docker cleanup --help' for details.\n\
-                            \#")
-           _ -> buildStrLn "# Lines that begin with 'R' denote an image or container that will be.\n\
-                           \# removed."
+                buildStrLn
+                  (unlines
+                     ["#"
+                     ,"# The default plan can be adjusted using command-line arguments."
+                     ,"# Run '" ++ takeBaseName progName ++ " docker cleanup --help' for details."
+                     ,"#"])
+           _ -> buildStrLn
+                  (unlines
+                    ["# Lines that begin with 'R' denote an image or container that will be."
+                    ,"# removed."])
          buildSection "KNOWN IMAGES (pulled/used by stack)"
                       imagesLastUsed
                       buildKnownImage
@@ -496,24 +513,24 @@ pullImage docker image =
              Proc.callProcess "docker" ["pull", image])
 
 -- | Pull latest version of configured Docker image from registry.
-pull :: BuildConfig -> IO ()
-pull bconfig =
-  runAction
-    (Just bconfig)
-    (do checkDockerVersion
-        pullImage docker (dockerImageName docker))
+pull :: Manager -> LogLevel -> Config -> IO ()
+pull manager logLevel config =
+  runAction manager
+            logLevel
+            (\_ -> do checkDockerVersion
+                      pullImage docker (dockerImageName docker))
   where docker = configDocker config
-        config = bcConfig bconfig
 
 -- | Run a Shake action.
-runAction :: Maybe BuildConfig -> Action () -> IO ()
-runAction Nothing inner =
-  shake shakeOptions{shakeVerbosity = Quiet}
-        (action inner)
-runAction (Just bconfig) inner =
-  do shake shakeOptions{shakeVerbosity = Quiet
-                       ,shakeFiles = FL.toFilePath (configShakeFilesDir bconfig)}
-           (action inner)
+runAction :: Manager -> LogLevel -> (FP.FilePath -> Action ()) -> IO ()
+runAction manager logLevel inner =
+  do mfp <- runStackLoggingT manager logLevel getProjectConfig
+     let sandboxDir = case mfp of
+           Just fp -> FP.decodeString (FL.toFilePath (FL.parent fp FL.</> $(FL.mkRelFile ".docker-sandbox")))
+           Nothing -> error "Cannot determine Docker sandbox directory."
+     shake shakeOptions{shakeVerbosity = Quiet
+                       ,shakeFiles = FP.encodeString (sandboxDir)}
+           (action (inner sandboxDir))
 
 -- | Check docker version (throws exception if incorrect)
 checkDockerVersion :: Action ()
@@ -562,9 +579,9 @@ execProcessAndExit cmnd args successPostAction =
      exitWith exitCode
 
 -- | Perform the docker sandbox reset tasks that are performed on the host.
-resetOnHost :: BuildConfig -> Bool -> IO ()
-resetOnHost bconfig keepHome =
-  removeDirectoryContents (sandboxDir bconfig) [homeDirName | keepHome]
+resetOnHost :: Manager -> LogLevel -> Bool -> IO ()
+resetOnHost manager logLevel keepHome =
+  runAction manager logLevel (\sandboxDir -> liftIO (removeDirectoryContents sandboxDir [homeDirName | keepHome]))
 
 -- | Perform the Docker sandbox reset tasks that are performed from within a container.
 resetInContainer :: Config -> IO ()
@@ -602,11 +619,6 @@ warnNoContainer cmdName =
                        ("WARNING: Running '" ++ cmdName ++
                        "' even though Docker is disabled.")
 
--- | Location of the @.docker-sandbox@  directory.
-sandboxDir :: BuildConfig -> FP.FilePath
-sandboxDir bconfig =
-  FP.decodeString (FL.toFilePath (bcRoot bconfig)) </> dockerSandboxName
-
 -- | Subdirectories of the home directory to sandbox between GHC/Stackage versions.
 sandboxedHomeSubdirectories :: Config -> [FilePath]
 sandboxedHomeSubdirectories config =
@@ -615,11 +627,8 @@ sandboxedHomeSubdirectories config =
   ,".ghcjs"
    --EKB FIXME: this isn't going to work with reading a user config file from
    -- outside the Docker sandbox.
+   --EKB FIXME: this probably shouldn't be per-image.
   ,takeFileName (takeDirectory (FL.toFilePath (configStackRoot config)))]
-
--- | Name of @.docker-sandbox@ directory.
-dockerSandboxName :: FP.FilePath
-dockerSandboxName = FP.decodeString ".docker-sandbox"
 
 -- | Name of home directory within @.docker-sandbox@.
 homeDirName :: FP.FilePath
@@ -718,8 +727,9 @@ sandboxIDEnvVar :: String
 sandboxIDEnvVar = "DOCKER_SANDBOX_ID"
 
 -- | Command-line argument for @docker-pull@.
+--EKB FIXME: move this to Docker.Types
 dockerPullCmdName :: String
-dockerPullCmdName = "docker-pull"
+dockerPullCmdName = "pull"
 
 -- | Version of 'stack' required to be installed in container.
 requireContainerVersion :: Version

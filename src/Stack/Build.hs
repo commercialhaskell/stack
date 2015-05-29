@@ -363,7 +363,6 @@ installDependencies bopts deps' = do
                    plans <- forM (S.toList packages) $ \package -> do
                        let gconfig = GenConfig -- FIXME
                                { gconfigOptimize = False
-                               , gconfigForceRecomp = False
                                , gconfigLibProfiling = True
                                , gconfigExeProfiling = False
                                , gconfigGhcOptions = []
@@ -435,7 +434,8 @@ buildLocals bopts packagesToInstall packagesToRemove = do
      plans <-
        forM (M.toList packagesToInstall)
             (\(package, wantedTarget) ->
-               do when (wantedTarget == Wanted && boptsFinalAction bopts /= DoNothing)
+               do when (wantedTarget == Wanted && boptsFinalAction bopts /= DoNothing &&
+                        packageType package == PTUser)
                        (liftIO (deleteGenFile (packageDir package)))
                   gconfig <- readGenConfigFile
                       pkgIds
@@ -694,8 +694,7 @@ writeFinalFiles gconfig bconfig buildType dir package = liftIO $
 
              writeGenConfigFile
                       dir
-                      gconfig {gconfigForceRecomp = False
-                              ,gconfigPkgId = mpkgid}
+                      gconfig {gconfigPkgId = mpkgid}
                     -- After a build has completed successfully for a given
                     -- configuration, no recompilation forcing is required.
              updateGenFile dir)
@@ -779,17 +778,18 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconf
        singularBuild
        (concat [["build"]
                ,["--ghc-options=-O2" | gconfigOptimize gconfig]
-               ,["--ghc-options=-fforce-recomp" | gconfigForceRecomp gconfig]
-               ,concat [["--ghc-options",T.unpack opt] | opt <- boptsGhcOptions bopts]])
+               ,concat [["--ghc-options",T.unpack opt]
+                        | opt <- boptsGhcOptions bopts
+                        , packageType package == PTUser]])
 
      case setupAction of
        DoTests -> runhaskell' singularBuild ["test"]
        DoHaddock ->
            do
               {- EKB FIXME: doc generation for stack-doc-server
-#ifndef mingw32_HOST_OS
+ #ifndef mingw32_HOST_OS
               liftIO (removeDocLinks docLoc package)
-#endif
+ #endif
               ifcOpts <- liftIO (haddockInterfaceOpts docLoc package packages)
               --}
               runhaskell'
@@ -823,11 +823,11 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconf
        _ -> return ()
      withResource installResource 1 (runhaskell' False ["install"])
      {- EKB FIXME: doc generation for stack-doc-server
-#ifndef mingw32_HOST_OS
+ #ifndef mingw32_HOST_OS
      case setupAction of
        DoHaddock -> liftIO (createDocLinks docLoc package)
        _ -> return ()
-#endif
+ #endif
      --}
 
 -- | Run the Haskell command for the given package.

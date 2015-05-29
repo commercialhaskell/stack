@@ -2,7 +2,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -22,7 +21,8 @@
 -- probably default to behaving like cabal, possibly with spitting out
 -- a warning that "you should run `stk init` to make things better".
 module Stack.Config
-  ( loadConfig
+  ( getProjectConfig
+  , loadConfig
   , loadBuildConfig
   , stackDotYaml
   ) where
@@ -159,6 +159,9 @@ data Project = Project
     }
   deriving Show
 
+data ProjectAndConfigMonoid
+  = ProjectAndConfigMonoid !Project !ConfigMonoid
+
 instance ToJSON Project where
     toJSON p = object
         [ "packages"   .= projectPackages p
@@ -166,7 +169,7 @@ instance ToJSON Project where
         , "flags"      .= projectFlags p
         , "resolver"   .= projectResolver p
         ]
-instance FromJSON (Project, ConfigMonoid) where
+instance FromJSON ProjectAndConfigMonoid where
     parseJSON = withObject "Project, ConfigMonoid" $ \o -> do
         dirs <- o .:? "packages" .!= ["."]
         extraDeps' <- o .:? "extra-deps" .!= []
@@ -184,7 +187,7 @@ instance FromJSON (Project, ConfigMonoid) where
                 , projectFlags = flags
                 , projectResolver = resolver
                 }
-        return (project, config)
+        return $ ProjectAndConfigMonoid project config
       where
         goDeps =
             map toSingle . Map.toList . Map.unionsWith S.union . map toMap
@@ -407,7 +410,7 @@ loadProjectConfig = do
             return Nothing
   where
     load fp = do
-        (project, config) <-
+        ProjectAndConfigMonoid project config <-
             liftIO (Yaml.decodeFileEither (toFilePath fp))
                >>= either throwM return
         return $ Just (project, fp, config)
