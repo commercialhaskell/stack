@@ -52,6 +52,15 @@ extra-deps:
 - wai-logger-2.2.4
 ```
 
+Here's a list of open source stack.yaml files for reference and examples of
+real-world usage:
+
+* [Roman Cheplyaka's prover](https://github.com/feuerbach/prover/blob/master/stack.yaml)
+* [Web Application Interface](https://github.com/yesodweb/wai/blob/master/stack.yaml)
+
+If you have a stack.yaml file which you believe would be useful for others to
+see, please send a pull request to this file to include a link.
+
 ### FAQ
 
 So that this doesn't become repetitive: for the reasons behind the answers
