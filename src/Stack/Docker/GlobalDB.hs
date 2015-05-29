@@ -73,7 +73,7 @@ pruneDockerImagesLastUsed config existingHashes =
 -- | Run an action with the global database.  This performs any needed migrations as well.
 withGlobalDB :: forall a. Config -> SqlPersistT (NoLoggingT (ResourceT IO)) a -> IO a
 withGlobalDB config action =
-  do let db = toFilePath (configStackRoot config </> $(mkRelFile "global.db"))
+  do let db = toFilePath (configStackRoot config </> $(mkRelFile "docker.db"))
      createDirectoryIfMissing True (toFilePath (configStackRoot config))
      runSqlite (T.pack db)
                (do _ <- runMigrationSilent migrateTables
