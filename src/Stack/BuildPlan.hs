@@ -18,7 +18,6 @@ module Stack.BuildPlan
     , loadMiniBuildPlan
     , resolveBuildPlan
     , findBuildPlan
-    , removeReverseDeps
     , ToolMap
     , getToolMap
     ) where
@@ -73,22 +72,50 @@ import           System.Directory                (createDirectoryIfMissing, getD
 import           System.FilePath                 (takeDirectory)
 
 data BuildPlanException
-    = UnknownPackages (Map PackageName (Set PackageName))
+    = UnknownPackages
+        (Map PackageName (Set PackageName)) -- truly unknown
+        (Map PackageName (Set PackageIdentifier)) -- shadowed
     | Couldn'tFindInIndex (Set PackageIdentifier)
     deriving (Typeable)
 instance Exception BuildPlanException
 instance Show BuildPlanException where
-    show (UnknownPackages m) = unlines
-        $ "The following packages do not exist in the build plan:"
-        : map go (Map.toList m)
+    show (UnknownPackages unknown shadowed) =
+        unlines $ unknown' ++ shadowed'
       where
-        go (dep, users) | Set.null users = packageNameString dep
-        go (dep, users) = concat
-            [ packageNameString dep
-            , " (used by "
-            , intercalate ", " $ map packageNameString $ Set.toList users
-            , ")"
-            ]
+        unknown' :: [String]
+        unknown'
+            | Map.null unknown = []
+            | otherwise =
+              "The following packages do not exist in the build plan:"
+            : map go (Map.toList unknown)
+          where
+            go (dep, users) | Set.null users = packageNameString dep
+            go (dep, users) = concat
+                [ packageNameString dep
+                , " (used by "
+                , intercalate ", " $ map packageNameString $ Set.toList users
+                , ")"
+                ]
+
+        shadowed' :: [String]
+        shadowed'
+            | Map.null shadowed = []
+            | otherwise =
+              "The following packages are shadowed by local packages."
+            : "Recommended action: add their dependencies to your extra-deps"
+            : map go (Map.toList shadowed)
+          where
+            go (dep, users) | Set.null users = concat
+                [ packageNameString dep
+                , " (internal stack error: this should never be null)"
+                ]
+            go (dep, users) = concat
+                [ packageNameString dep
+                , " (used by "
+                , intercalate ", " $ map packageIdentifierString $ Set.toList users
+                , ")"
+                ]
+
     show (Couldn'tFindInIndex idents) =
         "Couldn't find the following packages in the index: " ++
         intercalate ", " (map packageIdentifierString $ Set.toList idents)
@@ -101,19 +128,21 @@ instance Show BuildPlanException where
 -- This may fail if a target package is not present in the @BuildPlan@.
 resolveBuildPlan :: MonadThrow m
                  => MiniBuildPlan
+                 -> (PackageName -> Bool) -- ^ is it shadowed by a local package?
                  -> Map PackageName (Set PackageName) -- ^ required packages, and users of it
                  -> m ( Map PackageName (Version, Map FlagName Bool)
                       , Map PackageName (Set PackageName)
                       )
-resolveBuildPlan mbp packages
-    | Map.null (rsUnknown rs) = return (rsToInstall rs, rsUsedBy rs)
-    | otherwise = throwM $ UnknownPackages $ rsUnknown rs
+resolveBuildPlan mbp isShadowed packages
+    | Map.null (rsUnknown rs) && Map.null (rsShadowed rs) = return (rsToInstall rs, rsUsedBy rs)
+    | otherwise = throwM $ UnknownPackages (rsUnknown rs) (rsShadowed rs)
   where
-    rs = getDeps mbp packages
+    rs = getDeps mbp isShadowed packages
 
 data ResolveState = ResolveState
     { rsVisited   :: Set PackageName
     , rsUnknown   :: Map PackageName (Set PackageName)
+    , rsShadowed  :: Map PackageName (Set PackageIdentifier)
     , rsToInstall :: Map PackageName (Version, Map FlagName Bool)
     , rsUsedBy    :: Map PackageName (Set PackageName)
     }
@@ -141,21 +170,6 @@ data MiniBuildPlan = MiniBuildPlan
     }
     deriving (Generic, Show)
 instance Binary.Binary MiniBuildPlan
-
--- | When a set of targets includes one of the packages in a build plan, we
--- need to remove that package from the build plan. See:
---
--- https://github.com/fpco/stack/issues/42
---
--- In the future, we may want to make the behavior actually match what's stated
--- (removing all the reverse deps). For now, we'll leave it to 'getDeps' to
--- discover if there's a dependency on a removed package.
-removeReverseDeps :: F.Foldable f => f PackageName -> MiniBuildPlan -> MiniBuildPlan
-removeReverseDeps toRemove mbp = mbp
-    { mbpPackages = Map.difference (mbpPackages mbp) toRemoveMap
-    }
-  where
-    toRemoveMap = Map.unions $ map (\x -> Map.singleton x ()) $ F.toList toRemove
 
 toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env)
                 => BuildPlan -> m MiniBuildPlan
@@ -247,11 +261,15 @@ addDeps ghcVersion toCalc = do
         ident = PackageIdentifier (ucfName ucf) (ucfVersion ucf)
 
 -- | Resolve all packages necessary to install for
-getDeps :: MiniBuildPlan -> Map PackageName (Set PackageName) -> ResolveState
-getDeps mbp packages =
+getDeps :: MiniBuildPlan
+        -> (PackageName -> Bool) -- ^ is it shadowed by a local package?
+        -> Map PackageName (Set PackageName)
+        -> ResolveState
+getDeps mbp isShadowed packages =
     execState (mapM_ (uncurry goName) $ Map.toList packages) ResolveState
         { rsVisited = Set.empty
         , rsUnknown = Map.empty
+        , rsShadowed = Map.empty
         , rsToInstall = Map.empty
         , rsUsedBy = Map.empty
         }
@@ -275,7 +293,16 @@ getDeps mbp packages =
                 put rs { rsVisited = Set.insert name $ rsVisited rs }
                 let depsForTools = Set.unions $ mapMaybe (flip Map.lookup toolMap) (Set.toList $ mpiToolDeps mpi)
                 let deps = Set.filter (/= name) (mpiPackageDeps mpi <> depsForTools)
-                F.mapM_ (flip goName $ Set.singleton name) deps
+                F.forM_ deps $ \dep ->
+                    if isShadowed dep
+                        then modify $ \rs' -> rs'
+                            { rsShadowed = Map.insertWith
+                                Set.union
+                                dep
+                                (Set.singleton $ PackageIdentifier name (mpiVersion mpi))
+                                (rsShadowed rs')
+                            }
+                        else goName dep (Set.singleton name)
                 modify $ \rs' -> rs'
                     { rsToInstall = Map.insert name (mpiVersion mpi, mpiFlags mpi) $ rsToInstall rs'
                     }

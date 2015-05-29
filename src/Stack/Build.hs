@@ -272,10 +272,11 @@ getDependencies locals ranges = do
     dependencies <- case bcResolver bconfig of
         ResolverSnapshot snapName -> do
             $logDebug $ "Checking resolver: " <> renderSnapName snapName
-            mbp <- liftM (removeReverseDeps $ map packageName locals)
-                 $ loadMiniBuildPlan snapName globals
+            mbp <- loadMiniBuildPlan snapName globals
 
             let toolMap = getToolMap mbp
+                shadowed = Set.fromList $ map packageName locals
+                isShadowed = (`Set.member` shadowed)
                 toolDeps = M.unionsWith Set.union
                          $ flip concatMap locals
                          $ \local -> flip concatMap (packageTools local)
@@ -287,7 +288,7 @@ getDependencies locals ranges = do
                                         (\pkg -> M.singleton pkg (Set.singleton $ packageName local))
                                         (Set.toList pkgs)
 
-            (deps, users) <- resolveBuildPlan mbp $ M.unionWith Set.union
+            (deps, users) <- resolveBuildPlan mbp isShadowed $ M.unionWith Set.union
                 (fmap M.keysSet ranges)
                 toolDeps
             forM_ (M.toList users) $ \(name, users') -> $logDebug $
