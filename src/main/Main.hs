@@ -31,6 +31,7 @@ import           Stack.Types.StackT
 import           System.Exit (exitWith)
 import qualified System.Process as P
 import qualified System.Process.Read
+import qualified Paths_stack as Meta
 
 -- | Commandline dispatcher.
 main :: IO ()
@@ -38,7 +39,7 @@ main =
   do Docker.checkVersions
      (level,run) <-
        simpleOptions
-         "ver"
+         $(simpleVersion Meta.version)
          "header"
          "desc"
          logLevelOpt
