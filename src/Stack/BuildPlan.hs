@@ -104,7 +104,7 @@ instance Show BuildPlanException where
             | otherwise = concat
                 [ ["The following packages are shadowed by local packages:"]
                 , map go (Map.toList shadowed)
-                , ["Recommended action: add the following your extra-deps:"]
+                , ["Recommended action: add the following to your extra-deps:"]
                 , extraDeps
                 ]
           where
