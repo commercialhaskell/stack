@@ -137,3 +137,10 @@ There are three sources of information to tell it which packages to install:
 the selected snapshot, the `extra-deps` configuration value, and your local
 packages. The only way to get stack to change its build plan is to modify one
 of those three. Updating the index will have no impact on stack's behavior.
+
+__I need to modify an upstream package, how should I do it?__
+
+Typically, you will want to get the source for the package and then add it to
+your `packages` list in stack.yaml. `stack unpack` is one approach for the
+former. Another would be to add the upstream package as a submodule to your
+project.
