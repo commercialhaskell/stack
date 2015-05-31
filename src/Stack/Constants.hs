@@ -17,37 +17,53 @@ module Stack.Constants
     ,projectDockerSandboxDir)
     where
 
+import Control.Monad (liftM)
+import Control.Monad.Catch (MonadThrow)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Path as FL
 import Prelude
 import Stack.Types.Config
+import Stack.Types.PackageIdentifier
+import Stack.Types.Version
 
 -- | Extensions used for Haskell files.
 haskellFileExts :: [Text]
 haskellFileExts = ["hs","hsc","lhs"]
 
 -- | The filename used for completed build indicators.
-builtFileFromDir :: Path Abs Dir -> Path Abs File
-builtFileFromDir fp =
-  distDirFromDir fp </>
-  $(mkRelFile "stack.gen")
+builtFileFromDir :: MonadThrow m
+                 => PackageIdentifier -- ^ Cabal version
+                 -> Path Abs Dir
+                 -> m (Path Abs File)
+builtFileFromDir cabalPkgVer fp = do
+  dist <- distDirFromDir cabalPkgVer fp
+  return (dist </> $(mkRelFile "stack.gen"))
 
 -- | The filename used for completed configure indicators.
-configuredFileFromDir :: Path Abs Dir -> Path Abs File
-configuredFileFromDir fp =
-  distDirFromDir fp </>
-  $(mkRelFile "setup-config")
+configuredFileFromDir :: MonadThrow m
+                      => PackageIdentifier -- ^ Cabal version
+                      -> Path Abs Dir
+                      -> m (Path Abs File)
+configuredFileFromDir cabalPkgVer fp = do
+  dist <- distDirFromDir cabalPkgVer fp
+  return (dist </> $(mkRelFile "setup-config"))
 
 -- | The filename used for completed build indicators.
-builtConfigFileFromDir :: Path Abs Dir -> Path Abs File
-builtConfigFileFromDir fp = fp </> builtConfigRelativeFile
+builtConfigFileFromDir :: MonadThrow m
+                       => PackageIdentifier -- ^ Cabal version
+                       -> Path Abs Dir
+                       -> m (Path Abs File)
+builtConfigFileFromDir cabalPkgVer fp =
+    liftM (fp </>) (builtConfigRelativeFile cabalPkgVer)
 
 -- | Relative location of completed build indicators.
-builtConfigRelativeFile :: Path Rel File
-builtConfigRelativeFile =
-  distRelativeDir </>
-  $(mkRelFile "stack.config")
+builtConfigRelativeFile :: MonadThrow m
+                        => PackageIdentifier -- ^ Cabal version
+                        -> m (Path Rel File)
+builtConfigRelativeFile cabalPkgVer = do
+  dist <- distRelativeDir cabalPkgVer
+  return (dist </> $(mkRelFile "stack.config"))
 
 -- | Default shake thread count for parallel builds.
 defaultShakeThreads :: Int
@@ -72,12 +88,21 @@ userDocsDir :: Config -> Path Abs Dir
 userDocsDir config = configStackRoot config </> $(mkRelDir "doc/")
 
 -- | Package's build artifacts directory.
-distDirFromDir :: Path Abs Dir -> Path Abs Dir
-distDirFromDir fp = fp </> distRelativeDir
+distDirFromDir :: MonadThrow m
+               => PackageIdentifier -- ^ Cabal version
+               -> Path Abs Dir
+               -> m (Path Abs Dir)
+distDirFromDir cabalPkgVersion fp =
+    liftM (fp </>) (distRelativeDir cabalPkgVersion)
 
 -- | Relative location of build artifacts.
-distRelativeDir :: Path Rel Dir
-distRelativeDir = $(mkRelDir "dist/")
+distRelativeDir :: MonadThrow m
+                => PackageIdentifier -- ^ Cabal version
+                -> m (Path Rel Dir)
+distRelativeDir cabalPkgVer = do
+    cabal <- parseRelDir $ "Cabal-" ++
+             versionString (packageIdentifierVersion cabalPkgVer)
+    return $ $(mkRelDir "dist-stack/") </> cabal
 
 -- pkgIndexDir :: Config -> Path Abs Dir
 -- pkgIndexDir config =

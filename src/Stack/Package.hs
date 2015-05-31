@@ -53,7 +53,7 @@ import           Data.Yaml (ParseException)
 import           Distribution.Compiler
 import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.ModuleName as Cabal
-import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion)
+import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
 import           Distribution.PackageDescription hiding (FlagName)
 import           Distribution.PackageDescription.Parse
 import           Distribution.Simple.Utils
@@ -487,23 +487,32 @@ buildLogPath package' = do
   return $ stack </> $(mkRelDir "logs") </> fp
 
 -- | Path for the project's configure log.
-configureLogPath :: Package -> Path Abs File
-configureLogPath package' =
-  stackageBuildDir package' </>
-  $(mkRelFile "configure-log")
+configureLogPath :: MonadThrow m
+                 => PackageIdentifier -- ^ Cabal version
+                 -> Package
+                 -> m (Path Abs File)
+configureLogPath cabalPkgVer package' = do
+  build <- stackageBuildDir cabalPkgVer package'
+  return (build </> $(mkRelFile "configure-log"))
 
 -- | Get the build directory.
-stackageBuildDir :: Package -> Path Abs Dir
-stackageBuildDir package' =
-  distDirFromDir dir </>
-  $(mkRelDir "stack-build")
+stackageBuildDir :: MonadThrow m
+                 => PackageIdentifier -- ^ Cabal version
+                 -> Package
+                 -> m (Path Abs Dir)
+stackageBuildDir cabalPkgVer package' = do
+  dist <- distDirFromDir cabalPkgVer dir
+  return (dist </> $(mkRelDir "stack-build"))
   where dir = packageDir package'
 
 -- | Package's documentation directory.
-packageDocDir :: Package -> Path Abs Dir
-packageDocDir package' =
-  distDirFromDir (packageDir package') </>
-  $(mkRelDir "doc/")
+packageDocDir :: MonadThrow m
+              => PackageIdentifier -- ^ Cabal version
+              -> Package
+              -> m (Path Abs Dir)
+packageDocDir cabalPkgVer package' = do
+  dist <- distDirFromDir cabalPkgVer (packageDir package')
+  return (dist </> $(mkRelDir "doc/"))
 
 -- | Resolve the file, if it can't be resolved, warn for the user
 -- (purely to be helpful).
