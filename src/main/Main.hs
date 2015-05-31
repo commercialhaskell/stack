@@ -107,7 +107,14 @@ main =
                             <$> (some (argument readPackageName
                                         (metavar "[PACKAGES]")))
                             <*> fmap (fromMaybe False)
-                               (maybeBoolFlags "dry-run" "Don't build anything, just prepare to")))
+                               (maybeBoolFlags "dry-run" "Don't build anything, just prepare to"))
+             addSubCommands
+               "docker"
+               "Subcommands specific to Docker use"
+               (do addCommand Docker.dockerPullCmdName
+                              "Pull latest version of Docker image from registry"
+                              dockerPullCmd
+                              (pure ())))
      run level
 
 setupCmd :: LogLevel -> IO ()
@@ -294,6 +301,15 @@ execCmd (cmd, args) logLevel = do
           (Nothing, Nothing, Nothing, ph) <- P.createProcess cp
           ec <- P.waitForProcess ph
           exitWith ec)
+
+-- | Pull the current Docker image.
+dockerPullCmd :: () -> LogLevel -> IO ()
+dockerPullCmd _ logLevel =
+  Docker.preventInContainer
+    (unwords [Docker.dockerCmdName, Docker.dockerPullCmdName])
+    (do manager <- newTLSManager
+        lc <- runStackLoggingT manager logLevel loadConfig
+        Docker.pull (lcConfig lc) (lcProjectRoot lc))
 
 -- | Parser for build arguments.
 buildOpts :: Parser BuildOpts

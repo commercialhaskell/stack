@@ -21,6 +21,8 @@ module Stack.Docker
   ,dockerPullCmdName
   ,rerunWithOptionalContainer
   ,rerunCmdWithOptionalContainer
+  ,dockerCmdName
+  ,preventInContainer
   ) where
 
 import           Control.Applicative
@@ -77,6 +79,16 @@ rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs inner =
         then inner
         else do (cmd_,args) <- getCmdArgs
                 runContainerAndExit config mprojectRoot cmd_ args [] (return ())
+
+-- | Error if running in a container.
+preventInContainer :: String -> IO () -> IO ()
+preventInContainer cmdName inner =
+  do inContainer <- getInContainer
+     if inContainer
+        then error (concat ["'"
+                           ,cmdName
+                           ,"' command must be run on host OS (not in a Docker container)."])
+        else inner
 
 -- | 'True' if we are currently running inside a Docker container.
 getInContainer :: IO Bool
@@ -143,7 +155,7 @@ runContainerAndExitAction config
              do progName <- liftIO getProgName
                 error ("The Docker image referenced by '" ++ toFilePath stackDotYaml ++
                        "'' has not\nbeen downloaded:\n\n" ++
-                       "Run '" ++ takeBaseName progName ++ " docker " ++ dockerPullCmdName ++
+                       "Run '" ++ unwords [takeBaseName progName, dockerCmdName, dockerPullCmdName] ++
                        "' to download it, then try again.")
      let (uid,gid) = (dropWhileEnd isSpace uidOut, dropWhileEnd isSpace gidOut)
          imageEnvVars = map (break (== '=')) (icEnv (iiConfig imageInfo))
@@ -710,8 +722,11 @@ requireVersionEnvVar = "STACK_DOCKER_REQUIRE_VERSION"
 sandboxIDEnvVar :: String
 sandboxIDEnvVar = "DOCKER_SANDBOX_ID"
 
--- | Command-line argument for @docker-pull@.
---EKB FIXME: move this to Docker.Types
+-- | Command-line argument for "docker"
+dockerCmdName :: String
+dockerCmdName = "docker"
+
+-- | Command-line argument for @docker pull@.
 dockerPullCmdName :: String
 dockerPullCmdName = "pull"
 

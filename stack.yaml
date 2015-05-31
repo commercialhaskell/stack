@@ -1,6 +1,7 @@
 packages:
 - .
 extra-deps:
+- optparse-simple-0.0.3
 - path-0.5.0
 - monad-unlift-0.1.1.0
 resolver: lts-2.9
