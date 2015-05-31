@@ -240,7 +240,7 @@ addDeps ghcVersion toCalc = do
             , mpiExes = exes
             })
 
-    go platform m ucf =
+    go platform m (Left ucf) =
         case Map.lookup ident m of
             Just (Left flags) -> do
                 gpd <- ucfParse ucf
@@ -269,6 +269,7 @@ addDeps ghcVersion toCalc = do
             _ -> return m
       where
         ident = PackageIdentifier (ucfName ucf) (ucfVersion ucf)
+    go _ m (Right _) = return m
 
 -- | Resolve all packages necessary to install for
 getDeps :: MiniBuildPlan

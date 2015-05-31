@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -18,24 +19,28 @@ module Stack.PackageIndex
     , readPackageIdents
     , findNewestVersions
     , UnparsedCabalFile (..)
-    , getLatestDescriptions
     , updateIndex
     , requireIndex
     , getPkgVersions
+    , PackageDownload (..)
+    , getPackageDownloads
     ) where
 
 import qualified Codec.Archive.Tar                     as Tar
+import           Control.Applicative                   ((<$>), (<*>))
 import           Control.Exception                     (Exception, toException)
 import           Control.Exception.Enclosed            (tryIO)
-import           Control.Monad                         (unless, when, liftM)
+import           Control.Monad                         (unless, when, liftM, mzero)
 import           Control.Monad.Catch                   (MonadThrow, throwM)
 import           Control.Monad.IO.Class                (MonadIO, liftIO)
 import           Control.Monad.Logger                  (MonadLogger, logDebug,
                                                         logInfo, logWarn)
+import           Data.Aeson
 import qualified Data.Binary                           as Binary
 import           Data.Binary.Get                       (ByteOffset)
+import           Data.ByteString                       (ByteString)
 import qualified Data.ByteString.Lazy                  as L
-import           Data.Conduit                          (($$), (=$), yield, Producer)
+import           Data.Conduit                          (($$), (=$), yield, Producer, ZipSink (..))
 import           Data.Conduit.Binary                   (sinkHandle,
                                                         sourceHandle)
 import qualified Data.Conduit.List                     as CL
@@ -44,16 +49,17 @@ import qualified Data.Foldable                         as F
 import           Data.Map                              (Map)
 import qualified Data.Map                              as Map
 import           Data.Maybe                            (fromMaybe, mapMaybe)
-import           Data.Monoid                           (mempty, (<>))
+import           Data.Monoid                           ((<>))
 import           Data.Set                              (Set)
 import qualified Data.Set                              as Set
 import           Data.Text                             (Text)
 import qualified Data.Text                             as T
+import           Data.Text.Encoding                    (encodeUtf8)
 import           Data.Text.Encoding.Error              (lenientDecode)
 import qualified Data.Text.Lazy                        as TL
 import           Data.Text.Lazy.Encoding               (decodeUtf8With)
-import           Data.Traversable                      (forM)
 import           Data.Typeable                         (Typeable)
+import           Data.Word                             (Word64)
 import qualified Distribution.Package                  as Cabal
 import           Distribution.PackageDescription       (package,
                                                         packageDescription)
@@ -62,6 +68,7 @@ import           Distribution.PackageDescription.Parse (ParseResult (..),
                                                         parsePackageDescription)
 import           Distribution.ParseUtils               (PError)
 import qualified Distribution.Text                     as DT
+import           GHC.Generics                          (Generic)
 import           Network.HTTP.Download
 import           Path                                  (mkRelDir, parent,
                                                         parseRelDir, toFilePath,
@@ -101,11 +108,7 @@ readPackageIdents menv = do
     case x of
         Left e -> do
             $logDebug $ "Populate index cache, load failed with " <> T.pack (show e)
-            $logInfo "Populating index cache, may take a moment"
-            let toIdent ucf = PackageIdentifier (ucfName ucf) (ucfVersion ucf)
-            pis <- sourcePackageIndex menv $$ CL.map toIdent =$ CL.consume
-            liftIO $ Binary.encodeFile fp pis
-            return pis
+            liftM fst $ populateCaches menv
         Right y -> return y
 
 newtype BinaryParseException = BinaryParseException (ByteOffset, String)
@@ -136,7 +139,7 @@ findNewestVersions menv names0 = do
 -- | Stream all of the cabal files from the 00-index tar file.
 sourcePackageIndex :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m)
                    => EnvOverride
-                   -> Producer m UnparsedCabalFile
+                   -> Producer m (Either UnparsedCabalFile (PackageIdentifier, L.ByteString))
 sourcePackageIndex menv = do
     requireIndex menv
     -- This uses full on lazy I/O instead of ResourceT to provide some
@@ -153,13 +156,17 @@ sourcePackageIndex menv = do
         | Just front <- T.stripSuffix ".cabal" $ T.pack $ Tar.entryPath e
         , Tar.NormalFile lbs _size <- Tar.entryContent e = do
             (fromCabalPackageName -> name, fromCabalVersion -> version) <- parseNameVersion front
-            yield UnparsedCabalFile
+            yield $ Left UnparsedCabalFile
                 { ucfName = name
                 , ucfVersion = version
                 , ucfParse = goContent (Tar.entryPath e) name version lbs
                 , ucfLbs = lbs
                 , ucfEntry = e
                 }
+        | Just front <- T.stripSuffix ".json" $ T.pack $ Tar.entryPath e
+        , Tar.NormalFile lbs _size <- Tar.entryContent e = do
+            (fromCabalPackageName -> name, fromCabalVersion -> version) <- parseNameVersion front
+            yield $ Right (PackageIdentifier name version, lbs)
         | otherwise = return ()
 
     goContent :: String -> PackageName -> Version -> L.ByteString -> (forall m. MonadThrow m => m GenericPackageDescription)
@@ -201,25 +208,6 @@ data CabalParseException
                           Version
   deriving (Show,Typeable)
 instance Exception CabalParseException
-
--- | Get all of the latest descriptions for name/version pairs matching the
--- given criterion.
-getLatestDescriptions :: (MonadIO m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadThrow m)
-                      => EnvOverride
-                      -> (PackageName -> Version -> Bool)
-                      -> (GenericPackageDescription -> IO desc)
-                      -> m (Map PackageName desc)
-getLatestDescriptions menv f parseDesc = do
-    m <- sourcePackageIndex menv $$ CL.filter f' =$ CL.fold add mempty
-    liftIO $ forM m $ \ucf -> ucfParse ucf >>= parseDesc
-  where
-    f' ucf = f (ucfName ucf) (ucfVersion ucf)
-    add m ucf =
-        case Map.lookup name m of
-            Just ucf' | ucfVersion ucf < ucfVersion ucf' -> m
-            _ -> Map.insert name ucf m
-      where
-        name = ucfName ucf
 
 -- | More generic simpleParse.
 simpleParse :: (MonadThrow m,DT.Text a)
@@ -378,8 +366,80 @@ isGitInstalled = flip doesExecutableExist "git"
 deleteCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m) => m ()
 deleteCache = do
     config <- askConfig
-    let fp = toFilePath $ configPackageIndexCache config
-    eres <- liftIO $ tryIO $ removeFile fp
-    case eres of
-        Left e -> $logDebug $ "Could not delete cache: " <> T.pack (show e)
-        Right () -> $logDebug $ "Deleted index cache at " <> T.pack fp
+    F.forM_ [configPackageIndexCache, configPackageIndexUrls] $ \f -> do
+        let fp = toFilePath $ f config
+        eres <- liftIO $ tryIO $ removeFile fp
+        case eres of
+            Left e -> $logDebug $ "Could not delete cache: " <> T.pack (show e)
+            Right () -> $logDebug $ "Deleted index cache at " <> T.pack fp
+
+data PackageDownload = PackageDownload
+    { pdSHA512 :: !ByteString
+    , pdUrl    :: !ByteString
+    , pdSize   :: !Word64
+    }
+    deriving (Show, Generic)
+instance Binary.Binary PackageDownload
+instance FromJSON PackageDownload where
+    parseJSON = withObject "Package" $ \o -> do
+        hashes <- o .: "package-hashes"
+        sha512 <- maybe mzero return (Map.lookup ("SHA512" :: Text) hashes)
+        locs <- o .: "package-locations"
+        url <-
+            case reverse locs of
+                [] -> mzero
+                x:_ -> return x
+        size <- o .: "package-size"
+        return PackageDownload
+            { pdSHA512 = encodeUtf8 sha512
+            , pdUrl = encodeUtf8 url
+            , pdSize = size
+            }
+
+-- | Load the cached package URLs, or created the cache if necessary.
+getPackageDownloads :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env)
+                    => EnvOverride
+                    -> m (Map PackageIdentifier PackageDownload)
+getPackageDownloads menv = do
+    config <- askConfig
+    let fp = toFilePath $ configPackageIndexUrls config
+        load = do
+            ebs <- liftIO $ tryIO $ Binary.decodeFileOrFail fp
+            case ebs of
+                Left e -> return $ Left $ toException e
+                Right (Left e) -> return $ Left $ toException $ BinaryParseException e
+                Right (Right pis) -> return $ Right pis
+    x <- load
+    case x of
+        Left e -> do
+            $logDebug $ "Populate index URLs, load failed with " <> T.pack (show e)
+            liftM snd $ populateCaches menv
+        Right y -> return y
+
+-- | Populate the package index caches and return them.
+populateCaches :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
+               => EnvOverride
+               -> m ([PackageIdentifier], Map PackageIdentifier PackageDownload)
+populateCaches menv = do
+    $logInfo "Populating index cache, may take a moment"
+    let toIdent (Left ucf) = Just (PackageIdentifier (ucfName ucf) (ucfVersion ucf))
+        toIdent (Right _) = Nothing
+
+        parseDownload (Left _) = Nothing
+        parseDownload (Right (ident, lbs)) = do
+            case decode lbs of
+                Nothing -> Nothing
+                Just pd -> Just (ident, pd)
+
+    (pis, pds) <- sourcePackageIndex menv $$ getZipSink ((,)
+        <$> ZipSink (CL.mapMaybe toIdent =$ CL.consume)
+        <*> ZipSink (Map.fromList <$> (CL.mapMaybe parseDownload =$ CL.consume)))
+
+    config <- askConfig
+
+    liftIO $ Binary.encodeFile (toFilePath $ configPackageIndexCache config) pis
+    liftIO $ Binary.encodeFile (toFilePath $ configPackageIndexUrls config) pds
+
+    $logInfo "Done populating cache"
+
+    return (pis, pds)

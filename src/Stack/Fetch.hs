@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
@@ -22,7 +23,7 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader (asks, runReaderT)
 import           Data.Monoid ((<>))
 import           Stack.Types
-import           Stack.PackageIndex (findNewestVersions)
+import           Stack.PackageIndex
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Check as Tar
 import           Control.Applicative ((*>), (<$>), (<*>))
@@ -40,7 +41,9 @@ import           Crypto.Hash              (Context, Digest, SHA512,
 import           Data.Aeson               (FromJSON (..), decode, withObject,
                                            (.!=), (.:?))
 import qualified Data.ByteString as S
+import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
+import           Data.Conduit
 import qualified Data.Foldable as F
 import           Data.Either (partitionEithers)
 import           Data.Function (fix)
@@ -50,7 +53,6 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8)
 import           Data.Typeable (Typeable)
 import           Data.Word (Word64)
 import           Network.HTTP.Download
@@ -59,7 +61,6 @@ import           Network.HTTP.Client      (Manager, brRead, checkStatus,
                                            responseStatus, withResponse)
 import           Network.HTTP.Types (statusCode)
 import           Stack.Constants
-import           Stack.PackageIndex (requireIndex, updateIndex)
 
 import Path
 import           System.Directory         (createDirectoryIfMissing,
@@ -73,75 +74,6 @@ import System.Process.Read (EnvOverride)
 import Data.Monoid (Monoid (..))
 import Control.Applicative ((<|>))
 
-data Package = Package
-    { packageHashes    :: Map Text Text
-    , packageLocations :: [Text]
-    , packageSize      :: Maybe Word64
-    , packageCabal     :: !S.ByteString
-    -- ^ use an empty ByteString to indicate nothing found
-    }
-    deriving Show
-instance FromJSON Package where
-    parseJSON = withObject "Package" $ \o -> Package
-        <$> o .:? "package-hashes" .!= Map.empty
-        <*> o .:? "package-locations" .!= []
-        <*> o .:? "package-size"
-        <*> return S.empty -- never stored in JSON
-instance Monoid Package where
-    mempty = Package Map.empty [] Nothing S.empty
-    mappend l r = Package
-        { packageHashes = Map.union (packageHashes l) (packageHashes r)
-        , packageLocations = packageLocations l ++ packageLocations r
-        , packageSize = packageSize l <|> packageSize r
-        , packageCabal = if S.null (packageCabal l) then packageCabal r else packageCabal l
-        }
-
--- | Returns the set of missing packages
-getPackageInfo :: MonadIO m
-               => FilePath
-               -> Set PackageIdentifier
-               -> m (Map PackageIdentifier Package, Set PackageIdentifier)
-getPackageInfo indexTar pkgs0 = liftIO $ withBinaryFile indexTar ReadMode $ \h -> do
-    lbs <- L.hGetContents h
-    loop pkgs0 pkgs0 Map.empty False $ Tar.read lbs
-  where
-    loop pkgsJ pkgsC m sawJSON Tar.Done = do
-        let pkgs = mappend (if sawJSON then pkgsJ else Set.empty) pkgsC
-        return (m, pkgs)
-    loop _ _ _m _ (Tar.Fail e) = throwIO $ Couldn'tReadIndexTarball indexTar e
-    loop pkgsJ pkgsC m _ (Tar.Next _ _)
-        | Set.null pkgsJ && Set.null pkgsC = return (m, Set.empty)
-    loop pkgsJ pkgsC m sawJSON (Tar.Next e es) = case Tar.entryContent e of
-        Tar.NormalFile lbs _
-            | Just pair <- getName ".json" (Tar.entryPath e)
-            , pair `Set.member` pkgsJ
-            , Just p <- decode lbs ->
-                loop (Set.delete pair pkgsJ) pkgsC (add pair p m) sawJSON' es
-            | Just pair <- getName ".cabal" (Tar.entryPath e)
-            , pair `Set.member` pkgsC ->
-                loop pkgsJ (Set.delete pair pkgsC) (add pair (fromCabal lbs) m) sawJSON' es
-        _ -> loop pkgsJ pkgsC m sawJSON' es
-      where
-        sawJSON' = sawJSON || takeExtension (Tar.entryPath e) == ".json"
-
-    add = Map.insertWith mappend
-
-    fromCabal lbs = Package
-        { packageHashes = Map.empty
-        , packageLocations = []
-        , packageSize = Nothing
-        , packageCabal = L.toStrict lbs
-        }
-
-    getName ext name =
-        case T.splitOn "/" $ T.replace "\\" "/" $ T.pack name of
-            [pkg, ver, fp]
-              | T.stripSuffix ext fp == Just pkg ->
-                do name' <- parsePackageNameFromString (T.unpack pkg)
-                   ver' <- parseVersionFromString (T.unpack ver)
-                   return (PackageIdentifier name' ver')
-            _ -> Nothing
-
 data FetchException
     = Couldn'tReadIndexTarball FilePath Tar.FormatError
     | Couldn'tReadPackageTarball FilePath SomeException
@@ -152,10 +84,10 @@ data FetchException
         }
     | InvalidHash
         { _ihUrl      :: String
-        , _ihExpected :: Text
+        , _ihExpected :: S.ByteString
         , _ihActual   :: Digest SHA512
         }
-    | CabalFileNotFound PackageIdentifier
+    | CabalFilesNotFound (Set PackageIdentifier)
     | UnpackDirectoryAlreadyExists FilePath
     | CouldNotParsePackageSelectors [String]
     deriving (Show, Typeable)
@@ -176,7 +108,11 @@ unpackPackages menv dest input = do
     idents2 <-
         if null names
             then return []
-            else findNewestVersions menv names
+            else do
+                $logDebug $ "Finding latest versions of: " <> T.pack (show names)
+                idents2 <- findNewestVersions menv names
+                $logDebug $ "Newest versions are: " <> T.pack (show idents2)
+                return idents2
     dests <- fetchPackages menv $ map (, Just dest') $ idents1 ++ idents2
     mapM_ (\dest'' -> $logInfo $ "Unpacked to " <> T.pack (toFilePath dest'')) dests
   where
@@ -213,6 +149,37 @@ unpackPackageIdentsForBuild menv idents0 = do
             paths2 <- fetchPackages menv $ map (, Just unpackDir) idents
             return $ Set.fromList $ paths1 ++ paths2
 
+-- | Add the contents of the cabal file from the index to packages that will be
+-- unpacked.
+addCabalFiles :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m)
+              => EnvOverride
+              -> [(PackageIdentifier, Maybe (Path Abs Dir))]
+              -> m (Either (Set PackageIdentifier) [(PackageIdentifier, Maybe (Path Abs Dir, S8.ByteString))])
+addCabalFiles menv pkgs0 = do
+    let (noUnpack, toUnpack0) = partitionEithers $ map toEither pkgs0
+    if null toUnpack0
+        then return $ Right noUnpack
+        else sourcePackageIndex menv $$ loop noUnpack (Map.fromList toUnpack0)
+  where
+    toEither (ident, Nothing) = Left (ident, Nothing)
+    toEither (ident, Just path) = Right (ident, path)
+
+    loop res m
+        | Map.null m = return $ Right res
+        | otherwise = await >>= maybe (return $ Left $ Map.keysSet m) (go res m)
+
+    go res m (Right _json) = loop res m
+    go res m (Left ucf) =
+        case Map.lookup ident m of
+            Nothing -> loop res m
+            Just path -> do
+                let !bs = L.toStrict $ ucfLbs ucf
+                    res' = (ident, Just (path, bs)) : res
+                    m' = Map.delete ident m
+                loop res' m'
+      where
+        ident = PackageIdentifier (ucfName ucf) (ucfVersion ucf)
+
 -- | Download the given name,version pairs into the directory expected by cabal.
 --
 -- For each package it downloads, it will optionally unpack it to the given
@@ -227,11 +194,11 @@ unpackPackageIdentsForBuild menv idents0 = do
 -- @
 --
 -- Since 0.1.0.0
-fetchPackages :: (F.Foldable f,Functor f,MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m,MonadBaseControl IO m)
+fetchPackages :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m,MonadBaseControl IO m)
               => EnvOverride
-              -> f (PackageIdentifier, Maybe (Path Abs Dir))
+              -> [(PackageIdentifier, Maybe (Path Abs Dir))]
               -> m [Path Abs Dir]
-fetchPackages menv pkgs = do
+fetchPackages menv pkgs0 = do
    env <- ask
    let man = getHttpManager env
        config = getConfig env
@@ -240,28 +207,23 @@ fetchPackages menv pkgs = do
    outputVar <- liftIO (newTVarIO [])
    let packageLocation = flip runReaderT config . configPackageTarball
 
-   let getPackageInfo' = getPackageInfo indexFP
-                       $ Set.fromList
-                       $ map fst
-                       $ F.toList pkgs
+   pds <- getPackageDownloads menv
 
-   (pkgInfo0, missing0) <- getPackageInfo'
-   pkgInfo <-
-       if Set.null missing0
-           then return pkgInfo0
-           else do
+   eres <- addCabalFiles menv pkgs0
+   pkgs <-
+       case eres of
+           Left _missing -> do
                $logInfo "Some cabal files not found, updating index"
                updateIndex menv
-               (pkgInfo, missing) <- getPackageInfo'
-               unless (Set.null missing) $ $logWarn $
-                    "Some cabal files not found: " <>
-                    T.intercalate ", "
-                    (map packageIdentifierText $ Set.toList missing)
-               return pkgInfo
+               eres' <- addCabalFiles menv pkgs0
+               case eres' of
+                   Left missing -> throwM $ CabalFilesNotFound missing
+                   Right pkgs -> return pkgs
+           Right pkgs -> return pkgs
 
    parMapM_
     (configConnectionCount config)
-    (go packageLocation man (return pkgInfo) outputVar)
+    (go packageLocation man pds outputVar)
     pkgs
    liftIO (readTVarIO outputVar)
   where
@@ -272,24 +234,21 @@ fetchPackages menv pkgs = do
     go :: (MonadIO m,Functor m,MonadThrow m,MonadLogger m)
        => (PackageIdentifier -> m (Path Abs File))
        -> Manager
-       -> m (Map PackageIdentifier Package)
+       -> Map PackageIdentifier PackageDownload
        -> TVar [Path Abs Dir]
-       -> (PackageIdentifier, Maybe (Path Abs Dir))
+       -> (PackageIdentifier, Maybe (Path Abs Dir, S8.ByteString))
        -> m ()
-    go packageLocation man getPackageInfo' outputVar (ident, mdest) = do
+    go packageLocation man pds outputVar (ident, mdest) = do
         fp <- fmap toFilePath $ packageLocation ident
         unlessM (liftIO (doesFileExist fp)) $ do
             $logInfo $ "Downloading " <> packageIdentifierText ident
-            packageInfo <- getPackageInfo'
             let (msha512, url, msize) =
-                    case Map.lookup ident packageInfo of
+                    case Map.lookup ident pds of
                         Nothing -> (Nothing, defUrl, Nothing)
-                        Just p ->
-                            ( Map.lookup "SHA512" $ packageHashes p
-                            , case reverse $ packageLocations p of
-                                [] -> defUrl
-                                x:_ -> T.unpack x
-                            , packageSize p
+                        Just pd ->
+                            ( Just $ pdSHA512 pd
+                            , S8.unpack $ pdUrl pd
+                            , Just $ pdSize pd
                             )
             liftIO $ createDirectoryIfMissing True $ takeDirectory fp
             req <- parseUrl url
@@ -312,7 +271,7 @@ fetchPackages menv pkgs = do
                                             Nothing -> return ()
                                             Just expected
                                                 | expected /= total ->
-                                                    throwIO InvalidDownloadSize
+                                                    throwM InvalidDownloadSize
                                                         { _idsUrl = url
                                                         , _idsExpected = expected
                                                         , _idsTotalDownloaded = total
@@ -323,7 +282,7 @@ fetchPackages menv pkgs = do
                                         let total' = total + fromIntegral (S.length bs)
                                         case msize of
                                             Just expected | expected < total' ->
-                                                throwIO InvalidDownloadSize
+                                                throwM InvalidDownloadSize
                                                     { _idsUrl = url
                                                     , _idsExpected = expected
                                                     , _idsTotalDownloaded = total'
@@ -338,14 +297,7 @@ fetchPackages menv pkgs = do
 
         case mdest of
             Nothing -> return ()
-            Just dest' -> do
-                packageInfo <- getPackageInfo'
-                cabalBS <-
-                    case Map.lookup ident packageInfo of
-                        Just p | not $ S.null $ packageCabal p
-                            -> return $ packageCabal p
-                        _ -> throwM $ CabalFileNotFound ident
-
+            Just (dest', cabalBS) -> do
                 let dest = toFilePath dest'
                     innerDest = dest FP.</> packageIdentifierString ident
                 exists <- liftIO (doesDirectoryExist innerDest)
@@ -378,10 +330,10 @@ fetchPackages menv pkgs = do
         targz = pkg ++ ".tar.gz"
         defUrl = T.unpack packageDownloadPrefix ++ targz
 
-validHash :: String -> Maybe Text -> Context SHA512 -> IO ()
+validHash :: String -> Maybe S.ByteString -> Context SHA512 -> IO ()
 validHash _ Nothing _ = return ()
 validHash url (Just sha512) ctx
-    | encodeUtf8 sha512 == digestToHexByteString dig = return ()
+    | sha512 == digestToHexByteString dig = return ()
     | otherwise = throwIO InvalidHash
         { _ihUrl = url
         , _ihExpected = sha512

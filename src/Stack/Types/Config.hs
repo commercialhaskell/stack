@@ -220,6 +220,12 @@ configPackageIndexCache = do
     config <- asks getConfig
     return (configStackRoot config </> $(mkRelFile "00-index.cache"))
 
+-- | Location of the 00-index.urls file
+configPackageIndexUrls :: (MonadReader env m, HasConfig env) => m (Path Abs File)
+configPackageIndexUrls = do
+    config <- asks getConfig
+    return (configStackRoot config </> $(mkRelFile "00-index.urls"))
+
 -- | Location of the 00-index.tar file
 configPackageIndex :: (MonadReader env m, HasConfig env) => m (Path Abs File)
 configPackageIndex = do
