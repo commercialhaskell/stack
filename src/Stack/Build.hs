@@ -293,10 +293,12 @@ getDependencies locals ranges = do
                                      Just pkgs -> map
                                         (\pkg -> M.singleton pkg (Set.singleton $ packageName local))
                                         (Set.toList pkgs)
+                localTools = M.fromList $ map (\p -> (packageName p, ())) locals
+                toolDeps' = M.difference toolDeps localTools
 
             (deps, users) <- resolveBuildPlan mbp isShadowed $ M.unionWith Set.union
                 (fmap M.keysSet ranges)
-                toolDeps
+                toolDeps'
             forM_ (M.toList users) $ \(name, users') -> $logDebug $
                 T.concat
                     [ packageNameText name
