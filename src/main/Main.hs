@@ -41,9 +41,14 @@ main =
      (level,run) <-
        simpleOptions
          $(simpleVersion Meta.version)
-         "header"
-         "desc"
-         logLevelOpt
+         "stack - The Haskell Tool Stack"
+         (unlines
+            ["Stack is a build tool for Haskell code. It handles installation and management"
+            ,"of dependencies, builds multi-package projects, isolates package installations"
+            ,"from each other, and will install build tool dependencies for you (including"
+            ,"GHC). It is designed from the ground up with sensible defaults and a"
+            ,"user-friendly interface.  See: https://github.com/fpco/stack#readme"])
+         globalOpts
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
