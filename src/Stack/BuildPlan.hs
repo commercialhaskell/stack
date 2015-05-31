@@ -564,7 +564,7 @@ findBuildPlan cabalfp gpd = do
         isNightly LTS{} = False
 
     snapshots <- getSnapshots
-    let names = concat
+    let names = nubOrd $ concat
             [ take 2 $ filter isLTS existing
             , take 2 $ filter isNightly existing
             , map (uncurry LTS)
@@ -583,3 +583,13 @@ findBuildPlan cabalfp gpd = do
                 Nothing -> loop names'
                 Just flags -> return $ Just (name, flags)
     loop names
+
+-- | Same semantics as @nub@, but more efficient by using the @Ord@ constraint.
+nubOrd :: Ord a => [a] -> [a]
+nubOrd =
+    go Set.empty
+  where
+    go _ [] = []
+    go s (x:xs)
+        | x `Set.member` s = go s xs
+        | otherwise = x : go (Set.insert x s) xs
