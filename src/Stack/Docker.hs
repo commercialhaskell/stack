@@ -1,28 +1,31 @@
-{-# LANGUAGE CPP, NamedFieldPuns, RankNTypes, TemplateHaskell, TupleSections #-}
+{-# LANGUAGE CPP, NamedFieldPuns, RankNTypes, RecordWildCards, TemplateHaskell, TupleSections #-}
 
 --EKB FIXME: get this all using proper logging infrastructure
 --EKB FIXME: throw exceptions instead of using `error`
+--EKB FIXME: include build plan file in Docker image so that it does not need to be downloaded on 1st use
 
 -- | Run commands in Docker containers
 module Stack.Docker
   --EKB FIXME: trim the exports, remove unused functions, clarify remaining names.
-  (getInContainer
+  (checkHostStackageDockerVersion
+  ,checkVersions
+  ,cleanup
+  ,Cleanup(..)
+  ,CleanupAction(..)
+  ,dockerCmdName
+  ,dockerOptsParser
+  ,dockerOptsFromMonoid
+  ,dockerPullCmdName
+  ,execProcessAndExit
+  ,getInContainer
+  ,preventInContainer
+  ,pull
+  ,rerunCmdWithOptionalContainer
+  ,rerunWithOptionalContainer
   ,runContainerAndExit
   ,runInContainerAndExit
   ,warnIfNoContainer
   ,warnNoContainer
-  ,checkVersions
-  ,Cleanup(..)
-  ,CleanupAction(..)
-  ,cleanup
-  ,pull
-  ,execProcessAndExit
-  ,checkHostStackageDockerVersion
-  ,dockerPullCmdName
-  ,rerunWithOptionalContainer
-  ,rerunCmdWithOptionalContainer
-  ,dockerCmdName
-  ,preventInContainer
   ) where
 
 import           Control.Applicative
@@ -35,18 +38,20 @@ import           Data.Char (isSpace,isPunctuation,toUpper,isAscii)
 import           Data.List (dropWhileEnd,intersperse,isPrefixOf,isInfixOf,foldl',sortBy)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import           Data.Maybe (catMaybes)
+import           Data.Maybe
+import           Data.Monoid
 import qualified Data.Text as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
 import           Data.Version (Version(..),parseVersion,showVersion)
 import           Development.Shake
+import           Options.Applicative.Builder.Extra (maybeBoolFlags)
+import           Options.Applicative (Parser,str,option,help,auto,metavar,long,value)
 import           Path
 import           Path.IO (getWorkingDir)
 import           Paths_stack (version)
-import           Stack.Config (stackDotYaml)
-import           Stack.Constants (projectDockerSandboxDir)
+import           Stack.Constants (projectDockerSandboxDir,stackDotYaml)
 import           Stack.Types hiding (Version, parseVersion) -- FIXME don't hide this
-import           Stack.Docker.GlobalDB (updateDockerImageLastUsed,getDockerImagesLastUsed,pruneDockerImagesLastUsed)
+import           Stack.Docker.GlobalDB
 import           System.Directory (createDirectoryIfMissing)
 import           System.Environment (lookupEnv,unsetEnv,getProgName,getArgs)
 import           System.Exit (ExitCode(ExitSuccess,ExitFailure),exitWith)
@@ -140,7 +145,7 @@ runContainerAndExitAction config
            maybe False (isInfixOf "boot2docker") dockerCertPath)
           (liftIO (hPutStrLn stderr
              ("WARNING: using boot2docker is NOT supported, and not likely to perform well.")))
-     let image = dockerImageName docker
+     let image = dockerImage docker
      maybeImageInfo <- inspect image
      imageInfo <- case maybeImageInfo of
        Just ii -> return ii
@@ -155,6 +160,7 @@ runContainerAndExitAction config
              do progName <- liftIO getProgName
                 error ("The Docker image referenced by '" ++ toFilePath stackDotYaml ++
                        "'' has not\nbeen downloaded:\n\n" ++
+                       --EKB FIXME probably doesn't make sense to use progName here, since `stack docker pull` is still the right command even if something else is using the lib (also check other uses of progName)
                        "Run '" ++ unwords [takeBaseName progName, dockerCmdName, dockerPullCmdName] ++
                        "' to download it, then try again.")
      let (uid,gid) = (dropWhileEnd isSpace uidOut, dropWhileEnd isSpace gidOut)
@@ -164,7 +170,7 @@ runContainerAndExitAction config
              Just x -> (x,False)
              Nothing ->
                --TODO: remove this and oldImage after lts-1.x images no longer in use
-               let sandboxName = maybe (dockerRepo docker) id (lookupImageEnv "SANDBOX_NAME" imageEnvVars)
+               let sandboxName = maybe "default" id (lookupImageEnv "SANDBOX_NAME" imageEnvVars)
                    maybeImageCabalRemoteRepoName = lookupImageEnv "CABAL_REMOTE_REPO_NAME" imageEnvVars
                    maybeImageStackageSlug = lookupImageEnv "STACKAGE_SLUG" imageEnvVars
                    maybeImageStackageDate = lookupImageEnv "STACKAGE_DATE" imageEnvVars
@@ -216,8 +222,7 @@ runContainerAndExitAction config
                      (True,Just x )-> ["-e","DOCKER_TLS_VERIFY=" ++ x]
                      _ -> []
                   ,concatMap sandboxSubdirArg sandboxSubdirs
-                  ,concatMap mountArg (dockerMountDefault docker)
-                  ,concatMap mountArg (dockerMountExtra docker)
+                  ,concatMap mountArg (dockerMount docker)
                   ,case dockerContainerName docker of
                      Just name -> ["--name=" ++ name]
                      Nothing -> []
@@ -226,8 +231,7 @@ runContainerAndExitAction config
                       else concat [["--rm" | not (dockerPersist docker)]
                                   ,["-t" | isTerm]
                                   ,["-i" | isTerm]]
-                  ,dockerRunArgsDefault docker
-                  ,concat (dockerRunArgsExtra docker)
+                  ,dockerRunArgs docker
                   ,[image
                    ,hostVersionEnvVar ++ "=" ++ showVersion version
                    ,requireVersionEnvVar ++ "=" ++ showVersion requireContainerVersion]
@@ -253,7 +257,7 @@ runContainerAndExitAction config
     sandboxSubdirArg :: Path Abs Dir -> [String]
     sandboxSubdirArg subdir = ["-v",toFilePath subdir++ ":" ++ toFilePath subdir]
 
-    docker :: Docker
+    docker :: DockerOpts
     docker = configDocker config
 
 -- | Clean-up old docker images and containers.
@@ -295,6 +299,7 @@ cleanupAction config opts =
                                       inspectMap
                plan = toLazyByteString (execWriter planWriter)
            case dcAction opts of
+                                    --EKB FIXME: use constants to construct filename
              CleanupInteractive -> editByteString "stack-docker-cleanup-plan" plan
              CleanupImmediate -> return plan
              CleanupDryRun -> do LBS.hPut stdout plan
@@ -359,11 +364,11 @@ cleanupAction config opts =
                 buildDefault dcRemoveDanglingImagesCreatedDaysAgo "Dangling images created"
                 buildDefault dcRemoveStoppedContainersCreatedDaysAgo "Stopped containers created"
                 buildDefault dcRemoveRunningContainersCreatedDaysAgo "Running containers created"
-                           --EKB FIXME: `docker cleanup` should come from shared constants.
                 buildStrLn
                   (unlines
                      ["#"
                      ,"# The default plan can be adjusted using command-line arguments."
+                      --EKB FIXME: `docker cleanup` should come from shared constants.
                      ,"# Run '" ++ takeBaseName progName ++ " docker cleanup --help' for details."
                      ,"#"])
            _ -> buildStrLn
@@ -493,7 +498,7 @@ inspect image =
        _ -> error ("Invalid 'docker inspect' output: expect a single result.")
 
 -- | Pull Docker image from registry.
-pullImage :: Docker -> String -> Action ()
+pullImage :: DockerOpts -> String -> Action ()
 pullImage docker image =
   liftIO (do hPutStrLn stderr ("\nPulling from registry: " ++ image)
              when (dockerRegistryLogin docker)
@@ -508,12 +513,11 @@ pullImage docker image =
              Proc.callProcess "docker" ["pull", image])
 
 -- | Pull latest version of configured Docker image from registry.
-pull :: Config -> Maybe (Path Abs Dir) -> IO ()
-pull config mprojectRoot =
-  runAction mprojectRoot
-            (\_ -> do checkDockerVersion
-                      pullImage docker (dockerImageName docker))
-  where docker = configDocker config
+pull :: DockerOpts -> Maybe (Path Abs Dir) -> IO ()
+pull docker mprojectRoot =
+    runAction mprojectRoot
+              (\_ -> do checkDockerVersion
+                        pullImage docker (dockerImage docker))
 
 -- | Run a Shake action.
 runAction :: Maybe (Path Abs Dir) -> (Path Abs Dir -> Action ()) -> IO ()
@@ -691,24 +695,99 @@ checkVersions =
                | otherwise -> return ()
              _ -> return ())
 
+-- | Options parser configuration for Docker.
+dockerOptsParser :: Parser DockerOptsMonoid
+dockerOptsParser =
+    --EKB FIXME: remove some of these options that would be uncommon to use from command-line?
+    DockerOptsMonoid
+    <$> maybeBoolFlags dockerCmdName
+                       "using a Docker container"
+    <*> maybeStrOption (long (dockerOptName dockerRepoOwnerArgName) <>
+                        metavar "REGISTRY/OWNER" <>
+                        help "Docker repository owner")
+    <*> maybeStrOption (long (dockerOptName dockerRepoPrefixArgName) <>
+                        metavar "PREFIX" <>
+                        help "Prefix to add to Docker repository names")
+    <*> maybeStrOption (long (dockerOptName dockerRepoArgName) <>
+                        metavar "NAME" <>
+                        help "Docker repository name")
+    <*> maybeStrOption (long (dockerOptName dockerRepoSuffixArgName) <>
+                        metavar "SUFFIX" <>
+                        help "Suffix to add to Docker repository names")
+    <*> maybeStrOption (long (dockerOptName dockerImageTagArgName) <>
+                        metavar "TAG" <>
+                        help "Docker image tag")
+    <*> maybeStrOption (long (dockerOptName dockerImageArgName) <>
+                        metavar "IMAGE" <>
+                        help "Exact Docker image tag or ID (overrides docker-repo-*/tag)")
+    <*> maybeBoolFlags (dockerOptName dockerRegistryLoginArgName)
+                       "registry requires login"
+    <*> maybeStrOption (long (dockerOptName dockerRegistryUsernameArgName) <>
+                        metavar "USERNAME" <>
+                        help "Docker registry username")
+    <*> maybeStrOption (long (dockerOptName dockerRegistryPasswordArgName) <>
+                        metavar "PASSWORD" <>
+                        help "Docker registry password")
+    <*> maybeBoolFlags (dockerOptName dockerAutoPullArgName)
+                       "automatic pulling latest version of image"
+    <*> maybeBoolFlags (dockerOptName dockerDetachArgName)
+                        "running a detached Docker container"
+    <*> maybeBoolFlags (dockerOptName dockerPersistArgName)
+                       "not deleting container after it exits"
+    <*> maybeStrOption (long (dockerOptName dockerContainerNameArgName) <>
+                        metavar "NAME" <>
+                        help "Docker container name")
+    <*> wordsStrOption (long (dockerOptName dockerRunArgsArgName) <>
+                        value [] <>
+                        metavar "'ARG1 [ARG2 ...]'" <>
+                        help ("Additional arguments to pass to 'docker run'"))
+    <*> many (option auto (long (dockerOptName dockerMountArgName) <>
+                           metavar "(PATH | HOST-PATH:CONTAINER-PATH)" <>
+                           help ("Mount volumes from host in container " ++
+                                 "(may specify mutliple times)")))
+    <*> maybeBoolFlags (dockerOptName dockerPassHostArgName)
+                       "passing Docker daemon connection information into container"
+  where
+    dockerOptName optName = dockerCmdName ++ "-" ++ T.unpack optName
+    maybeStrOption = optional . option str
+    wordsStrOption = option (fmap words str)
+
+-- | Interprets DockerOptsMonoid options.
+dockerOptsFromMonoid :: DockerOptsMonoid -> DockerOpts
+dockerOptsFromMonoid DockerOptsMonoid{..} = DockerOpts
+  {dockerEnable = fromMaybe False dockerMonoidEnable
+  ,dockerImage = let owner = fromMaybe "fpco" dockerMonoidRepoOwner
+                     tag = emptyToNothing dockerMonoidImageTag
+                 in concat [owner
+                           ,if null owner then "" else "/"
+                           ,fromMaybe "" dockerMonoidRepoPrefix
+                           ,fromMaybe "dev" dockerMonoidRepo
+                           ,fromMaybe "" dockerMonoidRepoSuffix
+                           --EKB FIXME should default image tag from the main config's resolver
+                           ,maybe "" (const ":") tag
+                           ,fromMaybe "" tag]
+  ,dockerRegistryLogin = fromMaybe (isJust (emptyToNothing dockerMonoidRegistryUsername))
+                                   dockerMonoidRegistryLogin
+  ,dockerRegistryUsername = emptyToNothing dockerMonoidRegistryUsername
+  ,dockerRegistryPassword = emptyToNothing dockerMonoidRegistryPassword
+  ,dockerAutoPull = fromMaybe False dockerMonoidAutoPull
+  ,dockerDetach = fromMaybe False dockerMonoidDetach
+  ,dockerPersist = fromMaybe False dockerMonoidPersist
+  ,dockerContainerName = emptyToNothing dockerMonoidContainerName
+  ,dockerRunArgs = dockerMonoidRunArgs
+  ,dockerMount = dockerMonoidMount
+  ,dockerPassHost = fromMaybe False dockerMonoidPassHost
+  }
+  where emptyToNothing Nothing = Nothing
+        emptyToNothing (Just s) | null s = Nothing
+                                | otherwise = Just s
+
 -- | Parse a version number.
 parseVersion' :: String -> Maybe Version
 parseVersion' v =
   case reverse (readP_to_S parseVersion (dropWhileEnd isPunctuation v)) of
     ((v',""):_) -> Just v'
     _ -> Nothing
-
--- | Construct full configured Docker image name/ID.
-dockerImageName :: Docker -> String
-dockerImageName docker =
-  case dockerImage docker of
-    Just i -> i
-    Nothing -> concat [dockerRepoOwner docker
-                      ,if null (dockerRepoOwner docker) then "" else "/"
-                      ,dockerRepo docker
-                      ,dockerRepoSuffix docker
-                      ,maybe "" (const ":") (dockerImageTag docker)
-                      ,maybe "" id (dockerImageTag docker)]
 
 -- | Environment variable to the host's stack version.
 hostVersionEnvVar :: String

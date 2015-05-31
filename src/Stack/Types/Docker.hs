@@ -1,151 +1,214 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings, FlexibleInstances, RecordWildCards #-}
 
 -- | Docker types.
 
 module Stack.Types.Docker where
 
-import Control.Applicative
+import Control.Applicative ((<|>))
 import Data.Aeson
+import Data.Monoid
 import Data.Text (Text)
 
 -- | Docker configuration.
-data Docker =
-  Docker {dockerEnable :: !Bool
-           -- ^ Is using Docker enabled?
-         ,dockerRepoOwner :: !String
-           -- ^ Docker repository (registry and) owner
-         ,dockerRepo :: !String
-           -- ^ Docker repository name (e.g. @dev@)
-         ,dockerRepoSuffix :: !String
-           -- ^ Docker repository name's suffix (e.g. stackage ver)
-         ,dockerImageTag :: !(Maybe String)
-           -- ^ Optional Docker image tag (e.g. the date)
-         ,dockerImage :: !(Maybe String)
-           -- ^ Exact Docker image tag or ID.  Overrides docker-repo-*/tag.
-         ,dockerRegistryLogin :: !Bool
-           -- ^ Does registry require login for pulls?
-         ,dockerRegistryUsername :: !(Maybe String)
-           -- ^ Optional username for Docker registry.
-         ,dockerRegistryPassword :: !(Maybe String)
-           -- ^ Optional password for Docker registry.
-         ,dockerAutoPull :: !Bool
-           -- ^ Automatically pull new images.
-         ,dockerDetach :: !Bool
-           -- ^ Whether to run a detached container
-         ,dockerPersist :: !Bool
-           -- ^ Create a persistent container (don't remove it when finished).  Implied by
-           -- `dockerDetach`.
-         ,dockerContainerName :: !(Maybe String)
-           -- ^ Container name to use, only makes sense from command-line with `dockerPersist`
-           -- or `dockerDetach`.
-         ,dockerRunArgsDefault :: ![String]
-           -- ^ Arguments to pass directly to @docker run@ (from @stackage-build.config@).
-         ,dockerRunArgsExtra :: ![[String]]
-           -- ^ Arguments to pass directly to @docker run@ (passed on stackage-build command-line).
-         ,dockerMountDefault :: ![Mount]
-           -- ^ Volumes to mount in the container (from @stackage-build.config@).
-         ,dockerMountExtra :: ![Mount]
-           -- ^ Volumes to mount in the container (from stackage-build command-line).
-         ,dockerPassHost :: !Bool
-           -- ^ Pass Docker daemon connection information into container.
-         ,dockerExtra :: ![String]
-           -- ^ This is a placeholder for command-line argument parsing.
-         }
+data DockerOpts = DockerOpts
+  {dockerEnable :: !Bool
+    -- ^ Is using Docker enabled?
+  ,dockerImage :: !String
+    -- ^ Exact Docker image tag or ID.  Overrides docker-repo-*/tag.
+  ,dockerRegistryLogin :: !Bool
+    -- ^ Does registry require login for pulls?
+  ,dockerRegistryUsername :: !(Maybe String)
+    -- ^ Optional username for Docker registry.
+  ,dockerRegistryPassword :: !(Maybe String)
+    -- ^ Optional password for Docker registry.
+  ,dockerAutoPull :: !Bool
+    -- ^ Automatically pull new images.
+  ,dockerDetach :: !Bool
+    -- ^ Whether to run a detached container
+  ,dockerPersist :: !Bool
+    -- ^ Create a persistent container (don't remove it when finished).  Implied by
+    -- `dockerDetach`.
+  ,dockerContainerName :: !(Maybe String)
+    -- ^ Container name to use, only makes sense from command-line with `dockerPersist`
+    -- or `dockerDetach`.
+  ,dockerRunArgs :: ![String]
+    -- ^ Arguments to pass directly to @docker run@.
+  ,dockerMount :: ![Mount]
+    -- ^ Volumes to mount in the container.
+  ,dockerPassHost :: !Bool
+    -- ^ Pass Docker daemon connection information into container.
+  }
   deriving (Show)
 
--- | For YAML.
-instance FromJSON Docker where
-  parseJSON = withObject "Docker" $ \o ->
-            Docker <$> o .:? dockerEnableArgName .!= True
-                   <*> o .:? dockerRepoOwnerArgName .!= dockerRepoOwner defaultDocker
-                   <*> o .:? dockerRepoArgName .!= dockerRepo defaultDocker
-                   <*> o .:? dockerRepoSuffixArgName .!= dockerRepoSuffix defaultDocker
-                   <*> o .:? dockerImageTagArgName .!= dockerImageTag defaultDocker
-                   <*> o .:? dockerImageArgName
-                   <*> o .:? dockerRegistryLoginArgName .!= dockerRegistryLogin defaultDocker
-                   <*> o .:? dockerRegistryUsernameArgName .!= dockerRegistryUsername defaultDocker
-                   <*> o .:? dockerRegistryPasswordArgName .!= dockerRegistryPassword defaultDocker
-                   <*> o .:? dockerAutoPullArgName .!= dockerAutoPull defaultDocker
-                   <*> o .:? dockerDetachArgName .!= dockerDetach defaultDocker
-                   <*> o .:? dockerPersistArgName .!= dockerPersist defaultDocker
-                   <*> o .:? dockerContainerNameArgName .!= dockerContainerName defaultDocker
-                   <*> o .:? dockerRunArgsArgName .!= dockerRunArgsDefault defaultDocker
-                   <*> pure (dockerRunArgsExtra defaultDocker)
-                   <*> o .:? dockerMountArgName .!= dockerMountDefault defaultDocker
-                   <*> pure (dockerMountExtra defaultDocker)
-                   <*> o .:? dockerPassHostArgName .!= dockerPassHost defaultDocker
-                   <*> pure (dockerExtra defaultDocker)
+-- An uninterpreted representation of xidocker options.
+-- Configurations may be "cascaded" using mappend (left-biased).
+data DockerOptsMonoid = DockerOptsMonoid
+  {dockerMonoidEnable :: !(Maybe Bool)
+    -- ^ Is using Docker enabled?
+  ,dockerMonoidRepoOwner :: !(Maybe String)
+    -- ^ Docker repository (registry and) owner
+  --EKB FIXME: rethink this prefix/repo/suffix business.  Improve naming?
+  ,dockerMonoidRepoPrefix :: !(Maybe String)
+    -- ^ Docker repository name's prefix (e.g. variant)
+  ,dockerMonoidRepo :: !(Maybe String)
+    -- ^ Docker repository name (e.g. @dev@)
+  ,dockerMonoidRepoSuffix :: !(Maybe String)
+    -- ^ Docker repository name's suffix (e.g. GHC version)
+  ,dockerMonoidImageTag :: !(Maybe String)
+    -- ^ Optional Docker image tag (e.g. the date)
+  ,dockerMonoidImage :: !(Maybe String)
+    -- ^ Exact Docker image tag or ID.  Overrides docker-repo-*/tag.
+  ,dockerMonoidRegistryLogin :: !(Maybe Bool)
+    -- ^ Does registry require login for pulls?
+  ,dockerMonoidRegistryUsername :: !(Maybe String)
+    -- ^ Optional username for Docker registry.
+  ,dockerMonoidRegistryPassword :: !(Maybe String)
+    -- ^ Optional password for Docker registry.
+  ,dockerMonoidAutoPull :: !(Maybe Bool)
+    -- ^ Automatically pull new images.
+  ,dockerMonoidDetach :: !(Maybe Bool)
+    -- ^ Whether to run a detached container
+  ,dockerMonoidPersist :: !(Maybe Bool)
+    -- ^ Create a persistent container (don't remove it when finished).  Implied by
+    -- `dockerDetach`.
+  ,dockerMonoidContainerName :: !(Maybe String)
+    -- ^ Container name to use, only makes sense from command-line with `dockerPersist`
+    -- or `dockerDetach`.
+  ,dockerMonoidRunArgs :: ![String]
+    -- ^ Arguments to pass directly to @docker run@
+  ,dockerMonoidMount :: ![Mount]
+    -- ^ Volumes to mount in the container
+  ,dockerMonoidPassHost :: !(Maybe Bool)
+    -- ^ Pass Docker daemon connection information into container.
+  }
+  deriving (Show)
 
--- | Default values for Docker configuration.
-defaultDocker :: Docker
-defaultDocker =
-        Docker {dockerEnable = False
-               ,dockerRepoOwner = "fpco"
-               ,dockerRepo = "dev"
-               ,dockerRepoSuffix = ""
-               ,dockerImageTag = Nothing
-               ,dockerImage = Nothing
-               ,dockerRegistryLogin = False
-               ,dockerRegistryUsername = Nothing
-               ,dockerRegistryPassword = Nothing
-               ,dockerAutoPull = False
-               ,dockerDetach = False
-               ,dockerPersist = False
-               ,dockerContainerName = Nothing
-               ,dockerRunArgsDefault = []
-               ,dockerRunArgsExtra = []
-               ,dockerMountDefault = []
-               ,dockerMountExtra = []
-               ,dockerPassHost = False
-               ,dockerExtra = []
-               }
+instance FromJSON DockerOptsMonoid where
+  parseJSON = withObject "DockerOptsMonoid"
+    (\o -> do dockerMonoidEnable           <- o .:? dockerEnableArgName .!= Just True
+              dockerMonoidRepoOwner        <- o .:? dockerRepoOwnerArgName
+              dockerMonoidRepoPrefix       <- o .:? dockerRepoPrefixArgName
+              dockerMonoidRepo             <- o .:? dockerRepoArgName
+              dockerMonoidRepoSuffix       <- o .:? dockerRepoSuffixArgName
+              dockerMonoidImageTag         <- o .:? dockerImageTagArgName
+              dockerMonoidImage            <- o .:? dockerImageArgName
+              dockerMonoidRegistryLogin    <- o .:? dockerRegistryLoginArgName
+              dockerMonoidRegistryUsername <- o .:? dockerRegistryUsernameArgName
+              dockerMonoidRegistryPassword <- o .:? dockerRegistryPasswordArgName
+              dockerMonoidAutoPull         <- o .:? dockerAutoPullArgName
+              dockerMonoidDetach           <- o .:? dockerDetachArgName
+              dockerMonoidPersist          <- o .:? dockerPersistArgName
+              dockerMonoidContainerName    <- o .:? dockerContainerNameArgName
+              dockerMonoidRunArgs          <- o .:? dockerRunArgsArgName .!= []
+              dockerMonoidMount            <- o .:? dockerMountArgName .!= []
+              dockerMonoidPassHost         <- o .:? dockerPassHostArgName
+              return DockerOptsMonoid{..})
 
+instance Monoid DockerOptsMonoid where
+  mempty = DockerOptsMonoid
+    {dockerMonoidEnable           = Nothing
+    ,dockerMonoidRepoOwner        = Nothing
+    ,dockerMonoidRepoPrefix       = Nothing
+    ,dockerMonoidRepo             = Nothing
+    ,dockerMonoidRepoSuffix       = Nothing
+    ,dockerMonoidImageTag         = Nothing
+    ,dockerMonoidImage            = Nothing
+    ,dockerMonoidRegistryLogin    = Nothing
+    ,dockerMonoidRegistryUsername = Nothing
+    ,dockerMonoidRegistryPassword = Nothing
+    ,dockerMonoidAutoPull         = Nothing
+    ,dockerMonoidDetach           = Nothing
+    ,dockerMonoidPersist          = Nothing
+    ,dockerMonoidContainerName    = Nothing
+    ,dockerMonoidRunArgs          = []
+    ,dockerMonoidMount            = []
+    ,dockerMonoidPassHost         = Nothing
+    }
+  mappend l r = DockerOptsMonoid
+    {dockerMonoidEnable           = dockerMonoidEnable l <|> dockerMonoidEnable r
+    ,dockerMonoidRepoOwner        = dockerMonoidRepoOwner l <|> dockerMonoidRepoOwner r
+    ,dockerMonoidRepoPrefix       = dockerMonoidRepoPrefix l <|> dockerMonoidRepoPrefix r
+    ,dockerMonoidRepo             = dockerMonoidRepo l <|> dockerMonoidRepo r
+    ,dockerMonoidRepoSuffix       = dockerMonoidRepoSuffix l <|> dockerMonoidRepoSuffix r
+    ,dockerMonoidImageTag         = dockerMonoidImageTag l <|> dockerMonoidImageTag r
+    ,dockerMonoidImage            = dockerMonoidImage l <|> dockerMonoidImage r
+    ,dockerMonoidRegistryLogin    = dockerMonoidRegistryLogin l <|> dockerMonoidRegistryLogin r
+    ,dockerMonoidRegistryUsername = dockerMonoidRegistryUsername l <|> dockerMonoidRegistryUsername r
+    ,dockerMonoidRegistryPassword = dockerMonoidRegistryPassword l <|> dockerMonoidRegistryPassword r
+    ,dockerMonoidAutoPull         = dockerMonoidAutoPull l <|> dockerMonoidAutoPull r
+    ,dockerMonoidDetach           = dockerMonoidDetach l <|> dockerMonoidDetach r
+    ,dockerMonoidPersist          = dockerMonoidPersist l <|> dockerMonoidPersist r
+    ,dockerMonoidContainerName    = dockerMonoidContainerName l <|> dockerMonoidContainerName r
+    ,dockerMonoidRunArgs          = dockerMonoidRunArgs r <> dockerMonoidRunArgs l
+    ,dockerMonoidMount            = dockerMonoidMount r <> dockerMonoidMount l
+    ,dockerMonoidPassHost         = dockerMonoidPassHost l <|> dockerMonoidPassHost r
+    }
+
+-- | Docker enable argument name.
 dockerEnableArgName :: Text
 dockerEnableArgName = "enable"
 
+-- | Docker repo owner argument name.
 dockerRepoOwnerArgName :: Text
 dockerRepoOwnerArgName = "repo-owner"
 
+-- | Docker repo prefix argument name.
+dockerRepoPrefixArgName :: Text
+dockerRepoPrefixArgName = "repo-prefix"
+
+-- | Docker repo arg argument name.
 dockerRepoArgName :: Text
 dockerRepoArgName = "repo"
 
+-- | Docker repo suffix argument name.
 dockerRepoSuffixArgName :: Text
 dockerRepoSuffixArgName = "repo-suffix"
 
+-- | Docker image tag argument name.
 dockerImageTagArgName :: Text
 dockerImageTagArgName = "image-tag"
 
+-- | Docker image argument name.
 dockerImageArgName :: Text
 dockerImageArgName = "image"
 
+-- | Docker registry login argument name.
 dockerRegistryLoginArgName :: Text
 dockerRegistryLoginArgName = "registry-login"
 
+-- | Docker registry username argument name.
 dockerRegistryUsernameArgName :: Text
 dockerRegistryUsernameArgName = "registry-username"
 
+-- | Docker registry password argument name.
 dockerRegistryPasswordArgName :: Text
 dockerRegistryPasswordArgName = "registry-password"
 
+-- | Docker auto-pull argument name.
 dockerAutoPullArgName :: Text
 dockerAutoPullArgName = "auto-pull"
 
+-- | Docker detach argument name.
 dockerDetachArgName :: Text
 dockerDetachArgName = "detach"
 
+-- | Docker run args argument name.
 dockerRunArgsArgName :: Text
 dockerRunArgsArgName = "run-args"
 
+-- | Docker mount argument name.
 dockerMountArgName :: Text
 dockerMountArgName = "mount"
 
+-- | Docker container name argument name.
 dockerContainerNameArgName :: Text
 dockerContainerNameArgName = "container-name"
 
+-- | Docker persist argument name.
 dockerPersistArgName :: Text
 dockerPersistArgName = "persist"
 
+-- | Docker pass host argument name.
 dockerPassHostArgName :: Text
 dockerPassHostArgName = "pass-host"
 
@@ -154,10 +217,11 @@ data Mount = Mount String String
 
 -- | For optparse-applicative.
 instance Read Mount where
-  readsPrec _ s = case break (== ':') s of
-                    (a,(':':b)) -> [(Mount a b,"")]
-                    (a,[]) -> [(Mount a a,"")]
-                    _ -> fail "Invalid value for mount"
+  readsPrec _ s =
+    case break (== ':') s of
+      (a,(':':b)) -> [(Mount a b,"")]
+      (a,[]) -> [(Mount a a,"")]
+      _ -> fail "Invalid value for Docker mount (expect '/host/path:/container/path')"
 
 -- | Show instance.
 instance Show Mount where

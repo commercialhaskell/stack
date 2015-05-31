@@ -19,7 +19,8 @@ extra-source-files:  README.md ARCHITECTURE.md ChangeLog.md
 library
   hs-source-dirs:    src/
   ghc-options:       -Wall -O0 -pgmPcpphs -optP--cpp
-  exposed-modules:   Stack.BuildPlan
+  exposed-modules:   Options.Applicative.Builder.Extra
+                     Stack.BuildPlan
                      Stack.Config
                      Stack.Constants
                      Stack.Docker

@@ -2,19 +2,22 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | The Config type.
 
 module Stack.Types.Config where
 
+import           Control.Applicative ((<|>))
 import           Control.Exception
 import           Control.Monad (liftM)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
-import           Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, withText)
+import           Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, (.:?), (.!=))
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (fromMaybe)
+import           Data.Monoid
 import           Data.Set (Set)
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -34,7 +37,7 @@ import           System.Process.Read (EnvOverride)
 data Config =
   Config {configStackRoot        :: !(Path Abs Dir)
          -- ^ ~/.stack more often than not
-         ,configDocker           :: !Docker
+         ,configDocker           :: !DockerOpts
          ,configUrls             :: !(Map Text Text)
          ,configGpgVerifyIndex   :: !Bool
          ,configEnvOverride      :: !(EnvSettings -> IO EnvOverride)
@@ -178,6 +181,52 @@ instance HasConfig BuildConfig
 instance HasBuildConfig BuildConfig where
     getBuildConfig = id
     {-# INLINE getBuildConfig #-}
+
+-- An uninterpreted representation of configuration options.
+-- Configurations may be "cascaded" using mappend (left-biased).
+data ConfigMonoid =
+  ConfigMonoid
+    { configMonoidDockerOpts     :: !DockerOptsMonoid
+    -- ^ Docker options.
+    , configMonoidUrls           :: !(Map Text Text)
+    -- ^ Various URLs for downloading things. Yes, this is stringly typed,
+    -- making it easy to extend. Please make sure to only access it using
+    -- helper functions.
+    , configMonoidGpgVerifyIndex :: !(Maybe Bool)
+    -- ^ Controls how package index updating occurs
+    , configMonoidConnectionCount :: !(Maybe Int)
+    -- ^ See: 'configConnectionCount'
+    , configMonoidHideTHLoading :: !(Maybe Bool)
+    -- ^ See: 'configHideTHLoading'
+    }
+  deriving Show
+
+instance Monoid ConfigMonoid where
+  mempty = ConfigMonoid
+    { configMonoidDockerOpts = mempty
+    , configMonoidUrls = mempty
+    , configMonoidGpgVerifyIndex = Nothing
+    , configMonoidConnectionCount = Nothing
+    , configMonoidHideTHLoading = Nothing
+    }
+  mappend l r = ConfigMonoid
+    { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
+    , configMonoidUrls = configMonoidUrls l <> configMonoidUrls r
+    , configMonoidGpgVerifyIndex = configMonoidGpgVerifyIndex l <|> configMonoidGpgVerifyIndex r
+    , configMonoidConnectionCount = configMonoidConnectionCount l <|> configMonoidConnectionCount r
+    , configMonoidHideTHLoading = configMonoidHideTHLoading l <|> configMonoidHideTHLoading r
+    }
+
+instance FromJSON ConfigMonoid where
+  parseJSON =
+    withObject "ConfigMonoid" $
+    \obj ->
+      do configMonoidDockerOpts <- obj .:? T.pack "docker" .!= mempty
+         configMonoidUrls <- obj .:? "urls" .!= mempty
+         configMonoidGpgVerifyIndex <- obj .:? "gpg-verify-index"
+         configMonoidConnectionCount <- obj .:? "connection-count"
+         configMonoidHideTHLoading <- obj .:? "hide-th-loading"
+         return ConfigMonoid {..}
 
 data ConfigException
   = ConfigInvalidYaml String
