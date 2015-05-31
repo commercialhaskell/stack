@@ -98,6 +98,15 @@ extra-deps: []
 
 The above example specifies that the `proprietary-dep` package is found in the project's `third-party` folder, that the `conduit` package is found in the project's `github-version-of` folder, and that the `diagrams` package is found in the project's `patched` folder.
 
+__I need to modify an upstream package, how should I do it?__
+
+Typically, you will want to get the source for the package and then add it to
+your `packages` list in stack.yaml. (See the previous question.)
+`stack unpack` is one approach for the
+former. Another would be to add the upstream package as a submodule to your
+project.
+
+
 __How do I use this with sandboxes?__
 
 Explicit sandboxing on the part of the user is not required by stack. All
@@ -154,9 +163,3 @@ the selected snapshot, the `extra-deps` configuration value, and your local
 packages. The only way to get stack to change its build plan is to modify one
 of those three. Updating the index will have no impact on stack's behavior.
 
-__I need to modify an upstream package, how should I do it?__
-
-Typically, you will want to get the source for the package and then add it to
-your `packages` list in stack.yaml. `stack unpack` is one approach for the
-former. Another would be to add the upstream package as a submodule to your
-project.
