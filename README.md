@@ -82,6 +82,22 @@ extra-deps:
 Note that any packages from the snapshot which depend on the modified package
 will not be available to you.
 
+__I need to use a package (or version of a package) that is not available on hackage, what should I do?__
+
+Add it to the `packages` list in your project's `stack.yaml`, specifying the package's source code location relative to the directory where your `stack.yaml` file lives, e.g.
+
+```yaml
+resolver: lts-2.10
+packages:
+- '.'
+- third-party/proprietary-dep
+- github-version-of/conduit
+- patched/diagrams
+extra-deps: []
+```
+
+The above example specifies that the `proprietary-dep` package is found in the project's `third-party` folder, that the `conduit` package is found in the project's `github-version-of` folder, and that the `diagrams` package is found in the project's `patched` folder.
+
 __How do I use this with sandboxes?__
 
 Explicit sandboxing on the part of the user is not required by stack. All
