@@ -101,6 +101,7 @@ readPackageIdents menv = do
     case x of
         Left e -> do
             $logDebug $ "Populate index cache, load failed with " <> T.pack (show e)
+            $logInfo "Populating index cache, may take a moment"
             let toIdent ucf = PackageIdentifier (ucfName ucf) (ucfVersion ucf)
             pis <- sourcePackageIndex menv $$ CL.map toIdent =$ CL.consume
             liftIO $ Binary.encodeFile fp pis
