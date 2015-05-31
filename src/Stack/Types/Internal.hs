@@ -14,8 +14,6 @@ data Env config =
 
 instance HasStackRoot config => HasStackRoot (Env config) where
     getStackRoot = getStackRoot . envConfig
-instance HasUrls config => HasUrls (Env config) where
-    getUrls = getUrls . envConfig
 instance HasPlatform config => HasPlatform (Env config) where
     getPlatform = getPlatform . envConfig
 instance HasConfig config => HasConfig (Env config) where

@@ -221,7 +221,7 @@ addDeps ghcVersion toCalc = do
   where
     tryAddDeps menv = do
         platform <- asks (configPlatform . getConfig)
-        idents <- sourcePackageIndex menv $$ CL.foldM (go platform) idents0
+        idents <- sourcePackageIndex menv $$ CL.foldM (go platform) idents0 -- FIXME use the more efficient cabal file lookup code like Stack.Fetch
         return $ case partitionEithers $ map hoistEither $ Map.toList idents of
             ([], pairs) -> Right $ Map.fromList pairs
             (missing, _) -> Left $ Couldn'tFindInIndex $ Set.fromList missing

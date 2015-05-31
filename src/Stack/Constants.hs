@@ -7,7 +7,6 @@ module Stack.Constants
     (distRelativeDir
     ,haskellFileExts
     ,distDirFromDir
-    ,packageDownloadPrefix
     ,rawGithubUrl
     ,defaultShakeThreads
     ,builtFileFromDir
@@ -113,10 +112,6 @@ distRelativeDir cabalPkgVer = do
 -- pkgIndexFile config =
 --   pkgIndexDir config </>
 --   $(mkRelFile "00-index.tar")
-
--- | URL prefix for downloading packages
-packageDownloadPrefix :: Text
-packageDownloadPrefix = "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
 
 -- | Get a URL for a raw file on Github
 rawGithubUrl :: Text -- ^ user/org name

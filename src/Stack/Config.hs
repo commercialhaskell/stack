@@ -416,3 +416,18 @@ loadProjectConfig = do
 -- | The filename used for the stack config file.
 stackDotYaml :: Path Rel File
 stackDotYaml = $(mkRelFile "stack.yaml")
+
+-- FIXME askUrl "latest-snapshot-url" "https://www.stackage.org/download/snapshots.json"
+{- FIXME
+-- | Git URL for the package index
+askPackageIndexGitUrl :: (MonadReader env m, HasUrls env) => m Text
+askPackageIndexGitUrl = askUrl "package-index-git-url" "https://github.com/commercialhaskell/all-cabal-hashes.git"
+
+-- | HTTP URL for the package index
+askPackageIndexHttpUrl :: (MonadReader env m, HasUrls env) => m Text
+askPackageIndexHttpUrl = askUrl "package-index-http-url" "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"
+
+-- | URL prefix for downloading packages
+packageDownloadPrefix :: Text
+packageDownloadPrefix = "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
+-}

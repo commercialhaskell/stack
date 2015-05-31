@@ -98,10 +98,12 @@ unpackPackages :: (MonadIO m,MonadBaseControl IO m,MonadReader env m,HasHttpMana
                -> m ()
 unpackPackages menv dest input = do
     dest' <- liftIO (canonicalizePath dest) >>= parseAbsDir
-    (names, idents1) <- case partitionEithers $ map parse input of
+    (names, idents) <- case partitionEithers $ map parse input of
         ([], x) -> return $ partitionEithers x
         (errs, _) -> throwM $ CouldNotParsePackageSelectors errs
     (pis, pds) <- getPackageCaches menv
+    idents1 <-
+        case partitionEithers $ map (getIdent pis) idents of
     idents2 <-
         if null names
             then return []
@@ -113,6 +115,11 @@ unpackPackages menv dest input = do
     dests <- fetchPackages menv pis pds $ map (, Just dest') $ idents1 ++ idents2
     mapM_ (\dest'' -> $logInfo $ "Unpacked to " <> T.pack (toFilePath dest'')) dests
   where
+    getIdent pis ident =
+        case Map.lookup ident pis of
+            Nothing -> Left ident
+            Just (
+
     -- Possible future enhancement: parse names as name + version range
     parse s =
         case parsePackageNameFromString s of
@@ -124,18 +131,18 @@ unpackPackages menv dest input = do
 
 -- | Find the newest versions of all given package names.
 findNewestVersions :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
-                   => Map PackageIdentifier PackageCache
+                   => Map PackageIdentifier (PackageIndex, PackageCache)
                    -> [PackageName]
-                   -> m [PackageIdentifier]
+                   -> m [(PackageIdentifier, PackageIndex)]
 findNewestVersions cache names
     | null missing = return idents
     | otherwise = throwM $ Couldn'tFindPackages $ Set.fromList missing
   where
     (missing, idents) = partitionEithers $ map go names
 
-    go name = maybe (Left name) (Right . PackageIdentifier name) (Map.lookup name m)
+    go name = maybe (Left name) Right (Map.lookup name m)
 
-    m = Map.fromList $ map toTuple $ Map.keys cache
+    m = Map.fromList $ map (\(ident, (idx, _)) -> (packageIdentifierName ident, (ident, idx))) $ Map.toList cache
 
 -- | Ensure that all of the given package idents are unpacked into the build
 -- unpack directory, and return the paths to all of the subdirectories.
@@ -165,7 +172,7 @@ unpackPackageIdentsForBuild menv idents0 = do
 -- | Add the contents of the cabal file from the index to packages that will be
 -- unpacked.
 addCabalFiles :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m)
-              => Map PackageIdentifier PackageCache
+              => Map PackageIdentifier (PackageIndex, PackageCache)
               -> [(PackageIdentifier, Maybe (Path Abs Dir))]
               -> m (Either (Set PackageIdentifier) [(PackageIdentifier, Maybe (Path Abs Dir, S8.ByteString))])
 addCabalFiles pis pkgs0 = do
@@ -209,8 +216,8 @@ addCabalFiles pis pkgs0 = do
 -- Since 0.1.0.0
 fetchPackages :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m,MonadBaseControl IO m)
               => EnvOverride
-              -> Map PackageIdentifier PackageCache
-              -> Map PackageIdentifier PackageDownload
+              -> Map PackageIdentifier (PackageIndex, PackageCache)
+              -> Map PackageIdentifier (PackageIndex, PackageDownload)
               -> [(PackageIdentifier, Maybe (Path Abs Dir))]
               -> m [Path Abs Dir]
 fetchPackages menv pis0 pds0 pkgs0 = do
@@ -219,7 +226,6 @@ fetchPackages menv pis0 pds0 pkgs0 = do
        config = getConfig env
 
    outputVar <- liftIO (newTVarIO [])
-   let packageLocation = flip runReaderT config . configPackageTarball
 
    eres <- addCabalFiles pis0 pkgs0
    (pds, pkgs) <-
@@ -236,7 +242,7 @@ fetchPackages menv pis0 pds0 pkgs0 = do
 
    parMapM_
     (configConnectionCount config)
-    (go packageLocation man pds outputVar)
+    (go man pds outputVar)
     pkgs
    liftIO (readTVarIO outputVar)
   where
@@ -245,24 +251,27 @@ fetchPackages menv pis0 pds0 pkgs0 = do
         unless p' f
 
     go :: (MonadIO m,Functor m,MonadThrow m,MonadLogger m)
-       => (PackageIdentifier -> m (Path Abs File))
-       -> Manager
-       -> Map PackageIdentifier PackageDownload
+       => Manager
+       -> Map PackageIdentifier (PackageIndex, PackageDownload)
        -> TVar [Path Abs Dir]
-       -> (PackageIdentifier, Maybe (Path Abs Dir, S8.ByteString))
+       -> (PackageIdentifier, PackageIndex, Maybe (Path Abs Dir, S8.ByteString))
        -> m ()
-    go packageLocation man pds outputVar (ident, mdest) = do
-        fp <- fmap toFilePath $ packageLocation ident
+    go man pds outputVar (ident, indexName, mdest) = do
+        fp <- fmap toFilePath $ configPackageTarball indexName ident
         unlessM (liftIO (doesFileExist fp)) $ do
             $logInfo $ "Downloading " <> packageIdentifierText ident
-            let (msha512, url, msize) =
+            let (msha512, murl, msize) =
                     case Map.lookup ident pds of
-                        Nothing -> (Nothing, defUrl, Nothing)
-                        Just pd ->
+                        Nothing -> (Nothing, Nothing, Nothing)
+                        Just (_, pd) ->
                             ( Just $ pdSHA512 pd
-                            , S8.unpack $ pdUrl pd
+                            , Just $ S8.unpack $ pdUrl pd
                             , Just $ pdSize pd
                             )
+            url <-
+                case murl of
+                    Just url -> return url
+                    Nothing -> error "defUrl = T.unpack packageDownloadPrefix ++ targz"
             liftIO $ createDirectoryIfMissing True $ takeDirectory fp
             req <- parseUrl url
             let req' = req
@@ -341,7 +350,6 @@ fetchPackages menv pis0 pds0 pkgs0 = do
       where
         pkg = packageIdentifierString ident
         targz = pkg ++ ".tar.gz"
-        defUrl = T.unpack packageDownloadPrefix ++ targz
 
 validHash :: String -> Maybe S.ByteString -> Context SHA512 -> IO ()
 validHash _ Nothing _ = return ()
