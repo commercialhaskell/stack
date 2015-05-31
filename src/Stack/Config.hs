@@ -303,8 +303,8 @@ loadBuildConfig mproject config = do
             let p = Project
                     { projectPackages =
                         if cabalFileExists
-                            then []
-                            else ["."]
+                            then ["."]
+                            else []
                     , projectExtraDeps = Map.empty
                     , projectFlags = flags
                     , projectResolver = r
