@@ -102,8 +102,8 @@ __I need to modify an upstream package, how should I do it?__
 
 Typically, you will want to get the source for the package and then add it to
 your `packages` list in stack.yaml. (See the previous question.)
-`stack unpack` is one approach for the
-former. Another would be to add the upstream package as a submodule to your
+`stack unpack` is one approach for getting the source.
+Another would be to add the upstream package as a submodule to your
 project.
 
 
