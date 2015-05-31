@@ -69,7 +69,8 @@ import           System.Directory         (createDirectoryIfMissing,
 import           System.FilePath (takeDirectory, (<.>), takeExtension)
 import qualified System.FilePath as FP
 import           System.IO                (IOMode (ReadMode, WriteMode),
-                                           withBinaryFile)
+                                           withBinaryFile, SeekMode (AbsoluteSeek),
+                                           hSeek)
 import System.Process.Read (EnvOverride)
 import Data.Monoid (Monoid (..))
 import Control.Applicative ((<|>))
@@ -159,26 +160,27 @@ addCabalFiles menv pkgs0 = do
     let (noUnpack, toUnpack0) = partitionEithers $ map toEither pkgs0
     if null toUnpack0
         then return $ Right noUnpack
-        else sourcePackageIndex menv $$ loop noUnpack (Map.fromList toUnpack0)
+        else do
+            pis <- readPackageIdents menv
+            config <- asks getConfig
+            let fp = toFilePath $ configPackageIndex config
+            (missing, toUnpack) <- liftIO
+                $ withBinaryFile fp ReadMode $ \h ->
+                liftM partitionEithers $ mapM (go pis h) toUnpack0
+            return $ if null missing
+                then Right $ noUnpack ++ toUnpack
+                else Left $ Set.fromList missing
   where
     toEither (ident, Nothing) = Left (ident, Nothing)
     toEither (ident, Just path) = Right (ident, path)
 
-    loop res m
-        | Map.null m = return $ Right res
-        | otherwise = await >>= maybe (return $ Left $ Map.keysSet m) (go res m)
-
-    go res m (Right _json) = loop res m
-    go res m (Left ucf) =
-        case Map.lookup ident m of
-            Nothing -> loop res m
-            Just path -> do
-                let !bs = L.toStrict $ ucfLbs ucf
-                    res' = (ident, Just (path, bs)) : res
-                    m' = Map.delete ident m
-                loop res' m'
-      where
-        ident = PackageIdentifier (ucfName ucf) (ucfVersion ucf)
+    go pis h (ident, path) =
+        case Map.lookup ident pis of
+            Nothing -> return $ Left ident
+            Just pc -> do
+                hSeek h AbsoluteSeek $ fromIntegral $ pcOffset pc
+                bs <- S.hGet h $ fromIntegral $ pcSize pc
+                return $ Right (ident, Just (path, bs))
 
 -- | Download the given name,version pairs into the directory expected by cabal.
 --

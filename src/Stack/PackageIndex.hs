@@ -23,6 +23,7 @@ module Stack.PackageIndex
     , requireIndex
     , getPkgVersions
     , PackageDownload (..)
+    , PackageCache (..)
     , getPackageDownloads
     ) where
 
@@ -46,6 +47,7 @@ import           Data.Conduit.Binary                   (sinkHandle,
 import qualified Data.Conduit.List                     as CL
 import           Data.Conduit.Zlib                     (ungzip)
 import qualified Data.Foldable                         as F
+import           Data.Int                              (Int64)
 import           Data.Map                              (Map)
 import qualified Data.Map                              as Map
 import           Data.Maybe                            (fromMaybe, mapMaybe)
@@ -89,12 +91,25 @@ data UnparsedCabalFile = UnparsedCabalFile
     , ucfParse   :: forall m. MonadThrow m => m GenericPackageDescription
     , ucfLbs     :: L.ByteString
     , ucfEntry   :: Tar.Entry
+    , ucfOffset  :: !Int64
+    -- ^ Byte offset into the 00-index.tar file for the entry contents
+    , ucfSize    :: !Int64
+    -- ^ Size of the entry contents, in bytes
     }
+
+data PackageCache = PackageCache
+    { pcOffset :: !Int64
+    -- ^ offset in bytes into the 00-index.tar file for the .cabal file contents
+    , pcSize :: !Int64
+    -- ^ size in bytes of the .cabal file
+    }
+    deriving Generic
+instance Binary.Binary PackageCache
 
 -- | Stream a list of all the package identifiers
 readPackageIdents :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
                   => EnvOverride
-                  -> m [PackageIdentifier]
+                  -> m (Map PackageIdentifier PackageCache)
 readPackageIdents menv = do
     config <- askConfig
     let fp = toFilePath $ configPackageIndexCache config
@@ -121,7 +136,8 @@ findNewestVersions :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env
                    -> [PackageName]
                    -> m [PackageIdentifier]
 findNewestVersions menv names0 = do
-    (m, discovered) <- liftM (F.foldl' add (Map.empty, Set.empty)) (readPackageIdents menv)
+    (m, discovered) <- liftM (F.foldl' add (Map.empty, Set.empty))
+        (liftM Map.keys (readPackageIdents menv))
     let missing = Set.difference names discovered
     if Set.null missing
         then return $ map fromTuple $ Map.toList m
@@ -146,15 +162,19 @@ sourcePackageIndex menv = do
     -- protections. Caveat emptor
     config <- askConfig
     lbs <- liftIO $ L.readFile $ Path.toFilePath $ configPackageIndex config
-    loop (Tar.read lbs)
+    loop 0 (Tar.read lbs)
   where
-    loop (Tar.Next e es) = goE e >> loop es
-    loop Tar.Done = return ()
-    loop (Tar.Fail e) = throwM e
+    loop blockNo (Tar.Next e es) = do
+        goE blockNo e
+        loop blockNo' es
+      where
+        blockNo' = blockNo + entrySizeInBlocks e
+    loop _ Tar.Done = return ()
+    loop _ (Tar.Fail e) = throwM e
 
-    goE e
+    goE blockNo e
         | Just front <- T.stripSuffix ".cabal" $ T.pack $ Tar.entryPath e
-        , Tar.NormalFile lbs _size <- Tar.entryContent e = do
+        , Tar.NormalFile lbs size <- Tar.entryContent e = do
             (fromCabalPackageName -> name, fromCabalVersion -> version) <- parseNameVersion front
             yield $ Left UnparsedCabalFile
                 { ucfName = name
@@ -162,6 +182,8 @@ sourcePackageIndex menv = do
                 , ucfParse = goContent (Tar.entryPath e) name version lbs
                 , ucfLbs = lbs
                 , ucfEntry = e
+                , ucfOffset = (blockNo + 1) * 512
+                , ucfSize = size
                 }
         | Just front <- T.stripSuffix ".json" $ T.pack $ Tar.entryPath e
         , Tar.NormalFile lbs _size <- Tar.entryContent e = do
@@ -350,7 +372,7 @@ getPkgVersions :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasCon
                => EnvOverride -> PackageName -> m (Set Version)
 getPkgVersions menv pkg = do
     idents <- readPackageIdents menv
-    return $ Set.fromList $ mapMaybe go idents
+    return $ Set.fromList $ mapMaybe go $ Map.keys idents
   where
     go (PackageIdentifier n v)
         | n == pkg = Just v
@@ -416,13 +438,23 @@ getPackageDownloads menv = do
             liftM snd $ populateCaches menv
         Right y -> return y
 
+-- FIXME provide a loadCaches function, use it in Stack.Fetch
+
 -- | Populate the package index caches and return them.
 populateCaches :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
                => EnvOverride
-               -> m ([PackageIdentifier], Map PackageIdentifier PackageDownload)
+               -> m ( Map PackageIdentifier PackageCache
+                    , Map PackageIdentifier PackageDownload
+                    )
 populateCaches menv = do
     $logInfo "Populating index cache, may take a moment"
-    let toIdent (Left ucf) = Just (PackageIdentifier (ucfName ucf) (ucfVersion ucf))
+    let toIdent (Left ucf) = Just
+            ( PackageIdentifier (ucfName ucf) (ucfVersion ucf)
+            , PackageCache
+                { pcOffset = ucfOffset ucf
+                , pcSize = ucfSize ucf
+                }
+            )
         toIdent (Right _) = Nothing
 
         parseDownload (Left _) = Nothing
@@ -432,7 +464,7 @@ populateCaches menv = do
                 Just pd -> Just (ident, pd)
 
     (pis, pds) <- sourcePackageIndex menv $$ getZipSink ((,)
-        <$> ZipSink (CL.mapMaybe toIdent =$ CL.consume)
+        <$> ZipSink (Map.fromList <$> (CL.mapMaybe toIdent =$ CL.consume))
         <*> ZipSink (Map.fromList <$> (CL.mapMaybe parseDownload =$ CL.consume)))
 
     config <- askConfig
@@ -443,3 +475,13 @@ populateCaches menv = do
     $logInfo "Done populating cache"
 
     return (pis, pds)
+
+--------------- Lifted from cabal-install, Distribution.Client.Tar:
+-- | Return the number of blocks in an entry.
+entrySizeInBlocks :: Tar.Entry -> Int64
+entrySizeInBlocks entry = 1 + case Tar.entryContent entry of
+  Tar.NormalFile     _   size -> bytesToBlocks size
+  Tar.OtherEntryType _ _ size -> bytesToBlocks size
+  _                           -> 0
+  where
+    bytesToBlocks s = 1 + ((fromIntegral s - 1) `div` 512)
