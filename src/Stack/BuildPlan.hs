@@ -450,10 +450,10 @@ loadBuildPlan name = do
     case eres of
         Right bp -> return bp
         Left e -> do
-            $logWarn $ "Decoding build plan from file failed: " <> T.pack (show e)
+            $logDebug $ "Decoding build plan from file failed: " <> T.pack (show e)
             liftIO $ createDirectoryIfMissing True $ takeDirectory $ toFilePath fp
             req <- parseUrl $ T.unpack url
-            $logWarn $ "Instead, downloading build plan from: " <> url
+            $logInfo $ "Downloading build plan from: " <> url
             download req fp
             liftIO (decodeFileEither $ toFilePath fp) >>= either throwM return
   where
