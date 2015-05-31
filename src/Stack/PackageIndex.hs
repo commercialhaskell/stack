@@ -17,14 +17,13 @@
 module Stack.PackageIndex
     ( sourcePackageIndex
     , readPackageIdents
-    , findNewestVersions
     , UnparsedCabalFile (..)
     , updateIndex
     , requireIndex
     , getPkgVersions
     , PackageDownload (..)
     , PackageCache (..)
-    , getPackageDownloads
+    , getPackageCaches
     ) where
 
 import qualified Codec.Archive.Tar                     as Tar
@@ -130,28 +129,6 @@ newtype BinaryParseException = BinaryParseException (ByteOffset, String)
     deriving (Show, Typeable)
 instance Exception BinaryParseException
 
--- | Find the newest versions of all given package names.
-findNewestVersions :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
-                   => EnvOverride
-                   -> [PackageName]
-                   -> m [PackageIdentifier]
-findNewestVersions menv names0 = do
-    (m, discovered) <- liftM (F.foldl' add (Map.empty, Set.empty))
-        (liftM Map.keys (readPackageIdents menv))
-    let missing = Set.difference names discovered
-    if Set.null missing
-        then return $ map fromTuple $ Map.toList m
-        else throwM $ Couldn'tFindPackages missing
-  where
-    names = Set.fromList names0
-
-    add orig@(m, discovered) (PackageIdentifier n v)
-        | n `Set.member` names =
-            let !m' = Map.insertWith max n v m
-                !d' = Set.insert n discovered
-             in (m', d')
-        | otherwise = orig
-
 -- | Stream all of the cabal files from the 00-index tar file.
 sourcePackageIndex :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m)
                    => EnvOverride
@@ -247,7 +224,6 @@ instance Exception SimpleParseException
 data PackageIndexException =
   Couldn'tReadIndexTarball FilePath
                            Tar.FormatError
-  | Couldn'tFindPackages (Set PackageName)
   deriving (Show,Typeable)
 instance Exception PackageIndexException
 
@@ -419,26 +395,29 @@ instance FromJSON PackageDownload where
             }
 
 -- | Load the cached package URLs, or created the cache if necessary.
-getPackageDownloads :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env)
-                    => EnvOverride
-                    -> m (Map PackageIdentifier PackageDownload)
-getPackageDownloads menv = do
+getPackageCaches :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env)
+                 => EnvOverride
+                 -> m ( Map PackageIdentifier PackageCache
+                      , Map PackageIdentifier PackageDownload
+                      )
+getPackageCaches menv = do
     config <- askConfig
-    let fp = toFilePath $ configPackageIndexUrls config
-        load = do
+    let fp1 = toFilePath $ configPackageIndexCache config
+        fp2 = toFilePath $ configPackageIndexUrls config
+        load fp = do
             ebs <- liftIO $ tryIO $ Binary.decodeFileOrFail fp
             case ebs of
                 Left e -> return $ Left $ toException e
                 Right (Left e) -> return $ Left $ toException $ BinaryParseException e
                 Right (Right pis) -> return $ Right pis
-    x <- load
+    x <- load fp1
     case x of
-        Left e -> do
-            $logDebug $ "Populate index URLs, load failed with " <> T.pack (show e)
-            liftM snd $ populateCaches menv
-        Right y -> return y
-
--- FIXME provide a loadCaches function, use it in Stack.Fetch
+        Left _ -> populateCaches menv
+        Right x' -> do
+            y <- load fp2
+            case y of
+                Left _ -> populateCaches menv
+                Right y' -> return (x', y')
 
 -- | Populate the package index caches and return them.
 populateCaches :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)

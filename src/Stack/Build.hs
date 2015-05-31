@@ -65,6 +65,7 @@ import           Stack.Constants
 import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
+import           Stack.PackageIndex
 import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Types.StackT
@@ -1293,7 +1294,8 @@ withTempUnpacked :: (MonadIO m,MonadThrow m,MonadLogger m,MonadMask m,MonadReade
 withTempUnpacked pkgs inner = withSystemTempDirectory "stack-unpack" $ \tmp -> do
     dest <- parseAbsDir tmp
     menv <- getMinimalEnvOverride
-    dirs <- fetchPackages menv $ map (, Just dest) pkgs
+    (pis, pds) <- getPackageCaches menv
+    dirs <- fetchPackages menv pis pds $ map (, Just dest) pkgs
     inner dirs
 
 --------------------------------------------------------------------------------

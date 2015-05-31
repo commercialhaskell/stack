@@ -26,7 +26,7 @@ import           Stack.Types
 import           Stack.PackageIndex
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Check as Tar
-import           Control.Applicative ((*>), (<$>), (<*>))
+import           Control.Applicative ((*>))
 import Control.Monad.Trans.Control
 import           Control.Concurrent.Async.Lifted (Concurrently (..))
 import           Control.Concurrent.STM   (atomically, newTVarIO, readTVar,
@@ -38,12 +38,9 @@ import Codec.Compression.GZip (decompress)
 import           Crypto.Hash              (Context, Digest, SHA512,
                                            digestToHexByteString, hashFinalize,
                                            hashInit, hashUpdate)
-import           Data.Aeson               (FromJSON (..), decode, withObject,
-                                           (.!=), (.:?))
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
-import           Data.Conduit
 import qualified Data.Foldable as F
 import           Data.Either (partitionEithers)
 import           Data.Function (fix)
@@ -51,7 +48,6 @@ import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Typeable (Typeable)
 import           Data.Word (Word64)
@@ -66,14 +62,12 @@ import Path
 import           System.Directory         (createDirectoryIfMissing,
                                            doesFileExist, doesDirectoryExist,
                                            renameFile, canonicalizePath)
-import           System.FilePath (takeDirectory, (<.>), takeExtension)
+import           System.FilePath (takeDirectory, (<.>))
 import qualified System.FilePath as FP
 import           System.IO                (IOMode (ReadMode, WriteMode),
                                            withBinaryFile, SeekMode (AbsoluteSeek),
                                            hSeek)
 import System.Process.Read (EnvOverride)
-import Data.Monoid (Monoid (..))
-import Control.Applicative ((<|>))
 
 data FetchException
     = Couldn'tReadIndexTarball FilePath Tar.FormatError
@@ -91,6 +85,7 @@ data FetchException
     | CabalFilesNotFound (Set PackageIdentifier)
     | UnpackDirectoryAlreadyExists FilePath
     | CouldNotParsePackageSelectors [String]
+    | Couldn'tFindPackages (Set PackageName)
     deriving (Show, Typeable)
 instance Exception FetchException
 
@@ -106,15 +101,16 @@ unpackPackages menv dest input = do
     (names, idents1) <- case partitionEithers $ map parse input of
         ([], x) -> return $ partitionEithers x
         (errs, _) -> throwM $ CouldNotParsePackageSelectors errs
+    (pis, pds) <- getPackageCaches menv
     idents2 <-
         if null names
             then return []
             else do
                 $logDebug $ "Finding latest versions of: " <> T.pack (show names)
-                idents2 <- findNewestVersions menv names
+                idents2 <- findNewestVersions pis names
                 $logDebug $ "Newest versions are: " <> T.pack (show idents2)
                 return idents2
-    dests <- fetchPackages menv $ map (, Just dest') $ idents1 ++ idents2
+    dests <- fetchPackages menv pis pds $ map (, Just dest') $ idents1 ++ idents2
     mapM_ (\dest'' -> $logInfo $ "Unpacked to " <> T.pack (toFilePath dest'')) dests
   where
     -- Possible future enhancement: parse names as name + version range
@@ -125,6 +121,21 @@ unpackPackages menv dest input = do
                 case parsePackageIdentifierFromString s of
                     Left _ -> Left s
                     Right x -> Right $ Right x
+
+-- | Find the newest versions of all given package names.
+findNewestVersions :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
+                   => Map PackageIdentifier PackageCache
+                   -> [PackageName]
+                   -> m [PackageIdentifier]
+findNewestVersions cache names
+    | null missing = return idents
+    | otherwise = throwM $ Couldn'tFindPackages $ Set.fromList missing
+  where
+    (missing, idents) = partitionEithers $ map go names
+
+    go name = maybe (Left name) (Right . PackageIdentifier name) (Map.lookup name m)
+
+    m = Map.fromList $ map toTuple $ Map.keys cache
 
 -- | Ensure that all of the given package idents are unpacked into the build
 -- unpack directory, and return the paths to all of the subdirectories.
@@ -147,26 +158,26 @@ unpackPackageIdentsForBuild menv idents0 = do
     if null idents
         then return $ Set.fromList paths1
         else do
-            paths2 <- fetchPackages menv $ map (, Just unpackDir) idents
+            (pis, pds) <- getPackageCaches menv
+            paths2 <- fetchPackages menv pis pds $ map (, Just unpackDir) idents
             return $ Set.fromList $ paths1 ++ paths2
 
 -- | Add the contents of the cabal file from the index to packages that will be
 -- unpacked.
 addCabalFiles :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m)
-              => EnvOverride
+              => Map PackageIdentifier PackageCache
               -> [(PackageIdentifier, Maybe (Path Abs Dir))]
               -> m (Either (Set PackageIdentifier) [(PackageIdentifier, Maybe (Path Abs Dir, S8.ByteString))])
-addCabalFiles menv pkgs0 = do
+addCabalFiles pis pkgs0 = do
     let (noUnpack, toUnpack0) = partitionEithers $ map toEither pkgs0
     if null toUnpack0
         then return $ Right noUnpack
         else do
-            pis <- readPackageIdents menv
             config <- asks getConfig
             let fp = toFilePath $ configPackageIndex config
             (missing, toUnpack) <- liftIO
                 $ withBinaryFile fp ReadMode $ \h ->
-                liftM partitionEithers $ mapM (go pis h) toUnpack0
+                liftM partitionEithers $ mapM (go h) toUnpack0
             return $ if null missing
                 then Right $ noUnpack ++ toUnpack
                 else Left $ Set.fromList missing
@@ -174,7 +185,7 @@ addCabalFiles menv pkgs0 = do
     toEither (ident, Nothing) = Left (ident, Nothing)
     toEither (ident, Just path) = Right (ident, path)
 
-    go pis h (ident, path) =
+    go h (ident, path) =
         case Map.lookup ident pis of
             Nothing -> return $ Left ident
             Just pc -> do
@@ -198,30 +209,30 @@ addCabalFiles menv pkgs0 = do
 -- Since 0.1.0.0
 fetchPackages :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m,MonadBaseControl IO m)
               => EnvOverride
+              -> Map PackageIdentifier PackageCache
+              -> Map PackageIdentifier PackageDownload
               -> [(PackageIdentifier, Maybe (Path Abs Dir))]
               -> m [Path Abs Dir]
-fetchPackages menv pkgs0 = do
+fetchPackages menv pis0 pds0 pkgs0 = do
    env <- ask
    let man = getHttpManager env
        config = getConfig env
-   indexFP <- liftM toFilePath configPackageIndex
-   requireIndex menv
+
    outputVar <- liftIO (newTVarIO [])
    let packageLocation = flip runReaderT config . configPackageTarball
 
-   pds <- getPackageDownloads menv
-
-   eres <- addCabalFiles menv pkgs0
-   pkgs <-
+   eres <- addCabalFiles pis0 pkgs0
+   (pds, pkgs) <-
        case eres of
            Left _missing -> do
                $logInfo "Some cabal files not found, updating index"
                updateIndex menv
-               eres' <- addCabalFiles menv pkgs0
+               (pis, pds) <- getPackageCaches menv
+               eres' <- addCabalFiles pis pkgs0
                case eres' of
                    Left missing -> throwM $ CabalFilesNotFound missing
-                   Right pkgs -> return pkgs
-           Right pkgs -> return pkgs
+                   Right pkgs -> return (pds, pkgs)
+           Right pkgs -> return (pds0, pkgs)
 
    parMapM_
     (configConnectionCount config)
