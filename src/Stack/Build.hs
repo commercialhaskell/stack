@@ -808,10 +808,10 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconf
               runhaskell'
                          singularBuild
                          ["haddock"
-                         ,"--html"
-                         ,"--hoogle"
-                         ,"--hyperlink-source"]
+                         ,"--html"]
               {- EKB FIXME: doc generation for stack-doc-server
+                         ,"--hoogle"
+                         ,"--hyperlink-source"
                          ,"--html-location=../$pkg-$version/"
                          ,"--haddock-options=" ++ intercalate " " ifcOpts ]
               haddockLocs <-
