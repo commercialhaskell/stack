@@ -188,16 +188,19 @@ other projects by installing into your shared snapshot database.
 __How can I make sure my project builds against multiple ghc versions?__
 
 You can create multiple yaml files for your project,
-one for each build plan. For example, you might set up your project like so:
+one for each build plan. For example, you might set up your project directory like so:
 
 ```
-/myproject
+myproject/
   stack-7.8.yaml
   stack-7.10.yaml
-  stack.yaml --> symlink to stack.7.8.yaml
+  stack.yaml --> symlink to stack-7.8.yaml
+  myproject.cabal
+  src/
+    ...
 ```
 
-And then when you run `stack build`, you can set the
+When you run `stack build`, you can set the
 `STACK_YAML` environment variable to indicate which build plan to use.
 
 ```
