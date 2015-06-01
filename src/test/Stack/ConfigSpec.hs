@@ -35,6 +35,7 @@ data T = T
 setup :: IO T
 setup = do
   manager <- newTLSManager
+  unsetEnv "STACK_YAML"
   return T{..}
 
 teardown :: T -> IO ()
