@@ -353,7 +353,15 @@ installDependencies bopts deps' = do
     pkgDbs <- getPackageDatabases bconfig BTDeps
     menv <- getMinimalEnvOverride
 
-    installed <- liftM toIdents $ getPackageVersionMapWithGlobalDb menv Nothing pkgDbs
+    bconfig <- asks getBuildConfig
+    mplan <- case bcResolver bconfig of
+               ResolverSnapshot snapName -> fmap Just (loadMiniBuildPlan snapName)
+               _ -> return Nothing
+    installed <- liftM toIdents $
+                 getPackageVersionMapWithGlobalDb
+                     menv
+                     mplan
+                     pkgDbs
     cabalPkgVer <- getCabalPkgVer menv
     let toInstall' = M.difference deps installed
 
