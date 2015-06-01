@@ -108,10 +108,10 @@ ghcPkg menv pkgDbs args = do
 getPackageVersionMapWithGlobalDb
     :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
     => EnvOverride
-    -> MiniBuildPlan
+    -> Maybe MiniBuildPlan
     -> [Path Abs Dir] -- ^ package databases
     -> m (Map PackageName Version)
-getPackageVersionMapWithGlobalDb menv mbp pkgDbs = do
+getPackageVersionMapWithGlobalDb menv mmbp pkgDbs = do
     gdb <- getGlobalDB menv
     -- Use unionsWith max to account for cases where the snapshot introduces a
     -- newer version of a global package, see:
@@ -124,17 +124,32 @@ getPackageVersionMapWithGlobalDb menv mbp pkgDbs = do
             (M.unionsWith max .
              map (M.fromList . rights))
     globals <-
-        foldM
-            (\acc ident ->
-                  if versionMatches mbp ident
-                      then do
-                          hasProfiling <- packageHasProfiling [gdb] ident
-                          if hasProfiling
-                              then return acc
-                              else return (expunge ident acc)
-                      else return (expunge ident acc))
-            allGlobals
-            (map fromTuple (M.toList allGlobals))
+        case mmbp of
+            Nothing ->
+                return allGlobals
+            Just mbp ->
+                foldM
+                    (\acc ident ->
+                          let expunge ident acc =
+                                  foldr
+                                      M.delete
+                                      acc
+                                      (map
+                                           packageIdentifierName
+                                           (ident :
+                                            getTransInclusiveDeps mbp ident))
+                          in if versionMatches mbp ident
+                                 then do
+                                     hasProfiling <-
+                                         packageHasProfiling
+                                             [gdb]
+                                             ident
+                                     if hasProfiling
+                                         then return acc
+                                         else return (expunge ident acc)
+                                 else return (expunge ident acc))
+                    allGlobals
+                    (map fromTuple (M.toList allGlobals))
     rest <-
         getPackageVersions
             menv
@@ -146,12 +161,6 @@ getPackageVersionMapWithGlobalDb menv mbp pkgDbs = do
         (M.unionsWith
              max
              [globals, rest])
-  where
-    expunge ident acc = do
-        foldr
-            M.delete
-            acc
-            (map packageIdentifierName (ident : getTransInclusiveDeps mbp ident))
 
 -- | Get the packages depended on by the given package.
 versionMatches :: MiniBuildPlan -> PackageIdentifier -> Bool

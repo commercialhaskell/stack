@@ -258,7 +258,7 @@ loadBuildConfig mproject config = do
     ghcVersion <-
         case projectResolver project of
             ResolverSnapshot snapName -> do
-                mbp <- runReaderT (loadMiniBuildPlan snapName Map.empty) miniConfig
+                mbp <- runReaderT (loadMiniBuildPlan snapName) miniConfig
                 return $ mbpGhcVersion mbp
             ResolverGhc m -> return $ fromMajorVersion m
 

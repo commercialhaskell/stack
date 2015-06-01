@@ -283,7 +283,7 @@ getDependencies locals ranges = do
         ResolverSnapshot snapName -> do
             $logDebug $ "Checking resolver: " <> renderSnapName snapName
             mbp0 <- loadMiniBuildPlan snapName
-            globals <- getPackageVersionMapWithGlobalDb menv mbp0 []
+            globals <- getPackageVersionMapWithGlobalDb menv (Just mbp0) []
             let mbp = mbp0
                     { mbpPackages = mbpPackages mbp `Map.union`
                         fmap (\v -> MiniPackageInfo
@@ -323,7 +323,7 @@ getDependencies locals ranges = do
                     ]
             return deps
         ResolverGhc _ -> do
-            globals <- getPackageVersionMapWithGlobalDb menv []
+            globals <- getPackageVersionMapWithGlobalDb menv Nothing []
             return $ fmap (, M.empty) globals
 
     let checkDepRange (dep, users) =
@@ -353,7 +353,7 @@ installDependencies bopts deps' = do
     pkgDbs <- getPackageDatabases bconfig BTDeps
     menv <- getMinimalEnvOverride
 
-    installed <- liftM toIdents $ getPackageVersionMapWithGlobalDb menv pkgDbs
+    installed <- liftM toIdents $ getPackageVersionMapWithGlobalDb menv Nothing pkgDbs
     cabalPkgVer <- getCabalPkgVer menv
     let toInstall' = M.difference deps installed
 

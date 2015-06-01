@@ -20,6 +20,7 @@ module Stack.Types.BuildPlan
     , Component (..)
     , SnapName (..)
     , MiniBuildPlan (..)
+    , MiniPackageInfo (..)
     , renderSnapName
     , parseSnapName
     ) where
