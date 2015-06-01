@@ -11,6 +11,7 @@
 module Stack.Package
   (readPackage
   ,readPackageUnresolved
+  ,readPackageUnresolvedBS
   ,resolvePackage
   ,getCabalFileName
   ,Package(..)
@@ -72,7 +73,7 @@ data PackageException
   = PackageConfigError ParseException
   | PackageNoConfigFile
   | PackageNoCabalFile (Path Abs Dir)
-  | PackageInvalidCabalFile (Path Abs File) PError
+  | PackageInvalidCabalFile (Maybe (Path Abs File)) PError
   | PackageDepCycle PackageName
   | PackageMissingDep Package PackageName VersionRange
   | PackageDependencyIssues [PackageException]
@@ -131,16 +132,28 @@ instance Eq Package where
   (==) = on (==) packageName
 
 -- | Read the raw, unresolved package information.
-readPackageUnresolved :: (MonadLogger m, MonadIO m, MonadThrow m)
+readPackageUnresolved :: (MonadIO m, MonadThrow m)
                       => Path Abs File
                       -> m GenericPackageDescription
-readPackageUnresolved cabalfp = do
-  do bs <- liftIO (S.readFile (FL.toFilePath cabalfp))
-     let chars = T.unpack (decodeUtf8With lenientDecode bs)
-     case parsePackageDescription chars of
+readPackageUnresolved cabalfp =
+  liftIO (S.readFile (FL.toFilePath cabalfp))
+  >>= readPackageUnresolvedBS (Just cabalfp)
+
+-- | Read the raw, unresolved package information from a ByteString.
+readPackageUnresolvedBS :: (MonadThrow m)
+                        => Maybe (Path Abs File)
+                        -> S.ByteString
+                        -> m GenericPackageDescription
+readPackageUnresolvedBS mcabalfp bs =
+    case parsePackageDescription chars of
        ParseFailed per ->
-         throwM (PackageInvalidCabalFile cabalfp per)
+         throwM (PackageInvalidCabalFile mcabalfp per)
        ParseOk _ gpkg -> return gpkg
+  where
+    chars = T.unpack (dropBOM (decodeUtf8With lenientDecode bs))
+
+    -- https://github.com/haskell/hackage-server/issues/351
+    dropBOM t = fromMaybe t $ T.stripPrefix "\xFEFF" t
 
 -- | Reads and exposes the package information
 readPackage :: (MonadLogger m, MonadIO m, MonadThrow m)

@@ -31,6 +31,7 @@ import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
 import           Control.Monad.Reader (MonadReader, ask, runReaderT)
+import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Aeson
 import           Data.Either (partitionEithers)
 import           Data.Map (Map)
@@ -74,7 +75,7 @@ data ConfigMonoid =
   deriving Show
 
 -- | Get the default resolver value
-getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m)
+getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
                    => Path Abs Dir
                    -> m (Resolver, Map PackageName (Map FlagName Bool), Bool)
 getDefaultResolver dir = do
@@ -278,7 +279,7 @@ instance HasPlatform MiniConfig
 
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.
-loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env)
+loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env,MonadBaseControl IO m)
            => m (LoadConfig m)
 loadConfig = do
     stackRoot <- determineStackRoot
@@ -296,7 +297,7 @@ loadConfig = do
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
-loadBuildConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env)
+loadBuildConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env,MonadBaseControl IO m)
                 => Maybe (Project, Path Abs File, ConfigMonoid)
                 -> Config
                 -> m BuildConfig

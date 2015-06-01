@@ -16,13 +16,7 @@
 
 -- | Dealing with the 00-index file and all its cabal files.
 module Stack.PackageIndex
-    ( sourcePackageIndex -- FIXME stop exporting this
-    , readPackageIdents
-    , UnparsedCabalFile (..)
-    , updateIndex -- FIXME stop exporting this?
-    , requireIndex -- FIXME stop exporting this?
-    , updateAllIndices
-    , getPkgVersions
+    ( updateAllIndices
     , PackageDownload (..)
     , PackageCache (..)
     , getPackageCaches
@@ -52,25 +46,13 @@ import qualified Data.Foldable                         as F
 import           Data.Int                              (Int64)
 import           Data.Map                              (Map)
 import qualified Data.Map                              as Map
-import           Data.Maybe                            (fromMaybe, mapMaybe)
 import           Data.Monoid                           ((<>), mconcat)
-import           Data.Set                              (Set)
-import qualified Data.Set                              as Set
 import           Data.Text                             (Text)
 import qualified Data.Text                             as T
 import           Data.Text.Encoding                    (encodeUtf8)
-import           Data.Text.Encoding.Error              (lenientDecode)
-import qualified Data.Text.Lazy                        as TL
-import           Data.Text.Lazy.Encoding               (decodeUtf8With)
 import           Data.Traversable                      (forM)
 import           Data.Typeable                         (Typeable)
 import           Data.Word                             (Word64)
-import qualified Distribution.Package                  as Cabal
-import           Distribution.PackageDescription       (package,
-                                                        packageDescription)
-import           Distribution.PackageDescription       as X (GenericPackageDescription)
-import           Distribution.PackageDescription.Parse (ParseResult (..),
-                                                        parsePackageDescription)
 import           Distribution.ParseUtils               (PError)
 import qualified Distribution.Text                     as DT
 import           GHC.Generics                          (Generic)
@@ -91,9 +73,6 @@ import           System.Process.Read                   (runIn, EnvOverride, does
 data UnparsedCabalFile = UnparsedCabalFile
     { ucfName    :: PackageName
     , ucfVersion :: Version
-    , ucfParse   :: forall m. MonadThrow m => m GenericPackageDescription
-    , ucfLbs     :: L.ByteString
-    , ucfEntry   :: Tar.Entry
     , ucfOffset  :: !Int64
     -- ^ Byte offset into the 00-index.tar file for the entry contents
     , ucfSize    :: !Int64
@@ -108,27 +87,6 @@ data PackageCache = PackageCache
     }
     deriving Generic
 instance Binary.Binary PackageCache
-
--- | Stream a list of all the package identifiers
-readPackageIdents :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
-                  => EnvOverride
-                  -> m (Map PackageIdentifier (PackageIndex, PackageCache))
-readPackageIdents menv = do
-    config <- askConfig
-    liftM mconcat $ forM (configPackageIndices config) $ \index -> do
-        fp <- liftM toFilePath $ configPackageIndexCache $ indexName index
-        let load = do
-                ebs <- liftIO $ tryIO $ Binary.decodeFileOrFail fp
-                case ebs of
-                    Left e -> return $ Left $ toException e
-                    Right (Left e) -> return $ Left $ toException $ BinaryParseException e
-                    Right (Right pis) -> return $ Right $ fmap (index,) pis
-        x <- load
-        case x of
-            Left e -> do
-                $logDebug $ "Populate index cache, load failed with " <> T.pack (show e)
-                liftM fst $ populateCaches menv index
-            Right y -> return y
 
 newtype BinaryParseException = BinaryParseException (ByteOffset, String)
     deriving (Show, Typeable)
@@ -157,14 +115,11 @@ sourcePackageIndex menv index = do
 
     goE blockNo e
         | Just front <- T.stripSuffix ".cabal" $ T.pack $ Tar.entryPath e
-        , Tar.NormalFile lbs size <- Tar.entryContent e = do
+        , Tar.NormalFile _ size <- Tar.entryContent e = do
             (fromCabalPackageName -> name, fromCabalVersion -> version) <- parseNameVersion front
             yield $ Left UnparsedCabalFile
                 { ucfName = name
                 , ucfVersion = version
-                , ucfParse = goContent (Tar.entryPath e) name version lbs
-                , ucfLbs = lbs
-                , ucfEntry = e
                 , ucfOffset = (blockNo + 1) * 512
                 , ucfSize = size
                 }
@@ -173,21 +128,6 @@ sourcePackageIndex menv index = do
             (fromCabalPackageName -> name, fromCabalVersion -> version) <- parseNameVersion front
             yield $ Right (PackageIdentifier name version, lbs)
         | otherwise = return ()
-
-    goContent :: String -> PackageName -> Version -> L.ByteString -> (forall m. MonadThrow m => m GenericPackageDescription)
-    goContent fp' name version lbs =
-        case parsePackageDescription $ TL.unpack $ dropBOM $ decodeUtf8With lenientDecode lbs of
-            ParseFailed e -> throwM $ CabalParseException fp' e
-            ParseOk _warnings gpd -> do
-                let pd = packageDescription gpd
-                    Cabal.PackageIdentifier (fromCabalPackageName -> name') (fromCabalVersion -> version') = package pd
-                when (name /= name' || version /= version') $
-                    throwM $ MismatchedNameVersion fp'
-                        name name' version version'
-                return gpd
-
-    -- https://github.com/haskell/hackage-server/issues/351
-    dropBOM t = fromMaybe t $ TL.stripPrefix "\xFEFF" t
 
     parseNameVersion t1 = do
         let (p', t2) = T.break (== '/') $ T.replace "\\" "/" t1
@@ -366,17 +306,6 @@ updateIndexHTTP indexName' url = do
         $ $logWarn
         $ "You have enabled GPG verification of the package index, " <>
           "but GPG verification only works with Git downloading"
-
--- | Fetch all the package versions for a given package
-getPkgVersions :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasConfig env,HasHttpManager env)
-               => EnvOverride -> PackageName -> m (Set Version)
-getPkgVersions menv pkg = do
-    idents <- readPackageIdents menv
-    return $ Set.fromList $ mapMaybe go $ Map.keys idents
-  where
-    go (PackageIdentifier n v)
-        | n == pkg = Just v
-        | otherwise = Nothing
 
 -- | Is the git executable installed?
 isGitInstalled :: MonadIO m

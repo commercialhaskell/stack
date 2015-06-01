@@ -14,6 +14,9 @@
 module Stack.Fetch
     ( unpackPackages
     , unpackPackageIdents
+    , resolvePackages
+    , ResolvedPackage (..)
+    , withCabalFiles
     ) where
 
 import qualified Codec.Archive.Tar               as Tar
@@ -200,6 +203,23 @@ data ToFetchResult = ToFetchResult
     , tfrAlreadyUnpacked :: !(Map PackageIdentifier (Path Abs Dir))
     }
 
+-- | Add the cabal files to a list of idents with their caches.
+withCabalFiles
+    :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env)
+    => IndexName
+    -> [(PackageIdentifier, PackageCache, a)]
+    -> (PackageIdentifier -> a -> ByteString -> IO b)
+    -> m [b]
+withCabalFiles name pkgs f = do
+    indexPath <- configPackageIndex name
+    liftIO $ withBinaryFile (toFilePath indexPath) ReadMode $ \h ->
+        mapM (goPkg h) pkgs
+  where
+    goPkg h (ident, pc, tf) = do
+        hSeek h AbsoluteSeek $ fromIntegral $ pcOffset pc
+        cabalBS <- S.hGet h $ fromIntegral $ pcSize pc
+        f ident tf cabalBS
+
 -- | Figure out where to fetch from.
 getToFetch :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env)
            => Path Abs Dir -- ^ directory to unpack into
@@ -235,14 +255,9 @@ getToFetch dest resolvedAll = do
                     , tfCabal = S.empty -- filled in by goIndex
                     })])
 
-    goIndex (name, pkgs) = do
-        indexPath <- configPackageIndex name
-        liftIO $ withBinaryFile (toFilePath indexPath) ReadMode $ \h ->
-            liftM Map.fromList $ mapM (goPkg h) pkgs
-
-    goPkg h (ident, pc, tf) = do
-        hSeek h AbsoluteSeek $ fromIntegral $ pcOffset pc
-        cabalBS <- S.hGet h $ fromIntegral $ pcSize pc
+    goIndex (name, pkgs) =
+        liftM Map.fromList $
+        withCabalFiles name pkgs $ \ident tf cabalBS ->
         return (ident, tf { tfCabal = cabalBS })
 
 -- | Download the given name,version pairs into the directory expected by cabal.
