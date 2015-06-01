@@ -273,6 +273,7 @@ loadBuildConfig mproject config = do
         , bcPackages = packages
         , bcExtraDeps = projectExtraDeps project
         , bcRoot = root
+        , bcStackYaml = stackYamlFP
         , bcFlags = projectFlags project
         }
 

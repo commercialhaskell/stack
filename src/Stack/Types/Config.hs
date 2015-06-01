@@ -159,6 +159,11 @@ data BuildConfig = BuildConfig
       -- will override packages provided by the resolver.
     , bcRoot       :: !(Path Abs Dir)
       -- ^ Directory containing the project's stack.yaml file
+    , bcStackYaml  :: !(Path Abs File)
+      -- ^ Location of the stack.yaml file.
+      --
+      -- Note: if the STACK_YAML environment variable is used, this may be
+      -- different from bcRoot </> "stack.yaml"
     , bcFlags      :: !(Map PackageName (Map FlagName Bool))
       -- ^ Per-package flag overrides
     }

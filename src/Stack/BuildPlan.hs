@@ -171,7 +171,7 @@ resolveBuildPlan menv mbp isShadowed packages
                 (Map.lookup ident maxVer, x)
         bconfig <- asks getBuildConfig
         throwM $ UnknownPackages
-            (bcRoot bconfig </> stackDotYaml)
+            (bcStackYaml bconfig)
             unknown
             (rsShadowed rs)
   where
