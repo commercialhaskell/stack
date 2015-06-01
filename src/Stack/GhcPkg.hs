@@ -39,6 +39,7 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Set.Monad as Set
 import           Data.Streaming.Process
+import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
@@ -300,6 +301,37 @@ findGhcPkgId menv pkgDbs name = do
             case mpid of
                 Just !pid ->
                     return (parseGhcPkgId pid)
+                _ ->
+                    return Nothing
+  where
+    stripCR t =
+        fromMaybe t (T.stripSuffix "\r" t)
+
+-- | Get the library directory of the package
+-- e.g. @/opt/ghc/7.8.4/lib/ghc-7.8.4/base-4.7.0.2@.
+findLibDir :: (MonadIO m, MonadLogger m)
+           => EnvOverride
+           -> [Path Abs Dir] -- ^ package databases
+           -> PackageName
+           -> m (Maybe (Path Abs Dir))
+findLibDir menv pkgDbs name = do
+    result <-
+        ghcPkg menv pkgDbs ["describe", packageNameString name]
+    case result of
+        Left{} ->
+            return Nothing
+        Right lbs -> do
+            let mpid =
+                    fmap
+                        T.unpack
+                        (listToMaybe
+                             (mapMaybe
+                                  (fmap stripCR .
+                                   T.stripPrefix "library-dirs: ")
+                                  (map T.decodeUtf8 (S8.lines lbs))))
+            case mpid of
+                Just !p ->
+                    return (parseAbsDir p)
                 _ ->
                     return Nothing
   where
