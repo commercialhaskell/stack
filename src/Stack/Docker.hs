@@ -35,7 +35,7 @@ import           Control.Monad.Writer (execWriter,runWriter,tell)
 import           Data.Aeson (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
 import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import           Data.Char (isSpace,isPunctuation,toUpper,isAscii)
+import           Data.Char (isSpace,toUpper,isAscii)
 import           Data.List (dropWhileEnd,intersperse,isPrefixOf,isInfixOf,foldl',sortBy)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -43,7 +43,6 @@ import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
-import           Data.Version (Version(..),parseVersion,showVersion)
 import           Development.Shake
 import           Options.Applicative.Builder.Extra (maybeBoolFlags)
 import           Options.Applicative (Parser,str,option,help,auto,metavar,long,value)
@@ -51,7 +50,7 @@ import           Path
 import           Path.IO (getWorkingDir)
 import           Paths_stack (version)
 import           Stack.Constants (projectDockerSandboxDir,stackDotYaml,stackRootEnvVar)
-import           Stack.Types hiding (Version, parseVersion) -- EKB FIXME don't hide this
+import           Stack.Types
 import           Stack.Docker.GlobalDB
 import           System.Directory (createDirectoryIfMissing)
 import           System.Environment (lookupEnv,unsetEnv,getProgName,getArgs)
@@ -60,7 +59,6 @@ import           System.FilePath (takeBaseName)
 import           System.IO (hPutStrLn,stderr,stdin,stdout,hIsTerminalDevice)
 import qualified System.Process as Proc
 import           System.Process.PagerEditor (editByteString)
-import           Text.ParserCombinators.ReadP (readP_to_S)
 import           Text.Printf (printf)
 
 #ifndef mingw32_HOST_OS
@@ -204,8 +202,8 @@ runContainerAndExitAction config
                    ,"-e","WORK_WD=" ++ toFilePath pwd
                    ,"-e","WORK_HOME=" ++ toFilePath sandboxRepoDir
                    ,"-e","WORK_ROOT=" ++ toFilePath projectRoot
-                   ,"-e",hostVersionEnvVar ++ "=" ++ showVersion version
-                   ,"-e",requireVersionEnvVar ++ "=" ++ showVersion requireContainerVersion
+                   ,"-e",hostVersionEnvVar ++ "=" ++ versionString stackVersion
+                   ,"-e",requireVersionEnvVar ++ "=" ++ versionString requireContainerVersion
                    ,"-v",toFilePath stackRoot ++ ":" ++ toFilePath stackRoot
                    ,"-v",toFilePath projectRoot ++ ":" ++ toFilePath projectRoot
                    ,"-v",toFilePath sandboxSandboxDir ++ ":" ++ toFilePath sandboxDir
@@ -547,26 +545,26 @@ checkDockerVersion =
        `actionOnException` putStrLn "\nCannot get Docker version.  IS DOCKER INSTALLED?\n"
      case words dockerVersionOut of
        (_:_:v:_) ->
-         case parseVersion' v of
+         case parseVersionFromString (dropWhileEnd (== ',') v) of
            Just v'
              | v' < minimumDockerVersion ->
                error (concat ["Minimum docker version '"
-                             ,showVersion minimumDockerVersion
+                             ,versionString minimumDockerVersion
                              ,"' is required (you have '"
-                             ,showVersion v'
+                             ,versionString v'
                              ,"')."])
              | v' `elem` prohibitedDockerVersions ->
                error (concat ["These Docker versions are prohibited (you have '"
-                             ,showVersion v'
+                             ,versionString v'
                              ,"'): "
-                             ,concat (intersperse ", " (map showVersion prohibitedDockerVersions))
+                             ,concat (intersperse ", " (map versionString prohibitedDockerVersions))
                              ,"."])
              | otherwise ->
                return ()
            _ -> error "Cannot get Docker version (invalid 'docker --version' output)."
        _ -> error "Cannot get Docker version (invalid 'docker --version' output)."
-  where minimumDockerVersion = Version [1,3,0] []
-        prohibitedDockerVersions = [Version [1,2,0] []]
+  where minimumDockerVersion = $(mkVersion "1.3.0")
+        prohibitedDockerVersions = [$(mkVersion "1.2.0")]
 
 -- | Run a command when we're already inside a Docker container.
 runInContainerAndExit :: FilePath -> [String] -> IO ()
@@ -661,20 +659,20 @@ checkHostStackageDockerVersion :: Version -> IO ()
 checkHostStackageDockerVersion minVersion =
   do maybeHostVer <- lookupEnv hostVersionEnvVar
      progName <- takeBaseName <$> getProgName
-     case parseVersion' =<< maybeHostVer of
+     case parseVersionFromString =<< maybeHostVer of
        Just hostVer
          | hostVer < minVersion ->
              error ("Your host's version of '" ++ progName ++ "' is too old for this Docker image.\nVersion " ++
-                    showVersion minVersion ++
+                    versionString minVersion ++
                     " is required; you have " ++
-                    showVersion hostVer ++
+                    versionString hostVer ++
                     ".\n")
          | otherwise -> return ()
        Nothing ->
           do inContainer <- getInContainer
              if inContainer
                 then error ("Your host's version of '" ++ progName ++ "' is too old.\nVersion " ++
-                            showVersion minVersion ++ " is required.")
+                            versionString minVersion ++ " is required.")
                 else return ()
 
 
@@ -686,15 +684,15 @@ checkVersions =
        (do checkHostStackageDockerVersion requireHostVersion
            maybeReqVer <- lookupEnv requireVersionEnvVar
            progName <- takeBaseName <$> getProgName
-           case parseVersion' =<< maybeReqVer of
+           case parseVersionFromString =<< maybeReqVer of
              Just reqVer
-               | version < reqVer ->
+               | stackVersion < reqVer ->
                    error ("This Docker image's version of '" ++
                           progName ++
                           "' is too old.\nVersion " ++
-                          showVersion reqVer ++
+                          versionString reqVer ++
                           " is required; you have " ++
-                          showVersion version ++
+                          versionString stackVersion ++
                           ".\nPlease update your '" ++
                           toFilePath stackDotYaml ++
                           "' to use a newer image.")
@@ -803,13 +801,6 @@ dockerOptsFromMonoid mproject DockerOptsMonoid{..} = DockerOpts
         emptyToNothing (Just s) | null s = Nothing
                                 | otherwise = Just s
 
--- | Parse a version number.
-parseVersion' :: String -> Maybe Version
-parseVersion' v =
-  case reverse (readP_to_S parseVersion (dropWhileEnd isPunctuation v)) of
-    ((v',""):_) -> Just v'
-    _ -> Nothing
-
 -- | Environment variable to the host's stack version.
 hostVersionEnvVar :: String
 hostVersionEnvVar = "STACK_DOCKER_HOST_VERSION"
@@ -832,11 +823,15 @@ dockerPullCmdName = "pull"
 
 -- | Version of 'stack' required to be installed in container.
 requireContainerVersion :: Version
-requireContainerVersion = Version [0,0,0] []
+requireContainerVersion = $(mkVersion "0.0.0")
 
 -- | Version of 'stack' required to be installed on the host.
 requireHostVersion :: Version
-requireHostVersion = Version [0,0,0] []
+requireHostVersion = $(mkVersion "0.0.0")
+
+-- | Stack cabal package version
+stackVersion :: Version
+stackVersion = fromCabalVersion version
 
 -- | Options for 'cleanup'.
 data Cleanup = Cleanup
