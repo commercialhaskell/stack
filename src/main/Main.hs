@@ -78,26 +78,26 @@ main =
                         "Execute a command"
                         execCmd
                         ((,)
-                            <$> strArgument (metavar "CMD")
-                            <*> many (strArgument (metavar "[ARGS]")))
+                            <$> strArgument (metavar "[--] CMD")
+                            <*> many (strArgument (metavar "ARGS")))
              addCommand "ghc"
                         "Run ghc"
                         execCmd
                         ((,)
                             <$> pure "ghc"
-                            <*> many (strArgument (metavar "[ARGS]")))
+                            <*> many (strArgument (metavar "ARGS")))
              addCommand "ghci"
                         "Run ghci"
                         execCmd
                         ((,)
                             <$> pure "ghci"
-                            <*> many (strArgument (metavar "[ARGS]")))
+                            <*> many (strArgument (metavar "ARGS")))
              addCommand "runghc"
                         "Run runghc"
                         execCmd
                         ((,)
                             <$> pure "runghc"
-                            <*> many (strArgument (metavar "[ARGS]")))
+                            <*> many (strArgument (metavar "ARGS")))
              addCommand "clean"
                         "Clean the local packages"
                         cleanCmd
