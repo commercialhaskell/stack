@@ -31,6 +31,7 @@ import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
 import           Control.Monad.Reader (MonadReader, ask, runReaderT)
+import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Aeson
 import           Data.Either (partitionEithers)
 import           Data.Map (Map)
@@ -59,7 +60,7 @@ import           System.Environment
 import           System.Process.Read (getEnvOverride, EnvOverride, unEnvOverride)
 
 -- | Get the default resolver value
-getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env, HasUrls env, HasHttpManager env, MonadLogger m)
+getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
                    => Path Abs Dir
                    -> m (Resolver, Map PackageName (Map FlagName Bool), Bool)
 getDefaultResolver dir = do
@@ -140,10 +141,21 @@ configFromConfigMonoid
     -> m Config
 configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
      let configDocker = Docker.dockerOptsFromMonoid mproject configMonoidDockerOpts
-         configUrls = configMonoidUrls
          configGpgVerifyIndex = fromMaybe False configMonoidGpgVerifyIndex
          configConnectionCount = fromMaybe 8 configMonoidConnectionCount
          configHideTHLoading = fromMaybe True configMonoidHideTHLoading
+         configLatestSnapshotUrl = fromMaybe
+            "https://www.stackage.org/download/snapshots.json"
+            configMonoidLatestSnapshotUrl
+         configPackageIndices = fromMaybe
+            [PackageIndex
+                { indexName = IndexName "hackage.haskell.org"
+                , indexLocation = ILGitHttp
+                        "https://github.com/commercialhaskell/all-cabal-hashes.git"
+                        "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"
+                , indexDownloadPrefix = "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
+                }]
+            configMonoidPackageIndices
 
          -- Only place in the codebase where platform is hard-coded. In theory
          -- in the future, allow it to be configured.
@@ -166,12 +178,8 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Parser ConfigMonoid
 configOptsParser =
-    ConfigMonoid
+    (\docker -> mempty { configMonoidDockerOpts = docker })
     <$> Docker.dockerOptsParser
-    <*> pure (configMonoidUrls mempty)
-    <*> pure (configMonoidGpgVerifyIndex mempty)
-    <*> pure (configMonoidConnectionCount mempty)
-    <*> pure (configMonoidHideTHLoading mempty)
 
 -- | Get the directory on Windows where we should install extra programs. For
 -- more information, see discussion at:
@@ -193,12 +201,11 @@ instance HasConfig MiniConfig where
 instance HasStackRoot MiniConfig
 instance HasHttpManager MiniConfig where
     getHttpManager (MiniConfig man _) = man
-instance HasUrls MiniConfig
 instance HasPlatform MiniConfig
 
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.
-loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env)
+loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env,MonadBaseControl IO m)
            => ConfigMonoid
            -- ^ Config monoid from parsed command-line arguments
            -> m (LoadConfig m)
@@ -218,7 +225,7 @@ loadConfig configArgs = do
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
-loadBuildConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env)
+loadBuildConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env,MonadBaseControl IO m)
                 => Maybe (Project, Path Abs File, ConfigMonoid)
                 -> Config
                 -> m BuildConfig

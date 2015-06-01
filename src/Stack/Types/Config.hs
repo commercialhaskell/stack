@@ -1,5 +1,6 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -14,14 +15,18 @@ import           Control.Monad (liftM)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
 import           Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, object
-                            ,(.=), (.:?), (.!=))
+                            ,(.=), (.:?), (.!=), (.:))
+import           Data.Binary (Binary)
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as S8
+import           Data.Hashable (Hashable)
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (fromMaybe)
 import           Data.Monoid
 import           Data.Set (Set)
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.Typeable
 import           Distribution.System (Platform)
 import qualified Distribution.Text
@@ -39,7 +44,6 @@ data Config =
   Config {configStackRoot        :: !(Path Abs Dir)
          -- ^ ~/.stack more often than not
          ,configDocker           :: !DockerOpts
-         ,configUrls             :: !(Map Text Text)
          ,configGpgVerifyIndex   :: !Bool
          ,configEnvOverride      :: !(EnvSettings -> IO EnvOverride)
          -- ^ Environment variables to be passed to external tools
@@ -51,7 +55,72 @@ data Config =
          -- ^ Hide the Template Haskell "Loading package ..." messages from the
          -- console
          ,configPlatform         :: !Platform
+         -- ^ The platform we're building for, used in many directory names
+         ,configLatestSnapshotUrl :: !Text
+         -- ^ URL for a JSON file containing information on the latest
+         -- snapshots available.
+         ,configPackageIndices   :: ![PackageIndex]
+         -- ^ Information on package indices. This is left biased, meaning that
+         -- packages in an earlier index will shadow those in a later index.
+         --
+         -- Warning: if you override packages in an index vs what's available
+         -- upstream, you may correct your compiled snapshots, as different
+         -- projects may have different definitions of what pkg-ver means! This
+         -- feature is primarily intended for adding local packages, not
+         -- overriding. Overriding is better accomplished by adding to your
+         -- list of packages.
+         --
+         -- Note that indices specified in a later config file will override
+         -- previous indices, /not/ extend them.
+         --
+         -- Using an assoc list instead of a Map to keep track of priority
          }
+
+-- | Information on a single package index
+data PackageIndex = PackageIndex
+    { indexName :: !IndexName
+    , indexLocation :: !IndexLocation
+    , indexDownloadPrefix :: !Text
+    -- ^ URL prefix for downloading packages
+    }
+    deriving Show
+instance FromJSON PackageIndex where
+    parseJSON = withObject "PackageIndex" $ \o -> do
+        name <- o .: "name"
+        prefix <- o .: "download-prefix"
+        mgit <- o .:? "git"
+        mhttp <- o .:? "http"
+        loc <-
+            case (mgit, mhttp) of
+                (Nothing, Nothing) -> fail $
+                    "Must provide either Git or HTTP URL for " ++
+                    T.unpack (indexNameText name)
+                (Just git, Nothing) -> return $ ILGit git
+                (Nothing, Just http) -> return $ ILHttp http
+                (Just git, Just http) -> return $ ILGitHttp git http
+        return PackageIndex
+            { indexName = name
+            , indexLocation = loc
+            , indexDownloadPrefix = prefix
+            }
+
+-- | Unique name for a package index
+newtype IndexName = IndexName { unIndexName :: ByteString }
+    deriving (Show, Eq, Ord, Hashable, Binary)
+indexNameText :: IndexName -> Text
+indexNameText = decodeUtf8 . unIndexName
+instance ToJSON IndexName where
+    toJSON = toJSON . indexNameText
+instance FromJSON IndexName where
+    parseJSON = withText "IndexName" $ \t ->
+        case parseRelDir (T.unpack t) of
+            Left e -> fail $ "Invalid index name: " ++ show e
+            Right _ -> return $ IndexName $ encodeUtf8 t
+
+-- | Location of the package index. This ensures that at least one of Git or
+-- HTTP is available.
+data IndexLocation = ILGit !Text | ILHttp !Text | ILGitHttp !Text !Text
+    deriving (Show, Eq, Ord)
 
 -- | Controls which version of the environment is used
 data EnvSettings = EnvSettings
@@ -169,13 +238,6 @@ class HasStackRoot env where
     getStackRoot = configStackRoot . getConfig
     {-# INLINE getStackRoot #-}
 
--- | Class for environment values which have access to the URLs
-class HasUrls env where
-    getUrls :: env -> Map Text Text
-    default getUrls :: HasConfig env => env -> Map Text Text
-    getUrls = configUrls . getConfig
-    {-# INLINE getUrls #-}
-
 -- | Class for environment values which have a Platform
 class HasPlatform env where
     getPlatform :: env -> Platform
@@ -186,13 +248,12 @@ instance HasPlatform Platform where
     getPlatform = id
 
 -- | Class for environment values that can provide a 'Config'.
-class (HasStackRoot env, HasUrls env, HasPlatform env) => HasConfig env where
+class (HasStackRoot env, HasPlatform env) => HasConfig env where
     getConfig :: env -> Config
     default getConfig :: HasBuildConfig env => env -> Config
     getConfig = bcConfig . getBuildConfig
     {-# INLINE getConfig #-}
 instance HasStackRoot Config
-instance HasUrls Config
 instance HasPlatform Config
 instance HasConfig Config where
     getConfig = id
@@ -202,7 +263,6 @@ instance HasConfig Config where
 class HasConfig env => HasBuildConfig env where
     getBuildConfig :: env -> BuildConfig
 instance HasStackRoot BuildConfig
-instance HasUrls BuildConfig
 instance HasPlatform BuildConfig
 instance HasConfig BuildConfig
 instance HasBuildConfig BuildConfig where
@@ -215,33 +275,35 @@ data ConfigMonoid =
   ConfigMonoid
     { configMonoidDockerOpts     :: !DockerOptsMonoid
     -- ^ Docker options.
-    , configMonoidUrls           :: !(Map Text Text)
-    -- ^ Various URLs for downloading things. Yes, this is stringly typed,
-    -- making it easy to extend. Please make sure to only access it using
-    -- helper functions.
     , configMonoidGpgVerifyIndex :: !(Maybe Bool)
     -- ^ Controls how package index updating occurs
     , configMonoidConnectionCount :: !(Maybe Int)
     -- ^ See: 'configConnectionCount'
     , configMonoidHideTHLoading :: !(Maybe Bool)
     -- ^ See: 'configHideTHLoading'
+    , configMonoidLatestSnapshotUrl :: !(Maybe Text)
+    -- ^ See: 'configLatestSnapshotUrl'
+    , configMonoidPackageIndices :: !(Maybe [PackageIndex])
+    -- ^ See: 'configPackageIndices'
     }
   deriving Show
 
 instance Monoid ConfigMonoid where
   mempty = ConfigMonoid
     { configMonoidDockerOpts = mempty
-    , configMonoidUrls = mempty
     , configMonoidGpgVerifyIndex = Nothing
     , configMonoidConnectionCount = Nothing
     , configMonoidHideTHLoading = Nothing
+    , configMonoidLatestSnapshotUrl = Nothing
+    , configMonoidPackageIndices = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
-    , configMonoidUrls = configMonoidUrls l <> configMonoidUrls r
     , configMonoidGpgVerifyIndex = configMonoidGpgVerifyIndex l <|> configMonoidGpgVerifyIndex r
     , configMonoidConnectionCount = configMonoidConnectionCount l <|> configMonoidConnectionCount r
     , configMonoidHideTHLoading = configMonoidHideTHLoading l <|> configMonoidHideTHLoading r
+    , configMonoidLatestSnapshotUrl = configMonoidLatestSnapshotUrl l <|> configMonoidLatestSnapshotUrl r
+    , configMonoidPackageIndices = configMonoidPackageIndices l <|> configMonoidPackageIndices r
     }
 
 instance FromJSON ConfigMonoid where
@@ -249,10 +311,11 @@ instance FromJSON ConfigMonoid where
     withObject "ConfigMonoid" $
     \obj ->
       do configMonoidDockerOpts <- obj .:? T.pack "docker" .!= mempty
-         configMonoidUrls <- obj .:? "urls" .!= mempty
          configMonoidGpgVerifyIndex <- obj .:? "gpg-verify-index"
          configMonoidConnectionCount <- obj .:? "connection-count"
          configMonoidHideTHLoading <- obj .:? "hide-th-loading"
+         configMonoidLatestSnapshotUrl <- obj .:? "latest-snapshot-url"
+         configMonoidPackageIndices <- obj .:? "package-indices"
          return ConfigMonoid {..}
 
 data ConfigException
@@ -271,57 +334,41 @@ instance Exception NotYetImplemented
 askConfig :: (MonadReader env m, HasConfig env) => m Config
 askConfig = liftM getConfig ask
 
--- | Helper for looking up URLs
-askUrl :: (MonadReader env m, HasUrls env)
-       => Text -- ^ key
-       -> Text -- ^ default
-       -> m Text
-askUrl key val = liftM (fromMaybe val . Map.lookup key . getUrls) ask
-
 -- | Get the URL to request the information on the latest snapshots
-askLatestSnapshotUrl :: (MonadReader env m, HasUrls env) => m Text
-askLatestSnapshotUrl = askUrl "latest-snapshot-url" "https://www.stackage.org/download/snapshots.json"
+askLatestSnapshotUrl :: (MonadReader env m, HasConfig env) => m Text
+askLatestSnapshotUrl = asks (configLatestSnapshotUrl . getConfig)
 
--- | Git URL for the package index
-askPackageIndexGitUrl :: (MonadReader env m, HasUrls env) => m Text
-askPackageIndexGitUrl = askUrl "package-index-git-url" "https://github.com/commercialhaskell/all-cabal-hashes.git"
-
--- | HTTP URL for the package index
-askPackageIndexHttpUrl :: (MonadReader env m, HasUrls env) => m Text
-askPackageIndexHttpUrl = askUrl "package-index-http-url" "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"
+-- | Root for a specific package index
+configPackageIndexRoot :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs Dir)
+configPackageIndexRoot (IndexName name) = do
+    config <- asks getConfig
+    dir <- parseRelDir $ S8.unpack name
+    return (configStackRoot config </> $(mkRelDir "indices") </> dir)
 
 -- | Location of the 00-index.cache file
-configPackageIndexCache :: (MonadReader env m, HasConfig env) => m (Path Abs File)
-configPackageIndexCache = do
-    config <- asks getConfig
-    return (configStackRoot config </> $(mkRelFile "00-index.cache"))
+configPackageIndexCache :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
+configPackageIndexCache = liftM (</> $(mkRelFile "00-index.cache")) . configPackageIndexRoot
 
 -- | Location of the 00-index.urls file
-configPackageIndexUrls :: (MonadReader env m, HasConfig env) => m (Path Abs File)
-configPackageIndexUrls = do
-    config <- asks getConfig
-    return (configStackRoot config </> $(mkRelFile "00-index.urls"))
+configPackageIndexUrls :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
+configPackageIndexUrls = liftM (</> $(mkRelFile "00-index.urls")) . configPackageIndexRoot
 
 -- | Location of the 00-index.tar file
-configPackageIndex :: (MonadReader env m, HasConfig env) => m (Path Abs File)
-configPackageIndex = do
-    config <- asks getConfig
-    return (configStackRoot config </> $(mkRelFile "00-index.tar"))
+configPackageIndex :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
+configPackageIndex = liftM (</> $(mkRelFile "00-index.tar")) . configPackageIndexRoot
 
 -- | Location of the 00-index.tar.gz file
-configPackageIndexGz :: (MonadReader env m, HasConfig env) => m (Path Abs File)
-configPackageIndexGz = do
-    config <- asks getConfig
-    return (configStackRoot config </> $(mkRelFile "00-index.tar.gz"))
+configPackageIndexGz :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
+configPackageIndexGz = liftM (</> $(mkRelFile "00-index.tar.gz")) . configPackageIndexRoot
 
 -- | Location of a package tarball
-configPackageTarball :: (MonadReader env m, HasConfig env, MonadThrow m) => PackageIdentifier -> m (Path Abs File)
-configPackageTarball ident = do
-    config <- asks getConfig
+configPackageTarball :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> PackageIdentifier -> m (Path Abs File)
+configPackageTarball iname ident = do
+    root <- configPackageIndexRoot iname
     name <- parseRelDir $ packageNameString $ packageIdentifierName ident
     ver <- parseRelDir $ versionString $ packageIdentifierVersion ident
     base <- parseRelFile $ packageIdentifierString ident ++ ".tar.gz"
-    return $ configStackRoot config </> $(mkRelDir "packages") </> name </> ver </> base
+    return (root </> $(mkRelDir "packages") </> name </> ver </> base)
 
 -- | Per-project work dir
 configProjectWorkDir :: (HasBuildConfig env, MonadReader env m) => m (Path Abs Dir)

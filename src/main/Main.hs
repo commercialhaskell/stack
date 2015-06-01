@@ -281,7 +281,7 @@ updateCmd () GlobalOpts{..} = do
     lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
     Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $
         runStackT manager globalLogLevel (lcConfig lc) $
-            getMinimalEnvOverride >>= Stack.PackageIndex.updateIndex
+            getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
 
 -- | Execute a command
 execCmd :: (String, [String]) -> GlobalOpts -> IO ()
