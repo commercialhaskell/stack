@@ -7,7 +7,7 @@
 -- | Functions for the GHC package database.
 
 module Stack.GhcPkg
-  (getPackageVersionMap
+  (getPackageVersionMapWithGlobalDb
   ,getPackageVersionsSet
   ,findGhcPkgId
   ,getGhcPkgIds
@@ -104,11 +104,13 @@ ghcPkg menv pkgDbs args = do
 
 -- | In the given databases, get a single version for all packages, chooses the
 -- latest version of each package.
-getPackageVersionMap :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
-                     => EnvOverride
-                     -> [Path Abs Dir] -- ^ package databases
-                     -> m (Map PackageName Version)
-getPackageVersionMap menv pkgDbs =
+getPackageVersionMapWithGlobalDb :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
+                                 => EnvOverride
+                                 -> [Path Abs Dir] -- ^ package databases
+                                 -> m (Map PackageName Version)
+getPackageVersionMapWithGlobalDb menv pkgDbs0 = do
+    gdb <- getGlobalDB menv
+    let pkgDbs = gdb : pkgDbs0
     -- Use unionsWith max to account for cases where the snapshot introduces a
     -- newer version of a global package, see:
     -- https://github.com/fpco/stack/issues/78
@@ -116,7 +118,8 @@ getPackageVersionMap menv pkgDbs =
         menv
         pkgDbs
         (flip elem pkgDbs)
-        (M.unionsWith max . map (M.fromList . rights))
+        (M.unionsWith max .
+         map (M.fromList . rights))
 
 -- | In the given databases, get every version of every package.
 getPackageVersionsSet :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
