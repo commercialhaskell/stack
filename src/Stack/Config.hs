@@ -141,7 +141,6 @@ configFromConfigMonoid
     -> m Config
 configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
      let configDocker = Docker.dockerOptsFromMonoid mproject configMonoidDockerOpts
-         configGpgVerifyIndex = fromMaybe False configMonoidGpgVerifyIndex
          configConnectionCount = fromMaybe 8 configMonoidConnectionCount
          configHideTHLoading = fromMaybe True configMonoidHideTHLoading
          configLatestSnapshotUrl = fromMaybe
@@ -154,6 +153,8 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
                         "https://github.com/commercialhaskell/all-cabal-hashes.git"
                         "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"
                 , indexDownloadPrefix = "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
+                , indexGpgVerify = False
+                , indexRequireHashes = False
                 }]
             configMonoidPackageIndices
 

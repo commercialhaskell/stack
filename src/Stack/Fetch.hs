@@ -142,7 +142,6 @@ unpackPackageIdents menv unpackDir idents = do
 data ResolvedPackage = ResolvedPackage
     { rpCache    :: !PackageCache
     , rpIndex    :: !PackageIndex
-    , rpDownload :: !(Maybe PackageDownload)
     }
 
 -- | Resolve a set of package names and identifiers into @FetchPackage@ values.
@@ -160,32 +159,27 @@ resolvePackages menv idents0 names0 = do
         Right x -> return x
   where
     go = do
-        (caches, downloads) <- getPackageCaches menv
+        caches <- getPackageCaches menv
         let versions = Map.fromListWith max $ map toTuple $ Map.keys caches
             (missing, idents1) = partitionEithers $ map
                 (\name -> maybe (Left name ) (Right . PackageIdentifier name)
                     (Map.lookup name versions))
                 (Set.toList names0)
         return $ if null missing
-            then goIdents caches downloads $ idents0 <> Set.fromList idents1
+            then goIdents caches $ idents0 <> Set.fromList idents1
             else Left $ UnknownPackageNames $ Set.fromList missing
 
-    goIdents caches downloads idents =
-        case partitionEithers $ map (goIdent caches downloads) $ Set.toList idents of
+    goIdents caches idents =
+        case partitionEithers $ map (goIdent caches) $ Set.toList idents of
             ([], resolved) -> Right $ Map.fromList resolved
             (missing, _) -> Left $ UnknownPackageIdentifiers $ Set.fromList missing
 
-    goIdent caches downloads ident =
+    goIdent caches ident =
         case Map.lookup ident caches of
             Nothing -> Left ident
             Just (index, cache) -> Right (ident, ResolvedPackage
                 { rpCache = cache
                 , rpIndex = index
-                , rpDownload =
-                    case Map.lookup ident downloads of
-                        Just (index', download')
-                            | indexName index == indexName index' -> Just download'
-                        _ -> Nothing
                 })
 
 data ToFetch = ToFetch
@@ -241,7 +235,7 @@ getToFetch dest resolvedAll = do
             then return $ Right (ident, destDir)
             else do
                 let index = rpIndex resolved
-                    d = rpDownload resolved
+                    d = pcDownload $ rpCache resolved
                     targz = T.pack $ packageIdentifierString ident ++ ".tar.gz"
                 tarball <- configPackageTarball (indexName index) ident
                 return $ Left (indexName index, [(ident, rpCache resolved, ToFetch

@@ -44,7 +44,6 @@ data Config =
   Config {configStackRoot        :: !(Path Abs Dir)
          -- ^ ~/.stack more often than not
          ,configDocker           :: !DockerOpts
-         ,configGpgVerifyIndex   :: !Bool
          ,configEnvOverride      :: !(EnvSettings -> IO EnvOverride)
          -- ^ Environment variables to be passed to external tools
          ,configLocalGHCs        :: !(Path Abs Dir)
@@ -82,6 +81,11 @@ data PackageIndex = PackageIndex
     , indexLocation :: !IndexLocation
     , indexDownloadPrefix :: !Text
     -- ^ URL prefix for downloading packages
+    , indexGpgVerify :: !Bool
+    -- ^ GPG-verify the package index during download. Only applies to Git
+    -- repositories for now.
+    , indexRequireHashes :: !Bool
+    -- ^ Require that hashes and package size information be available for packages in this index
     }
     deriving Show
 instance FromJSON PackageIndex where
@@ -98,10 +102,14 @@ instance FromJSON PackageIndex where
                 (Just git, Nothing) -> return $ ILGit git
                 (Nothing, Just http) -> return $ ILHttp http
                 (Just git, Just http) -> return $ ILGitHttp git http
+        gpgVerify <- o .:? "gpg-verify" .!= False
+        reqHashes <- o .:? "require-hashes" .!= False
         return PackageIndex
             { indexName = name
             , indexLocation = loc
             , indexDownloadPrefix = prefix
+            , indexGpgVerify = gpgVerify
+            , indexRequireHashes = reqHashes
             }
 
 -- | Unique name for a package index
@@ -275,8 +283,6 @@ data ConfigMonoid =
   ConfigMonoid
     { configMonoidDockerOpts     :: !DockerOptsMonoid
     -- ^ Docker options.
-    , configMonoidGpgVerifyIndex :: !(Maybe Bool)
-    -- ^ Controls how package index updating occurs
     , configMonoidConnectionCount :: !(Maybe Int)
     -- ^ See: 'configConnectionCount'
     , configMonoidHideTHLoading :: !(Maybe Bool)
@@ -291,7 +297,6 @@ data ConfigMonoid =
 instance Monoid ConfigMonoid where
   mempty = ConfigMonoid
     { configMonoidDockerOpts = mempty
-    , configMonoidGpgVerifyIndex = Nothing
     , configMonoidConnectionCount = Nothing
     , configMonoidHideTHLoading = Nothing
     , configMonoidLatestSnapshotUrl = Nothing
@@ -299,7 +304,6 @@ instance Monoid ConfigMonoid where
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
-    , configMonoidGpgVerifyIndex = configMonoidGpgVerifyIndex l <|> configMonoidGpgVerifyIndex r
     , configMonoidConnectionCount = configMonoidConnectionCount l <|> configMonoidConnectionCount r
     , configMonoidHideTHLoading = configMonoidHideTHLoading l <|> configMonoidHideTHLoading r
     , configMonoidLatestSnapshotUrl = configMonoidLatestSnapshotUrl l <|> configMonoidLatestSnapshotUrl r
@@ -311,7 +315,6 @@ instance FromJSON ConfigMonoid where
     withObject "ConfigMonoid" $
     \obj ->
       do configMonoidDockerOpts <- obj .:? T.pack "docker" .!= mempty
-         configMonoidGpgVerifyIndex <- obj .:? "gpg-verify-index"
          configMonoidConnectionCount <- obj .:? "connection-count"
          configMonoidHideTHLoading <- obj .:? "hide-th-loading"
          configMonoidLatestSnapshotUrl <- obj .:? "latest-snapshot-url"
@@ -348,10 +351,6 @@ configPackageIndexRoot (IndexName name) = do
 -- | Location of the 00-index.cache file
 configPackageIndexCache :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
 configPackageIndexCache = liftM (</> $(mkRelFile "00-index.cache")) . configPackageIndexRoot
-
--- | Location of the 00-index.urls file
-configPackageIndexUrls :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)
-configPackageIndexUrls = liftM (</> $(mkRelFile "00-index.urls")) . configPackageIndexRoot
 
 -- | Location of the 00-index.tar file
 configPackageIndex :: (MonadReader env m, HasConfig env, MonadThrow m) => IndexName -> m (Path Abs File)

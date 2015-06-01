@@ -171,8 +171,14 @@ You can configure this in your stack.yaml. Here's what the default configuration
 package-indices:
 - name: hackage.haskell.org
   download-prefix: https://s3.amazonaws.com/hackage.fpcomplete.com/package/
+
+  # at least one of the following must be present
   git: https://github.com/commercialhaskell/all-cabal-hashes.git
   http: https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz
+
+  # optional fields, both default to false
+  gpg-verify: false
+  require-hashes: false
 ```
 
 One thing you should be aware of: if you change the contents of package-version

@@ -42,7 +42,6 @@ import           Data.Conduit.Binary                   (sinkHandle,
                                                         sourceHandle)
 import qualified Data.Conduit.List                     as CL
 import           Data.Conduit.Zlib                     (ungzip)
-import qualified Data.Foldable                         as F
 import           Data.Int                              (Int64)
 import           Data.Map                              (Map)
 import qualified Data.Map                              as Map
@@ -84,6 +83,7 @@ data PackageCache = PackageCache
     -- ^ offset in bytes into the 00-index.tar file for the .cabal file contents
     , pcSize :: !Int64
     -- ^ size in bytes of the .cabal file
+    , pcDownload :: !(Maybe PackageDownload)
     }
     deriving Generic
 instance Binary.Binary PackageCache
@@ -171,6 +171,7 @@ data PackageIndexException =
   Couldn'tReadIndexTarball FilePath
                            Tar.FormatError
   | GitNotAvailable IndexName
+  | MissingRequiredHashes IndexName PackageIdentifier
   deriving (Show,Typeable)
 instance Exception PackageIndexException
 
@@ -208,20 +209,20 @@ updateIndex menv index =
      git <- isGitInstalled menv
      let name = indexName index
      case (git, indexLocation index) of
-        (True, ILGit url) -> updateIndexGit menv name url
-        (True, ILGitHttp url _) -> updateIndexGit menv name url
-        (_, ILHttp url) -> updateIndexHTTP name url
-        (False, ILGitHttp _ url) -> updateIndexHTTP name url
+        (True, ILGit url) -> updateIndexGit menv name index url
+        (True, ILGitHttp url _) -> updateIndexGit menv name index url
+        (_, ILHttp url) -> updateIndexHTTP name index url
+        (False, ILGitHttp _ url) -> updateIndexHTTP name index url
         (False, ILGit _) -> throwM $ GitNotAvailable name
 
 -- | Update the index Git repo and the index tarball
 updateIndexGit :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasConfig env)
                => EnvOverride
                -> IndexName
+               -> PackageIndex
                -> Text -- ^ Git URL
                -> m ()
-updateIndexGit menv indexName' gitUrl = do
-     config <- askConfig
+updateIndexGit menv indexName' index gitUrl = do
      tarFile <- configPackageIndex indexName'
      let idxPath = parent tarFile
      liftIO (createDirectoryIfMissing True (toFilePath idxPath))
@@ -248,7 +249,7 @@ updateIndexGit menv indexName' gitUrl = do
             runIn acfDir "git" menv ["fetch","--tags","--depth=1"] Nothing
             _ <-
               (liftIO . tryIO) (removeFile (toFilePath tarFile))
-            when (configGpgVerifyIndex config)
+            when (indexGpgVerify index)
                  (do runIn acfDir
                            "git"
                            menv
@@ -275,10 +276,10 @@ updateIndexGit menv indexName' gitUrl = do
 updateIndexHTTP :: (MonadIO m,MonadLogger m
                    ,MonadThrow m,MonadReader env m,HasHttpManager env,HasConfig env)
                 => IndexName
+                -> PackageIndex
                 -> Text -- ^ url
                 -> m ()
-updateIndexHTTP indexName' url = do
-    config <- askConfig
+updateIndexHTTP indexName' index url = do
     req <- parseUrl $ T.unpack url
     $logInfo ("Downloading package index from " <> url)
     gz <- configPackageIndexGz indexName'
@@ -302,7 +303,7 @@ updateIndexHTTP indexName' url = do
                     =$ sinkHandle output
             renameFile tmp $ toFilePath tar
 
-    when (configGpgVerifyIndex config)
+    when (indexGpgVerify index)
         $ $logWarn
         $ "You have enabled GPG verification of the package index, " <>
           "but GPG verification only works with Git downloading"
@@ -315,13 +316,12 @@ isGitInstalled = flip doesExecutableExist "git"
 
 -- | Delete the package index cache
 deleteCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, MonadThrow m) => IndexName -> m ()
-deleteCache indexName' =
-    F.forM_ [configPackageIndexCache, configPackageIndexUrls] $ \f -> do
-        fp <- liftM toFilePath $ f indexName'
-        eres <- liftIO $ tryIO $ removeFile fp
-        case eres of
-            Left e -> $logDebug $ "Could not delete cache: " <> T.pack (show e)
-            Right () -> $logDebug $ "Deleted index cache at " <> T.pack fp
+deleteCache indexName' = do
+    fp <- liftM toFilePath $ configPackageIndexCache indexName'
+    eres <- liftIO $ tryIO $ removeFile fp
+    case eres of
+        Left e -> $logDebug $ "Could not delete cache: " <> T.pack (show e)
+        Right () -> $logDebug $ "Deleted index cache at " <> T.pack fp
 
 data PackageDownload = PackageDownload
     { pdSHA512 :: !ByteString
@@ -349,43 +349,35 @@ instance FromJSON PackageDownload where
 -- | Load the cached package URLs, or created the cache if necessary.
 getPackageCaches :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env)
                  => EnvOverride
-                 -> m ( Map PackageIdentifier (PackageIndex, PackageCache)
-                      , Map PackageIdentifier (PackageIndex, PackageDownload)
-                      )
+                 -> m (Map PackageIdentifier (PackageIndex, PackageCache))
 getPackageCaches menv = do
     config <- askConfig
     liftM mconcat $ forM (configPackageIndices config) $ \index -> do
-        fp1 <- liftM toFilePath $ configPackageIndexCache (indexName index)
-        fp2 <- liftM toFilePath $ configPackageIndexUrls (indexName index)
-        let load fp = do
+        fp <- liftM toFilePath $ configPackageIndexCache (indexName index)
+        let load = do
                 ebs <- liftIO $ tryIO $ Binary.decodeFileOrFail fp
                 case ebs of
                     Left e -> return $ Left $ toException e
                     Right (Left e) -> return $ Left $ toException $ BinaryParseException e
                     Right (Right pis) -> return $ Right pis
-        x <- load fp1
+        x <- load
         case x of
-            Left _ -> populateCaches menv index
-            Right x' -> do
-                y <- load fp2
-                case y of
-                    Left _ -> populateCaches menv index
-                    Right y' -> return (fmap (index,) x', fmap (index,) y')
+            Left _ -> populateCache menv index
+            Right x' -> return $ fmap (index,) x'
 
 -- | Populate the package index caches and return them.
-populateCaches :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
-               => EnvOverride
-               -> PackageIndex
-               -> m ( Map PackageIdentifier (PackageIndex, PackageCache)
-                    , Map PackageIdentifier (PackageIndex, PackageDownload)
-                    )
-populateCaches menv index = do
+populateCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
+              => EnvOverride
+              -> PackageIndex
+              -> m (Map PackageIdentifier (PackageIndex, PackageCache))
+populateCache menv index = do
     $logInfo "Populating index cache, may take a moment"
     let toIdent (Left ucf) = Just
             ( PackageIdentifier (ucfName ucf) (ucfVersion ucf)
             , PackageCache
                 { pcOffset = ucfOffset ucf
                 , pcSize = ucfSize ucf
+                , pcDownload = Nothing
                 }
             )
         toIdent (Right _) = Nothing
@@ -397,18 +389,22 @@ populateCaches menv index = do
                 Just pd -> Just (ident, pd)
 
     (pis, pds) <- sourcePackageIndex menv index $$ getZipSink ((,)
-        <$> ZipSink (Map.fromList <$> (CL.mapMaybe toIdent =$ CL.consume))
+        <$> ZipSink (CL.mapMaybe toIdent =$ CL.consume)
         <*> ZipSink (Map.fromList <$> (CL.mapMaybe parseDownload =$ CL.consume)))
 
-    fp1 <- configPackageIndexCache (indexName index)
-    liftIO $ Binary.encodeFile (toFilePath fp1) pis
+    pis' <- liftM Map.fromList $ forM pis $ \(ident, pc) ->
+        case Map.lookup ident pds of
+            Just d -> return (ident, pc { pcDownload = Just d })
+            Nothing
+                | indexRequireHashes index -> throwM $ MissingRequiredHashes (indexName index) ident
+                | otherwise -> return (ident, pc)
 
-    fp2 <- configPackageIndexUrls (indexName index)
-    liftIO $ Binary.encodeFile (toFilePath fp2) pds
+    fp <- configPackageIndexCache (indexName index)
+    liftIO $ Binary.encodeFile (toFilePath fp) pis'
 
     $logInfo "Done populating cache"
 
-    return (fmap (index,) pis, fmap (index,) pds)
+    return (fmap (index,) pis')
 
 --------------- Lifted from cabal-install, Distribution.Client.Tar:
 -- | Return the number of blocks in an entry.
