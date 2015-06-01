@@ -29,6 +29,7 @@ module Stack.Docker
   ) where
 
 import           Control.Applicative
+import           Control.Exception
 import           Control.Monad
 import           Control.Monad.Writer (execWriter,runWriter,tell)
 import           Data.Aeson (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
@@ -497,6 +498,13 @@ inspect image =
        [(_,i)] -> return (Just i)
        _ -> error ("Invalid 'docker inspect' output: expect a single result.")
 
+-- | Pull latest version of configured Docker image from registry.
+pull :: DockerOpts -> Maybe (Path Abs Dir) -> IO ()
+pull docker mprojectRoot =
+  runAction mprojectRoot
+            (\_ -> do checkDockerVersion
+                      pullImage docker (dockerImage docker))
+
 -- | Pull Docker image from registry.
 pullImage :: DockerOpts -> String -> Action ()
 pullImage docker image =
@@ -510,14 +518,13 @@ pullImage docker image =
                            ,maybe [] (\u -> ["--username=" ++ u]) (dockerRegistryUsername docker)
                            ,maybe [] (\p -> ["--password=" ++ p]) (dockerRegistryPassword docker)
                            ,[takeWhile (/= '/') image]]))
-             Proc.callProcess "docker" ["pull", image])
-
--- | Pull latest version of configured Docker image from registry.
-pull :: DockerOpts -> Maybe (Path Abs Dir) -> IO ()
-pull docker mprojectRoot =
-    runAction mprojectRoot
-              (\_ -> do checkDockerVersion
-                        pullImage docker (dockerImage docker))
+             onException
+               (Proc.callProcess "docker" ["pull", image])
+               (error (concat ["Could not pull Docker image"
+                              ,"\nIf the tag was not found, there may not be an image on the registry for your"
+                              ,"\nresolver's LTS version in "
+                              ,toFilePath stackDotYaml
+                              ,"."])))
 
 -- | Run a Shake action.
 runAction :: Maybe (Path Abs Dir) -> (Path Abs Dir -> Action ()) -> IO ()
@@ -714,7 +721,8 @@ dockerOptsParser =
     <*> maybeStrOption (long (dockerOptName dockerRepoSuffixArgName) <>
                         metavar "SUFFIX" <>
                         help "Suffix to add to Docker repository names")
-    <*> maybeStrOption (long (dockerOptName dockerImageTagArgName) <>
+    <*> (optional . option (fmap Just str))
+                       (long (dockerOptName dockerImageTagArgName) <>
                         metavar "TAG" <>
                         help "Docker image tag")
     <*> maybeStrOption (long (dockerOptName dockerImageArgName) <>
@@ -753,19 +761,33 @@ dockerOptsParser =
     wordsStrOption = option (fmap words str)
 
 -- | Interprets DockerOptsMonoid options.
-dockerOptsFromMonoid :: DockerOptsMonoid -> DockerOpts
-dockerOptsFromMonoid DockerOptsMonoid{..} = DockerOpts
+dockerOptsFromMonoid :: Maybe Project -> DockerOptsMonoid -> DockerOpts
+dockerOptsFromMonoid mproject DockerOptsMonoid{..} = DockerOpts
   {dockerEnable = fromMaybe False dockerMonoidEnable
-  ,dockerImage = let owner = fromMaybe "fpco" dockerMonoidRepoOwner
-                     tag = emptyToNothing dockerMonoidImageTag
-                 in concat [owner
-                           ,if null owner then "" else "/"
-                           ,fromMaybe "" dockerMonoidRepoPrefix
-                           ,fromMaybe "dev" dockerMonoidRepo
-                           ,fromMaybe "" dockerMonoidRepoSuffix
-                           --EKB FIXME should default image tag from the main config's resolver
-                           ,maybe "" (const ":") tag
-                           ,fromMaybe "" tag]
+  ,dockerImage =
+     let owner = fromMaybe "fpco" dockerMonoidRepoOwner
+         tag = case dockerMonoidImageTag of
+                 Just t -> emptyToNothing t
+                 Nothing ->
+                   case mproject of
+                     Nothing -> Nothing
+                     Just proj ->
+                       case projectResolver proj of
+                         ResolverSnapshot n@(LTS _ _) -> Just (T.unpack (renderSnapName n))
+                         _ -> error (concat ["Resolver not supported for Docker images:\n    "
+                                             ,show (projectResolver proj)
+                                             ,"\nUse an LTS resolver, or set the '"
+                                             ,T.unpack dockerImageTagArgName
+                                             ,"' explicitly, in "
+                                             ,toFilePath stackDotYaml
+                                             ,"."])
+     in concat [owner
+               ,if null owner then "" else "/"
+               ,fromMaybe "" dockerMonoidRepoPrefix
+               ,fromMaybe "dev" dockerMonoidRepo
+               ,fromMaybe "" dockerMonoidRepoSuffix
+               ,maybe "" (const ":") tag
+               ,fromMaybe "" tag]
   ,dockerRegistryLogin = fromMaybe (isJust (emptyToNothing dockerMonoidRegistryUsername))
                                    dockerMonoidRegistryLogin
   ,dockerRegistryUsername = emptyToNothing dockerMonoidRegistryUsername

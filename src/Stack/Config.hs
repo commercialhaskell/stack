@@ -49,6 +49,7 @@ import           Options.Applicative (Parser)
 import           Path
 import           Path.IO
 import           Stack.BuildPlan
+import           Stack.Types.Config
 import           Stack.Constants
 import qualified Stack.Docker as Docker
 import           Stack.Package
@@ -86,34 +87,9 @@ getDefaultResolver dir = do
                     Nothing -> Nightly $ snapshotsNightly s
             return (ResolverSnapshot snap, Map.empty, cabalFileExists)
 
--- | A project is a collection of packages. We can have multiple stack.yaml
--- files, but only one of them may contain project information.
-data Project = Project
-    { projectPackages :: ![FilePath]
-    -- ^ Components of the package list which refer to local directories
-    --
-    -- Note that we use @FilePath@ and not @Path@s. The goal is: first parse
-    -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
-    , projectExtraDeps :: !(Map PackageName Version)
-    -- ^ Components of the package list referring to package/version combos,
-    -- see: https://github.com/fpco/stack/issues/41
-    , projectFlags :: !(Map PackageName (Map FlagName Bool))
-    -- ^ Per-package flag overrides
-    , projectResolver :: !Resolver
-    -- ^ How we resolve which dependencies to use
-    }
-  deriving Show
-
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
 
-instance ToJSON Project where
-    toJSON p = object
-        [ "packages"   .= projectPackages p
-        , "extra-deps" .= map fromTuple (Map.toList $ projectExtraDeps p)
-        , "flags"      .= projectFlags p
-        , "resolver"   .= projectResolver p
-        ]
 instance FromJSON ProjectAndConfigMonoid where
     parseJSON = withObject "Project, ConfigMonoid" $ \o -> do
         dirs <- o .:? "packages" .!= ["."]
@@ -156,12 +132,14 @@ defaultStackGlobalConfig :: Maybe (Path Abs File)
 defaultStackGlobalConfig = parseAbsFile "/etc/stack/config"
 
 -- Interprets ConfigMonoid options.
-configFromConfigMonoid :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env)
-  => Path Abs Dir -- ^ stack root, e.g. ~/.stack
-  -> ConfigMonoid
-  -> m Config
-configFromConfigMonoid configStackRoot ConfigMonoid{..} = do
-     let configDocker = Docker.dockerOptsFromMonoid configMonoidDockerOpts
+configFromConfigMonoid
+    :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env)
+    => Path Abs Dir -- ^ stack root, e.g. ~/.stack
+    -> Maybe Project
+    -> ConfigMonoid
+    -> m Config
+configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
+     let configDocker = Docker.dockerOptsFromMonoid mproject configMonoidDockerOpts
          configUrls = configMonoidUrls
          configGpgVerifyIndex = fromMaybe False configMonoidGpgVerifyIndex
          configConnectionCount = fromMaybe 8 configMonoidConnectionCount
@@ -228,7 +206,7 @@ loadConfig configArgs = do
     stackRoot <- determineStackRoot
     extraConfigs <- getExtraConfigs stackRoot >>= mapM loadYaml
     mproject <- loadProjectConfig
-    config <- configFromConfigMonoid stackRoot $ mconcat $
+    config <- configFromConfigMonoid stackRoot (fmap (\(proj, _, _) -> proj) mproject) $ mconcat $
         case mproject of
             Nothing -> configArgs : extraConfigs
             Just (_, _, projectConfig) -> configArgs : projectConfig : extraConfigs

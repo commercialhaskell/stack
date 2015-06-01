@@ -54,7 +54,7 @@ data DockerOptsMonoid = DockerOptsMonoid
     -- ^ Docker repository name (e.g. @dev@)
   ,dockerMonoidRepoSuffix :: !(Maybe String)
     -- ^ Docker repository name's suffix (e.g. GHC version)
-  ,dockerMonoidImageTag :: !(Maybe String)
+  ,dockerMonoidImageTag :: !(Maybe (Maybe String))
     -- ^ Optional Docker image tag (e.g. the date)
   ,dockerMonoidImage :: !(Maybe String)
     -- ^ Exact Docker image tag or ID.  Overrides docker-repo-*/tag.

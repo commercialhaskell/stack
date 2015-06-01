@@ -13,7 +13,8 @@ import           Control.Exception
 import           Control.Monad (liftM)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
-import           Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, (.:?), (.!=))
+import           Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, object
+                            ,(.=), (.:?), (.!=))
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (fromMaybe)
@@ -95,6 +96,32 @@ data LoadConfig m = LoadConfig
     , lcProjectRoot     :: !(Maybe (Path Abs Dir))
         -- ^ The project root directory, if in a project.
     }
+
+-- | A project is a collection of packages. We can have multiple stack.yaml
+-- files, but only one of them may contain project information.
+data Project = Project
+    { projectPackages :: ![FilePath]
+    -- ^ Components of the package list which refer to local directories
+    --
+    -- Note that we use @FilePath@ and not @Path@s. The goal is: first parse
+    -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
+    , projectExtraDeps :: !(Map PackageName Version)
+    -- ^ Components of the package list referring to package/version combos,
+    -- see: https://github.com/fpco/stack/issues/41
+    , projectFlags :: !(Map PackageName (Map FlagName Bool))
+    -- ^ Per-package flag overrides
+    , projectResolver :: !Resolver
+    -- ^ How we resolve which dependencies to use
+    }
+  deriving Show
+
+instance ToJSON Project where
+    toJSON p = object
+        [ "packages"   .= projectPackages p
+        , "extra-deps" .= map fromTuple (Map.toList $ projectExtraDeps p)
+        , "flags"      .= projectFlags p
+        , "resolver"   .= projectResolver p
+        ]
 
 -- | How we resolve which dependencies to install given a set of packages.
 data Resolver
