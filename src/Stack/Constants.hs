@@ -15,7 +15,9 @@ module Stack.Constants
     ,projectDockerSandboxDir
     ,rawGithubUrl
     ,stackDotYaml
-    ,userDocsDir)
+    ,stackRootEnvVar
+    ,userDocsDir
+    )
     where
 
 import Control.Monad (liftM)
@@ -157,3 +159,7 @@ projectDockerSandboxDir projectRoot = projectRoot </> $(mkRelDir ".docker-sandbo
 -- | The filename used for the stack config file.
 stackDotYaml :: Path Rel File
 stackDotYaml = $(mkRelFile "stack.yaml")
+
+-- | Environment variable used to override the '~/.stack' location.
+stackRootEnvVar :: String
+stackRootEnvVar = "STACK_ROOT"

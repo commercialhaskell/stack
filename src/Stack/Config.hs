@@ -273,7 +273,7 @@ determineStackRoot :: (MonadIO m, MonadThrow m) => m (Path Abs Dir)
 determineStackRoot = do
     env <- liftIO getEnvironment
     root <-
-        case lookup "STACK_ROOT" env of
+        case lookup stackRootEnvVar env of
             Nothing -> liftIO $ getAppUserDataDirectory "stack"
             Just x -> return x
     parseAbsDir root

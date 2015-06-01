@@ -50,8 +50,8 @@ import           Options.Applicative (Parser,str,option,help,auto,metavar,long,v
 import           Path
 import           Path.IO (getWorkingDir)
 import           Paths_stack (version)
-import           Stack.Constants (projectDockerSandboxDir,stackDotYaml)
-import           Stack.Types hiding (Version, parseVersion) -- FIXME don't hide this
+import           Stack.Constants (projectDockerSandboxDir,stackDotYaml,stackRootEnvVar)
+import           Stack.Types hiding (Version, parseVersion) -- EKB FIXME don't hide this
 import           Stack.Docker.GlobalDB
 import           System.Directory (createDirectoryIfMissing)
 import           System.Environment (lookupEnv,unsetEnv,getProgName,getArgs)
@@ -181,12 +181,13 @@ runContainerAndExitAction config
                      _ -> sandboxName ++ maybe "" ("_" ++) maybeImageCabalRemoteRepoName
                   ,True)
      sandboxIDDir <- liftIO (parseRelDir (sandboxID ++ "/"))
-     let sandboxDir = projectDockerSandboxDir projectRoot
+     let stackRoot = configStackRoot config
+         sandboxDir = projectDockerSandboxDir projectRoot
          sandboxSandboxDir = sandboxDir </> $(mkRelDir ".sandbox/") </> sandboxIDDir
          sandboxHomeDir = sandboxDir </> homeDirName
          sandboxRepoDir = sandboxDir </> sandboxIDDir
          sandboxSubdirs = map (\d -> sandboxRepoDir </> d)
-                                (sandboxedHomeSubdirectories config)
+                              sandboxedHomeSubdirectories
          isTerm = isStdinTerminal && isStdoutTerminal && isStderrTerminal
          execDockerProcess =
            do mapM_ (createDirectoryIfMissing True)
@@ -197,11 +198,13 @@ runContainerAndExitAction config
                 (concat
                   [["run"
                    ,"--net=host"
+                   ,"-e",stackRootEnvVar ++ "=" ++ toFilePath stackRoot
                    ,"-e","WORK_UID=" ++ uid
                    ,"-e","WORK_GID=" ++ gid
                    ,"-e","WORK_WD=" ++ toFilePath pwd
                    ,"-e","WORK_HOME=" ++ toFilePath sandboxRepoDir
                    ,"-e","WORK_ROOT=" ++ toFilePath projectRoot
+                   ,"-v",toFilePath stackRoot ++ ":" ++ toFilePath stackRoot
                    ,"-v",toFilePath projectRoot ++ ":" ++ toFilePath projectRoot
                    ,"-v",toFilePath sandboxSandboxDir ++ ":" ++ toFilePath sandboxDir
                    ,"-v",toFilePath sandboxHomeDir ++ ":" ++ toFilePath sandboxRepoDir]
@@ -595,10 +598,10 @@ resetInContainer config =
   do inContainer <- getInContainer
      if inContainer
         then do home <- FS.getHomeDirectory
-                forM_ (sandboxedHomeSubdirectories config)
+                forM_ sandboxedHomeSubdirectories
                       (removeSubdir home)
         else hPutStrLn stderr
-                       ("WARNING: Not removing " ++ show (sandboxedHomeSubdirectories config) ++
+                       ("WARNING: Not removing " ++ show sandboxedHomeSubdirectories ++
                         " from home directory since running with Docker disabled.")
   where
     removeSubdir home d =
@@ -643,15 +646,11 @@ warnNoContainer cmdName =
                        "' even though Docker is disabled.")
 
 -- | Subdirectories of the home directory to sandbox between GHC/Stackage versions.
-sandboxedHomeSubdirectories :: Config -> [Path Rel Dir]
-sandboxedHomeSubdirectories config =
+sandboxedHomeSubdirectories :: [Path Rel Dir]
+sandboxedHomeSubdirectories =
   [$(mkRelDir ".ghc/")
   ,$(mkRelDir ".cabal/")
-  ,$(mkRelDir ".ghcjs/")
-   --EKB FIXME: this isn't going to work with reading a user config file from
-   -- outside the Docker sandbox.
-   --EKB FIXME: this probably shouldn't be per-image.
-  ,dirname (configStackRoot config)]
+  ,$(mkRelDir ".ghcjs/")]
 
 -- | Name of home directory within @.docker-sandbox@.
 homeDirName :: Path Rel Dir
