@@ -68,12 +68,13 @@ import           Stack.GhcPkg
 import           Stack.Types
 import           Stack.Constants
 import           Stack.Package
+import           Stack.PackageIndex
 import           System.Directory                (createDirectoryIfMissing, getDirectoryContents)
 import           System.FilePath                 (takeDirectory)
 
 data BuildPlanException
     = UnknownPackages
-        (Map PackageName (Set PackageName)) -- truly unknown
+        (Map PackageName (Maybe Version, (Set PackageName))) -- truly unknown
         (Map PackageName (Set PackageIdentifier)) -- shadowed
     deriving (Typeable)
 instance Exception BuildPlanException
@@ -84,17 +85,36 @@ instance Show BuildPlanException where
         unknown' :: [String]
         unknown'
             | Map.null unknown = []
-            | otherwise =
-              "The following packages do not exist in the build plan:"
-            : map go (Map.toList unknown)
+            | otherwise = concat
+                [ ["The following packages do not exist in the build plan:"]
+                , map go (Map.toList unknown)
+                , case mapMaybe goRecommend $ Map.toList unknown of
+                    [] -> []
+                    rec ->
+                        "Recommended action: add the following to your extra-deps:"
+                        : rec
+                , case mapMaybe getNoKnown $ Map.toList unknown of
+                    [] -> []
+                    noKnown ->
+                        [ "There are no known versions of the following packages:"
+                        , intercalate ", " $ map packageNameString noKnown
+                        ]
+                ]
           where
-            go (dep, users) | Set.null users = packageNameString dep
-            go (dep, users) = concat
+            go (dep, (_, users)) | Set.null users = packageNameString dep
+            go (dep, (_, users)) = concat
                 [ packageNameString dep
                 , " (used by "
                 , intercalate ", " $ map packageNameString $ Set.toList users
                 , ")"
                 ]
+
+            goRecommend (name, (Just version, _)) =
+                Just $ "- " ++ packageIdentifierString (PackageIdentifier name version)
+            goRecommend (_, (Nothing, _)) = Nothing
+
+            getNoKnown (name, (Nothing, _)) = Just name
+            getNoKnown (_, (Just _, _)) = Nothing
 
         shadowed' :: [String]
         shadowed'
@@ -130,16 +150,22 @@ instance Show BuildPlanException where
 -- This function will not provide test suite and benchmark dependencies.
 --
 -- This may fail if a target package is not present in the @BuildPlan@.
-resolveBuildPlan :: MonadThrow m
-                 => MiniBuildPlan
+resolveBuildPlan :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
+                 => EnvOverride
+                 -> MiniBuildPlan
                  -> (PackageName -> Bool) -- ^ is it shadowed by a local package?
                  -> Map PackageName (Set PackageName) -- ^ required packages, and users of it
                  -> m ( Map PackageName (Version, Map FlagName Bool)
                       , Map PackageName (Set PackageName)
                       )
-resolveBuildPlan mbp isShadowed packages
+resolveBuildPlan menv mbp isShadowed packages
     | Map.null (rsUnknown rs) && Map.null (rsShadowed rs) = return (rsToInstall rs, rsUsedBy rs)
-    | otherwise = throwM $ UnknownPackages (rsUnknown rs) (rsShadowed rs)
+    | otherwise = do
+        cache <- getPackageCaches menv
+        let maxVer = Map.fromListWith max $ map toTuple $ Map.keys cache
+            unknown = flip Map.mapWithKey (rsUnknown rs) $ \ident x ->
+                (Map.lookup ident maxVer, x)
+        throwM $ UnknownPackages unknown (rsShadowed rs)
   where
     rs = getDeps mbp isShadowed packages
 

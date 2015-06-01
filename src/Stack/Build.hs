@@ -300,7 +300,7 @@ getDependencies locals ranges = do
                 localTools = M.fromList $ map (\p -> (packageName p, ())) locals
                 toolDeps' = M.difference toolDeps localTools
 
-            (deps, users) <- resolveBuildPlan mbp isShadowed $ M.unionWith Set.union
+            (deps, users) <- resolveBuildPlan menv mbp isShadowed $ M.unionWith Set.union
                 (fmap M.keysSet ranges)
                 toolDeps'
             forM_ (M.toList users) $ \(name, users') -> $logDebug $
