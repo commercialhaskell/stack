@@ -90,3 +90,15 @@ spec = beforeAll setup $ afterAll teardown $ do
           LoadConfig{..} <- loadConfig' manager
           BuildConfig{..} <- loadBuildConfigRest manager lcLoadBuildConfig
           bcRoot `shouldBe` dir
+
+    it "STACK_YAML can be relative" $ \T{..} -> inTempDir $ do
+        parentDir <- getCurrentDirectory >>= parseAbsDir
+        let childRel = $(mkRelDir "child")
+            yamlRel = childRel </> $(mkRelFile "some-other-name.config")
+            yamlAbs = parentDir </> yamlRel
+        createDirectoryIfMissing True $ toFilePath $ parent yamlAbs
+        writeFile (toFilePath yamlAbs) "resolver: ghc-7.8"
+        withEnvVar "STACK_YAML" (toFilePath yamlRel) $ do
+            LoadConfig{..} <- loadConfig' manager
+            BuildConfig{..} <- loadBuildConfigRest manager lcLoadBuildConfig
+            bcStackYaml `shouldBe` yamlAbs
