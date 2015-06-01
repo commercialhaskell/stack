@@ -105,7 +105,7 @@ ghcPkg menv pkgDbs args = do
 -- | In the given databases, get a single version for all packages, chooses the
 -- latest version of each package.
 --
--- Package databases passed to these function override eachother in a
+-- Package databases passed to this function override eachother in a
 -- left-biased way when containing two packages of the same name.
 getPackageVersionMapWithGlobalDb
     :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
@@ -160,7 +160,7 @@ getPackageVersionMapWithGlobalDb menv mmbp pkgDbs = do
             allGlobals
             (map fromTuple (M.toList allGlobals))
 
--- | Get the packages depended on by the given package.
+-- | Does this version match what's in the snapshot plan?
 versionMatches :: MiniBuildPlan -> PackageIdentifier -> Bool
 versionMatches mbp ident =
     M.member
