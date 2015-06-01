@@ -184,3 +184,23 @@ package-indices:
 One thing you should be aware of: if you change the contents of package-version
 combination by setting a different package index, this *can* have an effect on
 other projects by installing into your shared snapshot database.
+
+__How can I make sure my project builds against multiple ghc versions?__
+
+You can create multiple yaml files for your project,
+one for each build plan. For example, you might set up your project like so:
+
+```
+/myproject
+  stack-7.8.yaml
+  stack-7.10.yaml
+  stack.yaml --> symlink to stack.7.8.yaml
+```
+
+And then when you run `stack build`, you can set the
+`STACK_YAML` environment variable to indicate which build plan to use.
+
+```
+$ stack build                             # builds using the default stack.yaml
+$ STACK_YAML=stack-7.10.yaml stack build  # builds using the given yaml file
+```
