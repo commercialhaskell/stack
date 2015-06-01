@@ -104,6 +104,9 @@ ghcPkg menv pkgDbs args = do
 
 -- | In the given databases, get a single version for all packages, chooses the
 -- latest version of each package.
+--
+-- Package databases passed to these function override eachother in a
+-- left-biased way when containing two packages of the same name.
 getPackageVersionMapWithGlobalDb
     :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
     => EnvOverride
@@ -126,20 +129,15 @@ getPackageVersionMapWithGlobalDb menv mmbp pkgDbs = do
             Just mbp ->
                 filtering gdb mbp allGlobals
     $logDebug ("Filtered globals: " <> T.pack (show globals))
-    -- Use unionsWith max to account for cases where the snapshot introduces a
-    -- newer version of a global package, see:
-    -- https://github.com/fpco/stack/issues/78
+    -- M.unions is left-biased.
     rest <-
         getPackageVersions
             menv
             pkgDbs
             (flip elem pkgDbs)
-            (M.unionsWith max .
+            (M.unions .
              map (M.fromList . rights))
-    return
-        (M.unionsWith
-             max
-             [globals, rest])
+    return (M.unions [rest,globals])
   where
     filtering gdb mbp allGlobals =
         foldM
