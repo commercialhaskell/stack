@@ -43,6 +43,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
+import           Path.IO
 import           Prelude hiding (FilePath)
 import           Stack.Types
 import           System.Directory (createDirectoryIfMissing, doesDirectoryExist, canonicalizePath)
@@ -153,7 +154,7 @@ getPackageVersionMapWithGlobalDb menv mmbp pkgDbs = do
                                     getTransInclusiveDeps mbp (packageIdentifierName ident)))
                   in if versionMatches mbp ident
                          then do
-                             hasProfiling <- packageHasProfiling [gdb] ident
+                             hasProfiling <- packageHasProfiling menv [gdb] ident
                              return (if hasProfiling
                                          then acc
                                          else expunge)
@@ -185,8 +186,19 @@ getTransInclusiveDeps mbp name =
 
 -- | Does the given package identifier from the given package db have
 -- profiling libs built?
-packageHasProfiling :: Monad m => [Path Abs Dir] -> PackageIdentifier -> m Bool
-packageHasProfiling _ _ = return True
+packageHasProfiling :: (MonadIO m, MonadThrow m, MonadLogger m)
+                    => EnvOverride
+                    -> [Path Abs Dir]
+                    -> PackageIdentifier
+                    -> m Bool
+packageHasProfiling env dbs ident = do
+    mlibDir <- findLibDir env dbs (packageIdentifierName ident)
+    case mlibDir of
+        Nothing ->
+            return False
+        Just dir -> do
+            (_dirs,files) <- listDirectory dir
+            return (any (isSuffixOf "_p.a" . toFilePath) files)
 
 -- | In the given databases, get every version of every package.
 getPackageVersionsSet :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
