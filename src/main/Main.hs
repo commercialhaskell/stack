@@ -125,7 +125,12 @@ main =
                    addCommand "cleanup"
                               "Clean up Docker images and containers"
                               dockerCleanupCmd
-                              dockerCleanupOpts))
+                              dockerCleanupOpts
+                   addCommand "exec"
+                              "Execute a command in a Docker container without setting up Haskell environment first"
+                              dockerExecCmd
+                              ((,) <$> strArgument (metavar "[--] CMD")
+                                   <*> many (strArgument (metavar "ARGS")))))
      run level
 
 setupCmd :: GlobalOpts -> IO ()
@@ -291,7 +296,6 @@ updateCmd () GlobalOpts{..} = do
 -- | Execute a command
 execCmd :: (String, [String]) -> GlobalOpts -> IO ()
 execCmd (cmd, args) GlobalOpts{..} = do
-    --EKB FIXME: add a `docker exec` subcommand that just reruns in docker without needing `stack` in image
     manager <- newTLSManager
     lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
     Docker.rerunWithOptionalContainer
@@ -336,6 +340,14 @@ dockerCleanupCmd cleanupOpts GlobalOpts{..} =
     (do manager <- newTLSManager
         lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
         Docker.cleanup (lcConfig lc) cleanupOpts)
+
+-- | Execute a command
+dockerExecCmd :: (String, [String]) -> GlobalOpts -> IO ()
+dockerExecCmd cmdArgs GlobalOpts{..} = do
+    manager <- newTLSManager
+    lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
+    Docker.preventInContainer
+      (Docker.rerunCmdWithRequiredContainer (lcConfig lc) (lcProjectRoot lc) (return cmdArgs))
 
 -- | Parser for build arguments.
 buildOpts :: Parser BuildOpts

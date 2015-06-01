@@ -21,12 +21,11 @@ module Stack.Docker
   ,preventInContainer
   ,pull
   ,rerunCmdWithOptionalContainer
+  ,rerunCmdWithRequiredContainer
   ,rerunWithOptionalContainer
   ,reset
   ,runContainerAndExit
   ,runInContainerAndExit
-  ,warnIfNoContainer
-  ,warnNoContainer
   ) where
 
 import           Control.Applicative
@@ -86,6 +85,17 @@ rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs inner =
         then inner
         else do (cmd_,args) <- getCmdArgs
                 runContainerAndExit config mprojectRoot cmd_ args [] (return ())
+
+-- | If Docker is enabled, re-runs the OS command returned by the second argument in a
+-- Docker container.  Otherwise, runs the inner action.
+rerunCmdWithRequiredContainer :: Config -> Maybe (Path Abs Dir) -> IO (FilePath, [String]) -> IO ()
+rerunCmdWithRequiredContainer config mprojectRoot getCmdArgs =
+  do when (not (dockerEnable (configDocker config)))
+          (error (concat ["Docker must be enabled in your "
+                         ,toFilePath stackDotYaml
+                         ," to use this command."]))
+     (cmd_,args) <- getCmdArgs
+     runContainerAndExit config mprojectRoot cmd_ args [] (return ())
 
 -- | Error if running in a container.
 preventInContainer :: IO () -> IO ()
@@ -611,24 +621,6 @@ removeDirectoryContents path excludeDirs excludeFiles =
               forM_ lsf
                     (\f -> unless (filename f `elem` excludeFiles)
                                   (removeFile (toFilePath f))))
-
--- | Display a warning to the user if running without Docker enabled.
-warnIfNoContainer :: String -> IO ()
-warnIfNoContainer cmdName =
-  do inContainer <- getInContainer
-     unless inContainer (warnNoContainer cmdName)
-
--- | Display a warning to the user when running without Docker enabled or when already inside a container.
-warnNoContainer :: String -> IO ()
-warnNoContainer cmdName =
-  do inContainer <- getInContainer
-     if inContainer
-        then hPutStrLn stderr
-                       ("WARNING: Running '" ++ cmdName ++
-                       "' when already in a Docker container.")
-        else hPutStrLn stderr
-                       ("WARNING: Running '" ++ cmdName ++
-                       "' even though Docker is disabled.")
 
 -- | Subdirectories of the home directory to sandbox between GHC/Stackage versions.
 sandboxedHomeSubdirectories :: [Path Rel Dir]
