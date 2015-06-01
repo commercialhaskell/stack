@@ -116,7 +116,12 @@ main =
                (do addCommand Docker.dockerPullCmdName
                               "Pull latest version of Docker image from registry"
                               dockerPullCmd
-                              (pure ())))
+                              (pure ())
+                   addCommand "reset"
+                              "Reset the Docker sandbox"
+                              dockerResetCmd
+                              (flag False True (long "keep-home" <>
+                                               help "Do not delete sandbox's home directory"))))
      run level
 
 setupCmd :: GlobalOpts -> IO ()
@@ -308,10 +313,17 @@ execCmd (cmd, args) GlobalOpts{..} = do
 dockerPullCmd :: () -> GlobalOpts -> IO ()
 dockerPullCmd _ GlobalOpts{..} =
   Docker.preventInContainer
-    (unwords [Docker.dockerCmdName, Docker.dockerPullCmdName])
     (do manager <- newTLSManager
         lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
         Docker.pull (configDocker (lcConfig lc)) (lcProjectRoot lc))
+
+-- | Reset the Docker sandbox.
+dockerResetCmd :: Bool -> GlobalOpts -> IO ()
+dockerResetCmd keepHome GlobalOpts{..} =
+  Docker.preventInContainer
+    (do manager <- newTLSManager
+        lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
+        Docker.reset (lcProjectRoot lc) keepHome)
 
 -- | Parser for build arguments.
 buildOpts :: Parser BuildOpts

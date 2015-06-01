@@ -22,6 +22,7 @@ module Stack.Docker
   ,pull
   ,rerunCmdWithOptionalContainer
   ,rerunWithOptionalContainer
+  ,reset
   ,runContainerAndExit
   ,runInContainerAndExit
   ,warnIfNoContainer
@@ -43,16 +44,17 @@ import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
-import           Development.Shake
+import           Development.Shake hiding (doesDirectoryExist)
 import           Options.Applicative.Builder.Extra (maybeBoolFlags)
 import           Options.Applicative (Parser,str,option,help,auto,metavar,long,value)
 import           Path
-import           Path.IO (getWorkingDir)
+import           Path.IO (getWorkingDir,listDirectory)
 import           Paths_stack (version)
 import           Stack.Constants (projectDockerSandboxDir,stackDotYaml,stackRootEnvVar)
 import           Stack.Types
 import           Stack.Docker.GlobalDB
-import           System.Directory (createDirectoryIfMissing)
+import           System.Directory (createDirectoryIfMissing,removeDirectoryRecursive,removeFile)
+import           System.Directory (doesDirectoryExist)
 import           System.Environment (lookupEnv,unsetEnv,getProgName,getArgs)
 import           System.Exit (ExitCode(ExitSuccess,ExitFailure),exitWith)
 import           System.FilePath (takeBaseName)
@@ -85,13 +87,11 @@ rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs inner =
                 runContainerAndExit config mprojectRoot cmd_ args [] (return ())
 
 -- | Error if running in a container.
-preventInContainer :: String -> IO () -> IO ()
-preventInContainer cmdName inner =
+preventInContainer :: IO () -> IO ()
+preventInContainer inner =
   do inContainer <- getInContainer
      if inContainer
-        then error (concat ["'"
-                           ,cmdName
-                           ,"' command must be run on host OS (not in a Docker container)."])
+        then error (concat ["This command must be run on host OS (not in a Docker container)."])
         else inner
 
 -- | 'True' if we are currently running inside a Docker container.
@@ -584,46 +584,34 @@ execProcessAndExit cmnd args successPostAction =
           successPostAction
      exitWith exitCode
 
-{- EKB FIXME: restore reset command
--- | Perform the docker sandbox reset tasks that are performed on the host.
-resetOnHost :: Manager -> LogLevel -> Bool -> IO ()
-resetOnHost manager logLevel keepHome =
-  runAction manager logLevel (\projectRoot -> liftIO (removeDirectoryContents sandboxDir [homeDirName | keepHome]))
-
--- | Perform the Docker sandbox reset tasks that are performed from within a container.
-resetInContainer :: Config -> IO ()
-resetInContainer config =
-  do inContainer <- getInContainer
-     if inContainer
-        then do home <- FS.getHomeDirectory
-                forM_ sandboxedHomeSubdirectories
-                      (removeSubdir home)
-        else hPutStrLn stderr
-                       ("WARNING: Not removing " ++ show sandboxedHomeSubdirectories ++
-                        " from home directory since running with Docker disabled.")
-  where
-    removeSubdir home d =
-      removeDirectoryContents (home </> d)
-                              (if d == $(mkRelDir ".cabal/") then [$(mkRelFile "config")
-                                                                  ,$(mkRelDir "packages")]
-                                                             else [])
+-- | Remove the project's Docker sandbox.
+reset :: Maybe (Path Abs Dir) -> Bool -> IO ()
+reset maybeProjectRoot keepHome =
+  case maybeProjectRoot of
+    Nothing -> return ()
+    Just projectRoot ->
+      removeDirectoryContents
+        (projectDockerSandboxDir projectRoot)
+        [homeDirName | keepHome]
+        []
 
 -- | Remove the contents of a directory, without removing the directory itself.
 -- This is used instead of 'FS.removeTree' to clear bind-mounted directories, since
 -- removing the root of the bind-mount won't work.
 removeDirectoryContents :: Path Abs Dir -- ^ Directory to remove contents of
-                        -> [FP.FilePath] -- ^ Directory names to exclude from removal
+                        -> [Path Rel Dir] -- ^ Top-level directory names to exclude from removal
+                        -> [Path Rel File] -- ^ Top-level file names to exclude from removal
                         -> IO ()
-removeDirectoryContents path exclude =
-  do isRootDir <- FS.isDirectory path
+removeDirectoryContents path excludeDirs excludeFiles =
+  do isRootDir <- doesDirectoryExist (toFilePath path)
      when isRootDir
-          (do ls <- FS.listDirectory path
-              forM_ ls (\l -> unless (FP.filename l `elem` exclude)
-                                     (do isDir <- FS.isDirectory l
-                                         if isDir
-                                           then FS.removeTree l
-                                           else FS.removeFile l)))
---}
+          (do (lsd,lsf) <- listDirectory path
+              forM_ lsd
+                    (\d -> unless (dirname d `elem` excludeDirs)
+                                  (removeDirectoryRecursive (toFilePath d)))
+              forM_ lsf
+                    (\f -> unless (filename f `elem` excludeFiles)
+                                  (removeFile (toFilePath f))))
 
 -- | Display a warning to the user if running without Docker enabled.
 warnIfNoContainer :: String -> IO ()
