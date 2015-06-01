@@ -6,11 +6,15 @@ MAINTAINER Greg Weber
 #    docker build -t haskell-stack:7.8 .
 #    docker run --rm -i -t -v `pwd`:/home/haskell haskell-stack /bin/bash
 #
+# If you want to re-use your host ~/.stack directory you can mount it into the host.
+# Setting the STACK_ROOT env variable may be of help
+#
+#    docker run --rm -i -t -v `pwd`:/home/haskell/ ~/.stack/:/root/.stack haskell-stack /bin/bash
+#
 # It is also possible to directly use stack from the image
+# However, for that purpose this image is very bloated
 #
 #    docker run --rm haskell-stack stack --help
-#
-# However, for that purpose this image is very bloated
 
 RUN apt-get update && apt-get install sudo \
     # ssl certificates for uploading to hackage
