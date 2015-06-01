@@ -1,7 +1,9 @@
+{-# LANGUAGE RecordWildCards #-}
 module Network.HTTP.Download.VerifiedSpec where
 
 import Crypto.Hash
 import Control.Exception
+import Control.Monad.Trans.Reader
 import Data.Maybe
 import Network.HTTP.Client.Conduit
 import Network.HTTP.Download.Verified
@@ -10,6 +12,7 @@ import System.Directory
 import System.IO (writeFile)
 import System.IO.Temp
 import Test.Hspec
+
 
 -- TODO: share across test files
 withTempDir :: (Path Abs Dir -> IO a) -> IO a
@@ -54,53 +57,66 @@ isWrongDigest :: VerifiedDownloadException -> Bool
 isWrongDigest WrongDigest{} = True
 isWrongDigest _ = False
 
-spec :: Spec
-spec = do
-  -- TODO: share manager across tests
+data T = T
+  { manager :: Manager
+  }
 
+runWith :: Manager -> ReaderT Manager m r -> m r
+runWith = flip runReaderT
+
+setup :: IO T
+setup = do
+  manager <- newManager
+  return T{..}
+
+teardown :: T -> IO ()
+teardown _ = return ()
+
+spec :: Spec
+spec = beforeAll setup $ afterAll teardown $ do
   describe "verifiedDownload" $ do
-    it "downloads the file correctly" $ withTempDir $ \dir -> do
+    it "downloads the file correctly" $ \T{..} -> withTempDir $ \dir -> do
       examplePath <- getExamplePath dir
       let exampleFilePath = toFilePath examplePath
       doesFileExist exampleFilePath `shouldReturn` False
-      let go = withManager $ verifiedDownload exampleReq examplePath
+      let go = runWith manager $ verifiedDownload exampleReq examplePath
       go `shouldReturn` True
       doesFileExist exampleFilePath `shouldReturn` True
 
-    it "is idempotent, and doesn't redownload unnecessarily" $ withTempDir $ \dir -> do
+    it "is idempotent, and doesn't redownload unnecessarily" $ \T{..} -> withTempDir $ \dir -> do
       examplePath <- getExamplePath dir
       let exampleFilePath = toFilePath examplePath
       doesFileExist exampleFilePath `shouldReturn` False
-      let go = withManager $ verifiedDownload exampleReq examplePath
+      let go = runWith manager $ verifiedDownload exampleReq examplePath
       go `shouldReturn` True
       doesFileExist exampleFilePath `shouldReturn` True
       go `shouldReturn` False
       doesFileExist exampleFilePath `shouldReturn` True
 
-    it "does redownload when the destination file is wrong" $ withTempDir $ \dir -> do
+    it "does redownload when the destination file is wrong" $ \T{..} -> withTempDir $ \dir -> do
       examplePath <- getExamplePath dir
       let exampleFilePath = toFilePath examplePath
       writeFile exampleFilePath exampleWrongContent
       doesFileExist exampleFilePath `shouldReturn` True
-      let go = withManager $ verifiedDownload exampleReq examplePath
+      let go = runWith manager $ verifiedDownload exampleReq examplePath
       go `shouldReturn` True
       doesFileExist exampleFilePath `shouldReturn` True
 
-    it "rejects incorrect content length" $ withTempDir $ \dir -> do
+    it "rejects incorrect content length" $ \T{..} -> withTempDir $ \dir -> do
       examplePath <- getExamplePath dir
       let exampleFilePath = toFilePath examplePath
       let wrongContentLengthReq = exampleReq
             { vrDownloadBytes = exampleWrongContentLength
             }
-      let go = withManager $ verifiedDownload wrongContentLengthReq examplePath
+      let go = runWith manager $ verifiedDownload wrongContentLengthReq examplePath
       go `shouldThrow` isWrongContentLength
       doesFileExist exampleFilePath `shouldReturn` False
 
-    it "rejects incorrect digest" $ withTempDir $ \dir -> do
+    it "rejects incorrect digest" $ \T{..} -> withTempDir $ \dir -> do
       examplePath <- getExamplePath dir
       let exampleFilePath = toFilePath examplePath
       let wrongDigestReq = exampleReq
             { vrExpectedHexDigest = exampleWrongDigest }
-      let go = withManager $ verifiedDownload wrongDigestReq examplePath
+      let go = runWith manager $ verifiedDownload wrongDigestReq examplePath
       go `shouldThrow` isWrongDigest
       doesFileExist exampleFilePath `shouldReturn` False

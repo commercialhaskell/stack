@@ -157,4 +157,5 @@ test-suite stack-test
                 , monad-logger
                 , http-conduit
                 , cryptohash
+                , transformers
   default-language:    Haskell2010
