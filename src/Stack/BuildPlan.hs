@@ -12,8 +12,8 @@
 
 module Stack.BuildPlan
     ( BuildPlanException (..)
-    , MiniBuildPlan
-    , mbpGhcVersion
+    , MiniBuildPlan(..)
+    , MiniPackageInfo(..)
     , Snapshots (..)
     , getSnapshots
     , loadMiniBuildPlan
@@ -65,6 +65,7 @@ import           Network.HTTP.Download
 import           Path
 import           Stack.Fetch
 import           Stack.GhcPkg
+import           Stack.Types
 import           Stack.Types
 import           Stack.Constants
 import           Stack.Package
@@ -185,30 +186,6 @@ data ResolveState = ResolveState
     , rsToInstall :: Map PackageName (Version, Map FlagName Bool)
     , rsUsedBy    :: Map PackageName (Set PackageName)
     }
-
--- | Information on a single package for the 'MiniBuildPlan'.
-data MiniPackageInfo = MiniPackageInfo
-    { mpiVersion :: !Version
-    , mpiFlags :: !(Map FlagName Bool)
-    , mpiPackageDeps :: !(Set PackageName)
-    , mpiToolDeps :: !(Set ByteString)
-    -- ^ Due to ambiguity in Cabal, it is unclear whether this refers to the
-    -- executable name, the package name, or something else. We have to guess
-    -- based on what's available, which is why we store this is an unwrapped
-    -- 'ByteString'.
-    , mpiExes :: !(Set ExeName)
-    -- ^ Executables provided by this package
-    }
-    deriving (Generic, Show)
-instance Binary.Binary MiniPackageInfo
-
--- | A simplified version of the 'BuildPlan' + cabal file.
-data MiniBuildPlan = MiniBuildPlan
-    { mbpGhcVersion :: !Version
-    , mbpPackages :: !(Map PackageName MiniPackageInfo)
-    }
-    deriving (Generic, Show)
-instance Binary.Binary MiniBuildPlan
 
 toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m)
                 => BuildPlan -> m MiniBuildPlan
@@ -396,9 +373,8 @@ instance FromJSON Snapshots where
 loadMiniBuildPlan
     :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m)
     => SnapName
-    -> Map PackageName Version -- ^ packages in global database
     -> m MiniBuildPlan
-loadMiniBuildPlan name globals = do
+loadMiniBuildPlan name = do
     path <- configMiniBuildPlanCache name
     let fp = toFilePath path
         dir = toFilePath $ parent path
@@ -415,15 +391,6 @@ loadMiniBuildPlan name globals = do
                 Binary.encodeFile fp mbp
             return mbp
     return mbp
-        { mbpPackages = mbpPackages mbp `Map.union`
-            fmap (\v -> MiniPackageInfo
-                { mpiVersion = v
-                , mpiFlags = Map.empty
-                , mpiPackageDeps = Set.empty
-                , mpiToolDeps = Set.empty
-                , mpiExes = Set.empty
-                }) globals
-        }
 
 -- | Some hard-coded fixes for build plans, hopefully to be irrelevant over
 -- time.
@@ -578,7 +545,7 @@ findBuildPlan cabalfp gpd = do
             ]
         loop [] = return Nothing
         loop (name:names') = do
-            mbp <- loadMiniBuildPlan name Map.empty
+            mbp <- loadMiniBuildPlan name
             mflags <- checkBuildPlan name mbp cabalfp gpd
             case mflags of
                 Nothing -> loop names'

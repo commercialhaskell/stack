@@ -43,6 +43,7 @@ import           Data.IORef
 import           Data.List
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
+import qualified Data.Map.Strict as Map
 import           Data.Maybe
 import           Data.Set (Set)
 import qualified Data.Set as S
@@ -275,13 +276,24 @@ getDependencies
 getDependencies locals ranges = do
     -- Get global packages
     menv <- getMinimalEnvOverride
-    globals <- getPackageVersionMapWithGlobalDb menv []
+
 
     bconfig <- asks getBuildConfig
     dependencies <- case bcResolver bconfig of
         ResolverSnapshot snapName -> do
             $logDebug $ "Checking resolver: " <> renderSnapName snapName
-            mbp <- loadMiniBuildPlan snapName globals
+            mbp0 <- loadMiniBuildPlan snapName
+            globals <- getPackageVersionMapWithGlobalDb menv mbp0 []
+            let mbp = mbp0
+                    { mbpPackages = mbpPackages mbp `Map.union`
+                        fmap (\v -> MiniPackageInfo
+                            { mpiVersion = v
+                            , mpiFlags = Map.empty
+                            , mpiPackageDeps = Set.empty
+                            , mpiToolDeps = Set.empty
+                            , mpiExes = Set.empty
+                            }) globals
+                    }
 
             let toolMap = getToolMap mbp
                 shadowed = Set.fromList $ map packageName locals
@@ -310,7 +322,9 @@ getDependencies locals ranges = do
                                          $ Set.toList users'
                     ]
             return deps
-        ResolverGhc _ -> return $ fmap (, M.empty) globals
+        ResolverGhc _ -> do
+            globals <- getPackageVersionMapWithGlobalDb menv []
+            return $ fmap (, M.empty) globals
 
     let checkDepRange (dep, users) =
             concatMap go $ M.toList users

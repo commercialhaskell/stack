@@ -44,6 +44,7 @@ import qualified Data.Text.Encoding as T
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
 import           Prelude hiding (FilePath)
 import           Stack.Types
+import           Stack.Types.BuildPlan
 import           System.Directory (createDirectoryIfMissing, doesDirectoryExist, canonicalizePath)
 import           System.Process.Read
 
@@ -104,11 +105,13 @@ ghcPkg menv pkgDbs args = do
 
 -- | In the given databases, get a single version for all packages, chooses the
 -- latest version of each package.
-getPackageVersionMapWithGlobalDb :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
-                                 => EnvOverride
-                                 -> [Path Abs Dir] -- ^ package databases
-                                 -> m (Map PackageName Version)
-getPackageVersionMapWithGlobalDb menv pkgDbs = do
+getPackageVersionMapWithGlobalDb
+    :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
+    => EnvOverride
+    -> MiniBuildPlan
+    -> [Path Abs Dir] -- ^ package databases
+    -> m (Map PackageName Version)
+getPackageVersionMapWithGlobalDb menv mbp pkgDbs = do
     gdb <- getGlobalDB menv
     -- Use unionsWith max to account for cases where the snapshot introduces a
     -- newer version of a global package, see:
@@ -123,23 +126,13 @@ getPackageVersionMapWithGlobalDb menv pkgDbs = do
     globals <-
         foldM
             (\acc ident ->
-                  do hasProfiling <-
-                         packageHasProfiling
-                             [gdb]
-                             ident
-                     if hasProfiling && versionMatches ident
-                         then return acc
-                         else do
-                             let dependencies =
-                                     getPackageDeps
-                                         ident
-                             return
-                                 (foldr
-                                      M.delete
-                                      acc
-                                      (map
-                                           packageIdentifierName
-                                           (ident : dependencies))))
+                  if versionMatches mbp ident
+                      then do
+                          hasProfiling <- packageHasProfiling [gdb] ident
+                          if hasProfiling
+                              then return acc
+                              else return (expunge ident acc)
+                      else return (expunge ident acc))
             allGlobals
             (map fromTuple (M.toList allGlobals))
     rest <-
@@ -153,14 +146,20 @@ getPackageVersionMapWithGlobalDb menv pkgDbs = do
         (M.unionsWith
              max
              [globals, rest])
+  where
+    expunge ident acc = do
+        foldr
+            M.delete
+            acc
+            (map packageIdentifierName (ident : getTransInclusiveDeps mbp ident))
 
 -- | Get the packages depended on by the given package.
-versionMatches :: PackageIdentifier -> Bool
-versionMatches = const True
+versionMatches :: MiniBuildPlan -> PackageIdentifier -> Bool
+versionMatches mbp ident = True
 
 -- | Get the packages depended on by the given package.
-getPackageDeps :: PackageIdentifier -> [PackageIdentifier]
-getPackageDeps = const []
+getTransInclusiveDeps :: MiniBuildPlan -> PackageIdentifier -> [PackageIdentifier]
+getTransInclusiveDeps mbp ident = []
 
 -- | Does the given package identifier from the given package db have
 -- profiling libs built?

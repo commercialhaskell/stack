@@ -19,6 +19,7 @@ module Stack.Types.BuildPlan
     , DepInfo (..)
     , Component (..)
     , SnapName (..)
+    , MiniBuildPlan (..)
     , renderSnapName
     , parseSnapName
     ) where
@@ -30,7 +31,7 @@ import           Control.Monad.Catch             (MonadThrow, throwM)
 import           Data.Aeson                      (FromJSON (..), ToJSON (..),
                                                   object, withObject, withText,
                                                   (.!=), (.:), (.:?), (.=))
-import           Data.Binary                     (Binary)
+import           Data.Binary                     as Binary (Binary)
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Char8           as S8
 import           Data.Hashable                   (Hashable)
@@ -353,3 +354,27 @@ instance ToJSON a => ToJSON (Map ExeName a) where
   toJSON = toJSON . Map.mapKeysWith const (S8.unpack . unExeName)
 instance FromJSON a => FromJSON (Map ExeName a) where
     parseJSON = fmap (Map.mapKeysWith const (ExeName . encodeUtf8)) . parseJSON
+
+-- | A simplified version of the 'BuildPlan' + cabal file.
+data MiniBuildPlan = MiniBuildPlan
+    { mbpGhcVersion :: !Version
+    , mbpPackages :: !(Map PackageName MiniPackageInfo)
+    }
+    deriving (Generic, Show)
+instance Binary.Binary MiniBuildPlan
+
+-- | Information on a single package for the 'MiniBuildPlan'.
+data MiniPackageInfo = MiniPackageInfo
+    { mpiVersion :: !Version
+    , mpiFlags :: !(Map FlagName Bool)
+    , mpiPackageDeps :: !(Set PackageName)
+    , mpiToolDeps :: !(Set ByteString)
+    -- ^ Due to ambiguity in Cabal, it is unclear whether this refers to the
+    -- executable name, the package name, or something else. We have to guess
+    -- based on what's available, which is why we store this is an unwrapped
+    -- 'ByteString'.
+    , mpiExes :: !(Set ExeName)
+    -- ^ Executables provided by this package
+    }
+    deriving (Generic, Show)
+instance Binary.Binary MiniPackageInfo
