@@ -108,18 +108,64 @@ getPackageVersionMapWithGlobalDb :: (MonadCatch m, MonadIO m, MonadThrow m, Mona
                                  => EnvOverride
                                  -> [Path Abs Dir] -- ^ package databases
                                  -> m (Map PackageName Version)
-getPackageVersionMapWithGlobalDb menv pkgDbs0 = do
+getPackageVersionMapWithGlobalDb menv pkgDbs = do
     gdb <- getGlobalDB menv
-    let pkgDbs = gdb : pkgDbs0
     -- Use unionsWith max to account for cases where the snapshot introduces a
     -- newer version of a global package, see:
     -- https://github.com/fpco/stack/issues/78
-    getPackageVersions
-        menv
-        pkgDbs
-        (flip elem pkgDbs)
-        (M.unionsWith max .
-         map (M.fromList . rights))
+    allGlobals <-
+        getPackageVersions
+            menv
+            [gdb]
+            (const True)
+            (M.unionsWith max .
+             map (M.fromList . rights))
+    globals <-
+        foldM
+            (\acc ident ->
+                  do hasProfiling <-
+                         packageHasProfiling
+                             [gdb]
+                             ident
+                     if hasProfiling && versionMatches ident
+                         then return acc
+                         else do
+                             let dependencies =
+                                     getPackageDeps
+                                         ident
+                             return
+                                 (foldr
+                                      M.delete
+                                      acc
+                                      (map
+                                           packageIdentifierName
+                                           (ident : dependencies))))
+            allGlobals
+            (map fromTuple (M.toList allGlobals))
+    rest <-
+        getPackageVersions
+            menv
+            pkgDbs
+            (flip elem pkgDbs)
+            (M.unionsWith max .
+             map (M.fromList . rights))
+    return
+        (M.unionsWith
+             max
+             [globals, rest])
+
+-- | Get the packages depended on by the given package.
+versionMatches :: PackageIdentifier -> Bool
+versionMatches = const True
+
+-- | Get the packages depended on by the given package.
+getPackageDeps :: PackageIdentifier -> [PackageIdentifier]
+getPackageDeps = const []
+
+-- | Does the given package identifier from the given package db have
+-- profiling libs built?
+packageHasProfiling :: Monad m => [Path Abs Dir] -> PackageIdentifier -> m Bool
+packageHasProfiling _ _ = return True
 
 -- | In the given databases, get every version of every package.
 getPackageVersionsSet :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
