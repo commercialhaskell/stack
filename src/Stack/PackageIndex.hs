@@ -235,10 +235,10 @@ updateIndexGit menv indexName' gitUrl = do
                   ,"1"
                   ,"-b" --
                   ,"display"]
-            let sDir = configStackRoot config
+            sDir <- configPackageIndexRoot indexName'
             let suDir =
                   sDir </>
-                  $(mkRelDir "update")
+                  $(mkRelDir "git-update")
                 acfDir = suDir </> repoName
             repoExists <-
               liftIO (doesDirectoryExist (toFilePath acfDir))
