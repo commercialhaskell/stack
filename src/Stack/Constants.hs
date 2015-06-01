@@ -4,16 +4,19 @@
 -- | Constants used throughout the project.
 
 module Stack.Constants
-    (distRelativeDir
-    ,haskellFileExts
-    ,distDirFromDir
-    ,rawGithubUrl
-    ,defaultShakeThreads
+    (builtConfigFileFromDir
     ,builtFileFromDir
     ,configuredFileFromDir
-    ,builtConfigFileFromDir
+    ,defaultShakeThreads
+    ,distDirFromDir
+    ,distRelativeDir
+    ,haskellFileExts
+    ,projectDockerSandboxDir
+    ,rawGithubUrl
+    ,stackDotYaml
+    ,stackRootEnvVar
     ,userDocsDir
-    ,projectDockerSandboxDir)
+    )
     where
 
 import Control.Monad (liftM)
@@ -147,3 +150,11 @@ rawGithubUrl org repo branch file = T.concat
 -- | Docker sandbox from project root.
 projectDockerSandboxDir :: Path Abs Dir -> Path Abs Dir
 projectDockerSandboxDir projectRoot = projectRoot </> $(mkRelDir ".docker-sandbox/")
+
+-- | The filename used for the stack config file.
+stackDotYaml :: Path Rel File
+stackDotYaml = $(mkRelFile "stack.yaml")
+
+-- | Environment variable used to override the '~/.stack' location.
+stackRootEnvVar :: String
+stackRootEnvVar = "STACK_ROOT"

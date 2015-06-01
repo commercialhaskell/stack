@@ -1,6 +1,6 @@
 -- | Extra functions for optparse-applicative.
 
-module Options.Applicative.Extra
+module Options.Applicative.Builder.Extra
   (boolFlags
   ,maybeBoolFlags
   ,enableDisableFlags)

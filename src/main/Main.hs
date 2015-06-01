@@ -2,6 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | Main stack tool entry point.
 
@@ -11,10 +12,10 @@ import           Control.Exception
 import           Control.Monad (join)
 import           Control.Monad.Logger
 import           Data.List
-import           Data.Maybe
+import           Data.Monoid
 import qualified Data.Text as T
 import           Distribution.Text (display)
-import           Options.Applicative.Extra
+import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Simple
 import           Options.Applicative.Types (readerAsk)
 import           Path (toFilePath)
@@ -41,9 +42,9 @@ main =
      (level,run) <-
        simpleOptions
          $(simpleVersion Meta.version)
-         "header"
-         "desc"
-         logLevelOpt
+         "stack - The Haskell Tool Stack"
+         ""
+         globalOpts
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
@@ -76,26 +77,26 @@ main =
                         "Execute a command"
                         execCmd
                         ((,)
-                            <$> strArgument (metavar "CMD")
-                            <*> many (strArgument (metavar "[ARGS]")))
+                            <$> strArgument (metavar "[--] CMD")
+                            <*> many (strArgument (metavar "ARGS")))
              addCommand "ghc"
                         "Run ghc"
                         execCmd
                         ((,)
                             <$> pure "ghc"
-                            <*> many (strArgument (metavar "[ARGS]")))
+                            <*> many (strArgument (metavar "ARGS")))
              addCommand "ghci"
                         "Run ghci"
                         execCmd
                         ((,)
                             <$> pure "ghci"
-                            <*> many (strArgument (metavar "[ARGS]")))
+                            <*> many (strArgument (metavar "ARGS")))
              addCommand "runghc"
                         "Run runghc"
                         execCmd
                         ((,)
                             <$> pure "runghc"
-                            <*> many (strArgument (metavar "[ARGS]")))
+                            <*> many (strArgument (metavar "ARGS")))
              addCommand "clean"
                         "Clean the local packages"
                         cleanCmd
@@ -106,43 +107,55 @@ main =
                         ((,)
                             <$> (some (argument readPackageName
                                         (metavar "[PACKAGES]")))
-                            <*> fmap (fromMaybe False)
-                               (maybeBoolFlags "dry-run" "Don't build anything, just prepare to")))
+                            <*> (flag False True (long "dry-run" <>
+                                                  help "Don't build anything, just prepare to")))
+             addSubCommands
+               Docker.dockerCmdName
+               "Subcommands specific to Docker use"
+               (do addCommand Docker.dockerPullCmdName
+                              "Pull latest version of Docker image from registry"
+                              dockerPullCmd
+                              (pure ())
+                   addCommand "reset"
+                              "Reset the Docker sandbox"
+                              dockerResetCmd
+                              (flag False True (long "keep-home" <>
+                                               help "Do not delete sandbox's home directory"))))
      run level
 
-setupCmd :: LogLevel -> IO ()
-setupCmd logLevel = do
+setupCmd :: GlobalOpts -> IO ()
+setupCmd GlobalOpts{..} = do
   manager <- newTLSManager
-  lc <- runStackLoggingT manager logLevel loadConfig
+  lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
   Docker.rerunWithOptionalContainer
     (lcConfig lc)
     (lcProjectRoot lc)
     (do _ <- runStackLoggingT manager
-                              logLevel
+                              globalLogLevel
                               (lcLoadBuildConfig lc >>= setupEnv True manager)
         return ())
 
-cleanCmd :: () -> LogLevel -> IO ()
-cleanCmd _ logLevel = do
+cleanCmd :: () -> GlobalOpts -> IO ()
+cleanCmd _ GlobalOpts{..} = do
   manager <- newTLSManager
-  lc <- runStackLoggingT manager logLevel loadConfig
+  lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
   Docker.rerunWithOptionalContainer
     (lcConfig lc)
     (lcProjectRoot lc)
     (do config <- runStackLoggingT manager
-                                   logLevel
+                                   globalLogLevel
                                    (lcLoadBuildConfig lc >>= setupEnv False manager)
-        runStackT manager logLevel config clean)
+        runStackT manager globalLogLevel config clean)
 
 -- | Install dependencies
-depsCmd :: ([PackageName], Bool) -> LogLevel -> IO ()
-depsCmd (names, dryRun) logLevel = do
+depsCmd :: ([PackageName], Bool) -> GlobalOpts -> IO ()
+depsCmd (names, dryRun) GlobalOpts{..} = do
     manager <- newTLSManager
-    lc <- runStackLoggingT manager logLevel loadConfig
+    lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
     Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $ do
-        config <- runStackLoggingT manager logLevel
+        config <- runStackLoggingT manager globalLogLevel
             (lcLoadBuildConfig lc >>= setupEnv False manager)
-        runStackT manager logLevel config $ Stack.Build.build BuildOpts
+        runStackT manager globalLogLevel config $ Stack.Build.build BuildOpts
             { boptsTargets = Right names
             , boptsLibProfile = False
             , boptsExeProfile = False
@@ -161,18 +174,18 @@ readPackageName = do
         Just x -> return x
 
 -- | Build the project.
-buildCmd :: FinalAction -> BuildOpts -> LogLevel -> IO ()
-buildCmd finalAction opts logLevel =
+buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
+buildCmd finalAction opts GlobalOpts{..} =
   catch
   (do manager <- newTLSManager
-      lc <- runStackLoggingT manager logLevel loadConfig
+      lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
       Docker.rerunWithOptionalContainer
         (lcConfig lc)
         (lcProjectRoot lc)
         (do config <- runStackLoggingT manager
-                                       logLevel
+                                       globalLogLevel
                                        (lcLoadBuildConfig lc >>= setupEnv False manager)
-            runStackT manager logLevel config $
+            runStackT manager globalLogLevel config $
                       Stack.Build.build opts { boptsFinalAction = finalAction}))
              (error . printBuildException)
   where printBuildException e =
@@ -252,35 +265,35 @@ buildCmd finalAction opts logLevel =
                 intercalate ", " (map packageNameString targets)
 
 -- | Unpack packages to the filesystem
-unpackCmd :: [String] -> LogLevel -> IO ()
-unpackCmd names logLevel = do
+unpackCmd :: [String] -> GlobalOpts -> IO ()
+unpackCmd names GlobalOpts{..} = do
     manager <- newTLSManager
-    lc <- runStackLoggingT manager logLevel loadConfig
+    lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
     Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $ do
-        runStackT manager logLevel (lcConfig lc) $ do
+        runStackT manager globalLogLevel (lcConfig lc) $ do
             menv <- getMinimalEnvOverride
             Stack.Fetch.unpackPackages menv "." names
 
 -- | Update the package index
-updateCmd :: () -> LogLevel -> IO ()
-updateCmd () logLevel = do
+updateCmd :: () -> GlobalOpts -> IO ()
+updateCmd () GlobalOpts{..} = do
     manager <- newTLSManager
-    lc <- runStackLoggingT manager logLevel loadConfig
+    lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
     Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $
-        runStackT manager logLevel (lcConfig lc) $
+        runStackT manager globalLogLevel (lcConfig lc) $
             getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
 
 -- | Execute a command
-execCmd :: (String, [String]) -> LogLevel -> IO ()
-execCmd (cmd, args) logLevel = do
+execCmd :: (String, [String]) -> GlobalOpts -> IO ()
+execCmd (cmd, args) GlobalOpts{..} = do
     --EKB FIXME: add a `docker exec` subcommand that just reruns in docker without needing `stack` in image
     manager <- newTLSManager
-    lc <- runStackLoggingT manager logLevel loadConfig
+    lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
     Docker.rerunWithOptionalContainer
       (lcConfig lc)
       (lcProjectRoot lc)
       (do config <- runStackLoggingT manager
-                                     logLevel
+                                     globalLogLevel
                                      (lcLoadBuildConfig lc >>= setupEnv False manager)
           menv <- configEnvOverride (bcConfig config)
                           EnvSettings
@@ -294,6 +307,22 @@ execCmd (cmd, args) logLevel = do
           (Nothing, Nothing, Nothing, ph) <- P.createProcess cp
           ec <- P.waitForProcess ph
           exitWith ec)
+
+-- | Pull the current Docker image.
+dockerPullCmd :: () -> GlobalOpts -> IO ()
+dockerPullCmd _ GlobalOpts{..} =
+  Docker.preventInContainer
+    (do manager <- newTLSManager
+        lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
+        Docker.pull (configDocker (lcConfig lc)) (lcProjectRoot lc))
+
+-- | Reset the Docker sandbox.
+dockerResetCmd :: Bool -> GlobalOpts -> IO ()
+dockerResetCmd keepHome GlobalOpts{..} =
+  Docker.preventInContainer
+    (do manager <- newTLSManager
+        lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
+        Docker.reset (lcProjectRoot lc) keepHome)
 
 -- | Parser for build arguments.
 buildOpts :: Parser BuildOpts
@@ -315,14 +344,20 @@ buildOpts = BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
                     "executable-profiling"
                     "library profiling for TARGETs and all its dependencies"
         finalAction = pure DoNothing
-        dryRun =
-          fmap (fromMaybe False)
-               (maybeBoolFlags "dry-run" "Don't build anything, just prepare to")
+        dryRun = flag False True (long "dry-run" <>
+                                  help "Don't build anything, just prepare to")
         ghcOpts =
           many (fmap T.pack
                      (strOption (long "ghc-options" <>
                                  metavar "OPTION" <>
                                  help "Additional options passed to GHC")))
+
+-- | Parser for global command-line options.
+globalOpts :: Parser GlobalOpts
+globalOpts =
+    GlobalOpts
+    <$> logLevelOpt
+    <*> configOptsParser
 
 -- | Parse for a logging level.
 logLevelOpt :: Parser LogLevel
@@ -346,3 +381,9 @@ logLevelOpt =
 -- | Default logging level should be something useful but not crazy.
 defaultLogLevel :: LogLevel
 defaultLogLevel = LevelInfo
+
+-- | Parsed global command-line options.
+data GlobalOpts = GlobalOpts
+    { globalLogLevel     :: LogLevel -- ^ Log level
+    , globalConfigMonoid :: ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
+    } deriving (Show)

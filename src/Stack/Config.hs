@@ -21,8 +21,8 @@
 -- probably default to behaving like cabal, possibly with spitting out
 -- a warning that "you should run `stk init` to make things better".
 module Stack.Config
-  ( loadConfig
-  , stackDotYaml
+  ( configOptsParser
+  , loadConfig
   ) where
 
 import           Control.Applicative
@@ -42,37 +42,22 @@ import qualified Distribution.PackageDescription as C
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Set as S
-import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import           Distribution.System (OS (Windows), Platform (..), buildPlatform)
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager)
+import           Options.Applicative (Parser)
 import           Path
 import           Path.IO
 import           Stack.BuildPlan
+import           Stack.Types.Config
+import           Stack.Constants
+import qualified Stack.Docker as Docker
 import           Stack.Package
 import           Stack.Types
 import           System.Directory
 import           System.Environment
 import           System.Process.Read (getEnvOverride, EnvOverride, unEnvOverride)
-
--- An uninterpreted representation of configuration options.
--- Configurations may be "cascaded" using mappend (left-biased).
-data ConfigMonoid =
-  ConfigMonoid
-    { configMonoidDockerOpts     :: !DockerOpts
-    , configMonoidGpgVerifyIndex :: !(Maybe Bool)
-    -- ^ Controls how package index updating occurs
-    , configMonoidConnectionCount :: !(Maybe Int)
-    -- ^ See: 'configConnectionCount'
-    , configMonoidHideTHLoading :: !(Maybe Bool)
-    -- ^ See: 'configHideTHLoading'
-    , configMonoidLatestSnapshotUrl :: !(Maybe Text)
-    -- ^ See: 'configLatestSnapshotUrl'
-    , configMonoidPackageIndices :: !(Maybe [PackageIndex])
-    -- ^ See: 'configPackageIndices'
-    }
-  deriving Show
 
 -- | Get the default resolver value
 getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
@@ -103,75 +88,9 @@ getDefaultResolver dir = do
                     Nothing -> Nightly $ snapshotsNightly s
             return (ResolverSnapshot snap, Map.empty, cabalFileExists)
 
--- | Dummy type to support this monoid business.
-newtype DockerOpts = DockerOpts Docker
-  deriving (Show)
-
--- | Left-biased instance.
-instance Monoid DockerOpts where
-  --EKB FIXME: implement proper configuration inheritance
-  mappend x _ = x
-  mempty = DockerOpts defaultDocker
-
-instance Monoid ConfigMonoid where
-  mempty = ConfigMonoid
-    { configMonoidDockerOpts = mempty
-    , configMonoidGpgVerifyIndex = Nothing
-    , configMonoidConnectionCount = Nothing
-    , configMonoidHideTHLoading = Nothing
-    , configMonoidLatestSnapshotUrl = Nothing
-    , configMonoidPackageIndices = Nothing
-    }
-  mappend l r = ConfigMonoid
-    { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
-    , configMonoidGpgVerifyIndex = configMonoidGpgVerifyIndex l <|> configMonoidGpgVerifyIndex r
-    , configMonoidConnectionCount = configMonoidConnectionCount l <|> configMonoidConnectionCount r
-    , configMonoidHideTHLoading = configMonoidHideTHLoading l <|> configMonoidHideTHLoading r
-    , configMonoidLatestSnapshotUrl = configMonoidLatestSnapshotUrl l <|> configMonoidLatestSnapshotUrl r
-    , configMonoidPackageIndices = configMonoidPackageIndices l <|> configMonoidPackageIndices r
-    }
-
-instance FromJSON ConfigMonoid where
-  parseJSON =
-    withObject "ConfigMonoid" $
-    \obj ->
-      do getTheDocker <- obj .:? "docker" .!= defaultDocker
-         configMonoidGpgVerifyIndex <- obj .:? "gpg-verify-index"
-         configMonoidConnectionCount <- obj .:? "connection-count"
-         configMonoidHideTHLoading <- obj .:? "hide-th-loading"
-         configMonoidLatestSnapshotUrl <- obj .:? "latest-snapshot-url"
-         configMonoidPackageIndices <- obj .:? "package-indices"
-         let configMonoidDockerOpts = DockerOpts getTheDocker
-         return ConfigMonoid {..}
-
--- | A project is a collection of packages. We can have multiple stack.yaml
--- files, but only one of them may contain project information.
-data Project = Project
-    { projectPackages :: ![FilePath]
-    -- ^ Components of the package list which refer to local directories
-    --
-    -- Note that we use @FilePath@ and not @Path@s. The goal is: first parse
-    -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
-    , projectExtraDeps :: !(Map PackageName Version)
-    -- ^ Components of the package list referring to package/version combos,
-    -- see: https://github.com/fpco/stack/issues/41
-    , projectFlags :: !(Map PackageName (Map FlagName Bool))
-    -- ^ Per-package flag overrides
-    , projectResolver :: !Resolver
-    -- ^ How we resolve which dependencies to use
-    }
-  deriving Show
-
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
 
-instance ToJSON Project where
-    toJSON p = object
-        [ "packages"   .= projectPackages p
-        , "extra-deps" .= map fromTuple (Map.toList $ projectExtraDeps p)
-        , "flags"      .= projectFlags p
-        , "resolver"   .= projectResolver p
-        ]
 instance FromJSON ProjectAndConfigMonoid where
     parseJSON = withObject "Project, ConfigMonoid" $ \o -> do
         dirs <- o .:? "packages" .!= ["."]
@@ -214,13 +133,14 @@ defaultStackGlobalConfig :: Maybe (Path Abs File)
 defaultStackGlobalConfig = parseAbsFile "/etc/stack/config"
 
 -- Interprets ConfigMonoid options.
-configFromConfigMonoid :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env)
-  => Path Abs Dir -- ^ stack root, e.g. ~/.stack
-  -> ConfigMonoid
-  -> m Config
-configFromConfigMonoid configStackRoot ConfigMonoid{..} = do
-     let configDocker = case configMonoidDockerOpts of
-                 DockerOpts x -> x
+configFromConfigMonoid
+    :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env)
+    => Path Abs Dir -- ^ stack root, e.g. ~/.stack
+    -> Maybe Project
+    -> ConfigMonoid
+    -> m Config
+configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
+     let configDocker = Docker.dockerOptsFromMonoid mproject configMonoidDockerOpts
          configGpgVerifyIndex = fromMaybe False configMonoidGpgVerifyIndex
          configConnectionCount = fromMaybe 8 configMonoidConnectionCount
          configHideTHLoading = fromMaybe True configMonoidHideTHLoading
@@ -255,6 +175,12 @@ configFromConfigMonoid configStackRoot ConfigMonoid{..} = do
 
      return Config {..}
 
+-- | Command-line arguments parser for configuration.
+configOptsParser :: Parser ConfigMonoid
+configOptsParser =
+    (\docker -> mempty { configMonoidDockerOpts = docker })
+    <$> Docker.dockerOptsParser
+
 -- | Get the directory on Windows where we should install extra programs. For
 -- more information, see discussion at:
 -- https://github.com/fpco/minghc/issues/43#issuecomment-99737383
@@ -280,19 +206,21 @@ instance HasPlatform MiniConfig
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.
 loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env,MonadBaseControl IO m)
-           => m (LoadConfig m)
-loadConfig = do
+           => ConfigMonoid
+           -- ^ Config monoid from parsed command-line arguments
+           -> m (LoadConfig m)
+loadConfig configArgs = do
     stackRoot <- determineStackRoot
-    extraConfigs <- getExtraConfigs stackRoot >>= mapM loadConfigMonoid
+    extraConfigs <- getExtraConfigs stackRoot >>= mapM loadYaml
     mproject <- loadProjectConfig
-    config <- configFromConfigMonoid stackRoot $ mconcat $
+    config <- configFromConfigMonoid stackRoot (fmap (\(proj, _, _) -> proj) mproject) $ mconcat $
         case mproject of
-            Nothing -> extraConfigs
-            Just (_, _, config) -> config : extraConfigs
+            Nothing -> configArgs : extraConfigs
+            Just (_, _, projectConfig) -> configArgs : projectConfig : extraConfigs
     return $ LoadConfig
         { lcConfig          = config
         , lcLoadBuildConfig = loadBuildConfig mproject config
-        , lcProjectRoot     = maybe Nothing (\(_, fp, _) -> Just (parent fp)) mproject
+        , lcProjectRoot     = fmap (\(_, fp, _) -> parent fp) mproject
         }
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
@@ -352,7 +280,7 @@ determineStackRoot :: (MonadIO m, MonadThrow m) => m (Path Abs Dir)
 determineStackRoot = do
     env <- liftIO getEnvironment
     root <-
-        case lookup "STACK_ROOT" env of
+        case lookup stackRootEnvVar env of
             Nothing -> liftIO $ getAppUserDataDirectory "stack"
             Just x -> return x
     parseAbsDir root
@@ -375,9 +303,9 @@ getExtraConfigs stackRoot = liftIO $ do
         $ fromMaybe (stackRoot </> stackDotYaml) mstackConfig
         : maybe [] return (mstackGlobalConfig <|> defaultStackGlobalConfig)
 
--- | Load the value of a 'ConfigMonoid' from the given file.
-loadConfigMonoid :: (FromJSON a,MonadIO m) => Path Abs File -> m a
-loadConfigMonoid path =
+-- | Load and parse YAML from the given file.
+loadYaml :: (FromJSON a,MonadIO m) => Path Abs File -> m a
+loadYaml path =
     liftIO $ Yaml.decodeFileEither (toFilePath path)
          >>= either throwM return
 
@@ -421,12 +349,10 @@ loadProjectConfig = do
             $logDebug $ "Loading project config file " <>
                         T.pack (maybe (toFilePath fp) toFilePath (stripDir currDir fp))
             load fp
-        Nothing -> return Nothing
+        Nothing -> do
+            $logInfo $ "No project config file found, using defaults"
+            return Nothing
   where
     load fp = do
-        ProjectAndConfigMonoid project config <- loadConfigMonoid fp
+        ProjectAndConfigMonoid project config <- loadYaml fp
         return $ Just (project, fp, config)
-
--- | The filename used for the stack config file.
-stackDotYaml :: Path Rel File
-stackDotYaml = $(mkRelFile "stack.yaml")

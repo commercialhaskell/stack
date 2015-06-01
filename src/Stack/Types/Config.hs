@@ -3,21 +3,26 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | The Config type.
 
 module Stack.Types.Config where
 
+import           Control.Applicative ((<|>))
 import           Control.Exception
 import           Control.Monad (liftM)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
-import           Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, withText, (.:), (.:?), withObject)
+import           Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, object
+                            ,(.=), (.:?), (.!=), (.:))
 import           Data.Binary (Binary)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Hashable (Hashable)
 import           Data.Map (Map)
+import qualified Data.Map as Map
+import           Data.Monoid
 import           Data.Set (Set)
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -38,7 +43,7 @@ import           System.Process.Read (EnvOverride)
 data Config =
   Config {configStackRoot        :: !(Path Abs Dir)
          -- ^ ~/.stack more often than not
-         ,configDocker           :: !Docker
+         ,configDocker           :: !DockerOpts
          ,configGpgVerifyIndex   :: !Bool
          ,configEnvOverride      :: !(EnvSettings -> IO EnvOverride)
          -- ^ Environment variables to be passed to external tools
@@ -161,6 +166,32 @@ data LoadConfig m = LoadConfig
         -- ^ The project root directory, if in a project.
     }
 
+-- | A project is a collection of packages. We can have multiple stack.yaml
+-- files, but only one of them may contain project information.
+data Project = Project
+    { projectPackages :: ![FilePath]
+    -- ^ Components of the package list which refer to local directories
+    --
+    -- Note that we use @FilePath@ and not @Path@s. The goal is: first parse
+    -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
+    , projectExtraDeps :: !(Map PackageName Version)
+    -- ^ Components of the package list referring to package/version combos,
+    -- see: https://github.com/fpco/stack/issues/41
+    , projectFlags :: !(Map PackageName (Map FlagName Bool))
+    -- ^ Per-package flag overrides
+    , projectResolver :: !Resolver
+    -- ^ How we resolve which dependencies to use
+    }
+  deriving Show
+
+instance ToJSON Project where
+    toJSON p = object
+        [ "packages"   .= projectPackages p
+        , "extra-deps" .= map fromTuple (Map.toList $ projectExtraDeps p)
+        , "flags"      .= projectFlags p
+        , "resolver"   .= projectResolver p
+        ]
+
 -- | How we resolve which dependencies to install given a set of packages.
 data Resolver
   = ResolverSnapshot SnapName
@@ -237,6 +268,55 @@ instance HasConfig BuildConfig
 instance HasBuildConfig BuildConfig where
     getBuildConfig = id
     {-# INLINE getBuildConfig #-}
+
+-- An uninterpreted representation of configuration options.
+-- Configurations may be "cascaded" using mappend (left-biased).
+data ConfigMonoid =
+  ConfigMonoid
+    { configMonoidDockerOpts     :: !DockerOptsMonoid
+    -- ^ Docker options.
+    , configMonoidGpgVerifyIndex :: !(Maybe Bool)
+    -- ^ Controls how package index updating occurs
+    , configMonoidConnectionCount :: !(Maybe Int)
+    -- ^ See: 'configConnectionCount'
+    , configMonoidHideTHLoading :: !(Maybe Bool)
+    -- ^ See: 'configHideTHLoading'
+    , configMonoidLatestSnapshotUrl :: !(Maybe Text)
+    -- ^ See: 'configLatestSnapshotUrl'
+    , configMonoidPackageIndices :: !(Maybe [PackageIndex])
+    -- ^ See: 'configPackageIndices'
+    }
+  deriving Show
+
+instance Monoid ConfigMonoid where
+  mempty = ConfigMonoid
+    { configMonoidDockerOpts = mempty
+    , configMonoidGpgVerifyIndex = Nothing
+    , configMonoidConnectionCount = Nothing
+    , configMonoidHideTHLoading = Nothing
+    , configMonoidLatestSnapshotUrl = Nothing
+    , configMonoidPackageIndices = Nothing
+    }
+  mappend l r = ConfigMonoid
+    { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
+    , configMonoidGpgVerifyIndex = configMonoidGpgVerifyIndex l <|> configMonoidGpgVerifyIndex r
+    , configMonoidConnectionCount = configMonoidConnectionCount l <|> configMonoidConnectionCount r
+    , configMonoidHideTHLoading = configMonoidHideTHLoading l <|> configMonoidHideTHLoading r
+    , configMonoidLatestSnapshotUrl = configMonoidLatestSnapshotUrl l <|> configMonoidLatestSnapshotUrl r
+    , configMonoidPackageIndices = configMonoidPackageIndices l <|> configMonoidPackageIndices r
+    }
+
+instance FromJSON ConfigMonoid where
+  parseJSON =
+    withObject "ConfigMonoid" $
+    \obj ->
+      do configMonoidDockerOpts <- obj .:? T.pack "docker" .!= mempty
+         configMonoidGpgVerifyIndex <- obj .:? "gpg-verify-index"
+         configMonoidConnectionCount <- obj .:? "connection-count"
+         configMonoidHideTHLoading <- obj .:? "hide-th-loading"
+         configMonoidLatestSnapshotUrl <- obj .:? "latest-snapshot-url"
+         configMonoidPackageIndices <- obj .:? "package-indices"
+         return ConfigMonoid {..}
 
 data ConfigException
   = ConfigInvalidYaml String
