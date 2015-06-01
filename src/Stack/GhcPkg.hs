@@ -151,10 +151,11 @@ getPackageVersionMapWithGlobalDb menv mmbp pkgDbs = do
                               (map
                                    packageIdentifierName
                                    (ident :
-                                    getTransInclusiveDeps mbp (packageIdentifierName ident)))
+                                    getTransInclusiveRevDeps mbp (packageIdentifierName ident)))
                   in if versionMatches mbp ident
                          then do
                              hasProfiling <- packageHasProfiling menv [gdb] ident
+                             $logDebug (packageIdentifierText ident <> " has profiling: " <> T.pack (show hasProfiling))
                              return (if hasProfiling
                                          then acc
                                          else expunge)
@@ -170,19 +171,29 @@ versionMatches mbp ident =
         (mbpPackages mbp)
 
 -- | Get the packages depended on by the given package.
-getTransInclusiveDeps :: MiniBuildPlan -> PackageName -> [PackageIdentifier]
-getTransInclusiveDeps mbp name =
+getTransInclusiveRevDeps :: MiniBuildPlan -> PackageName -> [PackageIdentifier]
+getTransInclusiveRevDeps mbp name =
     case M.lookup name (mbpPackages mbp) of
         Nothing -> []
         Just miniPkgInfo ->
-            let deps = S.toList (mpiPackageDeps miniPkgInfo)
-            in mapMaybe lookupPackageIdent deps <>
-               concatMap (getTransInclusiveDeps mbp) deps
+            let revDeps = packageRevDeps mbp name
+            in mapMaybe lookupPackageIdent revDeps <>
+               concatMap (getTransInclusiveRevDeps mbp) revDeps
   where
     lookupPackageIdent depname =
         fmap
             (\miniPkgInfo -> PackageIdentifier depname (mpiVersion miniPkgInfo))
             (M.lookup depname (mbpPackages mbp))
+
+-- | Get reverse dependencies of a package.
+packageRevDeps :: MiniBuildPlan -> PackageName -> [PackageName]
+packageRevDeps mbp name =
+    mapMaybe
+        (\(name,miniPkgInfo) ->
+              if S.member name (mpiPackageDeps miniPkgInfo)
+                  then Just (name)
+                  else Nothing)
+        (M.toList (mbpPackages mbp))
 
 -- | Does the given package identifier from the given package db have
 -- profiling libs built?
