@@ -60,12 +60,10 @@ import           Distribution.PackageDescription (GenericPackageDescription,
                                                   flagDefault, flagManual,
                                                   flagName, genPackageFlags,
                                                   executables, exeName)
-import           GHC.Generics                    (Generic)
 import           Network.HTTP.Download
 import           Path
 import           Stack.Fetch
 import           Stack.GhcPkg
-import           Stack.Types
 import           Stack.Types
 import           Stack.Constants
 import           Stack.Package

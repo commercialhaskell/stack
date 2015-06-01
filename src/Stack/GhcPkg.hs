@@ -44,7 +44,6 @@ import qualified Data.Text.Encoding as T
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
 import           Prelude hiding (FilePath)
 import           Stack.Types
-import           Stack.Types.BuildPlan
 import           System.Directory (createDirectoryIfMissing, doesDirectoryExist, canonicalizePath)
 import           System.Process.Read
 
@@ -113,40 +112,23 @@ getPackageVersionMapWithGlobalDb
     -> m (Map PackageName Version)
 getPackageVersionMapWithGlobalDb menv mmbp pkgDbs = do
     gdb <- getGlobalDB menv
-    -- Use unionsWith max to account for cases where the snapshot introduces a
-    -- newer version of a global package, see:
-    -- https://github.com/fpco/stack/issues/78
     allGlobals <-
         getPackageVersions
             menv
             [gdb]
             (const True)
-            (M.unionsWith max .
-             map (M.fromList . rights))
+            (M.unions . map (M.fromList . rights))
+    $logDebug ("All globals: " <> T.pack (show allGlobals))
     globals <-
         case mmbp of
             Nothing ->
                 return allGlobals
             Just mbp ->
-                foldM
-                    (\acc ident ->
-                          let expunge =
-                                  foldr
-                                      M.delete
-                                      acc
-                                      (map
-                                           packageIdentifierName
-                                           (ident :
-                                            getTransInclusiveDeps mbp (packageIdentifierName ident)))
-                          in if versionMatches mbp ident
-                                 then do
-                                     hasProfiling <- packageHasProfiling [gdb] ident
-                                     if hasProfiling
-                                         then return acc
-                                         else return expunge
-                                 else return expunge)
-                    allGlobals
-                    (map fromTuple (M.toList allGlobals))
+                filtering gdb mbp allGlobals
+    $logDebug ("Filtered globals: " <> T.pack (show globals))
+    -- Use unionsWith max to account for cases where the snapshot introduces a
+    -- newer version of a global package, see:
+    -- https://github.com/fpco/stack/issues/78
     rest <-
         getPackageVersions
             menv
@@ -158,6 +140,27 @@ getPackageVersionMapWithGlobalDb menv mmbp pkgDbs = do
         (M.unionsWith
              max
              [globals, rest])
+  where
+    filtering gdb mbp allGlobals =
+        foldM
+            (\acc ident ->
+                  let expunge =
+                          foldr
+                              M.delete
+                              acc
+                              (map
+                                   packageIdentifierName
+                                   (ident :
+                                    getTransInclusiveDeps mbp (packageIdentifierName ident)))
+                  in if versionMatches mbp ident
+                         then do
+                             hasProfiling <- packageHasProfiling [gdb] ident
+                             if hasProfiling
+                                 then return acc
+                                 else return expunge
+                         else return expunge)
+            allGlobals
+            (map fromTuple (M.toList allGlobals))
 
 -- | Get the packages depended on by the given package.
 versionMatches :: MiniBuildPlan -> PackageIdentifier -> Bool
@@ -176,10 +179,10 @@ getTransInclusiveDeps mbp name =
             in mapMaybe lookupPackageIdent deps <>
                concatMap (getTransInclusiveDeps mbp) deps
   where
-    lookupPackageIdent name =
+    lookupPackageIdent depname =
         fmap
-            (\miniPkgInfo -> PackageIdentifier name (mpiVersion miniPkgInfo))
-            (M.lookup name (mbpPackages mbp))
+            (\miniPkgInfo -> PackageIdentifier depname (mpiVersion miniPkgInfo))
+            (M.lookup depname (mbpPackages mbp))
 
 -- | Does the given package identifier from the given package db have
 -- profiling libs built?
