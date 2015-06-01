@@ -74,12 +74,13 @@ import           System.FilePath                 (takeDirectory)
 
 data BuildPlanException
     = UnknownPackages
+        (Path Abs File) -- ^ stack.yaml file
         (Map PackageName (Maybe Version, (Set PackageName))) -- truly unknown
         (Map PackageName (Set PackageIdentifier)) -- shadowed
     deriving (Typeable)
 instance Exception BuildPlanException
 instance Show BuildPlanException where
-    show (UnknownPackages unknown shadowed) =
+    show (UnknownPackages stackYaml unknown shadowed) =
         unlines $ unknown' ++ shadowed'
       where
         unknown' :: [String]
@@ -91,7 +92,9 @@ instance Show BuildPlanException where
                 , case mapMaybe goRecommend $ Map.toList unknown of
                     [] -> []
                     rec ->
-                        "Recommended action: add the following to your extra-deps:"
+                        ("Recommended action: modify the extra-deps field of " ++
+                        toFilePath stackYaml ++
+                        " to include the following:")
                         : rec
                 , case mapMaybe getNoKnown $ Map.toList unknown of
                     [] -> []
@@ -122,7 +125,9 @@ instance Show BuildPlanException where
             | otherwise = concat
                 [ ["The following packages are shadowed by local packages:"]
                 , map go (Map.toList shadowed)
-                , ["Recommended action: add the following to your extra-deps:"]
+                , ["Recommended action: modify the extra-deps field of " ++
+                   toFilePath stackYaml ++
+                   " to include the following:"]
                 , extraDeps
                 ]
           where
@@ -150,7 +155,7 @@ instance Show BuildPlanException where
 -- This function will not provide test suite and benchmark dependencies.
 --
 -- This may fail if a target package is not present in the @BuildPlan@.
-resolveBuildPlan :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
+resolveBuildPlan :: (MonadThrow m, MonadIO m, MonadReader env m, HasBuildConfig env, MonadLogger m, HasHttpManager env)
                  => EnvOverride
                  -> MiniBuildPlan
                  -> (PackageName -> Bool) -- ^ is it shadowed by a local package?
@@ -165,7 +170,11 @@ resolveBuildPlan menv mbp isShadowed packages
         let maxVer = Map.fromListWith max $ map toTuple $ Map.keys cache
             unknown = flip Map.mapWithKey (rsUnknown rs) $ \ident x ->
                 (Map.lookup ident maxVer, x)
-        throwM $ UnknownPackages unknown (rsShadowed rs)
+        bconfig <- asks getBuildConfig
+        throwM $ UnknownPackages
+            (bcRoot bconfig </> stackDotYaml)
+            unknown
+            (rsShadowed rs)
   where
     rs = getDeps mbp isShadowed packages
 
