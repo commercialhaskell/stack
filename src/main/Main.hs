@@ -12,7 +12,6 @@ import           Control.Exception
 import           Control.Monad (join)
 import           Control.Monad.Logger
 import           Data.List
-import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text as T
 import           Distribution.Text (display)
@@ -108,8 +107,8 @@ main =
                         ((,)
                             <$> (some (argument readPackageName
                                         (metavar "[PACKAGES]")))
-                            <*> fmap (fromMaybe False)
-                               (maybeBoolFlags "dry-run" "Don't build anything, just prepare to"))
+                            <*> (flag False True (long "dry-run" <>
+                                                  help "Don't build anything, just prepare to")))
              addSubCommands
                Docker.dockerCmdName
                "Subcommands specific to Docker use"
@@ -345,9 +344,8 @@ buildOpts = BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
                     "executable-profiling"
                     "library profiling for TARGETs and all its dependencies"
         finalAction = pure DoNothing
-        dryRun =
-          fmap (fromMaybe False)
-               (maybeBoolFlags "dry-run" "Don't build anything, just prepare to")
+        dryRun = flag False True (long "dry-run" <>
+                                  help "Don't build anything, just prepare to")
         ghcOpts =
           many (fmap T.pack
                      (strOption (long "ghc-options" <>
