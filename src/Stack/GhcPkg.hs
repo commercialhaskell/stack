@@ -130,24 +130,21 @@ getPackageVersionMapWithGlobalDb menv mmbp pkgDbs = do
             Just mbp ->
                 foldM
                     (\acc ident ->
-                          let expunge ident acc =
+                          let expunge =
                                   foldr
                                       M.delete
                                       acc
                                       (map
                                            packageIdentifierName
                                            (ident :
-                                            getTransInclusiveDeps mbp ident))
+                                            getTransInclusiveDeps mbp (packageIdentifierName ident)))
                           in if versionMatches mbp ident
                                  then do
-                                     hasProfiling <-
-                                         packageHasProfiling
-                                             [gdb]
-                                             ident
+                                     hasProfiling <- packageHasProfiling [gdb] ident
                                      if hasProfiling
                                          then return acc
-                                         else return (expunge ident acc)
-                                 else return (expunge ident acc))
+                                         else return expunge
+                                 else return expunge)
                     allGlobals
                     (map fromTuple (M.toList allGlobals))
     rest <-
@@ -164,11 +161,25 @@ getPackageVersionMapWithGlobalDb menv mmbp pkgDbs = do
 
 -- | Get the packages depended on by the given package.
 versionMatches :: MiniBuildPlan -> PackageIdentifier -> Bool
-versionMatches mbp ident = True
+versionMatches mbp ident =
+    M.member
+        (packageIdentifierName ident)
+        (mbpPackages mbp)
 
 -- | Get the packages depended on by the given package.
-getTransInclusiveDeps :: MiniBuildPlan -> PackageIdentifier -> [PackageIdentifier]
-getTransInclusiveDeps mbp ident = []
+getTransInclusiveDeps :: MiniBuildPlan -> PackageName -> [PackageIdentifier]
+getTransInclusiveDeps mbp name =
+    case M.lookup name (mbpPackages mbp) of
+        Nothing -> []
+        Just miniPkgInfo ->
+            let deps = S.toList (mpiPackageDeps miniPkgInfo)
+            in mapMaybe lookupPackageIdent deps <>
+               concatMap (getTransInclusiveDeps mbp) deps
+  where
+    lookupPackageIdent name =
+        fmap
+            (\miniPkgInfo -> PackageIdentifier name (mpiVersion miniPkgInfo))
+            (M.lookup name (mbpPackages mbp))
 
 -- | Does the given package identifier from the given package db have
 -- profiling libs built?
