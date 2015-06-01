@@ -569,11 +569,7 @@ findBuildPlan cabalfp gpd = do
             ]
         loop [] = return Nothing
         loop (name:names') = do
-            menv <- getMinimalEnvOverride
-            globalDB <- getGlobalDB menv
-            globals <- getPackageVersionMap menv [globalDB]
-
-            mbp <- loadMiniBuildPlan name globals
+            mbp <- loadMiniBuildPlan name Map.empty
             mflags <- checkBuildPlan name mbp cabalfp gpd
             case mflags of
                 Nothing -> loop names'
