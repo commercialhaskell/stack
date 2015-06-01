@@ -155,9 +155,9 @@ getPackageVersionMapWithGlobalDb menv mmbp pkgDbs = do
                   in if versionMatches mbp ident
                          then do
                              hasProfiling <- packageHasProfiling [gdb] ident
-                             if hasProfiling
-                                 then return acc
-                                 else return expunge
+                             return (if hasProfiling
+                                         then acc
+                                         else expunge)
                          else return expunge)
             allGlobals
             (map fromTuple (M.toList allGlobals))
