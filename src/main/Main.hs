@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- | Main stack tool entry point.
 
@@ -13,12 +14,17 @@ import           Control.Monad (join)
 import           Control.Monad.Logger
 import           Data.Char (toLower)
 import           Data.List
+import qualified Data.List as List
+import           Data.Maybe (isJust)
 import           Data.Monoid
 import qualified Data.Text as T
+import qualified Data.Text.IO as T
 import           Distribution.Text (display)
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Simple
 import           Options.Applicative.Types (readerAsk)
+import           Plugins
+import           Plugins.Commands
 import           Path (toFilePath)
 import           Stack.Build
 import           Stack.Build.Types
@@ -31,7 +37,9 @@ import qualified Stack.PackageIndex
 import           Stack.Setup (setupEnv)
 import           Stack.Types
 import           Stack.Types.StackT
-import           System.Exit (exitWith)
+import           System.Environment (getArgs)
+import           System.Exit
+import           System.IO (stderr)
 import qualified System.Process as P
 import qualified System.Process.Read
 import qualified Paths_stack as Meta
@@ -39,7 +47,9 @@ import qualified Paths_stack as Meta
 -- | Commandline dispatcher.
 main :: IO ()
 main =
-  do Docker.checkVersions
+  do plugins <- findPlugins "stack"
+     tryRunPlugin plugins
+     Docker.checkVersions
      (level,run) <-
        simpleOptions
          $(simpleVersion Meta.version)
@@ -130,8 +140,34 @@ main =
                               "Execute a command in a Docker container without setting up Haskell environment first"
                               dockerExecCmd
                               ((,) <$> strArgument (metavar "[--] CMD")
-                                   <*> many (strArgument (metavar "ARGS")))))
+                                   <*> many (strArgument (metavar "ARGS"))))
+             commandsFromPlugins plugins pluginShouldHaveRun)
      run level
+
+
+-- Try to run a plugin
+tryRunPlugin :: Plugins -> IO ()
+tryRunPlugin plugins = do
+  args <- getArgs
+  case dropWhile (List.isPrefixOf "-") args of
+    ((T.pack -> name):args')
+      | isJust (lookupPlugin plugins name) -> do
+          callPlugin plugins name args' `catch` onPluginErr
+          exitSuccess
+    _ -> return ()
+-- TODO(danburton): use logger
+onPluginErr :: PluginException -> IO ()
+onPluginErr (PluginNotFound _ name) = do
+  T.hPutStr stderr $ "Stack plugin not found: " <> name
+  exitFailure
+onPluginErr (PluginExitFailure _ i) = do
+  exitWith (ExitFailure i)
+
+-- TODO(danburton): improve this, although it should never happen
+pluginShouldHaveRun :: Plugin -> GlobalOpts -> IO ()
+pluginShouldHaveRun _plugin _globalOpts = do
+  fail "Plugin should have run"
+
 
 setupCmd :: GlobalOpts -> IO ()
 setupCmd GlobalOpts{..} = do
