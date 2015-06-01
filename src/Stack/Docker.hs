@@ -204,6 +204,8 @@ runContainerAndExitAction config
                    ,"-e","WORK_WD=" ++ toFilePath pwd
                    ,"-e","WORK_HOME=" ++ toFilePath sandboxRepoDir
                    ,"-e","WORK_ROOT=" ++ toFilePath projectRoot
+                   ,"-e",hostVersionEnvVar ++ "=" ++ showVersion version
+                   ,"-e",requireVersionEnvVar ++ "=" ++ showVersion requireContainerVersion
                    ,"-v",toFilePath stackRoot ++ ":" ++ toFilePath stackRoot
                    ,"-v",toFilePath projectRoot ++ ":" ++ toFilePath projectRoot
                    ,"-v",toFilePath sandboxSandboxDir ++ ":" ++ toFilePath sandboxDir
@@ -236,9 +238,7 @@ runContainerAndExitAction config
                                   ,["-t" | isTerm]
                                   ,["-i" | isTerm]]
                   ,dockerRunArgs docker
-                  ,[image
-                   ,hostVersionEnvVar ++ "=" ++ showVersion version
-                   ,requireVersionEnvVar ++ "=" ++ showVersion requireContainerVersion]
+                  ,[image]
                   ,map (\(k,v) -> k ++ "=" ++ v) envVars
                   ,[cmnd]
                   ,args])
