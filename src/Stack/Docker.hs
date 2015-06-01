@@ -10,7 +10,7 @@ module Stack.Docker
   (checkHostStackageDockerVersion
   ,checkVersions
   ,cleanup
-  ,Cleanup(..)
+  ,CleanupOpts(..)
   ,CleanupAction(..)
   ,dockerCmdName
   ,dockerOptsParser
@@ -59,6 +59,7 @@ import           System.Environment (lookupEnv,unsetEnv,getProgName,getArgs)
 import           System.Exit (ExitCode(ExitSuccess,ExitFailure),exitWith)
 import           System.FilePath (takeBaseName)
 import           System.IO (hPutStrLn,stderr,stdin,stdout,hIsTerminalDevice)
+import           System.IO.Temp (withSystemTempDirectory)
 import qualified System.Process as Proc
 import           System.Process.PagerEditor (editByteString)
 import           Text.Printf (printf)
@@ -111,22 +112,22 @@ runContainerAndExit :: Config
                     -> IO ()
                     -> IO ()
 runContainerAndExit config mprojectRoot cmnd args envVars successPostAction =
-  runAction mprojectRoot (runContainerAndExitAction config cmnd args envVars successPostAction)
+  runAction (runContainerAndExitAction config mprojectRoot cmnd args envVars successPostAction)
 
 -- | Shake action to run a command in a new Docker container.
 runContainerAndExitAction :: Config
+                          -> Maybe (Path Abs Dir)
                           -> FilePath
                           -> [String]
                           -> [(String,String)]
                           -> IO ()
-                          -> Path Abs Dir
                           -> Action ()
 runContainerAndExitAction config
+                          mprojectRoot
                           cmnd
                           args
                           envVars
-                          successPostAction
-                          projectRoot =
+                          successPostAction =
   do checkDockerVersion
      (Stdout uidOut) <- cmd "id -u"
      (Stdout gidOut) <- cmd "id -g"
@@ -259,16 +260,18 @@ runContainerAndExitAction config
     sandboxSubdirArg :: Path Abs Dir -> [String]
     sandboxSubdirArg subdir = ["-v",toFilePath subdir++ ":" ++ toFilePath subdir]
 
+    projectRoot :: Path Abs Dir
+    projectRoot = fromMaybeProjectRoot mprojectRoot
+
     docker :: DockerOpts
     docker = configDocker config
 
 -- | Clean-up old docker images and containers.
-cleanup :: Config -> Maybe (Path Abs Dir) -> Cleanup -> IO ()
-cleanup config projectRoot opts =
-  runAction projectRoot (\_ -> cleanupAction config opts)
+cleanup :: Config -> CleanupOpts -> IO ()
+cleanup config opts = runAction (cleanupAction config opts)
 
 -- | Cleanup action
-cleanupAction :: Config -> Cleanup -> Action ()
+cleanupAction :: Config -> CleanupOpts -> Action ()
 cleanupAction config opts =
   do checkDockerVersion
      progName <- liftIO (takeBaseName <$> getProgName)
@@ -500,11 +503,10 @@ inspect image =
        _ -> error ("Invalid 'docker inspect' output: expect a single result.")
 
 -- | Pull latest version of configured Docker image from registry.
-pull :: DockerOpts -> Maybe (Path Abs Dir) -> IO ()
-pull docker mprojectRoot =
-  runAction mprojectRoot
-            (\_ -> do checkDockerVersion
-                      pullImage docker (dockerImage docker))
+pull :: DockerOpts -> IO ()
+pull docker =
+  runAction (do checkDockerVersion
+                pullImage docker (dockerImage docker))
 
 -- | Pull Docker image from registry.
 pullImage :: DockerOpts -> String -> Action ()
@@ -528,15 +530,14 @@ pullImage docker image =
                               ,"."])))
 
 -- | Run a Shake action.
-runAction :: Maybe (Path Abs Dir) -> (Path Abs Dir -> Action ()) -> IO ()
-runAction maybeProjectRoot inner =
-  let projectRoot =
-        case maybeProjectRoot of
-          Just r -> r
-          Nothing -> error "Cannot determine project root directory for Docker sandbox."
-  in shake shakeOptions{shakeVerbosity = Quiet
-                       ,shakeFiles = toFilePath (projectDockerSandboxDir projectRoot)}
-           (action (inner projectRoot))
+runAction :: Action () -> IO ()
+runAction inner =
+  --EKB FIXME construct "stack-docker" from constants
+  withSystemTempDirectory
+    "stack-docker."
+    (\tmp -> do shake shakeOptions{shakeVerbosity = Quiet
+                                  ,shakeFiles = tmp}
+                      (action inner))
 
 -- | Check docker version (throws exception if incorrect)
 checkDockerVersion :: Action ()
@@ -587,13 +588,11 @@ execProcessAndExit cmnd args successPostAction =
 -- | Remove the project's Docker sandbox.
 reset :: Maybe (Path Abs Dir) -> Bool -> IO ()
 reset maybeProjectRoot keepHome =
-  case maybeProjectRoot of
-    Nothing -> return ()
-    Just projectRoot ->
-      removeDirectoryContents
-        (projectDockerSandboxDir projectRoot)
-        [homeDirName | keepHome]
-        []
+  removeDirectoryContents
+    (projectDockerSandboxDir projectRoot)
+    [homeDirName | keepHome]
+    []
+  where projectRoot = fromMaybeProjectRoot maybeProjectRoot
 
 -- | Remove the contents of a directory, without removing the directory itself.
 -- This is used instead of 'FS.removeTree' to clear bind-mounted directories, since
@@ -789,6 +788,11 @@ dockerOptsFromMonoid mproject DockerOptsMonoid{..} = DockerOpts
         emptyToNothing (Just s) | null s = Nothing
                                 | otherwise = Just s
 
+-- | Fail with friendly error if project root not set.
+fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
+fromMaybeProjectRoot =
+  fromMaybe (error "Cannot determine project root directory for Docker sandbox.")
+
 -- | Environment variable to the host's stack version.
 hostVersionEnvVar :: String
 hostVersionEnvVar = "STACK_DOCKER_HOST_VERSION"
@@ -822,7 +826,7 @@ stackVersion :: Version
 stackVersion = fromCabalVersion version
 
 -- | Options for 'cleanup'.
-data Cleanup = Cleanup
+data CleanupOpts = CleanupOpts
   { dcAction                                :: !CleanupAction
   , dcRemoveKnownImagesLastUsedDaysAgo      :: !(Maybe Integer)
   , dcRemoveUnknownImagesCreatedDaysAgo     :: !(Maybe Integer)

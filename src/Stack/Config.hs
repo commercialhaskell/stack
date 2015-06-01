@@ -350,7 +350,7 @@ loadProjectConfig = do
                         T.pack (maybe (toFilePath fp) toFilePath (stripDir currDir fp))
             load fp
         Nothing -> do
-            $logInfo $ "No project config file found, using defaults"
+            $logInfo $ "No project config file found, using defaults."
             return Nothing
   where
     load fp = do

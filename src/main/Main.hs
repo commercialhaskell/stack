@@ -11,6 +11,7 @@ module Main where
 import           Control.Exception
 import           Control.Monad (join)
 import           Control.Monad.Logger
+import           Data.Char (toLower)
 import           Data.List
 import           Data.Monoid
 import qualified Data.Text as T
@@ -120,7 +121,11 @@ main =
                               "Reset the Docker sandbox"
                               dockerResetCmd
                               (flag False True (long "keep-home" <>
-                                               help "Do not delete sandbox's home directory"))))
+                                               help "Do not delete sandbox's home directory"))
+                   addCommand "cleanup"
+                              "Clean up Docker images and containers"
+                              dockerCleanupCmd
+                              dockerCleanupOpts))
      run level
 
 setupCmd :: GlobalOpts -> IO ()
@@ -314,7 +319,7 @@ dockerPullCmd _ GlobalOpts{..} =
   Docker.preventInContainer
     (do manager <- newTLSManager
         lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
-        Docker.pull (configDocker (lcConfig lc)) (lcProjectRoot lc))
+        Docker.pull (configDocker (lcConfig lc)))
 
 -- | Reset the Docker sandbox.
 dockerResetCmd :: Bool -> GlobalOpts -> IO ()
@@ -323,6 +328,14 @@ dockerResetCmd keepHome GlobalOpts{..} =
     (do manager <- newTLSManager
         lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
         Docker.reset (lcProjectRoot lc) keepHome)
+
+-- | Cleanup Docker images and containers.
+dockerCleanupCmd :: Docker.CleanupOpts -> GlobalOpts -> IO ()
+dockerCleanupCmd cleanupOpts GlobalOpts{..} =
+  Docker.preventInContainer
+    (do manager <- newTLSManager
+        lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
+        Docker.cleanup (lcConfig lc) cleanupOpts)
 
 -- | Parser for build arguments.
 buildOpts :: Parser BuildOpts
@@ -351,6 +364,51 @@ buildOpts = BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
                      (strOption (long "ghc-options" <>
                                  metavar "OPTION" <>
                                  help "Additional options passed to GHC")))
+
+-- | Parser for docker cleanup arguments.
+dockerCleanupOpts :: Parser Docker.CleanupOpts
+dockerCleanupOpts =
+  Docker.CleanupOpts <$>
+  (flag' Docker.CleanupInteractive
+         (short 'i' <>
+          long "interactive" <>
+          help "Show cleanup plan in editor and allow changes (default)") <|>
+   flag' Docker.CleanupImmediate
+         (short 'y' <>
+          long "immediate" <>
+          help "Immediately execute cleanup plan") <|>
+   flag' Docker.CleanupDryRun
+         (short 'n' <>
+          long "dry-run" <>
+          help "Display cleanup plan but do not execute") <|>
+   pure Docker.CleanupInteractive) <*>
+  opt (Just 14) "known-images" "LAST-USED" <*>
+  opt Nothing "unknown-images" "CREATED" <*>
+  opt (Just 0) "dangling-images" "CREATED" <*>
+  opt Nothing "stopped-containers" "CREATED" <*>
+  opt Nothing "running-containers" "CREATED"
+  where opt def' name mv =
+          fmap Just
+               (option auto
+                       (long name <>
+                        metavar (mv ++ "-DAYS-AGO") <>
+                        help ("Remove " ++
+                              toDescr name ++
+                              " " ++
+                              map toLower (toDescr mv) ++
+                              " N days ago" ++
+                              case def' of
+                                Just n -> " (default " ++ show n ++ ")"
+                                Nothing -> ""))) <|>
+          flag' Nothing
+                (long ("no-" ++ name) <>
+                 help ("Do not remove " ++
+                       toDescr name ++
+                       case def' of
+                         Just _ -> ""
+                         Nothing -> " (default)")) <|>
+          pure def'
+        toDescr = map (\c -> if c == '-' then ' ' else c)
 
 -- | Parser for global command-line options.
 globalOpts :: Parser GlobalOpts
