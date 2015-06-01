@@ -285,7 +285,7 @@ getDependencies locals ranges = do
             mbp0 <- loadMiniBuildPlan snapName
             globals <- getPackageVersionMapWithGlobalDb menv (Just mbp0) []
             let mbp = mbp0
-                    { mbpPackages = mbpPackages mbp `Map.union`
+                    { mbpPackages = mbpPackages mbp0 `Map.union`
                         fmap (\v -> MiniPackageInfo
                             { mpiVersion = v
                             , mpiFlags = Map.empty
