@@ -19,7 +19,7 @@ location**
 Running `stack` will give you a list of commands, some of the most common are:
 
 * `stack test` will build and run your test suites
-* `stack bench` will build abd run your benchmarks
+* `stack bench` will build and run your benchmarks
 * `stack exec` will run a command with a modified environment
     * For convenience, we also provide `stack ghc`, `stack runghc`, and `stack ghci`, which work just like `stack exec`
 
