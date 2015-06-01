@@ -1,96 +1,96 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE TemplateHaskell    #-}
-{-# LANGUAGE TupleSections      #-}
-{-# LANGUAGE ViewPatterns       #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE PatternGuards         #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TupleSections         #-}
+{-# LANGUAGE ViewPatterns          #-}
 
 -- | Functionality for downloading packages securely for cabal's usage.
 
 module Stack.Fetch
-    ( fetchPackages
-    , unpackPackages
-    , unpackPackageIdentsForBuild
+    ( unpackPackages
+    , unpackPackageIdents
     ) where
 
-import           Control.Monad.IO.Class
-import           Control.Monad (forM, liftM)
-import           Control.Monad.Logger
-import           Control.Monad.Reader (asks, runReaderT)
-import           Data.Monoid ((<>))
-import           Stack.Types
-import           Stack.PackageIndex
-import qualified Codec.Archive.Tar as Tar
-import qualified Codec.Archive.Tar.Check as Tar
-import           Control.Applicative ((*>))
-import Control.Monad.Trans.Control
+import qualified Codec.Archive.Tar               as Tar
+import qualified Codec.Archive.Tar.Check         as Tar
+import           Codec.Compression.GZip          (decompress)
+import           Control.Applicative             ((*>))
 import           Control.Concurrent.Async.Lifted (Concurrently (..))
-import           Control.Concurrent.STM   (atomically, newTVarIO, readTVar,
-                                           writeTVar, TVar, modifyTVar, readTVarIO)
-import           Control.Exception (Exception, throwIO, SomeException, toException)
-import           Control.Monad (join, unless, when)
-import           Control.Monad.Catch (MonadThrow, throwM)
-import Codec.Compression.GZip (decompress)
-import           Crypto.Hash              (Context, Digest, SHA512,
-                                           digestToHexByteString, hashFinalize,
-                                           hashInit, hashUpdate)
-import qualified Data.ByteString as S
-import qualified Data.ByteString.Char8 as S8
-import qualified Data.ByteString.Lazy as L
-import qualified Data.Foldable as F
-import           Data.Either (partitionEithers)
-import           Data.Function (fix)
-import           Data.Map (Map)
-import qualified Data.Map as Map
-import           Data.Set (Set)
-import qualified Data.Set as Set
-import qualified Data.Text as T
-import           Data.Typeable (Typeable)
-import           Data.Word (Word64)
+import           Control.Concurrent.STM          (TVar, atomically, modifyTVar,
+                                                  newTVarIO, readTVar,
+                                                  readTVarIO, writeTVar)
+import           Control.Exception               (Exception, SomeException,
+                                                  throwIO, toException)
+import           Control.Monad                   (liftM)
+import           Control.Monad                   (join, unless)
+import           Control.Monad.Catch             (MonadThrow, throwM)
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import           Control.Monad.Trans.Control
+import           Crypto.Hash                     (Context, Digest, SHA512,
+                                                  digestToHexByteString,
+                                                  hashFinalize, hashInit,
+                                                  hashUpdate)
+import           Data.ByteString                 (ByteString)
+import qualified Data.ByteString                 as S
+import qualified Data.ByteString.Lazy            as L
+import           Data.Either                     (partitionEithers)
+import qualified Data.Foldable                   as F
+import           Data.Function                   (fix)
+import           Data.Map                        (Map)
+import qualified Data.Map                        as Map
+import           Data.Monoid                     ((<>))
+import           Data.Set                        (Set)
+import qualified Data.Set                        as Set
+import qualified Data.Text                       as T
+import           Data.Text.Encoding              (decodeUtf8)
+import           Data.Typeable                   (Typeable)
+import           Data.Word                       (Word64)
+import           Network.HTTP.Client             (Manager, brRead,
+                                                  responseBody,
+                                                  withResponse)
 import           Network.HTTP.Download
-import           Network.HTTP.Client      (Manager, brRead, checkStatus,
-                                           responseBody,
-                                           responseStatus, withResponse)
-import           Network.HTTP.Types (statusCode)
-import           Stack.Constants
+import           Stack.PackageIndex
+import           Stack.Types
 
-import Path
-import           System.Directory         (createDirectoryIfMissing,
-                                           doesFileExist, doesDirectoryExist,
-                                           renameFile, canonicalizePath)
-import           System.FilePath (takeDirectory, (<.>))
-import qualified System.FilePath as FP
-import           System.IO                (IOMode (ReadMode, WriteMode),
-                                           withBinaryFile, SeekMode (AbsoluteSeek),
-                                           hSeek)
-import System.Process.Read (EnvOverride)
+import           Path
+import           System.Directory                (canonicalizePath,
+                                                  createDirectoryIfMissing,
+                                                  doesDirectoryExist,
+                                                  doesFileExist, renameFile)
+import           System.FilePath                 (takeDirectory, (<.>))
+import qualified System.FilePath                 as FP
+import           System.IO                       (IOMode (ReadMode, WriteMode),
+                                                  SeekMode (AbsoluteSeek),
+                                                  hSeek, withBinaryFile)
+import           System.Process.Read             (EnvOverride)
 
 data FetchException
     = Couldn'tReadIndexTarball FilePath Tar.FormatError
     | Couldn'tReadPackageTarball FilePath SomeException
     | InvalidDownloadSize
-        { _idsUrl             :: String
+        { _idsUrl             :: T.Text
         , _idsExpected        :: Word64
         , _idsTotalDownloaded :: Word64
         }
     | InvalidHash
-        { _ihUrl      :: String
+        { _ihUrl      :: T.Text
         , _ihExpected :: S.ByteString
         , _ihActual   :: Digest SHA512
         }
-    | CabalFilesNotFound (Set PackageIdentifier)
-    | UnpackDirectoryAlreadyExists FilePath
+    | UnpackDirectoryAlreadyExists (Set FilePath)
     | CouldNotParsePackageSelectors [String]
-    | Couldn'tFindPackages (Set PackageName)
+    | UnknownPackageNames (Set PackageName)
+    | UnknownPackageIdentifiers (Set PackageIdentifier)
     deriving (Show, Typeable)
 instance Exception FetchException
 
--- | Similar to 'fetchPackages', but optimized for command line input, where
--- the values may be either package names or package identifiers.
+-- | Intended to work for the command line command.
 unpackPackages :: (MonadIO m,MonadBaseControl IO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadThrow m,MonadLogger m)
                => EnvOverride
                -> FilePath -- ^ destination
@@ -101,25 +101,18 @@ unpackPackages menv dest input = do
     (names, idents) <- case partitionEithers $ map parse input of
         ([], x) -> return $ partitionEithers x
         (errs, _) -> throwM $ CouldNotParsePackageSelectors errs
-    (pis, pds) <- getPackageCaches menv
-    idents1 <-
-        case partitionEithers $ map (getIdent pis) idents of
-    idents2 <-
-        if null names
-            then return []
-            else do
-                $logDebug $ "Finding latest versions of: " <> T.pack (show names)
-                idents2 <- findNewestVersions pis names
-                $logDebug $ "Newest versions are: " <> T.pack (show idents2)
-                return idents2
-    dests <- fetchPackages menv pis pds $ map (, Just dest') $ idents1 ++ idents2
-    mapM_ (\dest'' -> $logInfo $ "Unpacked to " <> T.pack (toFilePath dest'')) dests
+    resolved <- resolvePackages menv (Set.fromList idents) (Set.fromList names)
+    ToFetchResult toFetch alreadyUnpacked <- getToFetch dest' resolved
+    unless (Map.null alreadyUnpacked) $
+        throwM $ UnpackDirectoryAlreadyExists $ Set.fromList $ map toFilePath $ Map.elems alreadyUnpacked
+    unpacked <- fetchPackages toFetch
+    F.forM_ (Map.toList unpacked) $ \(ident, dest'') -> $logInfo $ T.pack $ concat
+        [ "Unpacked "
+        , packageIdentifierString ident
+        , " to "
+        , toFilePath dest''
+        ]
   where
-    getIdent pis ident =
-        case Map.lookup ident pis of
-            Nothing -> Left ident
-            Just (
-
     -- Possible future enhancement: parse names as name + version range
     parse s =
         case parsePackageNameFromString s of
@@ -129,76 +122,128 @@ unpackPackages menv dest input = do
                     Left _ -> Left s
                     Right x -> Right $ Right x
 
--- | Find the newest versions of all given package names.
-findNewestVersions :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
-                   => Map PackageIdentifier (PackageIndex, PackageCache)
-                   -> [PackageName]
-                   -> m [(PackageIdentifier, PackageIndex)]
-findNewestVersions cache names
-    | null missing = return idents
-    | otherwise = throwM $ Couldn'tFindPackages $ Set.fromList missing
-  where
-    (missing, idents) = partitionEithers $ map go names
-
-    go name = maybe (Left name) Right (Map.lookup name m)
-
-    m = Map.fromList $ map (\(ident, (idx, _)) -> (packageIdentifierName ident, (ident, idx))) $ Map.toList cache
-
 -- | Ensure that all of the given package idents are unpacked into the build
 -- unpack directory, and return the paths to all of the subdirectories.
-unpackPackageIdentsForBuild
-    :: (MonadBaseControl IO m, MonadIO m, MonadReader env m, HasHttpManager env, HasBuildConfig env, MonadThrow m, MonadLogger m)
+unpackPackageIdents
+    :: (MonadBaseControl IO m, MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m)
     => EnvOverride
-    -> Map PackageName Version
-    -> m (Set (Path Abs Dir))
-unpackPackageIdentsForBuild menv idents0 = do
-    bconfig <- asks getBuildConfig
-    let unpackDir = configLocalUnpackDir bconfig
-    (idents, paths1) <- liftM partitionEithers $ forM (Map.toList idents0) $ \(name, version) -> do
-        let ident = PackageIdentifier name version
-        rel <- parseRelDir $ packageIdentifierString ident
-        let dir = unpackDir </> rel
-        exists <- liftIO $ doesDirectoryExist $ toFilePath dir
-        if exists
-            then return $ Right dir
-            else return $ Left ident
-    if null idents
-        then return $ Set.fromList paths1
-        else do
-            (pis, pds) <- getPackageCaches menv
-            paths2 <- fetchPackages menv pis pds $ map (, Just unpackDir) idents
-            return $ Set.fromList $ paths1 ++ paths2
+    -> Path Abs Dir -- ^ unpack directory
+    -> Set PackageIdentifier
+    -> m (Map PackageIdentifier (Path Abs Dir))
+unpackPackageIdents menv unpackDir idents = do
+    resolved <- resolvePackages menv idents Set.empty
+    ToFetchResult toFetch alreadyUnpacked <- getToFetch unpackDir resolved
+    nowUnpacked <- fetchPackages toFetch
+    return $ alreadyUnpacked <> nowUnpacked
 
--- | Add the contents of the cabal file from the index to packages that will be
--- unpacked.
-addCabalFiles :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m)
-              => Map PackageIdentifier (PackageIndex, PackageCache)
-              -> [(PackageIdentifier, Maybe (Path Abs Dir))]
-              -> m (Either (Set PackageIdentifier) [(PackageIdentifier, Maybe (Path Abs Dir, S8.ByteString))])
-addCabalFiles pis pkgs0 = do
-    let (noUnpack, toUnpack0) = partitionEithers $ map toEither pkgs0
-    if null toUnpack0
-        then return $ Right noUnpack
-        else do
-            config <- asks getConfig
-            let fp = toFilePath $ configPackageIndex config
-            (missing, toUnpack) <- liftIO
-                $ withBinaryFile fp ReadMode $ \h ->
-                liftM partitionEithers $ mapM (go h) toUnpack0
-            return $ if null missing
-                then Right $ noUnpack ++ toUnpack
-                else Left $ Set.fromList missing
+data ResolvedPackage = ResolvedPackage
+    { rpCache    :: !PackageCache
+    , rpIndex    :: !PackageIndex
+    , rpDownload :: !(Maybe PackageDownload)
+    }
+
+-- | Resolve a set of package names and identifiers into @FetchPackage@ values.
+resolvePackages :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m,MonadBaseControl IO m)
+                => EnvOverride
+                -> Set PackageIdentifier
+                -> Set PackageName
+                -> m (Map PackageIdentifier ResolvedPackage)
+resolvePackages menv idents0 names0 = do
+    eres <- go
+    case eres of
+        Left _ -> do
+            updateAllIndices menv
+            go >>= either throwM return
+        Right x -> return x
   where
-    toEither (ident, Nothing) = Left (ident, Nothing)
-    toEither (ident, Just path) = Right (ident, path)
+    go = do
+        (caches, downloads) <- getPackageCaches menv
+        let versions = Map.fromListWith max $ map toTuple $ Map.keys caches
+            (missing, idents1) = partitionEithers $ map
+                (\name -> maybe (Left name ) (Right . PackageIdentifier name)
+                    (Map.lookup name versions))
+                (Set.toList names0)
+        return $ if null missing
+            then goIdents caches downloads $ idents0 <> Set.fromList idents1
+            else Left $ UnknownPackageNames $ Set.fromList missing
 
-    go h (ident, path) =
-        case Map.lookup ident pis of
-            Nothing -> return $ Left ident
-            Just pc -> do
-                hSeek h AbsoluteSeek $ fromIntegral $ pcOffset pc
-                bs <- S.hGet h $ fromIntegral $ pcSize pc
-                return $ Right (ident, Just (path, bs))
+    goIdents caches downloads idents =
+        case partitionEithers $ map (goIdent caches downloads) $ Set.toList idents of
+            ([], resolved) -> Right $ Map.fromList resolved
+            (missing, _) -> Left $ UnknownPackageIdentifiers $ Set.fromList missing
+
+    goIdent caches downloads ident =
+        case Map.lookup ident caches of
+            Nothing -> Left ident
+            Just (index, cache) -> Right (ident, ResolvedPackage
+                { rpCache = cache
+                , rpIndex = index
+                , rpDownload =
+                    case Map.lookup ident downloads of
+                        Just (index', download')
+                            | indexName index == indexName index' -> Just download'
+                        _ -> Nothing
+                })
+
+data ToFetch = ToFetch
+    { tfTarball :: !(Path Abs File)
+    , tfDestDir :: !(Path Abs Dir)
+    , tfUrl     :: !T.Text
+    , tfSize    :: !(Maybe Word64)
+    , tfSHA512  :: !(Maybe ByteString)
+    , tfCabal   :: !ByteString
+    -- ^ Contents of the .cabal file
+    }
+
+data ToFetchResult = ToFetchResult
+    { tfrToFetch         :: !(Map PackageIdentifier ToFetch)
+    , tfrAlreadyUnpacked :: !(Map PackageIdentifier (Path Abs Dir))
+    }
+
+-- | Figure out where to fetch from.
+getToFetch :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env)
+           => Path Abs Dir -- ^ directory to unpack into
+           -> Map PackageIdentifier ResolvedPackage
+           -> m ToFetchResult
+getToFetch dest resolvedAll = do
+    (toFetch0, unpacked) <- liftM partitionEithers $ mapM checkUnpacked $ Map.toList resolvedAll
+    toFetch1 <- mapM goIndex $ Map.toList $ Map.fromListWith (++) toFetch0
+    return ToFetchResult
+        { tfrToFetch = Map.unions toFetch1
+        , tfrAlreadyUnpacked = Map.fromList unpacked
+        }
+  where
+    checkUnpacked (ident, resolved) = do
+        dirRel <- parseRelDir $ packageIdentifierString ident
+        let destDir = dest </> dirRel
+        exists <- liftIO $ doesDirectoryExist $ toFilePath destDir
+        if exists
+            then return $ Right (ident, destDir)
+            else do
+                let index = rpIndex resolved
+                    d = rpDownload resolved
+                    targz = T.pack $ packageIdentifierString ident ++ ".tar.gz"
+                tarball <- configPackageTarball (indexName index) ident
+                return $ Left (indexName index, [(ident, rpCache resolved, ToFetch
+                    { tfTarball = tarball
+                    , tfDestDir = destDir
+                    , tfUrl = case d of
+                        Just d' -> decodeUtf8 $ pdUrl d'
+                        Nothing -> indexDownloadPrefix index <> targz
+                    , tfSize = fmap pdSize d
+                    , tfSHA512 = fmap pdSHA512 d
+                    , tfCabal = S.empty -- filled in by goIndex
+                    })])
+
+    goIndex (name, pkgs) = do
+        indexPath <- configPackageIndex name
+        liftIO $ withBinaryFile (toFilePath indexPath) ReadMode $ \h ->
+            liftM Map.fromList $ mapM (goPkg h) pkgs
+
+    goPkg h (ident, pc, tf) = do
+        hSeek h AbsoluteSeek $ fromIntegral $ pcOffset pc
+        cabalBS <- S.hGet h $ fromIntegral $ pcSize pc
+        return (ident, tf { tfCabal = cabalBS })
 
 -- | Download the given name,version pairs into the directory expected by cabal.
 --
@@ -215,36 +260,20 @@ addCabalFiles pis pkgs0 = do
 --
 -- Since 0.1.0.0
 fetchPackages :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m,MonadBaseControl IO m)
-              => EnvOverride
-              -> Map PackageIdentifier (PackageIndex, PackageCache)
-              -> Map PackageIdentifier (PackageIndex, PackageDownload)
-              -> [(PackageIdentifier, Maybe (Path Abs Dir))]
-              -> m [Path Abs Dir]
-fetchPackages menv pis0 pds0 pkgs0 = do
-   env <- ask
-   let man = getHttpManager env
-       config = getConfig env
+              => Map PackageIdentifier ToFetch
+              -> m (Map PackageIdentifier (Path Abs Dir))
+fetchPackages toFetchAll = do
+    env <- ask
+    let man = getHttpManager env
+        config = getConfig env
+    outputVar <- liftIO $ newTVarIO Map.empty
 
-   outputVar <- liftIO (newTVarIO [])
+    parMapM_
+        (configConnectionCount config)
+        (go man outputVar)
+        (Map.toList toFetchAll)
 
-   eres <- addCabalFiles pis0 pkgs0
-   (pds, pkgs) <-
-       case eres of
-           Left _missing -> do
-               $logInfo "Some cabal files not found, updating index"
-               updateIndex menv
-               (pis, pds) <- getPackageCaches menv
-               eres' <- addCabalFiles pis pkgs0
-               case eres' of
-                   Left missing -> throwM $ CabalFilesNotFound missing
-                   Right pkgs -> return (pds, pkgs)
-           Right pkgs -> return (pds0, pkgs)
-
-   parMapM_
-    (configConnectionCount config)
-    (go man pds outputVar)
-    pkgs
-   liftIO (readTVarIO outputVar)
+    liftIO $ readTVarIO outputVar
   where
     unlessM p f = do
         p' <- p
@@ -252,106 +281,72 @@ fetchPackages menv pis0 pds0 pkgs0 = do
 
     go :: (MonadIO m,Functor m,MonadThrow m,MonadLogger m)
        => Manager
-       -> Map PackageIdentifier (PackageIndex, PackageDownload)
-       -> TVar [Path Abs Dir]
-       -> (PackageIdentifier, PackageIndex, Maybe (Path Abs Dir, S8.ByteString))
+       -> TVar (Map PackageIdentifier (Path Abs Dir))
+       -> (PackageIdentifier, ToFetch)
        -> m ()
-    go man pds outputVar (ident, indexName, mdest) = do
-        fp <- fmap toFilePath $ configPackageTarball indexName ident
+    go man outputVar (ident, toFetch) = do
+        let fp = toFilePath $ tfTarball toFetch
         unlessM (liftIO (doesFileExist fp)) $ do
             $logInfo $ "Downloading " <> packageIdentifierText ident
-            let (msha512, murl, msize) =
-                    case Map.lookup ident pds of
-                        Nothing -> (Nothing, Nothing, Nothing)
-                        Just (_, pd) ->
-                            ( Just $ pdSHA512 pd
-                            , Just $ S8.unpack $ pdUrl pd
-                            , Just $ pdSize pd
-                            )
-            url <-
-                case murl of
-                    Just url -> return url
-                    Nothing -> error "defUrl = T.unpack packageDownloadPrefix ++ targz"
             liftIO $ createDirectoryIfMissing True $ takeDirectory fp
-            req <- parseUrl url
-            let req' = req
-                    { checkStatus = \s' x y ->
-                        if statusCode s' `elem` [401, 403]
-                            -- See: https://github.com/fpco/stackage-install/issues/2
-                            then Nothing
-                            else checkStatus req s' x y
-                    }
-            ok <- liftIO $ withResponse req' man $ \res -> if statusCode (responseStatus res) == 200
-                then do
-                    let tmp = fp <.> "tmp"
-                    withBinaryFile tmp WriteMode $ \h -> do
-                        let loop total ctx = do
-                                bs <- brRead $ responseBody res
-                                if S.null bs
-                                    then
-                                        case msize of
-                                            Nothing -> return ()
-                                            Just expected
-                                                | expected /= total ->
-                                                    throwM InvalidDownloadSize
-                                                        { _idsUrl = url
-                                                        , _idsExpected = expected
-                                                        , _idsTotalDownloaded = total
-                                                        }
-                                                | otherwise -> validHash url msha512 ctx
-                                    else do
-                                        S.hPut h bs
-                                        let total' = total + fromIntegral (S.length bs)
-                                        case msize of
-                                            Just expected | expected < total' ->
+            req <- parseUrl $ T.unpack $ tfUrl toFetch
+            -- FIXME switch to using verifiedDownload
+            liftIO $ withResponse req man $ \res -> do
+                let tmp = fp <.> "tmp"
+                withBinaryFile tmp WriteMode $ \h -> do
+                    let loop total ctx = do
+                            bs <- brRead $ responseBody res
+                            if S.null bs
+                                then
+                                    case tfSize toFetch of
+                                        Nothing -> return ()
+                                        Just expected
+                                            | expected /= total ->
                                                 throwM InvalidDownloadSize
-                                                    { _idsUrl = url
+                                                    { _idsUrl = tfUrl toFetch
                                                     , _idsExpected = expected
-                                                    , _idsTotalDownloaded = total'
+                                                    , _idsTotalDownloaded = total
                                                     }
-                                            _ -> loop total' $! hashUpdate ctx bs
-                        loop 0 hashInit
-                    renameFile tmp fp
-                    return True
-                else return False
-            when (not ok)
-                 ($logError $ "Error downloading " <> packageIdentifierText ident)
+                                            | otherwise -> validHash (tfUrl toFetch) (tfSHA512 toFetch) ctx
+                                else do
+                                    S.hPut h bs
+                                    let total' = total + fromIntegral (S.length bs)
+                                    case tfSize toFetch of
+                                        Just expected | expected < total' ->
+                                            throwM InvalidDownloadSize
+                                                { _idsUrl = tfUrl toFetch
+                                                , _idsExpected = expected
+                                                , _idsTotalDownloaded = total'
+                                                }
+                                        _ -> loop total' $! hashUpdate ctx bs
+                    loop 0 hashInit
+                renameFile tmp fp
 
-        case mdest of
-            Nothing -> return ()
-            Just (dest', cabalBS) -> do
-                let dest = toFilePath dest'
-                    innerDest = dest FP.</> packageIdentifierString ident
-                exists <- liftIO (doesDirectoryExist innerDest)
-                when exists $ throwM $ UnpackDirectoryAlreadyExists innerDest
+        let dest = toFilePath $ parent $ tfDestDir toFetch
+            innerDest = toFilePath $ tfDestDir toFetch
 
-                liftIO $ createDirectoryIfMissing True dest
+        liftIO $ createDirectoryIfMissing True dest
 
-                liftIO $ withBinaryFile fp ReadMode $ \h -> do
-                    -- Avoid using L.readFile, which is more likely to leak
-                    -- resources
-                    lbs <- L.hGetContents h
-                    let entries = fmap (either wrap wrap)
-                                $ Tar.checkTarbomb (packageIdentifierString ident)
-                                $ Tar.read $ decompress lbs
-                        wrap :: Exception e => e -> FetchException
-                        wrap = Couldn'tReadPackageTarball fp . toException
-                    Tar.unpack dest entries
+        liftIO $ withBinaryFile fp ReadMode $ \h -> do
+            -- Avoid using L.readFile, which is more likely to leak
+            -- resources
+            lbs <- L.hGetContents h
+            let entries = fmap (either wrap wrap)
+                        $ Tar.checkTarbomb (packageIdentifierString ident)
+                        $ Tar.read $ decompress lbs
+                wrap :: Exception e => e -> FetchException
+                wrap = Couldn'tReadPackageTarball fp . toException
+            Tar.unpack dest entries
 
-                    let cabalFP =
-                            innerDest FP.</>
-                            packageNameString (packageIdentifierName ident)
-                            <.> "cabal"
-                    S.writeFile cabalFP cabalBS
+            let cabalFP =
+                    innerDest FP.</>
+                    packageNameString (packageIdentifierName ident)
+                    <.> "cabal"
+            S.writeFile cabalFP $ tfCabal toFetch
 
-                    res <- parseAbsDir innerDest
-                    atomically $ modifyTVar outputVar (res:)
+            atomically $ modifyTVar outputVar $ Map.insert ident $ tfDestDir toFetch
 
-      where
-        pkg = packageIdentifierString ident
-        targz = pkg ++ ".tar.gz"
-
-validHash :: String -> Maybe S.ByteString -> Context SHA512 -> IO ()
+validHash :: T.Text -> Maybe S.ByteString -> Context SHA512 -> IO ()
 validHash _ Nothing _ = return ()
 validHash url (Just sha512) ctx
     | sha512 == digestToHexByteString dig = return ()

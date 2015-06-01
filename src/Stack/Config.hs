@@ -60,21 +60,21 @@ import           System.Process.Read (getEnvOverride, EnvOverride, unEnvOverride
 data ConfigMonoid =
   ConfigMonoid
     { configMonoidDockerOpts     :: !DockerOpts
-    , configMonoidUrls           :: !(Map Text Text)
-    -- ^ Various URLs for downloading things. Yes, this is stringly typed,
-    -- making it easy to extend. Please make sure to only access it using
-    -- helper functions.
     , configMonoidGpgVerifyIndex :: !(Maybe Bool)
     -- ^ Controls how package index updating occurs
     , configMonoidConnectionCount :: !(Maybe Int)
     -- ^ See: 'configConnectionCount'
     , configMonoidHideTHLoading :: !(Maybe Bool)
     -- ^ See: 'configHideTHLoading'
+    , configMonoidLatestSnapshotUrl :: !(Maybe Text)
+    -- ^ See: 'configLatestSnapshotUrl'
+    , configMonoidPackageIndices :: !(Maybe [PackageIndex])
+    -- ^ See: 'configPackageIndices'
     }
   deriving Show
 
 -- | Get the default resolver value
-getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env, HasUrls env, HasHttpManager env, MonadLogger m)
+getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m)
                    => Path Abs Dir
                    -> m (Resolver, Map PackageName (Map FlagName Bool), Bool)
 getDefaultResolver dir = do
@@ -115,17 +115,19 @@ instance Monoid DockerOpts where
 instance Monoid ConfigMonoid where
   mempty = ConfigMonoid
     { configMonoidDockerOpts = mempty
-    , configMonoidUrls = mempty
     , configMonoidGpgVerifyIndex = Nothing
     , configMonoidConnectionCount = Nothing
     , configMonoidHideTHLoading = Nothing
+    , configMonoidLatestSnapshotUrl = Nothing
+    , configMonoidPackageIndices = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
-    , configMonoidUrls = configMonoidUrls l <> configMonoidUrls r
     , configMonoidGpgVerifyIndex = configMonoidGpgVerifyIndex l <|> configMonoidGpgVerifyIndex r
     , configMonoidConnectionCount = configMonoidConnectionCount l <|> configMonoidConnectionCount r
     , configMonoidHideTHLoading = configMonoidHideTHLoading l <|> configMonoidHideTHLoading r
+    , configMonoidLatestSnapshotUrl = configMonoidLatestSnapshotUrl l <|> configMonoidLatestSnapshotUrl r
+    , configMonoidPackageIndices = configMonoidPackageIndices l <|> configMonoidPackageIndices r
     }
 
 instance FromJSON ConfigMonoid where
@@ -133,10 +135,11 @@ instance FromJSON ConfigMonoid where
     withObject "ConfigMonoid" $
     \obj ->
       do getTheDocker <- obj .:? "docker" .!= defaultDocker
-         configMonoidUrls <- obj .:? "urls" .!= mempty
          configMonoidGpgVerifyIndex <- obj .:? "gpg-verify-index"
          configMonoidConnectionCount <- obj .:? "connection-count"
          configMonoidHideTHLoading <- obj .:? "hide-th-loading"
+         configMonoidLatestSnapshotUrl <- obj .:? "latest-snapshot-url"
+         configMonoidPackageIndices <- obj .:? "package-indices"
          let configMonoidDockerOpts = DockerOpts getTheDocker
          return ConfigMonoid {..}
 
@@ -217,10 +220,21 @@ configFromConfigMonoid :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader e
 configFromConfigMonoid configStackRoot ConfigMonoid{..} = do
      let configDocker = case configMonoidDockerOpts of
                  DockerOpts x -> x
-         configUrls = configMonoidUrls
          configGpgVerifyIndex = fromMaybe False configMonoidGpgVerifyIndex
          configConnectionCount = fromMaybe 8 configMonoidConnectionCount
          configHideTHLoading = fromMaybe True configMonoidHideTHLoading
+         configLatestSnapshotUrl = fromMaybe
+            "https://www.stackage.org/download/snapshots.json"
+            configMonoidLatestSnapshotUrl
+         configPackageIndices = fromMaybe
+            [PackageIndex
+                { indexName = IndexName "hackage.haskell.org"
+                , indexLocation = ILGitHttp
+                        "https://github.com/commercialhaskell/all-cabal-hashes.git"
+                        "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"
+                , indexDownloadPrefix = "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
+                }]
+            configMonoidPackageIndices
 
          -- Only place in the codebase where platform is hard-coded. In theory
          -- in the future, allow it to be configured.
@@ -260,7 +274,6 @@ instance HasConfig MiniConfig where
 instance HasStackRoot MiniConfig
 instance HasHttpManager MiniConfig where
     getHttpManager (MiniConfig man _) = man
-instance HasUrls MiniConfig
 instance HasPlatform MiniConfig
 
 -- | Load the configuration, using current directory, environment variables,
@@ -416,18 +429,3 @@ loadProjectConfig = do
 -- | The filename used for the stack config file.
 stackDotYaml :: Path Rel File
 stackDotYaml = $(mkRelFile "stack.yaml")
-
--- FIXME askUrl "latest-snapshot-url" "https://www.stackage.org/download/snapshots.json"
-{- FIXME
--- | Git URL for the package index
-askPackageIndexGitUrl :: (MonadReader env m, HasUrls env) => m Text
-askPackageIndexGitUrl = askUrl "package-index-git-url" "https://github.com/commercialhaskell/all-cabal-hashes.git"
-
--- | HTTP URL for the package index
-askPackageIndexHttpUrl :: (MonadReader env m, HasUrls env) => m Text
-askPackageIndexHttpUrl = askUrl "package-index-http-url" "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"
-
--- | URL prefix for downloading packages
-packageDownloadPrefix :: Text
-packageDownloadPrefix = "https://s3.amazonaws.com/hackage.fpcomplete.com/package/"
--}

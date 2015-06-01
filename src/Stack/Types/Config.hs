@@ -12,7 +12,7 @@ import           Control.Exception
 import           Control.Monad (liftM)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
-import           Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, withText)
+import           Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, withText, (.:), (.:?), withObject)
 import           Data.Binary (Binary)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
@@ -78,12 +78,34 @@ data PackageIndex = PackageIndex
     , indexDownloadPrefix :: !Text
     -- ^ URL prefix for downloading packages
     }
+    deriving Show
+instance FromJSON PackageIndex where
+    parseJSON = withObject "PackageIndex" $ \o -> do
+        name <- o .: "name"
+        prefix <- o .: "download-prefix"
+        mgit <- o .:? "git"
+        mhttp <- o .:? "http"
+        loc <-
+            case (mgit, mhttp) of
+                (Nothing, Nothing) -> fail $
+                    "Must provide either Git or HTTP URL for " ++
+                    T.unpack (indexNameText name)
+                (Just git, Nothing) -> return $ ILGit git
+                (Nothing, Just http) -> return $ ILHttp http
+                (Just git, Just http) -> return $ ILGitHttp git http
+        return PackageIndex
+            { indexName = name
+            , indexLocation = loc
+            , indexDownloadPrefix = prefix
+            }
 
 -- | Unique name for a package index
 newtype IndexName = IndexName { unIndexName :: ByteString }
     deriving (Show, Eq, Ord, Hashable, Binary)
+indexNameText :: IndexName -> Text
+indexNameText = decodeUtf8 . unIndexName
 instance ToJSON IndexName where
-    toJSON = toJSON . decodeUtf8 . unIndexName
+    toJSON = toJSON . indexNameText
 instance FromJSON IndexName where
     parseJSON = withText "IndexName" $ \t ->
         case parseRelDir (T.unpack t) of
@@ -93,6 +115,7 @@ instance FromJSON IndexName where
 -- | Location of the package index. This ensures that at least one of Git or
 -- HTTP is available.
 data IndexLocation = ILGit !Text | ILHttp !Text | ILGitHttp !Text !Text
+    deriving (Show, Eq, Ord)
 
 -- | Controls which version of the environment is used
 data EnvSettings = EnvSettings

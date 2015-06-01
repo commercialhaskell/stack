@@ -268,7 +268,7 @@ updateCmd () logLevel = do
     lc <- runStackLoggingT manager logLevel loadConfig
     Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $
         runStackT manager logLevel (lcConfig lc) $
-            getMinimalEnvOverride >>= Stack.PackageIndex.updateIndex
+            getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
 
 -- | Execute a command
 execCmd :: (String, [String]) -> LogLevel -> IO ()

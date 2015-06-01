@@ -215,13 +215,14 @@ addDeps ghcVersion toCalc = do
     case eres of
         Left _ -> do
             $logInfo "Missing packages in index, updating and trying again"
-            updateIndex menv
+            updateAllIndices menv
             tryAddDeps menv >>= either throwM return
         Right res -> return res
   where
     tryAddDeps menv = do
         platform <- asks (configPlatform . getConfig)
-        idents <- sourcePackageIndex menv $$ CL.foldM (go platform) idents0 -- FIXME use the more efficient cabal file lookup code like Stack.Fetch
+        index:_ <- asks (configPackageIndices . getConfig) -- FIXME
+        idents <- sourcePackageIndex menv index $$ CL.foldM (go platform) idents0 -- FIXME use the more efficient cabal file lookup code like Stack.Fetch
         return $ case partitionEithers $ map hoistEither $ Map.toList idents of
             ([], pairs) -> Right $ Map.fromList pairs
             (missing, _) -> Left $ Couldn'tFindInIndex $ Set.fromList missing
@@ -354,7 +355,7 @@ getToolMap mbp = Map.unionsWith Set.union
       $ mpiExes mpi
 
 -- | Download the 'Snapshots' value from stackage.org.
-getSnapshots :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env, HasStackRoot env, HasUrls env)
+getSnapshots :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env, HasStackRoot env, HasConfig env)
              => m Snapshots
 getSnapshots = askLatestSnapshotUrl >>= parseUrl . T.unpack >>= downloadJSON
 

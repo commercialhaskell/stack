@@ -65,7 +65,6 @@ import           Stack.Constants
 import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
-import           Stack.PackageIndex
 import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Types.StackT
@@ -180,9 +179,13 @@ determineLocals bopts = do
 
     $logDebug "Unpacking packages as necessary"
     menv <- getMinimalEnvOverride
-    paths2 <- unpackPackageIdentsForBuild menv (bcExtraDeps bconfig)
+    paths2 <- unpackPackageIdents menv (configLocalUnpackDir bconfig)
+            $ Set.fromList
+            $ map fromTuple
+            $ M.toList
+            $ bcExtraDeps bconfig
     let paths = M.fromList (map (, PTUser) $ Set.toList $ bcPackages bconfig)
-             <> M.fromList (map (, PTDep) $ Set.toList paths2)
+             <> M.fromList (map (, PTDep) $ M.elems paths2)
     $logDebug $ "Installing from local directories: " <> T.pack (show paths)
     locals <- forM (M.toList paths) $ \(dir, ptype) -> do
         cabalfp <- getCabalFileName dir
@@ -1294,9 +1297,8 @@ withTempUnpacked :: (MonadIO m,MonadThrow m,MonadLogger m,MonadMask m,MonadReade
 withTempUnpacked pkgs inner = withSystemTempDirectory "stack-unpack" $ \tmp -> do
     dest <- parseAbsDir tmp
     menv <- getMinimalEnvOverride
-    (pis, pds) <- getPackageCaches menv
-    dirs <- fetchPackages menv pis pds $ map (, Just dest) pkgs
-    inner dirs
+    m <- unpackPackageIdents menv dest $ Set.fromList pkgs
+    inner $ M.elems m
 
 --------------------------------------------------------------------------------
 -- Paths

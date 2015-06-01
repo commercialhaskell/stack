@@ -19,8 +19,9 @@ module Stack.PackageIndex
     ( sourcePackageIndex -- FIXME stop exporting this
     , readPackageIdents
     , UnparsedCabalFile (..)
-    , updateIndex
-    , requireIndex
+    , updateIndex -- FIXME stop exporting this?
+    , requireIndex -- FIXME stop exporting this?
+    , updateAllIndices
     , getPkgVersions
     , PackageDownload (..)
     , PackageCache (..)
@@ -36,6 +37,7 @@ import           Control.Monad.Catch                   (MonadThrow, throwM)
 import           Control.Monad.IO.Class                (MonadIO, liftIO)
 import           Control.Monad.Logger                  (MonadLogger, logDebug,
                                                         logInfo, logWarn)
+import           Control.Monad.Reader                  (asks)
 import           Data.Aeson
 import qualified Data.Binary                           as Binary
 import           Data.Binary.Get                       (ByteOffset)
@@ -244,6 +246,16 @@ requireIndex menv index = do
     exists <- liftIO $ doesFileExist $ toFilePath tarFile
     unless exists $ updateIndex menv index
 
+-- | Update all of the package indices
+updateAllIndices
+    :: (MonadIO m,MonadLogger m
+       ,MonadThrow m,MonadReader env m,HasHttpManager env
+       ,HasConfig env)
+    => EnvOverride
+    -> m ()
+updateAllIndices menv =
+    asks (configPackageIndices . getConfig) >>= mapM_ (updateIndex menv)
+
 -- | Update the index tarball
 updateIndex :: (MonadIO m,MonadLogger m
                ,MonadThrow m,MonadReader env m,HasHttpManager env
@@ -252,7 +264,7 @@ updateIndex :: (MonadIO m,MonadLogger m
             -> PackageIndex
             -> m ()
 updateIndex menv index =
-  do $logInfo "Updating package index ..."
+  do $logInfo $ "Updating package index " <> indexNameText (indexName index) <> "..."
      git <- isGitInstalled menv
      let name = indexName index
      case (git, indexLocation index) of
