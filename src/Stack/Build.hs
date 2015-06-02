@@ -729,8 +729,6 @@ writeFinalFiles cabalPkgVer cfgVar gconfig bconfig buildType dir package = liftI
                                        cabalPkgVer
                                        dir
                                        gconfig {gconfigPkgId = mpkgid})
-                                          -- After a build has completed successfully for a given
-                                          -- configuration, no recompilation forcing is required.
              updateGenFile cabalPkgVer dir)
 
 -- | Build the given package with the given configuration.
