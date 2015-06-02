@@ -685,8 +685,8 @@ getPackageDatabases bconfig BTDeps =
     liftIO $ liftM return $ runReaderT packageDatabaseDeps bconfig
 getPackageDatabases bconfig BTLocals = liftIO $ flip runReaderT bconfig $
     sequence
-        [ packageDatabaseLocal
-        , packageDatabaseDeps
+        [ packageDatabaseDeps
+        , packageDatabaseLocal
         ]
 
 getInstallRoot :: MonadIO m => BuildConfig -> BuildType -> m (Path Abs Dir)

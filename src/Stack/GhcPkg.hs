@@ -106,7 +106,7 @@ ghcPkg menv pkgDbs args = do
 -- latest version of each package.
 --
 -- Package databases passed to this function override eachother in a
--- left-biased way when containing two packages of the same name.
+-- right-biased way when containing two packages of the same name.
 getPackageVersionMapWithGlobalDb
     :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
     => EnvOverride
@@ -129,13 +129,15 @@ getPackageVersionMapWithGlobalDb menv mmbp pkgDbs = do
             Just mbp ->
                 filtering gdb mbp allGlobals
     $logDebug ("Filtered globals: " <> T.pack (show globals))
-    -- M.unions is left-biased.
+    -- M.unions is left-biased, so we reverse the list before calling
+    -- it to make it right-biased, like GHC.
     rest <-
         getPackageVersions
             menv
             pkgDbs
             (flip elem pkgDbs)
             (M.unions .
+             reverse .
              map (M.fromList . rights))
     return (M.unions [rest,globals])
   where
