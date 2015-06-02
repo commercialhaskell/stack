@@ -646,7 +646,7 @@ makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig 
                  installResource
                  docLoc)
             removeAfterwards
-        writeFinalFiles cabalPkgVer gconfig bconfig buildType dir package
+        writeFinalFiles cabalPkgVer cfgVar gconfig bconfig buildType dir package
 
 -- | Specify that the given package needs the following other
 -- packages.
@@ -697,9 +697,14 @@ getInstallRoot bconfig BTLocals = liftIO $ runReaderT installationRootLocal bcon
 -- completes.
 writeFinalFiles :: (MonadIO m)
                 => PackageIdentifier -- ^ Cabal version
-                -> GenConfig -> BuildConfig -> BuildType
-                -> Path Abs Dir -> Package -> m ()
-writeFinalFiles cabalPkgVer gconfig bconfig buildType dir package = liftIO $
+                -> MVar ConfigLock
+                -> GenConfig
+                -> BuildConfig
+                -> BuildType
+                -> Path Abs Dir
+                -> Package
+                -> m ()
+writeFinalFiles cabalPkgVer cfgVar gconfig bconfig buildType dir package = liftIO $
          (do pkgDbs <- getPackageDatabases bconfig buildType
              menv <- runReaderT getMinimalEnvOverride bconfig
              mpkgid <- runNoLoggingT
@@ -720,12 +725,12 @@ writeFinalFiles cabalPkgVer gconfig bconfig buildType dir package = liftIO $
                  createDirectoryIfMissing True $ toFilePath $ parent dest
                  writeFile (toFilePath dest) "Installed"
 
-             writeGenConfigFile
-                      cabalPkgVer
-                      dir
-                      gconfig {gconfigPkgId = mpkgid}
-                    -- After a build has completed successfully for a given
-                    -- configuration, no recompilation forcing is required.
+             withMVar cfgVar (writeGenConfigFile
+                                       cabalPkgVer
+                                       dir
+                                       gconfig {gconfigPkgId = mpkgid})
+                                          -- After a build has completed successfully for a given
+                                          -- configuration, no recompilation forcing is required.
              updateGenFile cabalPkgVer dir)
 
 -- | Build the given package with the given configuration.
@@ -773,8 +778,10 @@ configurePackage cabalPkgVer bconfig configureResource setuphs buildType package
 
 -- | Remove the dist/ dir of a package.
 cleanPackage :: PackageIdentifier -- ^ Cabal version
-             -> Package -> IO ()
-cleanPackage cabalPkgVer package = do
+             -> Package
+             -> ConfigLock -- ^ Needed because this affects the config directory.
+             -> IO ()
+cleanPackage cabalPkgVer package _ = do
     dist <- distRelativeDir cabalPkgVer
     handleIO onErr $ removeDirectoryRecursive
         (toFilePath
@@ -1230,8 +1237,9 @@ writeGenConfigFile :: MonadIO m
                    => PackageIdentifier -- ^ Cabal version
                    -> Path Abs Dir
                    -> GenConfig
+                   -> ConfigLock -- ^ Needed because this affects the config directory.
                    -> m ()
-writeGenConfigFile cabalPkgVer dir gconfig = liftIO $
+writeGenConfigFile cabalPkgVer dir gconfig _ = liftIO $
   do built <- builtConfigFileFromDir cabalPkgVer dir
      createDirectoryIfMissing True (FL.toFilePath (FL.parent built))
      fp <- builtConfigFileFromDir cabalPkgVer dir
@@ -1247,10 +1255,10 @@ readGenConfigFile :: MonadIO m
                   -> Package
                   -> MVar ConfigLock
                   -> m GenConfig
-readGenConfigFile cabalPkgVer pkgIds bopts wanted package cfgVar = liftIO (withMVar cfgVar (const go))
+readGenConfigFile cabalPkgVer pkgIds bopts wanted package cfgVar = liftIO (withMVar cfgVar go)
   where name = packageName package
         dir = packageDir package
-        go =
+        go configLock =
           do fp <- builtConfigFileFromDir cabalPkgVer dir
              bytes <-
                catch (fmap Just
@@ -1273,8 +1281,8 @@ readGenConfigFile cabalPkgVer pkgIds bopts wanted package cfgVar = liftIO (withM
                             -- configuration has changed such that things need
                             -- to be recompiled, hence the above setting of force
                             -- recomp.
-                            cleanPackage cabalPkgVer package
-                            writeGenConfigFile cabalPkgVer dir gconfig'
+                            cleanPackage cabalPkgVer package configLock
+                            writeGenConfigFile cabalPkgVer dir gconfig' configLock
                             return gconfig'
                     else return gconfig -- No change, the generated config is consistent with the build config.
                Nothing ->
@@ -1286,7 +1294,7 @@ readGenConfigFile cabalPkgVer pkgIds bopts wanted package cfgVar = liftIO (withM
                     deleteGenFile cabalPkgVer dir
                     let gconfig' =
                           newConfig defaultGenConfig bopts package
-                    writeGenConfigFile cabalPkgVer dir gconfig'
+                    writeGenConfigFile cabalPkgVer dir gconfig' configLock
                     return gconfig' -- Probably doesn't exist or is out of date (not parseable.)
 
 -- | Update a gen configuration using the build configuration.
