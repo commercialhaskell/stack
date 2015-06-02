@@ -28,6 +28,7 @@ module Stack.Types.Version
   where
 
 import           Control.Applicative
+import           Control.DeepSeq
 import           Control.Monad.Catch
 import           Data.Aeson
 import           Data.Attoparsec.ByteString.Char8
@@ -45,12 +46,12 @@ import           Data.Vector.Binary ()
 import           Data.Vector.Unboxed (Vector)
 import qualified Data.Vector.Unboxed as V
 import           Data.Word
+import           Distribution.Text (disp)
+import qualified Distribution.Version as Cabal
 import           GHC.Generics
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
-import Distribution.Text (disp)
-import Text.PrettyPrint (render)
-import qualified Distribution.Version as Cabal
+import           Text.PrettyPrint (render)
 
 -- | A parse fail.
 data VersionParseFail =
@@ -62,7 +63,7 @@ instance Exception VersionParseFail
 -- | A package version.
 newtype Version =
   Version {unVersion :: Vector Word}
-  deriving (Eq,Ord,Typeable,Data,Generic,Binary)
+  deriving (Eq,Ord,Typeable,Data,Generic,Binary,NFData)
 
 -- | The first two components of a version.
 data MajorVersion = MajorVersion !Word !Word

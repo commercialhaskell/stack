@@ -1,4 +1,6 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS -fno-warn-unused-do-bind #-}
 
@@ -17,23 +19,24 @@ module Stack.Types.PackageIdentifier
   ,packageIdentifierText)
   where
 
-import Control.Applicative ((<*))
-import Control.Exception (Exception)
-import Control.Monad.Catch (MonadThrow, throwM)
-import Data.Aeson
-import Data.Attoparsec.ByteString.Char8
-import Data.Binary (Binary)
-import Data.ByteString (ByteString)
+import           Control.Applicative ((<*))
+import           Control.DeepSeq
+import           Control.Exception (Exception)
+import           Control.Monad.Catch (MonadThrow, throwM)
+import           Data.Aeson
+import           Data.Attoparsec.ByteString.Char8
+import           Data.Binary (Binary)
+import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
-import Data.Data
-import Data.Hashable
-import Data.Text (Text)
+import           Data.Data
+import           Data.Hashable
+import           Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text.Encoding (encodeUtf8)
-import GHC.Generics
-import Prelude hiding (FilePath)
-import Stack.Types.PackageName
-import Stack.Types.Version
+import           Data.Text.Encoding (encodeUtf8)
+import           GHC.Generics
+import           Prelude hiding (FilePath)
+import           Stack.Types.PackageName
+import           Stack.Types.Version
 
 -- | A parse fail.
 data PackageIdentifierParseFail
@@ -46,6 +49,10 @@ data PackageIdentifier =
   PackageIdentifier !PackageName
                     !Version
   deriving (Eq,Ord,Generic,Data,Typeable)
+
+instance NFData PackageIdentifier where
+  rnf (PackageIdentifier !p !v) =
+      seq (rnf p) (rnf v)
 
 instance Hashable PackageIdentifier
 instance Binary PackageIdentifier

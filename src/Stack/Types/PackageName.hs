@@ -24,6 +24,7 @@ module Stack.Types.PackageName
   where
 
 import           Control.Applicative
+import           Control.DeepSeq
 import           Control.Monad
 import           Control.Monad.Catch
 import           Data.Aeson
@@ -55,7 +56,7 @@ instance Exception PackageNameParseFail
 -- | A package name.
 newtype PackageName =
   PackageName ByteString
-  deriving (Eq,Ord,Typeable,Data,Generic,Hashable,Binary)
+  deriving (Eq,Ord,Typeable,Data,Generic,Hashable,Binary,NFData)
 
 instance Lift PackageName where
   lift (PackageName n) =

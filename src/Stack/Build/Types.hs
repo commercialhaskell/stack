@@ -10,9 +10,12 @@
 
 module Stack.Build.Types where
 
+import Control.DeepSeq
 import Control.Exception
 import Data.Aeson
+import Data.Binary (Binary(..))
 import Data.Data
+import Data.Hashable
 import Data.Map.Strict (Map)
 import Data.Maybe
 import Data.Monoid
@@ -114,3 +117,8 @@ data InstallLock = InstallLock
 -- packages. Shake works in parallel, without this there are race
 -- conditions.
 data ConfigLock = ConfigLock
+
+-- | Package dependency oracle.
+newtype PkgDepsOracle =
+    PkgDeps PackageName
+    deriving (Show,Typeable,Eq,Hashable,Binary,NFData)

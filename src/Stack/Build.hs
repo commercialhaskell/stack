@@ -1,8 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE NoMonomorphismRestriction #-}
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -54,6 +50,7 @@ import           Data.Streaming.Process hiding (env,callProcess)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import           Development.Shake (addOracle,Action)
 import           Distribution.Package (Dependency (..))
 import           Distribution.Version (intersectVersionRanges)
 import           Network.HTTP.Conduit (Manager)
@@ -498,26 +495,40 @@ buildLocals bopts packagesToInstall packagesToRemove = do
 runPlans :: (MonadIO m, MonadReader env m, HasBuildConfig env, HasLogLevel env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
          => BuildOpts
          -> Map Package Wanted
-         -> [Rules ()]
+         -> [(PkgDepsOracle -> Action [PackageIdentifier]) -> Rules ()]
          -> Path Abs Dir
          -> m ()
-runPlans _bopts _packages plans _docLoc = do
+runPlans _bopts packagesToInstall plans _docLoc = do
     shakeDir <- asks configShakeFilesDir
     shakeArgs
         shakeDir
         defaultShakeThreads
-        (do sequence_ plans
-            {- EKB FIXME: doc generation for stack-doc-server
-            when
-                (boptsFinalAction bopts == DoHaddock)
-                (buildDocIndex
-                     (wanted pwd)
-                     docLoc
-                     packages
-                     mgr
-                     logLevel)
-                                      --}
-                              )
+        (do getPkgDeps <- makeOracle
+            mapM_ ($ getPkgDeps) plans)
+        {- EKB FIXME: doc generation for stack-doc-server
+        when
+            (boptsFinalAction bopts == DoHaddock)
+            (buildDocIndex
+                 (wanted pwd)
+                 docLoc
+                 packages
+                 mgr
+                 logLevel)
+                                  --}
+  where makeOracle =
+            addOracle
+                (\(PkgDeps name) ->
+                      case find ((==name).packageName) (M.keys packagesToInstall) of
+                        Just package ->
+                            return
+                                (map packageIdentifier
+                                     (mapMaybe
+                                          (\depname ->
+                                                find
+                                                    ((== depname) . packageName)
+                                                    (M.keys packagesToInstall))
+                                          (M.keys (packageDeps package))))
+                        Nothing -> return [])
 
 -- | Dry run output.
 dryRunPrint :: MonadLogger m => Text -> Set PackageIdentifier -> Set PackageIdentifier -> m ()
@@ -583,8 +594,9 @@ makePlan :: Manager
          -> Resource
          -> Path Abs Dir
          -> MVar ConfigLock
+         -> (PkgDepsOracle -> Action [PackageIdentifier])
          -> Rules ()
-makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig packages package installResource configureResource docLoc cfgVar = do
+makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig packages package installResource configureResource docLoc cfgVar getPkgDeps = do
     configureTarget <-
         either throw return $
         liftM FL.toFilePath
@@ -596,7 +608,9 @@ makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig 
     when
         (wanted == Wanted)
         (want [buildTarget])
-    configureTarget %> const (runWithLogging configureAction)
+    configureTarget %>
+        const (do void (getPkgDeps (PkgDeps (packageName package)))
+                  runWithLogging configureAction)
     buildTarget %> const (runWithLogging (buildAction configureTarget))
   where
     needSourceFiles =
