@@ -114,3 +114,17 @@ spec = do
             $  conduitDumpPackage
             =$ addProfiling pcache
             =$ CL.sinkNull
+
+    it "sinkMatching" $ do
+        menv' <- getEnvOverride buildPlatform
+        menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
+        pcache <- newProfilingCache
+        m <- runNoLoggingT $ ghcPkgDump menv []
+            $  conduitDumpPackage
+            =$ addProfiling pcache
+            =$ sinkMatching False (Map.singleton $(mkPackageName "transformers") $(mkVersion "0.0.0.0.0.0.1"))
+        case Map.lookup $(mkPackageName "base") m of
+            Nothing -> error "base not present"
+            Just _ -> return ()
+        Map.lookup $(mkPackageName "transformers") m `shouldBe` Nothing
+        Map.lookup $(mkPackageName "ghc") m `shouldBe` Nothing

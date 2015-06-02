@@ -14,6 +14,7 @@ module Stack.PackageDump
     , loadProfilingCache
     , saveProfilingCache
     , addProfiling
+    , sinkMatching
     ) where
 
 import qualified Data.Binary as Binary
@@ -35,6 +36,8 @@ import Data.Typeable (Typeable)
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Map as Map
+import Data.Either (partitionEithers)
+import qualified Data.Set as Set
 import Control.Applicative ((<$>))
 import Data.Maybe (catMaybes)
 import System.Directory (createDirectoryIfMissing, getDirectoryContents)
@@ -72,6 +75,38 @@ saveProfilingCache :: MonadIO m => Path Abs File -> ProfilingCache -> m ()
 saveProfilingCache path (ProfilingCache ref) = liftIO $ do
     createDirectoryIfMissing True $ toFilePath $ parent path
     readIORef ref >>= Binary.encodeFile (toFilePath path)
+
+-- | Find the package IDs matching the given constraints with all dependencies installed.
+-- Packages not mentioned in the provided @Map@ are allowed to be present too.
+sinkMatching :: Monad m
+             => Bool -- ^ require profiling?
+             -> Map PackageName Version -- ^ allowed versions
+             -> Consumer (DumpPackage Bool) m (Map PackageName GhcPkgId)
+sinkMatching reqProfiling allowed = do
+    dps <- CL.filter (\dp -> isAllowed (dpGhcPkgId dp) && (not reqProfiling || dpProfiling dp))
+       =$= CL.consume
+    return
+        $ Map.fromList
+        $ (map $ \gid -> (packageIdentifierName $ ghcPkgIdPackageIdentifier gid, gid))
+        $ Set.toList
+        $ loop Set.empty dps
+  where
+    isAllowed gid =
+        case Map.lookup name allowed of
+            Just version' | version /= version' -> False
+            _ -> True
+      where
+        PackageIdentifier name version = ghcPkgIdPackageIdentifier gid
+
+    loop s dps =
+        case partitionEithers $ map depsMet dps of
+            ([], _) -> s
+            (s', dps') -> loop (Set.union s $ Set.fromList s') dps'
+      where
+        depsMet dp =
+            if all (`Set.member` s) $ dpDepends dp
+                then Left $ dpGhcPkgId dp
+                else Right dp
 
 -- | Add profiling information to the stream of @DumpPackage@s
 addProfiling :: MonadIO m
