@@ -136,11 +136,11 @@ getPackageVersionMapWithGlobalDb menv mmbp pkgDbs = do
             menv
             pkgDbs
             (flip elem pkgDbs)
-            (M.unions .
-             reverse .
+            (rightBiasUnion .
              map (M.fromList . rights))
-    return (M.unions [rest,globals])
+    return (rightBiasUnion [globals,rest])
   where
+    rightBiasUnion = M.unions . reverse
     filtering gdb mbp allGlobals =
         foldM
             (\acc ident ->
