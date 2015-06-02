@@ -14,7 +14,9 @@ module Stack.GhcPkg
   ,getGlobalDB
   ,EnvOverride
   ,envHelper
-  ,unregisterPackages)
+  ,unregisterPackages
+  ,createDatabase
+  ,packageDbFlags)
   where
 
 import           Control.Applicative
@@ -83,24 +85,31 @@ ghcPkg menv pkgDbs args = do
     eres <- go
     case eres of
         Left _ -> do
-            forM_ pkgDbs $ \db -> do
-                let db' = toFilePath db
-                exists <- liftIO $ doesDirectoryExist db'
-                unless exists $ do
-                    -- Creating the parent doesn't seem necessary, as ghc-pkg
-                    -- seems to be sufficiently smart. But I don't feel like
-                    -- finding out it isn't the hard way
-                    liftIO $ createDirectoryIfMissing True $ toFilePath $ parent db
-                    _ <- tryProcessStdout menv "ghc-pkg" ["init", db']
-                    return ()
+            mapM_ (createDatabase menv) pkgDbs
             go
         Right _ -> return eres
   where
-    args' =
+    go = tryProcessStdout menv "ghc-pkg" args' -- FIXME ensure that GHC_PACKAGE_PATH isn't set?
+    args' = packageDbFlags pkgDbs ++ args
+
+-- | Create a package database in the given directory, if it doesn't exist.
+createDatabase :: (MonadIO m, MonadLogger m) => EnvOverride -> Path Abs Dir -> m ()
+createDatabase menv db = do
+    let db' = toFilePath db
+    exists <- liftIO $ doesDirectoryExist db'
+    unless exists $ do
+        -- Creating the parent doesn't seem necessary, as ghc-pkg
+        -- seems to be sufficiently smart. But I don't feel like
+        -- finding out it isn't the hard way
+        liftIO $ createDirectoryIfMissing True $ toFilePath $ parent db
+        _ <- tryProcessStdout menv "ghc-pkg" ["init", db']
+        return ()
+
+-- | Get the necessary ghc-pkg flags for setting up the given package database
+packageDbFlags :: [Path Abs Dir] -> [String]
+packageDbFlags pkgDbs =
           "--no-user-package-db"
         : map (\x -> ("--package-db=" ++ toFilePath x)) pkgDbs
-       ++ args
-    go = tryProcessStdout menv "ghc-pkg" args'
 
 -- | In the given databases, get a single version for all packages, chooses the
 -- latest version of each package.

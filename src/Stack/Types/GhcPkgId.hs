@@ -16,6 +16,7 @@ import           Control.Applicative
 import           Control.Monad.Catch
 import           Data.Aeson
 import           Data.Attoparsec.ByteString.Char8
+import           Data.Binary (Binary)
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Char (isLetter)
@@ -38,6 +39,7 @@ data GhcPkgId =
   deriving (Eq,Ord,Data,Typeable,Generic)
 
 instance Hashable GhcPkgId
+instance Binary GhcPkgId
 
 instance Show GhcPkgId where
   show = show . ghcPkgIdString

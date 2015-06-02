@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -7,13 +9,30 @@ module Stack.PackageDump
     , eachPair
     , DumpPackage (..)
     , conduitDumpPackage
+    , ghcPkgDump
+    , ProfilingCache
+    , newProfilingCache
+    , loadProfilingCache
+    , saveProfilingCache
+    , addProfiling
     ) where
 
+import Data.Binary (Binary)
+import qualified Data.Binary as Binary
+import GHC.Generics (Generic)
+import Path
+import Control.Monad.IO.Class
+import Control.Monad.Logger (MonadLogger)
+import System.Process.Read
+import Control.Exception.Enclosed (tryIO)
+import Data.Map (Map)
+import Data.IORef
 import Control.Monad.Catch (MonadThrow, Exception, throwM)
-import Control.Monad (when)
+import Control.Monad (when, liftM)
 import Stack.Types
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as S
+import qualified Data.ByteString.Char8 as S8
 import Data.Conduit
 import Data.Typeable (Typeable)
 import qualified Data.Conduit.List as CL
@@ -21,16 +40,82 @@ import qualified Data.Conduit.Binary as CB
 import qualified Data.Map as Map
 import Control.Applicative ((<$>), (<*>))
 import Data.Maybe (catMaybes)
+import System.Directory (createDirectoryIfMissing, getDirectoryContents)
+import Stack.GhcPkg
+
+-- | Cached information on whether a package has profiling libraries
+newtype ProfilingCache = ProfilingCache (IORef (Map GhcPkgId Bool))
+
+-- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@
+ghcPkgDump :: (MonadIO m, MonadLogger m)
+           => EnvOverride
+           -> [Path Abs Dir] -- ^ package databases
+           -> Consumer ByteString IO a
+           -> m a
+ghcPkgDump menv pkgDbs sink = do
+    mapM_ (createDatabase menv) pkgDbs -- FIXME maybe use some retry logic instead?
+    sinkProcessStdout menv "ghc-pkg" args sink -- FIXME ensure that GHC_PACKAGE_PATH isn't set?
+  where
+    args = packageDbFlags pkgDbs ++ ["dump"]
+
+-- | Create a new, empty @ProfilingCache@
+newProfilingCache :: MonadIO m => m ProfilingCache
+newProfilingCache = liftIO $ ProfilingCache <$> newIORef Map.empty
+
+-- | Load a @ProfilingCache@ from disk, swalloing any errors and returning an empty cache.
+loadProfilingCache :: MonadIO m => Path Abs File -> m ProfilingCache
+loadProfilingCache path = liftIO $ fmap ProfilingCache $ do
+    eres <- tryIO $ Binary.decodeFileOrFail $ toFilePath path
+    newIORef $ case eres of
+        Right (Right x) -> x
+        _ -> Map.empty
+
+-- | Save a @ProfilingCache@ to disk
+saveProfilingCache :: MonadIO m => Path Abs File -> ProfilingCache -> m ()
+saveProfilingCache path (ProfilingCache ref) = liftIO $ do
+    createDirectoryIfMissing True $ toFilePath $ parent path
+    readIORef ref >>= Binary.encodeFile (toFilePath path)
+
+-- | Add profiling information to the stream of @DumpPackage@s
+addProfiling :: MonadIO m
+             => ProfilingCache
+             -> Conduit (DumpPackage a) m (DumpPackage Bool)
+addProfiling (ProfilingCache ref) =
+    CL.mapM go
+  where
+    go dp = liftIO $ do
+        m <- readIORef ref
+        let gid = dpGhcPkgId dp
+        p <- case Map.lookup gid m of
+            Just p -> return p
+            Nothing -> do
+                let loop [] = return False
+                    loop (dir:dirs) = do
+                        contents <- getDirectoryContents $ S8.unpack dir
+                        let pairs = [(content, lib) | content <- contents, lib <- dpLibraries dp]
+                        if or [isProfiling content lib
+                              | content <- contents
+                              , lib <- dpLibraries dp
+                              ]
+                            then return True
+                            else loop dirs
+                loop $ dpLibDirs dp
+        return dp { dpProfiling = p }
+
+isProfiling content lib =
+    prefix `S.isPrefixOf` S8.pack content
+  where
+    prefix = S.concat ["lib", lib, "_p"]
 
 -- | Dump information for a single package
-data DumpPackage = DumpPackage
+data DumpPackage profiling = DumpPackage
     { dpGhcPkgId :: !GhcPkgId
     , dpLibDirs :: ![ByteString]
-    , dpDepends :: ![(GhcPkgId, BuiltinRts)]
+    , dpLibraries :: ![ByteString]
+    , dpDepends :: ![GhcPkgId]
+    , dpProfiling :: !profiling
     }
     deriving (Show, Eq, Ord)
-
-type BuiltinRts = Bool
 
 data PackageDumpException
     = MissingSingleField ByteString
@@ -40,7 +125,8 @@ data PackageDumpException
 instance Exception PackageDumpException
 
 -- | Convert a stream of bytes into a stream of @DumpPackage@s
-conduitDumpPackage :: MonadThrow m => Conduit ByteString m DumpPackage
+conduitDumpPackage :: MonadThrow m
+                   => Conduit ByteString m (DumpPackage ())
 conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
     pairs <- eachPair (\k -> (k, ) <$> CL.consume) =$= CL.consume
     let m = Map.fromList pairs
@@ -53,11 +139,12 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 Just vs -> return vs
                 Nothing -> throwM $ MissingMultiField k
 
+        parseDepend :: MonadThrow m => ByteString -> m (Maybe GhcPkgId)
         parseDepend "builtin_rts" = return Nothing
         parseDepend bs =
-            (Just . (, builtinRts)) <$> parseGhcPkgId bs'
+            liftM Just $ parseGhcPkgId bs'
           where
-            (bs', builtinRts) =
+            (bs', _builtinRts) =
                 case stripSuffixBS " builtin_rts" bs of
                     Nothing ->
                         case stripPrefixBS "builtin_rts " bs of
@@ -73,11 +160,14 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
             when (PackageIdentifier name version /= ghcPkgIdPackageIdentifier ghcPkgId)
                 $ throwM $ MismatchedId name version ghcPkgId
             libDirs <- parseM "library-dirs"
+            libraries <- parseM "hs-libraries"
             depends <- parseM "depends" >>= mapM parseDepend
             return $ Just DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpLibDirs = libDirs
-                , dpDepends = catMaybes depends
+                , dpLibraries = S8.words $ S8.unwords libraries
+                , dpDepends = catMaybes (depends :: [Maybe GhcPkgId])
+                , dpProfiling = ()
                 }
 
 stripPrefixBS x y

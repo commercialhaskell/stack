@@ -10,6 +10,10 @@ import Control.Monad.Trans.Resource (runResourceT)
 import Stack.PackageDump
 import Stack.Types
 import Test.Hspec
+import System.Process.Read
+import Control.Monad.Logger
+import Distribution.System (buildPlatform)
+import qualified Data.Map as Map
 
 main :: IO ()
 main = hspec spec
@@ -67,7 +71,9 @@ spec = do
             haskell2010 `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpLibDirs = ["/opt/ghc/7.8.4/lib/ghc-7.8.4/haskell2010-1.1.2.0"]
-                , dpDepends = map (, False) depends
+                , dpDepends = depends
+                , dpLibraries = ["HShaskell2010-1.1.2.0"]
+                , dpProfiling = ()
                 }
 
         it "ghc 7.10" $ do
@@ -95,5 +101,16 @@ spec = do
             haskell2010 `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpLibDirs = ["/opt/ghc/7.10.1/lib/ghc-7.10.1/ghc_EMlWrQ42XY0BNVbSrKixqY"]
-                , dpDepends = map (, False) depends
+                , dpDepends = depends
+                , dpLibraries = ["HSghc-7.10.1-EMlWrQ42XY0BNVbSrKixqY"]
+                , dpProfiling = ()
                 }
+
+    it "ghcPkgDump + addProfiling" $ (id :: IO () -> IO ()) $ runNoLoggingT $ do
+        menv' <- getEnvOverride buildPlatform
+        menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
+        pcache <- newProfilingCache
+        ghcPkgDump menv []
+            $  conduitDumpPackage
+            =$ addProfiling pcache
+            =$ CL.sinkNull
