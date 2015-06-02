@@ -29,8 +29,7 @@ import           Control.Concurrent.STM          (TVar, atomically, modifyTVar,
                                                   readTVarIO, writeTVar)
 import           Control.Exception               (Exception, SomeException,
                                                   throwIO, toException)
-import           Control.Monad                   (liftM)
-import           Control.Monad                   (join, unless)
+import           Control.Monad                   (liftM, when, join, unless)
 import           Control.Monad.Catch             (MonadThrow, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -65,7 +64,8 @@ import           Path
 import           System.Directory                (canonicalizePath,
                                                   createDirectoryIfMissing,
                                                   doesDirectoryExist,
-                                                  doesFileExist, renameFile)
+                                                  doesFileExist, renameFile,
+                                                  renameDirectory)
 import           System.FilePath                 (takeDirectory, (<.>))
 import qualified System.FilePath                 as FP
 import           System.IO                       (IOMode (ReadMode, WriteMode),
@@ -108,7 +108,7 @@ unpackPackages menv dest input = do
     ToFetchResult toFetch alreadyUnpacked <- getToFetch dest' resolved
     unless (Map.null alreadyUnpacked) $
         throwM $ UnpackDirectoryAlreadyExists $ Set.fromList $ map toFilePath $ Map.elems alreadyUnpacked
-    unpacked <- fetchPackages toFetch
+    unpacked <- fetchPackages Nothing toFetch
     F.forM_ (Map.toList unpacked) $ \(ident, dest'') -> $logInfo $ T.pack $ concat
         [ "Unpacked "
         , packageIdentifierString ident
@@ -131,12 +131,13 @@ unpackPackageIdents
     :: (MonadBaseControl IO m, MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m)
     => EnvOverride
     -> Path Abs Dir -- ^ unpack directory
+    -> Maybe (Path Rel Dir) -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
     -> Set PackageIdentifier
     -> m (Map PackageIdentifier (Path Abs Dir))
-unpackPackageIdents menv unpackDir idents = do
+unpackPackageIdents menv unpackDir mdistDir idents = do
     resolved <- resolvePackages menv idents Set.empty
     ToFetchResult toFetch alreadyUnpacked <- getToFetch unpackDir resolved
-    nowUnpacked <- fetchPackages toFetch
+    nowUnpacked <- fetchPackages mdistDir toFetch
     return $ alreadyUnpacked <> nowUnpacked
 
 data ResolvedPackage = ResolvedPackage
@@ -269,9 +270,10 @@ getToFetch dest resolvedAll = do
 --
 -- Since 0.1.0.0
 fetchPackages :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m,MonadBaseControl IO m)
-              => Map PackageIdentifier ToFetch
+              => Maybe (Path Rel Dir) -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
+              -> Map PackageIdentifier ToFetch
               -> m (Map PackageIdentifier (Path Abs Dir))
-fetchPackages toFetchAll = do
+fetchPackages mdistDir toFetchAll = do
     env <- ask
     let man = getHttpManager env
         config = getConfig env
@@ -341,11 +343,24 @@ fetchPackages toFetchAll = do
             -- resources
             lbs <- L.hGetContents h
             let entries = fmap (either wrap wrap)
-                        $ Tar.checkTarbomb (packageIdentifierString ident)
+                        $ Tar.checkTarbomb identStr
                         $ Tar.read $ decompress lbs
                 wrap :: Exception e => e -> FetchException
                 wrap = Couldn'tReadPackageTarball fp . toException
+                identStr = packageIdentifierString ident
             Tar.unpack dest entries
+
+            case mdistDir of
+                Nothing -> return ()
+                -- See: https://github.com/fpco/stack/issues/157
+                Just distDir -> do
+                    let inner = dest FP.</> identStr
+                        oldDist = inner FP.</> "dist"
+                        newDist = inner FP.</> toFilePath distDir
+                    exists <- doesDirectoryExist oldDist
+                    when exists $ do
+                        createDirectoryIfMissing True $ FP.takeDirectory newDist
+                        renameDirectory oldDist newDist
 
             let cabalFP =
                     innerDest FP.</>

@@ -84,9 +84,11 @@ import           System.Posix.Files (createSymbolicLink,removeLink)
 build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
       => BuildOpts -> m ()
 build bopts = do
+    cabalPkgVer <- getMinimalEnvOverride >>= getCabalPkgVer
+
     -- FIXME currently this will install all dependencies for the entire
     -- project even if just building a subset of the project
-    locals <- determineLocals bopts
+    locals <- determineLocals cabalPkgVer bopts
     localsWanted <- checkWanted locals bopts
     ranges <- getDependencyRanges locals
     dependencies <- getDependencies locals $
@@ -96,7 +98,7 @@ build bopts = do
                 Left _ -> M.empty
                 Right names -> M.fromList $ map (, M.empty) names)
 
-    installDependencies bopts dependencies
+    installDependencies cabalPkgVer bopts dependencies
     toRemove <- getPackagesToRemove (Set.map packageIdentifier (S.fromList locals))
     buildLocals bopts localsWanted toRemove
 
@@ -173,14 +175,16 @@ getPackagesToRemove toInstall = do
 -- include any dependencies.
 determineLocals
     :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
-    => BuildOpts
+    => PackageIdentifier -- ^ Cabal version
+    -> BuildOpts
     -> m [Package]
-determineLocals bopts = do
+determineLocals cabalPkgVer bopts = do
     bconfig <- asks getBuildConfig
 
     $logDebug "Unpacking packages as necessary"
     menv <- getMinimalEnvOverride
-    paths2 <- unpackPackageIdents menv (configLocalUnpackDir bconfig)
+    mdist <- liftM Just $ distRelativeDir cabalPkgVer
+    paths2 <- unpackPackageIdents menv (configLocalUnpackDir bconfig) mdist
             $ Set.fromList
             $ map fromTuple
             $ M.toList
@@ -343,10 +347,11 @@ getDependencies locals ranges = do
 -- | Install the given set of dependencies into the dependency database, if missing.
 installDependencies
     :: (MonadIO m,MonadReader env m,HasLogLevel env,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
-    => BuildOpts
+    => PackageIdentifier -- ^ Cabal version
+    -> BuildOpts
     -> Map PackageName (Version, Map FlagName Bool)
     -> m ()
-installDependencies bopts deps' = do
+installDependencies cabalPkgVer bopts deps' = do
     bconfig <- asks getBuildConfig
     mgr <- asks getHttpManager
     logLevel <- asks getLogLevel
@@ -354,7 +359,6 @@ installDependencies bopts deps' = do
     menv <- getMinimalEnvOverride
 
     installed <- liftM toIdents $ getPackageVersionMapWithGlobalDb menv Nothing pkgDbs
-    cabalPkgVer <- getCabalPkgVer menv
     let toInstall' = M.difference deps installed
 
     -- Get rid of non-library dependencies which are already installed
@@ -376,7 +380,7 @@ installDependencies bopts deps' = do
                then dryRunPrint "dependencies" mempty (S.fromList (M.keys toInstall))
                else do
                  $logInfo $ "Installing dependencies: " <> T.intercalate ", " (map packageIdentifierText (M.keys toInstall))
-                 withTempUnpacked (M.keys toInstall) $ \newPkgDirs -> do
+                 withTempUnpacked cabalPkgVer (M.keys toInstall) $ \newPkgDirs -> do
                    $logInfo "All dependencies unpacked"
                    packages <- liftM S.fromList $ forM newPkgDirs $ \dir -> do
                        cabalfp <- getCabalFileName dir
@@ -1303,13 +1307,15 @@ newConfig gconfig bopts package =
 
 -- | Fetch and unpack the package.
 withTempUnpacked :: (MonadIO m,MonadThrow m,MonadLogger m,MonadMask m,MonadReader env m,HasHttpManager env,HasConfig env,MonadBaseControl IO m)
-                 => [PackageIdentifier]
+                 => PackageIdentifier -- ^ Cabal version
+                 -> [PackageIdentifier]
                  -> ([Path Abs Dir] -> m a)
                  -> m a
-withTempUnpacked pkgs inner = withSystemTempDirectory "stack-unpack" $ \tmp -> do
+withTempUnpacked cabalPkgVer pkgs inner = withSystemTempDirectory "stack-unpack" $ \tmp -> do
     dest <- parseAbsDir tmp
     menv <- getMinimalEnvOverride
-    m <- unpackPackageIdents menv dest $ Set.fromList pkgs
+    mdist <- liftM Just $ distRelativeDir cabalPkgVer
+    m <- unpackPackageIdents menv dest mdist $ Set.fromList pkgs
     inner $ M.elems m
 
 --------------------------------------------------------------------------------
