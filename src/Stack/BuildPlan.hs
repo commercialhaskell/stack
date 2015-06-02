@@ -94,7 +94,8 @@ instance Show BuildPlanException where
                         ("Recommended action: modify the extra-deps field of " ++
                         toFilePath stackYaml ++
                         " to include the following:")
-                        : rec
+                        : (rec
+                        ++ ["Note: further dependencies may need to be added"])
                 , case mapMaybe getNoKnown $ Map.toList unknown of
                     [] -> []
                     noKnown ->
@@ -128,6 +129,7 @@ instance Show BuildPlanException where
                    toFilePath stackYaml ++
                    " to include the following:"]
                 , extraDeps
+                , ["Note: further dependencies may need to be added"]
                 ]
           where
             go (dep, users) | Set.null users = concat

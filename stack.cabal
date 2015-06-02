@@ -155,12 +155,15 @@ test-suite stack-test
   hs-source-dirs: src/test
   main-is:        Test.hs
   other-modules:  Spec
+                , Stack.BuildPlanSpec
                 , Stack.ConfigSpec
   ghc-options:    -Wall -O2
   extensions:     FlexibleContexts
   build-depends:  base >=4.7 && <5
                 , hspec
+                , containers
                 , directory
+                , exceptions
                 , filepath
                 , path
                 , temporary
