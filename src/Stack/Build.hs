@@ -883,10 +883,13 @@ runhaskell liveOutput cabalPkgVer package setuphs config' buildType args =
         menv <- liftIO $ iomenv
         exeName <- liftIO $ join $ findExecutable menv "runhaskell"
         distRelativeDir' <- liftIO $ distRelativeDir cabalPkgVer
+        let subEnv =
+                 fmap (filter (\(x, _) -> x /= "GHC_PACKAGE_PATH"))
+               $ envHelper menv
         withSink $ \sink -> withCheckedProcess
           (cp exeName distRelativeDir')
              {cwd = Just (FL.toFilePath (packageDir package))
-             ,Process.env = envHelper menv}
+             ,Process.env = subEnv}
           (\ClosedStream stdout' stderr' -> runConcurrently $
                 Concurrently (logFrom stdout' sink outRef) A.*>
                 Concurrently (logFrom stderr' sink errRef))
