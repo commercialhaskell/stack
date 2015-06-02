@@ -14,7 +14,8 @@ copyright:           2015 FP Complete
 category:            Development
 build-type:          Simple
 cabal-version:       >=1.10
-extra-source-files:  README.md ARCHITECTURE.md ChangeLog.md test/package-dump/*.txt
+extra-source-files:  README.md ARCHITECTURE.md ChangeLog.md
+                     -- FIXME bug in path resolution on this glob test/package-dump/*.txt
 
 library
   hs-source-dirs:    src/
@@ -174,4 +175,8 @@ test-suite stack-test
                 , http-conduit
                 , cryptohash
                 , transformers
+                , conduit
+                , conduit-extra
+                , resourcet
+                , Cabal
   default-language:    Haskell2010

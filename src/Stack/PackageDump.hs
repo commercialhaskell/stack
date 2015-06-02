@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
@@ -17,9 +16,7 @@ module Stack.PackageDump
     , addProfiling
     ) where
 
-import Data.Binary (Binary)
 import qualified Data.Binary as Binary
-import GHC.Generics (Generic)
 import Path
 import Control.Monad.IO.Class
 import Control.Monad.Logger (MonadLogger)
@@ -38,7 +35,7 @@ import Data.Typeable (Typeable)
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Map as Map
-import Control.Applicative ((<$>), (<*>))
+import Control.Applicative ((<$>))
 import Data.Maybe (catMaybes)
 import System.Directory (createDirectoryIfMissing, getDirectoryContents)
 import Stack.GhcPkg
@@ -92,7 +89,6 @@ addProfiling (ProfilingCache ref) =
                 let loop [] = return False
                     loop (dir:dirs) = do
                         contents <- getDirectoryContents $ S8.unpack dir
-                        let pairs = [(content, lib) | content <- contents, lib <- dpLibraries dp]
                         if or [isProfiling content lib
                               | content <- contents
                               , lib <- dpLibraries dp
@@ -102,6 +98,9 @@ addProfiling (ProfilingCache ref) =
                 loop $ dpLibDirs dp
         return dp { dpProfiling = p }
 
+isProfiling :: FilePath -- ^ entry in directory
+            -> ByteString -- ^ name of library
+            -> Bool
 isProfiling content lib =
     prefix `S.isPrefixOf` S8.pack content
   where
@@ -170,10 +169,12 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 , dpProfiling = ()
                 }
 
+stripPrefixBS :: ByteString -> ByteString -> Maybe ByteString
 stripPrefixBS x y
     | x `S.isPrefixOf` y = Just $ S.drop (S.length x) y
     | otherwise = Nothing
 
+stripSuffixBS :: ByteString -> ByteString -> Maybe ByteString
 stripSuffixBS x y
     | x `S.isSuffixOf` y = Just $ S.take (S.length y - S.length x) y
     | otherwise = Nothing
