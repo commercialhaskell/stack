@@ -138,18 +138,18 @@ getPackageVersionMapWithGlobalDb menv mmbp pkgDbs = do
             Just mbp ->
                 filtering gdb mbp allGlobals
     $logDebug ("Filtered globals: " <> T.pack (show globals))
-    -- M.unions is left-biased, so we reverse the list before calling
-    -- it to make it right-biased, like GHC.
     rest <-
         getPackageVersions
             menv
             pkgDbs
             (flip elem pkgDbs)
-            (M.unions .
-             reverse .
+            (rightBiasUnion .
              map (M.fromList . rights))
-    return (M.unions [rest,globals])
+    return (rightBiasUnion [globals,rest])
   where
+    -- M.unions is left-biased, so we reverse the list before calling
+    -- it to make it right-biased, like GHC.
+    rightBiasUnion = M.unions . reverse
     filtering gdb mbp allGlobals =
         foldM
             (\acc ident ->
