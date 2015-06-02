@@ -17,6 +17,9 @@ MAINTAINER Greg Weber
 #    docker run --rm haskell-stack stack --help
 
 RUN apt-get update && apt-get install sudo \
+    # install profiling libraries
+    # stack needs a profiled base to install profiled packages
+ && apt-get install ghc-7.8.4-prof \
     # ssl certificates for uploading to hackage
  && apt-get install -y libssl-dev ca-certificates \
     # stack needs git
