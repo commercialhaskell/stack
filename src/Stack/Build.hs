@@ -21,6 +21,7 @@ import           Control.Arrow ((&&&))
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.MVar
 import           Control.Exception
+import           Control.Exception.Enclosed (handleIO)
 import           Control.Monad
 import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.Catch (MonadMask)
@@ -775,9 +776,11 @@ cleanPackage :: PackageIdentifier -- ^ Cabal version
              -> Package -> IO ()
 cleanPackage cabalPkgVer package = do
     dist <- distRelativeDir cabalPkgVer
-    removeDirectoryRecursive
+    handleIO onErr $ removeDirectoryRecursive
         (toFilePath
              (packageDir package </> dist))
+  where
+    onErr e = putStrLn $ "FIXME Race condition https://github.com/fpco/stack/issues/155 triggered: " ++ show e
 
 -- | Whether we're building dependencies (separate database and build
 -- process), or locally specified packages.
