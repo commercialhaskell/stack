@@ -39,9 +39,11 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Set.Monad as Set
 import           Data.Streaming.Process
+import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
+import           Path.IO
 import           Prelude hiding (FilePath)
 import           Stack.Types
 import           System.Directory (createDirectoryIfMissing, doesDirectoryExist, canonicalizePath)
@@ -149,10 +151,11 @@ getPackageVersionMapWithGlobalDb menv mmbp pkgDbs = do
                               (map
                                    packageIdentifierName
                                    (ident :
-                                    getTransInclusiveDeps mbp (packageIdentifierName ident)))
+                                    getTransInclusiveRevDeps mbp (packageIdentifierName ident)))
                   in if versionMatches mbp ident
                          then do
-                             hasProfiling <- packageHasProfiling [gdb] ident
+                             hasProfiling <- packageHasProfiling menv [gdb] ident
+                             $logDebug (packageIdentifierText ident <> " has profiling: " <> T.pack (show hasProfiling))
                              return (if hasProfiling
                                          then acc
                                          else expunge)
@@ -168,24 +171,45 @@ versionMatches mbp ident =
         (mbpPackages mbp)
 
 -- | Get the packages depended on by the given package.
-getTransInclusiveDeps :: MiniBuildPlan -> PackageName -> [PackageIdentifier]
-getTransInclusiveDeps mbp name =
+getTransInclusiveRevDeps :: MiniBuildPlan -> PackageName -> [PackageIdentifier]
+getTransInclusiveRevDeps mbp name =
     case M.lookup name (mbpPackages mbp) of
         Nothing -> []
         Just miniPkgInfo ->
-            let deps = S.toList (mpiPackageDeps miniPkgInfo)
-            in mapMaybe lookupPackageIdent deps <>
-               concatMap (getTransInclusiveDeps mbp) deps
+            let revDeps = packageRevDeps mbp name
+            in mapMaybe lookupPackageIdent revDeps <>
+               concatMap (getTransInclusiveRevDeps mbp) revDeps
   where
     lookupPackageIdent depname =
         fmap
             (\miniPkgInfo -> PackageIdentifier depname (mpiVersion miniPkgInfo))
             (M.lookup depname (mbpPackages mbp))
 
+-- | Get reverse dependencies of a package.
+packageRevDeps :: MiniBuildPlan -> PackageName -> [PackageName]
+packageRevDeps mbp name =
+    mapMaybe
+        (\(name,miniPkgInfo) ->
+              if S.member name (mpiPackageDeps miniPkgInfo)
+                  then Just (name)
+                  else Nothing)
+        (M.toList (mbpPackages mbp))
+
 -- | Does the given package identifier from the given package db have
 -- profiling libs built?
-packageHasProfiling :: Monad m => [Path Abs Dir] -> PackageIdentifier -> m Bool
-packageHasProfiling _ _ = return True
+packageHasProfiling :: (MonadIO m, MonadThrow m, MonadLogger m)
+                    => EnvOverride
+                    -> [Path Abs Dir]
+                    -> PackageIdentifier
+                    -> m Bool
+packageHasProfiling env dbs ident = do
+    mlibDir <- findLibDir env dbs (packageIdentifierName ident)
+    case mlibDir of
+        Nothing ->
+            return False
+        Just dir -> do
+            (_dirs,files) <- listDirectory dir
+            return (any (isSuffixOf "_p.a" . toFilePath) files)
 
 -- | In the given databases, get every version of every package.
 getPackageVersionsSet :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
@@ -300,6 +324,37 @@ findGhcPkgId menv pkgDbs name = do
             case mpid of
                 Just !pid ->
                     return (parseGhcPkgId pid)
+                _ ->
+                    return Nothing
+  where
+    stripCR t =
+        fromMaybe t (T.stripSuffix "\r" t)
+
+-- | Get the library directory of the package
+-- e.g. @/opt/ghc/7.8.4/lib/ghc-7.8.4/base-4.7.0.2@.
+findLibDir :: (MonadIO m, MonadLogger m)
+           => EnvOverride
+           -> [Path Abs Dir] -- ^ package databases
+           -> PackageName
+           -> m (Maybe (Path Abs Dir))
+findLibDir menv pkgDbs name = do
+    result <-
+        ghcPkg menv pkgDbs ["describe", packageNameString name]
+    case result of
+        Left{} ->
+            return Nothing
+        Right lbs -> do
+            let mpid =
+                    fmap
+                        T.unpack
+                        (listToMaybe
+                             (mapMaybe
+                                  (fmap stripCR .
+                                   T.stripPrefix "library-dirs: ")
+                                  (map T.decodeUtf8 (S8.lines lbs))))
+            case mpid of
+                Just !p ->
+                    return (parseAbsDir p)
                 _ ->
                     return Nothing
   where
