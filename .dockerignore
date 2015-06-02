@@ -1,0 +1,4 @@
+/.cabal-sandbox
+/cabal*.config
+/dist
+/target
