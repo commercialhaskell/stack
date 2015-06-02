@@ -35,6 +35,7 @@ The stack.yaml file is pretty self-explanatory, here's a real-life example from 
 
 ```yaml
 resolver: lts-2.9
+
 packages:
 - ./wai
 - ./wai-extra
@@ -47,6 +48,8 @@ packages:
 - ./wai-conduit
 - ./mime-types
 - ./auto-update
+
+# Version numbers are required for extra-deps
 extra-deps:
 - fast-logger-2.3.1
 - wai-logger-2.2.4
