@@ -128,3 +128,30 @@ spec = do
             Just _ -> return ()
         Map.lookup $(mkPackageName "transformers") m `shouldBe` Nothing
         Map.lookup $(mkPackageName "ghc") m `shouldBe` Nothing
+
+    describe "pruneDeps" $ do
+        it "sanity check" $ do
+            let prunes =
+                    [ PruneCheck (1, 'a') []
+                    , PruneCheck (1, 'b') []
+                    , PruneCheck (2, 'a') [(1, 'b')]
+                    , PruneCheck (2, 'b') [(1, 'a')]
+                    , PruneCheck (3, 'a') [(1, 'c')]
+                    , PruneCheck (4, 'a') [(2, 'a')]
+                    ]
+                actual = pruneDeps fst pcId pcDeps bestPrune prunes
+            actual `shouldBe` Map.fromList
+                [ (1, (1, 'b'))
+                , (2, (2, 'a'))
+                , (4, (4, 'a'))
+                ]
+
+data PruneCheck = PruneCheck
+    { pcId :: (Int, Char)
+    , pcDeps :: [(Int, Char)]
+    }
+
+bestPrune :: PruneCheck -> PruneCheck -> PruneCheck
+bestPrune x y
+    | pcId x > pcId y = x
+    | otherwise = y

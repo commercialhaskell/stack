@@ -15,6 +15,7 @@ module Stack.PackageDump
     , saveProfilingCache
     , addProfiling
     , sinkMatching
+    , pruneDeps
     ) where
 
 import qualified Data.Binary as Binary
@@ -76,6 +77,45 @@ saveProfilingCache path (ProfilingCache ref) = liftIO $ do
     createDirectoryIfMissing True $ toFilePath $ parent path
     readIORef ref >>= Binary.encodeFile (toFilePath path)
 
+-- | Prune a list of possible packages down to those whose dependencies are met.
+--
+-- * id uniquely identifies an item
+--
+-- * There can be multiple items per name
+pruneDeps
+    :: (Ord name, Ord id)
+    => (id -> name) -- ^ extract the name from an id
+    -> (item -> id) -- ^ the id of an item
+    -> (item -> [id]) -- ^ get the dependencies of an item
+    -> (item -> item -> item) -- ^ choose the desired of two possible items
+    -> [item] -- ^ input items
+    -> Map name id
+pruneDeps getName getId getDepends chooseBest =
+      Map.fromList
+    . (map $ \gid -> (getName gid, gid))
+    . Set.toList
+    . loop Set.empty Set.empty
+  where
+    loop foundIds usedNames dps =
+        case partitionEithers $ map depsMet dps of
+            ([], _) -> foundIds
+            (s', dps') ->
+                let foundIds' = Map.fromListWith chooseBest s'
+                    foundIds'' = Set.fromList $ map getId $ Map.elems foundIds'
+                    usedNames' = Map.keysSet foundIds'
+                 in loop
+                        (Set.union foundIds foundIds'')
+                        (Set.union usedNames usedNames')
+                        (catMaybes dps')
+      where
+        depsMet dp
+            | name `Set.member` usedNames = Right Nothing
+            | all (`Set.member` foundIds) (getDepends dp) = Left (name, dp)
+            | otherwise = Right $ Just dp
+          where
+            id' = getId dp
+            name = getName id'
+
 -- | Find the package IDs matching the given constraints with all dependencies installed.
 -- Packages not mentioned in the provided @Map@ are allowed to be present too.
 sinkMatching :: Monad m
@@ -85,11 +125,12 @@ sinkMatching :: Monad m
 sinkMatching reqProfiling allowed = do
     dps <- CL.filter (\dp -> isAllowed (dpGhcPkgId dp) && (not reqProfiling || dpProfiling dp))
        =$= CL.consume
-    return
-        $ Map.fromList
-        $ (map $ \gid -> (packageIdentifierName $ ghcPkgIdPackageIdentifier gid, gid))
-        $ Set.toList
-        $ loop Set.empty dps
+    return $ pruneDeps
+        (packageIdentifierName . ghcPkgIdPackageIdentifier)
+        dpGhcPkgId
+        dpDepends
+        const -- FIXME better comparison, prefer profiling version?
+        dps
   where
     isAllowed gid =
         case Map.lookup name allowed of
@@ -97,16 +138,6 @@ sinkMatching reqProfiling allowed = do
             _ -> True
       where
         PackageIdentifier name version = ghcPkgIdPackageIdentifier gid
-
-    loop s dps =
-        case partitionEithers $ map depsMet dps of
-            ([], _) -> s
-            (s', dps') -> loop (Set.union s $ Set.fromList s') dps'
-      where
-        depsMet dp =
-            if all (`Set.member` s) $ dpDepends dp
-                then Left $ dpGhcPkgId dp
-                else Right dp
 
 -- | Add profiling information to the stream of @DumpPackage@s
 addProfiling :: MonadIO m
