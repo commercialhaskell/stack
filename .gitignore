@@ -13,3 +13,4 @@ cabal.sandbox.config
 /.cabal-sandbox/
 .shake/
 .stack-work/
+/target/
