@@ -309,6 +309,16 @@ buildCmd finalAction opts GlobalOpts{..} =
             UnknownTargets targets ->
                 "The following target packages were not found: " ++
                 intercalate ", " (map packageNameString targets)
+            TestSuiteFailure exe mlogFile ec -> concat
+                [ "Test suite "
+                , toFilePath exe
+                , " exited with code "
+                , show ec
+                , case mlogFile of
+                    Nothing -> ""
+                    Just logFile ->
+                        ", log available at: " ++ toFilePath logFile
+                ]
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()

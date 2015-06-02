@@ -99,6 +99,7 @@ data Package =
           ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
           ,packageType :: !PackageType
           ,packageHasLibrary :: !Bool                     -- ^ does the package have a buildable library stanza?
+          ,packageTests :: !(Set Text)                    -- ^ names of test suites
           }
  deriving (Show,Typeable)
 
@@ -203,6 +204,9 @@ resolvePackage packageConfig cabalfp ptype gpkg = do
                                 False
                                 (buildable . libBuildInfo)
                                 (library pkg)
+                            ,packageTests = S.fromList
+                                          $ map (T.pack . fst)
+                                          $ condTestSuites gpkg
                             })
 
 -- | Get all dependencies of the package (buildable targets only).

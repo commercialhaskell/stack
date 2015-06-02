@@ -22,9 +22,11 @@ import Data.Monoid
 import Data.Text (Text)
 import Distribution.Package hiding (Package,PackageName)
 import GHC.Generics
+import Path (Path, Abs, File)
 import Prelude hiding (FilePath)
 import Stack.Package
 import Stack.Types
+import System.Exit (ExitCode)
 
 data StackBuildException
   = MissingTool Dependency
@@ -39,6 +41,7 @@ data StackBuildException
   | GHCVersionMismatch (Maybe Version) Version
   | Couldn'tParseTargets [Text]
   | UnknownTargets [PackageName]
+  | TestSuiteFailure (Path Abs File) (Maybe (Path Abs File)) ExitCode
   deriving (Typeable,Show)
 
 instance Exception StackBuildException

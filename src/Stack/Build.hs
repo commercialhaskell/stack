@@ -52,6 +52,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Development.Shake (addOracle,Action)
 import           Distribution.Package (Dependency (..))
+import           Distribution.System (Platform (Platform), OS (Windows))
 import           Distribution.Version (intersectVersionRanges)
 import           Network.HTTP.Conduit (Manager)
 import           Network.HTTP.Download
@@ -68,6 +69,7 @@ import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Types.StackT
 import           System.Directory hiding (findFiles, findExecutable)
+import           System.Exit (ExitCode (ExitSuccess))
 import           System.IO
 import           System.IO.Temp (withSystemTempDirectory)
 import           System.Process.Read
@@ -834,7 +836,37 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconf
                         , packageType package == PTUser]])
 
      case setupAction of
-       DoTests -> runhaskell' singularBuild ["test"]
+       DoTests -> do
+         let pkgRoot = packageDir package
+         distRelativeDir' <- liftIO $ distRelativeDir cabalPkgVer
+         let buildDir = pkgRoot </> distRelativeDir'
+         menv <- liftIO $ configEnvOverride (getConfig bconfig) EnvSettings
+            { esIncludeLocals = True
+            , esIncludeGhcPackagePath = True
+            }
+         forM_ (Set.toList $ packageTests package) $ \testName -> do
+           let exeExtension =
+                case configPlatform $ getConfig bconfig of
+                    Platform _ Windows -> ".exe"
+                    _ -> ""
+           nameDir <- liftIO $ parseRelDir $ T.unpack testName
+           nameExe <- liftIO $ parseRelFile $ T.unpack testName ++ exeExtension
+           let exeName = buildDir </> $(mkRelDir "build") </> nameDir </> nameExe
+           exists <- liftIO $ doesFileExist $ toFilePath exeName
+           if exists
+               then runTestSuite
+                        menv
+                        (if singularBuild then Nothing else Just logPath)
+                        pkgRoot
+                        exeName
+               else $logInfo $ T.concat
+                    [ "Test suite "
+                    , testName
+                    , " executable not found found for "
+                    , T.pack $ packageNameString $ packageName package
+                    ]
+           -- Previously just used this, but see https://github.com/fpco/stack/issues/167
+           -- runhaskell' singularBuild ["test"]
        DoHaddock ->
            do
               {- EKB FIXME: doc generation for stack-doc-server
@@ -880,6 +912,32 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconf
        _ -> return ()
  #endif
      --}
+
+-- | Run a single test suite
+runTestSuite :: MonadIO m
+             => EnvOverride
+             -> Maybe (Path Abs File) -- ^ optional log file, otherwise use console
+             -> Path Abs Dir -- ^ working directory
+             -> Path Abs File -- ^ executable
+             -> m ()
+runTestSuite menv mlogFile pkgRoot fp = liftIO $ do
+    case mlogFile of
+        Nothing -> go Inherit
+        Just logFile -> withBinaryFile (toFilePath logFile) AppendMode $ go . UseHandle
+  where
+    go outerr = do
+        (Just stdin', Nothing, Nothing, ph) <- createProcess (proc (toFilePath fp) [])
+            { cwd = Just $ toFilePath pkgRoot
+            , Process.env = envHelper menv
+            , std_in = CreatePipe
+            , std_out = outerr
+            , std_err = outerr
+            }
+        hClose stdin'
+        ec <- waitForProcess ph
+        case ec of
+            ExitSuccess -> return ()
+            _ -> throwM $ TestSuiteFailure fp mlogFile ec
 
 -- | Run the Haskell command for the given package.
 runhaskell :: (HasBuildConfig config,MonadAction m)
