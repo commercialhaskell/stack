@@ -14,7 +14,7 @@ copyright:           2015 FP Complete
 category:            Development
 build-type:          Simple
 cabal-version:       >=1.10
-extra-source-files:  README.md ARCHITECTURE.md ChangeLog.md
+extra-source-files:  README.md ARCHITECTURE.md ChangeLog.md test/package-dump/*.txt
 
 library
   hs-source-dirs:    src/
@@ -28,6 +28,7 @@ library
                      Stack.Fetch
                      Stack.GhcPkg
                      Stack.Package
+                     Stack.PackageDump
                      Stack.PackageIndex
                      Stack.Setup
                      Stack.Types
@@ -157,6 +158,7 @@ test-suite stack-test
   other-modules:  Spec
                 , Stack.BuildPlanSpec
                 , Stack.ConfigSpec
+                , Stack.PackageDumpSpec
   ghc-options:    -Wall -O2
   extensions:     FlexibleContexts
   build-depends:  base >=4.7 && <5
