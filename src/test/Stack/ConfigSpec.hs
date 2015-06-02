@@ -3,7 +3,6 @@
 module Stack.ConfigSpec where
 
 import Control.Applicative
-import Control.Monad
 import Control.Monad.Logger
 import Control.Exception
 import Data.Maybe

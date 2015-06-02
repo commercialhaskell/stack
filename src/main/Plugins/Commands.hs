@@ -8,8 +8,7 @@ module Plugins.Commands
 
 import Control.Monad.Trans.Either (EitherT)
 import Control.Monad.Trans.Writer (Writer)
-import Data.Text (Text, unpack)
-import Data.Foldable (foldMap)
+import Data.Text (unpack)
 import Plugins
 import Options.Applicative.Simple
 

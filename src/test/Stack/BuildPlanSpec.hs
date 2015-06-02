@@ -4,26 +4,19 @@
 module Stack.BuildPlanSpec where
 
 import Stack.BuildPlan
-import Control.Applicative
-import Control.Monad
 import Control.Monad.Logger
 import Control.Exception hiding (try)
 import Control.Monad.Catch (try)
-import Data.Maybe
 import Data.Monoid
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Network.HTTP.Conduit (Manager)
-import Path
---import System.FilePath
 import System.Directory
 import System.IO.Temp
 import System.Environment
 import Test.Hspec
-
 import Stack.Config
 import Stack.Types
-import Stack.Types.Config
 import Stack.Types.StackT
 
 data T = T

@@ -19,7 +19,6 @@ module Plugins
   , PluginException (..)
   ) where
 
-import Control.Applicative
 import Control.Exception (Exception)
 import Control.Monad
 import Control.Monad.Catch (MonadThrow, throwM)
@@ -35,15 +34,13 @@ import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Conduit.List as CL
 import Data.Conduit.Lift (evalStateC)
 import qualified Data.List as L
-import Data.List.Split (splitOn)
 import Data.Text (Text, pack, unpack)
 import qualified Data.Text as T
 import Data.Typeable (Typeable)
 import Data.Monoid
 import System.Directory
-import System.Process (CreateProcess, proc, readProcess, readProcessWithExitCode, createProcess, waitForProcess)
+import System.Process (CreateProcess, proc, readProcessWithExitCode, createProcess, waitForProcess)
 import System.FilePath ((</>), getSearchPath, splitExtension)
-import System.Environment (getEnv)
 import System.Exit (ExitCode (..))
 
 -- | Represents a runnable plugin.
@@ -101,8 +98,8 @@ findPlugins t = fmap (Plugins t)
 
 toPlugin :: (MonadIO m) => Text -> Text -> Producer m Plugin
 toPlugin prefix name = do
-  let proc = unpack $ prefix <> "-" <> name
-  (exit, out, _err) <- liftIO $ readProcessWithExitCode proc ["--summary"] ""
+  let proc' = unpack $ prefix <> "-" <> name
+  (exit, out, _err) <- liftIO $ readProcessWithExitCode proc' ["--summary"] ""
   case exit of
     ExitSuccess -> case T.lines (pack out) of
       [summary] -> yield $ Plugin
@@ -188,8 +185,8 @@ isExecutableIn dir file = liftIO $ do
   return (executable perms)
 
 clFilterM :: Monad m => (a -> m Bool) -> Conduit a m a
-clFilterM pred = awaitForever $ \a -> do
-  predPassed <- lift $ pred a
+clFilterM pred' = awaitForever $ \a -> do
+  predPassed <- lift $ pred' a
   when predPassed $ yield a
 
 clNub :: (Monad m, Eq a, Hashable a)

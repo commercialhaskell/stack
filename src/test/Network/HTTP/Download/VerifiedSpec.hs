@@ -2,14 +2,12 @@
 module Network.HTTP.Download.VerifiedSpec where
 
 import Crypto.Hash
-import Control.Exception
 import Control.Monad.Trans.Reader
 import Data.Maybe
 import Network.HTTP.Client.Conduit
 import Network.HTTP.Download.Verified
 import Path
 import System.Directory
-import System.IO (writeFile)
 import System.IO.Temp
 import Test.Hspec
 
