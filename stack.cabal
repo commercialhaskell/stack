@@ -161,7 +161,7 @@ test-suite stack-test
                 , Stack.BuildPlanSpec
                 , Stack.ConfigSpec
                 , Stack.PackageDumpSpec
-  ghc-options:    -Wall -O2
+  ghc-options:    -Wall -O2 -threaded
   extensions:     FlexibleContexts
   build-depends:  base >=4.7 && <5
                 , hspec
