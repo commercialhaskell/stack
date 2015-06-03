@@ -914,16 +914,18 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconf
      --}
 
 -- | Run a single test suite
-runTestSuite :: MonadIO m
+runTestSuite :: (MonadIO m, MonadLogger m)
              => EnvOverride
              -> Maybe (Path Abs File) -- ^ optional log file, otherwise use console
              -> Path Abs Dir -- ^ working directory
              -> Path Abs File -- ^ executable
              -> m ()
-runTestSuite menv mlogFile pkgRoot fp = liftIO $ do
+runTestSuite menv mlogFile pkgRoot fp = do
     case mlogFile of
-        Nothing -> go Inherit
-        Just logFile -> withBinaryFile (toFilePath logFile) AppendMode $ go . UseHandle
+        Nothing -> do
+            $logInfo $ "Running test suite " <> T.pack (toFilePath fp)
+            liftIO $ go Inherit
+        Just logFile -> liftIO $ withBinaryFile (toFilePath logFile) AppendMode $ go . UseHandle
   where
     go outerr = do
         (Just stdin', Nothing, Nothing, ph) <- createProcess (proc (toFilePath fp) [])
