@@ -192,8 +192,8 @@ data DumpPackage profiling extra = DumpPackage
     deriving (Show, Eq, Ord)
 
 data PackageDumpException
-    = MissingSingleField ByteString
-    | MissingMultiField ByteString
+    = MissingSingleField ByteString (Map ByteString [Line])
+    | MissingMultiField ByteString (Map ByteString [Line])
     | MismatchedId PackageName Version GhcPkgId
     deriving (Show, Typeable)
 instance Exception PackageDumpException
@@ -207,11 +207,11 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
     let parseS k =
             case Map.lookup k m of
                 Just [v] -> return v
-                _ -> throwM $ MissingSingleField k
+                _ -> throwM $ MissingSingleField k m
         parseM k =
             case Map.lookup k m of
                 Just vs -> return vs
-                Nothing -> throwM $ MissingMultiField k
+                Nothing -> throwM $ MissingMultiField k m
 
         parseDepend :: MonadThrow m => ByteString -> m (Maybe GhcPkgId)
         parseDepend "builtin_rts" = return Nothing
@@ -267,7 +267,12 @@ eachSection inner =
   where
     _cr = 13
 
-    start = CL.peek >>= maybe (return ()) (const go)
+    peekBS = await >>= maybe (return Nothing) (\bs ->
+        if S.null bs
+            then peekBS
+            else leftover bs >> return (Just bs))
+
+    start = peekBS >>= maybe (return ()) (const go)
 
     go = do
         x <- toConsumer $ takeWhileC (/= "---") =$= inner
