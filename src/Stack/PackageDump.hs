@@ -27,6 +27,7 @@ import Control.Exception.Enclosed (tryIO)
 import Data.Map (Map)
 import Data.IORef
 import Control.Monad.Catch (MonadThrow, Exception, throwM)
+import qualified Data.Foldable as F
 import Control.Monad (when, liftM)
 import Stack.Types
 import Data.ByteString (ByteString)
@@ -47,17 +48,23 @@ import Stack.GhcPkg
 -- | Cached information on whether a package has profiling libraries
 newtype ProfilingCache = ProfilingCache (IORef (Map GhcPkgId Bool))
 
--- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@
-ghcPkgDump :: (MonadIO m, MonadLogger m)
-           => EnvOverride
-           -> [Path Abs Dir] -- ^ package databases
-           -> Consumer ByteString IO a
-           -> m a
-ghcPkgDump menv pkgDbs sink = do
-    mapM_ (createDatabase menv) pkgDbs -- FIXME maybe use some retry logic instead?
+-- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
+ghcPkgDump
+    :: (MonadIO m, MonadLogger m)
+    => EnvOverride
+    -> Maybe (Path Abs Dir) -- ^ if Nothing, use global
+    -> Consumer ByteString IO a
+    -> m a
+ghcPkgDump menv mpkgDb sink = do
+    F.mapM_ (createDatabase menv) mpkgDb -- FIXME maybe use some retry logic instead?
     sinkProcessStdout menv "ghc-pkg" args sink -- FIXME ensure that GHC_PACKAGE_PATH isn't set?
   where
-    args = packageDbFlags pkgDbs ++ ["dump"]
+    args = concat
+        [ case mpkgDb of
+            Nothing -> ["--global", "--no-user-package-db"]
+            Just pkgdb -> ["--user", "--no-user-package-db", "--package-db", toFilePath pkgdb]
+        , ["dump"]
+        ]
 
 -- | Create a new, empty @ProfilingCache@
 newProfilingCache :: MonadIO m => m ProfilingCache

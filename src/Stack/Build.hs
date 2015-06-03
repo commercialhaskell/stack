@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -65,6 +66,7 @@ import           Stack.Constants
 import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
+import           Stack.PackageDump
 import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Types.StackT
@@ -79,11 +81,176 @@ import           System.Process.Read
 import           System.Posix.Files (createSymbolicLink,removeLink)
 #endif
 --}
+data Installed = Library GhcPkgId | Executable
+    deriving Show
+
+data Location = Global | Snap | Local
+    deriving Show
+
+type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
+
+getInstalled :: M env m
+             => Bool -- ^ profiling?
+             -> Map PackageName Version -- ^ in build plan
+             -> Set PackageName -- ^ locals
+             -> m (Map PackageName (Version, Location, Installed))
+getInstalled profiling allowed localNames = do
+    snapDBPath <- packageDatabaseDeps
+    localDBPath <- packageDatabaseLocal
+
+    bconfig <- asks getBuildConfig
+
+    pcache <- loadProfilingCache $ configProfilingCache bconfig
+
+    menv <- getMinimalEnvOverride
+    let loadDatabase' = loadDatabase menv pcache allowed localNames profiling
+    libraryIds <-
+        loadDatabase' Global Nothing M.empty >>=
+        loadDatabase' Snap (Just snapDBPath) >>=
+        loadDatabase' Local (Just localDBPath)
+
+    saveProfilingCache (configProfilingCache bconfig) pcache
+
+    {- FIXME executables
+    snapExePath <- error "snap exes"
+    localExePath <- error "localExePath"
+    -}
+
+    let libraries = Map.fromList
+                  $ map (\(gid, loc) ->
+                    let PackageIdentifier name ver = ghcPkgIdPackageIdentifier gid
+                     in (name, (ver, loc, Library gid)))
+                  $ Map.toList libraryIds
+        executables = M.empty -- FIXME
+    return $ M.union libraries executables
+
+data LocalPackage = LocalPackage
+    { lpPackage :: Package
+    , lpWanted :: Bool
+    }
+    deriving Show
+
+loadLocals :: M env m
+           => BuildOpts
+           -> m [LocalPackage]
+loadLocals bopts = do
+    targets <- mapM parseTarget $
+        case boptsTargets bopts of
+            Left [] -> ["."]
+            Left x -> x
+            Right _ -> []
+    (dirs, names0) <- case partitionEithers targets of
+        ([], targets') -> return $ partitionEithers targets'
+        (bad, _) -> throwM $ Couldn'tParseTargets bad
+    let names = Set.fromList names0
+
+    bconfig <- asks getBuildConfig
+    lps <- forM (Set.toList $ bcPackages bconfig) $ \dir -> do
+        cabalfp <- getCabalFileName dir
+        name <- parsePackageNameFromFilePath cabalfp
+        let wanted = isWanted dirs names dir name
+        pkg <- readPackage
+            PackageConfig
+                { packageConfigEnableTests = wanted && boptsFinalAction bopts == DoTests
+                , packageConfigEnableBenchmarks = wanted && boptsFinalAction bopts == DoBenchmarks
+                , packageConfigFlags =
+                    fromMaybe M.empty $ M.lookup name $ bcFlags bconfig
+                , packageConfigGhcVersion = bcGhcVersion bconfig
+                , packageConfigPlatform = configPlatform $ getConfig bconfig
+                }
+            cabalfp
+            PTUser
+        -- FIXME check if name == what's inside pkg
+        return LocalPackage
+            { lpPackage = pkg
+            , lpWanted = wanted
+            }
+
+    let known = Set.fromList $ map (packageName . lpPackage) lps
+        unknown = Set.difference names known
+    unless (Set.null unknown) $ throwM $ UnknownTargets $ Set.toList unknown
+
+    return lps
+  where
+    parseTarget t = do
+        let s = T.unpack t
+        isDir <- liftIO $ doesDirectoryExist s
+        if isDir
+            then liftM (Right . Left) $ liftIO (canonicalizePath s) >>= parseAbsDir
+            else return $ case parsePackageNameFromString s of
+                     Left _ -> Left t
+                     Right pname -> Right $ Right pname
+    isWanted dirs names dir name =
+        name `Set.member` names ||
+        any (`FL.isParentOf` dir) dirs ||
+        any (== dir) dirs
+
+-- | Output Set includes the input dependencies
+loadDatabase :: M env m
+             => EnvOverride
+             -> ProfilingCache
+             -> Map PackageName Version -- ^ packages in this Map may only be as the specified Version, otherwise any version is allowed
+             -> Set PackageName -- ^ no package from this list is allowed
+             -> Bool -- ^ require profiling libraries?
+             -> Location
+             -> Maybe (Path Abs Dir) -- ^ package database
+             -> Map GhcPkgId Location -- ^ dependencies available
+             -> m (Map GhcPkgId Location)
+loadDatabase menv pcache allowed banned profiling loc mdb available = do
+    dps <- ghcPkgDump menv mdb
+        $  conduitDumpPackage
+        =$ addProfiling pcache
+        =$ CL.filter isAllowed
+        =$ CL.map dpToItem
+        =$ CL.consume
+    let items = dps ++ (Map.toList $ fmap (, []) available)
+    return $ Map.fromList $ map toPair $ M.elems $ pruneDeps
+        (packageIdentifierName . ghcPkgIdPackageIdentifier)
+        fst
+        (snd . snd)
+        const
+        items
+  where
+    toPair (gid, (loc, _)) = (gid, loc)
+    isAllowed dp
+        | profiling && not (dpProfiling dp) = False
+        | name `Set.member` banned = False
+        | otherwise =
+            case Map.lookup name allowed of
+                Just version' | version /= version' -> False
+                _ -> True
+      where
+        PackageIdentifier name version = ghcPkgIdPackageIdentifier $ dpGhcPkgId dp
+
+    dpToItem dp = (dpGhcPkgId dp, (loc, dpDepends dp))
+
+constructPlan :: M env m
+              => [LocalPackage]
+              -> Map PackageName (Version, Location, Installed)
+              -> m ()
+constructPlan locals installed = error "constructPlan"
 
 -- | Build using Shake.
-build :: (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
-      => BuildOpts -> m ()
+build :: M env m => BuildOpts -> m ()
 build bopts = do
+    bconfig <- asks getBuildConfig
+    inBuildPlan <- case bcResolver bconfig of
+        ResolverSnapshot snapName -> do
+            $logDebug $ "Checking resolver: " <> renderSnapName snapName
+            mbp <- loadMiniBuildPlan snapName
+            return $ mbpPackages mbp
+        ResolverGhc _ -> return M.empty
+
+    locals <- loadLocals bopts
+    let localNames = Set.fromList $ map (packageName . lpPackage) locals
+
+    installed <- getInstalled profiling (fmap mpiVersion inBuildPlan) localNames
+
+    constructPlan locals installed >>= error .show
+  where
+    profiling = boptsLibProfile bopts || boptsExeProfile bopts
+
+    {- FIXME
     cabalPkgVer <- getMinimalEnvOverride >>= getCabalPkgVer
 
     -- FIXME currently this will install all dependencies for the entire
@@ -101,43 +268,6 @@ build bopts = do
     installDependencies cabalPkgVer bopts dependencies
     toRemove <- getPackagesToRemove (Set.map packageIdentifier (S.fromList locals))
     buildLocals bopts localsWanted toRemove
-
--- | Given a list of local packages and some options, determine which ones are
--- wanted.
-checkWanted :: (MonadIO m, MonadThrow m)
-            => [Package] -> BuildOpts -> m (Map Package Wanted)
-checkWanted packages bopts = do
-    targets <- mapM parseTarget $
-        case boptsTargets bopts of
-            Left [] -> ["."]
-            Left x -> x
-            Right _ -> []
-    (dirs, names0) <- case partitionEithers targets of
-        ([], targets') -> return $ partitionEithers targets'
-        (bad, _) -> throwM $ Couldn'tParseTargets bad
-
-    -- Check for unknown names
-    let names = Set.fromList names0
-        known = Set.fromList $ map packageName packages
-        unknown = Set.difference names known
-    unless (Set.null unknown) $ throwM $ UnknownTargets $ Set.toList unknown
-
-    return $ M.fromList $ map (id &&& wanted dirs names) packages
-  where
-    parseTarget t = do
-        let s = T.unpack t
-        isDir <- liftIO $ doesDirectoryExist s
-        if isDir
-            then liftM (Right . Left) $ liftIO (canonicalizePath s) >>= parseAbsDir
-            else return $ case parsePackageNameFromString s of
-                     Left _ -> Left t
-                     Right pname -> Right $ Right pname
-    wanted dirs names package = boolToWanted $
-        packageName package `Set.member` names ||
-        any (`FL.isParentOf` packageDir package) dirs ||
-        any (== packageDir package) dirs
-      where
-        boolToWanted True = Wanted; boolToWanted _ = NotWanted
 
 -- | Get currently user-local-db-installed packages that need to be
 -- removed before we install the new package set.
@@ -1448,3 +1578,7 @@ getCabalPkgVer menv = do
   where
     cabalName =
         $(mkPackageName "Cabal")
+        -}
+
+clean :: a
+clean = error "clean"
