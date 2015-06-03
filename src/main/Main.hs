@@ -34,6 +34,7 @@ import           Stack.Fetch
 import           Stack.GhcPkg (envHelper)
 import           Stack.Package
 import qualified Stack.PackageIndex
+import           Stack.Path
 import           Stack.Setup (setupEnv)
 import           Stack.Types
 import           Stack.Types.StackT
@@ -121,6 +122,21 @@ main =
                             <*> (flag False True (long "dry-run" <>
                                                   help "Don't build anything, just prepare to")))
              addSubCommands
+               "path"
+               "Print path information for certain things"
+               (do addCommand "ghc"
+                              "Print path to the ghc executable in use"
+                              pathCmd
+                              (pure PathGhc)
+                   addCommand "log"
+                              "Print path to the log directory in use"
+                              pathCmd
+                              (pure PathLog)
+                   addCommand "package-db"
+                              "Print the package databases in use"
+                              pathCmd
+                              (pure PathPackageDb))
+             addSubCommands
                Docker.dockerCmdName
                "Subcommands specific to Docker use"
                (do addCommand Docker.dockerPullCmdName
@@ -143,6 +159,13 @@ main =
                                    <*> many (strArgument (metavar "ARGS"))))
              commandsFromPlugins plugins pluginShouldHaveRun)
      run level
+
+pathCmd :: PathArg -> GlobalOpts -> IO ()
+pathCmd pathArg GlobalOpts{..} = do
+  manager <- newTLSManager
+  lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
+  buildConfig <- runStackLoggingT manager globalLogLevel (lcLoadBuildConfig lc)
+  runStackT manager globalLogLevel buildConfig (pathString pathArg) >>= putStrLn
 
 
 -- Try to run a plugin

@@ -31,6 +31,7 @@ library
                      Stack.Package
                      Stack.PackageDump
                      Stack.PackageIndex
+                     Stack.Path
                      Stack.Setup
                      Stack.Types
                      Stack.Types.Internal
