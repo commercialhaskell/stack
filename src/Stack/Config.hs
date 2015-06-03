@@ -179,7 +179,7 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser docker =
-    (\docker -> mempty { configMonoidDockerOpts = docker })
+    (\opts -> mempty { configMonoidDockerOpts = opts })
     <$> if docker
            then Docker.dockerOptsParser
            else pure mempty
