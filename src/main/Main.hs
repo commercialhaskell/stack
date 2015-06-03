@@ -506,10 +506,18 @@ logLevelOpt =
                    metavar "VERBOSITY" <>
                    help "Verbosity: silent, error, warn, info, debug")) <|>
   flag defaultLogLevel
-       LevelDebug
+       verboseLevel
        (short 'v' <>
-        help "Enable verbose mode: verbosity level \"info\"")
-  where parse s =
+        help ("Enable verbose mode: verbosity level \"" <> showLevel verboseLevel <> "\""))
+  where verboseLevel = LevelDebug
+        showLevel l =
+          case l of
+            LevelDebug -> "debug"
+            LevelInfo -> "info"
+            LevelWarn -> "warn"
+            LevelError -> "error"
+            LevelOther x -> T.unpack x
+        parse s =
           case s of
             "debug" -> LevelDebug
             "info" -> LevelInfo
