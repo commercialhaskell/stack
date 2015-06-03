@@ -333,11 +333,6 @@ data ConfigException
   deriving (Typeable,Show)
 instance Exception ConfigException
 
--- TODO: eliminate occurrences of this exception.
-data NotYetImplemented = NotYetImplemented Text
-  deriving (Show, Typeable)
-instance Exception NotYetImplemented
-
 -- | Helper function to ask the environment and apply getConfig
 askConfig :: (MonadReader env m, HasConfig env) => m Config
 askConfig = liftM getConfig ask
