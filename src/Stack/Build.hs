@@ -253,7 +253,9 @@ constructPlan locals buildPlan installed = do
     s <- execStateT (mapM_ goWanted $ filter lpWanted locals) (S M.empty [] Set.empty)
     if Set.null $ failures s
         then return $ tasks s
-        else error $ show $ failures s -- FIXME
+        else do liftIO (print ("visited",visited    s))
+                liftIO (print ("tasks",tasks s))
+                error $ show $ failures s -- FIXME
   where
     goWanted = goPackage Local True . lpPackage
 
@@ -389,14 +391,17 @@ build bopts = do
 
     locals <- loadLocals bopts
     let localNames = Set.fromList $ map (packageName . lpPackage) locals
-
-    installed <- getInstalled profiling (fmap mpiVersion inBuildPlan) localNames
+        localDepVersions = bcExtraDeps bconfig
+    installed <- getInstalled
+        profiling
+        (localDepVersions `M.union` fmap mpiVersion inBuildPlan)
+        localNames
 
     constructPlan locals inBuildPlan installed >>= error .show
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
 
-    {- FIXME
+{- FIXME
     cabalPkgVer <- getMinimalEnvOverride >>= getCabalPkgVer
 
     -- FIXME currently this will install all dependencies for the entire
