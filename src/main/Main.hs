@@ -23,9 +23,10 @@ import           Distribution.Text (display)
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Simple
 import           Options.Applicative.Types (readerAsk)
+import           Path (toFilePath)
+import qualified Paths_stack as Meta
 import           Plugins
 import           Plugins.Commands
-import           Path (toFilePath)
 import           Stack.Build
 import           Stack.Build.Types
 import           Stack.Config
@@ -43,7 +44,6 @@ import           System.Exit
 import           System.IO (stderr)
 import qualified System.Process as P
 import qualified System.Process.Read
-import qualified Paths_stack as Meta
 
 -- | Commandline dispatcher.
 main :: IO ()
