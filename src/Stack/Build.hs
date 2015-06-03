@@ -856,6 +856,7 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconf
            if exists
                then runTestSuite
                         menv
+                        bopts
                         (if singularBuild then Nothing else Just logPath)
                         pkgRoot
                         exeName
@@ -916,17 +917,19 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconf
 -- | Run a single test suite
 runTestSuite :: MonadIO m
              => EnvOverride
+             -> BuildOpts
              -> Maybe (Path Abs File) -- ^ optional log file, otherwise use console
              -> Path Abs Dir -- ^ working directory
              -> Path Abs File -- ^ executable
              -> m ()
-runTestSuite menv mlogFile pkgRoot fp = liftIO $ do
+runTestSuite menv bopts mlogFile pkgRoot fp = liftIO $ do
     case mlogFile of
         Nothing -> go Inherit
         Just logFile -> withBinaryFile (toFilePath logFile) AppendMode $ go . UseHandle
   where
+    args = map T.unpack $ boptsTestArgs bopts
     go outerr = do
-        (Just stdin', Nothing, Nothing, ph) <- createProcess (proc (toFilePath fp) [])
+        (Just stdin', Nothing, Nothing, ph) <- createProcess (proc (toFilePath fp) args)
             { cwd = Just $ toFilePath pkgRoot
             , Process.env = envHelper menv
             , std_in = CreatePipe
