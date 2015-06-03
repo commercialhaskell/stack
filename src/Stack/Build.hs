@@ -407,6 +407,7 @@ installDependencies cabalPkgVer bopts deps' = do
                            bopts
                            bconfig
                            BTDeps
+                           0 -- no wanted locals while building deps
                            gconfig
                            packages
                            package
@@ -481,6 +482,7 @@ buildLocals bopts packagesToInstall packagesToRemove = do
                                    bopts
                                    (getBuildConfig env)
                                    BTLocals
+                                   (length $ filter (== Wanted) $ Map.elems packagesToInstall)
                                    gconfig
                                    (M.keysSet packagesToInstall)
                                    package
@@ -589,6 +591,7 @@ makePlan :: Manager
          -> BuildOpts
          -> BuildConfig
          -> BuildType
+         -> Int -- ^ number of wanted locals
          -> GenConfig
          -> Set Package
          -> Package
@@ -598,7 +601,7 @@ makePlan :: Manager
          -> MVar ConfigLock
          -> (PkgDepsOracle -> Action [PackageIdentifier])
          -> Rules ()
-makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig packages package installResource configureResource docLoc cfgVar getPkgDeps = do
+makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType wantedLocals gconfig packages package installResource configureResource docLoc cfgVar getPkgDeps = do
     configureTarget <-
         either throw return $
         liftM FL.toFilePath
@@ -652,6 +655,8 @@ makePlan mgr logLevel cabalPkgVer pkgIds wanted bopts bconfig buildType gconfig 
                  bopts
                  bconfig
                  setuphs
+                 wanted
+                 wantedLocals
                  buildType
                  packages
                  package
@@ -814,6 +819,8 @@ buildPackage :: MonadAction m
              -> BuildOpts
              -> BuildConfig
              -> Path Abs File -- ^ Setup.hs file
+             -> Wanted
+             -> Int -- ^ number of wanted locals
              -> BuildType
              -> Set Package
              -> Package
@@ -822,11 +829,25 @@ buildPackage :: MonadAction m
              -> Resource
              -> Path Abs Dir
              -> m ()
-buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconfig setupAction installResource _docLoc =
+buildPackage cabalPkgVer bopts bconfig setuphs wanted wantedLocals buildType _packages package gconfig setupAction installResource _docLoc =
   do logPath <- liftIO $ runReaderT (buildLogPath package) bconfig
      liftIO (void (try (removeFile (FL.toFilePath logPath)) :: IO (Either IOException ())))
      let runhaskell' live = runhaskell live cabalPkgVer package setuphs bconfig buildType
-         singularBuild = S.size (bcPackages bconfig) == 1 && packageType package == PTUser
+         -- The purpose of singularBuild is to say whether we should print
+         -- build output to the console (as opposed to a log file). The
+         -- goal is to only do so when building a single local target
+         -- package. The semantics are:
+         --
+         -- * Is there only one wanted local package? If so, we know that
+         -- package will be the last one to be built, so we know its output
+         -- won't end up interleaved with other builds
+         --
+         -- * Is it a user package? We never print information on dependencies
+         --
+         -- * Is this the wanted package? We don't want to print information
+         -- on one of the local packages that was just pulled in as a
+         -- dependency of the current target
+         singularBuild = wantedLocals == 1 && packageType package == PTUser && wanted == Wanted
      runhaskell'
        singularBuild
        (concat [["build"]
