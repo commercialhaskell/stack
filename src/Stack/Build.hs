@@ -859,6 +859,8 @@ buildPackage cabalPkgVer bopts bconfig setuphs buildType _packages package gconf
                         (if singularBuild then Nothing else Just logPath)
                         pkgRoot
                         exeName
+                        package
+                        testName
                else $logInfo $ T.concat
                     [ "Test suite "
                     , testName
@@ -919,14 +921,35 @@ runTestSuite :: (MonadIO m, MonadLogger m)
              -> Maybe (Path Abs File) -- ^ optional log file, otherwise use console
              -> Path Abs Dir -- ^ working directory
              -> Path Abs File -- ^ executable
+             -> Package
+             -> Text -- ^ test name
              -> m ()
-runTestSuite menv mlogFile pkgRoot fp = do
-    case mlogFile of
-        Nothing -> do
-            $logInfo $ "Running test suite " <> T.pack (toFilePath fp)
-            liftIO $ go Inherit
-        Just logFile -> liftIO $ withBinaryFile (toFilePath logFile) AppendMode $ go . UseHandle
+runTestSuite menv mlogFile pkgRoot fp package testName = do
+    $logInfo display
+    ec <- liftIO $ case mlogFile of
+        Nothing -> go Inherit
+        Just logFile -> withBinaryFile (toFilePath logFile) AppendMode $ go . UseHandle
+    case ec of
+        ExitSuccess -> return ()
+        _ -> do
+            $logError $ T.concat
+                [ display
+                , ": ERROR"
+                , case mlogFile of
+                    Nothing -> ""
+                    Just logFile -> T.concat
+                        [ " (see "
+                        , T.pack $ toFilePath logFile
+                        , ")"
+                        ]
+                ]
+            liftIO $ throwM $ TestSuiteFailure fp mlogFile ec
   where
+    display = T.concat
+        [ packageIdentifierText $ packageIdentifier package
+        , ": test "
+        , testName
+        ]
     go outerr = do
         (Just stdin', Nothing, Nothing, ph) <- createProcess (proc (toFilePath fp) [])
             { cwd = Just $ toFilePath pkgRoot
@@ -936,10 +959,7 @@ runTestSuite menv mlogFile pkgRoot fp = do
             , std_err = outerr
             }
         hClose stdin'
-        ec <- waitForProcess ph
-        case ec of
-            ExitSuccess -> return ()
-            _ -> throwM $ TestSuiteFailure fp mlogFile ec
+        waitForProcess ph
 
 -- | Run the Haskell command for the given package.
 runhaskell :: (HasBuildConfig config,MonadAction m)
