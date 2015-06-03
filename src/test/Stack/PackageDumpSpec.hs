@@ -77,6 +77,7 @@ spec = do
                 , dpDepends = depends
                 , dpLibraries = ["HShaskell2010-1.1.2.0"]
                 , dpProfiling = ()
+                , dpExtra = ()
                 }
 
         it "ghc 7.10" $ do
@@ -107,6 +108,7 @@ spec = do
                 , dpDepends = depends
                 , dpLibraries = ["HSghc-7.10.1-EMlWrQ42XY0BNVbSrKixqY"]
                 , dpProfiling = ()
+                , dpExtra = ()
                 }
 
     it "ghcPkgDump + addProfiling" $ (id :: IO () -> IO ()) $ runNoLoggingT $ do
@@ -142,7 +144,7 @@ spec = do
                     , ((3, 'a'), [(1, 'c')])
                     , ((4, 'a'), [(2, 'a')])
                     ]
-                actual = pruneDeps fst fst snd bestPrune prunes
+                actual = fmap fst $ pruneDeps fst fst snd bestPrune prunes
             actual `shouldBe` Map.fromList
                 [ (1, (1, 'b'))
                 , (2, (2, 'a'))
@@ -150,7 +152,7 @@ spec = do
                 ]
 
         prop "invariant holds" $ \prunes ->
-            checkDepsPresent prunes $ pruneDeps fst fst snd bestPrune prunes
+            checkDepsPresent prunes $ fmap fst $ pruneDeps fst fst snd bestPrune prunes
 
 type PruneCheck = ((Int, Char), [(Int, Char)])
 

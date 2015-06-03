@@ -89,23 +89,24 @@ pruneDeps
     -> (item -> [id]) -- ^ get the dependencies of an item
     -> (item -> item -> item) -- ^ choose the desired of two possible items
     -> [item] -- ^ input items
-    -> Map name id
+    -> Map name item
 pruneDeps getName getId getDepends chooseBest =
       Map.fromList
-    . (map $ \gid -> (getName gid, gid))
-    . Set.toList
-    . loop Set.empty Set.empty
+    . (map $ \item -> (getName $ getId item, item))
+    . loop Set.empty Set.empty []
   where
-    loop foundIds usedNames dps =
+    loop foundIds usedNames foundItems dps =
         case partitionEithers $ map depsMet dps of
-            ([], _) -> foundIds
+            ([], _) -> foundItems
             (s', dps') ->
                 let foundIds' = Map.fromListWith chooseBest s'
                     foundIds'' = Set.fromList $ map getId $ Map.elems foundIds'
                     usedNames' = Map.keysSet foundIds'
+                    foundItems' = Map.elems foundIds'
                  in loop
                         (Set.union foundIds foundIds'')
                         (Set.union usedNames usedNames')
+                        (foundItems ++ foundItems')
                         (catMaybes dps')
       where
         depsMet dp
@@ -121,7 +122,7 @@ pruneDeps getName getId getDepends chooseBest =
 sinkMatching :: Monad m
              => Bool -- ^ require profiling?
              -> Map PackageName Version -- ^ allowed versions
-             -> Consumer (DumpPackage Bool) m (Map PackageName GhcPkgId)
+             -> Consumer (DumpPackage Bool extra) m (Map PackageName (DumpPackage Bool extra))
 sinkMatching reqProfiling allowed = do
     dps <- CL.filter (\dp -> isAllowed (dpGhcPkgId dp) && (not reqProfiling || dpProfiling dp))
        =$= CL.consume
@@ -142,7 +143,7 @@ sinkMatching reqProfiling allowed = do
 -- | Add profiling information to the stream of @DumpPackage@s
 addProfiling :: MonadIO m
              => ProfilingCache
-             -> Conduit (DumpPackage a) m (DumpPackage Bool)
+             -> Conduit (DumpPackage a extra) m (DumpPackage Bool extra)
 addProfiling (ProfilingCache ref) =
     CL.mapM go
   where
@@ -173,12 +174,13 @@ isProfiling content lib =
     prefix = S.concat ["lib", lib, "_p"]
 
 -- | Dump information for a single package
-data DumpPackage profiling = DumpPackage
+data DumpPackage profiling extra = DumpPackage
     { dpGhcPkgId :: !GhcPkgId
     , dpLibDirs :: ![ByteString]
     , dpLibraries :: ![ByteString]
     , dpDepends :: ![GhcPkgId]
     , dpProfiling :: !profiling
+    , dpExtra :: extra
     }
     deriving (Show, Eq, Ord)
 
@@ -191,7 +193,7 @@ instance Exception PackageDumpException
 
 -- | Convert a stream of bytes into a stream of @DumpPackage@s
 conduitDumpPackage :: MonadThrow m
-                   => Conduit ByteString m (DumpPackage ())
+                   => Conduit ByteString m (DumpPackage () ())
 conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
     pairs <- eachPair (\k -> (k, ) <$> CL.consume) =$= CL.consume
     let m = Map.fromList pairs
@@ -233,6 +235,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 , dpLibraries = S8.words $ S8.unwords libraries
                 , dpDepends = catMaybes (depends :: [Maybe GhcPkgId])
                 , dpProfiling = ()
+                , dpExtra = ()
                 }
 
 stripPrefixBS :: ByteString -> ByteString -> Maybe ByteString

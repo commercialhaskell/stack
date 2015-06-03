@@ -375,6 +375,10 @@ configProjectWorkDir = do
     bc <- asks getBuildConfig
     return (bcRoot bc </> $(mkRelDir ".stack-work"))
 
+-- | File containing the profiling cache, see "Stack.PackageDump"
+configProfilingCache :: (HasBuildConfig env, MonadReader env m) => m (Path Abs File)
+configProfilingCache = liftM (</> $(mkRelFile "profiling-cache.bin")) configProjectWorkDir
+
 -- | Relative directory for the platform identifier
 platformRelDir :: (MonadReader env m, HasPlatform env, MonadThrow m) => m (Path Rel Dir)
 platformRelDir = asks getPlatform >>= parseRelDir . Distribution.Text.display
