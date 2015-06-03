@@ -161,9 +161,8 @@ main =
      run level
 
 pathCmd :: PathArg -> GlobalOpts -> IO ()
-pathCmd pathArg GlobalOpts{..} = do
-  manager <- newTLSManager
-  lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
+pathCmd pathArg go@GlobalOpts{..} = do
+  (manager,lc) <- loadConfigWithOpts go
   buildConfig <- runStackLoggingT manager globalLogLevel (lcLoadBuildConfig lc)
   runStackT manager globalLogLevel buildConfig (pathString pathArg) >>= putStrLn
 
@@ -193,9 +192,8 @@ pluginShouldHaveRun _plugin _globalOpts = do
 
 
 setupCmd :: GlobalOpts -> IO ()
-setupCmd GlobalOpts{..} = do
-  manager <- newTLSManager
-  lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
+setupCmd go@GlobalOpts{..} = do
+  (manager,lc) <- loadConfigWithOpts go
   Docker.rerunWithOptionalContainer
     (lcConfig lc)
     (lcProjectRoot lc)
@@ -205,9 +203,8 @@ setupCmd GlobalOpts{..} = do
         return ())
 
 cleanCmd :: () -> GlobalOpts -> IO ()
-cleanCmd _ GlobalOpts{..} = do
-  manager <- newTLSManager
-  lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
+cleanCmd _ go@GlobalOpts{..} = do
+  (manager,lc) <- loadConfigWithOpts go
   Docker.rerunWithOptionalContainer
     (lcConfig lc)
     (lcProjectRoot lc)
@@ -218,9 +215,8 @@ cleanCmd _ GlobalOpts{..} = do
 
 -- | Install dependencies
 depsCmd :: ([PackageName], Bool) -> GlobalOpts -> IO ()
-depsCmd (names, dryRun) GlobalOpts{..} = do
-    manager <- newTLSManager
-    lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
+depsCmd (names, dryRun) go@GlobalOpts{..} = do
+    (manager,lc) <- loadConfigWithOpts go
     Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $ do
         config <- runStackLoggingT manager globalLogLevel
             (lcLoadBuildConfig lc >>= setupEnv False manager)
@@ -244,10 +240,9 @@ readPackageName = do
 
 -- | Build the project.
 buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
-buildCmd finalAction opts GlobalOpts{..} =
+buildCmd finalAction opts go@GlobalOpts{..} =
   catch
-  (do manager <- newTLSManager
-      lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
+  (do (manager,lc) <- loadConfigWithOpts go
       Docker.rerunWithOptionalContainer
         (lcConfig lc)
         (lcProjectRoot lc)
@@ -345,9 +340,8 @@ buildCmd finalAction opts GlobalOpts{..} =
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
-unpackCmd names GlobalOpts{..} = do
-    manager <- newTLSManager
-    lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
+unpackCmd names go@GlobalOpts{..} = do
+    (manager,lc) <- loadConfigWithOpts go
     Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $ do
         runStackT manager globalLogLevel (lcConfig lc) $ do
             menv <- getMinimalEnvOverride
@@ -355,18 +349,16 @@ unpackCmd names GlobalOpts{..} = do
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()
-updateCmd () GlobalOpts{..} = do
-    manager <- newTLSManager
-    lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
+updateCmd () go@GlobalOpts{..} = do
+    (manager,lc) <- loadConfigWithOpts go
     Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $
         runStackT manager globalLogLevel (lcConfig lc) $
             getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
 
 -- | Execute a command
 execCmd :: (String, [String]) -> GlobalOpts -> IO ()
-execCmd (cmd, args) GlobalOpts{..} = do
-    manager <- newTLSManager
-    lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
+execCmd (cmd, args) go@GlobalOpts{..} = do
+    (manager,lc) <- loadConfigWithOpts go
     Docker.rerunWithOptionalContainer
       (lcConfig lc)
       (lcProjectRoot lc)
@@ -388,33 +380,29 @@ execCmd (cmd, args) GlobalOpts{..} = do
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
-dockerPullCmd _ GlobalOpts{..} =
+dockerPullCmd _ go@GlobalOpts{..} =
   Docker.preventInContainer
-    (do manager <- newTLSManager
-        lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
+    (do (_,lc) <- loadConfigWithOpts go
         Docker.pull (configDocker (lcConfig lc)))
 
 -- | Reset the Docker sandbox.
 dockerResetCmd :: Bool -> GlobalOpts -> IO ()
-dockerResetCmd keepHome GlobalOpts{..} =
+dockerResetCmd keepHome go@GlobalOpts{..} =
   Docker.preventInContainer
-    (do manager <- newTLSManager
-        lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
+    (do (_,lc) <- loadConfigWithOpts go
         Docker.reset (lcProjectRoot lc) keepHome)
 
 -- | Cleanup Docker images and containers.
 dockerCleanupCmd :: Docker.CleanupOpts -> GlobalOpts -> IO ()
-dockerCleanupCmd cleanupOpts GlobalOpts{..} =
+dockerCleanupCmd cleanupOpts go@GlobalOpts{..} =
   Docker.preventInContainer
-    (do manager <- newTLSManager
-        lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
+    (do (_,lc) <- loadConfigWithOpts go
         Docker.cleanup (lcConfig lc) cleanupOpts)
 
 -- | Execute a command
 dockerExecCmd :: (String, [String]) -> GlobalOpts -> IO ()
-dockerExecCmd cmdArgs GlobalOpts{..} = do
-    manager <- newTLSManager
-    lc <- runStackLoggingT manager globalLogLevel (loadConfig globalConfigMonoid)
+dockerExecCmd cmdArgs go@GlobalOpts{..} = do
+    (_,lc) <- loadConfigWithOpts go
     Docker.preventInContainer
       (Docker.rerunCmdWithRequiredContainer (lcConfig lc) (lcProjectRoot lc) (return cmdArgs))
 
@@ -534,3 +522,14 @@ data GlobalOpts = GlobalOpts
     { globalLogLevel     :: LogLevel -- ^ Log level
     , globalConfigMonoid :: ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     } deriving (Show)
+
+-- | Load the configuration with a manager. Convenience function used
+-- throughout this module.
+loadConfigWithOpts :: GlobalOpts -> IO (Manager,LoadConfig (StackLoggingT IO))
+loadConfigWithOpts GlobalOpts{..} = do
+    manager <- newTLSManager
+    lc <- runStackLoggingT
+              manager
+              globalLogLevel
+              (loadConfig globalConfigMonoid)
+    return (manager,lc)
