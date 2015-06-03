@@ -177,8 +177,12 @@ setupEnv installIfMissing manager bconfig = do
                                 then intercalate [searchPathSeparator]
                                         [ toFilePath localdb
                                         , toFilePath deps
+                                        , ""
                                         ]
-                                else toFilePath deps)
+                                else intercalate [searchPathSeparator]
+                                        [ toFilePath deps
+                                        , ""
+                                        ])
                         $ env0
                     !() <- atomicModifyIORef envRef $ \m' ->
                         (Map.insert es eo m', ())
