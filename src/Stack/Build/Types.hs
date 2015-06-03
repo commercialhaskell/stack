@@ -57,6 +57,7 @@ data BuildOpts =
             ,boptsFinalAction :: !FinalAction
             ,boptsDryrun :: !Bool
             ,boptsGhcOptions :: ![Text]
+            ,boptsTestArgs :: ![Text]
             }
   deriving (Show)
 

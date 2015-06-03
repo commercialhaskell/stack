@@ -232,6 +232,7 @@ depsCmd (names, dryRun) GlobalOpts{..} = do
             , boptsFinalAction = DoNothing
             , boptsDryrun = dryRun
             , boptsGhcOptions = []
+            , boptsTestArgs = []
             }
 
 -- | Parser for package names
@@ -421,7 +422,7 @@ dockerExecCmd cmdArgs GlobalOpts{..} = do
 -- | Parser for build arguments.
 buildOpts :: Parser BuildOpts
 buildOpts = BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
-            optimize <*> finalAction <*> dryRun <*> ghcOpts
+            optimize <*> finalAction <*> dryRun <*> ghcOpts <*> testArgs
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies"
         target =
@@ -445,6 +446,12 @@ buildOpts = BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
                      (strOption (long "ghc-options" <>
                                  metavar "OPTION" <>
                                  help "Additional options passed to GHC")))
+
+        testArgs =
+          many (fmap T.pack
+                     (strOption (long "test-args" <>
+                                 metavar "ARGUMENT" <>
+                                 help "Command line arguments to pass to the test suites")))
 
 -- | Parser for docker cleanup arguments.
 dockerCleanupOpts :: Parser Docker.CleanupOpts
