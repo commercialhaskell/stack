@@ -26,6 +26,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (asks, runReaderT)
 import           Control.Monad.Trans.Resource
+import           Control.Monad.State.Strict
 import           Control.Monad.Writer
 import           Data.Aeson
 import qualified Data.ByteString as S
@@ -224,11 +225,128 @@ loadDatabase menv pcache allowed banned profiling loc mdb available = do
 
     dpToItem dp = (dpGhcPkgId dp, (loc, dpDepends dp))
 
+data Task = Task
+    { taskProvides :: !PackageIdentifier
+    , taskRequiresMissing :: !(Set PackageIdentifier)
+    , taskRequiresPresent :: !(Set GhcPkgId)
+    , taskWanted :: !Bool
+    }
+    deriving Show
+
+data S = S
+    { visited :: !(Map PackageName Version)
+    , tasks :: ![Task]
+    , failures :: !(Set Text)
+    }
+
 constructPlan :: M env m
               => [LocalPackage]
+              -> Map PackageName MiniPackageInfo
               -> Map PackageName (Version, Location, Installed)
-              -> m ()
-constructPlan locals installed = error "constructPlan"
+              -> m [Task]
+constructPlan locals buildPlan installed = do
+    s <- execStateT (mapM_ goWanted $ filter lpWanted locals) (S M.empty [] Set.empty)
+    if Set.null $ failures s
+        then return $ tasks s
+        else error $ show $ failures s -- FIXME
+  where
+    goWanted = goPackage Local True . lpPackage
+
+    addTask task = modify $ \s -> s { tasks = task : tasks s }
+    addFailure t = modify $ \s -> s { failures = Set.insert t $ failures s }
+
+    withVisited package inner = do
+        s <- get
+        case M.lookup name $ visited s of
+            Nothing -> do
+                put s { visited = M.insert name version $ visited s }
+                inner
+            Just _ -> return ()
+      where
+        name = packageName package
+        version = packageVersion package
+
+    goPackage location wanted package = withVisited package $ do
+        res <- forM (M.toList $ packageDeps package) $ \(depname, deprange) -> do
+            let checkVersionLoc depversion deploc
+                    | depversion `withinRange` deprange = return ()
+                    -- FIXME check that the location matches what we need
+                    | otherwise = addFailure $ T.pack $ concat
+                        [ packageNameString $ packageName package
+                        , " depends on "
+                        , packageNameString depname
+                        , " ("
+                        , show deprange
+                        , "), but "
+                        , versionString depversion
+                        , " is available"
+                        ]
+
+            case Map.lookup depname installed of
+                Just (depversion, deploc, inst) -> do
+                    checkVersionLoc depversion deploc
+                    return $ case inst of
+                        Library gid -> Just $ Left gid
+                        Executable -> Nothing
+                Nothing -> do
+                    mdep <- findDep depname
+                    case mdep of
+                    {-
+                        Nothing -> do
+                            addFailure $ T.pack $ concat
+                                [ packageNameString $ packageName package
+                                , " depends on "
+                                , packageNameString depname
+                                , ", but it wasn't found"
+                                ]
+                            return Nothing
+                            -}
+                        FDRFound gid deploc -> do
+                            checkVersionLoc (packageIdentifierVersion $ ghcPkgIdPackageIdentifier gid) deploc
+                            return $ Just $ Left gid
+                        FDRToInstall depversion deploc -> do
+                            checkVersionLoc depversion deploc
+                            return $ Just $ Right $ PackageIdentifier depname depversion
+        let (gids, idents) = partitionEithers $ catMaybes res
+        addTask Task
+            { taskProvides = PackageIdentifier (packageName package) (packageVersion package)
+            , taskRequiresMissing = Set.fromList idents
+            , taskRequiresPresent = Set.fromList gids
+            , taskWanted = wanted
+            }
+
+    localMap = Map.fromList $ map (packageName . lpPackage &&& id) locals
+    findDep name =
+        case Map.lookup name localMap of
+            Just lp -> do
+                -- FIXME check if installed and not dirty. If so, return the
+                -- GhcPkgId. Otherwise, call goPackage
+                goPackage Local (lpWanted lp) (lpPackage lp)
+                return $ FDRToInstall (packageVersion $ lpPackage lp) Local
+            Nothing -> do
+                bconfig <- asks getBuildConfig
+                case Map.lookup name $ bcExtraDeps bconfig of
+                    Just version -> addExtra name version
+                    Nothing ->
+                        case Map.lookup name buildPlan of
+                            Nothing -> return FDRNotFound
+                            Just mpi -> addMPI name mpi
+
+    addExtra name version = do
+        -- FIXME load up package information etc
+        addFailure $ "FIXME addExtra " <> T.pack (show (name, version))
+        return $ FDRToInstall version Local
+
+    addMPI name mpi = do
+        addFailure $ "FIXME addMPI " <> T.pack (show (name, mpi))
+        -- FIXME load up package information etc
+        return $ FDRToInstall (mpiVersion mpi) Snap
+
+data FindDepRes
+    = FDRToInstall Version Location
+    | FDRFound GhcPkgId Location
+    | FDRNotFound
+    deriving Show
 
 -- | Build using Shake.
 build :: M env m => BuildOpts -> m ()
@@ -246,7 +364,7 @@ build bopts = do
 
     installed <- getInstalled profiling (fmap mpiVersion inBuildPlan) localNames
 
-    constructPlan locals installed >>= error .show
+    constructPlan locals inBuildPlan installed >>= error .show
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
 
