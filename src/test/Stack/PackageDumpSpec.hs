@@ -10,10 +10,13 @@ import Control.Monad.Trans.Resource (runResourceT)
 import Stack.PackageDump
 import Stack.Types
 import Test.Hspec
+import Test.Hspec.QuickCheck
 import System.Process.Read
 import Control.Monad.Logger
 import Distribution.System (buildPlatform)
 import qualified Data.Map as Map
+import Data.Map (Map)
+import qualified Data.Set as Set
 
 main :: IO ()
 main = hspec spec
@@ -132,26 +135,38 @@ spec = do
     describe "pruneDeps" $ do
         it "sanity check" $ do
             let prunes =
-                    [ PruneCheck (1, 'a') []
-                    , PruneCheck (1, 'b') []
-                    , PruneCheck (2, 'a') [(1, 'b')]
-                    , PruneCheck (2, 'b') [(1, 'a')]
-                    , PruneCheck (3, 'a') [(1, 'c')]
-                    , PruneCheck (4, 'a') [(2, 'a')]
+                    [ ((1, 'a'), [])
+                    , ((1, 'b'), [])
+                    , ((2, 'a'), [(1, 'b')])
+                    , ((2, 'b'), [(1, 'a')])
+                    , ((3, 'a'), [(1, 'c')])
+                    , ((4, 'a'), [(2, 'a')])
                     ]
-                actual = pruneDeps fst pcId pcDeps bestPrune prunes
+                actual = pruneDeps fst fst snd bestPrune prunes
             actual `shouldBe` Map.fromList
                 [ (1, (1, 'b'))
                 , (2, (2, 'a'))
                 , (4, (4, 'a'))
                 ]
 
-data PruneCheck = PruneCheck
-    { pcId :: (Int, Char)
-    , pcDeps :: [(Int, Char)]
-    }
+        prop "invariant holds" $ \prunes ->
+            checkDepsPresent prunes $ pruneDeps fst fst snd bestPrune prunes
+
+type PruneCheck = ((Int, Char), [(Int, Char)])
 
 bestPrune :: PruneCheck -> PruneCheck -> PruneCheck
 bestPrune x y
-    | pcId x > pcId y = x
+    | fst x > fst y = x
     | otherwise = y
+
+checkDepsPresent :: [PruneCheck] -> Map Int (Int, Char) -> Bool
+checkDepsPresent prunes selected =
+    all hasDeps $ Set.toList allIds
+  where
+    depMap = Map.fromList prunes
+    allIds = Set.fromList $ Map.elems selected
+
+    hasDeps ident =
+        case Map.lookup ident depMap of
+            Nothing -> error "checkDepsPresent: missing in depMap"
+            Just deps -> Set.null $ Set.difference (Set.fromList deps) allIds
