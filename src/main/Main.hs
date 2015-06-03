@@ -20,6 +20,7 @@ import           Data.Monoid
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Distribution.Text (display)
+import           Network.HTTP.Client
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Simple
 import           Options.Applicative.Types (readerAsk)
@@ -51,12 +52,14 @@ main =
   do plugins <- findPlugins "stack"
      tryRunPlugin plugins
      Docker.checkVersions
+     manager <- newTLSManager
+     lc <- runStackLoggingT manager LevelWarn (loadConfig mempty)
      (level,run) <-
        simpleOptions
          $(simpleVersion Meta.version)
          "stack - The Haskell Tool Stack"
          ""
-         globalOpts
+         (globalOpts (dockerEnable (configDocker (lcConfig lc))))
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
@@ -480,11 +483,11 @@ dockerCleanupOpts =
         toDescr = map (\c -> if c == '-' then ' ' else c)
 
 -- | Parser for global command-line options.
-globalOpts :: Parser GlobalOpts
-globalOpts =
+globalOpts :: Bool -> Parser GlobalOpts
+globalOpts docker =
     GlobalOpts
     <$> logLevelOpt
-    <*> configOptsParser
+    <*> configOptsParser docker
 
 -- | Parse for a logging level.
 logLevelOpt :: Parser LogLevel
