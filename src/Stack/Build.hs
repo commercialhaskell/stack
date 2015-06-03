@@ -230,7 +230,12 @@ data Task = Task
     , taskRequiresMissing :: !(Set PackageIdentifier)
     , taskRequiresPresent :: !(Set GhcPkgId)
     , taskWanted :: !Bool
+    , taskLocation :: !Location
+    , taskType :: !TaskType
     }
+    deriving Show
+
+data TaskType = TTPackage Package | TTMPI MiniPackageInfo
     deriving Show
 
 data S = S
@@ -255,23 +260,34 @@ constructPlan locals buildPlan installed = do
     addTask task = modify $ \s -> s { tasks = task : tasks s }
     addFailure t = modify $ \s -> s { failures = Set.insert t $ failures s }
 
-    withVisited package inner = do
+    withVisited package = withVisited'
+        (packageName package)
+        (packageVersion package)
+
+    withVisited' name version inner = do
         s <- get
         case M.lookup name $ visited s of
             Nothing -> do
                 put s { visited = M.insert name version $ visited s }
                 inner
             Just _ -> return ()
-      where
-        name = packageName package
-        version = packageVersion package
 
     goPackage location wanted package = withVisited package $ do
         res <- forM (M.toList $ packageDeps package) $ \(depname, deprange) -> do
-            let checkVersionLoc depversion deploc
-                    | depversion `withinRange` deprange = return ()
-                    -- FIXME check that the location matches what we need
-                    | otherwise = addFailure $ T.pack $ concat
+            let checkVersionLoc depversion deploc = do
+                    case (location, deploc) of
+                        (Global, _) -> error $ "goPackage should never be called with Global"
+                        (Snap, Local) -> addFailure $ T.pack $ concat
+                            [ packageNameString $ packageName package
+                            , " is in the snapshot database, but depends on "
+                            , packageNameString depname
+                            , " in the local database. Recommendation: add the following to extra-deps: - "
+                            , packageNameString depname
+                            , "-"
+                            , versionString depversion
+                            ]
+                        (_, _) -> return ()
+                    unless (depversion `withinRange` deprange) $ addFailure $ T.pack $ concat
                         [ packageNameString $ packageName package
                         , " depends on "
                         , packageNameString depname
@@ -291,8 +307,7 @@ constructPlan locals buildPlan installed = do
                 Nothing -> do
                     mdep <- findDep depname
                     case mdep of
-                    {-
-                        Nothing -> do
+                        FDRNotFound -> do
                             addFailure $ T.pack $ concat
                                 [ packageNameString $ packageName package
                                 , " depends on "
@@ -300,7 +315,6 @@ constructPlan locals buildPlan installed = do
                                 , ", but it wasn't found"
                                 ]
                             return Nothing
-                            -}
                         FDRFound gid deploc -> do
                             checkVersionLoc (packageIdentifierVersion $ ghcPkgIdPackageIdentifier gid) deploc
                             return $ Just $ Left gid
@@ -313,6 +327,8 @@ constructPlan locals buildPlan installed = do
             , taskRequiresMissing = Set.fromList idents
             , taskRequiresPresent = Set.fromList gids
             , taskWanted = wanted
+            , taskLocation = location
+            , taskType = TTPackage package
             }
 
     localMap = Map.fromList $ map (packageName . lpPackage &&& id) locals
@@ -338,9 +354,21 @@ constructPlan locals buildPlan installed = do
         return $ FDRToInstall version Local
 
     addMPI name mpi = do
-        addFailure $ "FIXME addMPI " <> T.pack (show (name, mpi))
-        -- FIXME load up package information etc
-        return $ FDRToInstall (mpiVersion mpi) Snap
+        s <- get
+        case Map.lookup name $ visited s of
+            Just v -> return $ FDRToInstall v Snap
+            Nothing -> do
+                put $ s { visited = Map.insert name (mpiVersion mpi) $ visited s }
+                (missing, present) <- liftM partitionEithers $ return [] -- FIXME
+                addTask Task
+                    { taskProvides = PackageIdentifier name $ mpiVersion mpi
+                    , taskRequiresMissing = Set.fromList missing
+                    , taskRequiresPresent = Set.fromList present
+                    , taskWanted = False
+                    , taskLocation = Snap
+                    , taskType = TTMPI mpi
+                    }
+                return $ FDRToInstall (mpiVersion mpi) Snap
 
 data FindDepRes
     = FDRToInstall Version Location
