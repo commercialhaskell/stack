@@ -152,6 +152,7 @@ executable stack
                 , hashable
                 , conduit
                 , transformers
+                , http-client
   default-language:    Haskell2010
 
 test-suite stack-test
