@@ -2,7 +2,13 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 module Network.HTTP.Download
-    ( download
+    ( verifiedDownload
+    , DownloadRequest(..)
+    , HashCheck(..)
+    , LengthCheck
+    , VerifiedDownloadException(..)
+
+    , download
     , redownload
     , downloadJSON
     , parseUrl
@@ -36,6 +42,7 @@ import           Network.HTTP.Client.Conduit (HasHttpManager, Manager, Request,
                                               requestHeaders, responseBody,
                                               responseHeaders, responseStatus,
                                               withResponse)
+import           Network.HTTP.Download.Verified
 import           Network.HTTP.Types          (status200, status304)
 import           Path                        (Abs, File, Path, parent,
                                               toFilePath)
@@ -56,24 +63,33 @@ import           System.IO                   (IOMode (WriteMode),
 download :: (MonadReader env m, HasHttpManager env, MonadIO m)
          => Request
          -> Path Abs File -- ^ destination
-         -> m ()
+         -> m Bool -- ^ Was a downloaded performed (True) or did the file already exist (False)?
 download req destpath = do
-    env <- ask
-    liftIO $ unlessM (doesFileExist fp) $ do
-        createDirectoryIfMissing True dir
-        withBinaryFile fptmp WriteMode $ \h ->
-            flip runReaderT env $
-            withResponse req $ \res ->
-            responseBody res $$ sinkHandle h
-        renameFile fptmp fp
-  where
-    unlessM mp m = do
-        p <- mp
-        if p then return () else m
+    let downloadReq = DownloadRequest
+            { drRequest = req
+            , drHashChecks = []
+            , drLengthCheck = Nothing
+            }
+    let progressHook = return ()
+    verifiedDownload downloadReq destpath progressHook
 
-    fp = toFilePath destpath
-    fptmp = fp <.> "tmp"
-    dir = toFilePath $ parent destpath
+  --  env <- ask
+  --  liftIO $ unlessM (doesFileExist fp) $ do
+  --      createDirectoryIfMissing True dir
+  --      withBinaryFile fptmp WriteMode $ \h ->
+  --          flip runReaderT env $
+  --          withResponse req $ \res ->
+  --          responseBody res $$ sinkHandle h
+  --      renameFile fptmp fp
+  --where
+  --  unlessM mp m = do
+  --      p <- mp
+  --      if p then return () else m
+
+  --  fp = toFilePath destpath
+  --  fptmp = fp <.> "tmp"
+  --  dir = toFilePath $ parent destpath
+
 
 -- | Same as 'download', but will download a file a second time if it is already present.
 --
