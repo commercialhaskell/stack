@@ -3,7 +3,7 @@ GIT_REV_COUNT := $(shell git rev-list HEAD --count)
 GIT_SHA := $(shell PAGER=cat git log --pretty=%h HEAD~1..HEAD|head -n1)
 UBUNTU_VERSION ?= 15.04
 
-default: target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)_amd64.deb
+default: deb
 
 target/ubuntu-$(UBUNTU_VERSION):
 	@mkdir -p target/ubuntu-$(UBUNTU_VERSION)
@@ -17,7 +17,9 @@ target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)
 	@docker build --rm=false --tag=stack-$(UBUNTU_VERSION):$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA) .
 	@docker run --rm -v target/ubuntu-$(UBUNTU_VERSION):/mnt stack-$(UBUNTU_VERSION):$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)
 
+deb: | target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)_amd64.deb
+
 clean:
 	@rm -rf Dockerfile target
 
-.PHONY: clean default
+.PHONY: clean deb default
