@@ -730,6 +730,10 @@ constructPlan mbp baseConfigOpts locals locallyRegistered sourceMap = do
             let missing = Set.fromList $ mapMaybe toMissing adrs
                 present = Set.fromList $ mapMaybe toPresent adrs
                 configOpts = configureOpts baseConfigOpts present (lpWanted lp) Local (packageFlags $ lpPackage lp)
+                mlocalGID =
+                    case fmap Set.toList $ Map.lookup name localMap of
+                        Just [gid] -> Just gid
+                        _ -> Nothing
                 dres | not $ Set.null missing = Dirty AllSteps
                      | otherwise =
                         case lpLastConfigOpts lp of
@@ -743,13 +747,16 @@ constructPlan mbp baseConfigOpts locals locallyRegistered sourceMap = do
                                 -- add an extra flag to indicate "no need to
                                 -- build".
                                 | lpWanted lp && bcoFinalAction baseConfigOpts `elem`
-                                    [DoTests, DoBenchmarks] -> Dirty JustFinal
+                                    [DoTests, DoBenchmarks] ->
+                                        case mlocalGID of
+                                            Just _ -> Dirty JustFinal
+                                            Nothing -> Dirty SkipConfig
 
                                 | not $ packageHasLibrary p -> CleanExecutable
                                 | otherwise ->
-                                    case fmap Set.toList $ Map.lookup name localMap of
-                                        Just [gid] -> CleanLibrary gid
-                                        _ -> Dirty SkipConfig
+                                    case mlocalGID of
+                                        Just gid -> CleanLibrary gid
+                                        Nothing -> Dirty SkipConfig
             -- TODO probably need to cache results of calls to addLocal in S, possibly all of addDep
             case dres of
                 Dirty needConfig -> addTask Task
