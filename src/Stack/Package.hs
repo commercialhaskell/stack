@@ -15,7 +15,6 @@ module Stack.Package
   ,resolvePackage
   ,getCabalFileName
   ,Package(..)
-  ,PackageType(..)
   ,PackageConfig(..)
   ,buildLogPath
   ,configureLogPath
@@ -98,7 +97,6 @@ data Package =
           ,packageTools :: ![Dependency]                  -- ^ A build tool name.
           ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
           ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
-          ,packageType :: !PackageType
           ,packageHasLibrary :: !Bool                     -- ^ does the package have a buildable library stanza?
           ,packageTests :: !(Set Text)                    -- ^ names of test suites
           }
@@ -110,10 +108,6 @@ packageIdentifier pkg =
     Stack.Types.PackageIdentifier.PackageIdentifier
         (packageName pkg)
         (packageVersion pkg)
-
--- | Is this package a user target package, or a dependency?
-data PackageType = PTUser | PTDep
- deriving (Show,Typeable,Eq)
 
 -- | Package build configuration
 data PackageConfig =
@@ -161,19 +155,17 @@ readPackageUnresolvedBS mcabalfp bs =
 readPackage :: (MonadLogger m, MonadIO m, MonadThrow m)
             => PackageConfig
             -> Path Abs File
-            -> PackageType
             -> m Package
-readPackage packageConfig cabalfp ptype =
-  readPackageUnresolved cabalfp >>= resolvePackage packageConfig cabalfp ptype
+readPackage packageConfig cabalfp =
+  readPackageUnresolved cabalfp >>= resolvePackage packageConfig cabalfp
 
 -- | Resolve a parsed cabal file into a 'Package'.
 resolvePackage :: (MonadLogger m, MonadIO m, MonadThrow m)
                => PackageConfig
                -> Path Abs File
-               -> PackageType
                -> GenericPackageDescription
                -> m Package
-resolvePackage packageConfig cabalfp ptype gpkg = do
+resolvePackage packageConfig cabalfp gpkg = do
      let pkgId =
            package (packageDescription gpkg)
          name = fromCabalPackageName (pkgName pkgId)
@@ -200,7 +192,6 @@ resolvePackage packageConfig cabalfp ptype gpkg = do
                             ,packageFlags = pkgFlags
                             ,packageAllDeps =
                                S.fromList (M.keys deps')
-                            ,packageType = ptype
                             ,packageHasLibrary = maybe
                                 False
                                 (buildable . libBuildInfo)

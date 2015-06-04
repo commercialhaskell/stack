@@ -235,7 +235,6 @@ loadLocals bopts = do
                 , packageConfigPlatform = configPlatform $ getConfig bconfig
                 }
             cabalfp
-            PTUser
         -- FIXME check if name == what's inside pkg
         mdirtyCache <- tryGetDirtyCache dir
         fileModTimes <- getPackageFileModTimes pkg
@@ -742,7 +741,7 @@ constructPlan mbp baseConfigOpts locals locallyRegistered sourceMap = do
                         (PackageIdentifier name version)
                     return $ Left name
 
-    toMissing (ADRToInstall pi _) = Just pi
+    toMissing (ADRToInstall pi' _) = Just pi'
     toMissing _ = Nothing
 
     toPresent (ADRFound gid _) = Just gid
@@ -842,7 +841,7 @@ loadExtraDeps menv cabalPkgVer = do
         let name = packageIdentifierName ident
             flags = fromMaybe M.empty (M.lookup name $ bcFlags bconfig)
             pc = depPackageConfig bconfig flags
-        readPackage pc cabalfp PTDep
+        readPackage pc cabalfp
         -- FIXME confirm that the ident matches with what we just read?
 
 -- | Package config to be used for dependencies
@@ -1051,7 +1050,6 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                             cabalfp <- getCabalFileName dir
                             bconfig <- asks getBuildConfig
                             package <- readPackage (packageConfig bconfig mpi) cabalfp
-                                PTUser -- FIXME I think we can get rid of that field entirely now
                             inner package
                     _ -> error $ "withPackage: invariant violated: " ++ show m
 
