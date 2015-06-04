@@ -22,7 +22,7 @@ import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
-import           Control.Exception
+import           Control.Exception.Lifted
 import           Control.Exception.Enclosed (handleIO)
 import           Control.Monad
 import           Control.Monad.Catch (MonadCatch)
@@ -80,6 +80,7 @@ import           System.Directory hiding (findFiles, findExecutable)
 import           System.Exit (ExitCode (ExitSuccess))
 import           System.IO
 import           System.IO.Temp (withSystemTempDirectory)
+import           System.Process.Internals (createProcess_)
 import           System.Process.Read
 
 -- | Directory containing files to mark an executable as installed
@@ -622,6 +623,8 @@ build bopts = do
             tmpdir' <- parseAbsDir tmpdir
             configLock <- newMVar ()
             idMap <- liftIO $ newTVarIO M.empty
+            let setupHs = tmpdir' </> $(mkRelFile "Setup.hs")
+            liftIO $ writeFile (FL.toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
             executePlan plan ExecuteEnv
                 { eeEnvOverride = menv
                 , eeBuildOpts = bopts
@@ -633,6 +636,7 @@ build bopts = do
                 , eeBaseConfigOpts = baseConfigOpts
                 , eeGhcPkgIds = idMap
                 , eeTempDir = tmpdir'
+                , eeSetupHs = setupHs
                 , eeCabalPkgVer = cabalPkgVer
                 , eeTotalWanted = length $ filter lpWanted locals
                 }
@@ -715,6 +719,7 @@ data ExecuteEnv = ExecuteEnv
     , eeBaseConfigOpts :: !BaseConfigOpts
     , eeGhcPkgIds :: !(TVar (Map PackageIdentifier GhcPkgId))
     , eeTempDir :: !(Path Abs Dir)
+    , eeSetupHs :: !(Path Abs File)
     , eeCabalPkgVer :: !PackageIdentifier
     , eeTotalWanted :: !Int
     }
@@ -760,8 +765,8 @@ singleBuild :: M env m
             -> m ()
 singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
   withPackage $ \package ->
-  withHandles package $ \outH errH ->
-  withCabal outH errH $ \cabal -> do
+  withLogFile package $ \mlogFile ->
+  withCabal package mlogFile $ \cabal -> do
     when needsConfig $ withMVar eeConfigureLock $ \_ -> do
         announce "configure"
         idMap <- liftIO $ readTVarIO eeGhcPkgIds
@@ -776,6 +781,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                 allDeps
                 wanted
                 eeBaseConfigOpts
+        cabal $ "configure" : map T.unpack configOpts
         $logDebug $ T.pack $ show configOpts
 
     announce "build"
@@ -828,13 +834,80 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
 
     packageConfig = error "packageConfig"
 
-    withHandles package inner
-        | console = inner stdout stderr
+    withLogFile package inner
+        | console = inner Nothing
         | otherwise = do
             logPath <- buildLogPath package
-            inner (error $ "withHandles: " ++ show logPath) (error "withHandles2")
+            liftIO $ createDirectoryIfMissing True $ toFilePath $ parent logPath
+            let fp = toFilePath logPath
+            bracket
+                (liftIO $ openBinaryFile fp WriteMode)
+                (liftIO . hClose)
+                $ \h -> inner (Just (fp, h))
 
-    withCabal outH errH inner = inner $ error "withCabal"
+    withCabal package mlogFile inner = do
+        exeName <- liftIO $ join $ findExecutable eeEnvOverride "runhaskell"
+        distRelativeDir' <- distRelativeDir eeCabalPkgVer
+        msetuphs <- liftIO $ getSetupHs $ packageDir package
+        let setuphs = fromMaybe eeSetupHs msetuphs
+        inner $ \args -> do
+            let fullArgs =
+                      ("-package=" ++ packageIdentifierString eeCabalPkgVer)
+                    : "-clear-package-db"
+                    : "-global-package-db"
+                    -- TODO: Perhaps we want to include the snapshot package database here
+                    -- as well
+                    : toFilePath setuphs
+                    : ("--builddir=" ++ toFilePath distRelativeDir')
+                    : args
+                cp0 = proc (toFilePath exeName) fullArgs
+                subEnv =
+                     fmap (filter (\(x, _) -> x /= "GHC_PACKAGE_PATH"))
+                   $ envHelper eeEnvOverride
+                cp = cp0
+                    { cwd = Just $ toFilePath $ packageDir package
+                    , Process.env = subEnv
+                    , std_in = CreatePipe
+                    , std_out =
+                        case mlogFile of
+                            Nothing -> Inherit
+                            Just (_, h) -> UseHandle h
+                    , std_err =
+                        case mlogFile of
+                            Nothing -> Inherit
+                            Just (_, h) -> UseHandle h
+                    }
+            $logDebug $ "Running: " <> T.pack (show $ toFilePath exeName : fullArgs)
+
+            (Just inH, Nothing, Nothing, ph) <- liftIO $ createProcess_ "singleBuild" cp
+            liftIO $ hClose inH
+            ec <- liftIO $ waitForProcess ph
+            case ec of
+                ExitSuccess -> return ()
+                _ -> do
+                    bs <- liftIO $
+                        case mlogFile of
+                            Nothing -> return ""
+                            Just (logFile, h) -> do
+                                hClose h
+                                S.readFile logFile
+                    throwM $ CabalExitedUnsuccessfully
+                        ec
+                        taskProvides
+                        exeName
+                        fullArgs
+                        (fmap fst mlogFile)
+                        bs
+
+data CabalExitedUnsuccessfully = CabalExitedUnsuccessfully
+    ExitCode
+    PackageIdentifier
+    (Path Abs File)
+    [String]
+    (Maybe FilePath)
+    S.ByteString
+    deriving (Show, Typeable)
+instance Exception CabalExitedUnsuccessfully
 
 {- FIXME
     cabalPkgVer <- getMinimalEnvOverride >>= getCabalPkgVer
@@ -1796,19 +1869,6 @@ isTHLoading bs =
     "Loading package " `S8.isPrefixOf` bs &&
     ("done." `S8.isSuffixOf` bs || "done.\r" `S8.isSuffixOf` bs)
 
--- | Ensure Setup.hs exists in the given directory. Returns an action
--- to remove it later.
-ensureSetupHs :: Path Abs Dir -> IO (Path Abs File, IO ())
-ensureSetupHs dir =
-  do exists1 <- doesFileExist (FL.toFilePath fp1)
-     exists2 <- doesFileExist (FL.toFilePath fp2)
-     if exists1 || exists2
-        then return (if exists1 then fp1 else fp2, return ())
-        else do writeFile (FL.toFilePath fp1) "import Distribution.Simple\nmain = defaultMain"
-                return (fp1, removeFile (FL.toFilePath fp1))
-  where fp1 = dir </> $(mkRelFile "Setup.hs")
-        fp2 = dir </> $(mkRelFile "Setup.lhs")
-
 {- EKB FIXME: doc generation for stack-doc-server
 -- | Build the haddock documentation index and contents.
 buildDocIndex :: (Package -> Wanted)
@@ -2189,3 +2249,20 @@ getCabalPkgVer menv = do
 
 clean :: a
 clean = error "clean"
+
+-- | Ensure Setup.hs exists in the given directory. Returns an action
+-- to remove it later.
+getSetupHs :: Path Abs Dir -- ^ project directory
+           -> IO (Maybe (Path Abs File))
+getSetupHs dir = do
+    exists1 <- doesFileExist (FL.toFilePath fp1)
+    if exists1
+        then return $ Just fp1
+        else do
+            exists2 <- doesFileExist (FL.toFilePath fp2)
+            if exists2
+                then return $ Just fp2
+                else return Nothing
+  where
+    fp1 = dir </> $(mkRelFile "Setup.hs")
+    fp2 = dir </> $(mkRelFile "Setup.lhs")
