@@ -18,7 +18,7 @@ RUN echo "Acquire::http { Proxy \"http://$(netstat -nr|grep '^0\.0\.0\.0'|awk '{
 ENV GHCVER=7.8.4
 ENV CABALVER=1.20
 RUN apt-get update
-RUN apt-get install -y python-software-properties
+RUN apt-get install -y python-software-properties software-properties-common
 RUN apt-add-repository -y ppa:hvr/ghc
 RUN apt-get update
 RUN apt-get install -y ghc-$GHCVER cabal-install-$CABALVER zlib1g-dev wget
