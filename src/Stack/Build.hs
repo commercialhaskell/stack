@@ -236,7 +236,12 @@ loadLocals bopts = do
                 , packageConfigPlatform = configPlatform $ getConfig bconfig
                 }
             cabalfp
-        -- FIXME check if name == what's inside pkg
+        when (packageName pkg /= name) $ error $ concat
+            [ "cabal file "
+            , toFilePath cabalfp
+            , " has a mismatched name: "
+            , packageNameString $ packageName pkg
+            ]
         mdirtyCache <- tryGetDirtyCache dir
         fileModTimes <- getPackageFileModTimes pkg
         return LocalPackage
