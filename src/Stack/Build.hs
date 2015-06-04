@@ -1021,12 +1021,12 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                     =$= CL.mapM_ S8.putStrLn
                 | otherwise = CL.iterM S8.putStr =$= sinkHandle h
 
--- | Is this line a Template Haskell "Loading package" line
--- ByteString
-isTHLoading :: S8.ByteString -> Bool
-isTHLoading bs =
-    "Loading package " `S8.isPrefixOf` bs &&
-    ("done." `S8.isSuffixOf` bs || "done.\r" `S8.isSuffixOf` bs)
+ -- | Is this line a Template Haskell "Loading package" line
+ -- ByteString
+ isTHLoading :: S8.ByteString -> Bool
+ isTHLoading bs =
+     "Loading package " `S8.isPrefixOf` bs &&
+     ("done." `S8.isSuffixOf` bs || "done.\r" `S8.isSuffixOf` bs)
         -}
 
         announce "build"
