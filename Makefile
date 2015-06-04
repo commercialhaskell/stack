@@ -19,6 +19,6 @@ $(DIR)/target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(G
 	@docker run --rm -v $(DIR)/target/ubuntu-$(UBUNTU_VERSION):/mnt stack-$(UBUNTU_VERSION):$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)
 
 clean:
-	@rm -f $(DIR)/Dockerfile $(DIR)/target
+	@rm -rf $(DIR)/Dockerfile $(DIR)/target
 
 .PHONY: clean default
