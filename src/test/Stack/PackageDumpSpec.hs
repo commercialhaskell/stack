@@ -113,7 +113,7 @@ spec = do
         menv' <- getEnvOverride buildPlatform
         menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
         pcache <- newProfilingCache
-        ghcPkgDump menv []
+        ghcPkgDump menv Nothing
             $  conduitDumpPackage
             =$ addProfiling pcache
             =$ CL.sinkNull
@@ -122,7 +122,7 @@ spec = do
         menv' <- getEnvOverride buildPlatform
         menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
         pcache <- newProfilingCache
-        m <- runNoLoggingT $ ghcPkgDump menv []
+        m <- runNoLoggingT $ ghcPkgDump menv Nothing
             $  conduitDumpPackage
             =$ addProfiling pcache
             =$ sinkMatching False (Map.singleton $(mkPackageName "transformers") $(mkVersion "0.0.0.0.0.0.1"))
@@ -142,7 +142,7 @@ spec = do
                     , ((3, 'a'), [(1, 'c')])
                     , ((4, 'a'), [(2, 'a')])
                     ]
-                actual = pruneDeps fst fst snd bestPrune prunes
+                actual = fmap fst $ pruneDeps fst fst snd bestPrune prunes
             actual `shouldBe` Map.fromList
                 [ (1, (1, 'b'))
                 , (2, (2, 'a'))
@@ -150,7 +150,7 @@ spec = do
                 ]
 
         prop "invariant holds" $ \prunes ->
-            checkDepsPresent prunes $ pruneDeps fst fst snd bestPrune prunes
+            checkDepsPresent prunes $ fmap fst $ pruneDeps fst fst snd bestPrune prunes
 
 type PruneCheck = ((Int, Char), [(Int, Char)])
 

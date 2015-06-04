@@ -375,6 +375,10 @@ configProjectWorkDir = do
     bc <- asks getBuildConfig
     return (bcRoot bc </> $(mkRelDir ".stack-work"))
 
+-- | File containing the profiling cache, see "Stack.PackageDump"
+configProfilingCache :: (HasBuildConfig env, MonadReader env m) => m (Path Abs File)
+configProfilingCache = liftM (</> $(mkRelFile "profiling-cache.bin")) configProjectWorkDir
+
 -- | Relative directory for the platform identifier
 platformRelDir :: (MonadReader env m, HasPlatform env, MonadThrow m) => m (Path Rel Dir)
 platformRelDir = asks getPlatform >>= parseRelDir . Distribution.Text.display
@@ -460,12 +464,3 @@ getMinimalEnvOverride = do
                     { esIncludeLocals = False
                     , esIncludeGhcPackagePath = False
                     }
-
--- | File indicating that a specific package-version combo has been installed.
--- Should only be used for non-library dependencies (ghc-pkg tracks library).
-configPackageInstalled :: (HasBuildConfig env, MonadReader env m, MonadThrow m)
-                       => PackageIdentifier -> m (Path Abs File)
-configPackageInstalled ident = do
-    deps <- installationRootDeps
-    ident' <- parseRelFile $ packageIdentifierString ident
-    return $ deps </> $(mkRelDir "installed-packages") </> ident'

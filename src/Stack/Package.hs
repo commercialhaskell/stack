@@ -10,12 +10,12 @@
 
 module Stack.Package
   (readPackage
+  ,readPackageDir
   ,readPackageUnresolved
   ,readPackageUnresolvedBS
   ,resolvePackage
   ,getCabalFileName
   ,Package(..)
-  ,PackageType(..)
   ,PackageConfig(..)
   ,buildLogPath
   ,configureLogPath
@@ -59,6 +59,7 @@ import           Distribution.PackageDescription hiding (FlagName)
 import           Distribution.PackageDescription.Parse
 import           Distribution.Simple.Utils
 import           Distribution.System (OS, Arch, Platform (..))
+import           Distribution.Version (intersectVersionRanges)
 import           Path as FL
 import           Path.Find
 import           Path.IO
@@ -83,8 +84,19 @@ data PackageException
   | PackageStackageDepVerMismatch PackageName Version VersionRange
   | PackageNoCabalFileFound (Path Abs Dir)
   | PackageMultipleCabalFilesFound (Path Abs Dir) [Path Abs File]
+  | MismatchedCabalName (Path Abs File) PackageName
   deriving (Show,Typeable)
 instance Exception PackageException
+
+{- TODO use for nicer error messages
+instance Show MismatchedCabalName where
+    show (MismatchedCabalName fp name) = concat
+        [ "cabal file "
+        , toFilePath cabalfp
+        , " has a mismatched package name: "
+        , packageNameString $ packageName pkg
+        ]
+        -}
 
 -- | Some package info.
 data Package =
@@ -97,7 +109,6 @@ data Package =
           ,packageTools :: ![Dependency]                  -- ^ A build tool name.
           ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
           ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
-          ,packageType :: !PackageType
           ,packageHasLibrary :: !Bool                     -- ^ does the package have a buildable library stanza?
           ,packageTests :: !(Set Text)                    -- ^ names of test suites
           }
@@ -109,10 +120,6 @@ packageIdentifier pkg =
     Stack.Types.PackageIdentifier.PackageIdentifier
         (packageName pkg)
         (packageVersion pkg)
-
--- | Is this package a user target package, or a dependency?
-data PackageType = PTUser | PTDep
- deriving (Show,Typeable,Eq)
 
 -- | Package build configuration
 data PackageConfig =
@@ -160,19 +167,31 @@ readPackageUnresolvedBS mcabalfp bs =
 readPackage :: (MonadLogger m, MonadIO m, MonadThrow m)
             => PackageConfig
             -> Path Abs File
-            -> PackageType
             -> m Package
-readPackage packageConfig cabalfp ptype =
-  readPackageUnresolved cabalfp >>= resolvePackage packageConfig cabalfp ptype
+readPackage packageConfig cabalfp =
+  readPackageUnresolved cabalfp >>= resolvePackage packageConfig cabalfp
+
+-- | Convenience wrapper around @readPackage@ that first finds the cabal file
+-- in the given directory.
+readPackageDir :: (MonadLogger m, MonadIO m, MonadThrow m)
+               => PackageConfig
+               -> Path Abs Dir
+               -> m Package
+readPackageDir packageConfig dir = do
+    cabalfp <- getCabalFileName dir
+    pkg <- readPackage packageConfig cabalfp
+    name <- parsePackageNameFromFilePath cabalfp
+    when (packageName pkg /= name)
+        $ throwM $ MismatchedCabalName cabalfp name
+    return pkg
 
 -- | Resolve a parsed cabal file into a 'Package'.
 resolvePackage :: (MonadLogger m, MonadIO m, MonadThrow m)
                => PackageConfig
                -> Path Abs File
-               -> PackageType
                -> GenericPackageDescription
                -> m Package
-resolvePackage packageConfig cabalfp ptype gpkg = do
+resolvePackage packageConfig cabalfp gpkg = do
      let pkgId =
            package (packageDescription gpkg)
          name = fromCabalPackageName (pkgName pkgId)
@@ -199,7 +218,6 @@ resolvePackage packageConfig cabalfp ptype gpkg = do
                             ,packageFlags = pkgFlags
                             ,packageAllDeps =
                                S.fromList (M.keys deps')
-                            ,packageType = ptype
                             ,packageHasLibrary = maybe
                                 False
                                 (buildable . libBuildInfo)
@@ -212,7 +230,7 @@ resolvePackage packageConfig cabalfp ptype gpkg = do
 -- | Get all dependencies of the package (buildable targets only).
 packageDependencies :: PackageDescription -> Map PackageName VersionRange
 packageDependencies =
-  M.fromList .
+  M.fromListWith intersectVersionRanges .
   concatMap (map (\dep -> ((depName dep),depRange dep)) .
              targetBuildDepends) .
   allBuildInfo'

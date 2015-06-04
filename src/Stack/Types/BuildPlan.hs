@@ -376,6 +376,8 @@ data MiniPackageInfo = MiniPackageInfo
     -- 'ByteString'.
     , mpiExes :: !(Set ExeName)
     -- ^ Executables provided by this package
+    , mpiHasLibrary :: !Bool
+    -- ^ Is there a library present?
     }
     deriving (Generic, Show)
 instance Binary.Binary MiniPackageInfo

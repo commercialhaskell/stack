@@ -27,6 +27,7 @@ import Control.Exception.Enclosed (tryIO)
 import Data.Map (Map)
 import Data.IORef
 import Control.Monad.Catch (MonadThrow, Exception, throwM)
+import qualified Data.Foldable as F
 import Control.Monad (when, liftM)
 import Stack.Types
 import Data.ByteString (ByteString)
@@ -47,17 +48,23 @@ import Stack.GhcPkg
 -- | Cached information on whether a package has profiling libraries
 newtype ProfilingCache = ProfilingCache (IORef (Map GhcPkgId Bool))
 
--- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@
-ghcPkgDump :: (MonadIO m, MonadLogger m)
-           => EnvOverride
-           -> [Path Abs Dir] -- ^ package databases
-           -> Consumer ByteString IO a
-           -> m a
-ghcPkgDump menv pkgDbs sink = do
-    mapM_ (createDatabase menv) pkgDbs -- FIXME maybe use some retry logic instead?
+-- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
+ghcPkgDump
+    :: (MonadIO m, MonadLogger m)
+    => EnvOverride
+    -> Maybe (Path Abs Dir) -- ^ if Nothing, use global
+    -> Sink ByteString IO a
+    -> m a
+ghcPkgDump menv mpkgDb sink = do
+    F.mapM_ (createDatabase menv) mpkgDb -- FIXME maybe use some retry logic instead?
     sinkProcessStdout menv "ghc-pkg" args sink -- FIXME ensure that GHC_PACKAGE_PATH isn't set?
   where
-    args = packageDbFlags pkgDbs ++ ["dump"]
+    args = concat
+        [ case mpkgDb of
+            Nothing -> ["--global", "--no-user-package-db"]
+            Just pkgdb -> ["--user", "--no-user-package-db", "--package-db", toFilePath pkgdb]
+        , ["dump"]
+        ]
 
 -- | Create a new, empty @ProfilingCache@
 newProfilingCache :: MonadIO m => m ProfilingCache
@@ -89,23 +96,24 @@ pruneDeps
     -> (item -> [id]) -- ^ get the dependencies of an item
     -> (item -> item -> item) -- ^ choose the desired of two possible items
     -> [item] -- ^ input items
-    -> Map name id
+    -> Map name item
 pruneDeps getName getId getDepends chooseBest =
       Map.fromList
-    . (map $ \gid -> (getName gid, gid))
-    . Set.toList
-    . loop Set.empty Set.empty
+    . (map $ \item -> (getName $ getId item, item))
+    . loop Set.empty Set.empty []
   where
-    loop foundIds usedNames dps =
+    loop foundIds usedNames foundItems dps =
         case partitionEithers $ map depsMet dps of
-            ([], _) -> foundIds
+            ([], _) -> foundItems
             (s', dps') ->
                 let foundIds' = Map.fromListWith chooseBest s'
                     foundIds'' = Set.fromList $ map getId $ Map.elems foundIds'
                     usedNames' = Map.keysSet foundIds'
+                    foundItems' = Map.elems foundIds'
                  in loop
                         (Set.union foundIds foundIds'')
                         (Set.union usedNames usedNames')
+                        (foundItems ++ foundItems')
                         (catMaybes dps')
       where
         depsMet dp
@@ -121,7 +129,7 @@ pruneDeps getName getId getDepends chooseBest =
 sinkMatching :: Monad m
              => Bool -- ^ require profiling?
              -> Map PackageName Version -- ^ allowed versions
-             -> Consumer (DumpPackage Bool) m (Map PackageName GhcPkgId)
+             -> Consumer (DumpPackage Bool) m (Map PackageName (DumpPackage Bool))
 sinkMatching reqProfiling allowed = do
     dps <- CL.filter (\dp -> isAllowed (dpGhcPkgId dp) && (not reqProfiling || dpProfiling dp))
        =$= CL.consume
@@ -183,8 +191,8 @@ data DumpPackage profiling = DumpPackage
     deriving (Show, Eq, Ord)
 
 data PackageDumpException
-    = MissingSingleField ByteString
-    | MissingMultiField ByteString
+    = MissingSingleField ByteString (Map ByteString [Line])
+    | MissingMultiField ByteString (Map ByteString [Line])
     | MismatchedId PackageName Version GhcPkgId
     deriving (Show, Typeable)
 instance Exception PackageDumpException
@@ -198,11 +206,11 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
     let parseS k =
             case Map.lookup k m of
                 Just [v] -> return v
-                _ -> throwM $ MissingSingleField k
+                _ -> throwM $ MissingSingleField k m
         parseM k =
             case Map.lookup k m of
                 Just vs -> return vs
-                Nothing -> throwM $ MissingMultiField k
+                Nothing -> throwM $ MissingMultiField k m
 
         parseDepend :: MonadThrow m => ByteString -> m (Maybe GhcPkgId)
         parseDepend "builtin_rts" = return Nothing
@@ -257,7 +265,12 @@ eachSection inner =
   where
     _cr = 13
 
-    start = CL.peek >>= maybe (return ()) (const go)
+    peekBS = await >>= maybe (return Nothing) (\bs ->
+        if S.null bs
+            then peekBS
+            else leftover bs >> return (Just bs))
+
+    start = peekBS >>= maybe (return ()) (const go)
 
     go = do
         x <- toConsumer $ takeWhileC (/= "---") =$= inner

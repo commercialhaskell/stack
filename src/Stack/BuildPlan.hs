@@ -59,7 +59,7 @@ import           Data.Yaml                       (decodeFileEither)
 import           Distribution.PackageDescription (GenericPackageDescription,
                                                   flagDefault, flagManual,
                                                   flagName, genPackageFlags,
-                                                  executables, exeName)
+                                                  executables, exeName, library, libBuildInfo, buildable)
 import           Network.HTTP.Download
 import           Path
 import           Stack.Fetch
@@ -203,6 +203,7 @@ toMiniBuildPlan bp = do
                 , mpiPackageDeps = Set.empty
                 , mpiToolDeps = Set.empty
                 , mpiExes = Set.empty
+                , mpiHasLibrary = True
                 }) $ siCorePackages $ bpSystemInfo bp
 
     goPP pp =
@@ -246,6 +247,10 @@ addDeps ghcVersion toCalc = do
                 , mpiPackageDeps = notMe $ packageDependencies pd
                 , mpiToolDeps = Map.keysSet $ packageToolDependencies pd
                 , mpiExes = exes
+                , mpiHasLibrary = maybe
+                    False
+                    (buildable . libBuildInfo)
+                    (library pd)
                 })
     return $ Map.fromList $ concat res
   where
@@ -454,7 +459,7 @@ checkBuildPlan name mbp cabalfp gpd = do
   where
     loop _ [] = return Nothing
     loop platform (flags:rest) = do
-        pkg <- resolvePackage pkgConfig cabalfp PTUser gpd
+        pkg <- resolvePackage pkgConfig cabalfp gpd
         passes <- checkDeps flags (packageDeps pkg) (mbpPackages mbp)
         if passes
             then return $ Just flags

@@ -16,7 +16,8 @@ module Stack.GhcPkg
   ,envHelper
   ,unregisterPackages
   ,createDatabase
-  ,packageDbFlags)
+  ,packageDbFlags
+  ,unregisterGhcPkgId)
   where
 
 import           Control.Applicative
@@ -349,6 +350,21 @@ unregisterPackages menv pkgDbs predicate idents = do
     Set.mapM_ (unregisterPackage menv pkgDbs) idents
     broken <- getBrokenPackages menv pkgDbs predicate
     Set.mapM_ (unregisterPackage menv pkgDbs) broken
+
+unregisterGhcPkgId :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m)
+                    => EnvOverride
+                    -> Path Abs Dir -- ^ package database
+                    -> GhcPkgId
+                    -> m ()
+unregisterGhcPkgId menv pkgDb gid = do
+    -- FIXME Currently just ignore exceptions...
+    eres <- ghcPkg menv [pkgDb] $ toArgs gid
+    case eres of
+        Left e -> $logWarn $ T.pack $ show e
+        Right _ -> return ()
+  where
+    -- FIXME is there really no way to tell ghc-pkg a GhcPkgId?
+    toArgs gid = ["unregister", "--user", "--force", packageIdentifierString $ ghcPkgIdPackageIdentifier gid]
 
 -- | Unregister the given package.
 unregisterPackage :: (MonadIO m, MonadLogger m, MonadThrow m)

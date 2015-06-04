@@ -16,6 +16,8 @@ module Stack.Constants
     ,stackDotYaml
     ,stackRootEnvVar
     ,userDocsDir
+    ,configCacheFile
+    ,buildCacheFile
     )
     where
 
@@ -88,6 +90,26 @@ defaultShakeThreads = 4
 -- | User documentation directory.
 userDocsDir :: Config -> Path Abs Dir
 userDocsDir config = configStackRoot config </> $(mkRelDir "doc/")
+
+-- | The filename used for dirtiness check of source files.
+buildCacheFile :: MonadThrow m
+               => PackageIdentifier -- ^ Cabal version
+               -> Path Abs Dir      -- ^ Package directory.
+               -> m (Path Abs File)
+buildCacheFile cabalPkgVersion dir = do
+    liftM
+        (</> $(mkRelFile "stack-build-cache"))
+        (distDirFromDir cabalPkgVersion dir)
+
+-- | The filename used for dirtiness check of config.
+configCacheFile :: MonadThrow m
+               => PackageIdentifier -- ^ Cabal version
+               -> Path Abs Dir      -- ^ Package directory.
+               -> m (Path Abs File)
+configCacheFile cabalPkgVersion dir = do
+    liftM
+        (</> $(mkRelFile "stack-config-cache"))
+        (distDirFromDir cabalPkgVersion dir)
 
 -- | Package's build artifacts directory.
 distDirFromDir :: MonadThrow m
