@@ -86,7 +86,7 @@ import           System.Posix.Files (createSymbolicLink,removeLink)
 #endif
 --}
 data Installed = Library GhcPkgId | Executable
-    deriving Show
+    deriving (Show, Eq, Ord)
 
 data Location = Global | Snap | Local
     deriving (Show, Eq)
@@ -141,6 +141,8 @@ getInstalled menv profiling sourceMap1 = do
 data LocalPackage = LocalPackage
     { lpPackage :: Package
     , lpWanted :: Bool
+    , lpLastConfigOpts :: !(Maybe [Text])       -- ^ configure options used during last Setup.hs configure, if available
+    , lpDirtyFiles :: !Bool                     -- ^ are there files that have changed since the last build?
     }
     deriving Show
 
@@ -178,6 +180,8 @@ loadLocals bopts = do
         return LocalPackage
             { lpPackage = pkg
             , lpWanted = wanted
+            , lpLastConfigOpts = Nothing -- FIXME
+            , lpDirtyFiles = True -- FIXME
             }
 
     let known = Set.fromList $ map (packageName . lpPackage) lps
@@ -297,7 +301,7 @@ data Task = Task
     }
     deriving Show
 
-data TaskType = TTPackage LocalPackage | TTMPI MiniPackageInfo
+data TaskType = TTPackage LocalPackage NeedsConfig | TTMPI MiniPackageInfo
     deriving Show
 
 data S = S
@@ -327,16 +331,45 @@ data AddDepRes
     | ADRFoundExe Location
     deriving Show
 
+configureOpts :: Set GhcPkgId -- ^ dependencies
+              -> Bool -- ^ wanted?
+              -> BaseConfigOpts
+              -> [Text]
+configureOpts deps wanted bco =
+    (if wanted then bcoWanted bco else bcoNotWanted bco) ++
+    flags
+  where
+    flags = map toFlag $ Set.toList deps
+
+    toFlag gid = T.pack $ concat
+        [ "--dependency="
+        , packageNameString $ packageIdentifierName $ ghcPkgIdPackageIdentifier gid
+        , "-"
+        , ghcPkgIdString gid
+        ]
+
+type NeedsConfig = Bool
+data DirtyResult
+    = Dirty NeedsConfig
+    | CleanLibrary GhcPkgId
+    | CleanExecutable
+
 data Plan = Plan
     { planTasks :: !(Map PackageName Task)
     , planUnregisterLocal :: !(Set GhcPkgId)
     }
+data BaseConfigOpts = BaseConfigOpts
+    { bcoWanted :: ![Text]
+    , bcoNotWanted :: ![Text]
+    }
 constructPlan :: MonadThrow m
-              => [LocalPackage]
+              => MiniBuildPlan
+              -> BaseConfigOpts
+              -> [LocalPackage]
               -> Set GhcPkgId -- ^ locally registered
               -> SourceMap
               -> m Plan
-constructPlan locals locallyRegistered sourceMap = do
+constructPlan mbp baseConfigOpts locals locallyRegistered sourceMap = do
     let s0 = S
             { callStack = []
             , tasks = M.empty
@@ -382,6 +415,16 @@ constructPlan locals locallyRegistered sourceMap = do
                         return $ maybe (Left name) Right res
                     _ -> error $ "constructPlan invariant violated: call stack is corrupted: " ++ show (name, callStack s, callStack s')
 
+    toolMap = getToolMap mbp
+    toolToPackages (Dependency name _) =
+        Map.fromList
+      $ map (, anyVersion)
+      $ maybe [] Set.toList
+      $ Map.lookup (S8.pack . packageNameString . fromCabalPackageName $ name) toolMap
+    packageDepsWithTools p = Map.unionsWith intersectVersionRanges
+        $ packageDeps p
+        : map toolToPackages (packageTools p)
+
     withDeps name loc deps inner = do
         eadrs <- mapM (uncurry (addDep name loc)) deps
         let (errs, adrs) = partitionEithers eadrs
@@ -391,32 +434,56 @@ constructPlan locals locallyRegistered sourceMap = do
                 addFailure $ DependencyPlanFailures name $ Set.fromList errs
                 return Nothing
 
+    localMap = Map.fromListWith Set.union $ map
+        (\gid -> (packageIdentifierName $ ghcPkgIdPackageIdentifier gid, Set.singleton gid))
+        (Set.toList locallyRegistered)
     addLocal lp = checkCallStack name $ do
-        withDeps name Local (M.toList $ packageDeps p) $ \adrs -> do
-            -- FIXME do dirtiness checking here and, if not dirty, don't build
+        withDeps name Local (M.toList $ packageDepsWithTools p) $ \adrs -> do
+            let missing = Set.fromList $ mapMaybe toMissing adrs
+                present = Set.fromList $ mapMaybe toPresent adrs
+                configOpts = configureOpts present (lpWanted lp) baseConfigOpts
+                dres | not $ Set.null missing = Dirty True
+                     | otherwise =
+                        case lpLastConfigOpts lp of
+                            Nothing -> Dirty True
+                            Just oldConfigOpts
+                                | oldConfigOpts /= configOpts -> Dirty True
+                                | lpDirtyFiles lp -> Dirty False
+                                | not $ packageHasLibrary p -> CleanExecutable
+                                | otherwise ->
+                                    case fmap Set.toList $ Map.lookup name localMap of
+                                        Just [gid] -> CleanLibrary gid
+                                        _ -> Dirty False
             -- FIXME probably need to cache results of calls to addLocal in S, possibly all of addDep
-            addTask Task
-                { taskProvides = ident
-                , taskRequiresMissing = Set.fromList $ mapMaybe toMissing adrs
-                , taskRequiresPresent = Set.fromList $ mapMaybe toPresent adrs
-                , taskLocation = Local
-                , taskType = TTPackage lp
-                }
+            case dres of
+                Dirty needConfig -> addTask Task
+                    { taskProvides = ident
+                    , taskRequiresMissing = Set.fromList $ mapMaybe toMissing adrs
+                    , taskRequiresPresent = Set.fromList $ mapMaybe toPresent adrs
+                    , taskLocation = Local
+                    , taskType = TTPackage lp needConfig
+                    }
+                CleanLibrary gid -> return $ Just $ ADRFound gid Local
+                CleanExecutable -> return $ Just $ ADRFoundExe Local
       where
         p = lpPackage lp
         name = packageName p
         version = packageVersion p
         ident = PackageIdentifier name version
 
-    addExtraDep p =
-        -- FIXME won't work once we add dirtiness tracking
-        addLocal LocalPackage
-            { lpPackage = p
-            , lpWanted = False
-            }
+    addExtraDep p = addLocal LocalPackage
+        { lpPackage = p
+        , lpWanted = False
+        , lpLastConfigOpts = Nothing
+        , lpDirtyFiles = True
+        }
 
     addMPI name mpi = checkCallStack name $ do
-        withDeps name Snap (map (, anyVersion) $ Set.toList $ mpiPackageDeps mpi) $ \adrs -> do
+        let deps = map (, anyVersion) $ Set.toList $ Set.unions
+                $ mpiPackageDeps mpi
+                : map goTool (Set.toList $ mpiToolDeps mpi)
+            goTool tool = fromMaybe Set.empty $ Map.lookup tool toolMap
+        withDeps name Snap deps $ \adrs -> do
             addTask Task
                 { taskProvides = ident
                 , taskRequiresMissing = Set.fromList $ mapMaybe toMissing adrs
@@ -472,12 +539,15 @@ build bopts = do
     cabalPkgVer <- getCabalPkgVer menv
 
     bconfig <- asks getBuildConfig
-    inBuildPlan <- case bcResolver bconfig of
+    mbp <- case bcResolver bconfig of
         ResolverSnapshot snapName -> do
             $logDebug $ "Checking resolver: " <> renderSnapName snapName
             mbp <- loadMiniBuildPlan snapName
-            return $ mbpPackages mbp
-        ResolverGhc _ -> return M.empty
+            return mbp
+        ResolverGhc ghc -> return MiniBuildPlan
+            { mbpGhcVersion = fromMajorVersion ghc
+            , mbpPackages = M.empty
+            }
 
     locals <- loadLocals bopts
     let localNames = Set.fromList $ map (packageName . lpPackage) locals
@@ -491,12 +561,14 @@ build bopts = do
                  in (packageName p, (packageVersion p, PSLocal lp))
             , Map.fromList $ flip map extraDeps $ \p ->
                 (packageName p, (packageVersion p, PSExtraDeps p))
-            , flip fmap inBuildPlan $ \mpi -> (mpiVersion mpi, PSSnapshot mpi)
+            , flip fmap (mbpPackages mbp)
+                $ \mpi -> (mpiVersion mpi, PSSnapshot mpi)
             ]
 
     (sourceMap2, locallyRegistered) <- getInstalled menv profiling sourceMap1
 
-    plan <- constructPlan locals locallyRegistered sourceMap2
+    let baseConfigOpts = BaseConfigOpts [] [] -- FIXME!
+    plan <- constructPlan mbp baseConfigOpts locals locallyRegistered sourceMap2
 
     if boptsDryrun bopts
         then printPlan plan
@@ -563,7 +635,10 @@ displayTask task = T.pack $ concat
         Local -> "local"
     , ", source="
     , case taskType task of
-        TTPackage lp -> toFilePath $ packageDir $ lpPackage lp
+        TTPackage lp needConfig -> concat
+            [ toFilePath $ packageDir $ lpPackage lp
+            , if needConfig then " (configure)" else ""
+            ]
         TTMPI _ -> "package index"
     , if Set.null $ taskRequiresMissing task
         then ""
