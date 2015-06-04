@@ -484,6 +484,7 @@ data BaseConfigOpts = BaseConfigOpts
     , bcoLibProfiling :: !Bool
     , bcoExeProfiling :: !Bool
     , bcoFinalAction :: !FinalAction
+    , bcoGhcOptions :: ![Text]
     }
 
 configureOpts :: BaseConfigOpts
@@ -515,6 +516,10 @@ configureOpts bco deps wanted loc flags = map T.pack $ concat
                            else "-") <>
                        flagNameString name)
                     (Map.toList flags)
+    -- FIXME Chris: where does this come from now? , ["--ghc-options=-O2" | gconfigOptimize gconfig]
+    , if wanted
+        then concatMap (\x -> ["--ghc-options", T.unpack x]) (bcoGhcOptions bco)
+        else []
     ]
   where
     installRoot =
@@ -794,6 +799,7 @@ build bopts = do
             , bcoLibProfiling = boptsLibProfile bopts
             , bcoExeProfiling = boptsExeProfile bopts
             , bcoFinalAction = boptsFinalAction bopts
+            , bcoGhcOptions = boptsGhcOptions bopts
             }
     plan <- constructPlan mbp baseConfigOpts locals locallyRegistered sourceMap2
 
