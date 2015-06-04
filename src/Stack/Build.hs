@@ -474,22 +474,71 @@ data AddDepRes
     | ADRFoundExe Location
     deriving Show
 
-configureOpts :: Set GhcPkgId -- ^ dependencies
-              -> Bool -- ^ wanted?
-              -> BaseConfigOpts
-              -> [Text]
-configureOpts deps wanted bco =
-    (if wanted then bcoWanted bco else bcoNotWanted bco) ++
-    flags
-  where
-    flags = map toFlag $ Set.toList deps
+data BaseConfigOpts = BaseConfigOpts
+    { bcoSnapDB :: !(Path Abs Dir)
+    , bcoLocalDB :: !(Path Abs Dir)
+    , bcoSnapInstallRoot :: !(Path Abs Dir)
+    , bcoLocalInstallRoot :: !(Path Abs Dir)
+    , bcoLibProfiling :: !Bool
+    , bcoExeProfiling :: !Bool
+    , bcoFinalAction :: !FinalAction
+    }
 
-    toFlag gid = T.pack $ concat
+configureOpts :: BaseConfigOpts
+              -> Set GhcPkgId -- ^ dependencies
+              -> Bool -- ^ wanted?
+              -> Location
+              -> Map FlagName Bool
+              -> [Text]
+configureOpts bco deps wanted loc flags = map T.pack $ concat
+    [ ["--user", "--package-db=clear", "--package-db=global"]
+    , map (("--package-db=" ++) . toFilePath) $ case loc of
+        Global -> assert False []
+        Snap -> [bcoSnapDB bco]
+        Local -> [bcoSnapDB bco, bcoLocalDB bco]
+    , depOptions
+    , [ "--libdir=" ++ toFilePath (installRoot </> $(mkRelDir "lib"))
+      , "--bindir=" ++ toFilePath (installRoot </> bindirSuffix)
+      , "--datadir=" ++ toFilePath (installRoot </> $(mkRelDir "share"))
+      , "--docdir=" ++ toFilePath (installRoot </> $(mkRelDir "doc"))
+      ]
+    , ["--enable-library-profiling" | bcoLibProfiling bco || bcoExeProfiling bco]
+    , ["--enable-executable-profiling" | bcoLibProfiling bco]
+    , ["--enable-tests" | wanted && bcoFinalAction bco == DoTests]
+    , ["--enable-benchmarks" | wanted && bcoFinalAction bco == DoBenchmarks]
+    , map (\(name,enabled) ->
+                       "-f" <>
+                       (if enabled
+                           then ""
+                           else "-") <>
+                       flagNameString name)
+                    (Map.toList flags)
+    ]
+  where
+    installRoot =
+        case loc of
+            Global -> error "configureOpts: installing into Global"
+            Snap -> bcoSnapInstallRoot bco
+            Local -> bcoLocalInstallRoot bco
+
+    depOptions = map toDepOption $ Set.toList deps
+
+    {- FIXME does this work with some versions of Cabal?
+    toDepOption gid = T.pack $ concat
         [ "--dependency="
         , packageNameString $ packageIdentifierName $ ghcPkgIdPackageIdentifier gid
         , "="
         , ghcPkgIdString gid
         ]
+    -}
+    toDepOption gid = concat
+        [ "--constraint="
+        , packageNameString name
+        , "=="
+        , versionString version
+        ]
+      where
+        PackageIdentifier name version = ghcPkgIdPackageIdentifier gid
 
 type NeedsConfig = Bool
 data DirtyResult
@@ -500,10 +549,6 @@ data DirtyResult
 data Plan = Plan
     { planTasks :: !(Map PackageName Task)
     , planUnregisterLocal :: !(Set GhcPkgId)
-    }
-data BaseConfigOpts = BaseConfigOpts
-    { bcoWanted :: ![Text]
-    , bcoNotWanted :: ![Text]
     }
 constructPlan :: MonadThrow m
               => MiniBuildPlan
@@ -584,7 +629,7 @@ constructPlan mbp baseConfigOpts locals locallyRegistered sourceMap = do
         withDeps name Local (M.toList $ packageDepsWithTools p) $ \adrs -> do
             let missing = Set.fromList $ mapMaybe toMissing adrs
                 present = Set.fromList $ mapMaybe toPresent adrs
-                configOpts = configureOpts present (lpWanted lp) baseConfigOpts
+                configOpts = configureOpts baseConfigOpts present (lpWanted lp) Local (packageFlags $ lpPackage lp)
                 dres | not $ Set.null missing = Dirty True
                      | otherwise =
                         case lpLastConfigOpts lp of
@@ -710,7 +755,19 @@ build bopts = do
 
     (sourceMap2, locallyRegistered) <- getInstalled menv profiling sourceMap1
 
-    let baseConfigOpts = BaseConfigOpts [] [] -- FIXME!
+    snapDBPath <- packageDatabaseDeps
+    localDBPath <- packageDatabaseLocal
+    snapInstallRoot <- installationRootDeps
+    localInstallRoot <- installationRootLocal
+    let baseConfigOpts = BaseConfigOpts
+            { bcoSnapDB = snapDBPath
+            , bcoLocalDB = localDBPath
+            , bcoSnapInstallRoot = snapInstallRoot
+            , bcoLocalInstallRoot = localInstallRoot
+            , bcoLibProfiling = boptsLibProfile bopts
+            , bcoExeProfiling = boptsExeProfile bopts
+            , bcoFinalAction = boptsFinalAction bopts
+            }
     plan <- constructPlan mbp baseConfigOpts locals locallyRegistered sourceMap2
 
     if boptsDryrun bopts
@@ -833,7 +890,7 @@ executePlan plan ee = do
             unregisterGhcPkgIds (eeEnvOverride ee) localDB ids
     u <- askUnliftBase
     let actions = concatMap (toActions u ee) $ Map.elems $ planTasks plan
-        threads = 8 -- FIXME where did we get this before?
+        threads = 1 -- 8 -- FIXME where did we get this before?
     liftIO $ runActions threads actions
 
 toActions :: M env m
@@ -874,16 +931,18 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                 taskRequiresPresent
                 (Set.fromList $ map getMissing $ Set.toList taskRequiresMissing)
         let configOpts = configureOpts
+                eeBaseConfigOpts
                 allDeps
                 wanted
-                eeBaseConfigOpts
+                taskLocation
+                (packageFlags package)
         cabal $ "configure" : map T.unpack configOpts
         $logDebug $ T.pack $ show configOpts
         fileModTimes <- getPackageFileModTimes package
         writeDirtyCache (packageDir package) fileModTimes configOpts
 
     announce "build"
-    announce $ "console: " <> T.pack (show console)
+    cabal ["build"]
 
     case taskType of
         TTPackage lp _ | lpWanted lp -> do
@@ -895,6 +954,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
         _ -> return ()
 
     announce "install"
+    cabal ["install"]
   where
     announce x = $logInfo $ T.concat
         [ T.pack $ packageIdentifierString taskProvides
@@ -925,12 +985,19 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                         | ident == taskProvides -> do
                             -- FIXME shouldn't there be a readPackageDir helper function?
                             cabalfp <- getCabalFileName dir
-                            package <- readPackage packageConfig cabalfp
+                            bconfig <- asks getBuildConfig
+                            package <- readPackage (packageConfig bconfig mpi) cabalfp
                                 PTUser -- FIXME I think we can get rid of that field entirely now
                             inner package
                     _ -> error $ "withPackage: invariant violated: " ++ show m
 
-    packageConfig = error "packageConfig"
+    packageConfig bconfig mpi = PackageConfig
+        { packageConfigEnableTests = False
+        , packageConfigEnableBenchmarks = False
+        , packageConfigFlags = mpiFlags mpi
+        , packageConfigGhcVersion = bcGhcVersion bconfig
+        , packageConfigPlatform = configPlatform $ getConfig bconfig
+        }
 
     withLogFile package inner
         | console = inner Nothing
@@ -1665,22 +1732,6 @@ configurePackage cabalPkgVer bconfig configureResource setuphs buildType package
        (concat [["configure","--user"]
                ,["--package-db=clear","--package-db=global"]
                ,map (("--package-db=" ++) . toFilePath) pkgDbs
-               ,["--libdir=" ++ toFilePath (installRoot </> $(mkRelDir "lib"))
-                ,"--bindir=" ++ toFilePath (installRoot </> bindirSuffix)
-                ,"--datadir=" ++ toFilePath (installRoot </> $(mkRelDir "share"))
-                ,"--docdir=" ++ toFilePath (installRoot </> $(mkRelDir "doc"))
-                ]
-               ,["--enable-library-profiling" | gconfigLibProfiling gconfig]
-               ,["--enable-executable-profiling" | gconfigExeProfiling gconfig]
-               ,["--enable-tests" | setupAction == DoTests]
-               ,["--enable-benchmarks" | setupAction == DoBenchmarks]
-               ,map (\(name,enabled) ->
-                       "-f" <>
-                       (if enabled
-                           then ""
-                           else "-") <>
-                       flagNameString name)
-                    (M.toList (packageFlags package))])
 
 -- | Remove the dist/ dir of a package.
 cleanPackage :: PackageIdentifier -- ^ Cabal version
