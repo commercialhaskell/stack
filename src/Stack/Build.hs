@@ -96,16 +96,17 @@ type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig en
 type SourceMap = Map PackageName (Version, PackageSource)
 data PackageSource
     = PSLocal LocalPackage
-    | PSExtraDeps (Map FlagName Bool) -- FIXME load up the Package for this preemptively, and cache it in a binary file
+    | PSExtraDeps Package
     | PSSnapshot MiniPackageInfo
     | PSInstalledLib Location GhcPkgId
     | PSInstalledExe Location
 
 getInstalled :: M env m
-             => Bool -- ^ profiling?
+             => EnvOverride
+             -> Bool -- ^ profiling?
              -> SourceMap -- ^ does not contain any installed information
              -> m SourceMap
-getInstalled profiling sourceMap1 = do
+getInstalled menv profiling sourceMap1 = do
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
 
@@ -113,7 +114,6 @@ getInstalled profiling sourceMap1 = do
 
     pcache <- loadProfilingCache $ configProfilingCache bconfig
 
-    menv <- getMinimalEnvOverride
     let loadDatabase' = loadDatabase menv pcache profiling
     (sourceMap2, localInstalled) <-
         loadDatabase' Global Nothing sourceMap1 >>=
@@ -313,6 +313,7 @@ data ConstructPlanException
     | UnknownPackage PackageName
     -- ^ Recommend adding to extra-deps, give a helpful version number?
     | VersionOutsideRange PackageName PackageIdentifier VersionRange
+    | Couldn'tMakePlanForWanted (Set PackageName)
     deriving (Show, Typeable, Eq)
 
 newtype ConstructPlanExceptions = ConstructPlanExceptions [ConstructPlanException]
@@ -330,11 +331,16 @@ constructPlan :: MonadThrow m
               -> SourceMap
               -> m (Map PackageName Task)
 constructPlan locals sourceMap = do
-    s <- execStateT (mapM_ goLocal $ filter lpWanted locals) S
-        { callStack = []
-        , tasks = M.empty
-        , failures = []
-        }
+    let s0 = S
+            { callStack = []
+            , tasks = M.empty
+            , failures = []
+            }
+    ((), s) <- flip runStateT s0 $ do
+        eres <- mapM addLocal $ filter lpWanted locals
+        case partitionEithers eres of
+            ([], _) -> return ()
+            (errs, _) -> addFailure $ Couldn'tMakePlanForWanted $ Set.fromList errs
     if null $ failures s
         then return $ tasks s
         else throwM $ ConstructPlanExceptions $ failures s
@@ -360,16 +366,16 @@ constructPlan locals sourceMap = do
                         return $ maybe (Left name) Right res
                     _ -> error $ "constructPlan invariant violated: call stack is corrupted: " ++ show (name, callStack s, callStack s')
 
-    goLocal lp = checkCallStack name $ do
+    addLocal lp = checkCallStack name $ do
         eadrs <- mapM (uncurry (addDep name Local)) (M.toList $ packageDeps p) -- FIXME start adding in tool deps
         let (errs, adrs) = partitionEithers eadrs
-        if null errs
+        if not $ null errs
             then do
                 addFailure $ DependencyPlanFailures name $ Set.fromList errs
                 return Nothing
             else do
                 -- FIXME do dirtiness checking here and, if not dirty, don't build
-                -- FIXME probably need to cache results of calls to goLocal in S, possibly all of addDep
+                -- FIXME probably need to cache results of calls to addLocal in S, possibly all of addDep
                 addTask Task
                     { taskProvides = ident
                     , taskRequiresMissing = Set.fromList $ mapMaybe toMissing adrs
@@ -384,6 +390,13 @@ constructPlan locals sourceMap = do
         version = packageVersion p
         ident = PackageIdentifier name version
 
+    addExtraDep p =
+        -- FIXME won't work once we add dirtiness tracking
+        addLocal LocalPackage
+            { lpPackage = p
+            , lpWanted = False
+            }
+
     addDep user userloc name range =
         case Map.lookup name sourceMap of
             Nothing -> do
@@ -391,8 +404,8 @@ constructPlan locals sourceMap = do
                 return $ Left name
             Just (version, ps)
                 | version `withinRange` range -> case ps of
-                    PSLocal lp -> allowLocal version $ goLocal lp
-                    PSExtraDeps _ -> allowLocal version $ error "addDep: PSExtraDeps not handled"
+                    PSLocal lp -> allowLocal version $ addLocal lp
+                    PSExtraDeps p -> allowLocal version $ addExtraDep p
                     PSSnapshot mpi -> error "addDep: PSSnapshot not handled"
                     PSInstalledLib loc gid -> allowLocation loc version $ return $ Right $ ADRFound gid loc
                     PSInstalledExe loc -> allowLocation loc version $ return $ Right $ ADRFoundExe loc
@@ -415,9 +428,11 @@ constructPlan locals sourceMap = do
                         (PackageIdentifier name version)
                     return $ Left name
 
-    checkRange = error "checkRange"
-    toMissing = error "toMissing"
-    toPresent = error "toPresent"
+    toMissing (ADRToInstall pi _) = Just pi
+    toMissing _ = Nothing
+
+    toPresent (ADRFound gid _) = Just gid
+    toPresent _ = Nothing
 
     {-
     addFailure t = modify $ \s -> s { failures = Set.insert t $ failures s }
@@ -536,6 +551,9 @@ constructPlan locals sourceMap = do
 -- | Build using Shake.
 build :: M env m => BuildOpts -> m ()
 build bopts = do
+    menv <- getMinimalEnvOverride
+    cabalPkgVer <- getCabalPkgVer menv
+
     bconfig <- asks getBuildConfig
     inBuildPlan <- case bcResolver bconfig of
         ResolverSnapshot snapName -> do
@@ -548,20 +566,54 @@ build bopts = do
     let localNames = Set.fromList $ map (packageName . lpPackage) locals
         localDepVersions = bcExtraDeps bconfig
 
+    extraDeps <- loadExtraDeps menv cabalPkgVer
+
     let sourceMap1 = Map.unions
             [ Map.fromList $ flip map locals $ \lp ->
                 let p = lpPackage lp
                  in (packageName p, (packageVersion p, PSLocal lp))
-            , flip Map.mapWithKey (bcExtraDeps bconfig) $ \name version ->
-                (version, PSExtraDeps $ fromMaybe Map.empty $ Map.lookup name $ bcFlags bconfig)
+            , Map.fromList $ flip map extraDeps $ \p ->
+                (packageName p, (packageVersion p, PSExtraDeps p))
             , flip fmap inBuildPlan $ \mpi -> (mpiVersion mpi, PSSnapshot mpi)
             ]
 
-    sourceMap2 <- getInstalled profiling sourceMap1
+    sourceMap2 <- getInstalled menv profiling sourceMap1
 
     constructPlan locals sourceMap2 >>= error . show
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
+
+loadExtraDeps :: M env m
+              => EnvOverride
+              -> PackageIdentifier -- ^ Cabal version
+              -> m [Package]
+loadExtraDeps menv cabalPkgVer = do
+    bconfig <- asks getBuildConfig
+    unpackDir <- configLocalUnpackDir
+    dist <- distRelativeDir cabalPkgVer
+    paths <- unpackPackageIdents menv unpackDir (Just dist)
+        $ Set.fromList
+        $ map fromTuple
+        $ M.toList
+        $ bcExtraDeps bconfig
+    forM (Map.toList paths) $ \(ident, dir) -> do
+        cabalfp <- getCabalFileName dir
+        -- FIXME confirm this matches name <- parsePackageNameFromFilePath cabalfp
+        let name = packageIdentifierName ident
+            flags = fromMaybe M.empty (M.lookup name $ bcFlags bconfig)
+            pc = depPackageConfig bconfig flags
+        readPackage pc cabalfp PTDep
+        -- FIXME confirm that the ident matches with what we just read?
+
+-- | Package config to be used for dependencies
+depPackageConfig :: BuildConfig -> Map FlagName Bool -> PackageConfig
+depPackageConfig bconfig flags = PackageConfig
+    { packageConfigEnableTests = False
+    , packageConfigEnableBenchmarks = False
+    , packageConfigFlags = flags
+    , packageConfigGhcVersion = bcGhcVersion bconfig
+    , packageConfigPlatform = configPlatform (getConfig bconfig)
+    }
 
 {- FIXME
     cabalPkgVer <- getMinimalEnvOverride >>= getCabalPkgVer
@@ -1896,6 +1948,7 @@ withTempUnpacked cabalPkgVer pkgs inner = withSystemTempDirectory "stack-unpack"
 isHiddenDir :: Path b Dir -> Bool
 isHiddenDir = isPrefixOf "." . toFilePath . dirname
 --}
+        -}
 
 -- | Get the version of Cabal from the global package database.
 getCabalPkgVer :: (MonadThrow m,MonadIO m,MonadLogger m)
@@ -1912,7 +1965,6 @@ getCabalPkgVer menv = do
   where
     cabalName =
         $(mkPackageName "Cabal")
-        -}
 
 clean :: a
 clean = error "clean"
