@@ -25,6 +25,7 @@ import Control.Monad.Logger (MonadLogger)
 import System.Process.Read
 import Control.Exception.Enclosed (tryIO)
 import Data.Map (Map)
+import Data.Maybe (fromMaybe)
 import Data.IORef
 import Control.Monad.Catch (MonadThrow, Exception, throwM)
 import qualified Data.Foldable as F
@@ -159,6 +160,7 @@ addProfiling (ProfilingCache ref) =
         let gid = dpGhcPkgId dp
         p <- case Map.lookup gid m of
             Just p -> return p
+            Nothing | null (dpLibraries dp) -> return True
             Nothing -> do
                 let loop [] = return False
                     loop (dir:dirs) = do
@@ -232,8 +234,11 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
             ghcPkgId <- parseS "id" >>= parseGhcPkgId
             when (PackageIdentifier name version /= ghcPkgIdPackageIdentifier ghcPkgId)
                 $ throwM $ MismatchedId name version ghcPkgId
-            libDirs <- parseM "library-dirs"
-            libraries <- parseM "hs-libraries"
+
+            -- if a package has no modules, these won't exist
+            let libDirs = fromMaybe [] $ parseM "library-dirs"
+                libraries = fromMaybe [] $ parseM "hs-libraries"
+
             depends <- parseM "depends" >>= mapM parseDepend
             return $ Just DumpPackage
                 { dpGhcPkgId = ghcPkgId
