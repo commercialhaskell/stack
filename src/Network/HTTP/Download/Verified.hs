@@ -4,12 +4,22 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE RankNTypes            #-}
-module Network.HTTP.Download.Verified where
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE StandaloneDeriving    #-}
+module Network.HTTP.Download.Verified
+  ( verifiedDownload
+  , DownloadRequest(..)
+  , HashCheck(..)
+  , LengthCheck
+  , VerifiedDownloadException(..)
+  ) where
 
 import qualified Data.List as List
+import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.List as CL
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 
@@ -23,6 +33,8 @@ import Crypto.Hash.Conduit (sinkHash)
 import Data.ByteString (ByteString)
 import Data.Conduit
 import Data.Conduit.Binary (sourceHandle, sinkHandle)
+import Data.Foldable (traverse_)
+import Data.Monoid
 import Data.Typeable (Typeable)
 import Network.HTTP.Client.Conduit
 import Network.HTTP.Types.Header (hContentLength, hContentMD5)
@@ -31,22 +43,30 @@ import System.FilePath((<.>))
 import System.Directory
 import System.IO
 
--- | A request together with the hash algorithm to use
--- to verify the response.
--- The type parameter specifies the algorithm.
-data VerifiedRequest a = VerifiedRequest
-    { vrHashAlgorithm :: a
-    , vrExpectedHexDigest :: String
-    , vrDownloadBytes :: Int
-    , vrRequest :: Request
+-- | A request together with some checks to perform.
+data DownloadRequest = DownloadRequest
+    { drRequest :: Request
+    , drHashChecks :: [HashCheck]
+    , drLengthCheck :: Maybe LengthCheck
     }
   deriving Show
+
+data HashCheck = forall a. (Show a, HashAlgorithm a) => HashCheck
+  { hashCheckAlgorithm :: a
+  , hashCheckHexDigest :: String
+  }
+deriving instance Show HashCheck
+
+type LengthCheck = Int
 
 -- | An exception regarding verification of a download.
 data VerifiedDownloadException
     = WrongContentLength
           Int -- expected
           ByteString -- actual (as listed in the header)
+    | WrongStreamLength
+          Int -- expected
+          Int -- actual
     | WrongDigest
           String -- algorithm
           String -- expected
@@ -65,41 +85,49 @@ instance Exception VerifyFileException
 -- is as expected.
 --
 -- Throws WrongDigest (VerifiedDownloadException)
-sinkCheckHash
-    :: forall a m. (MonadThrow m, Show a, HashAlgorithm a)
-    => a -- ^ The algorithm (e.g. MD5)
-    -> String -- ^ The expected digest, rendered as a String (hexadecimal)
+sinkCheckHash :: MonadThrow m
+    => HashCheck
     -> Consumer ByteString m ()
-sinkCheckHash a expectedDigestString = do
-    (digest :: Digest a) <- sinkHash
+sinkCheckHash HashCheck{..} = do
+    digest <- sinkHashUsing hashCheckAlgorithm
     let actualDigestString = show digest
-    when (actualDigestString /= expectedDigestString) $
-        throwM $ WrongDigest (show a) expectedDigestString actualDigestString
+    when (actualDigestString /= hashCheckHexDigest) $
+        throwM $ WrongDigest (show hashCheckAlgorithm) hashCheckHexDigest actualDigestString
 
+assertLengthSink :: MonadThrow m
+    => LengthCheck
+    -> ZipSink ByteString m ()
+assertLengthSink expectedStreamLength = ZipSink $ do
+  Sum actualStreamLength <- CL.foldMap (Sum . ByteString.length)
+  when (actualStreamLength /= expectedStreamLength) $
+    throwM $ WrongStreamLength expectedStreamLength actualStreamLength
+
+-- | A more explicitly type-guided sinkHash.
+sinkHashUsing :: (Monad m, HashAlgorithm a) => a -> Consumer ByteString m (Digest a)
+sinkHashUsing _ = sinkHash
+
+-- | Turns a list of hash checks into a ZipSink that checks all of them.
+hashChecksToZipSink :: MonadThrow m => [HashCheck] -> ZipSink ByteString m ()
+hashChecksToZipSink = traverse_ (ZipSink . sinkCheckHash)
 
 -- | Copied and extended version of Network.HTTP.Download.download.
 --
 -- Has the following additional features:
 -- * Verifies that response content-length header (if present)
 --     matches expected length
--- * Only downloads expected length # of bytes
+-- * Limits the download to (close to) the expected # of bytes
+-- * Verifies that the expected # bytes were downloaded (not too few)
 -- * Verifies md5 if response includes content-md5 header
--- * Verifies the expected hash
---
--- Further work ideas:
--- * Check existing file for the given length & hash
---     and redownload if it doesn't match
--- * Check the downloaded file isn't too small.
---    (Currently behavior only prevents it from being too large.)
--- * Add a "progress" hook so that long downloads don't look like they've hung.
+-- * Verifies the expected hashes
 --
 -- Throws VerifiedDownloadException, and whatever else "download" throws.
-verifiedDownload :: (HashAlgorithm a, Show a, MonadReader env m, HasHttpManager env, MonadIO m, MonadThrow m)
-         => VerifiedRequest a
+verifiedDownload :: (MonadReader env m, HasHttpManager env, MonadIO m)
+         => DownloadRequest
          -> Path Abs File -- ^ destination
+         -> Sink ByteString (ReaderT env IO) () -- ^ custom hook to observe progress
          -> m Bool -- ^ Whether a download was performed
-verifiedDownload VerifiedRequest{..} destpath = do
-    let req = vrRequest
+verifiedDownload DownloadRequest{..} destpath progressSink = do
+    let req = drRequest
     env <- ask
     liftIO $ whenM' getShouldDownload $ do
         createDirectoryIfMissing True dir
@@ -130,38 +158,51 @@ verifiedDownload VerifiedRequest{..} destpath = do
         (checkExpectations >> return True)
           `catch` \(_ :: VerifyFileException) -> return False
           `catch` \(_ :: VerifiedDownloadException) -> return False
-      where
-        checkExpectations = bracket (openFile fp ReadMode) hClose $ \h -> do
-            fileSizeInteger <- hFileSize h
-            when (fileSizeInteger > toInteger (maxBound :: Int)) $
-              throwM $ WrongFileSize vrDownloadBytes fileSizeInteger
-            let fileSize = fromInteger fileSizeInteger
-            when (fileSize /= vrDownloadBytes) $
-              throwM $ WrongFileSize vrDownloadBytes fileSizeInteger
-            sourceHandle h $$ getZipSink sinkCheckGivenHash
 
-    sinkCheckGivenHash :: MonadThrow m => ZipSink ByteString m ()
-    sinkCheckGivenHash = ZipSink $
-      sinkCheckHash vrHashAlgorithm vrExpectedHexDigest
+    whenJust :: Monad m => Maybe a -> (a -> m ()) -> m ()
+    whenJust (Just a) f = f a
+    whenJust _ _ = return ()
 
-    go h res = do
-        let headers = responseHeaders res
+    checkExpectations = bracket (openFile fp ReadMode) hClose $ \h -> do
+        whenJust drLengthCheck $ checkFileSizeExpectations h
+        sourceHandle h $$ getZipSink (hashChecksToZipSink drHashChecks)
+
+    -- doesn't move the handle
+    checkFileSizeExpectations h expectedFileSize = do
+        fileSizeInteger <- hFileSize h
+        when (fileSizeInteger > toInteger (maxBound :: Int)) $
+            throwM $ WrongFileSize expectedFileSize fileSizeInteger
+        let fileSize = fromInteger fileSizeInteger
+        when (fileSize /= expectedFileSize) $
+            throwM $ WrongFileSize expectedFileSize fileSizeInteger
+
+    checkContentLengthHeader headers expectedContentLength = do
         case List.lookup hContentLength headers of
             Just lengthBS -> do
               let lengthText = Text.strip $ Text.decodeUtf8 lengthBS
                   lengthStr = Text.unpack lengthText
-              when (lengthStr /= show vrDownloadBytes) $
-                throwM $ WrongContentLength vrDownloadBytes lengthBS
+              when (lengthStr /= show expectedContentLength) $
+                throwM $ WrongContentLength expectedContentLength lengthBS
             _ -> return ()
-        let checkHash = (case List.lookup hContentMD5 headers of
+
+    go h res = do
+        let headers = responseHeaders res
+        whenJust drLengthCheck $ checkContentLengthHeader headers
+        let hashChecks = (case List.lookup hContentMD5 headers of
                 Just md5BS ->
                     let md5ExpectedHexDigest =  BC.unpack (B64.decodeLenient md5BS)
-                    in ZipSink (sinkCheckHash MD5 md5ExpectedHexDigest)
-                Nothing ->
-                    pure ()
-                ) *> sinkCheckGivenHash
+                    in  [ HashCheck
+                              { hashCheckAlgorithm = MD5
+                              , hashCheckHexDigest = md5ExpectedHexDigest
+                              }
+                        ]
+                Nothing -> []
+                ) ++ drHashChecks
 
         responseBody res
-            $= CB.isolate vrDownloadBytes
-            -- TODO: $= progressHook
-            $$ getZipSink (checkHash *> ZipSink (sinkHandle h))
+            $= maybe (awaitForever yield) CB.isolate drLengthCheck
+            $$ getZipSink
+                ( hashChecksToZipSink hashChecks
+                  *> maybe (pure ()) assertLengthSink drLengthCheck
+                  *> ZipSink (sinkHandle h)
+                  *> ZipSink progressSink)

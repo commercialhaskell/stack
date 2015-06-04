@@ -25,16 +25,24 @@ getExamplePath dir = do
     file <- parseRelFile "cabal-install-1.22.4.0.tar.gz"
     return (dir </> file)
 
--- | An example VerifiedRequest that uses a SHA1
-exampleReq :: VerifiedRequest SHA1
+-- | An example DownloadRequest that uses a SHA1
+exampleReq :: DownloadRequest
 exampleReq = fromMaybe (error "exampleReq") $ do
     req <- parseUrl "http://download.fpcomplete.com/stackage-cli/linux64/cabal-install-1.22.4.0.tar.gz"
-    return VerifiedRequest
-        { vrRequest = req
-        , vrDownloadBytes = 302513
-        , vrExpectedHexDigest = "b98eea96d321cdeed83a201c192dac116e786ec2"
-        , vrHashAlgorithm  = SHA1
+    return DownloadRequest
+        { drRequest = req
+        , drHashChecks = [exampleHashCheck]
+        , drLengthCheck = Just exampleLengthCheck
         }
+
+exampleHashCheck :: HashCheck
+exampleHashCheck = HashCheck
+    { hashCheckAlgorithm = SHA1
+    , hashCheckHexDigest = "b98eea96d321cdeed83a201c192dac116e786ec2"
+    }
+
+exampleLengthCheck :: LengthCheck
+exampleLengthCheck = 302513
 
 -- | The wrong ContentLength for exampleReq
 exampleWrongContentLength :: Int
@@ -72,12 +80,17 @@ teardown _ = return ()
 
 spec :: Spec
 spec = beforeAll setup $ afterAll teardown $ do
+  let exampleProgressHook = return ()
+
   describe "verifiedDownload" $ do
+    -- Preconditions:
+    -- * the exampleReq server is running
+    -- * the test runner has working internet access to it
     it "downloads the file correctly" $ \T{..} -> withTempDir $ \dir -> do
       examplePath <- getExamplePath dir
       let exampleFilePath = toFilePath examplePath
       doesFileExist exampleFilePath `shouldReturn` False
-      let go = runWith manager $ verifiedDownload exampleReq examplePath
+      let go = runWith manager $ verifiedDownload exampleReq examplePath exampleProgressHook
       go `shouldReturn` True
       doesFileExist exampleFilePath `shouldReturn` True
 
@@ -85,7 +98,7 @@ spec = beforeAll setup $ afterAll teardown $ do
       examplePath <- getExamplePath dir
       let exampleFilePath = toFilePath examplePath
       doesFileExist exampleFilePath `shouldReturn` False
-      let go = runWith manager $ verifiedDownload exampleReq examplePath
+      let go = runWith manager $ verifiedDownload exampleReq examplePath exampleProgressHook
       go `shouldReturn` True
       doesFileExist exampleFilePath `shouldReturn` True
       go `shouldReturn` False
@@ -96,7 +109,7 @@ spec = beforeAll setup $ afterAll teardown $ do
       let exampleFilePath = toFilePath examplePath
       writeFile exampleFilePath exampleWrongContent
       doesFileExist exampleFilePath `shouldReturn` True
-      let go = runWith manager $ verifiedDownload exampleReq examplePath
+      let go = runWith manager $ verifiedDownload exampleReq examplePath exampleProgressHook
       go `shouldReturn` True
       doesFileExist exampleFilePath `shouldReturn` True
 
@@ -104,17 +117,17 @@ spec = beforeAll setup $ afterAll teardown $ do
       examplePath <- getExamplePath dir
       let exampleFilePath = toFilePath examplePath
       let wrongContentLengthReq = exampleReq
-            { vrDownloadBytes = exampleWrongContentLength
+            { drLengthCheck = Just exampleWrongContentLength
             }
-      let go = runWith manager $ verifiedDownload wrongContentLengthReq examplePath
+      let go = runWith manager $ verifiedDownload wrongContentLengthReq examplePath exampleProgressHook
       go `shouldThrow` isWrongContentLength
       doesFileExist exampleFilePath `shouldReturn` False
 
     it "rejects incorrect digest" $ \T{..} -> withTempDir $ \dir -> do
       examplePath <- getExamplePath dir
       let exampleFilePath = toFilePath examplePath
-      let wrongDigestReq = exampleReq
-            { vrExpectedHexDigest = exampleWrongDigest }
-      let go = runWith manager $ verifiedDownload wrongDigestReq examplePath
+      let wrongHashCheck = exampleHashCheck { hashCheckHexDigest = exampleWrongDigest }
+      let wrongDigestReq = exampleReq { drHashChecks = [wrongHashCheck] }
+      let go = runWith manager $ verifiedDownload wrongDigestReq examplePath exampleProgressHook
       go `shouldThrow` isWrongDigest
       doesFileExist exampleFilePath `shouldReturn` False
