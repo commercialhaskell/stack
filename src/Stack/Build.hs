@@ -444,7 +444,7 @@ data Task = Task
     }
     deriving Show
 
-data TaskType = TTPackage LocalPackage NeedsConfig | TTMPI MiniPackageInfo
+data TaskType = TTPackage LocalPackage NeededSteps | TTMPI MiniPackageInfo
     deriving Show
 
 data S = S
@@ -540,9 +540,10 @@ configureOpts bco deps wanted loc flags = map T.pack $ concat
       where
         PackageIdentifier name version = ghcPkgIdPackageIdentifier gid
 
-type NeedsConfig = Bool
+data NeededSteps = AllSteps | SkipConfig | JustFinal
+    deriving (Show, Eq)
 data DirtyResult
-    = Dirty NeedsConfig
+    = Dirty NeededSteps
     | CleanLibrary GhcPkgId
     | CleanExecutable
 
@@ -569,7 +570,12 @@ constructPlan mbp baseConfigOpts locals locallyRegistered sourceMap = do
             ([], _) -> return ()
             (errs, _) -> addFailure $ Couldn'tMakePlanForWanted $ Set.fromList errs
     let toUnregisterLocal (PackageIdentifier name version)
-            | name `Map.member` tasks s = True
+            | Just task <- Map.lookup name (tasks s) =
+                case taskType task of
+                    -- If we're just going to be running the tests/benchmarks,
+                    -- and the version is the same, do not unregister
+                    TTPackage _ JustFinal -> version /= (packageIdentifierVersion $ taskProvides task)
+                    _ -> True
             | otherwise =
                 case Map.lookup name sourceMap of
                     Nothing -> False
@@ -644,26 +650,26 @@ constructPlan mbp baseConfigOpts locals locallyRegistered sourceMap = do
             let missing = Set.fromList $ mapMaybe toMissing adrs
                 present = Set.fromList $ mapMaybe toPresent adrs
                 configOpts = configureOpts baseConfigOpts present (lpWanted lp) Local (packageFlags $ lpPackage lp)
-                dres | not $ Set.null missing = Dirty True
+                dres | not $ Set.null missing = Dirty AllSteps
                      | otherwise =
                         case lpLastConfigOpts lp of
-                            Nothing -> Dirty True
+                            Nothing -> Dirty AllSteps
                             Just oldConfigOpts
-                                | oldConfigOpts /= configOpts -> Dirty True
-                                | lpDirtyFiles lp -> Dirty False
+                                | oldConfigOpts /= configOpts -> Dirty AllSteps
+                                | lpDirtyFiles lp -> Dirty SkipConfig
 
                                 -- We want to make sure to run the final action
                                 -- if this target is wanted. We should probably
                                 -- add an extra flag to indicate "no need to
                                 -- build".
                                 | lpWanted lp && bcoFinalAction baseConfigOpts `elem`
-                                    [DoTests, DoBenchmarks] -> Dirty False
+                                    [DoTests, DoBenchmarks] -> Dirty JustFinal
 
                                 | not $ packageHasLibrary p -> CleanExecutable
                                 | otherwise ->
                                     case fmap Set.toList $ Map.lookup name localMap of
                                         Just [gid] -> CleanLibrary gid
-                                        _ -> Dirty False
+                                        _ -> Dirty SkipConfig
             -- FIXME probably need to cache results of calls to addLocal in S, possibly all of addDep
             case dres of
                 Dirty needConfig -> addTask Task
@@ -760,9 +766,6 @@ build bopts = do
             }
 
     locals <- loadLocals bopts
-    let localNames = Set.fromList $ map (packageName . lpPackage) locals
-        localDepVersions = bcExtraDeps bconfig
-
     extraDeps <- loadExtraDeps menv cabalPkgVer
 
     let sourceMap1 = Map.unions
@@ -879,9 +882,12 @@ displayTask task = T.pack $ concat
         Local -> "local"
     , ", source="
     , case taskType task of
-        TTPackage lp needConfig -> concat
+        TTPackage lp steps -> concat
             [ toFilePath $ packageDir $ lpPackage lp
-            , if needConfig then " (configure)" else ""
+            , case steps of
+                AllSteps -> " (configure)"
+                SkipConfig -> " (build)"
+                JustFinal -> " (already built)"
             ]
         TTMPI _ -> "package index"
     , if Set.null $ taskRequiresMissing task
@@ -972,8 +978,9 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
         fileModTimes <- getPackageFileModTimes package
         writeDirtyCache (packageDir package) fileModTimes configOpts
 
-    announce "build"
-    cabal ["build"]
+    unless justFinal $ do
+        announce "build"
+        cabal ["build"]
 
     case taskType of
         TTPackage lp _ | lpWanted lp -> do
@@ -986,10 +993,12 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                 DoNothing -> return ()
         _ -> return ()
 
-    withMVar eeInstallLock $ \_ -> do
+    unless justFinal $ withMVar eeInstallLock $ \_ -> do
         announce "install"
         cabal ["install"]
 
+    -- It seems correct to leave this outside of the "justFinal" check above,
+    -- in case another package depends on a justFinal target
     let pkgDbs =
             case taskLocation of
                 Global -> []
@@ -1015,8 +1024,12 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
 
     needsConfig =
         case taskType of
-            TTPackage _ y -> y
+            TTPackage _ y -> y == AllSteps
             TTMPI _ -> True
+    justFinal =
+        case taskType of
+            TTPackage _ JustFinal -> True
+            _ -> False
 
     wanted =
         case taskType of
