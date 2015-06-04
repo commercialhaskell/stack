@@ -101,11 +101,12 @@ data PackageSource
     | PSInstalledLib Location GhcPkgId
     | PSInstalledExe Location
 
+-- | Returns the new SourceMap and all of the locally registered packages.
 getInstalled :: M env m
              => EnvOverride
              -> Bool -- ^ profiling?
              -> SourceMap -- ^ does not contain any installed information
-             -> m SourceMap
+             -> m (SourceMap, Set GhcPkgId)
 getInstalled menv profiling sourceMap1 = do
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
@@ -135,7 +136,7 @@ getInstalled menv profiling sourceMap1 = do
     return $ M.union libraries executables
     -}
 
-    return sourceMap2
+    return (sourceMap2, localInstalled)
 
 data LocalPackage = LocalPackage
     { lpPackage :: Package
@@ -326,11 +327,16 @@ data AddDepRes
     | ADRFoundExe Location
     deriving Show
 
+data Plan = Plan
+    { planTasks :: !(Map PackageName Task)
+    , planUnregisterLocal :: !(Set GhcPkgId)
+    }
 constructPlan :: MonadThrow m
               => [LocalPackage]
+              -> Set GhcPkgId -- ^ locally registered
               -> SourceMap
-              -> m (Map PackageName Task)
-constructPlan locals sourceMap = do
+              -> m Plan
+constructPlan locals locallyRegistered sourceMap = do
     let s0 = S
             { callStack = []
             , tasks = M.empty
@@ -342,7 +348,12 @@ constructPlan locals sourceMap = do
             ([], _) -> return ()
             (errs, _) -> addFailure $ Couldn'tMakePlanForWanted $ Set.fromList errs
     if null $ failures s
-        then return $ tasks s
+        then return Plan
+            { planTasks = tasks s
+            , planUnregisterLocal = Set.filter
+                ((`Map.member` tasks s) . packageIdentifierName . ghcPkgIdPackageIdentifier)
+                locallyRegistered
+            }
         else throwM $ ConstructPlanExceptions $ failures s
   where
     addTask task = do
@@ -483,13 +494,13 @@ build bopts = do
             , flip fmap inBuildPlan $ \mpi -> (mpiVersion mpi, PSSnapshot mpi)
             ]
 
-    sourceMap2 <- getInstalled menv profiling sourceMap1
+    (sourceMap2, locallyRegistered) <- getInstalled menv profiling sourceMap1
 
-    plan <- constructPlan locals sourceMap2
+    plan <- constructPlan locals locallyRegistered sourceMap2
 
     if boptsDryrun bopts
-        then mapM_ ($logInfo . displayTask) $ Map.elems plan
-        else executeTasks $ M.elems plan
+        then printPlan plan
+        else executePlan plan
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
 
@@ -525,6 +536,22 @@ depPackageConfig bconfig flags = PackageConfig
     , packageConfigPlatform = configPlatform (getConfig bconfig)
     }
 
+printPlan :: M env m => Plan -> m ()
+printPlan plan = do
+    case Set.toList $ planUnregisterLocal plan of
+        [] -> $logInfo "Nothing to unregister"
+        xs -> do
+            $logInfo "Would unregister locally:"
+            mapM_ ($logInfo . T.pack . ghcPkgIdString) xs
+
+    $logInfo ""
+
+    case Map.elems $ planTasks plan of
+        [] -> $logInfo "Nothing to build"
+        xs -> do
+            $logInfo "Would build:"
+            mapM_ ($logInfo . displayTask) xs
+
 -- | For a dry run
 displayTask :: Task -> Text
 displayTask task = T.pack $ concat
@@ -544,8 +571,8 @@ displayTask task = T.pack $ concat
     ]
 
 -- | Perform the actual plan
-executeTasks :: a
-executeTasks = error "executeTasks"
+executePlan :: a
+executePlan = error "executePlan"
 
 {- FIXME
     cabalPkgVer <- getMinimalEnvOverride >>= getCabalPkgVer
