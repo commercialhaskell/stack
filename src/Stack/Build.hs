@@ -153,7 +153,7 @@ markExeInstalled loc ident = do
     liftIO $ createDirectoryIfMissing True $ toFilePath dir
     ident' <- parseRelFile $ packageIdentifierString ident
     let fp = toFilePath $ dir </> ident'
-    -- FIXME consideration for the future: list all of the executables
+    -- TODO consideration for the future: list all of the executables
     -- installed, and invalidate this file in getInstalledExes if they no
     -- longer exist
     liftIO $ writeFile fp "Installed"
