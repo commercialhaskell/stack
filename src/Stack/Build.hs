@@ -616,7 +616,9 @@ build bopts = do
 
     if boptsDryrun bopts
         then printPlan plan
-        else executePlan plan
+        else executePlan plan ExecuteEnv
+            { eeEnvOverride = menv
+            }
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
 
@@ -689,9 +691,22 @@ displayTask task = T.pack $ concat
         else ", after: " ++ intercalate "," (map packageIdentifierString $ Set.toList $ taskRequiresMissing task)
     ]
 
+data ExecuteEnv = ExecuteEnv
+    { eeEnvOverride :: !EnvOverride
+    }
+
 -- | Perform the actual plan
-executePlan :: a
-executePlan = error "executePlan"
+executePlan :: M env m
+            => Plan
+            -> ExecuteEnv
+            -> m ()
+executePlan plan ee = do
+    case Set.toList $ planUnregisterLocal plan of
+        [] -> return ()
+        ids -> do
+            localDB <- packageDatabaseLocal
+            unregisterGhcPkgIds (eeEnvOverride ee) localDB ids
+    error "executePlan"
 
 {- FIXME
     cabalPkgVer <- getMinimalEnvOverride >>= getCabalPkgVer
