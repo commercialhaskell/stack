@@ -1052,7 +1052,12 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                 $ \h -> inner (Just (fp, h))
 
     withCabal package mlogFile inner = do
-        exeName <- liftIO $ join $ findExecutable eeEnvOverride "runhaskell"
+        config <- asks getConfig
+        menv <- liftIO $ configEnvOverride config EnvSettings
+            { esIncludeLocals = taskLocation == Local
+            , esIncludeGhcPackagePath = False
+            }
+        exeName <- liftIO $ join $ findExecutable menv "runhaskell"
         distRelativeDir' <- distRelativeDir eeCabalPkgVer
         msetuphs <- liftIO $ getSetupHs $ packageDir package
         let setuphs = fromMaybe eeSetupHs msetuphs
@@ -1069,7 +1074,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                 cp0 = proc (toFilePath exeName) fullArgs
                 subEnv =
                      fmap (filter (\(x, _) -> x /= "GHC_PACKAGE_PATH"))
-                   $ envHelper eeEnvOverride
+                   $ envHelper menv
                 cp = cp0
                     { cwd = Just $ toFilePath $ packageDir package
                     , Process.env = subEnv
