@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -14,6 +15,18 @@ module Stack.Build
   (build
   ,clean)
   where
+
+import           Data.Binary (Binary)
+import qualified Data.Binary as Binary
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString as S
+import qualified Data.ByteString.Lazy as L
+import           Data.Text (Text)
+import qualified Data.Text.Encoding as T
+import           Data.Time.Calendar
+import           Data.Time.Clock
+import           GHC.Generics
+import           System.IO.Error
 
 import qualified Control.Applicative as A
 import           Control.Applicative ((<$>), (<*>))
@@ -224,11 +237,17 @@ loadLocals bopts = do
             cabalfp
             PTUser
         -- FIXME check if name == what's inside pkg
+        mdirtyCache <- tryGetDirtyCache dir
+        fileModTimes <- getPackageFileModTimes pkg
         return LocalPackage
             { lpPackage = pkg
             , lpWanted = wanted
-            , lpLastConfigOpts = Nothing -- FIXME
-            , lpDirtyFiles = True -- FIXME
+            , lpLastConfigOpts =
+                  fmap (map T.decodeUtf8 . dirtyCacheOpts) mdirtyCache
+            , lpDirtyFiles =
+                  maybe True
+                        ((/= fileModTimes) . dirtyCacheTimes)
+                        mdirtyCache
             }
 
     let known = Set.fromList $ map (packageName . lpPackage) lps
@@ -249,6 +268,83 @@ loadLocals bopts = do
         name `Set.member` names ||
         any (`FL.isParentOf` dir) dirs ||
         any (== dir) dirs
+
+-- | Stored on disk to know whether the flags have changed or any
+-- files have changed.
+data DirtyCache = DirtyCache
+    { dirtyCacheOpts :: ![ByteString]
+      -- ^ All options used for this package.
+    , dirtyCacheTimes :: ![(FilePath,ModTime)]
+      -- ^ Modification times of files.
+    }
+    deriving (Generic,Eq)
+instance Binary DirtyCache
+
+-- | Used for storage and comparison.
+newtype ModTime = ModTime (Integer,Rational)
+  deriving (Ord,Show,Generic,Eq)
+instance Binary ModTime
+
+-- | One-way conversion to serialized time.
+modTime :: UTCTime -> ModTime
+modTime x =
+    ModTime
+        ( toModifiedJulianDay
+              (utctDay x)
+        , toRational
+              (utctDayTime x))
+
+-- | Try to read the dirtiness cache for the given package directory.
+tryGetDirtyCache :: (M env m)
+                 => Path Abs Dir -> m (Maybe DirtyCache)
+tryGetDirtyCache dir = do
+    menv <- getMinimalEnvOverride
+    cabalPkgVer <- getCabalPkgVer menv
+    fp <- dirtyCacheFile cabalPkgVer dir
+    liftIO
+        (catch
+             (fmap (decodeMaybe . L.fromStrict) (S.readFile (toFilePath fp)))
+             (\e -> if isDoesNotExistError e
+                       then return Nothing
+                       else throwIO e))
+  where decodeMaybe =
+            either (const Nothing) (Just . thd) . Binary.decodeOrFail
+          where thd (_,_,x) = x
+
+-- | Write the dirtiness cache for this package.
+writeDirtyCache :: (M env m)
+                => Path Abs Dir -> [(FilePath,ModTime)] -> [Text] -> m ()
+writeDirtyCache dir times opts = do
+    menv <- getMinimalEnvOverride
+    cabalPkgVer <- getCabalPkgVer menv
+    fp <- dirtyCacheFile cabalPkgVer dir
+    liftIO
+        (L.writeFile
+             (toFilePath fp)
+             (Binary.encode
+                  (DirtyCache
+                   { dirtyCacheOpts = map T.encodeUtf8 opts
+                   , dirtyCacheTimes = times
+                   })))
+
+-- | Get the modified times of all known files in the package,
+-- including the package's cabal file itself.
+getPackageFileModTimes :: MonadIO m => Package -> m [(FilePath,ModTime)]
+getPackageFileModTimes pkg =
+    liftM
+        catMaybes
+        (mapM getModTimeMaybe (packageCabalFile pkg : Set.toList (packageFiles pkg)))
+  where
+    getModTimeMaybe fp =
+        liftIO
+            (catch
+                 (liftM
+                      (Just . (toFilePath fp,) . modTime)
+                      (getModificationTime (toFilePath fp)) )
+                 (\e ->
+                       if isDoesNotExistError e
+                           then return Nothing
+                           else throw e))
 
 data LoadHelper = LoadHelper
     { lhId :: !GhcPkgId
@@ -783,6 +879,8 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                 eeBaseConfigOpts
         cabal $ "configure" : map T.unpack configOpts
         $logDebug $ T.pack $ show configOpts
+        fileModTimes <- getPackageFileModTimes package
+        writeDirtyCache (packageDir package) fileModTimes configOpts
 
     announce "build"
     announce $ "console: " <> T.pack (show console)
