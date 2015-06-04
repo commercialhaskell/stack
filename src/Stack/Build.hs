@@ -1339,12 +1339,12 @@ printWithoutTHLoading outH = liftIO $ void $ forkIO $
 -- | Reset the build (remove Shake database and .gen files).
 clean :: (M env m) => m ()
 clean = do
-    env <- ask
+    bconfig <- asks getBuildConfig
     menv <- getMinimalEnvOverride
     cabalPkgVer <- getCabalPkgVer menv
     forM_
-        (S.toList (bcPackages $ getBuildConfig env))
-        deleteCaches
+        (S.toList (bcPackages bconfig))
+        (distDirFromDir cabalPkgVer >=> removeTreeIfExists)
 
 {- EKB FIXME: doc generation for stack-doc-server
             (boptsFinalAction bopts == DoHaddock)

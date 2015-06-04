@@ -10,10 +10,12 @@ module Path.IO
   ,resolveDirMaybe
   ,resolveFileMaybe
   ,ResolveException(..)
-  ,removeFileIfExists)
+  ,removeFileIfExists
+  ,removeTree
+  ,removeTreeIfExists)
   where
 
-import           Control.Exception
+import           Control.Exception hiding (catch)
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -112,10 +114,23 @@ listDirectory dir =
 -- doesn't, doesn't complain.
 removeFileIfExists :: MonadIO m => Path b File -> m ()
 removeFileIfExists fp =
-    liftIO (Control.Exception.catch
+    liftIO (catch
                 (removeFile
                      (toFilePath fp))
                 (\e ->
                       if isDoesNotExistError e
                           then return ()
                           else throwIO e))
+
+-- | Remove the given tree. Bails out if the directory doesn't exist.
+removeTree :: MonadIO m => Path b Dir -> m ()
+removeTree =
+    liftIO . removeDirectoryRecursive . toFilePath
+
+-- | Remove tree, don't complain about non-existent directories.
+removeTreeIfExists :: MonadIO m => Path b Dir -> m ()
+removeTreeIfExists fp = do
+    liftIO (catch (removeTree fp)
+                  (\e -> if isDoesNotExistError e
+                            then return ()
+                            else throwIO e))
