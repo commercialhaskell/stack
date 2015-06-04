@@ -275,17 +275,18 @@ loadLocals bopts = do
             cabalfp
         when (packageName pkg /= name) $ throwM
             $ MismatchedCabalName cabalfp (packageName pkg)
-        mdirtyCache <- tryGetDirtyCache dir
+        mbuildCache <- tryGetBuildCache dir
+        mconfigCache <- tryGetConfigCache dir
         fileModTimes <- getPackageFileModTimes pkg
         return LocalPackage
             { lpPackage = pkg
             , lpWanted = wanted
             , lpLastConfigOpts =
-                  fmap (map T.decodeUtf8 . dirtyCacheOpts) mdirtyCache
+                  fmap (map T.decodeUtf8 . configCacheOpts) mconfigCache
             , lpDirtyFiles =
                   maybe True
-                        ((/= fileModTimes) . dirtyCacheTimes)
-                        mdirtyCache
+                        ((/= fileModTimes) . buildCacheTimes)
+                        mbuildCache
             }
 
     let known = Set.fromList $ map (packageName . lpPackage) lps
@@ -309,14 +310,21 @@ loadLocals bopts = do
 
 -- | Stored on disk to know whether the flags have changed or any
 -- files have changed.
-data DirtyCache = DirtyCache
-    { dirtyCacheOpts :: ![ByteString]
-      -- ^ All options used for this package.
-    , dirtyCacheTimes :: !(Map FilePath ModTime)
+data BuildCache = BuildCache
+    { buildCacheTimes :: !(Map FilePath ModTime)
       -- ^ Modification times of files.
     }
     deriving (Generic,Eq)
-instance Binary DirtyCache
+instance Binary BuildCache
+
+-- | Stored on disk to know whether the flags have changed or any
+-- files have changed.
+data ConfigCache = ConfigCache
+    { configCacheOpts :: ![ByteString]
+      -- ^ All options used for this package.
+    }
+    deriving (Generic,Eq)
+instance Binary ConfigCache
 
 -- | Used for storage and comparison.
 newtype ModTime = ModTime (Integer,Rational)
@@ -333,12 +341,24 @@ modTime x =
               (utctDayTime x))
 
 -- | Try to read the dirtiness cache for the given package directory.
-tryGetDirtyCache :: (M env m)
-                 => Path Abs Dir -> m (Maybe DirtyCache)
-tryGetDirtyCache dir = do
+tryGetBuildCache :: (M env m)
+                 => Path Abs Dir -> m (Maybe BuildCache)
+tryGetBuildCache = tryGetCache buildCacheFile
+
+-- | Try to read the dirtiness cache for the given package directory.
+tryGetConfigCache :: (M env m)
+                  => Path Abs Dir -> m (Maybe ConfigCache)
+tryGetConfigCache = tryGetCache configCacheFile
+
+-- | Try to load a cache.
+tryGetCache :: (M env m,Binary a)
+            => (PackageIdentifier -> Path Abs Dir -> m (Path Abs File))
+            -> Path Abs Dir
+            -> m (Maybe a)
+tryGetCache get dir = do
     menv <- getMinimalEnvOverride
     cabalPkgVer <- getCabalPkgVer menv
-    fp <- dirtyCacheFile cabalPkgVer dir
+    fp <- get cabalPkgVer dir
     liftIO
         (catch
              (fmap (decodeMaybe . L.fromStrict) (S.readFile (toFilePath fp)))
@@ -349,21 +369,42 @@ tryGetDirtyCache dir = do
             either (const Nothing) (Just . thd) . Binary.decodeOrFail
           where thd (_,_,x) = x
 
--- | Write the dirtiness cache for this package.
-writeDirtyCache :: (M env m)
-                => Path Abs Dir -> Map FilePath ModTime -> [Text] -> m ()
-writeDirtyCache dir times opts = do
+-- | Write the dirtiness cache for this package's files.
+writeBuildCache :: (M env m)
+                => Path Abs Dir -> Map FilePath ModTime -> m ()
+writeBuildCache dir times =
+    writeCache
+        dir
+        buildCacheFile
+        (BuildCache
+         { buildCacheTimes = times
+         })
+
+-- | Write the dirtiness cache for this package's configuration.
+writeConfigCache :: (M env m)
+                => Path Abs Dir -> [Text] -> m ()
+writeConfigCache dir opts =
+    writeCache
+        dir
+        configCacheFile
+        (ConfigCache
+         { configCacheOpts = map T.encodeUtf8 opts
+         })
+
+-- | Write to a cache.
+writeCache :: (Binary a, M env m)
+           => Path Abs Dir
+           -> (PackageIdentifier -> Path Abs Dir -> m (Path Abs File))
+           -> a
+           -> m ()
+writeCache dir get content = do
     menv <- getMinimalEnvOverride
     cabalPkgVer <- getCabalPkgVer menv
-    fp <- dirtyCacheFile cabalPkgVer dir
+    fp <- get cabalPkgVer dir
     liftIO
         (L.writeFile
              (toFilePath fp)
-             (Binary.encode
-                  (DirtyCache
-                   { dirtyCacheOpts = map T.encodeUtf8 opts
-                   , dirtyCacheTimes = times
-                   })))
+             (Binary.encode content))
 
 -- | Get the modified times of all known files in the package,
 -- including the package's cabal file itself.
@@ -985,32 +1026,31 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
   withPackage $ \package ->
   withLogFile package $ \mlogFile ->
   withCabal package mlogFile $ \cabal -> do
-    idMap <- liftIO $ readTVarIO eeGhcPkgIds
-    let getMissing ident =
-            case Map.lookup ident idMap of
-                Nothing -> error "singleBuild: invariant violated, missing package ID missing"
-                Just (Library x) -> Just x
-                Just Executable -> Nothing
-        allDeps = Set.union
-            taskRequiresPresent
-            (Set.fromList $ mapMaybe getMissing $ Set.toList taskRequiresMissing)
-    let configOpts = configureOpts
-            eeBaseConfigOpts
-            allDeps
-            wanted
-            taskLocation
-            (packageFlags package)
-
     when needsConfig $ withMVar eeConfigureLock $ \_ -> do
+        idMap <- liftIO $ readTVarIO eeGhcPkgIds
+        let getMissing ident =
+                case Map.lookup ident idMap of
+                    Nothing -> error "singleBuild: invariant violated, missing package ID missing"
+                    Just (Library x) -> Just x
+                    Just Executable -> Nothing
+            allDeps = Set.union
+                taskRequiresPresent
+                (Set.fromList $ mapMaybe getMissing $ Set.toList taskRequiresMissing)
+        let configOpts = configureOpts
+                eeBaseConfigOpts
+                allDeps
+                wanted
+                taskLocation
+                (packageFlags package)
         announce "configure"
         cabal False $ "configure" : map T.unpack configOpts
-
-    $logDebug $ T.pack $ show configOpts
-    fileModTimes <- getPackageFileModTimes package
-    writeDirtyCache (packageDir package) fileModTimes configOpts
+        $logDebug $ T.pack $ show configOpts
+        writeConfigCache (packageDir package) configOpts
 
     unless justFinal $ do
         announce "build"
+        fileModTimes <- getPackageFileModTimes package
+        writeBuildCache (packageDir package) fileModTimes
         config <- asks getConfig
         cabal (console && configHideTHLoading config) ["build"]
 
