@@ -568,11 +568,25 @@ constructPlan mbp baseConfigOpts locals locallyRegistered sourceMap = do
         case partitionEithers eres of
             ([], _) -> return ()
             (errs, _) -> addFailure $ Couldn'tMakePlanForWanted $ Set.fromList errs
+    let toUnregisterLocal (PackageIdentifier name version)
+            | name `Map.member` tasks s = True
+            | otherwise =
+                case Map.lookup name sourceMap of
+                    Nothing -> False
+                    Just (version', ps)
+                        | version /= version' -> True
+                        | otherwise -> case ps of
+                            PSLocal _ -> False
+                            PSExtraDeps _ -> False
+                            PSSnapshot _ -> True
+                            PSInstalledLib Local _ -> False
+                            PSInstalledLib _ _ -> False
+                            PSInstalledExe _ -> assert False False
     if null $ failures s
         then return Plan
             { planTasks = tasks s
             , planUnregisterLocal = Set.filter
-                ((`Map.member` tasks s) . packageIdentifierName . ghcPkgIdPackageIdentifier)
+                (toUnregisterLocal . ghcPkgIdPackageIdentifier)
                 locallyRegistered
             }
         else throwM $ ConstructPlanExceptions $ failures s
@@ -890,10 +904,15 @@ executePlan plan ee = do
         [] -> return ()
         ids -> do
             localDB <- packageDatabaseLocal
-            unregisterGhcPkgIds (eeEnvOverride ee) localDB ids
+            forM_ ids $ \id' -> do
+                $logInfo $ T.concat
+                    [ T.pack $ ghcPkgIdString id'
+                    , ": unregistering"
+                    ]
+                unregisterGhcPkgId (eeEnvOverride ee) localDB id'
     u <- askUnliftBase
     let actions = concatMap (toActions u ee) $ Map.elems $ planTasks plan
-        threads = 1 -- 8 -- FIXME where did we get this before?
+        threads = 8 -- FIXME where did we get this before?
     liftIO $ runActions threads actions
 
 toActions :: M env m
