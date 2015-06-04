@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -53,6 +54,7 @@ import           Data.Streaming.Process hiding (env,callProcess)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import           Data.Typeable (Typeable)
 import           Development.Shake (addOracle,Action)
 import           Distribution.Package (Dependency (..))
 import           Distribution.System (Platform (Platform), OS (Windows))
@@ -93,7 +95,7 @@ type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig en
 
 type SourceMap = Map PackageName (Version, PackageSource)
 data PackageSource
-    = PSLocal Package
+    = PSLocal LocalPackage
     | PSExtraDeps (Map FlagName Bool) -- FIXME load up the Package for this preemptively, and cache it in a binary file
     | PSSnapshot MiniPackageInfo
     | PSInstalledLib Location GhcPkgId
@@ -289,38 +291,135 @@ data Task = Task
     { taskProvides :: !PackageIdentifier
     , taskRequiresMissing :: !(Set PackageIdentifier)
     , taskRequiresPresent :: !(Set GhcPkgId)
-    , taskWanted :: !Bool
     , taskLocation :: !Location
     , taskType :: !TaskType
     }
     deriving Show
 
-data TaskType = TTPackage Package | TTMPI MiniPackageInfo
+data TaskType = TTPackage LocalPackage | TTMPI MiniPackageInfo
     deriving Show
 
 data S = S
-    { visited :: !(Map PackageName Version)
-    , tasks :: ![Task]
-    , failures :: !(Set Text)
+    { callStack :: ![PackageName]
+    , tasks :: !(Map PackageName Task)
+    , failures :: ![ConstructPlanException]
     }
 
-constructPlan :: M env m
+data ConstructPlanException
+    = SnapshotPackageDependsOnLocal PackageName PackageIdentifier
+    -- ^ Recommend adding to extra-deps
+    | DependencyCycleDetected [PackageName]
+    | DependencyPlanFailures PackageName (Set PackageName)
+    | UnknownPackage PackageName
+    -- ^ Recommend adding to extra-deps, give a helpful version number?
+    | VersionOutsideRange PackageName PackageIdentifier VersionRange
+    deriving (Show, Typeable, Eq)
+
+newtype ConstructPlanExceptions = ConstructPlanExceptions [ConstructPlanException]
+    deriving (Show, Typeable)
+instance Exception ConstructPlanExceptions
+
+data AddDepRes
+    = ADRToInstall PackageIdentifier Location
+    | ADRFound GhcPkgId Location
+    | ADRFoundExe Location
+    deriving Show
+
+constructPlan :: MonadThrow m
               => [LocalPackage]
               -> SourceMap
-              -> m [Task]
+              -> m (Map PackageName Task)
 constructPlan locals sourceMap = do
-    error "constructPlan"
-    {-
-    s <- execStateT (mapM_ goWanted $ filter lpWanted locals) (S M.empty [] Set.empty)
-    if Set.null $ failures s
+    s <- execStateT (mapM_ goLocal $ filter lpWanted locals) S
+        { callStack = []
+        , tasks = M.empty
+        , failures = []
+        }
+    if null $ failures s
         then return $ tasks s
-        else do liftIO (print ("visited",visited    s))
-                liftIO (print ("tasks",tasks s))
-                error $ show $ failures s -- FIXME
+        else throwM $ ConstructPlanExceptions $ failures s
   where
-    goWanted = goPackage Local True . lpPackage
+    addTask task = modify $ \s -> s { tasks = Map.insert
+        (packageIdentifierName $ taskProvides task)
+        task
+        (tasks s) }
+    addFailure e = modify $ \s -> s { failures = e : failures s }
+    checkCallStack name inner = do
+        s <- get
+        if name `elem` callStack s
+            then do
+                addFailure $ DependencyCycleDetected $ callStack s
+                return $ Left name
+            else do
+                put s { callStack = name : callStack s }
+                res <- inner
+                s' <- get
+                case callStack s' of
+                    name':rest | name == name' -> do
+                        put s' { callStack = rest }
+                        return $ maybe (Left name) Right res
+                    _ -> error $ "constructPlan invariant violated: call stack is corrupted: " ++ show (name, callStack s, callStack s')
 
-    addTask task = modify $ \s -> s { tasks = task : tasks s }
+    goLocal lp = checkCallStack name $ do
+        eadrs <- mapM (uncurry (addDep name Local)) (M.toList $ packageDeps p) -- FIXME start adding in tool deps
+        let (errs, adrs) = partitionEithers eadrs
+        if null errs
+            then do
+                addFailure $ DependencyPlanFailures name $ Set.fromList errs
+                return Nothing
+            else do
+                -- FIXME do dirtiness checking here and, if not dirty, don't build
+                -- FIXME probably need to cache results of calls to goLocal in S, possibly all of addDep
+                addTask Task
+                    { taskProvides = ident
+                    , taskRequiresMissing = Set.fromList $ mapMaybe toMissing adrs
+                    , taskRequiresPresent = Set.fromList $ mapMaybe toPresent adrs
+                    , taskLocation = Local
+                    , taskType = TTPackage lp
+                    }
+                return $ Just $ ADRToInstall ident Local
+      where
+        p = lpPackage lp
+        name = packageName p
+        version = packageVersion p
+        ident = PackageIdentifier name version
+
+    addDep user userloc name range =
+        case Map.lookup name sourceMap of
+            Nothing -> do
+                addFailure $ UnknownPackage name
+                return $ Left name
+            Just (version, ps)
+                | version `withinRange` range -> case ps of
+                    PSLocal lp -> allowLocal version $ goLocal lp
+                    PSExtraDeps _ -> allowLocal version $ error "addDep: PSExtraDeps not handled"
+                    PSSnapshot mpi -> error "addDep: PSSnapshot not handled"
+                    PSInstalledLib loc gid -> allowLocation loc version $ return $ Right $ ADRFound gid loc
+                    PSInstalledExe loc -> allowLocation loc version $ return $ Right $ ADRFoundExe loc
+                | otherwise -> do
+                    addFailure $ VersionOutsideRange
+                        user
+                        (PackageIdentifier name version)
+                        range
+                    return $ Left name
+      where
+        allowLocation loc version inner =
+            case loc of
+                Local -> allowLocal version inner
+                _ -> inner
+        allowLocal version inner =
+            case userloc of
+                Local -> inner
+                _ -> do
+                    addFailure $ SnapshotPackageDependsOnLocal user
+                        (PackageIdentifier name version)
+                    return $ Left name
+
+    checkRange = error "checkRange"
+    toMissing = error "toMissing"
+    toPresent = error "toPresent"
+
+    {-
     addFailure t = modify $ \s -> s { failures = Set.insert t $ failures s }
 
     withVisited package = withVisited'
@@ -434,12 +533,6 @@ constructPlan locals sourceMap = do
                 return $ FDRToInstall (mpiVersion mpi) Snap
     -}
 
-data FindDepRes
-    = FDRToInstall Version Location
-    | FDRFound GhcPkgId Location
-    | FDRNotFound
-    deriving Show
-
 -- | Build using Shake.
 build :: M env m => BuildOpts -> m ()
 build bopts = do
@@ -458,7 +551,7 @@ build bopts = do
     let sourceMap1 = Map.unions
             [ Map.fromList $ flip map locals $ \lp ->
                 let p = lpPackage lp
-                 in (packageName p, (packageVersion p, PSLocal p))
+                 in (packageName p, (packageVersion p, PSLocal lp))
             , flip Map.mapWithKey (bcExtraDeps bconfig) $ \name version ->
                 (version, PSExtraDeps $ fromMaybe Map.empty $ Map.lookup name $ bcFlags bconfig)
             , flip fmap inBuildPlan $ \mpi -> (mpiVersion mpi, PSSnapshot mpi)
