@@ -390,7 +390,7 @@ configureOpts deps wanted bco =
     toFlag gid = T.pack $ concat
         [ "--dependency="
         , packageNameString $ packageIdentifierName $ ghcPkgIdPackageIdentifier gid
-        , "-"
+        , "="
         , ghcPkgIdString gid
         ]
 
@@ -618,8 +618,10 @@ build bopts = do
 
     if boptsDryrun bopts
         then printPlan plan
-        else do
+        else withSystemTempDirectory "stack" $ \tmpdir -> do
+            tmpdir' <- parseAbsDir tmpdir
             configLock <- newMVar ()
+            idMap <- liftIO $ newTVarIO M.empty
             executePlan plan ExecuteEnv
                 { eeEnvOverride = menv
                 , eeBuildOpts = bopts
@@ -628,6 +630,11 @@ build bopts = do
                  -- https://github.com/fpco/stack/issues/84. Ideally we'd be able to remove
                  -- this.
                 , eeConfigureLock = configLock
+                , eeBaseConfigOpts = baseConfigOpts
+                , eeGhcPkgIds = idMap
+                , eeTempDir = tmpdir'
+                , eeCabalPkgVer = cabalPkgVer
+                , eeTotalWanted = length $ filter lpWanted locals
                 }
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
@@ -705,6 +712,11 @@ data ExecuteEnv = ExecuteEnv
     { eeEnvOverride :: !EnvOverride
     , eeConfigureLock :: !(MVar ())
     , eeBuildOpts :: !BuildOpts
+    , eeBaseConfigOpts :: !BaseConfigOpts
+    , eeGhcPkgIds :: !(TVar (Map PackageIdentifier GhcPkgId))
+    , eeTempDir :: !(Path Abs Dir)
+    , eeCabalPkgVer :: !PackageIdentifier
+    , eeTotalWanted :: !Int
     }
 
 -- | Perform the actual plan
@@ -746,9 +758,25 @@ singleBuild :: M env m
             -> ExecuteEnv
             -> Task
             -> m ()
-singleBuild ActionContext {..} ExecuteEnv {..} Task {..} = do
+singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
+  withPackage $ \package ->
+  withHandles package $ \outH errH ->
+  withCabal outH errH $ \cabal -> do
     when needsConfig $ withMVar eeConfigureLock $ \_ -> do
         announce "configure"
+        idMap <- liftIO $ readTVarIO eeGhcPkgIds
+        let getMissing ident =
+                case Map.lookup ident idMap of
+                    Nothing -> error "singleBuild: invariant violated, missing package ID missing"
+                    Just x -> x
+            allDeps = Set.union
+                taskRequiresPresent
+                (Set.fromList $ map getMissing $ Set.toList taskRequiresMissing)
+        let configOpts = configureOpts
+                allDeps
+                wanted
+                eeBaseConfigOpts
+        $logDebug $ T.pack $ show configOpts
 
     announce "build"
     announce $ "console: " <> T.pack (show console)
@@ -780,10 +808,33 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} = do
             TTPackage lp _ -> lpWanted lp
             _ -> False
 
-    -- FIXME maybe also check if the wanted count is 1? as it stands, it's
-    -- possible that whether console output happens is nondeterministic based
-    -- on the order in which multiple wanted targets are executed
-    console = wanted && acRemaining == 0
+    console = wanted && acRemaining == 0 && eeTotalWanted == 1
+
+    withPackage inner =
+        case taskType of
+            TTPackage package _ -> inner $ lpPackage package
+            TTMPI mpi -> do
+                mdist <- liftM Just $ distRelativeDir eeCabalPkgVer
+                m <- unpackPackageIdents eeEnvOverride eeTempDir mdist $ Set.singleton taskProvides
+                case M.toList m of
+                    [(ident, dir)]
+                        | ident == taskProvides -> do
+                            -- FIXME shouldn't there be a readPackageDir helper function?
+                            cabalfp <- getCabalFileName dir
+                            package <- readPackage packageConfig cabalfp
+                                PTUser -- FIXME I think we can get rid of that field entirely now
+                            inner package
+                    _ -> error $ "withPackage: invariant violated: " ++ show m
+
+    packageConfig = error "packageConfig"
+
+    withHandles package inner
+        | console = inner stdout stderr
+        | otherwise = do
+            logPath <- buildLogPath package
+            inner (error $ "withHandles: " ++ show logPath) (error "withHandles2")
+
+    withCabal outH errH inner = inner $ error "withCabal"
 
 {- FIXME
     cabalPkgVer <- getMinimalEnvOverride >>= getCabalPkgVer
