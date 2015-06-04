@@ -989,20 +989,41 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
         announce "build"
         cabal ["build"]
 
-    case taskType of
-        TTPackage lp _ | lpWanted lp -> do
-            case boptsFinalAction eeBuildOpts of
-                DoTests -> do
-                    announce "test"
-                    runTests package mlogFile
-                DoBenchmarks -> do
-                    announce "benchmarks"
-                    -- FIXME implement benchmarks
-                DoHaddock -> do
-                    announce "haddock"
-                    -- FIXME implements haddocks. However: it doesn't seem right that only the wanteds build Haddocks, probably need to change that
-                DoNothing -> return ()
-        _ -> return ()
+    case boptsFinalAction eeBuildOpts of
+        DoTests -> when wanted $ do
+            announce "test"
+            runTests package mlogFile
+        DoBenchmarks -> when wanted $ do
+            announce "benchmarks"
+            -- FIXME implement benchmarks
+        DoHaddock -> do
+            announce "haddock"
+            -- FIXME implements haddocks. However: it doesn't seem right that only the wanteds build Haddocks, probably need to change that
+            cabal ["haddock", "--html"]
+              {- EKB FIXME: doc generation for stack-doc-server
+                         ,"--hoogle"
+                         ,"--hyperlink-source"
+                         ,"--html-location=../$pkg-$version/"
+                         ,"--haddock-options=" ++ intercalate " " ifcOpts ]
+              haddockLocs <-
+                liftIO (findFiles (packageDocDir package)
+                                  (\loc -> FilePath.takeExtensions (toFilePath loc) ==
+                                           "." ++ haddockExtension)
+                                  (not . isHiddenDir))
+              forM_ haddockLocs $ \haddockLoc ->
+                do let hoogleTxtPath = FilePath.replaceExtension (toFilePath haddockLoc) "txt"
+                       hoogleDbPath = FilePath.replaceExtension hoogleTxtPath hoogleDbExtension
+                   hoogleExists <- liftIO (doesFileExist hoogleTxtPath)
+                   when hoogleExists
+                        (callProcess
+                             mempty -- FIXME: ?
+                             "hoogle"
+                             ["convert"
+                             ,"--haddock"
+                             ,hoogleTxtPath
+                             ,hoogleDbPath])
+                        -}
+        DoNothing -> return ()
 
     unless justFinal $ withMVar eeInstallLock $ \_ -> do
         announce "install"
@@ -1944,33 +1965,6 @@ buildPackage cabalPkgVer bopts bconfig setuphs wanted wantedLocals buildType _pa
               liftIO (removeDocLinks docLoc package)
  #endif
               ifcOpts <- liftIO (haddockInterfaceOpts docLoc package packages)
-              --}
-              runhaskell'
-                         singularBuild
-                         ["haddock"
-                         ,"--html"]
-              {- EKB FIXME: doc generation for stack-doc-server
-                         ,"--hoogle"
-                         ,"--hyperlink-source"
-                         ,"--html-location=../$pkg-$version/"
-                         ,"--haddock-options=" ++ intercalate " " ifcOpts ]
-              haddockLocs <-
-                liftIO (findFiles (packageDocDir package)
-                                  (\loc -> FilePath.takeExtensions (toFilePath loc) ==
-                                           "." ++ haddockExtension)
-                                  (not . isHiddenDir))
-              forM_ haddockLocs $ \haddockLoc ->
-                do let hoogleTxtPath = FilePath.replaceExtension (toFilePath haddockLoc) "txt"
-                       hoogleDbPath = FilePath.replaceExtension hoogleTxtPath hoogleDbExtension
-                   hoogleExists <- liftIO (doesFileExist hoogleTxtPath)
-                   when hoogleExists
-                        (callProcess
-                             mempty -- FIXME: ?
-                             "hoogle"
-                             ["convert"
-                             ,"--haddock"
-                             ,hoogleTxtPath
-                             ,hoogleDbPath])
               --}
        DoBenchmarks -> runhaskell' singularBuild ["bench"]
        _ -> return ()
