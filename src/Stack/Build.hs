@@ -58,7 +58,7 @@ import           Data.Typeable (Typeable)
 import           Development.Shake (addOracle,Action)
 import           Distribution.Package (Dependency (..))
 import           Distribution.System (Platform (Platform), OS (Windows))
-import           Distribution.Version (intersectVersionRanges)
+import           Distribution.Version (intersectVersionRanges, anyVersion)
 import           Network.HTTP.Conduit (Manager)
 import           Network.HTTP.Download
 import           Path as FL
@@ -345,10 +345,15 @@ constructPlan locals sourceMap = do
         then return $ tasks s
         else throwM $ ConstructPlanExceptions $ failures s
   where
-    addTask task = modify $ \s -> s { tasks = Map.insert
-        (packageIdentifierName $ taskProvides task)
-        task
-        (tasks s) }
+    addTask task = do
+        modify $ \s -> s
+            { tasks = Map.insert
+                (packageIdentifierName $ taskProvides task)
+                task
+                (tasks s)
+            }
+        return $ Just $ ADRToInstall (taskProvides task) (taskLocation task)
+
     addFailure e = modify $ \s -> s { failures = e : failures s }
     checkCallStack name inner = do
         s <- get
@@ -366,24 +371,26 @@ constructPlan locals sourceMap = do
                         return $ maybe (Left name) Right res
                     _ -> error $ "constructPlan invariant violated: call stack is corrupted: " ++ show (name, callStack s, callStack s')
 
-    addLocal lp = checkCallStack name $ do
-        eadrs <- mapM (uncurry (addDep name Local)) (M.toList $ packageDeps p) -- FIXME start adding in tool deps
+    withDeps name loc deps inner = do
+        eadrs <- mapM (uncurry (addDep name loc)) deps
         let (errs, adrs) = partitionEithers eadrs
-        if not $ null errs
-            then do
+        if null errs
+            then inner adrs
+            else do
                 addFailure $ DependencyPlanFailures name $ Set.fromList errs
                 return Nothing
-            else do
-                -- FIXME do dirtiness checking here and, if not dirty, don't build
-                -- FIXME probably need to cache results of calls to addLocal in S, possibly all of addDep
-                addTask Task
-                    { taskProvides = ident
-                    , taskRequiresMissing = Set.fromList $ mapMaybe toMissing adrs
-                    , taskRequiresPresent = Set.fromList $ mapMaybe toPresent adrs
-                    , taskLocation = Local
-                    , taskType = TTPackage lp
-                    }
-                return $ Just $ ADRToInstall ident Local
+
+    addLocal lp = checkCallStack name $ do
+        withDeps name Local (M.toList $ packageDeps p) $ \adrs -> do
+            -- FIXME do dirtiness checking here and, if not dirty, don't build
+            -- FIXME probably need to cache results of calls to addLocal in S, possibly all of addDep
+            addTask Task
+                { taskProvides = ident
+                , taskRequiresMissing = Set.fromList $ mapMaybe toMissing adrs
+                , taskRequiresPresent = Set.fromList $ mapMaybe toPresent adrs
+                , taskLocation = Local
+                , taskType = TTPackage lp
+                }
       where
         p = lpPackage lp
         name = packageName p
@@ -397,6 +404,19 @@ constructPlan locals sourceMap = do
             , lpWanted = False
             }
 
+    addMPI name mpi = checkCallStack name $ do
+        withDeps name Snap (map (, anyVersion) $ Set.toList $ mpiPackageDeps mpi) $ \adrs -> do
+            addTask Task
+                { taskProvides = ident
+                , taskRequiresMissing = Set.fromList $ mapMaybe toMissing adrs
+                , taskRequiresPresent = Set.fromList $ mapMaybe toPresent adrs
+                , taskLocation = Snap
+                , taskType = TTMPI mpi
+                }
+      where
+        ident = PackageIdentifier name version
+        version = mpiVersion mpi
+
     addDep user userloc name range =
         case Map.lookup name sourceMap of
             Nothing -> do
@@ -406,7 +426,7 @@ constructPlan locals sourceMap = do
                 | version `withinRange` range -> case ps of
                     PSLocal lp -> allowLocal version $ addLocal lp
                     PSExtraDeps p -> allowLocal version $ addExtraDep p
-                    PSSnapshot mpi -> error "addDep: PSSnapshot not handled"
+                    PSSnapshot mpi -> addMPI name mpi
                     PSInstalledLib loc gid -> allowLocation loc version $ return $ Right $ ADRFound gid loc
                     PSInstalledExe loc -> allowLocation loc version $ return $ Right $ ADRFoundExe loc
                 | otherwise -> do
@@ -433,120 +453,6 @@ constructPlan locals sourceMap = do
 
     toPresent (ADRFound gid _) = Just gid
     toPresent _ = Nothing
-
-    {-
-    addFailure t = modify $ \s -> s { failures = Set.insert t $ failures s }
-
-    withVisited package = withVisited'
-        (packageName package)
-        (packageVersion package)
-
-    withVisited' name version inner = do
-        s <- get
-        case M.lookup name $ visited s of
-            Nothing -> do
-                put s { visited = M.insert name version $ visited s }
-                inner
-            Just _ -> return ()
-
-    goPackage location wanted package = withVisited package $ do
-        res <- forM (M.toList $ packageDeps package) $ \(depname, deprange) -> do
-            let checkVersionLoc depversion deploc = do
-                    case (location, deploc) of
-                        (Global, _) -> error $ "goPackage should never be called with Global"
-                        (Snap, Local) -> addFailure $ T.pack $ concat
-                            [ packageNameString $ packageName package
-                            , " is in the snapshot database, but depends on "
-                            , packageNameString depname
-                            , " in the local database. Recommendation: add the following to extra-deps: - "
-                            , packageNameString depname
-                            , "-"
-                            , versionString depversion
-                            ]
-                        (_, _) -> return ()
-                    unless (depversion `withinRange` deprange) $ addFailure $ T.pack $ concat
-                        [ packageNameString $ packageName package
-                        , " depends on "
-                        , packageNameString depname
-                        , " ("
-                        , show deprange
-                        , "), but "
-                        , versionString depversion
-                        , " is available"
-                        ]
-
-            case Map.lookup depname installed of
-                Just (depversion, deploc, inst) -> do
-                    checkVersionLoc depversion deploc
-                    return $ case inst of
-                        Library gid -> Just $ Left gid
-                        Executable -> Nothing
-                Nothing -> do
-                    mdep <- findDep depname
-                    case mdep of
-                        FDRNotFound -> do
-                            addFailure $ T.pack $ concat
-                                [ packageNameString $ packageName package
-                                , " depends on "
-                                , packageNameString depname
-                                , ", but it wasn't found"
-                                ]
-                            return Nothing
-                        FDRFound gid deploc -> do
-                            checkVersionLoc (packageIdentifierVersion $ ghcPkgIdPackageIdentifier gid) deploc
-                            return $ Just $ Left gid
-                        FDRToInstall depversion deploc -> do
-                            checkVersionLoc depversion deploc
-                            return $ Just $ Right $ PackageIdentifier depname depversion
-        let (gids, idents) = partitionEithers $ catMaybes res
-        addTask Task
-            { taskProvides = PackageIdentifier (packageName package) (packageVersion package)
-            , taskRequiresMissing = Set.fromList idents
-            , taskRequiresPresent = Set.fromList gids
-            , taskWanted = wanted
-            , taskLocation = location
-            , taskType = TTPackage package
-            }
-
-    localMap = Map.fromList $ map (packageName . lpPackage &&& id) locals
-    findDep name =
-        case Map.lookup name localMap of
-            Just lp -> do
-                -- FIXME check if installed and not dirty. If so, return the
-                -- GhcPkgId. Otherwise, call goPackage
-                goPackage Local (lpWanted lp) (lpPackage lp)
-                return $ FDRToInstall (packageVersion $ lpPackage lp) Local
-            Nothing -> do
-                bconfig <- asks getBuildConfig
-                case Map.lookup name $ bcExtraDeps bconfig of
-                    Just version -> addExtra name version
-                    Nothing ->
-                        case Map.lookup name buildPlan of
-                            Nothing -> return FDRNotFound
-                            Just mpi -> addMPI name mpi
-
-    addExtra name version = do
-        -- FIXME load up package information etc
-        addFailure $ "FIXME addExtra " <> T.pack (show (name, version))
-        return $ FDRToInstall version Local
-
-    addMPI name mpi = do
-        s <- get
-        case Map.lookup name $ visited s of
-            Just v -> return $ FDRToInstall v Snap
-            Nothing -> do
-                put $ s { visited = Map.insert name (mpiVersion mpi) $ visited s }
-                (missing, present) <- liftM partitionEithers $ return [] -- FIXME
-                addTask Task
-                    { taskProvides = PackageIdentifier name $ mpiVersion mpi
-                    , taskRequiresMissing = Set.fromList missing
-                    , taskRequiresPresent = Set.fromList present
-                    , taskWanted = False
-                    , taskLocation = Snap
-                    , taskType = TTMPI mpi
-                    }
-                return $ FDRToInstall (mpiVersion mpi) Snap
-    -}
 
 -- | Build using Shake.
 build :: M env m => BuildOpts -> m ()
