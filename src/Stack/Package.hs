@@ -59,6 +59,7 @@ import           Distribution.PackageDescription hiding (FlagName)
 import           Distribution.PackageDescription.Parse
 import           Distribution.Simple.Utils
 import           Distribution.System (OS, Arch, Platform (..))
+import           Distribution.Version (intersectVersionRanges)
 import           Path as FL
 import           Path.Find
 import           Path.IO
@@ -212,7 +213,7 @@ resolvePackage packageConfig cabalfp ptype gpkg = do
 -- | Get all dependencies of the package (buildable targets only).
 packageDependencies :: PackageDescription -> Map PackageName VersionRange
 packageDependencies =
-  M.fromList .
+  M.fromListWith intersectVersionRanges .
   concatMap (map (\dep -> ((depName dep),depRange dep)) .
              targetBuildDepends) .
   allBuildInfo'
