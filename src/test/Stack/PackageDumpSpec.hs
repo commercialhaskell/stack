@@ -115,7 +115,7 @@ spec = do
         menv' <- getEnvOverride buildPlatform
         menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
         pcache <- newProfilingCache
-        ghcPkgDump menv []
+        ghcPkgDump menv Nothing
             $  conduitDumpPackage
             =$ addProfiling pcache
             =$ CL.sinkNull
@@ -124,7 +124,7 @@ spec = do
         menv' <- getEnvOverride buildPlatform
         menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
         pcache <- newProfilingCache
-        m <- runNoLoggingT $ ghcPkgDump menv []
+        m <- runNoLoggingT $ ghcPkgDump menv Nothing
             $  conduitDumpPackage
             =$ addProfiling pcache
             =$ sinkMatching False (Map.singleton $(mkPackageName "transformers") $(mkVersion "0.0.0.0.0.0.1"))

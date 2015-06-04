@@ -978,7 +978,9 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
     case taskType of
         TTPackage lp _ | lpWanted lp -> do
             case boptsFinalAction eeBuildOpts of
-                DoTests -> announce "test"
+                DoTests -> do
+                    announce "test"
+                    runTests package mlogFile
                 DoBenchmarks -> announce "benchmarks"
                 DoHaddock -> announce "haddock"
                 DoNothing -> return ()
@@ -1117,6 +1119,62 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                         fullArgs
                         (fmap fst mlogFile)
                         bs
+
+    runTests package mlogFile = do
+        bconfig <- asks getBuildConfig
+        let pkgRoot = packageDir package
+        distRelativeDir' <- liftIO $ distRelativeDir eeCabalPkgVer
+        let buildDir = pkgRoot </> distRelativeDir'
+        let exeExtension =
+                case configPlatform $ getConfig bconfig of
+                    Platform _ Windows -> ".exe"
+                    _ -> ""
+
+        errs <- liftM Map.unions $ forM (Set.toList $ packageTests package) $ \testName -> do
+            nameDir <- liftIO $ parseRelDir $ T.unpack testName
+            nameExe <- liftIO $ parseRelFile $ T.unpack testName ++ exeExtension
+            let exeName = buildDir </> $(mkRelDir "build") </> nameDir </> nameExe
+            exists <- liftIO $ doesFileExist $ toFilePath exeName
+            config <- asks getConfig
+            menv <- liftIO $ configEnvOverride config EnvSettings
+                { esIncludeLocals = taskLocation == Local
+                , esIncludeGhcPackagePath = True
+                }
+            if exists
+                then do
+                    announce $ "test " <> testName
+                    let cp = (proc (toFilePath exeName) [])
+                            { cwd = Just $ toFilePath pkgRoot
+                            , Process.env = envHelper menv
+                            , std_in = CreatePipe
+                            , std_out =
+                                case mlogFile of
+                                    Nothing -> Inherit
+                                    Just (_, h) -> UseHandle h
+                            , std_err =
+                                case mlogFile of
+                                    Nothing -> Inherit
+                                    Just (_, h) -> UseHandle h
+                            }
+                    (Just inH, Nothing, Nothing, ph) <- liftIO $ createProcess cp
+                    liftIO $ hClose inH
+                    ec <- liftIO $ waitForProcess ph
+                    return $ case ec of
+                        ExitSuccess -> M.empty
+                        _ -> M.singleton testName $ Just ec
+                else do
+                    $logError $ T.concat
+                        [ "Test suite "
+                        , testName
+                        , " executable not found for "
+                        , T.pack $ packageNameString $ packageName package
+                        ]
+                    return $ Map.singleton testName Nothing
+        unless (Map.null errs) $ throwM $ TestSuiteFailure2 taskProvides errs (fmap fst mlogFile)
+
+data TestSuiteFailure2 = TestSuiteFailure2 PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe FilePath)
+    deriving (Show, Typeable)
+instance Exception TestSuiteFailure2
 
 data CabalExitedUnsuccessfully = CabalExitedUnsuccessfully
     ExitCode
@@ -1848,36 +1906,11 @@ buildPackage cabalPkgVer bopts bconfig setuphs wanted wantedLocals buildType _pa
 
      case setupAction of
        DoTests -> do
-         let pkgRoot = packageDir package
-         distRelativeDir' <- liftIO $ distRelativeDir cabalPkgVer
-         let buildDir = pkgRoot </> distRelativeDir'
          menv <- liftIO $ configEnvOverride (getConfig bconfig) EnvSettings
             { esIncludeLocals = True
             , esIncludeGhcPackagePath = True
             }
          forM_ (Set.toList $ packageTests package) $ \testName -> do
-           let exeExtension =
-                case configPlatform $ getConfig bconfig of
-                    Platform _ Windows -> ".exe"
-                    _ -> ""
-           nameDir <- liftIO $ parseRelDir $ T.unpack testName
-           nameExe <- liftIO $ parseRelFile $ T.unpack testName ++ exeExtension
-           let exeName = buildDir </> $(mkRelDir "build") </> nameDir </> nameExe
-           exists <- liftIO $ doesFileExist $ toFilePath exeName
-           if exists
-               then runTestSuite
-                        menv
-                        (if singularBuild then Nothing else Just logPath)
-                        pkgRoot
-                        exeName
-                        package
-                        testName
-               else $logInfo $ T.concat
-                    [ "Test suite "
-                    , testName
-                    , " executable not found found for "
-                    , T.pack $ packageNameString $ packageName package
-                    ]
            -- Previously just used this, but see https://github.com/fpco/stack/issues/167
            -- runhaskell' singularBuild ["test"]
        DoHaddock ->
@@ -1925,52 +1958,6 @@ buildPackage cabalPkgVer bopts bconfig setuphs wanted wantedLocals buildType _pa
        _ -> return ()
  #endif
      --}
-
--- | Run a single test suite
-runTestSuite :: (MonadIO m, MonadLogger m)
-             => EnvOverride
-             -> Maybe (Path Abs File) -- ^ optional log file, otherwise use console
-             -> Path Abs Dir -- ^ working directory
-             -> Path Abs File -- ^ executable
-             -> Package
-             -> Text -- ^ test name
-             -> m ()
-runTestSuite menv mlogFile pkgRoot fp package testName = do
-    $logInfo display
-    ec <- liftIO $ case mlogFile of
-        Nothing -> go Inherit
-        Just logFile -> withBinaryFile (toFilePath logFile) AppendMode $ go . UseHandle
-    case ec of
-        ExitSuccess -> return ()
-        _ -> do
-            $logError $ T.concat
-                [ display
-                , ": ERROR"
-                , case mlogFile of
-                    Nothing -> ""
-                    Just logFile -> T.concat
-                        [ " (see "
-                        , T.pack $ toFilePath logFile
-                        , ")"
-                        ]
-                ]
-            liftIO $ throwM $ TestSuiteFailure fp mlogFile ec
-  where
-    display = T.concat
-        [ packageIdentifierText $ packageIdentifier package
-        , ": test "
-        , testName
-        ]
-    go outerr = do
-        (Just stdin', Nothing, Nothing, ph) <- createProcess (proc (toFilePath fp) [])
-            { cwd = Just $ toFilePath pkgRoot
-            , Process.env = envHelper menv
-            , std_in = CreatePipe
-            , std_out = outerr
-            , std_err = outerr
-            }
-        hClose stdin'
-        waitForProcess ph
 
 -- | Run the Haskell command for the given package.
 runhaskell :: (HasBuildConfig config,MonadAction m)
