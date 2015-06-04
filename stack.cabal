@@ -50,6 +50,7 @@ library
                      System.Process.Read
                      Network.HTTP.Download.Verified
   other-modules:     Network.HTTP.Download
+                     Control.Concurrent.Execute
                      Path.Find
                      Path.IO
                      System.Process.PagerEditor

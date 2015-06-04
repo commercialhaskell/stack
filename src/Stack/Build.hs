@@ -2,6 +2,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -18,7 +19,9 @@ import qualified Control.Applicative as A
 import           Control.Applicative ((<$>), (<*>))
 import           Control.Arrow ((&&&))
 import           Control.Concurrent.Async (Concurrently (..))
+import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar
+import           Control.Concurrent.STM
 import           Control.Exception
 import           Control.Exception.Enclosed (handleIO)
 import           Control.Monad
@@ -28,6 +31,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (asks, runReaderT)
 import           Control.Monad.Trans.Resource
+import           Control.Monad.Trans.Unlift
 import           Control.Monad.State.Strict
 import           Control.Monad.Writer
 import           Data.Aeson
@@ -55,7 +59,6 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Typeable (Typeable)
-import           Development.Shake (addOracle,Action)
 import           Distribution.Package (Dependency (..))
 import           Distribution.System (Platform (Platform), OS (Windows))
 import           Distribution.Version (intersectVersionRanges, anyVersion)
@@ -63,7 +66,6 @@ import           Network.HTTP.Conduit (Manager)
 import           Network.HTTP.Download
 import           Path as FL
 import           Prelude hiding (FilePath,writeFile)
-import           Shake
 import           Stack.Build.Types
 import           Stack.BuildPlan
 import           Stack.Constants
@@ -116,7 +118,7 @@ data Installed = Library GhcPkgId | Executable
 data Location = Global | Snap | Local
     deriving (Show, Eq)
 
-type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
+type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseUnlift IO m,MonadCatch m,MonadMask m,HasLogLevel env)
 
 type SourceMap = Map PackageName (Version, PackageSource)
 data PackageSource
@@ -706,7 +708,24 @@ executePlan plan ee = do
         ids -> do
             localDB <- packageDatabaseLocal
             unregisterGhcPkgIds (eeEnvOverride ee) localDB ids
-    error "executePlan"
+    u <- askUnliftBase
+    let actions = concatMap (toActions u ee) $ Map.elems $ planTasks plan
+        threads = 8 -- FIXME where did we get this before?
+    liftIO $ runActions threads actions
+
+toActions :: M env m
+          => UnliftBase IO m
+          -> ExecuteEnv
+          -> Task
+          -> [Action]
+toActions u ee Task {..} =
+    [ Action
+        { actionId = ActionId taskProvides ATInstall
+        , actionDeps =
+            (Set.map (\ident -> ActionId ident ATInstall) taskRequiresMissing)
+        , actionDo = \ac -> unliftBase u $ $logInfo $ T.pack $ show (ac, taskProvides)
+        }
+    ]
 
 {- FIXME
     cabalPkgVer <- getMinimalEnvOverride >>= getCabalPkgVer
