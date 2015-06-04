@@ -775,6 +775,7 @@ build bopts = do
         else withSystemTempDirectory "stack" $ \tmpdir -> do
             tmpdir' <- parseAbsDir tmpdir
             configLock <- newMVar ()
+            installLock <- newMVar ()
             idMap <- liftIO $ newTVarIO M.empty
             let setupHs = tmpdir' </> $(mkRelFile "Setup.hs")
             liftIO $ writeFile (FL.toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
@@ -786,6 +787,7 @@ build bopts = do
                  -- https://github.com/fpco/stack/issues/84. Ideally we'd be able to remove
                  -- this.
                 , eeConfigureLock = configLock
+                , eeInstallLock = installLock
                 , eeBaseConfigOpts = baseConfigOpts
                 , eeGhcPkgIds = idMap
                 , eeTempDir = tmpdir'
@@ -868,9 +870,10 @@ displayTask task = T.pack $ concat
 data ExecuteEnv = ExecuteEnv
     { eeEnvOverride :: !EnvOverride
     , eeConfigureLock :: !(MVar ())
+    , eeInstallLock :: !(MVar ())
     , eeBuildOpts :: !BuildOpts
     , eeBaseConfigOpts :: !BaseConfigOpts
-    , eeGhcPkgIds :: !(TVar (Map PackageIdentifier GhcPkgId))
+    , eeGhcPkgIds :: !(TVar (Map PackageIdentifier Installed))
     , eeTempDir :: !(Path Abs Dir)
     , eeSetupHs :: !(Path Abs File)
     , eeCabalPkgVer :: !PackageIdentifier
@@ -926,10 +929,11 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
         let getMissing ident =
                 case Map.lookup ident idMap of
                     Nothing -> error "singleBuild: invariant violated, missing package ID missing"
-                    Just x -> x
+                    Just (Library x) -> Just x
+                    Just Executable -> Nothing
             allDeps = Set.union
                 taskRequiresPresent
-                (Set.fromList $ map getMissing $ Set.toList taskRequiresMissing)
+                (Set.fromList $ mapMaybe getMissing $ Set.toList taskRequiresMissing)
         let configOpts = configureOpts
                 eeBaseConfigOpts
                 allDeps
@@ -953,8 +957,26 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                 DoNothing -> return ()
         _ -> return ()
 
-    announce "install"
-    cabal ["install"]
+    withMVar eeInstallLock $ \_ -> do
+        announce "install"
+        cabal ["install"]
+
+    let pkgDbs =
+            case taskLocation of
+                Global -> []
+                Snap -> [bcoSnapDB eeBaseConfigOpts]
+                Local ->
+                    [ bcoSnapDB eeBaseConfigOpts
+                    , bcoLocalDB eeBaseConfigOpts
+                    ]
+    mpkgid <- findGhcPkgId eeEnvOverride pkgDbs (packageName package)
+    mpkgid' <- case (packageHasLibrary package, mpkgid) of
+        (False, _) -> assert (isNothing mpkgid) $ do
+            markExeInstalled taskLocation taskProvides
+            return Executable
+        (True, Nothing) -> throwM $ Couldn'tFindPkgId $ packageName package
+        (True, Just pkgid) -> return $ Library pkgid
+    liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides mpkgid'
   where
     announce x = $logInfo $ T.concat
         [ T.pack $ packageIdentifierString taskProvides
@@ -1688,8 +1710,6 @@ writeFinalFiles cabalPkgVer cfgVar gconfig bconfig buildType dir package = liftI
                             menv
                             pkgDbs
                             (packageName package)
-             when (packageHasLibrary package && isNothing mpkgid)
-                (throwIO (Couldn'tFindPkgId (packageName package)))
 
              -- Write out some record that we installed the package
              when (buildType == BTDeps && not (packageHasLibrary package)) $ do
