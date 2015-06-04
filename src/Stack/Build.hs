@@ -20,7 +20,7 @@ import           Control.Applicative ((<$>), (<*>))
 import           Control.Arrow ((&&&))
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.Execute
-import           Control.Concurrent.MVar
+import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
 import           Control.Exception
 import           Control.Exception.Enclosed (handleIO)
@@ -618,9 +618,17 @@ build bopts = do
 
     if boptsDryrun bopts
         then printPlan plan
-        else executePlan plan ExecuteEnv
-            { eeEnvOverride = menv
-            }
+        else do
+            configLock <- newMVar ()
+            executePlan plan ExecuteEnv
+                { eeEnvOverride = menv
+                , eeBuildOpts = bopts
+                 -- Uncertain as to why we cannot run configures in parallel. This appears
+                 -- to be a Cabal library bug. Original issue:
+                 -- https://github.com/fpco/stack/issues/84. Ideally we'd be able to remove
+                 -- this.
+                , eeConfigureLock = configLock
+                }
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
 
@@ -695,6 +703,8 @@ displayTask task = T.pack $ concat
 
 data ExecuteEnv = ExecuteEnv
     { eeEnvOverride :: !EnvOverride
+    , eeConfigureLock :: !(MVar ())
+    , eeBuildOpts :: !BuildOpts
     }
 
 -- | Perform the actual plan
@@ -718,14 +728,62 @@ toActions :: M env m
           -> ExecuteEnv
           -> Task
           -> [Action]
-toActions u ee Task {..} =
+toActions u ee task@Task {..} =
+    -- FIXME in the future, we need to have proper support for cyclic
+    -- dependencies from test suites, in which case we'll need more than one
+    -- Action here
+
     [ Action
-        { actionId = ActionId taskProvides ATInstall
+        { actionId = ActionId taskProvides ATBuild
         , actionDeps =
-            (Set.map (\ident -> ActionId ident ATInstall) taskRequiresMissing)
-        , actionDo = \ac -> unliftBase u $ $logInfo $ T.pack $ show (ac, taskProvides)
+            (Set.map (\ident -> ActionId ident ATBuild) taskRequiresMissing)
+        , actionDo = \ac -> unliftBase u $ singleBuild ac ee task
         }
     ]
+
+singleBuild :: M env m
+            => ActionContext
+            -> ExecuteEnv
+            -> Task
+            -> m ()
+singleBuild ActionContext {..} ExecuteEnv {..} Task {..} = do
+    when needsConfig $ withMVar eeConfigureLock $ \_ -> do
+        announce "configure"
+
+    announce "build"
+    announce $ "console: " <> T.pack (show console)
+
+    case taskType of
+        TTPackage lp _ | lpWanted lp -> do
+            case boptsFinalAction eeBuildOpts of
+                DoTests -> announce "test"
+                DoBenchmarks -> announce "benchmarks"
+                DoHaddock -> announce "haddock"
+                DoNothing -> return ()
+        _ -> return ()
+
+    announce "install"
+  where
+    announce x = $logInfo $ T.concat
+        [ T.pack $ packageIdentifierString taskProvides
+        , ": "
+        , x
+        ]
+
+    needsConfig =
+        case taskType of
+            TTPackage _ y -> y
+            TTMPI _ -> True
+
+    wanted =
+        case taskType of
+            TTPackage lp _ -> lpWanted lp
+            _ -> False
+
+    -- FIXME maybe also check if the wanted count is 1? as it stands, it's
+    -- possible that whether console output happens is nondeterministic based
+    -- on the order in which multiple wanted targets are executed
+    console = wanted && acRemaining == 0
 
 {- FIXME
     cabalPkgVer <- getMinimalEnvOverride >>= getCabalPkgVer
