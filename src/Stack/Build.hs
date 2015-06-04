@@ -651,6 +651,14 @@ constructPlan mbp baseConfigOpts locals locallyRegistered sourceMap = do
                             Just oldConfigOpts
                                 | oldConfigOpts /= configOpts -> Dirty True
                                 | lpDirtyFiles lp -> Dirty False
+
+                                -- We want to make sure to run the final action
+                                -- if this target is wanted. We should probably
+                                -- add an extra flag to indicate "no need to
+                                -- build".
+                                | lpWanted lp && bcoFinalAction baseConfigOpts `elem`
+                                    [DoTests, DoBenchmarks] -> Dirty False
+
                                 | not $ packageHasLibrary p -> CleanExecutable
                                 | otherwise ->
                                     case fmap Set.toList $ Map.lookup name localMap of
