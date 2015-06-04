@@ -1047,10 +1047,11 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
         $logDebug $ T.pack $ show configOpts
         writeConfigCache (packageDir package) configOpts
 
+    fileModTimes <- getPackageFileModTimes package
+    writeBuildCache (packageDir package) fileModTimes
+
     unless justFinal $ do
         announce "build"
-        fileModTimes <- getPackageFileModTimes package
-        writeBuildCache (packageDir package) fileModTimes
         config <- asks getConfig
         cabal (console && configHideTHLoading config) ["build"]
 
