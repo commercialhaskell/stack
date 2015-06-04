@@ -25,7 +25,8 @@ RUN apt-get install -y ghc-$GHCVER cabal-install-$CABALVER zlib1g-dev wget
 ENV PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
 
 # RUBY & FPM
-RUN apt-get install -y ruby-dev rubygems libffi-dev make
+RUN apt-get install -y ruby-dev libffi-dev make
+RUN if [ "<<UBUNTU_VERSION>>" \< "14.04" ]; then apt-get install -y rubygems; fi
 RUN gem install fpm
 
 # BUILD
