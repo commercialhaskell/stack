@@ -1001,10 +1001,16 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
             runTests package mlogFile
         DoBenchmarks -> when wanted $ do
             announce "benchmarks"
+            cabal ["bench"]
             -- FIXME implement benchmarks
         DoHaddock -> do
             announce "haddock"
-            -- FIXME implements haddocks. However: it doesn't seem right that only the wanteds build Haddocks, probably need to change that
+              {- EKB FIXME: doc generation for stack-doc-server
+ #ifndef mingw32_HOST_OS
+              liftIO (removeDocLinks docLoc package)
+ #endif
+              ifcOpts <- liftIO (haddockInterfaceOpts docLoc package packages)
+              -}
             cabal ["haddock", "--html"]
               {- EKB FIXME: doc generation for stack-doc-server
                          ,"--hoogle"
@@ -1029,6 +1035,13 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                              ,hoogleTxtPath
                              ,hoogleDbPath])
                         -}
+                 {- EKB FIXME: doc generation for stack-doc-server
+             #ifndef mingw32_HOST_OS
+                 case setupAction of
+                   DoHaddock -> liftIO (createDocLinks docLoc package)
+                   _ -> return ()
+             #endif
+                 --}
         DoNothing -> return ()
 
     unless justFinal $ withMVar eeInstallLock $ \_ -> do
@@ -1932,56 +1945,9 @@ buildPackage cabalPkgVer bopts bconfig setuphs wanted wantedLocals buildType _pa
   do logPath <- liftIO $ runReaderT (buildLogPath package) bconfig
      liftIO (void (try (removeFile (FL.toFilePath logPath)) :: IO (Either IOException ())))
      let runhaskell' live = runhaskell live cabalPkgVer package setuphs bconfig buildType
-         -- The purpose of singularBuild is to say whether we should print
-         -- build output to the console (as opposed to a log file). The
-         -- goal is to only do so when building a single local target
-         -- package. The semantics are:
-         --
-         -- * Is there only one wanted local package? If so, we know that
-         -- package will be the last one to be built, so we know its output
-         -- won't end up interleaved with other builds
-         --
-         -- * Is it a user package? We never print information on dependencies
-         --
-         -- * Is this the wanted package? We don't want to print information
-         -- on one of the local packages that was just pulled in as a
-         -- dependency of the current target
-         singularBuild = wantedLocals == 1 && packageType package == PTUser && wanted == Wanted
      runhaskell'
        singularBuild
-       (concat [["build"]
-               ,["--ghc-options=-O2" | gconfigOptimize gconfig]
-               ,concat [["--ghc-options",T.unpack opt]
-                        | opt <- boptsGhcOptions bopts
-                        , packageType package == PTUser]])
 
-     case setupAction of
-       DoTests -> do
-         menv <- liftIO $ configEnvOverride (getConfig bconfig) EnvSettings
-            { esIncludeLocals = True
-            , esIncludeGhcPackagePath = True
-            }
-         forM_ (Set.toList $ packageTests package) $ \testName -> do
-           -- Previously just used this, but see https://github.com/fpco/stack/issues/167
-           -- runhaskell' singularBuild ["test"]
-       DoHaddock ->
-           do
-              {- EKB FIXME: doc generation for stack-doc-server
- #ifndef mingw32_HOST_OS
-              liftIO (removeDocLinks docLoc package)
- #endif
-              ifcOpts <- liftIO (haddockInterfaceOpts docLoc package packages)
-              --}
-       DoBenchmarks -> runhaskell' singularBuild ["bench"]
-       _ -> return ()
-     withResource installResource 1 (runhaskell' False ["install"])
-     {- EKB FIXME: doc generation for stack-doc-server
- #ifndef mingw32_HOST_OS
-     case setupAction of
-       DoHaddock -> liftIO (createDocLinks docLoc package)
-       _ -> return ()
- #endif
-     --}
 
 -- | Run the Haskell command for the given package.
 runhaskell :: (HasBuildConfig config,MonadAction m)
@@ -2460,7 +2426,7 @@ getCabalPkgVer menv = do
         $(mkPackageName "Cabal")
 
 clean :: a
-clean = error "clean"
+clean = error "clean" -- FIXME
 
 -- | Ensure Setup.hs exists in the given directory. Returns an action
 -- to remove it later.
