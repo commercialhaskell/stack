@@ -485,7 +485,11 @@ build bopts = do
 
     sourceMap2 <- getInstalled menv profiling sourceMap1
 
-    constructPlan locals sourceMap2 >>= error . show
+    plan <- constructPlan locals sourceMap2
+
+    if boptsDryrun bopts
+        then mapM_ ($logInfo . displayTask) $ Map.elems plan
+        else executeTasks $ M.elems plan
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
 
@@ -520,6 +524,28 @@ depPackageConfig bconfig flags = PackageConfig
     , packageConfigGhcVersion = bcGhcVersion bconfig
     , packageConfigPlatform = configPlatform (getConfig bconfig)
     }
+
+-- | For a dry run
+displayTask :: Task -> Text
+displayTask task = T.pack $ concat
+    [ packageIdentifierString $ taskProvides task
+    , ": database="
+    , case taskLocation task of
+        Global -> assert False "global"
+        Snap -> "snapshot"
+        Local -> "local"
+    , ", source="
+    , case taskType task of
+        TTPackage lp -> toFilePath $ packageDir $ lpPackage lp
+        TTMPI _ -> "package index"
+    , if Set.null $ taskRequiresMissing task
+        then ""
+        else ", after: " ++ intercalate "," (map packageIdentifierString $ Set.toList $ taskRequiresMissing task)
+    ]
+
+-- | Perform the actual plan
+executeTasks :: a
+executeTasks = error "executeTasks"
 
 {- FIXME
     cabalPkgVer <- getMinimalEnvOverride >>= getCabalPkgVer
