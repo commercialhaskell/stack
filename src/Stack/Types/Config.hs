@@ -464,12 +464,3 @@ getMinimalEnvOverride = do
                     { esIncludeLocals = False
                     , esIncludeGhcPackagePath = False
                     }
-
--- | File indicating that a specific package-version combo has been installed.
--- Should only be used for non-library dependencies (ghc-pkg tracks library).
-configPackageInstalled :: (HasBuildConfig env, MonadReader env m, MonadThrow m)
-                       => PackageIdentifier -> m (Path Abs File)
-configPackageInstalled ident = do
-    deps <- installationRootDeps
-    ident' <- parseRelFile $ packageIdentifierString ident
-    return $ deps </> $(mkRelDir "installed-packages") </> ident'

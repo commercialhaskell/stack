@@ -80,6 +80,31 @@ import           System.IO
 import           System.IO.Temp (withSystemTempDirectory)
 import           System.Process.Read
 
+-- | Directory containing files to mark an executable as installed
+exeInstalledDir :: M env m => Location -> m (Path Abs Dir)
+exeInstalledDir Global = error "exeInstalledDir Global"
+exeInstalledDir Snap = (</> $(mkRelDir "installed-packages")) `liftM` installationRootDeps
+exeInstalledDir Local = (</> $(mkRelDir "installed-packages")) `liftM` installationRootLocal
+
+-- | Get all of the installed executables
+getInstalledExes :: M env m => Location -> m [PackageIdentifier]
+getInstalledExes loc = do
+    dir <- exeInstalledDir loc
+    files <- liftIO $ handleIO (const $ return []) $ getDirectoryContents $ toFilePath dir
+    return $ mapMaybe parsePackageIdentifierFromString files
+
+-- | Mark the given executable as installed
+markExeInstalled :: M env m => Location -> PackageIdentifier -> m ()
+markExeInstalled loc ident = do
+    dir <- exeInstalledDir loc
+    liftIO $ createDirectoryIfMissing True $ toFilePath dir
+    ident' <- parseRelFile $ packageIdentifierString ident
+    let fp = toFilePath $ dir </> ident'
+    -- FIXME consideration for the future: list all of the executables
+    -- installed, and invalidate this file in getInstalledExes if they no
+    -- longer exist
+    liftIO $ writeFile fp "Installed"
+
 {- EKB FIXME: doc generation for stack-doc-server
 #ifndef mingw32_HOST_OS
 import           System.Posix.Files (createSymbolicLink,removeLink)
@@ -123,20 +148,39 @@ getInstalled menv profiling sourceMap1 = do
 
     saveProfilingCache (configProfilingCache bconfig) pcache
 
-    {- FIXME executables
-    snapExePath <- error "snap exes"
-    localExePath <- error "localExePath"
+    -- Add in the executables that are installed, making sure to only trust a
+    -- listed installation under the right circumstances (see below)
+    let exesToSM loc = Map.unions . map (exeToSM loc)
+        exeToSM loc (PackageIdentifier name version) =
+            case Map.lookup name sourceMap2 of
+                -- Doesn't conflict with anything, so that's OK
+                Nothing -> m
+                Just (version', ps)
+                    -- Not the version we want, ignore it
+                    | version /= version' -> Map.empty
+                    | otherwise -> case ps of
+                        -- Never mark locals as installed, instead do dirty
+                        -- checking
+                        PSLocal _ -> Map.empty
+                        -- Only trust for extra deps when in the local database
+                        -- and no library is available
+                        PSExtraDeps p
+                            | loc == Local && not (packageHasLibrary p) -> Map.empty
+                        -- Same thing for snapshots, but in the snapshot database
+                        PSSnapshot _ | loc == Snap -> Map.empty -- FIXME add info on whether a library exists to mpi and check it
+                        -- Passed all the tests, mark this as installed!
+                        _ -> m
+          where
+            m = Map.singleton name (version, PSInstalledExe loc)
+    exesSnap <- getInstalledExes Snap
+    exesLocal <- getInstalledExes Local
+    let sourceMap3 = Map.unions
+            [ exesToSM Local exesLocal
+            , exesToSM Snap exesSnap
+            , sourceMap2
+            ]
 
-    let libraries = Map.fromList
-                  $ map (\(gid, loc) ->
-                    let PackageIdentifier name ver = ghcPkgIdPackageIdentifier gid
-                     in (name, (ver, loc, Library gid)))
-                  $ Map.toList libraryIds
-        executables = M.empty -- FIXME
-    return $ M.union libraries executables
-    -}
-
-    return (sourceMap2, localInstalled)
+    return (sourceMap3, localInstalled)
 
 data LocalPackage = LocalPackage
     { lpPackage :: Package
