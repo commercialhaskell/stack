@@ -77,7 +77,6 @@ spec = do
                 , dpDepends = depends
                 , dpLibraries = ["HShaskell2010-1.1.2.0"]
                 , dpProfiling = ()
-                , dpExtra = ()
                 }
 
         it "ghc 7.10" $ do
@@ -108,7 +107,6 @@ spec = do
                 , dpDepends = depends
                 , dpLibraries = ["HSghc-7.10.1-EMlWrQ42XY0BNVbSrKixqY"]
                 , dpProfiling = ()
-                , dpExtra = ()
                 }
 
     it "ghcPkgDump + addProfiling" $ (id :: IO () -> IO ()) $ runNoLoggingT $ do
