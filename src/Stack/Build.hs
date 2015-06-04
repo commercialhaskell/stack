@@ -279,7 +279,7 @@ data DirtyCache = DirtyCache
     deriving (Generic,Eq)
 instance Binary DirtyCache
 
--- | POSIX epoch time. Used for storage and comparison.
+-- | Used for storage and comparison.
 newtype ModTime = ModTime (Integer,Rational)
   deriving (Ord,Show,Generic,Eq)
 instance Binary ModTime
