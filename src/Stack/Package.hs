@@ -10,6 +10,7 @@
 
 module Stack.Package
   (readPackage
+  ,readPackageDir
   ,readPackageUnresolved
   ,readPackageUnresolvedBS
   ,resolvePackage
@@ -83,8 +84,19 @@ data PackageException
   | PackageStackageDepVerMismatch PackageName Version VersionRange
   | PackageNoCabalFileFound (Path Abs Dir)
   | PackageMultipleCabalFilesFound (Path Abs Dir) [Path Abs File]
+  | MismatchedCabalName (Path Abs File) PackageName
   deriving (Show,Typeable)
 instance Exception PackageException
+
+{- TODO use for nicer error messages
+instance Show MismatchedCabalName where
+    show (MismatchedCabalName fp name) = concat
+        [ "cabal file "
+        , toFilePath cabalfp
+        , " has a mismatched package name: "
+        , packageNameString $ packageName pkg
+        ]
+        -}
 
 -- | Some package info.
 data Package =
@@ -158,6 +170,20 @@ readPackage :: (MonadLogger m, MonadIO m, MonadThrow m)
             -> m Package
 readPackage packageConfig cabalfp =
   readPackageUnresolved cabalfp >>= resolvePackage packageConfig cabalfp
+
+-- | Convenience wrapper around @readPackage@ that first finds the cabal file
+-- in the given directory.
+readPackageDir :: (MonadLogger m, MonadIO m, MonadThrow m)
+               => PackageConfig
+               -> Path Abs Dir
+               -> m Package
+readPackageDir packageConfig dir = do
+    cabalfp <- getCabalFileName dir
+    pkg <- readPackage packageConfig cabalfp
+    name <- parsePackageNameFromFilePath cabalfp
+    when (packageName pkg /= name)
+        $ throwM $ MismatchedCabalName cabalfp name
+    return pkg
 
 -- | Resolve a parsed cabal file into a 'Package'.
 resolvePackage :: (MonadLogger m, MonadIO m, MonadThrow m)

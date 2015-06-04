@@ -31,6 +31,7 @@ import           System.IO.Error
 import qualified Control.Applicative as A
 import           Control.Applicative ((<$>), (<*>))
 import           Control.Arrow ((&&&))
+import           Control.Concurrent (getNumCapabilities)
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
@@ -236,12 +237,8 @@ loadLocals bopts = do
                 , packageConfigPlatform = configPlatform $ getConfig bconfig
                 }
             cabalfp
-        when (packageName pkg /= name) $ error $ concat
-            [ "cabal file "
-            , toFilePath cabalfp
-            , " has a mismatched name: "
-            , packageNameString $ packageName pkg
-            ]
+        when (packageName pkg /= name) $ throwM
+            $ MismatchedCabalName cabalfp (packageName pkg)
         mdirtyCache <- tryGetDirtyCache dir
         fileModTimes <- getPackageFileModTimes pkg
         return LocalPackage
@@ -528,7 +525,7 @@ configureOpts bco deps wanted loc flags = map T.pack $ concat
 
     depOptions = map toDepOption $ Set.toList deps
 
-    {- FIXME does this work with some versions of Cabal?
+    {- TODO does this work with some versions of Cabal?
     toDepOption gid = T.pack $ concat
         [ "--dependency="
         , packageNameString $ packageIdentifierName $ ghcPkgIdPackageIdentifier gid
@@ -675,7 +672,7 @@ constructPlan mbp baseConfigOpts locals locallyRegistered sourceMap = do
                                     case fmap Set.toList $ Map.lookup name localMap of
                                         Just [gid] -> CleanLibrary gid
                                         _ -> Dirty SkipConfig
-            -- FIXME probably need to cache results of calls to addLocal in S, possibly all of addDep
+            -- TODO probably need to cache results of calls to addLocal in S, possibly all of addDep
             case dres of
                 Dirty needConfig -> addTask Task
                     { taskProvides = ident
@@ -842,13 +839,17 @@ loadExtraDeps menv cabalPkgVer = do
         $ M.toList
         $ bcExtraDeps bconfig
     forM (Map.toList paths) $ \(ident, dir) -> do
-        cabalfp <- getCabalFileName dir
-        -- FIXME confirm this matches name <- parsePackageNameFromFilePath cabalfp
         let name = packageIdentifierName ident
             flags = fromMaybe M.empty (M.lookup name $ bcFlags bconfig)
             pc = depPackageConfig bconfig flags
-        readPackage pc cabalfp
-        -- FIXME confirm that the ident matches with what we just read?
+        package <- readPackageDir pc dir
+        when (name /= packageName package)
+            $ throwM $ UnpackedPackageHasWrongName ident (packageName package)
+        return package
+
+data UnpackedPackageHasWrongName = UnpackedPackageHasWrongName PackageIdentifier PackageName
+    deriving (Show, Typeable)
+instance Exception UnpackedPackageHasWrongName
 
 -- | Package config to be used for dependencies
 depPackageConfig :: BuildConfig -> Map FlagName Bool -> PackageConfig
@@ -931,7 +932,7 @@ executePlan plan ee = do
                 unregisterGhcPkgId (eeEnvOverride ee) localDB id'
     u <- askUnliftBase
     let actions = concatMap (toActions u ee) $ Map.elems $ planTasks plan
-        threads = 8 -- FIXME where did we get this before?
+    threads <- liftIO getNumCapabilities -- TODO make a build opt to override this
     liftIO $ runActions threads actions
 
 toActions :: M env m
@@ -940,7 +941,7 @@ toActions :: M env m
           -> Task
           -> [Action]
 toActions u ee task@Task {..} =
-    -- FIXME in the future, we need to have proper support for cyclic
+    -- TODO in the future, we need to have proper support for cyclic
     -- dependencies from test suites, in which case we'll need more than one
     -- Action here
 
@@ -984,6 +985,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
         writeDirtyCache (packageDir package) fileModTimes configOpts
 
     unless justFinal $ do
+        -- FIXME strip out TH loading
         announce "build"
         cabal ["build"]
 
@@ -993,8 +995,12 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                 DoTests -> do
                     announce "test"
                     runTests package mlogFile
-                DoBenchmarks -> announce "benchmarks"
-                DoHaddock -> announce "haddock"
+                DoBenchmarks -> do
+                    announce "benchmarks"
+                    -- FIXME implement benchmarks
+                DoHaddock -> do
+                    announce "haddock"
+                    -- FIXME implements haddocks. However: it doesn't seem right that only the wanteds build Haddocks, probably need to change that
                 DoNothing -> return ()
         _ -> return ()
 
@@ -1052,10 +1058,11 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                 case M.toList m of
                     [(ident, dir)]
                         | ident == taskProvides -> do
-                            -- FIXME shouldn't there be a readPackageDir helper function?
-                            cabalfp <- getCabalFileName dir
                             bconfig <- asks getBuildConfig
-                            package <- readPackage (packageConfig bconfig mpi) cabalfp
+                            package <- readPackageDir (packageConfig bconfig mpi) dir
+                            let name = packageIdentifierName taskProvides
+                            when (name /= packageName package)
+                                $ throwM $ UnpackedPackageHasWrongName ident (packageName package)
                             inner package
                     _ -> error $ "withPackage: invariant violated: " ++ show m
 
