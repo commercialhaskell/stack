@@ -985,27 +985,29 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
   withPackage $ \package ->
   withLogFile package $ \mlogFile ->
   withCabal package mlogFile $ \cabal -> do
+    idMap <- liftIO $ readTVarIO eeGhcPkgIds
+    let getMissing ident =
+            case Map.lookup ident idMap of
+                Nothing -> error "singleBuild: invariant violated, missing package ID missing"
+                Just (Library x) -> Just x
+                Just Executable -> Nothing
+        allDeps = Set.union
+            taskRequiresPresent
+            (Set.fromList $ mapMaybe getMissing $ Set.toList taskRequiresMissing)
+    let configOpts = configureOpts
+            eeBaseConfigOpts
+            allDeps
+            wanted
+            taskLocation
+            (packageFlags package)
+
     when needsConfig $ withMVar eeConfigureLock $ \_ -> do
         announce "configure"
-        idMap <- liftIO $ readTVarIO eeGhcPkgIds
-        let getMissing ident =
-                case Map.lookup ident idMap of
-                    Nothing -> error "singleBuild: invariant violated, missing package ID missing"
-                    Just (Library x) -> Just x
-                    Just Executable -> Nothing
-            allDeps = Set.union
-                taskRequiresPresent
-                (Set.fromList $ mapMaybe getMissing $ Set.toList taskRequiresMissing)
-        let configOpts = configureOpts
-                eeBaseConfigOpts
-                allDeps
-                wanted
-                taskLocation
-                (packageFlags package)
         cabal $ "configure" : map T.unpack configOpts
-        $logDebug $ T.pack $ show configOpts
-        fileModTimes <- getPackageFileModTimes package
-        writeDirtyCache (packageDir package) fileModTimes configOpts
+
+    $logDebug $ T.pack $ show configOpts
+    fileModTimes <- getPackageFileModTimes package
+    writeDirtyCache (packageDir package) fileModTimes configOpts
 
     unless justFinal $ do
         -- FIXME strip out TH loading
