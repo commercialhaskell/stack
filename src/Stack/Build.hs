@@ -312,7 +312,7 @@ loadLocals bopts = do
 data DirtyCache = DirtyCache
     { dirtyCacheOpts :: ![ByteString]
       -- ^ All options used for this package.
-    , dirtyCacheTimes :: ![(FilePath,ModTime)]
+    , dirtyCacheTimes :: !(Map FilePath ModTime)
       -- ^ Modification times of files.
     }
     deriving (Generic,Eq)
@@ -351,7 +351,7 @@ tryGetDirtyCache dir = do
 
 -- | Write the dirtiness cache for this package.
 writeDirtyCache :: (M env m)
-                => Path Abs Dir -> [(FilePath,ModTime)] -> [Text] -> m ()
+                => Path Abs Dir -> Map FilePath ModTime -> [Text] -> m ()
 writeDirtyCache dir times opts = do
     menv <- getMinimalEnvOverride
     cabalPkgVer <- getCabalPkgVer menv
@@ -367,10 +367,10 @@ writeDirtyCache dir times opts = do
 
 -- | Get the modified times of all known files in the package,
 -- including the package's cabal file itself.
-getPackageFileModTimes :: MonadIO m => Package -> m [(FilePath,ModTime)]
+getPackageFileModTimes :: MonadIO m => Package -> m (Map FilePath ModTime)
 getPackageFileModTimes pkg =
     liftM
-        catMaybes
+        (M.fromList . catMaybes)
         (mapM getModTimeMaybe (packageCabalFile pkg : Set.toList (packageFiles pkg)))
   where
     getModTimeMaybe fp =
