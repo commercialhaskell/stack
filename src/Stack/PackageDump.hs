@@ -53,7 +53,7 @@ ghcPkgDump
     :: (MonadIO m, MonadLogger m)
     => EnvOverride
     -> Maybe (Path Abs Dir) -- ^ if Nothing, use global
-    -> Consumer ByteString IO a
+    -> Sink ByteString IO a
     -> m a
 ghcPkgDump menv mpkgDb sink = do
     F.mapM_ (createDatabase menv) mpkgDb -- FIXME maybe use some retry logic instead?

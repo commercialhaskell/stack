@@ -14,6 +14,7 @@ module Stack.Build
   where
 
 import qualified Control.Applicative as A
+import           Control.Applicative ((<$>), (<*>))
 import           Control.Arrow ((&&&))
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.MVar
@@ -86,16 +87,23 @@ data Installed = Library GhcPkgId | Executable
     deriving Show
 
 data Location = Global | Snap | Local
-    deriving Show
+    deriving (Show, Eq)
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
 
+type SourceMap = Map PackageName (Version, PackageSource)
+data PackageSource
+    = PSLocal Package
+    | PSExtraDeps (Map FlagName Bool) -- FIXME load up the Package for this preemptively, and cache it in a binary file
+    | PSSnapshot MiniPackageInfo
+    | PSInstalledLib Location GhcPkgId
+    | PSInstalledExe Location
+
 getInstalled :: M env m
              => Bool -- ^ profiling?
-             -> Map PackageName Version -- ^ in build plan
-             -> Set PackageName -- ^ locals
-             -> m (Map PackageName (Version, Location, Installed))
-getInstalled profiling allowed localNames = do
+             -> SourceMap -- ^ does not contain any installed information
+             -> m SourceMap
+getInstalled profiling sourceMap1 = do
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
 
@@ -104,18 +112,17 @@ getInstalled profiling allowed localNames = do
     pcache <- loadProfilingCache $ configProfilingCache bconfig
 
     menv <- getMinimalEnvOverride
-    let loadDatabase' = loadDatabase menv pcache allowed localNames profiling
-    libraryIds <-
-        loadDatabase' Global Nothing M.empty >>=
-        loadDatabase' Snap (Just snapDBPath) >>=
-        loadDatabase' Local (Just localDBPath)
+    let loadDatabase' = loadDatabase menv pcache profiling
+    (sourceMap2, localInstalled) <-
+        loadDatabase' Global Nothing sourceMap1 >>=
+        loadDatabase' Snap (Just snapDBPath) . fst >>=
+        loadDatabase' Local (Just localDBPath) . fst
 
     saveProfilingCache (configProfilingCache bconfig) pcache
 
     {- FIXME executables
     snapExePath <- error "snap exes"
     localExePath <- error "localExePath"
-    -}
 
     let libraries = Map.fromList
                   $ map (\(gid, loc) ->
@@ -124,6 +131,9 @@ getInstalled profiling allowed localNames = do
                   $ Map.toList libraryIds
         executables = M.empty -- FIXME
     return $ M.union libraries executables
+    -}
+
+    return sourceMap2
 
 data LocalPackage = LocalPackage
     { lpPackage :: Package
@@ -186,44 +196,94 @@ loadLocals bopts = do
         any (`FL.isParentOf` dir) dirs ||
         any (== dir) dirs
 
--- | Output Set includes the input dependencies
+data LoadHelper = LoadHelper
+    { lhId :: !GhcPkgId
+    , lhDeps :: ![GhcPkgId]
+    , lhNew :: !Bool
+    }
+
+-- | Outputs both the modified SourceMap and the Set of all installed packages in this database
 loadDatabase :: M env m
              => EnvOverride
              -> ProfilingCache
-             -> Map PackageName Version -- ^ packages in this Map may only be as the specified Version, otherwise any version is allowed
-             -> Set PackageName -- ^ no package from this list is allowed
              -> Bool -- ^ require profiling libraries?
              -> Location
              -> Maybe (Path Abs Dir) -- ^ package database
-             -> Map GhcPkgId Location -- ^ dependencies available
-             -> m (Map GhcPkgId Location)
-loadDatabase menv pcache allowed banned profiling loc mdb available = do
-    dps <- ghcPkgDump menv mdb
-        $  conduitDumpPackage
-        =$ addProfiling pcache
-        =$ CL.filter isAllowed
-        =$ CL.map dpToItem
-        =$ CL.consume
-    let items = dps ++ (Map.toList $ fmap (, []) available)
-    return $ Map.fromList $ map toPair $ M.elems $ pruneDeps
-        (packageIdentifierName . ghcPkgIdPackageIdentifier)
-        fst
-        (snd . snd)
-        const
-        items
+             -> SourceMap
+             -> m (SourceMap, Set GhcPkgId)
+loadDatabase menv pcache profiling loc mdb sourceMap0 = do
+    let sinkDP = addProfiling pcache
+              =$ CL.filter isAllowed
+              =$ CL.map dpToLH
+              =$ CL.consume
+        sinkGIDs = CL.map dpGhcPkgId =$ CL.consume
+        sink = getZipSink $ (,)
+            <$> ZipSink sinkDP
+            <*> ZipSink sinkGIDs
+    (lhs1, gids) <- ghcPkgDump menv mdb $ conduitDumpPackage =$= sink
+    let lhs2 = lhs1 ++ installed0
+        lhs3 = pruneDeps
+            (packageIdentifierName . ghcPkgIdPackageIdentifier)
+            lhId
+            lhDeps
+            const
+            lhs2
+        sourceMap1 = Map.fromList
+            $ map (\lh ->
+                let gid = lhId lh
+                    PackageIdentifier name version = ghcPkgIdPackageIdentifier gid
+                 in (name, (version, PSInstalledLib loc gid)))
+            $ filter lhNew
+            $ Map.elems lhs3
+        sourceMap2 = Map.union sourceMap1 sourceMap0
+    return (sourceMap2, Set.fromList gids)
   where
-    toPair (gid, (loc, _)) = (gid, loc)
+    -- Get a list of all installed GhcPkgIds with their "dependencies". The
+    -- dependencies are always an empty list, since we don't need anything to
+    -- use an installed dependency
+    installed0 = flip mapMaybe (Map.toList sourceMap0) $ \x ->
+        case x of
+            (_, (_, PSInstalledLib _ gid)) -> Just LoadHelper
+                { lhId = gid
+                , lhDeps = []
+                , lhNew = False
+                }
+            _ -> Nothing
+
+    dpToLH dp = LoadHelper
+        { lhId = dpGhcPkgId dp
+        , lhDeps = dpDepends dp
+        , lhNew = True
+        }
+
     isAllowed dp
         | profiling && not (dpProfiling dp) = False
-        | name `Set.member` banned = False
         | otherwise =
-            case Map.lookup name allowed of
-                Just version' | version /= version' -> False
-                _ -> True
+            case Map.lookup name sourceMap0 of
+                Nothing -> True
+                Just (version', ps)
+                  | version /= version' -> False
+                  | otherwise -> case ps of
+                    -- Never trust an installed local, instead we do dirty
+                    -- checking later when constructing the plan
+                    PSLocal _ -> False
+
+                    -- Shadow any installations in the global and snapshot
+                    -- databases
+                    PSExtraDeps _ -> loc == Local
+
+                    -- Alows cool to have the right version of a
+                    -- snapshot-listed package
+                    PSSnapshot _ -> True
+
+                    -- And then above we just resolve the conflict
+                    PSInstalledLib _ _ -> True
+
+                    -- Something's wrong if we think a package is
+                    -- executable-only and it appears in a package datbase
+                    PSInstalledExe _ -> assert False False
       where
         PackageIdentifier name version = ghcPkgIdPackageIdentifier $ dpGhcPkgId dp
-
-    dpToItem dp = (dpGhcPkgId dp, (loc, dpDepends dp))
 
 data Task = Task
     { taskProvides :: !PackageIdentifier
@@ -246,10 +306,11 @@ data S = S
 
 constructPlan :: M env m
               => [LocalPackage]
-              -> Map PackageName MiniPackageInfo
-              -> Map PackageName (Version, Location, Installed)
+              -> SourceMap
               -> m [Task]
-constructPlan locals buildPlan installed = do
+constructPlan locals sourceMap = do
+    error "constructPlan"
+    {-
     s <- execStateT (mapM_ goWanted $ filter lpWanted locals) (S M.empty [] Set.empty)
     if Set.null $ failures s
         then return $ tasks s
@@ -371,6 +432,7 @@ constructPlan locals buildPlan installed = do
                     , taskType = TTMPI mpi
                     }
                 return $ FDRToInstall (mpiVersion mpi) Snap
+    -}
 
 data FindDepRes
     = FDRToInstall Version Location
@@ -392,12 +454,19 @@ build bopts = do
     locals <- loadLocals bopts
     let localNames = Set.fromList $ map (packageName . lpPackage) locals
         localDepVersions = bcExtraDeps bconfig
-    installed <- getInstalled
-        profiling
-        (localDepVersions `M.union` fmap mpiVersion inBuildPlan)
-        localNames
 
-    constructPlan locals inBuildPlan installed >>= error .show
+    let sourceMap1 = Map.unions
+            [ Map.fromList $ flip map locals $ \lp ->
+                let p = lpPackage lp
+                 in (packageName p, (packageVersion p, PSLocal p))
+            , flip Map.mapWithKey (bcExtraDeps bconfig) $ \name version ->
+                (version, PSExtraDeps $ fromMaybe Map.empty $ Map.lookup name $ bcFlags bconfig)
+            , flip fmap inBuildPlan $ \mpi -> (mpiVersion mpi, PSSnapshot mpi)
+            ]
+
+    sourceMap2 <- getInstalled profiling sourceMap1
+
+    constructPlan locals sourceMap2 >>= error . show
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
 

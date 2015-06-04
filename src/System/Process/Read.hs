@@ -128,7 +128,7 @@ sinkProcessStdout :: (MonadIO m)
                   => EnvOverride
                   -> String
                   -> [String]
-                  -> Consumer S.ByteString IO a
+                  -> Sink S.ByteString IO a
                   -> m a
 sinkProcessStdout menv name args sink = do
   name' <- liftIO $ liftM toFilePath $ join $ findExecutable menv name
