@@ -18,14 +18,15 @@ RUN echo "Acquire::http { Proxy \"http://$(netstat -nr|grep '^0\.0\.0\.0'|awk '{
 ENV GHCVER=7.8.4
 ENV CABALVER=1.20
 RUN apt-get update
-RUN apt-get install -y python-software-properties
+RUN apt-get install -y python-software-properties software-properties-common
 RUN apt-add-repository -y ppa:hvr/ghc
 RUN apt-get update
 RUN apt-get install -y ghc-$GHCVER cabal-install-$CABALVER zlib1g-dev wget
 ENV PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
 
 # RUBY & FPM
-RUN apt-get install -y ruby-dev rubygems libffi-dev make
+RUN apt-get install -y ruby-dev libffi-dev make
+RUN if [ "<<UBUNTU_VERSION>>" \< "14.04" ]; then apt-get install -y rubygems; fi
 RUN gem install fpm
 
 # BUILD

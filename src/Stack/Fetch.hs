@@ -30,26 +30,30 @@ import           Control.Concurrent.STM          (TVar, atomically, modifyTVar,
 import           Control.Exception               (Exception, SomeException,
                                                   throwIO, toException)
 import           Control.Monad                   (liftM, when, join, unless)
-import           Control.Monad.Catch             (MonadThrow, throwM)
+import           Control.Monad.Catch             (MonadCatch, MonadThrow, throwM, catch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Control
-import           Crypto.Hash                     (Context, Digest, SHA512,
+import           Control.Monad.Trans.Reader      (runReaderT)
+import           Crypto.Hash                     (Context, Digest, SHA512(..),
                                                   digestToHexByteString,
                                                   hashFinalize, hashInit,
                                                   hashUpdate)
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString                 as S
+import qualified Data.ByteString.Char8           as C8
 import qualified Data.ByteString.Lazy            as L
 import           Data.Either                     (partitionEithers)
 import qualified Data.Foldable                   as F
 import           Data.Function                   (fix)
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
+import           Data.Maybe                      (fromMaybe, maybeToList)
 import           Data.Monoid                     ((<>))
 import           Data.Set                        (Set)
 import qualified Data.Set                        as Set
 import qualified Data.Text                       as T
+import qualified Data.Text.IO                    as T
 import           Data.Text.Encoding              (decodeUtf8)
 import           Data.Typeable                   (Typeable)
 import           Data.Word                       (Word64)
@@ -57,6 +61,7 @@ import           Network.HTTP.Client             (Manager, brRead,
                                                   responseBody,
                                                   withResponse)
 import           Network.HTTP.Download
+import           Network.HTTP.Download.Verified
 import           Stack.PackageIndex
 import           Stack.Types
 
@@ -81,10 +86,10 @@ data FetchException
         , _idsExpected        :: Word64
         , _idsTotalDownloaded :: Word64
         }
-    | InvalidHash
+    | InvalidSha512
         { _ihUrl      :: T.Text
         , _ihExpected :: S.ByteString
-        , _ihActual   :: Digest SHA512
+        , _ihActual   :: String
         }
     | UnpackDirectoryAlreadyExists (Set FilePath)
     | CouldNotParsePackageSelectors [String]
@@ -296,42 +301,74 @@ fetchPackages mdistDir toFetchAll = do
        -> (PackageIdentifier, ToFetch)
        -> m ()
     go man outputVar (ident, toFetch) = do
-        let fp = toFilePath $ tfTarball toFetch
-        unlessM (liftIO (doesFileExist fp)) $ do
-            $logInfo $ "Downloading " <> packageIdentifierText ident
-            liftIO $ createDirectoryIfMissing True $ takeDirectory fp
-            req <- parseUrl $ T.unpack $ tfUrl toFetch
-            -- FIXME switch to using verifiedDownload
-            liftIO $ withResponse req man $ \res -> do
-                let tmp = fp <.> "tmp"
-                withBinaryFile tmp WriteMode $ \h -> do
-                    let loop total ctx = do
-                            bs <- brRead $ responseBody res
-                            if S.null bs
-                                then
-                                    case tfSize toFetch of
-                                        Nothing -> return ()
-                                        Just expected
-                                            | expected /= total ->
-                                                throwM InvalidDownloadSize
-                                                    { _idsUrl = tfUrl toFetch
-                                                    , _idsExpected = expected
-                                                    , _idsTotalDownloaded = total
-                                                    }
-                                            | otherwise -> validHash (tfUrl toFetch) (tfSHA512 toFetch) ctx
-                                else do
-                                    S.hPut h bs
-                                    let total' = total + fromIntegral (S.length bs)
-                                    case tfSize toFetch of
-                                        Just expected | expected < total' ->
-                                            throwM InvalidDownloadSize
-                                                { _idsUrl = tfUrl toFetch
-                                                , _idsExpected = expected
-                                                , _idsTotalDownloaded = total'
-                                                }
-                                        _ -> loop total' $! hashUpdate ctx bs
-                    loop 0 hashInit
-                renameFile tmp fp
+        req <- parseUrl $ T.unpack $ tfUrl toFetch
+        let destpath = tfTarball toFetch
+
+        let toHashCheck bs = HashCheck SHA512 (C8.unpack bs)
+        let downloadReq = DownloadRequest
+                { drRequest = req
+                , drHashChecks = map toHashCheck $ maybeToList (tfSHA512 toFetch)
+                , drLengthCheck = fmap fromIntegral $ tfSize toFetch
+                }
+        let progressSink = do
+                -- TODO: logInfo
+                liftIO $ T.putStrLn $ "Downloading " <> packageIdentifierText ident
+        errMay <- liftIO $ do
+            (flip runReaderT man (verifiedDownload downloadReq destpath progressSink) >> return Nothing)
+                `catch` \e -> case e of
+                    WrongContentLength _ actual -> return $ Just $ InvalidDownloadSize
+                        { _idsUrl = tfUrl toFetch
+                        , _idsExpected = fromMaybe (error "fetchPackagesImpossible cl") (tfSize toFetch)
+                        , _idsTotalDownloaded = read (show actual) -- TODO(danburton): something better than this
+                        }
+                    WrongStreamLength _ actual -> return $ Just $ InvalidDownloadSize
+                        { _idsUrl = tfUrl toFetch
+                        , _idsExpected = fromMaybe (error "fetchPackagesImpossible sl") (tfSize toFetch)
+                        , _idsTotalDownloaded = fromIntegral actual
+                        }
+                    WrongDigest _ _ actual -> return $ Just $ InvalidSha512
+                        { _ihUrl = tfUrl toFetch
+                        , _ihExpected = fromMaybe (error "fetchPackagesImpossible dg") (tfSHA512 toFetch)
+                        , _ihActual = actual
+                        }
+        maybe (return ()) throwM errMay
+
+        let fp = toFilePath destpath
+        --unlessM (liftIO (doesFileExist fp)) $ do
+        --    $logInfo $ "Downloading " <> packageIdentifierText ident
+        --    liftIO $ createDirectoryIfMissing True $ takeDirectory fp
+        --    req <- parseUrl $ T.unpack $ tfUrl toFetch
+        --    -- FIXME switch to using verifiedDownload
+        --    liftIO $ withResponse req man $ \res -> do
+        --        let tmp = fp <.> "tmp"
+        --        withBinaryFile tmp WriteMode $ \h -> do
+        --            let loop total ctx = do
+        --                    bs <- brRead $ responseBody res
+        --                    if S.null bs
+        --                        then
+        --                            case tfSize toFetch of
+        --                                Nothing -> return ()
+        --                                Just expected
+        --                                    | expected /= total ->
+        --                                        throwM InvalidDownloadSize
+        --                                            { _idsUrl = tfUrl toFetch
+        --                                            , _idsExpected = expected
+        --                                            , _idsTotalDownloaded = total
+        --                                            }
+        --                                    | otherwise -> validHash (tfUrl toFetch) (tfSHA512 toFetch) ctx
+        --                        else do
+        --                            S.hPut h bs
+        --                            let total' = total + fromIntegral (S.length bs)
+        --                            case tfSize toFetch of
+        --                                Just expected | expected < total' ->
+        --                                    throwM InvalidDownloadSize
+        --                                        { _idsUrl = tfUrl toFetch
+        --                                        , _idsExpected = expected
+        --                                        , _idsTotalDownloaded = total'
+        --                                        }
+        --                                _ -> loop total' $! hashUpdate ctx bs
+        --            loop 0 hashInit
+        --        renameFile tmp fp
 
         let dest = toFilePath $ parent $ tfDestDir toFetch
             innerDest = toFilePath $ tfDestDir toFetch
@@ -370,17 +407,17 @@ fetchPackages mdistDir toFetchAll = do
 
             atomically $ modifyTVar outputVar $ Map.insert ident $ tfDestDir toFetch
 
-validHash :: T.Text -> Maybe S.ByteString -> Context SHA512 -> IO ()
-validHash _ Nothing _ = return ()
-validHash url (Just sha512) ctx
-    | sha512 == digestToHexByteString dig = return ()
-    | otherwise = throwIO InvalidHash
-        { _ihUrl = url
-        , _ihExpected = sha512
-        , _ihActual = dig
-        }
-  where
-    dig = hashFinalize ctx
+--validHash :: T.Text -> Maybe S.ByteString -> Context SHA512 -> IO ()
+--validHash _ Nothing _ = return ()
+--validHash url (Just sha512) ctx
+--    | sha512 == digestToHexByteString dig = return ()
+--    | otherwise = throwIO InvalidHash
+--        { _ihUrl = url
+--        , _ihExpected = sha512
+--        , _ihActual = dig
+--        }
+--  where
+--    dig = hashFinalize ctx
 
 parMapM_ :: (F.Foldable f,MonadIO m,MonadBaseControl IO m)
          => Int
