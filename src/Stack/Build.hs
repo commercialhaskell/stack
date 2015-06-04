@@ -183,7 +183,8 @@ getInstalled menv profiling sourceMap1 = do
                         PSExtraDeps p
                             | loc == Local && not (packageHasLibrary p) -> Map.empty
                         -- Same thing for snapshots, but in the snapshot database
-                        PSSnapshot _ | loc == Snap -> Map.empty -- FIXME add info on whether a library exists to mpi and check it
+                        PSSnapshot mpi
+                            | loc == Snap && not (mpiHasLibrary mpi) -> Map.empty
                         -- Passed all the tests, mark this as installed!
                         _ -> m
           where
