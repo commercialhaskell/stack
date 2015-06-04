@@ -9,7 +9,8 @@ module Path.IO
   ,resolveFile
   ,resolveDirMaybe
   ,resolveFileMaybe
-  ,ResolveException(..))
+  ,ResolveException(..)
+  ,removeFileIfExists)
   where
 
 import           Control.Exception
@@ -22,6 +23,7 @@ import           Data.Typeable
 import           Path
 import           System.Directory
 import qualified System.FilePath as FP
+import           System.IO.Error
 
 data ResolveException
     = ResolveDirFailed (Path Abs Dir) FilePath FilePath
@@ -105,3 +107,15 @@ listDirectory dir =
      let entries = catMaybes maybeEntries
      return (lefts entries,rights entries)
   where dirFP = toFilePath dir
+
+-- | Remove the given file. Optimistically assumes it exists. If it
+-- doesn't, doesn't complain.
+removeFileIfExists :: MonadIO m => Path b File -> m ()
+removeFileIfExists fp =
+    liftIO (Control.Exception.catch
+                (removeFile
+                     (toFilePath fp))
+                (\e ->
+                      if isDoesNotExistError e
+                          then return ()
+                          else throwIO e))

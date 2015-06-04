@@ -78,7 +78,8 @@ import           Distribution.System (Platform (Platform), OS (Windows))
 import           Distribution.Version (intersectVersionRanges, anyVersion)
 import           Network.HTTP.Conduit (Manager)
 import           Network.HTTP.Download
-import           Path as FL
+import           Path
+import           Path.IO
 import           Prelude hiding (FilePath,writeFile)
 import           Stack.Build.Types
 import           Stack.BuildPlan
@@ -305,7 +306,7 @@ loadLocals bopts = do
                      Right pname -> Right $ Right pname
     isWanted dirs names dir name =
         name `Set.member` names ||
-        any (`FL.isParentOf` dir) dirs ||
+        any (`isParentOf` dir) dirs ||
         any (== dir) dirs
 
 -- | Stored on disk to know whether the flags have changed or any
@@ -390,6 +391,16 @@ writeConfigCache dir opts =
         (ConfigCache
          { configCacheOpts = map T.encodeUtf8 opts
          })
+
+-- | Delete the caches for the project.
+deleteCaches :: (M env m)  => Path Abs Dir -> m ()
+deleteCaches dir = do
+    menv <- getMinimalEnvOverride
+    cabalPkgVer <- getCabalPkgVer menv
+    bfp <- buildCacheFile cabalPkgVer dir
+    removeFileIfExists bfp
+    cfp <- configCacheFile cabalPkgVer dir
+    removeFileIfExists cfp
 
 -- | Write to a cache.
 writeCache :: (Binary a, M env m)
@@ -873,7 +884,7 @@ build bopts = do
             installLock <- newMVar ()
             idMap <- liftIO $ newTVarIO M.empty
             let setupHs = tmpdir' </> $(mkRelFile "Setup.hs")
-            liftIO $ writeFile (FL.toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
+            liftIO $ writeFile (toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
             executePlan plan ExecuteEnv
                 { eeEnvOverride = menv
                 , eeBuildOpts = bopts
@@ -1027,6 +1038,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
   withLogFile package $ \mlogFile ->
   withCabal package mlogFile $ \cabal -> do
     when needsConfig $ withMVar eeConfigureLock $ \_ -> do
+        deleteCaches (packageDir package)
         idMap <- liftIO $ readTVarIO eeGhcPkgIds
         let getMissing ident =
                 case Map.lookup ident idMap of
@@ -1318,30 +1330,16 @@ printWithoutTHLoading outH = liftIO $ void $ forkIO $
 
 
 -- | Reset the build (remove Shake database and .gen files).
-clean :: forall m env.
-         (MonadIO m, MonadReader env m, HasHttpManager env, HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m)
-      => m ()
-clean = do -- FIXME implement this
-    return ()
-  {-
-  do env <- ask
-     menv <- getMinimalEnvOverride
-     cabalPkgVer <- getCabalPkgVer menv
-     forM_ (S.toList (bcPackages $ getBuildConfig env))
-           (\pkgdir ->
-              do deleteGenFile cabalPkgVer pkgdir
-                 distDir' <- liftM FL.toFilePath
-                       (distDirFromDir cabalPkgVer pkgdir)
-                 liftIO $ do
-                     exists <- doesDirectoryExist distDir'
-                     when exists (removeDirectoryRecursive distDir'))
-     shakeDir <- asks configShakeFilesDir
-     liftIO (do exists <- doesDirectoryExist (toFilePath shakeDir)
-                when exists
-                     (removeDirectoryRecursive (toFilePath shakeDir)))
-     -}
+clean :: (M env m) => m ()
+clean = do
+    env <- ask
+    menv <- getMinimalEnvOverride
+    cabalPkgVer <- getCabalPkgVer menv
+    forM_
+        (S.toList (bcPackages $ getBuildConfig env))
+        deleteCaches
 
-        {- EKB FIXME: doc generation for stack-doc-server
+{- EKB FIXME: doc generation for stack-doc-server
             (boptsFinalAction bopts == DoHaddock)
             (buildDocIndex
                  (wanted pwd)
@@ -1385,11 +1383,11 @@ getCabalPkgVer menv = do
 getSetupHs :: Path Abs Dir -- ^ project directory
            -> IO (Maybe (Path Abs File))
 getSetupHs dir = do
-    exists1 <- doesFileExist (FL.toFilePath fp1)
+    exists1 <- doesFileExist (toFilePath fp1)
     if exists1
         then return $ Just fp1
         else do
-            exists2 <- doesFileExist (FL.toFilePath fp2)
+            exists2 <- doesFileExist (toFilePath fp2)
             if exists2
                 then return $ Just fp2
                 else return Nothing
@@ -1439,7 +1437,7 @@ buildDocIndex wanted docLoc packages mgr logLevel =
                      else [])
     combineHoogle =
       do let destHoogleDbLoc = hoogleDatabaseFile docLoc
-             destPath = FL.toFilePath destHoogleDbLoc
+             destPath = toFilePath destHoogleDbLoc
          want [destPath]
          destPath %> \_ ->
            runWithLogging
@@ -1450,7 +1448,7 @@ buildDocIndex wanted docLoc packages mgr logLevel =
                         "hoogle"
                         ("combine" :
                          "-o" :
-                         FL.toFilePath destHoogleDbLoc :
+                         toFilePath destHoogleDbLoc :
                          srcHoogleDbs))
     toSrcHoogleDb package =
       do let srcPath = toFilePath docLoc ++ "/" ++
@@ -1464,7 +1462,7 @@ buildDocIndex wanted docLoc packages mgr logLevel =
     needDeps =
       need (concatMap (\package -> if wanted package == Wanted
                                     then let dir = packageDir package
-                                         in [FL.toFilePath (builtFileFromDir dir)]
+                                         in [toFilePath (builtFileFromDir dir)]
                                     else [])
                       (S.toList packages))
 
@@ -1474,10 +1472,10 @@ removeDocLinks :: Path Abs Dir -> Package -> IO ()
 removeDocLinks docLoc package =
   --EKB FIXME: only when running in Docker, for now.
   do createDirectoryIfMissing True
-                              (FL.toFilePath docLoc)
+                              (toFilePath docLoc)
      userDocLs <-
-       fmap (map (FL.toFilePath docLoc ++))
-            (getDirectoryContents (FL.toFilePath docLoc))
+       fmap (map (toFilePath docLoc ++))
+            (getDirectoryContents (toFilePath docLoc))
      forM_ userDocLs $
        \docPath ->
          do isDir <- doesDirectoryExist docPath
@@ -1497,7 +1495,7 @@ createDocLinks docLoc package =
      pkgVerLoc <- liftIO (parseRelDir pkgVer)
      let pkgDestDocLoc = docLoc </> pkgVerLoc
          pkgDestDocPath =
-           FilePath.dropTrailingPathSeparator (FL.toFilePath pkgDestDocLoc)
+           FilePath.dropTrailingPathSeparator (toFilePath pkgDestDocLoc)
          cabalDocLoc = parent docLoc </>
                       --EKB FIXME: this does not work with .stack-work
                        $(mkRelDir "share/doc/")
@@ -1519,11 +1517,11 @@ createDocLinks docLoc package =
              else return []
      case haddockLocs of
        [haddockLoc] ->
-         case FL.stripDir (parent docLoc)
+         case stripDir (parent docLoc)
                           haddockLoc of
            Just relHaddockPath ->
              do let srcRelPathCollapsed =
-                      FilePath.takeDirectory (FilePath.dropTrailingPathSeparator (FL.toFilePath relHaddockPath))
+                      FilePath.takeDirectory (FilePath.dropTrailingPathSeparator (toFilePath relHaddockPath))
                     {-srcRelPath = "../" ++ srcRelPathCollapsed-}
                 createSymbolicLink (FilePath.dropTrailingPathSeparator srcRelPathCollapsed)
                                    pkgDestDocPath
@@ -1553,7 +1551,7 @@ haddockInterfaceOpts userDocLoc package packages =
                             haddockExtension]
                          _ -> [])
              Just dpi ->
-               do let destPath = (FL.toFilePath userDocLoc ++ "/" ++
+               do let destPath = (toFilePath userDocLoc ++ "/" ++
                                  joinPkgVer (pn,packageVersion dpi) ++ "/" ++
                                  packageNameString pn ++ "." ++
                                  haddockExtension)
