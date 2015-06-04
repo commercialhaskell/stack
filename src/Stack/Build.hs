@@ -31,7 +31,7 @@ import           System.IO.Error
 import qualified Control.Applicative as A
 import           Control.Applicative ((<$>), (<*>))
 import           Control.Arrow ((&&&))
-import           Control.Concurrent (getNumCapabilities)
+import           Control.Concurrent (getNumCapabilities, forkIO)
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
@@ -1003,34 +1003,16 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
 
     when needsConfig $ withMVar eeConfigureLock $ \_ -> do
         announce "configure"
-        cabal $ "configure" : map T.unpack configOpts
+        cabal False $ "configure" : map T.unpack configOpts
 
     $logDebug $ T.pack $ show configOpts
     fileModTimes <- getPackageFileModTimes package
     writeDirtyCache (packageDir package) fileModTimes configOpts
 
     unless justFinal $ do
-        -- FIXME strip out TH loading
-      {-
-      where stdoutToo h
-                | not liveOutput = sinkHandle h
-                | configHideTHLoading (getConfig config') =
-                        CL.iterM (S8.hPut h)
-                    =$= CB.lines
-                    =$= CL.filter (not . isTHLoading)
-                    =$= CL.mapM_ S8.putStrLn
-                | otherwise = CL.iterM S8.putStr =$= sinkHandle h
-
- -- | Is this line a Template Haskell "Loading package" line
- -- ByteString
- isTHLoading :: S8.ByteString -> Bool
- isTHLoading bs =
-     "Loading package " `S8.isPrefixOf` bs &&
-     ("done." `S8.isSuffixOf` bs || "done.\r" `S8.isSuffixOf` bs)
-        -}
-
         announce "build"
-        cabal ["build"]
+        config <- asks getConfig
+        cabal (console && configHideTHLoading config) ["build"]
 
     case boptsFinalAction eeBuildOpts of
         DoTests -> when wanted $ do
@@ -1038,7 +1020,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
             runTests package mlogFile
         DoBenchmarks -> when wanted $ do
             announce "benchmarks"
-            cabal ["bench"]
+            cabal False ["bench"]
         DoHaddock -> do
             announce "haddock"
               {- EKB FIXME: doc generation for stack-doc-server
@@ -1047,7 +1029,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
  #endif
               ifcOpts <- liftIO (haddockInterfaceOpts docLoc package packages)
               -}
-            cabal ["haddock", "--html"]
+            cabal False ["haddock", "--html"]
               {- EKB FIXME: doc generation for stack-doc-server
                          ,"--hoogle"
                          ,"--hyperlink-source"
@@ -1082,7 +1064,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
 
     unless justFinal $ withMVar eeInstallLock $ \_ -> do
         announce "install"
-        cabal ["install"]
+        cabal False ["install"]
 
     -- It seems correct to leave this outside of the "justFinal" check above,
     -- in case another package depends on a justFinal target
@@ -1171,7 +1153,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
         distRelativeDir' <- distRelativeDir eeCabalPkgVer
         msetuphs <- liftIO $ getSetupHs $ packageDir package
         let setuphs = fromMaybe eeSetupHs msetuphs
-        inner $ \args -> do
+        inner $ \stripTHLoading args -> do
             let fullArgs =
                       ("-package=" ++ packageIdentifierString eeCabalPkgVer)
                     : "-clear-package-db"
@@ -1190,9 +1172,11 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                     , Process.env = subEnv
                     , std_in = CreatePipe
                     , std_out =
-                        case mlogFile of
-                            Nothing -> Inherit
-                            Just (_, h) -> UseHandle h
+                        if stripTHLoading
+                            then CreatePipe
+                            else case mlogFile of
+                                Nothing -> Inherit
+                                Just (_, h) -> UseHandle h
                     , std_err =
                         case mlogFile of
                             Nothing -> Inherit
@@ -1200,8 +1184,11 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                     }
             $logDebug $ "Running: " <> T.pack (show $ toFilePath exeName : fullArgs)
 
-            (Just inH, Nothing, Nothing, ph) <- liftIO $ createProcess_ "singleBuild" cp
+            (Just inH, moutH, Nothing, ph) <- liftIO $ createProcess_ "singleBuild" cp
             liftIO $ hClose inH
+            case moutH of
+                Just outH -> assert stripTHLoading $ printWithoutTHLoading outH
+                Nothing -> return ()
             ec <- liftIO $ waitForProcess ph
             case ec of
                 ExitSuccess -> return ()
@@ -1271,6 +1258,23 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                         ]
                     return $ Map.singleton testName Nothing
         unless (Map.null errs) $ throwM $ TestSuiteFailure2 taskProvides errs (fmap fst mlogFile)
+
+-- | Grab all output from the given @Handle@ and print it to stdout, stripping
+-- Template Haskell "Loading package" lines. Does work in a separate thread.
+printWithoutTHLoading :: MonadIO m => Handle -> m ()
+printWithoutTHLoading outH = liftIO $ void $ forkIO $
+       CB.sourceHandle outH
+    $$ CB.lines
+    =$ CL.filter (not . isTHLoading)
+    =$ CL.mapM_ S8.putStrLn
+  where
+    -- | Is this line a Template Haskell "Loading package" line
+    -- ByteString
+    isTHLoading :: S8.ByteString -> Bool
+    isTHLoading bs =
+        "Loading package " `S8.isPrefixOf` bs &&
+        ("done." `S8.isSuffixOf` bs || "done.\r" `S8.isSuffixOf` bs)
+
 
 -- | Reset the build (remove Shake database and .gen files).
 clean :: forall m env.
