@@ -2,7 +2,7 @@ DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 PKG_VERSION := $(shell cat stack.cabal|grep -e '^version:'|cut -d':' -f2|sed 's/\s//g')
 GIT_REV_COUNT := $(shell git rev-list HEAD --count)
 GIT_SHA := $(shell PAGER=cat git log --pretty=%h HEAD~1..HEAD|head -n1)
-UBUNTU_VERSION ?= 15.04
+UBUNTU_VERSION ?= 14.04
 
 default: docker
 
