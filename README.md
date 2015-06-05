@@ -254,3 +254,21 @@ When you run `stack build`, you can set the
 $ stack build                             # builds using the default stack.yaml
 $ STACK_YAML=stack-7.10.yaml stack build  # builds using the given yaml file
 ```
+
+__I heard you can use this with Docker?__
+
+Yes, stack supports using Docker with images that contain all of Stackage and
+the tools pre-installed.  Commands like `stack build` will automatically run
+in a temporary container (with your project bind-mounted into the container).
+To enable, add this to your `stack.yaml`:
+
+```
+docker:
+  enable: true
+```
+
+This will use a Docker image tagged with the same LTS version as your resolver.
+Note that the Docker images are really big (approx. 10 GB), and not all LTS
+versions have a Docker image (they tend to lag behind).  We also recommend
+against using this with Docker's _devicemapper_ storage driver, since its
+default settings have trouble with images this big.
