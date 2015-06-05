@@ -25,7 +25,6 @@ import Control.Monad.Logger (MonadLogger)
 import System.Process.Read
 import Control.Exception.Enclosed (tryIO)
 import Data.Map (Map)
-import Data.Maybe (fromMaybe)
 import Data.IORef
 import Control.Monad.Catch (MonadThrow, Exception, throwM)
 import qualified Data.Foldable as F
@@ -209,10 +208,12 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
             case Map.lookup k m of
                 Just [v] -> return v
                 _ -> throwM $ MissingSingleField k m
+        -- Can't fail: if not found, same as an empty list. See:
+        -- https://github.com/fpco/stack/issues/182
         parseM k =
             case Map.lookup k m of
-                Just vs -> return vs
-                Nothing -> throwM $ MissingMultiField k m
+                Just vs -> vs
+                Nothing -> []
 
         parseDepend :: MonadThrow m => ByteString -> m (Maybe GhcPkgId)
         parseDepend "builtin_rts" = return Nothing
@@ -236,10 +237,10 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 $ throwM $ MismatchedId name version ghcPkgId
 
             -- if a package has no modules, these won't exist
-            let libDirs = fromMaybe [] $ parseM "library-dirs"
-                libraries = fromMaybe [] $ parseM "hs-libraries"
+            let libDirs = parseM "library-dirs"
+                libraries = parseM "hs-libraries"
+            depends <- mapM parseDepend $ parseM "depends"
 
-            depends <- parseM "depends" >>= mapM parseDepend
             return $ Just DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpLibDirs = libDirs
