@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
@@ -8,6 +9,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- | Build project(s).
 
@@ -16,36 +18,29 @@ module Stack.Build
   ,clean)
   where
 
-import           Data.Binary (Binary)
-import qualified Data.Binary as Binary
-import           Data.ByteString (ByteString)
-import qualified Data.ByteString as S
-import qualified Data.ByteString.Lazy as L
-import           Data.Text (Text)
-import qualified Data.Text.Encoding as T
-import           Data.Time.Calendar
-import           Data.Time.Clock
-import           GHC.Generics
-import           System.IO.Error
-
 import           Control.Applicative ((<$>), (<*>))
 import           Control.Concurrent (getNumCapabilities, forkIO)
 import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
-import           Control.Exception.Lifted
 import           Control.Exception.Enclosed (handleIO)
+import           Control.Exception.Lifted
 import           Control.Monad
-import           Control.Monad.Catch (MonadCatch)
-import           Control.Monad.Catch (MonadMask)
+import           Control.Monad.Catch (MonadCatch, MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
+import           Control.Monad.State.Strict
 import           Control.Monad.Trans.Control (liftBaseWith)
 import           Control.Monad.Trans.Resource
-import           Control.Monad.State.Strict
 import           Control.Monad.Writer
+import           Data.Binary (Binary)
+import qualified Data.Binary as Binary
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteString.Lazy as L
+import           Data.Char (isSpace)
 import           Data.Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
@@ -61,11 +56,17 @@ import qualified Data.Set as S
 import qualified Data.Set as Set
 import qualified Data.Streaming.Process as Process
 import           Data.Streaming.Process hiding (env,callProcess)
+import           Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import           Data.Time.Calendar
+import           Data.Time.Clock
 import           Data.Typeable (Typeable)
 import           Distribution.Package (Dependency (..))
 import           Distribution.System (Platform (Platform), OS (Windows))
+import           Distribution.Text (display)
 import           Distribution.Version (intersectVersionRanges, anyVersion)
+import           GHC.Generics
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.IO
@@ -82,6 +83,7 @@ import           Stack.Types.Internal
 import           System.Directory hiding (findFiles, findExecutable)
 import           System.Exit (ExitCode (ExitSuccess))
 import           System.IO
+import           System.IO.Error
 import           System.IO.Temp (withSystemTempDirectory)
 import           System.Process.Internals (createProcess_)
 import           System.Process.Read
@@ -97,11 +99,59 @@ data ConstructPlanException
     -- ^ Recommend adding to extra-deps, give a helpful version number?
     | VersionOutsideRange PackageName PackageIdentifier VersionRange
     | Couldn'tMakePlanForWanted (Set PackageName)
-    deriving (Show, Typeable, Eq)
+    deriving (Typeable, Eq)
+
+instance Show ConstructPlanException where
+  show e =
+    let details = case e of
+         (SnapshotPackageDependsOnLocal pName pIdentifier) ->
+           "Exception: Stack.Build.SnapshotPackageDependsOnLocal\n" ++
+           "  Custom snapshot package " ++ show pName ++ " depends on locally installed package:\n" ++
+           "  "  ++ show pIdentifier ++ ",\n" ++
+           "  should you add " ++ show pIdentifier ++ " to [extra-deps] in the project's stack.yaml?"
+         (DependencyCycleDetected pNames) ->
+           "Exception: Stack.Build.DependencyCycle\n" ++
+           "  While checking call stack,\n" ++
+           "  Dependency cycle detected in packages :" ++ indent (appendLines pNames)
+         (DependencyPlanFailures pName (S.toList -> pDeps)) ->
+           "Exception: Stack.Build.DependencyPlanFailures\n" ++
+           "  Failure when adding dependencies:" ++ doubleIndent (appendLines pDeps) ++ "\n" ++
+           "  needed for package: " ++ show pName
+         (UnknownPackage pName) ->
+             "Exception: Stack.Build.UnknownPackage\n" ++
+             "  While attempting to add dependency:\n" ++
+             "    Could not find package " ++ show pName  ++ "in known packages"
+         (VersionOutsideRange pName pIdentifier versionRange) ->
+             "Exception: Stack.Build.VersionOutsideRange\n" ++
+             "  While adding dependency for package " ++ show pName ++ ",\n" ++
+             "  package outside allowed version range detected:\n" ++
+             "    " ++ dropQuotes (show pIdentifier) ++ "\n" ++
+             "  Allowed version range " ++ display versionRange ++ ",\n" ++
+             "  should you give an allowed range to" ++ show pIdentifier ++ " and add it to [extra-deps] in the project's stack.yaml?"
+         (Couldn'tMakePlanForWanted (S.toList -> lpSet)) ->
+            "Exception Stack.Build.Couldn'tMakePlanForWanted\n" ++
+            "  Couldn't make build plan while adding local packages:" ++
+            doubleIndent (appendLines lpSet)
+    in indent details
+     where
+      appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
+      indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
+      dropQuotes = filter ((/=) '\"')
+      doubleIndent = indent . indent
 
 newtype ConstructPlanExceptions = ConstructPlanExceptions [ConstructPlanException]
-    deriving (Show, Typeable)
+    deriving (Typeable)
 instance Exception ConstructPlanExceptions
+
+instance Show ConstructPlanExceptions where
+  show (ConstructPlanExceptions exceptions) =
+    "Exception: Stack.Build.ConstuctPlanExceptions\n" ++
+    "While constructing the BuildPlan the following exceptions were encountered:" ++
+    appendExceptions (removeDuplicates exceptions)
+     where
+         appendExceptions = foldr (\e -> (++) ("\n\n--" ++ show e)) ""
+         removeDuplicates = nub
+ -- ^ Supressing duplicate output
 
 data UnpackedPackageHasWrongName = UnpackedPackageHasWrongName PackageIdentifier PackageName
     deriving (Show, Typeable)
