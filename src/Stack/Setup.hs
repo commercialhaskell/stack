@@ -143,13 +143,14 @@ ensureGHC manager config sopts = do
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: (MonadIO m, MonadMask m, MonadLogger m)
          => Bool -- ^ allow system GHC
+         -> Bool -- ^ install if missing?
          -> Manager
          -> BuildConfig
          -> m BuildConfig
-setupEnv useSystem manager bconfig = do
+setupEnv useSystem installIfMissing manager bconfig = do
     let platform = getPlatform bconfig
         sopts = SetupOpts
-            { soptsInstallIfMissing = False
+            { soptsInstallIfMissing = installIfMissing
             , soptsUseSystem = useSystem
             , soptsExpected = bcGhcVersion bconfig
             , soptsStackYaml = Just $ bcStackYaml bconfig
