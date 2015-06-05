@@ -3,6 +3,7 @@ PKG_VERSION := $(shell cat stack.cabal|grep -e '^version:'|cut -d':' -f2|sed 's/
 GIT_REV_COUNT := $(shell git rev-list HEAD --count)
 GIT_SHA := $(shell PAGER=cat git log --pretty=%h HEAD~1..HEAD|head -n1)
 UBUNTU_VERSION ?= 14.04
+UBUNTU_CODENAME ?= trusty
 
 default: docker
 
@@ -26,7 +27,11 @@ target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)
 
 deb: | target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)_amd64.deb
 
+upload: | target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)_amd64.deb
+	deb-s3 upload -b fpco --sign=9BEFB442 --prefix=ubuntu/$(UBUNTU_CODENAME) \
+		target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)_amd64.deb
+
 clean:
 	@rm -rf Dockerfile target
 
-.PHONY: clean deb docker default ubuntu-stack
+.PHONY: clean deb docker default ubuntu-stack upload
