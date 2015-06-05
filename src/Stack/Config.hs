@@ -231,13 +231,20 @@ loadConfig configArgs = do
 loadBuildConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env,MonadBaseControl IO m)
                 => Maybe (Project, Path Abs File, ConfigMonoid)
                 -> Config
+                -> NoBuildConfigStrategy
                 -> m BuildConfig
-loadBuildConfig mproject config = do
+loadBuildConfig mproject config noConfigStrat = do
     env <- ask
     let miniConfig = MiniConfig (getHttpManager env) config
     (project, stackYamlFP) <- case mproject of
-        Just (project, fp, _) -> return (project, fp)
-        Nothing -> do
+      Just (project, fp, _) -> return (project, fp)
+      Nothing -> case noConfigStrat of
+        ThrowException -> do
+            currDir <- getWorkingDir
+            throwM $ NoProjectConfigFound currDir
+        ExecStrategy ->
+            error "You do not have a stack.yaml. This will be handled in the future, see https://github.com/fpco/stack/issues/59"
+        CreateConfig -> do
             currDir <- getWorkingDir
             (r, flags, cabalFileExists) <- runReaderT (getDefaultResolver currDir) miniConfig
             let dest = currDir </> stackDotYaml
