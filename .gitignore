@@ -14,3 +14,4 @@ cabal.sandbox.config
 .shake/
 .stack-work/
 /target/
+/Dockerfile
