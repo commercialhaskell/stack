@@ -180,15 +180,20 @@ getInstalled menv profiling sourceMap1 = do
 
     bconfig <- asks getBuildConfig
 
-    pcache <- loadProfilingCache $ configProfilingCache bconfig
+    mpcache <-
+        if profiling
+            then liftM Just $ loadProfilingCache $ configProfilingCache bconfig
+            else return Nothing
 
-    let loadDatabase' = loadDatabase menv pcache profiling
+    let loadDatabase' = loadDatabase menv mpcache
     (sourceMap2, localInstalled) <-
         loadDatabase' Global Nothing sourceMap1 >>=
         loadDatabase' Snap (Just snapDBPath) . fst >>=
         loadDatabase' Local (Just localDBPath) . fst
 
-    saveProfilingCache (configProfilingCache bconfig) pcache
+    case mpcache of
+        Nothing -> return ()
+        Just pcache -> saveProfilingCache (configProfilingCache bconfig) pcache
 
     -- Add in the executables that are installed, making sure to only trust a
     -- listed installation under the right circumstances (see below)
@@ -432,14 +437,17 @@ data LoadHelper = LoadHelper
 -- | Outputs both the modified SourceMap and the Set of all installed packages in this database
 loadDatabase :: M env m
              => EnvOverride
-             -> ProfilingCache
-             -> Bool -- ^ require profiling libraries?
+             -> Maybe ProfilingCache -- ^ if Just, profiling is required
              -> Location
              -> Maybe (Path Abs Dir) -- ^ package database
              -> SourceMap
              -> m (SourceMap, Set GhcPkgId)
-loadDatabase menv pcache profiling loc mdb sourceMap0 = do
-    let sinkDP = addProfiling pcache
+loadDatabase menv mpcache loc mdb sourceMap0 = do
+    let sinkDP = (case mpcache of
+                    Just pcache -> addProfiling pcache
+                    -- Just an optimization to avoid calculating the profiling
+                    -- values when they aren't necessary
+                    Nothing -> CL.map (\dp -> dp { dpProfiling = False }))
               =$ CL.filter isAllowed
               =$ CL.map dpToLH
               =$ CL.consume
@@ -484,7 +492,7 @@ loadDatabase menv pcache profiling loc mdb sourceMap0 = do
         }
 
     isAllowed dp
-        | profiling && not (dpProfiling dp) = False
+        | isJust mpcache && not (dpProfiling dp) = False
         | otherwise =
             case Map.lookup name sourceMap0 of
                 Nothing -> True
