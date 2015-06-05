@@ -439,7 +439,10 @@ downloadPair (DownloadPair _ url) ident = do
         , " to "
         , T.pack $ toFilePath path
         ]
-    _ <- download req path -- TODO add progress indicator
+    x <- download req path -- TODO add progress indicator
+    if x
+        then $logInfo "Download complete"
+        else $logInfo "File already downloaded"
     return (path, at)
   where
     extension =
@@ -463,36 +466,30 @@ installGHCPosix :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, Ha
                 -> Path Abs Dir
                 -> PackageIdentifier
                 -> m ()
-installGHCPosix si =
-    error "installGHCPosix"
-    {-
+installGHCPosix _ archiveFile archiveType destDir ident = do
     menv <- getMinimalEnvOverride
-    DownloadPair version url <- getGHCPair si osKey reqVersion
-    let ghcExtension = FP.takeExtension (T.unpack url)
-        zipTool = case ghcExtension of
-                    ".xz"  -> ["xz"]
-                    ".bz2" -> ["bzip2"]
-                    _      -> []
-    checkDependencies (concat [["make", "tar"], zipTool])
-    let dirPiece = "ghc-" <> versionString version
-    req <- parseUrl $ T.unpack url
+    zipTool <-
+        case archiveType of
+            TarXz -> return "xz"
+            TarBz2 -> return "bzip2"
+            SevenZ -> error "Don't know how to deal with .7z files on non-Windows"
+    checkDependencies $ zipTool : ["make", "tar"]
+
     withSystemTempDirectory "stack-setup" $ \root' -> do
         root <- parseAbsDir root'
-        ghcFilename <- parseRelFile ("ghc.tar" ++ ghcExtension)
-        let file = root Path.</> ghcFilename
-        dir <- liftM (root Path.</>) $ parseRelDir dirPiece
-        $logInfo $ "Downloading from: " <> url
-        _ <- runReaderT (download req file) manager
-        $logInfo "Unpacking"
-        runIn root "tar" menv ["xf", toFilePath file] Nothing
+        dir <- liftM (root Path.</>) $ parseRelDir $ packageIdentifierString ident
+
+        $logInfo $ "Unpacking " <> T.pack (toFilePath archiveFile)
+        runIn root "tar" menv ["xf", toFilePath archiveFile] Nothing
+
         $logInfo "Configuring"
         runIn dir (toFilePath $ dir Path.</> $(mkRelFile "configure"))
-              menv ["--prefix=" ++ toFilePath dest] Nothing
+              menv ["--prefix=" ++ toFilePath destDir] Nothing
+
         $logInfo "Installing"
         runIn dir "make" menv ["install"] Nothing
-        $logInfo "GHC installed!"
-    return [toFilePath dest FP.</> "bin"]
-    -}
+
+        $logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
 
 installGHCWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env)
                   => SetupInfo
