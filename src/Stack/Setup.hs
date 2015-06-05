@@ -122,7 +122,7 @@ setupEnv installIfMissing manager bconfig = do
                         ghcBin <- installLocalGHC manager bconfig expected
                         return $ Just ghcBin
                     | otherwise ->
-                        throwM $ GHCVersionMismatch minstalled (bcGhcVersion bconfig)
+                        throwM $ GHCVersionMismatch minstalled (bcGhcVersion bconfig) (bcStackYaml bconfig)
         else return Nothing
 
     -- Modify the initial environment to include the GHC path, if a local GHC

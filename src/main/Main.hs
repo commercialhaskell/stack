@@ -312,17 +312,21 @@ buildCmd finalAction opts go@GlobalOpts{..} =
               ("Dependency issues:\n" ++
                intercalate "\n"
                            (map printBuildException es))
-            GHCVersionMismatch Nothing expected -> concat
+            GHCVersionMismatch Nothing expected stack -> concat
                 [ "No GHC found, expected version "
                 , versionString expected
-                , ". Try running stack setup"
+                , " (based on resolver setting in "
+                , toFilePath stack
+                , "). Try running stack setup"
                 ]
-            GHCVersionMismatch (Just actual) expected -> concat
+            GHCVersionMismatch (Just actual) expected stack -> concat
                 [ "GHC version mismatched, found "
                 , versionString actual
                 , ", but expected "
                 , versionString expected
-                , ". Try running stack setup"
+                , " (based on resolver setting in "
+                , toFilePath stack
+                , "). Try running stack setup"
                 ]
             Couldn'tParseTargets targets -> unlines
                 $ "The following targets could not be parsed as package names or directories:"

@@ -38,7 +38,8 @@ data StackBuildException
   | StackageDepVerMismatch PackageName Version VersionRange
   | StackageVersionMismatch PackageName Version Version
   | DependencyIssues [StackBuildException]
-  | GHCVersionMismatch (Maybe Version) Version
+  | GHCVersionMismatch (Maybe Version) Version (Path Abs File)
+  -- ^ Path to the stack.yaml file
   | Couldn'tParseTargets [Text]
   | UnknownTargets [PackageName]
   | TestSuiteFailure (Path Abs File) (Maybe (Path Abs File)) ExitCode
