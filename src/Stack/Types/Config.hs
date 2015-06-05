@@ -46,8 +46,8 @@ data Config =
          ,configDocker           :: !DockerOpts
          ,configEnvOverride      :: !(EnvSettings -> IO EnvOverride)
          -- ^ Environment variables to be passed to external tools
-         ,configLocalGHCs        :: !(Path Abs Dir)
-         -- ^ Path containing local GHC installations
+         ,configLocalPrograms    :: !(Path Abs Dir)
+         -- ^ Path containing local installations (mainly GHC)
          ,configConnectionCount  :: !Int
          -- ^ How many concurrent connections are allowed when downloading
          ,configHideTHLoading    :: !Bool

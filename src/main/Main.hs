@@ -11,7 +11,9 @@ module Main where
 
 import           Control.Exception
 import           Control.Monad (join)
+import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Logger
+import           Control.Monad.Reader (asks)
 import           Data.Char (toLower)
 import           Data.List
 import qualified Data.List as List
@@ -228,7 +230,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                 Nothing -> do
                     bc <- lcLoadBuildConfig lc ThrowException
                     return (bcGhcVersion bc, Just $ bcStackYaml bc)
-        mpaths <- ensureGHC manager (lcConfig lc) SetupOpts
+        mpaths <- runStackT manager globalLogLevel (lcConfig lc) $ ensureGHC SetupOpts
             { soptsInstallIfMissing = True
             , soptsUseSystem = globalSystemGhc && not scoForceReinstall
             , soptsExpected = ghc
@@ -241,78 +243,18 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                 <> T.pack (intercalate [searchPathSeparator] paths)
             )
 
-cleanCmd :: () -> GlobalOpts -> IO ()
-cleanCmd _ go@GlobalOpts{..} = do
-  (manager,lc) <- loadConfigWithOpts go
-  Docker.rerunWithOptionalContainer
-    (lcConfig lc)
-    (lcProjectRoot lc)
-    (do config <- runStackLoggingT manager
-                                   globalLogLevel
-                                   (lcLoadBuildConfig lc ThrowException >>= setupEnv globalSystemGhc globalInstallGhc manager)
-        runStackT manager globalLogLevel config clean)
-
--- | Install dependencies
-depsCmd :: ([PackageName], Bool) -> GlobalOpts -> IO ()
-depsCmd (names, dryRun) go@GlobalOpts{..} = do
-    (manager,lc) <- loadConfigWithOpts go
+withBuildConfig :: GlobalOpts
+                -> NoBuildConfigStrategy
+                -> StackT BuildConfig IO ()
+                -> IO ()
+withBuildConfig go@GlobalOpts{..} strat inner = handle (error . printBuildException) $ do
+    (manager, lc) <- loadConfigWithOpts go
     Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $ do
-        config <- runStackLoggingT manager globalLogLevel
-            (lcLoadBuildConfig lc ExecStrategy >>= setupEnv globalSystemGhc globalInstallGhc manager)
-        runStackT manager globalLogLevel config $ Stack.Build.build BuildOpts
-            { boptsTargets = Right names
-            , boptsLibProfile = False
-            , boptsExeProfile = False
-            , boptsEnableOptimizations = Nothing
-            , boptsFinalAction = DoNothing
-            , boptsDryrun = dryRun
-            , boptsGhcOptions = []
-            , boptsFlags = Map.empty
-            }
-
--- | Parser for package names
-readPackageName :: ReadM PackageName
-readPackageName = do
-    s <- readerAsk
-    case parsePackageNameFromString s of
-        Nothing -> readerError $ "Invalid package name: " ++ s
-        Just x -> return x
-
--- | Parser for package:[-]flag
-readFlag :: ReadM (Map PackageName (Map FlagName Bool))
-readFlag = do
-    s <- readerAsk
-    case break (== ':') s of
-        (pn, ':':mflag) -> do
-            pn' <-
-                case parsePackageNameFromString pn of
-                    Nothing -> readerError $ "Invalid package name: " ++ pn
-                    Just x -> return x
-            let (b, flagS) =
-                    case mflag of
-                        '-':x -> (False, x)
-                        _ -> (True, mflag)
-            flagN <-
-                case parseFlagNameFromString flagS of
-                    Nothing -> readerError $ "Invalid flag name: " ++ flagS
-                    Just x -> return x
-            return $ Map.singleton pn' $ Map.singleton flagN b
-        _ -> readerError "Must have a colon"
-
--- | Build the project.
-buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
-buildCmd finalAction opts go@GlobalOpts{..} =
-  catch
-  (do (manager,lc) <- loadConfigWithOpts go
-      Docker.rerunWithOptionalContainer
-        (lcConfig lc)
-        (lcProjectRoot lc)
-        (do config <- runStackLoggingT manager
-                                       globalLogLevel
-                                       (lcLoadBuildConfig lc CreateConfig >>= setupEnv globalSystemGhc globalInstallGhc manager)
-            runStackT manager globalLogLevel config $
-                      Stack.Build.build opts { boptsFinalAction = finalAction}))
-             (error . printBuildException)
+        bconfig1 <- runStackLoggingT manager globalLogLevel $
+            lcLoadBuildConfig lc strat
+        bconfig2 <- runStackT manager globalLogLevel bconfig1 $
+            setupEnv globalSystemGhc globalInstallGhc
+        runStackT manager globalLogLevel bconfig2 inner
   where printBuildException e =
           case e of
             MissingTool dep -> "Missing build tool: " <> display dep
@@ -401,6 +343,57 @@ buildCmd finalAction opts go@GlobalOpts{..} =
                         ", log available at: " ++ toFilePath logFile
                 ]
 
+cleanCmd :: () -> GlobalOpts -> IO ()
+cleanCmd () go = withBuildConfig go ThrowException clean
+
+-- | Install dependencies
+depsCmd :: ([PackageName], Bool) -> GlobalOpts -> IO ()
+depsCmd (names, dryRun) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $
+    Stack.Build.build BuildOpts
+        { boptsTargets = Right names
+        , boptsLibProfile = False
+        , boptsExeProfile = False
+        , boptsEnableOptimizations = Nothing
+        , boptsFinalAction = DoNothing
+        , boptsDryrun = dryRun
+        , boptsGhcOptions = []
+        , boptsFlags = Map.empty
+        }
+
+-- | Parser for package names
+readPackageName :: ReadM PackageName
+readPackageName = do
+    s <- readerAsk
+    case parsePackageNameFromString s of
+        Nothing -> readerError $ "Invalid package name: " ++ s
+        Just x -> return x
+
+-- | Parser for package:[-]flag
+readFlag :: ReadM (Map PackageName (Map FlagName Bool))
+readFlag = do
+    s <- readerAsk
+    case break (== ':') s of
+        (pn, ':':mflag) -> do
+            pn' <-
+                case parsePackageNameFromString pn of
+                    Nothing -> readerError $ "Invalid package name: " ++ pn
+                    Just x -> return x
+            let (b, flagS) =
+                    case mflag of
+                        '-':x -> (False, x)
+                        _ -> (True, mflag)
+            flagN <-
+                case parseFlagNameFromString flagS of
+                    Nothing -> readerError $ "Invalid flag name: " ++ flagS
+                    Just x -> return x
+            return $ Map.singleton pn' $ Map.singleton flagN b
+        _ -> readerError "Must have a colon"
+
+-- | Build the project.
+buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
+buildCmd finalAction opts go@GlobalOpts{..} = withBuildConfig go CreateConfig $
+    Stack.Build.build opts { boptsFinalAction = finalAction }
+
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
 unpackCmd names go@GlobalOpts{..} = do
@@ -420,15 +413,10 @@ updateCmd () go@GlobalOpts{..} = do
 
 -- | Execute a command
 execCmd :: (String, [String]) -> GlobalOpts -> IO ()
-execCmd (cmd, args) go@GlobalOpts{..} = do
-    (manager,lc) <- loadConfigWithOpts go
-    Docker.rerunWithOptionalContainer
-      (lcConfig lc)
-      (lcProjectRoot lc)
-      (do config <- runStackLoggingT manager
-                                     globalLogLevel
-                                     (lcLoadBuildConfig lc ExecStrategy >>= setupEnv globalSystemGhc globalInstallGhc manager)
-          menv <- configEnvOverride (bcConfig config)
+execCmd (cmd, args) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $ do
+      config <- asks getConfig
+      liftIO $ do
+          menv <- configEnvOverride config
                           EnvSettings
                               { esIncludeLocals = True
                               , esIncludeGhcPackagePath = True
@@ -437,9 +425,10 @@ execCmd (cmd, args) go@GlobalOpts{..} = do
           let cp = (P.proc (toFilePath cmd') args)
                   { P.env = envHelper menv
                   }
+
           (Nothing, Nothing, Nothing, ph) <- P.createProcess cp
           ec <- P.waitForProcess ph
-          exitWith ec)
+          exitWith ec
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
