@@ -187,6 +187,14 @@ Set the `STACK_YAML` environment variable to point to the `stack.yaml` config
 file for your project. Then you can run `stack exec`, `stack ghc`, etc., from
 any directory and still use your packages.
 
+__Can I get bash autocomplation?__
+
+Yes, just run the following:
+
+    source <(stack --bash-completion-script `which stack`)
+
+You can add this to your `.bashrc` file if you like.
+
 __How do I update my package index?__
 
 Users of cabal are used to running `cabal update` regularly. You can do the
