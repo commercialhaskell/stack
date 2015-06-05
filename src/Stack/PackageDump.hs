@@ -18,12 +18,11 @@ module Stack.PackageDump
     , pruneDeps
     ) where
 
-import qualified Data.Binary as Binary
+import Data.Binary.VersionTagged (taggedDecodeOrLoad, taggedEncodeFile)
 import Path
 import Control.Monad.IO.Class
 import Control.Monad.Logger (MonadLogger)
 import System.Process.Read
-import Control.Exception.Enclosed (tryIO)
 import Data.Map (Map)
 import Data.IORef
 import Control.Monad.Catch (MonadThrow, Exception, throwM)
@@ -70,19 +69,18 @@ ghcPkgDump menv mpkgDb sink = do
 newProfilingCache :: MonadIO m => m ProfilingCache
 newProfilingCache = liftIO $ ProfilingCache <$> newIORef Map.empty
 
--- | Load a @ProfilingCache@ from disk, swalloing any errors and returning an empty cache.
+-- | Load a @ProfilingCache@ from disk, swallowing any errors and returning an
+-- empty cache.
 loadProfilingCache :: MonadIO m => Path Abs File -> m ProfilingCache
-loadProfilingCache path = liftIO $ fmap ProfilingCache $ do
-    eres <- tryIO $ Binary.decodeFileOrFail $ toFilePath path
-    newIORef $ case eres of
-        Right (Right x) -> x
-        _ -> Map.empty
+loadProfilingCache path = do
+    m <- taggedDecodeOrLoad (toFilePath path) (return Map.empty)
+    liftIO $ fmap ProfilingCache $ newIORef m
 
 -- | Save a @ProfilingCache@ to disk
 saveProfilingCache :: MonadIO m => Path Abs File -> ProfilingCache -> m ()
 saveProfilingCache path (ProfilingCache ref) = liftIO $ do
     createDirectoryIfMissing True $ toFilePath $ parent path
-    readIORef ref >>= Binary.encodeFile (toFilePath path)
+    readIORef ref >>= taggedEncodeFile (toFilePath path)
 
 -- | Prune a list of possible packages down to those whose dependencies are met.
 --

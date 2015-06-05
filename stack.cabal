@@ -56,6 +56,7 @@ library
                      System.Process.PagerEditor
                      Paths_stack
                      Data.Attoparsec.Combinators
+                     Data.Binary.VersionTagged
                      Data.Set.Monad
                      Data.Maybe.Extra
   build-depends:     Cabal >= 1.18.1.5
