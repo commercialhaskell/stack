@@ -1141,16 +1141,17 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
             cabal False ["bench"]
         DoHaddock -> do
             announce "haddock"
+            hscolourExists <- doesExecutableExist eeEnvOverride "hscolour"
               {- EKB TODO: doc generation for stack-doc-server
  #ifndef mingw32_HOST_OS
               liftIO (removeDocLinks docLoc package)
  #endif
               ifcOpts <- liftIO (haddockInterfaceOpts docLoc package packages)
               -}
-            cabal False ["haddock", "--html"]
+            cabal False (concat [["haddock", "--html"]
+                                ,["--hyperlink-source" | hscolourExists]])
               {- EKB TODO: doc generation for stack-doc-server
                          ,"--hoogle"
-                         ,"--hyperlink-source"
                          ,"--html-location=../$pkg-$version/"
                          ,"--haddock-options=" ++ intercalate " " ifcOpts ]
               haddockLocs <-
