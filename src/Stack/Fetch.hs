@@ -23,13 +23,13 @@ import qualified Codec.Archive.Tar               as Tar
 import qualified Codec.Archive.Tar.Check         as Tar
 import           Codec.Compression.GZip          (decompress)
 import           Control.Applicative             ((*>))
-import           Control.Concurrent.Async.Lifted (Concurrently (..))
+import           Control.Concurrent.Async        (Concurrently (..))
 import           Control.Concurrent.STM          (TVar, atomically, modifyTVar,
                                                   newTVarIO, readTVar,
                                                   readTVarIO, writeTVar)
 import           Control.Exception               (Exception, SomeException,
                                                   toException)
-import           Control.Monad                   (liftM, when, join, unless)
+import           Control.Monad                   (liftM, when, join, unless, void)
 import           Control.Monad.Catch             (MonadThrow, throwM, catch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -416,15 +416,19 @@ parMapM_ :: (F.Foldable f,MonadIO m,MonadBaseControl IO m)
 parMapM_ (max 1 -> 1) f xs = F.mapM_ f xs
 parMapM_ cnt f xs0 = do
     var <- liftIO (newTVarIO $ F.toList xs0)
-    let worker = fix $ \loop -> join $ liftIO $ atomically $ do
+
+    -- See comment on similar line in Stack.Build
+    runInBase <- liftBaseWith $ \run -> return (void . run)
+
+    let worker = fix $ \loop -> join $ atomically $ do
             xs <- readTVar var
             case xs of
                 [] -> return $ return ()
                 x:xs' -> do
                     writeTVar var xs'
                     return $ do
-                        f x
+                        runInBase $ f x
                         loop
         workers 1 = Concurrently worker
         workers i = Concurrently worker *> workers (i - 1)
-    runConcurrently $ workers cnt
+    liftIO $ runConcurrently $ workers cnt
