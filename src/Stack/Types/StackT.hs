@@ -27,16 +27,13 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
-import           Control.Monad.Trans.Unlift
 import qualified Data.ByteString.Char8 as S8
 import           Data.Char
 import           Data.Text (Text)
 import           Data.Time
-import           Development.Shake (Action)
 import           Language.Haskell.TH.Syntax (Loc(..))
 import           Network.HTTP.Client.Conduit (HasHttpManager(..))
 import           Network.HTTP.Conduit
-import           Shake
 import           Stack.Types.Internal
 import           System.Log.FastLogger
 
@@ -95,10 +92,6 @@ instance MonadTransControl StackLoggingT where
     type StT StackLoggingT a = StT (ReaderT (LogLevel,Manager)) a
     liftWith = defaultLiftWith StackLoggingT unStackLoggingT
     restoreT = defaultRestoreT StackLoggingT
-
-instance MonadAction (StackLoggingT Action) where
-  liftAction = lift
-  unliftAction = askRun
 
 -- | Takes the configured log level into account.
 instance (MonadIO m) => MonadLogger (StackLoggingT m) where

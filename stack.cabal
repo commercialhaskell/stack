@@ -58,7 +58,6 @@ library
                      Data.Attoparsec.Combinators
                      Data.Set.Monad
                      Data.Maybe.Extra
-                     Shake
   build-depends:     Cabal >= 1.18.1.5
                    , aeson >= 0.8.0.2
                    , async >= 2.0.2
