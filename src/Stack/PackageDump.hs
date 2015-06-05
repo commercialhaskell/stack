@@ -62,7 +62,7 @@ ghcPkgDump menv mpkgDb sink = do
         [ case mpkgDb of
             Nothing -> ["--global", "--no-user-package-db"]
             Just pkgdb -> ["--user", "--no-user-package-db", "--package-db", toFilePath pkgdb]
-        , ["dump"]
+        , ["dump", "--expand-pkgroot"]
         ]
 
 -- | Create a new, empty @ProfilingCache@
