@@ -15,6 +15,8 @@ import           Control.Monad.Logger
 import           Data.Char (toLower)
 import           Data.List
 import qualified Data.List as List
+import           Data.Map (Map)
+import qualified Data.Map as Map
 import           Data.Maybe (isJust)
 import           Data.Monoid
 import qualified Data.Text as T
@@ -231,6 +233,7 @@ depsCmd (names, dryRun) go@GlobalOpts{..} = do
             , boptsFinalAction = DoNothing
             , boptsDryrun = dryRun
             , boptsGhcOptions = []
+            , boptsFlags = Map.empty
             }
 
 -- | Parser for package names
@@ -240,6 +243,27 @@ readPackageName = do
     case parsePackageNameFromString s of
         Nothing -> readerError $ "Invalid package name: " ++ s
         Just x -> return x
+
+-- | Parser for package:[-]flag
+readFlag :: ReadM (Map PackageName (Map FlagName Bool))
+readFlag = do
+    s <- readerAsk
+    case break (== ':') s of
+        (pn, ':':mflag) -> do
+            pn' <-
+                case parsePackageNameFromString pn of
+                    Nothing -> readerError $ "Invalid package name: " ++ pn
+                    Just x -> return x
+            let (b, flagS) =
+                    case mflag of
+                        '-':x -> (False, x)
+                        _ -> (True, mflag)
+            flagN <-
+                case parseFlagNameFromString flagS of
+                    Nothing -> readerError $ "Invalid flag name: " ++ flagS
+                    Just x -> return x
+            return $ Map.singleton pn' $ Map.singleton flagN b
+        _ -> readerError "Must have a colon"
 
 -- | Build the project.
 buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
@@ -416,7 +440,7 @@ dockerExecCmd cmdArgs go@GlobalOpts{..} = do
 -- | Parser for build arguments.
 buildOpts :: Parser BuildOpts
 buildOpts = BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
-            optimize <*> finalAction <*> dryRun <*> ghcOpts
+            optimize <*> finalAction <*> dryRun <*> ghcOpts <*> flags
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies"
         target =
@@ -440,6 +464,14 @@ buildOpts = BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
                      (strOption (long "ghc-options" <>
                                  metavar "OPTION" <>
                                  help "Additional options passed to GHC")))
+
+        flags =
+          fmap (Map.unionsWith Map.union) $ many
+            (option readFlag
+                ( long "flag"
+               <> metavar "PACKAGE:[-]FLAG"
+               <> help "Override flags set in stack.yaml (applies to local packages and extra-deps)"
+                ))
 
 -- | Parser for docker cleanup arguments.
 dockerCleanupOpts :: Parser Docker.CleanupOpts

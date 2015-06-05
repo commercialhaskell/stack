@@ -58,6 +58,7 @@ data BuildOpts =
             ,boptsFinalAction :: !FinalAction
             ,boptsDryrun :: !Bool
             ,boptsGhcOptions :: ![Text]
+            ,boptsFlags :: !(Map PackageName (Map FlagName Bool))
             }
   deriving (Show)
 
