@@ -170,8 +170,8 @@ runContainerAndExitAction config
                   Nothing -> error ("'docker inspect' failed for image after pull: " ++ image)
          | otherwise ->
              do progName <- liftIO getProgName
-                error ("The Docker image referenced by '" ++ toFilePath stackDotYaml ++
-                       "'' has not\nbeen downloaded:\n\n" ++
+                error ("The Docker image referenced by " ++ toFilePath stackDotYaml ++
+                       " has not\nbeen downloaded:\n    " ++ image ++ "\n\n" ++
                        --EKB FIXME probably doesn't make sense to use progName here, since `stack docker pull` is still the right command even if something else is using the lib (also check other uses of progName)
                        "Run '" ++ unwords [takeBaseName progName, dockerCmdName, dockerPullCmdName] ++
                        "' to download it, then try again.")
