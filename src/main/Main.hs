@@ -453,10 +453,12 @@ dockerCleanupCmd cleanupOpts go@GlobalOpts{..} =
 
 -- | Execute a command
 dockerExecCmd :: (String, [String]) -> GlobalOpts -> IO ()
-dockerExecCmd cmdArgs go@GlobalOpts{..} = do
+dockerExecCmd (cmd,args) go@GlobalOpts{..} = do
     (_,lc) <- loadConfigWithOpts go
     Docker.preventInContainer
-      (Docker.rerunCmdWithRequiredContainer (lcConfig lc) (lcProjectRoot lc) (return cmdArgs))
+      (Docker.rerunCmdWithRequiredContainer (lcConfig lc)
+                                            (lcProjectRoot lc)
+                                            (return (cmd,args,lcConfig lc)))
 
 -- | Parser for build arguments.
 buildOpts :: Parser BuildOpts

@@ -56,9 +56,10 @@ import           Stack.Types
 import           Stack.Docker.GlobalDB
 import           System.Directory (createDirectoryIfMissing,removeDirectoryRecursive,removeFile)
 import           System.Directory (doesDirectoryExist)
-import           System.Environment (lookupEnv,unsetEnv,getProgName,getArgs)
+import           System.Environment (lookupEnv,unsetEnv,getProgName,getArgs,getExecutablePath)
 import           System.Exit (ExitCode(ExitSuccess,ExitFailure),exitWith)
 import           System.FilePath (takeBaseName)
+import           System.Info (arch,os)
 import           System.IO (hPutStrLn,stderr,stdin,stdout,hIsTerminalDevice)
 import           System.IO.Temp (withSystemTempDirectory)
 import qualified System.Process as Proc
@@ -73,31 +74,45 @@ import           System.Posix.Signals (installHandler,sigTERM,Handler(Catch))
 -- Otherwise, runs the inner action.
 rerunWithOptionalContainer :: Config -> Maybe (Path Abs Dir) -> IO () -> IO ()
 rerunWithOptionalContainer config mprojectRoot inner =
-  rerunCmdWithOptionalContainer config
-                                mprojectRoot
-                                ((,) <$> (takeBaseName <$> getProgName) <*> getArgs)
-                                inner
+     rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs inner
+   where
+     getCmdArgs =
+       do args <- getArgs
+          if arch == "x86_64" && os == "linux"
+              then do exePath <- getExecutablePath
+                      let mountPath = "/tmp/host-" ++ takeBaseName exePath
+                      return (mountPath
+                             ,args
+                             ,config{configDocker=docker{dockerMount=Mount exePath mountPath :
+                                                                     dockerMount docker}})
+              else do progName <- getProgName
+                      return (takeBaseName progName,args,config)
+     docker = configDocker config
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
 -- Docker container.  Otherwise, runs the inner action.
-rerunCmdWithOptionalContainer :: Config -> Maybe (Path Abs Dir) -> IO (FilePath, [String]) -> IO () -> IO ()
+rerunCmdWithOptionalContainer :: Config
+                              -> Maybe (Path Abs Dir)
+                              -> IO (FilePath,[String],Config)
+                              -> IO ()
+                              -> IO ()
 rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs inner =
   do inContainer <- getInContainer
      if inContainer || not (dockerEnable (configDocker config))
         then inner
-        else do (cmd_,args) <- getCmdArgs
-                runContainerAndExit config mprojectRoot cmd_ args [] (return ())
+        else do (cmd_,args,config') <- getCmdArgs
+                runContainerAndExit config' mprojectRoot cmd_ args [] (return ())
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
 -- Docker container.  Otherwise, runs the inner action.
-rerunCmdWithRequiredContainer :: Config -> Maybe (Path Abs Dir) -> IO (FilePath, [String]) -> IO ()
+rerunCmdWithRequiredContainer :: Config -> Maybe (Path Abs Dir) -> IO (FilePath,[String],Config) -> IO ()
 rerunCmdWithRequiredContainer config mprojectRoot getCmdArgs =
   do when (not (dockerEnable (configDocker config)))
           (error (concat ["Docker must be enabled in your "
                          ,toFilePath stackDotYaml
                          ," to use this command."]))
-     (cmd_,args) <- getCmdArgs
-     runContainerAndExit config mprojectRoot cmd_ args [] (return ())
+     (cmd_,args,config') <- getCmdArgs
+     runContainerAndExit config' mprojectRoot cmd_ args [] (return ())
 
 -- | Error if running in a container.
 preventInContainer :: IO () -> IO ()
@@ -143,8 +158,7 @@ runContainerAndExitAction config
   do checkDockerVersion
      (Stdout uidOut) <- cmd "id -u"
      (Stdout gidOut) <- cmd "id -g"
-     (dockerHost,dockerCertPath,dockerTlsVerify,isStdinTerminal,isStdoutTerminal,isStderrTerminal
-       ,pwd) <-
+     (dockerHost,dockerCertPath,dockerTlsVerify,isStdinTerminal,isStdoutTerminal,isStderrTerminal,pwd) <-
        liftIO ((,,,,,,) <$>
                lookupEnv "DOCKER_HOST" <*>
                lookupEnv "DOCKER_CERT_PATH" <*>

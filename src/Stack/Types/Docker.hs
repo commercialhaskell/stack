@@ -122,6 +122,27 @@ instance Monoid DockerOptsMonoid where
     ,dockerMonoidPassHost         = dockerMonoidPassHost l <|> dockerMonoidPassHost r
     }
 
+-- | Docker volume mount.
+data Mount = Mount String String
+
+-- | For optparse-applicative.
+instance Read Mount where
+  readsPrec _ s =
+    case break (== ':') s of
+      (a,(':':b)) -> [(Mount a b,"")]
+      (a,[]) -> [(Mount a a,"")]
+      _ -> fail "Invalid value for Docker mount (expect '/host/path:/container/path')"
+
+-- | Show instance.
+instance Show Mount where
+  show (Mount a b) = if a == b
+                        then a
+                        else concat [a,":",b]
+
+-- | For YAML.
+instance FromJSON Mount where
+  parseJSON v = fmap read (parseJSON v)
+
 -- | Options for Docker repository or image.
 data DockerMonoidRepoOrImage
   = DockerMonoidRepo String
@@ -179,24 +200,3 @@ dockerPersistArgName = "persist"
 -- | Docker pass host argument name.
 dockerPassHostArgName :: Text
 dockerPassHostArgName = "pass-host"
-
--- | Docker volume mount.
-data Mount = Mount String String
-
--- | For optparse-applicative.
-instance Read Mount where
-  readsPrec _ s =
-    case break (== ':') s of
-      (a,(':':b)) -> [(Mount a b,"")]
-      (a,[]) -> [(Mount a a,"")]
-      _ -> fail "Invalid value for Docker mount (expect '/host/path:/container/path')"
-
--- | Show instance.
-instance Show Mount where
-  show (Mount a b) = if a == b
-                        then a
-                        else concat [a,":",b]
-
--- | For YAML.
-instance FromJSON Mount where
-  parseJSON v = fmap read (parseJSON v)
