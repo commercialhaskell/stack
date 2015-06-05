@@ -18,6 +18,7 @@ module Stack.Constants
     ,userDocsDir
     ,configCacheFile
     ,buildCacheFile
+    ,stackProgName
     )
     where
 
@@ -174,6 +175,10 @@ rawGithubUrl org repo branch file = T.concat
 -- | Docker sandbox from project root.
 projectDockerSandboxDir :: Path Abs Dir -> Path Abs Dir
 projectDockerSandboxDir projectRoot = projectRoot </> $(mkRelDir ".docker-sandbox/")
+
+-- | Name of the 'stack' program.
+stackProgName :: String
+stackProgName = "stack"
 
 -- | The filename used for the stack config file.
 stackDotYaml :: Path Rel File

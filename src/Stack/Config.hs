@@ -171,7 +171,7 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
         case configPlatform of
             Platform _ Windows -> do
                 progsDir <- getWindowsProgsDir configStackRoot origEnv
-                return $ progsDir </> $(mkRelDir "stack") </> platform
+                return $ progsDir </> $(mkRelDir stackProgName) </> platform
             _ -> return $ configStackRoot </> $(mkRelDir "programs") </> platform
 
      return Config {..}
@@ -292,7 +292,7 @@ determineStackRoot = do
     env <- liftIO getEnvironment
     root <-
         case lookup stackRootEnvVar env of
-            Nothing -> liftIO $ getAppUserDataDirectory "stack"
+            Nothing -> liftIO $ getAppUserDataDirectory stackProgName
             Just x -> return x
     parseAbsDir root
 

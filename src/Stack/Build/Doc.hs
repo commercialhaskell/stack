@@ -66,7 +66,7 @@ getExistingUserDocPath config = do
 -- | Get location of global package docs.
 getGlobalDocPath :: IO (Maybe (Path Abs Dir))
 getGlobalDocPath = do
-    --EKB FIXME: move this location into Config
+    --EKB TODO: move this location into Config
     maybeRootEnv <- lookupEnv "STACK_DOC_ROOT"
     case maybeRootEnv of
         Nothing -> return Nothing

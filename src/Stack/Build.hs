@@ -951,7 +951,7 @@ build bopts = do
 
     if boptsDryrun bopts
         then printPlan plan
-        else withSystemTempDirectory "stack" $ \tmpdir -> do
+        else withSystemTempDirectory stackProgName $ \tmpdir -> do
             tmpdir' <- parseAbsDir tmpdir
             configLock <- newMVar ()
             installLock <- newMVar ()

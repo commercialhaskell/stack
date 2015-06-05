@@ -1,10 +1,7 @@
 {-# LANGUAGE CPP, NamedFieldPuns, RankNTypes, RecordWildCards, TemplateHaskell, TupleSections #-}
 
---EKB FIXME: some way to sync `stack` between host and container
---EKB FIXME: make this work from Windows
 --EKB FIXME: get this all using proper logging infrastructure
 --EKB FIXME: throw exceptions instead of using `error`
---EKB FIXME: include build plan file in Docker image so that it does not need to be downloaded on 1st use
 
 -- | Run commands in Docker containers
 module Stack.Docker
@@ -14,6 +11,7 @@ module Stack.Docker
   ,cleanup
   ,CleanupOpts(..)
   ,CleanupAction(..)
+  ,dockerCleanupCmdName
   ,dockerCmdName
   ,dockerOptsParser
   ,dockerOptsFromMonoid
@@ -38,7 +36,7 @@ import           Data.Aeson (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
 import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Char (isSpace,toUpper,isAscii)
-import           Data.List (dropWhileEnd,find,intersperse,isPrefixOf,isInfixOf,foldl',sortBy)
+import           Data.List (dropWhileEnd,find,intercalate,intersperse,isPrefixOf,isInfixOf,foldl',sortBy)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
@@ -51,7 +49,7 @@ import           Options.Applicative (Parser,str,option,help,auto,metavar,long,v
 import           Path
 import           Path.IO (getWorkingDir,listDirectory)
 import           Paths_stack (version)
-import           Stack.Constants (projectDockerSandboxDir,stackDotYaml,stackRootEnvVar)
+import           Stack.Constants (projectDockerSandboxDir,stackProgName,stackDotYaml,stackRootEnvVar)
 import           Stack.Types
 import           Stack.Docker.GlobalDB
 import           System.Directory (createDirectoryIfMissing,removeDirectoryRecursive,removeFile)
@@ -184,12 +182,10 @@ runContainerAndExitAction config
                   Just ii2 -> return ii2
                   Nothing -> error ("'docker inspect' failed for image after pull: " ++ image)
          | otherwise ->
-             do progName <- liftIO getProgName
-                error ("The Docker image referenced by " ++ toFilePath stackDotYaml ++
-                       " has not\nbeen downloaded:\n    " ++ image ++ "\n\n" ++
-                       --EKB FIXME probably doesn't make sense to use progName here, since `stack docker pull` is still the right command even if something else is using the lib (also check other uses of progName)
-                       "Run '" ++ unwords [takeBaseName progName, dockerCmdName, dockerPullCmdName] ++
-                       "' to download it, then try again.")
+             error ("The Docker image referenced by " ++ toFilePath stackDotYaml ++
+                    " has not\nbeen downloaded:\n    " ++ image ++ "\n\n" ++
+                    "Run '" ++ unwords [stackProgName, dockerCmdName, dockerPullCmdName] ++
+                    "' to download it, then try again.")
      let (uid,gid) = (dropWhileEnd isSpace uidOut, dropWhileEnd isSpace gidOut)
          imageEnvVars = map (break (== '=')) (icEnv (iiConfig imageInfo))
          (sandboxID,oldImage) =
@@ -301,7 +297,6 @@ cleanup config opts = runAction (cleanupAction config opts)
 cleanupAction :: Config -> CleanupOpts -> Action ()
 cleanupAction config opts =
   do checkDockerVersion
-     progName <- liftIO (takeBaseName <$> getProgName)
      (Stdout imagesOut) <- cmd "docker images --no-trunc -f dangling=false"
      (Stdout danglingImagesOut) <- cmd "docker images --no-trunc -f dangling=true"
      (Stdout runningContainersOut) <- cmd "docker ps -a --no-trunc -f status=running"
@@ -321,8 +316,7 @@ cleanupAction config opts =
      plan <- liftIO
        (do imagesLastUsed <- getDockerImagesLastUsed config
            curTime <- getZonedTime
-           let planWriter = buildPlan progName
-                                      curTime
+           let planWriter = buildPlan curTime
                                       imagesLastUsed
                                       imageRepos
                                       danglingImageHashes
@@ -331,8 +325,11 @@ cleanupAction config opts =
                                       inspectMap
                plan = toLazyByteString (execWriter planWriter)
            case dcAction opts of
-                                    --EKB FIXME: use constants to construct filename
-             CleanupInteractive -> editByteString "stack-docker-cleanup-plan" plan
+             CleanupInteractive -> editByteString (intercalate "-" [stackProgName
+                                                                   ,dockerCmdName
+                                                                   ,dockerCleanupCmdName
+                                                                   ,"plan"])
+                                                  plan
              CleanupImmediate -> return plan
              CleanupDryRun -> do LBS.hPut stdout plan
                                  return LBS.empty)
@@ -367,8 +364,7 @@ cleanupAction config opts =
               case words line of
                 hash:image:rest -> (hash,(image,last rest))
                 _ -> error ("Invalid 'docker ps' output line: " ++ line)
-    buildPlan progName
-              curTime
+    buildPlan curTime
               imagesLastUsed
               imageRepos
               danglingImageHashes
@@ -378,31 +374,31 @@ cleanupAction config opts =
       do case dcAction opts of
            CleanupInteractive ->
              do buildStrLn
-                  (unlines
+                  (concat
                      ["# STACK DOCKER CLEANUP PLAN"
-                     ,"#"
-                     ,"# When you leave the editor, the lines in this plan will be processed."
-                     ,"#"
-                     ,"# Lines that begin with 'R' denote an image or container that will be."
-                     ,"# removed.  You may change the first character to/from 'R' to remove/keep"
-                     ,"# and image or container that would otherwise be kept/removed."
-                     ,"#"
-                     ,"# To cancel the cleanup, delete all lines in this file."
-                     ,"#"
-                     ,"# By default, the following images/containers will be removed:"
-                     ,"#"])
+                     ,"\n#"
+                     ,"\n# When you leave the editor, the lines in this plan will be processed."
+                     ,"\n#"
+                     ,"\n# Lines that begin with 'R' denote an image or container that will be."
+                     ,"\n# removed.  You may change the first character to/from 'R' to remove/keep"
+                     ,"\n# and image or container that would otherwise be kept/removed."
+                     ,"\n#"
+                     ,"\n# To cancel the cleanup, delete all lines in this file."
+                     ,"\n#"
+                     ,"\n# By default, the following images/containers will be removed:"
+                     ,"\n#"])
                 buildDefault dcRemoveKnownImagesLastUsedDaysAgo "Known images last used"
                 buildDefault dcRemoveUnknownImagesCreatedDaysAgo "Unknown images created"
                 buildDefault dcRemoveDanglingImagesCreatedDaysAgo "Dangling images created"
                 buildDefault dcRemoveStoppedContainersCreatedDaysAgo "Stopped containers created"
                 buildDefault dcRemoveRunningContainersCreatedDaysAgo "Running containers created"
                 buildStrLn
-                  (unlines
+                  (concat
                      ["#"
-                     ,"# The default plan can be adjusted using command-line arguments."
-                      --EKB FIXME: `docker cleanup` should come from shared constants.
-                     ,"# Run '" ++ takeBaseName progName ++ " docker cleanup --help' for details."
-                     ,"#"])
+                     ,"\n# The default plan can be adjusted using command-line arguments."
+                     ,"\n# Run '" ++ unwords [stackProgName, dockerCmdName, dockerCleanupCmdName] ++
+                      " --help' for details."
+                     ,"\n#"])
            _ -> buildStrLn
                   (unlines
                     ["# Lines that begin with 'R' denote an image or container that will be."
@@ -559,9 +555,8 @@ pullImage docker image =
 -- | Run a Shake action.
 runAction :: Action () -> IO ()
 runAction inner =
-  --EKB FIXME construct "stack-docker" from constants
   withSystemTempDirectory
-    "stack-docker."
+    (stackProgName ++ "-" ++ dockerCmdName ++ ".")
     (\tmp -> do shake shakeOptions{shakeVerbosity = Quiet
                                   ,shakeFiles = tmp}
                       (action inner))
@@ -654,21 +649,20 @@ homeDirName = $(mkRelDir ".home/")
 checkHostStackageDockerVersion :: Version -> IO ()
 checkHostStackageDockerVersion minVersion =
   do maybeHostVer <- lookupEnv hostVersionEnvVar
-     progName <- takeBaseName <$> getProgName
      case parseVersionFromString =<< maybeHostVer of
        Just hostVer
          | hostVer < minVersion ->
-             error ("Your host's version of '" ++ progName ++ "' is too old for this Docker image.\nVersion " ++
-                    versionString minVersion ++
-                    " is required; you have " ++
-                    versionString hostVer ++
-                    ".\n")
+             error ("Your host's version of '" ++ stackProgName ++
+                    "' is too old for this Docker image.\nVersion " ++
+                    versionString minVersion ++ " is required; you have " ++
+                    versionString hostVer ++ ".\n")
          | otherwise -> return ()
        Nothing ->
           do inContainer <- getInContainer
              if inContainer
-                then error ("Your host's version of '" ++ progName ++ "' is too old.\nVersion " ++
-                            versionString minVersion ++ " is required.")
+                then error ("Your host's version of '" ++ stackProgName ++
+                            "' is too old.\nVersion " ++ versionString minVersion ++
+                            " is required.")
                 else return ()
 
 
@@ -679,12 +673,11 @@ checkVersions =
      when inContainer
        (do checkHostStackageDockerVersion requireHostVersion
            maybeReqVer <- lookupEnv requireVersionEnvVar
-           progName <- takeBaseName <$> getProgName
            case parseVersionFromString =<< maybeReqVer of
              Just reqVer
                | stackVersion < reqVer ->
                    error ("This Docker image's version of '" ++
-                          progName ++
+                          stackProgName ++
                           "' is too old.\nVersion " ++
                           versionString reqVer ++
                           " is required; you have " ++
@@ -801,6 +794,10 @@ dockerCmdName = "docker"
 -- | Command-line argument for @docker pull@.
 dockerPullCmdName :: String
 dockerPullCmdName = "pull"
+
+-- | Command-line argument for @docker cleanup@.
+dockerCleanupCmdName :: String
+dockerCleanupCmdName = "cleanup"
 
 -- | Version of 'stack' required to be installed in container.
 requireContainerVersion :: Version

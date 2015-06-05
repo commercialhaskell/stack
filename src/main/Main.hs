@@ -35,6 +35,7 @@ import           Plugins.Commands
 import           Stack.Build
 import           Stack.Build.Types
 import           Stack.Config
+import           Stack.Constants
 import qualified Stack.Docker as Docker
 import           Stack.Fetch
 import           Stack.GhcPkg (envHelper)
@@ -54,7 +55,7 @@ import qualified System.Process.Read
 -- | Commandline dispatcher.
 main :: IO ()
 main =
-  do plugins <- findPlugins "stack"
+  do plugins <- findPlugins (T.pack stackProgName)
      tryRunPlugin plugins
      Docker.checkVersions
      manager <- newTLSManager
@@ -156,7 +157,7 @@ main =
                               dockerResetCmd
                               (flag False True (long "keep-home" <>
                                                help "Do not delete sandbox's home directory"))
-                   addCommand "cleanup"
+                   addCommand Docker.dockerCleanupCmdName
                               "Clean up Docker images and containers"
                               dockerCleanupCmd
                               dockerCleanupOpts
