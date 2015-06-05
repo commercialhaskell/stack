@@ -169,7 +169,7 @@ main =
 pathCmd :: PathArg -> GlobalOpts -> IO ()
 pathCmd pathArg go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
-  buildConfig <- runStackLoggingT manager globalLogLevel (lcLoadBuildConfig lc)
+  buildConfig <- runStackLoggingT manager globalLogLevel (lcLoadBuildConfig lc ExecStrategy)
   runStackT manager globalLogLevel buildConfig (pathString pathArg) >>= putStrLn
 
 
@@ -226,7 +226,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
             case scoGhcVersion of
                 Just v -> return (v, Nothing)
                 Nothing -> do
-                    bc <- lcLoadBuildConfig lc
+                    bc <- lcLoadBuildConfig lc ThrowException
                     return (bcGhcVersion bc, Just $ bcStackYaml bc)
         mpaths <- ensureGHC manager (lcConfig lc) SetupOpts
             { soptsInstallIfMissing = True
@@ -249,7 +249,7 @@ cleanCmd _ go@GlobalOpts{..} = do
     (lcProjectRoot lc)
     (do config <- runStackLoggingT manager
                                    globalLogLevel
-                                   (lcLoadBuildConfig lc >>= setupEnv globalSystemGhc manager)
+                                   (lcLoadBuildConfig lc ThrowException >>= setupEnv globalSystemGhc manager)
         runStackT manager globalLogLevel config clean)
 
 -- | Install dependencies
@@ -258,7 +258,7 @@ depsCmd (names, dryRun) go@GlobalOpts{..} = do
     (manager,lc) <- loadConfigWithOpts go
     Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $ do
         config <- runStackLoggingT manager globalLogLevel
-            (lcLoadBuildConfig lc >>= setupEnv globalSystemGhc manager)
+            (lcLoadBuildConfig lc ExecStrategy >>= setupEnv globalSystemGhc manager)
         runStackT manager globalLogLevel config $ Stack.Build.build BuildOpts
             { boptsTargets = Right names
             , boptsLibProfile = False
@@ -309,7 +309,7 @@ buildCmd finalAction opts go@GlobalOpts{..} =
         (lcProjectRoot lc)
         (do config <- runStackLoggingT manager
                                        globalLogLevel
-                                       (lcLoadBuildConfig lc >>= setupEnv globalSystemGhc manager)
+                                       (lcLoadBuildConfig lc CreateConfig >>= setupEnv globalSystemGhc manager)
             runStackT manager globalLogLevel config $
                       Stack.Build.build opts { boptsFinalAction = finalAction}))
              (error . printBuildException)
@@ -427,7 +427,7 @@ execCmd (cmd, args) go@GlobalOpts{..} = do
       (lcProjectRoot lc)
       (do config <- runStackLoggingT manager
                                      globalLogLevel
-                                     (lcLoadBuildConfig lc >>= setupEnv globalSystemGhc manager)
+                                     (lcLoadBuildConfig lc ExecStrategy >>= setupEnv globalSystemGhc manager)
           menv <- configEnvOverride (bcConfig config)
                           EnvSettings
                               { esIncludeLocals = True

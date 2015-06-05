@@ -172,12 +172,17 @@ data BuildConfig = BuildConfig
 data LoadConfig m = LoadConfig
     { lcConfig          :: !Config
       -- ^ Top-level Stack configuration.
-    , lcLoadBuildConfig :: !(m BuildConfig)
-        -- ^ Action to load the remaining 'BuildConfig'.  This action will create a project if one
-        -- does not already exist.
+    , lcLoadBuildConfig :: !(NoBuildConfigStrategy -> m BuildConfig)
+        -- ^ Action to load the remaining 'BuildConfig'.
     , lcProjectRoot     :: !(Maybe (Path Abs Dir))
         -- ^ The project root directory, if in a project.
     }
+
+data NoBuildConfigStrategy
+    = ThrowException
+    | CreateConfig
+    | ExecStrategy
+    deriving (Show, Eq, Ord)
 
 -- | A project is a collection of packages. We can have multiple stack.yaml
 -- files, but only one of them may contain project information.
@@ -239,10 +244,6 @@ parseResolver t =
                 Nothing -> throwM $ ParseResolverException t
   where
     parseGhc = T.stripPrefix "ghc-" t >>= parseMajorVersionFromString . T.unpack
-
-data ParseResolverException = ParseResolverException Text
-    deriving (Show, Typeable)
-instance Exception ParseResolverException
 
 -- | Class for environment values which have access to the stack root
 class HasStackRoot env where
@@ -327,10 +328,20 @@ instance FromJSON ConfigMonoid where
          return ConfigMonoid {..}
 
 data ConfigException
-  = ConfigInvalidYaml String
-  | ConfigNoFile
-  | ConfigNoDockerConfig
-  deriving (Typeable,Show)
+  = ParseResolverException Text
+  | NoProjectConfigFound (Path Abs Dir)
+  deriving Typeable
+instance Show ConfigException where
+    show (ParseResolverException t) = concat
+        [ "Invalid resolver value: "
+        , T.unpack t
+        , ". Possible valid values include lts-2.12, nightly-2015-01-01, and ghc-7.10."
+        ]
+    show (NoProjectConfigFound dir) = concat
+        [ "Unable to find a stack.yaml file in the current directory ("
+        , toFilePath dir
+        , ") or its ancestors"
+        ]
 instance Exception ConfigException
 
 -- | Helper function to ask the environment and apply getConfig
