@@ -25,7 +25,7 @@ module Stack.BuildPlan
 
 import           Control.Applicative             ((<$>), (<*>))
 import           Control.Arrow                   ((&&&))
-import           Control.Exception.Enclosed      (tryIO, handleIO)
+import           Control.Exception.Enclosed      (handleIO)
 import           Control.Monad                   (liftM, forM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -36,7 +36,7 @@ import           Control.Monad.State.Strict      (State, execState, get, modify,
                                                   put)
 import           Data.Aeson                      (FromJSON (..))
 import           Data.Aeson                      (withObject, withText, (.:))
-import qualified Data.Binary                     as Binary
+import           Data.Binary.VersionTagged       (taggedDecodeOrLoad)
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Char8           as S8
 import qualified Data.Foldable                   as F
@@ -382,20 +382,8 @@ loadMiniBuildPlan
 loadMiniBuildPlan name = do
     path <- configMiniBuildPlanCache name
     let fp = toFilePath path
-        dir = toFilePath $ parent path
-
-    eres <- liftIO $ tryIO $ Binary.decodeFileOrFail fp
-    mbp <- case eres of
-        Right (Right mbp) -> return mbp
-        _ -> do
-            $logDebug $ "loadMiniBuildPlan from cache failed: " <> T.pack (show (name, eres))
-            bp <- loadBuildPlan name
-            mbp <- liftM buildPlanFixes $ toMiniBuildPlan bp
-            liftIO $ do
-                createDirectoryIfMissing True dir
-                Binary.encodeFile fp mbp
-            return mbp
-    return mbp
+    taggedDecodeOrLoad fp $ liftM buildPlanFixes $
+        loadBuildPlan name >>= toMiniBuildPlan
 
 -- | Some hard-coded fixes for build plans, hopefully to be irrelevant over
 -- time.

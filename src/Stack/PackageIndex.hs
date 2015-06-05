@@ -24,7 +24,7 @@ module Stack.PackageIndex
 
 import qualified Codec.Archive.Tar                     as Tar
 import           Control.Applicative                   ((<$>), (<*>))
-import           Control.Exception                     (Exception, toException)
+import           Control.Exception                     (Exception)
 import           Control.Exception.Enclosed            (tryIO)
 import           Control.Monad                         (unless, when, liftM, mzero)
 import           Control.Monad.Catch                   (MonadThrow, throwM)
@@ -34,7 +34,7 @@ import           Control.Monad.Logger                  (MonadLogger, logDebug,
 import           Control.Monad.Reader                  (asks)
 import           Data.Aeson
 import qualified Data.Binary                           as Binary
-import           Data.Binary.Get                       (ByteOffset)
+import           Data.Binary.VersionTagged             (taggedDecodeOrLoad)
 import           Data.ByteString                       (ByteString)
 import qualified Data.ByteString.Lazy                  as L
 import           Data.Conduit                          (($$), (=$), yield, Producer, ZipSink (..))
@@ -87,10 +87,6 @@ data PackageCache = PackageCache
     }
     deriving Generic
 instance Binary.Binary PackageCache
-
-newtype BinaryParseException = BinaryParseException (ByteOffset, String)
-    deriving (Show, Typeable)
-instance Exception BinaryParseException
 
 -- | Stream all of the cabal files from the 00-index tar file.
 sourcePackageIndex :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m)
@@ -354,22 +350,15 @@ getPackageCaches menv = do
     config <- askConfig
     liftM mconcat $ forM (configPackageIndices config) $ \index -> do
         fp <- liftM toFilePath $ configPackageIndexCache (indexName index)
-        let load = do
-                ebs <- liftIO $ tryIO $ Binary.decodeFileOrFail fp
-                case ebs of
-                    Left e -> return $ Left $ toException e
-                    Right (Left e) -> return $ Left $ toException $ BinaryParseException e
-                    Right (Right pis) -> return $ Right pis
-        x <- load
-        case x of
-            Left _ -> populateCache menv index
-            Right x' -> return $ fmap (index,) x'
+        pis' <- taggedDecodeOrLoad fp $ populateCache menv index
+
+        return (fmap (index,) pis')
 
 -- | Populate the package index caches and return them.
 populateCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
               => EnvOverride
               -> PackageIndex
-              -> m (Map PackageIdentifier (PackageIndex, PackageCache))
+              -> m (Map PackageIdentifier PackageCache)
 populateCache menv index = do
     $logInfo "Populating index cache, may take a moment"
     let toIdent (Left ucf) = Just
@@ -399,12 +388,9 @@ populateCache menv index = do
                 | indexRequireHashes index -> throwM $ MissingRequiredHashes (indexName index) ident
                 | otherwise -> return (ident, pc)
 
-    fp <- configPackageIndexCache (indexName index)
-    liftIO $ Binary.encodeFile (toFilePath fp) pis'
-
     $logInfo "Done populating cache"
 
-    return (fmap (index,) pis')
+    return pis'
 
 --------------- Lifted from cabal-install, Distribution.Client.Tar:
 -- | Return the number of blocks in an entry.
