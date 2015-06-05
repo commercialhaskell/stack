@@ -51,7 +51,6 @@ import Data.Map (Map)
 import qualified Data.Set as Set
 import Data.Set (Set)
 import System.Process.Read
-import Stack.GhcPkg
 import qualified System.FilePath as FP
 import Data.Maybe (catMaybes, listToMaybe)
 import Data.List (sortBy)
@@ -180,11 +179,10 @@ setupEnv useSystem installIfMissing manager bconfig = do
     depsExists <- liftIO $ doesDirectoryExist $ toFilePath deps
     localdb <- runReaderT packageDatabaseLocal bconfig
     localdbExists <- liftIO $ doesDirectoryExist $ toFilePath localdb
-    global <- mkEnvOverride platform (Map.insert "PATH" depsPath env0) >>= getGlobalDB
     let mkGPP locals = T.pack $ intercalate [searchPathSeparator] $ concat
             [ [toFilePath localdb | locals && localdbExists]
             , [toFilePath deps | depsExists]
-            , [toFilePath global]
+            , [""] -- force an empty component at the end to include the global package DB
             ]
 
     envRef <- liftIO $ newIORef Map.empty
