@@ -249,7 +249,7 @@ cleanCmd _ go@GlobalOpts{..} = do
     (lcProjectRoot lc)
     (do config <- runStackLoggingT manager
                                    globalLogLevel
-                                   (lcLoadBuildConfig lc ThrowException >>= setupEnv globalSystemGhc manager)
+                                   (lcLoadBuildConfig lc ThrowException >>= setupEnv globalSystemGhc globalInstallGhc manager)
         runStackT manager globalLogLevel config clean)
 
 -- | Install dependencies
@@ -258,7 +258,7 @@ depsCmd (names, dryRun) go@GlobalOpts{..} = do
     (manager,lc) <- loadConfigWithOpts go
     Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $ do
         config <- runStackLoggingT manager globalLogLevel
-            (lcLoadBuildConfig lc ExecStrategy >>= setupEnv globalSystemGhc manager)
+            (lcLoadBuildConfig lc ExecStrategy >>= setupEnv globalSystemGhc globalInstallGhc manager)
         runStackT manager globalLogLevel config $ Stack.Build.build BuildOpts
             { boptsTargets = Right names
             , boptsLibProfile = False
@@ -309,7 +309,7 @@ buildCmd finalAction opts go@GlobalOpts{..} =
         (lcProjectRoot lc)
         (do config <- runStackLoggingT manager
                                        globalLogLevel
-                                       (lcLoadBuildConfig lc CreateConfig >>= setupEnv globalSystemGhc manager)
+                                       (lcLoadBuildConfig lc CreateConfig >>= setupEnv globalSystemGhc globalInstallGhc manager)
             runStackT manager globalLogLevel config $
                       Stack.Build.build opts { boptsFinalAction = finalAction}))
              (error . printBuildException)
@@ -427,7 +427,7 @@ execCmd (cmd, args) go@GlobalOpts{..} = do
       (lcProjectRoot lc)
       (do config <- runStackLoggingT manager
                                      globalLogLevel
-                                     (lcLoadBuildConfig lc ExecStrategy >>= setupEnv globalSystemGhc manager)
+                                     (lcLoadBuildConfig lc ExecStrategy >>= setupEnv globalSystemGhc globalInstallGhc manager)
           menv <- configEnvOverride (bcConfig config)
                           EnvSettings
                               { esIncludeLocals = True
@@ -559,6 +559,9 @@ globalOpts docker =
     <*> boolFlags True
             "system-ghc"
             "Use the system installed GHC (on the PATH) if available and a matching version"
+    <*> boolFlags True
+            "install-ghc"
+            "Download and install GHC if necessary (can be done manually with stack setup)"
 
 -- | Parse for a logging level.
 logLevelOpt :: Parser LogLevel
@@ -596,6 +599,7 @@ data GlobalOpts = GlobalOpts
     { globalLogLevel     :: LogLevel -- ^ Log level
     , globalConfigMonoid :: ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalSystemGhc    :: Bool -- ^ Use system GHC if available and correct version?
+    , globalInstallGhc   :: Bool -- ^ Install GHC if missing
     } deriving (Show)
 
 -- | Load the configuration with a manager. Convenience function used
