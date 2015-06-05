@@ -52,7 +52,6 @@ sudo apt-get install stack -y
 
 1. Download stack following the instructions at **FIXME** and place it on your `PATH`
 2. Run `stack build` from within your project to generate a config file, install dependencies, and build your code
-    * NOTE: if necessary, run `stack setup` to download GHC and then run `stack build` again. stack will tell you if this is required
 
 Running `stack` will give you a list of commands, some of the most common are:
 
@@ -159,15 +158,14 @@ __I already have GHC installed, can I still use stack?__
 
 Yes. stack will default to using whatever GHC is on your PATH. If that GHC is a
 compatible version with the snapshot you're using, it will simply use it.
-Otherwise, you can either:
+Otherwise, if will install the new version for you. (If you don't want this
+automatic installation, you can use the `--no-install-ghc` option.)
 
-* Install a different GHC yourself and modify your PATH
-* Use `stack setup`
-
-Note that `stack setup` doesn't work for all OSes, so in some cases the first
-option will be required. Also, `stack setup` is a no-op when an appropriate GHC
-is already available, so it's safe to run it from an automated script, for
-example.
+Note that GHC installation doesn't work for all OSes, so in some cases the
+first option will need to install GHC yourself. Also, the `stack setup` command
+gives you more direct control of installing GHC. When the necessary GHC is
+already installed, `stack setup` is a no-op, so it's safe to run it from an
+automated script, for example.
 
 __How do I get extra build tools?__
 
