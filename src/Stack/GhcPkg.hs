@@ -7,40 +7,25 @@
 -- | Functions for the GHC package database.
 
 module Stack.GhcPkg
-  (getPackageVersionMapWithGlobalDb
-  ,getPackageVersionsSet
-  ,findGhcPkgId
-  ,getGhcPkgIds
+  (findGhcPkgId
   ,getGlobalDB
   ,EnvOverride
   ,envHelper
-  ,unregisterPackages
   ,createDatabase
-  ,packageDbFlags
   ,unregisterGhcPkgId)
   where
 
-import           Control.Applicative
 import           Control.Exception hiding (catch)
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Data.Attoparsec.ByteString.Char8
-import qualified Data.Attoparsec.ByteString.Lazy as AttoLazy
-import           Data.Bifunctor
 import qualified Data.ByteString.Char8 as S8
-import qualified Data.ByteString.Lazy as L
 import           Data.Data
 import           Data.Either
 import           Data.List
-import           Data.Map.Strict (Map)
-import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Monoid ((<>))
-import           Data.Set (Set)
-import qualified Data.Set as S
-import qualified Data.Set.Monad as Set
 import           Data.Streaming.Process
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -84,11 +69,13 @@ ghcPkg :: (MonadIO m, MonadLogger m)
 ghcPkg menv pkgDbs args = do
     $logDebug $ "Calling ghc-pkg with: " <> T.pack (show args')
     eres <- go
-    case eres of
-        Left _ -> do
-            mapM_ (createDatabase menv) pkgDbs
-            go
-        Right _ -> return eres
+    r <- case eres of
+            Left _ -> do
+                mapM_ (createDatabase menv) pkgDbs
+                go
+            Right _ -> return eres
+    $logDebug $ "Done calling ghc-pkg with: " <> T.pack (show args')
+    return r
   where
     go = tryProcessStdout menv "ghc-pkg" args' -- FIXME ensure that GHC_PACKAGE_PATH isn't set?
     args' = packageDbFlags pkgDbs ++ args
@@ -111,182 +98,6 @@ packageDbFlags :: [Path Abs Dir] -> [String]
 packageDbFlags pkgDbs =
           "--no-user-package-db"
         : map (\x -> ("--package-db=" ++ toFilePath x)) pkgDbs
-
--- | In the given databases, get a single version for all packages, chooses the
--- latest version of each package.
---
--- Package databases passed to this function override eachother in a
--- right-biased way when containing two packages of the same name.
-getPackageVersionMapWithGlobalDb
-    :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
-    => EnvOverride
-    -> Maybe MiniBuildPlan
-    -> [Path Abs Dir] -- ^ package databases
-    -> m (Map PackageName Version)
-getPackageVersionMapWithGlobalDb menv mmbp pkgDbs = do
-    gdb <- getGlobalDB menv
-    allGlobals <-
-        getPackageVersions
-            menv
-            [gdb]
-            (const True)
-            (M.unions . map (M.fromList . rights))
-    $logDebug ("All globals: " <> T.pack (show allGlobals))
-    globals <-
-        case mmbp of
-            Nothing ->
-                return allGlobals
-            Just mbp ->
-                filtering gdb mbp allGlobals
-    $logDebug ("Filtered globals: " <> T.pack (show globals))
-    rest <-
-        getPackageVersions
-            menv
-            pkgDbs
-            (flip elem pkgDbs)
-            (rightBiasUnion .
-             map (M.fromList . rights))
-    return (rightBiasUnion [globals,rest])
-  where
-    -- M.unions is left-biased, so we reverse the list before calling
-    -- it to make it right-biased, like GHC.
-    rightBiasUnion = M.unions . reverse
-    filtering gdb mbp allGlobals =
-        foldM
-            (\acc ident ->
-                  let expunge =
-                          foldr
-                              M.delete
-                              acc
-                              (map
-                                   packageIdentifierName
-                                   (ident :
-                                    getTransInclusiveDeps mbp (packageIdentifierName ident)))
-                  in if versionMatches mbp ident
-                         then do
-                             hasProfiling <- packageHasProfiling [gdb] ident
-                             return (if hasProfiling
-                                         then acc
-                                         else expunge)
-                         else return expunge)
-            allGlobals
-            (map fromTuple (M.toList allGlobals))
-
--- | Does this version match what's in the snapshot plan?
-versionMatches :: MiniBuildPlan -> PackageIdentifier -> Bool
-versionMatches mbp ident =
-    M.member
-        (packageIdentifierName ident)
-        (mbpPackages mbp)
-
--- | Get the packages depended on by the given package.
-getTransInclusiveDeps :: MiniBuildPlan -> PackageName -> [PackageIdentifier]
-getTransInclusiveDeps mbp name =
-    case M.lookup name (mbpPackages mbp) of
-        Nothing -> []
-        Just miniPkgInfo ->
-            let deps = S.toList (mpiPackageDeps miniPkgInfo)
-            in mapMaybe lookupPackageIdent deps <>
-               concatMap (getTransInclusiveDeps mbp) deps
-  where
-    lookupPackageIdent depname =
-        fmap
-            (\miniPkgInfo -> PackageIdentifier depname (mpiVersion miniPkgInfo))
-            (M.lookup depname (mbpPackages mbp))
-
--- | Does the given package identifier from the given package db have
--- profiling libs built?
-packageHasProfiling :: Monad m => [Path Abs Dir] -> PackageIdentifier -> m Bool
-packageHasProfiling _ _ = return True
-
--- | In the given databases, get every version of every package.
-getPackageVersionsSet :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
-                      => EnvOverride
-                      -> [Path Abs Dir]         -- ^ Package databases to enable.
-                      -> (Path Abs Dir -> Bool) -- ^ Return only packages matching this database predicate.
-                      -> m (Set PackageIdentifier)
-getPackageVersionsSet menv pkgDbs predicate =
-    getPackageVersions
-        menv
-        pkgDbs
-        predicate
-        (S.fromList .
-         concatMap (map fromTuple . rights))
-
--- | In the given databases, broken packages according to the given predicate.
-getBrokenPackages :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
-                  => EnvOverride
-                  -> [Path Abs Dir]         -- ^ Package databases to enable.
-                  -> (Path Abs Dir -> Bool) -- ^ Return only packages matching this database predicate.
-                  -> m (Set PackageIdentifier)
-getBrokenPackages menv pkgDbs predicate =
-    getPackageVersions
-        menv
-        pkgDbs
-        predicate
-        (S.fromList .
-         concatMap (map fromTuple . lefts))
-
--- | In the given databases, get all available packages.
-getPackageVersions :: (MonadCatch m, MonadIO m, MonadThrow m, MonadLogger m)
-                   => EnvOverride
-                   -> [Path Abs Dir]         -- ^ Package databases to enable.
-                   -> (Path Abs Dir -> Bool) -- ^ Return only packages matching this database predicate.
-                   -> ([[Either (PackageName, Version) (PackageName, Version)]] -> a)
-                   -> m a
-getPackageVersions menv pkgDbs predicate f = do
-    result <-
-        ghcPkg menv pkgDbs ["list"]
-    case result of
-        Left{} ->
-            throw GetAllPackagesFail
-        Right lbs ->
-            case AttoLazy.parse
-                     (packageVersionsParser predicate f)
-                     (L.fromStrict lbs) of
-                AttoLazy.Fail _ _ _ ->
-                    throw GetAllPackagesFail
-                AttoLazy.Done _ r ->
-                    liftIO (evaluate r)
-
--- | Parser for ghc-pkg's list output.
-packageVersionsParser :: (Path Abs Dir -> Bool)
-                      -> ([[Either (PackageName, Version) (PackageName, Version)]] -> a)
-                      -> Parser a
-packageVersionsParser sectionPredicate f =
-    fmap
-        (f .
-         mapMaybe
-             (\(fp,pkgs) ->
-                   do dir <- parseAbsDir fp
-                      guard (sectionPredicate dir)
-                      return pkgs))
-        sections
-  where
-    sections =
-        many
-            (do fp <- heading
-                pkgs <- many (pkg <* endOfLine)
-                optional endOfLine
-                return (fp, pkgs))
-    heading =
-        fmap
-            (reverse .
-             dropWhile (== ':') .
-             dropWhile (== '\r') .
-             reverse)
-            (many1 (satisfy (not . (== '\n')))) <*
-        endOfLine
-    pkg = do
-        space
-        space
-        space
-        space
-        fmap
-            (bimap toTuple toTuple)
-            ((Right <$> packageIdentifierParser) <|> -- normal packages
-             (Right <$> ("(" *> packageIdentifierParser <* ")")) <|> -- hidden packages
-             (Left <$> ("{" *> packageIdentifierParser <* "}"))) -- broken packages
 
 -- | Get the id of the package e.g. @foo-0.0.0-9c293923c0685761dcff6f8c3ad8f8ec@.
 findGhcPkgId :: (MonadIO m, MonadLogger m)
@@ -318,39 +129,6 @@ findGhcPkgId menv pkgDbs name = do
     stripCR t =
         fromMaybe t (T.stripSuffix "\r" t)
 
--- | Get all current package ids.
-getGhcPkgIds :: (MonadIO m, MonadLogger m)
-             => EnvOverride
-             -> [Path Abs Dir] -- ^ package databases
-             -> [PackageName]
-             -> m (Map PackageName GhcPkgId)
-getGhcPkgIds menv pkgDbs pkgs =
-    collect pkgs >>= liftIO . evaluate
-  where
-    collect =
-        liftM (M.fromList . catMaybes) .
-        mapM getTuple
-    getTuple name = do
-        mpid <- findGhcPkgId menv pkgDbs name
-        case mpid of
-            Nothing ->
-                return Nothing
-            Just pid ->
-                return (Just (name, pid))
-
--- | Unregister the given package(s) and any dependent packages which
--- become broken as a result.
-unregisterPackages :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m)
-                   => EnvOverride
-                   -> [Path Abs Dir]
-                   -> (Path Abs Dir -> Bool)
-                   -> Set PackageIdentifier
-                   -> m ()
-unregisterPackages menv pkgDbs predicate idents = do
-    Set.mapM_ (unregisterPackage menv pkgDbs) idents
-    broken <- getBrokenPackages menv pkgDbs predicate
-    Set.mapM_ (unregisterPackage menv pkgDbs) broken
-
 unregisterGhcPkgId :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m)
                     => EnvOverride
                     -> Path Abs Dir -- ^ package database
@@ -365,13 +143,3 @@ unregisterGhcPkgId menv pkgDb gid = do
   where
     -- TODO ideally we'd tell ghc-pkg a GhcPkgId instead
     args = ["unregister", "--user", "--force", packageIdentifierString $ ghcPkgIdPackageIdentifier gid]
-
--- | Unregister the given package.
-unregisterPackage :: (MonadIO m, MonadLogger m, MonadThrow m)
-                  => EnvOverride -> [Path Abs Dir] -> PackageIdentifier -> m ()
-unregisterPackage menv pkgDbs ident =
-    do $logInfo (packageIdentifierText ident <> ": unregistering")
-       liftM
-           (const ())
-           (ghcPkg menv pkgDbs ["unregister", "--force", packageIdentifierString ident] >>=
-            either throwM return)
