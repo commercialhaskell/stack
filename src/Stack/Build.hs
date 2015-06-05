@@ -41,8 +41,8 @@ import           Control.Monad.Catch (MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
+import           Control.Monad.Trans.Control (liftBaseWith)
 import           Control.Monad.Trans.Resource
-import           Control.Monad.Trans.Unlift
 import           Control.Monad.State.Strict
 import           Control.Monad.Writer
 import qualified Data.ByteString.Char8 as S8
@@ -158,7 +158,7 @@ data Installed = Library GhcPkgId | Executable
 data Location = Global | Snap | Local
     deriving (Show, Eq)
 
-type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseUnlift IO m,MonadCatch m,MonadMask m,HasLogLevel env)
+type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
 
 type SourceMap = Map PackageName (Version, PackageSource)
 data PackageSource
@@ -1000,17 +1000,23 @@ executePlan plan ee = do
                     , ": unregistering"
                     ]
                 unregisterGhcPkgId (eeEnvOverride ee) localDB id'
-    u <- askUnliftBase
-    let actions = concatMap (toActions u ee) $ Map.elems $ planTasks plan
+
+    -- Yes, we're explicitly discarding result values, which in general would
+    -- be bad. monad-unlift does this all properly at the type system level,
+    -- but I don't want to pull it in for this one use case, when we know that
+    -- stack always using transformer stacks that are safe for this use case.
+    runInBase <- liftBaseWith $ \run -> return (void . run)
+
+    let actions = concatMap (toActions runInBase ee) $ Map.elems $ planTasks plan
     threads <- liftIO getNumCapabilities -- TODO make a build opt to override this
     liftIO $ runActions threads actions
 
 toActions :: M env m
-          => UnliftBase IO m
+          => (m () -> IO ())
           -> ExecuteEnv
           -> Task
           -> [Action]
-toActions u ee task@Task {..} =
+toActions runInBase ee task@Task {..} =
     -- TODO in the future, we need to have proper support for cyclic
     -- dependencies from test suites, in which case we'll need more than one
     -- Action here
@@ -1019,7 +1025,7 @@ toActions u ee task@Task {..} =
         { actionId = ActionId taskProvides ATBuild
         , actionDeps =
             (Set.map (\ident -> ActionId ident ATBuild) taskRequiresMissing)
-        , actionDo = \ac -> unliftBase u $ singleBuild ac ee task
+        , actionDo = \ac -> runInBase $ singleBuild ac ee task
         }
     ]
 

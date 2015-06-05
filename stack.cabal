@@ -114,7 +114,6 @@ library
                    , void >= 0.7
                    , yaml >= 0.8.10.1
                    , zlib >= 0.5.4.2
-                   , monad-unlift >= 0.1.1.0
                    , deepseq
   if !os(windows)
     build-depends:   unix >= 2.7.0.1
