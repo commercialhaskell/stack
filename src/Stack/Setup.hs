@@ -16,7 +16,6 @@ module Stack.Setup
 
 import Control.Exception (Exception)
 import Data.Maybe (mapMaybe, catMaybes)
-import Control.Exception.Enclosed (handleIO)
 import Control.Monad (liftM, when)
 import Control.Monad.Catch (MonadThrow, throwM, MonadMask)
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -26,7 +25,6 @@ import qualified Data.Conduit.List as CL
 import Control.Applicative ((<$>), (<*>))
 import Data.Aeson
 import Data.IORef
-import qualified Data.List as List
 import Data.Monoid
 import qualified Data.Yaml as Yaml
 import Data.Text (Text)
@@ -43,21 +41,15 @@ import Stack.Types
 import Distribution.System (OS (..), Arch (..), Platform (..))
 import Stack.Build.Types
 import qualified Data.ByteString.Char8 as S8
-import Path (Path, Abs, Dir, parseRelDir, parseAbsDir, parseRelFile, mkRelFile, File)
-import qualified Path
 import Control.Monad.Logger
 import qualified Data.Text as T
 import Data.List (intercalate)
-import Path (toFilePath)
 import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified Data.Set as Set
 import Data.Set (Set)
 import System.Process.Read
 import qualified System.FilePath as FP
-import Data.Maybe (catMaybes, listToMaybe)
-import Data.List (sortBy)
-import Data.Ord (comparing)
 import Network.HTTP.Download (download)
 
 data SetupOpts = SetupOpts
@@ -385,6 +377,7 @@ ensureTool sopts installed getSetupInfo' msystem (name, mversion)
 
         (file, at) <- downloadPair pair ident
         dir <- installDir ident
+        unmarkInstalled ident
         installer si file at dir ident
 
         markInstalled ident
@@ -394,7 +387,7 @@ ensureTool sopts installed getSetupInfo' msystem (name, mversion)
         | soptsForceReinstall sopts = []
         | otherwise = filter goodVersion
                     $ map packageIdentifierVersion
-                    $ filter (\pi -> packageIdentifierName pi == name) installed
+                    $ filter (\pi' -> packageIdentifierName pi' == name) installed
 
     goodVersion =
         case mversion of
@@ -428,28 +421,18 @@ downloadPair (DownloadPair _ url) ident = do
         case extension of
             ".tar.xz" -> return TarXz
             ".tar.bz2" -> return TarBz2
-            ".exe.7z" -> return SevenZ
+            ".7z.exe" -> return SevenZ
             _ -> error $ "Unknown extension: " ++ extension
     relfile <- parseRelFile $ packageIdentifierString ident ++ extension
     let path = configLocalPrograms config </> relfile
-    req <- parseUrl $ T.unpack url
-    $logInfo $ T.concat
-        [ "Downloading from "
-        , url
-        , " to "
-        , T.pack $ toFilePath path
-        ]
-    x <- download req path -- TODO add progress indicator
-    if x
-        then $logInfo "Download complete"
-        else $logInfo "File already downloaded"
+    chattyDownload url path
     return (path, at)
   where
     extension =
         loop $ T.unpack url
       where
         loop fp
-            | ext `elem` [".tar", ".bz2", ".xz", ".exe", "7z"] = loop fp' ++ ext
+            | ext `elem` [".tar", ".bz2", ".xz", ".exe", ".7z"] = loop fp' ++ ext
             | otherwise = ""
           where
             (fp', ext) = FP.splitExtension fp
@@ -490,6 +473,21 @@ installGHCPosix _ archiveFile archiveType destDir ident = do
         runIn dir "make" menv ["install"] Nothing
 
         $logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
+  where
+    -- | Check if given processes appear to be present, throwing an exception if
+    -- missing.
+    checkDependencies :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env)
+                      => [String] -> m ()
+    checkDependencies tools = do
+        menv <- getMinimalEnvOverride
+        missing <- liftM catMaybes $ mapM (check menv) tools
+        if null missing
+            then return ()
+            else throwM $ MissingDependencies missing
+      where
+        check menv tool = do
+            exists <- doesExecutableExist menv tool
+            return $ if exists then Nothing else Just tool
 
 installGHCWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env)
                   => SetupInfo
@@ -498,7 +496,22 @@ installGHCWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, 
                   -> Path Abs Dir
                   -> PackageIdentifier
                   -> m ()
-installGHCWindows = error "installGHCWindows"
+installGHCWindows si archiveFile archiveType destDir _ = do
+    case archiveType of
+        TarXz -> return ()
+        _ -> error $ "GHC on Windows must be a .tar.xz file"
+    tarFile <-
+        case T.stripSuffix ".xz" $ T.pack $ toFilePath archiveFile of
+            Nothing -> error $ "Invalid GHC filename: " ++ show archiveFile
+            Just x -> parseAbsFile $ T.unpack x
+
+    config <- asks getConfig
+    run7z <- setup7z si config
+
+    run7z (parent archiveFile) archiveFile
+    run7z (parent archiveFile) tarFile
+
+    $logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
 
 installGitWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env)
                   => SetupInfo
@@ -507,106 +520,52 @@ installGitWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, 
                   -> Path Abs Dir
                   -> PackageIdentifier
                   -> m ()
-installGitWindows = error "installGitWindows"
+installGitWindows si archiveFile archiveType destDir _ = do
+    case archiveType of
+        SevenZ -> return ()
+        _ -> error $ "Git on Windows must be a 7z archive"
+
+    config <- asks getConfig
+    run7z <- setup7z si config
+    run7z destDir archiveFile
 
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
 -- Returned function takes an unpack directory and archive.
-setup7z :: (MonadReader env m, HasHttpManager env, MonadThrow m, MonadIO m, MonadIO n)
+setup7z :: (MonadReader env m, HasHttpManager env, MonadThrow m, MonadIO m, MonadIO n, MonadLogger m)
         => SetupInfo
-        -> FilePath -- ^ install root (Programs\)
-        -> m (FilePath -> FilePath -> n ())
-setup7z si root = do
-    go (siSevenzDll si) dll
-    go (siSevenzExe si) exe
+        -> Config
+        -> m (Path Abs Dir -> Path Abs File -> n ())
+setup7z si config = do
+    chattyDownload (siSevenzDll si) dll
+    chattyDownload (siSevenzExe si) exe
     return $ \outdir archive -> liftIO $ do
-        ec <- rawSystem exe
+        ec <- rawSystem (toFilePath exe)
             [ "x"
-            , "-o" ++ outdir
+            , "-o" ++ toFilePath outdir
             , "-y"
-            , archive
+            , toFilePath archive
             ]
         when (ec /= ExitSuccess)
-            $ error $ "Problem while decompressing " ++ archive
+            $ error $ "Problem while decompressing " ++ toFilePath archive
   where
-    dir = root FP.</> "7z"
+    dir = configLocalPrograms config </> $(mkRelDir "7z")
+    exe = dir </> $(mkRelFile "7z.exe")
+    dll = dir </> $(mkRelFile "7z.dll")
 
-    go url fp = do
-        path <- Path.parseAbsFile fp
-        req <- parseUrl $ T.unpack url
-        _ <- download req path
-        return ()
-
-    exe = dir FP.</> "7z.exe"
-    dll = dir FP.</> "7z.dll"
-
--- | Install PortableGit and get a list of directories to add to PATH
-setupGit :: (MonadLogger m, MonadThrow m, MonadIO m)
-         => SetupInfo
-         -> Manager
-         -> FilePath -- ^ root to install into (Programs\)
-         -> m [FilePath]
-setupGit si manager root = do
-    $logInfo "Downloading PortableGit"
-    run7z <- runReaderT (setup7z si root) manager
+chattyDownload :: (MonadReader env m, HasHttpManager env, MonadIO m, MonadLogger m, MonadThrow m)
+               => Text -- ^ URL
+               -> Path Abs File -- ^ destination
+               -> m ()
+chattyDownload url path = do
     req <- parseUrl $ T.unpack url
-    dest <- Path.parseAbsFile $ dir FP.<.> "7z"
-    _ <- runReaderT (download req dest) manager
-    liftIO $ createDirectoryIfMissing True dir
-    run7z dir $ toFilePath dest
-    return $ gitDirs dir
-  where
-    dir = root FP.</> name
-    DownloadPair gitVersion url = siPortableGit si
-    name = "git-" <> versionString gitVersion
-
--- | Windows: Turn a base Git installation directory into a list of bin paths.
-gitDirs :: FilePath -> [FilePath]
-gitDirs dir =
-    [ dir FP.</> "cmd"
-    , dir FP.</> "usr" FP.</> "bin"
-    ]
-
--- | Perform necessary installation for Windows
-windows :: (MonadLogger m, MonadThrow m, MonadIO m)
-        => SetupInfo
-        -> Manager
-        -> Version
-        -> Path Abs Dir -- ^ GHC install root (Programs\ghc-X.Y.Z)
-        -> Path Abs Dir -- ^ installation root (Programs\)
-        -> m [FilePath]
-windows si manager reqVersion dest progDir = do
-    let root = toFilePath progDir
-    contents <- liftIO $ handleIO (const $ return []) (getDirectoryContents root)
-    gitDirs' <- error "FIXME" -- getGitDirs (Just (si, manager)) root contents
-    DownloadPair version url <- error "FIXME" -- getGHCPair si "windows32" reqVersion
-    let dirPiece = "ghc-" <> versionString version
-    req <- parseUrl $ T.unpack url
-    piece <- Path.parseRelFile $ dirPiece ++ ".tar.xz"
-    let destXZ = progDir Path.</> piece
-    $logInfo $ "Downloading GHC from: " <> url
-    _ <- runReaderT (download req destXZ) manager
-    run7z <- runReaderT (setup7z si root) manager
-    run7z (toFilePath progDir) (toFilePath destXZ)
-    run7z (toFilePath progDir)
-          (toFilePath progDir FP.</> dirPiece FP.<.> "tar")
-    return $
-        [ toFilePath $ dest Path.</> $(Path.mkRelDir "bin")
-        , toFilePath $ dest Path.</> $(Path.mkRelDir "mingw")
-                            Path.</> $(Path.mkRelDir "bin")
-        ] ++ gitDirs'
-
--- | Check if given processes appear to be present, throwing an exception if
--- missing.
-checkDependencies :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env)
-                  => [String] -> m ()
-checkDependencies tools = do
-    menv <- getMinimalEnvOverride
-    missing <- liftM catMaybes $ mapM (check menv) tools
-    if null missing
-        then return ()
-        else throwM $ MissingDependencies missing
-  where
-    check menv tool = do
-        exists <- doesExecutableExist menv tool
-        return $ if exists then Nothing else Just tool
+    $logInfo $ T.concat
+        [ "Downloading from "
+        , url
+        , " to "
+        , T.pack $ toFilePath path
+        ]
+    x <- download req path -- TODO add progress indicator
+    if x
+        then $logInfo "Download complete"
+        else $logInfo "File already downloaded"
