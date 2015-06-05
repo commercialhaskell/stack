@@ -38,7 +38,7 @@ import           Data.Aeson (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
 import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Char (isSpace,toUpper,isAscii)
-import           Data.List (dropWhileEnd,intersperse,isPrefixOf,isInfixOf,foldl',sortBy)
+import           Data.List (dropWhileEnd,find,intersperse,isPrefixOf,isInfixOf,foldl',sortBy)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
@@ -683,37 +683,19 @@ checkVersions =
 -- | Options parser configuration for Docker.
 dockerOptsParser :: Parser DockerOptsMonoid
 dockerOptsParser =
-    --EKB FIXME: remove some of these options that would be uncommon to use from command-line?
     DockerOptsMonoid
     <$> maybeBoolFlags dockerCmdName
                        "using a Docker container"
-    <*> maybeStrOption (long (dockerOptName dockerRepoOwnerArgName) <>
-                        metavar "REGISTRY/OWNER" <>
-                        help "Docker repository owner")
-    <*> maybeStrOption (long (dockerOptName dockerRepoPrefixArgName) <>
-                        metavar "PREFIX" <>
-                        help "Prefix to add to Docker repository names")
-    <*> maybeStrOption (long (dockerOptName dockerRepoArgName) <>
-                        metavar "NAME" <>
-                        help "Docker repository name")
-    <*> maybeStrOption (long (dockerOptName dockerRepoSuffixArgName) <>
-                        metavar "SUFFIX" <>
-                        help "Suffix to add to Docker repository names")
-    <*> (optional . option (fmap Just str))
-                       (long (dockerOptName dockerImageTagArgName) <>
-                        metavar "TAG" <>
-                        help "Docker image tag")
-    <*> maybeStrOption (long (dockerOptName dockerImageArgName) <>
-                        metavar "IMAGE" <>
-                        help "Exact Docker image tag or ID (overrides docker-repo-*/tag)")
-    <*> maybeBoolFlags (dockerOptName dockerRegistryLoginArgName)
-                       "registry requires login"
-    <*> maybeStrOption (long (dockerOptName dockerRegistryUsernameArgName) <>
-                        metavar "USERNAME" <>
-                        help "Docker registry username")
-    <*> maybeStrOption (long (dockerOptName dockerRegistryPasswordArgName) <>
-                        metavar "PASSWORD" <>
-                        help "Docker registry password")
+    <*> ((Just . DockerMonoidRepo) <$> option str (long (dockerOptName dockerRepoArgName) <>
+                                                   metavar "NAME" <>
+                                                   help "Docker repository name") <|>
+         (Just . DockerMonoidImage) <$> option str (long (dockerOptName dockerImageArgName) <>
+                                                    metavar "IMAGE" <>
+                                                    help "Exact Docker image ID (overrides docker-repo)") <|>
+         pure Nothing)
+    <*> pure Nothing
+    <*> pure Nothing
+    <*> pure Nothing
     <*> maybeBoolFlags (dockerOptName dockerAutoPullArgName)
                        "automatic pulling latest version of image"
     <*> maybeBoolFlags (dockerOptName dockerDetachArgName)
@@ -743,29 +725,27 @@ dockerOptsFromMonoid :: Maybe Project -> DockerOptsMonoid -> DockerOpts
 dockerOptsFromMonoid mproject DockerOptsMonoid{..} = DockerOpts
   {dockerEnable = fromMaybe False dockerMonoidEnable
   ,dockerImage =
-     let owner = fromMaybe "fpco" dockerMonoidRepoOwner
-         tag = case dockerMonoidImageTag of
-                 Just t -> emptyToNothing t
-                 Nothing ->
-                   case mproject of
-                     Nothing -> Nothing
-                     Just proj ->
-                       case projectResolver proj of
-                         ResolverSnapshot n@(LTS _ _) -> Just (T.unpack (renderSnapName n))
-                         _ -> error (concat ["Resolver not supported for Docker images:\n    "
-                                             ,show (projectResolver proj)
-                                             ,"\nUse an LTS resolver, or set the '"
-                                             ,T.unpack dockerImageTagArgName
-                                             ,"' explicitly, in "
-                                             ,toFilePath stackDotYaml
-                                             ,"."])
-     in concat [owner
-               ,if null owner then "" else "/"
-               ,fromMaybe "" dockerMonoidRepoPrefix
-               ,fromMaybe "dev" dockerMonoidRepo
-               ,fromMaybe "" dockerMonoidRepoSuffix
-               ,maybe "" (const ":") tag
-               ,fromMaybe "" tag]
+     let defaultTag =
+           case mproject of
+             Nothing -> ""
+             Just proj ->
+               case projectResolver proj of
+                 ResolverSnapshot n@(LTS _ _) -> ":" ++  (T.unpack (renderSnapName n))
+                 _ -> error (concat ["Resolver not supported for Docker images:\n    "
+                                     ,show (projectResolver proj)
+                                     ,"\nUse an LTS resolver, or set the '"
+                                     ,T.unpack dockerImageArgName
+                                     ,"' explicitly, in "
+                                     ,toFilePath stackDotYaml
+                                     ,"."])
+     in case dockerMonoidRepoOrImage of
+       Nothing -> "fpco/dev" ++ defaultTag
+       Just (DockerMonoidImage image) -> image
+       Just (DockerMonoidRepo repo) ->
+         case find (`elem` ":@") repo of
+           Just _ -> -- Repo already specified a tag or digest, so don't append default
+                     repo
+           Nothing -> repo ++ defaultTag
   ,dockerRegistryLogin = fromMaybe (isJust (emptyToNothing dockerMonoidRegistryUsername))
                                    dockerMonoidRegistryLogin
   ,dockerRegistryUsername = emptyToNothing dockerMonoidRegistryUsername

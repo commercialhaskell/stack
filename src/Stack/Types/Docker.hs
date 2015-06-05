@@ -4,7 +4,7 @@
 
 module Stack.Types.Docker where
 
-import Control.Applicative ((<|>))
+import Control.Applicative
 import Data.Aeson
 import Data.Monoid
 import Data.Text (Text)
@@ -40,24 +40,13 @@ data DockerOpts = DockerOpts
   }
   deriving (Show)
 
--- An uninterpreted representation of xidocker options.
+-- An uninterpreted representation of docker options.
 -- Configurations may be "cascaded" using mappend (left-biased).
 data DockerOptsMonoid = DockerOptsMonoid
   {dockerMonoidEnable :: !(Maybe Bool)
     -- ^ Is using Docker enabled?
-  ,dockerMonoidRepoOwner :: !(Maybe String)
-    -- ^ Docker repository (registry and) owner
-  --EKB FIXME: rethink this prefix/repo/suffix business.  Improve naming?
-  ,dockerMonoidRepoPrefix :: !(Maybe String)
-    -- ^ Docker repository name's prefix (e.g. variant)
-  ,dockerMonoidRepo :: !(Maybe String)
-    -- ^ Docker repository name (e.g. @dev@)
-  ,dockerMonoidRepoSuffix :: !(Maybe String)
-    -- ^ Docker repository name's suffix (e.g. GHC version)
-  ,dockerMonoidImageTag :: !(Maybe (Maybe String))
-    -- ^ Optional Docker image tag (e.g. the date)
-  ,dockerMonoidImage :: !(Maybe String)
-    -- ^ Exact Docker image tag or ID.  Overrides docker-repo-*/tag.
+  ,dockerMonoidRepoOrImage :: !(Maybe DockerMonoidRepoOrImage)
+    -- ^ Docker repository name (e.g. @fpco/dev@ or @fpco/dev:lts-2.8@)
   ,dockerMonoidRegistryLogin :: !(Maybe Bool)
     -- ^ Does registry require login for pulls?
   ,dockerMonoidRegistryUsername :: !(Maybe String)
@@ -86,12 +75,9 @@ data DockerOptsMonoid = DockerOptsMonoid
 instance FromJSON DockerOptsMonoid where
   parseJSON = withObject "DockerOptsMonoid"
     (\o -> do dockerMonoidEnable           <- o .:? dockerEnableArgName .!= Just True
-              dockerMonoidRepoOwner        <- o .:? dockerRepoOwnerArgName
-              dockerMonoidRepoPrefix       <- o .:? dockerRepoPrefixArgName
-              dockerMonoidRepo             <- o .:? dockerRepoArgName
-              dockerMonoidRepoSuffix       <- o .:? dockerRepoSuffixArgName
-              dockerMonoidImageTag         <- o .:? dockerImageTagArgName
-              dockerMonoidImage            <- o .:? dockerImageArgName
+              dockerMonoidRepoOrImage      <- ((Just . DockerMonoidImage) <$> o .: dockerImageArgName) <|>
+                                              ((Just . DockerMonoidRepo) <$> o .: dockerRepoArgName) <|>
+                                              pure Nothing
               dockerMonoidRegistryLogin    <- o .:? dockerRegistryLoginArgName
               dockerMonoidRegistryUsername <- o .:? dockerRegistryUsernameArgName
               dockerMonoidRegistryPassword <- o .:? dockerRegistryPasswordArgName
@@ -107,12 +93,7 @@ instance FromJSON DockerOptsMonoid where
 instance Monoid DockerOptsMonoid where
   mempty = DockerOptsMonoid
     {dockerMonoidEnable           = Nothing
-    ,dockerMonoidRepoOwner        = Nothing
-    ,dockerMonoidRepoPrefix       = Nothing
-    ,dockerMonoidRepo             = Nothing
-    ,dockerMonoidRepoSuffix       = Nothing
-    ,dockerMonoidImageTag         = Nothing
-    ,dockerMonoidImage            = Nothing
+    ,dockerMonoidRepoOrImage      = Nothing
     ,dockerMonoidRegistryLogin    = Nothing
     ,dockerMonoidRegistryUsername = Nothing
     ,dockerMonoidRegistryPassword = Nothing
@@ -126,12 +107,7 @@ instance Monoid DockerOptsMonoid where
     }
   mappend l r = DockerOptsMonoid
     {dockerMonoidEnable           = dockerMonoidEnable l <|> dockerMonoidEnable r
-    ,dockerMonoidRepoOwner        = dockerMonoidRepoOwner l <|> dockerMonoidRepoOwner r
-    ,dockerMonoidRepoPrefix       = dockerMonoidRepoPrefix l <|> dockerMonoidRepoPrefix r
-    ,dockerMonoidRepo             = dockerMonoidRepo l <|> dockerMonoidRepo r
-    ,dockerMonoidRepoSuffix       = dockerMonoidRepoSuffix l <|> dockerMonoidRepoSuffix r
-    ,dockerMonoidImageTag         = dockerMonoidImageTag l <|> dockerMonoidImageTag r
-    ,dockerMonoidImage            = dockerMonoidImage l <|> dockerMonoidImage r
+    ,dockerMonoidRepoOrImage      = dockerMonoidRepoOrImage l <|> dockerMonoidRepoOrImage r
     ,dockerMonoidRegistryLogin    = dockerMonoidRegistryLogin l <|> dockerMonoidRegistryLogin r
     ,dockerMonoidRegistryUsername = dockerMonoidRegistryUsername l <|> dockerMonoidRegistryUsername r
     ,dockerMonoidRegistryPassword = dockerMonoidRegistryPassword l <|> dockerMonoidRegistryPassword r
@@ -144,29 +120,19 @@ instance Monoid DockerOptsMonoid where
     ,dockerMonoidPassHost         = dockerMonoidPassHost l <|> dockerMonoidPassHost r
     }
 
+-- | Options for Docker repository or image.
+data DockerMonoidRepoOrImage
+  = DockerMonoidRepo String
+  | DockerMonoidImage String
+  deriving (Show)
+
 -- | Docker enable argument name.
 dockerEnableArgName :: Text
 dockerEnableArgName = "enable"
 
--- | Docker repo owner argument name.
-dockerRepoOwnerArgName :: Text
-dockerRepoOwnerArgName = "repo-owner"
-
--- | Docker repo prefix argument name.
-dockerRepoPrefixArgName :: Text
-dockerRepoPrefixArgName = "repo-prefix"
-
 -- | Docker repo arg argument name.
 dockerRepoArgName :: Text
 dockerRepoArgName = "repo"
-
--- | Docker repo suffix argument name.
-dockerRepoSuffixArgName :: Text
-dockerRepoSuffixArgName = "repo-suffix"
-
--- | Docker image tag argument name.
-dockerImageTagArgName :: Text
-dockerImageTagArgName = "image-tag"
 
 -- | Docker image argument name.
 dockerImageArgName :: Text
