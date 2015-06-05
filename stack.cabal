@@ -19,7 +19,7 @@ extra-source-files:  README.md ARCHITECTURE.md ChangeLog.md
 
 library
   hs-source-dirs:    src/
-  ghc-options:       -Wall -O0 -pgmPcpphs -optP--cpp
+  ghc-options:       -Wall -O2 -pgmPcpphs -optP--cpp
   exposed-modules:   Options.Applicative.Builder.Extra
                      Stack.BuildPlan
                      Stack.Config
