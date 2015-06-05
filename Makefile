@@ -10,6 +10,8 @@ docker:
 	@cp etc/docker/haskell-stack/Dockerfile Dockerfile
 	@docker build --tag=haskell-stack:7.8 $(DIR)
 
+ubuntu-stack: docker
+
 target/ubuntu-$(UBUNTU_VERSION):
 	@mkdir -p target/ubuntu-$(UBUNTU_VERSION)
 
@@ -27,4 +29,4 @@ deb: | target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(G
 clean:
 	@rm -rf Dockerfile target
 
-.PHONY: clean deb docker default
+.PHONY: clean deb docker default ubuntu-stack
