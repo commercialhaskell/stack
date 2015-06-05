@@ -5,9 +5,7 @@
 
 -- | Run commands in Docker containers
 module Stack.Docker
-  --EKB FIXME: trim the exports, remove unused functions, clarify remaining names.
-  (checkHostStackageDockerVersion
-  ,checkVersions
+  (checkVersions
   ,cleanup
   ,CleanupOpts(..)
   ,CleanupAction(..)
@@ -16,16 +14,12 @@ module Stack.Docker
   ,dockerOptsParser
   ,dockerOptsFromMonoid
   ,dockerPullCmdName
-  ,execProcessAndExit
-  ,getInContainer
   ,preventInContainer
   ,pull
   ,rerunCmdWithOptionalContainer
   ,rerunCmdWithRequiredContainer
   ,rerunWithOptionalContainer
   ,reset
-  ,runContainerAndExit
-  ,runInContainerAndExit
   ) where
 
 import           Control.Applicative
@@ -54,7 +48,7 @@ import           Stack.Types
 import           Stack.Docker.GlobalDB
 import           System.Directory (createDirectoryIfMissing,removeDirectoryRecursive,removeFile)
 import           System.Directory (doesDirectoryExist)
-import           System.Environment (lookupEnv,unsetEnv,getProgName,getArgs,getExecutablePath)
+import           System.Environment (lookupEnv,getProgName,getArgs,getExecutablePath)
 import           System.Exit (ExitCode(ExitSuccess,ExitFailure),exitWith)
 import           System.FilePath (takeBaseName)
 import           System.Info (arch,os)
@@ -588,12 +582,6 @@ checkDockerVersion =
        _ -> error "Cannot get Docker version (invalid 'docker --version' output)."
   where minimumDockerVersion = $(mkVersion "1.3.0")
         prohibitedDockerVersions = [$(mkVersion "1.2.0")]
-
--- | Run a command when we're already inside a Docker container.
-runInContainerAndExit :: FilePath -> [String] -> IO ()
-runInContainerAndExit cmnd args =
-  do unsetEnv requireVersionEnvVar
-     execProcessAndExit cmnd args (return ())
 
 -- | Run a process, then exit with the same exit code.
 execProcessAndExit :: FilePath -> [String] -> IO () -> IO ()
