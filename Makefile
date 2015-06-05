@@ -19,7 +19,7 @@ target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)
 	@perl -p -i -e "s/<<PKG_VERSION>>/$(PKG_VERSION)/g" Dockerfile
 	@perl -p -i -e "s/<<GIT_REV_COUNT>>/$(GIT_REV_COUNT)/g" Dockerfile
 	@perl -p -i -e "s/<<GIT_SHA>>/$(GIT_SHA)/g" Dockerfile
-	@docker build --rm=false --tag=stack-$(UBUNTU_VERSION):$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA) .
+	@docker build --tag=stack-$(UBUNTU_VERSION):$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA) $(DIR)
 	@docker run --rm -v $(DIR)/target/ubuntu-$(UBUNTU_VERSION):/mnt stack-$(UBUNTU_VERSION):$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)
 
 deb: | target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)_amd64.deb
