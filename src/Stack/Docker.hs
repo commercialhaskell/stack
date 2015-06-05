@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP, NamedFieldPuns, RankNTypes, RecordWildCards, TemplateHaskell, TupleSections #-}
 
+--EKB FIXME: some way to sync `stack` between host and container
+--EKB FIXME: make this work from Windows
 --EKB FIXME: get this all using proper logging infrastructure
 --EKB FIXME: throw exceptions instead of using `error`
 --EKB FIXME: include build plan file in Docker image so that it does not need to be downloaded on 1st use

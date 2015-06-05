@@ -197,7 +197,7 @@ markExeInstalled loc ident = do
     -- longer exist
     liftIO $ writeFile fp "Installed"
 
-{- EKB FIXME: doc generation for stack-doc-server
+{- EKB TODO: doc generation for stack-doc-server
 #ifndef mingw32_HOST_OS
 import           System.Posix.Files (createSymbolicLink,removeLink)
 #endif
@@ -1141,14 +1141,14 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
             cabal False ["bench"]
         DoHaddock -> do
             announce "haddock"
-              {- EKB FIXME: doc generation for stack-doc-server
+              {- EKB TODO: doc generation for stack-doc-server
  #ifndef mingw32_HOST_OS
               liftIO (removeDocLinks docLoc package)
  #endif
               ifcOpts <- liftIO (haddockInterfaceOpts docLoc package packages)
               -}
             cabal False ["haddock", "--html"]
-              {- EKB FIXME: doc generation for stack-doc-server
+              {- EKB TODO: doc generation for stack-doc-server
                          ,"--hoogle"
                          ,"--hyperlink-source"
                          ,"--html-location=../$pkg-$version/"
@@ -1171,7 +1171,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                              ,hoogleTxtPath
                              ,hoogleDbPath])
                         -}
-                 {- EKB FIXME: doc generation for stack-doc-server
+                 {- EKB TODO: doc generation for stack-doc-server
              #ifndef mingw32_HOST_OS
                  case setupAction of
                    DoHaddock -> liftIO (createDocLinks docLoc package)
@@ -1407,7 +1407,7 @@ clean = do
         (S.toList (bcPackages bconfig))
         (distDirFromDir cabalPkgVer >=> removeTreeIfExists)
 
-{- EKB FIXME: doc generation for stack-doc-server
+{- EKB TODO: doc generation for stack-doc-server
             (boptsFinalAction bopts == DoHaddock)
             (buildDocIndex
                  (wanted pwd)
@@ -1450,7 +1450,7 @@ getSetupHs dir = do
     fp1 = dir </> $(mkRelFile "Setup.hs")
     fp2 = dir </> $(mkRelFile "Setup.lhs")
 
-{- EKB FIXME: doc generation for stack-doc-server
+{- EKB TODO: doc generation for stack-doc-server
 -- | Build the haddock documentation index and contents.
 buildDocIndex :: (Package -> Wanted)
               -> Path Abs Dir
@@ -1525,7 +1525,6 @@ buildDocIndex wanted docLoc packages mgr logLevel =
 -- | Remove existing links docs for package from @~/.shake/doc@.
 removeDocLinks :: Path Abs Dir -> Package -> IO ()
 removeDocLinks docLoc package =
-  --EKB FIXME: only when running in Docker, for now.
   do createDirectoryIfMissing True
                               (toFilePath docLoc)
      userDocLs <-
@@ -1544,7 +1543,6 @@ removeDocLinks docLoc package =
 -- | Add link for package to @~/.shake/doc@.
 createDocLinks :: Path Abs Dir -> Package -> IO ()
 createDocLinks docLoc package =
-  --EKB FIXME: only when running in Docker, for now.
   do let pkgVer =
            joinPkgVer (packageName package,(packageVersion package))
      pkgVerLoc <- liftIO (parseRelDir pkgVer)
@@ -1552,7 +1550,6 @@ createDocLinks docLoc package =
          pkgDestDocPath =
            FilePath.dropTrailingPathSeparator (toFilePath pkgDestDocLoc)
          cabalDocLoc = parent docLoc </>
-                      --EKB FIXME: this does not work with .stack-work
                        $(mkRelDir "share/doc/")
      haddockLocs <-
        do cabalDocExists <- doesDirectoryExist (toFilePath cabalDocLoc)
@@ -1627,7 +1624,7 @@ haddockInterfaceOpts userDocLoc package packages =
 --------------------------------------------------------------------------------
 -- Paths
 
-{- EKB FIXME: doc generation for stack-doc-server
+{- EKB TODO: doc generation for stack-doc-server
 -- | Returns true for paths whose last directory component begins with ".".
 isHiddenDir :: Path b Dir -> Bool
 isHiddenDir = isPrefixOf "." . toFilePath . dirname
