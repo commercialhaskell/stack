@@ -4,13 +4,17 @@ GIT_REV_COUNT := $(shell git rev-list HEAD --count)
 GIT_SHA := $(shell PAGER=cat git log --pretty=%h HEAD~1..HEAD|head -n1)
 UBUNTU_VERSION ?= 15.04
 
-default: deb
+default: docker
+
+docker:
+	@cp etc/docker/haskell-stack/Dockerfile Dockerfile
+	@docker build --tag=haskell-stack:7.8 $(DIR)
 
 target/ubuntu-$(UBUNTU_VERSION):
 	@mkdir -p target/ubuntu-$(UBUNTU_VERSION)
 
 target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)_amd64.deb: | target/ubuntu-$(UBUNTU_VERSION)
-	@cp etc/Dockerfile Dockerfile
+	@cp etc/docker/ubuntu-packages/Dockerfile Dockerfile
 	@perl -p -i -e "s/<<UBUNTU_VERSION>>/$(UBUNTU_VERSION)/g" Dockerfile
 	@perl -p -i -e "s/<<PKG_VERSION>>/$(PKG_VERSION)/g" Dockerfile
 	@perl -p -i -e "s/<<GIT_REV_COUNT>>/$(GIT_REV_COUNT)/g" Dockerfile
@@ -23,4 +27,4 @@ deb: | target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(G
 clean:
 	@rm -rf Dockerfile target
 
-.PHONY: clean deb default
+.PHONY: clean deb docker default
