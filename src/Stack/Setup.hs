@@ -15,22 +15,23 @@ module Stack.Setup
   ) where
 
 import Control.Exception (Exception)
-import Control.Exception.Enclosed (handleIO)
+import Data.Maybe (mapMaybe, catMaybes)
 import Control.Monad (liftM, when)
 import Control.Monad.Catch (MonadThrow, throwM, MonadMask)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Reader (MonadReader, ReaderT (..))
+import Control.Monad.Reader (MonadReader, ReaderT (..), asks)
 import Data.Conduit (($$))
 import qualified Data.Conduit.List as CL
 import Control.Applicative ((<$>), (<*>))
 import Data.Aeson
 import Data.IORef
-import qualified Data.List as List
 import Data.Monoid
 import qualified Data.Yaml as Yaml
 import Data.Text (Text)
 import Data.Typeable (Typeable)
 import Network.HTTP.Client.Conduit
+import Path
+import Path.IO
 import System.Directory
 import System.Exit (ExitCode (ExitSuccess))
 import System.FilePath (searchPathSeparator)
@@ -40,51 +41,16 @@ import Stack.Types
 import Distribution.System (OS (..), Arch (..), Platform (..))
 import Stack.Build.Types
 import qualified Data.ByteString.Char8 as S8
-import Path (Path, Abs, Dir, parseRelDir, parseAbsDir, parseRelFile, mkRelFile, File)
-import qualified Path
 import Control.Monad.Logger
 import qualified Data.Text as T
 import Data.List (intercalate)
-import Path (toFilePath)
 import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified Data.Set as Set
 import Data.Set (Set)
 import System.Process.Read
 import qualified System.FilePath as FP
-import Data.Maybe (catMaybes, listToMaybe)
-import Data.List (sortBy)
-import Data.Ord (comparing)
 import Network.HTTP.Download (download)
-
-data DownloadPair = DownloadPair Version Text
-instance FromJSON DownloadPair where
-    parseJSON = withObject "DownloadPair" $ \o -> DownloadPair
-        <$> o .: "version"
-        <*> o .: "url"
-
-data SetupInfo = SetupInfo
-    { siSevenzExe :: Text
-    , siSevenzDll :: Text
-    , siPortableGit :: DownloadPair
-    , siGHCs :: Map Text (Map MajorVersion DownloadPair)
-    }
-instance FromJSON SetupInfo where
-    parseJSON = withObject "SetupInfo" $ \o -> SetupInfo
-        <$> o .: "sevenzexe"
-        <*> o .: "sevenzdll"
-        <*> o .: "portable-git"
-        <*> o .: "ghc"
-
--- | Download the most recent SetupInfo
-getSetupInfo :: (MonadIO m, MonadThrow m) => Manager -> m SetupInfo
-getSetupInfo manager = do
-    bss <- liftIO $ flip runReaderT manager
-         $ withResponse req $ \res -> responseBody res $$ CL.consume
-    let bs = S8.concat bss
-    either throwM return $ Yaml.decodeEither' bs
-  where
-    req = "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/stack-setup.yaml"
 
 data SetupOpts = SetupOpts
     { soptsInstallIfMissing :: !Bool
@@ -94,59 +60,39 @@ data SetupOpts = SetupOpts
     -- ^ If we got the desired GHC version from that file
     , soptsForceReinstall :: !Bool
     }
-
--- | Ensure GHC is installed and provide the PATHs to add if necessary
-ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m)
-          => Manager
-          -> Config
-          -> SetupOpts
-          -> m (Maybe [FilePath])
-ensureGHC manager config sopts = do
-    -- Check the available GHCs
-    menv0 <- runReaderT getMinimalEnvOverride config
-
-    minstalled <-
-        if soptsUseSystem sopts
-            then getInstalledGHC menv0
-            else return Nothing
-    let needLocal = case minstalled of
-            Nothing -> True
-            Just installed ->
-                -- we allow a newer version of GHC within the same major series
-                getMajorVersion installed /= getMajorVersion expected ||
-                expected > installed
-
-    -- If we need to install a GHC, try to do so
-    if needLocal
-        then do
-            $logDebug "Looking for a local copy of GHC"
-            mghcBin <-
-                if soptsForceReinstall sopts
-                    then return Nothing
-                    else getLocalGHC config sopts
-            case mghcBin of
-                Just ghcBin -> do
-                    $logDebug $ "Local copy found at: " <> T.intercalate ", " (map T.pack ghcBin)
-                    return $ Just ghcBin
-                Nothing
-                    | soptsInstallIfMissing sopts -> do
-                        $logDebug $ "None found, installing: " <> versionText expected
-                        ghcBin <- installLocalGHC manager config expected
-                        return $ Just ghcBin
-                    | otherwise ->
-                        throwM $ GHCVersionMismatch minstalled (soptsExpected sopts) (soptsStackYaml sopts)
-        else return Nothing
-  where
-    expected = soptsExpected sopts
+    deriving Show
+data SetupException = UnsupportedSetupCombo OS Arch
+                    | MissingDependencies [String]
+                    | UnknownGHCVersion Version (Set MajorVersion)
+                    | UnknownOSKey Text
+    deriving Typeable
+instance Exception SetupException
+instance Show SetupException where
+    show (UnsupportedSetupCombo os arch) = concat
+        [ "I don't know how to install GHC for "
+        , show (os, arch)
+        , ", please install manually"
+        ]
+    show (MissingDependencies tools) =
+        "The following executables are missing and must be installed:" ++
+        intercalate ", " tools
+    show (UnknownGHCVersion version known) = concat
+        [ "No information found for GHC version "
+        , versionString version
+        , ". Known GHC major versions: "
+        , intercalate ", " (map show $ Set.toList known)
+        ]
+    show (UnknownOSKey oskey) =
+        "Unable to find installation URLs for OS key: " ++
+        T.unpack oskey
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
-setupEnv :: (MonadIO m, MonadMask m, MonadLogger m)
+setupEnv :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasBuildConfig env, HasHttpManager env)
          => Bool -- ^ allow system GHC
          -> Bool -- ^ install if missing?
-         -> Manager
-         -> BuildConfig
          -> m BuildConfig
-setupEnv useSystem installIfMissing manager bconfig = do
+setupEnv useSystem installIfMissing = do
+    bconfig <- asks getBuildConfig
     let platform = getPlatform bconfig
         sopts = SetupOpts
             { soptsInstallIfMissing = installIfMissing
@@ -155,8 +101,8 @@ setupEnv useSystem installIfMissing manager bconfig = do
             , soptsStackYaml = Just $ bcStackYaml bconfig
             , soptsForceReinstall = False
             }
-    mghcBin <- ensureGHC manager (getConfig bconfig) sopts
-    menv0 <- runReaderT getMinimalEnvOverride bconfig
+    mghcBin <- ensureGHC sopts
+    menv0 <- getMinimalEnvOverride
 
     -- Modify the initial environment to include the GHC path, if a local GHC
     -- is being used
@@ -224,9 +170,64 @@ setupEnv useSystem installIfMissing manager bconfig = do
     mkPath dirs mpath = T.pack $ intercalate [searchPathSeparator]
         (map toFilePath dirs ++ maybe [] (return . T.unpack) mpath)
 
--- | Get the major version of the installed GHC, if available
-getInstalledGHC :: (MonadIO m) => EnvOverride -> m (Maybe Version)
-getInstalledGHC menv = do
+-- | Ensure GHC is installed and provide the PATHs to add if necessary
+ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env)
+          => SetupOpts
+          -> m (Maybe [FilePath])
+ensureGHC sopts = do
+    -- Check the available GHCs
+    menv0 <- getMinimalEnvOverride
+
+    msystem <-
+        if soptsUseSystem sopts
+            then getSystemGHC menv0
+            else return Nothing
+
+    let needLocal = case msystem of
+            Nothing -> True
+            Just system ->
+                -- we allow a newer version of GHC within the same major series
+                getMajorVersion system /= getMajorVersion expected ||
+                expected > system
+
+    -- If we need to install a GHC, try to do so
+    if needLocal
+        then do
+            config <- asks getConfig
+            let tools =
+                    case configPlatform config of
+                        Platform _ Windows ->
+                            [ ($(mkPackageName "ghc"), Just expected)
+                            , ($(mkPackageName "git"), Nothing)
+                            ]
+                        _ ->
+                            [ ($(mkPackageName "ghc"), Just expected)
+                            ]
+
+            -- Avoid having to load it twice
+            siRef <- liftIO $ newIORef Nothing
+            manager <- asks getHttpManager
+            let getSetupInfo' = liftIO $ do
+                    msi <- readIORef siRef
+                    case msi of
+                        Just si -> return si
+                        Nothing -> do
+                            si <- getSetupInfo manager
+                            writeIORef siRef $ Just si
+                            return si
+
+            installed <- runReaderT listInstalled config
+            idents <- mapM (ensureTool sopts installed getSetupInfo' msystem) tools
+            paths <- runReaderT (mapM binDirs $ catMaybes idents) config
+            -- TODO: strip the trailing slash for prettier PATH output
+            return $ Just $ map toFilePath $ concat paths
+        else return Nothing
+  where
+    expected = soptsExpected sopts
+
+-- | Get the major version of the system GHC, if available
+getSystemGHC :: (MonadIO m) => EnvOverride -> m (Maybe Version)
+getSystemGHC menv = do
     exists <- doesExecutableExist menv "ghc"
     if exists
         then do
@@ -239,274 +240,332 @@ getInstalledGHC menv = do
     isValidChar '.' = True
     isValidChar c = '0' <= c && c <= '9'
 
--- | Get the bin directory for a local copy of GHC meeting the given version
--- requirement, if it exists
-getLocalGHC :: (HasConfig config, MonadIO m, MonadLogger m, MonadThrow m)
-            => config
-            -> SetupOpts
-            -> m (Maybe [FilePath])
-getLocalGHC config' sopts = do
-    let dir = toFilePath $ configLocalGHCs $ getConfig config'
-    contents <- liftIO $ handleIO (const $ return []) (getDirectoryContents dir)
-    pairs <- liftIO $ fmap catMaybes $ mapM (toMaybePair dir) contents
-    case listToMaybe $ reverse $ map snd $ sortBy (comparing fst) pairs of
-        Nothing -> return Nothing
-        Just (ghcDir, ghcBin) ->
-            case configPlatform $ getConfig config' of
-                Platform _ Windows -> do
-                    gitDirs' <- getGitDirs Nothing dir contents
-                    return $ Just
-                        $ ghcBin
-                        : (ghcDir FP.</> "mingw" FP.</> "bin")
-                        : gitDirs'
-                _ -> return $ Just [ghcBin]
+data DownloadPair = DownloadPair Version Text
+    deriving Show
+instance FromJSON DownloadPair where
+    parseJSON = withObject "DownloadPair" $ \o -> DownloadPair
+        <$> o .: "version"
+        <*> o .: "url"
+
+data SetupInfo = SetupInfo
+    { siSevenzExe :: Text
+    , siSevenzDll :: Text
+    , siPortableGit :: DownloadPair
+    , siGHCs :: Map Text (Map MajorVersion DownloadPair)
+    }
+    deriving Show
+instance FromJSON SetupInfo where
+    parseJSON = withObject "SetupInfo" $ \o -> SetupInfo
+        <$> o .: "sevenzexe"
+        <*> o .: "sevenzdll"
+        <*> o .: "portable-git"
+        <*> o .: "ghc"
+
+-- | Download the most recent SetupInfo
+getSetupInfo :: (MonadIO m, MonadThrow m) => Manager -> m SetupInfo
+getSetupInfo manager = do
+    bss <- liftIO $ flip runReaderT manager
+         $ withResponse req $ \res -> responseBody res $$ CL.consume
+    let bs = S8.concat bss
+    either throwM return $ Yaml.decodeEither' bs
   where
-    expected = soptsExpected sopts
-    expectedMajor = getMajorVersion expected
-    toMaybePair root name
-        | Just noGhc <- List.stripPrefix "ghc-" name
-        , Just version <- parseVersionFromString noGhc
-        , getMajorVersion version == expectedMajor
-        , version >= expected = do
-            let dir = root FP.</> name
-                bin = dir FP.</> "bin"
-                ghc = bin FP.</> "ghc" ++ exeSuffix
-            exists <- doesFileExist ghc
-            return $ if exists
-                then Just (version, (dir, bin))
-                else Nothing
-        | otherwise = return Nothing
+    req = "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/stack-setup.yaml"
 
-    exeSuffix =
-        case configPlatform $ getConfig config' of
-            Platform _ Windows -> ".exe"
-            _ -> ""
+markInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
+              => PackageIdentifier -- ^ e.g., ghc-7.8.4, git-2.4.0.1
+              -> m ()
+markInstalled ident = do
+    dir <- asks $ configLocalPrograms . getConfig
+    fpRel <- parseRelFile $ packageIdentifierString ident ++ ".installed"
+    liftIO $ writeFile (toFilePath $ dir </> fpRel) "installed"
 
--- | Get the installation directories for Git on Windows
-getGitDirs :: (MonadIO m, MonadLogger m, MonadThrow m)
-           => Maybe (SetupInfo, Manager) -- ^ Just if we want to setup
-           -> FilePath -- ^ root installation directory
-           -> [FilePath] -- ^ contents of that directory
-           -> m [FilePath] -- ^ extra directories for the PATH
-getGitDirs mSetup root contents = do
-    pairs <- liftM catMaybes $ mapM toMaybePair contents
-    case listToMaybe $ reverse $ map snd $ sortBy (comparing fst) pairs of
-        Just dirs -> return dirs
-        Nothing -> case mSetup of
-            Just (si, manager) -> setupGit si manager root
-            Nothing -> do
-                $logWarn "Using local GHC installation, but no local Git available"
-                return []
+unmarkInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
+                => PackageIdentifier
+                -> m ()
+unmarkInstalled ident = do
+    dir <- asks $ configLocalPrograms . getConfig
+    fpRel <- parseRelFile $ packageIdentifierString ident ++ ".installed"
+    removeFileIfExists $ dir </> fpRel
+
+listInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
+              => m [PackageIdentifier]
+listInstalled = do
+    dir <- asks $ configLocalPrograms . getConfig
+    liftIO $ createDirectoryIfMissing True $ toFilePath dir
+    (_, files) <- listDirectory dir
+    return $ mapMaybe toIdent files
   where
-    toMaybePair name
-        | Just noGit <- List.stripPrefix "git-" name
-        , Just version <- parseVersionFromString noGit = do
-            let dir = root FP.</> name
-                dirs = gitDirs dir
-            exists <- liftIO $ doesDirectoryExist $ head dirs
-            return $ if exists
-                then Just (version, gitDirs dir)
-                else Nothing
-        | otherwise = return Nothing
+    toIdent fp = do
+        x <- T.stripSuffix ".installed" $ T.pack $ toFilePath $ filename fp
+        parsePackageIdentifierFromString $ T.unpack x
 
--- | Install a local copy of GHC in the given major version with at least the
--- given version. In other words, if 7.8.3 is specified, 7.8.4 may be selected.
--- Return the bin directory.
-installLocalGHC :: (MonadIO m, MonadLogger m, HasConfig env, MonadThrow m, MonadMask m)
-                => Manager -> env -> Version -> m [FilePath]
-installLocalGHC manager config' version = do
-    rel <- parseRelDir $ "ghc-" <> versionString version
-    let dest = configLocalGHCs (getConfig config') Path.</> rel
-    si <- getSetupInfo manager
-    $logDebug $ "Attempting to install GHC " <> versionText version <>
-                " to " <> T.pack (toFilePath dest)
-    let posix' oskey = posix si oskey manager version dest
-        windows' = windows si manager version dest (configLocalGHCs $ getConfig config')
-    flip runReaderT config' $ case configPlatform $ getConfig config' of
-        Platform I386 Linux -> posix' "linux32"
-        Platform X86_64 Linux -> posix' "linux64"
-        Platform I386 OSX -> posix' "macosx"
-        Platform X86_64 OSX -> posix' "macosx"
-        Platform I386 FreeBSD -> posix' "freebsd32"
-        Platform X86_64 FreeBSD -> posix' "freebsd64"
-        Platform I386 Windows -> windows'
-        Platform X86_64 Windows -> windows'
+installDir :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
+           => PackageIdentifier
+           -> m (Path Abs Dir)
+installDir ident = do
+    config <- asks getConfig
+    reldir <- parseRelDir $ packageIdentifierString ident
+    return $ configLocalPrograms config </> reldir
+
+-- | Binary directories for the given installed package
+binDirs :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
+        => PackageIdentifier
+        -> m [Path Abs Dir]
+binDirs ident = do
+    config <- asks getConfig
+    dir <- installDir ident
+    case (configPlatform config, packageNameString $ packageIdentifierName ident) of
+        (Platform _ Windows, "ghc") -> return
+            [ dir </> $(mkRelDir "bin")
+            , dir </> $(mkRelDir "mingw") </> $(mkRelDir "bin")
+            ]
+        (Platform _ Windows, "git") -> return
+            [ dir </> $(mkRelDir "cmd")
+            , dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
+            ]
+        (_, "ghc") -> return
+            [ dir </> $(mkRelDir "bin")
+            ]
+        (Platform _ x, tool) -> do
+            $logWarn $ "binDirs: unexpected OS/tool combo: " <> T.pack (show (x, tool))
+            return []
+
+ensureTool :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env)
+           => SetupOpts
+           -> [PackageIdentifier] -- ^ already installed
+           -> m SetupInfo
+           -> Maybe Version -- ^ installed GHC
+           -> (PackageName, Maybe Version)
+           -> m (Maybe PackageIdentifier)
+ensureTool sopts installed getSetupInfo' msystem (name, mversion)
+    | not $ null available = return $ Just $ PackageIdentifier name $ maximum available
+    | not $ soptsInstallIfMissing sopts =
+        if name == $(mkPackageName "ghc")
+            then throwM $ GHCVersionMismatch msystem (soptsExpected sopts) (soptsStackYaml sopts)
+            else do
+                $logWarn $ "Continuing despite missing tool: " <> T.pack (packageNameString name)
+                return Nothing
+    | otherwise = do
+        si <- getSetupInfo'
+        (pair@(DownloadPair version _), installer) <-
+            case packageNameString name of
+                "git" -> do
+                    let pair = siPortableGit si
+                    return (pair, installGitWindows)
+                "ghc" -> do
+                    osKey <- getOSKey
+                    pairs <-
+                        case Map.lookup osKey $ siGHCs si of
+                            Nothing -> throwM $ UnknownOSKey osKey
+                            Just pairs -> return pairs
+                    version <-
+                        case mversion of
+                            Nothing -> error "invariant violated: ghc must have a version"
+                            Just version -> return version
+                    pair <-
+                        case Map.lookup (getMajorVersion version) pairs of
+                            Nothing -> throwM $ UnknownGHCVersion version (Map.keysSet pairs)
+                            Just pair -> return pair
+                    platform <- asks $ configPlatform . getConfig
+                    let installer =
+                            case platform of
+                                Platform _ Windows -> installGHCWindows
+                                _ -> installGHCPosix
+                    return (pair, installer)
+                x -> error $ "Invariant violated: ensureTool on " ++ x
+        let ident = PackageIdentifier name version
+
+        (file, at) <- downloadPair pair ident
+        dir <- installDir ident
+        unmarkInstalled ident
+        installer si file at dir ident
+
+        markInstalled ident
+        return $ Just ident
+  where
+    available
+        | soptsForceReinstall sopts = []
+        | otherwise = filter goodVersion
+                    $ map packageIdentifierVersion
+                    $ filter (\pi' -> packageIdentifierName pi' == name) installed
+
+    goodVersion =
+        case mversion of
+            Nothing -> const True
+            Just expected -> \actual ->
+                getMajorVersion expected == getMajorVersion actual &&
+                actual >= expected
+
+getOSKey :: (MonadReader env m, MonadThrow m, HasConfig env) => m Text
+getOSKey = do
+    platform <- asks $ configPlatform . getConfig
+    case platform of
+        Platform I386 Linux -> return "linux32"
+        Platform X86_64 Linux -> return "linux64"
+        Platform I386 OSX -> return "macosx"
+        Platform X86_64 OSX -> return "macosx"
+        Platform I386 FreeBSD -> return "freebsd32"
+        Platform X86_64 FreeBSD -> return "freebsd64"
+        Platform I386 Windows -> return "windows32"
+        -- Note: we always use 32-bit Windows as the 64-bit version has problems
+        Platform X86_64 Windows -> return "windows32"
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
-data SetupException = UnsupportedSetupCombo OS Arch
-                    | MissingDependencies [String]
-                    | UnknownGHCVersion Version (Set MajorVersion)
-                    | UnknownOSKey Text
-    deriving Typeable
-instance Exception SetupException
-instance Show SetupException where
-    show (UnsupportedSetupCombo os arch) = concat
-        [ "I don't know how to install GHC for "
-        , show (os, arch)
-        , ", please install manually"
-        ]
-    show (MissingDependencies tools) =
-        "The following executables are missing and must be installed:" ++
-        intercalate ", " tools
-    show (UnknownGHCVersion version known) = concat
-        [ "No information found for GHC version "
-        , versionString version
-        , ". Known GHC major versions: "
-        , intercalate ", " (map show $ Set.toList known)
-        ]
-    show (UnknownOSKey oskey) =
-        "Unable to find installation URLs for OS key: " ++
-        T.unpack oskey
+downloadPair :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env)
+             => DownloadPair
+             -> PackageIdentifier
+             -> m (Path Abs File, ArchiveType)
+downloadPair (DownloadPair _ url) ident = do
+    config <- asks getConfig
+    at <-
+        case extension of
+            ".tar.xz" -> return TarXz
+            ".tar.bz2" -> return TarBz2
+            ".7z.exe" -> return SevenZ
+            _ -> error $ "Unknown extension: " ++ extension
+    relfile <- parseRelFile $ packageIdentifierString ident ++ extension
+    let path = configLocalPrograms config </> relfile
+    chattyDownload url path
+    return (path, at)
+  where
+    extension =
+        loop $ T.unpack url
+      where
+        loop fp
+            | ext `elem` [".tar", ".bz2", ".xz", ".exe", ".7z"] = loop fp' ++ ext
+            | otherwise = ""
+          where
+            (fp', ext) = FP.splitExtension fp
 
--- | Get the DownloadPair for the given OS and GHC version
-getGHCPair :: MonadThrow m
-           => SetupInfo
-           -> Text -- ^ OS key
-           -> Version -- ^ GHC version
-           -> m DownloadPair
-getGHCPair si osKey version =
-    case Map.lookup osKey $ siGHCs si of
-        Nothing -> throwM $ UnknownOSKey osKey
-        Just m ->
-            case Map.lookup (getMajorVersion version) m of
-                Nothing -> throwM $ UnknownGHCVersion version (Map.keysSet m)
-                Just pair -> return pair
+data ArchiveType
+    = TarBz2
+    | TarXz
+    | SevenZ
 
--- | Install GHC for 64-bit Linux
-posix :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, MonadMask m)
-      => SetupInfo
-      -> Text -- ^ OS key
-      -> Manager
-      -> Version
-      -> Path Abs Dir
-      -> m [FilePath]
-posix si osKey manager reqVersion dest = do
+installGHCPosix :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env)
+                => SetupInfo
+                -> Path Abs File
+                -> ArchiveType
+                -> Path Abs Dir
+                -> PackageIdentifier
+                -> m ()
+installGHCPosix _ archiveFile archiveType destDir ident = do
     menv <- getMinimalEnvOverride
-    DownloadPair version url <- getGHCPair si osKey reqVersion
-    let ghcExtension = FP.takeExtension (T.unpack url)
-        zipTool = case ghcExtension of
-                    ".xz"  -> ["xz"]
-                    ".bz2" -> ["bzip2"]
-                    _      -> []
-    checkDependencies (concat [["make", "tar"], zipTool])
-    let dirPiece = "ghc-" <> versionString version
-    req <- parseUrl $ T.unpack url
+    zipTool <-
+        case archiveType of
+            TarXz -> return "xz"
+            TarBz2 -> return "bzip2"
+            SevenZ -> error "Don't know how to deal with .7z files on non-Windows"
+    checkDependencies $ zipTool : ["make", "tar"]
+
     withSystemTempDirectory "stack-setup" $ \root' -> do
         root <- parseAbsDir root'
-        ghcFilename <- parseRelFile ("ghc.tar" ++ ghcExtension)
-        let file = root Path.</> ghcFilename
-        dir <- liftM (root Path.</>) $ parseRelDir dirPiece
-        $logInfo $ "Downloading from: " <> url
-        _ <- runReaderT (download req file) manager
-        $logInfo "Unpacking"
-        runIn root "tar" menv ["xf", toFilePath file] Nothing
+        dir <- liftM (root Path.</>) $ parseRelDir $ packageIdentifierString ident
+
+        $logInfo $ "Unpacking " <> T.pack (toFilePath archiveFile)
+        runIn root "tar" menv ["xf", toFilePath archiveFile] Nothing
+
         $logInfo "Configuring"
         runIn dir (toFilePath $ dir Path.</> $(mkRelFile "configure"))
-              menv ["--prefix=" ++ toFilePath dest] Nothing
+              menv ["--prefix=" ++ toFilePath destDir] Nothing
+
         $logInfo "Installing"
         runIn dir "make" menv ["install"] Nothing
-        $logInfo "GHC installed!"
-    return [toFilePath dest FP.</> "bin"]
+
+        $logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
+  where
+    -- | Check if given processes appear to be present, throwing an exception if
+    -- missing.
+    checkDependencies :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env)
+                      => [String] -> m ()
+    checkDependencies tools = do
+        menv <- getMinimalEnvOverride
+        missing <- liftM catMaybes $ mapM (check menv) tools
+        if null missing
+            then return ()
+            else throwM $ MissingDependencies missing
+      where
+        check menv tool = do
+            exists <- doesExecutableExist menv tool
+            return $ if exists then Nothing else Just tool
+
+installGHCWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env)
+                  => SetupInfo
+                  -> Path Abs File
+                  -> ArchiveType
+                  -> Path Abs Dir
+                  -> PackageIdentifier
+                  -> m ()
+installGHCWindows si archiveFile archiveType destDir _ = do
+    case archiveType of
+        TarXz -> return ()
+        _ -> error $ "GHC on Windows must be a .tar.xz file"
+    tarFile <-
+        case T.stripSuffix ".xz" $ T.pack $ toFilePath archiveFile of
+            Nothing -> error $ "Invalid GHC filename: " ++ show archiveFile
+            Just x -> parseAbsFile $ T.unpack x
+
+    config <- asks getConfig
+    run7z <- setup7z si config
+
+    run7z (parent archiveFile) archiveFile
+    run7z (parent archiveFile) tarFile
+
+    $logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
+
+installGitWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env)
+                  => SetupInfo
+                  -> Path Abs File
+                  -> ArchiveType
+                  -> Path Abs Dir
+                  -> PackageIdentifier
+                  -> m ()
+installGitWindows si archiveFile archiveType destDir _ = do
+    case archiveType of
+        SevenZ -> return ()
+        _ -> error $ "Git on Windows must be a 7z archive"
+
+    config <- asks getConfig
+    run7z <- setup7z si config
+    run7z destDir archiveFile
 
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
 -- Returned function takes an unpack directory and archive.
-setup7z :: (MonadReader env m, HasHttpManager env, MonadThrow m, MonadIO m, MonadIO n)
+setup7z :: (MonadReader env m, HasHttpManager env, MonadThrow m, MonadIO m, MonadIO n, MonadLogger m)
         => SetupInfo
-        -> FilePath -- ^ install root (Programs\)
-        -> m (FilePath -> FilePath -> n ())
-setup7z si root = do
-    go (siSevenzDll si) dll
-    go (siSevenzExe si) exe
+        -> Config
+        -> m (Path Abs Dir -> Path Abs File -> n ())
+setup7z si config = do
+    chattyDownload (siSevenzDll si) dll
+    chattyDownload (siSevenzExe si) exe
     return $ \outdir archive -> liftIO $ do
-        ec <- rawSystem exe
+        ec <- rawSystem (toFilePath exe)
             [ "x"
-            , "-o" ++ outdir
+            , "-o" ++ toFilePath outdir
             , "-y"
-            , archive
+            , toFilePath archive
             ]
         when (ec /= ExitSuccess)
-            $ error $ "Problem while decompressing " ++ archive
+            $ error $ "Problem while decompressing " ++ toFilePath archive
   where
-    dir = root FP.</> "7z"
+    dir = configLocalPrograms config </> $(mkRelDir "7z")
+    exe = dir </> $(mkRelFile "7z.exe")
+    dll = dir </> $(mkRelFile "7z.dll")
 
-    go url fp = do
-        path <- Path.parseAbsFile fp
-        req <- parseUrl $ T.unpack url
-        _ <- download req path
-        return ()
-
-    exe = dir FP.</> "7z.exe"
-    dll = dir FP.</> "7z.dll"
-
--- | Install PortableGit and get a list of directories to add to PATH
-setupGit :: (MonadLogger m, MonadThrow m, MonadIO m)
-         => SetupInfo
-         -> Manager
-         -> FilePath -- ^ root to install into (Programs\)
-         -> m [FilePath]
-setupGit si manager root = do
-    $logInfo "Downloading PortableGit"
-    run7z <- runReaderT (setup7z si root) manager
+chattyDownload :: (MonadReader env m, HasHttpManager env, MonadIO m, MonadLogger m, MonadThrow m)
+               => Text -- ^ URL
+               -> Path Abs File -- ^ destination
+               -> m ()
+chattyDownload url path = do
     req <- parseUrl $ T.unpack url
-    dest <- Path.parseAbsFile $ dir FP.<.> "7z"
-    _ <- runReaderT (download req dest) manager
-    liftIO $ createDirectoryIfMissing True dir
-    run7z dir $ toFilePath dest
-    return $ gitDirs dir
-  where
-    dir = root FP.</> name
-    DownloadPair gitVersion url = siPortableGit si
-    name = "git-" <> versionString gitVersion
-
--- | Windows: Turn a base Git installation directory into a list of bin paths.
-gitDirs :: FilePath -> [FilePath]
-gitDirs dir =
-    [ dir FP.</> "cmd"
-    , dir FP.</> "usr" FP.</> "bin"
-    ]
-
--- | Perform necessary installation for Windows
-windows :: (MonadLogger m, MonadThrow m, MonadIO m)
-        => SetupInfo
-        -> Manager
-        -> Version
-        -> Path Abs Dir -- ^ GHC install root (Programs\ghc-X.Y.Z)
-        -> Path Abs Dir -- ^ installation root (Programs\)
-        -> m [FilePath]
-windows si manager reqVersion dest progDir = do
-    let root = toFilePath progDir
-    contents <- liftIO $ handleIO (const $ return []) (getDirectoryContents root)
-    gitDirs' <- getGitDirs (Just (si, manager)) root contents
-    -- Note: we always use 32-bit Windows as the 64-bit version has problems
-    DownloadPair version url <- getGHCPair si "windows32" reqVersion
-    let dirPiece = "ghc-" <> versionString version
-    req <- parseUrl $ T.unpack url
-    piece <- Path.parseRelFile $ dirPiece ++ ".tar.xz"
-    let destXZ = progDir Path.</> piece
-    $logInfo $ "Downloading GHC from: " <> url
-    _ <- runReaderT (download req destXZ) manager
-    run7z <- runReaderT (setup7z si root) manager
-    run7z (toFilePath progDir) (toFilePath destXZ)
-    run7z (toFilePath progDir)
-          (toFilePath progDir FP.</> dirPiece FP.<.> "tar")
-    return $
-        [ toFilePath $ dest Path.</> $(Path.mkRelDir "bin")
-        , toFilePath $ dest Path.</> $(Path.mkRelDir "mingw")
-                            Path.</> $(Path.mkRelDir "bin")
-        ] ++ gitDirs'
-
--- | Check if given processes appear to be present, throwing an exception if
--- missing.
-checkDependencies :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env)
-                  => [String] -> m ()
-checkDependencies tools = do
-    menv <- getMinimalEnvOverride
-    missing <- liftM catMaybes $ mapM (check menv) tools
-    if null missing
-        then return ()
-        else throwM $ MissingDependencies missing
-  where
-    check menv tool = do
-        exists <- doesExecutableExist menv tool
-        return $ if exists then Nothing else Just tool
+    $logInfo $ T.concat
+        [ "Downloading from "
+        , url
+        , " to "
+        , T.pack $ toFilePath path
+        ]
+    x <- download req path -- TODO add progress indicator
+    if x
+        then $logInfo "Download complete"
+        else $logInfo "File already downloaded"
