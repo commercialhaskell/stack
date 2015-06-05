@@ -1329,7 +1329,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
     runTests package mlogFile = do
         bconfig <- asks getBuildConfig
         let pkgRoot = packageDir package
-        distRelativeDir' <- liftIO $ distRelativeDir eeCabalPkgVer
+        distRelativeDir' <- distRelativeDir eeCabalPkgVer
         let buildDir = pkgRoot </> distRelativeDir'
         let exeExtension =
                 case configPlatform $ getConfig bconfig of
@@ -1619,7 +1619,6 @@ haddockInterfaceOpts userDocLoc package packages =
      --(e.g. redis-fp doesn't include @text@ in its dependencies which means the 'Text'
      --datatype isn't linked in its haddocks)
      fmap concat (mapM toInterfaceOpt (S.toList (packageAllDeps package)))
-
 
 --------------------------------------------------------------------------------
 -- Paths
