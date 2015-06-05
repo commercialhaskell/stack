@@ -256,8 +256,7 @@ loadLocals bopts = do
             PackageConfig
                 { packageConfigEnableTests = wanted && boptsFinalAction bopts == DoTests
                 , packageConfigEnableBenchmarks = wanted && boptsFinalAction bopts == DoBenchmarks
-                , packageConfigFlags =
-                    fromMaybe M.empty $ M.lookup name $ bcFlags bconfig
+                , packageConfigFlags = localFlags bopts bconfig name
                 , packageConfigGhcVersion = bcGhcVersion bconfig
                 , packageConfigPlatform = configPlatform $ getConfig bconfig
                 }
@@ -841,7 +840,7 @@ build bopts = do
             }
 
     locals <- loadLocals bopts
-    extraDeps <- loadExtraDeps menv cabalPkgVer
+    extraDeps <- loadExtraDeps menv bopts cabalPkgVer
 
     let sourceMap1 = Map.unions
             [ Map.fromList $ flip map locals $ \lp ->
@@ -901,9 +900,10 @@ build bopts = do
 
 loadExtraDeps :: M env m
               => EnvOverride
+              -> BuildOpts
               -> PackageIdentifier -- ^ Cabal version
               -> m [Package]
-loadExtraDeps menv cabalPkgVer = do
+loadExtraDeps menv bopts cabalPkgVer = do
     bconfig <- asks getBuildConfig
     unpackDir <- configLocalUnpackDir
     dist <- distRelativeDir cabalPkgVer
@@ -914,12 +914,18 @@ loadExtraDeps menv cabalPkgVer = do
         $ bcExtraDeps bconfig
     forM (Map.toList paths) $ \(ident, dir) -> do
         let name = packageIdentifierName ident
-            flags = fromMaybe M.empty (M.lookup name $ bcFlags bconfig)
+            flags = localFlags bopts bconfig name
             pc = depPackageConfig bconfig flags
         package <- readPackageDir pc dir
         when (name /= packageName package)
             $ throwM $ UnpackedPackageHasWrongName ident (packageName package)
         return package
+
+-- | All flags for a local package
+localFlags :: BuildOpts -> BuildConfig -> PackageName -> Map FlagName Bool
+localFlags bopts bconfig name = M.union
+    (fromMaybe M.empty $ M.lookup name $ boptsFlags bopts)
+    (fromMaybe M.empty $ M.lookup name $ bcFlags bconfig)
 
 -- | Package config to be used for dependencies
 depPackageConfig :: BuildConfig -> Map FlagName Bool -> PackageConfig
