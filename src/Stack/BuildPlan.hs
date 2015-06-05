@@ -432,7 +432,7 @@ loadBuildPlan name = do
             liftIO $ createDirectoryIfMissing True $ takeDirectory $ toFilePath fp
             req <- parseUrl $ T.unpack url
             $logInfo $ "Downloading build plan from: " <> url
-            download req fp
+            _ <- download req fp
             liftIO (decodeFileEither $ toFilePath fp) >>= either throwM return
   where
     file = renderSnapName name <> ".yaml"

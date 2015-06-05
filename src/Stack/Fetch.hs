@@ -28,17 +28,14 @@ import           Control.Concurrent.STM          (TVar, atomically, modifyTVar,
                                                   newTVarIO, readTVar,
                                                   readTVarIO, writeTVar)
 import           Control.Exception               (Exception, SomeException,
-                                                  throwIO, toException)
+                                                  toException)
 import           Control.Monad                   (liftM, when, join, unless)
-import           Control.Monad.Catch             (MonadCatch, MonadThrow, throwM, catch)
+import           Control.Monad.Catch             (MonadThrow, throwM, catch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.Reader      (runReaderT)
-import           Crypto.Hash                     (Context, Digest, SHA512(..),
-                                                  digestToHexByteString,
-                                                  hashFinalize, hashInit,
-                                                  hashUpdate)
+import           Crypto.Hash                     (SHA512(..))
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString                 as S
 import qualified Data.ByteString.Char8           as C8
@@ -57,11 +54,8 @@ import qualified Data.Text.IO                    as T
 import           Data.Text.Encoding              (decodeUtf8)
 import           Data.Typeable                   (Typeable)
 import           Data.Word                       (Word64)
-import           Network.HTTP.Client             (Manager, brRead,
-                                                  responseBody,
-                                                  withResponse)
+import           Network.HTTP.Client             (Manager)
 import           Network.HTTP.Download
-import           Network.HTTP.Download.Verified
 import           Stack.PackageIndex
 import           Stack.Types
 
@@ -69,11 +63,10 @@ import           Path
 import           System.Directory                (canonicalizePath,
                                                   createDirectoryIfMissing,
                                                   doesDirectoryExist,
-                                                  doesFileExist, renameFile,
                                                   renameDirectory)
-import           System.FilePath                 (takeDirectory, (<.>))
+import           System.FilePath                 ((<.>))
 import qualified System.FilePath                 as FP
-import           System.IO                       (IOMode (ReadMode, WriteMode),
+import           System.IO                       (IOMode (ReadMode),
                                                   SeekMode (AbsoluteSeek),
                                                   hSeek, withBinaryFile)
 import           System.Process.Read             (EnvOverride)
@@ -291,10 +284,6 @@ fetchPackages mdistDir toFetchAll = do
 
     liftIO $ readTVarIO outputVar
   where
-    unlessM p f = do
-        p' <- p
-        unless p' f
-
     go :: (MonadIO m,Functor m,MonadThrow m,MonadLogger m)
        => Manager
        -> TVar (Map PackageIdentifier (Path Abs Dir))

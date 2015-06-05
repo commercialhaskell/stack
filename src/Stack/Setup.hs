@@ -364,7 +364,7 @@ posix si osKey manager reqVersion dest = do
         let file = root Path.</> ghcFilename
         dir <- liftM (root Path.</>) $ parseRelDir dirPiece
         $logInfo $ "Downloading from: " <> url
-        runReaderT (download req file) manager
+        _ <- runReaderT (download req file) manager
         $logInfo "Unpacking"
         runIn root "tar" menv ["xf", toFilePath file] Nothing
         $logInfo "Configuring"
@@ -400,7 +400,8 @@ setup7z si root = do
     go url fp = do
         path <- Path.parseAbsFile fp
         req <- parseUrl $ T.unpack url
-        download req path
+        _ <- download req path
+        return ()
 
     exe = dir FP.</> "7z.exe"
     dll = dir FP.</> "7z.dll"
@@ -416,7 +417,7 @@ setupGit si manager root = do
     run7z <- runReaderT (setup7z si root) manager
     req <- parseUrl $ T.unpack url
     dest <- Path.parseAbsFile $ dir FP.<.> "7z"
-    runReaderT (download req dest) manager
+    _ <- runReaderT (download req dest) manager
     liftIO $ createDirectoryIfMissing True dir
     run7z dir $ toFilePath dest
     return $ gitDirs dir
@@ -451,7 +452,7 @@ windows si manager reqVersion dest progDir = do
     piece <- Path.parseRelFile $ dirPiece ++ ".tar.xz"
     let destXZ = progDir Path.</> piece
     $logInfo $ "Downloading GHC from: " <> url
-    runReaderT (download req destXZ) manager
+    _ <- runReaderT (download req destXZ) manager
     run7z <- runReaderT (setup7z si root) manager
     run7z (toFilePath progDir) (toFilePath destXZ)
     run7z (toFilePath progDir)

@@ -28,11 +28,8 @@ import           Data.Time.Clock
 import           GHC.Generics
 import           System.IO.Error
 
-import qualified Control.Applicative as A
 import           Control.Applicative ((<$>), (<*>))
-import           Control.Arrow ((&&&))
 import           Control.Concurrent (getNumCapabilities, forkIO)
-import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
@@ -43,22 +40,17 @@ import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.Catch (MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (asks, runReaderT)
+import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Trans.Unlift
 import           Control.Monad.State.Strict
 import           Control.Monad.Writer
-import           Data.Aeson
-import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
-import qualified Data.ByteString.Lazy as L
 import           Data.Conduit
-import           Data.Conduit.Binary (sinkHandle)
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Either
 import           Data.Function
-import           Data.IORef
 import           Data.List
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
@@ -69,15 +61,12 @@ import qualified Data.Set as S
 import qualified Data.Set as Set
 import qualified Data.Streaming.Process as Process
 import           Data.Streaming.Process hiding (env,callProcess)
-import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
 import           Data.Typeable (Typeable)
 import           Distribution.Package (Dependency (..))
 import           Distribution.System (Platform (Platform), OS (Windows))
 import           Distribution.Version (intersectVersionRanges, anyVersion)
-import           Network.HTTP.Conduit (Manager)
-import           Network.HTTP.Download
+import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.IO
 import           Prelude hiding (FilePath,writeFile)
@@ -90,7 +79,6 @@ import           Stack.Package
 import           Stack.PackageDump
 import           Stack.Types
 import           Stack.Types.Internal
-import           Stack.Types.StackT
 import           System.Directory hiding (findFiles, findExecutable)
 import           System.Exit (ExitCode (ExitSuccess))
 import           System.IO
@@ -356,10 +344,10 @@ tryGetCache :: (M env m,Binary a)
             => (PackageIdentifier -> Path Abs Dir -> m (Path Abs File))
             -> Path Abs Dir
             -> m (Maybe a)
-tryGetCache get dir = do
+tryGetCache get' dir = do
     menv <- getMinimalEnvOverride
     cabalPkgVer <- getCabalPkgVer menv
-    fp <- get cabalPkgVer dir
+    fp <- get' cabalPkgVer dir
     liftIO
         (catch
              (fmap (decodeMaybe . L.fromStrict) (S.readFile (toFilePath fp)))
@@ -408,10 +396,10 @@ writeCache :: (Binary a, M env m)
            -> (PackageIdentifier -> Path Abs Dir -> m (Path Abs File))
            -> a
            -> m ()
-writeCache dir get content = do
+writeCache dir get' content = do
     menv <- getMinimalEnvOverride
     cabalPkgVer <- getCabalPkgVer menv
-    fp <- get cabalPkgVer dir
+    fp <- get' cabalPkgVer dir
     liftIO
         (L.writeFile
              (toFilePath fp)
@@ -1358,19 +1346,6 @@ clean = do
                  mgr
                  logLevel)
                                   -}
-
--- | Remove the dist/ dir of a package.
-cleanPackage :: PackageIdentifier -- ^ Cabal version
-             -> Package
-             -> ConfigLock -- ^ Needed because this affects the config directory.
-             -> IO ()
-cleanPackage cabalPkgVer package _ = do
-    dist <- distRelativeDir cabalPkgVer
-    handleIO onErr $ removeDirectoryRecursive
-        (toFilePath
-             (packageDir package </> dist))
-  where
-    onErr e = putStrLn $ "FIXME Race condition https://github.com/fpco/stack/issues/155 triggered: " ++ show e
 
 -- | Get the version of Cabal from the global package database.
 getCabalPkgVer :: (MonadThrow m,MonadIO m,MonadLogger m)

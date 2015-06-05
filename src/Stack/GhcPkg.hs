@@ -358,13 +358,13 @@ unregisterGhcPkgId :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m)
                     -> m ()
 unregisterGhcPkgId menv pkgDb gid = do
     -- FIXME Currently just ignore exceptions...
-    eres <- ghcPkg menv [pkgDb] $ toArgs gid
+    eres <- ghcPkg menv [pkgDb] args
     case eres of
         Left e -> $logWarn $ T.pack $ show e
         Right _ -> return ()
   where
-    -- FIXME is there really no way to tell ghc-pkg a GhcPkgId?
-    toArgs gid = ["unregister", "--user", "--force", packageIdentifierString $ ghcPkgIdPackageIdentifier gid]
+    -- TODO ideally we'd tell ghc-pkg a GhcPkgId instead
+    args = ["unregister", "--user", "--force", packageIdentifierString $ ghcPkgIdPackageIdentifier gid]
 
 -- | Unregister the given package.
 unregisterPackage :: (MonadIO m, MonadLogger m, MonadThrow m)

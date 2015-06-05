@@ -44,10 +44,9 @@ import           Network.HTTP.Client.Conduit (HasHttpManager, Manager, Request,
                                               withResponse)
 import           Network.HTTP.Download.Verified
 import           Network.HTTP.Types          (status200, status304)
-import           Path                        (Abs, File, Path, parent,
-                                              toFilePath)
+import           Path                        (Abs, File, Path, toFilePath)
 import           System.Directory            (createDirectoryIfMissing,
-                                              doesFileExist, removeFile,
+                                              removeFile,
                                               renameFile)
 import           System.FilePath             (takeDirectory, (<.>))
 import           System.IO                   (IOMode (ReadMode))
