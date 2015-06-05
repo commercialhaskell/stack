@@ -167,12 +167,12 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
 
      platform <- runReaderT platformRelDir configPlatform
 
-     configLocalGHCs <-
+     configLocalPrograms <-
         case configPlatform of
             Platform _ Windows -> do
                 progsDir <- getWindowsProgsDir configStackRoot origEnv
                 return $ progsDir </> $(mkRelDir "stack") </> platform
-            _ -> return $ configStackRoot </> $(mkRelDir "ghc") </> platform
+            _ -> return $ configStackRoot </> $(mkRelDir "programs") </> platform
 
      return Config {..}
 
