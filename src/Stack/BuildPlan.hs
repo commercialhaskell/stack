@@ -73,7 +73,7 @@ import           System.FilePath                 (takeDirectory)
 
 data BuildPlanException
     = UnknownPackages
-        (Path Abs File) -- ^ stack.yaml file
+        (Path Abs File) -- stack.yaml file
         (Map PackageName (Maybe Version, (Set PackageName))) -- truly unknown
         (Map PackageName (Set PackageIdentifier)) -- shadowed
     deriving (Typeable)

@@ -40,7 +40,7 @@ data DockerOpts = DockerOpts
   }
   deriving (Show)
 
--- An uninterpreted representation of docker options.
+-- | An uninterpreted representation of docker options.
 -- Configurations may be "cascaded" using mappend (left-biased).
 data DockerOptsMonoid = DockerOptsMonoid
   {dockerMonoidEnable :: !(Maybe Bool)
@@ -72,6 +72,7 @@ data DockerOptsMonoid = DockerOptsMonoid
   }
   deriving (Show)
 
+-- | Decode uninterpreted docker options from JSON/YAML.
 instance FromJSON DockerOptsMonoid where
   parseJSON = withObject "DockerOptsMonoid"
     (\o -> do dockerMonoidEnable           <- o .:? dockerEnableArgName .!= Just True
@@ -90,6 +91,7 @@ instance FromJSON DockerOptsMonoid where
               dockerMonoidPassHost         <- o .:? dockerPassHostArgName
               return DockerOptsMonoid{..})
 
+-- | Left-biased combine Docker options
 instance Monoid DockerOptsMonoid where
   mempty = DockerOptsMonoid
     {dockerMonoidEnable           = Nothing
