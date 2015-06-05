@@ -10,6 +10,8 @@
 
 module Stack.Setup
   ( setupEnv
+  , ensureGHC
+  , SetupOpts (..)
   ) where
 
 import Control.Exception (Exception)
@@ -38,7 +40,7 @@ import Stack.Types
 import Distribution.System (OS (..), Arch (..), Platform (..))
 import Stack.Build.Types
 import qualified Data.ByteString.Char8 as S8
-import Path (Path, Abs, Dir, parseRelDir, parseAbsDir, parseRelFile, mkRelFile)
+import Path (Path, Abs, Dir, parseRelDir, parseAbsDir, parseRelFile, mkRelFile, File)
 import qualified Path
 import Control.Monad.Logger
 import qualified Data.Text as T
@@ -85,21 +87,29 @@ getSetupInfo manager = do
   where
     req = "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/stack-setup.yaml"
 
--- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
-setupEnv :: (MonadIO m, MonadMask m, MonadLogger m)
-         => Bool -- ^ install GHC if missing?
-         -> Manager
-         -> BuildConfig
-         -> m BuildConfig
-setupEnv installIfMissing manager bconfig = do
+data SetupOpts = SetupOpts
+    { soptsInstallIfMissing :: !Bool
+    , soptsUseSystem :: !Bool
+    , soptsExpected :: !Version
+    , soptsStackYaml :: !(Maybe (Path Abs File))
+    -- ^ If we got the desired GHC version from that file
+    , soptsForceReinstall :: !Bool
+    }
+
+-- | Ensure GHC is installed and provide the PATHs to add if necessary
+ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m)
+          => Manager
+          -> Config
+          -> SetupOpts
+          -> m (Maybe [FilePath])
+ensureGHC manager config sopts = do
     -- Check the available GHCs
-    menv0 <- liftIO $ configEnvOverride (bcConfig bconfig) EnvSettings
-            { esIncludeLocals = False
-            , esIncludeGhcPackagePath = False
-            }
-    let expected = bcGhcVersion bconfig
-        platform = configPlatform (getConfig bconfig)
-    minstalled <- getInstalledGHC menv0
+    menv0 <- runReaderT getMinimalEnvOverride config
+
+    minstalled <-
+        if soptsUseSystem sopts
+            then getInstalledGHC menv0
+            else return Nothing
     let needLocal = case minstalled of
             Nothing -> True
             Just installed ->
@@ -108,22 +118,45 @@ setupEnv installIfMissing manager bconfig = do
                 expected > installed
 
     -- If we need to install a GHC, try to do so
-    mghcBin <- if needLocal
+    if needLocal
         then do
             $logDebug "Looking for a local copy of GHC"
-            mghcBin <- getLocalGHC bconfig expected
+            mghcBin <-
+                if soptsForceReinstall sopts
+                    then return Nothing
+                    else getLocalGHC config sopts
             case mghcBin of
                 Just ghcBin -> do
                     $logDebug $ "Local copy found at: " <> T.intercalate ", " (map T.pack ghcBin)
                     return $ Just ghcBin
                 Nothing
-                    | installIfMissing -> do
+                    | soptsInstallIfMissing sopts -> do
                         $logDebug $ "None found, installing: " <> versionText expected
-                        ghcBin <- installLocalGHC manager bconfig expected
+                        ghcBin <- installLocalGHC manager config expected
                         return $ Just ghcBin
                     | otherwise ->
-                        throwM $ GHCVersionMismatch minstalled (bcGhcVersion bconfig) (bcStackYaml bconfig)
+                        throwM $ GHCVersionMismatch minstalled (soptsExpected sopts) (soptsStackYaml sopts)
         else return Nothing
+  where
+    expected = soptsExpected sopts
+
+-- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
+setupEnv :: (MonadIO m, MonadMask m, MonadLogger m)
+         => Bool -- ^ allow system GHC
+         -> Manager
+         -> BuildConfig
+         -> m BuildConfig
+setupEnv useSystem manager bconfig = do
+    let platform = getPlatform bconfig
+        sopts = SetupOpts
+            { soptsInstallIfMissing = False
+            , soptsUseSystem = useSystem
+            , soptsExpected = bcGhcVersion bconfig
+            , soptsStackYaml = Just $ bcStackYaml bconfig
+            , soptsForceReinstall = False
+            }
+    mghcBin <- ensureGHC manager (getConfig bconfig) sopts
+    menv0 <- runReaderT getMinimalEnvOverride bconfig
 
     -- Modify the initial environment to include the GHC path, if a local GHC
     -- is being used
@@ -211,9 +244,9 @@ getInstalledGHC menv = do
 -- requirement, if it exists
 getLocalGHC :: (HasConfig config, MonadIO m, MonadLogger m, MonadThrow m)
             => config
-            -> Version
+            -> SetupOpts
             -> m (Maybe [FilePath])
-getLocalGHC config' expected = do
+getLocalGHC config' sopts = do
     let dir = toFilePath $ configLocalGHCs $ getConfig config'
     contents <- liftIO $ handleIO (const $ return []) (getDirectoryContents dir)
     pairs <- liftIO $ fmap catMaybes $ mapM (toMaybePair dir) contents
@@ -229,6 +262,7 @@ getLocalGHC config' expected = do
                         : gitDirs'
                 _ -> return $ Just [ghcBin]
   where
+    expected = soptsExpected sopts
     expectedMajor = getMajorVersion expected
     toMaybePair root name
         | Just noGhc <- List.stripPrefix "ghc-" name
