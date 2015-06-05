@@ -522,7 +522,7 @@ buildLogPath package' = do
   return $ stack </> $(mkRelDir "logs") </> fp
 
 -- | Path for the project's configure log.
-configureLogPath :: MonadThrow m
+configureLogPath :: (MonadThrow m, MonadReader env m, HasPlatform env)
                  => PackageIdentifier -- ^ Cabal version
                  -> Package
                  -> m (Path Abs File)
@@ -531,7 +531,7 @@ configureLogPath cabalPkgVer package' = do
   return (build </> $(mkRelFile "configure-log"))
 
 -- | Get the build directory.
-stackageBuildDir :: MonadThrow m
+stackageBuildDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
                  => PackageIdentifier -- ^ Cabal version
                  -> Package
                  -> m (Path Abs Dir)
@@ -541,7 +541,7 @@ stackageBuildDir cabalPkgVer package' = do
   where dir = packageDir package'
 
 -- | Package's documentation directory.
-packageDocDir :: MonadThrow m
+packageDocDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
               => PackageIdentifier -- ^ Cabal version
               -> Package
               -> m (Path Abs Dir)

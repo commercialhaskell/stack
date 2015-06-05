@@ -23,6 +23,7 @@ module Stack.Constants
 
 import Control.Monad (liftM)
 import Control.Monad.Catch (MonadThrow)
+import Control.Monad.Reader (MonadReader)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Path as FL
@@ -36,7 +37,7 @@ haskellFileExts :: [Text]
 haskellFileExts = ["hs","hsc","lhs"]
 
 -- | The filename used for completed build indicators.
-builtFileFromDir :: MonadThrow m
+builtFileFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
                  => PackageIdentifier -- ^ Cabal version
                  -> Path Abs Dir
                  -> m (Path Abs File)
@@ -45,7 +46,7 @@ builtFileFromDir cabalPkgVer fp = do
   return (dist </> $(mkRelFile "stack.gen"))
 
 -- | The filename used for completed configure indicators.
-configuredFileFromDir :: MonadThrow m
+configuredFileFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
                       => PackageIdentifier -- ^ Cabal version
                       -> Path Abs Dir
                       -> m (Path Abs File)
@@ -54,7 +55,7 @@ configuredFileFromDir cabalPkgVer fp = do
   return (dist </> $(mkRelFile "setup-config"))
 
 -- | The filename used for completed build indicators.
-builtConfigFileFromDir :: MonadThrow m
+builtConfigFileFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
                        => PackageIdentifier -- ^ Cabal version
                        -> Path Abs Dir
                        -> m (Path Abs File)
@@ -62,7 +63,7 @@ builtConfigFileFromDir cabalPkgVer fp =
     liftM (fp </>) (builtConfigRelativeFile cabalPkgVer)
 
 -- | Relative location of completed build indicators.
-builtConfigRelativeFile :: MonadThrow m
+builtConfigRelativeFile :: (MonadThrow m, MonadReader env m, HasPlatform env)
                         => PackageIdentifier -- ^ Cabal version
                         -> m (Path Rel File)
 builtConfigRelativeFile cabalPkgVer = do
@@ -92,7 +93,7 @@ userDocsDir :: Config -> Path Abs Dir
 userDocsDir config = configStackRoot config </> $(mkRelDir "doc/")
 
 -- | The filename used for dirtiness check of source files.
-buildCacheFile :: MonadThrow m
+buildCacheFile :: (MonadThrow m, MonadReader env m, HasPlatform env)
                => PackageIdentifier -- ^ Cabal version
                -> Path Abs Dir      -- ^ Package directory.
                -> m (Path Abs File)
@@ -102,17 +103,17 @@ buildCacheFile cabalPkgVersion dir = do
         (distDirFromDir cabalPkgVersion dir)
 
 -- | The filename used for dirtiness check of config.
-configCacheFile :: MonadThrow m
-               => PackageIdentifier -- ^ Cabal version
-               -> Path Abs Dir      -- ^ Package directory.
-               -> m (Path Abs File)
+configCacheFile :: (MonadThrow m, MonadReader env m, HasPlatform env)
+                => PackageIdentifier -- ^ Cabal version
+                -> Path Abs Dir      -- ^ Package directory.
+                -> m (Path Abs File)
 configCacheFile cabalPkgVersion dir = do
     liftM
         (</> $(mkRelFile "stack-config-cache"))
         (distDirFromDir cabalPkgVersion dir)
 
 -- | Package's build artifacts directory.
-distDirFromDir :: MonadThrow m
+distDirFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
                => PackageIdentifier -- ^ Cabal version
                -> Path Abs Dir
                -> m (Path Abs Dir)
@@ -120,14 +121,14 @@ distDirFromDir cabalPkgVersion fp =
     liftM (fp </>) (distRelativeDir cabalPkgVersion)
 
 -- | Relative location of build artifacts.
-distRelativeDir :: MonadThrow m
+distRelativeDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
                 => PackageIdentifier -- ^ Cabal version
                 -> m (Path Rel Dir)
 distRelativeDir cabalPkgVer = do
-    --EKB FIXME: include platform in directory
+    platform <- platformRelDir
     cabal <- parseRelDir $ "Cabal-" ++
              versionString (packageIdentifierVersion cabalPkgVer)
-    return $ $(mkRelDir "dist-stack/") </> cabal
+    return $ $(mkRelDir "dist-stack/") </> platform </> cabal
 
 -- pkgIndexDir :: Config -> Path Abs Dir
 -- pkgIndexDir config =
