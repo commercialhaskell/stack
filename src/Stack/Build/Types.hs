@@ -38,7 +38,7 @@ data StackBuildException
   | StackageDepVerMismatch PackageName Version VersionRange
   | StackageVersionMismatch PackageName Version Version
   | DependencyIssues [StackBuildException]
-  | GHCVersionMismatch (Maybe Version) Version (Path Abs File)
+  | GHCVersionMismatch (Maybe Version) Version (Maybe (Path Abs File))
   -- ^ Path to the stack.yaml file
   | Couldn'tParseTargets [Text]
   | UnknownTargets [PackageName]

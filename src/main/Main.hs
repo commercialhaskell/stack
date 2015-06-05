@@ -39,11 +39,12 @@ import           Stack.GhcPkg (envHelper)
 import           Stack.Package
 import qualified Stack.PackageIndex
 import           Stack.Path
-import           Stack.Setup (setupEnv)
+import           Stack.Setup
 import           Stack.Types
 import           Stack.Types.StackT
 import           System.Environment (getArgs)
 import           System.Exit
+import           System.FilePath (searchPathSeparator)
 import           System.IO (stderr)
 import qualified System.Process as P
 import qualified System.Process.Read
@@ -80,8 +81,8 @@ main =
                         buildOpts
              addCommand "setup"
                         "Get the appropriate ghc for your project"
-                        (const setupCmd)
-                        (pure ())
+                        setupCmd
+                        setupParser
              addCommand "unpack"
                         "Unpack one or more packages locally"
                         unpackCmd
@@ -196,16 +197,49 @@ pluginShouldHaveRun _plugin _globalOpts = do
   fail "Plugin should have run"
 
 
-setupCmd :: GlobalOpts -> IO ()
-setupCmd go@GlobalOpts{..} = do
+data SetupCmdOpts = SetupCmdOpts
+    { scoGhcVersion :: !(Maybe Version)
+    , scoForceReinstall :: !Bool
+    }
+
+setupParser :: Parser SetupCmdOpts
+setupParser = SetupCmdOpts
+    <$> (optional $ argument readVersion (metavar "VERSION"))
+    <*> boolFlags False
+            "reinstall"
+            "Reinstall GHC, even if available (implies no-system-ghc)"
+  where
+    readVersion = do
+        s <- readerAsk
+        case parseVersionFromString s of
+            Nothing -> readerError $ "Invalid version: " ++ s
+            Just x -> return x
+
+setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
+setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
   Docker.rerunWithOptionalContainer
     (lcConfig lc)
     (lcProjectRoot lc)
-    (do _ <- runStackLoggingT manager
-                              globalLogLevel
-                              (lcLoadBuildConfig lc >>= setupEnv True manager)
-        return ())
+    (runStackLoggingT manager globalLogLevel $ do
+        (ghc, mstack) <-
+            case scoGhcVersion of
+                Just v -> return (v, Nothing)
+                Nothing -> do
+                    bc <- lcLoadBuildConfig lc
+                    return (bcGhcVersion bc, Just $ bcStackYaml bc)
+        mpaths <- ensureGHC manager (lcConfig lc) SetupOpts
+            { soptsInstallIfMissing = True
+            , soptsUseSystem = globalSystemGhc && not scoForceReinstall
+            , soptsExpected = ghc
+            , soptsStackYaml = mstack
+            , soptsForceReinstall = scoForceReinstall
+            }
+        case mpaths of
+            Nothing -> $logInfo "GHC on PATH would be used"
+            Just paths -> $logInfo $ "Would add the following to PATH: "
+                <> T.pack (intercalate [searchPathSeparator] paths)
+            )
 
 cleanCmd :: () -> GlobalOpts -> IO ()
 cleanCmd _ go@GlobalOpts{..} = do
@@ -215,7 +249,7 @@ cleanCmd _ go@GlobalOpts{..} = do
     (lcProjectRoot lc)
     (do config <- runStackLoggingT manager
                                    globalLogLevel
-                                   (lcLoadBuildConfig lc >>= setupEnv False manager)
+                                   (lcLoadBuildConfig lc >>= setupEnv globalSystemGhc manager)
         runStackT manager globalLogLevel config clean)
 
 -- | Install dependencies
@@ -224,7 +258,7 @@ depsCmd (names, dryRun) go@GlobalOpts{..} = do
     (manager,lc) <- loadConfigWithOpts go
     Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $ do
         config <- runStackLoggingT manager globalLogLevel
-            (lcLoadBuildConfig lc >>= setupEnv False manager)
+            (lcLoadBuildConfig lc >>= setupEnv globalSystemGhc manager)
         runStackT manager globalLogLevel config $ Stack.Build.build BuildOpts
             { boptsTargets = Right names
             , boptsLibProfile = False
@@ -275,7 +309,7 @@ buildCmd finalAction opts go@GlobalOpts{..} =
         (lcProjectRoot lc)
         (do config <- runStackLoggingT manager
                                        globalLogLevel
-                                       (lcLoadBuildConfig lc >>= setupEnv False manager)
+                                       (lcLoadBuildConfig lc >>= setupEnv globalSystemGhc manager)
             runStackT manager globalLogLevel config $
                       Stack.Build.build opts { boptsFinalAction = finalAction}))
              (error . printBuildException)
@@ -336,20 +370,18 @@ buildCmd finalAction opts go@GlobalOpts{..} =
               ("Dependency issues:\n" ++
                intercalate "\n"
                            (map printBuildException es))
-            GHCVersionMismatch Nothing expected stack -> concat
-                [ "No GHC found, expected version "
+            GHCVersionMismatch mactual expected mstack -> concat
+                [ case mactual of
+                    Nothing -> "No GHC found, expected version "
+                    Just actual ->
+                        "GHC version mismatched, found " ++
+                        versionString actual ++
+                        ", but expected version "
                 , versionString expected
-                , " (based on resolver setting in "
-                , toFilePath stack
-                , "). Try running stack setup"
-                ]
-            GHCVersionMismatch (Just actual) expected stack -> concat
-                [ "GHC version mismatched, found "
-                , versionString actual
-                , ", but expected "
-                , versionString expected
-                , " (based on resolver setting in "
-                , toFilePath stack
+                , " (based on "
+                , case mstack of
+                    Nothing -> "command line arguments"
+                    Just stack -> "resolver setting in " ++ toFilePath stack
                 , "). Try running stack setup"
                 ]
             Couldn'tParseTargets targets -> unlines
@@ -395,7 +427,7 @@ execCmd (cmd, args) go@GlobalOpts{..} = do
       (lcProjectRoot lc)
       (do config <- runStackLoggingT manager
                                      globalLogLevel
-                                     (lcLoadBuildConfig lc >>= setupEnv False manager)
+                                     (lcLoadBuildConfig lc >>= setupEnv globalSystemGhc manager)
           menv <- configEnvOverride (bcConfig config)
                           EnvSettings
                               { esIncludeLocals = True
@@ -524,6 +556,9 @@ globalOpts docker =
     GlobalOpts
     <$> logLevelOpt
     <*> configOptsParser docker
+    <*> boolFlags True
+            "system-ghc"
+            "Use the system installed GHC (on the PATH) if available and a matching version"
 
 -- | Parse for a logging level.
 logLevelOpt :: Parser LogLevel
@@ -560,6 +595,7 @@ defaultLogLevel = LevelInfo
 data GlobalOpts = GlobalOpts
     { globalLogLevel     :: LogLevel -- ^ Log level
     , globalConfigMonoid :: ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
+    , globalSystemGhc    :: Bool -- ^ Use system GHC if available and correct version?
     } deriving (Show)
 
 -- | Load the configuration with a manager. Convenience function used
