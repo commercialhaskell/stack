@@ -165,11 +165,32 @@ data CabalExitedUnsuccessfully = CabalExitedUnsuccessfully
     ExitCode
     PackageIdentifier
     (Path Abs File)
+-- ^ cabal Executable
     [String]
+-- ^ cabal arguments
     (Maybe FilePath)
+-- ^ logfiles location
     S.ByteString
-    deriving (Show, Typeable)
+-- ^ log contents
+    deriving (Typeable)
 instance Exception CabalExitedUnsuccessfully
+
+instance Show CabalExitedUnsuccessfully where
+  show (CabalExitedUnsuccessfully exitCode taskProvides execName fullArgs logFiles _) = 
+    let fullCmd = (dropQuotes (show execName) ++ " " ++ (unwords fullArgs))
+        logLocations = maybe "" (\fp -> "Logs have been written to: " ++ show fp) logFiles
+    in "\nException: CabalExitedUnsuccessfully\n" ++
+       "While building package " ++ dropQuotes (show taskProvides) ++ " using:\n" ++
+       "  " ++ fullCmd ++ "\n" ++
+       "Process exited with code: " ++ show exitCode ++ "\n" ++
+       logLocations
+     where 
+      -- appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
+      -- indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
+      dropQuotes = filter ('\"' /=)
+      -- doubleIndent = indent . indent
+
+
 ----------------------------------------------
 
 -- | Directory containing files to mark an executable as installed
