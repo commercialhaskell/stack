@@ -80,7 +80,8 @@ rerunWithOptionalContainer config mprojectRoot inner =
        do args <- getArgs
           if arch == "x86_64" && os == "linux"
               then do exePath <- getExecutablePath
-                      let mountPath = "/tmp/host-" ++ takeBaseName exePath
+                      let mountDir = concat ["/tmp/host-",takeBaseName exePath]
+                          mountPath = concat [mountDir,"/",takeBaseName exePath]
                       return (mountPath
                              ,args
                              ,config{configDocker=docker{dockerMount=Mount exePath mountPath :
