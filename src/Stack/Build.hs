@@ -1244,6 +1244,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                     }
             $logDebug $ "Running: " <> T.pack (show $ toFilePath exeName : fullArgs)
 
+            -- Use createProcess_ to avoid the log file being closed afterwards
             (Just inH, moutH, Nothing, ph) <- liftIO $ createProcess_ "singleBuild" cp
             liftIO $ hClose inH
             case moutH of
@@ -1303,7 +1304,9 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                                     Nothing -> Inherit
                                     Just (_, h) -> UseHandle h
                             }
-                    (Just inH, Nothing, Nothing, ph) <- liftIO $ createProcess cp
+
+                    -- Use createProcess_ to avoid the log file being closed afterwards
+                    (Just inH, Nothing, Nothing, ph) <- liftIO $ createProcess_ "singleBuild.runTests" cp
                     liftIO $ hClose inH
                     ec <- liftIO $ waitForProcess ph
                     return $ case ec of
