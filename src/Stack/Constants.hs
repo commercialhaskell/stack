@@ -124,6 +124,7 @@ distRelativeDir :: MonadThrow m
                 => PackageIdentifier -- ^ Cabal version
                 -> m (Path Rel Dir)
 distRelativeDir cabalPkgVer = do
+    --EKB FIXME: include platform in directory
     cabal <- parseRelDir $ "Cabal-" ++
              versionString (packageIdentifierVersion cabalPkgVer)
     return $ $(mkRelDir "dist-stack/") </> cabal

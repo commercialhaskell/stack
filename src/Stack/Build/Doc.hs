@@ -52,7 +52,7 @@ breakPkgVer pkgPath =
 joinPkgVer :: (PackageName,Version) -> FilePath
 joinPkgVer (pkg,ver) = (packageNameString pkg ++ "-" ++ versionString ver)
 
---EKB FIXME: doc generation for stack-doc-server
+--EKB TODO: doc generation for stack-doc-server
 -- | Get location of user-generated documentation if it exists.
 getExistingUserDocPath :: Config -> IO (Maybe (Path Abs Dir))
 getExistingUserDocPath config = do
@@ -62,7 +62,7 @@ getExistingUserDocPath config = do
         then return (Just docPath)
         else return Nothing
 
---EKB FIXME: doc generation for stack-doc-server
+--EKB TODO: doc generation for stack-doc-server
 -- | Get location of global package docs.
 getGlobalDocPath :: IO (Maybe (Path Abs Dir))
 getGlobalDocPath = do
@@ -75,7 +75,7 @@ getGlobalDocPath = do
             pkgDocExists <- doesDirectoryExist (toFilePath pkgDocPath)
             return (if pkgDocExists then Just pkgDocPath else Nothing)
 
---EKB FIXME: doc generation for stack-doc-server
+--EKB TODO: doc generation for stack-doc-server
 -- | Get location of GHC docs.
 getGhcDocPath :: IO (Maybe (Path Abs Dir))
 getGhcDocPath = do
