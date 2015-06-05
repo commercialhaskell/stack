@@ -151,7 +151,7 @@ instance Show ConstructPlanExceptions where
      where
          appendExceptions = foldr (\e -> (++) ("\n\n--" ++ show e)) ""
          removeDuplicates = nub
- -- ^ Supressing duplicate output
+ -- Supressing duplicate output
 
 data UnpackedPackageHasWrongName = UnpackedPackageHasWrongName PackageIdentifier PackageName
     deriving (Show, Typeable)
