@@ -127,7 +127,7 @@ instance Show ConstructPlanException where
              "  package outside allowed version range detected:\n" ++
              "    " ++ dropQuotes (show pIdentifier) ++ "\n" ++
              "  Allowed version range " ++ display versionRange ++ ",\n" ++
-             "  should you give an allowed range to" ++ show pIdentifier ++ " and add it to [extra-deps] in the project's stack.yaml?"
+             "  should you correct the version range for " ++ dropQuotes (show pIdentifier) ++ ", found in [extra-deps] in the project's stack.yaml?"
          (Couldn'tMakePlanForWanted (S.toList -> lpSet)) ->
             "Exception Stack.Build.Couldn'tMakePlanForWanted\n" ++
             "  Couldn't make build plan while adding local packages:" ++
