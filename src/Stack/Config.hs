@@ -140,7 +140,7 @@ configFromConfigMonoid
     -> ConfigMonoid
     -> m Config
 configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
-     let configDocker = Docker.dockerOptsFromMonoid mproject configMonoidDockerOpts
+     let configDocker = Docker.dockerOptsFromMonoid mproject configStackRoot configMonoidDockerOpts
          configConnectionCount = fromMaybe 8 configMonoidConnectionCount
          configHideTHLoading = fromMaybe True configMonoidHideTHLoading
          configLatestSnapshotUrl = fromMaybe

@@ -8,6 +8,7 @@ import Control.Applicative
 import Data.Aeson
 import Data.Monoid
 import Data.Text (Text)
+import Path
 
 -- | Docker configuration.
 data DockerOpts = DockerOpts
@@ -37,6 +38,8 @@ data DockerOpts = DockerOpts
     -- ^ Volumes to mount in the container.
   ,dockerPassHost :: !Bool
     -- ^ Pass Docker daemon connection information into container.
+  ,dockerDatabasePath :: !(Path Abs File)
+    -- ^ Location of image usage database.
   }
   deriving (Show)
 
@@ -69,6 +72,8 @@ data DockerOptsMonoid = DockerOptsMonoid
     -- ^ Volumes to mount in the container
   ,dockerMonoidPassHost :: !(Maybe Bool)
     -- ^ Pass Docker daemon connection information into container.
+  ,dockerMonoidDatabasePath :: !(Maybe String)
+    -- ^ Location of image usage database.
   }
   deriving (Show)
 
@@ -89,6 +94,7 @@ instance FromJSON DockerOptsMonoid where
               dockerMonoidRunArgs          <- o .:? dockerRunArgsArgName .!= []
               dockerMonoidMount            <- o .:? dockerMountArgName .!= []
               dockerMonoidPassHost         <- o .:? dockerPassHostArgName
+              dockerMonoidDatabasePath     <- o .:? dockerDatabasePathArgName
               return DockerOptsMonoid{..})
 
 -- | Left-biased combine Docker options
@@ -106,6 +112,7 @@ instance Monoid DockerOptsMonoid where
     ,dockerMonoidRunArgs          = []
     ,dockerMonoidMount            = []
     ,dockerMonoidPassHost         = Nothing
+    ,dockerMonoidDatabasePath     = Nothing
     }
   mappend l r = DockerOptsMonoid
     {dockerMonoidEnable           = dockerMonoidEnable l <|> dockerMonoidEnable r
@@ -120,6 +127,7 @@ instance Monoid DockerOptsMonoid where
     ,dockerMonoidRunArgs          = dockerMonoidRunArgs r <> dockerMonoidRunArgs l
     ,dockerMonoidMount            = dockerMonoidMount r <> dockerMonoidMount l
     ,dockerMonoidPassHost         = dockerMonoidPassHost l <|> dockerMonoidPassHost r
+    ,dockerMonoidDatabasePath     = dockerMonoidDatabasePath l <|> dockerMonoidDatabasePath r
     }
 
 -- | Docker volume mount.
@@ -200,3 +208,7 @@ dockerPersistArgName = "persist"
 -- | Docker pass host argument name.
 dockerPassHostArgName :: Text
 dockerPassHostArgName = "pass-host"
+
+-- | Docker database path argument name.
+dockerDatabasePathArgName :: Text
+dockerDatabasePathArgName = "database-path"

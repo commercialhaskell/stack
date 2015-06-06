@@ -662,9 +662,14 @@ dockerOptsParser =
                                                     metavar "IMAGE" <>
                                                     help "Exact Docker image ID (overrides docker-repo)") <|>
          pure Nothing)
-    <*> pure Nothing
-    <*> pure Nothing
-    <*> pure Nothing
+    <*> maybeBoolFlags (dockerOptName dockerRegistryLoginArgName)
+                       "registry requires login"
+    <*> maybeStrOption (long (dockerOptName dockerRegistryUsernameArgName) <>
+                        metavar "USERNAME" <>
+                        help "Docker registry username")
+    <*> maybeStrOption (long (dockerOptName dockerRegistryPasswordArgName) <>
+                        metavar "PASSWORD" <>
+                        help "Docker registry password")
     <*> maybeBoolFlags (dockerOptName dockerAutoPullArgName)
                        "automatic pulling latest version of image"
     <*> maybeBoolFlags (dockerOptName dockerDetachArgName)
@@ -684,14 +689,17 @@ dockerOptsParser =
                                  "(may specify mutliple times)")))
     <*> maybeBoolFlags (dockerOptName dockerPassHostArgName)
                        "passing Docker daemon connection information into container"
+    <*> maybeStrOption (long (dockerOptName dockerDatabasePathArgName) <>
+                        metavar "PATH" <>
+                        help "Location of image usage tracking database")
   where
     dockerOptName optName = dockerCmdName ++ "-" ++ T.unpack optName
     maybeStrOption = optional . option str
     wordsStrOption = option (fmap words str)
 
 -- | Interprets DockerOptsMonoid options.
-dockerOptsFromMonoid :: Maybe Project -> DockerOptsMonoid -> DockerOpts
-dockerOptsFromMonoid mproject DockerOptsMonoid{..} = DockerOpts
+dockerOptsFromMonoid :: Maybe Project -> Path Abs Dir -> DockerOptsMonoid -> DockerOpts
+dockerOptsFromMonoid mproject stackRoot DockerOptsMonoid{..} = DockerOpts
   {dockerEnable = fromMaybe False dockerMonoidEnable
   ,dockerImage =
      let defaultTag =
@@ -720,6 +728,12 @@ dockerOptsFromMonoid mproject DockerOptsMonoid{..} = DockerOpts
   ,dockerRunArgs = dockerMonoidRunArgs
   ,dockerMount = dockerMonoidMount
   ,dockerPassHost = fromMaybe False dockerMonoidPassHost
+  ,dockerDatabasePath =
+     case dockerMonoidDatabasePath of
+       Nothing -> stackRoot </> $(mkRelFile "docker.db")
+       Just fp -> case parseAbsFile fp of
+                    Left e -> throw (InvalidDatabasePathException e)
+                    Right p -> p
   }
   where emptyToNothing Nothing = Nothing
         emptyToNothing (Just s) | null s = Nothing
@@ -853,6 +867,8 @@ data StackDockerException
     -- ^ Can't determine the project root (where to put @.docker-sandbox@).
   | DockerNotInstalledException
     -- ^ @docker --version@ failed.
+  | InvalidDatabasePathException SomeException
+    -- ^ Invalid global database path.
   deriving (Typeable)
 
 -- | Exception instance for StackDockerException.
@@ -936,3 +952,5 @@ instance Show StackDockerException where
     "Cannot determine project root directory for Docker sandbox."
   show DockerNotInstalledException=
     "Cannot find 'docker' in PATH.  Is Docker installed?"
+  show (InvalidDatabasePathException ex) =
+    concat ["Invalid database path: ",show ex]

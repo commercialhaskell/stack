@@ -24,9 +24,10 @@ import           Data.Time.Clock (UTCTime,getCurrentTime)
 import           Database.Persist
 import           Database.Persist.Sqlite
 import           Database.Persist.TH
-import           Path (toFilePath, (</>), mkRelFile)
+import           Path (toFilePath, parent)
 import           System.Directory (createDirectoryIfMissing)
 import           Stack.Types.Config
+import           Stack.Types.Docker
 
 share [mkPersist sqlSettings, mkMigrate "migrateTables"] [persistLowerCase|
 DockerImageProject
@@ -73,9 +74,9 @@ pruneDockerImagesLastUsed config existingHashes =
 -- | Run an action with the global database.  This performs any needed migrations as well.
 withGlobalDB :: forall a. Config -> SqlPersistT (NoLoggingT (ResourceT IO)) a -> IO a
 withGlobalDB config action =
-  do let db = toFilePath (configStackRoot config </> $(mkRelFile "docker.db"))
-     createDirectoryIfMissing True (toFilePath (configStackRoot config))
-     runSqlite (T.pack db)
+  do let db = dockerDatabasePath (configDocker config)
+     createDirectoryIfMissing True (toFilePath (parent db))
+     runSqlite (T.pack (toFilePath db))
                (do _ <- runMigrationSilent migrateTables
                    action)
          `catch` \ex -> do
@@ -86,7 +87,7 @@ withGlobalDB config action =
              if "ErrorReadOnly" `isInfixOf` str
                  then fail $ str' ++
                      " This likely indicates that your DB file, " ++
-                     db ++ ", has incorrect permissions or ownership."
+                     toFilePath db ++ ", has incorrect permissions or ownership."
                  else throwIO (ex :: IOException)
 
 -- | Date and project path where Docker image hash last used.
