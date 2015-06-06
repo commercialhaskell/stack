@@ -1,7 +1,7 @@
-{-# LANGUAGE CPP, NamedFieldPuns, RankNTypes, RecordWildCards, TemplateHaskell, TupleSections #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, NamedFieldPuns, RankNTypes, RecordWildCards, TemplateHaskell,
+             TupleSections #-}
 
 --EKB FIXME: get this all using proper logging infrastructure
---EKB FIXME: throw exceptions instead of using `error`
 
 -- | Run commands in Docker containers
 module Stack.Docker
@@ -37,6 +37,7 @@ import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
+import           Data.Typeable (Typeable)
 import           Development.Shake hiding (doesDirectoryExist)
 import           Options.Applicative.Builder.Extra (maybeBoolFlags)
 import           Options.Applicative (Parser,str,option,help,auto,metavar,long,value)
@@ -101,9 +102,7 @@ rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs inner =
 rerunCmdWithRequiredContainer :: Config -> Maybe (Path Abs Dir) -> IO (FilePath,[String],Config) -> IO ()
 rerunCmdWithRequiredContainer config mprojectRoot getCmdArgs =
   do when (not (dockerEnable (configDocker config)))
-          (error (concat ["Docker must be enabled in your "
-                         ,toFilePath stackDotYaml
-                         ," to use this command."]))
+          (throwIO DockerMustBeEnabledException)
      (cmd_,args,config') <- getCmdArgs
      runContainerAndExit config' mprojectRoot cmd_ args [] (return ())
 
@@ -112,7 +111,7 @@ preventInContainer :: IO () -> IO ()
 preventInContainer inner =
   do inContainer <- getInContainer
      if inContainer
-        then error (concat ["This command must be run on host OS (not in a Docker container)."])
+        then throwIO OnlyOnHostException
         else inner
 
 -- | 'True' if we are currently running inside a Docker container.
@@ -174,12 +173,8 @@ runContainerAndExitAction config
                 mii2 <- inspect image
                 case mii2 of
                   Just ii2 -> return ii2
-                  Nothing -> error ("'docker inspect' failed for image after pull: " ++ image)
-         | otherwise ->
-             error ("The Docker image referenced by " ++ toFilePath stackDotYaml ++
-                    " has not\nbeen downloaded:\n    " ++ image ++ "\n\n" ++
-                    "Run '" ++ unwords [stackProgName, dockerCmdName, dockerPullCmdName] ++
-                    "' to download it, then try again.")
+                  Nothing -> throwAction (InspectFailedException image)
+         | otherwise -> throwAction (NotPulledException image)
      let (uid,gid) = (dropWhileEnd isSpace uidOut, dropWhileEnd isSpace gidOut)
          imageEnvVars = map (break (== '=')) (icEnv (iiConfig imageInfo))
          (sandboxID,oldImage) =
@@ -342,7 +337,7 @@ cleanupAction config opts =
            [] -> return (Exit ExitSuccess)
            (c:_):t:v:_ | toUpper c == 'R' && t == imageStr -> cmd "docker rmi" [v]
                        | toUpper c == 'R' && t == containerStr -> cmd "docker rm -f " [v]
-           _ -> error ("Invalid line in cleanup commands: '" ++ line ++ "'")
+           _ -> throwAction (InvalidCleanupCommandException line)
          return ()
     parseImagesOut = Map.fromListWith (++) . map parseImageRepo . drop 1 . lines
       where parseImageRepo :: String -> (String, [String])
@@ -352,12 +347,12 @@ cleanupAction config opts =
                   | repo == "<none>" -> (hash,[])
                   | tag == "<none>" -> (hash,[repo])
                   | otherwise -> (hash,[repo ++ ":" ++ tag])
-                _ -> error ("Invalid 'docker images' output line: " ++ line)
+                _ -> throw (InvalidImagesOutputException line)
     parseContainersOut = map parseContainer . drop 1 . lines
       where parseContainer line =
               case words line of
                 hash:image:rest -> (hash,(image,last rest))
-                _ -> error ("Invalid 'docker ps' output line: " ++ line)
+                _ -> throw (InvalidPSOutputException line)
     buildPlan curTime
               imagesLastUsed
               imageRepos
@@ -506,7 +501,7 @@ inspects images =
        ExitSuccess ->
          -- filtering with 'isAscii' to workaround @docker inspect@ output containing invalid UTF-8
          case eitherDecode (LBS.pack (filter isAscii inspectOut)) of
-           Left msg -> error ("Invalid 'docker inspect' output: " ++ msg ++ ".")
+           Left msg -> throwAction (InvalidInspectOutputException msg)
            Right results -> return (Map.fromList (map (\r -> (iiId r,r)) results))
        ExitFailure _ -> return Map.empty
 
@@ -517,7 +512,7 @@ inspect image =
      case Map.toList results of
        [] -> return Nothing
        [(_,i)] -> return (Just i)
-       _ -> error ("Invalid 'docker inspect' output: expect a single result.")
+       _ -> throwAction (InvalidInspectOutputException "expect a single result")
 
 -- | Pull latest version of configured Docker image from registry.
 pull :: DockerOpts -> IO ()
@@ -540,11 +535,7 @@ pullImage docker image =
                            ,[takeWhile (/= '/') image]]))
              onException
                (Proc.callProcess "docker" ["pull", image])
-               (error (concat ["Could not pull Docker image"
-                              ,"\nIf the tag was not found, there may not be an image on the registry for your"
-                              ,"\nresolver's LTS version in "
-                              ,toFilePath stackDotYaml
-                              ,"."])))
+               (throwIO (PullFailedException image)))
 
 -- | Run a Shake action.
 runAction :: Action () -> IO ()
@@ -565,21 +556,13 @@ checkDockerVersion =
          case parseVersionFromString (dropWhileEnd (== ',') v) of
            Just v'
              | v' < minimumDockerVersion ->
-               error (concat ["Minimum docker version '"
-                             ,versionString minimumDockerVersion
-                             ,"' is required (you have '"
-                             ,versionString v'
-                             ,"')."])
+               throwAction (DockerTooOldException minimumDockerVersion v')
              | v' `elem` prohibitedDockerVersions ->
-               error (concat ["These Docker versions are prohibited (you have '"
-                             ,versionString v'
-                             ,"'): "
-                             ,concat (intersperse ", " (map versionString prohibitedDockerVersions))
-                             ,"."])
+               throwAction (DockerVersionProhibitedException prohibitedDockerVersions v')
              | otherwise ->
                return ()
-           _ -> error "Cannot get Docker version (invalid 'docker --version' output)."
-       _ -> error "Cannot get Docker version (invalid 'docker --version' output)."
+           _ -> throwAction InvalidVersionOutputException
+       _ -> throwAction InvalidVersionOutputException
   where minimumDockerVersion = $(mkVersion "1.3.0")
         prohibitedDockerVersions = [$(mkVersion "1.2.0")]
 
@@ -634,23 +617,17 @@ homeDirName :: Path Rel Dir
 homeDirName = $(mkRelDir ".home/")
 
 -- | Check host 'stack' version
-checkHostStackageDockerVersion :: Version -> IO ()
-checkHostStackageDockerVersion minVersion =
+checkHostStackVersion :: Version -> IO ()
+checkHostStackVersion minVersion =
   do maybeHostVer <- lookupEnv hostVersionEnvVar
      case parseVersionFromString =<< maybeHostVer of
        Just hostVer
-         | hostVer < minVersion ->
-             error ("Your host's version of '" ++ stackProgName ++
-                    "' is too old for this Docker image.\nVersion " ++
-                    versionString minVersion ++ " is required; you have " ++
-                    versionString hostVer ++ ".\n")
+         | hostVer < minVersion -> throwIO (HostStackTooOldException minVersion (Just hostVer))
          | otherwise -> return ()
        Nothing ->
           do inContainer <- getInContainer
              if inContainer
-                then error ("Your host's version of '" ++ stackProgName ++
-                            "' is too old.\nVersion " ++ versionString minVersion ++
-                            " is required.")
+                then throwIO (HostStackTooOldException minVersion Nothing)
                 else return ()
 
 
@@ -659,20 +636,11 @@ checkVersions :: IO ()
 checkVersions =
   do inContainer <- getInContainer
      when inContainer
-       (do checkHostStackageDockerVersion requireHostVersion
+       (do checkHostStackVersion requireHostVersion
            maybeReqVer <- lookupEnv requireVersionEnvVar
            case parseVersionFromString =<< maybeReqVer of
              Just reqVer
-               | stackVersion < reqVer ->
-                   error ("This Docker image's version of '" ++
-                          stackProgName ++
-                          "' is too old.\nVersion " ++
-                          versionString reqVer ++
-                          " is required; you have " ++
-                          versionString stackVersion ++
-                          ".\nPlease update your '" ++
-                          toFilePath stackDotYaml ++
-                          "' to use a newer image.")
+               | stackVersion < reqVer -> throwIO (ContainerStackTooOldException reqVer stackVersion)
                | otherwise -> return ()
              _ -> return ())
 
@@ -727,13 +695,7 @@ dockerOptsFromMonoid mproject DockerOptsMonoid{..} = DockerOpts
              Just proj ->
                case projectResolver proj of
                  ResolverSnapshot n@(LTS _ _) -> ":" ++  (T.unpack (renderSnapName n))
-                 _ -> error (concat ["Resolver not supported for Docker images:\n    "
-                                     ,show (projectResolver proj)
-                                     ,"\nUse an LTS resolver, or set the '"
-                                     ,T.unpack dockerImageArgName
-                                     ,"' explicitly, in "
-                                     ,toFilePath stackDotYaml
-                                     ,"."])
+                 _ -> throw (ResolverNotSupportedException (projectResolver proj))
      in case dockerMonoidRepoOrImage of
        Nothing -> "fpco/dev" ++ defaultTag
        Just (DockerMonoidImage image) -> image
@@ -758,10 +720,13 @@ dockerOptsFromMonoid mproject DockerOptsMonoid{..} = DockerOpts
         emptyToNothing (Just s) | null s = Nothing
                                 | otherwise = Just s
 
+-- | Throw an exception from a Shake Action.
+throwAction :: StackDockerException -> Action a
+throwAction = liftIO . throwIO
+
 -- | Fail with friendly error if project root not set.
 fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
-fromMaybeProjectRoot =
-  fromMaybe (error "Cannot determine project root directory for Docker sandbox.")
+fromMaybeProjectRoot = fromMaybe (throw CannotDetermineProjectRoot)
 
 -- | Environment variable to the host's stack version.
 hostVersionEnvVar :: String
@@ -842,3 +807,120 @@ instance FromJSON ImageConfig where
   parseJSON v =
     do o <- parseJSON v
        (ImageConfig <$> o .:? T.pack "Env" .!= [])
+
+-- | Exceptions thrown by Stack.Docker.
+data StackDockerException
+  = DockerMustBeEnabledException
+    -- ^ Docker must be enabled to use the command.
+  | OnlyOnHostException
+    -- ^ Command must be run on host OS (not in a container).
+  | InspectFailedException String
+    -- ^ @docker inspect@ failed.
+  | NotPulledException String
+    -- ^ Image does not exist.
+  | InvalidCleanupCommandException String
+    -- ^ Input to @docker cleanup@ has invalid command.
+  | InvalidImagesOutputException String
+    -- ^ Invalid output from @docker images@.
+  | InvalidPSOutputException String
+    -- ^ Invalid output from @docker ps@.
+  | InvalidInspectOutputException String
+    -- ^ Invalid output from @docker inspect@.
+  | PullFailedException String
+    -- ^ Could not pull a Docker image.
+  | DockerTooOldException Version Version
+    -- ^ Installed version of @docker@ below minimum version.
+  | DockerVersionProhibitedException [Version] Version
+    -- ^ Installed version of @docker@ is prohibited.
+  | InvalidVersionOutputException
+    -- ^ Invalid output from @docker --version@.
+  | HostStackTooOldException Version (Maybe Version)
+    -- ^ Version of @stack@ on host is too old for version in image.
+  | ContainerStackTooOldException Version Version
+    -- ^ Version of @stack@ in container/image is too old for version on host.
+  | ResolverNotSupportedException Resolver
+    -- ^ Only LTS resolvers are supported for default image tag.
+  | CannotDetermineProjectRoot
+    -- ^ Can't determine the project root (where to put @.docker-sandbox@).
+  deriving (Typeable)
+
+-- | Exception instance for StackDockerException.
+instance Exception StackDockerException
+
+-- | Show instance for StackDockerException.
+instance Show StackDockerException where
+  show DockerMustBeEnabledException =
+    concat ["Docker must be enabled in your ",toFilePath stackDotYaml," to use this command."]
+  show OnlyOnHostException =
+    "This command must be run on host OS (not in a Docker container)."
+  show (InspectFailedException image) =
+    concat ["'docker inspect' failed for image after pull: ",image,"."]
+  show (NotPulledException image) =
+    concat ["The Docker image referenced by "
+           ,toFilePath stackDotYaml
+           ," has not\nbeen downloaded:\n    "
+           ,image
+           ,"\n\nRun '"
+           ,unwords [stackProgName, dockerCmdName, dockerPullCmdName]
+           ,"' to download it, then try again."]
+  show (InvalidCleanupCommandException line) =
+    concat ["Invalid line in cleanup commands: '",line,"'."]
+  show (InvalidImagesOutputException line) =
+    concat ["Invalid 'docker images' output line: '",line,"'."]
+  show (InvalidPSOutputException line) =
+    concat ["Invalid 'docker ps' output line: '",line,"'."]
+  show (InvalidInspectOutputException msg) =
+    concat ["Invalid 'docker inspect' output: ",msg,"."]
+  show (PullFailedException image) = 
+    concat ["Could not pull Docker image:\n   "
+           ,image
+           ,"\nIf the tag was not found, there may not be an image on the registry for your"
+           ,"\nresolver's LTS version in "
+           ,toFilePath stackDotYaml
+           ,"."]
+  show (DockerTooOldException minVersion haveVersion) =
+    concat ["Minimum docker version '"
+           ,versionString minVersion
+           ,"' is required (you have '"
+           ,versionString haveVersion
+           ,"')."]
+  show (DockerVersionProhibitedException prohibitedVersions haveVersion) =
+    concat ["These Docker versions are prohibited (you have '"
+           ,versionString haveVersion
+           ,"'): "
+           ,concat (intersperse ", " (map versionString prohibitedVersions))
+           ,"."]
+  show InvalidVersionOutputException =
+    "Cannot get Docker version (invalid 'docker --version' output)."
+  show (HostStackTooOldException minVersion (Just hostVersion)) =
+    concat ["The host's version of '"
+           ,stackProgName
+           ,"' is too old for this Docker image.\nVersion "
+           ,versionString minVersion
+           ," is required; you have "
+           ,versionString hostVersion
+           ,"."]
+  show (HostStackTooOldException minVersion Nothing) =
+    concat ["The host's version of '"
+           ,stackProgName
+           ,"' is too old.\nVersion "
+           ,versionString minVersion
+           ," is required."]
+  show (ContainerStackTooOldException requiredVersion containerVersion) =
+    concat ["The Docker container's version of '"
+           ,stackProgName
+           ,"' is too old.\nVersion "
+           ,versionString requiredVersion
+           ," is required; the container has "
+           ,versionString containerVersion
+           ,"."]
+  show (ResolverNotSupportedException resolver) =
+    concat ["Resolver not supported for Docker images:\n    "
+           ,show resolver
+           ,"\nUse an LTS resolver, or set the '"
+           ,T.unpack dockerImageArgName
+           ,"' explicitly, in "
+           ,toFilePath stackDotYaml
+           ,"."]
+  show CannotDetermineProjectRoot =
+    "Cannot determine project root directory for Docker sandbox."
