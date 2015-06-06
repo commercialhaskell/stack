@@ -19,7 +19,7 @@ extra-source-files:  README.md ARCHITECTURE.md ChangeLog.md
 
 library
   hs-source-dirs:    src/
-  ghc-options:       -Wall -O2 -pgmPcpphs -optP--cpp
+  ghc-options:       -Wall -O1 -pgmPcpphs -optP--cpp
   exposed-modules:   Options.Applicative.Builder.Extra
                      Stack.BuildPlan
                      Stack.Config
@@ -123,7 +123,7 @@ library
 executable stack
   hs-source-dirs: src/main
   main-is:        Main.hs
-  ghc-options:    -Wall -O2 -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:    -Wall -O1 -threaded -rtsopts -with-rtsopts=-N
   other-modules:     Plugins
                      Plugins.Commands
 
@@ -163,7 +163,7 @@ test-suite stack-test
                 , Stack.BuildPlanSpec
                 , Stack.ConfigSpec
                 , Stack.PackageDumpSpec
-  ghc-options:    -Wall -O2 -threaded
+  ghc-options:    -Wall -O1 -threaded
   extensions:     FlexibleContexts
   build-depends:  base >=4.7 && <5
                 , hspec
