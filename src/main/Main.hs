@@ -436,7 +436,7 @@ dockerPullCmd :: () -> GlobalOpts -> IO ()
 dockerPullCmd _ go@GlobalOpts{..} =
   Docker.preventInContainer
     (do (_,lc) <- loadConfigWithOpts go
-        Docker.pull (configDocker (lcConfig lc)))
+        Docker.pull (lcConfig lc))
 
 -- | Reset the Docker sandbox.
 dockerResetCmd :: Bool -> GlobalOpts -> IO ()

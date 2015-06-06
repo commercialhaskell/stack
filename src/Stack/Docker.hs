@@ -1,5 +1,5 @@
-{-# LANGUAGE CPP, DeriveDataTypeable, NamedFieldPuns, RankNTypes, RecordWildCards, TemplateHaskell,
-             TupleSections #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, MultiWayIf, NamedFieldPuns, RankNTypes, RecordWildCards,
+             TemplateHaskell, TupleSections #-}
 
 --EKB FIXME: get this all using proper logging infrastructure
 
@@ -28,6 +28,7 @@ import           Control.Monad
 import           Control.Monad.Writer (execWriter,runWriter,tell)
 import           Data.Aeson (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
 import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
+import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Char (isSpace,toUpper,isAscii)
 import           Data.List (dropWhileEnd,find,intercalate,intersperse,isPrefixOf,isInfixOf,foldl',sortBy)
@@ -35,10 +36,11 @@ import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
 import           Data.Monoid
+import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
 import           Data.Typeable (Typeable)
-import           Development.Shake hiding (doesDirectoryExist)
 import           Options.Applicative.Builder.Extra (maybeBoolFlags)
 import           Options.Applicative (Parser,str,option,help,auto,metavar,long,value)
 import           Path
@@ -50,13 +52,13 @@ import           Stack.Docker.GlobalDB
 import           System.Directory (createDirectoryIfMissing,removeDirectoryRecursive,removeFile)
 import           System.Directory (doesDirectoryExist)
 import           System.Environment (lookupEnv,getProgName,getArgs,getExecutablePath)
-import           System.Exit (ExitCode(ExitSuccess,ExitFailure),exitWith)
-import           System.FilePath (takeBaseName)
+import           System.Exit (ExitCode(ExitSuccess),exitWith)
+import           System.FilePath (takeBaseName,isPathSeparator)
 import           System.Info (arch,os)
 import           System.IO (hPutStrLn,stderr,stdin,stdout,hIsTerminalDevice)
-import           System.IO.Temp (withSystemTempDirectory)
 import qualified System.Process as Proc
 import           System.Process.PagerEditor (editByteString)
+import           System.Process.Read
 import           Text.Printf (printf)
 
 #ifndef mingw32_HOST_OS
@@ -73,7 +75,7 @@ rerunWithOptionalContainer config mprojectRoot inner =
        do args <- getArgs
           if arch == "x86_64" && os == "linux"
               then do exePath <- getExecutablePath
-                      let mountDir = concat ["/tmp/host-",takeBaseName exePath]
+                      let mountDir = concat ["/tmp/host-",stackProgName]
                           mountPath = concat [mountDir,"/",takeBaseName exePath]
                       return (mountPath
                              ,args
@@ -130,58 +132,47 @@ runContainerAndExit :: Config
                     -> [(String,String)]
                     -> IO ()
                     -> IO ()
-runContainerAndExit config mprojectRoot cmnd args envVars successPostAction =
-  runAction (runContainerAndExitAction config mprojectRoot cmnd args envVars successPostAction)
-
--- | Shake action to run a command in a new Docker container.
-runContainerAndExitAction :: Config
-                          -> Maybe (Path Abs Dir)
-                          -> FilePath
-                          -> [String]
-                          -> [(String,String)]
-                          -> IO ()
-                          -> Action ()
-runContainerAndExitAction config
-                          mprojectRoot
-                          cmnd
-                          args
-                          envVars
-                          successPostAction =
-  do checkDockerVersion
-     (Stdout uidOut) <- cmd "id -u"
-     (Stdout gidOut) <- cmd "id -g"
-     (dockerHost,dockerCertPath,dockerTlsVerify,isStdinTerminal,isStdoutTerminal,isStderrTerminal,pwd) <-
-       liftIO ((,,,,,,) <$>
-               lookupEnv "DOCKER_HOST" <*>
-               lookupEnv "DOCKER_CERT_PATH" <*>
-               lookupEnv "DOCKER_TLS_VERIFY" <*>
-               hIsTerminalDevice stdin <*>
-               hIsTerminalDevice stdout <*>
-               hIsTerminalDevice stderr <*>
-               getWorkingDir)
+runContainerAndExit config
+                    mprojectRoot
+                    cmnd
+                    args
+                    envVars
+                    successPostAction =
+  do envOverride <- getEnvOverride (configPlatform config)
+     checkDockerVersion envOverride
+     uidOut <- readProcessStdout envOverride "id" ["-u"]
+     gidOut <- readProcessStdout envOverride "id" ["-g"]
+     dockerHost <- lookupEnv "DOCKER_HOST"
+     dockerCertPath <- lookupEnv "DOCKER_CERT_PATH"
+     dockerTlsVerify <- lookupEnv "DOCKER_TLS_VERIFY"
+     isStdinTerminal <- hIsTerminalDevice stdin
+     isStdoutTerminal <- hIsTerminalDevice stdout
+     isStderrTerminal <- hIsTerminalDevice stderr
+     pwd <- getWorkingDir
      when (maybe False (isPrefixOf "tcp://") dockerHost &&
            maybe False (isInfixOf "boot2docker") dockerCertPath)
-          (liftIO (hPutStrLn stderr
-             ("WARNING: using boot2docker is NOT supported, and not likely to perform well.")))
+          (hPutStrLn stderr
+             ("WARNING: using boot2docker is NOT supported, and not likely to perform well."))
      let image = dockerImage docker
-     maybeImageInfo <- inspect image
+     maybeImageInfo <- inspect envOverride image
      imageInfo <- case maybeImageInfo of
        Just ii -> return ii
        Nothing
          | dockerAutoPull docker ->
-             do pullImage docker image
-                mii2 <- inspect image
+             do pullImage envOverride docker image
+                mii2 <- inspect envOverride image
                 case mii2 of
                   Just ii2 -> return ii2
-                  Nothing -> throwAction (InspectFailedException image)
-         | otherwise -> throwAction (NotPulledException image)
-     let (uid,gid) = (dropWhileEnd isSpace uidOut, dropWhileEnd isSpace gidOut)
+                  Nothing -> throwIO (InspectFailedException image)
+         | otherwise -> throwIO (NotPulledException image)
+     let uid = dropWhileEnd isSpace (decodeUtf8 uidOut)
+         gid = dropWhileEnd isSpace (decodeUtf8 gidOut)
          imageEnvVars = map (break (== '=')) (icEnv (iiConfig imageInfo))
          (sandboxID,oldImage) =
            case lookupImageEnv sandboxIDEnvVar imageEnvVars of
              Just x -> (x,False)
              Nothing ->
-               --TODO: remove this and oldImage after lts-1.x images no longer in use
+               --EKB TODO: remove this and oldImage after lts-1.x images no longer in use
                let sandboxName = maybe "default" id (lookupImageEnv "SANDBOX_NAME" imageEnvVars)
                    maybeImageCabalRemoteRepoName = lookupImageEnv "CABAL_REMOTE_REPO_NAME" imageEnvVars
                    maybeImageStackageSlug = lookupImageEnv "STACKAGE_SLUG" imageEnvVars
@@ -191,7 +182,7 @@ runContainerAndExitAction config
                      (_,Just stackageDate) -> sandboxName ++ "_" ++ stackageDate
                      _ -> sandboxName ++ maybe "" ("_" ++) maybeImageCabalRemoteRepoName
                   ,True)
-     sandboxIDDir <- liftIO (parseRelDir (sandboxID ++ "/"))
+     sandboxIDDir <- parseRelDir (sandboxID ++ "/")
      let stackRoot = configStackRoot config
          sandboxDir = projectDockerSandboxDir projectRoot
          sandboxSandboxDir = sandboxDir </> $(mkRelDir ".sandbox/") </> sandboxIDDir
@@ -205,22 +196,24 @@ runContainerAndExitAction config
                     (concat [[toFilePath sandboxHomeDir
                              ,toFilePath sandboxSandboxDir] ++
                              map toFilePath sandboxSubdirs])
-              execProcessAndExit "docker"
+              execProcessAndExit
+                envOverride
+                "docker"
                 (concat
                   [["run"
                    ,"--net=host"
-                   ,"-e",stackRootEnvVar ++ "=" ++ toFilePath stackRoot
+                   ,"-e",stackRootEnvVar ++ "=" ++ trimTrailingPathSep stackRoot
                    ,"-e","WORK_UID=" ++ uid
                    ,"-e","WORK_GID=" ++ gid
-                   ,"-e","WORK_WD=" ++ toFilePath pwd
-                   ,"-e","WORK_HOME=" ++ toFilePath sandboxRepoDir
-                   ,"-e","WORK_ROOT=" ++ toFilePath projectRoot
+                   ,"-e","WORK_WD=" ++ trimTrailingPathSep pwd
+                   ,"-e","WORK_HOME=" ++ trimTrailingPathSep sandboxRepoDir
+                   ,"-e","WORK_ROOT=" ++ trimTrailingPathSep projectRoot
                    ,"-e",hostVersionEnvVar ++ "=" ++ versionString stackVersion
                    ,"-e",requireVersionEnvVar ++ "=" ++ versionString requireContainerVersion
-                   ,"-v",toFilePath stackRoot ++ ":" ++ toFilePath stackRoot
-                   ,"-v",toFilePath projectRoot ++ ":" ++ toFilePath projectRoot
-                   ,"-v",toFilePath sandboxSandboxDir ++ ":" ++ toFilePath sandboxDir
-                   ,"-v",toFilePath sandboxHomeDir ++ ":" ++ toFilePath sandboxRepoDir]
+                   ,"-v",trimTrailingPathSep stackRoot ++ ":" ++ trimTrailingPathSep stackRoot
+                   ,"-v",trimTrailingPathSep projectRoot ++ ":" ++ trimTrailingPathSep projectRoot
+                   ,"-v",trimTrailingPathSep sandboxSandboxDir ++ ":" ++ trimTrailingPathSep sandboxDir
+                   ,"-v",trimTrailingPathSep sandboxHomeDir ++ ":" ++ trimTrailingPathSep sandboxRepoDir]
                   ,if oldImage
                      then ["-e",sandboxIDEnvVar ++ "=" ++ sandboxID
                           ,"--entrypoint=/root/entrypoint.sh"]
@@ -254,92 +247,90 @@ runContainerAndExitAction config
                   ,[cmnd]
                   ,args])
                 successPostAction
-     liftIO (do updateDockerImageLastUsed config
-                                          (iiId imageInfo)
-                                          (toFilePath projectRoot)
-                execDockerProcess)
+     updateDockerImageLastUsed config
+                               (iiId imageInfo)
+                               (toFilePath projectRoot)
+     execDockerProcess
 
   where
-    lookupImageEnv :: String -> [(String,String)] -> Maybe String
     lookupImageEnv name vars =
       case lookup name vars of
         Just ('=':val) -> Just val
         _ -> Nothing
-
-    mountArg :: Mount -> [String]
     mountArg (Mount host container) = ["-v",host ++ ":" ++ container]
-
-    sandboxSubdirArg :: Path Abs Dir -> [String]
-    sandboxSubdirArg subdir = ["-v",toFilePath subdir++ ":" ++ toFilePath subdir]
-
-    projectRoot :: Path Abs Dir
+    sandboxSubdirArg subdir = ["-v",trimTrailingPathSep subdir++ ":" ++ trimTrailingPathSep subdir]
+    trimTrailingPathSep = dropWhileEnd isPathSeparator . toFilePath
     projectRoot = fromMaybeProjectRoot mprojectRoot
-
-    docker :: DockerOpts
     docker = configDocker config
 
 -- | Clean-up old docker images and containers.
 cleanup :: Config -> CleanupOpts -> IO ()
-cleanup config opts = runAction (cleanupAction config opts)
-
--- | Cleanup action
-cleanupAction :: Config -> CleanupOpts -> Action ()
-cleanupAction config opts =
-  do checkDockerVersion
-     (Stdout imagesOut) <- cmd "docker images --no-trunc -f dangling=false"
-     (Stdout danglingImagesOut) <- cmd "docker images --no-trunc -f dangling=true"
-     (Stdout runningContainersOut) <- cmd "docker ps -a --no-trunc -f status=running"
-     (Stdout restartingContainersOut) <- cmd "docker ps -a --no-trunc -f status=restarting"
-     (Stdout exitedContainersOut) <- cmd "docker ps -a --no-trunc -f status=exited"
-     (Stdout pausedContainersOut) <- cmd "docker ps -a --no-trunc -f status=paused"
+cleanup config opts =
+  do envOverride <- getEnvOverride (configPlatform config)
+     checkDockerVersion envOverride
+     imagesOut <- readProcessStdout envOverride "docker" ["images","--no-trunc","-f","dangling=false"]
+     danglingImagesOut <- readProcessStdout envOverride "docker" ["images","--no-trunc","-f","dangling=true"]
+     runningContainersOut <- readProcessStdout envOverride "docker" ["ps","-a","--no-trunc","-f","status=running"]
+     restartingContainersOut <- readProcessStdout envOverride "docker" ["ps","-a","--no-trunc","-f","status=restarting"]
+     exitedContainersOut <- readProcessStdout envOverride "docker" ["ps","-a","--no-trunc","-f","status=exited"]
+     pausedContainersOut <- readProcessStdout envOverride "docker" ["ps","-a","--no-trunc","-f","status=paused"]
      let imageRepos = parseImagesOut imagesOut
          danglingImageHashes = Map.keys (parseImagesOut danglingImagesOut)
          runningContainers = parseContainersOut runningContainersOut ++
                              parseContainersOut restartingContainersOut
          stoppedContainers = parseContainersOut exitedContainersOut ++
                              parseContainersOut pausedContainersOut
-     inspectMap <- inspects (Map.keys imageRepos ++
+     inspectMap <- inspects envOverride
+                            (Map.keys imageRepos ++
                              danglingImageHashes ++
                              map fst stoppedContainers ++
                              map fst runningContainers)
-     plan <- liftIO
-       (do imagesLastUsed <- getDockerImagesLastUsed config
-           curTime <- getZonedTime
-           let planWriter = buildPlan curTime
-                                      imagesLastUsed
-                                      imageRepos
-                                      danglingImageHashes
-                                      stoppedContainers
-                                      runningContainers
-                                      inspectMap
-               plan = toLazyByteString (execWriter planWriter)
-           case dcAction opts of
-             CleanupInteractive -> editByteString (intercalate "-" [stackProgName
-                                                                   ,dockerCmdName
-                                                                   ,dockerCleanupCmdName
-                                                                   ,"plan"])
-                                                  plan
-             CleanupImmediate -> return plan
-             CleanupDryRun -> do LBS.hPut stdout plan
-                                 return LBS.empty)
-     withVerbosity
-       Loud
-       (mapM_ performPlanLine (reverse (filter filterPlanLine (lines (LBS.unpack plan)))))
-     (Stdout allImageHashesOut) <- cmd "docker images -aq --no-trunc"
-     liftIO (pruneDockerImagesLastUsed config (lines allImageHashesOut))
+     imagesLastUsed <- getDockerImagesLastUsed config
+     curTime <- getZonedTime
+     let planWriter = buildPlan curTime
+                                imagesLastUsed
+                                imageRepos
+                                danglingImageHashes
+                                stoppedContainers
+                                runningContainers
+                                inspectMap
+         plan = toLazyByteString (execWriter planWriter)
+     plan' <- case dcAction opts of
+                CleanupInteractive -> editByteString (intercalate "-" [stackProgName
+                                                                      ,dockerCmdName
+                                                                      ,dockerCleanupCmdName
+                                                                      ,"plan"])
+                                                     plan
+                CleanupImmediate -> return plan
+                CleanupDryRun -> do LBS.hPut stdout plan
+                                    return LBS.empty
+     mapM_ (performPlanLine envOverride)
+           (reverse (filter filterPlanLine (lines (LBS.unpack plan'))))
+     allImageHashesOut <- readProcessStdout envOverride "docker" ["images","-aq","--no-trunc"]
+     pruneDockerImagesLastUsed config (lines (decodeUtf8 allImageHashesOut))
   where
     filterPlanLine line =
       case line of
         c:_ | isSpace c -> False
         _ -> True
-    performPlanLine line =
-      do (Exit _) <- case filter (not . null) (words (takeWhile (/= '#') line)) of
-           [] -> return (Exit ExitSuccess)
-           (c:_):t:v:_ | toUpper c == 'R' && t == imageStr -> cmd "docker rmi" [v]
-                       | toUpper c == 'R' && t == containerStr -> cmd "docker rm -f " [v]
-           _ -> throwAction (InvalidCleanupCommandException line)
-         return ()
-    parseImagesOut = Map.fromListWith (++) . map parseImageRepo . drop 1 . lines
+    performPlanLine envOverride line =
+      case filter (not . null) (words (takeWhile (/= '#') line)) of
+        [] -> return ()
+        (c:_):t:v:_ ->
+          do args <- if | toUpper c == 'R' && t == imageStr ->
+                            do putStrLn (concat ["Removing image: '",v,"'"])
+                               return ["rmi",v]
+                        | toUpper c == 'R' && t == containerStr ->
+                            do putStrLn (concat ["Removing container: '",v,"'"])
+                               return ["rm","-f",v]
+                        | otherwise -> throwIO (InvalidCleanupCommandException line)
+             e <- try (callProcess envOverride "docker" args)
+             case e of
+               Left (ProcessExitedUnsuccessfully _ _) ->
+                 hPutStrLn stderr (concat ["Could not remove: '",v,"'"])
+               Right () -> return ()
+        _ -> throwIO (InvalidCleanupCommandException line)
+    parseImagesOut = Map.fromListWith (++) . map parseImageRepo . drop 1 . lines . decodeUtf8
       where parseImageRepo :: String -> (String, [String])
             parseImageRepo line =
               case words line of
@@ -348,7 +339,7 @@ cleanupAction config opts =
                   | tag == "<none>" -> (hash,[repo])
                   | otherwise -> (hash,[repo ++ ":" ++ tag])
                 _ -> throw (InvalidImagesOutputException line)
-    parseContainersOut = map parseContainer . drop 1 . lines
+    parseContainersOut = map parseContainer . drop 1 . lines . decodeUtf8
       where parseContainer line =
               case words line of
                 hash:image:rest -> (hash,(image,last rest))
@@ -492,84 +483,82 @@ cleanupAction config opts =
     imageStr = "image"
     containerStr = "container"
 
--- | Inspect multiple Docker images and/or containers.
-inspects :: [String] -> Action (Map String Inspect)
-inspects [] = return Map.empty
-inspects images =
-  do (Exit inspectExitCode, Stdout inspectOut) <- cmd "docker inspect" images
-     case inspectExitCode of
-       ExitSuccess ->
-         -- filtering with 'isAscii' to workaround @docker inspect@ output containing invalid UTF-8
-         case eitherDecode (LBS.pack (filter isAscii inspectOut)) of
-           Left msg -> throwAction (InvalidInspectOutputException msg)
-           Right results -> return (Map.fromList (map (\r -> (iiId r,r)) results))
-       ExitFailure _ -> return Map.empty
-
 -- | Inspect Docker image or container.
-inspect :: String -> Action (Maybe Inspect)
-inspect image =
-  do results <- inspects [image]
+inspect :: EnvOverride -> String -> IO (Maybe Inspect)
+inspect envOverride image =
+  do results <- inspects envOverride [image]
      case Map.toList results of
        [] -> return Nothing
        [(_,i)] -> return (Just i)
-       _ -> throwAction (InvalidInspectOutputException "expect a single result")
+       _ -> throwIO (InvalidInspectOutputException "expect a single result")
+
+-- | Inspect multiple Docker images and/or containers.
+inspects :: EnvOverride -> [String] -> IO (Map String Inspect)
+inspects _ [] = return Map.empty
+inspects envOverride images =
+  do maybeInspectOut <- tryProcessStdout envOverride "docker" ("inspect" : images)
+     case maybeInspectOut of
+       Right inspectOut ->
+         -- filtering with 'isAscii' to workaround @docker inspect@ output containing invalid UTF-8
+         case eitherDecode (LBS.pack (filter isAscii (decodeUtf8 inspectOut))) of
+           Left msg -> throwIO (InvalidInspectOutputException msg)
+           Right results -> return (Map.fromList (map (\r -> (iiId r,r)) results))
+       Left (ProcessExitedUnsuccessfully _ _) -> return Map.empty
 
 -- | Pull latest version of configured Docker image from registry.
-pull :: DockerOpts -> IO ()
-pull docker =
-  runAction (do checkDockerVersion
-                pullImage docker (dockerImage docker))
+pull :: Config -> IO ()
+pull config =
+  do envOverride <- getEnvOverride (configPlatform config)
+     checkDockerVersion envOverride
+     pullImage envOverride docker (dockerImage docker)
+  where docker = configDocker config
 
 -- | Pull Docker image from registry.
-pullImage :: DockerOpts -> String -> Action ()
-pullImage docker image =
-  liftIO (do hPutStrLn stderr ("\nPulling from registry: " ++ image)
-             when (dockerRegistryLogin docker)
-                  (do hPutStrLn stderr "You may need to log in."
-                      Proc.callProcess
-                        "docker"
-                        (concat
-                           [["login"]
-                           ,maybe [] (\u -> ["--username=" ++ u]) (dockerRegistryUsername docker)
-                           ,maybe [] (\p -> ["--password=" ++ p]) (dockerRegistryPassword docker)
-                           ,[takeWhile (/= '/') image]]))
-             onException
-               (Proc.callProcess "docker" ["pull", image])
-               (throwIO (PullFailedException image)))
-
--- | Run a Shake action.
-runAction :: Action () -> IO ()
-runAction inner =
-  withSystemTempDirectory
-    (stackProgName ++ "-" ++ dockerCmdName ++ ".")
-    (\tmp -> do shake shakeOptions{shakeVerbosity = Quiet
-                                  ,shakeFiles = tmp}
-                      (action inner))
+pullImage :: EnvOverride -> DockerOpts -> String -> IO ()
+pullImage envOverride docker image =
+  do putStrLn ("Pulling from registry: " ++ image)
+     when (dockerRegistryLogin docker)
+          (do putStrLn "You may need to log in."
+              callProcess
+                envOverride
+                "docker"
+                (concat
+                   [["login"]
+                   ,maybe [] (\u -> ["--username=" ++ u]) (dockerRegistryUsername docker)
+                   ,maybe [] (\p -> ["--password=" ++ p]) (dockerRegistryPassword docker)
+                   ,[takeWhile (/= '/') image]]))
+     e <- try (callProcess envOverride "docker" ["pull",image])
+     case e of
+       Left (ProcessExitedUnsuccessfully _ _) -> throwIO (PullFailedException image)
+       Right () -> return ()
 
 -- | Check docker version (throws exception if incorrect)
-checkDockerVersion :: Action ()
-checkDockerVersion =
-  do (Stdout dockerVersionOut) <- cmd "docker --version"
-       `actionOnException` putStrLn "\nCannot get Docker version.  IS DOCKER INSTALLED?\n"
-     case words dockerVersionOut of
+checkDockerVersion :: EnvOverride -> IO ()
+checkDockerVersion envOverride =
+  do dockerExists <- doesExecutableExist envOverride "docker"
+     when (not dockerExists)
+          (throwIO DockerNotInstalledException)
+     dockerVersionOut <- readProcessStdout envOverride "docker" ["--version"]
+     case words (decodeUtf8 dockerVersionOut) of
        (_:_:v:_) ->
          case parseVersionFromString (dropWhileEnd (== ',') v) of
            Just v'
              | v' < minimumDockerVersion ->
-               throwAction (DockerTooOldException minimumDockerVersion v')
+               throwIO (DockerTooOldException minimumDockerVersion v')
              | v' `elem` prohibitedDockerVersions ->
-               throwAction (DockerVersionProhibitedException prohibitedDockerVersions v')
+               throwIO (DockerVersionProhibitedException prohibitedDockerVersions v')
              | otherwise ->
                return ()
-           _ -> throwAction InvalidVersionOutputException
-       _ -> throwAction InvalidVersionOutputException
+           _ -> throwIO InvalidVersionOutputException
+       _ -> throwIO InvalidVersionOutputException
   where minimumDockerVersion = $(mkVersion "1.3.0")
         prohibitedDockerVersions = [$(mkVersion "1.2.0")]
 
 -- | Run a process, then exit with the same exit code.
-execProcessAndExit :: FilePath -> [String] -> IO () -> IO ()
-execProcessAndExit cmnd args successPostAction =
-  do (_, _, _, h) <- Proc.createProcess (Proc.proc cmnd args){Proc.delegate_ctlc = True}
+execProcessAndExit :: EnvOverride -> FilePath -> [String] -> IO () -> IO ()
+execProcessAndExit envOverride cmnd args successPostAction =
+  do (_, _, _, h) <- Proc.createProcess (Proc.proc cmnd args){Proc.delegate_ctlc = True
+                                                             ,Proc.env = envHelper envOverride}
 #ifndef mingw32_HOST_OS
      _ <- installHandler sigTERM (Catch (Proc.terminateProcess h)) Nothing
 #endif
@@ -720,13 +709,14 @@ dockerOptsFromMonoid mproject DockerOptsMonoid{..} = DockerOpts
         emptyToNothing (Just s) | null s = Nothing
                                 | otherwise = Just s
 
--- | Throw an exception from a Shake Action.
-throwAction :: StackDockerException -> Action a
-throwAction = liftIO . throwIO
+-- | Decode ByteString to UTF8.
+decodeUtf8 :: BS.ByteString -> String
+decodeUtf8 bs = T.unpack (T.decodeUtf8 (bs))
+
 
 -- | Fail with friendly error if project root not set.
 fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
-fromMaybeProjectRoot = fromMaybe (throw CannotDetermineProjectRoot)
+fromMaybeProjectRoot = fromMaybe (throw CannotDetermineProjectRootException)
 
 -- | Environment variable to the host's stack version.
 hostVersionEnvVar :: String
@@ -840,8 +830,10 @@ data StackDockerException
     -- ^ Version of @stack@ in container/image is too old for version on host.
   | ResolverNotSupportedException Resolver
     -- ^ Only LTS resolvers are supported for default image tag.
-  | CannotDetermineProjectRoot
+  | CannotDetermineProjectRootException
     -- ^ Can't determine the project root (where to put @.docker-sandbox@).
+  | DockerNotInstalledException
+    -- ^ @docker --version@ failed.
   deriving (Typeable)
 
 -- | Exception instance for StackDockerException.
@@ -872,10 +864,9 @@ instance Show StackDockerException where
   show (InvalidInspectOutputException msg) =
     concat ["Invalid 'docker inspect' output: ",msg,"."]
   show (PullFailedException image) = 
-    concat ["Could not pull Docker image:\n   "
+    concat ["Could not pull Docker image:\n    "
            ,image
-           ,"\nIf the tag was not found, there may not be an image on the registry for your"
-           ,"\nresolver's LTS version in "
+           ,"\nThere may not be an image on the registry for your resolver's LTS version in\n"
            ,toFilePath stackDotYaml
            ,"."]
   show (DockerTooOldException minVersion haveVersion) =
@@ -922,5 +913,7 @@ instance Show StackDockerException where
            ,"' explicitly, in "
            ,toFilePath stackDotYaml
            ,"."]
-  show CannotDetermineProjectRoot =
+  show CannotDetermineProjectRootException =
     "Cannot determine project root directory for Docker sandbox."
+  show DockerNotInstalledException=
+    "Cannot find 'docker' in PATH.  Is Docker installed?"

@@ -98,7 +98,6 @@ library
                    , process >= 1.2.0.0
                    , resourcet >= 1.1.4.1
                    , safe >= 0.3
-                   , shake >= 0.15
                    , stm >= 2.4.4
                    , streaming-commons >= 0.1.10.0
                    , tar >= 0.4.1.0
@@ -142,7 +141,6 @@ executable stack
                 , path
                 , process
                 , resourcet >= 1.1.4.1
-                , shake
                 , stack
                 , text >= 1.2.0.4
                 , either
