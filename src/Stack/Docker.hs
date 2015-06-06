@@ -1,7 +1,5 @@
-{-# LANGUAGE CPP, DeriveDataTypeable, MultiWayIf, NamedFieldPuns, RankNTypes, RecordWildCards,
-             TemplateHaskell, TupleSections #-}
-
---EKB FIXME: get this all using proper logging infrastructure
+{-# LANGUAGE CPP, DeriveDataTypeable, MultiWayIf, NamedFieldPuns, OverloadedStrings, RankNTypes,
+             RecordWildCards, TemplateHaskell, TupleSections #-}
 
 -- | Run commands in Docker containers
 module Stack.Docker
@@ -25,6 +23,9 @@ module Stack.Docker
 import           Control.Applicative
 import           Control.Exception
 import           Control.Monad
+import           Control.Monad.Catch (MonadThrow, throwM)
+import           Control.Monad.IO.Class (MonadIO,liftIO)
+import           Control.Monad.Logger (MonadLogger,logError,logInfo,logWarn)
 import           Control.Monad.Writer (execWriter,runWriter,tell)
 import           Data.Aeson (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
 import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
@@ -37,6 +38,7 @@ import qualified Data.Map.Strict as Map
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
+import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
@@ -55,7 +57,7 @@ import           System.Environment (lookupEnv,getProgName,getArgs,getExecutable
 import           System.Exit (ExitCode(ExitSuccess),exitWith)
 import           System.FilePath (takeBaseName,isPathSeparator)
 import           System.Info (arch,os)
-import           System.IO (hPutStrLn,stderr,stdin,stdout,hIsTerminalDevice)
+import           System.IO (stderr,stdin,stdout,hIsTerminalDevice)
 import qualified System.Process as Proc
 import           System.Process.PagerEditor (editByteString)
 import           System.Process.Read
@@ -67,7 +69,8 @@ import           System.Posix.Signals (installHandler,sigTERM,Handler(Catch))
 
 -- | If Docker is enabled, re-runs the currently running OS command in a Docker container.
 -- Otherwise, runs the inner action.
-rerunWithOptionalContainer :: Config -> Maybe (Path Abs Dir) -> IO () -> IO ()
+rerunWithOptionalContainer :: (MonadLogger m,MonadIO m,MonadThrow m)
+                           => Config -> Maybe (Path Abs Dir) -> IO () -> m ()
 rerunWithOptionalContainer config mprojectRoot inner =
      rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs inner
    where
@@ -87,51 +90,57 @@ rerunWithOptionalContainer config mprojectRoot inner =
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
 -- Docker container.  Otherwise, runs the inner action.
-rerunCmdWithOptionalContainer :: Config
+rerunCmdWithOptionalContainer :: (MonadLogger m,MonadIO m,MonadThrow m)
+                              => Config
                               -> Maybe (Path Abs Dir)
                               -> IO (FilePath,[String],Config)
                               -> IO ()
-                              -> IO ()
+                              -> m ()
 rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs inner =
   do inContainer <- getInContainer
      if inContainer || not (dockerEnable (configDocker config))
-        then inner
-        else do (cmd_,args,config') <- getCmdArgs
+        then liftIO inner
+        else do (cmd_,args,config') <- liftIO getCmdArgs
                 runContainerAndExit config' mprojectRoot cmd_ args [] (return ())
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
 -- Docker container.  Otherwise, runs the inner action.
-rerunCmdWithRequiredContainer :: Config -> Maybe (Path Abs Dir) -> IO (FilePath,[String],Config) -> IO ()
+rerunCmdWithRequiredContainer :: (MonadLogger m,MonadIO m,MonadThrow m)
+                              => Config
+                              -> Maybe (Path Abs Dir)
+                              -> IO (FilePath,[String],Config)
+                              -> m ()
 rerunCmdWithRequiredContainer config mprojectRoot getCmdArgs =
   do when (not (dockerEnable (configDocker config)))
-          (throwIO DockerMustBeEnabledException)
-     (cmd_,args,config') <- getCmdArgs
+          (throwM DockerMustBeEnabledException)
+     (cmd_,args,config') <- liftIO getCmdArgs
      runContainerAndExit config' mprojectRoot cmd_ args [] (return ())
 
 -- | Error if running in a container.
-preventInContainer :: IO () -> IO ()
+preventInContainer :: (MonadIO m,MonadThrow m) => m () -> m ()
 preventInContainer inner =
   do inContainer <- getInContainer
      if inContainer
-        then throwIO OnlyOnHostException
+        then throwM OnlyOnHostException
         else inner
 
 -- | 'True' if we are currently running inside a Docker container.
-getInContainer :: IO Bool
+getInContainer :: (MonadIO m) => m Bool
 getInContainer =
-  do maybeEnvVar <- lookupEnv sandboxIDEnvVar
+  do maybeEnvVar <- liftIO (lookupEnv sandboxIDEnvVar)
      case maybeEnvVar of
        Nothing -> return False
        Just _ -> return True
 
 -- | Run a command in a new Docker container, then exit the process.
-runContainerAndExit :: Config
+runContainerAndExit :: (MonadLogger m,MonadIO m,MonadThrow m)
+                    => Config
                     -> Maybe (Path Abs Dir)
                     -> FilePath
                     -> [String]
                     -> [(String,String)]
                     -> IO ()
-                    -> IO ()
+                    -> m ()
 runContainerAndExit config
                     mprojectRoot
                     cmnd
@@ -142,29 +151,30 @@ runContainerAndExit config
      checkDockerVersion envOverride
      uidOut <- readProcessStdout envOverride "id" ["-u"]
      gidOut <- readProcessStdout envOverride "id" ["-g"]
-     dockerHost <- lookupEnv "DOCKER_HOST"
-     dockerCertPath <- lookupEnv "DOCKER_CERT_PATH"
-     dockerTlsVerify <- lookupEnv "DOCKER_TLS_VERIFY"
-     isStdinTerminal <- hIsTerminalDevice stdin
-     isStdoutTerminal <- hIsTerminalDevice stdout
-     isStderrTerminal <- hIsTerminalDevice stderr
+     (dockerHost,dockerCertPath,dockerTlsVerify) <-
+       liftIO ((,,) <$> lookupEnv "DOCKER_HOST"
+                    <*> lookupEnv "DOCKER_CERT_PATH"
+                    <*> lookupEnv "DOCKER_TLS_VERIFY")
+     (isStdinTerminal,isStdoutTerminal,isStderrTerminal) <-
+       liftIO ((,,) <$> hIsTerminalDevice stdin
+                    <*> hIsTerminalDevice stdout
+                    <*> hIsTerminalDevice stderr)
      pwd <- getWorkingDir
      when (maybe False (isPrefixOf "tcp://") dockerHost &&
            maybe False (isInfixOf "boot2docker") dockerCertPath)
-          (hPutStrLn stderr
-             ("WARNING: using boot2docker is NOT supported, and not likely to perform well."))
+          ($logWarn "WARNING: Using boot2docker is NOT supported, and not likely to perform well.")
      let image = dockerImage docker
      maybeImageInfo <- inspect envOverride image
      imageInfo <- case maybeImageInfo of
        Just ii -> return ii
        Nothing
          | dockerAutoPull docker ->
-             do pullImage envOverride docker image
+             do pullImage pwd envOverride docker image
                 mii2 <- inspect envOverride image
                 case mii2 of
                   Just ii2 -> return ii2
-                  Nothing -> throwIO (InspectFailedException image)
-         | otherwise -> throwIO (NotPulledException image)
+                  Nothing -> throwM (InspectFailedException image)
+         | otherwise -> throwM (NotPulledException image)
      let uid = dropWhileEnd isSpace (decodeUtf8 uidOut)
          gid = dropWhileEnd isSpace (decodeUtf8 gidOut)
          imageEnvVars = map (break (== '=')) (icEnv (iiConfig imageInfo))
@@ -247,10 +257,10 @@ runContainerAndExit config
                   ,[cmnd]
                   ,args])
                 successPostAction
-     updateDockerImageLastUsed config
-                               (iiId imageInfo)
-                               (toFilePath projectRoot)
-     execDockerProcess
+     liftIO (do updateDockerImageLastUsed config
+                                          (iiId imageInfo)
+                                          (toFilePath projectRoot)
+                execDockerProcess)
 
   where
     lookupImageEnv name vars =
@@ -264,7 +274,7 @@ runContainerAndExit config
     docker = configDocker config
 
 -- | Clean-up old docker images and containers.
-cleanup :: Config -> CleanupOpts -> IO ()
+cleanup :: (MonadLogger m,MonadIO m,MonadThrow m) => Config -> CleanupOpts -> m ()
 cleanup config opts =
   do envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride
@@ -285,8 +295,9 @@ cleanup config opts =
                              danglingImageHashes ++
                              map fst stoppedContainers ++
                              map fst runningContainers)
-     imagesLastUsed <- getDockerImagesLastUsed config
-     curTime <- getZonedTime
+     (imagesLastUsed,curTime) <-
+       liftIO ((,) <$> getDockerImagesLastUsed config
+                   <*> getZonedTime)
      let planWriter = buildPlan curTime
                                 imagesLastUsed
                                 imageRepos
@@ -296,18 +307,19 @@ cleanup config opts =
                                 inspectMap
          plan = toLazyByteString (execWriter planWriter)
      plan' <- case dcAction opts of
-                CleanupInteractive -> editByteString (intercalate "-" [stackProgName
-                                                                      ,dockerCmdName
-                                                                      ,dockerCleanupCmdName
-                                                                      ,"plan"])
-                                                     plan
+                CleanupInteractive ->
+                  liftIO (editByteString (intercalate "-" [stackProgName
+                                                          ,dockerCmdName
+                                                          ,dockerCleanupCmdName
+                                                          ,"plan"])
+                                         plan)
                 CleanupImmediate -> return plan
-                CleanupDryRun -> do LBS.hPut stdout plan
+                CleanupDryRun -> do liftIO (LBS.hPut stdout plan)
                                     return LBS.empty
      mapM_ (performPlanLine envOverride)
            (reverse (filter filterPlanLine (lines (LBS.unpack plan'))))
      allImageHashesOut <- readProcessStdout envOverride "docker" ["images","-aq","--no-trunc"]
-     pruneDockerImagesLastUsed config (lines (decodeUtf8 allImageHashesOut))
+     liftIO (pruneDockerImagesLastUsed config (lines (decodeUtf8 allImageHashesOut)))
   where
     filterPlanLine line =
       case line of
@@ -318,18 +330,18 @@ cleanup config opts =
         [] -> return ()
         (c:_):t:v:_ ->
           do args <- if | toUpper c == 'R' && t == imageStr ->
-                            do putStrLn (concat ["Removing image: '",v,"'"])
+                            do $logInfo (concatT ["Removing image: '",v,"'"])
                                return ["rmi",v]
                         | toUpper c == 'R' && t == containerStr ->
-                            do putStrLn (concat ["Removing container: '",v,"'"])
+                            do $logInfo (concatT ["Removing container: '",v,"'"])
                                return ["rm","-f",v]
-                        | otherwise -> throwIO (InvalidCleanupCommandException line)
-             e <- try (callProcess envOverride "docker" args)
+                        | otherwise -> throwM (InvalidCleanupCommandException line)
+             e <- liftIO (try (callProcess envOverride "docker" args))
              case e of
                Left (ProcessExitedUnsuccessfully _ _) ->
-                 hPutStrLn stderr (concat ["Could not remove: '",v,"'"])
+                 $logError (concatT ["Could not remove: '",v,"'"])
                Right () -> return ()
-        _ -> throwIO (InvalidCleanupCommandException line)
+        _ -> throwM (InvalidCleanupCommandException line)
     parseImagesOut = Map.fromListWith (++) . map parseImageRepo . drop 1 . lines . decodeUtf8
       where parseImageRepo :: String -> (String, [String])
             parseImageRepo line =
@@ -484,16 +496,16 @@ cleanup config opts =
     containerStr = "container"
 
 -- | Inspect Docker image or container.
-inspect :: EnvOverride -> String -> IO (Maybe Inspect)
+inspect :: (MonadIO m,MonadThrow m) => EnvOverride -> String -> m (Maybe Inspect)
 inspect envOverride image =
   do results <- inspects envOverride [image]
      case Map.toList results of
        [] -> return Nothing
        [(_,i)] -> return (Just i)
-       _ -> throwIO (InvalidInspectOutputException "expect a single result")
+       _ -> throwM (InvalidInspectOutputException "expect a single result")
 
 -- | Inspect multiple Docker images and/or containers.
-inspects :: EnvOverride -> [String] -> IO (Map String Inspect)
+inspects :: (MonadIO m,MonadThrow m) => EnvOverride -> [String] -> m (Map String Inspect)
 inspects _ [] = return Map.empty
 inspects envOverride images =
   do maybeInspectOut <- tryProcessStdout envOverride "docker" ("inspect" : images)
@@ -501,56 +513,60 @@ inspects envOverride images =
        Right inspectOut ->
          -- filtering with 'isAscii' to workaround @docker inspect@ output containing invalid UTF-8
          case eitherDecode (LBS.pack (filter isAscii (decodeUtf8 inspectOut))) of
-           Left msg -> throwIO (InvalidInspectOutputException msg)
+           Left msg -> throwM (InvalidInspectOutputException msg)
            Right results -> return (Map.fromList (map (\r -> (iiId r,r)) results))
        Left (ProcessExitedUnsuccessfully _ _) -> return Map.empty
 
 -- | Pull latest version of configured Docker image from registry.
-pull :: Config -> IO ()
+pull :: (MonadLogger m,MonadIO m,MonadThrow m) => Config -> m ()
 pull config =
   do envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride
-     pullImage envOverride docker (dockerImage docker)
+     pwd <- getWorkingDir
+     pullImage pwd envOverride docker (dockerImage docker)
   where docker = configDocker config
 
 -- | Pull Docker image from registry.
-pullImage :: EnvOverride -> DockerOpts -> String -> IO ()
-pullImage envOverride docker image =
-  do putStrLn ("Pulling from registry: " ++ image)
+pullImage :: (MonadLogger m,MonadIO m,MonadThrow m)
+          => Path Abs Dir -> EnvOverride -> DockerOpts -> String -> m ()
+pullImage pwd envOverride docker image =
+  do $logInfo (concatT ["Pulling image from registry: '",image,"'"])
      when (dockerRegistryLogin docker)
-          (do putStrLn "You may need to log in."
-              callProcess
-                envOverride
+          (do $logInfo "You may need to log in."
+              runIn
+                pwd
                 "docker"
+                envOverride
                 (concat
                    [["login"]
                    ,maybe [] (\u -> ["--username=" ++ u]) (dockerRegistryUsername docker)
                    ,maybe [] (\p -> ["--password=" ++ p]) (dockerRegistryPassword docker)
-                   ,[takeWhile (/= '/') image]]))
-     e <- try (callProcess envOverride "docker" ["pull",image])
+                   ,[takeWhile (/= '/') image]])
+                Nothing)
+     e <- liftIO (try (callProcess envOverride "docker" ["pull",image]))
      case e of
-       Left (ProcessExitedUnsuccessfully _ _) -> throwIO (PullFailedException image)
+       Left (ProcessExitedUnsuccessfully _ _) -> throwM (PullFailedException image)
        Right () -> return ()
 
 -- | Check docker version (throws exception if incorrect)
-checkDockerVersion :: EnvOverride -> IO ()
+checkDockerVersion :: (MonadIO m,MonadThrow m) => EnvOverride -> m ()
 checkDockerVersion envOverride =
   do dockerExists <- doesExecutableExist envOverride "docker"
      when (not dockerExists)
-          (throwIO DockerNotInstalledException)
+          (throwM DockerNotInstalledException)
      dockerVersionOut <- readProcessStdout envOverride "docker" ["--version"]
      case words (decodeUtf8 dockerVersionOut) of
        (_:_:v:_) ->
          case parseVersionFromString (dropWhileEnd (== ',') v) of
            Just v'
              | v' < minimumDockerVersion ->
-               throwIO (DockerTooOldException minimumDockerVersion v')
+               throwM (DockerTooOldException minimumDockerVersion v')
              | v' `elem` prohibitedDockerVersions ->
-               throwIO (DockerVersionProhibitedException prohibitedDockerVersions v')
+               throwM (DockerVersionProhibitedException prohibitedDockerVersions v')
              | otherwise ->
                return ()
-           _ -> throwIO InvalidVersionOutputException
-       _ -> throwIO InvalidVersionOutputException
+           _ -> throwM InvalidVersionOutputException
+       _ -> throwM InvalidVersionOutputException
   where minimumDockerVersion = $(mkVersion "1.3.0")
         prohibitedDockerVersions = [$(mkVersion "1.2.0")]
 
@@ -568,12 +584,12 @@ execProcessAndExit envOverride cmnd args successPostAction =
      exitWith exitCode
 
 -- | Remove the project's Docker sandbox.
-reset :: Maybe (Path Abs Dir) -> Bool -> IO ()
+reset :: (MonadIO m) => Maybe (Path Abs Dir) -> Bool -> m ()
 reset maybeProjectRoot keepHome =
-  removeDirectoryContents
-    (projectDockerSandboxDir projectRoot)
-    [homeDirName | keepHome]
-    []
+  liftIO (removeDirectoryContents
+            (projectDockerSandboxDir projectRoot)
+            [homeDirName | keepHome]
+            [])
   where projectRoot = fromMaybeProjectRoot maybeProjectRoot
 
 -- | Remove the contents of a directory, without removing the directory itself.
@@ -606,30 +622,30 @@ homeDirName :: Path Rel Dir
 homeDirName = $(mkRelDir ".home/")
 
 -- | Check host 'stack' version
-checkHostStackVersion :: Version -> IO ()
+checkHostStackVersion :: (MonadIO m,MonadThrow m) => Version -> m ()
 checkHostStackVersion minVersion =
-  do maybeHostVer <- lookupEnv hostVersionEnvVar
+  do maybeHostVer <- liftIO (lookupEnv hostVersionEnvVar)
      case parseVersionFromString =<< maybeHostVer of
        Just hostVer
-         | hostVer < minVersion -> throwIO (HostStackTooOldException minVersion (Just hostVer))
+         | hostVer < minVersion -> throwM (HostStackTooOldException minVersion (Just hostVer))
          | otherwise -> return ()
        Nothing ->
           do inContainer <- getInContainer
              if inContainer
-                then throwIO (HostStackTooOldException minVersion Nothing)
+                then throwM (HostStackTooOldException minVersion Nothing)
                 else return ()
 
 
 -- | Check host and container 'stack' versions are compatible.
-checkVersions :: IO ()
+checkVersions :: (MonadIO m,MonadThrow m) => m ()
 checkVersions =
   do inContainer <- getInContainer
      when inContainer
        (do checkHostStackVersion requireHostVersion
-           maybeReqVer <- lookupEnv requireVersionEnvVar
+           maybeReqVer <- liftIO (lookupEnv requireVersionEnvVar)
            case parseVersionFromString =<< maybeReqVer of
              Just reqVer
-               | stackVersion < reqVer -> throwIO (ContainerStackTooOldException reqVer stackVersion)
+               | stackVersion < reqVer -> throwM (ContainerStackTooOldException reqVer stackVersion)
                | otherwise -> return ()
              _ -> return ())
 
@@ -709,10 +725,13 @@ dockerOptsFromMonoid mproject DockerOptsMonoid{..} = DockerOpts
         emptyToNothing (Just s) | null s = Nothing
                                 | otherwise = Just s
 
--- | Decode ByteString to UTF8.
+-- | Convenience function to decode ByteString to String.
 decodeUtf8 :: BS.ByteString -> String
 decodeUtf8 bs = T.unpack (T.decodeUtf8 (bs))
 
+-- | Convenience function constructing message for @$log*@.
+concatT :: [String] -> Text
+concatT = T.pack . concat
 
 -- | Fail with friendly error if project root not set.
 fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir

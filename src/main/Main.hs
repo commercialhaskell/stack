@@ -221,28 +221,29 @@ setupParser = SetupCmdOpts
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
-  Docker.rerunWithOptionalContainer
-    (lcConfig lc)
-    (lcProjectRoot lc)
-    (runStackLoggingT manager globalLogLevel $ do
-        (ghc, mstack) <-
-            case scoGhcVersion of
-                Just v -> return (v, Nothing)
-                Nothing -> do
-                    bc <- lcLoadBuildConfig lc ThrowException
-                    return (bcGhcVersion bc, Just $ bcStackYaml bc)
-        mpaths <- runStackT manager globalLogLevel (lcConfig lc) $ ensureGHC SetupOpts
-            { soptsInstallIfMissing = True
-            , soptsUseSystem = globalSystemGhc && not scoForceReinstall
-            , soptsExpected = ghc
-            , soptsStackYaml = mstack
-            , soptsForceReinstall = scoForceReinstall
-            }
-        case mpaths of
-            Nothing -> $logInfo "GHC on PATH would be used"
-            Just paths -> $logInfo $ "Would add the following to PATH: "
-                <> T.pack (intercalate [searchPathSeparator] paths)
-            )
+  runStackLoggingT manager globalLogLevel $
+      Docker.rerunWithOptionalContainer
+          (lcConfig lc)
+          (lcProjectRoot lc)
+          (runStackLoggingT manager globalLogLevel $ do
+              (ghc, mstack) <-
+                  case scoGhcVersion of
+                      Just v -> return (v, Nothing)
+                      Nothing -> do
+                          bc <- lcLoadBuildConfig lc ThrowException
+                          return (bcGhcVersion bc, Just $ bcStackYaml bc)
+              mpaths <- runStackT manager globalLogLevel (lcConfig lc) $ ensureGHC SetupOpts
+                  { soptsInstallIfMissing = True
+                  , soptsUseSystem = globalSystemGhc && not scoForceReinstall
+                  , soptsExpected = ghc
+                  , soptsStackYaml = mstack
+                  , soptsForceReinstall = scoForceReinstall
+                  }
+              case mpaths of
+                  Nothing -> $logInfo "GHC on PATH would be used"
+                  Just paths -> $logInfo $ "Would add the following to PATH: "
+                      <> T.pack (intercalate [searchPathSeparator] paths)
+                  )
 
 withBuildConfig :: GlobalOpts
                 -> NoBuildConfigStrategy
@@ -250,12 +251,13 @@ withBuildConfig :: GlobalOpts
                 -> IO ()
 withBuildConfig go@GlobalOpts{..} strat inner = handle (error . printBuildException) $ do
     (manager, lc) <- loadConfigWithOpts go
-    Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $ do
-        bconfig1 <- runStackLoggingT manager globalLogLevel $
-            lcLoadBuildConfig lc strat
-        bconfig2 <- runStackT manager globalLogLevel bconfig1 $
-            setupEnv globalSystemGhc globalInstallGhc
-        runStackT manager globalLogLevel bconfig2 inner
+    runStackLoggingT manager globalLogLevel $
+        Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $ do
+            bconfig1 <- runStackLoggingT manager globalLogLevel $
+                lcLoadBuildConfig lc strat
+            bconfig2 <- runStackT manager globalLogLevel bconfig1 $
+                setupEnv globalSystemGhc globalInstallGhc
+            runStackT manager globalLogLevel bconfig2 inner
   where printBuildException e =
           case e of
             MissingTool dep -> "Missing build tool: " <> display dep
@@ -399,18 +401,20 @@ buildCmd finalAction opts go@GlobalOpts{..} = withBuildConfig go CreateConfig $
 unpackCmd :: [String] -> GlobalOpts -> IO ()
 unpackCmd names go@GlobalOpts{..} = do
     (manager,lc) <- loadConfigWithOpts go
-    Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $ do
-        runStackT manager globalLogLevel (lcConfig lc) $ do
-            menv <- getMinimalEnvOverride
-            Stack.Fetch.unpackPackages menv "." names
+    runStackLoggingT manager globalLogLevel $
+        Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $
+            runStackT manager globalLogLevel (lcConfig lc) $ do
+                menv <- getMinimalEnvOverride
+                Stack.Fetch.unpackPackages menv "." names
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()
 updateCmd () go@GlobalOpts{..} = do
     (manager,lc) <- loadConfigWithOpts go
-    Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $
-        runStackT manager globalLogLevel (lcConfig lc) $
-            getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
+    runStackLoggingT manager globalLogLevel $
+        Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $
+            runStackT manager globalLogLevel (lcConfig lc) $
+                getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
 
 -- | Execute a command
 execCmd :: (String, [String]) -> GlobalOpts -> IO ()
@@ -433,33 +437,33 @@ execCmd (cmd, args) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $ do
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
-dockerPullCmd _ go@GlobalOpts{..} =
-  Docker.preventInContainer
-    (do (_,lc) <- loadConfigWithOpts go
-        Docker.pull (lcConfig lc))
+dockerPullCmd _ go@GlobalOpts{..} = do
+    (manager,lc) <- liftIO $ loadConfigWithOpts go
+    runStackLoggingT manager globalLogLevel $ Docker.preventInContainer $
+        Docker.pull (lcConfig lc)
 
 -- | Reset the Docker sandbox.
 dockerResetCmd :: Bool -> GlobalOpts -> IO ()
-dockerResetCmd keepHome go@GlobalOpts{..} =
-  Docker.preventInContainer
-    (do (_,lc) <- loadConfigWithOpts go
-        Docker.reset (lcProjectRoot lc) keepHome)
+dockerResetCmd keepHome go@GlobalOpts{..} = do
+    (manager,lc) <- liftIO (loadConfigWithOpts go)
+    runStackLoggingT manager globalLogLevel $ Docker.preventInContainer $
+        Docker.reset (lcProjectRoot lc) keepHome
 
 -- | Cleanup Docker images and containers.
 dockerCleanupCmd :: Docker.CleanupOpts -> GlobalOpts -> IO ()
-dockerCleanupCmd cleanupOpts go@GlobalOpts{..} =
-  Docker.preventInContainer
-    (do (_,lc) <- loadConfigWithOpts go
-        Docker.cleanup (lcConfig lc) cleanupOpts)
+dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
+    (manager,lc) <- liftIO $ loadConfigWithOpts go
+    runStackLoggingT manager globalLogLevel $ Docker.preventInContainer $
+        Docker.cleanup (lcConfig lc) cleanupOpts
 
 -- | Execute a command
 dockerExecCmd :: (String, [String]) -> GlobalOpts -> IO ()
 dockerExecCmd (cmd,args) go@GlobalOpts{..} = do
-    (_,lc) <- loadConfigWithOpts go
-    Docker.preventInContainer
-      (Docker.rerunCmdWithRequiredContainer (lcConfig lc)
-                                            (lcProjectRoot lc)
-                                            (return (cmd,args,lcConfig lc)))
+    (manager,lc) <- liftIO $ loadConfigWithOpts go
+    runStackLoggingT manager globalLogLevel $ Docker.preventInContainer $
+        Docker.rerunCmdWithRequiredContainer (lcConfig lc)
+                                             (lcProjectRoot lc)
+                                             (return (cmd,args,lcConfig lc))
 
 -- | Parser for build arguments.
 buildOpts :: Parser BuildOpts
