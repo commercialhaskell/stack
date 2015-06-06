@@ -19,7 +19,7 @@ module Stack.Types.PackageIdentifier
   ,packageIdentifierText)
   where
 
-import           Control.Applicative ((<*))
+import           Control.Applicative
 import           Control.DeepSeq
 import           Control.Exception (Exception)
 import           Control.Monad.Catch (MonadThrow, throwM)

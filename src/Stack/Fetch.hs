@@ -22,7 +22,7 @@ module Stack.Fetch
 import qualified Codec.Archive.Tar               as Tar
 import qualified Codec.Archive.Tar.Check         as Tar
 import           Codec.Compression.GZip          (decompress)
-import           Control.Applicative             ((*>))
+import           Control.Applicative
 import           Control.Concurrent.Async        (Concurrently (..))
 import           Control.Concurrent.STM          (TVar, atomically, modifyTVar,
                                                   newTVarIO, readTVar,
@@ -56,6 +56,7 @@ import           Data.Typeable                   (Typeable)
 import           Data.Word                       (Word64)
 import           Network.HTTP.Client             (Manager)
 import           Network.HTTP.Download
+import           Prelude -- Fix AMP warning
 import           Stack.PackageIndex
 import           Stack.Types
 

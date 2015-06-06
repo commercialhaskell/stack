@@ -59,12 +59,12 @@ findFiles :: Path Abs Dir            -- ^ Root directory to begin with.
           -> (Path Abs File -> Bool) -- ^ Predicate to match files.
           -> (Path Abs Dir -> Bool)  -- ^ Predicate for which directories to traverse.
           -> IO [Path Abs File]      -- ^ List of matching files.
-findFiles dir p traverse =
+findFiles dir p traversep =
   do (dirs,files) <- listDirectory dir
      subResults <-
        forM dirs
             (\entry ->
-               if traverse entry
-                  then findFiles entry p traverse
+               if traversep entry
+                  then findFiles entry p traversep
                   else return [])
      return (concat (filter p files : subResults))

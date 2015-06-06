@@ -51,6 +51,7 @@ import qualified Distribution.Version as Cabal
 import           GHC.Generics
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
+import           Prelude -- Fix warning: Word in Prelude from base-4.8.
 import           Text.PrettyPrint (render)
 
 -- | A parse fail.

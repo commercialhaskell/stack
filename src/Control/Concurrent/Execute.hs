@@ -10,7 +10,7 @@ module Control.Concurrent.Execute
     , runActions
     ) where
 
-import           Control.Applicative      ((<$>), (<*>))
+import           Control.Applicative
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.STM
 import           Control.Exception
@@ -19,6 +19,7 @@ import           Data.Foldable            (sequenceA_)
 import           Data.Set                 (Set)
 import qualified Data.Set                 as Set
 import           Data.Typeable            (Typeable)
+import           Prelude -- Fix AMP warning
 import           Stack.Types
 
 data ActionType

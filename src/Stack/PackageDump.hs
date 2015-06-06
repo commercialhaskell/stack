@@ -39,10 +39,11 @@ import qualified Data.Conduit.Binary as CB
 import qualified Data.Map as Map
 import Data.Either (partitionEithers)
 import qualified Data.Set as Set
-import Control.Applicative ((<$>))
+import Control.Applicative
 import Data.Maybe (catMaybes)
 import System.Directory (createDirectoryIfMissing, getDirectoryContents)
 import Stack.GhcPkg
+import Prelude -- Fix AMP warning
 
 -- | Cached information on whether a package has profiling libraries
 newtype ProfilingCache = ProfilingCache (IORef (Map GhcPkgId Bool))

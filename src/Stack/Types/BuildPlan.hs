@@ -25,7 +25,7 @@ module Stack.Types.BuildPlan
     , parseSnapName
     ) where
 
-import           Control.Applicative             ((<$>), (<*>), (<|>))
+import           Control.Applicative
 import           Control.Arrow                   ((&&&))
 import           Control.Exception               (Exception)
 import           Control.Monad.Catch             (MonadThrow, throwM)
@@ -40,7 +40,7 @@ import qualified Data.HashMap.Strict             as HashMap
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
 import           Data.Maybe                      (fromMaybe)
-import           Data.Monoid                     (Monoid, mappend, mempty, (<>))
+import           Data.Monoid
 import           Data.Set                        (Set)
 import           Data.String                     (IsString, fromString)
 import           Data.Text                       (Text, pack, unpack)
@@ -55,6 +55,7 @@ import           Distribution.System             (Arch, OS)
 import qualified Distribution.Text               as DT
 import qualified Distribution.Version            as C
 import           GHC.Generics                    (Generic)
+import           Prelude -- Fix AMP warning
 import           Safe (readMay)
 import           Stack.Types.FlagName
 import           Stack.Types.PackageName

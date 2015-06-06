@@ -23,7 +23,7 @@ module Stack.PackageIndex
     ) where
 
 import qualified Codec.Archive.Tar                     as Tar
-import           Control.Applicative                   ((<$>), (<*>))
+import           Control.Applicative
 import           Control.Exception                     (Exception)
 import           Control.Exception.Enclosed            (tryIO)
 import           Control.Monad                         (unless, when, liftM, mzero)
@@ -45,7 +45,7 @@ import           Data.Conduit.Zlib                     (ungzip)
 import           Data.Int                              (Int64)
 import           Data.Map                              (Map)
 import qualified Data.Map                              as Map
-import           Data.Monoid                           ((<>), mconcat)
+import           Data.Monoid
 import           Data.Text                             (Text)
 import qualified Data.Text                             as T
 import           Data.Text.Encoding                    (encodeUtf8)
@@ -59,6 +59,7 @@ import           Network.HTTP.Download
 import           Path                                  (mkRelDir, parent,
                                                         parseRelDir, toFilePath,
                                                         (</>))
+import           Prelude -- Fix AMP warning
 import           Stack.Types
 import           System.Directory
 import           System.FilePath                       (takeBaseName, (<.>))
