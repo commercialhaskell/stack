@@ -14,6 +14,7 @@ module Stack.Setup
   , SetupOpts (..)
   ) where
 
+import Control.Applicative
 import Control.Exception (Exception)
 import Data.Maybe (mapMaybe, catMaybes)
 import Control.Monad (liftM, when)
@@ -22,7 +23,6 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ReaderT (..), asks)
 import Data.Conduit (($$))
 import qualified Data.Conduit.List as CL
-import Control.Applicative ((<$>), (<*>))
 import Data.Aeson
 import Data.IORef
 import Data.Monoid
@@ -51,6 +51,7 @@ import Data.Set (Set)
 import System.Process.Read
 import qualified System.FilePath as FP
 import Network.HTTP.Download (download)
+import Prelude -- Fix AMP warning
 
 data SetupOpts = SetupOpts
     { soptsInstallIfMissing :: !Bool

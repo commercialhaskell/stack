@@ -34,6 +34,7 @@ import           Data.Time
 import           Language.Haskell.TH.Syntax (Loc(..))
 import           Network.HTTP.Client.Conduit (HasHttpManager(..))
 import           Network.HTTP.Conduit
+import           Prelude -- Fix AMP warning
 import           Stack.Types.Internal
 import           System.Log.FastLogger
 

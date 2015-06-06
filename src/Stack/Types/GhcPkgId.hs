@@ -24,6 +24,7 @@ import           Data.Data
 import           Data.Hashable
 import           Data.Text.Encoding (encodeUtf8)
 import           GHC.Generics
+import           Prelude -- Fix AMP warning
 import           Stack.Types.PackageIdentifier
 
 -- | A parse fail.

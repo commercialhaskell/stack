@@ -39,6 +39,7 @@ import Data.Typeable (Typeable)
 import Network.HTTP.Client.Conduit
 import Network.HTTP.Types.Header (hContentLength, hContentMD5)
 import Path
+import Prelude -- Fix AMP warning
 import System.FilePath((<.>))
 import System.Directory
 import System.IO

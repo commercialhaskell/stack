@@ -18,7 +18,7 @@ module Stack.Build
   ,clean)
   where
 
-import           Control.Applicative ((<$>), (<*>))
+import           Control.Applicative
 import           Control.Concurrent (getNumCapabilities, forkIO)
 import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
@@ -70,7 +70,7 @@ import           GHC.Generics
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.IO
-import           Prelude hiding (FilePath,writeFile)
+import           Prelude hiding (FilePath, writeFile)
 import           Stack.Build.Types
 import           Stack.BuildPlan
 import           Stack.Constants
@@ -176,7 +176,7 @@ data CabalExitedUnsuccessfully = CabalExitedUnsuccessfully
 instance Exception CabalExitedUnsuccessfully
 
 instance Show CabalExitedUnsuccessfully where
-  show (CabalExitedUnsuccessfully exitCode taskProvides execName fullArgs logFiles _) = 
+  show (CabalExitedUnsuccessfully exitCode taskProvides execName fullArgs logFiles _) =
     let fullCmd = (dropQuotes (show execName) ++ " " ++ (unwords fullArgs))
         logLocations = maybe "" (\fp -> "Logs have been written to: " ++ show fp) logFiles
     in "\nException: CabalExitedUnsuccessfully\n" ++
@@ -184,7 +184,7 @@ instance Show CabalExitedUnsuccessfully where
        "  " ++ fullCmd ++ "\n" ++
        "Process exited with code: " ++ show exitCode ++ "\n" ++
        logLocations
-     where 
+     where
       -- appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
       -- indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
       dropQuotes = filter ('\"' /=)

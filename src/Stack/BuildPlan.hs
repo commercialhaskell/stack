@@ -23,7 +23,7 @@ module Stack.BuildPlan
     , getToolMap
     ) where
 
-import           Control.Applicative             ((<$>), (<*>))
+import           Control.Applicative
 import           Control.Arrow                   ((&&&))
 import           Control.Exception.Enclosed      (handleIO)
 import           Control.Monad                   (liftM, forM)
@@ -61,6 +61,7 @@ import           Distribution.PackageDescription (GenericPackageDescription,
                                                   flagName, genPackageFlags,
                                                   executables, exeName, library, libBuildInfo, buildable)
 import           Network.HTTP.Download
+import           Prelude -- Fix AMP warning
 import           Path
 import           Stack.Fetch
 import           Stack.GhcPkg

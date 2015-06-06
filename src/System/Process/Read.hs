@@ -22,7 +22,7 @@ module System.Process.Read
   ,getEnvOverride)
   where
 
-import           Control.Applicative ((*>))
+import           Control.Applicative
 import           Control.Arrow ((***), first)
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Exception
@@ -44,6 +44,7 @@ import qualified Data.Text as T
 import           Data.Typeable (Typeable)
 import           Distribution.System (OS (Windows), Platform (Platform))
 import           Path (Path, Abs, Dir, toFilePath, File, parseAbsFile)
+import           Prelude -- Fix AMP warning
 import           System.Directory (createDirectoryIfMissing, doesFileExist, canonicalizePath)
 import qualified System.FilePath as FP
 import           System.Environment (getEnvironment)
