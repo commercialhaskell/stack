@@ -10,7 +10,7 @@
 
 module Stack.Types.Version
   (Version
-  ,Cabal.VersionRange -- FIXME in the future should have a newtype wrapper
+  ,Cabal.VersionRange -- TODO in the future should have a newtype wrapper
   ,MajorVersion (..)
   ,getMajorVersion
   ,fromMajorVersion

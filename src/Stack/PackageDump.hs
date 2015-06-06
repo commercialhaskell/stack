@@ -56,8 +56,8 @@ ghcPkgDump
     -> Sink ByteString IO a
     -> m a
 ghcPkgDump menv mpkgDb sink = do
-    F.mapM_ (createDatabase menv) mpkgDb -- FIXME maybe use some retry logic instead?
-    sinkProcessStdout menv "ghc-pkg" args sink -- FIXME ensure that GHC_PACKAGE_PATH isn't set?
+    F.mapM_ (createDatabase menv) mpkgDb -- TODO maybe use some retry logic instead?
+    sinkProcessStdout menv "ghc-pkg" args sink
   where
     args = concat
         [ case mpkgDb of
@@ -136,7 +136,7 @@ sinkMatching reqProfiling allowed = do
         (packageIdentifierName . ghcPkgIdPackageIdentifier)
         dpGhcPkgId
         dpDepends
-        const -- FIXME better comparison, prefer profiling version?
+        const -- Could consider a better comparison in the future
         dps
   where
     isAllowed gid =

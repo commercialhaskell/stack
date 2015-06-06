@@ -1303,12 +1303,9 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                     : ("--builddir=" ++ toFilePath distRelativeDir')
                     : args
                 cp0 = proc (toFilePath exeName) fullArgs
-                subEnv =
-                     fmap (filter (\(x, _) -> x /= "GHC_PACKAGE_PATH"))
-                   $ envHelper menv
                 cp = cp0
                     { cwd = Just $ toFilePath $ packageDir package
-                    , Process.env = subEnv
+                    , Process.env = envHelper menv
                     , std_in = CreatePipe
                     , std_out =
                         if stripTHLoading

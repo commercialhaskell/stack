@@ -116,9 +116,15 @@ setupEnv useSystem installIfMissing = do
                         $ map T.pack ghcBin ++ maybe [] return mpath
                  in Map.insert "PATH" path x
 
+    -- Remove potentially confusing environment variables
+        env1 = Map.delete "GHC_PACKAGE_PATH"
+             $ Map.delete "HASKELL_PACKAGE_SANDBOX"
+             $ Map.delete "HASKELL_PACKAGE_SANDBOXES"
+               env0
+
     -- extra installation bin directories
     mkDirs <- runReaderT extraBinDirs bconfig
-    let mpath = Map.lookup "PATH" env0
+    let mpath = Map.lookup "PATH" env1
         depsPath = mkPath (mkDirs False) mpath
         localsPath = mkPath (mkDirs True) mpath
 
@@ -148,11 +154,6 @@ setupEnv useSystem installIfMissing = do
                         $ Map.insert "HASKELL_PACKAGE_SANDBOX" (T.pack $ toFilePath deps)
                         $ Map.insert "HASKELL_PACKAGE_SANDBOXES"
                             (T.pack $ if esIncludeLocals es
-                                {- This is what we'd ideally want to provide, but
-                                 - HASKELL_PACKAGE_SANDBOX isn't set up to respect it. Need
-                                 - to figure out a better solution, maybe creating a
-                                 - combined database and passing that in?
-                                 - -}
                                 then intercalate [searchPathSeparator]
                                         [ toFilePath localdb
                                         , toFilePath deps
@@ -162,7 +163,7 @@ setupEnv useSystem installIfMissing = do
                                         [ toFilePath deps
                                         , ""
                                         ])
-                        $ env0
+                        $ env1
                     !() <- atomicModifyIORef envRef $ \m' ->
                         (Map.insert es eo m', ())
                     return eo

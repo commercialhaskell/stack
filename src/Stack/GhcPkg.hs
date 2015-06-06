@@ -77,7 +77,7 @@ ghcPkg menv pkgDbs args = do
     $logDebug $ "Done calling ghc-pkg with: " <> T.pack (show args')
     return r
   where
-    go = tryProcessStdout menv "ghc-pkg" args' -- FIXME ensure that GHC_PACKAGE_PATH isn't set?
+    go = tryProcessStdout menv "ghc-pkg" args'
     args' = packageDbFlags pkgDbs ++ args
 
 -- | Create a package database in the given directory, if it doesn't exist.
@@ -135,7 +135,6 @@ unregisterGhcPkgId :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m)
                     -> GhcPkgId
                     -> m ()
 unregisterGhcPkgId menv pkgDb gid = do
-    -- FIXME Currently just ignore exceptions...
     eres <- ghcPkg menv [pkgDb] args
     case eres of
         Left e -> $logWarn $ T.pack $ show e
