@@ -1186,7 +1186,6 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                    hoogleExists <- liftIO (doesFileExist hoogleTxtPath)
                    when hoogleExists
                         (callProcess
-                             mempty -- FIXME: ?
                              "hoogle"
                              ["convert"
                              ,"--haddock"
@@ -1521,7 +1520,6 @@ buildDocIndex wanted docLoc packages mgr logLevel =
                (do needDeps
                    srcHoogleDbs <- liftIO (fmap concat (mapM toSrcHoogleDb (S.toList packages)))
                    callProcess
-                        mempty -- FIXME: ?
                         "hoogle"
                         ("combine" :
                          "-o" :
