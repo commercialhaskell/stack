@@ -15,3 +15,4 @@ cabal.sandbox.config
 dist-stack/
 dist/
 tags
+/.docker-sandbox/
