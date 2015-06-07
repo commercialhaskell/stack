@@ -163,14 +163,10 @@ instance Exception TestSuiteFailure2
 data CabalExitedUnsuccessfully = CabalExitedUnsuccessfully
     ExitCode
     PackageIdentifier
-    (Path Abs File)
--- ^ cabal Executable
-    [String]
--- ^ cabal arguments
-    (Maybe FilePath)
--- ^ logfiles location
-    S.ByteString
--- ^ log contents
+    (Path Abs File)  -- cabal Executable
+    [String]         -- cabal arguments
+    (Maybe FilePath) -- logfiles location
+    S.ByteString     -- log contents
     deriving (Typeable)
 instance Exception CabalExitedUnsuccessfully
 
