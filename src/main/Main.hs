@@ -45,7 +45,7 @@ import           Stack.Path
 import           Stack.Setup
 import           Stack.Types
 import           Stack.Types.StackT
-import           System.Environment (getArgs)
+import           System.Environment (getArgs, getProgName)
 import           System.Exit
 import           System.FilePath (searchPathSeparator)
 import           System.IO (stderr)
@@ -58,15 +58,18 @@ main =
   do plugins <- findPlugins (T.pack stackProgName)
      tryRunPlugin plugins
      Docker.checkVersions
-     manager <- newTLSManager
-     lc <- runStackLoggingT manager LevelWarn
-       (loadConfig mempty {configMonoidDockerOpts = mempty {dockerMonoidExists = Nothing}})
+     progName <- getProgName
+     args <- getArgs
+     execExtraHelp args
+                   dockerHelpOptName
+                   (Docker.dockerOptsParser True)
+                   ("Only showing --" ++ Docker.dockerCmdName ++ "* options.")
      (level,run) <-
        simpleOptions
          $(simpleVersion Meta.version)
          "stack - The Haskell Tool Stack"
          ""
-         (globalOpts (dockerEnable (configDocker (lcConfig lc))))
+         (extraHelpOption progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*> globalOpts)
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
@@ -169,6 +172,9 @@ main =
                                    <*> many (strArgument (metavar "ARGS"))))
              commandsFromPlugins plugins pluginShouldHaveRun)
      run level
+  where
+    dockerHelpOptName = Docker.dockerCmdName ++ "-help"
+
 
 pathCmd :: PathArg -> GlobalOpts -> IO ()
 pathCmd pathArg go@GlobalOpts{..} = do
@@ -551,11 +557,11 @@ dockerCleanupOpts =
         toDescr = map (\c -> if c == '-' then ' ' else c)
 
 -- | Parser for global command-line options.
-globalOpts :: Bool -> Parser GlobalOpts
-globalOpts docker =
+globalOpts :: Parser GlobalOpts
+globalOpts =
     GlobalOpts
     <$> logLevelOpt
-    <*> configOptsParser docker
+    <*> configOptsParser False
     <*> boolFlags True
             "system-ghc"
             "using the system installed GHC (on the PATH) if available and a matching version"
