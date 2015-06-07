@@ -362,7 +362,7 @@ data MiniBuildPlan = MiniBuildPlan
     { mbpGhcVersion :: !Version
     , mbpPackages :: !(Map PackageName MiniPackageInfo)
     }
-    deriving (Generic, Show)
+    deriving (Generic, Show, Eq)
 instance Binary.Binary MiniBuildPlan
 
 -- | Information on a single package for the 'MiniBuildPlan'.
@@ -380,5 +380,5 @@ data MiniPackageInfo = MiniPackageInfo
     , mpiHasLibrary :: !Bool
     -- ^ Is there a library present?
     }
-    deriving (Generic, Show)
+    deriving (Generic, Show, Eq)
 instance Binary.Binary MiniPackageInfo

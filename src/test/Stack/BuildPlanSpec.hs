@@ -32,6 +32,9 @@ setup = do
 teardown :: T -> IO ()
 teardown _ = return ()
 
+main :: IO ()
+main = hspec spec
+
 spec :: Spec
 spec = beforeAll setup $ afterAll teardown $ do
     let logLevel = LevelDebug
@@ -73,3 +76,48 @@ spec = beforeAll setup $ afterAll teardown $ do
                     -}
                 _ -> error $ "Unexpected result from resolveBuildPlan: " ++ show eres
             return ()
+
+    describe "shadowMiniBuildPlan" $ do
+        let version = $(mkVersion "1.0.0") -- unimportant for this test
+            pn = either throw id . parsePackageNameFromString
+            mkMPI deps = MiniPackageInfo
+                { mpiVersion = version
+                , mpiFlags = Map.empty
+                , mpiPackageDeps = Set.fromList $ map pn $ words deps
+                , mpiToolDeps = Set.empty
+                , mpiExes = Set.empty
+                , mpiHasLibrary = True
+                }
+            go x y = (pn x, mkMPI y)
+            resourcet = go "resourcet" ""
+            conduit = go "conduit" "resourcet"
+            conduitExtra = go "conduit-extra" "conduit"
+            text = go "text" ""
+            attoparsec = go "attoparsec" "text"
+            aeson = go "aeson" "text attoparsec"
+            mkMBP pkgs = MiniBuildPlan
+                { mbpGhcVersion = version
+                , mbpPackages = Map.fromList pkgs
+                }
+            mbpAll = mkMBP [resourcet, conduit, conduitExtra, text, attoparsec, aeson]
+            test name input shadowed output extra =
+                it name $ const $
+                    shadowMiniBuildPlan input (Set.fromList $ map pn $ words shadowed)
+                    `shouldBe` (output, Map.fromList extra)
+        test "no shadowing" mbpAll "" mbpAll []
+        test "shadow something that isn't there" mbpAll "does-not-exist" mbpAll []
+        test "shadow a leaf" mbpAll "conduit-extra"
+                (mkMBP [resourcet, conduit, text, attoparsec, aeson])
+                []
+        test "shadow direct dep" mbpAll "conduit"
+                (mkMBP [resourcet, text, attoparsec, aeson])
+                [conduitExtra]
+        test "shadow deep dep" mbpAll "resourcet"
+                (mkMBP [text, attoparsec, aeson])
+                [conduit, conduitExtra]
+        test "shadow deep dep and leaf" mbpAll "resourcet aeson"
+                (mkMBP [text, attoparsec])
+                [conduit, conduitExtra]
+        test "shadow deep dep and direct dep" mbpAll "resourcet conduit"
+                (mkMBP [text, attoparsec, aeson])
+                [conduitExtra]

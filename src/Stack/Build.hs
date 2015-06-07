@@ -235,6 +235,7 @@ type SourceMap = Map PackageName (Version, PackageSource)
 data PackageSource
     = PSLocal LocalPackage
     | PSExtraDeps Package
+    | PSExtraDepsInherited MiniPackageInfo
     | PSSnapshot MiniPackageInfo
     | PSInstalledLib Location GhcPkgId
     | PSInstalledExe Location
@@ -577,6 +578,7 @@ loadDatabase menv mpcache loc mdb sourceMap0 = do
                     -- Shadow any installations in the global and snapshot
                     -- databases
                     PSExtraDeps _ -> loc == Local
+                    PSExtraDepsInherited _ -> loc == Local
 
                     -- Alows cool to have the right version of a
                     -- snapshot-listed package
@@ -730,6 +732,7 @@ constructPlan mbp baseConfigOpts locals locallyRegistered sourceMap = do
                         | otherwise -> case ps of
                             PSLocal _ -> False
                             PSExtraDeps _ -> False
+                            PSExtraDepsInherited _ -> False
                             PSSnapshot _ -> True
                             PSInstalledLib Local _ -> False
                             PSInstalledLib _ _ -> False
@@ -847,17 +850,17 @@ constructPlan mbp baseConfigOpts locals locallyRegistered sourceMap = do
         , lpDirtyFiles = True
         }
 
-    addMPI name mpi = checkCallStack name $ do
+    addMPI loc name mpi = checkCallStack name $ do
         let deps = map (, anyVersion) $ Set.toList $ Set.unions
                 $ mpiPackageDeps mpi
                 : map goTool (Set.toList $ mpiToolDeps mpi)
             goTool tool = fromMaybe Set.empty $ Map.lookup tool toolMap
-        withDeps name Snap deps $ \adrs -> do
+        withDeps name loc deps $ \adrs -> do
             addTask Task
                 { taskProvides = ident
                 , taskRequiresMissing = Set.fromList $ mapMaybe toMissing adrs
                 , taskRequiresPresent = Set.fromList $ mapMaybe toPresent adrs
-                , taskLocation = Snap
+                , taskLocation = loc
                 , taskType = TTMPI mpi
                 }
       where
@@ -873,7 +876,8 @@ constructPlan mbp baseConfigOpts locals locallyRegistered sourceMap = do
                 | version `withinRange` range -> case ps of
                     PSLocal lp -> allowLocal version $ addLocal lp
                     PSExtraDeps p -> allowLocal version $ addExtraDep p
-                    PSSnapshot mpi -> addMPI name mpi
+                    PSExtraDepsInherited mpi -> allowLocal version $ addMPI Local name mpi
+                    PSSnapshot mpi -> addMPI Snap name mpi
                     PSInstalledLib loc gid -> allowLocation loc version $ return $ Right $ ADRFound gid loc
                     PSInstalledExe loc -> allowLocation loc version $ return $ Right $ ADRFoundExe loc
                 | otherwise -> do
@@ -908,7 +912,7 @@ build bopts = do
     cabalPkgVer <- getCabalPkgVer menv
 
     bconfig <- asks getBuildConfig
-    mbp <- case bcResolver bconfig of
+    mbp0 <- case bcResolver bconfig of
         ResolverSnapshot snapName -> do
             $logDebug $ "Checking resolver: " <> renderSnapName snapName
             mbp <- loadMiniBuildPlan snapName
@@ -921,12 +925,24 @@ build bopts = do
     locals <- loadLocals bopts
     extraDeps <- loadExtraDeps menv bopts cabalPkgVer
 
+    let shadowed = Set.fromList (map (packageName . lpPackage) locals)
+                <> Set.fromList (map packageName extraDeps)
+        (mbp, newExtraDeps0) = shadowMiniBuildPlan mbp0 shadowed
+        newExtraDeps = flip Map.mapWithKey newExtraDeps0 $ \name mpi ->
+            (mpiVersion mpi, PSExtraDepsInherited mpi
+                { mpiFlags =
+                    case Map.lookup name $ bcFlags bconfig of
+                        Nothing -> mpiFlags mpi
+                        Just flags -> flags
+                })
+
     let sourceMap1 = Map.unions
             [ Map.fromList $ flip map locals $ \lp ->
                 let p = lpPackage lp
                  in (packageName p, (packageVersion p, PSLocal lp))
             , Map.fromList $ flip map extraDeps $ \p ->
                 (packageName p, (packageVersion p, PSExtraDeps p))
+            , newExtraDeps
             , flip fmap (mbpPackages mbp)
                 $ \mpi -> (mpiVersion mpi, PSSnapshot mpi)
             ]

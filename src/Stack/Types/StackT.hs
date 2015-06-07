@@ -38,6 +38,9 @@ import           Prelude -- Fix AMP warning
 import           Stack.Types.Internal
 import           System.Log.FastLogger
 
+#ifndef MIN_VERSION_time
+#define MIN_VERSION_time(x, y, z) 0
+#endif
 #if !MIN_VERSION_time(1, 5, 0)
 import           System.Locale
 #endif

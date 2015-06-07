@@ -21,10 +21,12 @@ module Stack.BuildPlan
     , findBuildPlan
     , ToolMap
     , getToolMap
+    , shadowMiniBuildPlan
     ) where
 
 import           Control.Applicative
 import           Control.Arrow                   ((&&&))
+import           Control.Exception               (assert)
 import           Control.Exception.Enclosed      (handleIO)
 import           Control.Monad                   (liftM, forM)
 import           Control.Monad.Catch
@@ -39,6 +41,7 @@ import           Data.Aeson                      (withObject, withText, (.:))
 import           Data.Binary.VersionTagged       (taggedDecodeOrLoad)
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Char8           as S8
+import           Data.Either                     (partitionEithers)
 import qualified Data.Foldable                   as F
 import qualified Data.HashMap.Strict             as HM
 import           Data.IntMap                     (IntMap)
@@ -555,3 +558,41 @@ nubOrd =
     go s (x:xs)
         | x `Set.member` s = go s xs
         | otherwise = x : go (Set.insert x s) xs
+
+shadowMiniBuildPlan :: MiniBuildPlan
+                    -> Set PackageName
+                    -> (MiniBuildPlan, Map PackageName MiniPackageInfo)
+shadowMiniBuildPlan (MiniBuildPlan ghc pkgs0) shadowed =
+    (MiniBuildPlan ghc $ Map.fromList met, Map.fromList unmet)
+  where
+    pkgs1 = Map.difference pkgs0 $ Map.fromList $ map (, ()) $ Set.toList shadowed
+
+    depsMet = flip execState Map.empty $ mapM_ (check Set.empty) (Map.keys pkgs1)
+
+    check visited name
+        | name `Set.member` visited =
+            error $ "shadowMiniBuildPlan: cycle detected, your MiniBuildPlan is broken: " ++ show (visited, name)
+        | otherwise = do
+            m <- get
+            case Map.lookup name m of
+                Just x -> return x
+                Nothing ->
+                    case Map.lookup name pkgs1 of
+                        Nothing -> assert (name `Set.member` shadowed) (return False)
+                        Just mpi -> do
+                            let visited' = Set.insert name visited
+                            ress <- mapM (check visited') (Set.toList $ mpiPackageDeps mpi)
+                            let res = and ress
+                            modify $ \m' -> Map.insert name res m'
+                            return res
+
+    (met, unmet) = partitionEithers $ map toEither $ Map.toList pkgs1
+
+    toEither pair@(name, _) =
+        wrapper pair
+      where
+        wrapper =
+            case Map.lookup name depsMet of
+                Just True -> Left
+                Just False -> Right
+                Nothing -> assert False Right
