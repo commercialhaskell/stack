@@ -179,9 +179,9 @@ instance Show CabalExitedUnsuccessfully where
     let fullCmd = (dropQuotes (show execName) ++ " " ++ (unwords fullArgs))
         logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ show fp) logFiles
     in "\n--  Exception: CabalExitedUnsuccessfully\n" ++
-       "      While building package " ++ dropQuotes (show taskProvides) ++ " using:\n" ++
-       "        " ++ fullCmd ++ "\n" ++
-       "      Process exited with code: " ++ show exitCode ++
+       "    While building package " ++ dropQuotes (show taskProvides) ++ " using:\n" ++
+       "      " ++ fullCmd ++ "\n" ++
+       "    Process exited with code: " ++ show exitCode ++
        logLocations
      where
       -- appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
