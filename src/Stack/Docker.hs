@@ -713,7 +713,7 @@ dockerOptsFromMonoid mproject stackRoot DockerOptsMonoid{..} = DockerOpts
        Nothing -> "fpco/dev" ++ defaultTag
        Just (DockerMonoidImage image) -> image
        Just (DockerMonoidRepo repo) ->
-         case find (`elem` ":@") repo of
+         case find (`elem` (":@" :: String)) repo of
            Just _ -> -- Repo already specified a tag or digest, so don't append default
                      repo
            Nothing -> repo ++ defaultTag
