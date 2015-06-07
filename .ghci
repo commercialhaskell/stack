@@ -1,2 +1,4 @@
 :set -package optparse-applicative -package optparse-simple -package binary
 :set -isrc/main -isrc
+:set -idist-stack/Cabal-1.18.1.5/build/autogen/
+:set -optP-include -optPdist-stack/Cabal-1.18.1.5/build/autogen/cabal_macros.h
