@@ -162,7 +162,6 @@ test-suite stack-test
                 , Stack.ConfigSpec
                 , Stack.PackageDumpSpec
   ghc-options:    -Wall -O1 -threaded
-  extensions:     FlexibleContexts
   build-depends:  base >=4.7 && <5
                 , hspec
                 , containers
