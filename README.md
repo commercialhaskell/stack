@@ -1,16 +1,44 @@
 ## The Haskell Tool Stack
 
-stack is a build tool for Haskell code. It handles installation and management
-of dependencies, builds multi-package projects, isolates package installations
-from each other, and will install build tool dependencies for you (including
-GHC). It is designed from the ground up with sensible defaults and a
-user-friendly interface.
+> ᕕ( ᐛ )ᕗ I'm off to install stack 
+
+stack is the easiest and most reliable way to build your Haskell projects, from
+simple one-file executables to massive, multi-package projects with modified
+local dependencies. It uses sensible defaults- like isolation binary
+installations and LTS Haskell- while allowing full user customization. All
+builds are reproducible, so that changes in the upstream package repository or
+work you do on other projects will not break your codebase. If your code builds
+today, it will build tomorrow.
+
+stack is a full stack tool, capable of installing the appropriate version of
+GHC for you automatically and downloading an installing your upstream library
+dependencies into shared package databases (to minimize compilation time). It
+will intelligently recompile your libraries as necessary to enable profiling
+support, and give helpful error messages and advice for fixing your project.
+
+And of course, stack has been designed from the ground up to be as easy as
+possible to use. In most cases, you'll be able to get your project building
+with just a single command: `stack build`.
 
 For more details on how stack works internally, please see [the architecture
 document](ARCHITECTURE.md). **FIXME more correct link once moved to final repo
-location**
+location** For more motivation for the tool, see "Why stack" below.
+
+### Usage
+
+1. Download stack following the install instructions below.
+2. Run `stack build` from within your project to generate a config file, install dependencies, and build your code
+
+Running `stack` will give you a list of commands, some of the most common are:
+
+* `stack test` will build and run your test suites
+* `stack bench` will build and run your benchmarks
+* `stack exec` will run a command with a modified environment
+    * For convenience, we also provide `stack ghc`, `stack runghc`, and `stack ghci`, which work just like `stack exec`
 
 ### Install
+
+Need to support more OSes
 
 #### Ubuntu
 
@@ -55,25 +83,12 @@ Stack can be found in the AUR:
   - [haskell-stack](https://aur.archlinux.org/packages/haskell-stack/) _latest stable version_
   - [haskell-stack-git](https://aur.archlinux.org/packages/haskell-stack-git/) _git version_
 
-### Usage
-
-1. Download stack following the instructions at **FIXME** and place it on your `PATH`
-2. Run `stack build` from within your project to generate a config file, install dependencies, and build your code
-
-Running `stack` will give you a list of commands, some of the most common are:
-
-* `stack test` will build and run your test suites
-* `stack bench` will build and run your benchmarks
-* `stack exec` will run a command with a modified environment
-    * For convenience, we also provide `stack ghc`, `stack runghc`, and `stack ghci`, which work just like `stack exec`
-
 ### Basic information
 
 * stack builds on top of the Cabal library, making it compatible with the existing Haskell package ecosystem and projects.
 * Every *project* contains a `stack.yaml` configuration file, which `stack build` will autogenerate for you
 * A project can have multiple *packages* if desired
 * stack uses [LTS Haskell](https://github.com/fpco/lts-haskell) and [Stackage Nightly](https://github.com/fpco/stackage-nightly) by default to provide for robust dependency resolution
-* The [Shake build system](http://shakebuild.com/) provides the core build execution infrastructure
 
 The stack.yaml file is pretty self-explanatory, here's a real-life example from [the WAI project](https://github.com/yesodweb/wai):
 
@@ -92,11 +107,6 @@ packages:
 - ./wai-conduit
 - ./mime-types
 - ./auto-update
-
-# Version numbers are required for extra-deps
-extra-deps:
-- fast-logger-2.3.1
-- wai-logger-2.2.4
 ```
 
 Here's a list of open source stack.yaml files for reference and examples of
@@ -107,6 +117,27 @@ real-world usage:
 
 If you have a stack.yaml file which you believe would be useful for others to
 see, please send a pull request to this file to include a link.
+
+### Why stack?
+
+stack is a project of the [Commercial Haskell](http://commercialhaskell.com/)
+group, spearheaded by [FP Complete](https://www.fpcomplete.com/). It is
+designed to answer the needs of commercial Haskell users, hobbyist Haskellers,
+and individuals and companies thinking about starting to use Haskell. It is
+intended to be easy to use for newcomers, while providing the customizability
+and power experienced developers need.
+
+While stack itself has been around since June of 2015, it is based on codebases
+used by FP Complete for its corporate customers and internally for years prior.
+stack is a refresh of that codebase combined with other open source efforts
+like [stackage-cli](https://github.com/fpco/stackage-cli) to meet the needs of
+users everywhere.
+
+A large impetus for the work on stack was a [large survey of people interested
+in
+Haskell](https://www.fpcomplete.com/blog/2015/05/thousand-user-haskell-survey),
+which rated build issues as a major concern. The stack team hopes that stack
+can address these concerns.
 
 ### FAQ
 
@@ -125,9 +156,6 @@ packages:
 extra-deps:
 - text-1.2.1.1
 ```
-
-Note that any packages from the snapshot which depend on the modified package
-will not be available to you.
 
 __I need to use a package (or version of a package) that is not available on hackage, what should I do?__
 
