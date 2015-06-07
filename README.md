@@ -52,8 +52,8 @@ sudo apt-get install stack -y
 #### Arch Linux
 
 Stack can be found in the AUR:
-  - [stack](https://aur.archlinux.org/packages/stack/) _latest stable version_
-  - [stack-git](https://aur.archlinux.org/packages/stack-git/) _git version_
+  - [haskell-stack](https://aur.archlinux.org/packages/haskell-stack/) _latest stable version_
+  - [haskell-stack-git](https://aur.archlinux.org/packages/haskell-stack-git/) _git version_
 
 ### Usage
 
