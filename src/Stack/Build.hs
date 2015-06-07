@@ -106,9 +106,9 @@ instance Show ConstructPlanException where
     let details = case e of
          (SnapshotPackageDependsOnLocal pName pIdentifier) ->
            "Exception: Stack.Build.SnapshotPackageDependsOnLocal\n" ++
-           "  Custom snapshot package " ++ show pName ++ " depends on locally installed package:\n" ++
-           "  "  ++ show pIdentifier ++ ",\n" ++
-           "  should you add " ++ show pIdentifier ++ " to [extra-deps] in the project's stack.yaml?"
+           " Local package " ++ show pIdentifier ++ " is a dependency of snapshot package " ++ show pName ++ ":\n" ++
+           " Snapshot packages cannot depend on local packages,\n " ++
+           " should you add " ++ show pName ++ " to [extra-deps] in the project's stack.yaml?"
          (DependencyCycleDetected pNames) ->
            "Exception: Stack.Build.DependencyCycle\n" ++
            "  While checking call stack,\n" ++
