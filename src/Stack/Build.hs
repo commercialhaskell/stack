@@ -703,18 +703,25 @@ constructPlan :: MonadThrow m
               => MiniBuildPlan
               -> BaseConfigOpts
               -> [LocalPackage]
+              -> [PackageName] -- ^ additional packages that must be built
               -> Set GhcPkgId -- ^ locally registered
               -> SourceMap
               -> m Plan
-constructPlan mbp baseConfigOpts locals locallyRegistered sourceMap = do
+constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered sourceMap = do
     let s0 = S
             { callStack = []
             , tasks = M.empty
             , failures = []
             }
     ((), s) <- flip runStateT s0 $ do
-        eres <- mapM addLocal $ filter lpWanted locals
-        case partitionEithers eres of
+        eres1 <- mapM addLocal $ filter lpWanted locals
+        eres2 <- mapM
+            -- TODO it's pretty ugly that we have to pass in the fake
+            -- deps-command package name and anyVersion, would be nice to clean
+            -- things up a bit
+            (\name -> addDep $(mkPackageName "deps-command") Local name anyVersion)
+            extraToBuild
+        case partitionEithers $ eres1 ++ eres2 of
             ([], _) -> return ()
             (errs, _) -> addFailure $ Couldn'tMakePlanForWanted $ Set.fromList errs
     let toUnregisterLocal (PackageIdentifier name version)
@@ -963,7 +970,8 @@ build bopts = do
             , bcoFinalAction = boptsFinalAction bopts
             , bcoGhcOptions = boptsGhcOptions bopts
             }
-    plan <- constructPlan mbp baseConfigOpts locals locallyRegistered sourceMap2
+        extraToBuild = either (const []) id $ boptsTargets bopts
+    plan <- constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered sourceMap2
 
     if boptsDryrun bopts
         then printPlan plan
