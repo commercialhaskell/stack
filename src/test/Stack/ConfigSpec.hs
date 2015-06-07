@@ -78,7 +78,8 @@ spec = beforeAll setup $ afterAll teardown $ do
       createDirectory childDir
       setCurrentDirectory childDir
       LoadConfig{..} <- loadConfig' manager
-      BuildConfig{..} <- loadBuildConfigRest manager lcLoadBuildConfig
+      BuildConfig{..} <- loadBuildConfigRest manager
+                            (lcLoadBuildConfig ThrowException)
       bcRoot `shouldBe` parentDir
 
     it "respects the STACK_YAML env variable" $ \T{..} -> inTempDir $ do
@@ -88,7 +89,8 @@ spec = beforeAll setup $ afterAll teardown $ do
         writeFile stackYamlFp sampleConfig
         withEnvVar "STACK_YAML" stackYamlFp $ do
           LoadConfig{..} <- loadConfig' manager
-          BuildConfig{..} <- loadBuildConfigRest manager lcLoadBuildConfig
+          BuildConfig{..} <- loadBuildConfigRest manager
+                                (lcLoadBuildConfig ThrowException)
           bcRoot `shouldBe` dir
 
     it "STACK_YAML can be relative" $ \T{..} -> inTempDir $ do
@@ -100,5 +102,6 @@ spec = beforeAll setup $ afterAll teardown $ do
         writeFile (toFilePath yamlAbs) "resolver: ghc-7.8"
         withEnvVar "STACK_YAML" (toFilePath yamlRel) $ do
             LoadConfig{..} <- loadConfig' manager
-            BuildConfig{..} <- loadBuildConfigRest manager lcLoadBuildConfig
+            BuildConfig{..} <- loadBuildConfigRest manager
+                                (lcLoadBuildConfig ThrowException)
             bcStackYaml `shouldBe` yamlAbs
