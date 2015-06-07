@@ -12,6 +12,8 @@ location**
 
 ### Install
 
+#### Ubuntu
+
 * Ubuntu 15.04 (amd64)
 
 ```sh
@@ -47,6 +49,11 @@ echo 'deb http://fpco.s3.amazonaws.com/ubuntu/precise stable main'|sudo tee /etc
 sudo apt-get update
 sudo apt-get install stack -y
 ```
+#### Arch Linux
+
+Stack can be found in the AUR:
+  - [stack](https://aur.archlinux.org/packages/stack/) _latest stable version_
+  - [stack-git](https://aur.archlinux.org/packages/stack-git/) _git version_
 
 ### Usage
 
