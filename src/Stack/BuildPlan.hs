@@ -441,22 +441,21 @@ loadBuildPlan name = do
 checkBuildPlan :: (MonadLogger m, MonadThrow m, MonadIO m, MonadReader env m, HasConfig env)
                => SnapName -- ^ used only for debugging purposes
                -> MiniBuildPlan
-               -> Path Abs File -- ^ cabal file path, used only for debugging purposes
                -> GenericPackageDescription
                -> m (Maybe (Map FlagName Bool))
-checkBuildPlan name mbp cabalfp gpd = do
+checkBuildPlan name mbp gpd = do
     $logInfo $ "Checking against build plan " <> renderSnapName name
     platform <- asks (configPlatform . getConfig)
     loop platform flagOptions
   where
     loop _ [] = return Nothing
     loop platform (flags:rest) = do
-        pkg <- resolvePackage pkgConfig cabalfp gpd
         passes <- checkDeps flags (packageDeps pkg) (mbpPackages mbp)
         if passes
             then return $ Just flags
             else loop platform rest
       where
+        pkg = resolvePackage pkgConfig gpd
         pkgConfig = PackageConfig
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True
@@ -515,10 +514,9 @@ checkDeps flags deps packages = do
 -- | Find a snapshot and set of flags that is compatible with the given
 -- 'GenericPackageDescription'. Returns 'Nothing' if no such snapshot is found.
 findBuildPlan :: (MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m)
-              => Path Abs File
-              -> GenericPackageDescription
+              => GenericPackageDescription
               -> m (Maybe (SnapName, Map FlagName Bool))
-findBuildPlan cabalfp gpd = do
+findBuildPlan gpd = do
     -- Get the most recent LTS and Nightly in the snapshots directory and
     -- prefer them over anything else, since odds are high that something
     -- already exists for them.
@@ -543,7 +541,7 @@ findBuildPlan cabalfp gpd = do
         loop [] = return Nothing
         loop (name:names') = do
             mbp <- loadMiniBuildPlan name
-            mflags <- checkBuildPlan name mbp cabalfp gpd
+            mflags <- checkBuildPlan name mbp gpd
             case mflags of
                 Nothing -> loop names'
                 Just flags -> return $ Just (name, flags)

@@ -233,7 +233,7 @@ type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig en
 type SourceMap = Map PackageName (Version, PackageSource)
 data PackageSource
     = PSLocal LocalPackage
-    | PSExtraDeps Package
+    | PSExtraDeps LocalPackage
     | PSExtraDepsInherited MiniPackageInfo
     | PSSnapshot MiniPackageInfo
     | PSInstalledLib Location GhcPkgId
@@ -282,8 +282,8 @@ getInstalled menv profiling sourceMap1 = do
                         PSLocal _ -> Map.empty
                         -- Only trust for extra deps when in the local database
                         -- and no library is available
-                        PSExtraDeps p
-                            | loc == Local && not (packageHasLibrary p) -> Map.empty
+                        PSExtraDeps lp
+                            | loc == Local && not (packageHasLibrary $ lpPackage lp) -> Map.empty
                         -- Same thing for snapshots, but in the snapshot database
                         PSSnapshot mpi
                             | loc == Snap && not (mpiHasLibrary mpi) -> Map.empty
@@ -304,6 +304,8 @@ getInstalled menv profiling sourceMap1 = do
 data LocalPackage = LocalPackage
     { lpPackage :: Package
     , lpWanted :: Bool
+    , lpDir :: !(Path Abs Dir)                  -- ^ Directory of the package.
+    , lpCabalFile :: !(Path Abs File)           -- ^ The .cabal file
     , lpLastConfigOpts :: !(Maybe [Text])       -- ^ configure options used during last Setup.hs configure, if available
     , lpDirtyFiles :: !Bool                     -- ^ are there files that have changed since the last build?
     }
@@ -341,7 +343,7 @@ loadLocals bopts = do
             $ MismatchedCabalName cabalfp (packageName pkg)
         mbuildCache <- tryGetBuildCache dir
         mconfigCache <- tryGetConfigCache dir
-        fileModTimes <- getPackageFileModTimes pkg
+        fileModTimes <- getPackageFileModTimes pkg cabalfp
         return LocalPackage
             { lpPackage = pkg
             , lpWanted = wanted
@@ -351,6 +353,8 @@ loadLocals bopts = do
                   maybe True
                         ((/= fileModTimes) . buildCacheTimes)
                         mbuildCache
+            , lpCabalFile = cabalfp
+            , lpDir = dir
             }
 
     let known = Set.fromList $ map (packageName . lpPackage) lps
@@ -482,11 +486,15 @@ writeCache dir get' content = do
 
 -- | Get the modified times of all known files in the package,
 -- including the package's cabal file itself.
-getPackageFileModTimes :: MonadIO m => Package -> m (Map FilePath ModTime)
-getPackageFileModTimes pkg =
-    liftM
-        (M.fromList . catMaybes)
-        (mapM getModTimeMaybe (packageCabalFile pkg : Set.toList (packageFiles pkg)))
+getPackageFileModTimes :: (MonadIO m, MonadLogger m, MonadThrow m)
+                       => Package
+                       -> Path Abs File -- ^ cabal file
+                       -> m (Map FilePath ModTime)
+getPackageFileModTimes pkg cabalfp = do
+    files <- getPackageFiles (packageFiles pkg) cabalfp
+    liftM (M.fromList . catMaybes)
+        $ mapM getModTimeMaybe
+        $ Set.toList files
   where
     getModTimeMaybe fp =
         liftIO
@@ -849,13 +857,6 @@ constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered sourceMap
         version = packageVersion p
         ident = PackageIdentifier name version
 
-    addExtraDep p = addLocal LocalPackage
-        { lpPackage = p
-        , lpWanted = False
-        , lpLastConfigOpts = Nothing
-        , lpDirtyFiles = True
-        }
-
     addMPI loc name mpi = checkCallStack name $ do
         let deps = map (, anyVersion) $ Set.toList $ Set.unions
                 $ mpiPackageDeps mpi
@@ -881,7 +882,7 @@ constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered sourceMap
             Just (version, ps)
                 | version `withinRange` range -> case ps of
                     PSLocal lp -> allowLocal version $ addLocal lp
-                    PSExtraDeps p -> allowLocal version $ addExtraDep p
+                    PSExtraDeps lp -> allowLocal version $ addLocal lp
                     PSExtraDepsInherited mpi -> allowLocal version $ addMPI Local name mpi
                     PSSnapshot mpi -> addMPI Snap name mpi
                     PSInstalledLib loc gid -> allowLocation loc version $ return $ Right $ ADRFound gid loc
@@ -932,7 +933,7 @@ build bopts = do
     extraDeps <- loadExtraDeps menv bopts cabalPkgVer
 
     let shadowed = Set.fromList (map (packageName . lpPackage) locals)
-                <> Set.fromList (map packageName extraDeps)
+                <> Set.fromList (map (packageName . lpPackage) extraDeps)
         (mbp, newExtraDeps0) = shadowMiniBuildPlan mbp0 shadowed
         newExtraDeps = flip Map.mapWithKey newExtraDeps0 $ \name mpi ->
             (mpiVersion mpi, PSExtraDepsInherited mpi
@@ -946,8 +947,9 @@ build bopts = do
             [ Map.fromList $ flip map locals $ \lp ->
                 let p = lpPackage lp
                  in (packageName p, (packageVersion p, PSLocal lp))
-            , Map.fromList $ flip map extraDeps $ \p ->
-                (packageName p, (packageVersion p, PSExtraDeps p))
+            , Map.fromList $ flip map extraDeps $ \lp ->
+                let p = lpPackage lp
+                 in (packageName p, (packageVersion p, PSExtraDeps lp))
             , newExtraDeps
             , flip fmap (mbpPackages mbp)
                 $ \mpi -> (mpiVersion mpi, PSSnapshot mpi)
@@ -1004,7 +1006,7 @@ loadExtraDeps :: M env m
               => EnvOverride
               -> BuildOpts
               -> PackageIdentifier -- ^ Cabal version
-              -> m [Package]
+              -> m [LocalPackage]
 loadExtraDeps menv bopts cabalPkgVer = do
     bconfig <- asks getBuildConfig
     unpackDir <- configLocalUnpackDir
@@ -1018,10 +1020,18 @@ loadExtraDeps menv bopts cabalPkgVer = do
         let name = packageIdentifierName ident
             flags = localFlags bopts bconfig name
             pc = depPackageConfig bconfig flags
-        package <- readPackageDir pc dir
+        (cabalfp, package) <- readPackageDir pc dir
         when (name /= packageName package)
             $ throwM $ UnpackedPackageHasWrongName ident (packageName package)
-        return package
+
+        return LocalPackage -- FIXME this all has to go away
+            { lpPackage = package
+            , lpWanted = False
+            , lpLastConfigOpts = Nothing
+            , lpDirtyFiles = True
+            , lpDir = dir
+            , lpCabalFile = cabalfp
+            }
 
 -- | All flags for a local package
 localFlags :: BuildOpts -> BuildConfig -> PackageName -> Map FlagName Bool
@@ -1067,7 +1077,7 @@ displayTask task = T.pack $ concat
     , ", source="
     , case taskType task of
         TTPackage lp steps -> concat
-            [ toFilePath $ packageDir $ lpPackage lp
+            [ toFilePath $ lpDir lp
             , case steps of
                 AllSteps -> " (configure)"
                 SkipConfig -> " (build)"
@@ -1143,11 +1153,11 @@ singleBuild :: M env m
             -> Task
             -> m ()
 singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
-  withPackage $ \package ->
+  withPackage $ \package cabalfp pkgDir ->
   withLogFile package $ \mlogFile ->
-  withCabal package mlogFile $ \cabal -> do
+  withCabal pkgDir mlogFile $ \cabal -> do
     when needsConfig $ withMVar eeConfigureLock $ \_ -> do
-        deleteCaches (packageDir package)
+        deleteCaches pkgDir
         idMap <- liftIO $ readTVarIO eeGhcPkgIds
         let getMissing ident =
                 case Map.lookup ident idMap of
@@ -1166,10 +1176,10 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
         announce "configure"
         cabal False $ "configure" : map T.unpack configOpts
         $logDebug $ T.pack $ show configOpts
-        writeConfigCache (packageDir package) configOpts
+        writeConfigCache pkgDir configOpts
 
-    fileModTimes <- getPackageFileModTimes package
-    writeBuildCache (packageDir package) fileModTimes
+    fileModTimes <- getPackageFileModTimes package cabalfp
+    writeBuildCache pkgDir fileModTimes
 
     unless justFinal $ do
         announce "build"
@@ -1179,7 +1189,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
     case boptsFinalAction eeBuildOpts of
         DoTests -> when wanted $ do
             announce "test"
-            runTests package mlogFile
+            runTests package pkgDir mlogFile
         DoBenchmarks -> when wanted $ do
             announce "benchmarks"
             cabal False ["bench"]
@@ -1221,6 +1231,15 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                    DoHaddock -> liftIO (createDocLinks docLoc package)
                    _ -> return ()
              #endif
+
+-- | Package's documentation directory.
+packageDocDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
+              => PackageIdentifier -- ^ Cabal version
+              -> Package
+              -> m (Path Abs Dir)
+packageDocDir cabalPkgVer package' = do
+  dist <- distDirFromDir cabalPkgVer (packageDir package')
+  return (dist </> $(mkRelDir "doc/"))
                  --}
         DoNothing -> return ()
 
@@ -1271,7 +1290,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
 
     withPackage inner =
         case taskType of
-            TTPackage package _ -> inner $ lpPackage package
+            TTPackage lp _ -> inner (lpPackage lp) (lpCabalFile lp) (lpDir lp)
             TTMPI mpi -> do
                 mdist <- liftM Just $ distRelativeDir eeCabalPkgVer
                 m <- unpackPackageIdents eeEnvOverride eeTempDir mdist $ Set.singleton taskProvides
@@ -1279,11 +1298,11 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                     [(ident, dir)]
                         | ident == taskProvides -> do
                             bconfig <- asks getBuildConfig
-                            package <- readPackageDir (packageConfig bconfig mpi) dir
+                            (cabalfp, package) <- readPackageDir (packageConfig bconfig mpi) dir
                             let name = packageIdentifierName taskProvides
                             when (name /= packageName package)
                                 $ throwM $ UnpackedPackageHasWrongName ident (packageName package)
-                            inner package
+                            inner package cabalfp dir
                     _ -> error $ "withPackage: invariant violated: " ++ show m
 
     packageConfig bconfig mpi = PackageConfig
@@ -1305,7 +1324,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                 (liftIO . hClose)
                 $ \h -> inner (Just (fp, h))
 
-    withCabal package mlogFile inner = do
+    withCabal pkgDir mlogFile inner = do
         config <- asks getConfig
         menv <- liftIO $ configEnvOverride config EnvSettings
             { esIncludeLocals = taskLocation == Local
@@ -1313,7 +1332,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
             }
         exeName <- liftIO $ join $ findExecutable menv "runhaskell"
         distRelativeDir' <- distRelativeDir eeCabalPkgVer
-        msetuphs <- liftIO $ getSetupHs $ packageDir package
+        msetuphs <- liftIO $ getSetupHs pkgDir
         let setuphs = fromMaybe eeSetupHs msetuphs
         inner $ \stripTHLoading args -> do
             let fullArgs =
@@ -1327,7 +1346,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                     : args
                 cp0 = proc (toFilePath exeName) fullArgs
                 cp = cp0
-                    { cwd = Just $ toFilePath $ packageDir package
+                    { cwd = Just $ toFilePath pkgDir
                     , Process.env = envHelper menv
                     , std_in = CreatePipe
                     , std_out =
@@ -1367,11 +1386,10 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                         (fmap fst mlogFile)
                         bs
 
-    runTests package mlogFile = do
+    runTests package pkgDir mlogFile = do
         bconfig <- asks getBuildConfig
-        let pkgRoot = packageDir package
         distRelativeDir' <- distRelativeDir eeCabalPkgVer
-        let buildDir = pkgRoot </> distRelativeDir'
+        let buildDir = pkgDir </> distRelativeDir'
         let exeExtension =
                 case configPlatform $ getConfig bconfig of
                     Platform _ Windows -> ".exe"
@@ -1391,7 +1409,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} Task {..} =
                 then do
                     announce $ "test " <> testName
                     let cp = (proc (toFilePath exeName) [])
-                            { cwd = Just $ toFilePath pkgRoot
+                            { cwd = Just $ toFilePath pkgDir
                             , Process.env = envHelper menv
                             , std_in = CreatePipe
                             , std_out =

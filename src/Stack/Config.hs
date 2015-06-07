@@ -72,7 +72,7 @@ getDefaultResolver dir = do
             return Nothing
         Right cabalfp -> do
             gpd <- readPackageUnresolved cabalfp
-            mpair <- findBuildPlan cabalfp gpd
+            mpair <- findBuildPlan gpd
             let name =
                     case C.package $ C.packageDescription gpd of
                         C.PackageIdentifier cname _ ->

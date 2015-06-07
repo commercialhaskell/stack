@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -16,11 +17,9 @@ module Stack.Package
   ,resolvePackage
   ,getCabalFileName
   ,Package(..)
+  ,GetPackageFiles(..)
   ,PackageConfig(..)
   ,buildLogPath
-  ,configureLogPath
-  ,packageDocDir
-  ,stackageBuildDir
   ,PackageException (..)
   ,resolvePackageDescription
   ,packageToolDependencies
@@ -102,9 +101,7 @@ instance Show MismatchedCabalName where
 data Package =
   Package {packageName :: !PackageName                    -- ^ Name of the package.
           ,packageVersion :: !Version                     -- ^ Version of the package
-          ,packageDir :: !(Path Abs Dir)                  -- ^ Directory of the package.
-          ,packageCabalFile :: !(Path Abs File)           -- ^ The .cabal file
-          ,packageFiles :: !(Set (Path Abs File))         -- ^ Files that the package depends on.
+          ,packageFiles :: !GetPackageFiles
           ,packageDeps :: !(Map PackageName VersionRange) -- ^ Packages that the package depends on.
           ,packageTools :: ![Dependency]                  -- ^ A build tool name.
           ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
@@ -113,6 +110,16 @@ data Package =
           ,packageTests :: !(Set Text)                    -- ^ names of test suites
           }
  deriving (Show,Typeable)
+
+-- | Files that the package depends on, relative to package directory.
+-- Argument is the location of the .cabal file
+newtype GetPackageFiles = GetPackageFiles
+    { getPackageFiles :: forall m. (MonadIO m, MonadLogger m, MonadThrow m)
+                      => Path Abs File
+                      -> m (Set (Path Abs File))
+    }
+instance Show GetPackageFiles where
+    show _ = "<GetPackageFiles>"
 
 -- | Get the identifier of the package.
 packageIdentifier :: Package -> Stack.Types.PackageIdentifier.PackageIdentifier
@@ -169,63 +176,45 @@ readPackage :: (MonadLogger m, MonadIO m, MonadThrow m)
             -> Path Abs File
             -> m Package
 readPackage packageConfig cabalfp =
-  readPackageUnresolved cabalfp >>= resolvePackage packageConfig cabalfp
+  resolvePackage packageConfig `liftM` readPackageUnresolved cabalfp
 
 -- | Convenience wrapper around @readPackage@ that first finds the cabal file
 -- in the given directory.
 readPackageDir :: (MonadLogger m, MonadIO m, MonadThrow m)
                => PackageConfig
                -> Path Abs Dir
-               -> m Package
+               -> m (Path Abs File, Package)
 readPackageDir packageConfig dir = do
     cabalfp <- getCabalFileName dir
     pkg <- readPackage packageConfig cabalfp
     name <- parsePackageNameFromFilePath cabalfp
     when (packageName pkg /= name)
         $ throwM $ MismatchedCabalName cabalfp name
-    return pkg
+    return (cabalfp, pkg)
 
 -- | Resolve a parsed cabal file into a 'Package'.
-resolvePackage :: (MonadLogger m, MonadIO m, MonadThrow m)
-               => PackageConfig
-               -> Path Abs File
+resolvePackage :: PackageConfig
                -> GenericPackageDescription
-               -> m Package
-resolvePackage packageConfig cabalfp gpkg = do
-     let pkgId =
-           package (packageDescription gpkg)
-         name = fromCabalPackageName (pkgName pkgId)
-         pkgFlags =
-           packageConfigFlags packageConfig
-         pkg =
-           resolvePackageDescription packageConfig gpkg
-     case packageDependencies pkg of
-       deps ->
-           do let dir = FL.parent cabalfp
-              pkgFiles <-
-                runReaderT (packageDescFiles pkg) cabalfp
-              let files = cabalfp : pkgFiles
-                  deps' =
-                    M.filterWithKey (const . (/= name))
-                                    deps
-              return (Package {packageName = name
-                            ,packageVersion = fromCabalVersion (pkgVersion pkgId)
-                            ,packageDeps = deps'
-                            ,packageDir = dir
-                            ,packageCabalFile = cabalfp
-                            ,packageFiles = S.fromList files
-                            ,packageTools = packageDescTools pkg
-                            ,packageFlags = pkgFlags
-                            ,packageAllDeps =
-                               S.fromList (M.keys deps')
-                            ,packageHasLibrary = maybe
-                                False
-                                (buildable . libBuildInfo)
-                                (library pkg)
-                            ,packageTests = S.fromList
-                                          $ map (T.pack . fst)
-                                          $ condTestSuites gpkg
-                            })
+               -> Package
+resolvePackage packageConfig gpkg = Package
+    { packageName = name
+    , packageVersion = fromCabalVersion (pkgVersion pkgId)
+    , packageDeps = deps
+    , packageFiles = GetPackageFiles $ \cabalfp -> do
+        files <- runReaderT (packageDescFiles pkg) cabalfp
+        return $ S.fromList $ cabalfp : files
+    , packageTools = packageDescTools pkg
+    , packageFlags = packageConfigFlags packageConfig
+    , packageAllDeps = S.fromList (M.keys deps)
+    , packageHasLibrary = maybe False (buildable . libBuildInfo) (library pkg)
+    , packageTests = S.fromList $ map (T.pack . fst) $ condTestSuites gpkg
+    }
+
+  where
+    pkgId = package (packageDescription gpkg)
+    name = fromCabalPackageName (pkgName pkgId)
+    pkg = resolvePackageDescription packageConfig gpkg
+    deps = M.filterWithKey (const . (/= name)) (packageDependencies pkg)
 
 -- | Get all dependencies of the package (buildable targets only).
 packageDependencies :: PackageDescription -> Map PackageName VersionRange
@@ -520,34 +509,6 @@ buildLogPath package' = do
     , ".log"
     ]
   return $ stack </> $(mkRelDir "logs") </> fp
-
--- | Path for the project's configure log.
-configureLogPath :: (MonadThrow m, MonadReader env m, HasPlatform env)
-                 => PackageIdentifier -- ^ Cabal version
-                 -> Package
-                 -> m (Path Abs File)
-configureLogPath cabalPkgVer package' = do
-  build <- stackageBuildDir cabalPkgVer package'
-  return (build </> $(mkRelFile "configure-log"))
-
--- | Get the build directory.
-stackageBuildDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
-                 => PackageIdentifier -- ^ Cabal version
-                 -> Package
-                 -> m (Path Abs Dir)
-stackageBuildDir cabalPkgVer package' = do
-  dist <- distDirFromDir cabalPkgVer dir
-  return (dist </> $(mkRelDir "stack-build"))
-  where dir = packageDir package'
-
--- | Package's documentation directory.
-packageDocDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
-              => PackageIdentifier -- ^ Cabal version
-              -> Package
-              -> m (Path Abs Dir)
-packageDocDir cabalPkgVer package' = do
-  dist <- distDirFromDir cabalPkgVer (packageDir package')
-  return (dist </> $(mkRelDir "doc/"))
 
 -- | Resolve the file, if it can't be resolved, warn for the user
 -- (purely to be helpful).
