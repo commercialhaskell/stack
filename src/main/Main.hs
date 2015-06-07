@@ -554,10 +554,10 @@ globalOpts docker =
     <*> configOptsParser docker
     <*> boolFlags True
             "system-ghc"
-            "Use the system installed GHC (on the PATH) if available and a matching version"
+            "using the system installed GHC (on the PATH) if available and a matching version"
     <*> boolFlags True
             "install-ghc"
-            "Download and install GHC if necessary (can be done manually with stack setup)"
+            "downloading and installing GHC if necessary (can be done manually with stack setup)"
 
 -- | Parse for a logging level.
 logLevelOpt :: Parser LogLevel
