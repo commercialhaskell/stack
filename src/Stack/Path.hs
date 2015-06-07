@@ -44,18 +44,18 @@ pathString PathPackageDb = liftM process pathPackageDb where
 -- that will be used for the current project.
 pathGhc :: (MonadReader env m, HasBuildConfig env, MonadThrow m)
   => m (Path Abs File)
-pathGhc = throwM $ NotYetImplemented "Stack.Path.pathGhc"
+pathGhc = throwM $ NotYetImplemented "Stack.Path.pathGhc https://github.com/fpco/stack/issues/95"
 
 -- (Note: it's not actually as simple as just one log dir.)
 -- | The path to the log file directory
 -- that will be used for the current project.
 pathLog :: (MonadReader env m, HasBuildConfig env, MonadThrow m)
   => m (Path Abs Dir)
-pathLog = throwM $ NotYetImplemented "Stack.Path.pathLog"
+pathLog = throwM $ NotYetImplemented "Stack.Path.pathLog https://github.com/fpco/stack/issues/95"
 
 -- | The list of package-db directories
 -- that will be used for the current project.
 -- The earlier databases in the list take precedence over the later ones.
 pathPackageDb :: (MonadReader env m, HasBuildConfig env, MonadThrow m)
   => m [Path Abs Dir]
-pathPackageDb = throwM $ NotYetImplemented "Stack.Path.pathPackageDb"
+pathPackageDb = throwM $ NotYetImplemented "Stack.Path.pathPackageDb https://github.com/fpco/stack/issues/95"
