@@ -37,6 +37,7 @@ import System.Exit (ExitCode (ExitSuccess))
 import System.FilePath (searchPathSeparator)
 import System.IO.Temp (withSystemTempDirectory)
 import System.Process (rawSystem)
+import Stack.GhcPkg (getGlobalDB)
 import Stack.Types
 import Distribution.System (OS (..), Arch (..), Platform (..))
 import Stack.Build.Types
@@ -132,10 +133,11 @@ setupEnv useSystem installIfMissing = do
     depsExists <- liftIO $ doesDirectoryExist $ toFilePath deps
     localdb <- runReaderT packageDatabaseLocal bconfig
     localdbExists <- liftIO $ doesDirectoryExist $ toFilePath localdb
+    globalDB <- mkEnvOverride platform env1 >>= getGlobalDB
     let mkGPP locals = T.pack $ intercalate [searchPathSeparator] $ concat
             [ [toFilePath localdb | locals && localdbExists]
             , [toFilePath deps | depsExists]
-            , [""] -- force an empty component at the end to include the global package DB
+            , [toFilePath globalDB]
             ]
 
     envRef <- liftIO $ newIORef Map.empty
