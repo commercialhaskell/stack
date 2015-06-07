@@ -17,6 +17,7 @@ module Stack.Fetch
     , resolvePackages
     , ResolvedPackage (..)
     , withCabalFiles
+    , withCabalLoader
     ) where
 
 import qualified Codec.Archive.Tar               as Tar
@@ -213,6 +214,24 @@ withCabalFiles name pkgs f = do
         hSeek h AbsoluteSeek $ fromIntegral $ pcOffset pc
         cabalBS <- S.hGet h $ fromIntegral $ pcSize pc
         f ident tf cabalBS
+
+-- | Provide a function which will load up a cabal @ByteString@ from the
+-- package indices.
+withCabalLoader
+    :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
+    => EnvOverride
+    -> ((PackageIdentifier -> m ByteString) -> m a)
+    -> m a
+withCabalLoader menv inner = do
+    caches <- getPackageCaches menv
+    -- TODO in the future, keep all of the necessary @Handle@s open
+    inner $ \ident ->
+        case Map.lookup ident caches of
+            Nothing -> throwM $ UnknownPackageIdentifiers $ Set.singleton ident
+            Just (index, cache) -> do
+                [bs] <- withCabalFiles (indexName index) [(ident, cache, ())]
+                    $ \_ _ bs -> return bs
+                return bs
 
 -- | Figure out where to fetch from.
 getToFetch :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env)

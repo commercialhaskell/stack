@@ -1,3 +1,9 @@
+-- TODO:
+--
+-- Record flags used for local packages after installing them
+--
+-- When loading local database, only count as installed if flags match what we
+-- have locally
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE CPP #-}
@@ -194,7 +200,6 @@ instance Show CabalExitedUnsuccessfully where
 
 -- | Directory containing files to mark an executable as installed
 exeInstalledDir :: M env m => Location -> m (Path Abs Dir)
-exeInstalledDir Global = error "exeInstalledDir Global"
 exeInstalledDir Snap = (</> $(mkRelDir "installed-packages")) `liftM` installationRootDeps
 exeInstalledDir Local = (</> $(mkRelDir "installed-packages")) `liftM` installationRootLocal
 
@@ -225,7 +230,7 @@ import           System.Posix.Files (createSymbolicLink,removeLink)
 data Installed = Library GhcPkgId | Executable
     deriving (Show, Eq, Ord)
 
-data Location = Global | Snap | Local
+data Location = Snap | Local
     deriving (Show, Eq)
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
@@ -233,10 +238,8 @@ type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig en
 type SourceMap = Map PackageName (Version, PackageSource)
 data PackageSource
     = PSLocal LocalPackage
-    | PSExtraDeps LocalPackage
-    | PSExtraDepsInherited MiniPackageInfo
-    | PSSnapshot MiniPackageInfo
-    | PSInstalledLib Location GhcPkgId
+    | PSUpstream Location (Map FlagName Bool)
+    | PSInstalledLib (Maybe Location) GhcPkgId -- ^ Nothing == Global
     | PSInstalledExe Location
 
 -- | Returns the new SourceMap and all of the locally registered packages.
@@ -258,9 +261,9 @@ getInstalled menv profiling sourceMap1 = do
 
     let loadDatabase' = loadDatabase menv mpcache
     (sourceMap2, localInstalled) <-
-        loadDatabase' Global Nothing sourceMap1 >>=
-        loadDatabase' Snap (Just snapDBPath) . fst >>=
-        loadDatabase' Local (Just localDBPath) . fst
+        loadDatabase' Nothing sourceMap1 >>=
+        loadDatabase' (Just (Snap, snapDBPath)) . fst >>=
+        loadDatabase' (Just (Local, localDBPath)) . fst
 
     case mpcache of
         Nothing -> return ()
@@ -280,13 +283,13 @@ getInstalled menv profiling sourceMap1 = do
                         -- Never mark locals as installed, instead do dirty
                         -- checking
                         PSLocal _ -> Map.empty
-                        -- Only trust for extra deps when in the local database
-                        -- and no library is available
-                        PSExtraDeps lp
-                            | loc == Local && not (packageHasLibrary $ lpPackage lp) -> Map.empty
-                        -- Same thing for snapshots, but in the snapshot database
-                        PSSnapshot mpi
-                            | loc == Snap && not (mpiHasLibrary mpi) -> Map.empty
+
+                        -- FIXME start recording build flags for installed
+                        -- executables, and only count as installed if it
+                        -- matches
+
+                        PSUpstream loc' _flags | loc == loc' -> Map.empty
+
                         -- Passed all the tests, mark this as installed!
                         _ -> m
           where
@@ -517,11 +520,10 @@ data LoadHelper = LoadHelper
 loadDatabase :: M env m
              => EnvOverride
              -> Maybe ProfilingCache -- ^ if Just, profiling is required
-             -> Location
-             -> Maybe (Path Abs Dir) -- ^ package database
+             -> Maybe (Location, Path Abs Dir) -- ^ package database, Nothing for global
              -> SourceMap
              -> m (SourceMap, Set GhcPkgId)
-loadDatabase menv mpcache loc mdb sourceMap0 = do
+loadDatabase menv mpcache mdb sourceMap0 = do
     let sinkDP = (case mpcache of
                     Just pcache -> addProfiling pcache
                     -- Just an optimization to avoid calculating the profiling
@@ -534,7 +536,7 @@ loadDatabase menv mpcache loc mdb sourceMap0 = do
         sink = getZipSink $ (,)
             <$> ZipSink sinkDP
             <*> ZipSink sinkGIDs
-    (lhs1, gids) <- ghcPkgDump menv mdb $ conduitDumpPackage =$= sink
+    (lhs1, gids) <- ghcPkgDump menv (fmap snd mdb) $ conduitDumpPackage =$= sink
     let lhs2 = lhs1 ++ installed0
         lhs3 = pruneDeps
             (packageIdentifierName . ghcPkgIdPackageIdentifier)
@@ -546,7 +548,7 @@ loadDatabase menv mpcache loc mdb sourceMap0 = do
             $ map (\lh ->
                 let gid = lhId lh
                     PackageIdentifier name version = ghcPkgIdPackageIdentifier gid
-                 in (name, (version, PSInstalledLib loc gid)))
+                 in (name, (version, PSInstalledLib (fmap fst mdb) gid)))
             $ filter lhNew
             $ Map.elems lhs3
         sourceMap2 = Map.union sourceMap1 sourceMap0
@@ -584,12 +586,8 @@ loadDatabase menv mpcache loc mdb sourceMap0 = do
 
                     -- Shadow any installations in the global and snapshot
                     -- databases
-                    PSExtraDeps _ -> loc == Local
-                    PSExtraDepsInherited _ -> loc == Local
-
-                    -- Alows cool to have the right version of a
-                    -- snapshot-listed package
-                    PSSnapshot _ -> True
+                    PSUpstream Local _ -> fmap fst mdb == Just Local
+                    PSUpstream Snap _ -> True
 
                     -- And then above we just resolve the conflict
                     PSInstalledLib _ _ -> True
@@ -609,7 +607,8 @@ data Task = Task
     }
     deriving Show
 
-data TaskType = TTPackage LocalPackage NeededSteps | TTMPI MiniPackageInfo
+data TaskType = TTLocal LocalPackage NeededSteps
+              | TTUpstream Package Location
     deriving Show
 
 data S = S
@@ -620,8 +619,8 @@ data S = S
 
 data AddDepRes
     = ADRToInstall PackageIdentifier Location
-    | ADRFound GhcPkgId Location
-    | ADRFoundExe Location
+    | ADRFound GhcPkgId
+    | ADRFoundExe
     deriving Show
 
 data BaseConfigOpts = BaseConfigOpts
@@ -644,7 +643,6 @@ configureOpts :: BaseConfigOpts
 configureOpts bco deps wanted loc flags = map T.pack $ concat
     [ ["--user", "--package-db=clear", "--package-db=global"]
     , map (("--package-db=" ++) . toFilePath) $ case loc of
-        Global -> assert False []
         Snap -> [bcoSnapDB bco]
         Local -> [bcoSnapDB bco, bcoLocalDB bco]
     , depOptions
@@ -672,7 +670,6 @@ configureOpts bco deps wanted loc flags = map T.pack $ concat
   where
     installRoot =
         case loc of
-            Global -> error "configureOpts: installing into Global"
             Snap -> bcoSnapInstallRoot bco
             Local -> bcoLocalInstallRoot bco
 
@@ -712,9 +709,10 @@ constructPlan :: MonadThrow m
               -> [LocalPackage]
               -> [PackageName] -- ^ additional packages that must be built
               -> Set GhcPkgId -- ^ locally registered
+              -> (PackageName -> Version -> Map FlagName Bool -> m Package) -- ^ load upstream package
               -> SourceMap
               -> m Plan
-constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered sourceMap = do
+constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered loadPackage sourceMap = do
     let s0 = S
             { callStack = []
             , tasks = M.empty
@@ -736,7 +734,7 @@ constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered sourceMap
                 case taskType task of
                     -- If we're just going to be running the tests/benchmarks,
                     -- and the version is the same, do not unregister
-                    TTPackage _ JustFinal -> version /= (packageIdentifierVersion $ taskProvides task)
+                    TTLocal _ JustFinal -> version /= (packageIdentifierVersion $ taskProvides task)
                     _ -> True
             | otherwise =
                 case Map.lookup name sourceMap of
@@ -745,11 +743,10 @@ constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered sourceMap
                         | version /= version' -> True
                         | otherwise -> case ps of
                             PSLocal _ -> False
-                            PSExtraDeps _ -> False
-                            PSExtraDepsInherited _ -> False
-                            PSSnapshot _ -> True
-                            PSInstalledLib Local _ -> False
-                            PSInstalledLib _ _ -> False
+                            PSUpstream Local _ -> False
+                            PSUpstream Snap _ -> True
+                            PSInstalledLib (Just Local) _ -> False
+                            PSInstalledLib _ _ -> True
                             PSInstalledExe _ -> assert False False
     if null $ failures s
         then return Plan
@@ -796,83 +793,83 @@ constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered sourceMap
         $ packageDeps p
         : map toolToPackages (packageTools p)
 
-    withDeps name loc deps inner = do
-        eadrs <- mapM (uncurry (addDep name loc)) deps
-        let (errs, adrs) = partitionEithers eadrs
-        if null errs
-            then inner adrs
-            else do
-                addFailure $ DependencyPlanFailures name $ Set.fromList errs
-                return Nothing
-
     localMap = Map.fromListWith Set.union $ map
         (\gid -> (packageIdentifierName $ ghcPkgIdPackageIdentifier gid, Set.singleton gid))
         (Set.toList locallyRegistered)
-    addLocal lp = checkCallStack name $ do
-        withDeps name Local (M.toList $ packageDepsWithTools p) $ \adrs -> do
-            let missing = Set.fromList $ mapMaybe toMissing adrs
-                present = Set.fromList $ mapMaybe toPresent adrs
-                configOpts = configureOpts baseConfigOpts present (lpWanted lp) Local (packageFlags $ lpPackage lp)
-                mlocalGID =
-                    case fmap Set.toList $ Map.lookup name localMap of
-                        Just [gid] -> Just gid
-                        _ -> Nothing
-                dres | not $ Set.null missing = Dirty AllSteps
-                     | otherwise =
-                        case lpLastConfigOpts lp of
-                            Nothing -> Dirty AllSteps
-                            Just oldConfigOpts
-                                | oldConfigOpts /= configOpts -> Dirty AllSteps
-                                | lpDirtyFiles lp -> Dirty SkipConfig
+    withDeps loc p isDirty mlastConfigOpts wanted mkTaskType = checkCallStack name $ do
+        let deps = M.toList $ packageDepsWithTools p
+        eadrs <- mapM (uncurry (addDep name loc)) deps
+        let (errs, adrs) = partitionEithers eadrs
+            missing = Set.fromList $ mapMaybe toMissing adrs
+            present = Set.fromList $ mapMaybe toPresent adrs
+            configOpts = configureOpts baseConfigOpts present wanted loc (packageFlags p)
+            mlocalGID =
+                case fmap Set.toList $ Map.lookup name localMap of
+                    Just [gid] -> Just gid
+                    _ -> Nothing
+        let dres
+                | not $ Set.null missing = Dirty AllSteps
+                | loc /= Local = Dirty AllSteps
+                | otherwise =
+                    case mlastConfigOpts of
+                        Nothing -> Dirty AllSteps
+                        Just oldConfigOpts
+                            | oldConfigOpts /= configOpts -> Dirty AllSteps
+                            | isDirty -> Dirty SkipConfig
 
-                                -- We want to make sure to run the final action
-                                -- if this target is wanted. We should probably
-                                -- add an extra flag to indicate "no need to
-                                -- build".
-                                | lpWanted lp && bcoFinalAction baseConfigOpts `elem`
-                                    [DoTests, DoBenchmarks] ->
-                                        case mlocalGID of
-                                            Just _ -> Dirty JustFinal
-                                            Nothing -> Dirty SkipConfig
-
-                                | not $ packageHasLibrary p -> CleanExecutable
-                                | otherwise ->
+                            -- We want to make sure to run the final action
+                            -- if this target is wanted. We should probably
+                            -- add an extra flag to indicate "no need to
+                            -- build".
+                            | wanted && bcoFinalAction baseConfigOpts `elem`
+                                [DoTests, DoBenchmarks] ->
                                     case mlocalGID of
-                                        Just gid -> CleanLibrary gid
+                                        Just _ -> Dirty JustFinal
                                         Nothing -> Dirty SkipConfig
-            -- TODO probably need to cache results of calls to addLocal in S, possibly all of addDep
-            case dres of
-                Dirty needConfig -> addTask Task
-                    { taskProvides = ident
-                    , taskRequiresMissing = Set.fromList $ mapMaybe toMissing adrs
-                    , taskRequiresPresent = Set.fromList $ mapMaybe toPresent adrs
-                    , taskLocation = Local
-                    , taskType = TTPackage lp needConfig
-                    }
-                CleanLibrary gid -> return $ Just $ ADRFound gid Local
-                CleanExecutable -> return $ Just $ ADRFoundExe Local
-      where
-        p = lpPackage lp
-        name = packageName p
-        version = packageVersion p
-        ident = PackageIdentifier name version
 
-    addMPI loc name mpi = checkCallStack name $ do
-        let deps = map (, anyVersion) $ Set.toList $ Set.unions
-                $ mpiPackageDeps mpi
-                : map goTool (Set.toList $ mpiToolDeps mpi)
-            goTool tool = fromMaybe Set.empty $ Map.lookup tool toolMap
-        withDeps name loc deps $ \adrs -> do
-            addTask Task
-                { taskProvides = ident
-                , taskRequiresMissing = Set.fromList $ mapMaybe toMissing adrs
-                , taskRequiresPresent = Set.fromList $ mapMaybe toPresent adrs
-                , taskLocation = loc
-                , taskType = TTMPI mpi
-                }
+                            | not $ packageHasLibrary p -> CleanExecutable
+                            | otherwise ->
+                                case mlocalGID of
+                                    Just gid -> CleanLibrary gid
+                                    Nothing -> Dirty SkipConfig
+        if null errs
+            then
+                case dres of
+                    Dirty needConfig -> addTask Task
+                        { taskProvides = PackageIdentifier name (packageVersion p)
+                        , taskRequiresMissing = missing
+                        , taskRequiresPresent = present
+                        , taskLocation = loc
+                        , taskType = mkTaskType needConfig
+                        }
+                    CleanLibrary gid -> return $ Just $ ADRFound gid
+                    CleanExecutable -> return $ Just ADRFoundExe
+            else do
+                addFailure $ DependencyPlanFailures name $ Set.fromList errs
+                return Nothing
       where
-        ident = PackageIdentifier name version
-        version = mpiVersion mpi
+        name = packageName p
+
+    addLocal lp = withDeps
+        Local
+        (lpPackage lp)
+        (lpDirtyFiles lp)
+        (lpLastConfigOpts lp)
+        (lpWanted lp)
+        (TTLocal lp)
+
+    addUpstream loc name version flags = do
+        p <- lift $ loadPackage name version flags
+        let dirty = False -- upstream files are never dirty, since they are immutable
+            mlastConfigOpts = Nothing -- FIXME think about this
+            wanted = False
+        withDeps
+            loc
+            p
+            dirty
+            mlastConfigOpts
+            wanted
+            (const $ TTUpstream p loc)
 
     addDep user userloc name range =
         case Map.lookup name sourceMap of
@@ -882,11 +879,9 @@ constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered sourceMap
             Just (version, ps)
                 | version `withinRange` range -> case ps of
                     PSLocal lp -> allowLocal version $ addLocal lp
-                    PSExtraDeps lp -> allowLocal version $ addLocal lp
-                    PSExtraDepsInherited mpi -> allowLocal version $ addMPI Local name mpi
-                    PSSnapshot mpi -> addMPI Snap name mpi
-                    PSInstalledLib loc gid -> allowLocation loc version $ return $ Right $ ADRFound gid loc
-                    PSInstalledExe loc -> allowLocation loc version $ return $ Right $ ADRFoundExe loc
+                    PSUpstream loc flags -> allowLocation (Just loc) version $ addUpstream loc name version flags
+                    PSInstalledLib loc gid -> allowLocation loc version $ return $ Right $ ADRFound gid
+                    PSInstalledExe loc -> allowLocation (Just loc) version $ return $ Right ADRFoundExe
                 | otherwise -> do
                     addFailure $ VersionOutsideRange
                         user
@@ -896,7 +891,7 @@ constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered sourceMap
       where
         allowLocation loc version inner =
             case loc of
-                Local -> allowLocal version inner
+                Just Local -> allowLocal version inner
                 _ -> inner
         allowLocal version inner =
             case userloc of
@@ -909,7 +904,7 @@ constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered sourceMap
     toMissing (ADRToInstall pi' _) = Just pi'
     toMissing _ = Nothing
 
-    toPresent (ADRFound gid _) = Just gid
+    toPresent (ADRFound gid) = Just gid
     toPresent _ = Nothing
 
 -- | Build using Shake.
@@ -930,29 +925,29 @@ build bopts = do
             }
 
     locals <- loadLocals bopts
-    extraDeps <- loadExtraDeps menv bopts cabalPkgVer
 
     let shadowed = Set.fromList (map (packageName . lpPackage) locals)
-                <> Set.fromList (map (packageName . lpPackage) extraDeps)
-        (mbp, newExtraDeps0) = shadowMiniBuildPlan mbp0 shadowed
-        newExtraDeps = flip Map.mapWithKey newExtraDeps0 $ \name mpi ->
-            (mpiVersion mpi, PSExtraDepsInherited mpi
-                { mpiFlags =
-                    case Map.lookup name $ bcFlags bconfig of
-                        Nothing -> mpiFlags mpi
-                        Just flags -> flags
-                })
+                <> Map.keysSet (bcExtraDeps bconfig)
+        (mbp, extraDeps0) = shadowMiniBuildPlan mbp0 shadowed
+
+        -- Add the extra deps from the stack.yaml file to the deps grabbed from
+        -- the snapshot
+        extraDeps1 = Map.union
+            (Map.map (\v -> (v, M.empty)) (bcExtraDeps bconfig))
+            (Map.map (\mpi -> (mpiVersion mpi, mpiFlags mpi)) extraDeps0)
+
+        -- Overwrite any flag settings with those from the config file
+        extraDeps2 = Map.mapWithKey
+            (\n (v, f) -> (v, PSUpstream Local $ fromMaybe f $ Map.lookup n $ bcFlags bconfig))
+            extraDeps1
 
     let sourceMap1 = Map.unions
             [ Map.fromList $ flip map locals $ \lp ->
                 let p = lpPackage lp
                  in (packageName p, (packageVersion p, PSLocal lp))
-            , Map.fromList $ flip map extraDeps $ \lp ->
-                let p = lpPackage lp
-                 in (packageName p, (packageVersion p, PSExtraDeps lp))
-            , newExtraDeps
+            , extraDeps2
             , flip fmap (mbpPackages mbp)
-                $ \mpi -> (mpiVersion mpi, PSSnapshot mpi)
+                $ \mpi -> (mpiVersion mpi, PSUpstream Snap $ mpiFlags mpi)
             ]
 
     (sourceMap2, locallyRegistered) <- getInstalled menv profiling sourceMap1
@@ -972,7 +967,11 @@ build bopts = do
             , bcoGhcOptions = boptsGhcOptions bopts
             }
         extraToBuild = either (const []) id $ boptsTargets bopts
-    plan <- constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered sourceMap2
+    plan <- withCabalLoader menv $ \cabalLoader -> do
+        let loadPackage name version flags = do
+                bs <- cabalLoader $ PackageIdentifier name version -- TODO automatically update index the first time this fails
+                readPackageBS (depPackageConfig bconfig flags) bs
+        constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered loadPackage sourceMap2
 
     if boptsDryrun bopts
         then printPlan plan
@@ -1001,37 +1000,6 @@ build bopts = do
                 }
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
-
-loadExtraDeps :: M env m
-              => EnvOverride
-              -> BuildOpts
-              -> PackageIdentifier -- ^ Cabal version
-              -> m [LocalPackage]
-loadExtraDeps menv bopts cabalPkgVer = do
-    bconfig <- asks getBuildConfig
-    unpackDir <- configLocalUnpackDir
-    dist <- distRelativeDir cabalPkgVer
-    paths <- unpackPackageIdents menv unpackDir (Just dist)
-        $ Set.fromList
-        $ map fromTuple
-        $ M.toList
-        $ bcExtraDeps bconfig
-    forM (Map.toList paths) $ \(ident, dir) -> do
-        let name = packageIdentifierName ident
-            flags = localFlags bopts bconfig name
-            pc = depPackageConfig bconfig flags
-        (cabalfp, package) <- readPackageDir pc dir
-        when (name /= packageName package)
-            $ throwM $ UnpackedPackageHasWrongName ident (packageName package)
-
-        return LocalPackage -- FIXME this all has to go away
-            { lpPackage = package
-            , lpWanted = False
-            , lpLastConfigOpts = Nothing
-            , lpDirtyFiles = True
-            , lpDir = dir
-            , lpCabalFile = cabalfp
-            }
 
 -- | All flags for a local package
 localFlags :: BuildOpts -> BuildConfig -> PackageName -> Map FlagName Bool
@@ -1071,19 +1039,18 @@ displayTask task = T.pack $ concat
     [ packageIdentifierString $ taskProvides task
     , ": database="
     , case taskLocation task of
-        Global -> assert False "global"
         Snap -> "snapshot"
         Local -> "local"
     , ", source="
     , case taskType task of
-        TTPackage lp steps -> concat
+        TTLocal lp steps -> concat
             [ toFilePath $ lpDir lp
             , case steps of
                 AllSteps -> " (configure)"
                 SkipConfig -> " (build)"
                 JustFinal -> " (already built)"
             ]
-        TTMPI _ -> "package index"
+        TTUpstream _ _ -> "package index"
     , if Set.null $ taskRequiresMissing task
         then ""
         else ", after: " ++ intercalate "," (map packageIdentifierString $ Set.toList $ taskRequiresMissing task)
@@ -1251,7 +1218,6 @@ packageDocDir cabalPkgVer package' = do
     -- in case another package depends on a justFinal target
     let pkgDbs =
             case taskLocation of
-                Global -> []
                 Snap -> [bcoSnapDB eeBaseConfigOpts]
                 Local ->
                     [ bcoSnapDB eeBaseConfigOpts
@@ -1274,44 +1240,34 @@ packageDocDir cabalPkgVer package' = do
 
     needsConfig =
         case taskType of
-            TTPackage _ y -> y == AllSteps
-            TTMPI _ -> True
+            TTLocal _ y -> y == AllSteps
+            TTUpstream _ _ -> True
     justFinal =
         case taskType of
-            TTPackage _ JustFinal -> True
+            TTLocal _ JustFinal -> True
             _ -> False
 
     wanted =
         case taskType of
-            TTPackage lp _ -> lpWanted lp
-            _ -> False
+            TTLocal lp _ -> lpWanted lp
+            TTUpstream _ _ -> False
 
     console = wanted && acRemaining == 0 && eeTotalWanted == 1
 
     withPackage inner =
         case taskType of
-            TTPackage lp _ -> inner (lpPackage lp) (lpCabalFile lp) (lpDir lp)
-            TTMPI mpi -> do
+            TTLocal lp _ -> inner (lpPackage lp) (lpCabalFile lp) (lpDir lp)
+            TTUpstream package _ -> do
                 mdist <- liftM Just $ distRelativeDir eeCabalPkgVer
                 m <- unpackPackageIdents eeEnvOverride eeTempDir mdist $ Set.singleton taskProvides
                 case M.toList m of
                     [(ident, dir)]
                         | ident == taskProvides -> do
-                            bconfig <- asks getBuildConfig
-                            (cabalfp, package) <- readPackageDir (packageConfig bconfig mpi) dir
                             let name = packageIdentifierName taskProvides
-                            when (name /= packageName package)
-                                $ throwM $ UnpackedPackageHasWrongName ident (packageName package)
+                            cabalfpRel <- parseRelFile $ packageNameString name ++ ".cabal"
+                            let cabalfp = dir </> cabalfpRel
                             inner package cabalfp dir
                     _ -> error $ "withPackage: invariant violated: " ++ show m
-
-    packageConfig bconfig mpi = PackageConfig
-        { packageConfigEnableTests = False
-        , packageConfigEnableBenchmarks = False
-        , packageConfigFlags = mpiFlags mpi
-        , packageConfigGhcVersion = bcGhcVersion bconfig
-        , packageConfigPlatform = configPlatform $ getConfig bconfig
-        }
 
     withLogFile package inner
         | console = inner Nothing

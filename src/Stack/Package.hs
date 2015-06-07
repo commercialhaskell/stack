@@ -11,6 +11,7 @@
 
 module Stack.Package
   (readPackage
+  ,readPackageBS
   ,readPackageDir
   ,readPackageUnresolved
   ,readPackageUnresolvedBS
@@ -177,6 +178,14 @@ readPackage :: (MonadLogger m, MonadIO m, MonadThrow m)
             -> m Package
 readPackage packageConfig cabalfp =
   resolvePackage packageConfig `liftM` readPackageUnresolved cabalfp
+
+-- | Reads and exposes the package information, from a ByteString
+readPackageBS :: (MonadThrow m)
+              => PackageConfig
+              -> S.ByteString
+              -> m Package
+readPackageBS packageConfig bs =
+  resolvePackage packageConfig `liftM` readPackageUnresolvedBS Nothing bs
 
 -- | Convenience wrapper around @readPackage@ that first finds the cabal file
 -- in the given directory.
