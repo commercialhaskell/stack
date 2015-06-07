@@ -4,7 +4,7 @@
 
 stack is the easiest and most reliable way to build your Haskell projects, from
 simple one-file executables to massive, multi-package projects with modified
-local dependencies. It uses sensible defaults- like isolation binary
+local dependencies. It uses sensible defaults -like isolation binary
 installations and LTS Haskell- while allowing full user customization. All
 builds are reproducible, so that changes in the upstream package repository or
 work you do on other projects will not break your codebase. If your code builds
@@ -38,7 +38,7 @@ Running `stack` will give you a list of commands, some of the most common are:
 
 ### Install
 
-Need to support more OSes
+Distribution packages are available for Ubuntu and Arch Linux. For the future, we have plans to support more OSes.
 
 #### Ubuntu
 
@@ -79,7 +79,7 @@ sudo apt-get install stack -y
 ```
 #### Arch Linux
 
-Stack can be found in the AUR:
+stack can be found in the AUR:
   - [haskell-stack](https://aur.archlinux.org/packages/haskell-stack/) _latest stable version_
   - [haskell-stack-git](https://aur.archlinux.org/packages/haskell-stack-git/) _git version_
 
