@@ -603,6 +603,10 @@ loadDatabase menv mpcache mdb sourceMap0 = do
                   | otherwise -> case ps of
                     -- Never trust an installed local, instead we do dirty
                     -- checking later when constructing the plan
+                    --
+                    -- TODO: This logic is faulty right now, and breaks in the
+                    -- case where an extra-dep depends on a local package (such
+                    -- as happens in the wai repo). This needs to be rethought
                     PSLocal _ -> return False
 
                     -- Shadow any installations in the global and snapshot
