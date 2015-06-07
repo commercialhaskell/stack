@@ -509,7 +509,7 @@ writeFlagCache gid flags = do
 
 -- | Get the modified times of all known files in the package,
 -- including the package's cabal file itself.
-getPackageFileModTimes :: (MonadIO m, MonadLogger m, MonadThrow m)
+getPackageFileModTimes :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m)
                        => Package
                        -> Path Abs File -- ^ cabal file
                        -> m (Map FilePath ModTime)
@@ -524,7 +524,7 @@ getPackageFileModTimes pkg cabalfp = do
             (catch
                  (liftM
                       (Just . (toFilePath fp,) . modTime)
-                      (getModificationTime (toFilePath fp)) )
+                      (getModificationTime (toFilePath fp)))
                  (\e ->
                        if isDoesNotExistError e
                            then return Nothing
