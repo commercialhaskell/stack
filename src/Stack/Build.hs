@@ -1,9 +1,3 @@
--- TODO:
---
--- Record flags used for local packages after installing them
---
--- When loading local database, only count as installed if flags match what we
--- have locally
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE CPP #-}
@@ -29,13 +23,13 @@ import           Control.Concurrent (getNumCapabilities, forkIO)
 import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
-import           Control.Exception.Enclosed (handleIO)
+import           Control.Exception.Enclosed (handleIO, tryIO)
 import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.Catch (MonadCatch, MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader, asks)
+import           Control.Monad.Reader (MonadReader, asks, ask, runReaderT)
 import           Control.Monad.State.Strict
 import           Control.Monad.Trans.Control (liftBaseWith)
 import           Control.Monad.Trans.Resource
@@ -487,6 +481,32 @@ writeCache dir get' content = do
              (toFilePath fp)
              (Binary.encode content))
 
+flagCacheFile :: (MonadIO m, MonadThrow m, MonadReader env m, HasBuildConfig env)
+              => GhcPkgId
+              -> m (Path Abs File)
+flagCacheFile gid = do
+    rel <- parseRelFile $ ghcPkgIdString gid
+    dir <- flagCacheLocal
+    return $ dir </> rel
+
+-- | Loads the flag cache for the given installed extra-deps
+tryGetFlagCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasBuildConfig env)
+                => GhcPkgId
+                -> m (Maybe (Map FlagName Bool))
+tryGetFlagCache gid = do
+    file <- flagCacheFile gid
+    eres <- liftIO $ tryIO $ Binary.decodeFileOrFail $ toFilePath file
+    case eres of
+        Right (Right x) -> return $ Just x
+        _ -> return Nothing
+
+writeFlagCache :: M env m => GhcPkgId -> Map FlagName Bool -> m ()
+writeFlagCache gid flags = do
+    file <- flagCacheFile gid
+    liftIO $ do
+        createDirectoryIfMissing True $ toFilePath $ parent file
+        Binary.encodeFile (toFilePath file) flags
+
 -- | Get the modified times of all known files in the package,
 -- including the package's cabal file itself.
 getPackageFileModTimes :: (MonadIO m, MonadLogger m, MonadThrow m)
@@ -524,19 +544,20 @@ loadDatabase :: M env m
              -> SourceMap
              -> m (SourceMap, Set GhcPkgId)
 loadDatabase menv mpcache mdb sourceMap0 = do
+    env <- ask
     let sinkDP = (case mpcache of
                     Just pcache -> addProfiling pcache
                     -- Just an optimization to avoid calculating the profiling
                     -- values when they aren't necessary
                     Nothing -> CL.map (\dp -> dp { dpProfiling = False }))
-              =$ CL.filter isAllowed
+              =$ filterMC (flip runReaderT env . isAllowed)
               =$ CL.map dpToLH
               =$ CL.consume
         sinkGIDs = CL.map dpGhcPkgId =$ CL.consume
         sink = getZipSink $ (,)
             <$> ZipSink sinkDP
             <*> ZipSink sinkGIDs
-    (lhs1, gids) <- ghcPkgDump menv (fmap snd mdb) $ conduitDumpPackage =$= sink
+    (lhs1, gids) <- ghcPkgDump menv (fmap snd mdb) $ conduitDumpPackage =$ sink
     let lhs2 = lhs1 ++ installed0
         lhs3 = pruneDeps
             (packageIdentifierName . ghcPkgIdPackageIdentifier)
@@ -573,30 +594,52 @@ loadDatabase menv mpcache mdb sourceMap0 = do
         }
 
     isAllowed dp
-        | isJust mpcache && not (dpProfiling dp) = False
+        | isJust mpcache && not (dpProfiling dp) = return False
         | otherwise =
             case Map.lookup name sourceMap0 of
-                Nothing -> True
+                Nothing -> return True
                 Just (version', ps)
-                  | version /= version' -> False
+                  | version /= version' -> return False
                   | otherwise -> case ps of
                     -- Never trust an installed local, instead we do dirty
                     -- checking later when constructing the plan
-                    PSLocal _ -> False
+                    PSLocal _ -> return False
 
                     -- Shadow any installations in the global and snapshot
                     -- databases
-                    PSUpstream Local _ -> fmap fst mdb == Just Local
-                    PSUpstream Snap _ -> True
+                    PSUpstream Local _ | fmap fst mdb /= Just Local -> return False
+                    PSUpstream Local flags -> do
+                        -- Check that the flags for the installed package match
+                        -- what we would use
+                        cachedFlags <- tryGetFlagCache gid
+                        case cachedFlags of
+                            Just flags' | flags == flags' -> return True
+                            _ -> return False
+
+                    -- We trust that anything installed in the snapshot
+                    PSUpstream Snap _ ->
+                        case fmap fst mdb of
+                            Just Local -> assert False $ return False
+                            _ -> return True
 
                     -- And then above we just resolve the conflict
-                    PSInstalledLib _ _ -> True
+                    PSInstalledLib _ _ -> return True
 
                     -- Something's wrong if we think a package is
                     -- executable-only and it appears in a package datbase
-                    PSInstalledExe _ -> assert False False
+                    PSInstalledExe _ -> assert False $ return False
       where
-        PackageIdentifier name version = ghcPkgIdPackageIdentifier $ dpGhcPkgId dp
+        gid = dpGhcPkgId dp
+        PackageIdentifier name version = ghcPkgIdPackageIdentifier gid
+
+filterMC :: Monad m => (a -> m Bool) -> Conduit a m a
+filterMC p =
+    loop
+  where
+    loop = await >>= maybe (return ()) (\x -> go x >> loop)
+    go x = do
+        b <- lift (p x)
+        if b then yield x else return ()
 
 data Task = Task
     { taskProvides :: !PackageIdentifier
@@ -1229,7 +1272,9 @@ packageDocDir cabalPkgVer package' = do
             markExeInstalled taskLocation taskProvides
             return Executable
         (True, Nothing) -> throwM $ Couldn'tFindPkgId $ packageName package
-        (True, Just pkgid) -> return $ Library pkgid
+        (True, Just pkgid) -> do
+            writeFlagCache pkgid $ packageFlags package
+            return $ Library pkgid
     liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides mpkgid'
   where
     announce x = $logInfo $ T.concat

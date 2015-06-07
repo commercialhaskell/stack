@@ -439,6 +439,12 @@ packageDatabaseLocal = do
     root <- installationRootLocal
     return $ root </> $(mkRelDir "pkgdb")
 
+-- | Directory for holding flag cache information
+flagCacheLocal :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
+flagCacheLocal = do
+    root <- installationRootLocal
+    return $ root </> $(mkRelDir "flag-cache")
+
 -- | Where to store mini build plan caches
 configMiniBuildPlanCache :: (MonadThrow m, MonadReader env m, HasStackRoot env, HasPlatform env)
                          => SnapName
