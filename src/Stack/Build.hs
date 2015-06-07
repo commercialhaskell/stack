@@ -106,31 +106,30 @@ instance Show ConstructPlanException where
     let details = case e of
          (SnapshotPackageDependsOnLocal pName pIdentifier) ->
            "Exception: Stack.Build.SnapshotPackageDependsOnLocal\n" ++
-           " Local package " ++ show pIdentifier ++ " is a dependency of snapshot package " ++ show pName ++ ":\n" ++
-           " Snapshot packages cannot depend on local packages,\n " ++
-           " should you add " ++ show pName ++ " to [extra-deps] in the project's stack.yaml?"
+           "  Local package " ++ show pIdentifier ++ " is a dependency of snapshot package " ++ show pName ++ ".\n" ++
+           "  Snapshot packages cannot depend on local packages,\n " ++
+           "  should you add " ++ show pName ++ " to [extra-deps] in the project's stack.yaml?"
          (DependencyCycleDetected pNames) ->
            "Exception: Stack.Build.DependencyCycle\n" ++
            "  While checking call stack,\n" ++
-           "  Dependency cycle detected in packages :" ++ indent (appendLines pNames)
+           "  dependency cycle detected in packages:" ++ indent (appendLines pNames)
          (DependencyPlanFailures pName (S.toList -> pDeps)) ->
            "Exception: Stack.Build.DependencyPlanFailures\n" ++
            "  Failure when adding dependencies:" ++ doubleIndent (appendLines pDeps) ++ "\n" ++
            "  needed for package: " ++ show pName
          (UnknownPackage pName) ->
              "Exception: Stack.Build.UnknownPackage\n" ++
-             "  While attempting to add dependency:\n" ++
-             "    Could not find package " ++ show pName  ++ "in known packages"
+             "  While attempting to add dependency,\n" ++
+             "  Could not find package " ++ show pName  ++ "in known packages"
          (VersionOutsideRange pName pIdentifier versionRange) ->
              "Exception: Stack.Build.VersionOutsideRange\n" ++
              "  While adding dependency for package " ++ show pName ++ ",\n" ++
-             "  package outside allowed version range detected:\n" ++
-             "    " ++ dropQuotes (show pIdentifier) ++ "\n" ++
-             "  Allowed version range " ++ display versionRange ++ ",\n" ++
+             "  " ++ dropQuotes (show pIdentifier) ++ " was found to be outside its allowed version range.\n" ++
+             "  Allowed version range is " ++ display versionRange ++ ",\n" ++
              "  should you correct the version range for " ++ dropQuotes (show pIdentifier) ++ ", found in [extra-deps] in the project's stack.yaml?"
          (Couldn'tMakePlanForWanted (S.toList -> lpSet)) ->
-            "Exception Stack.Build.Couldn'tMakePlanForWanted\n" ++
-            "  Couldn't make build plan while adding local packages:" ++
+            "Exception: Stack.Build.Couldn'tMakePlanForWanted\n" ++
+            "  Couldn't make a build plan while adding local packages:" ++
             doubleIndent (appendLines lpSet)
     in indent details
      where
@@ -178,11 +177,11 @@ instance Exception CabalExitedUnsuccessfully
 instance Show CabalExitedUnsuccessfully where
   show (CabalExitedUnsuccessfully exitCode taskProvides execName fullArgs logFiles _) =
     let fullCmd = (dropQuotes (show execName) ++ " " ++ (unwords fullArgs))
-        logLocations = maybe "" (\fp -> "Logs have been written to: " ++ show fp) logFiles
-    in "\nException: CabalExitedUnsuccessfully\n" ++
-       "While building package " ++ dropQuotes (show taskProvides) ++ " using:\n" ++
-       "  " ++ fullCmd ++ "\n" ++
-       "Process exited with code: " ++ show exitCode ++ "\n" ++
+        logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ show fp) logFiles
+    in "\n--  Exception: CabalExitedUnsuccessfully\n" ++
+       "      While building package " ++ dropQuotes (show taskProvides) ++ " using:\n" ++
+       "        " ++ fullCmd ++ "\n" ++
+       "      Process exited with code: " ++ show exitCode ++
        logLocations
      where
       -- appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
