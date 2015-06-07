@@ -59,7 +59,8 @@ main =
      tryRunPlugin plugins
      Docker.checkVersions
      manager <- newTLSManager
-     lc <- runStackLoggingT manager LevelWarn (loadConfig mempty)
+     lc <- runStackLoggingT manager LevelWarn
+       (loadConfig mempty {configMonoidDockerOpts = mempty {dockerMonoidExists = Nothing}})
      (level,run) <-
        simpleOptions
          $(simpleVersion Meta.version)
@@ -211,6 +212,7 @@ setupParser = SetupCmdOpts
     <*> boolFlags False
             "reinstall"
             "Reinstall GHC, even if available (implies no-system-ghc)"
+            idm
   where
     readVersion = do
         s <- readerAsk
@@ -470,7 +472,7 @@ buildOpts :: Parser BuildOpts
 buildOpts = BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> finalAction <*> dryRun <*> ghcOpts <*> flags
   where optimize =
-          maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies"
+          maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
         target =
           fmap (Left . map T.pack)
                (many (strArgument
@@ -480,10 +482,12 @@ buildOpts = BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
           boolFlags False
                     "library-profiling"
                     "library profiling for TARGETs and all its dependencies"
+                    idm
         exeProfiling =
           boolFlags False
                     "executable-profiling"
                     "library profiling for TARGETs and all its dependencies"
+                    idm
         finalAction = pure DoNothing
         dryRun = flag False True (long "dry-run" <>
                                   help "Don't build anything, just prepare to")
@@ -555,9 +559,11 @@ globalOpts docker =
     <*> boolFlags True
             "system-ghc"
             "using the system installed GHC (on the PATH) if available and a matching version"
+            idm
     <*> boolFlags True
             "install-ghc"
             "downloading and installing GHC if necessary (can be done manually with stack setup)"
+            idm
 
 -- | Parse for a logging level.
 logLevelOpt :: Parser LogLevel

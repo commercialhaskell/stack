@@ -44,7 +44,7 @@ import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
 import           Data.Typeable (Typeable)
 import           Options.Applicative.Builder.Extra (maybeBoolFlags)
-import           Options.Applicative (Parser,str,option,help,auto,metavar,long,value)
+import           Options.Applicative (Parser,str,option,help,auto,metavar,long,value,hidden,internal,idm)
 import           Path
 import           Path.IO (getWorkingDir,listDirectory)
 import           Paths_stack (version)
@@ -650,57 +650,75 @@ checkVersions =
              _ -> return ())
 
 -- | Options parser configuration for Docker.
-dockerOptsParser :: Parser DockerOptsMonoid
-dockerOptsParser =
+dockerOptsParser :: Bool -> Parser DockerOptsMonoid
+dockerOptsParser showOptions =
     DockerOptsMonoid
-    <$> maybeBoolFlags dockerCmdName
+    <$> pure Nothing
+    <*> maybeBoolFlags dockerCmdName
                        "using a Docker container"
+                       hide
     <*> ((Just . DockerMonoidRepo) <$> option str (long (dockerOptName dockerRepoArgName) <>
+                                                   hide <>
                                                    metavar "NAME" <>
                                                    help "Docker repository name") <|>
          (Just . DockerMonoidImage) <$> option str (long (dockerOptName dockerImageArgName) <>
+                                                    hide <>
                                                     metavar "IMAGE" <>
                                                     help "Exact Docker image ID (overrides docker-repo)") <|>
          pure Nothing)
     <*> maybeBoolFlags (dockerOptName dockerRegistryLoginArgName)
                        "registry requires login"
+                       hide
     <*> maybeStrOption (long (dockerOptName dockerRegistryUsernameArgName) <>
+                        hide <>
                         metavar "USERNAME" <>
                         help "Docker registry username")
     <*> maybeStrOption (long (dockerOptName dockerRegistryPasswordArgName) <>
+                        hide <>
                         metavar "PASSWORD" <>
                         help "Docker registry password")
     <*> maybeBoolFlags (dockerOptName dockerAutoPullArgName)
                        "automatic pulling latest version of image"
+                       hide
     <*> maybeBoolFlags (dockerOptName dockerDetachArgName)
-                        "running a detached Docker container"
+                       "running a detached Docker container"
+                       hide
     <*> maybeBoolFlags (dockerOptName dockerPersistArgName)
                        "not deleting container after it exits"
+                       hide
     <*> maybeStrOption (long (dockerOptName dockerContainerNameArgName) <>
+                        hide <>
                         metavar "NAME" <>
                         help "Docker container name")
     <*> wordsStrOption (long (dockerOptName dockerRunArgsArgName) <>
+                        hide <>
                         value [] <>
                         metavar "'ARG1 [ARG2 ...]'" <>
-                        help ("Additional arguments to pass to 'docker run'"))
+                        help "Additional arguments to pass to 'docker run'")
     <*> many (option auto (long (dockerOptName dockerMountArgName) <>
+                           hide <>
                            metavar "(PATH | HOST-PATH:CONTAINER-PATH)" <>
                            help ("Mount volumes from host in container " ++
                                  "(may specify mutliple times)")))
     <*> maybeBoolFlags (dockerOptName dockerPassHostArgName)
                        "passing Docker daemon connection information into container"
+                       hide
     <*> maybeStrOption (long (dockerOptName dockerDatabasePathArgName) <>
+                        hide <>
                         metavar "PATH" <>
                         help "Location of image usage tracking database")
   where
     dockerOptName optName = dockerCmdName ++ "-" ++ T.unpack optName
     maybeStrOption = optional . option str
     wordsStrOption = option (fmap words str)
+    hide = if showOptions
+              then idm
+              else internal <> hidden
 
 -- | Interprets DockerOptsMonoid options.
 dockerOptsFromMonoid :: Maybe Project -> Path Abs Dir -> DockerOptsMonoid -> DockerOpts
 dockerOptsFromMonoid mproject stackRoot DockerOptsMonoid{..} = DockerOpts
-  {dockerEnable = fromMaybe False dockerMonoidEnable
+  {dockerEnable = fromMaybe (fromMaybe False dockerMonoidExists) dockerMonoidEnable
   ,dockerImage =
      let defaultTag =
            case mproject of

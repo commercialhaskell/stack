@@ -46,7 +46,9 @@ data DockerOpts = DockerOpts
 -- | An uninterpreted representation of docker options.
 -- Configurations may be "cascaded" using mappend (left-biased).
 data DockerOptsMonoid = DockerOptsMonoid
-  {dockerMonoidEnable :: !(Maybe Bool)
+  {dockerMonoidExists :: !(Maybe Bool)
+    -- ^ Does a @docker:@ section exist in the top-level (usually project) config?
+  ,dockerMonoidEnable :: !(Maybe Bool)
     -- ^ Is using Docker enabled?
   ,dockerMonoidRepoOrImage :: !(Maybe DockerMonoidRepoOrImage)
     -- ^ Docker repository name (e.g. @fpco/dev@ or @fpco/dev:lts-2.8@)
@@ -80,7 +82,8 @@ data DockerOptsMonoid = DockerOptsMonoid
 -- | Decode uninterpreted docker options from JSON/YAML.
 instance FromJSON DockerOptsMonoid where
   parseJSON = withObject "DockerOptsMonoid"
-    (\o -> do dockerMonoidEnable           <- o .:? dockerEnableArgName .!= Just True
+    (\o -> do dockerMonoidExists           <- pure (Just True)
+              dockerMonoidEnable           <- o .:? dockerEnableArgName
               dockerMonoidRepoOrImage      <- ((Just . DockerMonoidImage) <$> o .: dockerImageArgName) <|>
                                               ((Just . DockerMonoidRepo) <$> o .: dockerRepoArgName) <|>
                                               pure Nothing
@@ -100,7 +103,8 @@ instance FromJSON DockerOptsMonoid where
 -- | Left-biased combine Docker options
 instance Monoid DockerOptsMonoid where
   mempty = DockerOptsMonoid
-    {dockerMonoidEnable           = Nothing
+    {dockerMonoidExists           = Just False
+    ,dockerMonoidEnable           = Nothing
     ,dockerMonoidRepoOrImage      = Nothing
     ,dockerMonoidRegistryLogin    = Nothing
     ,dockerMonoidRegistryUsername = Nothing
@@ -115,7 +119,8 @@ instance Monoid DockerOptsMonoid where
     ,dockerMonoidDatabasePath     = Nothing
     }
   mappend l r = DockerOptsMonoid
-    {dockerMonoidEnable           = dockerMonoidEnable l <|> dockerMonoidEnable r
+    {dockerMonoidExists           = dockerMonoidExists l <|> dockerMonoidExists r
+    ,dockerMonoidEnable           = dockerMonoidEnable l <|> dockerMonoidEnable r
     ,dockerMonoidRepoOrImage      = dockerMonoidRepoOrImage l <|> dockerMonoidRepoOrImage r
     ,dockerMonoidRegistryLogin    = dockerMonoidRegistryLogin l <|> dockerMonoidRegistryLogin r
     ,dockerMonoidRegistryUsername = dockerMonoidRegistryUsername l <|> dockerMonoidRegistryUsername r
@@ -137,7 +142,7 @@ data Mount = Mount String String
 instance Read Mount where
   readsPrec _ s =
     case break (== ':') s of
-      (a,(':':b)) -> [(Mount a b,"")]
+      (a,':':b) -> [(Mount a b,"")]
       (a,[]) -> [(Mount a a,"")]
       _ -> fail "Invalid value for Docker mount (expect '/host/path:/container/path')"
 

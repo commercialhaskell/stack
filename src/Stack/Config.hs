@@ -180,9 +180,7 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser docker =
     (\opts -> mempty { configMonoidDockerOpts = opts })
-    <$> if docker
-           then Docker.dockerOptsParser
-           else pure mempty
+    <$> Docker.dockerOptsParser docker
 
 -- | Get the directory on Windows where we should install extra programs. For
 -- more information, see discussion at:
