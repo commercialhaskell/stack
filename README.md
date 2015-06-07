@@ -11,7 +11,7 @@ work you do on other projects will not break your codebase. If your code builds
 today, it will build tomorrow.
 
 stack is a full stack tool, capable of installing the appropriate version of
-GHC for you automatically and downloading an installing your upstream library
+GHC for you automatically and building and registering your upstream library
 dependencies into shared package databases (to minimize compilation time). It
 will intelligently recompile your libraries as necessary to enable profiling
 support, and give helpful error messages and advice for fixing your project.
