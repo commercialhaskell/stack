@@ -1,9 +1,9 @@
 # Maintainer:  Tristan Webb <tristan@fpcomplete.com>
 pkgname=stack
-pkgver='0.0.0'
+pkgver='1.0.0'
 pkgrel=1
 pkgdesc="The Haskell Tool Stack"
-arch=('x86_64')
+arch=('i686' 'x86_64')
 url="https://www.github.com/fpco/stack"
 license=('BSD3')
 depends=('libtinfo')
@@ -13,13 +13,13 @@ provides=('stack')
 conflicts=('stack-git')
 # install=
 if [ "${CARCH}" = 'x86_64' ]; then
-    ARCH='amd64'
+    _arch='x86_64'
     sha1sums=('bef142bd0343876c91c87ee67db9a239')
 elif [ "${CARCH}" = 'i686' ]; then
-    ARCH='i386'
+    _arch='i686'
     sha1sums=('0b4886dd77579af4205beca53ebb834a')
 fi
-source=("http://fpco.s3.amazonaws.com/arch/${pkgname}_${pkgver}-${ARCH}.tar.gz")
+source=("http://fpco.s3.amazonaws.com/archlinux/${pkgname}_${pkgver}-${_arch}.tar.gz")
 
 package() {
   cd "$srcdir"
