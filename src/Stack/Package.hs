@@ -68,6 +68,8 @@ import           Prelude hiding (FilePath)
 import           Stack.Constants
 import           Stack.Types
 import qualified Stack.Types.PackageIdentifier
+import           System.Directory (getDirectoryContents)
+import           System.FilePath (splitExtensions)
 import qualified System.FilePath as FilePath
 import           System.IO.Error
 
@@ -309,7 +311,7 @@ resolveGlobFiles =
         mapM resolveFileOrWarn names
     matchDirFileGlob' dir glob =
         catch
-            (liftIO (matchDirFileGlob dir glob))
+            (liftIO (matchDirFileGlob_ dir glob))
             (\(e :: IOException) ->
                   if isUserError e
                       then do
@@ -318,6 +320,38 @@ resolveGlobFiles =
                                "in directory: " <> T.pack dir)
                           return []
                       else throwM e)
+
+-- | This is a copy/paste of the Cabal library function, but with
+--
+-- @ext == ext'@
+--
+-- Changed to
+--
+-- @isSuffixOf ext ext'@
+--
+-- So that this will work:
+--
+-- @
+-- λ> matchDirFileGlob_ "." "test/package-dump/*.txt"
+-- ["test/package-dump/ghc-7.8.txt","test/package-dump/ghc-7.10.txt"]
+-- @
+--
+matchDirFileGlob_ :: String -> String -> IO [String]
+matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
+  Nothing -> die $ "invalid file glob '" ++ filepath
+                ++ "'. Wildcards '*' are only allowed in place of the file"
+                ++ " name, not in the directory name or file extension."
+                ++ " If a wildcard is used it must be with an file extension."
+  Just (NoGlob filepath') -> return [filepath']
+  Just (FileGlob dir' ext) -> do
+    files <- getDirectoryContents (dir FilePath.</> dir')
+    case   [ dir' FilePath.</> file
+           | file <- files
+           , let (name, ext') = splitExtensions file
+           , not (null name) && isSuffixOf ext ext' ] of
+      []      -> die $ "filepath wildcard '" ++ filepath
+                    ++ "' does not match any files."
+      matches -> return matches
 
 -- | Get all files referenced by the executable.
 executableFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m)
