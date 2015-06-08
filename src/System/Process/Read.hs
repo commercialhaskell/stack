@@ -26,7 +26,7 @@ import           Control.Applicative
 import           Control.Arrow ((***), first)
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Exception
-import           Control.Monad (when, join, liftM)
+import           Control.Monad (join, liftM)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger (MonadLogger, logError)
@@ -48,7 +48,7 @@ import           Prelude -- Fix AMP warning
 import           System.Directory (createDirectoryIfMissing, doesFileExist, canonicalizePath)
 import qualified System.FilePath as FP
 import           System.Environment (getEnvironment)
-import           System.Exit (ExitCode(ExitSuccess), exitWith)
+import           System.Exit (exitWith)
 
 -- | Override the environment received by a child process
 data EnvOverride = EnvOverride

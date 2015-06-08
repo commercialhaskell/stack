@@ -28,13 +28,12 @@ import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.STM          (TVar, atomically, modifyTVar,
                                                   newTVarIO, readTVar,
                                                   readTVarIO, writeTVar)
-import           Control.Monad (liftM, forM)
 import           Control.Monad (liftM, when, join, unless, void)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (asks)
-import           Control.Monad.Reader (runReaderT,asks)
+import           Control.Monad.Reader (runReaderT)
 import           Control.Monad.Trans.Control
 import           Crypto.Hash (SHA512(..))
 import           Data.ByteString (ByteString)
