@@ -39,6 +39,7 @@ import           Data.Streaming.Process         hiding (callProcess, env)
 import qualified Data.Streaming.Process         as Process
 import           Data.Text                      (Text)
 import qualified Data.Text                      as T
+import           Data.Text.Encoding             (encodeUtf8)
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
 import           Network.HTTP.Client.Conduit    (HasHttpManager)
@@ -205,23 +206,26 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
   withPackage $ \package cabalfp pkgDir ->
   withLogFile package $ \mlogFile ->
   withCabal pkgDir mlogFile $ \cabal -> do
-    when needsConfig $ withMVar eeConfigureLock $ \_ -> do
-        deleteCaches pkgDir
-        idMap <- liftIO $ readTVarIO eeGhcPkgIds
-        let getMissing ident =
-                case Map.lookup ident idMap of
-                    Nothing -> error "singleBuild: invariant violated, missing package ID missing"
-                    Just (Library x) -> Just x
-                    Just Executable -> Nothing
-            TaskConfigOpts missing mkOpts = taskConfigOpts
-            configOpts = mkOpts
-                       $ Set.fromList
-                       $ mapMaybe getMissing
-                       $ Set.toList missing
-        announce "configure"
-        cabal False $ "configure" : map T.unpack configOpts
-        $logDebug $ T.pack $ show configOpts
-        writeConfigCache pkgDir configOpts
+    mconfigOpts <- if needsConfig
+        then withMVar eeConfigureLock $ \_ -> do
+            deleteCaches pkgDir
+            idMap <- liftIO $ readTVarIO eeGhcPkgIds
+            let getMissing ident =
+                    case Map.lookup ident idMap of
+                        Nothing -> error "singleBuild: invariant violated, missing package ID missing"
+                        Just (Library x) -> Just x
+                        Just Executable -> Nothing
+                TaskConfigOpts missing mkOpts = taskConfigOpts
+                configOpts = mkOpts
+                           $ Set.fromList
+                           $ mapMaybe getMissing
+                           $ Set.toList missing
+            announce "configure"
+            cabal False $ "configure" : map T.unpack configOpts
+            $logDebug $ T.pack $ show configOpts
+            writeConfigCache pkgDir configOpts
+            return $ Just configOpts
+        else return Nothing
 
     fileModTimes <- getPackageFileModTimes package cabalfp
     writeBuildCache pkgDir fileModTimes
@@ -308,7 +312,9 @@ packageDocDir cabalPkgVer package' = do
             return Executable
         (True, Nothing) -> throwM $ Couldn'tFindPkgId $ packageName package
         (True, Just pkgid) -> do
-            writeFlagCache pkgid $ packageFlags package
+            case mconfigOpts of
+                Nothing -> return ()
+                Just configOpts -> writeFlagCache pkgid $ map encodeUtf8 configOpts
             return $ Library pkgid
     liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides mpkgid'
   where

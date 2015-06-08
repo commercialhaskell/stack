@@ -248,7 +248,7 @@ data LocalPackage = LocalPackage
     , lpWanted         :: !Bool            -- ^ Is this package a \"wanted\" target based on command line input
     , lpDir            :: !(Path Abs Dir)  -- ^ Directory of the package.
     , lpCabalFile      :: !(Path Abs File) -- ^ The .cabal file
-    , lpLastConfigOpts :: !(Maybe [Text])  -- ^ configure options used during last Setup.hs configure, if available
+    , lpLastConfigOpts :: !(Maybe [S.ByteString])  -- ^ configure options used during last Setup.hs configure, if available
     , lpDirtyFiles     :: !Bool            -- ^ are there files that have changed since the last build?
     }
     deriving Show

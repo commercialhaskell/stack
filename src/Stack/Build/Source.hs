@@ -25,7 +25,6 @@ import           Data.Maybe
 import           Data.Monoid                  ((<>))
 import qualified Data.Set                     as Set
 import qualified Data.Text                    as T
-import qualified Data.Text.Encoding           as T
 import           Path
 import           Prelude                      hiding (FilePath, writeFile)
 import           Stack.Build.Cache
@@ -126,8 +125,7 @@ loadLocals bopts = do
         return LocalPackage
             { lpPackage = pkg
             , lpWanted = wanted
-            , lpLastConfigOpts =
-                  fmap (map T.decodeUtf8 . configCacheOpts) mconfigCache
+            , lpLastConfigOpts = fmap configCacheOpts mconfigCache
             , lpDirtyFiles =
                   maybe True
                         ((/= fileModTimes) . buildCacheTimes)

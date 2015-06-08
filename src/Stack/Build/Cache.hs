@@ -197,7 +197,7 @@ flagCacheFile gid = do
 -- | Loads the flag cache for the given installed extra-deps
 tryGetFlagCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasBuildConfig env)
                 => GhcPkgId
-                -> m (Maybe (Map FlagName Bool))
+                -> m (Maybe [ByteString])
 tryGetFlagCache gid = do
     file <- flagCacheFile gid
     eres <- liftIO $ tryIO $ Binary.decodeFileOrFail $ toFilePath file
@@ -206,7 +206,7 @@ tryGetFlagCache gid = do
         _ -> return Nothing
 
 writeFlagCache :: (MonadIO m, MonadReader env m, HasBuildConfig env, MonadThrow m)
-               => GhcPkgId -> Map FlagName Bool -> m ()
+               => GhcPkgId -> [ByteString] -> m ()
 writeFlagCache gid flags = do
     file <- flagCacheFile gid
     liftIO $ do
