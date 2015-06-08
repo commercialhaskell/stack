@@ -288,11 +288,15 @@ loadBuildConfig mproject config noConfigStrat = do
 determineStackRoot :: (MonadIO m, MonadThrow m) => m (Path Abs Dir)
 determineStackRoot = do
     env <- liftIO getEnvironment
-    root <-
-        case lookup stackRootEnvVar env of
-            Nothing -> liftIO $ getAppUserDataDirectory stackProgName
-            Just x -> return x
-    parseAbsDir root
+    case lookup stackRootEnvVar env of
+        Nothing -> do
+            x <- liftIO $ getAppUserDataDirectory stackProgName
+            parseAbsDir x
+        Just x -> do
+            y <- liftIO $ do
+                createDirectoryIfMissing True x
+                canonicalizePath x
+            parseAbsDir y
 
 -- | Determine the extra config file locations which exist.
 --
