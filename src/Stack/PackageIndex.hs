@@ -236,11 +236,11 @@ updateIndexGit menv indexName' index gitUrl = do
                            "git"
                            menv
                            ["tag","-v","current-hackage"]
-                           (Just (unlines ["Signature verification failed. "
-                                          ,"Please ensure you've set up your"
-                                          ,"GPG keychain to accept the D6CF60FD signing key."
-                                          ,"For more information, see:"
-                                          ,"https://github.com/fpco/stackage-update#readme"])))
+                           (Just (T.unlines ["Signature verification failed. "
+                                            ,"Please ensure you've set up your"
+                                            ,"GPG keychain to accept the D6CF60FD signing key."
+                                            ,"For more information, see:"
+                                            ,"https://github.com/fpco/stackage-update#readme"])))
             $logDebug ("Exporting a tarball to " <>
                        (T.pack . toFilePath) tarFile)
             deleteCache indexName'

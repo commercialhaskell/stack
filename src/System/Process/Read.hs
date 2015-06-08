@@ -137,6 +137,7 @@ sinkProcessStdout :: (MonadIO m)
                   -> m a
 sinkProcessStdout wd menv name args sink = do
   name' <- liftIO $ liftM toFilePath $ join $ findExecutable menv name
+  liftIO (maybe (return ()) (createDirectoryIfMissing True . toFilePath) wd)
   liftIO (withCheckedProcess
             (proc name' args) { env = envHelper menv, cwd = fmap toFilePath wd }
             (\ClosedStream out err ->
@@ -154,27 +155,24 @@ runIn :: forall (m :: * -> *).
       -> FilePath -- ^ command to run
       -> EnvOverride
       -> [String] -- ^ command line arguments
-      -> Maybe String -- ^ error message on failure, if Nothing uses a default
+      -> Maybe Text
       -> m ()
-runIn dir cmd menv args errMsg =
-  do let dir' = toFilePath dir
-     liftIO (createDirectoryIfMissing True dir')
-     (Nothing,Nothing,Nothing,ph) <-
-       liftIO (createProcess
-                 (proc cmd args) {cwd = Just dir'
-                                 ,env = envHelper menv
-                                 })
-     ec <- liftIO (waitForProcess ph)
-     when (ec /= ExitSuccess)
-          (do $logError (T.pack (concat ["Exit code "
-                                        ,show ec
-                                        ," while running "
-                                        ,show (cmd : args)
-                                        ," in "
-                                        ,dir']))
-              forM_ errMsg
-                    (\e -> ($logError (T.pack e)))
-              liftIO (exitWith ec))
+runIn wd cmd menv args errMsg = do
+    result <- liftIO (try (callProcess (Just wd) menv cmd args))
+    case result of
+        Left (ProcessExitedUnsuccessfully _ ec) -> do
+            $logError $
+                T.pack $
+                concat
+                    [ "Exit code "
+                    , show ec
+                    , " while running "
+                    , show (cmd : args)
+                    , " in "
+                    , toFilePath wd]
+            forM_ errMsg $logError
+            liftIO (exitWith ec)
+        Right () -> return ()
 
 -- | Check if the given executable exists on the given PATH
 doesExecutableExist :: MonadIO m => EnvOverride -> String -> m Bool
