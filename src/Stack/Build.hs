@@ -83,10 +83,7 @@ mkBaseConfigOpts bopts = do
         , bcoLocalDB = localDBPath
         , bcoSnapInstallRoot = snapInstallRoot
         , bcoLocalInstallRoot = localInstallRoot
-        , bcoLibProfiling = boptsLibProfile bopts
-        , bcoExeProfiling = boptsExeProfile bopts
-        , bcoFinalAction = boptsFinalAction bopts
-        , bcoGhcOptions = boptsGhcOptions bopts
+        , bcoBuildOpts = bopts
         }
 
 -- | Provide a function for loading package information from the package index

@@ -328,10 +328,7 @@ data BaseConfigOpts = BaseConfigOpts
     , bcoLocalDB :: !(Path Abs Dir)
     , bcoSnapInstallRoot :: !(Path Abs Dir)
     , bcoLocalInstallRoot :: !(Path Abs Dir)
-    , bcoLibProfiling :: !Bool
-    , bcoExeProfiling :: !Bool
-    , bcoFinalAction :: !FinalAction
-    , bcoGhcOptions :: ![Text]
+    , bcoBuildOpts :: !BuildOpts
     }
 
 -- | Render a @BaseConfigOpts@ to an actual list of options
@@ -352,10 +349,10 @@ configureOpts bco deps wanted loc flags = map T.pack $ concat
       , "--datadir=" ++ toFilePathNoTrailingSlash  (installRoot </> $(mkRelDir "share"))
       , "--docdir=" ++ toFilePathNoTrailingSlash  (installRoot </> $(mkRelDir "doc"))
       ]
-    , ["--enable-library-profiling" | bcoLibProfiling bco || bcoExeProfiling bco]
-    , ["--enable-executable-profiling" | bcoLibProfiling bco]
-    , ["--enable-tests" | wanted && bcoFinalAction bco == DoTests]
-    , ["--enable-benchmarks" | wanted && bcoFinalAction bco == DoBenchmarks]
+    , ["--enable-library-profiling" | boptsLibProfile bopts || boptsExeProfile bopts]
+    , ["--enable-executable-profiling" | boptsExeProfile bopts]
+    , ["--enable-tests" | wanted && boptsFinalAction bopts == DoTests]
+    , ["--enable-benchmarks" | wanted && boptsFinalAction bopts == DoBenchmarks]
     , map (\(name,enabled) ->
                        "-f" <>
                        (if enabled
@@ -365,10 +362,11 @@ configureOpts bco deps wanted loc flags = map T.pack $ concat
                     (Map.toList flags)
     -- FIXME Chris: where does this come from now? , ["--ghc-options=-O2" | gconfigOptimize gconfig]
     , if wanted
-        then concatMap (\x -> ["--ghc-options", T.unpack x]) (bcoGhcOptions bco)
+        then concatMap (\x -> ["--ghc-options", T.unpack x]) (boptsGhcOptions bopts)
         else []
     ]
   where
+    bopts = bcoBuildOpts bco
     toFilePathNoTrailingSlash =
         loop . toFilePath
       where
