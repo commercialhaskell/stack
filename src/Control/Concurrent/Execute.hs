@@ -16,7 +16,6 @@ import           Control.Concurrent.STM
 import           Control.Exception
 import           Control.Monad            (join)
 import           Data.Foldable            (sequenceA_)
-import           Data.List                (intercalate)
 import           Data.Set                 (Set)
 import qualified Data.Set                 as Set
 import           Data.Typeable            (Typeable)
@@ -50,18 +49,16 @@ data ExecuteState = ExecuteState
 
 data ExecuteException
     = InconsistentDependencies
-    | ExecutionFailure [SomeException]
     deriving Typeable
 instance Exception ExecuteException
 
 instance Show ExecuteException where
     show InconsistentDependencies =
         "Inconsistent dependencies were discovered while executing your build plan. This should never happen, please report it as a bug to the stack team."
-    show (ExecutionFailure es) = intercalate "\n\n" $ map show es
 
 runActions :: Int -- ^ threads
            -> [Action]
-           -> IO ()
+           -> IO [SomeException]
 runActions threads actions0 = do
     es <- ExecuteState
         <$> newTVarIO actions0
@@ -70,10 +67,7 @@ runActions threads actions0 = do
     if threads <= 1
         then runActions' es
         else runConcurrently $ sequenceA_ $ replicate threads $ Concurrently $ runActions' es
-    errs <- readTVarIO $ esExceptions es
-    if null errs
-        then return ()
-        else throwIO $ ExecutionFailure errs
+    readTVarIO $ esExceptions es
 
 runActions' :: ExecuteState -> IO ()
 runActions' ExecuteState {..} =

@@ -50,8 +50,11 @@ import           Path
 data PackageNameParseFail
   = PackageNameParseFail ByteString
   | CabalFileNameParseFail FilePath
-  deriving (Show,Typeable)
+  deriving (Typeable)
 instance Exception PackageNameParseFail
+instance Show PackageNameParseFail where
+    show (PackageNameParseFail bs) = "Invalid package name: " ++ show bs
+    show (CabalFileNameParseFail fp) = "Invalid file path for cabal file: " ++ fp
 
 -- | A package name.
 newtype PackageName =

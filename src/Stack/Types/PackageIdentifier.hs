@@ -41,7 +41,9 @@ import           Stack.Types.Version
 -- | A parse fail.
 data PackageIdentifierParseFail
   = PackageIdentifierParseFail ByteString
-  deriving (Show,Typeable)
+  deriving (Typeable)
+instance Show PackageIdentifierParseFail where
+    show (PackageIdentifierParseFail bs) = "Invalid package identifier: " ++ show bs
 instance Exception PackageIdentifierParseFail
 
 -- | A pkg-ver combination.

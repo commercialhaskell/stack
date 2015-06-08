@@ -10,7 +10,6 @@ module Stack.Types.BuildPlan
       BuildPlan (..)
     , PackagePlan (..)
     , PackageConstraints (..)
-    , ParseFailedException (..)
     , TestState (..)
     , SystemInfo (..)
     , Maintainer (..)
@@ -145,9 +144,15 @@ simpleParse orig = withTypeRep $ \rep ->
         unwrap :: m a -> a
         unwrap _ = error "unwrap"
 
-data ParseFailedException = ParseFailedException TypeRep Text
-    deriving (Show, Typeable)
-instance Exception ParseFailedException
+data BuildPlanTypesException
+    = ParseSnapNameException Text
+    | ParseFailedException TypeRep Text
+    deriving Typeable
+instance Exception BuildPlanTypesException
+instance Show BuildPlanTypesException where
+    show (ParseSnapNameException t) = "Invalid snapshot name: " ++ T.unpack t
+    show (ParseFailedException rep t) =
+        "Unable to parse " ++ show t ++ " as " ++ show rep
 
 data PackageConstraints = PackageConstraints
     { pcVersionRange     :: VersionRange
@@ -346,11 +351,6 @@ parseSnapName t0 =
     nightly = do
         t1 <- T.stripPrefix "nightly-" t0
         Nightly <$> readMay (T.unpack t1)
-
-data BuildPlanTypesException
-    = ParseSnapNameException Text
-    deriving (Show, Typeable)
-instance Exception BuildPlanTypesException
 
 instance ToJSON a => ToJSON (Map ExeName a) where
   toJSON = toJSON . Map.mapKeysWith const (S8.unpack . unExeName)

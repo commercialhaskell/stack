@@ -177,7 +177,8 @@ executePlan' plan ee = do
 
     let actions = concatMap (toActions runInBase ee) $ Map.elems $ planTasks plan
     threads <- liftIO getNumCapabilities -- TODO make a build opt to override this
-    liftIO $ runActions threads actions
+    errs <- liftIO $ runActions threads actions
+    unless (null errs) $ throwM $ ExecutionFailure errs
 
 toActions :: M env m
           => (m () -> IO ())

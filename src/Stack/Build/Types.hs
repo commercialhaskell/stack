@@ -37,6 +37,7 @@ import Prelude hiding (FilePath)
 import Stack.Package
 import Stack.Types
 import System.Exit (ExitCode)
+import System.FilePath (pathSeparator)
 
 ----------------------------------------------
 -- Exceptions
@@ -55,6 +56,7 @@ data StackBuildException
         [String]         -- cabal arguments
         (Maybe (Path Abs File)) -- logfiles location
         S.ByteString     -- log contents
+  | ExecutionFailure [SomeException]
   deriving Typeable
 
 instance Show StackBuildException where
@@ -120,6 +122,7 @@ instance Show StackBuildException where
           indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
           dropQuotes = filter ('\"' /=)
           doubleIndent = indent . indent
+    show (ExecutionFailure es) = intercalate "\n\n" $ map show es
 
 instance Exception StackBuildException
 
@@ -344,10 +347,10 @@ configureOpts bco deps wanted loc flags = map T.pack $ concat
         Snap -> [bcoSnapDB bco]
         Local -> [bcoSnapDB bco, bcoLocalDB bco]
     , depOptions
-    , [ "--libdir=" ++ toFilePath (installRoot </> $(mkRelDir "lib"))
-      , "--bindir=" ++ toFilePath (installRoot </> bindirSuffix)
-      , "--datadir=" ++ toFilePath (installRoot </> $(mkRelDir "share"))
-      , "--docdir=" ++ toFilePath (installRoot </> $(mkRelDir "doc"))
+    , [ "--libdir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "lib"))
+      , "--bindir=" ++ toFilePathNoTrailingSlash  (installRoot </> bindirSuffix)
+      , "--datadir=" ++ toFilePathNoTrailingSlash  (installRoot </> $(mkRelDir "share"))
+      , "--docdir=" ++ toFilePathNoTrailingSlash  (installRoot </> $(mkRelDir "doc"))
       ]
     , ["--enable-library-profiling" | bcoLibProfiling bco || bcoExeProfiling bco]
     , ["--enable-executable-profiling" | bcoLibProfiling bco]
@@ -366,6 +369,14 @@ configureOpts bco deps wanted loc flags = map T.pack $ concat
         else []
     ]
   where
+    toFilePathNoTrailingSlash =
+        loop . toFilePath
+      where
+        loop [] = []
+        loop [c]
+            | c == pathSeparator = []
+            | otherwise = [c]
+        loop (c:cs) = c : loop cs
     installRoot =
         case loc of
             Snap -> bcoSnapInstallRoot bco

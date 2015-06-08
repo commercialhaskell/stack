@@ -58,8 +58,15 @@ import           Text.PrettyPrint (render)
 data VersionParseFail =
   VersionParseFail ByteString
   | NotAMajorVersion Version
-  deriving (Show,Typeable)
+  deriving (Typeable)
 instance Exception VersionParseFail
+instance Show VersionParseFail where
+    show (VersionParseFail bs) = "Invalid version: " ++ show bs
+    show (NotAMajorVersion v) = concat
+        [ "Not a major version: "
+        , versionString v
+        , ", expecting exactly two numbers (e.g. 7.10)"
+        ]
 
 -- | A package version.
 newtype Version =

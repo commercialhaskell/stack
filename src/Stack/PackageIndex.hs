@@ -52,8 +52,6 @@ import           Data.Text.Encoding                    (encodeUtf8)
 import           Data.Traversable                      (forM)
 import           Data.Typeable                         (Typeable)
 import           Data.Word                             (Word64)
-import           Distribution.ParseUtils               (PError)
-import qualified Distribution.Text                     as DT
 import           GHC.Generics                          (Generic)
 import           Network.HTTP.Download
 import           Path                                  (mkRelDir, parent,
@@ -113,7 +111,7 @@ sourcePackageIndex menv index = do
     goE blockNo e
         | Just front <- T.stripSuffix ".cabal" $ T.pack $ Tar.entryPath e
         , Tar.NormalFile _ size <- Tar.entryContent e = do
-            (fromCabalPackageName -> name, fromCabalVersion -> version) <- parseNameVersion front
+            PackageIdentifier name version <- parseNameVersion front
             yield $ Left UnparsedCabalFile
                 { ucfName = name
                 , ucfVersion = version
@@ -122,44 +120,42 @@ sourcePackageIndex menv index = do
                 }
         | Just front <- T.stripSuffix ".json" $ T.pack $ Tar.entryPath e
         , Tar.NormalFile lbs _size <- Tar.entryContent e = do
-            (fromCabalPackageName -> name, fromCabalVersion -> version) <- parseNameVersion front
-            yield $ Right (PackageIdentifier name version, lbs)
+            ident <- parseNameVersion front
+            yield $ Right (ident, lbs)
         | otherwise = return ()
 
     parseNameVersion t1 = do
         let (p', t2) = T.break (== '/') $ T.replace "\\" "/" t1
-        p <- simpleParse p'
+        p <- parsePackageNameFromString $ T.unpack p'
         t3 <- maybe (throwM $ InvalidCabalPath t1 "no slash") return
             $ T.stripPrefix "/" t2
         let (v', t4) = T.break (== '/') t3
-        v <- simpleParse v'
+        v <- parseVersionFromString $ T.unpack v'
         when (t4 /= T.cons '/' p') $ throwM $ InvalidCabalPath t1 $ "Expected at end: " <> p'
-        return (p, v)
+        return $ PackageIdentifier p v
 
 data PackageIndexException
   = InvalidCabalPath Text Text
-  | CabalParseException FilePath
-                        PError
-  | MismatchedNameVersion FilePath
-                          PackageName
-                          PackageName
-                          Version
-                          Version
-  | SimpleParseException Text
-  | Couldn'tReadIndexTarball FilePath
-                           Tar.FormatError
   | GitNotAvailable IndexName
   | MissingRequiredHashes IndexName PackageIdentifier
-  deriving (Show,Typeable)
+  deriving Typeable
 instance Exception PackageIndexException
-
--- | More generic simpleParse.
-simpleParse :: (MonadThrow m,DT.Text a)
-            => Text -> m a
-simpleParse x =
-  case DT.simpleParse (T.unpack x) of
-    Nothing -> throwM (SimpleParseException x)
-    Just x' -> return x'
+instance Show PackageIndexException where
+    show (InvalidCabalPath x y) =
+        "Invalid cabal path " ++ T.unpack x ++ ": " ++ T.unpack y
+    show (GitNotAvailable name) = concat
+        [ "Package index "
+        , T.unpack $ indexNameText name
+        , " only provides Git access, and you do not have"
+        , " the git executable on your PATH"
+        ]
+    show (MissingRequiredHashes name ident) = concat
+        [ "Package index "
+        , T.unpack $ indexNameText name
+        , " is configured to require package hashes, but no"
+        , " hash is available for "
+        , packageIdentifierString ident
+        ]
 
 -- | Require that an index be present, updating if it isn't.
 requireIndex :: (MonadIO m,MonadLogger m

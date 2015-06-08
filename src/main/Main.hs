@@ -169,7 +169,14 @@ main =
                               ((,) <$> strArgument (metavar "[--] CMD")
                                    <*> many (strArgument (metavar "ARGS"))))
              commandsFromPlugins plugins pluginShouldHaveRun)
-     run level
+     run level `catch` \e -> do
+        -- This special handler stops "stack: " from being printed before the
+        -- exception
+        case fromException e of
+            Just ec -> exitWith ec
+            Nothing -> do
+                print e
+                exitFailure
   where
     dockerHelpOptName = Docker.dockerCmdName ++ "-help"
 

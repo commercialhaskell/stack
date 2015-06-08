@@ -30,7 +30,9 @@ import           Stack.Types.PackageIdentifier
 -- | A parse fail.
 data GhcPkgIdParseFail
   = GhcPkgIdParseFail ByteString
-  deriving (Show,Typeable)
+  deriving Typeable
+instance Show GhcPkgIdParseFail where
+    show (GhcPkgIdParseFail bs) = "Invalid package ID: " ++ show bs
 instance Exception GhcPkgIdParseFail
 
 -- | A ghc-pkg package identifier.

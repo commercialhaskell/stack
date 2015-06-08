@@ -44,8 +44,10 @@ import           Language.Haskell.TH.Syntax
 -- | A parse fail.
 data FlagNameParseFail
   = FlagNameParseFail ByteString
-  deriving (Show,Typeable)
+  deriving (Typeable)
 instance Exception FlagNameParseFail
+instance Show FlagNameParseFail where
+    show (FlagNameParseFail bs) = "Invalid flag name: " ++ show bs
 
 -- | A flag name.
 newtype FlagName =
