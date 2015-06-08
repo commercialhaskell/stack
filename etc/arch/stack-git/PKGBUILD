@@ -5,7 +5,7 @@ pkgver='f33b823dff'
 pkgrel=1
 pkgdesc="The Haskell Tool Stack"
 arch=('i686' 'x86_64')
-url="https://www.github.com/fpco/stack"
+url="https://www.github.com/commercialhaskell/stack"
 license=('BSD3')
 depends=('libtinfo')
 makedepends=('ghc' 'cabal-install')
@@ -13,7 +13,7 @@ optdepends=('docker: Use Docker images to build your project in a temporary cont
 provides=('stack')
 conflicts=('stack')
 # install=
-source=("${_pkgname}::git+https://github.com/fpco/stack.git")
+source=("${_pkgname}::git+https://github.com/commercial/stack.git")
 md5sums=('SKIP')
 
 prepare() {
