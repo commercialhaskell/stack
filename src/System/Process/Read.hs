@@ -97,44 +97,48 @@ envHelper = Just . eoStringList
 -- | Try to produce a strict 'S.ByteString' from the stdout of a
 -- process.
 tryProcessStdout :: (MonadIO m)
-                 => EnvOverride
+                 => Maybe (Path Abs Dir)
+                 -> EnvOverride
                  -> String
                  -> [String]
                  -> m (Either ProcessExitedUnsuccessfully S.ByteString)
-tryProcessStdout menv name args = do
-  liftIO (try (readProcessStdout menv name args))
+tryProcessStdout wd menv name args = do
+  liftIO (try (readProcessStdout wd menv name args))
 
 -- | Produce a strict 'S.ByteString' from the stdout of a
 -- process. Throws a 'ProcessExitedUnsuccessfully' exception if the
 -- process fails.
 readProcessStdout :: (MonadIO m)
-                  => EnvOverride
+                  => Maybe (Path Abs Dir)
+                  -> EnvOverride
                   -> String
                   -> [String]
                   -> m S.ByteString
-readProcessStdout menv name args =
-  sinkProcessStdout menv name args CL.consume >>=
+readProcessStdout wd menv name args =
+  sinkProcessStdout wd menv name args CL.consume >>=
   liftIO . evaluate . S.concat
 
 -- | Same as @System.Process.callProcess@, but takes an environment override
 callProcess :: (MonadIO m)
-            => EnvOverride
+            => Maybe (Path Abs Dir)
+            -> EnvOverride
             -> String
             -> [String]
             -> m ()
-callProcess menv name args = sinkProcessStdout menv name args CL.sinkNull
+callProcess wd menv name args = sinkProcessStdout wd menv name args CL.sinkNull
 
 -- | Consume the stdout of a process feeding strict 'S.ByteString's to a consumer.
 sinkProcessStdout :: (MonadIO m)
-                  => EnvOverride
+                  => Maybe (Path Abs Dir)
+                  -> EnvOverride
                   -> String
                   -> [String]
                   -> Sink S.ByteString IO a
                   -> m a
-sinkProcessStdout menv name args sink = do
+sinkProcessStdout wd menv name args sink = do
   name' <- liftIO $ liftM toFilePath $ join $ findExecutable menv name
   liftIO (withCheckedProcess
-            (proc name' args) { env = envHelper menv }
+            (proc name' args) { env = envHelper menv, cwd = fmap toFilePath wd }
             (\ClosedStream out err ->
                runConcurrently $
                Concurrently (asBSSource err $$ CL.sinkNull) *>

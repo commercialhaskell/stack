@@ -241,7 +241,7 @@ getSystemGHC menv = do
     exists <- doesExecutableExist menv "ghc"
     if exists
         then do
-            eres <- liftIO $ tryProcessStdout menv "ghc" ["--numeric-version"]
+            eres <- liftIO $ tryProcessStdout Nothing menv "ghc" ["--numeric-version"]
             return $ do
                 Right bs <- Just eres
                 parseVersion $ S8.takeWhile isValidChar bs

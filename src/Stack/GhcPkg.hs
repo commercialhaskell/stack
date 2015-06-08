@@ -69,7 +69,7 @@ ghcPkg menv pkgDbs args = do
     $logDebug $ "Done calling ghc-pkg with: " <> T.pack (show args')
     return r
   where
-    go = tryProcessStdout menv "ghc-pkg" args'
+    go = tryProcessStdout Nothing menv "ghc-pkg" args'
     args' = packageDbFlags pkgDbs ++ args
 
 -- | Create a package database in the given directory, if it doesn't exist.
@@ -82,7 +82,7 @@ createDatabase menv db = do
         -- seems to be sufficiently smart. But I don't feel like
         -- finding out it isn't the hard way
         liftIO $ createDirectoryIfMissing True $ toFilePath $ parent db
-        _ <- tryProcessStdout menv "ghc-pkg" ["init", db']
+        _ <- tryProcessStdout Nothing menv "ghc-pkg" ["init", db']
         return ()
 
 -- | Get the necessary ghc-pkg flags for setting up the given package database

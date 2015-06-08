@@ -149,8 +149,8 @@ runContainerAndExit config
                     successPostAction =
   do envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride
-     uidOut <- readProcessStdout envOverride "id" ["-u"]
-     gidOut <- readProcessStdout envOverride "id" ["-g"]
+     uidOut <- readProcessStdout Nothing envOverride "id" ["-u"]
+     gidOut <- readProcessStdout Nothing envOverride "id" ["-g"]
      (dockerHost,dockerCertPath,dockerTlsVerify) <-
        liftIO ((,,) <$> lookupEnv "DOCKER_HOST"
                     <*> lookupEnv "DOCKER_CERT_PATH"
@@ -278,12 +278,13 @@ cleanup :: (MonadLogger m,MonadIO m,MonadThrow m) => Config -> CleanupOpts -> m 
 cleanup config opts =
   do envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride
-     imagesOut <- readProcessStdout envOverride "docker" ["images","--no-trunc","-f","dangling=false"]
-     danglingImagesOut <- readProcessStdout envOverride "docker" ["images","--no-trunc","-f","dangling=true"]
-     runningContainersOut <- readProcessStdout envOverride "docker" ["ps","-a","--no-trunc","-f","status=running"]
-     restartingContainersOut <- readProcessStdout envOverride "docker" ["ps","-a","--no-trunc","-f","status=restarting"]
-     exitedContainersOut <- readProcessStdout envOverride "docker" ["ps","-a","--no-trunc","-f","status=exited"]
-     pausedContainersOut <- readProcessStdout envOverride "docker" ["ps","-a","--no-trunc","-f","status=paused"]
+     let runDocker = readProcessStdout Nothing envOverride "docker"
+     imagesOut <- runDocker ["images","--no-trunc","-f","dangling=false"]
+     danglingImagesOut <- runDocker ["images","--no-trunc","-f","dangling=true"]
+     runningContainersOut <- runDocker ["ps","-a","--no-trunc","-f","status=running"]
+     restartingContainersOut <- runDocker ["ps","-a","--no-trunc","-f","status=restarting"]
+     exitedContainersOut <- runDocker ["ps","-a","--no-trunc","-f","status=exited"]
+     pausedContainersOut <- runDocker ["ps","-a","--no-trunc","-f","status=paused"]
      let imageRepos = parseImagesOut imagesOut
          danglingImageHashes = Map.keys (parseImagesOut danglingImagesOut)
          runningContainers = parseContainersOut runningContainersOut ++
@@ -318,7 +319,7 @@ cleanup config opts =
                                     return LBS.empty
      mapM_ (performPlanLine envOverride)
            (reverse (filter filterPlanLine (lines (LBS.unpack plan'))))
-     allImageHashesOut <- readProcessStdout envOverride "docker" ["images","-aq","--no-trunc"]
+     allImageHashesOut <- runDocker ["images","-aq","--no-trunc"]
      liftIO (pruneDockerImagesLastUsed config (lines (decodeUtf8 allImageHashesOut)))
   where
     filterPlanLine line =
@@ -336,7 +337,7 @@ cleanup config opts =
                             do $logInfo (concatT ["Removing container: '",v,"'"])
                                return ["rm","-f",v]
                         | otherwise -> throwM (InvalidCleanupCommandException line)
-             e <- liftIO (try (callProcess envOverride "docker" args))
+             e <- liftIO (try (callProcess Nothing envOverride "docker" args))
              case e of
                Left (ProcessExitedUnsuccessfully _ _) ->
                  $logError (concatT ["Could not remove: '",v,"'"])
@@ -508,7 +509,7 @@ inspect envOverride image =
 inspects :: (MonadIO m,MonadThrow m) => EnvOverride -> [String] -> m (Map String Inspect)
 inspects _ [] = return Map.empty
 inspects envOverride images =
-  do maybeInspectOut <- tryProcessStdout envOverride "docker" ("inspect" : images)
+  do maybeInspectOut <- tryProcessStdout Nothing envOverride "docker" ("inspect" : images)
      case maybeInspectOut of
        Right inspectOut ->
          -- filtering with 'isAscii' to workaround @docker inspect@ output containing invalid UTF-8
@@ -543,7 +544,7 @@ pullImage pwd envOverride docker image =
                    ,maybe [] (\p -> ["--password=" ++ p]) (dockerRegistryPassword docker)
                    ,[takeWhile (/= '/') image]])
                 Nothing)
-     e <- liftIO (try (callProcess envOverride "docker" ["pull",image]))
+     e <- liftIO (try (callProcess Nothing envOverride "docker" ["pull",image]))
      case e of
        Left (ProcessExitedUnsuccessfully _ _) -> throwM (PullFailedException image)
        Right () -> return ()
@@ -554,7 +555,7 @@ checkDockerVersion envOverride =
   do dockerExists <- doesExecutableExist envOverride "docker"
      when (not dockerExists)
           (throwM DockerNotInstalledException)
-     dockerVersionOut <- readProcessStdout envOverride "docker" ["--version"]
+     dockerVersionOut <- readProcessStdout Nothing envOverride "docker" ["--version"]
      case words (decodeUtf8 dockerVersionOut) of
        (_:_:v:_) ->
          case parseVersionFromString (dropWhileEnd (== ',') v) of
@@ -916,7 +917,7 @@ instance Show StackDockerException where
     concat ["Invalid 'docker ps' output line: '",line,"'."]
   show (InvalidInspectOutputException msg) =
     concat ["Invalid 'docker inspect' output: ",msg,"."]
-  show (PullFailedException image) = 
+  show (PullFailedException image) =
     concat ["Could not pull Docker image:\n    "
            ,image
            ,"\nThere may not be an image on the registry for your resolver's LTS version in\n"

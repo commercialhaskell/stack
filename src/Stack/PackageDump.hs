@@ -57,7 +57,7 @@ ghcPkgDump
     -> m a
 ghcPkgDump menv mpkgDb sink = do
     F.mapM_ (createDatabase menv) mpkgDb -- TODO maybe use some retry logic instead?
-    sinkProcessStdout menv "ghc-pkg" args sink
+    sinkProcessStdout Nothing menv "ghc-pkg" args sink
   where
     args = concat
         [ case mpkgDb of
