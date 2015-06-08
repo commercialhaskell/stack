@@ -30,7 +30,6 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8With)
 import Data.Text.Encoding.Error (lenientDecode)
-import Distribution.Package (Dependency)
 import Distribution.Text (display)
 import GHC.Generics
 import Path (Path, Abs, File, Dir, mkRelDir, toFilePath, (</>))
@@ -42,79 +41,28 @@ import System.Exit (ExitCode)
 ----------------------------------------------
 -- Exceptions
 data StackBuildException
-  = MissingTool Dependency
-  | Couldn'tFindPkgId PackageName
-  | MissingDep Package PackageName VersionRange
-  | MissingDep2 PackageName PackageName VersionRange
-  | MismatchedLocalDep PackageName Version PackageName VersionRange
-  | MismatchedDep PackageName Version PackageName VersionRange
-  | StackageDepVerMismatch PackageName Version VersionRange
-  | StackageVersionMismatch PackageName Version Version
-  | DependencyIssues [StackBuildException]
+  = Couldn'tFindPkgId PackageName
   | GHCVersionMismatch (Maybe Version) Version (Maybe (Path Abs File))
   -- ^ Path to the stack.yaml file
   | Couldn'tParseTargets [Text]
   | UnknownTargets [PackageName]
-  | TestSuiteFailure (Path Abs File) (Maybe (Path Abs File)) ExitCode
+  | TestSuiteFailure PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe (Path Abs File))
   | ConstructPlanExceptions [ConstructPlanException]
+  | CabalExitedUnsuccessfully
+        ExitCode
+        PackageIdentifier
+        (Path Abs File)  -- cabal Executable
+        [String]         -- cabal arguments
+        (Maybe (Path Abs File)) -- logfiles location
+        S.ByteString     -- log contents
   deriving Typeable
 
 instance Show StackBuildException where
-    show (MissingTool dep) = "Missing build tool: " <> display dep
     show (Couldn'tFindPkgId name) =
               ("After installing " <> packageNameString name <>
                ", the package id couldn't be found " <> "(via ghc-pkg describe " <>
                packageNameString name <> "). This shouldn't happen, " <>
                "please report as a bug")
-    show (MissingDep p d range) =
-              "Missing dependency for package " <>
-              packageNameString (packageName p) <>
-              ": " <>
-              packageNameString d <>
-              " " <>
-              display range
-    show (MissingDep2 user dep range) =
-              "Local package " <>
-              packageNameString user <>
-              " depends on " <>
-              packageNameString dep <>
-              " (" <>
-              display range <>
-              "), but it wasn't found. Perhaps add it to your local package list?"
-    show (MismatchedLocalDep dep version user range) =
-              "Mismatched local dependencies, " <>
-              packageNameString user <>
-              " depends on " <>
-              packageNameString dep <>
-              " (" <>
-              display range <>
-              "), but " <>
-              versionString version <>
-              " is provided locally"
-    show (MismatchedDep dep version user range) =
-              "Mismatched dependencies, " <>
-              packageNameString user <>
-              " depends on " <>
-              packageNameString dep <>
-              " (" <>
-              display range <>
-              "), but " <>
-              versionString version <>
-              " is provided by your snapshot"
-    show (StackageDepVerMismatch name ver range) =
-              ("The package '" <> packageNameString name <>
-               "' in this Stackage snapshot is " <> versionString ver <>
-               ", but there is an (unsatisfiable) local constraint of " <>
-               display range <> ". Suggestion: " <>
-               "Check your local package constraints and make them consistent with your current Stackage")
-    show (StackageVersionMismatch name this that) =
-              ("There was a mismatch between an installed package, " <>
-               packageNameString name <> "==" <> versionString this <>
-               " but this Stackage snapshot should be " <> versionString that)
-    show (DependencyIssues es) =
-              ("Dependency issues:\n" ++
-               intercalate "\n"
-                           (map show es))
     show (GHCVersionMismatch mactual expected mstack) = concat
                 [ case mactual of
                     Nothing -> "No GHC found, expected version "
@@ -135,33 +83,50 @@ instance Show StackBuildException where
     show (UnknownTargets targets) =
                 "The following target packages were not found: " ++
                 intercalate ", " (map packageNameString targets)
-    show (TestSuiteFailure exe mlogFile ec) = concat
-                [ "Test suite "
-                , toFilePath exe
-                , " exited with code "
-                , show ec
-                , case mlogFile of
-                    Nothing -> ""
-                    Just logFile ->
-                        ", log available at: " ++ toFilePath logFile
-                ]
+    show (TestSuiteFailure ident codes mlogFile) = unlines $ concat
+        [ ["Test suite failure for package " ++ packageIdentifierString ident]
+        , flip map (Map.toList codes) $ \(name, mcode) -> concat
+            [ "    "
+            , T.unpack name
+            , ": "
+            , case mcode of
+                Nothing -> " executable not found"
+                Just ec -> " exited with: " ++ show ec
+            ]
+        , return $ case mlogFile of
+            Nothing -> "Logs printed to console"
+            -- TODO Should we load up the full error output and print it here?
+            Just logFile -> "Full log available at " ++ toFilePath logFile
+        ]
     show (ConstructPlanExceptions exceptions) =
-        "Exception: Stack.Build.ConstuctPlanExceptions\n" ++
         "While constructing the BuildPlan the following exceptions were encountered:" ++
         appendExceptions (removeDuplicates exceptions)
          where
              appendExceptions = foldr (\e -> (++) ("\n\n--" ++ show e)) ""
              removeDuplicates = nub
      -- Supressing duplicate output
+    show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bs) =
+        let fullCmd = (dropQuotes (show execName) ++ " " ++ (unwords fullArgs))
+            logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ show fp) logFiles
+        in "\n--  While building package " ++ dropQuotes (show taskProvides') ++ " using:\n" ++
+           "      " ++ fullCmd ++ "\n" ++
+           "    Process exited with code: " ++ show exitCode ++
+           logLocations ++
+           (if S.null bs
+                then ""
+                else "\n\n" ++ doubleIndent (T.unpack $ decodeUtf8With lenientDecode bs))
+         where
+          -- appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
+          indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
+          dropQuotes = filter ('\"' /=)
+          doubleIndent = indent . indent
 
 instance Exception StackBuildException
 
 data ConstructPlanException
-    = SnapshotPackageDependsOnLocal PackageName PackageIdentifier
-    -- ^ Recommend adding to extra-deps
-    | DependencyCycleDetected [PackageName]
+    = DependencyCycleDetected [PackageName]
     | DependencyPlanFailures PackageName (Map PackageName (VersionRange, BadDependency))
-    | UnknownPackage PackageName
+    | UnknownPackage PackageName -- TODO perhaps this constructor will be removed, and BadDependency will handle it all
     -- ^ Recommend adding to extra-deps, give a helpful version number?
     deriving (Typeable, Eq)
 
@@ -175,21 +140,13 @@ data BadDependency
 instance Show ConstructPlanException where
   show e =
     let details = case e of
-         (SnapshotPackageDependsOnLocal pName pIdentifier) ->
-           "Exception: Stack.Build.SnapshotPackageDependsOnLocal\n" ++
-           "  Local package " ++ show pIdentifier ++ " is a dependency of snapshot package " ++ show pName ++ ".\n" ++
-           "  Snapshot packages cannot depend on local packages,\n " ++
-           "  should you add " ++ show pName ++ " to [extra-deps] in the project's stack.yaml?"
          (DependencyCycleDetected pNames) ->
-           "Exception: Stack.Build.DependencyCycle\n" ++
            "  While checking call stack,\n" ++
            "  dependency cycle detected in packages:" ++ indent (appendLines pNames)
          (DependencyPlanFailures pName (Map.toList -> pDeps)) ->
-           "Exception: Stack.Build.DependencyPlanFailures\n" ++
            "  Failure when adding dependencies:" ++ doubleIndent (appendDeps pDeps) ++ "\n" ++
            "  needed for package: " ++ show pName
          (UnknownPackage pName) ->
-             "Exception: Stack.Build.UnknownPackage\n" ++
              "  While attempting to add dependency,\n" ++
              "  Could not find package " ++ show pName  ++ "in known packages"
     in indent details
@@ -217,42 +174,6 @@ instance Show ConstructPlanException where
              "  Allowed version range is " ++ display versionRange ++ ",\n" ++
              "  should you correct the version range for " ++ dropQuotes (show pIdentifier) ++ ", found in [extra-deps] in the project's stack.yaml?"
              -}
-
-data UnpackedPackageHasWrongName = UnpackedPackageHasWrongName PackageIdentifier PackageName
-    deriving (Show, Typeable)
-instance Exception UnpackedPackageHasWrongName
-
-data TestSuiteFailure2 = TestSuiteFailure2 PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe (Path Abs File))
-    deriving (Show, Typeable)
-instance Exception TestSuiteFailure2
-
-data CabalExitedUnsuccessfully = CabalExitedUnsuccessfully
-    ExitCode
-    PackageIdentifier
-    (Path Abs File)  -- cabal Executable
-    [String]         -- cabal arguments
-    (Maybe (Path Abs File)) -- logfiles location
-    S.ByteString     -- log contents
-    deriving (Typeable)
-instance Exception CabalExitedUnsuccessfully
-
-instance Show CabalExitedUnsuccessfully where
-  show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bs) =
-    let fullCmd = (dropQuotes (show execName) ++ " " ++ (unwords fullArgs))
-        logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ show fp) logFiles
-    in "\n--  Exception: CabalExitedUnsuccessfully\n" ++
-       "    While building package " ++ dropQuotes (show taskProvides') ++ " using:\n" ++
-       "      " ++ fullCmd ++ "\n" ++
-       "    Process exited with code: " ++ show exitCode ++
-       logLocations ++
-       (if S.null bs
-            then ""
-            else "\n\n" ++ doubleIndent (T.unpack $ decodeUtf8With lenientDecode bs))
-     where
-      -- appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
-      indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
-      dropQuotes = filter ('\"' /=)
-      doubleIndent = indent . indent
 
 
 ----------------------------------------------

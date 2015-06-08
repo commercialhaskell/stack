@@ -479,7 +479,7 @@ packageDocDir cabalPkgVer package' = do
                         , T.pack $ packageNameString $ packageName package
                         ]
                     return $ Map.singleton testName Nothing
-        unless (Map.null errs) $ throwM $ TestSuiteFailure2 taskProvides errs (fmap fst mlogFile)
+        unless (Map.null errs) $ throwM $ TestSuiteFailure taskProvides errs (fmap fst mlogFile)
 
 -- | Grab all output from the given @Handle@ and print it to stdout, stripping
 -- Template Haskell "Loading package" lines. Does work in a separate thread.

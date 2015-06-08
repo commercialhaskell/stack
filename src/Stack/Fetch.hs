@@ -31,11 +31,11 @@ import           Control.Concurrent.STM          (TVar, atomically, modifyTVar,
 import           Control.Exception               (Exception, SomeException,
                                                   toException)
 import           Control.Monad                   (liftM, when, join, unless, void)
-import           Control.Monad.Catch             (MonadThrow, throwM, catch)
+import           Control.Monad.Catch             (MonadThrow, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Control
-import           Control.Monad.Trans.Reader      (runReaderT)
+import           Control.Monad.Reader            (runReaderT,asks)
 import           Crypto.Hash                     (SHA512(..))
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString                 as S
@@ -44,9 +44,10 @@ import qualified Data.ByteString.Lazy            as L
 import           Data.Either                     (partitionEithers)
 import qualified Data.Foldable                   as F
 import           Data.Function                   (fix)
+import           Data.List                       (intercalate)
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
-import           Data.Maybe                      (fromMaybe, maybeToList)
+import           Data.Maybe                      (maybeToList)
 import           Data.Monoid                     ((<>))
 import           Data.Set                        (Set)
 import qualified Data.Set                        as Set
@@ -55,7 +56,6 @@ import qualified Data.Text.IO                    as T
 import           Data.Text.Encoding              (decodeUtf8)
 import           Data.Typeable                   (Typeable)
 import           Data.Word                       (Word64)
-import           Network.HTTP.Client             (Manager)
 import           Network.HTTP.Download
 import           Prelude -- Fix AMP warning
 import           Stack.PackageIndex
@@ -76,22 +76,38 @@ import           System.Process.Read             (EnvOverride)
 data FetchException
     = Couldn'tReadIndexTarball FilePath Tar.FormatError
     | Couldn'tReadPackageTarball FilePath SomeException
-    | InvalidDownloadSize
-        { _idsUrl             :: T.Text
-        , _idsExpected        :: Word64
-        , _idsTotalDownloaded :: Word64
-        }
-    | InvalidSha512
-        { _ihUrl      :: T.Text
-        , _ihExpected :: S.ByteString
-        , _ihActual   :: String
-        }
     | UnpackDirectoryAlreadyExists (Set FilePath)
     | CouldNotParsePackageSelectors [String]
     | UnknownPackageNames (Set PackageName)
     | UnknownPackageIdentifiers (Set PackageIdentifier)
-    deriving (Show, Typeable)
+    deriving Typeable
 instance Exception FetchException
+
+instance Show FetchException where
+    show (Couldn'tReadIndexTarball fp err) = concat
+        [ "There was an error reading the index tarball "
+        , fp
+        , ": "
+        , show err
+        ]
+    show (Couldn'tReadPackageTarball fp err) = concat
+        [ "There was an error reading the package tarball "
+        , fp
+        , ": "
+        , show err
+        ]
+    show (UnpackDirectoryAlreadyExists dirs) = unlines
+        $ "Unable to unpack due to already present directories:"
+        : map ("    " ++) (Set.toList dirs)
+    show (CouldNotParsePackageSelectors strs) =
+        "The following package selectors are not valid package names or identifiers: " ++
+        intercalate ", " strs
+    show (UnknownPackageNames names) =
+        "The following packages were not found in your indices: " ++
+        intercalate ", " (map packageNameString $ Set.toList names)
+    show (UnknownPackageIdentifiers idents) =
+        "The following package identifierss were not found in your indices: " ++
+        intercalate ", " (map packageIdentifierString $ Set.toList idents)
 
 -- | Intended to work for the command line command.
 unpackPackages :: (MonadIO m,MonadBaseControl IO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadThrow m,MonadLogger m)
@@ -294,24 +310,21 @@ fetchPackages :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,M
               -> Map PackageIdentifier ToFetch
               -> m (Map PackageIdentifier (Path Abs Dir))
 fetchPackages mdistDir toFetchAll = do
-    env <- ask
-    let man = getHttpManager env
-        config = getConfig env
+    connCount <- asks $ configConnectionCount . getConfig
     outputVar <- liftIO $ newTVarIO Map.empty
 
     parMapM_
-        (configConnectionCount config)
-        (go man outputVar)
+        connCount
+        (go outputVar)
         (Map.toList toFetchAll)
 
     liftIO $ readTVarIO outputVar
   where
-    go :: (MonadIO m,Functor m,MonadThrow m,MonadLogger m)
-       => Manager
-       -> TVar (Map PackageIdentifier (Path Abs Dir))
+    go :: (MonadIO m,Functor m,MonadThrow m,MonadLogger m,MonadReader env m,HasHttpManager env)
+       => TVar (Map PackageIdentifier (Path Abs Dir))
        -> (PackageIdentifier, ToFetch)
        -> m ()
-    go man outputVar (ident, toFetch) = do
+    go outputVar (ident, toFetch) = do
         req <- parseUrl $ T.unpack $ tfUrl toFetch
         let destpath = tfTarball toFetch
 
@@ -324,25 +337,7 @@ fetchPackages mdistDir toFetchAll = do
         let progressSink = do
                 -- TODO: logInfo
                 liftIO $ T.putStrLn $ "Downloading " <> packageIdentifierText ident
-        errMay <- liftIO $ do
-            (flip runReaderT man (verifiedDownload downloadReq destpath progressSink) >> return Nothing)
-                `catch` \e -> case e of
-                    WrongContentLength _ actual -> return $ Just $ InvalidDownloadSize
-                        { _idsUrl = tfUrl toFetch
-                        , _idsExpected = fromMaybe (error "fetchPackagesImpossible cl") (tfSize toFetch)
-                        , _idsTotalDownloaded = read (show actual) -- TODO(danburton): something better than this
-                        }
-                    WrongStreamLength _ actual -> return $ Just $ InvalidDownloadSize
-                        { _idsUrl = tfUrl toFetch
-                        , _idsExpected = fromMaybe (error "fetchPackagesImpossible sl") (tfSize toFetch)
-                        , _idsTotalDownloaded = fromIntegral actual
-                        }
-                    WrongDigest _ _ actual -> return $ Just $ InvalidSha512
-                        { _ihUrl = tfUrl toFetch
-                        , _ihExpected = fromMaybe (error "fetchPackagesImpossible dg") (tfSHA512 toFetch)
-                        , _ihActual = actual
-                        }
-        maybe (return ()) throwM errMay
+        _ <- verifiedDownload downloadReq destpath progressSink
 
         let fp = toFilePath destpath
         --unlessM (liftIO (doesFileExist fp)) $ do

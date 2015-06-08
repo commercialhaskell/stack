@@ -136,20 +136,22 @@ sourcePackageIndex menv index = do
         when (t4 /= T.cons '/' p') $ throwM $ InvalidCabalPath t1 $ "Expected at end: " <> p'
         return (p, v)
 
-data InvalidCabalPath = InvalidCabalPath Text Text
-    deriving (Show, Typeable)
-instance Exception InvalidCabalPath
-
-data CabalParseException
-  = CabalParseException FilePath
+data PackageIndexException
+  = InvalidCabalPath Text Text
+  | CabalParseException FilePath
                         PError
   | MismatchedNameVersion FilePath
                           PackageName
                           PackageName
                           Version
                           Version
+  | SimpleParseException Text
+  | Couldn'tReadIndexTarball FilePath
+                           Tar.FormatError
+  | GitNotAvailable IndexName
+  | MissingRequiredHashes IndexName PackageIdentifier
   deriving (Show,Typeable)
-instance Exception CabalParseException
+instance Exception PackageIndexException
 
 -- | More generic simpleParse.
 simpleParse :: (MonadThrow m,DT.Text a)
@@ -158,19 +160,6 @@ simpleParse x =
   case DT.simpleParse (T.unpack x) of
     Nothing -> throwM (SimpleParseException x)
     Just x' -> return x'
-
--- | A simple parse exception.
-newtype SimpleParseException = SimpleParseException Text
- deriving (Show,Typeable)
-instance Exception SimpleParseException
-
-data PackageIndexException =
-  Couldn'tReadIndexTarball FilePath
-                           Tar.FormatError
-  | GitNotAvailable IndexName
-  | MissingRequiredHashes IndexName PackageIdentifier
-  deriving (Show,Typeable)
-instance Exception PackageIndexException
 
 -- | Require that an index be present, updating if it isn't.
 requireIndex :: (MonadIO m,MonadLogger m

@@ -192,10 +192,21 @@ data DumpPackage profiling = DumpPackage
 
 data PackageDumpException
     = MissingSingleField ByteString (Map ByteString [Line])
-    | MissingMultiField ByteString (Map ByteString [Line])
     | MismatchedId PackageName Version GhcPkgId
-    deriving (Show, Typeable)
+    deriving Typeable
 instance Exception PackageDumpException
+instance Show PackageDumpException where
+    show (MissingSingleField name values) = unlines $ concat
+        [ return $ concat
+            [ "Expected single value for field name "
+            , show name
+            , " when parsing ghc-pkg dump output:"
+            ]
+        , map (\(k, v) -> "    " ++ show (k, v)) (Map.toList values)
+        ]
+    show (MismatchedId name version gid) =
+        "Invalid id/name/version in ghc-pkg dump output: " ++
+        show (name, version, gid)
 
 -- | Convert a stream of bytes into a stream of @DumpPackage@s
 conduitDumpPackage :: MonadThrow m

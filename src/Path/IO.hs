@@ -30,8 +30,12 @@ import           System.IO.Error
 data ResolveException
     = ResolveDirFailed (Path Abs Dir) FilePath FilePath
     | ResolveFileFailed (Path Abs Dir) FilePath FilePath
-    deriving (Show, Typeable)
+    deriving Typeable
 instance Exception ResolveException
+
+instance Show ResolveException where
+    show (ResolveDirFailed _ _ z) = "Could not resolve directory " ++ z
+    show (ResolveFileFailed _ _ z) = "Could not resolve file " ++ z
 
 -- | Get the current working directory.
 getWorkingDir :: (MonadIO m) => m (Path Abs Dir)

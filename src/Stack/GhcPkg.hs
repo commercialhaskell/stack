@@ -16,13 +16,11 @@ module Stack.GhcPkg
   ,getCabalPkgVer)
   where
 
-import           Control.Exception hiding (catch)
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import qualified Data.ByteString.Char8 as S8
-import           Data.Data
 import           Data.Either
 import           Data.List
 import           Data.Maybe
@@ -32,18 +30,10 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
 import           Prelude hiding (FilePath)
+import           Stack.Build.Types (StackBuildException (Couldn'tFindPkgId))
 import           Stack.Types
 import           System.Directory (createDirectoryIfMissing, doesDirectoryExist, canonicalizePath)
 import           System.Process.Read
-
--- | A ghc-pkg exception.
-data GhcPkgException
-  = GetAllPackagesFail
-  | GetUserDbPathFail
-  | FindPackageIdFail PackageName ProcessExitedUnsuccessfully
-  | Couldn'tFindCabalPackage
-  deriving (Typeable,Show)
-instance Exception GhcPkgException
 
 -- | Get the global package database
 getGlobalDB :: (MonadIO m, MonadLogger m, MonadThrow m)
@@ -155,7 +145,7 @@ getCabalPkgVer menv = do
         [db]
         cabalName >>=
         maybe
-            (throwM Couldn'tFindCabalPackage)
+            (throwM $ Couldn'tFindPkgId cabalName)
             (return . ghcPkgIdPackageIdentifier)
   where
     cabalName =

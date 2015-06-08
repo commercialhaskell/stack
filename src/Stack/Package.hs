@@ -51,10 +51,10 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
-import           Data.Yaml (ParseException)
 import           Distribution.Compiler
 import           Distribution.InstalledPackageInfo (PError)
-import           Distribution.ModuleName as Cabal
+import qualified Distribution.ModuleName as Cabal
+import           Distribution.ModuleName (ModuleName)
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
 import           Distribution.PackageDescription hiding (FlagName)
 import           Distribution.PackageDescription.Parse
@@ -75,32 +75,34 @@ import           System.IO.Error
 
 -- | All exceptions thrown by the library.
 data PackageException
-  = PackageConfigError ParseException
-  | PackageNoConfigFile
-  | PackageNoCabalFile (Path Abs Dir)
-  | PackageInvalidCabalFile (Maybe (Path Abs File)) PError
-  | PackageDepCycle PackageName
-  | PackageMissingDep Package PackageName VersionRange
-  | PackageDependencyIssues [PackageException]
-  | PackageMissingTool Dependency
-  | PackageCouldn'tFindPkgId PackageName
-  | PackageStackageVersionMismatch PackageName Version Version
-  | PackageStackageDepVerMismatch PackageName Version VersionRange
+  = PackageInvalidCabalFile (Maybe (Path Abs File)) PError
   | PackageNoCabalFileFound (Path Abs Dir)
   | PackageMultipleCabalFilesFound (Path Abs Dir) [Path Abs File]
   | MismatchedCabalName (Path Abs File) PackageName
-  deriving (Show,Typeable)
+  deriving Typeable
 instance Exception PackageException
-
-{- TODO use for nicer error messages
-instance Show MismatchedCabalName where
+instance Show PackageException where
+    show (PackageInvalidCabalFile mfile err) =
+        "Unable to parse cabal file" ++
+        (case mfile of
+            Nothing -> ""
+            Just file -> ' ' : toFilePath file) ++
+        ": " ++
+        show err
+    show (PackageNoCabalFileFound dir) =
+        "No .cabal file found in directory " ++
+        toFilePath dir
+    show (PackageMultipleCabalFilesFound dir files) =
+        "Multiple .cabal files found in directory " ++
+        toFilePath dir ++
+        ": " ++
+        intercalate ", " (map (toFilePath . filename) files)
     show (MismatchedCabalName fp name) = concat
         [ "cabal file "
-        , toFilePath cabalfp
+        , toFilePath fp
         , " has a mismatched package name: "
-        , packageNameString $ packageName pkg
+        , packageNameString name
         ]
-        -}
 
 -- | Some package info.
 data Package =
