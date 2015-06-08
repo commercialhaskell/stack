@@ -70,6 +70,7 @@ import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.IO
 import           Prelude hiding (FilePath, writeFile)
+import           Stack.Build.Cache
 import           Stack.Build.Types
 import           Stack.BuildPlan
 import           Stack.Constants
@@ -87,125 +88,6 @@ import           System.IO.Temp (withSystemTempDirectory)
 import           System.Process.Internals (createProcess_)
 import           System.Process.Read
 
-----------------------------------------------
--- Exceptions
-data ConstructPlanException
-    = SnapshotPackageDependsOnLocal PackageName PackageIdentifier
-    -- ^ Recommend adding to extra-deps
-    | DependencyCycleDetected [PackageName]
-    | DependencyPlanFailures PackageName (Set PackageName) -- FIXME include version range violation info?
-    | UnknownPackage PackageName
-    -- ^ Recommend adding to extra-deps, give a helpful version number?
-    | VersionOutsideRange PackageName PackageIdentifier VersionRange
-    deriving (Typeable, Eq)
-
-instance Show ConstructPlanException where
-  show e =
-    let details = case e of
-         (SnapshotPackageDependsOnLocal pName pIdentifier) ->
-           "Exception: Stack.Build.SnapshotPackageDependsOnLocal\n" ++
-           "  Local package " ++ show pIdentifier ++ " is a dependency of snapshot package " ++ show pName ++ ".\n" ++
-           "  Snapshot packages cannot depend on local packages,\n " ++
-           "  should you add " ++ show pName ++ " to [extra-deps] in the project's stack.yaml?"
-         (DependencyCycleDetected pNames) ->
-           "Exception: Stack.Build.DependencyCycle\n" ++
-           "  While checking call stack,\n" ++
-           "  dependency cycle detected in packages:" ++ indent (appendLines pNames)
-         (DependencyPlanFailures pName (S.toList -> pDeps)) ->
-           "Exception: Stack.Build.DependencyPlanFailures\n" ++
-           "  Failure when adding dependencies:" ++ doubleIndent (appendLines pDeps) ++ "\n" ++
-           "  needed for package: " ++ show pName
-         (UnknownPackage pName) ->
-             "Exception: Stack.Build.UnknownPackage\n" ++
-             "  While attempting to add dependency,\n" ++
-             "  Could not find package " ++ show pName  ++ "in known packages"
-         (VersionOutsideRange pName pIdentifier versionRange) ->
-             "Exception: Stack.Build.VersionOutsideRange\n" ++
-             "  While adding dependency for package " ++ show pName ++ ",\n" ++
-             "  " ++ dropQuotes (show pIdentifier) ++ " was found to be outside its allowed version range.\n" ++
-             "  Allowed version range is " ++ display versionRange ++ ",\n" ++
-             "  should you correct the version range for " ++ dropQuotes (show pIdentifier) ++ ", found in [extra-deps] in the project's stack.yaml?"
-    in indent details
-     where
-      appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
-      indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
-      dropQuotes = filter ((/=) '\"')
-      doubleIndent = indent . indent
-
-newtype ConstructPlanExceptions = ConstructPlanExceptions [ConstructPlanException]
-    deriving (Typeable)
-instance Exception ConstructPlanExceptions
-
-instance Show ConstructPlanExceptions where
-  show (ConstructPlanExceptions exceptions) =
-    "Exception: Stack.Build.ConstuctPlanExceptions\n" ++
-    "While constructing the BuildPlan the following exceptions were encountered:" ++
-    appendExceptions (removeDuplicates exceptions)
-     where
-         appendExceptions = foldr (\e -> (++) ("\n\n--" ++ show e)) ""
-         removeDuplicates = nub
- -- Supressing duplicate output
-
-data UnpackedPackageHasWrongName = UnpackedPackageHasWrongName PackageIdentifier PackageName
-    deriving (Show, Typeable)
-instance Exception UnpackedPackageHasWrongName
-
-data TestSuiteFailure2 = TestSuiteFailure2 PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe FilePath)
-    deriving (Show, Typeable)
-instance Exception TestSuiteFailure2
-
-data CabalExitedUnsuccessfully = CabalExitedUnsuccessfully
-    ExitCode
-    PackageIdentifier
-    (Path Abs File)  -- cabal Executable
-    [String]         -- cabal arguments
-    (Maybe FilePath) -- logfiles location
-    S.ByteString     -- log contents
-    deriving (Typeable)
-instance Exception CabalExitedUnsuccessfully
-
-instance Show CabalExitedUnsuccessfully where
-  show (CabalExitedUnsuccessfully exitCode taskProvides execName fullArgs logFiles _) =
-    let fullCmd = (dropQuotes (show execName) ++ " " ++ (unwords fullArgs))
-        logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ show fp) logFiles
-    in "\n--  Exception: CabalExitedUnsuccessfully\n" ++
-       "    While building package " ++ dropQuotes (show taskProvides) ++ " using:\n" ++
-       "      " ++ fullCmd ++ "\n" ++
-       "    Process exited with code: " ++ show exitCode ++
-       logLocations
-     where
-      -- appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
-      -- indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
-      dropQuotes = filter ('\"' /=)
-      -- doubleIndent = indent . indent
-
-
-----------------------------------------------
-
--- | Directory containing files to mark an executable as installed
-exeInstalledDir :: M env m => Location -> m (Path Abs Dir)
-exeInstalledDir Snap = (</> $(mkRelDir "installed-packages")) `liftM` installationRootDeps
-exeInstalledDir Local = (</> $(mkRelDir "installed-packages")) `liftM` installationRootLocal
-
--- | Get all of the installed executables
-getInstalledExes :: M env m => Location -> m [PackageIdentifier]
-getInstalledExes loc = do
-    dir <- exeInstalledDir loc
-    files <- liftIO $ handleIO (const $ return []) $ getDirectoryContents $ toFilePath dir
-    return $ mapMaybe parsePackageIdentifierFromString files
-
--- | Mark the given executable as installed
-markExeInstalled :: M env m => Location -> PackageIdentifier -> m ()
-markExeInstalled loc ident = do
-    dir <- exeInstalledDir loc
-    liftIO $ createDirectoryIfMissing True $ toFilePath dir
-    ident' <- parseRelFile $ packageIdentifierString ident
-    let fp = toFilePath $ dir </> ident'
-    -- TODO consideration for the future: list all of the executables
-    -- installed, and invalidate this file in getInstalledExes if they no
-    -- longer exist
-    liftIO $ writeFile fp "Installed"
-
 {- EKB TODO: doc generation for stack-doc-server
 #ifndef mingw32_HOST_OS
 import           System.Posix.Files (createSymbolicLink,removeLink)
@@ -213,9 +95,6 @@ import           System.Posix.Files (createSymbolicLink,removeLink)
 --}
 data Installed = Library GhcPkgId | Executable
     deriving (Show, Eq, Ord)
-
-data Location = Snap | Local
-    deriving (Show, Eq)
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
 
@@ -369,163 +248,6 @@ loadLocals bopts = do
         name `Set.member` names ||
         any (`isParentOf` dir) dirs ||
         any (== dir) dirs
-
--- | Stored on disk to know whether the flags have changed or any
--- files have changed.
-data BuildCache = BuildCache
-    { buildCacheTimes :: !(Map FilePath ModTime)
-      -- ^ Modification times of files.
-    }
-    deriving (Generic,Eq)
-instance Binary BuildCache
-
--- | Stored on disk to know whether the flags have changed or any
--- files have changed.
-data ConfigCache = ConfigCache
-    { configCacheOpts :: ![ByteString]
-      -- ^ All options used for this package.
-    }
-    deriving (Generic,Eq)
-instance Binary ConfigCache
-
--- | Used for storage and comparison.
-newtype ModTime = ModTime (Integer,Rational)
-  deriving (Ord,Show,Generic,Eq)
-instance Binary ModTime
-
--- | One-way conversion to serialized time.
-modTime :: UTCTime -> ModTime
-modTime x =
-    ModTime
-        ( toModifiedJulianDay
-              (utctDay x)
-        , toRational
-              (utctDayTime x))
-
--- | Try to read the dirtiness cache for the given package directory.
-tryGetBuildCache :: (M env m)
-                 => Path Abs Dir -> m (Maybe BuildCache)
-tryGetBuildCache = tryGetCache buildCacheFile
-
--- | Try to read the dirtiness cache for the given package directory.
-tryGetConfigCache :: (M env m)
-                  => Path Abs Dir -> m (Maybe ConfigCache)
-tryGetConfigCache = tryGetCache configCacheFile
-
--- | Try to load a cache.
-tryGetCache :: (M env m,Binary a)
-            => (PackageIdentifier -> Path Abs Dir -> m (Path Abs File))
-            -> Path Abs Dir
-            -> m (Maybe a)
-tryGetCache get' dir = do
-    menv <- getMinimalEnvOverride
-    cabalPkgVer <- getCabalPkgVer menv
-    fp <- get' cabalPkgVer dir
-    liftIO
-        (catch
-             (fmap (decodeMaybe . L.fromStrict) (S.readFile (toFilePath fp)))
-             (\e -> if isDoesNotExistError e
-                       then return Nothing
-                       else throwIO e))
-  where decodeMaybe =
-            either (const Nothing) (Just . thd) . Binary.decodeOrFail
-          where thd (_,_,x) = x
-
--- | Write the dirtiness cache for this package's files.
-writeBuildCache :: (M env m)
-                => Path Abs Dir -> Map FilePath ModTime -> m ()
-writeBuildCache dir times =
-    writeCache
-        dir
-        buildCacheFile
-        (BuildCache
-         { buildCacheTimes = times
-         })
-
--- | Write the dirtiness cache for this package's configuration.
-writeConfigCache :: (M env m)
-                => Path Abs Dir -> [Text] -> m ()
-writeConfigCache dir opts =
-    writeCache
-        dir
-        configCacheFile
-        (ConfigCache
-         { configCacheOpts = map T.encodeUtf8 opts
-         })
-
--- | Delete the caches for the project.
-deleteCaches :: (M env m)  => Path Abs Dir -> m ()
-deleteCaches dir = do
-    menv <- getMinimalEnvOverride
-    cabalPkgVer <- getCabalPkgVer menv
-    bfp <- buildCacheFile cabalPkgVer dir
-    removeFileIfExists bfp
-    cfp <- configCacheFile cabalPkgVer dir
-    removeFileIfExists cfp
-
--- | Write to a cache.
-writeCache :: (Binary a, M env m)
-           => Path Abs Dir
-           -> (PackageIdentifier -> Path Abs Dir -> m (Path Abs File))
-           -> a
-           -> m ()
-writeCache dir get' content = do
-    menv <- getMinimalEnvOverride
-    cabalPkgVer <- getCabalPkgVer menv
-    fp <- get' cabalPkgVer dir
-    liftIO
-        (L.writeFile
-             (toFilePath fp)
-             (Binary.encode content))
-
-flagCacheFile :: (MonadIO m, MonadThrow m, MonadReader env m, HasBuildConfig env)
-              => GhcPkgId
-              -> m (Path Abs File)
-flagCacheFile gid = do
-    rel <- parseRelFile $ ghcPkgIdString gid
-    dir <- flagCacheLocal
-    return $ dir </> rel
-
--- | Loads the flag cache for the given installed extra-deps
-tryGetFlagCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasBuildConfig env)
-                => GhcPkgId
-                -> m (Maybe (Map FlagName Bool))
-tryGetFlagCache gid = do
-    file <- flagCacheFile gid
-    eres <- liftIO $ tryIO $ Binary.decodeFileOrFail $ toFilePath file
-    case eres of
-        Right (Right x) -> return $ Just x
-        _ -> return Nothing
-
-writeFlagCache :: M env m => GhcPkgId -> Map FlagName Bool -> m ()
-writeFlagCache gid flags = do
-    file <- flagCacheFile gid
-    liftIO $ do
-        createDirectoryIfMissing True $ toFilePath $ parent file
-        Binary.encodeFile (toFilePath file) flags
-
--- | Get the modified times of all known files in the package,
--- including the package's cabal file itself.
-getPackageFileModTimes :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m)
-                       => Package
-                       -> Path Abs File -- ^ cabal file
-                       -> m (Map FilePath ModTime)
-getPackageFileModTimes pkg cabalfp = do
-    files <- getPackageFiles (packageFiles pkg) cabalfp
-    liftM (M.fromList . catMaybes)
-        $ mapM getModTimeMaybe
-        $ Set.toList files
-  where
-    getModTimeMaybe fp =
-        liftIO
-            (catch
-                 (liftM
-                      (Just . (toFilePath fp,) . modTime)
-                      (getModificationTime (toFilePath fp)))
-                 (\e ->
-                       if isDoesNotExistError e
-                           then return Nothing
-                           else throw e))
 
 data LoadHelper = LoadHelper
     { lhId :: !GhcPkgId
@@ -1264,7 +986,7 @@ packageDocDir cabalPkgVer package' = do
             bracket
                 (liftIO $ openBinaryFile fp WriteMode)
                 (liftIO . hClose)
-                $ \h -> inner (Just (fp, h))
+                $ \h -> inner (Just (logPath, h))
 
     withCabal pkgDir mlogFile inner = do
         config <- asks getConfig
@@ -1319,7 +1041,7 @@ packageDocDir cabalPkgVer package' = do
                             Nothing -> return ""
                             Just (logFile, h) -> do
                                 hClose h
-                                S.readFile logFile
+                                S.readFile $ toFilePath logFile
                     throwM $ CabalExitedUnsuccessfully
                         ec
                         taskProvides
@@ -1417,22 +1139,6 @@ clean = do
                  mgr
                  logLevel)
                                   -}
-
--- | Get the version of Cabal from the global package database.
-getCabalPkgVer :: (MonadThrow m,MonadIO m,MonadLogger m)
-               => EnvOverride -> m PackageIdentifier
-getCabalPkgVer menv = do
-    db <- getGlobalDB menv
-    findGhcPkgId
-        menv
-        [db]
-        cabalName >>=
-        maybe
-            (throwM (Couldn'tFindPkgId cabalName))
-            (return . ghcPkgIdPackageIdentifier)
-  where
-    cabalName =
-        $(mkPackageName "Cabal")
 
 -- | Ensure Setup.hs exists in the given directory. Returns an action
 -- to remove it later.

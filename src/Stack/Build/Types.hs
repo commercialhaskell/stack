@@ -5,6 +5,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- | All data types.
 
@@ -14,13 +15,19 @@ import Control.DeepSeq
 import Control.Exception
 import Data.Aeson
 import Data.Binary (Binary(..))
+import qualified Data.ByteString as S
+import Data.Char (isSpace)
 import Data.Data
 import Data.Hashable
+import Data.List (dropWhileEnd, nub)
 import Data.Map.Strict (Map)
 import Data.Maybe
 import Data.Monoid
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Text (Text)
-import Distribution.Package hiding (Package,PackageName)
+import Distribution.Package (Dependency)
+import Distribution.Text (display)
 import GHC.Generics
 import Path (Path, Abs, File)
 import Prelude hiding (FilePath)
@@ -28,6 +35,8 @@ import Stack.Package
 import Stack.Types
 import System.Exit (ExitCode)
 
+----------------------------------------------
+-- Exceptions
 data StackBuildException
   = MissingTool Dependency
   | Couldn'tFindPkgId PackageName
@@ -46,6 +55,99 @@ data StackBuildException
   deriving (Typeable,Show)
 
 instance Exception StackBuildException
+
+data ConstructPlanException
+    = SnapshotPackageDependsOnLocal PackageName PackageIdentifier
+    -- ^ Recommend adding to extra-deps
+    | DependencyCycleDetected [PackageName]
+    | DependencyPlanFailures PackageName (Set PackageName) -- FIXME include version range violation info?
+    | UnknownPackage PackageName
+    -- ^ Recommend adding to extra-deps, give a helpful version number?
+    | VersionOutsideRange PackageName PackageIdentifier VersionRange
+    deriving (Typeable, Eq)
+
+instance Show ConstructPlanException where
+  show e =
+    let details = case e of
+         (SnapshotPackageDependsOnLocal pName pIdentifier) ->
+           "Exception: Stack.Build.SnapshotPackageDependsOnLocal\n" ++
+           "  Local package " ++ show pIdentifier ++ " is a dependency of snapshot package " ++ show pName ++ ".\n" ++
+           "  Snapshot packages cannot depend on local packages,\n " ++
+           "  should you add " ++ show pName ++ " to [extra-deps] in the project's stack.yaml?"
+         (DependencyCycleDetected pNames) ->
+           "Exception: Stack.Build.DependencyCycle\n" ++
+           "  While checking call stack,\n" ++
+           "  dependency cycle detected in packages:" ++ indent (appendLines pNames)
+         (DependencyPlanFailures pName (Set.toList -> pDeps)) ->
+           "Exception: Stack.Build.DependencyPlanFailures\n" ++
+           "  Failure when adding dependencies:" ++ doubleIndent (appendLines pDeps) ++ "\n" ++
+           "  needed for package: " ++ show pName
+         (UnknownPackage pName) ->
+             "Exception: Stack.Build.UnknownPackage\n" ++
+             "  While attempting to add dependency,\n" ++
+             "  Could not find package " ++ show pName  ++ "in known packages"
+         (VersionOutsideRange pName pIdentifier versionRange) ->
+             "Exception: Stack.Build.VersionOutsideRange\n" ++
+             "  While adding dependency for package " ++ show pName ++ ",\n" ++
+             "  " ++ dropQuotes (show pIdentifier) ++ " was found to be outside its allowed version range.\n" ++
+             "  Allowed version range is " ++ display versionRange ++ ",\n" ++
+             "  should you correct the version range for " ++ dropQuotes (show pIdentifier) ++ ", found in [extra-deps] in the project's stack.yaml?"
+    in indent details
+     where
+      appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
+      indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
+      dropQuotes = filter ((/=) '\"')
+      doubleIndent = indent . indent
+
+newtype ConstructPlanExceptions = ConstructPlanExceptions [ConstructPlanException]
+    deriving (Typeable)
+instance Exception ConstructPlanExceptions
+
+instance Show ConstructPlanExceptions where
+  show (ConstructPlanExceptions exceptions) =
+    "Exception: Stack.Build.ConstuctPlanExceptions\n" ++
+    "While constructing the BuildPlan the following exceptions were encountered:" ++
+    appendExceptions (removeDuplicates exceptions)
+     where
+         appendExceptions = foldr (\e -> (++) ("\n\n--" ++ show e)) ""
+         removeDuplicates = nub
+ -- Supressing duplicate output
+
+data UnpackedPackageHasWrongName = UnpackedPackageHasWrongName PackageIdentifier PackageName
+    deriving (Show, Typeable)
+instance Exception UnpackedPackageHasWrongName
+
+data TestSuiteFailure2 = TestSuiteFailure2 PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe (Path Abs File))
+    deriving (Show, Typeable)
+instance Exception TestSuiteFailure2
+
+data CabalExitedUnsuccessfully = CabalExitedUnsuccessfully
+    ExitCode
+    PackageIdentifier
+    (Path Abs File)  -- cabal Executable
+    [String]         -- cabal arguments
+    (Maybe (Path Abs File)) -- logfiles location
+    S.ByteString     -- log contents
+    deriving (Typeable)
+instance Exception CabalExitedUnsuccessfully
+
+instance Show CabalExitedUnsuccessfully where
+  show (CabalExitedUnsuccessfully exitCode taskProvides execName fullArgs logFiles _) =
+    let fullCmd = (dropQuotes (show execName) ++ " " ++ (unwords fullArgs))
+        logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ show fp) logFiles
+    in "\n--  Exception: CabalExitedUnsuccessfully\n" ++
+       "    While building package " ++ dropQuotes (show taskProvides) ++ " using:\n" ++
+       "      " ++ fullCmd ++ "\n" ++
+       "    Process exited with code: " ++ show exitCode ++
+       logLocations
+     where
+      -- appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
+      -- indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
+      dropQuotes = filter ('\"' /=)
+      -- doubleIndent = indent . indent
+
+
+----------------------------------------------
 
 -- | Configuration for building.
 data BuildOpts =
@@ -127,3 +229,7 @@ data ConfigLock = ConfigLock
 newtype PkgDepsOracle =
     PkgDeps PackageName
     deriving (Show,Typeable,Eq,Hashable,Binary,NFData)
+
+-- | A location to install a package into, either snapshot or local
+data Location = Snap | Local
+    deriving (Show, Eq)

@@ -45,6 +45,7 @@ library
                      Stack.Types.Version
                      Stack.Types.StackT
                      Stack.Build
+                     Stack.Build.Cache
                      Stack.Build.Types
                      Stack.Build.Doc
                      System.Process.Read
