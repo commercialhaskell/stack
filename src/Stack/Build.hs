@@ -249,8 +249,14 @@ constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered loadPacka
                 { taskProvides = PackageIdentifier
                     (packageName $ lpPackage lp)
                     (packageVersion $ lpPackage lp)
-                , taskRequiresMissing = missing
-                , taskRequiresPresent = present
+                , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
+                    let allDeps = Set.union present missing'
+                     in configureOpts
+                            baseConfigOpts
+                            allDeps
+                            (lpWanted lp)
+                            Local
+                            (packageFlags $ lpPackage lp)
                 , taskType = TTLocal lp AllSteps
                 }
 
@@ -261,9 +267,15 @@ constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered loadPacka
             Left e -> return $ Left e
             Right (present, missing) -> return $ Right $ ADRToInstall Task
                 { taskProvides = PackageIdentifier name version
-                , taskRequiresMissing = missing
-                , taskRequiresPresent = present
                 , taskType = TTUpstream package loc
+                , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
+                    let allDeps = Set.union present missing'
+                     in configureOpts
+                            baseConfigOpts
+                            allDeps
+                            False
+                            loc
+                            flags
                 }
 
     -- Check if a locally installed package is dirty and must be reinstalled
@@ -288,9 +300,15 @@ constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered loadPacka
                                 Nothing -> ADRFound version installed
                                 Just neededSteps -> ADRToInstall Task
                                     { taskProvides = PackageIdentifier name version
-                                    , taskRequiresMissing = missing
-                                    , taskRequiresPresent = present
                                     , taskType = TTLocal lp neededSteps
+                                    , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
+                                        let allDeps = Set.union present missing'
+                                         in configureOpts
+                                                baseConfigOpts
+                                                allDeps
+                                                (lpWanted lp)
+                                                Local
+                                                (packageFlags $ lpPackage lp)
                                     }
             Just (PSUpstream version' loc flags) -> assert (version == version') $
                 case loc of
@@ -300,8 +318,14 @@ constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered loadPacka
                         eres <- checkPackage callStack package
                         let toInstall present missing = Right $ ADRToInstall Task
                                     { taskProvides = PackageIdentifier name version
-                                    , taskRequiresMissing = missing
-                                    , taskRequiresPresent = present
+                                    , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
+                                        let allDeps = Set.union present missing'
+                                         in configureOpts
+                                                baseConfigOpts
+                                                allDeps
+                                                False
+                                                Local
+                                                (packageFlags package)
                                     , taskType = TTUpstream package loc
                                     }
                         case eres of
@@ -653,3 +677,61 @@ isHiddenDir :: Path b Dir -> Bool
 isHiddenDir = isPrefixOf "." . toFilePath . dirname
         -}
 --}
+
+configureOpts :: BaseConfigOpts
+              -> Set GhcPkgId -- ^ dependencies
+              -> Bool -- ^ wanted?
+              -> Location
+              -> Map FlagName Bool
+              -> [Text]
+configureOpts bco deps wanted loc flags = map T.pack $ concat
+    [ ["--user", "--package-db=clear", "--package-db=global"]
+    , map (("--package-db=" ++) . toFilePath) $ case loc of
+        Snap -> [bcoSnapDB bco]
+        Local -> [bcoSnapDB bco, bcoLocalDB bco]
+    , depOptions
+    , [ "--libdir=" ++ toFilePath (installRoot </> $(mkRelDir "lib"))
+      , "--bindir=" ++ toFilePath (installRoot </> bindirSuffix)
+      , "--datadir=" ++ toFilePath (installRoot </> $(mkRelDir "share"))
+      , "--docdir=" ++ toFilePath (installRoot </> $(mkRelDir "doc"))
+      ]
+    , ["--enable-library-profiling" | bcoLibProfiling bco || bcoExeProfiling bco]
+    , ["--enable-executable-profiling" | bcoLibProfiling bco]
+    , ["--enable-tests" | wanted && bcoFinalAction bco == DoTests]
+    , ["--enable-benchmarks" | wanted && bcoFinalAction bco == DoBenchmarks]
+    , map (\(name,enabled) ->
+                       "-f" <>
+                       (if enabled
+                           then ""
+                           else "-") <>
+                       flagNameString name)
+                    (Map.toList flags)
+    -- FIXME Chris: where does this come from now? , ["--ghc-options=-O2" | gconfigOptimize gconfig]
+    , if wanted
+        then concatMap (\x -> ["--ghc-options", T.unpack x]) (bcoGhcOptions bco)
+        else []
+    ]
+  where
+    installRoot =
+        case loc of
+            Snap -> bcoSnapInstallRoot bco
+            Local -> bcoLocalInstallRoot bco
+
+    depOptions = map toDepOption $ Set.toList deps
+
+    {- TODO does this work with some versions of Cabal?
+    toDepOption gid = T.pack $ concat
+        [ "--dependency="
+        , packageNameString $ packageIdentifierName $ ghcPkgIdPackageIdentifier gid
+        , "="
+        , ghcPkgIdString gid
+        ]
+    -}
+    toDepOption gid = concat
+        [ "--constraint="
+        , packageNameString name
+        , "=="
+        , versionString version
+        ]
+      where
+        PackageIdentifier name version = ghcPkgIdPackageIdentifier gid

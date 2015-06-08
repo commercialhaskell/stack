@@ -8,7 +8,6 @@
 module Stack.Build.Execute
     ( printPlan
     , executePlan
-    , configureOpts
     ) where
 
 import           Control.Concurrent             (forkIO, getNumCapabilities)
@@ -35,7 +34,6 @@ import           Data.Map.Strict                (Map)
 import qualified Data.Map.Strict                as M
 import qualified Data.Map.Strict                as Map
 import           Data.Maybe
-import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
 import           Data.Streaming.Process         hiding (callProcess, env)
 import qualified Data.Streaming.Process         as Process
@@ -99,10 +97,12 @@ displayTask task = T.pack $ concat
                 JustFinal -> " (already built)"
             ]
         TTUpstream _ _ -> "package index"
-    , if Set.null $ taskRequiresMissing task
+    , if Set.null missing
         then ""
-        else ", after: " ++ intercalate "," (map packageIdentifierString $ Set.toList $ taskRequiresMissing task)
+        else ", after: " ++ intercalate "," (map packageIdentifierString $ Set.toList missing)
     ]
+  where
+    missing = tcoMissing $ taskConfigOpts task
 
 data ExecuteEnv = ExecuteEnv
     { eeEnvOverride    :: !EnvOverride
@@ -191,7 +191,7 @@ toActions runInBase ee task@Task {..} =
     [ Action
         { actionId = ActionId taskProvides ATBuild
         , actionDeps =
-            (Set.map (\ident -> ActionId ident ATBuild) taskRequiresMissing)
+            (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
         , actionDo = \ac -> runInBase $ singleBuild ac ee task
         }
     ]
@@ -213,15 +213,11 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
                     Nothing -> error "singleBuild: invariant violated, missing package ID missing"
                     Just (Library x) -> Just x
                     Just Executable -> Nothing
-            allDeps = Set.union
-                taskRequiresPresent
-                (Set.fromList $ mapMaybe getMissing $ Set.toList taskRequiresMissing)
-        let configOpts = configureOpts
-                eeBaseConfigOpts
-                allDeps
-                wanted
-                (taskLocation task)
-                (packageFlags package)
+            TaskConfigOpts missing mkOpts = taskConfigOpts
+            configOpts = mkOpts
+                       $ Set.fromList
+                       $ mapMaybe getMissing
+                       $ Set.toList missing
         announce "configure"
         cabal False $ "configure" : map T.unpack configOpts
         $logDebug $ T.pack $ show configOpts
@@ -517,61 +513,3 @@ getSetupHs dir = do
   where
     fp1 = dir </> $(mkRelFile "Setup.hs")
     fp2 = dir </> $(mkRelFile "Setup.lhs")
-
-configureOpts :: BaseConfigOpts
-              -> Set GhcPkgId -- ^ dependencies
-              -> Bool -- ^ wanted?
-              -> Location
-              -> Map FlagName Bool
-              -> [Text]
-configureOpts bco deps wanted loc flags = map T.pack $ concat
-    [ ["--user", "--package-db=clear", "--package-db=global"]
-    , map (("--package-db=" ++) . toFilePath) $ case loc of
-        Snap -> [bcoSnapDB bco]
-        Local -> [bcoSnapDB bco, bcoLocalDB bco]
-    , depOptions
-    , [ "--libdir=" ++ toFilePath (installRoot </> $(mkRelDir "lib"))
-      , "--bindir=" ++ toFilePath (installRoot </> bindirSuffix)
-      , "--datadir=" ++ toFilePath (installRoot </> $(mkRelDir "share"))
-      , "--docdir=" ++ toFilePath (installRoot </> $(mkRelDir "doc"))
-      ]
-    , ["--enable-library-profiling" | bcoLibProfiling bco || bcoExeProfiling bco]
-    , ["--enable-executable-profiling" | bcoLibProfiling bco]
-    , ["--enable-tests" | wanted && bcoFinalAction bco == DoTests]
-    , ["--enable-benchmarks" | wanted && bcoFinalAction bco == DoBenchmarks]
-    , map (\(name,enabled) ->
-                       "-f" <>
-                       (if enabled
-                           then ""
-                           else "-") <>
-                       flagNameString name)
-                    (Map.toList flags)
-    -- FIXME Chris: where does this come from now? , ["--ghc-options=-O2" | gconfigOptimize gconfig]
-    , if wanted
-        then concatMap (\x -> ["--ghc-options", T.unpack x]) (bcoGhcOptions bco)
-        else []
-    ]
-  where
-    installRoot =
-        case loc of
-            Snap -> bcoSnapInstallRoot bco
-            Local -> bcoLocalInstallRoot bco
-
-    depOptions = map toDepOption $ Set.toList deps
-
-    {- TODO does this work with some versions of Cabal?
-    toDepOption gid = T.pack $ concat
-        [ "--dependency="
-        , packageNameString $ packageIdentifierName $ ghcPkgIdPackageIdentifier gid
-        , "="
-        , ghcPkgIdString gid
-        ]
-    -}
-    toDepOption gid = concat
-        [ "--constraint="
-        , packageNameString name
-        , "=="
-        , versionString version
-        ]
-      where
-        PackageIdentifier name version = ghcPkgIdPackageIdentifier gid

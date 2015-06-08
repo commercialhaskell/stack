@@ -253,12 +253,26 @@ data LocalPackage = LocalPackage
 
 -- | A task to perform when building
 data Task = Task
-    { taskProvides        :: !PackageIdentifier       -- ^ the package/version to be built
-    , taskRequiresMissing :: !(Set PackageIdentifier) -- ^ dependencies needed to make this package which are not present
-    , taskRequiresPresent :: !(Set GhcPkgId)          -- ^ dependencies needed which are present
-    , taskType            :: !TaskType                -- ^ the task type, telling us how to build this
+    { taskProvides        :: !PackageIdentifier        -- ^ the package/version to be built
+    , taskType            :: !TaskType                 -- ^ the task type, telling us how to build this
+    , taskConfigOpts      :: !TaskConfigOpts
     }
     deriving Show
+
+-- | Given the IDs of any missing packages, produce the configure options
+data TaskConfigOpts = TaskConfigOpts
+    { tcoMissing :: !(Set PackageIdentifier)
+      -- ^ Dependencies for which we don't yet have an GhcPkgId
+    , tcoOpts    :: !(Set GhcPkgId -> [Text])
+      -- ^ Produce the list of options given the missing @GhcPkgId@s
+    }
+instance Show TaskConfigOpts where
+    show (TaskConfigOpts missing f) = concat
+        [ "Missing: "
+        , show missing
+        , ". Without those: "
+        , show $ f Set.empty
+        ]
 
 -- | The type of a task, either building local code or something from the
 -- package index (upstream)
