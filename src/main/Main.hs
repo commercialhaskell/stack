@@ -257,7 +257,7 @@ withBuildConfig :: GlobalOpts
                 -> NoBuildConfigStrategy
                 -> StackT BuildConfig IO ()
                 -> IO ()
-withBuildConfig go@GlobalOpts{..} strat inner = handle (error . printBuildException) $ do
+withBuildConfig go@GlobalOpts{..} strat inner = do
     (manager, lc) <- loadConfigWithOpts go
     runStackLoggingT manager globalLogLevel $
         Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $ do
@@ -266,93 +266,6 @@ withBuildConfig go@GlobalOpts{..} strat inner = handle (error . printBuildExcept
             bconfig2 <- runStackT manager globalLogLevel bconfig1 $
                 setupEnv globalSystemGhc globalInstallGhc
             runStackT manager globalLogLevel bconfig2 inner
-  where printBuildException e =
-          case e of
-            MissingTool dep -> "Missing build tool: " <> display dep
-            Couldn'tFindPkgId name ->
-              ("After installing " <> packageNameString name <>
-               ", the package id couldn't be found " <> "(via ghc-pkg describe " <>
-               packageNameString name <> "). This shouldn't happen, " <>
-               "please report as a bug")
-            MissingDep p d range ->
-              "Missing dependency for package " <>
-              packageNameString (packageName p) <>
-              ": " <>
-              packageNameString d <>
-              " " <>
-              display range
-            MissingDep2 user dep range ->
-              "Local package " <>
-              packageNameString user <>
-              " depends on " <>
-              packageNameString dep <>
-              " (" <>
-              display range <>
-              "), but it wasn't found. Perhaps add it to your local package list?"
-            MismatchedLocalDep dep version user range ->
-              "Mismatched local dependencies, " <>
-              packageNameString user <>
-              " depends on " <>
-              packageNameString dep <>
-              " (" <>
-              display range <>
-              "), but " <>
-              versionString version <>
-              " is provided locally"
-            MismatchedDep dep version user range ->
-              "Mismatched dependencies, " <>
-              packageNameString user <>
-              " depends on " <>
-              packageNameString dep <>
-              " (" <>
-              display range <>
-              "), but " <>
-              versionString version <>
-              " is provided by your snapshot"
-            StackageDepVerMismatch name ver range ->
-              ("The package '" <> packageNameString name <>
-               "' in this Stackage snapshot is " <> versionString ver <>
-               ", but there is an (unsatisfiable) local constraint of " <>
-               display range <> ". Suggestion: " <>
-               "Check your local package constraints and make them consistent with your current Stackage")
-            StackageVersionMismatch name this that ->
-              ("There was a mismatch between an installed package, " <>
-               packageNameString name <> "==" <> versionString this <>
-               " but this Stackage snapshot should be " <> versionString that)
-            DependencyIssues es ->
-              ("Dependency issues:\n" ++
-               intercalate "\n"
-                           (map printBuildException es))
-            GHCVersionMismatch mactual expected mstack -> concat
-                [ case mactual of
-                    Nothing -> "No GHC found, expected version "
-                    Just actual ->
-                        "GHC version mismatched, found " ++
-                        versionString actual ++
-                        ", but expected version "
-                , versionString expected
-                , " (based on "
-                , case mstack of
-                    Nothing -> "command line arguments"
-                    Just stack -> "resolver setting in " ++ toFilePath stack
-                , "). Try running stack setup"
-                ]
-            Couldn'tParseTargets targets -> unlines
-                $ "The following targets could not be parsed as package names or directories:"
-                : map T.unpack targets
-            UnknownTargets targets ->
-                "The following target packages were not found: " ++
-                intercalate ", " (map packageNameString targets)
-            TestSuiteFailure exe mlogFile ec -> concat
-                [ "Test suite "
-                , toFilePath exe
-                , " exited with code "
-                , show ec
-                , case mlogFile of
-                    Nothing -> ""
-                    Just logFile ->
-                        ", log available at: " ++ toFilePath logFile
-                ]
 
 cleanCmd :: () -> GlobalOpts -> IO ()
 cleanCmd () go = withBuildConfig go ThrowException clean

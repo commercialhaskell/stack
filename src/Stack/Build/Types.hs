@@ -19,7 +19,7 @@ import qualified Data.ByteString as S
 import Data.Char (isSpace)
 import Data.Data
 import Data.Hashable
-import Data.List (dropWhileEnd, nub)
+import Data.List (dropWhileEnd, nub, intercalate)
 import Data.Map.Strict (Map)
 import qualified Data.Map as Map
 import Data.Maybe
@@ -54,7 +54,94 @@ data StackBuildException
   | Couldn'tParseTargets [Text]
   | UnknownTargets [PackageName]
   | TestSuiteFailure (Path Abs File) (Maybe (Path Abs File)) ExitCode
-  deriving (Typeable,Show)
+  deriving Typeable
+
+instance Show StackBuildException where
+    show (MissingTool dep) = "Missing build tool: " <> display dep
+    show (Couldn'tFindPkgId name) =
+              ("After installing " <> packageNameString name <>
+               ", the package id couldn't be found " <> "(via ghc-pkg describe " <>
+               packageNameString name <> "). This shouldn't happen, " <>
+               "please report as a bug")
+    show (MissingDep p d range) =
+              "Missing dependency for package " <>
+              packageNameString (packageName p) <>
+              ": " <>
+              packageNameString d <>
+              " " <>
+              display range
+    show (MissingDep2 user dep range) =
+              "Local package " <>
+              packageNameString user <>
+              " depends on " <>
+              packageNameString dep <>
+              " (" <>
+              display range <>
+              "), but it wasn't found. Perhaps add it to your local package list?"
+    show (MismatchedLocalDep dep version user range) =
+              "Mismatched local dependencies, " <>
+              packageNameString user <>
+              " depends on " <>
+              packageNameString dep <>
+              " (" <>
+              display range <>
+              "), but " <>
+              versionString version <>
+              " is provided locally"
+    show (MismatchedDep dep version user range) =
+              "Mismatched dependencies, " <>
+              packageNameString user <>
+              " depends on " <>
+              packageNameString dep <>
+              " (" <>
+              display range <>
+              "), but " <>
+              versionString version <>
+              " is provided by your snapshot"
+    show (StackageDepVerMismatch name ver range) =
+              ("The package '" <> packageNameString name <>
+               "' in this Stackage snapshot is " <> versionString ver <>
+               ", but there is an (unsatisfiable) local constraint of " <>
+               display range <> ". Suggestion: " <>
+               "Check your local package constraints and make them consistent with your current Stackage")
+    show (StackageVersionMismatch name this that) =
+              ("There was a mismatch between an installed package, " <>
+               packageNameString name <> "==" <> versionString this <>
+               " but this Stackage snapshot should be " <> versionString that)
+    show (DependencyIssues es) =
+              ("Dependency issues:\n" ++
+               intercalate "\n"
+                           (map show es))
+    show (GHCVersionMismatch mactual expected mstack) = concat
+                [ case mactual of
+                    Nothing -> "No GHC found, expected version "
+                    Just actual ->
+                        "GHC version mismatched, found " ++
+                        versionString actual ++
+                        ", but expected version "
+                , versionString expected
+                , " (based on "
+                , case mstack of
+                    Nothing -> "command line arguments"
+                    Just stack -> "resolver setting in " ++ toFilePath stack
+                , "). Try running stack setup"
+                ]
+    show (Couldn'tParseTargets targets) = unlines
+                $ "The following targets could not be parsed as package names or directories:"
+                : map T.unpack targets
+    show (UnknownTargets targets) =
+                "The following target packages were not found: " ++
+                intercalate ", " (map packageNameString targets)
+    show (TestSuiteFailure exe mlogFile ec) = concat
+                [ "Test suite "
+                , toFilePath exe
+                , " exited with code "
+                , show ec
+                , case mlogFile of
+                    Nothing -> ""
+                    Just logFile ->
+                        ", log available at: " ++ toFilePath logFile
+                ]
 
 instance Exception StackBuildException
 
@@ -91,7 +178,6 @@ instance Show ConstructPlanException where
      where
       appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
       indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
-      dropQuotes = filter ((/=) '\"')
       doubleIndent = indent . indent
       appendDeps = foldr (\dep-> (++) ("\n" ++ showDep dep)) ""
       showDep (name, (range, mversion)) = concat
@@ -104,6 +190,7 @@ instance Show ConstructPlanException where
             Just version -> versionString version ++ " found"
         ]
          {- TODO Perhaps change the showDep function to look more like this:
+          dropQuotes = filter ((/=) '\"')
          (VersionOutsideRange pName pIdentifier versionRange) ->
              "Exception: Stack.Build.VersionOutsideRange\n" ++
              "  While adding dependency for package " ++ show pName ++ ",\n" ++
