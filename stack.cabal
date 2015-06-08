@@ -48,7 +48,7 @@ library
                      Stack.Build.Cache
                      Stack.Build.Execute
                      Stack.Build.Installed
-                     Stack.Build.LocalPackage
+                     Stack.Build.Source
                      Stack.Build.Types
                      Stack.Build.Doc
                      System.Process.Read

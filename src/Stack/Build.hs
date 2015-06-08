@@ -48,7 +48,7 @@ import           Prelude hiding (FilePath, writeFile)
 import           Stack.Build.Cache
 import           Stack.Build.Execute
 import           Stack.Build.Installed
-import           Stack.Build.LocalPackage
+import           Stack.Build.Source
 import           Stack.Build.Types
 import           Stack.BuildPlan
 import           Stack.Constants
@@ -65,17 +65,6 @@ import           System.Posix.Files (createSymbolicLink,removeLink)
 --}
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
-
-type SourceMap = Map PackageName PackageSource
-data PackageSource
-    = PSLocal LocalPackage
-    | PSUpstream Version Location (Map FlagName Bool)
-instance PackageInstallInfo PackageSource where
-    piiVersion (PSLocal lp) = packageVersion $ lpPackage lp
-    piiVersion (PSUpstream v _ _) = v
-
-    piiLocation (PSLocal _) = Local
-    piiLocation (PSUpstream _ loc _) = loc
 
 data AddDepRes
     = ADRToInstall Task
@@ -293,70 +282,57 @@ mkUnregisterLocal tasks locallyRegistered =
         ident = ghcPkgIdPackageIdentifier gid
         name = packageIdentifierName ident
 
+mkBaseConfigOpts :: (MonadIO m, MonadReader env m, HasBuildConfig env, MonadThrow m)
+                 => BuildOpts -> m BaseConfigOpts
+mkBaseConfigOpts bopts = do
+    snapDBPath <- packageDatabaseDeps
+    localDBPath <- packageDatabaseLocal
+    snapInstallRoot <- installationRootDeps
+    localInstallRoot <- installationRootLocal
+    return BaseConfigOpts
+        { bcoSnapDB = snapDBPath
+        , bcoLocalDB = localDBPath
+        , bcoSnapInstallRoot = snapInstallRoot
+        , bcoLocalInstallRoot = localInstallRoot
+        , bcoLibProfiling = boptsLibProfile bopts
+        , bcoExeProfiling = boptsExeProfile bopts
+        , bcoFinalAction = boptsFinalAction bopts
+        , bcoGhcOptions = boptsGhcOptions bopts
+        }
+
+withLoadPackage :: M env m
+                => EnvOverride
+                -> ((PackageName -> Version -> Map FlagName Bool -> m Package) -> m a)
+                -> m a
+withLoadPackage menv inner = do
+    bconfig <- asks getBuildConfig
+    withCabalLoader menv $ \cabalLoader ->
+        inner $ \name version flags -> do
+            bs <- cabalLoader $ PackageIdentifier name version -- TODO automatically update index the first time this fails
+            readPackageBS (depPackageConfig bconfig flags) bs
+  where
+    -- | Package config to be used for dependencies
+    depPackageConfig :: BuildConfig -> Map FlagName Bool -> PackageConfig
+    depPackageConfig bconfig flags = PackageConfig
+        { packageConfigEnableTests = False
+        , packageConfigEnableBenchmarks = False
+        , packageConfigFlags = flags
+        , packageConfigGhcVersion = bcGhcVersion bconfig
+        , packageConfigPlatform = configPlatform (getConfig bconfig)
+        }
+
 -- | Build using Shake.
 build :: M env m => BuildOpts -> m ()
 build bopts = do
     menv <- getMinimalEnvOverride
     cabalPkgVer <- getCabalPkgVer menv
 
-    bconfig <- asks getBuildConfig
-    mbp0 <- case bcResolver bconfig of
-        ResolverSnapshot snapName -> do
-            $logDebug $ "Checking resolver: " <> renderSnapName snapName
-            mbp <- loadMiniBuildPlan snapName
-            return mbp
-        ResolverGhc ghc -> return MiniBuildPlan
-            { mbpGhcVersion = fromMajorVersion ghc
-            , mbpPackages = M.empty
-            }
-
-    locals <- loadLocals bopts
-
-    let shadowed = Set.fromList (map (packageName . lpPackage) locals)
-                <> Map.keysSet (bcExtraDeps bconfig)
-        (mbp, extraDeps0) = shadowMiniBuildPlan mbp0 shadowed
-
-        -- Add the extra deps from the stack.yaml file to the deps grabbed from
-        -- the snapshot
-        extraDeps1 = Map.union
-            (Map.map (\v -> (v, M.empty)) (bcExtraDeps bconfig))
-            (Map.map (\mpi -> (mpiVersion mpi, mpiFlags mpi)) extraDeps0)
-
-        -- Overwrite any flag settings with those from the config file
-        extraDeps2 = Map.mapWithKey
-            (\n (v, f) -> PSUpstream v Local $ fromMaybe f $ Map.lookup n $ bcFlags bconfig)
-            extraDeps1
-
-    let sourceMap = Map.unions
-            [ Map.fromList $ flip map locals $ \lp ->
-                let p = lpPackage lp
-                 in (packageName p, PSLocal lp)
-            , extraDeps2
-            , flip fmap (mbpPackages mbp) $ \mpi ->
-                (PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi))
-            ]
-
+    (mbp, locals, sourceMap) <- loadSourceMap bopts
     (installedMap, locallyRegistered) <- getInstalled menv profiling sourceMap
 
-    snapDBPath <- packageDatabaseDeps
-    localDBPath <- packageDatabaseLocal
-    snapInstallRoot <- installationRootDeps
-    localInstallRoot <- installationRootLocal
-    let baseConfigOpts = BaseConfigOpts
-            { bcoSnapDB = snapDBPath
-            , bcoLocalDB = localDBPath
-            , bcoSnapInstallRoot = snapInstallRoot
-            , bcoLocalInstallRoot = localInstallRoot
-            , bcoLibProfiling = boptsLibProfile bopts
-            , bcoExeProfiling = boptsExeProfile bopts
-            , bcoFinalAction = boptsFinalAction bopts
-            , bcoGhcOptions = boptsGhcOptions bopts
-            }
-        extraToBuild = either (const []) id $ boptsTargets bopts
-    plan <- withCabalLoader menv $ \cabalLoader -> do
-        let loadPackage name version flags = do
-                bs <- cabalLoader $ PackageIdentifier name version -- TODO automatically update index the first time this fails
-                readPackageBS (depPackageConfig bconfig flags) bs
+    baseConfigOpts <- mkBaseConfigOpts bopts
+    let extraToBuild = either (const []) id $ boptsTargets bopts
+    plan <- withLoadPackage menv $ \loadPackage ->
         constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered loadPackage sourceMap installedMap
 
     if boptsDryrun bopts
@@ -364,16 +340,6 @@ build bopts = do
         else executePlan menv bopts baseConfigOpts cabalPkgVer locals plan
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
-
--- | Package config to be used for dependencies
-depPackageConfig :: BuildConfig -> Map FlagName Bool -> PackageConfig
-depPackageConfig bconfig flags = PackageConfig
-    { packageConfigEnableTests = False
-    , packageConfigEnableBenchmarks = False
-    , packageConfigFlags = flags
-    , packageConfigGhcVersion = bcGhcVersion bconfig
-    , packageConfigPlatform = configPlatform (getConfig bconfig)
-    }
 
 -- | Reset the build (remove Shake database and .gen files).
 clean :: (M env m) => m ()
