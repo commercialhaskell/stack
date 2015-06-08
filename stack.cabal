@@ -45,6 +45,11 @@ library
                      Stack.Types.Version
                      Stack.Types.StackT
                      Stack.Build
+                     Stack.Build.Cache
+                     Stack.Build.ConstructPlan
+                     Stack.Build.Execute
+                     Stack.Build.Installed
+                     Stack.Build.Source
                      Stack.Build.Types
                      Stack.Build.Doc
                      System.Process.Read
@@ -126,8 +131,7 @@ executable stack
   other-modules:     Plugins
                      Plugins.Commands
 
-  build-depends:  Cabal >= 1.18.1.5
-                , base >=4.7 && < 5
+  build-depends:  base >=4.7 && < 5
                 , bytestring >= 0.10.4.0
                 , containers
                 , exceptions

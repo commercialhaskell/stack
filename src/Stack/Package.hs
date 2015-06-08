@@ -220,7 +220,7 @@ resolvePackage packageConfig gpkg = Package
     , packageFlags = packageConfigFlags packageConfig
     , packageAllDeps = S.fromList (M.keys deps)
     , packageHasLibrary = maybe False (buildable . libBuildInfo) (library pkg)
-    , packageTests = S.fromList $ map (T.pack . fst) $ condTestSuites gpkg
+    , packageTests = S.fromList $ map (T.pack . fst) $ condTestSuites gpkg -- FIXME need to test if it's buildable
     }
 
   where

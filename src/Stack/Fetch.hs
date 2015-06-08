@@ -220,17 +220,19 @@ withCabalFiles name pkgs f = do
 withCabalLoader
     :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
     => EnvOverride
-    -> ((PackageIdentifier -> m ByteString) -> m a)
+    -> ((PackageIdentifier -> IO ByteString) -> m a)
     -> m a
 withCabalLoader menv inner = do
     caches <- getPackageCaches menv
+    env <- ask
     -- TODO in the future, keep all of the necessary @Handle@s open
     inner $ \ident ->
         case Map.lookup ident caches of
             Nothing -> throwM $ UnknownPackageIdentifiers $ Set.singleton ident
             Just (index, cache) -> do
-                [bs] <- withCabalFiles (indexName index) [(ident, cache, ())]
-                    $ \_ _ bs -> return bs
+                [bs] <- flip runReaderT env
+                      $ withCabalFiles (indexName index) [(ident, cache, ())]
+                      $ \_ _ bs -> return bs
                 return bs
 
 -- | Figure out where to fetch from.

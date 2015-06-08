@@ -12,7 +12,8 @@ module Stack.GhcPkg
   ,EnvOverride
   ,envHelper
   ,createDatabase
-  ,unregisterGhcPkgId)
+  ,unregisterGhcPkgId
+  ,getCabalPkgVer)
   where
 
 import           Control.Exception hiding (catch)
@@ -40,6 +41,7 @@ data GhcPkgException
   = GetAllPackagesFail
   | GetUserDbPathFail
   | FindPackageIdFail PackageName ProcessExitedUnsuccessfully
+  | Couldn'tFindCabalPackage
   deriving (Typeable,Show)
 instance Exception GhcPkgException
 
@@ -142,3 +144,19 @@ unregisterGhcPkgId menv pkgDb gid = do
   where
     -- TODO ideally we'd tell ghc-pkg a GhcPkgId instead
     args = ["unregister", "--user", "--force", packageIdentifierString $ ghcPkgIdPackageIdentifier gid]
+
+-- | Get the version of Cabal from the global package database.
+getCabalPkgVer :: (MonadThrow m,MonadIO m,MonadLogger m)
+               => EnvOverride -> m PackageIdentifier
+getCabalPkgVer menv = do
+    db <- getGlobalDB menv -- FIXME shouldn't be necessary, just tell ghc-pkg to look in the global DB
+    findGhcPkgId
+        menv
+        [db]
+        cabalName >>=
+        maybe
+            (throwM Couldn'tFindCabalPackage)
+            (return . ghcPkgIdPackageIdentifier)
+  where
+    cabalName =
+        $(mkPackageName "Cabal")
