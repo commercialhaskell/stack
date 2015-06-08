@@ -24,85 +24,53 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Check as Tar
 import           Codec.Compression.GZip (decompress)
 import           Control.Applicative
-
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.STM          (TVar, atomically, modifyTVar,
                                                   newTVarIO, readTVar,
                                                   readTVarIO, writeTVar)
-
-                                                  toException)
-
-
 import           Control.Monad (liftM, forM)
 import           Control.Monad (liftM, when, join, unless, void)
 import           Control.Monad.Catch
-
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (asks)
 import           Control.Monad.Reader (runReaderT,asks)
-
-                                                   put)
-
 import           Control.Monad.Trans.Control
-
 import           Crypto.Hash (SHA512(..))
-
-
-
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as C8
-
 import qualified Data.ByteString.Lazy as L
 import           Data.Either (partitionEithers)
 import qualified Data.Foldable as F
 import           Data.Function (fix)
-
-
-
 import           Data.List (intercalate)
-
 import           Data.Map (Map)
 import qualified Data.Map as Map
-
 import           Data.Maybe (maybeToList)
 import           Data.Monoid ((<>))
 import           Data.Set (Set)
 import qualified Data.Set as Set
-
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8)
 import qualified Data.Text.IO as T
-
-
 import           Data.Typeable (Typeable)
 import           Data.Word (Word64)
-
-
-                                                   flagDefault, flagManual,
-                                                   flagName, genPackageFlags,
-                                                   executables, exeName, library, libBuildInfo, buildable)
 import           Network.HTTP.Download
 import           Path
 import           Prelude -- Fix AMP warning
-
 import           Stack.GhcPkg
-
 import           Stack.PackageIndex
 import           Stack.Types
 import           System.Directory                (canonicalizePath,
                                                   createDirectoryIfMissing,
                                                   doesDirectoryExist,
                                                   renameDirectory)
-
 import           System.FilePath ((<.>))
-
 import qualified System.FilePath as FP
 import           System.IO                       (IOMode (ReadMode),
                                                   SeekMode (AbsoluteSeek),
                                                   hSeek, withBinaryFile)
-
 
 data FetchException
     = Couldn'tReadIndexTarball FilePath Tar.FormatError
