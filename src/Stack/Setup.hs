@@ -16,7 +16,7 @@ module Stack.Setup
 
 import Control.Applicative
 import Control.Exception (Exception)
-import Data.Maybe (mapMaybe, catMaybes)
+import Data.Maybe (mapMaybe, catMaybes, fromMaybe)
 import Control.Monad (liftM, when)
 import Control.Monad.Catch (MonadThrow, throwM, MonadMask)
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -114,7 +114,8 @@ setupEnv useSystem installIfMissing = do
                 let x = unEnvOverride menv0
                     mpath = Map.lookup "PATH" x
                     path = T.intercalate (T.singleton searchPathSeparator)
-                        $ map T.pack ghcBin ++ maybe [] return mpath
+                        $ map (stripTrailingSlashT . T.pack) ghcBin
+                       ++ maybe [] return mpath
                  in Map.insert "PATH" path x
 
     -- Remove potentially confusing environment variables
@@ -172,7 +173,12 @@ setupEnv useSystem installIfMissing = do
     return bconfig { bcConfig = (bcConfig bconfig) { configEnvOverride = getEnvOverride' } }
   where
     mkPath dirs mpath = T.pack $ intercalate [searchPathSeparator]
-        (map toFilePath dirs ++ maybe [] (return . T.unpack) mpath)
+        (map (stripTrailingSlashS . toFilePath) dirs ++ maybe [] (return . T.unpack) mpath)
+
+    stripTrailingSlashS = T.unpack . stripTrailingSlashT . T.pack
+    stripTrailingSlashT t = fromMaybe t $ T.stripSuffix
+            (T.singleton FP.pathSeparator)
+            t
 
 -- | Ensure GHC is installed and provide the PATHs to add if necessary
 ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env)
