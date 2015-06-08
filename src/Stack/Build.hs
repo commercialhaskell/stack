@@ -71,6 +71,7 @@ import           Path
 import           Path.IO
 import           Prelude hiding (FilePath, writeFile)
 import           Stack.Build.Cache
+import           Stack.Build.Installed
 import           Stack.Build.Types
 import           Stack.BuildPlan
 import           Stack.Constants
@@ -93,8 +94,6 @@ import           System.Process.Read
 import           System.Posix.Files (createSymbolicLink,removeLink)
 #endif
 --}
-data Installed = Library GhcPkgId | Executable
-    deriving (Show, Eq, Ord)
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
 
@@ -102,77 +101,16 @@ type SourceMap = Map PackageName PackageSource
 data PackageSource
     = PSLocal LocalPackage
     | PSUpstream Version Location (Map FlagName Bool)
+instance PackageInstallInfo PackageSource where
+    piiVersion (PSLocal lp) = packageVersion $ lpPackage lp
+    piiVersion (PSUpstream v _ _) = v
+
+    piiLocation (PSLocal _) = Local
+    piiLocation (PSUpstream _ loc _) = loc
 
 psVersion :: PackageSource -> Version
 psVersion (PSLocal lp) = packageVersion $ lpPackage lp
 psVersion (PSUpstream v _ _) = v
-
-type InstalledMap = Map PackageName (Version, Location, Installed)
-
--- | Returns the new SourceMap and all of the locally registered packages.
-getInstalled :: M env m
-             => EnvOverride
-             -> Bool -- ^ profiling?
-             -> SourceMap -- ^ does not contain any installed information
-             -> m (InstalledMap, Set GhcPkgId)
-getInstalled menv profiling sourceMap = do
-    snapDBPath <- packageDatabaseDeps
-    localDBPath <- packageDatabaseLocal
-
-    bconfig <- asks getBuildConfig
-
-    mpcache <-
-        if profiling
-            then liftM Just $ loadProfilingCache $ configProfilingCache bconfig
-            else return Nothing
-
-    let loadDatabase' = loadDatabase menv mpcache sourceMap
-    (installedLibs', localInstalled) <-
-        loadDatabase' Nothing [] >>=
-        loadDatabase' (Just (Snap, snapDBPath)) . fst >>=
-        loadDatabase' (Just (Local, localDBPath)) . fst
-    let installedLibs = M.fromList $ map lhPair installedLibs'
-
-    case mpcache of
-        Nothing -> return ()
-        Just pcache -> saveProfilingCache (configProfilingCache bconfig) pcache
-
-    -- Add in the executables that are installed, making sure to only trust a
-    -- listed installation under the right circumstances (see below)
-    let exesToSM loc = Map.unions . map (exeToSM loc)
-        exeToSM loc (PackageIdentifier name version) =
-            case Map.lookup name sourceMap of
-                -- Doesn't conflict with anything, so that's OK
-                Nothing -> m
-                Just ps
-                    -- Not the version we want, ignore it
-                    | version /= psVersion ps -> Map.empty
-                    | otherwise -> case ps of
-                        {- FIXME revisit this logic
-                        -- Never mark locals as installed, instead do dirty
-                        -- checking
-                        PSLocal _ -> Map.empty
-
-                        -- FIXME start recording build flags for installed
-                        -- executables, and only count as installed if it
-                        -- matches
-
-                        PSUpstream loc' _flags | loc == loc' -> Map.empty
-                        -}
-
-                        -- Passed all the tests, mark this as installed!
-                        _ -> m
-          where
-            m = Map.singleton name (version, loc, Executable)
-    exesSnap <- getInstalledExes Snap
-    exesLocal <- getInstalledExes Local
-    let installedMap = Map.unions
-            [ exesToSM Local exesLocal
-            , exesToSM Snap exesSnap
-            , installedLibs
-            ]
-
-    return (installedMap, localInstalled)
 
 data LocalPackage = LocalPackage
     { lpPackage :: Package
@@ -248,83 +186,6 @@ loadLocals bopts = do
         name `Set.member` names ||
         any (`isParentOf` dir) dirs ||
         any (== dir) dirs
-
-data LoadHelper = LoadHelper
-    { lhId :: !GhcPkgId
-    , lhDeps :: ![GhcPkgId]
-    , lhPair :: !(PackageName, (Version, Location, Installed))
-    }
-    deriving Show
-
--- | Outputs both the modified InstalledMap and the Set of all installed packages in this database
---
--- The goal is to ascertain that the dependencies for a package are present,
--- that it has profiling if necessary, and that it matches the version and
--- location needed by the SourceMap
-loadDatabase :: M env m
-             => EnvOverride
-             -> Maybe ProfilingCache -- ^ if Just, profiling is required
-             -> SourceMap -- ^ to determine which installed things we should include
-             -> Maybe (Location, Path Abs Dir) -- ^ package database, Nothing for global
-             -> [LoadHelper] -- ^ from parent databases
-             -> m ([LoadHelper], Set GhcPkgId)
-loadDatabase menv mpcache sourceMap mdb lhs0 = do
-    (lhs1, gids) <- ghcPkgDump menv (fmap snd mdb)
-                  $ conduitDumpPackage =$ sink
-    let lhs = pruneDeps
-            (packageIdentifierName . ghcPkgIdPackageIdentifier)
-            lhId
-            lhDeps
-            const
-            (lhs0 ++ lhs1)
-    return (map (\lh -> lh { lhDeps = [] }) $ Map.elems lhs, Set.fromList gids)
-  where
-    conduitCache =
-        case mpcache of
-            Just pcache -> addProfiling pcache
-            -- Just an optimization to avoid calculating the profiling
-            -- values when they aren't necessary
-            Nothing -> CL.map (\dp -> dp { dpProfiling = False })
-    sinkDP = conduitCache
-          =$ CL.mapMaybe (isAllowed mpcache sourceMap (fmap fst mdb))
-          =$ CL.consume
-    sinkGIDs = CL.map dpGhcPkgId =$ CL.consume
-    sink = getZipSink $ (,)
-        <$> ZipSink sinkDP
-        <*> ZipSink sinkGIDs
-
--- | Check if a can be included in the set of installed packages or not, based
--- on the package selections made by the user. This does not perform any
--- dirtiness or flag change checks.
-isAllowed mpcache sourceMap mloc dp
-    -- Check that it can do profiling if necessary
-    | isJust mpcache && not (dpProfiling dp) = Nothing
-    | toInclude = Just LoadHelper
-        { lhId = gid
-        , lhDeps = dpDepends dp
-        , lhPair = (name, (version, fromMaybe Snap mloc, Library gid))
-        }
-    | otherwise = Nothing
-  where
-    toInclude =
-        case Map.lookup name sourceMap of
-            -- The sourceMap has nothing to say about this package, so we can use it
-            Nothing -> True
-
-            Just ps ->
-                version == psVersion ps -- only accept the desired version
-                && checkLocation (targetLocation ps)
-
-    targetLocation (PSLocal _) = Local
-    targetLocation (PSUpstream _ loc _) = loc
-
-    -- Ensure that the installed location matches where the sourceMap says it
-    -- should be installed
-    checkLocation Snap = mloc /= Just Local -- we can allow either global or snap
-    checkLocation Local = mloc == Just Local
-
-    gid = dpGhcPkgId dp
-    PackageIdentifier name version = ghcPkgIdPackageIdentifier gid
 
 data BaseConfigOpts = BaseConfigOpts
     { bcoSnapDB :: !(Path Abs Dir)

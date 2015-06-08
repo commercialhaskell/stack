@@ -3,7 +3,20 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
 -- | Cache information about previous builds
-module Stack.Build.Cache where
+module Stack.Build.Cache
+    ( tryGetBuildCache
+    , tryGetConfigCache
+    , getPackageFileModTimes
+    , getInstalledExes
+    , buildCacheTimes
+    , ConfigCache (..)
+    , tryGetFlagCache
+    , deleteCaches
+    , markExeInstalled
+    , writeFlagCache
+    , writeBuildCache
+    , writeConfigCache
+    ) where
 
 import           Control.Exception.Enclosed (handleIO, tryIO)
 import           Control.Monad              (liftM)

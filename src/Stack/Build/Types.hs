@@ -233,3 +233,9 @@ newtype PkgDepsOracle =
 -- | A location to install a package into, either snapshot or local
 data Location = Snap | Local
     deriving (Show, Eq)
+
+-- | Datatype which tells how which version of a package to install and where
+-- to install it into
+class PackageInstallInfo a where
+    piiVersion :: a -> Version
+    piiLocation :: a -> Location
