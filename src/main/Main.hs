@@ -23,7 +23,6 @@ import           Data.Maybe (isJust)
 import           Data.Monoid
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
-import           Distribution.Text (display)
 import           Network.HTTP.Client
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Simple
@@ -39,7 +38,6 @@ import           Stack.Constants
 import qualified Stack.Docker as Docker
 import           Stack.Fetch
 import           Stack.GhcPkg (envHelper)
-import           Stack.Package
 import qualified Stack.PackageIndex
 import           Stack.Path
 import           Stack.Setup
