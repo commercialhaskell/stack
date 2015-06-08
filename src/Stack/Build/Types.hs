@@ -28,6 +28,8 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Text.Encoding (decodeUtf8With)
+import Data.Text.Encoding.Error (lenientDecode)
 import Distribution.Package (Dependency)
 import Distribution.Text (display)
 import GHC.Generics
@@ -232,19 +234,22 @@ data CabalExitedUnsuccessfully = CabalExitedUnsuccessfully
 instance Exception CabalExitedUnsuccessfully
 
 instance Show CabalExitedUnsuccessfully where
-  show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles _) =
+  show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bs) =
     let fullCmd = (dropQuotes (show execName) ++ " " ++ (unwords fullArgs))
         logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ show fp) logFiles
     in "\n--  Exception: CabalExitedUnsuccessfully\n" ++
        "    While building package " ++ dropQuotes (show taskProvides') ++ " using:\n" ++
        "      " ++ fullCmd ++ "\n" ++
        "    Process exited with code: " ++ show exitCode ++
-       logLocations
+       logLocations ++
+       (if S.null bs
+            then ""
+            else "\n" ++ doubleIndent (T.unpack $ decodeUtf8With lenientDecode bs))
      where
       -- appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
-      -- indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
+      indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
       dropQuotes = filter ('\"' /=)
-      -- doubleIndent = indent . indent
+      doubleIndent = indent . indent
 
 
 ----------------------------------------------
