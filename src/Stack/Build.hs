@@ -39,7 +39,6 @@ import qualified Data.Set as S
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
 import           Distribution.Package (Dependency (..))
 import           Distribution.Version (intersectVersionRanges, anyVersion)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
@@ -49,6 +48,7 @@ import           Prelude hiding (FilePath, writeFile)
 import           Stack.Build.Cache
 import           Stack.Build.Execute
 import           Stack.Build.Installed
+import           Stack.Build.LocalPackage
 import           Stack.Build.Types
 import           Stack.BuildPlan
 import           Stack.Constants
@@ -57,7 +57,6 @@ import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal
-import           System.Directory hiding (findFiles, findExecutable)
 
 {- EKB TODO: doc generation for stack-doc-server
 #ifndef mingw32_HOST_OS
@@ -77,71 +76,6 @@ instance PackageInstallInfo PackageSource where
 
     piiLocation (PSLocal _) = Local
     piiLocation (PSUpstream _ loc _) = loc
-
-loadLocals :: M env m
-           => BuildOpts
-           -> m [LocalPackage]
-loadLocals bopts = do
-    targets <- mapM parseTarget $
-        case boptsTargets bopts of
-            Left [] -> ["."]
-            Left x -> x
-            Right _ -> []
-    (dirs, names0) <- case partitionEithers targets of
-        ([], targets') -> return $ partitionEithers targets'
-        (bad, _) -> throwM $ Couldn'tParseTargets bad
-    let names = Set.fromList names0
-
-    bconfig <- asks getBuildConfig
-    lps <- forM (Set.toList $ bcPackages bconfig) $ \dir -> do
-        cabalfp <- getCabalFileName dir
-        name <- parsePackageNameFromFilePath cabalfp
-        let wanted = isWanted dirs names dir name
-        pkg <- readPackage
-            PackageConfig
-                { packageConfigEnableTests = wanted && boptsFinalAction bopts == DoTests
-                , packageConfigEnableBenchmarks = wanted && boptsFinalAction bopts == DoBenchmarks
-                , packageConfigFlags = localFlags bopts bconfig name
-                , packageConfigGhcVersion = bcGhcVersion bconfig
-                , packageConfigPlatform = configPlatform $ getConfig bconfig
-                }
-            cabalfp
-        when (packageName pkg /= name) $ throwM
-            $ MismatchedCabalName cabalfp (packageName pkg)
-        mbuildCache <- tryGetBuildCache dir
-        mconfigCache <- tryGetConfigCache dir
-        fileModTimes <- getPackageFileModTimes pkg cabalfp
-        return LocalPackage
-            { lpPackage = pkg
-            , lpWanted = wanted
-            , lpLastConfigOpts =
-                  fmap (map T.decodeUtf8 . configCacheOpts) mconfigCache
-            , lpDirtyFiles =
-                  maybe True
-                        ((/= fileModTimes) . buildCacheTimes)
-                        mbuildCache
-            , lpCabalFile = cabalfp
-            , lpDir = dir
-            }
-
-    let known = Set.fromList $ map (packageName . lpPackage) lps
-        unknown = Set.difference names known
-    unless (Set.null unknown) $ throwM $ UnknownTargets $ Set.toList unknown
-
-    return lps
-  where
-    parseTarget t = do
-        let s = T.unpack t
-        isDir <- liftIO $ doesDirectoryExist s
-        if isDir
-            then liftM (Right . Left) $ liftIO (canonicalizePath s) >>= parseAbsDir
-            else return $ case parsePackageNameFromString s of
-                     Left _ -> Left t
-                     Right pname -> Right $ Right pname
-    isWanted dirs names dir name =
-        name `Set.member` names ||
-        any (`isParentOf` dir) dirs ||
-        any (== dir) dirs
 
 data AddDepRes
     = ADRToInstall Task
@@ -430,12 +364,6 @@ build bopts = do
         else executePlan menv bopts baseConfigOpts cabalPkgVer locals plan
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
-
--- | All flags for a local package
-localFlags :: BuildOpts -> BuildConfig -> PackageName -> Map FlagName Bool
-localFlags bopts bconfig name = M.union
-    (fromMaybe M.empty $ M.lookup name $ boptsFlags bopts)
-    (fromMaybe M.empty $ M.lookup name $ bcFlags bconfig)
 
 -- | Package config to be used for dependencies
 depPackageConfig :: BuildConfig -> Map FlagName Bool -> PackageConfig
