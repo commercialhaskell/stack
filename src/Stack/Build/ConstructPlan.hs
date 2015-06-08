@@ -11,7 +11,8 @@ module Stack.Build.ConstructPlan
 import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Reader         (MonadReader)
+import           Control.Monad.Reader         (MonadReader, ReaderT, ask, asks,
+                                               runReaderT)
 import           Control.Monad.State.Strict
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Char8        as S8
@@ -47,13 +48,23 @@ adrVersion :: AddDepRes -> Version
 adrVersion (ADRToInstall task) = packageIdentifierVersion $ taskProvides task
 adrVersion (ADRFound v _) = v
 
-data Ctx m = Ctx
-    { mbp :: !MiniBuildPlan
+data Ctx = Ctx
+    { mbp            :: !MiniBuildPlan
     , baseConfigOpts :: !BaseConfigOpts
-    , loadPackage :: !(PackageName -> Version -> Map FlagName Bool -> m Package)
-    , sourceMap :: !SourceMap
-    , installedMap :: !InstalledMap
+    , loadPackage    :: !(PackageName -> Version -> Map FlagName Bool -> IO Package)
+    , sourceMap      :: !SourceMap
+    , installedMap   :: !InstalledMap
+    , toolToPackages :: !(Dependency -> Map PackageName VersionRange)
+    , ctxBuildConfig :: !BuildConfig
     }
+
+instance HasStackRoot Ctx
+instance HasPlatform Ctx
+instance HasConfig Ctx
+instance HasBuildConfig Ctx where
+    getBuildConfig = ctxBuildConfig
+
+type M = StateT S (ReaderT Ctx IO)
 
 constructPlan :: forall env m.
                  (MonadThrow m, MonadReader env m, HasBuildConfig env, MonadIO m)
@@ -62,12 +73,13 @@ constructPlan :: forall env m.
               -> [LocalPackage]
               -> [PackageName] -- ^ additional packages that must be built
               -> Set GhcPkgId -- ^ locally registered
-              -> (PackageName -> Version -> Map FlagName Bool -> m Package) -- ^ load upstream package
+              -> (PackageName -> Version -> Map FlagName Bool -> IO Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
               -> m Plan
 constructPlan mbp0 baseConfigOpts0 locals extraToBuild locallyRegistered loadPackage0 sourceMap0 installedMap0 = do
-    m <- flip execStateT M.empty $ do
+    bconfig <- asks getBuildConfig
+    m <- liftIO $ flip runReaderT (ctx bconfig) $ flip execStateT M.empty $ do
         let allTargets = Set.fromList
                        $ map (packageName . lpPackage) locals ++ extraToBuild
         mapM_ (addDep []) $ Set.toList allTargets
@@ -84,173 +96,200 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild locallyRegistered loadPac
                 }
         (errs, _) -> throwM $ ConstructPlanExceptions errs
   where
-    _ctx@Ctx {..} = Ctx
+    ctx bconfig = Ctx
         { mbp = mbp0
         , baseConfigOpts = baseConfigOpts0
         , loadPackage = loadPackage0
         , sourceMap = sourceMap0
         , installedMap = installedMap0
+        , toolToPackages = \ (Dependency name _) ->
+            Map.fromList
+          $ map (, anyVersion)
+          $ maybe [] Set.toList
+          $ Map.lookup (S8.pack . packageNameString . fromCabalPackageName $ name) toolMap
+        , ctxBuildConfig = bconfig
         }
-    addDep :: [PackageName] -- ^ call stack
+    toolMap = getToolMap mbp0
+
+addDep :: [PackageName]
+       -> PackageName
+       -> M (Either ConstructPlanException AddDepRes)
+addDep callStack name = do
+    m <- get
+    case M.lookup name m of
+        Just res -> return res
+        Nothing -> do
+            res <- addDep' callStack name
+            modify $ Map.insert name res
+            return res
+
+addDep' :: [PackageName]
+        -> PackageName
+        -> M (Either ConstructPlanException AddDepRes)
+addDep' callStack name | name `elem` callStack =
+    return $ Left $ DependencyCycleDetected $ name : callStack
+addDep' callStack0 name = do
+    Ctx {..} <- ask
+    case M.lookup name installedMap of
+        Nothing ->
+            case M.lookup name sourceMap of
+                Nothing -> return $ Left $ UnknownPackage name
+                Just (PSLocal lp) -> installLocalPackage callStack lp
+                Just (PSUpstream version loc flags) -> installUpstream callStack name version loc flags
+        Just (version, Snap, installed) -> return $ Right $ ADRFound version installed
+        Just (version, Local, installed) -> checkDirty callStack name version installed
+  where
+    callStack = name : callStack0
+
+installLocalPackage :: [PackageName]
+                    -> LocalPackage
+                    -> M (Either ConstructPlanException AddDepRes)
+installLocalPackage callStack lp = do
+    Ctx {..} <- ask
+    eres <- checkPackage callStack (lpPackage lp)
+    case eres of
+        Left e -> return $ Left e
+        Right (present, missing) -> return $ Right $ ADRToInstall Task
+            { taskProvides = PackageIdentifier
+                (packageName $ lpPackage lp)
+                (packageVersion $ lpPackage lp)
+            , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
+                let allDeps = Set.union present missing'
+                 in configureOpts
+                        baseConfigOpts
+                        allDeps
+                        (lpWanted lp)
+                        Local
+                        (packageFlags $ lpPackage lp)
+            , taskType = TTLocal lp AllSteps
+            }
+
+installUpstream :: [PackageName]
+                -> PackageName
+                -> Version
+                -> Location
+                -> Map FlagName Bool
+                -> M (Either ConstructPlanException AddDepRes)
+installUpstream callStack name version loc flags = do
+    Ctx {..} <- ask
+    package <- liftIO $ loadPackage name version flags
+    eres <- checkPackage callStack package
+    case eres of
+        Left e -> return $ Left e
+        Right (present, missing) -> return $ Right $ ADRToInstall Task
+            { taskProvides = PackageIdentifier name version
+            , taskType = TTUpstream package loc
+            , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
+                let allDeps = Set.union present missing'
+                 in configureOpts
+                        baseConfigOpts
+                        allDeps
+                        False
+                        loc
+                        flags
+            }
+
+-- Check if a locally installed package is dirty and must be reinstalled
+checkDirty :: [PackageName]
            -> PackageName
-           -> StateT S m (Either ConstructPlanException AddDepRes)
-    addDep callStack name = do
-        m <- get
-        case M.lookup name m of
-            Just res -> return res
-            Nothing -> do
-                res <- addDep' callStack name
-                modify $ Map.insert name res
-                return res
+           -> Version
+           -> Installed
+           -> M (Either ConstructPlanException AddDepRes)
+checkDirty callStack name version installed = do
+    Ctx {..} <- ask
+    case M.lookup name sourceMap of
+        Nothing -> return $ Right $ ADRFound version installed
+        Just (PSLocal lp) -> assert (version == packageVersion (lpPackage lp)) $ do
+            cpr <- checkPackage callStack $ lpPackage lp
+            case cpr of
+                Left e -> return $ Left e
+                Right (present, missing) -> do
+                    let configOpts = configureOpts baseConfigOpts present (lpWanted lp) Local (packageFlags $ lpPackage lp)
+                    let mneededSteps
+                            | not $ Set.null missing = Just AllSteps
+                            | Just configOpts /= lpLastConfigOpts lp
+                                = Just AllSteps
+                            | lpDirtyFiles lp = Just SkipConfig
+                            | lpWanted lp = Just JustFinal -- FIXME this currently causes too much recompilation
+                            | otherwise = Nothing
+                    return $ Right $
+                        case mneededSteps of
+                            Nothing -> ADRFound version installed
+                            Just neededSteps -> ADRToInstall Task
+                                { taskProvides = PackageIdentifier name version
+                                , taskType = TTLocal lp neededSteps
+                                , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
+                                    let allDeps = Set.union present missing'
+                                     in configureOpts
+                                            baseConfigOpts
+                                            allDeps
+                                            (lpWanted lp)
+                                            Local
+                                            (packageFlags $ lpPackage lp)
+                                }
+        Just (PSUpstream version' loc flags) -> assert (version == version') $
+            case loc of
+                Snap -> return $ Right $ ADRFound version installed
+                Local -> do
+                    package <- liftIO $ loadPackage name version flags
+                    eres <- checkPackage callStack package
+                    let toInstall present missing = Right $ ADRToInstall Task
+                                { taskProvides = PackageIdentifier name version
+                                , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
+                                    let allDeps = Set.union present missing'
+                                     in configureOpts
+                                            baseConfigOpts
+                                            allDeps
+                                            False
+                                            Local
+                                            (packageFlags package)
+                                , taskType = TTUpstream package loc
+                                }
+                    case eres of
+                        Left e -> return $ Left e
+                        Right (present, missing)
+                            | Set.null missing ->
+                                case installed of
+                                    Library gid -> do
+                                        oldFlags <- tryGetFlagCache gid
+                                        if oldFlags == Just flags
+                                            then return $ Right $ ADRFound version installed
+                                            else return $ toInstall present missing
+                                    Executable -> return $ Right $ ADRFound version installed -- TODO track flags for executables too
+                            | otherwise -> return $ toInstall present missing
 
-    addDep' callStack name | name `elem` callStack =
-        return $ Left $ DependencyCycleDetected $ name : callStack
-    addDep' callStack0 name = do
-        case M.lookup name installedMap of
-            Nothing ->
-                case M.lookup name sourceMap of
-                    Nothing -> return $ Left $ UnknownPackage name
-                    Just (PSLocal lp) -> installLocalPackage callStack lp
-                    Just (PSUpstream version loc flags) -> installUpstream callStack name version loc flags
-            Just (version, Snap, installed) -> return $ Right $ ADRFound version installed
-            Just (version, Local, installed) -> checkDirty callStack name version installed
-      where
-        callStack = name : callStack0
-
-    installLocalPackage callStack lp = do
-        eres <- checkPackage callStack (lpPackage lp)
+-- Check all of the dependencies for the given package
+checkPackage :: [PackageName] -- ^ call stack
+             -> Package
+             -> M (Either ConstructPlanException (Set GhcPkgId, Set PackageIdentifier))
+checkPackage callStack package = do
+    allDeps <- packageDepsWithTools package
+    eress <- forM (M.toList allDeps) $ \(name, range) -> do
+        eres <- addDep callStack name
         case eres of
-            Left e -> return $ Left e
-            Right (present, missing) -> return $ Right $ ADRToInstall Task
-                { taskProvides = PackageIdentifier
-                    (packageName $ lpPackage lp)
-                    (packageVersion $ lpPackage lp)
-                , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
-                    let allDeps = Set.union present missing'
-                     in configureOpts
-                            baseConfigOpts
-                            allDeps
-                            (lpWanted lp)
-                            Local
-                            (packageFlags $ lpPackage lp)
-                , taskType = TTLocal lp AllSteps
-                }
+            Left _e -> return $ Left name -- FIXME do something better with this?
+            Right adr
+                | adrVersion adr `withinRange` range -> return $ Right adr
+                | otherwise -> do
+                    -- TODO change exception setup so we can give a meaningful error message about ranges here
+                    return $ Left name
+    case partitionEithers eress of
+        ([], adrs) ->
+            let loop present missing [] = (present, missing)
+                loop present missing (x:xs) =
+                    case x of
+                        ADRToInstall t -> loop present (Set.insert (taskProvides t) missing) xs
+                        ADRFound _ Executable -> loop present missing xs
+                        ADRFound _ (Library gid) -> loop (Set.insert gid present) missing xs
+             in return $ Right $ loop Set.empty Set.empty adrs
+        (errs, _) -> return $ Left $ DependencyPlanFailures (packageName package) (Set.fromList errs)
 
-    installUpstream callStack name version loc flags = do
-        package <- lift $ loadPackage name version flags
-        eres <- checkPackage callStack package
-        case eres of
-            Left e -> return $ Left e
-            Right (present, missing) -> return $ Right $ ADRToInstall Task
-                { taskProvides = PackageIdentifier name version
-                , taskType = TTUpstream package loc
-                , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
-                    let allDeps = Set.union present missing'
-                     in configureOpts
-                            baseConfigOpts
-                            allDeps
-                            False
-                            loc
-                            flags
-                }
-
-    -- Check if a locally installed package is dirty and must be reinstalled
-    checkDirty callStack name version installed =
-        case M.lookup name sourceMap of
-            Nothing -> return $ Right $ ADRFound version installed
-            Just (PSLocal lp) -> assert (version == packageVersion (lpPackage lp)) $ do
-                cpr <- checkPackage callStack $ lpPackage lp
-                case cpr of
-                    Left e -> return $ Left e
-                    Right (present, missing) -> do
-                        let configOpts = configureOpts baseConfigOpts present (lpWanted lp) Local (packageFlags $ lpPackage lp)
-                        let mneededSteps
-                                | not $ Set.null missing = Just AllSteps
-                                | Just configOpts /= lpLastConfigOpts lp
-                                    = Just AllSteps
-                                | lpDirtyFiles lp = Just SkipConfig
-                                | lpWanted lp = Just JustFinal -- FIXME this currently causes too much recompilation
-                                | otherwise = Nothing
-                        return $ Right $
-                            case mneededSteps of
-                                Nothing -> ADRFound version installed
-                                Just neededSteps -> ADRToInstall Task
-                                    { taskProvides = PackageIdentifier name version
-                                    , taskType = TTLocal lp neededSteps
-                                    , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
-                                        let allDeps = Set.union present missing'
-                                         in configureOpts
-                                                baseConfigOpts
-                                                allDeps
-                                                (lpWanted lp)
-                                                Local
-                                                (packageFlags $ lpPackage lp)
-                                    }
-            Just (PSUpstream version' loc flags) -> assert (version == version') $
-                case loc of
-                    Snap -> return $ Right $ ADRFound version installed
-                    Local -> do
-                        package <- lift $ loadPackage name version flags
-                        eres <- checkPackage callStack package
-                        let toInstall present missing = Right $ ADRToInstall Task
-                                    { taskProvides = PackageIdentifier name version
-                                    , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
-                                        let allDeps = Set.union present missing'
-                                         in configureOpts
-                                                baseConfigOpts
-                                                allDeps
-                                                False
-                                                Local
-                                                (packageFlags package)
-                                    , taskType = TTUpstream package loc
-                                    }
-                        case eres of
-                            Left e -> return $ Left e
-                            Right (present, missing)
-                                | Set.null missing ->
-                                    case installed of
-                                        Library gid -> do
-                                            oldFlags <- tryGetFlagCache gid
-                                            if oldFlags == Just flags
-                                                then return $ Right $ ADRFound version installed
-                                                else return $ toInstall present missing
-                                        Executable -> return $ Right $ ADRFound version installed -- TODO track flags for executables too
-                                | otherwise -> return $ toInstall present missing
-
-    -- Check all of the dependencies for the given package
-    checkPackage :: [PackageName] -- ^ call stack
-                 -> Package
-                 -> StateT S m (Either ConstructPlanException (Set GhcPkgId, Set PackageIdentifier))
-    checkPackage callStack package = do
-        eress <- forM (M.toList $ packageDepsWithTools package) $ \(name, range) -> do
-            eres <- addDep callStack name
-            case eres of
-                Left _e -> return $ Left name -- FIXME do something better with this?
-                Right adr
-                    | adrVersion adr `withinRange` range -> return $ Right adr
-                    | otherwise -> do
-                        -- TODO change exception setup so we can give a meaningful error message about ranges here
-                        return $ Left name
-        case partitionEithers eress of
-            ([], adrs) ->
-                let loop present missing [] = (present, missing)
-                    loop present missing (x:xs) =
-                        case x of
-                            ADRToInstall t -> loop present (Set.insert (taskProvides t) missing) xs
-                            ADRFound _ Executable -> loop present missing xs
-                            ADRFound _ (Library gid) -> loop (Set.insert gid present) missing xs
-                 in return $ Right $ loop Set.empty Set.empty adrs
-            (errs, _) -> return $ Left $ DependencyPlanFailures (packageName package) (Set.fromList errs)
-
-    toolMap = getToolMap mbp
-    toolToPackages (Dependency name _) =
-        Map.fromList
-      $ map (, anyVersion)
-      $ maybe [] Set.toList
-      $ Map.lookup (S8.pack . packageNameString . fromCabalPackageName $ name) toolMap
-    packageDepsWithTools p = Map.unionsWith intersectVersionRanges
-        $ packageDeps p
-        : map toolToPackages (packageTools p)
+packageDepsWithTools :: Package -> M (Map PackageName VersionRange)
+packageDepsWithTools p = do
+    ctx <- ask
+    return $ Map.unionsWith intersectVersionRanges
+           $ packageDeps p
+           : map (toolToPackages ctx) (packageTools p)
 
 mkUnregisterLocal :: Map PackageName Task -> Set GhcPkgId -> Set GhcPkgId
 mkUnregisterLocal tasks locallyRegistered =

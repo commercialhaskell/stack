@@ -92,7 +92,7 @@ mkBaseConfigOpts bopts = do
 -- | Provide a function for loading package information from the package index
 withLoadPackage :: M env m
                 => EnvOverride
-                -> ((PackageName -> Version -> Map FlagName Bool -> m Package) -> m a)
+                -> ((PackageName -> Version -> Map FlagName Bool -> IO Package) -> m a)
                 -> m a
 withLoadPackage menv inner = do
     bconfig <- asks getBuildConfig
