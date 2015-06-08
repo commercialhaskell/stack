@@ -1,6 +1,7 @@
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
 -- | Construct a @Plan@ for how to build
@@ -50,6 +51,14 @@ adrVersion :: AddDepRes -> Version
 adrVersion (ADRToInstall task) = packageIdentifierVersion $ taskProvides task
 adrVersion (ADRFound v _) = v
 
+data Ctx m = Ctx
+    { mbp :: !MiniBuildPlan
+    , baseConfigOpts :: !BaseConfigOpts
+    , loadPackage :: !(PackageName -> Version -> Map FlagName Bool -> m Package)
+    , sourceMap :: !SourceMap
+    , installedMap :: !InstalledMap
+    }
+
 constructPlan :: forall env m.
                  M env m
               => MiniBuildPlan
@@ -61,7 +70,7 @@ constructPlan :: forall env m.
               -> SourceMap
               -> InstalledMap
               -> m Plan
-constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered loadPackage sourceMap installedMap = do
+constructPlan mbp0 baseConfigOpts0 locals extraToBuild locallyRegistered loadPackage0 sourceMap0 installedMap0 = do
     m <- flip execStateT M.empty $ do
         let allTargets = Set.fromList
                        $ map (packageName . lpPackage) locals ++ extraToBuild
@@ -79,6 +88,13 @@ constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered loadPacka
                 }
         (errs, _) -> throwM $ ConstructPlanExceptions errs
   where
+    _ctx@Ctx {..} = Ctx
+        { mbp = mbp0
+        , baseConfigOpts = baseConfigOpts0
+        , loadPackage = loadPackage0
+        , sourceMap = sourceMap0
+        , installedMap = installedMap0
+        }
     addDep :: [PackageName] -- ^ call stack
            -> PackageName
            -> StateT S m (Either ConstructPlanException AddDepRes)
