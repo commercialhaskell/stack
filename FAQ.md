@@ -163,4 +163,6 @@ This will use a Docker image tagged with the same LTS version as your resolver.
 Note that the Docker images are really big (approx. 10 GB), and not all LTS
 versions have a Docker image (they tend to lag behind).  We also recommend
 against using this with Docker's _devicemapper_ storage driver, since its
-default settings have trouble with images this big.
+default settings have trouble with images this big.  Finally, this is currently
+only supported with a Docker daemon running directly on the host (so
+boot2docker will not work).
