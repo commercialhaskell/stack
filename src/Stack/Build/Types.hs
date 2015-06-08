@@ -144,14 +144,14 @@ instance Show ConstructPlanException where
   show e =
     let details = case e of
          (DependencyCycleDetected pNames) ->
-           "  While checking call stack,\n" ++
+           "While checking call stack,\n" ++
            "  dependency cycle detected in packages:" ++ indent (appendLines pNames)
          (DependencyPlanFailures pName (Map.toList -> pDeps)) ->
-           "  Failure when adding dependencies:" ++ doubleIndent (appendDeps pDeps) ++ "\n" ++
+           "Failure when adding dependencies:" ++ doubleIndent (appendDeps pDeps) ++ "\n" ++
            "  needed for package: " ++ show pName
          (UnknownPackage pName) ->
-             "  While attempting to add dependency,\n" ++
-             "  Could not find package " ++ show pName  ++ "in known packages"
+             "While attempting to add dependency,\n" ++
+             "  Could not find package " ++ show pName  ++ " in known packages"
     in indent details
      where
       appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
