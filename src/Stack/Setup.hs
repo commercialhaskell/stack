@@ -21,7 +21,7 @@ import           Control.Monad.Catch (MonadThrow, throwM, MonadMask)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, ReaderT (..), asks)
-import           Control.Monad.Trans.Class
+
 import           Data.Aeson
 import qualified Data.ByteString.Char8 as S8
 import           Data.Conduit (($$))

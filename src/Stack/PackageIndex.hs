@@ -32,7 +32,7 @@ import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger                  (MonadLogger, logDebug,
                                                         logInfo, logWarn)
 import           Control.Monad.Reader (asks)
-import           Control.Monad.Trans.Class
+
 import           Data.Aeson
 import qualified Data.Binary as Binary
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
@@ -49,20 +49,20 @@ import qualified Data.Map as Map
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text (Text)
-import qualified Data.Text as T
+
+
 import           Data.Text.Encoding (encodeUtf8)
-import           Data.Text.Encoding (encodeUtf8)
+
 import           Data.Traversable (forM)
-import           Data.Traversable (forM)
+
 import           Data.Typeable (Typeable)
-import           Data.Typeable (Typeable)
+
 import           Data.Word (Word64)
-import           Data.Word (Word64)
-import           Distribution.ParseUtils (PError)
-import qualified Distribution.Text as DT
+
+
+
 import           GHC.Generics (Generic)
-import           GHC.Generics (Generic)
+
 import           Network.HTTP.Download
 import           Path                                  (mkRelDir, parent,
                                                         parseRelDir, toFilePath,

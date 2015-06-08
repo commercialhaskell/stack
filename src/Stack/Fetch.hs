@@ -20,58 +20,89 @@ module Stack.Fetch
     , withCabalLoader
     ) where
 
-import qualified Codec.Archive.Tar               as Tar
-import qualified Codec.Archive.Tar.Check         as Tar
-import           Codec.Compression.GZip          (decompress)
+import qualified Codec.Archive.Tar as Tar
+import qualified Codec.Archive.Tar.Check as Tar
+import           Codec.Compression.GZip (decompress)
 import           Control.Applicative
-import           Control.Concurrent.Async        (Concurrently (..))
+
+import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Concurrent.STM          (TVar, atomically, modifyTVar,
                                                   newTVarIO, readTVar,
                                                   readTVarIO, writeTVar)
-import           Control.Exception               (Exception, SomeException,
+
                                                   toException)
-import           Control.Monad                   (liftM, when, join, unless, void)
-import           Control.Monad.Catch             (MonadThrow, throwM)
+
+
+import           Control.Monad (liftM, forM)
+import           Control.Monad (liftM, when, join, unless, void)
+import           Control.Monad.Catch
+
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import           Control.Monad.Reader (asks)
+import           Control.Monad.Reader (runReaderT,asks)
+
+                                                   put)
+
 import           Control.Monad.Trans.Control
-import           Control.Monad.Reader            (runReaderT,asks)
-import           Crypto.Hash                     (SHA512(..))
-import           Data.ByteString                 (ByteString)
-import qualified Data.ByteString                 as S
-import qualified Data.ByteString.Char8           as C8
-import qualified Data.ByteString.Lazy            as L
-import           Data.Either                     (partitionEithers)
-import qualified Data.Foldable                   as F
-import           Data.Function                   (fix)
-import           Data.List                       (intercalate)
-import           Data.Map                        (Map)
-import qualified Data.Map                        as Map
-import           Data.Maybe                      (maybeToList)
-import           Data.Monoid                     ((<>))
-import           Data.Set                        (Set)
-import qualified Data.Set                        as Set
-import qualified Data.Text                       as T
-import qualified Data.Text.IO                    as T
-import           Data.Text.Encoding              (decodeUtf8)
-import           Data.Typeable                   (Typeable)
-import           Data.Word                       (Word64)
+
+import           Crypto.Hash (SHA512(..))
+
+
+
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString as S
+import qualified Data.ByteString.Char8 as C8
+
+import qualified Data.ByteString.Lazy as L
+import           Data.Either (partitionEithers)
+import qualified Data.Foldable as F
+import           Data.Function (fix)
+
+
+
+import           Data.List (intercalate)
+
+import           Data.Map (Map)
+import qualified Data.Map as Map
+
+import           Data.Maybe (maybeToList)
+import           Data.Monoid ((<>))
+import           Data.Set (Set)
+import qualified Data.Set as Set
+
+import qualified Data.Text as T
+import           Data.Text.Encoding (decodeUtf8)
+import qualified Data.Text.IO as T
+
+
+import           Data.Typeable (Typeable)
+import           Data.Word (Word64)
+
+
+                                                   flagDefault, flagManual,
+                                                   flagName, genPackageFlags,
+                                                   executables, exeName, library, libBuildInfo, buildable)
 import           Network.HTTP.Download
+import           Path
 import           Prelude -- Fix AMP warning
+
+import           Stack.GhcPkg
+
 import           Stack.PackageIndex
 import           Stack.Types
-
-import           Path
 import           System.Directory                (canonicalizePath,
                                                   createDirectoryIfMissing,
                                                   doesDirectoryExist,
                                                   renameDirectory)
-import           System.FilePath                 ((<.>))
-import qualified System.FilePath                 as FP
+
+import           System.FilePath ((<.>))
+
+import qualified System.FilePath as FP
 import           System.IO                       (IOMode (ReadMode),
                                                   SeekMode (AbsoluteSeek),
                                                   hSeek, withBinaryFile)
-import           System.Process.Read             (EnvOverride)
+
 
 data FetchException
     = Couldn'tReadIndexTarball FilePath Tar.FormatError
@@ -338,26 +369,6 @@ fetchPackages mdistDir toFetchAll = do
                 -- TODO: logInfo
                 liftIO $ T.putStrLn $ packageIdentifierText ident <> ": downloading"
         _ <- verifiedDownload downloadReq destpath progressSink
-        errMay <- liftIO $ do
-            (flip runReaderT man (verifiedDownload downloadReq destpath progressSink) >> return Nothing)
-                `catch` \e -> case e of
-                    WrongContentLength _ actual -> return $ Just $ InvalidDownloadSize
-                        { _idsUrl = tfUrl toFetch
-                        , _idsExpected = fromMaybe (error "fetchPackagesImpossible cl") (tfSize toFetch)
-                        , _idsTotalDownloaded = read (show actual) -- TODO(danburton): something better than this
-                        }
-                    WrongStreamLength _ actual -> return $ Just $ InvalidDownloadSize
-                        { _idsUrl = tfUrl toFetch
-                        , _idsExpected = fromMaybe (error "fetchPackagesImpossible sl") (tfSize toFetch)
-                        , _idsTotalDownloaded = fromIntegral actual
-                        }
-                    WrongDigest _ _ actual -> return $ Just $ InvalidSha512
-                        { _ihUrl = tfUrl toFetch
-                        , _ihExpected = fromMaybe (error "fetchPackagesImpossible dg") (tfSHA512 toFetch)
-                        , _ihActual = actual
-                        }
-        maybe (return ()) throwM errMay
->>>>>>> Simplify output messages, leaving details in -v
 
         let fp = toFilePath destpath
         --unlessM (liftIO (doesFileExist fp)) $ do
