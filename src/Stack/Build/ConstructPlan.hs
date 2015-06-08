@@ -179,42 +179,58 @@ addDep'' name = do
         Nothing -> return $ Left $ UnknownPackage name
         Just (PIOnlyInstalled version _ installed) ->
             return $ Right $ ADRFound version installed
-        Just (PIOnlySource ps) -> installPackage AllSteps name ps
+        Just (PIOnlySource ps) -> installPackage Nothing name ps
         Just (PIBoth ps installed) -> do
             mneededSteps <- checkNeededSteps name ps installed
             case mneededSteps of
                 Nothing -> return $ Right $ ADRFound (piiVersion ps) installed
-                Just neededSteps -> installPackage neededSteps name ps
+                Just neededSteps -> installPackage (Just neededSteps) name ps
 
 -- TODO There are a lot of duplicated computations below. I've kept that for
 -- simplicity right now
 
-installPackage :: NeededSteps -> PackageName -> PackageSource -> M (Either ConstructPlanException AddDepRes)
-installPackage neededSteps name ps = assert (neededSteps == AllSteps || piiLocation ps == Local) $ do
+installPackage :: Maybe NeededSteps -> PackageName -> PackageSource -> M (Either ConstructPlanException AddDepRes)
+installPackage mneededSteps name ps = do
     ctx <- ask
     package <- psPackage name ps
     depsRes <- addPackageDeps package
-    return $ case depsRes of
-        Left e -> Left e
-        Right (missing, present) -> Right $ ADRToInstall Task
-            { taskProvides = PackageIdentifier
-                (packageName package)
-                (packageVersion package)
-            , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
-                let allDeps = Set.union present missing'
-                 in configureOpts
-                        (baseConfigOpts ctx)
-                        allDeps
-                        (psWanted ps)
-                        (piiLocation ps)
-                        (packageFlags package)
-            , taskType =
-                case ps of
-                    PSLocal lp -> TTLocal lp neededSteps
-                    PSUpstream _ loc _ ->
-                        assert (neededSteps == AllSteps) $
-                        TTUpstream package loc
-            }
+    case depsRes of
+        Left e -> return $ Left e
+        Right (missing, present) -> do
+            return $ Right $ ADRToInstall Task
+                { taskProvides = PackageIdentifier
+                    (packageName package)
+                    (packageVersion package)
+                , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
+                    let allDeps = Set.union present missing'
+                     in configureOpts
+                            (baseConfigOpts ctx)
+                            allDeps
+                            (psWanted ps)
+                            (piiLocation ps)
+                            (packageFlags package)
+                , taskType =
+                    case ps of
+                        PSLocal lp -> TTLocal lp
+                            $ case mneededSteps of
+                                Just neededSteps -> neededSteps
+                                Nothing ->
+                                    case lpLastConfigOpts lp of
+                                        Nothing -> AllSteps
+                                        Just configOpts
+                                            | not $ Set.null missing -> AllSteps
+                                            | otherwise ->
+                                                let newOpts = configureOpts
+                                                        (baseConfigOpts ctx)
+                                                        present
+                                                        (psWanted ps)
+                                                        (piiLocation ps)
+                                                        (packageFlags package)
+                                                 in if map encodeUtf8 newOpts == configOpts
+                                                        then SkipConfig
+                                                        else AllSteps
+                        PSUpstream _ loc _ -> TTUpstream package loc
+                }
 
 checkNeededSteps :: PackageName -> PackageSource -> Installed -> M (Maybe NeededSteps)
 checkNeededSteps name ps installed = assert (piiLocation ps == Local) $ do
