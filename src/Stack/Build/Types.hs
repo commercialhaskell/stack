@@ -278,16 +278,31 @@ data LocalPackage = LocalPackage
     , lpWanted         :: !Bool            -- ^ Is this package a \"wanted\" target based on command line input
     , lpDir            :: !(Path Abs Dir)  -- ^ Directory of the package.
     , lpCabalFile      :: !(Path Abs File) -- ^ The .cabal file
-    , lpLastConfigOpts :: !(Maybe [S.ByteString])  -- ^ configure options used during last Setup.hs configure, if available
+    , lpLastConfigOpts :: !(Maybe ConfigCache)  -- ^ configure options used during last Setup.hs configure, if available
     , lpDirtyFiles     :: !Bool            -- ^ are there files that have changed since the last build?
     }
     deriving Show
+
+-- | Stored on disk to know whether the flags have changed or any
+-- files have changed.
+data ConfigCache = ConfigCache
+    { configCacheOpts :: ![S.ByteString]
+      -- ^ All options used for this package.
+    , configCacheDeps :: !(Set GhcPkgId)
+      -- ^ The GhcPkgIds of all of the dependencies. Since Cabal doesn't take
+      -- the complete GhcPkgId (only a PackageIdentifier) in the configure
+      -- options, just using the previous value is insufficient to know if
+      -- dependencies have changed.
+    }
+    deriving (Generic,Eq,Show)
+instance Binary ConfigCache
 
 -- | A task to perform when building
 data Task = Task
     { taskProvides        :: !PackageIdentifier        -- ^ the package/version to be built
     , taskType            :: !TaskType                 -- ^ the task type, telling us how to build this
     , taskConfigOpts      :: !TaskConfigOpts
+    , taskPresent         :: !(Set GhcPkgId)           -- ^ GhcPkgIds of already-installed dependencies
     }
     deriving Show
 

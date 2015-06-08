@@ -216,16 +216,15 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
                         Nothing -> error "singleBuild: invariant violated, missing package ID missing"
                         Just (Library x) -> Just x
                         Just Executable -> Nothing
+                missing' = Set.fromList $ mapMaybe getMissing $ Set.toList missing
                 TaskConfigOpts missing mkOpts = taskConfigOpts
-                configOpts = mkOpts
-                           $ Set.fromList
-                           $ mapMaybe getMissing
-                           $ Set.toList missing
+                configOpts = mkOpts missing'
+                allDeps = Set.union missing' taskPresent
             announce "configure"
             cabal False $ "configure" : map T.unpack configOpts
             $logDebug $ T.pack $ show configOpts
-            writeConfigCache pkgDir configOpts
-            return $ Just configOpts
+            writeConfigCache pkgDir configOpts allDeps
+            return $ Just (configOpts, allDeps)
         else return Nothing
 
     fileModTimes <- getPackageFileModTimes package cabalfp
@@ -315,7 +314,10 @@ packageDocDir cabalPkgVer package' = do
         (True, Just pkgid) -> do
             case mconfigOpts of
                 Nothing -> return ()
-                Just configOpts -> writeFlagCache pkgid $ map encodeUtf8 configOpts
+                Just (configOpts, deps) -> writeFlagCache
+                    pkgid
+                    (map encodeUtf8 configOpts)
+                    deps
             return $ Library pkgid
     liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides mpkgid'
   where

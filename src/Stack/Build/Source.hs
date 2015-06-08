@@ -125,7 +125,7 @@ loadLocals bopts = do
         return LocalPackage
             { lpPackage = pkg
             , lpWanted = wanted
-            , lpLastConfigOpts = fmap configCacheOpts mconfigCache
+            , lpLastConfigOpts = mconfigCache
             , lpDirtyFiles =
                   maybe True
                         ((/= fileModTimes) . buildCacheTimes)

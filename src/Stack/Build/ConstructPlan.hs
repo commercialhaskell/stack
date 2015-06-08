@@ -209,6 +209,7 @@ installPackage mneededSteps name ps = do
                             (psWanted ps)
                             (piiLocation ps)
                             (packageFlags package)
+                , taskPresent = present
                 , taskType =
                     case ps of
                         PSLocal lp -> TTLocal lp
@@ -226,7 +227,11 @@ installPackage mneededSteps name ps = do
                                                         (psWanted ps)
                                                         (piiLocation ps)
                                                         (packageFlags package)
-                                                 in if map encodeUtf8 newOpts == configOpts
+                                                    configCache = ConfigCache
+                                                        { configCacheOpts = map encodeUtf8 newOpts
+                                                        , configCacheDeps = present
+                                                        }
+                                                 in if configCache == configOpts
                                                         then SkipConfig
                                                         else AllSteps
                         PSUpstream _ loc _ -> TTUpstream package loc
@@ -283,11 +288,15 @@ checkDirtiness ps (Library installed) package present = do
             (psWanted ps)
             (piiLocation ps) -- should be Local always
             (packageFlags package)
+        configCache = ConfigCache
+            { configCacheOpts = map encodeUtf8 configOpts
+            , configCacheDeps = present
+            }
     moldOpts <- psOldOpts ps installed
     case moldOpts of
         Nothing -> return $ Just AllSteps
         Just oldOpts
-            | oldOpts /= map encodeUtf8 configOpts -> return $ Just AllSteps
+            | oldOpts /= configCache -> return $ Just AllSteps
             | psDirty ps -> return $ Just SkipConfig
             | otherwise -> do
                 case ps of
@@ -302,7 +311,9 @@ checkDirtiness ps (Library installed) package present = do
                             , taskType = TTLocal lp JustFinal
                             , taskConfigOpts = TaskConfigOpts Set.empty $ \missing' ->
                                 assert (Set.null missing') configOpts
+                            , taskPresent = present
                             }
+                            -- FIXME need to force reconfigure when GhcPkgId for dependencies change
                     _ -> return ()
                 return Nothing
 
@@ -310,7 +321,7 @@ psDirty :: PackageSource -> Bool
 psDirty (PSLocal lp) = lpDirtyFiles lp
 psDirty (PSUpstream _ _ _) = False -- files never change in an upstream package
 
-psOldOpts :: PackageSource -> GhcPkgId -> M (Maybe [S8.ByteString])
+psOldOpts :: PackageSource -> GhcPkgId -> M (Maybe ConfigCache)
 psOldOpts (PSLocal lp) _ = return $ lpLastConfigOpts lp
 psOldOpts (PSUpstream _ _ _) installed = tryGetFlagCache installed
 

@@ -9,7 +9,6 @@ module Stack.Build.Cache
     , getPackageFileModTimes
     , getInstalledExes
     , buildCacheTimes
-    , ConfigCache (..)
     , tryGetFlagCache
     , deleteCaches
     , markExeInstalled
@@ -33,6 +32,7 @@ import qualified Data.ByteString.Lazy       as L
 import           Data.Map                   (Map)
 import qualified Data.Map                   as Map
 import           Data.Maybe                 (catMaybes, mapMaybe)
+import           Data.Set                   (Set)
 import qualified Data.Set                   as Set
 import           Data.Text                  (Text)
 import           Data.Text.Encoding         (encodeUtf8)
@@ -85,15 +85,6 @@ data BuildCache = BuildCache
     }
     deriving (Generic,Eq)
 instance Binary BuildCache
-
--- | Stored on disk to know whether the flags have changed or any
--- files have changed.
-data ConfigCache = ConfigCache
-    { configCacheOpts :: ![ByteString]
-      -- ^ All options used for this package.
-    }
-    deriving (Generic,Eq)
-instance Binary ConfigCache
 
 -- | Used for storage and comparison.
 newtype ModTime = ModTime (Integer,Rational)
@@ -151,13 +142,17 @@ writeBuildCache dir times =
 
 -- | Write the dirtiness cache for this package's configuration.
 writeConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
-                => Path Abs Dir -> [Text] -> m ()
-writeConfigCache dir opts =
+                => Path Abs Dir
+                -> [Text]
+                -> Set GhcPkgId -- ^ dependencies
+                -> m ()
+writeConfigCache dir opts deps =
     writeCache
         dir
         configCacheFile
         (ConfigCache
          { configCacheOpts = map encodeUtf8 opts
+         , configCacheDeps = deps
          })
 
 -- | Delete the caches for the project.
@@ -197,7 +192,7 @@ flagCacheFile gid = do
 -- | Loads the flag cache for the given installed extra-deps
 tryGetFlagCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasBuildConfig env)
                 => GhcPkgId
-                -> m (Maybe [ByteString])
+                -> m (Maybe ConfigCache)
 tryGetFlagCache gid = do
     file <- flagCacheFile gid
     eres <- liftIO $ tryIO $ Binary.decodeFileOrFail $ toFilePath file
@@ -206,12 +201,18 @@ tryGetFlagCache gid = do
         _ -> return Nothing
 
 writeFlagCache :: (MonadIO m, MonadReader env m, HasBuildConfig env, MonadThrow m)
-               => GhcPkgId -> [ByteString] -> m ()
-writeFlagCache gid flags = do
+               => GhcPkgId
+               -> [ByteString]
+               -> Set GhcPkgId
+               -> m ()
+writeFlagCache gid flags deps = do
     file <- flagCacheFile gid
     liftIO $ do
         createDirectoryIfMissing True $ toFilePath $ parent file
-        Binary.encodeFile (toFilePath file) flags
+        Binary.encodeFile (toFilePath file) ConfigCache
+            { configCacheOpts = flags
+            , configCacheDeps = deps
+            }
 
 -- | Get the modified times of all known files in the package,
 -- including the package's cabal file itself.
