@@ -29,7 +29,7 @@ import Data.Text (Text)
 import Distribution.Package (Dependency)
 import Distribution.Text (display)
 import GHC.Generics
-import Path (Path, Abs, File)
+import Path (Path, Abs, File, Dir)
 import Prelude hiding (FilePath)
 import Stack.Package
 import Stack.Types
@@ -132,11 +132,11 @@ data CabalExitedUnsuccessfully = CabalExitedUnsuccessfully
 instance Exception CabalExitedUnsuccessfully
 
 instance Show CabalExitedUnsuccessfully where
-  show (CabalExitedUnsuccessfully exitCode taskProvides execName fullArgs logFiles _) =
+  show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles _) =
     let fullCmd = (dropQuotes (show execName) ++ " " ++ (unwords fullArgs))
         logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ show fp) logFiles
     in "\n--  Exception: CabalExitedUnsuccessfully\n" ++
-       "    While building package " ++ dropQuotes (show taskProvides) ++ " using:\n" ++
+       "    While building package " ++ dropQuotes (show taskProvides') ++ " using:\n" ++
        "      " ++ fullCmd ++ "\n" ++
        "    Process exited with code: " ++ show exitCode ++
        logLocations
@@ -239,3 +239,51 @@ data Location = Snap | Local
 class PackageInstallInfo a where
     piiVersion :: a -> Version
     piiLocation :: a -> Location
+
+-- | Information on a locally available package of source code
+data LocalPackage = LocalPackage
+    { lpPackage        :: !Package         -- ^ The @Package@ info itself, after resolution with package flags
+    , lpWanted         :: !Bool            -- ^ Is this package a \"wanted\" target based on command line input
+    , lpDir            :: !(Path Abs Dir)  -- ^ Directory of the package.
+    , lpCabalFile      :: !(Path Abs File) -- ^ The .cabal file
+    , lpLastConfigOpts :: !(Maybe [Text])  -- ^ configure options used during last Setup.hs configure, if available
+    , lpDirtyFiles     :: !Bool            -- ^ are there files that have changed since the last build?
+    }
+    deriving Show
+
+-- | A task to perform when building
+data Task = Task
+    { taskProvides        :: !PackageIdentifier       -- ^ the package/version to be built
+    , taskRequiresMissing :: !(Set PackageIdentifier) -- ^ dependencies needed to make this package which are not present
+    , taskRequiresPresent :: !(Set GhcPkgId)          -- ^ dependencies needed which are present
+    , taskType            :: !TaskType                -- ^ the task type, telling us how to build this
+    }
+    deriving Show
+
+-- | The type of a task, either building local code or something from the
+-- package index (upstream)
+data TaskType = TTLocal LocalPackage NeededSteps
+              | TTUpstream Package Location
+    deriving Show
+
+-- | How many steps must be taken when building
+data NeededSteps = AllSteps | SkipConfig | JustFinal
+    deriving (Show, Eq)
+
+-- | A complete plan of what needs to be built and how to do it
+data Plan = Plan
+    { planTasks :: !(Map PackageName Task)
+    , planUnregisterLocal :: !(Set GhcPkgId)
+    }
+
+-- | Basic information used to calculate what the configure options are
+data BaseConfigOpts = BaseConfigOpts
+    { bcoSnapDB :: !(Path Abs Dir)
+    , bcoLocalDB :: !(Path Abs Dir)
+    , bcoSnapInstallRoot :: !(Path Abs Dir)
+    , bcoLocalInstallRoot :: !(Path Abs Dir)
+    , bcoLibProfiling :: !Bool
+    , bcoExeProfiling :: !Bool
+    , bcoFinalAction :: !FinalAction
+    , bcoGhcOptions :: ![Text]
+    }

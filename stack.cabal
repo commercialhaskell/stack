@@ -46,6 +46,7 @@ library
                      Stack.Types.StackT
                      Stack.Build
                      Stack.Build.Cache
+                     Stack.Build.Execute
                      Stack.Build.Installed
                      Stack.Build.Types
                      Stack.Build.Doc
