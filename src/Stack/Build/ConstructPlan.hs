@@ -116,7 +116,8 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild locallyRegistered loadPac
         (errs, _) -> throwM $ ConstructPlanExceptions errs
   where
     allTargets = Set.fromList
-               $ map (packageName . lpPackage) locals ++ extraToBuild
+               $ map (packageName . lpPackage) (filter lpWanted locals) ++
+                 extraToBuild
 
     ctx bconfig = Ctx
         { mbp = mbp0
@@ -229,10 +230,11 @@ addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdenti
 addPackageDeps package = do
     deps' <- packageDepsWithTools package
     deps <- forM (Map.toList deps') $ \(depname, range) -> do
-        -- TODO need to check version ranges
         eres <- addDep depname
         case eres of
-            Left _ -> return $ Left depname
+            Left _ -> return $ Left (depname, (range, Nothing))
+            Right adr | not $ adrVersion adr `withinRange` range ->
+                return $ Left (depname, (range, Just $ adrVersion adr))
             Right (ADRToInstall task) -> return $ Right
                 (Set.singleton $ taskProvides task, Set.empty)
             Right (ADRFound _ Executable) -> return $ Right
@@ -241,7 +243,10 @@ addPackageDeps package = do
                 (Set.empty, Set.singleton gid)
     case partitionEithers deps of
         ([], pairs) -> return $ Right $ mconcat pairs
-        (errs, _) -> return $ Left $ DependencyPlanFailures (packageName package) (Set.fromList errs)
+        (errs, _) -> return $ Left $ DependencyPlanFailures (packageName package) (Map.fromList errs)
+  where
+    adrVersion (ADRToInstall task) = packageIdentifierVersion $ taskProvides task
+    adrVersion (ADRFound v _) = v
 
 checkDirtiness :: PackageSource
                -> Installed

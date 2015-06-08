@@ -62,10 +62,9 @@ data ConstructPlanException
     = SnapshotPackageDependsOnLocal PackageName PackageIdentifier
     -- ^ Recommend adding to extra-deps
     | DependencyCycleDetected [PackageName]
-    | DependencyPlanFailures PackageName (Set PackageName) -- FIXME include version range violation info?
+    | DependencyPlanFailures PackageName (Map PackageName (VersionRange, Maybe Version))
     | UnknownPackage PackageName
     -- ^ Recommend adding to extra-deps, give a helpful version number?
-    | VersionOutsideRange PackageName PackageIdentifier VersionRange
     deriving (Typeable, Eq)
 
 instance Show ConstructPlanException where
@@ -80,26 +79,38 @@ instance Show ConstructPlanException where
            "Exception: Stack.Build.DependencyCycle\n" ++
            "  While checking call stack,\n" ++
            "  dependency cycle detected in packages:" ++ indent (appendLines pNames)
-         (DependencyPlanFailures pName (Set.toList -> pDeps)) ->
+         (DependencyPlanFailures pName (Map.toList -> pDeps)) ->
            "Exception: Stack.Build.DependencyPlanFailures\n" ++
-           "  Failure when adding dependencies:" ++ doubleIndent (appendLines pDeps) ++ "\n" ++
+           "  Failure when adding dependencies:" ++ doubleIndent (appendDeps pDeps) ++ "\n" ++
            "  needed for package: " ++ show pName
          (UnknownPackage pName) ->
              "Exception: Stack.Build.UnknownPackage\n" ++
              "  While attempting to add dependency,\n" ++
              "  Could not find package " ++ show pName  ++ "in known packages"
-         (VersionOutsideRange pName pIdentifier versionRange) ->
-             "Exception: Stack.Build.VersionOutsideRange\n" ++
-             "  While adding dependency for package " ++ show pName ++ ",\n" ++
-             "  " ++ dropQuotes (show pIdentifier) ++ " was found to be outside its allowed version range.\n" ++
-             "  Allowed version range is " ++ display versionRange ++ ",\n" ++
-             "  should you correct the version range for " ++ dropQuotes (show pIdentifier) ++ ", found in [extra-deps] in the project's stack.yaml?"
     in indent details
      where
       appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
       indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
       dropQuotes = filter ((/=) '\"')
       doubleIndent = indent . indent
+      appendDeps = foldr (\dep-> (++) ("\n" ++ showDep dep)) ""
+      showDep (name, (range, mversion)) = concat
+        [ show name
+        , ": needed ("
+        , display range
+        , "), but "
+        , case mversion of
+            Nothing -> "none found"
+            Just version -> versionString version ++ " found"
+        ]
+         {- TODO Perhaps change the showDep function to look more like this:
+         (VersionOutsideRange pName pIdentifier versionRange) ->
+             "Exception: Stack.Build.VersionOutsideRange\n" ++
+             "  While adding dependency for package " ++ show pName ++ ",\n" ++
+             "  " ++ dropQuotes (show pIdentifier) ++ " was found to be outside its allowed version range.\n" ++
+             "  Allowed version range is " ++ display versionRange ++ ",\n" ++
+             "  should you correct the version range for " ++ dropQuotes (show pIdentifier) ++ ", found in [extra-deps] in the project's stack.yaml?"
+             -}
 
 newtype ConstructPlanExceptions = ConstructPlanExceptions [ConstructPlanException]
     deriving (Typeable)
