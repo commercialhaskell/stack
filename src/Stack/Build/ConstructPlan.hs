@@ -1,4 +1,3 @@
-{-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards       #-}
@@ -12,7 +11,6 @@ module Stack.Build.ConstructPlan
 import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger
 import           Control.Monad.Reader         (MonadReader)
 import           Control.Monad.State.Strict
 import           Control.Monad.Trans.Resource
@@ -38,8 +36,6 @@ import           Stack.BuildPlan
 import           Stack.Package
 import           Stack.Types
 
-type M env m = (MonadIO m,MonadReader env m,HasBuildConfig env,MonadLogger m,MonadThrow m)
-
 data AddDepRes
     = ADRToInstall Task
     | ADRFound Version Installed
@@ -60,7 +56,7 @@ data Ctx m = Ctx
     }
 
 constructPlan :: forall env m.
-                 M env m
+                 (MonadThrow m, MonadReader env m, HasBuildConfig env, MonadIO m)
               => MiniBuildPlan
               -> BaseConfigOpts
               -> [LocalPackage]
