@@ -15,7 +15,7 @@ category:            Development
 build-type:          Simple
 cabal-version:       >=1.10
 extra-source-files:  README.md ARCHITECTURE.md ChangeLog.md
-                     -- FIXME bug in path resolution on this glob test/package-dump/*.txt
+                     test/package-dump/*.txt
 
 library
   hs-source-dirs:    src/

@@ -18,6 +18,7 @@ md5sums=('SKIP')
 
 prepare() {
   cd "$srcdir/${_pkgname}"
+  rm -rf .cabal-sandbox
   cabal sandbox init
   rm -f cabal.config
   wget https://www.stackage.org/nightly/cabal.config

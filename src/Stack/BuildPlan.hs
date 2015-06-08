@@ -438,7 +438,7 @@ loadBuildPlan name = do
 -- @GenericPackageDescription@ to compile against the given @BuildPlan@. Will
 -- only modify non-manual flags, and will prefer default values for flags.
 -- Returns @Nothing@ if no combination exists.
-checkBuildPlan :: (MonadLogger m, MonadThrow m, MonadIO m, MonadReader env m, HasConfig env)
+checkBuildPlan :: (MonadLogger m, MonadThrow m, MonadIO m, MonadReader env m, HasConfig env, MonadCatch m)
                => SnapName -- ^ used only for debugging purposes
                -> MiniBuildPlan
                -> GenericPackageDescription

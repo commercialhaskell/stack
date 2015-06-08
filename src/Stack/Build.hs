@@ -1,12 +1,11 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -158,14 +157,10 @@ instance Exception TestSuiteFailure2
 data CabalExitedUnsuccessfully = CabalExitedUnsuccessfully
     ExitCode
     PackageIdentifier
-    (Path Abs File)
--- ^ cabal Executable
-    [String]
--- ^ cabal arguments
-    (Maybe FilePath)
--- ^ logfiles location
-    S.ByteString
--- ^ log contents
+    (Path Abs File)  -- cabal Executable
+    [String]         -- cabal arguments
+    (Maybe FilePath) -- logfiles location
+    S.ByteString     -- log contents
     deriving (Typeable)
 instance Exception CabalExitedUnsuccessfully
 
@@ -174,9 +169,9 @@ instance Show CabalExitedUnsuccessfully where
     let fullCmd = (dropQuotes (show execName) ++ " " ++ (unwords fullArgs))
         logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ show fp) logFiles
     in "\n--  Exception: CabalExitedUnsuccessfully\n" ++
-       "      While building package " ++ dropQuotes (show taskProvides) ++ " using:\n" ++
-       "        " ++ fullCmd ++ "\n" ++
-       "      Process exited with code: " ++ show exitCode ++
+       "    While building package " ++ dropQuotes (show taskProvides) ++ " using:\n" ++
+       "      " ++ fullCmd ++ "\n" ++
+       "    Process exited with code: " ++ show exitCode ++
        logLocations
      where
       -- appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
@@ -511,7 +506,7 @@ writeFlagCache gid flags = do
 
 -- | Get the modified times of all known files in the package,
 -- including the package's cabal file itself.
-getPackageFileModTimes :: (MonadIO m, MonadLogger m, MonadThrow m)
+getPackageFileModTimes :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m)
                        => Package
                        -> Path Abs File -- ^ cabal file
                        -> m (Map FilePath ModTime)
@@ -526,7 +521,7 @@ getPackageFileModTimes pkg cabalfp = do
             (catch
                  (liftM
                       (Just . (toFilePath fp,) . modTime)
-                      (getModificationTime (toFilePath fp)) )
+                      (getModificationTime (toFilePath fp)))
                  (\e ->
                        if isDoesNotExistError e
                            then return Nothing

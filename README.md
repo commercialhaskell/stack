@@ -2,23 +2,23 @@
 
 > ᕕ( ᐛ )ᕗ I'm off to install stack 
 
-stack is the easiest and most reliable way to build your Haskell projects, from
-simple one-file executables to massive, multi-package projects with modified
+`stack` is an easy and reliable way to build your Haskell projects. It works with
+simple one-file executables all the way up to massive, multi-package projects with modified
 local dependencies. It uses sensible defaults- like isolation binary
 installations and LTS Haskell- while allowing full user customization. All
-builds are reproducible, so that changes in the upstream package repository or
+builds are reproducible: changes in the upstream package repository or
 work you do on other projects will not break your codebase. If your code builds
 today, it will build tomorrow.
 
-stack is a full stack tool, capable of installing the appropriate version of
+stack is a full stack build tool, capable of installing the appropriate version of
 GHC for you automatically and building and registering your upstream library
 dependencies into shared package databases (to minimize compilation time). It
 will intelligently recompile your libraries as necessary to enable profiling
 support, and give helpful error messages and advice for fixing your project.
 
-And of course, stack has been designed from the ground up to be as easy as
+`stack` has been designed from the ground up to be as easy as
 possible to use. In most cases, you'll be able to get your project building
-with just a single command: `stack build`.
+by just running `stack build`.
 
 For more details on how stack works internally, please see [the architecture
 document](ARCHITECTURE.md). **FIXME more correct link once moved to final repo
@@ -38,7 +38,7 @@ Running `stack` will give you a list of commands, some of the most common are:
 
 ### Install
 
-Need to support more OSes
+Distribution packages are available for Ubuntu and Arch Linux. For the future, we have plans to support more OSes.
 
 #### Ubuntu
 
@@ -79,7 +79,7 @@ sudo apt-get install stack -y
 ```
 #### Arch Linux
 
-Stack can be found in the AUR:
+stack can be found in the AUR:
   - [haskell-stack](https://aur.archlinux.org/packages/haskell-stack/) _latest stable version_
   - [haskell-stack-git](https://aur.archlinux.org/packages/haskell-stack-git/) _git version_
 

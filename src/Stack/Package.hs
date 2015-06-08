@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -28,7 +29,7 @@ module Stack.Package
   ,packageIdentifier)
   where
 
-import           Control.Exception hiding (try)
+import           Control.Exception hiding (try,catch)
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -67,7 +68,10 @@ import           Prelude hiding (FilePath)
 import           Stack.Constants
 import           Stack.Types
 import qualified Stack.Types.PackageIdentifier
+import           System.Directory (getDirectoryContents)
+import           System.FilePath (splitExtensions)
 import qualified System.FilePath as FilePath
+import           System.IO.Error
 
 -- | All exceptions thrown by the library.
 data PackageException
@@ -115,7 +119,7 @@ data Package =
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the .cabal file
 newtype GetPackageFiles = GetPackageFiles
-    { getPackageFiles :: forall m. (MonadIO m, MonadLogger m, MonadThrow m)
+    { getPackageFiles :: forall m. (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m)
                       => Path Abs File
                       -> m (Set (Path Abs File))
     }
@@ -172,7 +176,7 @@ readPackageUnresolvedBS mcabalfp bs =
     dropBOM t = fromMaybe t $ T.stripPrefix "\xFEFF" t
 
 -- | Reads and exposes the package information
-readPackage :: (MonadLogger m, MonadIO m, MonadThrow m)
+readPackage :: (MonadLogger m, MonadIO m, MonadThrow m, MonadCatch m)
             => PackageConfig
             -> Path Abs File
             -> m Package
@@ -189,7 +193,7 @@ readPackageBS packageConfig bs =
 
 -- | Convenience wrapper around @readPackage@ that first finds the cabal file
 -- in the given directory.
-readPackageDir :: (MonadLogger m, MonadIO m, MonadThrow m)
+readPackageDir :: (MonadLogger m, MonadIO m, MonadThrow m, MonadCatch m)
                => PackageConfig
                -> Path Abs Dir
                -> m (Path Abs File, Package)
@@ -265,7 +269,7 @@ allBuildInfo' pkg_descr = [ bi | Just lib <- [library pkg_descr]
                               , benchmarkEnabled tst ]
 
 -- | Get all files referenced by the package.
-packageDescFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m)
+packageDescFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m,MonadCatch m)
                  => PackageDescription -> m [Path Abs File]
 packageDescFiles pkg =
   do libfiles <-
@@ -288,17 +292,66 @@ packageDescFiles pkg =
      return (concat [libfiles,exefiles,dfiles,srcfiles,docfiles])
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
-resolveGlobFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m)
+resolveGlobFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m,MonadCatch m)
                  => [String] -> m [Path Abs File]
-resolveGlobFiles = liftM (catMaybes . concat) . mapM resolve
-  where resolve name =
-          if any (== '*') name
-             then explode name
-             else liftM return (resolveFileOrWarn name)
-        explode name = do
-            dir <- asks parent
-            names <- liftIO (matchDirFileGlob (FL.toFilePath dir) name)
-            mapM resolveFileOrWarn names
+resolveGlobFiles =
+    liftM (catMaybes . concat) .
+    mapM resolve
+  where
+    resolve name =
+        if any (== '*') name
+            then explode name
+            else liftM return (resolveFileOrWarn name)
+    explode name = do
+        dir <- asks parent
+        names <-
+            matchDirFileGlob'
+                (FL.toFilePath dir)
+                name
+        mapM resolveFileOrWarn names
+    matchDirFileGlob' dir glob =
+        catch
+            (liftIO (matchDirFileGlob_ dir glob))
+            (\(e :: IOException) ->
+                  if isUserError e
+                      then do
+                          $logWarn
+                              ("Wildcard does not match any files: " <> T.pack glob <> "\n" <>
+                               "in directory: " <> T.pack dir)
+                          return []
+                      else throwM e)
+
+-- | This is a copy/paste of the Cabal library function, but with
+--
+-- @ext == ext'@
+--
+-- Changed to
+--
+-- @isSuffixOf ext ext'@
+--
+-- So that this will work:
+--
+-- @
+-- λ> matchDirFileGlob_ "." "test/package-dump/*.txt"
+-- ["test/package-dump/ghc-7.8.txt","test/package-dump/ghc-7.10.txt"]
+-- @
+--
+matchDirFileGlob_ :: String -> String -> IO [String]
+matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
+  Nothing -> die $ "invalid file glob '" ++ filepath
+                ++ "'. Wildcards '*' are only allowed in place of the file"
+                ++ " name, not in the directory name or file extension."
+                ++ " If a wildcard is used it must be with an file extension."
+  Just (NoGlob filepath') -> return [filepath']
+  Just (FileGlob dir' ext) -> do
+    files <- getDirectoryContents (dir FilePath.</> dir')
+    case   [ dir' FilePath.</> file
+           | file <- files
+           , let (name, ext') = splitExtensions file
+           , not (null name) && isSuffixOf ext ext' ] of
+      []      -> die $ "filepath wildcard '" ++ filepath
+                    ++ "' does not match any files."
+      matches -> return matches
 
 -- | Get all files referenced by the executable.
 executableFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m)
