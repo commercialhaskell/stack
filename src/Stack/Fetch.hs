@@ -336,8 +336,28 @@ fetchPackages mdistDir toFetchAll = do
                 }
         let progressSink = do
                 -- TODO: logInfo
-                liftIO $ T.putStrLn $ "Downloading " <> packageIdentifierText ident
+                liftIO $ T.putStrLn $ packageIdentifierText ident <> ": downloading"
         _ <- verifiedDownload downloadReq destpath progressSink
+        errMay <- liftIO $ do
+            (flip runReaderT man (verifiedDownload downloadReq destpath progressSink) >> return Nothing)
+                `catch` \e -> case e of
+                    WrongContentLength _ actual -> return $ Just $ InvalidDownloadSize
+                        { _idsUrl = tfUrl toFetch
+                        , _idsExpected = fromMaybe (error "fetchPackagesImpossible cl") (tfSize toFetch)
+                        , _idsTotalDownloaded = read (show actual) -- TODO(danburton): something better than this
+                        }
+                    WrongStreamLength _ actual -> return $ Just $ InvalidDownloadSize
+                        { _idsUrl = tfUrl toFetch
+                        , _idsExpected = fromMaybe (error "fetchPackagesImpossible sl") (tfSize toFetch)
+                        , _idsTotalDownloaded = fromIntegral actual
+                        }
+                    WrongDigest _ _ actual -> return $ Just $ InvalidSha512
+                        { _ihUrl = tfUrl toFetch
+                        , _ihExpected = fromMaybe (error "fetchPackagesImpossible dg") (tfSHA512 toFetch)
+                        , _ihActual = actual
+                        }
+        maybe (return ()) throwM errMay
+>>>>>>> Simplify output messages, leaving details in -v
 
         let fp = toFilePath destpath
         --unlessM (liftIO (doesFileExist fp)) $ do

@@ -25,55 +25,56 @@ module Stack.BuildPlan
     ) where
 
 import           Control.Applicative
-import           Control.Arrow                   ((&&&))
-import           Control.Exception               (assert)
-import           Control.Exception.Enclosed      (handleIO)
-import           Control.Monad                   (liftM, forM)
+import           Control.Arrow ((&&&))
+import           Control.Exception (assert)
+import           Control.Exception.Enclosed (handleIO)
+import           Control.Monad (liftM, forM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Trans.Control     (MonadBaseControl)
-import           Control.Monad.Reader            (asks)
+import           Control.Monad.Reader (asks)
 import           Control.Monad.State.Strict      (State, execState, get, modify,
                                                   put)
-import           Data.Aeson                      (FromJSON (..))
-import           Data.Aeson                      (withObject, withText, (.:))
-import           Data.Binary.VersionTagged       (taggedDecodeOrLoad)
-import           Data.ByteString                 (ByteString)
-import qualified Data.ByteString.Char8           as S8
-import           Data.Either                     (partitionEithers)
-import qualified Data.Foldable                   as F
-import qualified Data.HashMap.Strict             as HM
-import           Data.IntMap                     (IntMap)
-import qualified Data.IntMap                     as IntMap
-import           Data.List                       (intercalate, sort)
-import           Data.Map                        (Map)
-import qualified Data.Map                        as Map
-import           Data.Maybe                      (mapMaybe)
-import           Data.Monoid                     ((<>))
-import           Data.Set                        (Set)
-import qualified Data.Set                        as Set
-import           Data.Text                       (Text)
-import qualified Data.Text                       as T
-import           Data.Time                       (Day)
-import qualified Data.Traversable                as Tr
-import           Data.Typeable                   (Typeable)
-import           Data.Yaml                       (decodeFileEither)
+import           Control.Monad.Trans.Class
+import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Data.Aeson (FromJSON (..))
+import           Data.Aeson (withObject, withText, (.:))
+import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as S8
+import           Data.Either (partitionEithers)
+import qualified Data.Foldable as F
+import qualified Data.HashMap.Strict as HM
+import           Data.IntMap (IntMap)
+import qualified Data.IntMap as IntMap
+import           Data.List (intercalate, sort)
+import           Data.Map (Map)
+import qualified Data.Map as Map
+import           Data.Maybe (mapMaybe)
+import           Data.Monoid ((<>))
+import           Data.Set (Set)
+import qualified Data.Set as Set
+import           Data.Text (Text)
+import qualified Data.Text as T
+import           Data.Time (Day)
+import qualified Data.Traversable as Tr
+import           Data.Typeable (Typeable)
+import           Data.Yaml (decodeFileEither)
 import           Distribution.PackageDescription (GenericPackageDescription,
                                                   flagDefault, flagManual,
                                                   flagName, genPackageFlags,
                                                   executables, exeName, library, libBuildInfo, buildable)
 import           Network.HTTP.Download
-import           Prelude -- Fix AMP warning
 import           Path
+import           Prelude -- Fix AMP warning
+import           Stack.Constants
 import           Stack.Fetch
 import           Stack.GhcPkg
-import           Stack.Types
-import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageIndex
-import           System.Directory                (createDirectoryIfMissing, getDirectoryContents)
-import           System.FilePath                 (takeDirectory)
+import           Stack.Types
+import           System.Directory (createDirectoryIfMissing, getDirectoryContents)
+import           System.FilePath (takeDirectory)
 
 data BuildPlanException
     = UnknownPackages
@@ -423,9 +424,12 @@ loadBuildPlan name = do
             $logDebug $ "Decoding build plan from file failed: " <> T.pack (show e)
             liftIO $ createDirectoryIfMissing True $ takeDirectory $ toFilePath fp
             req <- parseUrl $ T.unpack url
-            $logInfo $ "Downloading build plan from: " <> url
+            $logInfo $ "Downloading " <> renderSnapName name <> " build plan ..."
+            $logDebug $ "Downloading build plan from: " <> url
             _ <- download req fp
+            $logInfo $ "Downloaded " <> renderSnapName name <> " build plan."
             liftIO (decodeFileEither $ toFilePath fp) >>= either throwM return
+
   where
     file = renderSnapName name <> ".yaml"
     reponame =

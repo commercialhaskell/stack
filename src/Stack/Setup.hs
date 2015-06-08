@@ -14,45 +14,46 @@ module Stack.Setup
   , SetupOpts (..)
   ) where
 
-import Control.Applicative
-import Control.Exception (Exception)
-import Data.Maybe (mapMaybe, catMaybes, fromMaybe)
-import Control.Monad (liftM, when)
-import Control.Monad.Catch (MonadThrow, throwM, MonadMask)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Reader (MonadReader, ReaderT (..), asks)
-import Data.Conduit (($$))
-import qualified Data.Conduit.List as CL
-import Data.Aeson
-import Data.IORef
-import Data.Monoid
-import qualified Data.Yaml as Yaml
-import Data.Text (Text)
-import Data.Typeable (Typeable)
-import Network.HTTP.Client.Conduit
-import Path
-import Path.IO
-import System.Directory
-import System.Exit (ExitCode (ExitSuccess))
-import System.FilePath (searchPathSeparator)
-import System.IO.Temp (withSystemTempDirectory)
-import System.Process (rawSystem)
-import Stack.GhcPkg (getGlobalDB)
-import Stack.Types
-import Distribution.System (OS (..), Arch (..), Platform (..))
-import Stack.Build.Types
+import           Control.Applicative
+import           Control.Exception (Exception)
+import           Control.Monad (liftM, when)
+import           Control.Monad.Catch (MonadThrow, throwM, MonadMask)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Control.Monad.Logger
+import           Control.Monad.Reader (MonadReader, ReaderT (..), asks)
+import           Control.Monad.Trans.Class
+import           Data.Aeson
 import qualified Data.ByteString.Char8 as S8
-import Control.Monad.Logger
-import qualified Data.Text as T
-import Data.List (intercalate)
+import           Data.Conduit (($$))
+import qualified Data.Conduit.List as CL
+import           Data.IORef
+import           Data.List (intercalate)
+import           Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Map (Map)
+import           Data.Maybe (mapMaybe, catMaybes, fromMaybe)
+import           Data.Monoid
+import           Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Set (Set)
-import System.Process.Read
+import           Data.Text (Text)
+import qualified Data.Text as T
+import           Data.Typeable (Typeable)
+import qualified Data.Yaml as Yaml
+import           Distribution.System (OS (..), Arch (..), Platform (..))
+import           Network.HTTP.Client.Conduit
+import           Network.HTTP.Download (download)
+import           Path
+import           Path.IO
+import           Prelude -- Fix AMP warning
+import           Stack.Build.Types
+import           Stack.GhcPkg (getGlobalDB)
+import           Stack.Types
+import           System.Directory
+import           System.Exit (ExitCode (ExitSuccess))
+import           System.FilePath (searchPathSeparator)
 import qualified System.FilePath as FP
-import Network.HTTP.Download (download)
-import Prelude -- Fix AMP warning
+import           System.IO.Temp (withSystemTempDirectory)
+import           System.Process (rawSystem)
+import           System.Process.Read
 
 data SetupOpts = SetupOpts
     { soptsInstallIfMissing :: !Bool
@@ -435,7 +436,7 @@ downloadPair (DownloadPair _ url) ident = do
             _ -> error $ "Unknown extension: " ++ extension
     relfile <- parseRelFile $ packageIdentifierString ident ++ extension
     let path = configLocalPrograms config </> relfile
-    chattyDownload url path
+    chattyDownload (packageIdentifierText ident) url path
     return (path, at)
   where
     extension =
@@ -472,17 +473,19 @@ installGHCPosix _ archiveFile archiveType destDir ident = do
         root <- parseAbsDir root'
         dir <- liftM (root Path.</>) $ parseRelDir $ packageIdentifierString ident
 
-        $logInfo $ "Unpacking " <> T.pack (toFilePath archiveFile)
+        $logInfo $ "Unpacking GHC ..."
+        $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
         runIn root "tar" menv ["xf", toFilePath archiveFile] Nothing
 
-        $logInfo "Configuring"
+        $logInfo "Configuring GHC ..."
         runIn dir (toFilePath $ dir Path.</> $(mkRelFile "configure"))
               menv ["--prefix=" ++ toFilePath destDir] Nothing
 
-        $logInfo "Installing"
+        $logInfo "Installing GHC ..."
         runIn dir "make" menv ["install"] Nothing
 
-        $logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
+        $logInfo $ "GHC installed."
+        $logDebug $ "GHC installed to " <> T.pack (toFilePath destDir)
   where
     -- | Check if given processes appear to be present, throwing an exception if
     -- missing.
@@ -547,8 +550,8 @@ setup7z :: (MonadReader env m, HasHttpManager env, MonadThrow m, MonadIO m, Mona
         -> Config
         -> m (Path Abs Dir -> Path Abs File -> n ())
 setup7z si config = do
-    chattyDownload (siSevenzDll si) dll
-    chattyDownload (siSevenzExe si) exe
+    chattyDownload (siSevenzDll si) "7z" dll
+    chattyDownload (siSevenzExe si) "7z" exe
     return $ \outdir archive -> liftIO $ do
         ec <- rawSystem (toFilePath exe)
             [ "x"
@@ -564,18 +567,25 @@ setup7z si config = do
     dll = dir </> $(mkRelFile "7z.dll")
 
 chattyDownload :: (MonadReader env m, HasHttpManager env, MonadIO m, MonadLogger m, MonadThrow m)
-               => Text -- ^ URL
+               => Text
+               -> Text -- ^ URL
                -> Path Abs File -- ^ destination
                -> m ()
-chattyDownload url path = do
+chattyDownload label url path = do
     req <- parseUrl $ T.unpack url
     $logInfo $ T.concat
-        [ "Downloading from "
-        , url
-        , " to "
-        , T.pack $ toFilePath path
-        ]
+      [ "Downloading "
+      , label
+      , " ..."
+      ]
+    $logDebug $ T.concat
+      [ "Downloading from "
+      , url
+      , " to "
+      , T.pack $ toFilePath path
+      , " ..."
+      ]
     x <- download req path -- TODO add progress indicator
     if x
-        then $logInfo "Download complete"
-        else $logInfo "File already downloaded"
+        then $logInfo ("Downloaded " <> label <> ".")
+        else $logDebug "Already downloaded."

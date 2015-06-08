@@ -22,37 +22,47 @@ module Stack.PackageIndex
     , getPackageCaches
     ) where
 
-import qualified Codec.Archive.Tar                     as Tar
+import qualified Codec.Archive.Tar as Tar
 import           Control.Applicative
-import           Control.Exception                     (Exception)
-import           Control.Exception.Enclosed            (tryIO)
-import           Control.Monad                         (unless, when, liftM, mzero)
-import           Control.Monad.Catch                   (MonadThrow, throwM)
-import           Control.Monad.IO.Class                (MonadIO, liftIO)
+import           Control.Exception (Exception)
+import           Control.Exception.Enclosed (tryIO)
+import           Control.Monad (unless, when, liftM, mzero)
+import           Control.Monad.Catch (MonadThrow, throwM)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger                  (MonadLogger, logDebug,
                                                         logInfo, logWarn)
-import           Control.Monad.Reader                  (asks)
+import           Control.Monad.Reader (asks)
+import           Control.Monad.Trans.Class
 import           Data.Aeson
-import qualified Data.Binary                           as Binary
-import           Data.Binary.VersionTagged             (taggedDecodeOrLoad)
-import           Data.ByteString                       (ByteString)
-import qualified Data.ByteString.Lazy                  as L
-import           Data.Conduit                          (($$), (=$), yield, Producer, ZipSink (..))
+import qualified Data.Binary as Binary
+import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString.Lazy as L
+import           Data.Conduit (($$), (=$), yield, Producer, ZipSink (..))
 import           Data.Conduit.Binary                   (sinkHandle,
                                                         sourceHandle)
-import qualified Data.Conduit.List                     as CL
-import           Data.Conduit.Zlib                     (ungzip)
-import           Data.Int                              (Int64)
-import           Data.Map                              (Map)
-import qualified Data.Map                              as Map
+import qualified Data.Conduit.List as CL
+import           Data.Conduit.Zlib (ungzip)
+import           Data.Int (Int64)
+import           Data.Map (Map)
+import qualified Data.Map as Map
 import           Data.Monoid
-import           Data.Text                             (Text)
-import qualified Data.Text                             as T
-import           Data.Text.Encoding                    (encodeUtf8)
-import           Data.Traversable                      (forM)
-import           Data.Typeable                         (Typeable)
-import           Data.Word                             (Word64)
-import           GHC.Generics                          (Generic)
+import           Data.Text (Text)
+import qualified Data.Text as T
+import           Data.Text (Text)
+import qualified Data.Text as T
+import           Data.Text.Encoding (encodeUtf8)
+import           Data.Text.Encoding (encodeUtf8)
+import           Data.Traversable (forM)
+import           Data.Traversable (forM)
+import           Data.Typeable (Typeable)
+import           Data.Typeable (Typeable)
+import           Data.Word (Word64)
+import           Data.Word (Word64)
+import           Distribution.ParseUtils (PError)
+import qualified Distribution.Text as DT
+import           GHC.Generics (Generic)
+import           GHC.Generics (Generic)
 import           Network.HTTP.Download
 import           Path                                  (mkRelDir, parent,
                                                         parseRelDir, toFilePath,
@@ -60,10 +70,10 @@ import           Path                                  (mkRelDir, parent,
 import           Prelude -- Fix AMP warning
 import           Stack.Types
 import           System.Directory
-import           System.FilePath                       (takeBaseName, (<.>))
+import           System.FilePath (takeBaseName, (<.>))
 import           System.IO                             (IOMode (ReadMode, WriteMode),
                                                         withBinaryFile)
-import           System.Process.Read                   (runIn, EnvOverride, doesExecutableExist)
+import           System.Process.Read (runIn, EnvOverride, doesExecutableExist)
 
 -- | A cabal file with name and version parsed from the filepath, and the
 -- package description itself ready to be parsed. It's left in unparsed form
@@ -187,7 +197,7 @@ updateIndex :: (MonadIO m,MonadLogger m
             -> PackageIndex
             -> m ()
 updateIndex menv index =
-  do $logInfo $ "Updating package index " <> indexNameText (indexName index) <> "..."
+  do $logInfo $ "Updating package index " <> indexNameText (indexName index) <> " ..."
      git <- isGitInstalled menv
      let name = indexName index
      case (git, indexLocation index) of
@@ -226,7 +236,8 @@ updateIndexGit menv indexName' index gitUrl = do
             repoExists <-
               liftIO (doesDirectoryExist (toFilePath acfDir))
             unless repoExists
-                   (do $logInfo ("Cloning repository for first from " <> gitUrl)
+                   (do $logInfo ("Cloning package index ... ")
+                       $logDebug ("Cloning Git repo from " <> gitUrl)
                        runIn suDir "git" menv cloneArgs Nothing)
             runIn acfDir "git" menv ["fetch","--tags","--depth=1"] Nothing
             _ <-
@@ -346,7 +357,7 @@ populateCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, Mon
               -> PackageIndex
               -> m (Map PackageIdentifier PackageCache)
 populateCache menv index = do
-    $logInfo "Populating index cache, may take a moment"
+    $logInfo "Populating index cache, may take a moment ..."
     let toIdent (Left ucf) = Just
             ( PackageIdentifier (ucfName ucf) (ucfVersion ucf)
             , PackageCache
@@ -374,7 +385,7 @@ populateCache menv index = do
                 | indexRequireHashes index -> throwM $ MissingRequiredHashes (indexName index) ident
                 | otherwise -> return (ident, pc)
 
-    $logInfo "Done populating cache"
+    $logInfo "Done populating index cache."
 
     return pis'
 
