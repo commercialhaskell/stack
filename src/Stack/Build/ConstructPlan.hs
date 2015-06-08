@@ -232,9 +232,14 @@ addPackageDeps package = do
     deps <- forM (Map.toList deps') $ \(depname, range) -> do
         eres <- addDep depname
         case eres of
-            Left _ -> return $ Left (depname, (range, Nothing))
+            Left e ->
+                let bd =
+                        case e of
+                            UnknownPackage _ -> NotInBuildPlan
+                            _ -> Couldn'tResolveItsDependencies
+                 in return $ Left (depname, (range, bd))
             Right adr | not $ adrVersion adr `withinRange` range ->
-                return $ Left (depname, (range, Just $ adrVersion adr))
+                return $ Left (depname, (range, DependencyMismatch $ adrVersion adr))
             Right (ADRToInstall task) -> return $ Right
                 (Set.singleton $ taskProvides task, Set.empty)
             Right (ADRFound _ Executable) -> return $ Right

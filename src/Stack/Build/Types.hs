@@ -151,9 +151,16 @@ data ConstructPlanException
     = SnapshotPackageDependsOnLocal PackageName PackageIdentifier
     -- ^ Recommend adding to extra-deps
     | DependencyCycleDetected [PackageName]
-    | DependencyPlanFailures PackageName (Map PackageName (VersionRange, Maybe Version))
+    | DependencyPlanFailures PackageName (Map PackageName (VersionRange, BadDependency))
     | UnknownPackage PackageName
     -- ^ Recommend adding to extra-deps, give a helpful version number?
+    deriving (Typeable, Eq)
+
+-- | Reason why a dependency was not used
+data BadDependency
+    = NotInBuildPlan -- TODO add recommended version so it can be added to extra-deps
+    | Couldn'tResolveItsDependencies
+    | DependencyMismatch Version
     deriving (Typeable, Eq)
 
 instance Show ConstructPlanException where
@@ -182,14 +189,15 @@ instance Show ConstructPlanException where
       indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
       doubleIndent = indent . indent
       appendDeps = foldr (\dep-> (++) ("\n" ++ showDep dep)) ""
-      showDep (name, (range, mversion)) = concat
+      showDep (name, (range, badDep)) = concat
         [ show name
         , ": needed ("
         , display range
         , "), but "
-        , case mversion of
-            Nothing -> "none found"
-            Just version -> versionString version ++ " found"
+        , case badDep of
+            NotInBuildPlan -> "not present in build plan"
+            Couldn'tResolveItsDependencies -> "couldn't resolve its dependencies"
+            DependencyMismatch version -> versionString version ++ " found"
         ]
          {- TODO Perhaps change the showDep function to look more like this:
           dropQuotes = filter ((/=) '\"')
@@ -244,7 +252,7 @@ instance Show CabalExitedUnsuccessfully where
        logLocations ++
        (if S.null bs
             then ""
-            else "\n" ++ doubleIndent (T.unpack $ decodeUtf8With lenientDecode bs))
+            else "\n\n" ++ doubleIndent (T.unpack $ decodeUtf8With lenientDecode bs))
      where
       -- appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
       indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
