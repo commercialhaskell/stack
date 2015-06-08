@@ -17,32 +17,16 @@ module Stack.Build
   ,clean)
   where
 
-import           Control.Applicative
-import           Control.Concurrent (getNumCapabilities, forkIO)
-import           Control.Concurrent.Execute
-import           Control.Concurrent.MVar.Lifted
-import           Control.Concurrent.STM
-import           Control.Exception.Enclosed (handleIO, tryIO)
 import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.Catch (MonadCatch, MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader, asks, ask, runReaderT)
+import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.State.Strict
-import           Control.Monad.Trans.Control (liftBaseWith)
 import           Control.Monad.Trans.Resource
 import           Control.Monad.Writer
-import           Data.Binary (Binary)
-import qualified Data.Binary as Binary
-import           Data.ByteString (ByteString)
-import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
-import qualified Data.ByteString.Lazy as L
-import           Data.Char (isSpace)
-import           Data.Conduit
-import qualified Data.Conduit.Binary as CB
-import qualified Data.Conduit.List as CL
 import           Data.Either
 import           Data.Function
 import           Data.List
@@ -53,19 +37,11 @@ import           Data.Maybe
 import           Data.Set (Set)
 import qualified Data.Set as S
 import qualified Data.Set as Set
-import qualified Data.Streaming.Process as Process
-import           Data.Streaming.Process hiding (env,callProcess)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Data.Time.Calendar
-import           Data.Time.Clock
-import           Data.Typeable (Typeable)
 import           Distribution.Package (Dependency (..))
-import           Distribution.System (Platform (Platform), OS (Windows))
-import           Distribution.Text (display)
 import           Distribution.Version (intersectVersionRanges, anyVersion)
-import           GHC.Generics (Generic)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.IO
@@ -79,16 +55,9 @@ import           Stack.Constants
 import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
-import           Stack.PackageDump
 import           Stack.Types
 import           Stack.Types.Internal
 import           System.Directory hiding (findFiles, findExecutable)
-import           System.Exit (ExitCode (ExitSuccess))
-import           System.IO
-import           System.IO.Error
-import           System.IO.Temp (withSystemTempDirectory)
-import           System.Process.Internals (createProcess_)
-import           System.Process.Read
 
 {- EKB TODO: doc generation for stack-doc-server
 #ifndef mingw32_HOST_OS
@@ -184,7 +153,6 @@ type S = Map PackageName (Either ConstructPlanException AddDepRes)
 adrVersion :: AddDepRes -> Version
 adrVersion (ADRToInstall task) = packageIdentifierVersion $ taskProvides task
 adrVersion (ADRFound v _) = v
-data DirtyResult = Dirty NeededSteps | Clean
 
 constructPlan :: forall env m.
                  M env m
@@ -349,7 +317,7 @@ constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered loadPacka
         eress <- forM (M.toList $ packageDepsWithTools package) $ \(name, range) -> do
             eres <- addDep callStack name
             case eres of
-                Left e -> return $ Left name
+                Left _e -> return $ Left name -- FIXME do something better with this?
                 Right adr
                     | adrVersion adr `withinRange` range -> return $ Right adr
                     | otherwise -> do
