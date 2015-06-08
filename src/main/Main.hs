@@ -437,6 +437,7 @@ execCmd (cmd, args) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $ do
           cmd' <- join $ System.Process.Read.findExecutable menv cmd
           let cp = (P.proc (toFilePath cmd') args)
                   { P.env = envHelper menv
+                  , P.delegate_ctlc = True
                   }
 
           (Nothing, Nothing, Nothing, ph) <- P.createProcess cp
