@@ -56,6 +56,7 @@ data StackBuildException
   | Couldn'tParseTargets [Text]
   | UnknownTargets [PackageName]
   | TestSuiteFailure (Path Abs File) (Maybe (Path Abs File)) ExitCode
+  | ConstructPlanExceptions [ConstructPlanException]
   deriving Typeable
 
 instance Show StackBuildException where
@@ -144,6 +145,14 @@ instance Show StackBuildException where
                     Just logFile ->
                         ", log available at: " ++ toFilePath logFile
                 ]
+    show (ConstructPlanExceptions exceptions) =
+        "Exception: Stack.Build.ConstuctPlanExceptions\n" ++
+        "While constructing the BuildPlan the following exceptions were encountered:" ++
+        appendExceptions (removeDuplicates exceptions)
+         where
+             appendExceptions = foldr (\e -> (++) ("\n\n--" ++ show e)) ""
+             removeDuplicates = nub
+     -- Supressing duplicate output
 
 instance Exception StackBuildException
 
@@ -208,20 +217,6 @@ instance Show ConstructPlanException where
              "  Allowed version range is " ++ display versionRange ++ ",\n" ++
              "  should you correct the version range for " ++ dropQuotes (show pIdentifier) ++ ", found in [extra-deps] in the project's stack.yaml?"
              -}
-
-newtype ConstructPlanExceptions = ConstructPlanExceptions [ConstructPlanException]
-    deriving (Typeable)
-instance Exception ConstructPlanExceptions
-
-instance Show ConstructPlanExceptions where
-  show (ConstructPlanExceptions exceptions) =
-    "Exception: Stack.Build.ConstuctPlanExceptions\n" ++
-    "While constructing the BuildPlan the following exceptions were encountered:" ++
-    appendExceptions (removeDuplicates exceptions)
-     where
-         appendExceptions = foldr (\e -> (++) ("\n\n--" ++ show e)) ""
-         removeDuplicates = nub
- -- Supressing duplicate output
 
 data UnpackedPackageHasWrongName = UnpackedPackageHasWrongName PackageIdentifier PackageName
     deriving (Show, Typeable)
