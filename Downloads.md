@@ -2,6 +2,8 @@ Distribution packages are available for Ubuntu and Arch Linux. For the future, w
 
 ## Ubuntu
 
+![Installing stack on Ubuntu](http://i.imgur.com/FiywTQA.gif)
+
 * Ubuntu 15.04 (amd64)
 
 ```sh
