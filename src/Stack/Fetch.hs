@@ -104,7 +104,7 @@ instance Show FetchException where
         "The following packages were not found in your indices: " ++
         intercalate ", " (map packageNameString $ Set.toList names)
     show (UnknownPackageIdentifiers idents) =
-        "The following package identifierss were not found in your indices: " ++
+        "The following package identifiers were not found in your indices: " ++
         intercalate ", " (map packageIdentifierString $ Set.toList idents)
 
 -- | Intended to work for the command line command.
