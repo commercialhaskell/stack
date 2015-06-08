@@ -11,9 +11,7 @@ module Stack.Build.ConstructPlan
 import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Reader         (MonadReader, ReaderT, ask, asks,
-                                               local, runReaderT)
-import           Control.Monad.State.Strict
+import           Control.Monad.RWS.Strict
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Char8        as S8
 import           Data.Either
@@ -23,7 +21,6 @@ import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import qualified Data.Map.Strict              as Map
 import           Data.Maybe
-import           Data.Monoid                  (mconcat)
 import           Data.Set                     (Set)
 import qualified Data.Set                     as Set
 import           Data.Text.Encoding           (encodeUtf8)
@@ -68,8 +65,11 @@ data AddDepRes
     | ADRFound Version Installed
     deriving Show
 
-type S = Map PackageName (Either ConstructPlanException AddDepRes)
-type M = StateT S (ReaderT Ctx IO)
+type M = RWST
+    Ctx
+    (Map PackageName Task) -- JustFinal
+    (Map PackageName (Either ConstructPlanException AddDepRes))
+    IO
 
 data Ctx = Ctx
     { mbp            :: !MiniBuildPlan
@@ -100,10 +100,8 @@ constructPlan :: forall env m.
               -> m Plan
 constructPlan mbp0 baseConfigOpts0 locals extraToBuild locallyRegistered loadPackage0 sourceMap installedMap = do
     bconfig <- asks getBuildConfig
-    m <- liftIO $ flip runReaderT (ctx bconfig) $ flip execStateT M.empty $ do
-        let allTargets = Set.fromList
-                       $ map (packageName . lpPackage) locals ++ extraToBuild
-        mapM_ addDep $ Set.toList allTargets
+    let inner = mapM_ addDep $ Set.toList allTargets
+    ((), m, justFinals) <- liftIO $ runRWST inner (ctx bconfig) M.empty
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
     case partitionEithers $ map toEither $ M.toList m of
@@ -112,11 +110,14 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild locallyRegistered loadPac
                 toTask (name, ADRToInstall task) = Just (name, task)
                 tasks = M.fromList $ mapMaybe toTask adrs
             return Plan
-                { planTasks = tasks -- FIXME add in JustFinal for all missing wanteds
+                { planTasks = Map.union tasks justFinals
                 , planUnregisterLocal = mkUnregisterLocal tasks locallyRegistered
                 }
         (errs, _) -> throwM $ ConstructPlanExceptions errs
   where
+    allTargets = Set.fromList
+               $ map (packageName . lpPackage) locals ++ extraToBuild
+
     ctx bconfig = Ctx
         { mbp = mbp0
         , baseConfigOpts = baseConfigOpts0
@@ -257,12 +258,27 @@ checkDirtiness ps (Library installed) package present = do
             (piiLocation ps) -- should be Local always
             (packageFlags package)
     moldOpts <- psOldOpts ps installed
-    return $ case moldOpts of
-        Nothing -> Just AllSteps
+    case moldOpts of
+        Nothing -> return $ Just AllSteps
         Just oldOpts
-            | oldOpts /= map encodeUtf8 configOpts -> Just AllSteps
-            | psDirty ps -> Just SkipConfig
-            | otherwise -> Nothing
+            | oldOpts /= map encodeUtf8 configOpts -> return $ Just AllSteps
+            | psDirty ps -> return $ Just SkipConfig
+            | otherwise -> do
+                case ps of
+                    PSLocal lp | lpWanted lp -> do
+                        -- track the fact that we need to perform a JustFinal. But
+                        -- don't put this in the main State Map, as that would
+                        -- trigger dependencies to rebuild also.
+                        tell $ Map.singleton (packageName package) Task
+                            { taskProvides = PackageIdentifier
+                                (packageName package)
+                                (packageVersion package)
+                            , taskType = TTLocal lp JustFinal
+                            , taskConfigOpts = TaskConfigOpts Set.empty $ \missing' ->
+                                assert (Set.null missing') configOpts
+                            }
+                    _ -> return ()
+                return Nothing
 
 psDirty :: PackageSource -> Bool
 psDirty (PSLocal lp) = lpDirtyFiles lp
