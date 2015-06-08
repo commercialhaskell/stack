@@ -14,7 +14,7 @@ copyright:           2015 FP Complete
 category:            Development
 build-type:          Simple
 cabal-version:       >=1.10
-extra-source-files:  README.md ARCHITECTURE.md ChangeLog.md
+extra-source-files:  README.md ChangeLog.md
                      test/package-dump/*.txt
 
 library
