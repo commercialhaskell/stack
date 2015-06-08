@@ -21,15 +21,17 @@ import Data.Data
 import Data.Hashable
 import Data.List (dropWhileEnd, nub)
 import Data.Map.Strict (Map)
+import qualified Data.Map as Map
 import Data.Maybe
 import Data.Monoid
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (Text)
+import qualified Data.Text as T
 import Distribution.Package (Dependency)
 import Distribution.Text (display)
 import GHC.Generics
-import Path (Path, Abs, File, Dir)
+import Path (Path, Abs, File, Dir, mkRelDir, toFilePath, (</>))
 import Prelude hiding (FilePath)
 import Stack.Package
 import Stack.Types
@@ -301,3 +303,62 @@ data BaseConfigOpts = BaseConfigOpts
     , bcoFinalAction :: !FinalAction
     , bcoGhcOptions :: ![Text]
     }
+
+-- | Render a @BaseConfigOpts@ to an actual list of options
+configureOpts :: BaseConfigOpts
+              -> Set GhcPkgId -- ^ dependencies
+              -> Bool -- ^ wanted?
+              -> Location
+              -> Map FlagName Bool
+              -> [Text]
+configureOpts bco deps wanted loc flags = map T.pack $ concat
+    [ ["--user", "--package-db=clear", "--package-db=global"]
+    , map (("--package-db=" ++) . toFilePath) $ case loc of
+        Snap -> [bcoSnapDB bco]
+        Local -> [bcoSnapDB bco, bcoLocalDB bco]
+    , depOptions
+    , [ "--libdir=" ++ toFilePath (installRoot </> $(mkRelDir "lib"))
+      , "--bindir=" ++ toFilePath (installRoot </> bindirSuffix)
+      , "--datadir=" ++ toFilePath (installRoot </> $(mkRelDir "share"))
+      , "--docdir=" ++ toFilePath (installRoot </> $(mkRelDir "doc"))
+      ]
+    , ["--enable-library-profiling" | bcoLibProfiling bco || bcoExeProfiling bco]
+    , ["--enable-executable-profiling" | bcoLibProfiling bco]
+    , ["--enable-tests" | wanted && bcoFinalAction bco == DoTests]
+    , ["--enable-benchmarks" | wanted && bcoFinalAction bco == DoBenchmarks]
+    , map (\(name,enabled) ->
+                       "-f" <>
+                       (if enabled
+                           then ""
+                           else "-") <>
+                       flagNameString name)
+                    (Map.toList flags)
+    -- FIXME Chris: where does this come from now? , ["--ghc-options=-O2" | gconfigOptimize gconfig]
+    , if wanted
+        then concatMap (\x -> ["--ghc-options", T.unpack x]) (bcoGhcOptions bco)
+        else []
+    ]
+  where
+    installRoot =
+        case loc of
+            Snap -> bcoSnapInstallRoot bco
+            Local -> bcoLocalInstallRoot bco
+
+    depOptions = map toDepOption $ Set.toList deps
+
+    {- TODO does this work with some versions of Cabal?
+    toDepOption gid = T.pack $ concat
+        [ "--dependency="
+        , packageNameString $ packageIdentifierName $ ghcPkgIdPackageIdentifier gid
+        , "="
+        , ghcPkgIdString gid
+        ]
+    -}
+    toDepOption gid = concat
+        [ "--constraint="
+        , packageNameString name
+        , "=="
+        , versionString version
+        ]
+      where
+        PackageIdentifier name version = ghcPkgIdPackageIdentifier gid
