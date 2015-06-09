@@ -40,7 +40,7 @@ Run `stack` for a complete list of commands.
 #### Architecture
 
 A full description of the architecture
-[is available here](https://github.com/fpco/stack/blob/master/ARCHITECTURE.md#shared-databases-not-sandboxes).
+[is available here](https://github.com/fpco/stack/wiki/Architecture).
 
 #### Frequently Asked Questions
 
