@@ -197,15 +197,15 @@ updateIndex :: (MonadIO m,MonadLogger m
             -> PackageIndex
             -> m ()
 updateIndex menv index =
-  do $logInfo $ "Updating package index " <> indexNameText (indexName index) <> " ..."
+  do let name = indexName index
+         logUpdate mirror = $logInfo $ "Updating package index " <> indexNameText (indexName index) <> " (mirrored at " <> mirror  <> ") ..."
      git <- isGitInstalled menv
-     let name = indexName index
      case (git, indexLocation index) of
-        (True, ILGit url) -> updateIndexGit menv name index url
-        (True, ILGitHttp url _) -> updateIndexGit menv name index url
-        (_, ILHttp url) -> updateIndexHTTP name index url
-        (False, ILGitHttp _ url) -> updateIndexHTTP name index url
-        (False, ILGit _) -> throwM $ GitNotAvailable name
+        (True, ILGit url) -> logUpdate url >> updateIndexGit menv name index url
+        (True, ILGitHttp url _) -> logUpdate url >> updateIndexGit menv name index url
+        (_, ILHttp url) -> logUpdate url >> updateIndexHTTP name index url
+        (False, ILGitHttp _ url) -> logUpdate url >> updateIndexHTTP name index url
+        (False, ILGit url) -> logUpdate url >> (throwM $ GitNotAvailable name)
 
 -- | Update the index Git repo and the index tarball
 updateIndexGit :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasConfig env)
