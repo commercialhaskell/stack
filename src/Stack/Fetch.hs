@@ -25,6 +25,7 @@ import qualified Codec.Archive.Tar.Check as Tar
 import           Codec.Compression.GZip (decompress)
 import           Control.Applicative
 import           Control.Concurrent.Async (Concurrently (..))
+import           Control.Concurrent.MVar.Lifted (newMVar, modifyMVar)
 import           Control.Concurrent.STM          (TVar, atomically, modifyTVar,
                                                   newTVarIO, readTVar,
                                                   readTVarIO, writeTVar)
@@ -43,6 +44,7 @@ import qualified Data.ByteString.Lazy as L
 import           Data.Either (partitionEithers)
 import qualified Data.Foldable as F
 import           Data.Function (fix)
+import           Data.IORef (newIORef, readIORef, writeIORef)
 import           Data.List (intercalate)
 import           Data.Map (Map)
 import qualified Data.Map as Map
@@ -232,22 +234,54 @@ withCabalFiles name pkgs f = do
 -- | Provide a function which will load up a cabal @ByteString@ from the
 -- package indices.
 withCabalLoader
-    :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
+    :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env, MonadBaseControl IO m)
     => EnvOverride
     -> ((PackageIdentifier -> IO ByteString) -> m a)
     -> m a
 withCabalLoader menv inner = do
-    caches <- getPackageCaches menv
+    icaches <- getPackageCaches menv >>= liftIO . newIORef
     env <- ask
+
+    -- Want to try updating the index once during a single run for missing
+    -- package identifiers. We also want to ensure we only update once at a
+    -- time
+    updateRef <- liftIO $ newMVar True
+
+    runInBase <- liftBaseWith $ \run -> return (void . run)
+
     -- TODO in the future, keep all of the necessary @Handle@s open
-    inner $ \ident ->
-        case Map.lookup ident caches of
-            Nothing -> throwM $ UnknownPackageIdentifiers $ Set.singleton ident
-            Just (index, cache) -> do
-                [bs] <- flip runReaderT env
-                      $ withCabalFiles (indexName index) [(ident, cache, ())]
-                      $ \_ _ bs -> return bs
-                return bs
+    let doLookup ident = do
+            eres <- doLookup' ident
+            case eres of
+                Right bs -> return bs
+                -- Update the cache and try again
+                Left e -> join $ modifyMVar updateRef $ \toUpdate ->
+                    if toUpdate
+                        then do
+                            runInBase $ do
+                                $logInfo $ T.concat
+                                    [ "Didn't see "
+                                    , T.pack $ packageIdentifierString ident
+                                    , " in your package indices, updating and trying again"
+                                    ]
+                                updateAllIndices menv
+                                caches <- getPackageCaches menv
+                                liftIO $ writeIORef icaches caches
+                            return (False, doLookup ident)
+                        else return (toUpdate, throwM e)
+
+        doLookup' ident = do
+            caches <- liftIO $ readIORef icaches
+            case Map.lookup ident caches of
+                Nothing ->
+                    return $ Left $ UnknownPackageIdentifiers $ Set.singleton ident
+                Just (index, cache) -> do
+                    [bs] <- flip runReaderT env
+                          $ withCabalFiles (indexName index) [(ident, cache, ())]
+                          $ \_ _ bs -> return bs
+                    return $ Right bs
+
+    inner doLookup
 
 -- | Figure out where to fetch from.
 getToFetch :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env)
