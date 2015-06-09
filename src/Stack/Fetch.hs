@@ -400,7 +400,14 @@ fetchPackages mdistDir toFetchAll = do
                         newDist = inner FP.</> toFilePath distDir
                     exists <- doesDirectoryExist oldDist
                     when exists $ do
-                        createDirectoryIfMissing True $ FP.takeDirectory newDist
+                        -- Previously used takeDirectory, but that got confused
+                        -- by trailing slashes, see:
+                        -- https://github.com/commercialhaskell/stack/issues/216
+                        --
+                        -- Instead, use Path which is a bit more resilient
+                        newDist' <- parseAbsDir newDist
+                        createDirectoryIfMissing True
+                            $ toFilePath $ parent newDist'
                         renameDirectory oldDist newDist
 
             let cabalFP =
