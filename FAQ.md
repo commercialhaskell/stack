@@ -77,7 +77,7 @@ Set the `STACK_YAML` environment variable to point to the `stack.yaml` config
 file for your project. Then you can run `stack exec`, `stack ghc`, etc., from
 any directory and still use your packages.
 
-__Can I get bash autocomplation?__
+__Can I get bash autocompletion?__
 
 Yes, just run the following:
 
