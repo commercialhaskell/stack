@@ -1,4 +1,4 @@
-Distribution packages are available for Ubuntu and Arch Linux. For the future, we have plans to support more OSes.
+Distribution packages are available for [Ubuntu](#ubuntu) and [Arch Linux](#arch-linux). Binaries for other operating systems are available on [the releases page](https://github.com/fpco/stack/releases). For the future, we have plans to support more OSes.
 
 ## Ubuntu
 
