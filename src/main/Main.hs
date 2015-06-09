@@ -499,7 +499,7 @@ logLevelOpt =
                    help "Verbosity: silent, error, warn, info, debug")) <|>
   flag defaultLogLevel
        verboseLevel
-       (short 'v' <>
+       (short 'v' <> long "verbose" <>
         help ("Enable verbose mode: verbosity level \"" <> showLevel verboseLevel <> "\""))
   where verboseLevel = LevelDebug
         showLevel l =
