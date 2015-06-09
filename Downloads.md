@@ -5,8 +5,8 @@ Distribution packages are available for Ubuntu and Arch Linux. For the future, w
 * Ubuntu 15.04 (amd64)
 
 ```sh
-wget -q -O- https://fpco.s3.amazonaws.com/fpco.key | sudo apt-key add -
-echo 'deb http://fpco.s3.amazonaws.com/ubuntu/vivid stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
+wget -q -O- https://downloads.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
+echo 'deb https://downloads.fpcomplete.com/ubuntu/vivid stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 sudo apt-get update
 sudo apt-get install stack -y
 ```
@@ -14,8 +14,8 @@ sudo apt-get install stack -y
 * Ubuntu 14.10 (amd64)
 
 ```sh
-wget -q -O- https://fpco.s3.amazonaws.com/fpco.key | sudo apt-key add -
-echo 'deb http://fpco.s3.amazonaws.com/ubuntu/utopic stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
+wget -q -O- http://download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
+echo 'deb http://download.fpcomplete.com/ubuntu/utopic stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 sudo apt-get update
 sudo apt-get install stack -y
 ```
@@ -23,8 +23,8 @@ sudo apt-get install stack -y
 * Ubuntu 14.04 (amd64)
 
 ```sh
-wget -q -O- https://fpco.s3.amazonaws.com/fpco.key | sudo apt-key add -
-echo 'deb http://fpco.s3.amazonaws.com/ubuntu/trusty stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
+wget -q -O- http://download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
+echo 'deb http://download.fpcomplete.com/ubuntu/trusty stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 sudo apt-get update
 sudo apt-get install stack -y
 ```
@@ -32,8 +32,8 @@ sudo apt-get install stack -y
 * Ubuntu 12.04 (amd64)
 
 ```sh
-wget -q -O- https://fpco.s3.amazonaws.com/fpco.key | sudo apt-key add -
-echo 'deb http://fpco.s3.amazonaws.com/ubuntu/precise stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
+wget -q -O- http://download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
+echo 'deb http://download.fpcomplete.com/ubuntu/precise stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 sudo apt-get update
 sudo apt-get install stack -y
 ```
