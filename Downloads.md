@@ -5,7 +5,7 @@ Distribution packages are available for [Ubuntu](#ubuntu) and [Arch Linux](#arch
 (32-bit)
 
 * Download [stack-0.0.0-i386-windows.zip](https://github.com/fpco/stack/releases/download/v0.0.0-beta/stack-0.0.0-i386-windows.zip)
-* Unpack the `stack.exe` to `C:\Program Files\` and now you can run `stack` in the commandline.
+* Unpack the `stack.exe` to somewhere on your `%PATH%` and you can then run `stack` on the commandline.
 
 ## OS X
 
