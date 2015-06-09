@@ -149,8 +149,10 @@ spec = do
                 , (4, (4, 'a'))
                 ]
 
-        prop "invariant holds" $ \prunes ->
-            checkDepsPresent prunes $ fmap fst $ pruneDeps fst fst snd bestPrune prunes
+        prop "invariant holds" $ \prunes' ->
+            -- Force uniqueness
+            let prunes = Map.toList $ Map.fromList prunes'
+             in checkDepsPresent prunes $ fmap fst $ pruneDeps fst fst snd bestPrune prunes
 
 type PruneCheck = ((Int, Char), [(Int, Char)])
 
