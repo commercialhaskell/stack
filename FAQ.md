@@ -1,5 +1,5 @@
 So that this doesn't become repetitive: for the reasons behind the answers
-below, see [the architecture document](https://github.com/fpco/stack/blob/master/ARCHITECTURE.md). The goal of the answers here is to be as
+below, see the [[Architecture]] page. The goal of the answers here is to be as
 helpful and concise as possible.
 
 __I need to use a different version of a package than what is provided by the LTS Haskell snapshot I'm using, what should I do?__
