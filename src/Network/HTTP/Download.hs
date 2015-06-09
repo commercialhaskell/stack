@@ -5,6 +5,7 @@ module Network.HTTP.Download
     ( verifiedDownload
     , DownloadRequest(..)
     , HashCheck(..)
+    , CheckHexDigest(..)
     , LengthCheck
     , VerifiedDownloadException(..)
 

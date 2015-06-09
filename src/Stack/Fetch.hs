@@ -39,7 +39,6 @@ import           Control.Monad.Trans.Control
 import           Crypto.Hash (SHA512(..))
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as S
-import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy as L
 import           Data.Either (partitionEithers)
 import qualified Data.Foldable as F
@@ -360,7 +359,7 @@ fetchPackages mdistDir toFetchAll = do
         req <- parseUrl $ T.unpack $ tfUrl toFetch
         let destpath = tfTarball toFetch
 
-        let toHashCheck bs = HashCheck SHA512 (C8.unpack bs)
+        let toHashCheck bs = HashCheck SHA512 (CheckHexDigestByteString bs)
         let downloadReq = DownloadRequest
                 { drRequest = req
                 , drHashChecks = map toHashCheck $ maybeToList (tfSHA512 toFetch)
