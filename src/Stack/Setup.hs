@@ -550,8 +550,8 @@ setup7z :: (MonadReader env m, HasHttpManager env, MonadThrow m, MonadIO m, Mona
         -> Config
         -> m (Path Abs Dir -> Path Abs File -> n ())
 setup7z si config = do
-    chattyDownload (siSevenzDll si) "7z" dll
-    chattyDownload (siSevenzExe si) "7z" exe
+    chattyDownload "7z.dll" (siSevenzDll si) dll
+    chattyDownload "7z.exe" (siSevenzExe si) exe
     return $ \outdir archive -> liftIO $ do
         ec <- rawSystem (toFilePath exe)
             [ "x"
