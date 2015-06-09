@@ -1,3 +1,28 @@
+## Terminology
+
+* Package identifier: a package name and version, e.g. text-1.2.1.0
+* GhcPkgId: a package identifier plus the unique hash for the generated binary, e.g. text-1.2.1.0-bb83023b42179dd898ebe815ada112c2
+* Package index: a collection of packages available for download. This is a combination of an index containing all of the .cabal files (either a tarball downloaded via HTTP(S) or a Git repository) and some way to download package tarballs.
+    * By default, stack uses a single package index (the Github/S3 mirrors of Hackage), but supports customization and adding more than one index
+* Package database: a collection of metadata about built libraries
+* Install root: a destination for installing packages into. Contains a bin path (for generated executables), lib (for the compiled libraries), pkgdb (for the package database), and a few other things
+* Snapshot: an LTS Haskell or Stackage Nightly, which gives information on a complete set of packages. This contains a lot of metadata, but importantly it can be converted into a mini build plan...
+* Mini build plan: a collection of package identifiers and their build flags that are known to build together
+* Resolver: the means by which stack resolves dependencies for your packages. The two currently supported options are snapshot (using LTS or Nightly), and GHC (which installs no extra dependencies). Others may be added in the future (such as a SAT-based dependency solver). These packages are always taken from a package index
+* extra-deps: additional packages to be taken from the package index for dependencies. This list will *shadow* packages provided by the resolver
+* Local packages: source code actually present on your file system, and referred to by the `packages` field in your stack.yaml file. Each local package has exactly one .cabal file
+* Project: a stack.yaml config file and all of the local packages it refers to. 
+
+__FIXME__ Just notes below here
+
+## Databases
+
+* global- never modified by stack
+* snap- shared, follows the build flags and dependencies in the resolver, never affected by user flags
+* local- everything else
+
+## Building
+
 __NOTE__ Needs to be cleaned up, this content hasn't been updated since some major refactorings took place.
 
 ## Architecture of stack
