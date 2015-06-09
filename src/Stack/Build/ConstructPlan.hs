@@ -269,7 +269,11 @@ addPackageDeps package = do
                 (Set.empty, Set.singleton gid)
     case partitionEithers deps of
         ([], pairs) -> return $ Right $ mconcat pairs
-        (errs, _) -> return $ Left $ DependencyPlanFailures (packageName package) (Map.fromList errs)
+        (errs, _) -> return $ Left $ DependencyPlanFailures
+            (PackageIdentifier
+                (packageName package)
+                (packageVersion package))
+            (Map.fromList errs)
   where
     adrVersion (ADRToInstall task) = packageIdentifierVersion $ taskProvides task
     adrVersion (ADRFound v _) = v

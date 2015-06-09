@@ -128,7 +128,7 @@ instance Exception StackBuildException
 
 data ConstructPlanException
     = DependencyCycleDetected [PackageName]
-    | DependencyPlanFailures PackageName (Map PackageName (VersionRange, BadDependency))
+    | DependencyPlanFailures PackageIdentifier (Map PackageName (VersionRange, BadDependency))
     | UnknownPackage PackageName -- TODO perhaps this constructor will be removed, and BadDependency will handle it all
     -- ^ Recommend adding to extra-deps, give a helpful version number?
     deriving (Typeable, Eq)
@@ -146,9 +146,9 @@ instance Show ConstructPlanException where
          (DependencyCycleDetected pNames) ->
            "While checking call stack,\n" ++
            "  dependency cycle detected in packages:" ++ indent (appendLines pNames)
-         (DependencyPlanFailures pName (Map.toList -> pDeps)) ->
+         (DependencyPlanFailures pIdent (Map.toList -> pDeps)) ->
            "Failure when adding dependencies:" ++ doubleIndent (appendDeps pDeps) ++ "\n" ++
-           "  needed for package: " ++ show pName
+           "  needed for package: " ++ packageIdentifierString pIdent
          (UnknownPackage pName) ->
              "While attempting to add dependency,\n" ++
              "  Could not find package " ++ show pName  ++ " in known packages"
