@@ -190,6 +190,8 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
         let headers = responseHeaders res
         whenJust drLengthCheck $ checkContentLengthHeader headers
         let hashChecks = (case List.lookup hContentMD5 headers of
+                _ -> []
+                {- FIXME: https://github.com/commercialhaskell/stack/issues/240
                 Just md5BS ->
                     let md5ExpectedHexDigest =  BC.unpack (B64.decodeLenient md5BS)
                     in  [ HashCheck
@@ -198,6 +200,7 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
                               }
                         ]
                 Nothing -> []
+                -}
                 ) ++ drHashChecks
 
         responseBody res
