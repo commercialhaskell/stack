@@ -1,5 +1,7 @@
 ## The Haskell Tool Stack
 
+[![Build Status](https://travis-ci.org/commercialhaskell/stack.svg?branch=master)](https://travis-ci.org/commercialhaskell/stack)
+
 `stack` is a cross-platform program for developing Haskell
 projects. It is aimed at Haskellers both new and experienced.
 
