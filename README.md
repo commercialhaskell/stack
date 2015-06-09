@@ -17,9 +17,11 @@ It features:
 
 Downloads are available by operating system:
 
-* [Linux](https://github.com/fpco/stack/wiki/Downloads)
-* ~~Windows~~ — Support will be available in next release.
-* ~~OS X~~ — Support will be available in next release.
+* [Windows](https://github.com/fpco/stack/wiki/Downloads#ubuntu
+* [OS X](https://github.com/fpco/stack/wiki/Downloads#osx)
+* [Ubuntu](https://github.com/fpco/stack/wiki/Downloads#ubuntu)
+* [Arch Linux](https://github.com/fpco/stack/wiki/Downloads#arch-linux)
+* [Linux (general)](https://github.com/fpco/stack/wiki/Downloads#linux)
 
 #### How to use
 
