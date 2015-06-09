@@ -13,7 +13,7 @@ optdepends=('docker: Use Docker images to build your project in a temporary cont
 provides=('stack')
 conflicts=('stack')
 # install=
-source=("${_pkgname}::git+https://github.com/commercial/stack.git")
+source=("${_pkgname}::git+https://github.com/commercialhaskell/stack.git")
 md5sums=('SKIP')
 
 prepare() {
