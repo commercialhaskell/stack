@@ -10,7 +10,7 @@ Distribution packages are available for [Ubuntu](#ubuntu) and [Arch Linux](#arch
 ## OS X
 
 * Download [stack-0.0.0-x86_64-osx.gz](https://github.com/fpco/stack/releases/download/v0.0.0-beta/stack-0.0.0-x86_64-osx.gz)
-* Open `Applications` folder and drag the `stack` executable into it. (TODO: Is this correct? Wiki contribution welcome.)
+* Extract the `stack` executable and put it somewhere on your `$PATH` (e.g. `/usr/local/bin`)
 
 ## Ubuntu
 
