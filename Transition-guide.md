@@ -4,3 +4,33 @@ This is intended to help people familiar with using other Haskell build tools- l
 * The `install` command doesn't exist. Dependencies are built for you automatically, and your packages are always registered into a local package database
 
 This page is just a stub right now, please help us expand! Also, the [[FAQ]] may be helpful.
+
+## Shared databases, not sandboxes
+
+Since sandboxing is such a common feature in the rest of the Haskell build tool
+world (hsenv, cabal, cabal-dev), it may be surprising to see so little mention
+of it in this document. That's because the goal of sandboxing- isolating
+builds- is the default in stack. There are two different aspects of a build
+that warrant some kind of isolation:
+
+* The package database, containing information on the compiled libraries
+* The bin directory, containing generated executables
+
+Whenever you build with stack, there are three of each at play:
+
+* GHC's `bin` directory and global package database
+* The snapshot's (e.g., lts-2.9)
+* Your project
+
+These are layered so that they shadow the previous ones. If you use extra-deps
+to install a new version of `text` in your project, for example, that will
+override whatever is installed in your snapshot. If you install a newer version
+of the xhtml library via your snapshot, it will shadow the xhtml that ships
+with GHC.
+
+The one important difference to note versus how GHC typically behaves is that
+we don't make use of the "user package database" at all. This is to properly
+enforce isolation. If you wish to use tools like `ghc` or `runhaskell`, you
+should do so via `stack ghc` or `stack exec`.
+
+The [[Architecture]] page goes into much more detail on this.

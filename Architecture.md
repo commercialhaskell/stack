@@ -13,166 +13,74 @@
 * Local packages: source code actually present on your file system, and referred to by the `packages` field in your stack.yaml file. Each local package has exactly one .cabal file
 * Project: a stack.yaml config file and all of the local packages it refers to. 
 
-__FIXME__ Just notes below here
-
 ## Databases
 
-* global- never modified by stack
-* snap- shared, follows the build flags and dependencies in the resolver, never affected by user flags
-* local- everything else
+Every build uses three distinct install roots, which means three separate package databases and bin paths. These are:
+
+* Global: the packages that ship with GHC. We never install anything into this database
+* Snapshot: a database shared by all projects using the same snapshot. Packages installed in this database must use the exact same dependencies and build flags as specified in the snapshot, and cannot be affected by user flags, ensuring that one project cannot corrupt another. There are two caveats to this:
+    * If different projects use different package indices, then their definitions of what package foo-1.2.3 are may be different, in which case they *can* corrupt each other's shared databases. This is warned about in the FAQ
+    * Turning on profiling may cause a package to be recompiled, which will result in a different GhcPkgId
+* Local: extra-deps, local packages, and snapshot packages which depend on them (more on that in shadowing)
 
 ## Building
 
-__NOTE__ Needs to be cleaned up, this content hasn't been updated since some major refactorings took place.
+### Shadowing
 
-## Architecture of stack
+Every project must have precisely one version of a package. If one of your
+local packages or extra dependencies conflicts with a package in the snapshot,
+the local/extradep *shadows* the snapshot version. The way this works is:
 
-It seemlessly handles multi-package projects,  It is:
+* The package is removed from the list of packages in the snapshot
+* Any package that depends on that package (directly or indirectly) is moved from the snapshot to extra-deps, so that it is available to your packages as dependencies.
+    * Note that there is no longer any guarantee that this package will build, since you're using an untested dependency
 
-* designed from the ground up to support common workflows many developers
-  encounter in the real world, such as multi-package projects and shared
-  package databases
+After shadowing, you end up with what is called internally a `SourceMap`, which
+is `Map PackageName PackageSource`, where a `PackageSource` can be either a
+local package, or a package taken from a package index (specified as a version
+number and the build flags).
 
-* robust by default, ensuring that separate projects cannot corrupt other
-  package databases (no explicit sandboxing required)
+### Installed packages
 
-* user friendly, making standard operations simple and performing necessary
-  prerequisites automatically, like installing dependencies and reconfiguring
+Once you have a `SourceMap`, you can inspect your three available databases and
+decide which of the installed packages you wish to use from them. We move from
+the global, to snapshot, and finally local, with the following rules:
 
-* modular, taking advantage of existing high quality projects like [LTS
-  Haskell](https://github.com/fpco/lts-haskell),
-  [Stackage](https://www.stackage.org/),
-  [all-cabal-hashes](https://github.com/commercialhaskell/all-cabal-hashes),
-  [the S3 Haskell package
-  mirror](https://www.fpcomplete.com/blog/2015/03/hackage-mirror),
-  [shake](http://shakebuild.com/) and the
-  [Cabal library](http://www.stackage.org/package/Cabal)
+* If we require profiling, and the library does not provide profiling, do not use it
+* If the package is in the `SourceMap`, but belongs to a difference database, or has a different version, do not use it
+* If after the above two steps, any of the dependencies are unavailable, do not use it
+* Otherwise: include the package in the list of installed packages
 
-* explicit about changes to your install plan; updating the list of available
-  packages will never cause `stack` to suddenly corrupt and reinstall your
-  packages
+We do something similar for executables, but maintain our own database of
+installed executables, since GHC does not track them for us.
 
-stack chooses sensible defaults wherever possible (such as preferring LTS
-Haskell snapshots) while allowing simple user customization (such as switching
-to either Stackage Nightly or manual package dependency selection). It will
-download and install GHC for you on many common platforms, or use your
-preexisting installation.
+### Plan construction
 
-#### Typical user story
+When running a build, we know which packages we want installed (inventively
+called "wanteds"), which packages are available to install, and which are
+already installed. In plan construction, we put them information together to
+decide which packages must be built. The code in Stack.Build.ConstructPlan is
+authoritative on this and should be consulted. The basic idea though is:
 
-To give an idea of how stack is used, here's a typical user story for a simple
-use case. Don't worry if some of the details seem strange, they'll be explained
-throughout this document:
+* If any of the dependencies have changed, reconfigure and rebuild
+* If a local package has any files changed, rebuild (but don't bother reconfiguring)
+* If a local package is wanted and we're running tests or benchmarks, run the test or benchmark even if the code and dependencies haven't changed
 
-1. You download the `stack` executable from (**FIXME** explain where it gets downloaded from) and put it on your `PATH`
-2. Go to an existing Haskell project with a .cabal file (we'll explain multi-package projects below)
-3. Run `stack build`. This will notice that you don't have a `stack.yaml` project configuration file, and create one for you. It will identify the most compatible snapshot (either LTS Haskell or Stackage Nightly), and set the current directory as the only package in the project. (See section below on snapshot auto-selection for more details.)
-4. Once the stack.yaml file is written, stack will check if you have the correct version of GHC on your PATH. If so, it will use it and continue. Otherwise, it will recommend that your run `stack setup` to download and install that GHC version. You can then run `stack build` again to continue.
-5. stack analyzes your package's cabal file, finds all necessary dependencies, and then installs the appropriate versions based on your selected snapshot. These packages are installed to a snapshot-specific package database, meaning that other projects using the same snapshot can use them, but other projects using a different snapshot will be unaffected by them
-6. Once your dependencies are installed, your package will be built and installed to your project-specific database
-7. If you have build errors, stack will print them
-8. Run `stack test` to run your test suites
-9. If you make changes to your package (or any packages in a multi-package project), `stack build` will rebuild them
+### Plan execution
 
-### stack.yaml
+Once we have the plan, execution is a relatively simple process of calling
+`runghc Setup.hs` in the correct order with the correct parameters. See
+Stack.Build.Execute for more information.
 
-stack.yaml is a project-wide configuration file. In stack terminology, a
-project is a collection of 1 or more packages, where a package is a single
-.cabal file. As its name implies, this is a YAML configuration file. You can
-look at the stack.yaml automatically created for you and add on from there.  A
-real life example from the [WAI repository](https://github.com/yesodweb/wai)
-is:
+## Configuration
 
-```yaml
-resolver: lts-2.9
-packages:
-- ./wai
-- ./wai-extra
-- ./warp
-- ./warp-tls
-- ./wai-app-static
-- ./wai-handler-fastcgi
-- ./wai-handler-launch
-- ./wai-websockets
-- ./wai-conduit
-- ./mime-types
-- ./auto-update
-extra-deps:
-- fast-logger-2.3.1
-- wai-logger-2.2.4
-```
-
-This demonstrates the three most common configuration values:
-
-* `resolver` states how dependencies are determined. Typically this will be an LTS Haskell or Stackage Nightly version, e.g. `lts-2.9` or `nightly-2015-05-26`. If you would like to specify all your dependencies manually, you can simply state the GHC major version to be used via `ghc-7.8` or `ghc-7.10`
-* `packages` lists the locations of all packages to be built. You generally will want to make these relative locations. A common use case- like that of WAI- is to put a `stack.yaml` at the root of a Git repository, with subdirectories for each package. If you just have a single package, it's also quite common to use something like `packages: ["."]`
-* `extra-deps` specifies additional dependencies to be installed from upstream. This can be used for multiple purposes: overriding a package version selected by your snapshot, or dealing with dependencies on your local packages (described below)
-
-__FIXME describe all of the other settings__
-
-### Dependencies vs local packages
-
-There's a clear separation in stack between your *dependencies* and your *local
-packages*. When installing dependencies for a snapshot, your local packages are
-not taken into account at all, and all installation goes into the shared
-package database. This is what allows us to both reuse compiled libraries and
-not risk corruption of a database based on what other projects are doing.
-
-When building this shared snapshot database, we turn on profiling immediately.
-The result of this is that the initial build will be a bit slower, but since
-recompilation of those packages never needs to happen, it's overall a
-time-saving feature.
-
-For local packages, however, stack will intelligently note when requirements
-have changed and rebuild. For example, when you initially run `stack build`, it
-will perform a non-profiled build. Later turning on profiling will
-automatically trigger local packages to be recompiled. The same applies to
-changing flags like `-Wall` and `-Werror`.
-
-#### Corner case: dependencies on local packages
-
-One corner case to be noted is when you are replacing a package in the snapshot
-with a local package. In the example from WAI above, note that the lts-2.9
-snapshot being used already provides the wai package (and others). In this
-case, stack will prune the dependency tree to disallow usage of wai and any of
-its users from the LTS snapshot. This ensures that when building your code,
-there is only one copy of the wai library in play- the local one. In the
-stack.yaml example above, we needed to explicitly include fast-logger and
-wai-logger since they depend on some of the packages being built locally.
-
-If this "corner case" seems a bit confusing, don't worry about it too much,
-most users will not run into it. Over time, as others get more experience with
-this case, I hope we can expand this section to make more sense.
-
-### Shared databases, not sandboxes
-
-Since sandboxing is such a common feature in the rest of the Haskell build tool
-world (hsenv, cabal, cabal-dev), it may be surprising to see so little mention
-of it in this document. That's because the goal of sandboxing- isolating
-builds- is the default in stack. There are two different aspects of a build
-that warrant some kind of isolation:
-
-* The package database, containing information on the compiled libraries
-* The bin directory, containing generated executables
-
-Whenever you build with stack, there are three of each at play:
-
-* GHC's `bin` directory and global package database
-* The snapshot's (e.g., lts-2.9)
-* Your project
-
-These are layered so that they shadow the previous ones. If you use extra-deps
-to install a new version of `text` in your project, for example, that will
-override whatever is installed in your snapshot. If you install a newer version
-of the xhtml library via your snapshot, it will shadow the xhtml that ships
-with GHC.
-
-The one important difference to note versus how GHC typically behaves is that
-we don't make use of the "user package database" at all. This is to properly
-enforce isolation. If you wish to use tools like `ghc` or `runhaskell`, you
-should do so via `stack ghc` or `stack exec`.
-
-### Environment variables
+stack has two layers of configuration: project and non-project. All of these
+are stored in stack.yaml files, but the former has extra fields (resolver,
+packages, extra-deps, and flags). The latter can be monoidally combined so that
+a system config file provides defaults, which a user can override with
+~/.stack/stack.yaml, and a project can further customize. In addition,
+environment variables STACK\_ROOT and STACK\_YAML can be used to tweak where
+stack gets its configuration from.
 
 stack follows a simple algorithm for finding your project configuration file:
 start in the current directory, and keep going to the parent until it finds a
@@ -181,7 +89,7 @@ sometimes want to override that behavior and point to a specific project in
 order to use its databases and bin directories. To do so, simply set the
 `STACK_YAML` environment variable to point to the relevant `stack.yaml` file.
 
-### Snapshot auto-detection
+## Snapshot auto-detection
 
 When you run `stack build` with no stack.yaml, it will create a basic
 configuration with a single package (the current directory) and an
@@ -203,9 +111,9 @@ second and third option above. Also, note that those options can be
 mixed-and-matched, e.g. you may decide to relax some version bounds in your
 .cabal file, while also adding some extra-deps.
 
-### Explicit breakage
+## Explicit breakage
 
-As mentioned above, updating your list of packages will not cause stack to
+As mentioned above, updating your package indices will not cause stack to
 invalidate any existing package databases. That's because stack is always
 explicit about build plans, via:
 
