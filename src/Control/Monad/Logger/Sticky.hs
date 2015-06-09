@@ -25,6 +25,8 @@ import           Language.Haskell.TH
 import           System.IO
 import           System.Log.FastLogger
 
+import           Prelude -- avoid AMP warnings
+
 data State = State
     { stateCurrentLine :: !(Maybe ByteString)
     , stateMaxColumns :: !Int
