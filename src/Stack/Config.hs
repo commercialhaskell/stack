@@ -25,6 +25,8 @@ module Stack.Config
   , loadConfig
   ) where
 
+import qualified Codec.Archive.Tar as Tar
+import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Catch
@@ -32,7 +34,10 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
 import           Control.Monad.Reader (MonadReader, ask, runReaderT)
 import           Control.Monad.Trans.Control (MonadBaseControl)
+import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson
+import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Lazy as L
 import           Data.Either (partitionEithers)
 import           Data.Map (Map)
 import qualified Data.IntMap as IntMap
@@ -43,9 +48,11 @@ import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Set as S
 import qualified Data.Text as T
+import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import qualified Data.Yaml as Yaml
 import           Distribution.System (OS (Windows), Platform (..), buildPlatform)
-import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager)
+import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager, parseUrl)
+import           Network.HTTP.Download (download)
 import           Options.Applicative (Parser)
 import           Path
 import           Path.IO
@@ -57,6 +64,7 @@ import           Stack.Package
 import           Stack.Types
 import           System.Directory
 import           System.Environment
+import           System.IO (IOMode (ReadMode), withBinaryFile)
 import           System.Process.Read (getEnvOverride, EnvOverride, unEnvOverride)
 
 -- | Get the default resolver value
@@ -294,7 +302,7 @@ loadBuildConfig mproject config noConfigStrat = do
 
 -- | Resolve a PackageEntry into a list of paths, downloading and cloning as
 -- necessary.
-resolvePackageEntry :: (MonadIO m, MonadThrow m)
+resolvePackageEntry :: (MonadIO m, MonadThrow m, MonadReader env m, HasHttpManager env)
                     => Path Abs Dir -- ^ project root
                     -> PackageEntry
                     -> m [(Path Abs Dir, Bool)]
@@ -308,12 +316,42 @@ resolvePackageEntry projRoot pe = do
 
 -- | Resolve a PackageLocation into a path, downloading and cloning as
 -- necessary.
-resolvePackageLocation :: (MonadIO m, MonadThrow m)
+resolvePackageLocation :: (MonadIO m, MonadThrow m, MonadReader env m, HasHttpManager env)
                        => Path Abs Dir -- ^ project root
                        -> PackageLocation
                        -> m (Path Abs Dir)
 resolvePackageLocation projRoot (PLFilePath fp) = resolveDir projRoot fp
-resolvePackageLocation _projRoot (PLHttpTarball _url) = error "resolvePackageLocation not implemented for HTTP tarballs"
+resolvePackageLocation projRoot (PLHttpTarball url) = do
+    let name = T.unpack $ decodeUtf8 $ B16.encode $ SHA256.hash $ encodeUtf8 url
+        root = projRoot </> workDirRel </> $(mkRelDir "downloaded")
+    fileRel <- parseRelFile $ name ++ ".tar.gz"
+    dirRel <- parseRelDir name
+    dirRelTmp <- parseRelDir $ name ++ ".tmp"
+    let file = root </> fileRel
+        dir = root </> dirRel
+        dirTmp = root </> dirRelTmp
+
+    exists <- liftIO $ doesDirectoryExist $ toFilePath dir
+    unless exists $ do
+        req <- parseUrl $ T.unpack url
+        _ <- download req file
+
+        removeTreeIfExists dirTmp
+        liftIO $ withBinaryFile (toFilePath file) ReadMode $ \h -> do
+            lbs <- L.hGetContents h
+            let entries = Tar.read $ GZip.decompress lbs
+            Tar.unpack (toFilePath dirTmp) entries
+            renameDirectory (toFilePath dirTmp) (toFilePath dir)
+
+    x <- listDirectory dir
+    case x of
+        ([dir'], []) -> return dir'
+        _ -> do
+            removeFileIfExists file
+            removeTreeIfExists dir
+            -- FIXME better exception type
+            error $ "Unexpected tarball contents: " ++ show x
+
 resolvePackageLocation _projRoot (PLGit _url _commit) = error "resolvePackageLocation not implemented for Git URLs"
 
 -- | Get the stack root, e.g. ~/.stack

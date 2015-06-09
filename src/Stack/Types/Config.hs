@@ -433,11 +433,14 @@ configPackageTarball iname ident = do
     base <- parseRelFile $ packageIdentifierString ident ++ ".tar.gz"
     return (root </> $(mkRelDir "packages") </> name </> ver </> base)
 
+workDirRel :: Path Rel Dir
+workDirRel = $(mkRelDir ".stack-work")
+
 -- | Per-project work dir
 configProjectWorkDir :: (HasBuildConfig env, MonadReader env m) => m (Path Abs Dir)
 configProjectWorkDir = do
     bc <- asks getBuildConfig
-    return (bcRoot bc </> $(mkRelDir ".stack-work"))
+    return (bcRoot bc </> workDirRel)
 
 -- | File containing the profiling cache, see "Stack.PackageDump"
 configProfilingCache :: (HasBuildConfig env, MonadReader env m) => m (Path Abs File)
