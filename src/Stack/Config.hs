@@ -148,7 +148,7 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
             configMonoidLatestSnapshotUrl
          configPackageIndices = fromMaybe
             [PackageIndex
-                { indexName = IndexName "hackage.haskell.org"
+                { indexName = IndexName "Hackage"
                 , indexLocation = ILGitHttp
                         "https://github.com/commercialhaskell/all-cabal-hashes.git"
                         "https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz"
