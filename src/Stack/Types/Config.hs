@@ -383,6 +383,7 @@ instance FromJSON ConfigMonoid where
 data ConfigException
   = ParseResolverException Text
   | NoProjectConfigFound (Path Abs Dir)
+  | UnexpectedTarballContents [Path Abs Dir] [Path Abs File]
   deriving Typeable
 instance Show ConfigException where
     show (ParseResolverException t) = concat
@@ -394,6 +395,13 @@ instance Show ConfigException where
         [ "Unable to find a stack.yaml file in the current directory ("
         , toFilePath dir
         , ") or its ancestors"
+        ]
+    show (UnexpectedTarballContents dirs files) = concat
+        [ "When unpacking a tarball specified in your stack.yaml file, "
+        , "did not find expected contents. Expected: a single directory. Found: "
+        , show ( map (toFilePath . dirname) dirs
+               , map (toFilePath . filename) files
+               )
         ]
 instance Exception ConfigException
 

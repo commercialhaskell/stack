@@ -350,11 +350,10 @@ resolvePackageLocation _ projRoot (PLHttpTarball url) = do
     x <- listDirectory dir
     case x of
         ([dir'], []) -> return dir'
-        _ -> do
+        (dirs, files) -> do
             removeFileIfExists file
             removeTreeIfExists dir
-            -- FIXME better exception type
-            error $ "Unexpected tarball contents: " ++ show x
+            throwM $ UnexpectedTarballContents dirs files
 
 resolvePackageLocation menv projRoot (PLGit url commit) = do
     let name = T.unpack $ decodeUtf8 $ B16.encode $ SHA256.hash $ encodeUtf8 $ T.unwords [url, commit]
