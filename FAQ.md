@@ -85,6 +85,13 @@ Yes, just run the following:
 
 You can add this to your `.bashrc` file if you like.
 
+If you're using zsh you can add 
+
+    autoload -U bashcompinit && bashcompinit
+    source <(stack --bash-completion-script `which stack`)
+
+to your `.zshrc`. (This may not work with older zsh versions)
+
 __How do I update my package index?__
 
 Users of cabal are used to running `cabal update` regularly. You can do the
