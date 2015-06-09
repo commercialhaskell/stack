@@ -6,3 +6,4 @@ to go. This list will likely expand over time:
 * stack can install GHC on Linux and Windows
 * stack can build the wai repo
 * Running `stack build` a second time on either stack or wai is a no-op
+* Build something that depends on `happy` (suggestion: `hlint`), since `happy` has special logic for moving around the `dist` directory
