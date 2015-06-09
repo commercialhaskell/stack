@@ -65,7 +65,7 @@ import           Stack.Types
 import           System.Directory
 import           System.Environment
 import           System.IO (IOMode (ReadMode), withBinaryFile)
-import           System.Process.Read (getEnvOverride, EnvOverride, unEnvOverride)
+import           System.Process.Read (getEnvOverride, EnvOverride, unEnvOverride, runIn)
 
 -- | Get the default resolver value
 getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
@@ -226,9 +226,10 @@ loadConfig configArgs = do
         case mproject of
             Nothing -> configArgs : extraConfigs
             Just (_, _, projectConfig) -> configArgs : projectConfig : extraConfigs
+    menv <- runReaderT getMinimalEnvOverride config
     return $ LoadConfig
         { lcConfig          = config
-        , lcLoadBuildConfig = loadBuildConfig mproject config
+        , lcLoadBuildConfig = loadBuildConfig menv mproject config
         , lcProjectRoot     = fmap (\(_, fp, _) -> parent fp) mproject
         }
 
@@ -243,11 +244,12 @@ packageEntryCurrDir = PackageEntry
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
 loadBuildConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env,MonadBaseControl IO m)
-                => Maybe (Project, Path Abs File, ConfigMonoid)
+                => EnvOverride
+                -> Maybe (Project, Path Abs File, ConfigMonoid)
                 -> Config
                 -> NoBuildConfigStrategy
                 -> m BuildConfig
-loadBuildConfig mproject config noConfigStrat = do
+loadBuildConfig menv mproject config noConfigStrat = do
     env <- ask
     let miniConfig = MiniConfig (getHttpManager env) config
     (project, stackYamlFP) <- case mproject of
@@ -286,7 +288,7 @@ loadBuildConfig mproject config noConfigStrat = do
             ResolverGhc m -> return $ fromMajorVersion m
 
     let root = parent stackYamlFP
-    packages' <- mapM (resolvePackageEntry root) (projectPackages project)
+    packages' <- mapM (resolvePackageEntry menv root) (projectPackages project)
     let packages = Map.fromList $ concat packages'
 
     return BuildConfig
@@ -302,26 +304,28 @@ loadBuildConfig mproject config noConfigStrat = do
 
 -- | Resolve a PackageEntry into a list of paths, downloading and cloning as
 -- necessary.
-resolvePackageEntry :: (MonadIO m, MonadThrow m, MonadReader env m, HasHttpManager env)
-                    => Path Abs Dir -- ^ project root
+resolvePackageEntry :: (MonadIO m, MonadThrow m, MonadReader env m, HasHttpManager env, MonadLogger m)
+                    => EnvOverride
+                    -> Path Abs Dir -- ^ project root
                     -> PackageEntry
                     -> m [(Path Abs Dir, Bool)]
-resolvePackageEntry projRoot pe = do
-    entryRoot <- resolvePackageLocation projRoot (peLocation pe)
+resolvePackageEntry menv projRoot pe = do
+    entryRoot <- resolvePackageLocation menv projRoot (peLocation pe)
     paths <-
         case peSubdirs pe of
             [] -> return [entryRoot]
-            subs -> mapM (resolveDir projRoot) subs
+            subs -> mapM (resolveDir entryRoot) subs
     return $ map (, peValidWanted pe) paths
 
 -- | Resolve a PackageLocation into a path, downloading and cloning as
 -- necessary.
-resolvePackageLocation :: (MonadIO m, MonadThrow m, MonadReader env m, HasHttpManager env)
-                       => Path Abs Dir -- ^ project root
+resolvePackageLocation :: (MonadIO m, MonadThrow m, MonadReader env m, HasHttpManager env, MonadLogger m)
+                       => EnvOverride
+                       -> Path Abs Dir -- ^ project root
                        -> PackageLocation
                        -> m (Path Abs Dir)
-resolvePackageLocation projRoot (PLFilePath fp) = resolveDir projRoot fp
-resolvePackageLocation projRoot (PLHttpTarball url) = do
+resolvePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
+resolvePackageLocation _ projRoot (PLHttpTarball url) = do
     let name = T.unpack $ decodeUtf8 $ B16.encode $ SHA256.hash $ encodeUtf8 url
         root = projRoot </> workDirRel </> $(mkRelDir "downloaded")
     fileRel <- parseRelFile $ name ++ ".tar.gz"
@@ -352,7 +356,29 @@ resolvePackageLocation projRoot (PLHttpTarball url) = do
             -- FIXME better exception type
             error $ "Unexpected tarball contents: " ++ show x
 
-resolvePackageLocation _projRoot (PLGit _url _commit) = error "resolvePackageLocation not implemented for Git URLs"
+resolvePackageLocation menv projRoot (PLGit url commit) = do
+    let name = T.unpack $ decodeUtf8 $ B16.encode $ SHA256.hash $ encodeUtf8 $ T.unwords [url, commit]
+        root = projRoot </> workDirRel </> $(mkRelDir "downloaded")
+    dirRel <- parseRelDir $ name ++ ".git"
+    dirRelTmp <- parseRelDir $ name ++ ".git.tmp"
+    let dir = root </> dirRel
+        dirTmp = root </> dirRelTmp
+
+    exists <- liftIO $ doesDirectoryExist $ toFilePath dir
+    unless exists $ do
+        removeTreeIfExists dirTmp
+        liftIO $ createDirectoryIfMissing True $ toFilePath $ parent dirTmp
+        runIn (parent dirTmp) "git" menv
+            [ "clone"
+            , T.unpack url
+            , toFilePath dirTmp
+            , "-b"
+            , T.unpack commit
+            ]
+            Nothing
+        liftIO $ renameDirectory (toFilePath dirTmp) (toFilePath dir)
+
+    return dir
 
 -- | Get the stack root, e.g. ~/.stack
 determineStackRoot :: (MonadIO m, MonadThrow m) => m (Path Abs Dir)
