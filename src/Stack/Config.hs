@@ -93,7 +93,7 @@ data ProjectAndConfigMonoid
 
 instance FromJSON ProjectAndConfigMonoid where
     parseJSON = withObject "Project, ConfigMonoid" $ \o -> do
-        dirs <- o .:? "packages" .!= ["."]
+        dirs <- o .:? "packages" .!= [packageEntryCurrDir]
         extraDeps' <- o .:? "extra-deps" .!= []
         extraDeps <-
             case partitionEithers $ goDeps extraDeps' of
@@ -224,6 +224,14 @@ loadConfig configArgs = do
         , lcProjectRoot     = fmap (\(_, fp, _) -> parent fp) mproject
         }
 
+-- | A PackageEntry for the current directory, used as a default
+packageEntryCurrDir :: PackageEntry
+packageEntryCurrDir = PackageEntry
+    { peValidWanted = True
+    , peLocation = PLFilePath "."
+    , peSubdirs = []
+    }
+
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
 loadBuildConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env,MonadBaseControl IO m)
@@ -253,7 +261,7 @@ loadBuildConfig mproject config noConfigStrat = do
             let p = Project
                     { projectPackages =
                         if cabalFileExists
-                            then ["."]
+                            then [packageEntryCurrDir]
                             else []
                     , projectExtraDeps = Map.empty
                     , projectFlags = flags
@@ -270,8 +278,8 @@ loadBuildConfig mproject config noConfigStrat = do
             ResolverGhc m -> return $ fromMajorVersion m
 
     let root = parent stackYamlFP
-    packages' <- mapM (resolveDir root) (projectPackages project)
-    let packages = S.fromList packages'
+    packages' <- mapM (resolvePackageEntry root) (projectPackages project)
+    let packages = Map.fromList $ concat packages'
 
     return BuildConfig
         { bcConfig = config
@@ -283,6 +291,30 @@ loadBuildConfig mproject config noConfigStrat = do
         , bcStackYaml = stackYamlFP
         , bcFlags = projectFlags project
         }
+
+-- | Resolve a PackageEntry into a list of paths, downloading and cloning as
+-- necessary.
+resolvePackageEntry :: (MonadIO m, MonadThrow m)
+                    => Path Abs Dir -- ^ project root
+                    -> PackageEntry
+                    -> m [(Path Abs Dir, Bool)]
+resolvePackageEntry projRoot pe = do
+    entryRoot <- resolvePackageLocation projRoot (peLocation pe)
+    paths <-
+        case peSubdirs pe of
+            [] -> return [entryRoot]
+            subs -> mapM (resolveDir projRoot) subs
+    return $ map (, peValidWanted pe) paths
+
+-- | Resolve a PackageLocation into a path, downloading and cloning as
+-- necessary.
+resolvePackageLocation :: (MonadIO m, MonadThrow m)
+                       => Path Abs Dir -- ^ project root
+                       -> PackageLocation
+                       -> m (Path Abs Dir)
+resolvePackageLocation projRoot (PLFilePath fp) = resolveDir projRoot fp
+resolvePackageLocation _projRoot (PLHttpTarball _url) = error "resolvePackageLocation not implemented for HTTP tarballs"
+resolvePackageLocation _projRoot (PLGit _url _commit) = error "resolvePackageLocation not implemented for Git URLs"
 
 -- | Get the stack root, e.g. ~/.stack
 determineStackRoot :: (MonadIO m, MonadThrow m) => m (Path Abs Dir)

@@ -104,10 +104,10 @@ loadLocals bopts = do
     let names = Set.fromList names0
 
     bconfig <- asks getBuildConfig
-    lps <- forM (Set.toList $ bcPackages bconfig) $ \dir -> do
+    lps <- forM (Map.toList $ bcPackages bconfig) $ \(dir, validWanted) -> do
         cabalfp <- getCabalFileName dir
         name <- parsePackageNameFromFilePath cabalfp
-        let wanted = isWanted dirs names dir name
+        let wanted = validWanted && isWanted dirs names dir name
         pkg <- readPackage
             PackageConfig
                 { packageConfigEnableTests = wanted && boptsFinalAction bopts == DoTests

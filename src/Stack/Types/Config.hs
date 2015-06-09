@@ -9,13 +9,13 @@
 
 module Stack.Types.Config where
 
-import           Control.Applicative ((<|>))
+import           Control.Applicative ((<|>), (<$>), (<*>), pure)
 import           Control.Exception
-import           Control.Monad (liftM)
+import           Control.Monad (liftM, mzero)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
 import           Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, object
-                            ,(.=), (.:?), (.!=), (.:))
+                            ,(.=), (.:?), (.!=), (.:), Value (String))
 import           Data.Binary (Binary)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
@@ -23,13 +23,13 @@ import           Data.Hashable (Hashable)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Monoid
-import           Data.Set (Set)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.Typeable
 import           Distribution.System (Platform)
 import qualified Distribution.Text
+import           Network.HTTP.Client (parseUrl)
 import           Path
 import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
 import           Stack.Types.Docker
@@ -150,8 +150,9 @@ data BuildConfig = BuildConfig
     , bcGhcVersion :: !Version
       -- ^ Version of GHC we'll be using for this build, @Nothing@ if no
       -- preference
-    , bcPackages   :: !(Set (Path Abs Dir))
-      -- ^ Local packages identified by a path
+    , bcPackages   :: !(Map (Path Abs Dir) Bool)
+      -- ^ Local packages identified by a path, Bool indicates whether it is
+      -- allowed to be wanted (see 'peValidWanted')
     , bcExtraDeps  :: !(Map PackageName Version)
       -- ^ Extra dependencies specified in configuration.
       --
@@ -184,14 +185,66 @@ data NoBuildConfigStrategy
     | ExecStrategy
     deriving (Show, Eq, Ord)
 
+data PackageEntry = PackageEntry
+    { peValidWanted :: !Bool
+    -- ^ Can this package be considered wanted? Useful to disable when simply
+    -- modifying an upstream package, see:
+    -- https://github.com/commercialhaskell/stack/issues/219
+    , peLocation :: !PackageLocation
+    , peSubdirs :: ![FilePath]
+    }
+    deriving Show
+instance ToJSON PackageEntry where
+    toJSON pe | peValidWanted pe && null (peSubdirs pe) =
+        toJSON $ peLocation pe
+    toJSON pe = object
+        [ "valid-wanted" .= peValidWanted pe
+        , "location" .= peLocation pe
+        , "subdirs" .= peSubdirs pe
+        ]
+instance FromJSON PackageEntry where
+    parseJSON (String t) = do
+        loc <- parseJSON $ String t
+        return PackageEntry
+            { peValidWanted = True
+            , peLocation = loc
+            , peSubdirs = []
+            }
+    parseJSON v = withObject "PackageEntry" (\o -> PackageEntry
+        <$> o .:? "valid-wanted" .!= True
+        <*> o .: "location"
+        <*> o .:? "subdirs" .!= []) v
+
+data PackageLocation
+    = PLFilePath FilePath
+    -- ^ Note that we use @FilePath@ and not @Path@s. The goal is: first parse
+    -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
+    | PLHttpTarball Text
+    | PLGit Text Text
+    -- ^ URL and commit
+    deriving Show
+instance ToJSON PackageLocation where
+    toJSON (PLFilePath fp) = toJSON fp
+    toJSON (PLHttpTarball t) = toJSON t
+    toJSON (PLGit x y) = toJSON $ T.unwords ["git", x, y]
+instance FromJSON PackageLocation where
+    parseJSON = withText "PackageLocation" $ \t ->
+        http t <|> git t <|> pure (PLFilePath $ T.unpack t)
+      where
+        http t =
+            case parseUrl $ T.unpack t of
+                Left _ -> mzero
+                Right _ -> return $ PLHttpTarball t
+        git t =
+            case T.words t of
+                ["git", x, y] -> return $ PLGit x y
+                _ -> mzero
+
 -- | A project is a collection of packages. We can have multiple stack.yaml
 -- files, but only one of them may contain project information.
 data Project = Project
-    { projectPackages :: ![FilePath]
-    -- ^ Components of the package list which refer to local directories
-    --
-    -- Note that we use @FilePath@ and not @Path@s. The goal is: first parse
-    -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
+    { projectPackages :: ![PackageEntry]
+    -- ^ Components of the package list
     , projectExtraDeps :: !(Map PackageName Version)
     -- ^ Components of the package list referring to package/version combos,
     -- see: https://github.com/fpco/stack/issues/41

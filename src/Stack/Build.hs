@@ -26,7 +26,7 @@ import           Control.Monad.Trans.Resource
 import           Data.Either
 import           Data.Function
 import           Data.Map.Strict (Map)
-import qualified Data.Set as S
+import qualified Data.Map as Map
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path.IO
 import           Prelude hiding (FilePath, writeFile)
@@ -115,7 +115,7 @@ clean = do
     menv <- getMinimalEnvOverride
     cabalPkgVer <- getCabalPkgVer menv
     forM_
-        (S.toList (bcPackages bconfig))
+        (Map.keys (bcPackages bconfig))
         (distDirFromDir cabalPkgVer >=> removeTreeIfExists)
 
 ----------------------------------------------------------
