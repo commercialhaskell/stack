@@ -372,7 +372,11 @@ resolvePackageLocation menv projRoot (PLGit url commit) = do
             [ "clone"
             , T.unpack url
             , toFilePath dirTmp
-            , "-b"
+            ]
+            Nothing
+        runIn dirTmp "git" menv
+            [ "reset"
+            , "--hard"
             , T.unpack commit
             ]
             Nothing
