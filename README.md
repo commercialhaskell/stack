@@ -17,11 +17,11 @@ It features:
 
 Downloads are available by operating system:
 
-* [Windows](https://github.com/fpco/stack/wiki/Downloads#windows)
-* [OS X](https://github.com/fpco/stack/wiki/Downloads#os-x)
-* [Ubuntu](https://github.com/fpco/stack/wiki/Downloads#ubuntu)
-* [Arch Linux](https://github.com/fpco/stack/wiki/Downloads#arch-linux)
-* [Linux (general)](https://github.com/fpco/stack/wiki/Downloads#linux)
+* [Windows](https://github.com/commercialhaskell/stack/wiki/Downloads#windows)
+* [OS X](https://github.com/commercialhaskell/stack/wiki/Downloads#os-x)
+* [Ubuntu](https://github.com/commercialhaskell/stack/wiki/Downloads#ubuntu)
+* [Arch Linux](https://github.com/commercialhaskell/stack/wiki/Downloads#arch-linux)
+* [Linux (general)](https://github.com/commercialhaskell/stack/wiki/Downloads#linux)
 
 #### How to use
 
@@ -42,13 +42,13 @@ Run `stack` for a complete list of commands.
 #### Architecture
 
 A full description of the architecture
-[is available here](https://github.com/fpco/stack/wiki/Architecture).
+[is available here](https://github.com/commercialhaskell/stack/wiki/Architecture).
 
 #### Frequently Asked Questions
 
 For frequently asked questions about detailed or specific use-cases,
-please see [the FAQ](https://github.com/fpco/stack/wiki/FAQ) or
-[open an issue](https://github.com/fpco/stack/issues/new) with label
+please see [the FAQ](https://github.com/commercialhaskell/stack/wiki/FAQ) or
+[open an issue](https://github.com/commercialhaskell/stack/issues/new) with label
 `question`.
 
 #### Why stack?
@@ -63,7 +63,7 @@ and power experienced developers need.
 While stack itself has been around since June of 2015, it is based on codebases
 used by FP Complete for its corporate customers and internally for years prior.
 stack is a refresh of that codebase combined with other open source efforts
-like [stackage-cli](https://github.com/fpco/stackage-cli) to meet the needs of
+like [stackage-cli](https://github.com/commercialhaskell/stackage-cli) to meet the needs of
 users everywhere.
 
 A large impetus for the work on stack was a [large survey of people interested
