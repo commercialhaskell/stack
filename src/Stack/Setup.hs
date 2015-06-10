@@ -21,10 +21,14 @@ import           Control.Monad.Catch (MonadThrow, throwM, MonadMask)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, ReaderT (..), asks)
+import           Control.Monad.State (get, put, modify)
 
 import           Data.Aeson
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
-import           Data.Conduit (($$))
+import           Data.Conduit (Conduit, Sink, ($$), (=$), await, yield, awaitForever)
+import           Data.Conduit.Lift (evalStateC)
 import qualified Data.Conduit.List as CL
 import           Data.IORef
 import           Data.List (intercalate)
@@ -36,11 +40,13 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.IO as T
+import           Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
 import           Data.Typeable (Typeable)
 import qualified Data.Yaml as Yaml
 import           Distribution.System (OS (..), Arch (..), Platform (..))
 import           Network.HTTP.Client.Conduit
-import           Network.HTTP.Download (download)
+import           Network.HTTP.Download (verifiedDownload, DownloadRequest(..))
 import           Path
 import           Path.IO
 import           Prelude -- Fix AMP warning
@@ -585,7 +591,57 @@ chattyDownload label url path = do
       , T.pack $ toFilePath path
       , " ..."
       ]
-    x <- download req path -- TODO add progress indicator
+
+    let dReq = DownloadRequest
+            { drRequest = req
+            , drHashChecks = []
+            , drLengthCheck = Nothing
+            }
+    x <- verifiedDownload dReq path (chattyDownloadProgress label)
     if x
         then $logInfo ("Downloaded " <> label <> ".")
         else $logDebug "Already downloaded."
+
+-- Await eagerly (collect with monoidal append),
+-- but space out yields by at least the given amount of time.
+-- Note that Integer and Float literals can be turned into NominalDiffTime
+-- (these literals are interpreted as "seconds")
+chunksOverTime :: (Monoid a, MonadIO m) => NominalDiffTime -> Conduit a m a
+chunksOverTime diff = do
+    currentTime <- liftIO getCurrentTime
+    evalStateC (currentTime, Nothing) go
+  where
+    -- State is a tuple of:
+    -- * the last time a yield happened (or the beginning of the sink)
+    -- * the accumulated awaits since the last yield
+    go = await >>= \case
+      Nothing -> do
+        (_, accMay) <- get
+        case accMay of
+            Just acc -> yield acc
+            Nothing -> return ()
+      Just a -> do
+        (lastTime, accMay) <- get
+        -- Just pattern match is safe per Maybe monoid instance
+        let accMay'@(Just acc') = accMay <> Just a
+        currentTime <- liftIO getCurrentTime
+        if diff < diffUTCTime currentTime lastTime
+          then put (currentTime, Nothing) >> yield acc'
+          else put (lastTime,    accMay')
+        go
+
+
+-- TODO: logInfo
+chattyDownloadProgress :: (MonadIO m)
+  => Text -- ^ label
+  -> Sink ByteString m ()
+chattyDownloadProgress label
+     = CL.map (Sum . S.length)
+    =$ chunksOverTime 1
+    =$ go
+  where
+    go = evalStateC 0 $ awaitForever $ \(Sum size) -> do
+        modify (+ size)
+        totalSoFar <- get
+        liftIO $ T.putStrLn $
+            label <> ": " <> T.pack (show totalSoFar) <> " bytes downloaded..."
