@@ -44,6 +44,7 @@ import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
 import           Network.HTTP.Client.Conduit    (HasHttpManager)
 import           Path
+import           Path.IO
 import           Prelude                        hiding (FilePath, writeFile)
 import           Stack.Build.Cache
 import           Stack.Build.Installed
@@ -57,6 +58,7 @@ import           Stack.Types.Internal
 import           System.Directory               hiding (findExecutable,
                                                  findFiles)
 import           System.Exit                    (ExitCode (ExitSuccess))
+import qualified System.FilePath                as FP
 import           System.IO
 import           System.IO.Temp                 (withSystemTempDirectory)
 import           System.Process.Internals       (createProcess_)
@@ -79,6 +81,21 @@ printPlan plan = do
         xs -> do
             $logInfo "Would build:"
             mapM_ ($logInfo . displayTask) xs
+
+    $logInfo ""
+
+    case Map.toList $ planInstallExes plan of
+        [] -> $logInfo "No executables to be installed"
+        xs -> do
+            $logInfo "Would install executables:"
+            forM_ xs $ \(name, loc) -> $logInfo $ T.concat
+                [ name
+                , " from "
+                , case loc of
+                    Snap -> "snapshot"
+                    Local -> "local"
+                , " database"
+                ]
 
 -- | For a dry run
 displayTask :: Task -> Text
@@ -127,7 +144,7 @@ executePlan :: M env m
             -> [LocalPackage]
             -> Plan
             -> m ()
-executePlan menv bopts baseConfigOpts cabalPkgVer locals plan =
+executePlan menv bopts baseConfigOpts cabalPkgVer locals plan = do
     withSystemTempDirectory stackProgName $ \tmpdir -> do
         tmpdir' <- parseAbsDir tmpdir
         configLock <- newMVar ()
@@ -151,6 +168,48 @@ executePlan menv bopts baseConfigOpts cabalPkgVer locals plan =
             , eeCabalPkgVer = cabalPkgVer
             , eeTotalWanted = length $ filter lpWanted locals
             }
+
+    unless (Map.null $ planInstallExes plan) $ do
+        snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
+        localBin <- (</> bindirSuffix) `liftM` installationRootLocal
+        destDir <- asks $ configLocalBin . getConfig
+        let destDir' = toFilePath destDir
+        liftIO $ createDirectoryIfMissing True destDir'
+
+        let stripSlash =
+                T.unpack . stripSlashT . T.pack
+              where
+                stripSlashT t = fromMaybe t $ T.stripSuffix slash t
+                slash = T.singleton FP.pathSeparator
+        when (stripSlash destDir' `notElem` map stripSlash (envSearchPath menv)) $
+            $logWarn $ T.concat
+                [ "Installation path "
+                , T.pack destDir'
+                , " not found in PATH environment variable"
+                ]
+
+        forM_ (Map.toList $ planInstallExes plan) $ \(name, loc) -> do
+            let bindir =
+                    case loc of
+                        Snap -> snapBin
+                        Local -> localBin
+            mfp <- resolveFileMaybe bindir $ T.unpack name
+            case mfp of
+                Nothing -> $logWarn $ T.concat
+                    [ "Couldn't find executable "
+                    , name
+                    , " in directory "
+                    , T.pack $ toFilePath bindir
+                    ]
+                Just file -> do
+                    let destFile = destDir' FP.</> T.unpack name
+                    $logInfo $ T.concat
+                        [ "Copying from "
+                        , T.pack $ toFilePath file
+                        , " to "
+                        , T.pack destFile
+                        ]
+                    liftIO $ copyFile (toFilePath file) destFile
 
 -- | Perform the actual plan (internal)
 executePlan' :: M env m

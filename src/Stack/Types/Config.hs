@@ -79,6 +79,8 @@ data Config =
          ,configInstallGHC       :: !Bool
          -- ^ Should we automatically install GHC if missing or the wrong
          -- version is available? Can be overridden by command line options.
+         ,configLocalBin         :: !(Path Abs Dir)
+         -- ^ Directory we should install executables into
          }
 
 -- | Information on a single package index

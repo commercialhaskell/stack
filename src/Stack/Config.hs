@@ -185,6 +185,10 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
                 return $ progsDir </> $(mkRelDir stackProgName) </> platform
             _ -> return $ configStackRoot </> $(mkRelDir "programs") </> platform
 
+     configLocalBin <- do
+        localDir <- liftIO (getAppUserDataDirectory "local") >>= parseAbsDir
+        return $ localDir </> $(mkRelDir "bin")
+
      return Config {..}
 
 -- | Command-line arguments parser for configuration.

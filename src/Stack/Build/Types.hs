@@ -191,6 +191,8 @@ data BuildOpts =
             ,boptsDryrun :: !Bool
             ,boptsGhcOptions :: ![Text]
             ,boptsFlags :: !(Map PackageName (Map FlagName Bool))
+            ,boptsInstallExes :: !Bool
+            -- ^ Install executables to user path after building?
             }
   deriving (Show)
 
@@ -333,6 +335,8 @@ data NeededSteps = AllSteps | SkipConfig | JustFinal
 data Plan = Plan
     { planTasks :: !(Map PackageName Task)
     , planUnregisterLocal :: !(Set GhcPkgId)
+    , planInstallExes :: !(Map Text Location)
+    -- ^ Executables that should be installed after successful building
     }
 
 -- | Basic information used to calculate what the configure options are

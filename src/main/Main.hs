@@ -71,19 +71,23 @@ main =
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
-                        buildOpts
+                        (buildOpts False)
+             addCommand "install-tool"
+                        "Build executables and install to a user path"
+                        (buildCmd DoNothing)
+                        (buildOpts True)
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
                         (buildCmd DoTests)
-                        buildOpts
+                        (buildOpts False)
              addCommand "bench"
                         "Build and benchmark the project(s) in this directory/configuration"
                         (buildCmd DoBenchmarks)
-                        buildOpts
+                        (buildOpts False)
              addCommand "haddock"
                         "Generate haddocks for the project(s) in this directory/configuration"
                         (buildCmd DoHaddock)
-                        buildOpts
+                        (buildOpts False)
              addCommand "setup"
                         "Get the appropriate ghc for your project"
                         setupCmd
@@ -375,9 +379,12 @@ dockerExecCmd (cmd,args) go@GlobalOpts{..} = do
                                              (return (cmd,args,lcConfig lc))
 
 -- | Parser for build arguments.
-buildOpts :: Parser BuildOpts
-buildOpts = BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
-            optimize <*> finalAction <*> dryRun <*> ghcOpts <*> flags
+buildOpts :: Bool -- ^ install?
+          -> Parser BuildOpts
+buildOpts toInstall =
+            BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
+            optimize <*> finalAction <*> dryRun <*> ghcOpts <*> flags <*>
+            pure toInstall
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
         target =
