@@ -33,7 +33,7 @@ import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
 import qualified Data.ByteString.Char8 as S8
 import           Data.Char
-
+import           Data.Monoid
 import           Data.Text (Text)
 import           Data.Time
 import           Language.Haskell.TH
@@ -143,9 +143,10 @@ stickyLoggerFunc loc src level msg = do
               clear =
                   liftIO
                       (S8.putStr
-                           (S8.replicate
-                                (stickyMaxColumns sticky)
-                                backSpaceChar))
+                           (repeating backSpaceChar <>
+                            repeating ' ' <>
+                            repeating backSpaceChar))
+                where repeating = S8.replicate (stickyMaxColumns sticky)
           case level of
               LevelOther "sticky-done" -> do
                   liftIO
