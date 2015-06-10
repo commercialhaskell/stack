@@ -389,7 +389,8 @@ instance Show ConfigException where
     show (ParseResolverException t) = concat
         [ "Invalid resolver value: "
         , T.unpack t
-        , ". Possible valid values include lts-2.12, nightly-2015-01-01, and ghc-7.10."
+        , ". Possible valid values include lts-2.12, nightly-YYYY-MM-DD, and ghc-7.10. "
+        , "See https://www.stackage.org/snapshots for a complete list."
         ]
     show (NoProjectConfigFound dir) = concat
         [ "Unable to find a stack.yaml file in the current directory ("
