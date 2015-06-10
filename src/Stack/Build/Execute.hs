@@ -57,6 +57,7 @@ import           Stack.Types
 import           Stack.Types.Internal
 import           System.Directory               hiding (findExecutable,
                                                  findFiles)
+import           System.Environment             (getExecutablePath)
 import           System.Exit                    (ExitCode (ExitSuccess))
 import qualified System.FilePath                as FP
 import           System.IO
@@ -194,6 +195,8 @@ executePlan menv bopts baseConfigOpts cabalPkgVer locals plan = do
                     Platform _ Windows -> ".exe"
                     _ -> ""
 
+        currExe <- liftIO getExecutablePath -- needed for windows, see below
+
         forM_ (Map.toList $ planInstallExes plan) $ \(name, loc) -> do
             let bindir =
                     case loc of
@@ -215,12 +218,22 @@ executePlan menv bopts baseConfigOpts cabalPkgVer locals plan = do
                         , " to "
                         , T.pack destFile
                         ]
-                    -- TODO currently, on Windows, this will fail when trying
-                    -- to upgrade stack itself. There are tricks available to
-                    -- overcome that which we could try, namely: rename the
-                    -- current exe to something else and then do the copy, and
-                    -- next time stack runs, delete the old name
-                    liftIO $ copyFile (toFilePath file) destFile
+
+                    liftIO $ case platform of
+                        Platform _ Windows | destFile == currExe ->
+                            windowsRenameCopy (toFilePath file) destFile
+                        _ -> copyFile (toFilePath file) destFile
+
+-- | Windows can't write over the current executable. Instead, we rename the
+-- current executable to something else and then do the copy.
+windowsRenameCopy :: FilePath -> FilePath -> IO ()
+windowsRenameCopy src dest = do
+    copyFile src new
+    renameFile dest old
+    renameFile new dest
+  where
+    new = dest ++ ".new"
+    old = dest ++ ".old"
 
 -- | Perform the actual plan (internal)
 executePlan' :: M env m
