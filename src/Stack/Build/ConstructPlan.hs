@@ -132,10 +132,8 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
         , loadPackage = loadPackage0
         , combinedMap = combineMap sourceMap installedMap
         , toolToPackages = \ (Dependency name _) ->
-            Map.fromList
-          $ map (, anyVersion)
-          $ maybe [] Set.toList
-          $ Map.lookup (S8.pack . packageNameString . fromCabalPackageName $ name) toolMap
+          maybe Map.empty (Map.fromSet (\_ -> anyVersion)) $
+          Map.lookup (S8.pack . packageNameString . fromCabalPackageName $ name) toolMap
         , ctxBuildConfig = bconfig
         , callStack = []
         , extraToBuild = extraToBuild0
