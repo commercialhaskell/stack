@@ -46,7 +46,7 @@ import           Data.Typeable (Typeable)
 import           Distribution.System (OS (Windows), Platform (Platform))
 import           Path (Path, Abs, Dir, toFilePath, File, parseAbsFile)
 import           Prelude -- Fix AMP warning
-import           System.Directory (createDirectoryIfMissing, doesFileExist, canonicalizePath)
+import           System.Directory (createDirectoryIfMissing, doesFileExist, getCurrentDirectory)
 import qualified System.FilePath as FP
 import           System.Environment (getEnvironment)
 import           System.Exit (exitWith)
@@ -183,6 +183,17 @@ runIn wd cmd menv args errMsg = do
 doesExecutableExist :: MonadIO m => EnvOverride -> String -> m Bool
 doesExecutableExist menv name = liftM isJust $ findExecutable menv name
 
+-- | Turn a relative path into an absolute path.
+--
+--   Note: this function duplicates the functionality of makeAbsolute
+--   in recent versions of "System.Directory", and can be removed once
+--   we no longer need to support older versions of GHC.
+makeAbsolute :: FilePath -> IO FilePath
+makeAbsolute = fmap FP.normalise . absolutize
+  where absolutize path
+          | FP.isRelative path = fmap (FP.</> path) getCurrentDirectory
+          | otherwise          = return path
+
 -- | Find the complete path for the executable
 findExecutable :: (MonadIO m, MonadThrow n) => EnvOverride -> String -> m (n (Path Abs File))
 findExecutable eo name = liftIO $ do
@@ -196,7 +207,7 @@ findExecutable eo name = liftIO $ do
                     exists <- doesFileExist fp
                     if exists
                         then do
-                            fp' <- canonicalizePath fp >>= parseAbsFile
+                            fp' <- makeAbsolute fp >>= parseAbsFile
                             return $ return fp'
                         else loop dirs
             epath <- loop $ eoPath eo
