@@ -12,7 +12,7 @@ Distribution packages are available for [Ubuntu](#ubuntu) and [Arch Linux](#arch
 * Download [stack-0.0.0-x86_64-osx.gz](https://github.com/fpco/stack/releases/download/v0.0.0-beta/stack-0.0.0-x86_64-osx.gz)
 * Extract the `stack` executable and put it somewhere on your `$PATH` (see [Path section below](#path))
 
-We generally test on the current version of OS X, but stack is known to work on Mavericks and may work on older versions (YMMV).
+We generally test on the current version of OS X, but stack is known to work on Mavericks as well, and may also work on older versions (YMMV).
 
 **Note**: due to [GHC bug 10322](https://ghc.haskell.org/trac/ghc/ticket/10322), building `stack` from source fails with GHC 7.10.1. This bug will be fixed in 7.10.2, but in the meantime, we recommend using GHC 7.8.4 on OS X.
 
