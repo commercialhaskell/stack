@@ -405,8 +405,12 @@ buildOpts toInstall =
         finalAction = pure DoNothing
         dryRun = flag False True (long "dry-run" <>
                                   help "Don't build anything, just prepare to")
-        ghcOpts =
-          many (fmap T.pack
+        ghcOpts = (++)
+          <$> flag [] ["-Wall", "-Werror"]
+              ( long "pedantic"
+             <> help "Turn on -Wall and -Werror (note: option name may change in the future"
+              )
+          <*> many (fmap T.pack
                      (strOption (long "ghc-options" <>
                                  metavar "OPTION" <>
                                  help "Additional options passed to GHC")))
