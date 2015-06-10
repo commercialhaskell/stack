@@ -18,8 +18,8 @@ Distribution packages are available for [Ubuntu](#ubuntu) and [Arch Linux](#arch
 * Ubuntu 15.04 (amd64)
 
 ```sh
-wget -q -O- https://downloads.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
-echo 'deb https://downloads.fpcomplete.com/ubuntu/vivid stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
+wget -q -O- http://download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
+echo 'deb http://downloads.fpcomplete.com/ubuntu/vivid stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 sudo apt-get update
 sudo apt-get install stack -y
 ```
