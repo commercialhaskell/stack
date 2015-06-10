@@ -188,12 +188,18 @@ executePlan menv bopts baseConfigOpts cabalPkgVer locals plan = do
                 , " not found in PATH environment variable"
                 ]
 
+        platform <- asks getPlatform
+        let ext =
+                case platform of
+                    Platform _ Windows -> ".exe"
+                    _ -> ""
+
         forM_ (Map.toList $ planInstallExes plan) $ \(name, loc) -> do
             let bindir =
                     case loc of
                         Snap -> snapBin
                         Local -> localBin
-            mfp <- resolveFileMaybe bindir $ T.unpack name
+            mfp <- resolveFileMaybe bindir $ T.unpack name ++ ext
             case mfp of
                 Nothing -> $logWarn $ T.concat
                     [ "Couldn't find executable "
@@ -202,7 +208,7 @@ executePlan menv bopts baseConfigOpts cabalPkgVer locals plan = do
                     , T.pack $ toFilePath bindir
                     ]
                 Just file -> do
-                    let destFile = destDir' FP.</> T.unpack name
+                    let destFile = destDir' FP.</> T.unpack name ++ ext
                     $logInfo $ T.concat
                         [ "Copying from "
                         , T.pack $ toFilePath file
