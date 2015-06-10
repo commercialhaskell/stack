@@ -73,24 +73,6 @@ download req destpath = do
     let progressHook = return ()
     verifiedDownload downloadReq destpath progressHook
 
-  --  env <- ask
-  --  liftIO $ unlessM (doesFileExist fp) $ do
-  --      createDirectoryIfMissing True dir
-  --      withBinaryFile fptmp WriteMode $ \h ->
-  --          flip runReaderT env $
-  --          withResponse req $ \res ->
-  --          responseBody res $$ sinkHandle h
-  --      renameFile fptmp fp
-  --where
-  --  unlessM mp m = do
-  --      p <- mp
-  --      if p then return () else m
-
-  --  fp = toFilePath destpath
-  --  fptmp = fp <.> "tmp"
-  --  dir = toFilePath $ parent destpath
-
-
 -- | Same as 'download', but will download a file a second time if it is already present.
 --
 -- Returns 'True' if the file was downloaded, 'False' otherwise
