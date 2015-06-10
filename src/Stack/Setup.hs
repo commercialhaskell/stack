@@ -27,13 +27,9 @@ import           Data.Aeson
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
-<<<<<<< HEAD
 import           Data.Conduit (Conduit, Sink, ($$), (=$), await, yield, awaitForever)
 import           Data.Conduit.Lift (evalStateC)
-=======
-import           Data.Conduit (($$))
 import           Data.Conduit.Process (ProcessExitedUnsuccessfully)
->>>>>>> master
 import qualified Data.Conduit.List as CL
 import           Data.IORef
 import           Data.List (intercalate)
