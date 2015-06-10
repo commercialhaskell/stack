@@ -72,7 +72,7 @@ main =
                         "Build the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
                         (buildOpts False)
-             addCommand "install-tool"
+             addCommand "install"
                         "Build executables and install to a user path"
                         (buildCmd DoNothing)
                         (buildOpts True)
