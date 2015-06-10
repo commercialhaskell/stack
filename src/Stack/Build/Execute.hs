@@ -10,7 +10,8 @@ module Stack.Build.Execute
     , executePlan
     ) where
 
-import           Control.Concurrent             (forkIO, getNumCapabilities)
+import           Control.Concurrent             (getNumCapabilities)
+import           Control.Concurrent.Lifted (fork)
 import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
@@ -39,6 +40,7 @@ import           Data.Streaming.Process         hiding (callProcess, env)
 import qualified Data.Streaming.Process         as Process
 import           Data.Text                      (Text)
 import qualified Data.Text                      as T
+import qualified Data.Text.Encoding             as T
 import           Data.Text.Encoding             (encodeUtf8)
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
@@ -489,10 +491,8 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
                     , Process.env = envHelper menv
                     , std_in = CreatePipe
                     , std_out =
-                        if stripTHLoading
-                            then CreatePipe
-                            else case mlogFile of
-                                Nothing -> Inherit
+                        case mlogFile of
+                                Nothing -> CreatePipe
                                 Just (_, h) -> UseHandle h
                     , std_err =
                         case mlogFile of
@@ -505,7 +505,10 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
             (Just inH, moutH, Nothing, ph) <- liftIO $ createProcess_ "singleBuild" cp
             liftIO $ hClose inH
             case moutH of
-                Just outH -> assert stripTHLoading $ printWithoutTHLoading outH
+                Just outH ->
+                    case mlogFile of
+                      Just{} -> return ()
+                      Nothing -> printBuildOutput stripTHLoading outH
                 Nothing -> return ()
             ec <- liftIO $ waitForProcess ph
             case ec of
@@ -580,16 +583,18 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
 
 -- | Grab all output from the given @Handle@ and print it to stdout, stripping
 -- Template Haskell "Loading package" lines. Does work in a separate thread.
-printWithoutTHLoading :: MonadIO m => Handle -> m ()
-printWithoutTHLoading outH = liftIO $ void $ forkIO $
-       CB.sourceHandle outH
+printBuildOutput :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
+                 => Bool -> Handle -> m ()
+printBuildOutput excludeTHLoading outH = void $ fork $
+         CB.sourceHandle outH
     $$ CB.lines
     =$ CL.filter (not . isTHLoading)
-    =$ CL.mapM_ S8.putStrLn
+    =$ CL.mapM_ ($logInfo . T.decodeUtf8)
   where
     -- | Is this line a Template Haskell "Loading package" line
     -- ByteString
     isTHLoading :: S8.ByteString -> Bool
+    isTHLoading _ | not excludeTHLoading = False
     isTHLoading bs =
         "Loading package " `S8.isPrefixOf` bs &&
         ("done." `S8.isSuffixOf` bs || "done.\r" `S8.isSuffixOf` bs)
