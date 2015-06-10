@@ -135,61 +135,65 @@ stickyLoggerFunc :: (HasSticky r, HasLogLevel r, ToLogStr msg, MonadReader r (t 
 stickyLoggerFunc loc src level msg = do
     Sticky mref <- asks getSticky
     case mref of
-      Nothing ->
-          loggerFunc loc src LevelInfo msg
-      Just ref -> do
-          sticky <- liftIO (takeMVar ref) -- TODO: make exception-safe.
-          let backSpaceChar = '\8'
-              clear =
-                  liftIO
-                      (S8.putStr
-                           (repeating backSpaceChar <>
-                            repeating ' ' <>
-                            repeating backSpaceChar))
-                where repeating = S8.replicate (stickyMaxColumns sticky)
-          case level of
-              LevelOther "sticky-done" -> do
-                  liftIO
-                      (putMVar
-                           ref
-                           (sticky
-                            { stickyLastWasSticky = False
-                            , stickyMaxColumns = 0
-                            , stickyCurrentLine = Nothing
-                            }))
-                  clear
-                  loggerFunc loc src level msg
-              LevelOther "sticky" -> do
-                  clear
-                  liftIO (S8.putStr msgBytes)
-                  liftIO
-                      (putMVar
-                           ref
-                           (sticky
-                            { stickyLastWasSticky = True
-                            , stickyMaxColumns = S8.length msgBytes
-                            , stickyCurrentLine = Just msgBytes
-                            }))
-              _ -> do
-                  clear
-                  loggerFunc loc src level msg
-                  liftIO
-                      (case stickyCurrentLine sticky of
-                           Nothing ->
-                               putMVar
-                                   ref
-                                   (sticky
-                                    { stickyLastWasSticky = False
-                                    , stickyMaxColumns = 0
-                                    })
-                           Just line -> do
-                               S8.putStr line
-                               putMVar
-                                   ref
-                                   (sticky
-                                    { stickyLastWasSticky = True
-                                    , stickyMaxColumns = S8.length msgBytes
-                                    }))
+        Nothing ->
+            loggerFunc loc src LevelInfo msg
+        Just ref -> do
+            sticky <- liftIO (takeMVar ref) -- TODO: make exception-safe.
+            let backSpaceChar =
+                    '\8'
+                clear =
+                    liftIO
+                        (S8.putStr
+                             (repeating backSpaceChar <>
+                              repeating ' ' <>
+                              repeating backSpaceChar))
+                  where
+                    repeating =
+                        S8.replicate
+                            (stickyMaxColumns sticky)
+            case level of
+                LevelOther "sticky-done" -> do
+                    liftIO
+                        (putMVar
+                             ref
+                             (sticky
+                              { stickyLastWasSticky = False
+                              , stickyMaxColumns = 0
+                              , stickyCurrentLine = Nothing
+                              }))
+                    clear
+                    loggerFunc loc src level msg
+                LevelOther "sticky" -> do
+                    clear
+                    liftIO (S8.putStr msgBytes)
+                    liftIO
+                        (putMVar
+                             ref
+                             (sticky
+                              { stickyLastWasSticky = True
+                              , stickyMaxColumns = S8.length msgBytes
+                              , stickyCurrentLine = Just msgBytes
+                              }))
+                _ -> do
+                    clear
+                    loggerFunc loc src level msg
+                    liftIO
+                        (case stickyCurrentLine sticky of
+                             Nothing ->
+                                 putMVar
+                                     ref
+                                     (sticky
+                                      { stickyLastWasSticky = False
+                                      , stickyMaxColumns = 0
+                                      })
+                             Just line -> do
+                                 S8.putStr line
+                                 putMVar
+                                     ref
+                                     (sticky
+                                      { stickyLastWasSticky = True
+                                      , stickyMaxColumns = S8.length msgBytes
+                                      }))
   where
     msgBytes =
         fromLogStr
