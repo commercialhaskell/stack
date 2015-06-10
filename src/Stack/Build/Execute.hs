@@ -215,6 +215,11 @@ executePlan menv bopts baseConfigOpts cabalPkgVer locals plan = do
                         , " to "
                         , T.pack destFile
                         ]
+                    -- TODO currently, on Windows, this will fail when trying
+                    -- to upgrade stack itself. There are tricks available to
+                    -- overcome that which we could try, namely: rename the
+                    -- current exe to something else and then do the copy, and
+                    -- next time stack runs, delete the old name
                     liftIO $ copyFile (toFilePath file) destFile
 
 -- | Perform the actual plan (internal)
