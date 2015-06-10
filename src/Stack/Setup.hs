@@ -47,6 +47,7 @@ import           Prelude -- Fix AMP warning
 import           Stack.Build.Types
 import           Stack.GhcPkg (getGlobalDB)
 import           Stack.Types
+import           Stack.Types.StackT
 import           System.Directory
 import           System.Exit (ExitCode (ExitSuccess))
 import           System.FilePath (searchPathSeparator)
@@ -573,7 +574,7 @@ chattyDownload :: (MonadReader env m, HasHttpManager env, MonadIO m, MonadLogger
                -> m ()
 chattyDownload label url path = do
     req <- parseUrl $ T.unpack url
-    $logInfo $ T.concat
+    $logSticky $ T.concat
       [ "Downloading "
       , label
       , " ..."
@@ -587,5 +588,5 @@ chattyDownload label url path = do
       ]
     x <- download req path -- TODO add progress indicator
     if x
-        then $logInfo ("Downloaded " <> label <> ".")
-        else $logDebug "Already downloaded."
+        then $logStickyDone ("Downloaded " <> label <> ".")
+        else $logStickyDone "Already downloaded."
