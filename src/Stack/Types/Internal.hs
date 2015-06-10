@@ -14,7 +14,7 @@ data Env config =
   Env {envConfig :: !config
       ,envLogLevel :: !LogLevel
       ,envManager :: !Manager
-      ,envSticky :: !(MVar Sticky)}
+      ,envSticky :: !Sticky}
 
 instance HasStackRoot config => HasStackRoot (Env config) where
     getStackRoot = getStackRoot . envConfig
@@ -37,14 +37,16 @@ instance HasLogLevel (Env config) where
 instance HasLogLevel LogLevel where
   getLogLevel = id
 
-data Sticky = Sticky
+newtype Sticky = Sticky { unSticky :: Maybe (MVar StickyState)}
+
+data StickyState = StickyState
     { stickyCurrentLine :: !(Maybe ByteString)
     , stickyMaxColumns :: !Int
     , stickyLastWasSticky :: !Bool
     }
 
 class HasSticky r where
-    getSticky :: r -> MVar Sticky
+    getSticky :: r -> Sticky
 
 instance HasSticky (Env config) where
   getSticky = envSticky
