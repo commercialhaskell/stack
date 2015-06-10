@@ -65,7 +65,7 @@ and power experienced developers need.
 While stack itself has been around since June of 2015, it is based on codebases
 used by FP Complete for its corporate customers and internally for years prior.
 stack is a refresh of that codebase combined with other open source efforts
-like [stackage-cli](https://github.com/commercialhaskell/stackage-cli) to meet the needs of
+like [stackage-cli](https://github.com/fpco/stackage-cli) to meet the needs of
 users everywhere.
 
 A large impetus for the work on stack was a [large survey of people interested
