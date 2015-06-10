@@ -260,6 +260,9 @@ executePlan' plan ee = do
     -- stack always using transformer stacks that are safe for this use case.
     runInBase <- liftBaseWith $ \run -> return (void . run)
 
+    let size = Map.size (planTasks plan)
+    when (size > 1)
+         ($logSticky ("Progress: 0/" <> T.pack (show size)))
     let actions = concatMap (toActions runInBase ee) $ Map.elems $ planTasks plan
     threads <- liftIO getNumCapabilities -- TODO make a build opt to override this
     errs <- liftIO $ runActions threads actions
