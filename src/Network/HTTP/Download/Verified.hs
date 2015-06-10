@@ -81,15 +81,44 @@ data VerifiedDownloadException
           String -- algorithm
           CheckHexDigest -- expected
           String -- actual (shown)
-  deriving (Show, Typeable)
+  deriving (Typeable)
+instance Show VerifiedDownloadException where
+    show (WrongContentLength expected actual) =
+        "Download expectation failure: ContentLength header\n"
+        ++ "Expected: " ++ show expected ++ "\n"
+        ++ "Actual:   " ++ displayByteString actual
+    show (WrongStreamLength expected actual) =
+        "Download expectation failure: download size\n"
+        ++ "Expected: " ++ show expected ++ "\n"
+        ++ "Actual:   " ++ show actual
+    show (WrongDigest algo expected actual) =
+        "Download expectation failure: content hash (" ++ algo ++  ")\n"
+        ++ "Expected: " ++ displayCheckHexDigest expected ++ "\n"
+        ++ "Actual:   " ++ actual
+
 instance Exception VerifiedDownloadException
 
+-- This exception is always caught and never thrown outside of this module.
 data VerifyFileException
     = WrongFileSize
           Int -- expected
           Integer -- actual (as listed by hFileSize)
   deriving (Show, Typeable)
 instance Exception VerifyFileException
+
+-- Show a ByteString that is known to be UTF8 encoded.
+displayByteString :: ByteString -> String
+displayByteString =
+    Text.unpack . Text.strip . Text.decodeUtf8
+
+-- Show a CheckHexDigest in human-readable format.
+displayCheckHexDigest :: CheckHexDigest -> String
+displayCheckHexDigest (CheckHexDigestString s) = s ++ " (String)"
+displayCheckHexDigest (CheckHexDigestByteString s) = displayByteString s ++ " (ByteString)"
+displayCheckHexDigest (CheckHexDigestHeader h) =
+      displayByteString (B64.decodeLenient h) ++ " (Header. unencoded: "
+      ++ displayByteString h ++ ")"
+
 
 -- | Make sure that the hash digest for a finite stream of bytes
 -- is as expected.
@@ -200,8 +229,7 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
     checkContentLengthHeader headers expectedContentLength = do
         case List.lookup hContentLength headers of
             Just lengthBS -> do
-              let lengthText = Text.strip $ Text.decodeUtf8 lengthBS
-                  lengthStr = Text.unpack lengthText
+              let lengthStr = displayByteString lengthBS
               when (lengthStr /= show expectedContentLength) $
                 throwM $ WrongContentLength expectedContentLength lengthBS
             _ -> return ()
