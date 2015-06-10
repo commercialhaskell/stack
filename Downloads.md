@@ -59,6 +59,8 @@ stack can be found in the AUR:
   - [haskell-stack](https://aur4.archlinux.org/packages/haskell-stack/) _latest stable version_
   - [haskell-stack-git](https://aur4.archlinux.org/packages/haskell-stack-git/) _git version_
 
+In order to install stack from Hackage or from source, you will need the [libtinfo](https://aur4.archlinux.org/packages/libtinfo/) Arch Linux package installed.  If this package is not installed, stack will not be able to install GHC.  
+
 ## Linux
 
 (64-bit only)
