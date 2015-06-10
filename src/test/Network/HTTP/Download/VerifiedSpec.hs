@@ -38,7 +38,7 @@ exampleReq = fromMaybe (error "exampleReq") $ do
 exampleHashCheck :: HashCheck
 exampleHashCheck = HashCheck
     { hashCheckAlgorithm = SHA1
-    , hashCheckHexDigest = "b98eea96d321cdeed83a201c192dac116e786ec2"
+    , hashCheckHexDigest = CheckHexDigestString "b98eea96d321cdeed83a201c192dac116e786ec2"
     }
 
 exampleLengthCheck :: LengthCheck
@@ -49,8 +49,8 @@ exampleWrongContentLength :: Int
 exampleWrongContentLength = 302512
 
 -- | The wrong SHA1 digest for exampleReq
-exampleWrongDigest :: String
-exampleWrongDigest = "b98eea96d321cdeed83a201c192dac116e786ec3"
+exampleWrongDigest :: CheckHexDigest
+exampleWrongDigest = CheckHexDigestString "b98eea96d321cdeed83a201c192dac116e786ec3"
 
 exampleWrongContent :: String
 exampleWrongContent = "example wrong content"
@@ -131,3 +131,19 @@ spec = beforeAll setup $ afterAll teardown $ do
       let go = runWith manager $ verifiedDownload wrongDigestReq examplePath exampleProgressHook
       go `shouldThrow` isWrongDigest
       doesFileExist exampleFilePath `shouldReturn` False
+
+    -- https://github.com/commercialhaskell/stack/issues/240
+    it "can download hackage tarballs" $ \T{..} -> withTempDir $ \dir -> do
+      dest <- fmap (dir </>) $ parseRelFile "acme-missiles-0.3.tar.gz"
+      let destFp = toFilePath dest
+      req <- parseUrl "http://hackage.haskell.org/package/acme-missiles-0.3/acme-missiles-0.3.tar.gz"
+      let dReq = DownloadRequest
+            { drRequest = req
+            , drHashChecks = []
+            , drLengthCheck = Nothing
+            }
+      let progressHook = return ()
+      let go = runWith manager $ verifiedDownload dReq dest progressHook
+      doesFileExist destFp `shouldReturn` False
+      go `shouldReturn` True
+      doesFileExist destFp `shouldReturn` True

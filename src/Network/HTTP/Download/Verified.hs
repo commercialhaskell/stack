@@ -10,14 +10,14 @@ module Network.HTTP.Download.Verified
   ( verifiedDownload
   , DownloadRequest(..)
   , HashCheck(..)
+  , CheckHexDigest(..)
   , LengthCheck
   , VerifiedDownloadException(..)
   ) where
 
 import qualified Data.List as List
 import qualified Data.ByteString as ByteString
---import qualified Data.ByteString.Base64 as B64
---import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Base64 as B64
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Text as Text
@@ -35,6 +35,7 @@ import Data.Conduit
 import Data.Conduit.Binary (sourceHandle, sinkHandle)
 import Data.Foldable (traverse_)
 import Data.Monoid
+import Data.String
 import Data.Typeable (Typeable)
 import Network.HTTP.Client.Conduit
 import Network.HTTP.Types.Header (hContentLength, hContentMD5)
@@ -54,9 +55,17 @@ data DownloadRequest = DownloadRequest
 
 data HashCheck = forall a. (Show a, HashAlgorithm a) => HashCheck
   { hashCheckAlgorithm :: a
-  , hashCheckHexDigest :: String
+  , hashCheckHexDigest :: CheckHexDigest
   }
 deriving instance Show HashCheck
+
+data CheckHexDigest
+  = CheckHexDigestString String
+  | CheckHexDigestByteString ByteString
+  | CheckHexDigestHeader ByteString
+  deriving Show
+instance IsString CheckHexDigest where
+  fromString = CheckHexDigestString
 
 type LengthCheck = Int
 
@@ -70,17 +79,46 @@ data VerifiedDownloadException
           Int -- actual
     | WrongDigest
           String -- algorithm
-          String -- expected
-          String -- actual
-  deriving (Show, Typeable)
+          CheckHexDigest -- expected
+          String -- actual (shown)
+  deriving (Typeable)
+instance Show VerifiedDownloadException where
+    show (WrongContentLength expected actual) =
+        "Download expectation failure: ContentLength header\n"
+        ++ "Expected: " ++ show expected ++ "\n"
+        ++ "Actual:   " ++ displayByteString actual
+    show (WrongStreamLength expected actual) =
+        "Download expectation failure: download size\n"
+        ++ "Expected: " ++ show expected ++ "\n"
+        ++ "Actual:   " ++ show actual
+    show (WrongDigest algo expected actual) =
+        "Download expectation failure: content hash (" ++ algo ++  ")\n"
+        ++ "Expected: " ++ displayCheckHexDigest expected ++ "\n"
+        ++ "Actual:   " ++ actual
+
 instance Exception VerifiedDownloadException
 
+-- This exception is always caught and never thrown outside of this module.
 data VerifyFileException
     = WrongFileSize
           Int -- expected
           Integer -- actual (as listed by hFileSize)
   deriving (Show, Typeable)
 instance Exception VerifyFileException
+
+-- Show a ByteString that is known to be UTF8 encoded.
+displayByteString :: ByteString -> String
+displayByteString =
+    Text.unpack . Text.strip . Text.decodeUtf8
+
+-- Show a CheckHexDigest in human-readable format.
+displayCheckHexDigest :: CheckHexDigest -> String
+displayCheckHexDigest (CheckHexDigestString s) = s ++ " (String)"
+displayCheckHexDigest (CheckHexDigestByteString s) = displayByteString s ++ " (ByteString)"
+displayCheckHexDigest (CheckHexDigestHeader h) =
+      displayByteString (B64.decodeLenient h) ++ " (Header. unencoded: "
+      ++ displayByteString h ++ ")"
+
 
 -- | Make sure that the hash digest for a finite stream of bytes
 -- is as expected.
@@ -92,7 +130,18 @@ sinkCheckHash :: MonadThrow m
 sinkCheckHash HashCheck{..} = do
     digest <- sinkHashUsing hashCheckAlgorithm
     let actualDigestString = show digest
-    when (actualDigestString /= hashCheckHexDigest) $
+    let actualDigestHexByteString = digestToHexByteString digest
+
+    let passedCheck = case hashCheckHexDigest of
+          CheckHexDigestString s -> s == actualDigestString
+          CheckHexDigestByteString b -> b == actualDigestHexByteString
+          CheckHexDigestHeader b -> B64.decodeLenient b == actualDigestHexByteString
+            -- A hack to allow hackage tarballs to download.
+            -- They should really base64-encode their md5 header as per rfc2616#sec14.15.
+            -- https://github.com/commercialhaskell/stack/issues/240
+            || b == actualDigestHexByteString
+
+    when (not passedCheck) $
         throwM $ WrongDigest (show hashCheckAlgorithm) hashCheckHexDigest actualDigestString
 
 assertLengthSink :: MonadThrow m
@@ -180,8 +229,7 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
     checkContentLengthHeader headers expectedContentLength = do
         case List.lookup hContentLength headers of
             Just lengthBS -> do
-              let lengthText = Text.strip $ Text.decodeUtf8 lengthBS
-                  lengthStr = Text.unpack lengthText
+              let lengthStr = displayByteString lengthBS
               when (lengthStr /= show expectedContentLength) $
                 throwM $ WrongContentLength expectedContentLength lengthBS
             _ -> return ()
@@ -190,17 +238,13 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
         let headers = responseHeaders res
         whenJust drLengthCheck $ checkContentLengthHeader headers
         let hashChecks = (case List.lookup hContentMD5 headers of
-                _ -> []
-                {- FIXME: https://github.com/commercialhaskell/stack/issues/240
                 Just md5BS ->
-                    let md5ExpectedHexDigest =  BC.unpack (B64.decodeLenient md5BS)
-                    in  [ HashCheck
-                              { hashCheckAlgorithm = MD5
-                              , hashCheckHexDigest = md5ExpectedHexDigest
-                              }
-                        ]
+                    [ HashCheck
+                          { hashCheckAlgorithm = MD5
+                          , hashCheckHexDigest = CheckHexDigestHeader md5BS
+                          }
+                    ]
                 Nothing -> []
-                -}
                 ) ++ drHashChecks
 
         responseBody res

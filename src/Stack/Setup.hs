@@ -16,15 +16,19 @@ module Stack.Setup
 
 import           Control.Applicative
 import           Control.Exception (Exception)
-import           Control.Monad (liftM, when, join)
+import           Control.Monad (liftM, when, join, void)
 import           Control.Monad.Catch (MonadThrow, throwM, MonadMask)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, ReaderT (..), asks)
+import           Control.Monad.State (get, put, modify)
+import           Control.Monad.Trans.Control
 
 import           Data.Aeson
+import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
-import           Data.Conduit (($$))
+import           Data.Conduit (Conduit, ($$), (=$), await, yield, awaitForever)
+import           Data.Conduit.Lift (evalStateC)
 import           Data.Conduit.Process (ProcessExitedUnsuccessfully)
 import qualified Data.Conduit.List as CL
 import           Data.IORef
@@ -37,11 +41,12 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
 import           Data.Typeable (Typeable)
 import qualified Data.Yaml as Yaml
 import           Distribution.System (OS (..), Arch (..), Platform (..))
 import           Network.HTTP.Client.Conduit
-import           Network.HTTP.Download (download)
+import           Network.HTTP.Download (verifiedDownload, DownloadRequest(..))
 import           Path
 import           Path.IO
 import           Prelude -- Fix AMP warning
@@ -103,7 +108,7 @@ instance Show SetupException where
         ]
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
-setupEnv :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasBuildConfig env, HasHttpManager env)
+setupEnv :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasBuildConfig env, HasHttpManager env, MonadBaseControl IO m)
          => Bool -- ^ allow system GHC
          -> Bool -- ^ install if missing?
          -> m BuildConfig
@@ -203,7 +208,7 @@ stripTrailingSlashT t = fromMaybe t $ T.stripSuffix
         t
 
 -- | Ensure GHC is installed and provide the PATHs to add if necessary
-ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env)
+ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
           => SetupOpts
           -> m (Maybe [FilePath])
 ensureGHC sopts = do
@@ -377,7 +382,7 @@ binDirs ident = do
             $logWarn $ "binDirs: unexpected OS/tool combo: " <> T.pack (show (x, tool))
             return []
 
-ensureTool :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env)
+ensureTool :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
            => SetupOpts
            -> [PackageIdentifier] -- ^ already installed
            -> m SetupInfo
@@ -458,7 +463,7 @@ getOSKey = do
         Platform X86_64 Windows -> return "windows32"
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
-downloadPair :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env)
+downloadPair :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
              => DownloadPair
              -> PackageIdentifier
              -> m (Path Abs File, ArchiveType)
@@ -538,7 +543,7 @@ installGHCPosix _ archiveFile archiveType destDir ident = do
             exists <- doesExecutableExist menv tool
             return $ if exists then Nothing else Just tool
 
-installGHCWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env)
+installGHCWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
                   => SetupInfo
                   -> Path Abs File
                   -> ArchiveType
@@ -562,7 +567,7 @@ installGHCWindows si archiveFile archiveType destDir _ = do
 
     $logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
 
-installGitWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env)
+installGitWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
                   => SetupInfo
                   -> Path Abs File
                   -> ArchiveType
@@ -581,7 +586,7 @@ installGitWindows si archiveFile archiveType destDir _ = do
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
 -- Returned function takes an unpack directory and archive.
-setup7z :: (MonadReader env m, HasHttpManager env, MonadThrow m, MonadIO m, MonadIO n, MonadLogger m)
+setup7z :: (MonadReader env m, HasHttpManager env, MonadThrow m, MonadIO m, MonadIO n, MonadLogger m, MonadBaseControl IO m)
         => SetupInfo
         -> Config
         -> m (Path Abs Dir -> Path Abs File -> n ())
@@ -602,7 +607,7 @@ setup7z si config = do
     exe = dir </> $(mkRelFile "7z.exe")
     dll = dir </> $(mkRelFile "7z.dll")
 
-chattyDownload :: (MonadReader env m, HasHttpManager env, MonadIO m, MonadLogger m, MonadThrow m)
+chattyDownload :: (MonadReader env m, HasHttpManager env, MonadIO m, MonadLogger m, MonadThrow m, MonadBaseControl IO m)
                => Text
                -> Text -- ^ URL
                -> Path Abs File -- ^ destination
@@ -610,7 +615,7 @@ chattyDownload :: (MonadReader env m, HasHttpManager env, MonadIO m, MonadLogger
 chattyDownload label url path = do
     req <- parseUrl $ T.unpack url
     $logSticky $ T.concat
-      [ "Downloading "
+      [ "Preparing to download "
       , label
       , " ..."
       ]
@@ -621,10 +626,58 @@ chattyDownload label url path = do
       , T.pack $ toFilePath path
       , " ..."
       ]
-    x <- download req path -- TODO add progress indicator
+
+    let dReq = DownloadRequest
+            { drRequest = req
+            , drHashChecks = []
+            , drLengthCheck = Nothing
+            }
+    runInBase <- liftBaseWith $ \run -> return (void . run)
+    x <- verifiedDownload dReq path (chattyDownloadProgress runInBase)
     if x
         then $logStickyDone ("Downloaded " <> label <> ".")
         else $logStickyDone "Already downloaded."
+  where
+    chattyDownloadProgress runInBase = do
+        _ <- liftIO $ runInBase $ $logSticky $
+          label <> ": download has begun"
+        CL.map (Sum . S.length)
+          =$ chunksOverTime 1
+          =$ go
+      where
+        go = evalStateC 0 $ awaitForever $ \(Sum size) -> do
+            modify (+ size)
+            totalSoFar <- get
+            liftIO $ runInBase $ $logSticky $
+                label <> ": " <> T.pack (show totalSoFar) <> " bytes downloaded..."
+
+
+-- Await eagerly (collect with monoidal append),
+-- but space out yields by at least the given amount of time.
+-- The final yield may come sooner, and may be a superfluous mempty.
+-- Note that Integer and Float literals can be turned into NominalDiffTime
+-- (these literals are interpreted as "seconds")
+chunksOverTime :: (Monoid a, MonadIO m) => NominalDiffTime -> Conduit a m a
+chunksOverTime diff = do
+    currentTime <- liftIO getCurrentTime
+    evalStateC (currentTime, mempty) go
+  where
+    -- State is a tuple of:
+    -- * the last time a yield happened (or the beginning of the sink)
+    -- * the accumulated awaits since the last yield
+    go = await >>= \case
+      Nothing -> do
+        (_, acc) <- get
+        yield acc
+      Just a -> do
+        (lastTime, acc) <- get
+        let acc' = acc <> a
+        currentTime <- liftIO getCurrentTime
+        if diff < diffUTCTime currentTime lastTime
+          then put (currentTime, mempty) >> yield acc'
+          else put (lastTime,    acc')
+        go
+
 
 -- | Perform a basic sanity check of GHC
 sanityCheck :: (MonadIO m, MonadMask m, MonadLogger m)
