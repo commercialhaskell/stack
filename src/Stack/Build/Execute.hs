@@ -10,7 +10,8 @@ module Stack.Build.Execute
     , executePlan
     ) where
 
-import           Control.Concurrent             (forkIO, getNumCapabilities)
+import           Control.Concurrent             (getNumCapabilities)
+import           Control.Concurrent.Lifted (fork)
 import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
@@ -39,6 +40,7 @@ import           Data.Streaming.Process         hiding (callProcess, env)
 import qualified Data.Streaming.Process         as Process
 import           Data.Text                      (Text)
 import qualified Data.Text                      as T
+import qualified Data.Text.Encoding             as T
 import           Data.Text.Encoding             (encodeUtf8)
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
@@ -54,6 +56,7 @@ import           Stack.Fetch                    as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.Types
+import           Stack.Types.StackT
 import           Stack.Types.Internal
 import           System.Directory               hiding (findExecutable,
                                                  findFiles)
@@ -126,7 +129,7 @@ displayTask task = T.pack $ concat
 data ExecuteEnv = ExecuteEnv
     { eeEnvOverride    :: !EnvOverride
     , eeConfigureLock  :: !(MVar ())
-    , eeInstallLock    :: !(MVar ())
+    , eeInstallLock    :: !(MVar (Int,Int))
     , eeBuildOpts      :: !BuildOpts
     , eeBaseConfigOpts :: !BaseConfigOpts
     , eeGhcPkgIds      :: !(TVar (Map PackageIdentifier Installed))
@@ -149,7 +152,8 @@ executePlan menv bopts baseConfigOpts cabalPkgVer locals plan = do
     withSystemTempDirectory stackProgName $ \tmpdir -> do
         tmpdir' <- parseAbsDir tmpdir
         configLock <- newMVar ()
-        installLock <- newMVar ()
+        installLock <- newMVar (let size = M.size (planTasks plan)
+                                in (0,size))
         idMap <- liftIO $ newTVarIO M.empty
         let setupHs = tmpdir' </> $(mkRelFile "Setup.hs")
         liftIO $ writeFile (toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
@@ -258,6 +262,9 @@ executePlan' plan ee = do
     -- stack always using transformer stacks that are safe for this use case.
     runInBase <- liftBaseWith $ \run -> return (void . run)
 
+    let size = Map.size (planTasks plan)
+    when (size > 1)
+         ($logSticky ("Progress: 0/" <> T.pack (show size)))
     let actions = concatMap (toActions runInBase ee) $ Map.elems $ planTasks plan
     threads <- liftIO getNumCapabilities -- TODO make a build opt to override this
     errs <- liftIO $ runActions threads actions
@@ -364,20 +371,26 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
                    _ -> return ()
              #endif
 
--- | Package's documentation directory.
-packageDocDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
-              => PackageIdentifier -- ^ Cabal version
-              -> Package
-              -> m (Path Abs Dir)
-packageDocDir cabalPkgVer package' = do
-  dist <- distDirFromDir cabalPkgVer (packageDir package')
-  return (dist </> $(mkRelDir "doc/"))
+ -- | Package's documentation directory.
+ packageDocDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
+               => PackageIdentifier -- ^ Cabal version
+               -> Package
+               -> m (Path Abs Dir)
+ packageDocDir cabalPkgVer package' = do
+   dist <- distDirFromDir cabalPkgVer (packageDir package')
+   return (dist </> $(mkRelDir "doc/"))
                  --}
         DoNothing -> return ()
 
-    unless justFinal $ withMVar eeInstallLock $ \_ -> do
+    unless justFinal $ modifyMVar_ eeInstallLock $ \(done,total) -> do
         announce "install"
         cabal False ["install"]
+        unless (total == 1) $ do
+            let done' = done + 1
+            $logSticky ("Progress: " <> T.pack (show done') <> "/" <> T.pack (show total))
+            when (done' == total)
+                 ($logStickyDone ("Completed all " <> T.pack (show total) <> " packages."))
+        return (done + 1,total)
 
     -- It seems correct to leave this outside of the "justFinal" check above,
     -- in case another package depends on a justFinal target
@@ -478,10 +491,8 @@ packageDocDir cabalPkgVer package' = do
                     , Process.env = envHelper menv
                     , std_in = CreatePipe
                     , std_out =
-                        if stripTHLoading
-                            then CreatePipe
-                            else case mlogFile of
-                                Nothing -> Inherit
+                        case mlogFile of
+                                Nothing -> CreatePipe
                                 Just (_, h) -> UseHandle h
                     , std_err =
                         case mlogFile of
@@ -494,7 +505,10 @@ packageDocDir cabalPkgVer package' = do
             (Just inH, moutH, Nothing, ph) <- liftIO $ createProcess_ "singleBuild" cp
             liftIO $ hClose inH
             case moutH of
-                Just outH -> assert stripTHLoading $ printWithoutTHLoading outH
+                Just outH ->
+                    case mlogFile of
+                      Just{} -> return ()
+                      Nothing -> printBuildOutput stripTHLoading outH
                 Nothing -> return ()
             ec <- liftIO $ waitForProcess ph
             case ec of
@@ -569,16 +583,18 @@ packageDocDir cabalPkgVer package' = do
 
 -- | Grab all output from the given @Handle@ and print it to stdout, stripping
 -- Template Haskell "Loading package" lines. Does work in a separate thread.
-printWithoutTHLoading :: MonadIO m => Handle -> m ()
-printWithoutTHLoading outH = liftIO $ void $ forkIO $
-       CB.sourceHandle outH
+printBuildOutput :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
+                 => Bool -> Handle -> m ()
+printBuildOutput excludeTHLoading outH = void $ fork $
+         CB.sourceHandle outH
     $$ CB.lines
     =$ CL.filter (not . isTHLoading)
-    =$ CL.mapM_ S8.putStrLn
+    =$ CL.mapM_ ($logInfo . T.decodeUtf8)
   where
     -- | Is this line a Template Haskell "Loading package" line
     -- ByteString
     isTHLoading :: S8.ByteString -> Bool
+    isTHLoading _ | not excludeTHLoading = False
     isTHLoading bs =
         "Loading package " `S8.isPrefixOf` bs &&
         ("done." `S8.isSuffixOf` bs || "done.\r" `S8.isSuffixOf` bs)
