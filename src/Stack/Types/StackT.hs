@@ -135,36 +135,37 @@ stickyLoggerFunc :: (HasSticky r, HasLogLevel r, ToLogStr msg, MonadReader r (t 
 stickyLoggerFunc loc src level msg = do
     ref <- asks getSticky
     sticky <- liftIO (takeMVar ref) -- TODO: make exception-safe.
-    let clear = liftIO
-                    (S8.putStr
-                         ("\r" <>
-                          S8.replicate
-                              (stickyMaxColumns sticky)
-                              ' ' <>
-                          "\r"))
+    let clear =
+            liftIO
+                (S8.putStr
+                     ("\r" <>
+                      S8.replicate
+                          (stickyMaxColumns sticky)
+                          ' ' <>
+                      "\r"))
     case level of
-        LevelOther "sticky-done" ->
-            do liftIO (putMVar
-                           ref
-                           (sticky
-                            { stickyLastWasSticky = False
-                            , stickyMaxColumns = 0
-                            , stickyCurrentLine = Nothing
-                            }))
-               clear
-               loggerFunc loc src level msg
-        LevelOther "sticky" ->
-            liftIO $
-            do S8.putStr
-                   ("\r" <> pad (stickyMaxColumns sticky) msgBytes <> "\r" <>
-                    msgBytes)
-               putMVar
-                   ref
-                   (sticky
-                    { stickyLastWasSticky = True
-                    , stickyMaxColumns = S8.length msgBytes
-                    , stickyCurrentLine = Just msgBytes
-                    })
+        LevelOther "sticky-done" -> do
+            liftIO
+                (putMVar
+                     ref
+                     (sticky
+                      { stickyLastWasSticky = False
+                      , stickyMaxColumns = 0
+                      , stickyCurrentLine = Nothing
+                      }))
+            clear
+            loggerFunc loc src level msg
+        LevelOther "sticky" -> do
+            clear
+            liftIO (S8.putStr msgBytes)
+            liftIO
+                (putMVar
+                     ref
+                     (sticky
+                      { stickyLastWasSticky = True
+                      , stickyMaxColumns = S8.length msgBytes
+                      , stickyCurrentLine = Just msgBytes
+                      }))
         _ -> do
             clear
             loggerFunc loc src level msg
@@ -189,11 +190,6 @@ stickyLoggerFunc loc src level msg = do
     msgBytes =
         fromLogStr
             (toLogStr msg)
-    pad width s =
-        S8.take
-            (max width (S8.length s))
-            (s <>
-             S8.replicate width ' ')
 
 -- | Logging function takes the log level into account.
 loggerFunc :: (MonadIO m,ToLogStr msg,MonadReader r m,HasLogLevel r)
