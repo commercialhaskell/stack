@@ -509,18 +509,18 @@ installGHCPosix _ archiveFile archiveType destDir ident = do
         root <- parseAbsDir root'
         dir <- liftM (root Path.</>) $ parseRelDir $ packageIdentifierString ident
 
-        $logInfo $ "Unpacking GHC ..."
+        $logSticky $ "Unpacking GHC ..."
         $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
         runIn root "tar" menv ["xf", toFilePath archiveFile] Nothing
 
-        $logInfo "Configuring GHC ..."
+        $logSticky "Configuring GHC ..."
         runIn dir (toFilePath $ dir Path.</> $(mkRelFile "configure"))
               menv ["--prefix=" ++ toFilePath destDir] Nothing
 
-        $logInfo "Installing GHC ..."
+        $logSticky "Installing GHC ..."
         runIn dir "make" menv ["install"] Nothing
 
-        $logInfo $ "GHC installed."
+        $logStickyDone $ "Installed GHC."
         $logDebug $ "GHC installed to " <> T.pack (toFilePath destDir)
   where
     -- | Check if given processes appear to be present, throwing an exception if

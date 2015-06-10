@@ -386,7 +386,7 @@ populateCache menv index = do
                 | indexRequireHashes index -> throwM $ MissingRequiredHashes (indexName index) ident
                 | otherwise -> return (ident, pc)
 
-    $logStickyDone "Done populating index cache."
+    $logStickyDone "Populated index cache."
 
     return pis'
 
