@@ -124,14 +124,6 @@ main =
                         "Clean the local packages"
                         cleanCmd
                         (pure ())
-             addCommand "deps"
-                        "Install dependencies"
-                        depsCmd
-                        ((,)
-                            <$> (some (argument readPackageName
-                                        (metavar "[PACKAGES]")))
-                            <*> (flag False True (long "dry-run" <>
-                                                  help "Don't build anything, just prepare to")))
              addSubCommands
                "path"
                "Print path information for certain things"
@@ -279,20 +271,6 @@ withBuildConfig go@GlobalOpts{..} strat inner = do
 cleanCmd :: () -> GlobalOpts -> IO ()
 cleanCmd () go = withBuildConfig go ThrowException clean
 
--- | Install dependencies
-depsCmd :: ([PackageName], Bool) -> GlobalOpts -> IO ()
-depsCmd (names, dryRun) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $
-    Stack.Build.build BuildOpts
-        { boptsTargets = Right names
-        , boptsLibProfile = False
-        , boptsExeProfile = False
-        , boptsEnableOptimizations = Nothing
-        , boptsFinalAction = DoNothing
-        , boptsDryrun = dryRun
-        , boptsGhcOptions = []
-        , boptsFlags = Map.empty
-        }
-
 -- | Parser for package names
 readPackageName :: ReadM PackageName
 readPackageName = do
@@ -403,7 +381,7 @@ buildOpts = BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
         target =
-          fmap (Left . map T.pack)
+          fmap (map T.pack)
                (many (strArgument
                         (metavar "TARGET" <>
                          help "If none specified, use all packages defined in current directory")))

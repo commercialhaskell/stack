@@ -183,9 +183,7 @@ instance Show ConstructPlanException where
 
 -- | Configuration for building.
 data BuildOpts =
-  BuildOpts {boptsTargets :: !(Either [Text] [PackageName])
-             -- ^ Right value indicates that we're only installing
-             -- dependencies, no local packages
+  BuildOpts {boptsTargets :: ![Text]
             ,boptsLibProfile :: !Bool
             ,boptsExeProfile :: !Bool
             ,boptsEnableOptimizations :: !(Maybe Bool)

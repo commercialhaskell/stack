@@ -23,6 +23,7 @@ import qualified Data.Map                     as Map
 import           Data.Map.Strict              (Map)
 import           Data.Maybe
 import           Data.Monoid                  ((<>))
+import           Data.Set                     (Set)
 import qualified Data.Set                     as Set
 import qualified Data.Text                    as T
 import           Path
@@ -48,7 +49,11 @@ instance PackageInstallInfo PackageSource where
 
 loadSourceMap :: (MonadIO m, MonadCatch m, MonadReader env m, HasBuildConfig env, MonadBaseControl IO m, HasHttpManager env, MonadLogger m)
               => BuildOpts
-              -> m (MiniBuildPlan, [LocalPackage], SourceMap)
+              -> m ( MiniBuildPlan
+                   , [LocalPackage]
+                   , Set PackageName -- non-local targets
+                   , SourceMap
+                   )
 loadSourceMap bopts = do
     bconfig <- asks getBuildConfig
     mbp0 <- case bcResolver bconfig of
@@ -61,7 +66,7 @@ loadSourceMap bopts = do
             , mbpPackages = Map.empty
             }
 
-    locals <- loadLocals bopts
+    (locals, nonLocalTargets) <- loadLocals bopts
 
     let shadowed = Set.fromList (map (packageName . lpPackage) locals)
                 <> Map.keysSet (bcExtraDeps bconfig)
@@ -87,17 +92,20 @@ loadSourceMap bopts = do
                 (PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi))
             ]
 
-    return (mbp, locals, sourceMap)
+    let unknown = Set.difference nonLocalTargets $ Map.keysSet sourceMap
+    unless (Set.null unknown) $ throwM $ UnknownTargets $ Set.toList unknown
 
+    return (mbp, locals, nonLocalTargets, sourceMap)
+
+-- | Returns locals and extra target packages
 loadLocals :: (MonadReader env m, HasBuildConfig env, MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m)
            => BuildOpts
-           -> m [LocalPackage]
+           -> m ([LocalPackage], Set PackageName)
 loadLocals bopts = do
     targets <- mapM parseTarget $
         case boptsTargets bopts of
-            Left [] -> ["."]
-            Left x -> x
-            Right _ -> []
+            [] -> ["."]
+            x -> x
     (dirs, names0) <- case partitionEithers targets of
         ([], targets') -> return $ partitionEithers targets'
         (bad, _) -> throwM $ Couldn'tParseTargets bad
@@ -136,9 +144,8 @@ loadLocals bopts = do
 
     let known = Set.fromList $ map (packageName . lpPackage) lps
         unknown = Set.difference names known
-    unless (Set.null unknown) $ throwM $ UnknownTargets $ Set.toList unknown
 
-    return lps
+    return (lps, unknown)
   where
     parseTarget t = do
         let s = T.unpack t

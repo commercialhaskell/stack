@@ -23,7 +23,6 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Resource
-import           Data.Either
 import           Data.Function
 import           Data.Map.Strict (Map)
 import qualified Data.Map as Map
@@ -56,11 +55,10 @@ build bopts = do
     menv <- getMinimalEnvOverride
     cabalPkgVer <- getCabalPkgVer menv
 
-    (mbp, locals, sourceMap) <- loadSourceMap bopts
+    (mbp, locals, extraToBuild, sourceMap) <- loadSourceMap bopts
     (installedMap, locallyRegistered) <- getInstalled menv profiling sourceMap
 
     baseConfigOpts <- mkBaseConfigOpts bopts
-    let extraToBuild = either (const []) id $ boptsTargets bopts
     plan <- withLoadPackage menv $ \loadPackage ->
         constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered loadPackage sourceMap installedMap
 

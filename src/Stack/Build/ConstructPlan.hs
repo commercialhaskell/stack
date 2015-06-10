@@ -92,7 +92,7 @@ constructPlan :: forall env m.
               => MiniBuildPlan
               -> BaseConfigOpts
               -> [LocalPackage]
-              -> [PackageName] -- ^ additional packages that must be built
+              -> Set PackageName -- ^ additional packages that must be built
               -> Set GhcPkgId -- ^ locally registered
               -> (PackageName -> Version -> Map FlagName Bool -> IO Package) -- ^ load upstream package
               -> SourceMap
@@ -115,9 +115,8 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild locallyRegistered loadPac
                 }
         (errs, _) -> throwM $ ConstructPlanExceptions errs
   where
-    allTargets = Set.fromList
-               $ map (packageName . lpPackage) (filter lpWanted locals) ++
-                 extraToBuild
+    allTargets = Set.fromList (map (packageName . lpPackage) (filter lpWanted locals))
+              <> extraToBuild
 
     ctx bconfig = Ctx
         { mbp = mbp0
