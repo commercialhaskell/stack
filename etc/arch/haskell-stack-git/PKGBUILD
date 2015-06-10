@@ -1,7 +1,7 @@
 # Maintainer:  Tristan Webb <tristan@fpcomplete.com>
-pkgname=stack-git
+pkgname=haskell-stack-git
 _pkgname=stack
-pkgver='f33b823dff'
+pkgver=20150609.527642d
 pkgrel=1
 pkgdesc="The Haskell Tool Stack"
 arch=('i686' 'x86_64')
@@ -10,8 +10,8 @@ license=('BSD3')
 depends=('libtinfo')
 makedepends=('ghc' 'cabal-install')
 optdepends=('docker: Use Docker images to build your project in a temporary container')
-provides=('stack')
-conflicts=('stack')
+provides=('haskell-stack')
+conflicts=('haskell-stack')
 # install=
 source=("${_pkgname}::git+https://github.com/commercialhaskell/stack.git")
 md5sums=('SKIP')
@@ -25,6 +25,7 @@ prepare() {
   cabal update
   cabal clean
   cabal install --only-dependencies --reorder-goals --enable-tests
+  cabal install cpphs
 }
 
 build() {
@@ -35,7 +36,7 @@ build() {
   mkdir -p $SHARE_DIR
   cabal install --disable-documentation \
         --disable-library-profiling \
-        --bindir=$BIN_DIR 
+        --bindir=$BIN_DIR
 }
 
 check() {
@@ -47,7 +48,7 @@ package() {
   cd "$srcdir/${_pkgname}"
   BIN_DIR="$srcdir/${_pkgname}/bin/"
   STACK_BIN=$BIN_DIR/stack
-  install -Dm755 $STACK_BIN "$pkgdir/usr/bin/stack" 
+  install -Dm755 $STACK_BIN "$pkgdir/usr/bin/stack"
 }
 
 pkgver() {
