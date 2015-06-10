@@ -234,17 +234,16 @@ instance ToJSON PackageLocation where
     toJSON (PLHttpTarball t) = toJSON t
     toJSON (PLGit x y) = toJSON $ T.unwords ["git", x, y]
 instance FromJSON PackageLocation where
-    parseJSON = withText "PackageLocation" $ \t ->
-        http t <|> git t <|> pure (PLFilePath $ T.unpack t)
+    parseJSON v = git v <|> withText "PackageLocation" (\t -> http t <|> file t) v
       where
+        file t = pure $ PLFilePath $ T.unpack t
         http t =
             case parseUrl $ T.unpack t of
                 Left _ -> mzero
                 Right _ -> return $ PLHttpTarball t
-        git t =
-            case T.words t of
-                ["git", x, y] -> return $ PLGit x y
-                _ -> mzero
+        git = withObject "PackageGitLocation" $ \o -> PLGit
+            <$> o .: "git"
+            <*> o .: "commit"
 
 -- | A project is a collection of packages. We can have multiple stack.yaml
 -- files, but only one of them may contain project information.
