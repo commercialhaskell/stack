@@ -5,12 +5,12 @@ Distribution packages are available for [Ubuntu](#ubuntu) and [Arch Linux](#arch
 (32-bit)
 
 * Download [stack-0.0.0-i386-windows.zip](https://github.com/fpco/stack/releases/download/v0.0.0-beta/stack-0.0.0-i386-windows.zip)
-* Unpack the `stack.exe` to somewhere on your `%PATH%` and you can then run `stack` on the commandline.
+* Unpack the `stack.exe` to somewhere on your `%PATH%` (see [Path section below](#path)) and you can then run `stack` on the commandline.
 
 ## OS X
 
 * Download [stack-0.0.0-x86_64-osx.gz](https://github.com/fpco/stack/releases/download/v0.0.0-beta/stack-0.0.0-x86_64-osx.gz)
-* Extract the `stack` executable and put it somewhere on your `$PATH` (e.g. `/usr/local/bin`)
+* Extract the `stack` executable and put it somewhere on your `$PATH` (see [Path section below](#path))
 * **Note**: due to [GHC bug 10322](https://ghc.haskell.org/trac/ghc/ticket/10322), `stack` does not build with GHC 7.10.1. This bug will be fixed in 7.10.2, but in the meantime, we recommend using GHC 7.8.4 on OS X.
 
 ## Ubuntu
@@ -61,5 +61,11 @@ stack can be found in the AUR:
 (64-bit only)
 
 * Download [stack-0.0.0-x86_64-linux.gz](https://github.com/fpco/stack/releases/download/v0.0.0-beta/stack-0.0.0-x86_64-linux.gz)
-* Extract the `stack` executable into `/usr/local/bin`.
+* Extract the `stack` executable somewhere on your `$PATH`  (see [Path section below](#path))
 * Now you can run `stack` from the terminal.
+
+## Path
+
+You can install stack by copying it anywhere on your PATH environment variable, such as `/usr/local/bin`. However, it may be advantageous to place the stack executable in the same directory where stack itself will install executables, that way stack is able to upgrade itself. On Windows, that directory is `$APPDATA\local\bin`, e.g. "c:\Users\Michael\AppData\Roaming\local\bin", and on other systems `$HOME/.local/bin`.
+
+If you're curious about the choice of these paths, see [issue #153](https://github.com/commercialhaskell/stack/issues/153)
