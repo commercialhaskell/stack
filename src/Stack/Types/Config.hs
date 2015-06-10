@@ -73,6 +73,12 @@ data Config =
          -- previous indices, /not/ extend them.
          --
          -- Using an assoc list instead of a Map to keep track of priority
+         ,configSystemGHC        :: !Bool
+         -- ^ Should we use the system-installed GHC (on the PATH) if
+         -- available? Can be overridden by command line options.
+         ,configInstallGHC       :: !Bool
+         -- ^ Should we automatically install GHC if missing or the wrong
+         -- version is available? Can be overridden by command line options.
          }
 
 -- | Information on a single package index
@@ -340,16 +346,20 @@ instance HasBuildConfig BuildConfig where
 -- Configurations may be "cascaded" using mappend (left-biased).
 data ConfigMonoid =
   ConfigMonoid
-    { configMonoidDockerOpts     :: !DockerOptsMonoid
+    { configMonoidDockerOpts        :: !DockerOptsMonoid
     -- ^ Docker options.
-    , configMonoidConnectionCount :: !(Maybe Int)
+    , configMonoidConnectionCount   :: !(Maybe Int)
     -- ^ See: 'configConnectionCount'
-    , configMonoidHideTHLoading :: !(Maybe Bool)
+    , configMonoidHideTHLoading     :: !(Maybe Bool)
     -- ^ See: 'configHideTHLoading'
     , configMonoidLatestSnapshotUrl :: !(Maybe Text)
     -- ^ See: 'configLatestSnapshotUrl'
-    , configMonoidPackageIndices :: !(Maybe [PackageIndex])
+    , configMonoidPackageIndices    :: !(Maybe [PackageIndex])
     -- ^ See: 'configPackageIndices'
+    , configMonoidSystemGHC         :: !(Maybe Bool)
+    -- ^ See: 'configSystemGHC'
+    ,configMonoidInstallGHC         :: !(Maybe Bool)
+    -- ^ See: 'configInstallGHC'
     }
   deriving Show
 
@@ -360,6 +370,8 @@ instance Monoid ConfigMonoid where
     , configMonoidHideTHLoading = Nothing
     , configMonoidLatestSnapshotUrl = Nothing
     , configMonoidPackageIndices = Nothing
+    , configMonoidSystemGHC = Nothing
+    , configMonoidInstallGHC = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -367,6 +379,8 @@ instance Monoid ConfigMonoid where
     , configMonoidHideTHLoading = configMonoidHideTHLoading l <|> configMonoidHideTHLoading r
     , configMonoidLatestSnapshotUrl = configMonoidLatestSnapshotUrl l <|> configMonoidLatestSnapshotUrl r
     , configMonoidPackageIndices = configMonoidPackageIndices l <|> configMonoidPackageIndices r
+    , configMonoidSystemGHC = configMonoidSystemGHC l <|> configMonoidSystemGHC r
+    , configMonoidInstallGHC = configMonoidInstallGHC l <|> configMonoidInstallGHC r
     }
 
 instance FromJSON ConfigMonoid where
@@ -378,6 +392,8 @@ instance FromJSON ConfigMonoid where
          configMonoidHideTHLoading <- obj .:? "hide-th-loading"
          configMonoidLatestSnapshotUrl <- obj .:? "latest-snapshot-url"
          configMonoidPackageIndices <- obj .:? "package-indices"
+         configMonoidSystemGHC <- obj .:? "system-ghc"
+         configMonoidInstallGHC <- obj .:? "install-ghc"
          return ConfigMonoid {..}
 
 data ConfigException

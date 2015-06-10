@@ -166,6 +166,9 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
                 }]
             configMonoidPackageIndices
 
+         configSystemGHC = fromMaybe True configMonoidSystemGHC
+         configInstallGHC = fromMaybe False configMonoidInstallGHC
+
          -- Only place in the codebase where platform is hard-coded. In theory
          -- in the future, allow it to be configured.
          configPlatform = buildPlatform

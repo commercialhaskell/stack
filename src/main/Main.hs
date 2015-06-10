@@ -19,7 +19,7 @@ import           Data.List
 import qualified Data.List as List
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (isJust)
+import           Data.Maybe (isJust, fromMaybe)
 import           Data.Monoid
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -247,7 +247,9 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                           return (bcGhcVersion bc, Just $ bcStackYaml bc)
               mpaths <- runStackT manager globalLogLevel (lcConfig lc) $ ensureGHC SetupOpts
                   { soptsInstallIfMissing = True
-                  , soptsUseSystem = globalSystemGhc && not scoForceReinstall
+                  , soptsUseSystem =
+                    fromMaybe (configSystemGHC $ lcConfig lc) globalSystemGhc
+                    && not scoForceReinstall
                   , soptsExpected = ghc
                   , soptsStackYaml = mstack
                   , soptsForceReinstall = scoForceReinstall
@@ -269,7 +271,9 @@ withBuildConfig go@GlobalOpts{..} strat inner = do
             bconfig1 <- runStackLoggingT manager globalLogLevel $
                 lcLoadBuildConfig lc strat
             bconfig2 <- runStackT manager globalLogLevel bconfig1 $
-                setupEnv globalSystemGhc globalInstallGhc
+                setupEnv
+                    (fromMaybe (configSystemGHC $ lcConfig lc) globalSystemGhc)
+                    (fromMaybe (configInstallGHC $ lcConfig lc) globalInstallGhc)
             runStackT manager globalLogLevel bconfig2 inner
 
 cleanCmd :: () -> GlobalOpts -> IO ()
@@ -481,11 +485,11 @@ globalOpts =
     GlobalOpts
     <$> logLevelOpt
     <*> configOptsParser False
-    <*> boolFlags True
+    <*> maybeBoolFlags
             "system-ghc"
             "using the system installed GHC (on the PATH) if available and a matching version"
             idm
-    <*> boolFlags True
+    <*> maybeBoolFlags
             "install-ghc"
             "downloading and installing GHC if necessary (can be done manually with stack setup)"
             idm
@@ -525,8 +529,8 @@ defaultLogLevel = LevelInfo
 data GlobalOpts = GlobalOpts
     { globalLogLevel     :: LogLevel -- ^ Log level
     , globalConfigMonoid :: ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
-    , globalSystemGhc    :: Bool -- ^ Use system GHC if available and correct version?
-    , globalInstallGhc   :: Bool -- ^ Install GHC if missing
+    , globalSystemGhc    :: Maybe Bool -- ^ Use system GHC if available and correct version?
+    , globalInstallGhc   :: Maybe Bool -- ^ Install GHC if missing
     } deriving (Show)
 
 -- | Load the configuration with a manager. Convenience function used
