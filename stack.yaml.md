@@ -35,3 +35,7 @@ URL providing a JSON with information on the latest LTS and Nightly snapshots, u
 Default: https://www.stackage.org/download/snapshots.json
 
 ### package-indices
+
+### system-ghc
+
+### install-ghc
