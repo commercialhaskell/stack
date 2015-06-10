@@ -35,6 +35,8 @@ import qualified Data.ByteString.Char8 as S8
 import           Data.Char
 import           Data.Monoid
 import           Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import           Data.Time
 import           Language.Haskell.TH
 import           Network.HTTP.Client.Conduit (HasHttpManager(..))
@@ -171,7 +173,7 @@ stickyLoggerFunc loc src level msg = do
                              ref
                              (sticky
                               { stickyLastWasSticky = True
-                              , stickyMaxColumns = S8.length msgBytes
+                              , stickyMaxColumns = characterLength msgBytes
                               , stickyCurrentLine = Just msgBytes
                               }))
                 _ -> do
@@ -192,12 +194,13 @@ stickyLoggerFunc loc src level msg = do
                                      ref
                                      (sticky
                                       { stickyLastWasSticky = True
-                                      , stickyMaxColumns = S8.length msgBytes
+                                      , stickyMaxColumns = characterLength msgBytes
                                       }))
   where
     msgBytes =
         fromLogStr
             (toLogStr msg)
+    characterLength = T.length . T.decodeUtf8
 
 -- | Logging function takes the log level into account.
 loggerFunc :: (MonadIO m,ToLogStr msg,MonadReader r m,HasLogLevel r)
