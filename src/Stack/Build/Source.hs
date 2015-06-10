@@ -33,6 +33,7 @@ import           Stack.Build.Types
 import           Stack.BuildPlan              (loadMiniBuildPlan,
                                                shadowMiniBuildPlan)
 import           Stack.Package
+import           Stack.PackageIndex
 import           Stack.Types
 import           System.Directory             hiding (findExecutable, findFiles)
 
@@ -93,7 +94,22 @@ loadSourceMap bopts = do
             ]
 
     let unknown = Set.difference nonLocalTargets $ Map.keysSet sourceMap
-    unless (Set.null unknown) $ throwM $ UnknownTargets $ Set.toList unknown
+    unless (Set.null unknown) $ do
+        menv <- getMinimalEnvOverride
+        caches <- getPackageCaches menv
+        let m = Map.fromList
+              $ map toTuple
+              $ Map.keys caches
+            toEither name =
+                case Map.lookup name m of
+                    Nothing -> Left name
+                    Just version -> Right (name, version)
+            eithers = map toEither $ Set.toList unknown
+            (unknown', notInIndex) = partitionEithers eithers
+        throwM $ UnknownTargets
+            (Set.fromList unknown')
+            (Map.fromList notInIndex)
+            (bcStackYaml bconfig)
 
     return (mbp, locals, nonLocalTargets, sourceMap)
 

@@ -46,7 +46,10 @@ data StackBuildException
   | GHCVersionMismatch (Maybe Version) Version (Maybe (Path Abs File))
   -- ^ Path to the stack.yaml file
   | Couldn'tParseTargets [Text]
-  | UnknownTargets [PackageName]
+  | UnknownTargets
+    (Set PackageName) -- no known version
+    (Map PackageName Version) -- ^ not in snapshot, here's the most recent version in the index
+    (Path Abs File) -- stack.yaml
   | TestSuiteFailure PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe (Path Abs File))
   | ConstructPlanExceptions [ConstructPlanException]
   | CabalExitedUnsuccessfully
@@ -82,9 +85,27 @@ instance Show StackBuildException where
     show (Couldn'tParseTargets targets) = unlines
                 $ "The following targets could not be parsed as package names or directories:"
                 : map T.unpack targets
-    show (UnknownTargets targets) =
+    show (UnknownTargets noKnown notInSnapshot stackYaml) =
+        unlines $ noKnown' ++ notInSnapshot'
+      where
+        noKnown'
+            | Set.null noKnown = []
+            | otherwise = return $
                 "The following target packages were not found: " ++
-                intercalate ", " (map packageNameString targets)
+                intercalate ", " (map packageNameString $ Set.toList noKnown)
+        notInSnapshot'
+            | Map.null notInSnapshot = []
+            | otherwise =
+                  "The following packages are not in your snapshot, but exist"
+                : "in your package index. Recommended action: add them to your"
+                : ("extra-deps in " ++ toFilePath stackYaml)
+                : "(Note: these are the most recent versions,"
+                : "but there's no guarantee that they'll build together)."
+                : ""
+                : map
+                    (\(name, version) -> "- " ++ packageIdentifierString
+                        (PackageIdentifier name version))
+                    (Map.toList notInSnapshot)
     show (TestSuiteFailure ident codes mlogFile) = unlines $ concat
         [ ["Test suite failure for package " ++ packageIdentifierString ident]
         , flip map (Map.toList codes) $ \(name, mcode) -> concat
