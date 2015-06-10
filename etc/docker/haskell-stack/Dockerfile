@@ -4,7 +4,7 @@ MAINTAINER Greg Weber
 # Intended as a base haskell development environment
 #
 #    docker build -t haskell-stack:7.8 .
-#    docker run --rm -i -t -v `pwd`:/home/haskell haskell-stack /bin/bash
+#    docker run --rm -i -t -v `pwd`:/home/haskell haskell-stack:7.8 /bin/bash
 #
 # If you want to re-use your host ~/.stack directory you can mount it into the host.
 # Setting the STACK_ROOT env variable may be of help
@@ -14,7 +14,7 @@ MAINTAINER Greg Weber
 # It is also possible to directly use stack from the image
 # However, for that purpose this image is very bloated
 #
-#    docker run --rm haskell-stack stack --help
+#    docker run --rm haskell-stack:7.8 stack --help
 
 RUN apt-get update && apt-get install sudo \
     # install profiling libraries
@@ -29,7 +29,7 @@ RUN apt-get update && apt-get install sudo \
 # install stackage binaries to /opt/stackage
 RUN sudo mkdir -p /opt/stackage/bin
 ENV PATH /opt/stackage/bin:.cabal-sandbox/bin:.cabal/bin:$PATH:./
-ADD . /opt/stackage/lib
+COPY . /opt/stackage/lib
 RUN cd /opt/stackage/lib \
  && cabal update && cabal install cpphs && cabal install \
  && mv /root/.cabal/bin/stack /opt/stackage/bin/ \
