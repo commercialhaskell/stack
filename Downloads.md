@@ -19,7 +19,7 @@ Distribution packages are available for [Ubuntu](#ubuntu) and [Arch Linux](#arch
 
 ```sh
 wget -q -O- http://download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
-echo 'deb http://downloads.fpcomplete.com/ubuntu/vivid stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
+echo 'deb http://download.fpcomplete.com/ubuntu/vivid stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 sudo apt-get update
 sudo apt-get install stack -y
 ```
