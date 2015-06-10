@@ -33,7 +33,7 @@ import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
 import qualified Data.ByteString.Char8 as S8
 import           Data.Char
-import           Data.Monoid
+
 import           Data.Text (Text)
 import           Data.Time
 import           Language.Haskell.TH
