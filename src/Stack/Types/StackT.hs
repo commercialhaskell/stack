@@ -138,11 +138,9 @@ stickyLoggerFunc loc src level msg = do
     let clear =
             liftIO
                 (S8.putStr
-                     ("\r" <>
-                      S8.replicate
+                     (S8.replicate
                           (stickyMaxColumns sticky)
-                          ' ' <>
-                      "\r"))
+                          '\8'))
     case level of
         LevelOther "sticky-done" -> do
             liftIO
