@@ -54,6 +54,7 @@ import           Stack.Fetch                    as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.Types
+import           Stack.Types.StackT
 import           Stack.Types.Internal
 import           System.Directory               hiding (findExecutable,
                                                  findFiles)
@@ -126,7 +127,7 @@ displayTask task = T.pack $ concat
 data ExecuteEnv = ExecuteEnv
     { eeEnvOverride    :: !EnvOverride
     , eeConfigureLock  :: !(MVar ())
-    , eeInstallLock    :: !(MVar ())
+    , eeInstallLock    :: !(MVar (Int,Int))
     , eeBuildOpts      :: !BuildOpts
     , eeBaseConfigOpts :: !BaseConfigOpts
     , eeGhcPkgIds      :: !(TVar (Map PackageIdentifier Installed))
@@ -149,7 +150,8 @@ executePlan menv bopts baseConfigOpts cabalPkgVer locals plan = do
     withSystemTempDirectory stackProgName $ \tmpdir -> do
         tmpdir' <- parseAbsDir tmpdir
         configLock <- newMVar ()
-        installLock <- newMVar ()
+        installLock <- newMVar (let size = M.size (planTasks plan)
+                                in (0,size))
         idMap <- liftIO $ newTVarIO M.empty
         let setupHs = tmpdir' </> $(mkRelFile "Setup.hs")
         liftIO $ writeFile (toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
@@ -364,20 +366,26 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
                    _ -> return ()
              #endif
 
--- | Package's documentation directory.
-packageDocDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
-              => PackageIdentifier -- ^ Cabal version
-              -> Package
-              -> m (Path Abs Dir)
-packageDocDir cabalPkgVer package' = do
-  dist <- distDirFromDir cabalPkgVer (packageDir package')
-  return (dist </> $(mkRelDir "doc/"))
+ -- | Package's documentation directory.
+ packageDocDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
+               => PackageIdentifier -- ^ Cabal version
+               -> Package
+               -> m (Path Abs Dir)
+ packageDocDir cabalPkgVer package' = do
+   dist <- distDirFromDir cabalPkgVer (packageDir package')
+   return (dist </> $(mkRelDir "doc/"))
                  --}
         DoNothing -> return ()
 
-    unless justFinal $ withMVar eeInstallLock $ \_ -> do
+    unless justFinal $ modifyMVar_ eeInstallLock $ \(done,total) -> do
         announce "install"
         cabal False ["install"]
+        unless (total == 1) $ do
+            let done' = done + 1
+            $logSticky ("Progress: " <> T.pack (show done') <> "/" <> T.pack (show total))
+            when (done' == total)
+                 ($logStickyDone ("Completed all " <> T.pack (show total) <> " packages."))
+        return (done + 1,total)
 
     -- It seems correct to leave this outside of the "justFinal" check above,
     -- in case another package depends on a justFinal target
