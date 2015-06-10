@@ -69,6 +69,7 @@ import           Path                                  (mkRelDir, parent,
                                                         (</>))
 import           Prelude -- Fix AMP warning
 import           Stack.Types
+import           Stack.Types.StackT
 import           System.Directory
 import           System.FilePath (takeBaseName, (<.>))
 import           System.IO                             (IOMode (ReadMode, WriteMode),
@@ -198,7 +199,7 @@ updateIndex :: (MonadIO m,MonadLogger m
             -> m ()
 updateIndex menv index =
   do let name = indexName index
-         logUpdate mirror = $logInfo $ "Updating package index " <> indexNameText (indexName index) <> " (mirrored at " <> mirror  <> ") ..."
+         logUpdate mirror = $logSticky $ "Updating package index " <> indexNameText (indexName index) <> " (mirrored at " <> mirror  <> ") ..."
      git <- isGitInstalled menv
      case (git, indexLocation index) of
         (True, ILGit url) -> logUpdate url >> updateIndexGit menv name index url
@@ -236,10 +237,10 @@ updateIndexGit menv indexName' index gitUrl = do
             repoExists <-
               liftIO (doesDirectoryExist (toFilePath acfDir))
             unless repoExists
-                   (do $logInfo ("Cloning package index ... ")
-                       $logDebug ("Cloning Git repo from " <> gitUrl)
-                       runIn suDir "git" menv cloneArgs Nothing)
+                   (runIn suDir "git" menv cloneArgs Nothing)
+            $logSticky "Fetching package index ..."
             runIn acfDir "git" menv ["fetch","--tags","--depth=1"] Nothing
+            $logStickyDone "Fetched package index."
             _ <-
               (liftIO . tryIO) (removeFile (toFilePath tarFile))
             when (indexGpgVerify index)
@@ -357,7 +358,7 @@ populateCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, Mon
               -> PackageIndex
               -> m (Map PackageIdentifier PackageCache)
 populateCache menv index = do
-    $logInfo "Populating index cache, may take a moment ..."
+    $logSticky "Populating index cache ..."
     let toIdent (Left ucf) = Just
             ( PackageIdentifier (ucfName ucf) (ucfVersion ucf)
             , PackageCache
@@ -385,7 +386,7 @@ populateCache menv index = do
                 | indexRequireHashes index -> throwM $ MissingRequiredHashes (indexName index) ident
                 | otherwise -> return (ident, pc)
 
-    $logInfo "Done populating index cache."
+    $logStickyDone "Done populating index cache."
 
     return pis'
 

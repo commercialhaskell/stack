@@ -72,6 +72,7 @@ import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.Types
+import           Stack.Types.StackT
 import           System.Directory (createDirectoryIfMissing, getDirectoryContents)
 import           System.FilePath (takeDirectory)
 
@@ -422,10 +423,10 @@ loadBuildPlan name = do
             $logDebug $ "Decoding build plan from file failed: " <> T.pack (show e)
             liftIO $ createDirectoryIfMissing True $ takeDirectory $ toFilePath fp
             req <- parseUrl $ T.unpack url
-            $logInfo $ "Downloading " <> renderSnapName name <> " build plan ..."
+            $logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
             $logDebug $ "Downloading build plan from: " <> url
             _ <- download req fp
-            $logInfo $ "Downloaded " <> renderSnapName name <> " build plan."
+            $logStickyDone $ "Downloaded " <> renderSnapName name <> " build plan."
             liftIO (decodeFileEither $ toFilePath fp) >>= either throwM return
 
   where
