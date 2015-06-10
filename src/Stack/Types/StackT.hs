@@ -240,14 +240,17 @@ loggerFunc loc _src level msg =
 withSticky :: MonadIO m
            => (Sticky -> m b) -> m b
 withSticky m = do
-    state <- liftIO (newMVar (StickyState Nothing 0 False))
-    originalMode <- liftIO (hGetBuffering stdout)
-    liftIO (hSetBuffering stdout NoBuffering)
-    a <- m (Sticky (Just state))
-    state' <- liftIO (takeMVar state)
-    liftIO (when (stickyLastWasSticky state') (S8.putStr "\n"))
-    liftIO (hSetBuffering stdout originalMode)
-    return a
+    terminal <- liftIO (hIsTerminalDevice stdout)
+    if terminal
+       then do state <- liftIO (newMVar (StickyState Nothing 0 False))
+               originalMode <- liftIO (hGetBuffering stdout)
+               liftIO (hSetBuffering stdout NoBuffering)
+               a <- m (Sticky (Just state))
+               state' <- liftIO (takeMVar state)
+               liftIO (when (stickyLastWasSticky state') (S8.putStr "\n"))
+               liftIO (hSetBuffering stdout originalMode)
+               return a
+       else m (Sticky Nothing)
 
 logSticky :: Q Exp
 logSticky =
