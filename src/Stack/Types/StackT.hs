@@ -135,12 +135,13 @@ stickyLoggerFunc :: (HasSticky r, HasLogLevel r, ToLogStr msg, MonadReader r (t 
 stickyLoggerFunc loc src level msg = do
     ref <- asks getSticky
     sticky <- liftIO (takeMVar ref) -- TODO: make exception-safe.
-    let clear =
+    let backSpaceChar = '\8'
+        clear =
             liftIO
                 (S8.putStr
                      (S8.replicate
                           (stickyMaxColumns sticky)
-                          '\8'))
+                          backSpaceChar))
     case level of
         LevelOther "sticky-done" -> do
             liftIO
