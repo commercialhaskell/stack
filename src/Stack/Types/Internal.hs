@@ -2,15 +2,19 @@
 
 module Stack.Types.Internal where
 
-import Control.Monad.Logger (LogLevel)
-import Network.HTTP.Client.Conduit (Manager,HasHttpManager(..))
-import Stack.Types.Config
+import           Control.Concurrent.MVar
+import           Control.Monad.Logger (LogLevel)
+import           Data.ByteString (ByteString)
+
+import           Network.HTTP.Client.Conduit (Manager,HasHttpManager(..))
+import           Stack.Types.Config
 
 -- | Monadic environment.
 data Env config =
   Env {envConfig :: !config
       ,envLogLevel :: !LogLevel
-      ,envManager :: !Manager}
+      ,envManager :: !Manager
+      ,envSticky :: !Sticky}
 
 instance HasStackRoot config => HasStackRoot (Env config) where
     getStackRoot = getStackRoot . envConfig
@@ -32,3 +36,17 @@ instance HasLogLevel (Env config) where
 
 instance HasLogLevel LogLevel where
   getLogLevel = id
+
+newtype Sticky = Sticky { unSticky :: Maybe (MVar StickyState)}
+
+data StickyState = StickyState
+    { stickyCurrentLine :: !(Maybe ByteString)
+    , stickyMaxColumns :: !Int
+    , stickyLastWasSticky :: !Bool
+    }
+
+class HasSticky r where
+    getSticky :: r -> Sticky
+
+instance HasSticky (Env config) where
+  getSticky = envSticky

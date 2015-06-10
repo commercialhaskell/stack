@@ -9,13 +9,13 @@
 
 module Stack.Types.Config where
 
-import           Control.Applicative ((<|>))
+import           Control.Applicative ((<|>), (<$>), (<*>), pure)
 import           Control.Exception
-import           Control.Monad (liftM)
+import           Control.Monad (liftM, mzero)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
 import           Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, object
-                            ,(.=), (.:?), (.!=), (.:))
+                            ,(.=), (.:?), (.!=), (.:), Value (String))
 import           Data.Binary (Binary)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
@@ -23,13 +23,13 @@ import           Data.Hashable (Hashable)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Monoid
-import           Data.Set (Set)
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.Typeable
 import           Distribution.System (Platform)
 import qualified Distribution.Text
+import           Network.HTTP.Client (parseUrl)
 import           Path
 import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
 import           Stack.Types.Docker
@@ -73,6 +73,14 @@ data Config =
          -- previous indices, /not/ extend them.
          --
          -- Using an assoc list instead of a Map to keep track of priority
+         ,configSystemGHC        :: !Bool
+         -- ^ Should we use the system-installed GHC (on the PATH) if
+         -- available? Can be overridden by command line options.
+         ,configInstallGHC       :: !Bool
+         -- ^ Should we automatically install GHC if missing or the wrong
+         -- version is available? Can be overridden by command line options.
+         ,configLocalBin         :: !(Path Abs Dir)
+         -- ^ Directory we should install executables into
          }
 
 -- | Information on a single package index
@@ -150,8 +158,9 @@ data BuildConfig = BuildConfig
     , bcGhcVersion :: !Version
       -- ^ Version of GHC we'll be using for this build, @Nothing@ if no
       -- preference
-    , bcPackages   :: !(Set (Path Abs Dir))
-      -- ^ Local packages identified by a path
+    , bcPackages   :: !(Map (Path Abs Dir) Bool)
+      -- ^ Local packages identified by a path, Bool indicates whether it is
+      -- allowed to be wanted (see 'peValidWanted')
     , bcExtraDeps  :: !(Map PackageName Version)
       -- ^ Extra dependencies specified in configuration.
       --
@@ -184,14 +193,65 @@ data NoBuildConfigStrategy
     | ExecStrategy
     deriving (Show, Eq, Ord)
 
+data PackageEntry = PackageEntry
+    { peValidWanted :: !Bool
+    -- ^ Can this package be considered wanted? Useful to disable when simply
+    -- modifying an upstream package, see:
+    -- https://github.com/commercialhaskell/stack/issues/219
+    , peLocation :: !PackageLocation
+    , peSubdirs :: ![FilePath]
+    }
+    deriving Show
+instance ToJSON PackageEntry where
+    toJSON pe | peValidWanted pe && null (peSubdirs pe) =
+        toJSON $ peLocation pe
+    toJSON pe = object
+        [ "valid-wanted" .= peValidWanted pe
+        , "location" .= peLocation pe
+        , "subdirs" .= peSubdirs pe
+        ]
+instance FromJSON PackageEntry where
+    parseJSON (String t) = do
+        loc <- parseJSON $ String t
+        return PackageEntry
+            { peValidWanted = True
+            , peLocation = loc
+            , peSubdirs = []
+            }
+    parseJSON v = withObject "PackageEntry" (\o -> PackageEntry
+        <$> o .:? "valid-wanted" .!= True
+        <*> o .: "location"
+        <*> o .:? "subdirs" .!= []) v
+
+data PackageLocation
+    = PLFilePath FilePath
+    -- ^ Note that we use @FilePath@ and not @Path@s. The goal is: first parse
+    -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
+    | PLHttpTarball Text
+    | PLGit Text Text
+    -- ^ URL and commit
+    deriving Show
+instance ToJSON PackageLocation where
+    toJSON (PLFilePath fp) = toJSON fp
+    toJSON (PLHttpTarball t) = toJSON t
+    toJSON (PLGit x y) = toJSON $ T.unwords ["git", x, y]
+instance FromJSON PackageLocation where
+    parseJSON v = git v <|> withText "PackageLocation" (\t -> http t <|> file t) v
+      where
+        file t = pure $ PLFilePath $ T.unpack t
+        http t =
+            case parseUrl $ T.unpack t of
+                Left _ -> mzero
+                Right _ -> return $ PLHttpTarball t
+        git = withObject "PackageGitLocation" $ \o -> PLGit
+            <$> o .: "git"
+            <*> o .: "commit"
+
 -- | A project is a collection of packages. We can have multiple stack.yaml
 -- files, but only one of them may contain project information.
 data Project = Project
-    { projectPackages :: ![FilePath]
-    -- ^ Components of the package list which refer to local directories
-    --
-    -- Note that we use @FilePath@ and not @Path@s. The goal is: first parse
-    -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
+    { projectPackages :: ![PackageEntry]
+    -- ^ Components of the package list
     , projectExtraDeps :: !(Map PackageName Version)
     -- ^ Components of the package list referring to package/version combos,
     -- see: https://github.com/fpco/stack/issues/41
@@ -287,16 +347,20 @@ instance HasBuildConfig BuildConfig where
 -- Configurations may be "cascaded" using mappend (left-biased).
 data ConfigMonoid =
   ConfigMonoid
-    { configMonoidDockerOpts     :: !DockerOptsMonoid
+    { configMonoidDockerOpts        :: !DockerOptsMonoid
     -- ^ Docker options.
-    , configMonoidConnectionCount :: !(Maybe Int)
+    , configMonoidConnectionCount   :: !(Maybe Int)
     -- ^ See: 'configConnectionCount'
-    , configMonoidHideTHLoading :: !(Maybe Bool)
+    , configMonoidHideTHLoading     :: !(Maybe Bool)
     -- ^ See: 'configHideTHLoading'
     , configMonoidLatestSnapshotUrl :: !(Maybe Text)
     -- ^ See: 'configLatestSnapshotUrl'
-    , configMonoidPackageIndices :: !(Maybe [PackageIndex])
+    , configMonoidPackageIndices    :: !(Maybe [PackageIndex])
     -- ^ See: 'configPackageIndices'
+    , configMonoidSystemGHC         :: !(Maybe Bool)
+    -- ^ See: 'configSystemGHC'
+    ,configMonoidInstallGHC         :: !(Maybe Bool)
+    -- ^ See: 'configInstallGHC'
     }
   deriving Show
 
@@ -307,6 +371,8 @@ instance Monoid ConfigMonoid where
     , configMonoidHideTHLoading = Nothing
     , configMonoidLatestSnapshotUrl = Nothing
     , configMonoidPackageIndices = Nothing
+    , configMonoidSystemGHC = Nothing
+    , configMonoidInstallGHC = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -314,6 +380,8 @@ instance Monoid ConfigMonoid where
     , configMonoidHideTHLoading = configMonoidHideTHLoading l <|> configMonoidHideTHLoading r
     , configMonoidLatestSnapshotUrl = configMonoidLatestSnapshotUrl l <|> configMonoidLatestSnapshotUrl r
     , configMonoidPackageIndices = configMonoidPackageIndices l <|> configMonoidPackageIndices r
+    , configMonoidSystemGHC = configMonoidSystemGHC l <|> configMonoidSystemGHC r
+    , configMonoidInstallGHC = configMonoidInstallGHC l <|> configMonoidInstallGHC r
     }
 
 instance FromJSON ConfigMonoid where
@@ -325,22 +393,33 @@ instance FromJSON ConfigMonoid where
          configMonoidHideTHLoading <- obj .:? "hide-th-loading"
          configMonoidLatestSnapshotUrl <- obj .:? "latest-snapshot-url"
          configMonoidPackageIndices <- obj .:? "package-indices"
+         configMonoidSystemGHC <- obj .:? "system-ghc"
+         configMonoidInstallGHC <- obj .:? "install-ghc"
          return ConfigMonoid {..}
 
 data ConfigException
   = ParseResolverException Text
   | NoProjectConfigFound (Path Abs Dir)
+  | UnexpectedTarballContents [Path Abs Dir] [Path Abs File]
   deriving Typeable
 instance Show ConfigException where
     show (ParseResolverException t) = concat
         [ "Invalid resolver value: "
         , T.unpack t
-        , ". Possible valid values include lts-2.12, nightly-2015-01-01, and ghc-7.10."
+        , ". Possible valid values include lts-2.12, nightly-YYYY-MM-DD, and ghc-7.10. "
+        , "See https://www.stackage.org/snapshots for a complete list."
         ]
     show (NoProjectConfigFound dir) = concat
         [ "Unable to find a stack.yaml file in the current directory ("
         , toFilePath dir
         , ") or its ancestors"
+        ]
+    show (UnexpectedTarballContents dirs files) = concat
+        [ "When unpacking a tarball specified in your stack.yaml file, "
+        , "did not find expected contents. Expected: a single directory. Found: "
+        , show ( map (toFilePath . dirname) dirs
+               , map (toFilePath . filename) files
+               )
         ]
 instance Exception ConfigException
 
@@ -380,11 +459,14 @@ configPackageTarball iname ident = do
     base <- parseRelFile $ packageIdentifierString ident ++ ".tar.gz"
     return (root </> $(mkRelDir "packages") </> name </> ver </> base)
 
+workDirRel :: Path Rel Dir
+workDirRel = $(mkRelDir ".stack-work")
+
 -- | Per-project work dir
 configProjectWorkDir :: (HasBuildConfig env, MonadReader env m) => m (Path Abs Dir)
 configProjectWorkDir = do
     bc <- asks getBuildConfig
-    return (bcRoot bc </> $(mkRelDir ".stack-work"))
+    return (bcRoot bc </> workDirRel)
 
 -- | File containing the profiling cache, see "Stack.PackageDump"
 configProfilingCache :: (HasBuildConfig env, MonadReader env m) => m (Path Abs File)

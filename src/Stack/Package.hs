@@ -115,6 +115,7 @@ data Package =
           ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
           ,packageHasLibrary :: !Bool                     -- ^ does the package have a buildable library stanza?
           ,packageTests :: !(Set Text)                    -- ^ names of test suites
+          ,packageExes :: !(Set Text)                     -- ^ names of executables
           }
  deriving (Show,Typeable)
 
@@ -223,6 +224,7 @@ resolvePackage packageConfig gpkg = Package
     , packageAllDeps = S.fromList (M.keys deps)
     , packageHasLibrary = maybe False (buildable . libBuildInfo) (library pkg)
     , packageTests = S.fromList $ map (T.pack . fst) $ condTestSuites gpkg -- FIXME need to test if it's buildable
+    , packageExes = S.fromList $ map (T.pack . fst) $ condExecutables gpkg -- FIXME need to test if it's buildable
     }
 
   where

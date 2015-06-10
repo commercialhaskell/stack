@@ -53,7 +53,6 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8)
-import qualified Data.Text.IO as T
 import           Data.Typeable (Typeable)
 import           Data.Word (Word64)
 import           Network.HTTP.Download
@@ -344,18 +343,20 @@ fetchPackages mdistDir toFetchAll = do
     connCount <- asks $ configConnectionCount . getConfig
     outputVar <- liftIO $ newTVarIO Map.empty
 
+    runInBase <- liftBaseWith $ \run -> return (void . run)
     parMapM_
         connCount
-        (go outputVar)
+        (go outputVar runInBase)
         (Map.toList toFetchAll)
 
     liftIO $ readTVarIO outputVar
   where
     go :: (MonadIO m,Functor m,MonadThrow m,MonadLogger m,MonadReader env m,HasHttpManager env)
        => TVar (Map PackageIdentifier (Path Abs Dir))
+       -> (m () -> IO ())
        -> (PackageIdentifier, ToFetch)
        -> m ()
-    go outputVar (ident, toFetch) = do
+    go outputVar runInBase (ident, toFetch) = do
         req <- parseUrl $ T.unpack $ tfUrl toFetch
         let destpath = tfTarball toFetch
 
@@ -366,8 +367,7 @@ fetchPackages mdistDir toFetchAll = do
                 , drLengthCheck = fmap fromIntegral $ tfSize toFetch
                 }
         let progressSink = do
-                -- TODO: logInfo
-                liftIO $ T.putStrLn $ packageIdentifierText ident <> ": downloading"
+                liftIO $ runInBase $ $logInfo $ packageIdentifierText ident <> ": downloading"
         _ <- verifiedDownload downloadReq destpath progressSink
 
         let fp = toFilePath destpath

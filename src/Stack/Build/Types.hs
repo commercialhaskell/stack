@@ -46,7 +46,10 @@ data StackBuildException
   | GHCVersionMismatch (Maybe Version) Version (Maybe (Path Abs File))
   -- ^ Path to the stack.yaml file
   | Couldn'tParseTargets [Text]
-  | UnknownTargets [PackageName]
+  | UnknownTargets
+    (Set PackageName) -- no known version
+    (Map PackageName Version) -- ^ not in snapshot, here's the most recent version in the index
+    (Path Abs File) -- stack.yaml
   | TestSuiteFailure PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe (Path Abs File))
   | ConstructPlanExceptions [ConstructPlanException]
   | CabalExitedUnsuccessfully
@@ -82,9 +85,27 @@ instance Show StackBuildException where
     show (Couldn'tParseTargets targets) = unlines
                 $ "The following targets could not be parsed as package names or directories:"
                 : map T.unpack targets
-    show (UnknownTargets targets) =
+    show (UnknownTargets noKnown notInSnapshot stackYaml) =
+        unlines $ noKnown' ++ notInSnapshot'
+      where
+        noKnown'
+            | Set.null noKnown = []
+            | otherwise = return $
                 "The following target packages were not found: " ++
-                intercalate ", " (map packageNameString targets)
+                intercalate ", " (map packageNameString $ Set.toList noKnown)
+        notInSnapshot'
+            | Map.null notInSnapshot = []
+            | otherwise =
+                  "The following packages are not in your snapshot, but exist"
+                : "in your package index. Recommended action: add them to your"
+                : ("extra-deps in " ++ toFilePath stackYaml)
+                : "(Note: these are the most recent versions,"
+                : "but there's no guarantee that they'll build together)."
+                : ""
+                : map
+                    (\(name, version) -> "- " ++ packageIdentifierString
+                        (PackageIdentifier name version))
+                    (Map.toList notInSnapshot)
     show (TestSuiteFailure ident codes mlogFile) = unlines $ concat
         [ ["Test suite failure for package " ++ packageIdentifierString ident]
         , flip map (Map.toList codes) $ \(name, mcode) -> concat
@@ -128,7 +149,7 @@ instance Exception StackBuildException
 
 data ConstructPlanException
     = DependencyCycleDetected [PackageName]
-    | DependencyPlanFailures PackageName (Map PackageName (VersionRange, BadDependency))
+    | DependencyPlanFailures PackageIdentifier (Map PackageName (VersionRange, BadDependency))
     | UnknownPackage PackageName -- TODO perhaps this constructor will be removed, and BadDependency will handle it all
     -- ^ Recommend adding to extra-deps, give a helpful version number?
     deriving (Typeable, Eq)
@@ -146,9 +167,9 @@ instance Show ConstructPlanException where
          (DependencyCycleDetected pNames) ->
            "While checking call stack,\n" ++
            "  dependency cycle detected in packages:" ++ indent (appendLines pNames)
-         (DependencyPlanFailures pName (Map.toList -> pDeps)) ->
+         (DependencyPlanFailures pIdent (Map.toList -> pDeps)) ->
            "Failure when adding dependencies:" ++ doubleIndent (appendDeps pDeps) ++ "\n" ++
-           "  needed for package: " ++ show pName
+           "  needed for package: " ++ packageIdentifierString pIdent
          (UnknownPackage pName) ->
              "While attempting to add dependency,\n" ++
              "  Could not find package " ++ show pName  ++ " in known packages"
@@ -183,9 +204,7 @@ instance Show ConstructPlanException where
 
 -- | Configuration for building.
 data BuildOpts =
-  BuildOpts {boptsTargets :: !(Either [Text] [PackageName])
-             -- ^ Right value indicates that we're only installing
-             -- dependencies, no local packages
+  BuildOpts {boptsTargets :: ![Text]
             ,boptsLibProfile :: !Bool
             ,boptsExeProfile :: !Bool
             ,boptsEnableOptimizations :: !(Maybe Bool)
@@ -193,6 +212,8 @@ data BuildOpts =
             ,boptsDryrun :: !Bool
             ,boptsGhcOptions :: ![Text]
             ,boptsFlags :: !(Map PackageName (Map FlagName Bool))
+            ,boptsInstallExes :: !Bool
+            -- ^ Install executables to user path after building?
             }
   deriving (Show)
 
@@ -335,6 +356,8 @@ data NeededSteps = AllSteps | SkipConfig | JustFinal
 data Plan = Plan
     { planTasks :: !(Map PackageName Task)
     , planUnregisterLocal :: !(Set GhcPkgId)
+    , planInstallExes :: !(Map Text Location)
+    -- ^ Executables that should be installed after successful building
     }
 
 -- | Basic information used to calculate what the configure options are

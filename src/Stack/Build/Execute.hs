@@ -10,7 +10,8 @@ module Stack.Build.Execute
     , executePlan
     ) where
 
-import           Control.Concurrent             (forkIO, getNumCapabilities)
+import           Control.Concurrent             (getNumCapabilities)
+import           Control.Concurrent.Lifted (fork)
 import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
@@ -39,11 +40,13 @@ import           Data.Streaming.Process         hiding (callProcess, env)
 import qualified Data.Streaming.Process         as Process
 import           Data.Text                      (Text)
 import qualified Data.Text                      as T
+import qualified Data.Text.Encoding             as T
 import           Data.Text.Encoding             (encodeUtf8)
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
 import           Network.HTTP.Client.Conduit    (HasHttpManager)
 import           Path
+import           Path.IO
 import           Prelude                        hiding (FilePath, writeFile)
 import           Stack.Build.Cache
 import           Stack.Build.Installed
@@ -53,10 +56,13 @@ import           Stack.Fetch                    as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.Types
+import           Stack.Types.StackT
 import           Stack.Types.Internal
 import           System.Directory               hiding (findExecutable,
                                                  findFiles)
+import           System.Environment             (getExecutablePath)
 import           System.Exit                    (ExitCode (ExitSuccess))
+import qualified System.FilePath                as FP
 import           System.IO
 import           System.IO.Temp                 (withSystemTempDirectory)
 import           System.Process.Internals       (createProcess_)
@@ -79,6 +85,21 @@ printPlan plan = do
         xs -> do
             $logInfo "Would build:"
             mapM_ ($logInfo . displayTask) xs
+
+    $logInfo ""
+
+    case Map.toList $ planInstallExes plan of
+        [] -> $logInfo "No executables to be installed"
+        xs -> do
+            $logInfo "Would install executables:"
+            forM_ xs $ \(name, loc) -> $logInfo $ T.concat
+                [ name
+                , " from "
+                , case loc of
+                    Snap -> "snapshot"
+                    Local -> "local"
+                , " database"
+                ]
 
 -- | For a dry run
 displayTask :: Task -> Text
@@ -108,7 +129,7 @@ displayTask task = T.pack $ concat
 data ExecuteEnv = ExecuteEnv
     { eeEnvOverride    :: !EnvOverride
     , eeConfigureLock  :: !(MVar ())
-    , eeInstallLock    :: !(MVar ())
+    , eeInstallLock    :: !(MVar (Int,Int))
     , eeBuildOpts      :: !BuildOpts
     , eeBaseConfigOpts :: !BaseConfigOpts
     , eeGhcPkgIds      :: !(TVar (Map PackageIdentifier Installed))
@@ -127,11 +148,12 @@ executePlan :: M env m
             -> [LocalPackage]
             -> Plan
             -> m ()
-executePlan menv bopts baseConfigOpts cabalPkgVer locals plan =
+executePlan menv bopts baseConfigOpts cabalPkgVer locals plan = do
     withSystemTempDirectory stackProgName $ \tmpdir -> do
         tmpdir' <- parseAbsDir tmpdir
         configLock <- newMVar ()
-        installLock <- newMVar ()
+        installLock <- newMVar (let size = M.size (planTasks plan)
+                                in (0,size))
         idMap <- liftIO $ newTVarIO M.empty
         let setupHs = tmpdir' </> $(mkRelFile "Setup.hs")
         liftIO $ writeFile (toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
@@ -151,6 +173,71 @@ executePlan menv bopts baseConfigOpts cabalPkgVer locals plan =
             , eeCabalPkgVer = cabalPkgVer
             , eeTotalWanted = length $ filter lpWanted locals
             }
+
+    unless (Map.null $ planInstallExes plan) $ do
+        snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
+        localBin <- (</> bindirSuffix) `liftM` installationRootLocal
+        destDir <- asks $ configLocalBin . getConfig
+        let destDir' = toFilePath destDir
+        liftIO $ createDirectoryIfMissing True destDir'
+
+        let stripSlash =
+                T.unpack . stripSlashT . T.pack
+              where
+                stripSlashT t = fromMaybe t $ T.stripSuffix slash t
+                slash = T.singleton FP.pathSeparator
+        when (stripSlash destDir' `notElem` map stripSlash (envSearchPath menv)) $
+            $logWarn $ T.concat
+                [ "Installation path "
+                , T.pack destDir'
+                , " not found in PATH environment variable"
+                ]
+
+        platform <- asks getPlatform
+        let ext =
+                case platform of
+                    Platform _ Windows -> ".exe"
+                    _ -> ""
+
+        currExe <- liftIO getExecutablePath -- needed for windows, see below
+
+        forM_ (Map.toList $ planInstallExes plan) $ \(name, loc) -> do
+            let bindir =
+                    case loc of
+                        Snap -> snapBin
+                        Local -> localBin
+            mfp <- resolveFileMaybe bindir $ T.unpack name ++ ext
+            case mfp of
+                Nothing -> $logWarn $ T.concat
+                    [ "Couldn't find executable "
+                    , name
+                    , " in directory "
+                    , T.pack $ toFilePath bindir
+                    ]
+                Just file -> do
+                    let destFile = destDir' FP.</> T.unpack name ++ ext
+                    $logInfo $ T.concat
+                        [ "Copying from "
+                        , T.pack $ toFilePath file
+                        , " to "
+                        , T.pack destFile
+                        ]
+
+                    liftIO $ case platform of
+                        Platform _ Windows | destFile == currExe ->
+                            windowsRenameCopy (toFilePath file) destFile
+                        _ -> copyFile (toFilePath file) destFile
+
+-- | Windows can't write over the current executable. Instead, we rename the
+-- current executable to something else and then do the copy.
+windowsRenameCopy :: FilePath -> FilePath -> IO ()
+windowsRenameCopy src dest = do
+    copyFile src new
+    renameFile dest old
+    renameFile new dest
+  where
+    new = dest ++ ".new"
+    old = dest ++ ".old"
 
 -- | Perform the actual plan (internal)
 executePlan' :: M env m
@@ -175,6 +262,9 @@ executePlan' plan ee = do
     -- stack always using transformer stacks that are safe for this use case.
     runInBase <- liftBaseWith $ \run -> return (void . run)
 
+    let size = Map.size (planTasks plan)
+    when (size > 1)
+         ($logSticky ("Progress: 0/" <> T.pack (show size)))
     let actions = concatMap (toActions runInBase ee) $ Map.elems $ planTasks plan
     threads <- liftIO getNumCapabilities -- TODO make a build opt to override this
     errs <- liftIO $ runActions threads actions
@@ -281,20 +371,26 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
                    _ -> return ()
              #endif
 
--- | Package's documentation directory.
-packageDocDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
-              => PackageIdentifier -- ^ Cabal version
-              -> Package
-              -> m (Path Abs Dir)
-packageDocDir cabalPkgVer package' = do
-  dist <- distDirFromDir cabalPkgVer (packageDir package')
-  return (dist </> $(mkRelDir "doc/"))
+ -- | Package's documentation directory.
+ packageDocDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
+               => PackageIdentifier -- ^ Cabal version
+               -> Package
+               -> m (Path Abs Dir)
+ packageDocDir cabalPkgVer package' = do
+   dist <- distDirFromDir cabalPkgVer (packageDir package')
+   return (dist </> $(mkRelDir "doc/"))
                  --}
         DoNothing -> return ()
 
-    unless justFinal $ withMVar eeInstallLock $ \_ -> do
+    unless justFinal $ modifyMVar_ eeInstallLock $ \(done,total) -> do
         announce "install"
         cabal False ["install"]
+        unless (total == 1) $ do
+            let done' = done + 1
+            $logSticky ("Progress: " <> T.pack (show done') <> "/" <> T.pack (show total))
+            when (done' == total)
+                 ($logStickyDone ("Completed all " <> T.pack (show total) <> " packages."))
+        return (done + 1,total)
 
     -- It seems correct to leave this outside of the "justFinal" check above,
     -- in case another package depends on a justFinal target
@@ -395,10 +491,8 @@ packageDocDir cabalPkgVer package' = do
                     , Process.env = envHelper menv
                     , std_in = CreatePipe
                     , std_out =
-                        if stripTHLoading
-                            then CreatePipe
-                            else case mlogFile of
-                                Nothing -> Inherit
+                        case mlogFile of
+                                Nothing -> CreatePipe
                                 Just (_, h) -> UseHandle h
                     , std_err =
                         case mlogFile of
@@ -411,7 +505,10 @@ packageDocDir cabalPkgVer package' = do
             (Just inH, moutH, Nothing, ph) <- liftIO $ createProcess_ "singleBuild" cp
             liftIO $ hClose inH
             case moutH of
-                Just outH -> assert stripTHLoading $ printWithoutTHLoading outH
+                Just outH ->
+                    case mlogFile of
+                      Just{} -> return ()
+                      Nothing -> printBuildOutput stripTHLoading outH
                 Nothing -> return ()
             ec <- liftIO $ waitForProcess ph
             case ec of
@@ -486,16 +583,18 @@ packageDocDir cabalPkgVer package' = do
 
 -- | Grab all output from the given @Handle@ and print it to stdout, stripping
 -- Template Haskell "Loading package" lines. Does work in a separate thread.
-printWithoutTHLoading :: MonadIO m => Handle -> m ()
-printWithoutTHLoading outH = liftIO $ void $ forkIO $
-       CB.sourceHandle outH
+printBuildOutput :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
+                 => Bool -> Handle -> m ()
+printBuildOutput excludeTHLoading outH = void $ fork $
+         CB.sourceHandle outH
     $$ CB.lines
     =$ CL.filter (not . isTHLoading)
-    =$ CL.mapM_ S8.putStrLn
+    =$ CL.mapM_ ($logInfo . T.decodeUtf8)
   where
     -- | Is this line a Template Haskell "Loading package" line
     -- ByteString
     isTHLoading :: S8.ByteString -> Bool
+    isTHLoading _ | not excludeTHLoading = False
     isTHLoading bs =
         "Loading package " `S8.isPrefixOf` bs &&
         ("done." `S8.isSuffixOf` bs || "done.\r" `S8.isSuffixOf` bs)

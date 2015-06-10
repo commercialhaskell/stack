@@ -17,10 +17,14 @@ module Stack.Types.StackT
   ,StackLoggingT
   ,runStackT
   ,runStackLoggingT
-  ,newTLSManager)
+  ,newTLSManager
+  ,logSticky
+  ,logStickyDone)
   where
 
 import           Control.Applicative
+import           Control.Concurrent.MVar
+import           Control.Monad
 import           Control.Monad.Base
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -29,13 +33,15 @@ import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
 import qualified Data.ByteString.Char8 as S8
 import           Data.Char
+
 import           Data.Text (Text)
 import           Data.Time
-import           Language.Haskell.TH.Syntax (Loc(..))
+import           Language.Haskell.TH
 import           Network.HTTP.Client.Conduit (HasHttpManager(..))
 import           Network.HTTP.Conduit
 import           Prelude -- Fix AMP warning
 import           Stack.Types.Internal
+import           System.IO
 import           System.Log.FastLogger
 
 #ifndef MIN_VERSION_time
@@ -67,14 +73,14 @@ instance MonadTransControl (StackT config) where
 
 -- | Takes the configured log level into account.
 instance (MonadIO m) => MonadLogger (StackT config m) where
-  monadLoggerLog = loggerFunc
+  monadLoggerLog = stickyLoggerFunc
 
 -- | Run a Stack action.
 runStackT :: (MonadIO m,MonadBaseControl IO m)
           => Manager -> LogLevel -> config -> StackT config m a -> m a
 runStackT manager logLevel config m =
-     runReaderT (unStackT m)
-                (Env config logLevel manager)
+     withSticky (\sticky -> runReaderT (unStackT m)
+                                       (Env config logLevel manager sticky))
 
 --------------------------------------------------------------------------------
 -- Logging only StackLoggingT monad transformer
@@ -82,8 +88,8 @@ runStackT manager logLevel config m =
 -- | The monad used for logging in the executable @stack@ before
 -- anything has been initialized.
 newtype StackLoggingT m a =
-  StackLoggingT {unStackLoggingT :: ReaderT (LogLevel,Manager) m a}
-  deriving (Functor,Applicative,Monad,MonadIO,MonadThrow,MonadReader (LogLevel,Manager),MonadCatch,MonadMask,MonadTrans)
+  StackLoggingT {unStackLoggingT :: ReaderT (LogLevel,Manager,Sticky) m a}
+  deriving (Functor,Applicative,Monad,MonadIO,MonadThrow,MonadReader (LogLevel,Manager,Sticky),MonadCatch,MonadMask,MonadTrans)
 
 deriving instance (MonadBase b m) => MonadBase b (StackLoggingT m)
 
@@ -93,26 +99,30 @@ instance MonadBaseControl b m => MonadBaseControl b (StackLoggingT m) where
     restoreM         = defaultRestoreM
 
 instance MonadTransControl StackLoggingT where
-    type StT StackLoggingT a = StT (ReaderT (LogLevel,Manager)) a
+    type StT StackLoggingT a = StT (ReaderT (LogLevel,Manager,Sticky)) a
     liftWith = defaultLiftWith StackLoggingT unStackLoggingT
     restoreT = defaultRestoreT StackLoggingT
 
 -- | Takes the configured log level into account.
 instance (MonadIO m) => MonadLogger (StackLoggingT m) where
-  monadLoggerLog = loggerFunc
+  monadLoggerLog = stickyLoggerFunc
 
-instance HasLogLevel (LogLevel,Manager) where
-  getLogLevel = fst
+instance HasSticky (LogLevel,Manager,Sticky) where
+    getSticky (_,_,s) = s
 
-instance HasHttpManager (LogLevel,Manager) where
-  getHttpManager = snd
+instance HasLogLevel (LogLevel,Manager,Sticky) where
+  getLogLevel (l,_,_) = l
+
+instance HasHttpManager (LogLevel,Manager,Sticky) where
+  getHttpManager (_,m,_) = m
 
 -- | Run the logging monad.
 runStackLoggingT :: MonadIO m
                  => Manager -> LogLevel -> StackLoggingT m a -> m a
 runStackLoggingT manager logLevel m =
-     runReaderT (unStackLoggingT m)
-                (logLevel,manager)
+     withSticky (\sticky ->
+                     runReaderT (unStackLoggingT m)
+                                (logLevel,manager,sticky))
 
 -- | Convenience for getting a 'Manager'
 newTLSManager :: MonadIO m => m Manager
@@ -120,6 +130,69 @@ newTLSManager = liftIO $ newManager conduitManagerSettings
 
 --------------------------------------------------------------------------------
 -- Logging functionality
+stickyLoggerFunc :: (HasSticky r, HasLogLevel r, ToLogStr msg, MonadReader r (t m), MonadTrans t, MonadIO (t m))
+                 => Loc -> LogSource -> LogLevel -> msg -> t m ()
+stickyLoggerFunc loc src level msg = do
+    Sticky mref <- asks getSticky
+    case mref of
+      Nothing ->
+          loggerFunc loc src LevelInfo msg
+      Just ref -> do
+          sticky <- liftIO (takeMVar ref) -- TODO: make exception-safe.
+          let backSpaceChar = '\8'
+              clear =
+                  liftIO
+                      (S8.putStr
+                           (S8.replicate
+                                (stickyMaxColumns sticky)
+                                backSpaceChar))
+          case level of
+              LevelOther "sticky-done" -> do
+                  liftIO
+                      (putMVar
+                           ref
+                           (sticky
+                            { stickyLastWasSticky = False
+                            , stickyMaxColumns = 0
+                            , stickyCurrentLine = Nothing
+                            }))
+                  clear
+                  loggerFunc loc src level msg
+              LevelOther "sticky" -> do
+                  clear
+                  liftIO (S8.putStr msgBytes)
+                  liftIO
+                      (putMVar
+                           ref
+                           (sticky
+                            { stickyLastWasSticky = True
+                            , stickyMaxColumns = S8.length msgBytes
+                            , stickyCurrentLine = Just msgBytes
+                            }))
+              _ -> do
+                  clear
+                  loggerFunc loc src level msg
+                  liftIO
+                      (case stickyCurrentLine sticky of
+                           Nothing ->
+                               putMVar
+                                   ref
+                                   (sticky
+                                    { stickyLastWasSticky = False
+                                    , stickyMaxColumns = 0
+                                    })
+                           Just line -> do
+                               S8.putStr line
+                               putMVar
+                                   ref
+                                   (sticky
+                                    { stickyLastWasSticky = True
+                                    , stickyMaxColumns = S8.length msgBytes
+                                    }))
+  where
+    msgBytes =
+        fromLogStr
+            (toLogStr msg)
 
 -- | Logging function takes the log level into account.
 loggerFunc :: (MonadIO m,ToLogStr msg,MonadReader r m,HasLogLevel r)
@@ -162,3 +235,27 @@ loggerFunc loc _src level msg =
                   (char loc)
                   where line = show . fst . loc_start
                         char = show . snd . loc_start
+
+-- | With a sticky state, do the thing.
+withSticky :: MonadIO m
+           => (Sticky -> m b) -> m b
+withSticky m = do
+    terminal <- liftIO (hIsTerminalDevice stdout)
+    if terminal
+       then do state <- liftIO (newMVar (StickyState Nothing 0 False))
+               originalMode <- liftIO (hGetBuffering stdout)
+               liftIO (hSetBuffering stdout NoBuffering)
+               a <- m (Sticky (Just state))
+               state' <- liftIO (takeMVar state)
+               liftIO (when (stickyLastWasSticky state') (S8.putStr "\n"))
+               liftIO (hSetBuffering stdout originalMode)
+               return a
+       else m (Sticky Nothing)
+
+logSticky :: Q Exp
+logSticky =
+    logOther "sticky"
+
+logStickyDone :: Q Exp
+logStickyDone =
+    logOther "sticky-done"

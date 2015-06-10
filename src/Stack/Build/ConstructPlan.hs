@@ -23,6 +23,7 @@ import qualified Data.Map.Strict              as Map
 import           Data.Maybe
 import           Data.Set                     (Set)
 import qualified Data.Set                     as Set
+import           Data.Text                    (Text)
 import           Data.Text.Encoding           (encodeUtf8)
 import           Distribution.Package         (Dependency (..))
 import           Distribution.Version         (anyVersion,
@@ -67,7 +68,9 @@ data AddDepRes
 
 type M = RWST
     Ctx
-    (Map PackageName Task) -- JustFinal
+    ( Map PackageName Task -- JustFinal
+    , Map Text Location -- executable to be installed, and location where the binary is placed
+    )
     (Map PackageName (Either ConstructPlanException AddDepRes))
     IO
 
@@ -79,6 +82,7 @@ data Ctx = Ctx
     , toolToPackages :: !(Dependency -> Map PackageName VersionRange)
     , ctxBuildConfig :: !BuildConfig
     , callStack      :: ![PackageName]
+    , extraToBuild   :: !(Set PackageName)
     }
 
 instance HasStackRoot Ctx
@@ -92,16 +96,16 @@ constructPlan :: forall env m.
               => MiniBuildPlan
               -> BaseConfigOpts
               -> [LocalPackage]
-              -> [PackageName] -- ^ additional packages that must be built
+              -> Set PackageName -- ^ additional packages that must be built
               -> Set GhcPkgId -- ^ locally registered
               -> (PackageName -> Version -> Map FlagName Bool -> IO Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
               -> m Plan
-constructPlan mbp0 baseConfigOpts0 locals extraToBuild locallyRegistered loadPackage0 sourceMap installedMap = do
+constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPackage0 sourceMap installedMap = do
     bconfig <- asks getBuildConfig
     let inner = mapM_ addDep $ Set.toList allTargets
-    ((), m, justFinals) <- liftIO $ runRWST inner (ctx bconfig) M.empty
+    ((), m, (justFinals, installExes)) <- liftIO $ runRWST inner (ctx bconfig) M.empty
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
     case partitionEithers $ map toEither $ M.toList m of
@@ -112,12 +116,15 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild locallyRegistered loadPac
             return Plan
                 { planTasks = Map.union tasks justFinals
                 , planUnregisterLocal = mkUnregisterLocal tasks locallyRegistered
+                , planInstallExes =
+                    if boptsInstallExes $ bcoBuildOpts baseConfigOpts0
+                        then installExes
+                        else Map.empty
                 }
         (errs, _) -> throwM $ ConstructPlanExceptions errs
   where
-    allTargets = Set.fromList
-               $ map (packageName . lpPackage) (filter lpWanted locals) ++
-                 extraToBuild
+    allTargets = Set.fromList (map (packageName . lpPackage) (filter lpWanted locals))
+              <> extraToBuild0
 
     ctx bconfig = Ctx
         { mbp = mbp0
@@ -125,12 +132,11 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild locallyRegistered loadPac
         , loadPackage = loadPackage0
         , combinedMap = combineMap sourceMap installedMap
         , toolToPackages = \ (Dependency name _) ->
-            Map.fromList
-          $ map (, anyVersion)
-          $ maybe [] Set.toList
-          $ Map.lookup (S8.pack . packageNameString . fromCabalPackageName $ name) toolMap
+          maybe Map.empty (Map.fromSet (\_ -> anyVersion)) $
+          Map.lookup (S8.pack . packageNameString . fromCabalPackageName $ name) toolMap
         , ctxBuildConfig = bconfig
         , callStack = []
+        , extraToBuild = extraToBuild0
         }
     toolMap = getToolMap mbp0
 
@@ -177,14 +183,38 @@ addDep'' name = do
         -- TODO look up in the package index and see if there's a
         -- recommendation available
         Nothing -> return $ Left $ UnknownPackage name
-        Just (PIOnlyInstalled version _ installed) ->
+        Just (PIOnlyInstalled version loc installed) -> do
+            tellExecutablesUpstream name version loc Map.empty -- slightly hacky, no flags since they likely won't affect executable names
             return $ Right $ ADRFound version installed
-        Just (PIOnlySource ps) -> installPackage Nothing name ps
+        Just (PIOnlySource ps) -> do
+            tellExecutables name ps
+            installPackage Nothing name ps
         Just (PIBoth ps installed) -> do
+            tellExecutables name ps
             mneededSteps <- checkNeededSteps name ps installed
             case mneededSteps of
                 Nothing -> return $ Right $ ADRFound (piiVersion ps) installed
                 Just neededSteps -> installPackage (Just neededSteps) name ps
+
+tellExecutables :: PackageName -> PackageSource -> M ()
+tellExecutables _ (PSLocal lp)
+    | lpWanted lp = tellExecutablesPackage Local $ lpPackage lp
+    | otherwise = return ()
+tellExecutables name (PSUpstream version loc flags) = do
+    tellExecutablesUpstream name version loc flags
+
+tellExecutablesUpstream :: PackageName -> Version -> Location -> Map FlagName Bool -> M ()
+tellExecutablesUpstream name version loc flags = do
+    ctx <- ask
+    when (name `Set.member` extraToBuild ctx) $ do
+        p <- liftIO $ loadPackage ctx name version flags
+        tellExecutablesPackage loc p
+
+tellExecutablesPackage :: Location -> Package -> M ()
+tellExecutablesPackage loc p =
+    tell (Map.empty, m)
+  where
+    m = Map.fromList $ map (, loc) $ Set.toList $ packageExes p
 
 -- TODO There are a lot of duplicated computations below. I've kept that for
 -- simplicity right now
@@ -269,7 +299,11 @@ addPackageDeps package = do
                 (Set.empty, Set.singleton gid)
     case partitionEithers deps of
         ([], pairs) -> return $ Right $ mconcat pairs
-        (errs, _) -> return $ Left $ DependencyPlanFailures (packageName package) (Map.fromList errs)
+        (errs, _) -> return $ Left $ DependencyPlanFailures
+            (PackageIdentifier
+                (packageName package)
+                (packageVersion package))
+            (Map.fromList errs)
   where
     adrVersion (ADRToInstall task) = packageIdentifierVersion $ taskProvides task
     adrVersion (ADRFound v _) = v
@@ -304,15 +338,16 @@ checkDirtiness ps (Library installed) package present = do
                         -- track the fact that we need to perform a JustFinal. But
                         -- don't put this in the main State Map, as that would
                         -- trigger dependencies to rebuild also.
-                        tell $ Map.singleton (packageName package) Task
-                            { taskProvides = PackageIdentifier
-                                (packageName package)
-                                (packageVersion package)
-                            , taskType = TTLocal lp JustFinal
-                            , taskConfigOpts = TaskConfigOpts Set.empty $ \missing' ->
-                                assert (Set.null missing') configOpts
-                            , taskPresent = present
-                            }
+                        let task = Task
+                                { taskProvides = PackageIdentifier
+                                    (packageName package)
+                                    (packageVersion package)
+                                , taskType = TTLocal lp JustFinal
+                                , taskConfigOpts = TaskConfigOpts Set.empty $ \missing' ->
+                                    assert (Set.null missing') configOpts
+                                , taskPresent = present
+                                }
+                        tell (Map.singleton (packageName package) task, Map.empty)
                             -- FIXME need to force reconfigure when GhcPkgId for dependencies change
                     _ -> return ()
                 return Nothing

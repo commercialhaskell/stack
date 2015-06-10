@@ -72,6 +72,7 @@ import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.Types
+import           Stack.Types.StackT
 import           System.Directory (createDirectoryIfMissing, getDirectoryContents)
 import           System.FilePath (takeDirectory)
 
@@ -313,8 +314,7 @@ getDeps mbp isShadowed packages =
                             return $ Set.singleton dep
                         else do
                             shadowed <- goName dep (Set.singleton name)
-                            let m = Map.fromList $ map (\x -> (x, Set.singleton $ PackageIdentifier name (mpiVersion mpi)))
-                                        $ Set.toList shadowed
+                            let m = Map.fromSet (\_ -> Set.singleton $ PackageIdentifier name (mpiVersion mpi)) shadowed
                             modify $ \rs' -> rs'
                                 { rsShadowed = Map.unionWith Set.union m $ rsShadowed rs'
                                 }
@@ -423,10 +423,10 @@ loadBuildPlan name = do
             $logDebug $ "Decoding build plan from file failed: " <> T.pack (show e)
             liftIO $ createDirectoryIfMissing True $ takeDirectory $ toFilePath fp
             req <- parseUrl $ T.unpack url
-            $logInfo $ "Downloading " <> renderSnapName name <> " build plan ..."
+            $logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
             $logDebug $ "Downloading build plan from: " <> url
             _ <- download req fp
-            $logInfo $ "Downloaded " <> renderSnapName name <> " build plan."
+            $logStickyDone $ "Downloaded " <> renderSnapName name <> " build plan."
             liftIO (decodeFileEither $ toFilePath fp) >>= either throwM return
 
   where
@@ -566,7 +566,7 @@ shadowMiniBuildPlan :: MiniBuildPlan
 shadowMiniBuildPlan (MiniBuildPlan ghc pkgs0) shadowed =
     (MiniBuildPlan ghc $ Map.fromList met, Map.fromList unmet)
   where
-    pkgs1 = Map.difference pkgs0 $ Map.fromList $ map (, ()) $ Set.toList shadowed
+    pkgs1 = Map.difference pkgs0 $ Map.fromSet (\_ -> ()) shadowed
 
     depsMet = flip execState Map.empty $ mapM_ (check Set.empty) (Map.keys pkgs1)
 

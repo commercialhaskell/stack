@@ -4,6 +4,10 @@
 * Improve output for package index updates [#227](https://github.com/commercialhaskell/stack/issues/227)
 * Automatically update indices as necessary [#227](https://github.com/commercialhaskell/stack/issues/227)
 * --verbose flag [#217](https://github.com/commercialhaskell/stack/issues/217)
+* Remove packages (HTTPS and Git) [#199](https://github.com/commercialhaskell/stack/issues/199)
+* Config values for system-ghc and install-ghc
+* Merge `stack deps` functionality into `stack build`
+* `install-tool` command [#153](https://github.com/commercialhaskell/stack/issues/153)
 
 ## 0.0.1
 

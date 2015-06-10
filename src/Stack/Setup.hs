@@ -16,7 +16,7 @@ module Stack.Setup
 
 import           Control.Applicative
 import           Control.Exception (Exception)
-import           Control.Monad (liftM, when)
+import           Control.Monad (liftM, when, join)
 import           Control.Monad.Catch (MonadThrow, throwM, MonadMask)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger
@@ -27,8 +27,13 @@ import           Data.Aeson
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
+<<<<<<< HEAD
 import           Data.Conduit (Conduit, Sink, ($$), (=$), await, yield, awaitForever)
 import           Data.Conduit.Lift (evalStateC)
+=======
+import           Data.Conduit (($$))
+import           Data.Conduit.Process (ProcessExitedUnsuccessfully)
+>>>>>>> master
 import qualified Data.Conduit.List as CL
 import           Data.IORef
 import           Data.List (intercalate)
@@ -53,7 +58,8 @@ import           Prelude -- Fix AMP warning
 import           Stack.Build.Types
 import           Stack.GhcPkg (getGlobalDB)
 import           Stack.Types
-import           System.Directory
+import           Stack.Types.StackT
+import           System.Directory (doesDirectoryExist, createDirectoryIfMissing)
 import           System.Exit (ExitCode (ExitSuccess))
 import           System.FilePath (searchPathSeparator)
 import qualified System.FilePath as FP
@@ -68,12 +74,15 @@ data SetupOpts = SetupOpts
     , soptsStackYaml :: !(Maybe (Path Abs File))
     -- ^ If we got the desired GHC version from that file
     , soptsForceReinstall :: !Bool
+    , soptsSanityCheck :: !Bool
+    -- ^ Run a sanity check on the selected GHC
     }
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
                     | MissingDependencies [String]
                     | UnknownGHCVersion Version (Set MajorVersion)
                     | UnknownOSKey Text
+                    | GHCSanityCheckCompileFailed ProcessExitedUnsuccessfully (Path Abs File)
     deriving Typeable
 instance Exception SetupException
 instance Show SetupException where
@@ -94,6 +103,14 @@ instance Show SetupException where
     show (UnknownOSKey oskey) =
         "Unable to find installation URLs for OS key: " ++
         T.unpack oskey
+    show (GHCSanityCheckCompileFailed e ghc) = concat
+        [ "The GHC located at "
+        , toFilePath ghc
+        , " failed to compile a sanity check. Please see:\n\n"
+        , "    https://github.com/commercialhaskell/stack/wiki/Downloads\n\n"
+        , "for more information. Exception was:\n"
+        , show e
+        ]
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasBuildConfig env, HasHttpManager env)
@@ -109,6 +126,7 @@ setupEnv useSystem installIfMissing = do
             , soptsExpected = bcGhcVersion bconfig
             , soptsStackYaml = Just $ bcStackYaml bconfig
             , soptsForceReinstall = False
+            , soptsSanityCheck = True
             }
     mghcBin <- ensureGHC sopts
     menv0 <- getMinimalEnvOverride
@@ -134,8 +152,9 @@ setupEnv useSystem installIfMissing = do
     -- extra installation bin directories
     mkDirs <- runReaderT extraBinDirs bconfig
     let mpath = Map.lookup "PATH" env1
-        depsPath = mkPath (mkDirs False) mpath
-        localsPath = mkPath (mkDirs True) mpath
+        mkDirs' = map toFilePath . mkDirs
+        depsPath = augmentPath (mkDirs' False) mpath
+        localsPath = augmentPath (mkDirs' True) mpath
 
     deps <- runReaderT packageDatabaseDeps bconfig
     depsExists <- liftIO $ doesDirectoryExist $ toFilePath deps
@@ -177,15 +196,21 @@ setupEnv useSystem installIfMissing = do
                     !() <- atomicModifyIORef envRef $ \m' ->
                         (Map.insert es eo m', ())
                     return eo
-    return bconfig { bcConfig = (bcConfig bconfig) { configEnvOverride = getEnvOverride' } }
-  where
-    mkPath dirs mpath = T.pack $ intercalate [searchPathSeparator]
-        (map (stripTrailingSlashS . toFilePath) dirs ++ maybe [] (return . T.unpack) mpath)
 
+    return bconfig { bcConfig = (bcConfig bconfig) { configEnvOverride = getEnvOverride' } }
+
+-- | Augment the PATH environment variable with the given extra paths
+augmentPath :: [FilePath] -> Maybe Text -> Text
+augmentPath dirs mpath =
+    T.pack $ intercalate [searchPathSeparator]
+        (map stripTrailingSlashS dirs ++ maybe [] (return . T.unpack) mpath)
+  where
     stripTrailingSlashS = T.unpack . stripTrailingSlashT . T.pack
-    stripTrailingSlashT t = fromMaybe t $ T.stripSuffix
-            (T.singleton FP.pathSeparator)
-            t
+
+stripTrailingSlashT :: Text -> Text
+stripTrailingSlashT t = fromMaybe t $ T.stripSuffix
+        (T.singleton FP.pathSeparator)
+        t
 
 -- | Ensure GHC is installed and provide the PATHs to add if necessary
 ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env)
@@ -208,7 +233,7 @@ ensureGHC sopts = do
                 expected > system
 
     -- If we need to install a GHC, try to do so
-    if needLocal
+    mpaths <- if needLocal
         then do
             config <- asks getConfig
             let tools =
@@ -239,6 +264,21 @@ ensureGHC sopts = do
             -- TODO: strip the trailing slash for prettier PATH output
             return $ Just $ map toFilePath $ concat paths
         else return Nothing
+
+    when (soptsSanityCheck sopts) $ do
+        menv <-
+            case mpaths of
+                Nothing -> return menv0
+                Just paths -> do
+                    config <- asks getConfig
+                    let m0 = unEnvOverride menv0
+                        path0 = Map.lookup "PATH" m0
+                        path = augmentPath paths path0
+                        m = Map.insert "PATH" path m0
+                    mkEnvOverride (configPlatform config) m
+        sanityCheck menv
+
+    return mpaths
   where
     expected = soptsExpected sopts
 
@@ -579,7 +619,7 @@ chattyDownload :: (MonadReader env m, HasHttpManager env, MonadIO m, MonadLogger
                -> m ()
 chattyDownload label url path = do
     req <- parseUrl $ T.unpack url
-    $logInfo $ T.concat
+    $logSticky $ T.concat
       [ "Downloading "
       , label
       , " ..."
@@ -599,8 +639,8 @@ chattyDownload label url path = do
             }
     x <- verifiedDownload dReq path (chattyDownloadProgress label)
     if x
-        then $logInfo ("Downloaded " <> label <> ".")
-        else $logDebug "Already downloaded."
+        then $logStickyDone ("Downloaded " <> label <> ".")
+        else $logStickyDone "Already downloaded."
 
 -- Await eagerly (collect with monoidal append),
 -- but space out yields by at least the given amount of time.
@@ -645,3 +685,21 @@ chattyDownloadProgress label
         totalSoFar <- get
         liftIO $ T.putStrLn $
             label <> ": " <> T.pack (show totalSoFar) <> " bytes downloaded..."
+
+-- | Perform a basic sanity check of GHC
+sanityCheck :: (MonadIO m, MonadMask m, MonadLogger m)
+            => EnvOverride
+            -> m ()
+sanityCheck menv = withSystemTempDirectory "stack-sanity-check" $ \dir -> do
+    dir' <- parseAbsDir dir
+    let fp = toFilePath $ dir' </> $(mkRelFile "Main.hs")
+    liftIO $ writeFile fp $ unlines
+        [ "import Distribution.Simple" -- ensure Cabal library is present
+        , "main = putStrLn \"Hello World\""
+        ]
+    ghc <- join $ findExecutable menv "ghc"
+    $logDebug $ "Performing a sanity check on: " <> T.pack (toFilePath ghc)
+    eres <- tryProcessStdout (Just dir') menv "ghc" [fp]
+    case eres of
+        Left e -> throwM $ GHCSanityCheckCompileFailed e ghc
+        Right _ -> return () -- TODO check that the output of running the command is correct

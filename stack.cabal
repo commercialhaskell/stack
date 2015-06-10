@@ -24,7 +24,7 @@ homepage:            https://github.com/commercialhaskell/stack
 
 library
   hs-source-dirs:    src/
-  ghc-options:       -Wall -pgmPcpphs -optP--cpp
+  ghc-options:       -Wall
   exposed-modules:   Options.Applicative.Builder.Extra
                      Stack.BuildPlan
                      Stack.Config
@@ -69,12 +69,12 @@ library
                      Data.Binary.VersionTagged
                      Data.Set.Monad
                      Data.Maybe.Extra
-                     Control.Monad.Logger.Sticky
   build-depends:     Cabal >= 1.18.1.5
                    , aeson >= 0.8.0.2
                    , async >= 2.0.2
                    , attoparsec >= 0.12.1.5
                    , base >= 4 && <5
+                   , base16-bytestring
                    , bifunctors >= 4.2.1
                    , binary >= 0.7
                    , base64-bytestring
@@ -127,7 +127,6 @@ library
                    , deepseq
   if !os(windows)
     build-depends:   unix >= 2.7.0.1
-  build-tools:       cpphs
   default-language:    Haskell2010
 
 executable stack

@@ -19,7 +19,8 @@ module System.Process.Read
   ,envHelper
   ,doesExecutableExist
   ,findExecutable
-  ,getEnvOverride)
+  ,getEnvOverride
+  ,envSearchPath)
   where
 
 import           Control.Applicative
@@ -62,6 +63,10 @@ data EnvOverride = EnvOverride
 -- | Get the environment variables from @EnvOverride@
 unEnvOverride :: EnvOverride -> Map Text Text
 unEnvOverride = eoTextMap
+
+-- | Get the list of directories searched
+envSearchPath :: EnvOverride -> [FilePath]
+envSearchPath = eoPath
 
 -- | Create a new @EnvOverride@
 mkEnvOverride :: MonadIO m

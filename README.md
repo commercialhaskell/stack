@@ -46,12 +46,16 @@ Run `stack` for a complete list of commands.
 A full description of the architecture
 [is available here](https://github.com/commercialhaskell/stack/wiki/Architecture).
 
-#### Frequently Asked Questions
+#### Questions, Feedback, Discussion
 
-For frequently asked questions about detailed or specific use-cases,
-please see [the FAQ](https://github.com/commercialhaskell/stack/wiki/FAQ) or
-[open an issue](https://github.com/commercialhaskell/stack/issues/new) with label
-`question`.
+* For frequently asked questions about detailed or specific use-cases,
+  please see
+  [the FAQ](https://github.com/commercialhaskell/stack/wiki/FAQ).
+* For general questions, comments, feedback and support please write
+  to
+  [the Commercial Haskell mailing list](https://groups.google.com/d/forum/commercialhaskell).
+* For bugs, issues, or requests please
+  [open an issue](https://github.com/commercialhaskell/stack/issues/new).
 
 #### Why stack?
 
@@ -65,7 +69,7 @@ and power experienced developers need.
 While stack itself has been around since June of 2015, it is based on codebases
 used by FP Complete for its corporate customers and internally for years prior.
 stack is a refresh of that codebase combined with other open source efforts
-like [stackage-cli](https://github.com/commercialhaskell/stackage-cli) to meet the needs of
+like [stackage-cli](https://github.com/fpco/stackage-cli) to meet the needs of
 users everywhere.
 
 A large impetus for the work on stack was a [large survey of people interested

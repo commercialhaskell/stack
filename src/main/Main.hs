@@ -19,7 +19,7 @@ import           Data.List
 import qualified Data.List as List
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (isJust)
+import           Data.Maybe (isJust, fromMaybe)
 import           Data.Monoid
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -71,19 +71,23 @@ main =
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
-                        buildOpts
+                        (buildOpts False)
+             addCommand "install"
+                        "Build executables and install to a user path"
+                        (buildCmd DoNothing)
+                        (buildOpts True)
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
                         (buildCmd DoTests)
-                        buildOpts
+                        (buildOpts False)
              addCommand "bench"
                         "Build and benchmark the project(s) in this directory/configuration"
                         (buildCmd DoBenchmarks)
-                        buildOpts
+                        (buildOpts False)
              addCommand "haddock"
                         "Generate haddocks for the project(s) in this directory/configuration"
                         (buildCmd DoHaddock)
-                        buildOpts
+                        (buildOpts False)
              addCommand "setup"
                         "Get the appropriate ghc for your project"
                         setupCmd
@@ -124,14 +128,6 @@ main =
                         "Clean the local packages"
                         cleanCmd
                         (pure ())
-             addCommand "deps"
-                        "Install dependencies"
-                        depsCmd
-                        ((,)
-                            <$> (some (argument readPackageName
-                                        (metavar "[PACKAGES]")))
-                            <*> (flag False True (long "dry-run" <>
-                                                  help "Don't build anything, just prepare to")))
              addSubCommands
                "path"
                "Print path information for certain things"
@@ -247,10 +243,13 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                           return (bcGhcVersion bc, Just $ bcStackYaml bc)
               mpaths <- runStackT manager globalLogLevel (lcConfig lc) $ ensureGHC SetupOpts
                   { soptsInstallIfMissing = True
-                  , soptsUseSystem = globalSystemGhc && not scoForceReinstall
+                  , soptsUseSystem =
+                    fromMaybe (configSystemGHC $ lcConfig lc) globalSystemGhc
+                    && not scoForceReinstall
                   , soptsExpected = ghc
                   , soptsStackYaml = mstack
                   , soptsForceReinstall = scoForceReinstall
+                  , soptsSanityCheck = True
                   }
               case mpaths of
                   Nothing -> $logInfo "GHC on PATH would be used"
@@ -269,25 +268,13 @@ withBuildConfig go@GlobalOpts{..} strat inner = do
             bconfig1 <- runStackLoggingT manager globalLogLevel $
                 lcLoadBuildConfig lc strat
             bconfig2 <- runStackT manager globalLogLevel bconfig1 $
-                setupEnv globalSystemGhc globalInstallGhc
+                setupEnv
+                    (fromMaybe (configSystemGHC $ lcConfig lc) globalSystemGhc)
+                    (fromMaybe (configInstallGHC $ lcConfig lc) globalInstallGhc)
             runStackT manager globalLogLevel bconfig2 inner
 
 cleanCmd :: () -> GlobalOpts -> IO ()
 cleanCmd () go = withBuildConfig go ThrowException clean
-
--- | Install dependencies
-depsCmd :: ([PackageName], Bool) -> GlobalOpts -> IO ()
-depsCmd (names, dryRun) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $
-    Stack.Build.build BuildOpts
-        { boptsTargets = Right names
-        , boptsLibProfile = False
-        , boptsExeProfile = False
-        , boptsEnableOptimizations = Nothing
-        , boptsFinalAction = DoNothing
-        , boptsDryrun = dryRun
-        , boptsGhcOptions = []
-        , boptsFlags = Map.empty
-        }
 
 -- | Parser for package names
 readPackageName :: ReadM PackageName
@@ -393,13 +380,16 @@ dockerExecCmd (cmd,args) go@GlobalOpts{..} = do
                                              (return (cmd,args,lcConfig lc))
 
 -- | Parser for build arguments.
-buildOpts :: Parser BuildOpts
-buildOpts = BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
-            optimize <*> finalAction <*> dryRun <*> ghcOpts <*> flags
+buildOpts :: Bool -- ^ install?
+          -> Parser BuildOpts
+buildOpts toInstall =
+            BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
+            optimize <*> finalAction <*> dryRun <*> ghcOpts <*> flags <*>
+            pure toInstall
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
         target =
-          fmap (Left . map T.pack)
+          fmap (map T.pack)
                (many (strArgument
                         (metavar "TARGET" <>
                          help "If none specified, use all packages defined in current directory")))
@@ -416,8 +406,12 @@ buildOpts = BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
         finalAction = pure DoNothing
         dryRun = flag False True (long "dry-run" <>
                                   help "Don't build anything, just prepare to")
-        ghcOpts =
-          many (fmap T.pack
+        ghcOpts = (++)
+          <$> flag [] ["-Wall", "-Werror"]
+              ( long "pedantic"
+             <> help "Turn on -Wall and -Werror (note: option name may change in the future"
+              )
+          <*> many (fmap T.pack
                      (strOption (long "ghc-options" <>
                                  metavar "OPTION" <>
                                  help "Additional options passed to GHC")))
@@ -481,11 +475,11 @@ globalOpts =
     GlobalOpts
     <$> logLevelOpt
     <*> configOptsParser False
-    <*> boolFlags True
+    <*> maybeBoolFlags
             "system-ghc"
             "using the system installed GHC (on the PATH) if available and a matching version"
             idm
-    <*> boolFlags True
+    <*> maybeBoolFlags
             "install-ghc"
             "downloading and installing GHC if necessary (can be done manually with stack setup)"
             idm
@@ -525,8 +519,8 @@ defaultLogLevel = LevelInfo
 data GlobalOpts = GlobalOpts
     { globalLogLevel     :: LogLevel -- ^ Log level
     , globalConfigMonoid :: ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
-    , globalSystemGhc    :: Bool -- ^ Use system GHC if available and correct version?
-    , globalInstallGhc   :: Bool -- ^ Install GHC if missing
+    , globalSystemGhc    :: Maybe Bool -- ^ Use system GHC if available and correct version?
+    , globalInstallGhc   :: Maybe Bool -- ^ Install GHC if missing
     } deriving (Show)
 
 -- | Load the configuration with a manager. Convenience function used
