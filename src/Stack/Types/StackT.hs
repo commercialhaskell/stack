@@ -252,10 +252,23 @@ withSticky m = do
                return a
        else m (Sticky Nothing)
 
+-- | Write a "sticky" line to the terminal. Any subsequent lines will
+-- overwrite this one, and that same line will be repeated below
+-- again. In other words, the line sticks at the bottom of the output
+-- forever. Running this function again will replace the sticky line
+-- with a new sticky line. When you want to get rid of the sticky
+-- line, run 'logStickyDone'.
+--
 logSticky :: Q Exp
 logSticky =
     logOther "sticky"
 
+-- | This will print out the given message with a newline and disable
+-- any further stickiness of the line until a new call to 'logSticky'
+-- happens.
+--
+-- It might be better at some point to have a 'runSticky' function
+-- that encompasses the logSticky->logStickyDone pairing.
 logStickyDone :: Q Exp
 logStickyDone =
     logOther "sticky-done"
