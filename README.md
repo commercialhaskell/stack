@@ -46,12 +46,16 @@ Run `stack` for a complete list of commands.
 A full description of the architecture
 [is available here](https://github.com/commercialhaskell/stack/wiki/Architecture).
 
-#### Frequently Asked Questions
+#### Questions, Feedback, Discussion
 
-For frequently asked questions about detailed or specific use-cases,
-please see [the FAQ](https://github.com/commercialhaskell/stack/wiki/FAQ) or
-[open an issue](https://github.com/commercialhaskell/stack/issues/new) with label
-`question`.
+* For frequently asked questions about detailed or specific use-cases,
+  please see
+  [the FAQ](https://github.com/commercialhaskell/stack/wiki/FAQ).
+* For general questions, comments, feedback and support please write
+  to
+  [the Commercial Haskell mailing list](https://groups.google.com/d/forum/commercialhaskell).
+* For bugs, issues, or requests please
+  [open an issue](https://github.com/commercialhaskell/stack/issues/new).
 
 #### Why stack?
 
