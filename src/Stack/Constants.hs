@@ -19,18 +19,21 @@ module Stack.Constants
     ,configCacheFile
     ,buildCacheFile
     ,stackProgName
+    ,wiredInPackages
     )
     where
 
 import Control.Monad (liftM)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.Reader (MonadReader)
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Path as FL
 import Prelude
 import Stack.Types.Config
 import Stack.Types.PackageIdentifier
+import Stack.Types.PackageName
 import Stack.Types.Version
 
 -- | Extensions used for Haskell files.
@@ -187,3 +190,20 @@ stackDotYaml = $(mkRelFile "stack.yaml")
 -- | Environment variable used to override the '~/.stack' location.
 stackRootEnvVar :: String
 stackRootEnvVar = "STACK_ROOT"
+
+-- See https://downloads.haskell.org/~ghc/7.10.1/docs/html/libraries/ghc/src/Module.html#integerPackageKey
+wiredInPackages :: [PackageName]
+wiredInPackages = fromMaybe (error "Parse error in wiredInPackages") mparsed
+  where
+    mparsed = sequence $ map parsePackageName
+      [ "ghc-prim"
+      , "integer-gmp"
+      , "integer-simple"
+      , "base"
+      , "rts"
+      , "template-haskell"
+      , "dph-seq"
+      , "dph-par"
+      , "ghc"
+      , "interactive"
+      ]

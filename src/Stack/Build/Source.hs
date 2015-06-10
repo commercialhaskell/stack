@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TupleSections         #-}
 -- Load information on package sources
 module Stack.Build.Source
     ( loadSourceMap
@@ -32,6 +33,7 @@ import           Stack.Build.Cache
 import           Stack.Build.Types
 import           Stack.BuildPlan              (loadMiniBuildPlan,
                                                shadowMiniBuildPlan)
+import           Stack.Constants              (wiredInPackages)
 import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.Types
@@ -91,7 +93,7 @@ loadSourceMap bopts = do
             , extraDeps2
             , flip fmap (mbpPackages mbp) $ \mpi ->
                 (PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi))
-            ]
+            ] `Map.difference` Map.fromList (map (, ()) wiredInPackages)
 
     let unknown = Set.difference nonLocalTargets $ Map.keysSet sourceMap
     unless (Set.null unknown) $ do
