@@ -95,7 +95,7 @@ When you run `stack build` with no stack.yaml, it will create a basic
 configuration with a single package (the current directory) and an
 auto-detected snapshot. The algorithm it uses for selecting this snapshot is:
 
-* Try the lastest two LTS major versions at their most recent minor version release, and the most recent Stackage Nightly. For example, at the time of writing, this would be lts-2.10, lts-1.15, and nightly-2015-05-26
+* Try the latest two LTS major versions at their most recent minor version release, and the most recent Stackage Nightly. For example, at the time of writing, this would be lts-2.10, lts-1.15, and nightly-2015-05-26
 * For each of these, test the version bounds in the package's .cabal file to see if they are compatible with the snapshot, choosing the first one that matches
 * If no snapshot matches, uses the most recent LTS snapshot, even though it will not compile
 
