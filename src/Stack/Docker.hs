@@ -167,7 +167,7 @@ runContainerAndExit config
        Just ii -> return ii
        Nothing
          | dockerAutoPull docker ->
-             do pullImage pwd envOverride docker image
+             do pullImage envOverride docker image
                 mii2 <- inspect envOverride image
                 case mii2 of
                   Just ii2 -> return ii2
@@ -519,27 +519,25 @@ pull :: (MonadLogger m,MonadIO m,MonadThrow m) => Config -> m ()
 pull config =
   do envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride
-     pwd <- getWorkingDir
-     pullImage pwd envOverride docker (dockerImage docker)
+     pullImage envOverride docker (dockerImage docker)
   where docker = configDocker config
 
 -- | Pull Docker image from registry.
 pullImage :: (MonadLogger m,MonadIO m,MonadThrow m)
-          => Path Abs Dir -> EnvOverride -> DockerOpts -> String -> m ()
-pullImage pwd envOverride docker image =
+          => EnvOverride -> DockerOpts -> String -> m ()
+pullImage envOverride docker image =
   do $logInfo (concatT ["Pulling image from registry: '",image,"'"])
      when (dockerRegistryLogin docker)
           (do $logInfo "You may need to log in."
-              runIn
-                pwd
-                "docker"
+              callProcess
+                Nothing
                 envOverride
+                "docker"
                 (concat
                    [["login"]
                    ,maybe [] (\u -> ["--username=" ++ u]) (dockerRegistryUsername docker)
                    ,maybe [] (\p -> ["--password=" ++ p]) (dockerRegistryPassword docker)
-                   ,[takeWhile (/= '/') image]])
-                Nothing)
+                   ,[takeWhile (/= '/') image]]))
      e <- liftIO (try (callProcess Nothing envOverride "docker" ["pull",image]))
      case e of
        Left (ProcessExitedUnsuccessfully _ _) -> throwM (PullFailedException image)

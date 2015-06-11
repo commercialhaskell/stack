@@ -49,7 +49,8 @@ import           Prelude -- Fix AMP warning
 import           System.Directory (createDirectoryIfMissing, doesFileExist, getCurrentDirectory)
 import qualified System.FilePath as FP
 import           System.Environment (getEnvironment)
-import           System.Exit (exitWith)
+import           System.Exit (exitWith, ExitCode (..))
+import qualified System.Process
 
 -- | Override the environment received by a child process
 data EnvOverride = EnvOverride
@@ -123,14 +124,25 @@ readProcessStdout wd menv name args =
   sinkProcessStdout wd menv name args CL.consume >>=
   liftIO . evaluate . S.concat
 
--- | Same as @System.Process.callProcess@, but takes an environment override
+-- | Like as @System.Process.callProcess@, but takes an optional working directory and
+-- environment override, and throws ProcessExitedUnsuccessfully if the process exits unsuccessfully.
 callProcess :: (MonadIO m)
             => Maybe (Path Abs Dir)
             -> EnvOverride
             -> String
             -> [String]
             -> m ()
-callProcess wd menv name args = sinkProcessStdout wd menv name args CL.sinkNull
+callProcess wd menv cmd args =
+    liftIO (System.Process.createProcess c >>= action)
+  where
+    c = (proc cmd args) { delegate_ctlc = True
+                        , cwd = fmap toFilePath wd
+                        , env = envHelper menv }
+    action (_, _, _, p) = do
+        exit_code <- waitForProcess p
+        case exit_code of
+          ExitSuccess   -> return ()
+          ExitFailure _ -> throwIO (ProcessExitedUnsuccessfully c exit_code)
 
 -- | Consume the stdout of a process feeding strict 'S.ByteString's to a consumer.
 sinkProcessStdout :: (MonadIO m)
@@ -153,7 +165,7 @@ sinkProcessStdout wd menv name args sink = do
         asBSSource = id
 
 -- | Run the given command in the given directory. If it exits with anything
--- but success, throw an exception.
+-- but success, prints an error and then calls 'exitWith' to exit the program.
 runIn :: forall (m :: * -> *).
          (MonadLogger m,MonadIO m)
       => Path Abs Dir -- ^ directory to run in
