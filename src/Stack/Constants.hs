@@ -137,7 +137,8 @@ distRelativeDir cabalPkgVer = do
         packageIdentifierString
             (PackageIdentifier cabalPackageName cabalPkgVer)
     return $
-        $(mkRelDir "dist-stack") </>
+        workDirRel </>
+        $(mkRelDir "dist") </>
         platform </>
         cabal
 
