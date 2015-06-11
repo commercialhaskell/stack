@@ -86,7 +86,7 @@ __Can I get bash autocompletion?__
 
 Yes, just run the following:
 
-    source <(stack --bash-completion-script `which stack`)
+    eval "$(stack --bash-completion-script "$(which stack)")"
 
 You can add this to your `.bashrc` file if you like.
 
