@@ -115,6 +115,7 @@ data Package =
           ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
           ,packageHasLibrary :: !Bool                     -- ^ does the package have a buildable library stanza?
           ,packageTests :: !(Set Text)                    -- ^ names of test suites
+          ,packageBenchmarks :: !(Set Text)               -- ^ names of benchmarks
           ,packageExes :: !(Set Text)                     -- ^ names of executables
           }
  deriving (Show,Typeable)
@@ -224,7 +225,8 @@ resolvePackage packageConfig gpkg = Package
     , packageAllDeps = S.fromList (M.keys deps)
     , packageHasLibrary = maybe False (buildable . libBuildInfo) (library pkg)
     , packageTests = S.fromList $ [ T.pack (testName t) | t <- testSuites pkg, buildable (testBuildInfo t)]
-    , packageExes = S.fromList $ [ T.pack (benchmarkName b) | b <- benchmarks pkg, buildable (benchmarkBuildInfo b)]
+    , packageBenchmarks = S.fromList $ [ T.pack (benchmarkName b) | b <- benchmarks pkg, buildable (benchmarkBuildInfo b)]
+    , packageExes = S.fromList $ [ T.pack (exeName b) | b <- executables pkg, buildable (buildInfo b)]
     }
 
   where
@@ -407,8 +409,7 @@ resolvePackageDescription packageConfig (GenericPackageDescription desc defaultF
   desc {library =
           fmap (resolveConditions rc updateLibDeps) mlib
        ,executables =
-          map (resolveConditions rc updateExeDeps .
-               snd)
+          map (\(n, v) -> (resolveConditions rc updateExeDeps v){exeName=n})
               exes
        ,testSuites =
           map (\(n,v) -> (resolveConditions rc updateTestDeps v){testName=n})
