@@ -313,7 +313,26 @@ checkDirtiness :: PackageSource
                -> Package
                -> Set GhcPkgId
                -> M (Maybe NeededSteps)
-checkDirtiness _ Executable _ _ = return Nothing -- TODO reinstall executables in the future
+checkDirtiness ps@(PSLocal lp) Executable package present = do
+    ctx <- ask
+    let configOpts = configureOpts
+            (baseConfigOpts ctx)
+            present
+            (psWanted ps)
+            (piiLocation ps) -- should be Local always
+            (packageFlags package)
+        configCache = ConfigCache
+            { configCacheOpts = map encodeUtf8 configOpts
+            , configCacheDeps = present
+            }
+    let moldOpts = lpLastConfigOpts lp
+    case moldOpts of
+        Nothing -> return $ Just AllSteps
+        Just oldOpts
+            | oldOpts /= configCache -> return $ Just AllSteps
+            | psDirty ps -> return $ Just SkipConfig
+            | otherwise -> return Nothing
+checkDirtiness (PSUpstream _ _ _) Executable _ _ = return Nothing -- TODO reinstall executables in the future
 checkDirtiness ps (Library installed) package present = do
     ctx <- ask
     let configOpts = configureOpts
