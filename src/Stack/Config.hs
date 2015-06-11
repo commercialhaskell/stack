@@ -46,6 +46,7 @@ import qualified Data.Map as Map
 import qualified Distribution.Package as C
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text
+import           Distribution.Version (simplifyVersionRange)
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Set as S
@@ -195,7 +196,7 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
             $ configMonoidOS >>= Distribution.Text.simpleParse
          configPlatform = Platform arch os
 
-         configRequireStackVersion = configMonoidRequireStackVersion
+         configRequireStackVersion = simplifyVersionRange configMonoidRequireStackVersion
 
      origEnv <- getEnvOverride configPlatform
      let configEnvOverride _ = return origEnv
