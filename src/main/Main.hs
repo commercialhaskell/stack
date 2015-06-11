@@ -71,23 +71,23 @@ main =
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
-                        (buildOpts False)
+                        buildOpts
              addCommand "install"
                         "Build executables and install to a user path"
-                        (buildCmd DoNothing)
-                        (buildOpts True)
+                        installCmd
+                        buildOpts
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
                         (buildCmd DoTests)
-                        (buildOpts False)
+                        buildOpts
              addCommand "bench"
                         "Build and benchmark the project(s) in this directory/configuration"
                         (buildCmd DoBenchmarks)
-                        (buildOpts False)
+                        buildOpts
              addCommand "haddock"
                         "Generate haddocks for the project(s) in this directory/configuration"
                         (buildCmd DoHaddock)
-                        (buildOpts False)
+                        buildOpts
              addCommand "setup"
                         "Get the appropriate ghc for your project"
                         setupCmd
@@ -307,6 +307,11 @@ buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
 buildCmd finalAction opts go@GlobalOpts{..} = withBuildConfig go CreateConfig $
     Stack.Build.build opts { boptsFinalAction = finalAction }
 
+-- | Install
+installCmd :: BuildOpts -> GlobalOpts -> IO ()
+installCmd opts go@GlobalOpts{..} = withBuildConfig go ExecStrategy $
+    Stack.Build.build opts { boptsInstallExes = True }
+
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
 unpackCmd names go@GlobalOpts{..} = do
@@ -377,12 +382,11 @@ dockerExecCmd (cmd,args) go@GlobalOpts{..} = do
                                              (return (cmd,args,lcConfig lc))
 
 -- | Parser for build arguments.
-buildOpts :: Bool -- ^ install?
-          -> Parser BuildOpts
-buildOpts toInstall =
+buildOpts :: Parser BuildOpts
+buildOpts =
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> finalAction <*> dryRun <*> ghcOpts <*> flags <*>
-            pure toInstall
+            installExes
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
         target =
@@ -401,6 +405,7 @@ buildOpts toInstall =
                     "library profiling for TARGETs and all its dependencies"
                     idm
         finalAction = pure DoNothing
+        installExes = pure False
         dryRun = flag False True (long "dry-run" <>
                                   help "Don't build anything, just prepare to")
         ghcOpts = (++)
