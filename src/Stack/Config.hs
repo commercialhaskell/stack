@@ -78,25 +78,21 @@ getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env
 getDefaultResolver dir = do
     cabalfp <- getCabalFileName dir
     gpd <- readPackageUnresolved cabalfp
-    esnapshots <- try getSnapshots
-    snapshots <-
-        case esnapshots of
-            Left e -> do
-                $logError $
-                    "Unable to download snapshot list, and therefore could " <>
-                    "not generate a stack.yaml file automatically"
-                $logError $
-                    "This sometimes happens due to missing Certificate Authorities " <>
-                    "on your system. For more information, see:"
-                $logError ""
-                $logError "    https://github.com/commercialhaskell/stack/issues/234"
-                $logError ""
-                $logError "You can try again, or create your stack.yaml file by hand. See:"
-                $logError ""
-                $logError "    https://github.com/commercialhaskell/stack/wiki/stack.yaml"
-                $logError ""
-                throwM (e :: SomeException)
-            Right snapshots -> return snapshots
+    snapshots <- getSnapshots `catch` \e -> do
+        $logError $
+            "Unable to download snapshot list, and therefore could " <>
+            "not generate a stack.yaml file automatically"
+        $logError $
+            "This sometimes happens due to missing Certificate Authorities " <>
+            "on your system. For more information, see:"
+        $logError ""
+        $logError "    https://github.com/commercialhaskell/stack/issues/234"
+        $logError ""
+        $logError "You can try again, or create your stack.yaml file by hand. See:"
+        $logError ""
+        $logError "    https://github.com/commercialhaskell/stack/wiki/stack.yaml"
+        $logError ""
+        throwM (e :: SomeException)
     mpair <- findBuildPlan gpd snapshots
     let name =
             case C.package $ C.packageDescription gpd of
