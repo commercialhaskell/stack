@@ -29,6 +29,7 @@ import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.Typeable
 import           Distribution.System (Platform)
 import qualified Distribution.Text
+import qualified Paths_stack as Meta
 import           Network.HTTP.Client (parseUrl)
 import           Path
 import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
@@ -41,24 +42,24 @@ import           System.Process.Read (EnvOverride)
 
 -- | The top-level Stackage configuration.
 data Config =
-  Config {configStackRoot        :: !(Path Abs Dir)
+  Config {configStackRoot           :: !(Path Abs Dir)
          -- ^ ~/.stack more often than not
-         ,configDocker           :: !DockerOpts
-         ,configEnvOverride      :: !(EnvSettings -> IO EnvOverride)
+         ,configDocker              :: !DockerOpts
+         ,configEnvOverride         :: !(EnvSettings -> IO EnvOverride)
          -- ^ Environment variables to be passed to external tools
-         ,configLocalPrograms    :: !(Path Abs Dir)
+         ,configLocalPrograms       :: !(Path Abs Dir)
          -- ^ Path containing local installations (mainly GHC)
-         ,configConnectionCount  :: !Int
+         ,configConnectionCount     :: !Int
          -- ^ How many concurrent connections are allowed when downloading
-         ,configHideTHLoading    :: !Bool
+         ,configHideTHLoading       :: !Bool
          -- ^ Hide the Template Haskell "Loading package ..." messages from the
          -- console
-         ,configPlatform         :: !Platform
+         ,configPlatform            :: !Platform
          -- ^ The platform we're building for, used in many directory names
-         ,configLatestSnapshotUrl :: !Text
+         ,configLatestSnapshotUrl   :: !Text
          -- ^ URL for a JSON file containing information on the latest
          -- snapshots available.
-         ,configPackageIndices   :: ![PackageIndex]
+         ,configPackageIndices      :: ![PackageIndex]
          -- ^ Information on package indices. This is left biased, meaning that
          -- packages in an earlier index will shadow those in a later index.
          --
@@ -73,14 +74,16 @@ data Config =
          -- previous indices, /not/ extend them.
          --
          -- Using an assoc list instead of a Map to keep track of priority
-         ,configSystemGHC        :: !Bool
+         ,configSystemGHC           :: !Bool
          -- ^ Should we use the system-installed GHC (on the PATH) if
          -- available? Can be overridden by command line options.
-         ,configInstallGHC       :: !Bool
+         ,configInstallGHC          :: !Bool
          -- ^ Should we automatically install GHC if missing or the wrong
          -- version is available? Can be overridden by command line options.
-         ,configLocalBin         :: !(Path Abs Dir)
+         ,configLocalBin            :: !(Path Abs Dir)
          -- ^ Directory we should install executables into
+         ,configRequireStackVersion :: !VersionRange
+         -- ^ Require a version of stack within this range.
          }
 
 -- | Information on a single package index
@@ -347,20 +350,22 @@ instance HasBuildConfig BuildConfig where
 -- Configurations may be "cascaded" using mappend (left-biased).
 data ConfigMonoid =
   ConfigMonoid
-    { configMonoidDockerOpts        :: !DockerOptsMonoid
+    { configMonoidDockerOpts         :: !DockerOptsMonoid
     -- ^ Docker options.
-    , configMonoidConnectionCount   :: !(Maybe Int)
+    , configMonoidConnectionCount    :: !(Maybe Int)
     -- ^ See: 'configConnectionCount'
-    , configMonoidHideTHLoading     :: !(Maybe Bool)
+    , configMonoidHideTHLoading      :: !(Maybe Bool)
     -- ^ See: 'configHideTHLoading'
-    , configMonoidLatestSnapshotUrl :: !(Maybe Text)
+    , configMonoidLatestSnapshotUrl  :: !(Maybe Text)
     -- ^ See: 'configLatestSnapshotUrl'
-    , configMonoidPackageIndices    :: !(Maybe [PackageIndex])
+    , configMonoidPackageIndices     :: !(Maybe [PackageIndex])
     -- ^ See: 'configPackageIndices'
-    , configMonoidSystemGHC         :: !(Maybe Bool)
+    , configMonoidSystemGHC          :: !(Maybe Bool)
     -- ^ See: 'configSystemGHC'
-    ,configMonoidInstallGHC         :: !(Maybe Bool)
+    ,configMonoidInstallGHC          :: !(Maybe Bool)
     -- ^ See: 'configInstallGHC'
+    ,configMonoidRequireStackVersion :: !(Maybe VersionRange)
+    -- ^ See: 'configRequireStackVersion'
     }
   deriving Show
 
@@ -373,6 +378,7 @@ instance Monoid ConfigMonoid where
     , configMonoidPackageIndices = Nothing
     , configMonoidSystemGHC = Nothing
     , configMonoidInstallGHC = Nothing
+    , configMonoidRequireStackVersion = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -382,6 +388,7 @@ instance Monoid ConfigMonoid where
     , configMonoidPackageIndices = configMonoidPackageIndices l <|> configMonoidPackageIndices r
     , configMonoidSystemGHC = configMonoidSystemGHC l <|> configMonoidSystemGHC r
     , configMonoidInstallGHC = configMonoidInstallGHC l <|> configMonoidInstallGHC r
+    , configMonoidRequireStackVersion = configMonoidRequireStackVersion l <|> configMonoidRequireStackVersion r
     }
 
 instance FromJSON ConfigMonoid where
@@ -395,12 +402,25 @@ instance FromJSON ConfigMonoid where
          configMonoidPackageIndices <- obj .:? "package-indices"
          configMonoidSystemGHC <- obj .:? "system-ghc"
          configMonoidInstallGHC <- obj .:? "install-ghc"
+         configMonoidRequireStackVersion <- fmap unVersionRangeJSON <$>
+                                            obj .:? "require-stack-version"
          return ConfigMonoid {..}
+
+-- | Newtype for non-orphan FromJSON instance.
+newtype VersionRangeJSON = VersionRangeJSON { unVersionRangeJSON :: VersionRange }
+
+-- | Parse VersionRange.
+instance FromJSON VersionRangeJSON where
+  parseJSON = withText "VersionRange"
+                (\s -> maybe (fail ("Invalid cabal-style VersionRange: " ++ T.unpack s))
+                             (return . VersionRangeJSON)
+                             (Distribution.Text.simpleParse (T.unpack s)))
 
 data ConfigException
   = ParseResolverException Text
   | NoProjectConfigFound (Path Abs Dir)
   | UnexpectedTarballContents [Path Abs Dir] [Path Abs File]
+  | BadStackVersionException VersionRange
   deriving Typeable
 instance Show ConfigException where
     show (ParseResolverException t) = concat
@@ -421,6 +441,13 @@ instance Show ConfigException where
                , map (toFilePath . filename) files
                )
         ]
+    show (BadStackVersionException requiredRange) = concat
+        [ "The version of stack you are using ("
+        , show (fromCabalVersion Meta.version)
+        , ") is outside the required\n"
+        ,"version range ("
+        , T.unpack (versionRangeText requiredRange)
+        , ") specified in stack.yaml." ]
 instance Exception ConfigException
 
 -- | Helper function to ask the environment and apply getConfig

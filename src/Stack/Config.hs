@@ -44,6 +44,7 @@ import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import qualified Distribution.Package as C
 import qualified Distribution.PackageDescription as C
+import qualified Distribution.Version as C
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Set as S
@@ -56,6 +57,7 @@ import           Network.HTTP.Download (download)
 import           Options.Applicative (Parser)
 import           Path
 import           Path.IO
+import qualified Paths_stack as Meta
 import           Stack.BuildPlan
 import           Stack.Types.Config
 import           Stack.Constants
@@ -173,6 +175,8 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
          -- in the future, allow it to be configured.
          configPlatform = buildPlatform
 
+         configRequireStackVersion = fromMaybe C.anyVersion configMonoidRequireStackVersion
+
      origEnv <- getEnvOverride configPlatform
      let configEnvOverride _ = return origEnv
 
@@ -221,7 +225,7 @@ instance HasPlatform MiniConfig
 
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.
-loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env,MonadBaseControl IO m)
+loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadThrow m,MonadBaseControl IO m,MonadReader env m,HasHttpManager env)
            => ConfigMonoid
            -- ^ Config monoid from parsed command-line arguments
            -> m (LoadConfig m)
@@ -233,6 +237,8 @@ loadConfig configArgs = do
         case mproject of
             Nothing -> configArgs : extraConfigs
             Just (_, _, projectConfig) -> configArgs : projectConfig : extraConfigs
+    unless (fromCabalVersion Meta.version `withinRange` configRequireStackVersion config)
+        (throwM (BadStackVersionException (configRequireStackVersion config)))
     menv <- runReaderT getMinimalEnvOverride config
     return $ LoadConfig
         { lcConfig          = config
