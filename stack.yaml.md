@@ -39,3 +39,12 @@ Default: https://www.stackage.org/download/snapshots.json
 ### system-ghc
 
 ### install-ghc
+
+### arch/os
+
+Set the architecture and operating system for GHC, build directories, etc. Values are those recognized by Cabal, e.g.:
+
+arch: i386, x86_64
+os: windows, linux
+
+You likely only ever want to change the arch value. This can also be set via the command line.
