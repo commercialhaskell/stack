@@ -74,31 +74,30 @@ import           System.Process.Read (getEnvOverride, EnvOverride, unEnvOverride
 -- | Get the default resolver value
 getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
                    => Path Abs Dir
-                   -> m (Resolver, Map PackageName (Map FlagName Bool), Bool)
+                   -> m (Resolver, Map PackageName (Map FlagName Bool))
 getDefaultResolver dir = do
-    ecabalfp <- try $ getCabalFileName dir
-    let cabalFileExists = either (const False) (const True) ecabalfp
-    msnap <- case ecabalfp of
-        Left e -> do
-            $logWarn $ T.pack $ show (e :: PackageException)
-            return Nothing
-        Right cabalfp -> do
-            gpd <- readPackageUnresolved cabalfp
-            mpair <- findBuildPlan gpd
-            let name =
-                    case C.package $ C.packageDescription gpd of
-                        C.PackageIdentifier cname _ ->
-                            fromCabalPackageName cname
-            return $ fmap (, name) mpair
-    case msnap of
-        Just ((snap, flags), name) ->
-            return (ResolverSnapshot snap, Map.singleton name flags, cabalFileExists)
+    cabalfp <- getCabalFileName dir
+    gpd <- readPackageUnresolved cabalfp
+    mpair <- findBuildPlan gpd
+    let name =
+            case C.package $ C.packageDescription gpd of
+                C.PackageIdentifier cname _ ->
+                    fromCabalPackageName cname
+    case mpair of
+        Just (snap, flags) ->
+            return (ResolverSnapshot snap, Map.singleton name flags)
         Nothing -> do
             s <- getSnapshots
             let snap = case IntMap.maxViewWithKey (snapshotsLts s) of
                     Just ((x, y), _) -> LTS x y
                     Nothing -> Nightly $ snapshotsNightly s
-            return (ResolverSnapshot snap, Map.empty, cabalFileExists)
+            $logWarn $ T.concat
+                [ "No matching snapshot was found for your package, "
+                , "falling back to: "
+                , renderSnapName snap
+                ]
+            $logWarn "This behavior will improve in the future, please see: https://github.com/commercialhaskell/stack/issues/253"
+            return (ResolverSnapshot snap, Map.empty)
 
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
@@ -306,17 +305,14 @@ loadBuildConfig menv mproject config noConfigStrat = do
             error "You do not have a stack.yaml. This will be handled in the future, see https://github.com/fpco/stack/issues/59"
         CreateConfig -> do
             currDir <- getWorkingDir
-            (r, flags, cabalFileExists) <- runReaderT (getDefaultResolver currDir) miniConfig
+            (r, flags) <- runReaderT (getDefaultResolver currDir) miniConfig
             let dest = currDir </> stackDotYaml
                 dest' = toFilePath dest
             exists <- liftIO $ doesFileExist dest'
             when exists $ error "Invariant violated: in toBuildConfig's Nothing branch, and the stack.yaml file exists"
             $logInfo $ "Writing default config file to: " <> T.pack dest'
             let p = Project
-                    { projectPackages =
-                        if cabalFileExists
-                            then [packageEntryCurrDir]
-                            else []
+                    { projectPackages = [packageEntryCurrDir]
                     , projectExtraDeps = Map.empty
                     , projectFlags = flags
                     , projectResolver = r
