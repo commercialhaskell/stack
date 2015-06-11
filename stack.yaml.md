@@ -40,11 +40,19 @@ Default: https://www.stackage.org/download/snapshots.json
 
 ### install-ghc
 
+### require-stack-version
+
+Require a version of stack within the specified range
+([cabal-style](https://www.haskell.org/cabal/users-guide/developing-packages.html#build-information))
+to be used for this project. Example: `require-stack-version: "== 0.1.*"`
+
+Default: "-any"
+
 ### arch/os
 
 Set the architecture and operating system for GHC, build directories, etc. Values are those recognized by Cabal, e.g.:
 
-arch: i386, x86_64
-os: windows, linux
+    arch: i386, x86_64
+    os: windows, linux
 
 You likely only ever want to change the arch value. This can also be set via the command line.
