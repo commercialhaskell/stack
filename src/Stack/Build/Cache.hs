@@ -112,7 +112,7 @@ tryGetConfigCache = tryGetCache configCacheFile
 
 -- | Try to load a cache.
 tryGetCache :: (MonadIO m, Binary a, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
-            => (PackageIdentifier -> Path Abs Dir -> m (Path Abs File))
+            => (Version -> Path Abs Dir -> m (Path Abs File))
             -> Path Abs Dir
             -> m (Maybe a)
 tryGetCache get' dir = do
@@ -169,7 +169,7 @@ deleteCaches dir = do
 -- | Write to a cache.
 writeCache :: (Binary a, MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env)
            => Path Abs Dir
-           -> (PackageIdentifier -> Path Abs Dir -> m (Path Abs File))
+           -> (Version -> Path Abs Dir -> m (Path Abs File))
            -> a
            -> m ()
 writeCache dir get' content = do

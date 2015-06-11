@@ -50,10 +50,10 @@ import           Prelude                        hiding (FilePath, writeFile)
 import           Stack.Build.Cache
 import           Stack.Build.Installed
 import           Stack.Build.Types
-import           Stack.Constants
 import           Stack.Fetch                    as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
+import           Stack.Constants
 import           Stack.Types
 import           Stack.Types.StackT
 import           Stack.Types.Internal
@@ -134,7 +134,7 @@ data ExecuteEnv = ExecuteEnv
     , eeGhcPkgIds      :: !(TVar (Map PackageIdentifier Installed))
     , eeTempDir        :: !(Path Abs Dir)
     , eeSetupHs        :: !(Path Abs File)
-    , eeCabalPkgVer    :: !PackageIdentifier
+    , eeCabalPkgVer    :: !Version
     , eeTotalWanted    :: !Int
     }
 
@@ -143,7 +143,7 @@ executePlan :: M env m
             => EnvOverride
             -> BuildOpts
             -> BaseConfigOpts
-            -> PackageIdentifier -- ^ cabal version
+            -> Version -- ^ cabal version
             -> [LocalPackage]
             -> Plan
             -> m ()
@@ -471,7 +471,10 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
         let setuphs = fromMaybe eeSetupHs msetuphs
         inner $ \stripTHLoading args -> do
             let fullArgs =
-                      ("-package=" ++ packageIdentifierString eeCabalPkgVer)
+                      ("-package=" ++
+                       packageIdentifierString
+                           (PackageIdentifier cabalPackageName
+                                              eeCabalPkgVer))
                     : "-clear-package-db"
                     : "-global-package-db"
                     -- TODO: Perhaps we want to include the snapshot package database here

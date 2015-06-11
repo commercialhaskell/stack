@@ -20,21 +20,23 @@ module Stack.Constants
     ,buildCacheFile
     ,stackProgName
     ,wiredInPackages
+    ,cabalPackageName
     )
     where
 
-import Control.Monad (liftM)
-import Control.Monad.Catch (MonadThrow)
-import Control.Monad.Reader (MonadReader)
-import Data.Maybe (fromMaybe)
-import Data.Text (Text)
+import           Control.Monad (liftM)
+import           Control.Monad.Catch (MonadThrow)
+import           Control.Monad.Reader (MonadReader)
+import           Data.Maybe (fromMaybe)
+import           Data.Text (Text)
 import qualified Data.Text as T
-import Path as FL
-import Prelude
-import Stack.Types.Config
-import Stack.Types.PackageIdentifier
-import Stack.Types.PackageName
-import Stack.Types.Version
+import           Path as FL
+import           Prelude
+import           Stack.Types.Config
+import           Stack.Types.PackageIdentifier
+
+import           Stack.Types.PackageName
+import           Stack.Types.Version
 
 -- | Extensions used for Haskell files.
 haskellFileExts :: [Text]
@@ -42,7 +44,7 @@ haskellFileExts = ["hs","hsc","lhs"]
 
 -- | The filename used for completed build indicators.
 builtFileFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
-                 => PackageIdentifier -- ^ Cabal version
+                 => Version -- ^ Cabal version
                  -> Path Abs Dir
                  -> m (Path Abs File)
 builtFileFromDir cabalPkgVer fp = do
@@ -51,7 +53,7 @@ builtFileFromDir cabalPkgVer fp = do
 
 -- | The filename used for completed configure indicators.
 configuredFileFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
-                      => PackageIdentifier -- ^ Cabal version
+                      => Version -- ^ Cabal version
                       -> Path Abs Dir
                       -> m (Path Abs File)
 configuredFileFromDir cabalPkgVer fp = do
@@ -60,7 +62,7 @@ configuredFileFromDir cabalPkgVer fp = do
 
 -- | The filename used for completed build indicators.
 builtConfigFileFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
-                       => PackageIdentifier -- ^ Cabal version
+                       => Version -- ^ Cabal version
                        -> Path Abs Dir
                        -> m (Path Abs File)
 builtConfigFileFromDir cabalPkgVer fp =
@@ -68,7 +70,7 @@ builtConfigFileFromDir cabalPkgVer fp =
 
 -- | Relative location of completed build indicators.
 builtConfigRelativeFile :: (MonadThrow m, MonadReader env m, HasPlatform env)
-                        => PackageIdentifier -- ^ Cabal version
+                        => Version -- ^ Cabal version
                         -> m (Path Rel File)
 builtConfigRelativeFile cabalPkgVer = do
   dist <- distRelativeDir cabalPkgVer
@@ -98,7 +100,7 @@ userDocsDir config = configStackRoot config </> $(mkRelDir "doc/")
 
 -- | The filename used for dirtiness check of source files.
 buildCacheFile :: (MonadThrow m, MonadReader env m, HasPlatform env)
-               => PackageIdentifier -- ^ Cabal version
+               => Version -- ^ Cabal version
                -> Path Abs Dir      -- ^ Package directory.
                -> m (Path Abs File)
 buildCacheFile cabalPkgVersion dir = do
@@ -108,7 +110,7 @@ buildCacheFile cabalPkgVersion dir = do
 
 -- | The filename used for dirtiness check of config.
 configCacheFile :: (MonadThrow m, MonadReader env m, HasPlatform env)
-                => PackageIdentifier -- ^ Cabal version
+                => Version -- ^ Cabal version
                 -> Path Abs Dir      -- ^ Package directory.
                 -> m (Path Abs File)
 configCacheFile cabalPkgVersion dir = do
@@ -118,7 +120,7 @@ configCacheFile cabalPkgVersion dir = do
 
 -- | Package's build artifacts directory.
 distDirFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
-               => PackageIdentifier -- ^ Cabal version
+               => Version -- ^ Cabal version
                -> Path Abs Dir
                -> m (Path Abs Dir)
 distDirFromDir cabalPkgVersion fp =
@@ -126,13 +128,18 @@ distDirFromDir cabalPkgVersion fp =
 
 -- | Relative location of build artifacts.
 distRelativeDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
-                => PackageIdentifier -- ^ Cabal version
+                => Version -- ^ Cabal version
                 -> m (Path Rel Dir)
 distRelativeDir cabalPkgVer = do
     platform <- platformRelDir
-    cabal <- parseRelDir $ "Cabal-" ++
-             versionString (packageIdentifierVersion cabalPkgVer)
-    return $ $(mkRelDir "dist-stack/") </> platform </> cabal
+    cabal <-
+        parseRelDir $
+        packageIdentifierString
+            (PackageIdentifier cabalPackageName cabalPkgVer)
+    return $
+        $(mkRelDir "dist-stack") </>
+        platform </>
+        cabal
 
 -- pkgIndexDir :: Config -> Path Abs Dir
 -- pkgIndexDir config =
@@ -207,3 +214,8 @@ wiredInPackages = fromMaybe (error "Parse error in wiredInPackages") mparsed
       , "ghc"
       , "interactive"
       ]
+
+-- | Just to avoid repetition and magic strings.
+cabalPackageName :: PackageName
+cabalPackageName =
+    $(mkPackageName "Cabal")

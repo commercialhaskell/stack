@@ -32,6 +32,7 @@ import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
 import           Prelude hiding (FilePath)
 import           Stack.Build.Types (StackBuildException (Couldn'tFindPkgId))
 import           Stack.Types
+import           Stack.Constants
 import           System.Directory (createDirectoryIfMissing, doesDirectoryExist, canonicalizePath)
 import           System.Process.Read
 
@@ -137,16 +138,13 @@ unregisterGhcPkgId menv pkgDb gid = do
 
 -- | Get the version of Cabal from the global package database.
 getCabalPkgVer :: (MonadThrow m,MonadIO m,MonadLogger m)
-               => EnvOverride -> m PackageIdentifier
+               => EnvOverride -> m Version
 getCabalPkgVer menv = do
     db <- getGlobalDB menv -- FIXME shouldn't be necessary, just tell ghc-pkg to look in the global DB
     findGhcPkgId
         menv
         [db]
-        cabalName >>=
+        cabalPackageName >>=
         maybe
-            (throwM $ Couldn'tFindPkgId cabalName)
-            (return . ghcPkgIdPackageIdentifier)
-  where
-    cabalName =
-        $(mkPackageName "Cabal")
+            (throwM $ Couldn'tFindPkgId cabalPackageName)
+            (return . packageIdentifierVersion . ghcPkgIdPackageIdentifier)
