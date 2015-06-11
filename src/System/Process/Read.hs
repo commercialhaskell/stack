@@ -132,17 +132,17 @@ callProcess :: (MonadIO m)
             -> String
             -> [String]
             -> m ()
-callProcess wd menv cmd args =
+callProcess wd menv cmd0 args = do
+    cmd <- preProcess wd menv cmd0
+    let c = (proc cmd args) { delegate_ctlc = True
+                             , cwd = fmap toFilePath wd
+                             , env = envHelper menv }
+        action (_, _, _, p) = do
+            exit_code <- waitForProcess p
+            case exit_code of
+              ExitSuccess   -> return ()
+              ExitFailure _ -> throwIO (ProcessExitedUnsuccessfully c exit_code)
     liftIO (System.Process.createProcess c >>= action)
-  where
-    c = (proc cmd args) { delegate_ctlc = True
-                        , cwd = fmap toFilePath wd
-                        , env = envHelper menv }
-    action (_, _, _, p) = do
-        exit_code <- waitForProcess p
-        case exit_code of
-          ExitSuccess   -> return ()
-          ExitFailure _ -> throwIO (ProcessExitedUnsuccessfully c exit_code)
 
 -- | Consume the stdout of a process feeding strict 'S.ByteString's to a consumer.
 sinkProcessStdout :: (MonadIO m)
@@ -153,8 +153,7 @@ sinkProcessStdout :: (MonadIO m)
                   -> Sink S.ByteString IO a
                   -> m a
 sinkProcessStdout wd menv name args sink = do
-  name' <- liftIO $ liftM toFilePath $ join $ findExecutable menv name
-  liftIO (maybe (return ()) (createDirectoryIfMissing True . toFilePath) wd)
+  name' <- preProcess wd menv name
   liftIO (withCheckedProcess
             (proc name' args) { env = envHelper menv, cwd = fmap toFilePath wd }
             (\ClosedStream out err ->
@@ -163,6 +162,14 @@ sinkProcessStdout wd menv name args sink = do
                Concurrently (asBSSource out $$ sink)))
   where asBSSource :: Source m S.ByteString -> Source m S.ByteString
         asBSSource = id
+
+-- | Perform pre-call-process tasks.  Ensure the working directory exists and find the
+-- executable path.
+preProcess :: (MonadIO m) => Maybe (Path Abs Dir) -> EnvOverride -> String -> m FilePath
+preProcess wd menv name = do
+  name' <- liftIO $ liftM toFilePath $ join $ findExecutable menv name
+  liftIO (maybe (return ()) (createDirectoryIfMissing True . toFilePath) wd)
+  return name'
 
 -- | Run the given command in the given directory. If it exits with anything
 -- but success, prints an error and then calls 'exitWith' to exit the program.
