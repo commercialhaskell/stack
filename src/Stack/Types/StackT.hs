@@ -33,10 +33,12 @@ import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
 import qualified Data.ByteString.Char8 as S8
 import           Data.Char
+import           Data.Maybe
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import qualified Data.Text.IO as T
 import           Data.Time
 import           Language.Haskell.TH
 import           Network.HTTP.Client.Conduit (HasHttpManager(..))
@@ -139,16 +141,18 @@ stickyLoggerFunc loc src level msg = do
     case mref of
         Nothing ->
             case level of
-              LevelOther x
-                  | elem x ["sticky-done","sticky"] -> loggerFunc loc src LevelInfo msg
-              _ -> loggerFunc loc src level msg
+                LevelOther x
+                  | elem x ["sticky-done", "sticky"] ->
+                      loggerFunc loc src LevelInfo msg
+                _ ->
+                    loggerFunc loc src level msg
         Just ref -> do
-            sticky <- liftIO (takeMVar ref) -- TODO: make exception-safe.
+            sticky <- liftIO (takeMVar ref)
             let backSpaceChar =
                     '\8'
                 repeating =
                     S8.replicate
-                        (stickyMaxColumns sticky)
+                        (maybe 0 T.length sticky)
             liftIO
                 (S8.putStr
                      (repeating backSpaceChar <>
@@ -158,44 +162,24 @@ stickyLoggerFunc loc src level msg = do
                 case level of
                     LevelOther "sticky-done" -> do
                         loggerFunc loc src level msg
-                        return
-                            sticky
-                            { stickyLastWasSticky = False
-                            , stickyMaxColumns = 0
-                            , stickyCurrentLine = Nothing
-                            }
+                        return Nothing
                     LevelOther "sticky" -> do
-                        liftIO (S8.putStr msgBytes)
-                        return
-                            sticky
-                            { stickyLastWasSticky = True
-                            , stickyMaxColumns = characterLength msgBytes
-                            , stickyCurrentLine = Just msgBytes
-                            }
+                        let text = T.decodeUtf8 msgBytes
+                        liftIO (T.putStr text)
+                        return (Just text)
                     _ -> do
                         loggerFunc loc src level msg
-                        case stickyCurrentLine sticky of
+                        case sticky of
                             Nothing ->
-                                return
-                                    sticky
-                                    { stickyLastWasSticky = False
-                                    , stickyMaxColumns = 0
-                                    }
+                                return Nothing
                             Just line -> do
-                                liftIO (S8.putStr line)
-                                return
-                                    sticky
-                                    { stickyLastWasSticky = True
-                                    , stickyMaxColumns = characterLength
-                                          msgBytes
-                                    }
+                                liftIO (T.putStr line)
+                                return sticky
             liftIO (putMVar ref newState)
   where
     msgBytes =
         fromLogStr
             (toLogStr msg)
-    characterLength =
-        T.length . T.decodeUtf8
 
 -- | Logging function takes the log level into account.
 loggerFunc :: (MonadIO m,ToLogStr msg,MonadReader r m,HasLogLevel r)
@@ -245,12 +229,12 @@ withSticky :: MonadIO m
 withSticky m = do
     terminal <- liftIO (hIsTerminalDevice stdout)
     if terminal
-       then do state <- liftIO (newMVar (StickyState Nothing 0 False))
+       then do state <- liftIO (newMVar Nothing)
                originalMode <- liftIO (hGetBuffering stdout)
                liftIO (hSetBuffering stdout NoBuffering)
                a <- m (Sticky (Just state))
                state' <- liftIO (takeMVar state)
-               liftIO (when (stickyLastWasSticky state') (S8.putStr "\n"))
+               liftIO (when (isJust state') (S8.putStr "\n"))
                liftIO (hSetBuffering stdout originalMode)
                return a
        else m (Sticky Nothing)
