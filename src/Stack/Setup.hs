@@ -119,7 +119,7 @@ setupEnv = do
             , soptsExpected = bcGhcVersion bconfig
             , soptsStackYaml = Just $ bcStackYaml bconfig
             , soptsForceReinstall = False
-            , soptsSanityCheck = True
+            , soptsSanityCheck = False
             }
     mghcBin <- ensureGHC sopts
     menv0 <- getMinimalEnvOverride
