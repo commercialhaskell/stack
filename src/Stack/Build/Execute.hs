@@ -256,9 +256,6 @@ executePlan' plan ee = do
     -- stack always using transformer stacks that are safe for this use case.
     runInBase <- liftBaseWith $ \run -> return (void . run)
 
-    let size = Map.size (planTasks plan)
-    when (size > 1)
-         ($logSticky ("Progress: 0/" <> T.pack (show size)))
     let actions = concatMap (toActions runInBase ee) $ Map.elems $ planTasks plan
     threads <- asks $ configJobs . getConfig
     errs <- liftIO $ runActions threads actions
@@ -304,6 +301,8 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
                 TaskConfigOpts missing mkOpts = taskConfigOpts
                 configOpts = mkOpts missing'
                 allDeps = Set.union missing' taskPresent
+            unless justFinal $  withMVar eeInstallLock $ \(done,total) -> do
+              $logSticky ("Progress: " <> T.pack (show done) <> "/" <> T.pack (show total))
             announce "configure"
             cabal False $ "configure" : map T.unpack configOpts
             $logDebug $ T.pack $ show configOpts
