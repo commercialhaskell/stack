@@ -181,12 +181,7 @@ executePlan menv bopts baseConfigOpts cabalPkgVer locals plan = do
         let destDir' = toFilePath destDir
         liftIO $ createDirectoryIfMissing True destDir'
 
-        let stripSlash =
-                T.unpack . stripSlashT . T.pack
-              where
-                stripSlashT t = fromMaybe t $ T.stripSuffix slash t
-                slash = T.singleton FP.pathSeparator
-        when (stripSlash destDir' `notElem` map stripSlash (envSearchPath menv)) $
+        when (not $ any (FP.equalFilePath destDir') (envSearchPath menv)) $
             $logWarn $ T.concat
                 [ "Installation path "
                 , T.pack destDir'
@@ -224,7 +219,7 @@ executePlan menv bopts baseConfigOpts cabalPkgVer locals plan = do
                         ]
 
                     liftIO $ case platform of
-                        Platform _ Windows | destFile == currExe ->
+                        Platform _ Windows | FP.equalFilePath destFile currExe ->
                             windowsRenameCopy (toFilePath file) destFile
                         _ -> copyFile (toFilePath file) destFile
 
