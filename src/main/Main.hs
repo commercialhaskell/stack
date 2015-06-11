@@ -55,7 +55,6 @@ main :: IO ()
 main =
   do plugins <- findPlugins (T.pack stackProgName)
      tryRunPlugin plugins
-     Docker.checkVersions
      progName <- getProgName
      args <- getArgs
      execExtraHelp args

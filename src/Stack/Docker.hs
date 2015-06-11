@@ -3,8 +3,7 @@
 
 -- | Run commands in Docker containers
 module Stack.Docker
-  (checkVersions
-  ,cleanup
+  (cleanup
   ,CleanupOpts(..)
   ,CleanupAction(..)
   ,dockerCleanupCmdName
@@ -47,7 +46,6 @@ import           Options.Applicative.Builder.Extra (maybeBoolFlags)
 import           Options.Applicative (Parser,str,option,help,auto,metavar,long,value,hidden,internal,idm)
 import           Path
 import           Path.IO (getWorkingDir,listDirectory)
-import           Paths_stack (version)
 import           Stack.Constants (projectDockerSandboxDir,stackProgName,stackDotYaml,stackRootEnvVar)
 import           Stack.Types
 import           Stack.Docker.GlobalDB
@@ -218,8 +216,6 @@ runContainerAndExit config
                    ,"-e","WORK_WD=" ++ trimTrailingPathSep pwd
                    ,"-e","WORK_HOME=" ++ trimTrailingPathSep sandboxRepoDir
                    ,"-e","WORK_ROOT=" ++ trimTrailingPathSep projectRoot
-                   ,"-e",hostVersionEnvVar ++ "=" ++ versionString stackVersion
-                   ,"-e",requireVersionEnvVar ++ "=" ++ versionString requireContainerVersion
                    ,"-v",trimTrailingPathSep stackRoot ++ ":" ++ trimTrailingPathSep stackRoot
                    ,"-v",trimTrailingPathSep projectRoot ++ ":" ++ trimTrailingPathSep projectRoot
                    ,"-v",trimTrailingPathSep sandboxSandboxDir ++ ":" ++ trimTrailingPathSep sandboxDir
@@ -553,8 +549,7 @@ pullImage pwd envOverride docker image =
 checkDockerVersion :: (MonadIO m,MonadThrow m) => EnvOverride -> m ()
 checkDockerVersion envOverride =
   do dockerExists <- doesExecutableExist envOverride "docker"
-     when (not dockerExists)
-          (throwM DockerNotInstalledException)
+     unless dockerExists (throwM DockerNotInstalledException)
      dockerVersionOut <- readProcessStdout Nothing envOverride "docker" ["--version"]
      case words (decodeUtf8 dockerVersionOut) of
        (_:_:v:_) ->
@@ -621,34 +616,6 @@ sandboxedHomeSubdirectories =
 -- | Name of home directory within @.docker-sandbox@.
 homeDirName :: Path Rel Dir
 homeDirName = $(mkRelDir ".home/")
-
--- | Check host 'stack' version
-checkHostStackVersion :: (MonadIO m,MonadThrow m) => Version -> m ()
-checkHostStackVersion minVersion =
-  do maybeHostVer <- liftIO (lookupEnv hostVersionEnvVar)
-     case parseVersionFromString =<< maybeHostVer of
-       Just hostVer
-         | hostVer < minVersion -> throwM (HostStackTooOldException minVersion (Just hostVer))
-         | otherwise -> return ()
-       Nothing ->
-          do inContainer <- getInContainer
-             if inContainer
-                then throwM (HostStackTooOldException minVersion Nothing)
-                else return ()
-
-
--- | Check host and container 'stack' versions are compatible.
-checkVersions :: (MonadIO m,MonadThrow m) => m ()
-checkVersions =
-  do inContainer <- getInContainer
-     when inContainer
-       (do checkHostStackVersion requireHostVersion
-           maybeReqVer <- liftIO (lookupEnv requireVersionEnvVar)
-           case parseVersionFromString =<< maybeReqVer of
-             Just reqVer
-               | stackVersion < reqVer -> throwM (ContainerStackTooOldException reqVer stackVersion)
-               | otherwise -> return ()
-             _ -> return ())
 
 -- | Options parser configuration for Docker.
 dockerOptsParser :: Bool -> Parser DockerOptsMonoid
@@ -770,14 +737,6 @@ concatT = T.pack . concat
 fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
 fromMaybeProjectRoot = fromMaybe (throw CannotDetermineProjectRootException)
 
--- | Environment variable to the host's stack version.
-hostVersionEnvVar :: String
-hostVersionEnvVar = "STACK_DOCKER_HOST_VERSION"
-
--- | Environment variable to pass required container stack version.
-requireVersionEnvVar :: String
-requireVersionEnvVar = "STACK_DOCKER_REQUIRE_VERSION"
-
 -- | Environment variable that contains the sandbox ID.
 sandboxIDEnvVar :: String
 sandboxIDEnvVar = "DOCKER_SANDBOX_ID"
@@ -793,18 +752,6 @@ dockerPullCmdName = "pull"
 -- | Command-line argument for @docker cleanup@.
 dockerCleanupCmdName :: String
 dockerCleanupCmdName = "cleanup"
-
--- | Version of 'stack' required to be installed in container.
-requireContainerVersion :: Version
-requireContainerVersion = $(mkVersion "0.0.0")
-
--- | Version of 'stack' required to be installed on the host.
-requireHostVersion :: Version
-requireHostVersion = $(mkVersion "0.0.0")
-
--- | Stack cabal package version
-stackVersion :: Version
-stackVersion = fromCabalVersion version
 
 -- | Options for 'cleanup'.
 data CleanupOpts = CleanupOpts
