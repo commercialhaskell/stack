@@ -65,6 +65,7 @@ library
                      Path.IO
                      System.Process.PagerEditor
                      Paths_stack
+                     Data.Aeson.Extended
                      Data.Attoparsec.Combinators
                      Data.Binary.VersionTagged
                      Data.Set.Monad

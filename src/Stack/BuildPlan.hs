@@ -36,8 +36,7 @@ import           Control.Monad.Reader (asks)
 import           Control.Monad.State.Strict      (State, execState, get, modify,
                                                   put)
 import           Control.Monad.Trans.Control (MonadBaseControl)
-import           Data.Aeson (FromJSON (..))
-import           Data.Aeson (withObject, withText, (.:))
+import           Data.Aeson.Extended (FromJSON (..), withObject, withText, (.:))
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8

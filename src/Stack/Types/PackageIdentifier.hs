@@ -23,7 +23,7 @@ import           Control.Applicative
 import           Control.DeepSeq
 import           Control.Exception (Exception)
 import           Control.Monad.Catch (MonadThrow, throwM)
-import           Data.Aeson
+import           Data.Aeson.Extended
 import           Data.Attoparsec.ByteString.Char8
 import           Data.Binary (Binary)
 import           Data.ByteString (ByteString)

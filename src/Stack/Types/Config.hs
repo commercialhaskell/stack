@@ -14,7 +14,7 @@ import           Control.Exception
 import           Control.Monad (liftM, mzero)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
-import           Data.Aeson (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, object
+import           Data.Aeson.Extended (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, object
                             ,(.=), (.:?), (.!=), (.:), Value (String))
 import           Data.Binary (Binary)
 import           Data.ByteString (ByteString)

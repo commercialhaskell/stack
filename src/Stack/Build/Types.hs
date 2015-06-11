@@ -13,7 +13,7 @@ module Stack.Build.Types where
 
 import Control.DeepSeq
 import Control.Exception
-import Data.Aeson
+import Data.Aeson.Extended
 import Data.Binary (Binary(..))
 import qualified Data.ByteString as S
 import Data.Char (isSpace)

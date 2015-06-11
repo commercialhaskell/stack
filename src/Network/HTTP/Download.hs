@@ -26,7 +26,7 @@ import           Control.Monad.Catch         (MonadThrow, throwM)
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
 import           Control.Monad.Reader        (MonadReader, ReaderT, ask,
                                               runReaderT)
-import           Data.Aeson                  (FromJSON, parseJSON)
+import           Data.Aeson.Extended         (FromJSON, parseJSON)
 import           Data.Aeson.Parser           (json')
 import           Data.Aeson.Types            (parseEither)
 import qualified Data.ByteString             as S
