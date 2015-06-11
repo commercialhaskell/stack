@@ -141,16 +141,6 @@ distRelativeDir cabalPkgVer = do
         platform </>
         cabal
 
--- pkgIndexDir :: Config -> Path Abs Dir
--- pkgIndexDir config =
---   configStackRoot config </>
---   $(mkRelDir "package-index")
-
--- pkgIndexFile :: Config -> Path Abs File
--- pkgIndexFile config =
---   pkgIndexDir config </>
---   $(mkRelFile "00-index.tar")
-
 -- | Get a URL for a raw file on Github
 rawGithubUrl :: Text -- ^ user/org name
              -> Text -- ^ repo name
