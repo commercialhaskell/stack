@@ -7,6 +7,8 @@ Distribution packages are available for [Ubuntu](#ubuntu) and [Arch Linux](#arch
 * Download [stack-0.0.0-i386-windows.zip](https://github.com/fpco/stack/releases/download/v0.0.0-beta/stack-0.0.0-i386-windows.zip)
 * Unpack the `stack.exe` to somewhere on your `%PATH%` (see [Path section below](#path)) and you can then run `stack` on the commandline.
 
+NOTE: This executable has been built and tested on a Windows 8.1 64-bit machine. It should run on older Windows installs as well, but has not been tested. If you do test, please edit and update this page to indicate as such.
+
 ## OS X
 
 * Download [stack-0.0.0-x86_64-osx.gz](https://github.com/fpco/stack/releases/download/v0.0.0-beta/stack-0.0.0-x86_64-osx.gz)
