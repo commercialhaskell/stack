@@ -11,6 +11,7 @@ module Stack.Build.Source
     ) where
 
 import Network.HTTP.Client.Conduit (HasHttpManager)
+import           Control.Applicative          ((<|>))
 import           Control.Monad
 import           Control.Monad.Catch          (MonadCatch)
 import           Control.Monad.IO.Class
@@ -18,6 +19,7 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader         (MonadReader, asks)
 import           Control.Monad.Trans.Resource
 import           Data.Either
+import qualified Data.Foldable                as F
 import           Data.Function
 import           Data.List
 import qualified Data.Map                     as Map
@@ -69,41 +71,50 @@ loadSourceMap bopts = do
             , mbpPackages = Map.empty
             }
 
-    (locals, nonLocalTargets) <- loadLocals bopts
+    menv <- getMinimalEnvOverride
+    caches <- getPackageCaches menv
+    let latestVersion = Map.fromList $ map toTuple $ Map.keys caches
+    (locals, extraNames, extraIdents) <- loadLocals bopts latestVersion
+
+    let nonLocalTargets = extraNames <> Set.map packageIdentifierName extraIdents
+
+        -- Extend extra-deps to encompass targets requested on the command line
+        -- that are not in the snapshot.
+        extraDeps0 = extendExtraDeps
+            (bcExtraDeps bconfig)
+            mbp0
+            latestVersion
+            extraNames
+            extraIdents
 
     let shadowed = Set.fromList (map (packageName . lpPackage) locals)
-                <> Map.keysSet (bcExtraDeps bconfig)
-        (mbp, extraDeps0) = shadowMiniBuildPlan mbp0 shadowed
+                <> Map.keysSet extraDeps0
+        (mbp, extraDeps1) = shadowMiniBuildPlan mbp0 shadowed
 
         -- Add the extra deps from the stack.yaml file to the deps grabbed from
         -- the snapshot
-        extraDeps1 = Map.union
-            (Map.map (\v -> (v, Map.empty)) (bcExtraDeps bconfig))
-            (Map.map (\mpi -> (mpiVersion mpi, mpiFlags mpi)) extraDeps0)
+        extraDeps2 = Map.union
+            (Map.map (\v -> (v, Map.empty)) extraDeps0)
+            (Map.map (\mpi -> (mpiVersion mpi, mpiFlags mpi)) extraDeps1)
 
         -- Overwrite any flag settings with those from the config file
-        extraDeps2 = Map.mapWithKey
+        extraDeps3 = Map.mapWithKey
             (\n (v, f) -> PSUpstream v Local $ fromMaybe f $ Map.lookup n $ bcFlags bconfig)
-            extraDeps1
+            extraDeps2
 
     let sourceMap = Map.unions
             [ Map.fromList $ flip map locals $ \lp ->
                 let p = lpPackage lp
                  in (packageName p, PSLocal lp)
-            , extraDeps2
+            , extraDeps3
             , flip fmap (mbpPackages mbp) $ \mpi ->
                 (PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi))
             ] `Map.difference` Map.fromList (map (, ()) wiredInPackages)
 
     let unknown = Set.difference nonLocalTargets $ Map.keysSet sourceMap
     unless (Set.null unknown) $ do
-        menv <- getMinimalEnvOverride
-        caches <- getPackageCaches menv
-        let m = Map.fromList
-              $ map toTuple
-              $ Map.keys caches
-            toEither name =
-                case Map.lookup name m of
+        let toEither name =
+                case Map.lookup name latestVersion of
                     Nothing -> Left name
                     Just version -> Right (name, version)
             eithers = map toEither $ Set.toList unknown
@@ -118,14 +129,15 @@ loadSourceMap bopts = do
 -- | Returns locals and extra target packages
 loadLocals :: (MonadReader env m, HasBuildConfig env, MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m)
            => BuildOpts
-           -> m ([LocalPackage], Set PackageName)
-loadLocals bopts = do
+           -> Map PackageName Version
+           -> m ([LocalPackage], Set PackageName, Set PackageIdentifier)
+loadLocals bopts latestVersion = do
     targets <- mapM parseTarget $
         case boptsTargets bopts of
             [] -> ["."]
             x -> x
-    (dirs, names0) <- case partitionEithers targets of
-        ([], targets') -> return $ partitionEithers targets'
+    (dirs, (names0, idents)) <- case partitionEithers targets of
+        ([], targets') -> return $ fmap partitionEithers $ partitionEithers targets'
         (bad, _) -> throwM $ Couldn'tParseTargets bad
     let names = Set.fromList names0
 
@@ -163,7 +175,7 @@ loadLocals bopts = do
     let known = Set.fromList $ map (packageName . lpPackage) lps
         unknown = Set.difference names known
 
-    return (lps, unknown)
+    return (lps, unknown, Set.fromList idents)
   where
     parseTarget t = do
         let s = T.unpack t
@@ -171,8 +183,17 @@ loadLocals bopts = do
         if isDir
             then liftM (Right . Left) $ liftIO (canonicalizePath s) >>= parseAbsDir
             else return $ case parsePackageNameFromString s of
-                     Left _ -> Left t
-                     Right pname -> Right $ Right pname
+                     Left _ ->
+                        case parsePackageIdentifierFromString s of
+                            Left _ ->
+                                case T.stripSuffix ":latest" t of
+                                    Just t'
+                                        | Just name <- parsePackageNameFromString $ T.unpack t'
+                                        , Just version <- Map.lookup name latestVersion
+                                        -> Right $ Right $ Right $ PackageIdentifier name version
+                                    _ -> Left t
+                            Right ident -> Right $ Right $ Right ident
+                     Right pname -> Right $ Right $ Left pname
     isWanted dirs names dir name =
         name `Set.member` names ||
         any (`isParentOf` dir) dirs ||
@@ -183,3 +204,36 @@ localFlags :: BuildOpts -> BuildConfig -> PackageName -> Map FlagName Bool
 localFlags bopts bconfig name = Map.union
     (fromMaybe Map.empty $ Map.lookup name $ boptsFlags bopts)
     (fromMaybe Map.empty $ Map.lookup name $ bcFlags bconfig)
+
+-- | Add in necessary packages to extra dependencies
+--
+-- See https://github.com/commercialhaskell/stack/issues/272 for the requirements of this function
+extendExtraDeps :: Map PackageName Version -- ^ original extra deps
+                -> MiniBuildPlan
+                -> Map PackageName Version -- ^ latest versions in indices
+                -> Set PackageName -- ^ extra package names desired
+                -> Set PackageIdentifier -- ^ extra package identifiers desired
+                -> Map PackageName Version -- ^ new extradeps
+extendExtraDeps extraDeps0 mbp latestVersion extraNames extraIdents =
+    F.foldl' addIdent
+        (F.foldl' addName extraDeps0 extraNames)
+        extraIdents
+  where
+    snapshot = fmap mpiVersion $ mbpPackages mbp
+
+    addName m name =
+        case Map.lookup name m <|> Map.lookup name snapshot of
+            -- alright exists in snapshot or extra-deps
+            Just _ -> m
+            Nothing ->
+                case Map.lookup name latestVersion of
+                    -- use the latest version in the index
+                    Just v -> Map.insert name v m
+                    -- does not exist, will be reported as an error
+                    Nothing -> m
+
+    addIdent m (PackageIdentifier name version) =
+        case Map.lookup name snapshot of
+            -- the version matches what's in the snapshot, so just use the snapshot version
+            Just version' | version == version' -> m
+            _ -> Map.insert name version m

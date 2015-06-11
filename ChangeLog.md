@@ -7,7 +7,7 @@
 * Remove packages (HTTPS and Git) [#199](https://github.com/commercialhaskell/stack/issues/199)
 * Config values for system-ghc and install-ghc
 * Merge `stack deps` functionality into `stack build`
-* `install-tool` command [#153](https://github.com/commercialhaskell/stack/issues/153)
+* `install` command [#153](https://github.com/commercialhaskell/stack/issues/153) and [#272](https://github.com/commercialhaskell/stack/issues/272)
 
 ## 0.0.1
 
