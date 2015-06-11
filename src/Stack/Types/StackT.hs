@@ -153,28 +153,37 @@ stickyLoggerFunc loc src level msg = do
                 repeating =
                     S8.replicate
                         (maybe 0 T.length sticky)
-            liftIO
-                (S8.putStr
-                     (repeating backSpaceChar <>
-                      repeating ' ' <>
-                      repeating backSpaceChar))
+                clear =
+                    liftIO
+                        (S8.putStr
+                             (repeating backSpaceChar <>
+                              repeating ' ' <>
+                              repeating backSpaceChar))
+            maxLogLevel <- asks getLogLevel
             newState <-
                 case level of
                     LevelOther "sticky-done" -> do
+                        clear
                         loggerFunc loc src level msg
                         return Nothing
                     LevelOther "sticky" -> do
-                        let text = T.decodeUtf8 msgBytes
+                        clear
+                        let text =
+                                T.decodeUtf8 msgBytes
                         liftIO (T.putStr text)
                         return (Just text)
-                    _ -> do
-                        loggerFunc loc src level msg
-                        case sticky of
-                            Nothing ->
-                                return Nothing
-                            Just line -> do
-                                liftIO (T.putStr line)
-                                return sticky
+                    _
+                      | level >= maxLogLevel -> do
+                          clear
+                          loggerFunc loc src level msg
+                          case sticky of
+                              Nothing ->
+                                  return Nothing
+                              Just line -> do
+                                  liftIO (T.putStr line)
+                                  return sticky
+                      | otherwise ->
+                          return sticky
             liftIO (putMVar ref newState)
   where
     msgBytes =
