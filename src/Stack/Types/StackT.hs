@@ -164,7 +164,9 @@ stickyLoggerFunc loc src level msg = do
                 case level of
                     LevelOther "sticky-done" -> do
                         clear
-                        loggerFunc loc src level msg
+                        let text =
+                                T.decodeUtf8 msgBytes
+                        liftIO (T.putStrLn text)
                         return Nothing
                     LevelOther "sticky" -> do
                         clear
