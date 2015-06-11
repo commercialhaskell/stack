@@ -28,6 +28,7 @@ module Stack.Config
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
+import           Control.Concurrent (getNumCapabilities)
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -55,7 +56,7 @@ import qualified Data.Yaml as Yaml
 import           Distribution.System (OS (Windows), Platform (..), buildPlatform)
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager, parseUrl)
 import           Network.HTTP.Download (download)
-import           Options.Applicative (Parser, idm, strOption, long, metavar, help)
+import           Options.Applicative (Parser, idm, strOption, long, short, metavar, help, option, auto)
 import           Options.Applicative.Builder.Extra (maybeBoolFlags)
 import           Path
 import           Path.IO
@@ -199,17 +200,23 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
         localDir <- liftIO (getAppUserDataDirectory "local") >>= parseAbsDir
         return $ localDir </> $(mkRelDir "bin")
 
+     configJobs <-
+        case configMonoidJobs of
+            Nothing -> liftIO getNumCapabilities
+            Just i -> return i
+
      return Config {..}
 
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser docker =
-    (\opts systemGHC installGHC arch os -> mempty
+    (\opts systemGHC installGHC arch os jobs -> mempty
         { configMonoidDockerOpts = opts
         , configMonoidSystemGHC = systemGHC
         , configMonoidInstallGHC = installGHC
         , configMonoidArch = arch
         , configMonoidOS = os
+        , configMonoidJobs = jobs
         })
     <$> Docker.dockerOptsParser docker
     <*> maybeBoolFlags
@@ -229,6 +236,12 @@ configOptsParser docker =
             ( long "os"
            <> metavar "OS"
            <> help "Operating system, e.g. linux, windows"
+            ))
+    <*> optional (option auto
+            ( long "jobs"
+           <> short 'j'
+           <> metavar "JOBS"
+           <> help "Number of concurrent jobs to run"
             ))
 
 -- | Get the directory on Windows where we should install extra programs. For

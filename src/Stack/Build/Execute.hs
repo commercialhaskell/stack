@@ -10,7 +10,6 @@ module Stack.Build.Execute
     , executePlan
     ) where
 
-import           Control.Concurrent             (getNumCapabilities)
 import           Control.Concurrent.Lifted (fork)
 import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
@@ -261,7 +260,7 @@ executePlan' plan ee = do
     when (size > 1)
          ($logSticky ("Progress: 0/" <> T.pack (show size)))
     let actions = concatMap (toActions runInBase ee) $ Map.elems $ planTasks plan
-    threads <- liftIO getNumCapabilities -- TODO make a build opt to override this
+    threads <- asks $ configJobs . getConfig
     errs <- liftIO $ runActions threads actions
     unless (null errs) $ throwM $ ExecutionFailure errs
 

@@ -84,6 +84,8 @@ data Config =
          -- ^ Directory we should install executables into
          ,configRequireStackVersion :: !VersionRange
          -- ^ Require a version of stack within this range.
+         ,configJobs                :: !Int
+         -- ^ How many concurrent jobs to run, defaults to number of capabilities
          }
 
 -- | Information on a single package index
@@ -370,6 +372,8 @@ data ConfigMonoid =
     -- ^ Used for overriding the platform
     ,configMonoidArch                :: !(Maybe String)
     -- ^ Used for overriding the platform
+    ,configMonoidJobs                :: !(Maybe Int)
+    -- ^ See: 'configJobs'
     }
   deriving Show
 
@@ -385,6 +389,7 @@ instance Monoid ConfigMonoid where
     , configMonoidRequireStackVersion = Nothing
     , configMonoidOS = Nothing
     , configMonoidArch = Nothing
+    , configMonoidJobs = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -397,6 +402,7 @@ instance Monoid ConfigMonoid where
     , configMonoidRequireStackVersion = configMonoidRequireStackVersion l <|> configMonoidRequireStackVersion r
     , configMonoidOS = configMonoidOS l <|> configMonoidOS r
     , configMonoidArch = configMonoidArch l <|> configMonoidArch r
+    , configMonoidJobs = configMonoidJobs l <|> configMonoidJobs r
     }
 
 instance FromJSON ConfigMonoid where
@@ -414,6 +420,7 @@ instance FromJSON ConfigMonoid where
                                             obj .:? "require-stack-version"
          configMonoidOS <- obj .:? "os"
          configMonoidArch <- obj .:? "arch"
+         configMonoidJobs <- obj .:? "jobs"
          return ConfigMonoid {..}
 
 -- | Newtype for non-orphan FromJSON instance.
