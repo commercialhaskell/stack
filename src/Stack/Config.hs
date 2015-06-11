@@ -54,7 +54,8 @@ import qualified Data.Yaml as Yaml
 import           Distribution.System (OS (Windows), Platform (..), buildPlatform)
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager, parseUrl)
 import           Network.HTTP.Download (download)
-import           Options.Applicative (Parser)
+import           Options.Applicative (Parser, idm)
+import           Options.Applicative.Builder.Extra (maybeBoolFlags)
 import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
@@ -198,8 +199,20 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser docker =
-    (\opts -> mempty { configMonoidDockerOpts = opts })
+    (\opts systemGHC installGHC -> mempty
+        { configMonoidDockerOpts = opts
+        , configMonoidSystemGHC = systemGHC
+        , configMonoidInstallGHC = installGHC
+        })
     <$> Docker.dockerOptsParser docker
+    <*> maybeBoolFlags
+            "system-ghc"
+            "using the system installed GHC (on the PATH) if available and a matching version"
+            idm
+    <*> maybeBoolFlags
+            "install-ghc"
+            "downloading and installing GHC if necessary (can be done manually with stack setup)"
+            idm
 
 -- | Get the directory on Windows where we should install extra programs. For
 -- more information, see discussion at:

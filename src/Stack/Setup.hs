@@ -109,15 +109,13 @@ instance Show SetupException where
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasBuildConfig env, HasHttpManager env, MonadBaseControl IO m)
-         => Bool -- ^ allow system GHC
-         -> Bool -- ^ install if missing?
-         -> m BuildConfig
-setupEnv useSystem installIfMissing = do
+         => m BuildConfig
+setupEnv = do
     bconfig <- asks getBuildConfig
     let platform = getPlatform bconfig
         sopts = SetupOpts
-            { soptsInstallIfMissing = installIfMissing
-            , soptsUseSystem = useSystem
+            { soptsInstallIfMissing = configInstallGHC $ bcConfig bconfig
+            , soptsUseSystem = configSystemGHC $ bcConfig bconfig
             , soptsExpected = bcGhcVersion bconfig
             , soptsStackYaml = Just $ bcStackYaml bconfig
             , soptsForceReinstall = False

@@ -19,7 +19,7 @@ import           Data.List
 import qualified Data.List as List
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (isJust, fromMaybe)
+import           Data.Maybe (isJust)
 import           Data.Monoid
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -244,7 +244,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
               mpaths <- runStackT manager globalLogLevel (lcConfig lc) $ ensureGHC SetupOpts
                   { soptsInstallIfMissing = True
                   , soptsUseSystem =
-                    fromMaybe (configSystemGHC $ lcConfig lc) globalSystemGhc
+                    (configSystemGHC $ lcConfig lc)
                     && not scoForceReinstall
                   , soptsExpected = ghc
                   , soptsStackYaml = mstack
@@ -267,10 +267,7 @@ withBuildConfig go@GlobalOpts{..} strat inner = do
         Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $ do
             bconfig1 <- runStackLoggingT manager globalLogLevel $
                 lcLoadBuildConfig lc strat
-            bconfig2 <- runStackT manager globalLogLevel bconfig1 $
-                setupEnv
-                    (fromMaybe (configSystemGHC $ lcConfig lc) globalSystemGhc)
-                    (fromMaybe (configInstallGHC $ lcConfig lc) globalInstallGhc)
+            bconfig2 <- runStackT manager globalLogLevel bconfig1 setupEnv
             runStackT manager globalLogLevel bconfig2 inner
 
 cleanCmd :: () -> GlobalOpts -> IO ()
@@ -475,14 +472,6 @@ globalOpts =
     GlobalOpts
     <$> logLevelOpt
     <*> configOptsParser False
-    <*> maybeBoolFlags
-            "system-ghc"
-            "using the system installed GHC (on the PATH) if available and a matching version"
-            idm
-    <*> maybeBoolFlags
-            "install-ghc"
-            "downloading and installing GHC if necessary (can be done manually with stack setup)"
-            idm
 
 -- | Parse for a logging level.
 logLevelOpt :: Parser LogLevel
@@ -519,8 +508,6 @@ defaultLogLevel = LevelInfo
 data GlobalOpts = GlobalOpts
     { globalLogLevel     :: LogLevel -- ^ Log level
     , globalConfigMonoid :: ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
-    , globalSystemGhc    :: Maybe Bool -- ^ Use system GHC if available and correct version?
-    , globalInstallGhc   :: Maybe Bool -- ^ Install GHC if missing
     } deriving (Show)
 
 -- | Load the configuration with a manager. Convenience function used
