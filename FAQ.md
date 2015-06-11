@@ -7,6 +7,14 @@ __Where is stack installed and will it interfere with `ghc` (etc) I already have
 Stack is installed under your `.stack` directory in your home directory. It
 should not affect your existing installation at all.
 
+__What is the relationship between stack and cabal?__
+
+* Cabal-the-library is used by stack to build your Haskell code.
+* cabal-install (the executable) is not used at all by stack.
+* A .cabal file is provided for each package, and defines all package-level metadata just like it does in the cabal-install world: modules, executables, test suites, etc. No change at all on this front.
+* A stack.yaml file references 1 or more packages, and provides information on where dependencies come from.
+* `stack build` currently initializes a stack.yaml from the existing .cabal file. Project initialization is something that is still being discussed and there may be more options here for new projects in the future (see issue [253](https://github.com/commercialhaskell/stack/issues/253))
+
 __I need to use a different version of a package than what is provided by the LTS Haskell snapshot I'm using, what should I do?__
 
 You can make tweaks to a snapshot by modifying the `extra-deps` configuration value in your `stack.yaml` file, e.g.:
