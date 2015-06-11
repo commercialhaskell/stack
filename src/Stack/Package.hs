@@ -223,7 +223,7 @@ resolvePackage packageConfig gpkg = Package
     , packageFlags = packageConfigFlags packageConfig
     , packageAllDeps = S.fromList (M.keys deps)
     , packageHasLibrary = maybe False (buildable . libBuildInfo) (library pkg)
-    , packageTests = S.fromList $ map (T.pack . fst) $ condTestSuites gpkg -- FIXME need to test if it's buildable
+    , packageTests = S.fromList $ [ T.pack (testName t) | t <- testSuites pkg, buildable (testBuildInfo t)]
     , packageExes = S.fromList $ map (T.pack . fst) $ condExecutables gpkg -- FIXME need to test if it's buildable
     }
 
@@ -411,8 +411,7 @@ resolvePackageDescription packageConfig (GenericPackageDescription desc defaultF
                snd)
               exes
        ,testSuites =
-          map (resolveConditions rc updateTestDeps .
-               snd)
+          map (\(n,v) -> (resolveConditions rc updateTestDeps v){testName=n})
               tests
        ,benchmarks =
           map (resolveConditions rc updateBenchmarkDeps .
