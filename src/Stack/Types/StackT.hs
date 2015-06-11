@@ -140,12 +140,14 @@ stickyLoggerFunc loc src level msg = do
     Sticky mref <- asks getSticky
     case mref of
         Nothing ->
-            case level of
-                LevelOther x
-                  | elem x ["sticky-done", "sticky"] ->
-                      loggerFunc loc src LevelInfo msg
-                _ ->
-                    loggerFunc loc src level msg
+            loggerFunc
+                loc
+                src
+                (case level of
+                     LevelOther "sticky-done" -> LevelInfo
+                     LevelOther "sticky" -> LevelInfo
+                     _ -> level)
+                msg
         Just ref -> do
             sticky <- liftIO (takeMVar ref)
             let backSpaceChar =
