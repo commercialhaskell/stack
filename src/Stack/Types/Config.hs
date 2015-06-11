@@ -29,6 +29,7 @@ import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.Typeable
 import           Distribution.System (Platform)
 import qualified Distribution.Text
+import           Distribution.Version (anyVersion, intersectVersionRanges)
 import qualified Paths_stack as Meta
 import           Network.HTTP.Client (parseUrl)
 import           Path
@@ -366,7 +367,7 @@ data ConfigMonoid =
     -- ^ See: 'configSystemGHC'
     ,configMonoidInstallGHC          :: !(Maybe Bool)
     -- ^ See: 'configInstallGHC'
-    ,configMonoidRequireStackVersion :: !(Maybe VersionRange)
+    ,configMonoidRequireStackVersion :: !VersionRange
     -- ^ See: 'configRequireStackVersion'
     ,configMonoidOS                  :: !(Maybe String)
     -- ^ Used for overriding the platform
@@ -386,7 +387,7 @@ instance Monoid ConfigMonoid where
     , configMonoidPackageIndices = Nothing
     , configMonoidSystemGHC = Nothing
     , configMonoidInstallGHC = Nothing
-    , configMonoidRequireStackVersion = Nothing
+    , configMonoidRequireStackVersion = anyVersion
     , configMonoidOS = Nothing
     , configMonoidArch = Nothing
     , configMonoidJobs = Nothing
@@ -399,7 +400,8 @@ instance Monoid ConfigMonoid where
     , configMonoidPackageIndices = configMonoidPackageIndices l <|> configMonoidPackageIndices r
     , configMonoidSystemGHC = configMonoidSystemGHC l <|> configMonoidSystemGHC r
     , configMonoidInstallGHC = configMonoidInstallGHC l <|> configMonoidInstallGHC r
-    , configMonoidRequireStackVersion = configMonoidRequireStackVersion l <|> configMonoidRequireStackVersion r
+    , configMonoidRequireStackVersion = intersectVersionRanges (configMonoidRequireStackVersion l)
+                                                               (configMonoidRequireStackVersion r)
     , configMonoidOS = configMonoidOS l <|> configMonoidOS r
     , configMonoidArch = configMonoidArch l <|> configMonoidArch r
     , configMonoidJobs = configMonoidJobs l <|> configMonoidJobs r
@@ -416,8 +418,9 @@ instance FromJSON ConfigMonoid where
          configMonoidPackageIndices <- obj .:? "package-indices"
          configMonoidSystemGHC <- obj .:? "system-ghc"
          configMonoidInstallGHC <- obj .:? "install-ghc"
-         configMonoidRequireStackVersion <- fmap unVersionRangeJSON <$>
+         configMonoidRequireStackVersion <- unVersionRangeJSON <$>
                                             obj .:? "require-stack-version"
+                                                .!= VersionRangeJSON anyVersion
          configMonoidOS <- obj .:? "os"
          configMonoidArch <- obj .:? "arch"
          configMonoidJobs <- obj .:? "jobs"
