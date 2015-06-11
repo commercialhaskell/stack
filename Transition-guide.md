@@ -36,3 +36,6 @@ enforce isolation. If you wish to use tools like `ghc` or `runhaskell`, you
 should do so via `stack ghc` or `stack exec`.
 
 The [[Architecture]] page goes into much more detail on this.
+
+### running an executable.
+There is no `stack run` that does what `cabal run` does, but `stack build && stack exec foo` accomplishes the same thing.
