@@ -44,6 +44,7 @@ import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import qualified Distribution.Package as C
 import qualified Distribution.PackageDescription as C
+import qualified Distribution.Text
 import qualified Distribution.Version as C
 import           Data.Maybe
 import           Data.Monoid
@@ -54,7 +55,7 @@ import qualified Data.Yaml as Yaml
 import           Distribution.System (OS (Windows), Platform (..), buildPlatform)
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager, parseUrl)
 import           Network.HTTP.Download (download)
-import           Options.Applicative (Parser, idm)
+import           Options.Applicative (Parser, idm, strOption, long, metavar, help)
 import           Options.Applicative.Builder.Extra (maybeBoolFlags)
 import           Path
 import           Path.IO
@@ -174,7 +175,12 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
 
          -- Only place in the codebase where platform is hard-coded. In theory
          -- in the future, allow it to be configured.
-         configPlatform = buildPlatform
+         (Platform defArch defOS) = buildPlatform
+         arch = fromMaybe defArch
+              $ configMonoidArch >>= Distribution.Text.simpleParse
+         os = fromMaybe defOS
+            $ configMonoidOS >>= Distribution.Text.simpleParse
+         configPlatform = Platform arch os
 
          configRequireStackVersion = fromMaybe C.anyVersion configMonoidRequireStackVersion
 
@@ -199,10 +205,12 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser docker =
-    (\opts systemGHC installGHC -> mempty
+    (\opts systemGHC installGHC arch os -> mempty
         { configMonoidDockerOpts = opts
         , configMonoidSystemGHC = systemGHC
         , configMonoidInstallGHC = installGHC
+        , configMonoidArch = arch
+        , configMonoidOS = os
         })
     <$> Docker.dockerOptsParser docker
     <*> maybeBoolFlags
@@ -213,6 +221,16 @@ configOptsParser docker =
             "install-ghc"
             "downloading and installing GHC if necessary (can be done manually with stack setup)"
             idm
+    <*> optional (strOption
+            ( long "arch"
+           <> metavar "ARCH"
+           <> help "System architecture, e.g. i386, x86_64"
+            ))
+    <*> optional (strOption
+            ( long "os"
+           <> metavar "OS"
+           <> help "Operating system, e.g. linux, windows"
+            ))
 
 -- | Get the directory on Windows where we should install extra programs. For
 -- more information, see discussion at:

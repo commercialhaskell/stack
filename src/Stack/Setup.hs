@@ -457,8 +457,7 @@ getOSKey = do
         Platform I386 FreeBSD -> return "freebsd32"
         Platform X86_64 FreeBSD -> return "freebsd64"
         Platform I386 Windows -> return "windows32"
-        -- Note: we always use 32-bit Windows as the 64-bit version has problems
-        Platform X86_64 Windows -> return "windows32"
+        Platform X86_64 Windows -> return "windows64"
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
 downloadPair :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)

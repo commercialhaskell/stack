@@ -366,6 +366,10 @@ data ConfigMonoid =
     -- ^ See: 'configInstallGHC'
     ,configMonoidRequireStackVersion :: !(Maybe VersionRange)
     -- ^ See: 'configRequireStackVersion'
+    ,configMonoidOS                  :: !(Maybe String)
+    -- ^ Used for overriding the platform
+    ,configMonoidArch                :: !(Maybe String)
+    -- ^ Used for overriding the platform
     }
   deriving Show
 
@@ -379,6 +383,8 @@ instance Monoid ConfigMonoid where
     , configMonoidSystemGHC = Nothing
     , configMonoidInstallGHC = Nothing
     , configMonoidRequireStackVersion = Nothing
+    , configMonoidOS = Nothing
+    , configMonoidArch = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -389,6 +395,8 @@ instance Monoid ConfigMonoid where
     , configMonoidSystemGHC = configMonoidSystemGHC l <|> configMonoidSystemGHC r
     , configMonoidInstallGHC = configMonoidInstallGHC l <|> configMonoidInstallGHC r
     , configMonoidRequireStackVersion = configMonoidRequireStackVersion l <|> configMonoidRequireStackVersion r
+    , configMonoidOS = configMonoidOS l <|> configMonoidOS r
+    , configMonoidArch = configMonoidArch l <|> configMonoidArch r
     }
 
 instance FromJSON ConfigMonoid where
@@ -404,6 +412,8 @@ instance FromJSON ConfigMonoid where
          configMonoidInstallGHC <- obj .:? "install-ghc"
          configMonoidRequireStackVersion <- fmap unVersionRangeJSON <$>
                                             obj .:? "require-stack-version"
+         configMonoidOS <- obj .:? "os"
+         configMonoidArch <- obj .:? "arch"
          return ConfigMonoid {..}
 
 -- | Newtype for non-orphan FromJSON instance.
