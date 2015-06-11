@@ -518,8 +518,9 @@ checkDeps flags deps packages = do
 -- 'GenericPackageDescription'. Returns 'Nothing' if no such snapshot is found.
 findBuildPlan :: (MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m)
               => GenericPackageDescription
+              -> Snapshots
               -> m (Maybe (SnapName, Map FlagName Bool))
-findBuildPlan gpd = do
+findBuildPlan gpd snapshots = do
     -- Get the most recent LTS and Nightly in the snapshots directory and
     -- prefer them over anything else, since odds are high that something
     -- already exists for them.
@@ -533,7 +534,6 @@ findBuildPlan gpd = do
         isNightly Nightly{} = True
         isNightly LTS{} = False
 
-    snapshots <- getSnapshots
     let names = nubOrd $ concat
             [ take 2 $ filter isLTS existing
             , take 2 $ filter isNightly existing

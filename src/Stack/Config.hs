@@ -78,7 +78,26 @@ getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env
 getDefaultResolver dir = do
     cabalfp <- getCabalFileName dir
     gpd <- readPackageUnresolved cabalfp
-    mpair <- findBuildPlan gpd
+    esnapshots <- try getSnapshots
+    snapshots <-
+        case esnapshots of
+            Left e -> do
+                $logError $
+                    "Unable to download snapshot list, and therefore could " <>
+                    "not generate a stack.yaml file automatically"
+                $logError $
+                    "This sometimes happens due to missing Certificate Authorities " <>
+                    "on your system. For more information, see:"
+                $logError ""
+                $logError "    https://github.com/commercialhaskell/stack/issues/234"
+                $logError ""
+                $logError "You can try again, or create your stack.yaml file by hand. See:"
+                $logError ""
+                $logError "    https://github.com/commercialhaskell/stack/wiki/stack.yaml"
+                $logError ""
+                throwM (e :: SomeException)
+            Right snapshots -> return snapshots
+    mpair <- findBuildPlan gpd snapshots
     let name =
             case C.package $ C.packageDescription gpd of
                 C.PackageIdentifier cname _ ->
@@ -87,10 +106,9 @@ getDefaultResolver dir = do
         Just (snap, flags) ->
             return (ResolverSnapshot snap, Map.singleton name flags)
         Nothing -> do
-            s <- getSnapshots
-            let snap = case IntMap.maxViewWithKey (snapshotsLts s) of
+            let snap = case IntMap.maxViewWithKey (snapshotsLts snapshots) of
                     Just ((x, y), _) -> LTS x y
-                    Nothing -> Nightly $ snapshotsNightly s
+                    Nothing -> Nightly $ snapshotsNightly snapshots
             $logWarn $ T.concat
                 [ "No matching snapshot was found for your package, "
                 , "falling back to: "
