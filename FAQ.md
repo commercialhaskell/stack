@@ -2,6 +2,11 @@ So that this doesn't become repetitive: for the reasons behind the answers
 below, see the [[Architecture]] page. The goal of the answers here is to be as
 helpful and concise as possible.
 
+__Where is stack installed and will it interfere with `ghc` (etc) I already have installed?__
+
+Stack is installed under your `.stack` directory in your home directory. It
+should not affect your existing installation at all.
+
 __I need to use a different version of a package than what is provided by the LTS Haskell snapshot I'm using, what should I do?__
 
 You can make tweaks to a snapshot by modifying the `extra-deps` configuration value in your `stack.yaml` file, e.g.:
