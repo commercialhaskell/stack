@@ -116,7 +116,6 @@ tryGetCache :: (MonadIO m, Binary a, MonadReader env m, HasConfig env, MonadThro
             -> Path Abs Dir
             -> m (Maybe a)
 tryGetCache get' dir = do
-    cabalPkgVer <- asks (bcCabalVersion . getBuildConfig)
     fp <- get' dir
     liftIO
         (catch
@@ -170,7 +169,6 @@ writeCache :: (Binary a, MonadIO m, MonadLogger m, MonadThrow m, MonadReader env
            -> a
            -> m ()
 writeCache dir get' content = do
-    cabalPkgVer <- asks (bcCabalVersion . getBuildConfig)
     fp <- get' dir
     liftIO
         (L.writeFile

@@ -12,33 +12,16 @@ module System.Process.Run
     ,callProcess)
     where
 
-
-
-
 import           Control.Exception
-
-
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger (MonadLogger, logError)
-
-
-
 import           Data.Conduit.Process hiding (callProcess)
 import           Data.Foldable (forM_)
-
-
-
-
 import           Data.Text (Text)
 import qualified Data.Text as T
-
-
-import           Path (Path, Abs, Dir, toFilePath, File, parseAbsFile)
+import           Path (Path, Abs, Dir, toFilePath)
 import           Prelude -- Fix AMP warning
-
-
 import           System.Exit (exitWith, ExitCode (..))
-
 import qualified System.Process
 import           System.Process.Read
 
