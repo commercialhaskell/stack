@@ -11,6 +11,7 @@ module System.Process.Read
   (callProcess
   ,readProcessStdout
   ,tryProcessStdout
+  ,sinkProcessStderrStdout
   ,sinkProcessStdout
   ,runIn
   ,EnvOverride
@@ -144,6 +145,27 @@ callProcess wd menv cmd0 args = do
               ExitFailure _ -> throwIO (ProcessExitedUnsuccessfully c exit_code)
     liftIO (System.Process.createProcess c >>= action)
 
+-- | Consume the stdout and stderr of a process feeding strict 'S.ByteString's to the consumers.
+sinkProcessStderrStdout :: (MonadIO m)
+                        => Maybe (Path Abs Dir)
+                        -> EnvOverride
+                        -> String
+                        -> [String]
+                        -> Sink S.ByteString IO e -- ^ Sink for stderr
+                        -> Sink S.ByteString IO o -- ^ Sink for stdout
+                        -> m (e,o)
+sinkProcessStderrStdout wd menv name args sinkStderr sinkStdout = do
+  name' <- preProcess wd menv name
+  liftIO (withCheckedProcess
+            (proc name' args) { env = envHelper menv, cwd = fmap toFilePath wd }
+            (\ClosedStream out err ->
+               runConcurrently $
+               (,) <$>
+               Concurrently (asBSSource err $$ sinkStderr) <*>
+               Concurrently (asBSSource out $$ sinkStdout)))
+  where asBSSource :: Source m S.ByteString -> Source m S.ByteString
+        asBSSource = id
+
 -- | Consume the stdout of a process feeding strict 'S.ByteString's to a consumer.
 sinkProcessStdout :: (MonadIO m)
                   => Maybe (Path Abs Dir)
@@ -153,15 +175,8 @@ sinkProcessStdout :: (MonadIO m)
                   -> Sink S.ByteString IO a
                   -> m a
 sinkProcessStdout wd menv name args sink = do
-  name' <- preProcess wd menv name
-  liftIO (withCheckedProcess
-            (proc name' args) { env = envHelper menv, cwd = fmap toFilePath wd }
-            (\ClosedStream out err ->
-               runConcurrently $
-               Concurrently (asBSSource err $$ CL.sinkNull) *>
-               Concurrently (asBSSource out $$ sink)))
-  where asBSSource :: Source m S.ByteString -> Source m S.ByteString
-        asBSSource = id
+  (_,stdout) <- sinkProcessStderrStdout wd menv name args CL.sinkNull sink
+  return stdout
 
 -- | Perform pre-call-process tasks.  Ensure the working directory exists and find the
 -- executable path.
