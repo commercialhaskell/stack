@@ -181,6 +181,8 @@ data BuildConfig = BuildConfig
       -- different from bcRoot </> "stack.yaml"
     , bcFlags      :: !(Map PackageName (Map FlagName Bool))
       -- ^ Per-package flag overrides
+    , bcCabalVersion :: !Version
+      -- ^ Cabal version used.
     }
 
 -- | Value returned by 'Stack.Config.loadConfig'.

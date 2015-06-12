@@ -24,9 +24,10 @@ module Stack.Constants
     )
     where
 
-import           Control.Monad (liftM)
+
 import           Control.Monad.Catch (MonadThrow)
-import           Control.Monad.Reader (MonadReader)
+import           Control.Monad.Reader
+
 import           Data.Maybe (fromMaybe)
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -36,44 +37,40 @@ import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
 
 import           Stack.Types.PackageName
-import           Stack.Types.Version
+
 
 -- | Extensions used for Haskell files.
 haskellFileExts :: [Text]
 haskellFileExts = ["hs","hsc","lhs"]
 
 -- | The filename used for completed build indicators.
-builtFileFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
-                 => Version -- ^ Cabal version
-                 -> Path Abs Dir
+builtFileFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env,HasBuildConfig env)
+                 => Path Abs Dir
                  -> m (Path Abs File)
-builtFileFromDir cabalPkgVer fp = do
-  dist <- distDirFromDir cabalPkgVer fp
+builtFileFromDir fp = do
+  dist <- distDirFromDir fp
   return (dist </> $(mkRelFile "stack.gen"))
 
 -- | The filename used for completed configure indicators.
-configuredFileFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
-                      => Version -- ^ Cabal version
-                      -> Path Abs Dir
+configuredFileFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env,HasBuildConfig env)
+                      => Path Abs Dir
                       -> m (Path Abs File)
-configuredFileFromDir cabalPkgVer fp = do
-  dist <- distDirFromDir cabalPkgVer fp
+configuredFileFromDir fp = do
+  dist <- distDirFromDir fp
   return (dist </> $(mkRelFile "setup-config"))
 
 -- | The filename used for completed build indicators.
-builtConfigFileFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
-                       => Version -- ^ Cabal version
-                       -> Path Abs Dir
+builtConfigFileFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env,HasBuildConfig env)
+                       => Path Abs Dir
                        -> m (Path Abs File)
-builtConfigFileFromDir cabalPkgVer fp =
-    liftM (fp </>) (builtConfigRelativeFile cabalPkgVer)
+builtConfigFileFromDir fp =
+    liftM (fp </>) builtConfigRelativeFile
 
 -- | Relative location of completed build indicators.
-builtConfigRelativeFile :: (MonadThrow m, MonadReader env m, HasPlatform env)
-                        => Version -- ^ Cabal version
-                        -> m (Path Rel File)
-builtConfigRelativeFile cabalPkgVer = do
-  dist <- distRelativeDir cabalPkgVer
+builtConfigRelativeFile :: (MonadThrow m, MonadReader env m, HasPlatform env,HasBuildConfig env)
+                        => m (Path Rel File)
+builtConfigRelativeFile = do
+  dist <- distRelativeDir
   return (dist </> $(mkRelFile "stack.config"))
 
 -- | Default shake thread count for parallel builds.
@@ -99,38 +96,35 @@ userDocsDir :: Config -> Path Abs Dir
 userDocsDir config = configStackRoot config </> $(mkRelDir "doc/")
 
 -- | The filename used for dirtiness check of source files.
-buildCacheFile :: (MonadThrow m, MonadReader env m, HasPlatform env)
-               => Version -- ^ Cabal version
-               -> Path Abs Dir      -- ^ Package directory.
+buildCacheFile :: (MonadThrow m, MonadReader env m, HasPlatform env,HasBuildConfig env)
+               => Path Abs Dir      -- ^ Package directory.
                -> m (Path Abs File)
-buildCacheFile cabalPkgVersion dir = do
+buildCacheFile dir = do
     liftM
         (</> $(mkRelFile "stack-build-cache"))
-        (distDirFromDir cabalPkgVersion dir)
+        (distDirFromDir dir)
 
 -- | The filename used for dirtiness check of config.
-configCacheFile :: (MonadThrow m, MonadReader env m, HasPlatform env)
-                => Version -- ^ Cabal version
-                -> Path Abs Dir      -- ^ Package directory.
+configCacheFile :: (MonadThrow m, MonadReader env m, HasPlatform env,HasBuildConfig env)
+                => Path Abs Dir      -- ^ Package directory.
                 -> m (Path Abs File)
-configCacheFile cabalPkgVersion dir = do
+configCacheFile dir = do
     liftM
         (</> $(mkRelFile "stack-config-cache"))
-        (distDirFromDir cabalPkgVersion dir)
+        (distDirFromDir dir)
 
 -- | Package's build artifacts directory.
-distDirFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
-               => Version -- ^ Cabal version
-               -> Path Abs Dir
+distDirFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env, HasBuildConfig env)
+               => Path Abs Dir
                -> m (Path Abs Dir)
-distDirFromDir cabalPkgVersion fp =
-    liftM (fp </>) (distRelativeDir cabalPkgVersion)
+distDirFromDir fp =
+    liftM (fp </>) distRelativeDir
 
 -- | Relative location of build artifacts.
-distRelativeDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
-                => Version -- ^ Cabal version
-                -> m (Path Rel Dir)
-distRelativeDir cabalPkgVer = do
+distRelativeDir :: (MonadThrow m, MonadReader env m, HasPlatform env, HasBuildConfig env)
+                => m (Path Rel Dir)
+distRelativeDir = do
+    cabalPkgVer <- asks (bcCabalVersion . getBuildConfig)
     platform <- platformRelDir
     cabal <-
         parseRelDir $

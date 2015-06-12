@@ -143,11 +143,10 @@ executePlan :: M env m
             => EnvOverride
             -> BuildOpts
             -> BaseConfigOpts
-            -> Version -- ^ cabal version
             -> [LocalPackage]
             -> Plan
             -> m ()
-executePlan menv bopts baseConfigOpts cabalPkgVer locals plan = do
+executePlan menv bopts baseConfigOpts locals plan = do
     withSystemTempDirectory stackProgName $ \tmpdir -> do
         tmpdir' <- parseAbsDir tmpdir
         configLock <- newMVar ()
@@ -156,6 +155,7 @@ executePlan menv bopts baseConfigOpts cabalPkgVer locals plan = do
         idMap <- liftIO $ newTVarIO M.empty
         let setupHs = tmpdir' </> $(mkRelFile "Setup.hs")
         liftIO $ writeFile (toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
+        cabalPkgVer <- asks (bcCabalVersion . getBuildConfig)
         executePlan' plan ExecuteEnv
             { eeEnvOverride = menv
             , eeBuildOpts = bopts
@@ -436,7 +436,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
         case taskType of
             TTLocal lp _ -> inner (lpPackage lp) (lpCabalFile lp) (lpDir lp)
             TTUpstream package _ -> do
-                mdist <- liftM Just $ distRelativeDir eeCabalPkgVer
+                mdist <- liftM Just distRelativeDir
                 m <- unpackPackageIdents eeEnvOverride eeTempDir mdist $ Set.singleton taskProvides
                 case M.toList m of
                     [(ident, dir)]
@@ -465,7 +465,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
             , esIncludeGhcPackagePath = False
             }
         exeName <- liftIO $ join $ findExecutable menv "runhaskell"
-        distRelativeDir' <- distRelativeDir eeCabalPkgVer
+        distRelativeDir' <- distRelativeDir
         msetuphs <- liftIO $ getSetupHs pkgDir
         let setuphs = fromMaybe eeSetupHs msetuphs
         inner $ \stripTHLoading args -> do
@@ -526,7 +526,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
 
     runTests package pkgDir mlogFile = do
         bconfig <- asks getBuildConfig
-        distRelativeDir' <- distRelativeDir eeCabalPkgVer
+        distRelativeDir' <- distRelativeDir
         let buildDir = pkgDir </> distRelativeDir'
         let exeExtension =
                 case configPlatform $ getConfig bconfig of

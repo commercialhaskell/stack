@@ -53,7 +53,6 @@ type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig en
 build :: M env m => BuildOpts -> m ()
 build bopts = do
     menv <- getMinimalEnvOverride
-    cabalPkgVer <- getCabalPkgVer menv
 
     (mbp, locals, extraToBuild, sourceMap) <- loadSourceMap bopts
     (installedMap, locallyRegistered) <- getInstalled menv profiling sourceMap
@@ -64,7 +63,7 @@ build bopts = do
 
     if boptsDryrun bopts
         then printPlan plan
-        else executePlan menv bopts baseConfigOpts cabalPkgVer locals plan
+        else executePlan menv bopts baseConfigOpts locals plan
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
 
@@ -110,11 +109,9 @@ withLoadPackage menv inner = do
 clean :: (M env m) => m ()
 clean = do
     bconfig <- asks getBuildConfig
-    menv <- getMinimalEnvOverride
-    cabalPkgVer <- getCabalPkgVer menv
     forM_
         (Map.keys (bcPackages bconfig))
-        (distDirFromDir cabalPkgVer >=> removeTreeIfExists)
+        (distDirFromDir >=> removeTreeIfExists)
 
 ----------------------------------------------------------
 -- DEAD CODE BELOW HERE

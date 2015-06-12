@@ -18,37 +18,37 @@ module Stack.Build.Cache
     ) where
 
 import           Control.Exception.Enclosed (handleIO, tryIO)
-import           Control.Monad              (liftM)
+
 import           Control.Monad.Catch        (MonadCatch, MonadThrow, catch,
                                              throwM)
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger       (MonadLogger)
-import           Control.Monad.Reader       (MonadReader)
-import           Data.Binary                (Binary)
-import qualified Data.Binary                as Binary
-import           Data.ByteString            (ByteString)
-import qualified Data.ByteString            as S
-import qualified Data.ByteString.Lazy       as L
-import           Data.Map                   (Map)
-import qualified Data.Map                   as Map
-import           Data.Maybe                 (catMaybes, mapMaybe)
-import           Data.Set                   (Set)
-import qualified Data.Set                   as Set
-import           Data.Text                  (Text)
-import           Data.Text.Encoding         (encodeUtf8)
-import           Data.Time                  (UTCTime (..), toModifiedJulianDay)
-import           GHC.Generics               (Generic)
+import           Control.Monad.Logger (MonadLogger)
+import           Control.Monad.Reader
+
+import           Data.Binary (Binary)
+import qualified Data.Binary as Binary
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString as S
+import qualified Data.ByteString.Lazy as L
+import           Data.Map (Map)
+import qualified Data.Map as Map
+import           Data.Maybe (catMaybes, mapMaybe)
+import           Data.Set (Set)
+import qualified Data.Set as Set
+import           Data.Text (Text)
+import           Data.Text.Encoding (encodeUtf8)
+import           Data.Time (UTCTime (..), toModifiedJulianDay)
+import           GHC.Generics (Generic)
 import           Path
 import           Path.IO
 import           Stack.Build.Types
 import           Stack.Constants
-import           Stack.GhcPkg               (getCabalPkgVer)
 import           Stack.Package
 import           Stack.Types
 import           System.Directory           (createDirectoryIfMissing,
                                              getDirectoryContents,
                                              getModificationTime)
-import           System.IO.Error            (isDoesNotExistError)
+import           System.IO.Error (isDoesNotExistError)
 
 -- | Directory containing files to mark an executable as installed
 exeInstalledDir :: (MonadReader env m, HasBuildConfig env, MonadThrow m)
@@ -101,24 +101,23 @@ modTime x =
               (utctDayTime x))
 
 -- | Try to read the dirtiness cache for the given package directory.
-tryGetBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
+tryGetBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasBuildConfig env)
                  => Path Abs Dir -> m (Maybe BuildCache)
 tryGetBuildCache = tryGetCache buildCacheFile
 
 -- | Try to read the dirtiness cache for the given package directory.
-tryGetConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
+tryGetConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasBuildConfig env)
                   => Path Abs Dir -> m (Maybe ConfigCache)
 tryGetConfigCache = tryGetCache configCacheFile
 
 -- | Try to load a cache.
-tryGetCache :: (MonadIO m, Binary a, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
-            => (Version -> Path Abs Dir -> m (Path Abs File))
+tryGetCache :: (MonadIO m, Binary a, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasBuildConfig env)
+            => (Path Abs Dir -> m (Path Abs File))
             -> Path Abs Dir
             -> m (Maybe a)
 tryGetCache get' dir = do
-    menv <- getMinimalEnvOverride
-    cabalPkgVer <- getCabalPkgVer menv
-    fp <- get' cabalPkgVer dir
+    cabalPkgVer <- asks (bcCabalVersion . getBuildConfig)
+    fp <- get' dir
     liftIO
         (catch
              (fmap (decodeMaybe . L.fromStrict) (S.readFile (toFilePath fp)))
@@ -130,7 +129,7 @@ tryGetCache get' dir = do
           where thd (_,_,x) = x
 
 -- | Write the dirtiness cache for this package's files.
-writeBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
+writeBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasBuildConfig env)
                 => Path Abs Dir -> Map FilePath ModTime -> m ()
 writeBuildCache dir times =
     writeCache
@@ -141,7 +140,7 @@ writeBuildCache dir times =
          })
 
 -- | Write the dirtiness cache for this package's configuration.
-writeConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
+writeConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasBuildConfig env)
                 => Path Abs Dir
                 -> [Text]
                 -> Set GhcPkgId -- ^ dependencies
@@ -156,26 +155,23 @@ writeConfigCache dir opts deps =
          })
 
 -- | Delete the caches for the project.
-deleteCaches :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, MonadThrow m)
+deleteCaches :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, MonadThrow m, HasBuildConfig env)
              => Path Abs Dir -> m ()
 deleteCaches dir = do
-    menv <- getMinimalEnvOverride
-    cabalPkgVer <- getCabalPkgVer menv
-    bfp <- buildCacheFile cabalPkgVer dir
+    bfp <- buildCacheFile dir
     removeFileIfExists bfp
-    cfp <- configCacheFile cabalPkgVer dir
+    cfp <- configCacheFile dir
     removeFileIfExists cfp
 
 -- | Write to a cache.
-writeCache :: (Binary a, MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env)
+writeCache :: (Binary a, MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasBuildConfig env)
            => Path Abs Dir
-           -> (Version -> Path Abs Dir -> m (Path Abs File))
+           -> (Path Abs Dir -> m (Path Abs File))
            -> a
            -> m ()
 writeCache dir get' content = do
-    menv <- getMinimalEnvOverride
-    cabalPkgVer <- getCabalPkgVer menv
-    fp <- get' cabalPkgVer dir
+    cabalPkgVer <- asks (bcCabalVersion . getBuildConfig)
+    fp <- get' dir
     liftIO
         (L.writeFile
              (toFilePath fp)
