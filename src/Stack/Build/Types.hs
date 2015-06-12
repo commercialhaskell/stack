@@ -11,33 +11,35 @@
 
 module Stack.Build.Types where
 
-import Control.DeepSeq
-import Control.Exception
-import Data.Aeson.Extended
-import Data.Binary (Binary(..))
+import           Control.DeepSeq
+import           Control.Exception
+import           Data.Aeson.Extended
+import           Data.Binary (Binary(..))
 import qualified Data.ByteString as S
-import Data.Char (isSpace)
-import Data.Data
-import Data.Hashable
-import Data.List (dropWhileEnd, nub, intercalate)
-import Data.Map.Strict (Map)
+import           Data.Char (isSpace)
+import           Data.Data
+import           Data.Hashable
+import           Data.List (dropWhileEnd, nub, intercalate)
 import qualified Data.Map as Map
-import Data.Maybe
-import Data.Monoid
-import Data.Set (Set)
+import           Data.Map.Strict (Map)
+import           Data.Maybe
+import           Data.Monoid
+import           Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Text (Text)
+import           Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8With)
-import Data.Text.Encoding.Error (lenientDecode)
-import Distribution.Text (display)
-import GHC.Generics
-import Path (Path, Abs, File, Dir, mkRelDir, toFilePath, (</>))
-import Prelude hiding (FilePath)
-import Stack.Package
-import Stack.Types
-import System.Exit (ExitCode)
-import System.FilePath (pathSeparator)
+import           Data.Text.Encoding (decodeUtf8With)
+import           Data.Text.Encoding.Error (lenientDecode)
+import           Data.Time.Calendar
+import           Data.Time.Clock
+import           Distribution.Text (display)
+import           GHC.Generics
+import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, (</>))
+import           Prelude hiding (FilePath)
+import           Stack.Package
+import           Stack.Types
+import           System.Exit (ExitCode)
+import           System.FilePath (pathSeparator)
 
 ----------------------------------------------
 -- Exceptions
@@ -314,6 +316,8 @@ data ConfigCache = ConfigCache
       -- the complete GhcPkgId (only a PackageIdentifier) in the configure
       -- options, just using the previous value is insufficient to know if
       -- dependencies have changed.
+    , configCabalFileModTime :: !(Maybe ModTime)
+      -- ^ Last time we did a configure.
     }
     deriving (Generic,Eq,Show)
 instance Binary ConfigCache
@@ -436,3 +440,17 @@ configureOpts bco deps wanted loc flags = map T.pack $ concat
         ]
       where
         PackageIdentifier name version = ghcPkgIdPackageIdentifier gid
+
+-- | Used for storage and comparison.
+newtype ModTime = ModTime (Integer,Rational)
+  deriving (Ord,Show,Generic,Eq)
+instance Binary ModTime
+
+-- | One-way conversion to serialized time.
+modTime :: UTCTime -> ModTime
+modTime x =
+    ModTime
+        ( toModifiedJulianDay
+              (utctDay x)
+        , toRational
+              (utctDayTime x))

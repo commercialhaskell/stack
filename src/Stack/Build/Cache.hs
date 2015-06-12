@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
@@ -18,12 +19,16 @@ module Stack.Build.Cache
     ) where
 
 import           Control.Exception.Enclosed (handleIO, tryIO)
+import           Data.Text (Text)
+import qualified Data.Text as T
+import           Data.Time.Clock
 
 import           Control.Monad.Catch        (MonadCatch, MonadThrow, catch,
                                              throwM)
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger (MonadLogger)
+import           Control.Monad.Logger (MonadLogger,logInfo)
 import           Control.Monad.Reader
+import           Data.Monoid
 
 import           Data.Binary (Binary)
 import qualified Data.Binary as Binary
@@ -37,7 +42,7 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
-import           Data.Time (UTCTime (..), toModifiedJulianDay)
+
 import           GHC.Generics (Generic)
 import           Path
 import           Path.IO
@@ -86,20 +91,6 @@ data BuildCache = BuildCache
     deriving (Generic,Eq)
 instance Binary BuildCache
 
--- | Used for storage and comparison.
-newtype ModTime = ModTime (Integer,Rational)
-  deriving (Ord,Show,Generic,Eq)
-instance Binary ModTime
-
--- | One-way conversion to serialized time.
-modTime :: UTCTime -> ModTime
-modTime x =
-    ModTime
-        ( toModifiedJulianDay
-              (utctDay x)
-        , toRational
-              (utctDayTime x))
-
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasBuildConfig env)
                  => Path Abs Dir -> m (Maybe BuildCache)
@@ -143,15 +134,23 @@ writeConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, 
                 => Path Abs Dir
                 -> [Text]
                 -> Set GhcPkgId -- ^ dependencies
+                -> Path Abs file
+                -> TaskType
                 -> m ()
-writeConfigCache dir opts deps =
-    writeCache
-        dir
-        configCacheFile
-        (ConfigCache
-         { configCacheOpts = map encodeUtf8 opts
-         , configCacheDeps = deps
-         })
+writeConfigCache dir opts deps cabalfp ttype =
+    do now <- liftIO (getModificationTime (toFilePath cabalfp))
+       let cache = ConfigCache
+                   { configCacheOpts = map encodeUtf8 opts
+                   , configCacheDeps = deps
+                   , configCabalFileModTime =
+                         case ttype of
+                           TTLocal lp _ | lpWanted lp -> Just (modTime now)
+                           _ -> Nothing
+                   }
+       writeCache
+           dir
+           configCacheFile
+           cache
 
 -- | Delete the caches for the project.
 deleteCaches :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, MonadThrow m, HasBuildConfig env)
@@ -194,19 +193,27 @@ tryGetFlagCache gid = do
         Right (Right x) -> return $ Just x
         _ -> return Nothing
 
-writeFlagCache :: (MonadIO m, MonadReader env m, HasBuildConfig env, MonadThrow m)
+writeFlagCache :: (MonadIO m, MonadReader env m, HasBuildConfig env, MonadThrow m, MonadLogger m)
                => GhcPkgId
                -> [ByteString]
                -> Set GhcPkgId
+               -> Path Abs File
+               -> TaskType
                -> m ()
-writeFlagCache gid flags deps = do
+writeFlagCache gid flags deps cabalfp ttype = do
     file <- flagCacheFile gid
+    now <- liftIO $ getModificationTime (toFilePath cabalfp)
+    let cache = ConfigCache
+                              { configCacheOpts = flags
+                              , configCacheDeps = deps
+                              , configCabalFileModTime = case ttype of
+                                                           TTLocal lp _ | lpWanted lp -> Just (modTime now)
+                                                           _ -> Nothing
+                              }
     liftIO $ do
         createDirectoryIfMissing True $ toFilePath $ parent file
-        Binary.encodeFile (toFilePath file) ConfigCache
-            { configCacheOpts = flags
-            , configCacheDeps = deps
-            }
+
+        Binary.encodeFile (toFilePath file) cache
 
 -- | Get the modified times of all known files in the package,
 -- including the package's cabal file itself.

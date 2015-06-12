@@ -329,7 +329,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
             announce "configure"
             cabal False $ "configure" : map T.unpack configOpts
             $logDebug $ T.pack $ show configOpts
-            writeConfigCache pkgDir configOpts allDeps
+            writeConfigCache pkgDir configOpts allDeps cabalfp taskType
             return $ Just (configOpts, allDeps)
         else return Nothing
 
@@ -430,6 +430,8 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
                     pkgid
                     (map encodeUtf8 configOpts)
                     deps
+                    cabalfp
+                    taskType
             return $ Library pkgid
     liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides mpkgid'
   where

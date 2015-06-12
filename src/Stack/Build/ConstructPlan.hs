@@ -13,29 +13,32 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.RWS.Strict
 import           Control.Monad.Trans.Resource
-import qualified Data.ByteString.Char8        as S8
+import qualified Data.ByteString.Char8 as S8
 import           Data.Either
 import           Data.Function
 import           Data.List
-import           Data.Map.Strict              (Map)
-import qualified Data.Map.Strict              as M
-import qualified Data.Map.Strict              as Map
+import           Data.Map.Strict (Map)
+import qualified Data.Map.Strict as M
+import qualified Data.Map.Strict as Map
 import           Data.Maybe
-import           Data.Set                     (Set)
-import qualified Data.Set                     as Set
-import           Data.Text                    (Text)
-import           Data.Text.Encoding           (encodeUtf8)
-import           Distribution.Package         (Dependency (..))
+import           Data.Set (Set)
+import qualified Data.Set as Set
+import           Data.Text (Text)
+import           Data.Text.Encoding (encodeUtf8)
+import           Distribution.Package (Dependency (..))
 import           Distribution.Version         (anyVersion,
                                                intersectVersionRanges)
-import           Prelude                      hiding (FilePath, pi, writeFile)
+import           Path
+import           Prelude hiding (FilePath, pi, writeFile)
 import           Stack.Build.Cache
 import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Build.Types
 import           Stack.BuildPlan
+
 import           Stack.Package
 import           Stack.Types
+import           System.Directory
 
 data PackageInfo
     = PIOnlyInstalled Version Location Installed
@@ -224,6 +227,7 @@ installPackage mneededSteps name ps = do
     ctx <- ask
     package <- psPackage name ps
     depsRes <- addPackageDeps package
+    mtime <- packageSourceCabalModTime ps
     case depsRes of
         Left e -> return $ Left e
         Right (missing, present) -> do
@@ -250,7 +254,8 @@ installPackage mneededSteps name ps = do
                                         Nothing -> AllSteps
                                         Just configOpts
                                             | not $ Set.null missing -> AllSteps
-                                            | otherwise ->
+                                            | otherwise -> do
+
                                                 let newOpts = configureOpts
                                                         (baseConfigOpts ctx)
                                                         present
@@ -260,6 +265,7 @@ installPackage mneededSteps name ps = do
                                                     configCache = ConfigCache
                                                         { configCacheOpts = map encodeUtf8 newOpts
                                                         , configCacheDeps = present
+                                                        , configCabalFileModTime = mtime
                                                         }
                                                  in if configCache == configOpts
                                                         then SkipConfig
@@ -308,6 +314,14 @@ addPackageDeps package = do
     adrVersion (ADRToInstall task) = packageIdentifierVersion $ taskProvides task
     adrVersion (ADRFound v _) = v
 
+packageSourceCabalModTime :: MonadIO m => PackageSource -> m (Maybe ModTime)
+packageSourceCabalModTime (PSLocal lp) | lpWanted lp = do
+    now <-
+        liftIO (getModificationTime
+                    (toFilePath (lpCabalFile lp)))
+    return (Just (modTime now))
+packageSourceCabalModTime _ = return Nothing
+
 checkDirtiness :: PackageSource
                -> Installed
                -> Package
@@ -315,6 +329,7 @@ checkDirtiness :: PackageSource
                -> M (Maybe NeededSteps)
 checkDirtiness ps@(PSLocal lp) Executable package present = do
     ctx <- ask
+    mtime <- packageSourceCabalModTime ps
     let configOpts = configureOpts
             (baseConfigOpts ctx)
             present
@@ -324,6 +339,7 @@ checkDirtiness ps@(PSLocal lp) Executable package present = do
         configCache = ConfigCache
             { configCacheOpts = map encodeUtf8 configOpts
             , configCacheDeps = present
+            , configCabalFileModTime = mtime
             }
     let moldOpts = lpLastConfigOpts lp
     case moldOpts of
@@ -335,6 +351,7 @@ checkDirtiness ps@(PSLocal lp) Executable package present = do
 checkDirtiness (PSUpstream _ _ _) Executable _ _ = return Nothing -- TODO reinstall executables in the future
 checkDirtiness ps (Library installed) package present = do
     ctx <- ask
+    mtime <- packageSourceCabalModTime ps
     let configOpts = configureOpts
             (baseConfigOpts ctx)
             present
@@ -344,6 +361,7 @@ checkDirtiness ps (Library installed) package present = do
         configCache = ConfigCache
             { configCacheOpts = map encodeUtf8 configOpts
             , configCacheDeps = present
+            , configCabalFileModTime = mtime
             }
     moldOpts <- psOldOpts ps installed
     case moldOpts of
