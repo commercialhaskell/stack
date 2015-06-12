@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
@@ -26,7 +25,7 @@ import           Data.Time.Clock
 import           Control.Monad.Catch        (MonadCatch, MonadThrow, catch,
                                              throwM)
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger (MonadLogger,logInfo)
+import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader
 import           Data.Monoid
 
@@ -193,7 +192,7 @@ tryGetFlagCache gid = do
         Right (Right x) -> return $ Just x
         _ -> return Nothing
 
-writeFlagCache :: (MonadIO m, MonadReader env m, HasBuildConfig env, MonadThrow m, MonadLogger m)
+writeFlagCache :: (MonadIO m, MonadReader env m, HasBuildConfig env, MonadThrow m)
                => GhcPkgId
                -> [ByteString]
                -> Set GhcPkgId

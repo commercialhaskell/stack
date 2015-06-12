@@ -317,7 +317,7 @@ data ConfigCache = ConfigCache
       -- options, just using the previous value is insufficient to know if
       -- dependencies have changed.
     , configCabalFileModTime :: !(Maybe ModTime)
-      -- ^ Last time we did a configure.
+      -- ^ Last time the .cabal file was changed.
     }
     deriving (Generic,Eq,Show)
 instance Binary ConfigCache
