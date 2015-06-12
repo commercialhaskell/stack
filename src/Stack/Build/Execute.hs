@@ -150,8 +150,8 @@ executePlan menv bopts baseConfigOpts locals plan = do
     withSystemTempDirectory stackProgName $ \tmpdir -> do
         tmpdir' <- parseAbsDir tmpdir
         configLock <- newMVar ()
-        installLock <- newMVar (let size = M.size (planTasks plan)
-                                in (0,size))
+        installLock <-
+            newMVar (0,installStepCount plan)
         idMap <- liftIO $ newTVarIO M.empty
         let setupHs = tmpdir' </> $(mkRelFile "Setup.hs")
         liftIO $ writeFile (toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
@@ -221,6 +221,29 @@ executePlan menv bopts baseConfigOpts locals plan = do
                         Platform _ Windows | FP.equalFilePath destFile currExe ->
                             windowsRenameCopy (toFilePath file) destFile
                         _ -> copyFile (toFilePath file) destFile
+
+-- | Calculate how many actual install steps are going to happen for
+-- the build.
+installStepCount :: Plan -> Int
+installStepCount plan =
+    M.size $
+    M.filter
+        (\t ->
+              case taskType t of
+                  TTUpstream{} ->
+                      True
+                  TTLocal _ step ->
+                      isInstallStep step)
+        (planTasks plan)
+  where
+    isInstallStep step =
+        case step of
+            AllSteps ->
+                True
+            SkipConfig ->
+                True
+            JustFinal ->
+                False
 
 -- | Windows can't write over the current executable. Instead, we rename the
 -- current executable to something else and then do the copy.
