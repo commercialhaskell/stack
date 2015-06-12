@@ -18,16 +18,12 @@ module Stack.Build.Cache
     ) where
 
 import           Control.Exception.Enclosed (handleIO, tryIO)
-import           Data.Text (Text)
-import qualified Data.Text as T
-import           Data.Time.Clock
 
 import           Control.Monad.Catch        (MonadCatch, MonadThrow, catch,
                                              throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader
-import           Data.Monoid
 
 import           Data.Binary (Binary)
 import qualified Data.Binary as Binary
