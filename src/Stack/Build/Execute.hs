@@ -132,6 +132,7 @@ data ExecuteEnv = ExecuteEnv
     , eeBuildOpts      :: !BuildOpts
     , eeBaseConfigOpts :: !BaseConfigOpts
     , eeGhcPkgIds      :: !(TVar (Map PackageIdentifier Installed))
+    , eeOldGhcPkgIds   :: !(Map PackageIdentifier Installed)
     , eeTempDir        :: !(Path Abs Dir)
     , eeSetupHs        :: !(Path Abs File)
     , eeCabalPkgVer    :: !Version
@@ -145,8 +146,9 @@ executePlan :: M env m
             -> BaseConfigOpts
             -> [LocalPackage]
             -> Plan
+            -> InstalledMap
             -> m ()
-executePlan menv bopts baseConfigOpts locals plan = do
+executePlan menv bopts baseConfigOpts locals plan installedMap = do
     withSystemTempDirectory stackProgName $ \tmpdir -> do
         tmpdir' <- parseAbsDir tmpdir
         configLock <- newMVar ()
@@ -167,6 +169,12 @@ executePlan menv bopts baseConfigOpts locals plan = do
             , eeInstallLock = installLock
             , eeBaseConfigOpts = baseConfigOpts
             , eeGhcPkgIds = idMap
+            , eeOldGhcPkgIds =
+                  M.fromList
+                      (map
+                           (\(name,(version,_,installed)) ->
+                               (PackageIdentifier name version,installed))
+                           (M.toList installedMap))
             , eeTempDir = tmpdir'
             , eeSetupHs = setupHs
             , eeCabalPkgVer = cabalPkgVer
@@ -375,15 +383,19 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
                  --}
         DoNothing -> return ()
 
-    unless justFinal $ modifyMVar_ eeInstallLock $ \(done,total) -> do
-        announce "install"
-        cabal False ["install"]
-        unless (total == 1) $ do
-            let done' = done + 1
-            $logSticky ("Progress: " <> T.pack (show done') <> "/" <> T.pack (show total))
-            when (done' == total)
-                 ($logStickyDone ("Completed all " <> T.pack (show total) <> " packages."))
-        return (done + 1,total)
+    justInstalled <- if justFinal
+        then return False
+        else do
+          modifyMVar_ eeInstallLock $ \(done,total) -> do
+              announce "install"
+              cabal False ["install"]
+              unless (total == 1) $ do
+                  let done' = done + 1
+                  $logSticky ("Progress: " <> T.pack (show done') <> "/" <> T.pack (show total))
+                  when (done' == total)
+                       ($logStickyDone ("Completed all " <> T.pack (show total) <> " packages."))
+              return (done + 1,total)
+          return True
 
     -- It seems correct to leave this outside of the "justFinal" check above,
     -- in case another package depends on a justFinal target
@@ -394,7 +406,17 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
                     [ bcoSnapDB eeBaseConfigOpts
                     , bcoLocalDB eeBaseConfigOpts
                     ]
-    mpkgid <- findGhcPkgId eeEnvOverride pkgDbs (packageName package)
+
+    -- If we just installed the package, then let's consult ghc-pkg
+    -- for that package id.  Otherwise, no new package ID will have
+    -- been created, so let's just look it up from the cache. This is
+    -- an optimization for the no-op case.
+    mpkgid <-
+        if justInstalled
+            then findGhcPkgId eeEnvOverride pkgDbs (packageName package)
+            else return $ do
+               Library pkgid <- M.lookup (packageIdentifier package) eeOldGhcPkgIds
+               return pkgid
     mpkgid' <- case (packageHasLibrary package, mpkgid) of
         (False, _) -> assert (isNothing mpkgid) $ do
             markExeInstalled (taskLocation task) taskProvides
