@@ -63,7 +63,7 @@ build bopts = do
 
     if boptsDryrun bopts
         then printPlan plan
-        else executePlan menv bopts baseConfigOpts locals plan
+        else executePlan menv bopts baseConfigOpts locals plan installedMap
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
 
