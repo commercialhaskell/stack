@@ -513,14 +513,14 @@ installGHCPosix _ archiveFile archiveType destDir ident = do
 
         $logSticky $ "Unpacking GHC ..."
         $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
-        runIn root "tar" menv ["xf", toFilePath archiveFile] Nothing
+        readInNull root "tar" menv ["xf", toFilePath archiveFile] Nothing
 
         $logSticky "Configuring GHC ..."
-        runIn dir (toFilePath $ dir Path.</> $(mkRelFile "configure"))
-              menv ["--prefix=" ++ toFilePath destDir] Nothing
+        readInNull dir (toFilePath $ dir Path.</> $(mkRelFile "configure"))
+                   menv ["--prefix=" ++ toFilePath destDir] Nothing
 
         $logSticky "Installing GHC ..."
-        runIn dir "make" menv ["install"] Nothing
+        readInNull dir "make" menv ["install"] Nothing
 
         $logStickyDone $ "Installed GHC."
         $logDebug $ "GHC installed to " <> T.pack (toFilePath destDir)

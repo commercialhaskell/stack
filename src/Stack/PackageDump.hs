@@ -37,10 +37,10 @@ import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (catMaybes)
-import           Data.Monoid
+
 import qualified Data.Set as Set
-import           Data.Text (Text)
-import qualified Data.Text as T
+
+
 import           Data.Time.Clock
 import           Data.Typeable (Typeable)
 import           Formatting

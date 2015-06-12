@@ -71,7 +71,7 @@ import           Stack.Types
 import           System.Directory
 import           System.Environment
 import           System.IO (IOMode (ReadMode), withBinaryFile)
-import           System.Process.Read (getEnvOverride, EnvOverride, unEnvOverride, runIn)
+import           System.Process.Read (getEnvOverride, EnvOverride, unEnvOverride, readInNull)
 
 -- | Get the default resolver value
 getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
@@ -438,13 +438,13 @@ resolvePackageLocation menv projRoot (PLGit url commit) = do
     unless exists $ do
         removeTreeIfExists dirTmp
         liftIO $ createDirectoryIfMissing True $ toFilePath $ parent dirTmp
-        runIn (parent dirTmp) "git" menv
+        readInNull (parent dirTmp) "git" menv
             [ "clone"
             , T.unpack url
             , toFilePath dirTmp
             ]
             Nothing
-        runIn dirTmp "git" menv
+        readInNull dirTmp "git" menv
             [ "reset"
             , "--hard"
             , T.unpack commit

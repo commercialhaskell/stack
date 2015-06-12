@@ -58,6 +58,7 @@ library
                      Stack.Build.Types
                      Stack.Build.Doc
                      System.Process.Read
+                     System.Process.Run
                      Network.HTTP.Download.Verified
   other-modules:     Network.HTTP.Download
                      Control.Concurrent.Execute

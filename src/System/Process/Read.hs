@@ -8,12 +8,10 @@
 -- | Reading from external processes.
 
 module System.Process.Read
-  (callProcess
-  ,readProcessStdout
+  (readProcessStdout
   ,tryProcessStdout
   ,sinkProcessStderrStdout
   ,sinkProcessStdout
-  ,runIn
   ,EnvOverride
   ,unEnvOverride
   ,mkEnvOverride
@@ -21,7 +19,10 @@ module System.Process.Read
   ,doesExecutableExist
   ,findExecutable
   ,getEnvOverride
-  ,envSearchPath)
+  ,envSearchPath
+  ,preProcess
+  ,readProcessNull
+  ,readInNull)
   where
 
 import           Control.Applicative
@@ -48,10 +49,9 @@ import           Distribution.System (OS (Windows), Platform (Platform))
 import           Path (Path, Abs, Dir, toFilePath, File, parseAbsFile)
 import           Prelude -- Fix AMP warning
 import           System.Directory (createDirectoryIfMissing, doesFileExist, getCurrentDirectory)
-import qualified System.FilePath as FP
 import           System.Environment (getEnvironment)
-import           System.Exit (exitWith, ExitCode (..))
-import qualified System.Process
+import           System.Exit
+import qualified System.FilePath as FP
 
 -- | Override the environment received by a child process
 data EnvOverride = EnvOverride
@@ -101,6 +101,44 @@ mkEnvOverride platform tm' = do
 envHelper :: EnvOverride -> Maybe [(String, String)]
 envHelper = Just . eoStringList
 
+-- | Read from the process, ignoring any output.
+readProcessNull
+    :: (MonadIO m)
+    => Maybe (Path Abs Dir)
+    -> EnvOverride
+    -> String
+    -> [String]
+    -> m ()
+readProcessNull wd menv name args =
+    sinkProcessStdout wd menv name args CL.sinkNull
+
+-- | Run the given command in the given directory. If it exits with anything
+-- but success, prints an error and then calls 'exitWith' to exit the program.
+readInNull :: forall (m :: * -> *).
+               (MonadLogger m,MonadIO m)
+            => Path Abs Dir -- ^ directory to run in
+            -> FilePath -- ^ command to run
+            -> EnvOverride
+            -> [String] -- ^ command line arguments
+            -> Maybe Text
+            -> m ()
+readInNull wd cmd menv args errMsg = do
+    result <- liftIO (try (readProcessNull (Just wd) menv cmd args))
+    case result of
+        Left (ProcessExitedUnsuccessfully _ ec) -> do
+            $logError $
+                T.pack $
+                concat
+                    [ "Exit code "
+                    , show ec
+                    , " while running "
+                    , show (cmd : args)
+                    , " in "
+                    , toFilePath wd]
+            forM_ errMsg $logError
+            liftIO (exitWith ec)
+        Right () -> return ()
+
 -- | Try to produce a strict 'S.ByteString' from the stdout of a
 -- process.
 tryProcessStdout :: (MonadIO m)
@@ -124,26 +162,6 @@ readProcessStdout :: (MonadIO m)
 readProcessStdout wd menv name args =
   sinkProcessStdout wd menv name args CL.consume >>=
   liftIO . evaluate . S.concat
-
--- | Like as @System.Process.callProcess@, but takes an optional working directory and
--- environment override, and throws ProcessExitedUnsuccessfully if the process exits unsuccessfully.
-callProcess :: (MonadIO m)
-            => Maybe (Path Abs Dir)
-            -> EnvOverride
-            -> String
-            -> [String]
-            -> m ()
-callProcess wd menv cmd0 args = do
-    cmd <- preProcess wd menv cmd0
-    let c = (proc cmd args) { delegate_ctlc = True
-                             , cwd = fmap toFilePath wd
-                             , env = envHelper menv }
-        action (_, _, _, p) = do
-            exit_code <- waitForProcess p
-            case exit_code of
-              ExitSuccess   -> return ()
-              ExitFailure _ -> throwIO (ProcessExitedUnsuccessfully c exit_code)
-    liftIO (System.Process.createProcess c >>= action)
 
 -- | Consume the stdout and stderr of a process feeding strict 'S.ByteString's to the consumers.
 sinkProcessStderrStdout :: (MonadIO m)
@@ -185,33 +203,6 @@ preProcess wd menv name = do
   name' <- liftIO $ liftM toFilePath $ join $ findExecutable menv name
   liftIO (maybe (return ()) (createDirectoryIfMissing True . toFilePath) wd)
   return name'
-
--- | Run the given command in the given directory. If it exits with anything
--- but success, prints an error and then calls 'exitWith' to exit the program.
-runIn :: forall (m :: * -> *).
-         (MonadLogger m,MonadIO m)
-      => Path Abs Dir -- ^ directory to run in
-      -> FilePath -- ^ command to run
-      -> EnvOverride
-      -> [String] -- ^ command line arguments
-      -> Maybe Text
-      -> m ()
-runIn wd cmd menv args errMsg = do
-    result <- liftIO (try (callProcess (Just wd) menv cmd args))
-    case result of
-        Left (ProcessExitedUnsuccessfully _ ec) -> do
-            $logError $
-                T.pack $
-                concat
-                    [ "Exit code "
-                    , show ec
-                    , " while running "
-                    , show (cmd : args)
-                    , " in "
-                    , toFilePath wd]
-            forM_ errMsg $logError
-            liftIO (exitWith ec)
-        Right () -> return ()
 
 -- | Check if the given executable exists on the given PATH
 doesExecutableExist :: MonadIO m => EnvOverride -> String -> m Bool

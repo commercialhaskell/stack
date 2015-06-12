@@ -74,7 +74,7 @@ import           System.Directory
 import           System.FilePath (takeBaseName, (<.>))
 import           System.IO                             (IOMode (ReadMode, WriteMode),
                                                         withBinaryFile)
-import           System.Process.Read (runIn, EnvOverride, doesExecutableExist)
+import           System.Process.Read (readInNull, EnvOverride, doesExecutableExist)
 
 -- | A cabal file with name and version parsed from the filepath, and the
 -- package description itself ready to be parsed. It's left in unparsed form
@@ -237,34 +237,34 @@ updateIndexGit menv indexName' index gitUrl = do
             repoExists <-
               liftIO (doesDirectoryExist (toFilePath acfDir))
             unless repoExists
-                   (runIn suDir "git" menv cloneArgs Nothing)
+                   (readInNull suDir "git" menv cloneArgs Nothing)
             $logSticky "Fetching package index ..."
-            runIn acfDir "git" menv ["fetch","--tags","--depth=1"] Nothing
+            readInNull acfDir "git" menv ["fetch","--tags","--depth=1"] Nothing
             $logStickyDone "Fetched package index."
             _ <-
               (liftIO . tryIO) (removeFile (toFilePath tarFile))
             when (indexGpgVerify index)
-                 (do runIn acfDir
-                           "git"
-                           menv
-                           ["tag","-v","current-hackage"]
-                           (Just (T.unlines ["Signature verification failed. "
-                                            ,"Please ensure you've set up your"
-                                            ,"GPG keychain to accept the D6CF60FD signing key."
-                                            ,"For more information, see:"
-                                            ,"https://github.com/fpco/stackage-update#readme"])))
+                 (do readInNull acfDir
+                                "git"
+                                menv
+                                ["tag","-v","current-hackage"]
+                                (Just (T.unlines ["Signature verification failed. "
+                                                 ,"Please ensure you've set up your"
+                                                 ,"GPG keychain to accept the D6CF60FD signing key."
+                                                 ,"For more information, see:"
+                                                 ,"https://github.com/fpco/stackage-update#readme"])))
             $logDebug ("Exporting a tarball to " <>
                        (T.pack . toFilePath) tarFile)
             deleteCache indexName'
-            runIn acfDir
-                  "git"
-                  menv
-                  ["archive"
-                  ,"--format=tar"
-                  ,"-o"
-                  ,toFilePath tarFile
-                  ,"current-hackage"]
-                  Nothing
+            readInNull acfDir
+                       "git"
+                       menv
+                       ["archive"
+                       ,"--format=tar"
+                       ,"-o"
+                       ,toFilePath tarFile
+                       ,"current-hackage"]
+                       Nothing
 
 -- | Update the index tarball via HTTP
 updateIndexHTTP :: (MonadIO m,MonadLogger m

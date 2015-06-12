@@ -24,7 +24,6 @@ import qualified Data.ByteString.Char8 as S8
 import           Data.Either
 import           Data.List
 import           Data.Maybe
-import           Data.Monoid ((<>))
 import           Data.Streaming.Process
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T

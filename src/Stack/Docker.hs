@@ -63,6 +63,7 @@ import           System.IO (stderr,stdin,stdout,hIsTerminalDevice)
 import qualified System.Process as Proc
 import           System.Process.PagerEditor (editByteString)
 import           System.Process.Read
+import           System.Process.Run
 import           Text.Printf (printf)
 
 #ifndef mingw32_HOST_OS
