@@ -169,7 +169,7 @@ rawGithubUrl org repo branch file = T.concat
 
 -- | Docker sandbox from project root.
 projectDockerSandboxDir :: Path Abs Dir -> Path Abs Dir
-projectDockerSandboxDir projectRoot = projectRoot </> $(mkRelDir ".docker-sandbox/")
+projectDockerSandboxDir projectRoot = projectRoot </> workDirRel </> $(mkRelDir "docker/")
 
 -- | Name of the 'stack' program.
 stackProgName :: String

@@ -198,7 +198,7 @@ runContainerAndExit config
      sandboxIDDir <- parseRelDir (sandboxID ++ "/")
      let stackRoot = configStackRoot config
          sandboxDir = projectDockerSandboxDir projectRoot
-         sandboxSandboxDir = sandboxDir </> $(mkRelDir ".sandbox/") </> sandboxIDDir
+         sandboxSandboxDir = sandboxDir </> $(mkRelDir "_sandbox/") </> sandboxIDDir
          sandboxHomeDir = sandboxDir </> homeDirName
          sandboxRepoDir = sandboxDir </> sandboxIDDir
          sandboxSubdirs = map (\d -> sandboxRepoDir </> d)
@@ -622,9 +622,9 @@ sandboxedHomeSubdirectories =
   ,$(mkRelDir ".cabal/")
   ,$(mkRelDir ".ghcjs/")]
 
--- | Name of home directory within @.docker-sandbox@.
+-- | Name of home directory within docker sandbox.
 homeDirName :: Path Rel Dir
-homeDirName = $(mkRelDir ".home/")
+homeDirName = $(mkRelDir "_home/")
 
 -- | Options parser configuration for Docker.
 dockerOptsParser :: Bool -> Parser DockerOptsMonoid
@@ -839,7 +839,7 @@ data StackDockerException
   | ResolverNotSupportedException Resolver
     -- ^ Only LTS resolvers are supported for default image tag.
   | CannotDetermineProjectRootException
-    -- ^ Can't determine the project root (where to put @.docker-sandbox@).
+    -- ^ Can't determine the project root (where to put docker sandbox).
   | DockerNotInstalledException
     -- ^ @docker --version@ failed.
   | InvalidDatabasePathException SomeException
