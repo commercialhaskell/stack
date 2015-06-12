@@ -36,7 +36,7 @@ import           Control.Monad.Logger hiding (Loc)
 import           Control.Monad.Reader (MonadReader, ask, runReaderT)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
-import           Data.Aeson
+import           Data.Aeson.Extended
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as L
 import           Data.Either (partitionEithers)

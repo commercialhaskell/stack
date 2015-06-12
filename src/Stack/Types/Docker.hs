@@ -5,7 +5,7 @@
 module Stack.Types.Docker where
 
 import Control.Applicative
-import Data.Aeson
+import Data.Aeson.Extended
 import Data.Monoid
 import Data.Text (Text)
 import Path

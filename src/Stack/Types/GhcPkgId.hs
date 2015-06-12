@@ -14,7 +14,7 @@ module Stack.Types.GhcPkgId
 
 import           Control.Applicative
 import           Control.Monad.Catch
-import           Data.Aeson
+import           Data.Aeson.Extended
 import           Data.Attoparsec.ByteString.Char8
 import           Data.Binary (Binary)
 import           Data.ByteString.Char8 (ByteString)

@@ -27,7 +27,7 @@ import           Control.Applicative
 import           Control.DeepSeq
 import           Control.Monad
 import           Control.Monad.Catch
-import           Data.Aeson
+import           Data.Aeson.Extended
 import           Data.Attoparsec.ByteString.Char8
 import           Data.Attoparsec.Combinators
 import           Data.Binary (Binary)

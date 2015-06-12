@@ -24,7 +24,7 @@ import           Control.Monad.Reader (MonadReader, ReaderT (..), asks)
 import           Control.Monad.State (get, put, modify)
 import           Control.Monad.Trans.Control
 
-import           Data.Aeson
+import           Data.Aeson.Extended
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import           Data.Conduit (Conduit, ($$), (=$), await, yield, awaitForever)

@@ -33,7 +33,7 @@ import           Control.Monad.Logger                  (MonadLogger, logDebug,
                                                         logInfo, logWarn)
 import           Control.Monad.Reader (asks)
 
-import           Data.Aeson
+import           Data.Aeson.Extended
 import qualified Data.Binary as Binary
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
 import           Data.ByteString (ByteString)
