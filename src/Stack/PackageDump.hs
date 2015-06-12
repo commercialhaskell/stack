@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
@@ -18,32 +19,38 @@ module Stack.PackageDump
     , pruneDeps
     ) where
 
-import Data.Binary.VersionTagged (taggedDecodeOrLoad, taggedEncodeFile)
-import Path
-import Control.Monad.IO.Class
-import Control.Monad.Logger (MonadLogger)
-import System.Process.Read
-import Data.Map (Map)
-import Data.IORef
-import Control.Monad.Catch (MonadThrow, Exception, throwM)
-import qualified Data.Foldable as F
-import Control.Monad (when, liftM)
-import Stack.Types
-import Data.ByteString (ByteString)
+import           Control.Applicative
+import           Control.Monad (when, liftM)
+import           Control.Monad.Catch (MonadThrow, Exception, throwM)
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger (MonadLogger, logDebug)
+import           Data.Binary.VersionTagged (taggedDecodeOrLoad, taggedEncodeFile)
+import           Data.ByteString (ByteString)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
-import Data.Conduit
-import Data.Typeable (Typeable)
-import qualified Data.Conduit.List as CL
+import           Data.Conduit
 import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.List as CL
+import           Data.Either (partitionEithers)
+import qualified Data.Foldable as F
+import           Data.IORef
+import           Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Either (partitionEithers)
+import           Data.Maybe (catMaybes)
+import           Data.Monoid
 import qualified Data.Set as Set
-import Control.Applicative
-import Data.Maybe (catMaybes)
-import System.Directory (createDirectoryIfMissing, getDirectoryContents)
-import Stack.GhcPkg
-import Prelude -- Fix AMP warning
+import           Data.Text (Text)
+import qualified Data.Text as T
+import           Data.Time.Clock
+import           Data.Typeable (Typeable)
+import           Formatting
+import           Formatting.Time
+import           Path
+import           Prelude -- Fix AMP warning
+import           Stack.GhcPkg
+import           Stack.Types
+import           System.Directory (createDirectoryIfMissing, getDirectoryContents)
+import           System.Process.Read
 
 -- | Cached information on whether a package has profiling libraries
 newtype ProfilingCache = ProfilingCache (IORef (Map GhcPkgId Bool))
@@ -57,7 +64,14 @@ ghcPkgDump
     -> m a
 ghcPkgDump menv mpkgDb sink = do
     F.mapM_ (createDatabase menv) mpkgDb -- TODO maybe use some retry logic instead?
-    sinkProcessStdout Nothing menv "ghc-pkg" args sink
+    start <- liftIO getCurrentTime
+    a <- sinkProcessStdout Nothing menv "ghc-pkg" args sink
+    end <- liftIO getCurrentTime
+    $logDebug $
+        sformat ("ghc-pkg (" % seconds 3 % "s) with args " % build)
+                (diffUTCTime end start)
+                (show args)
+    return a
   where
     args = concat
         [ case mpkgDb of

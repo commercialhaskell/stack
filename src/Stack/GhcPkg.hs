@@ -28,11 +28,14 @@ import           Data.Monoid ((<>))
 import           Data.Streaming.Process
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import           Data.Time.Clock
+import           Formatting
+import           Formatting.Time
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
 import           Prelude hiding (FilePath)
 import           Stack.Build.Types (StackBuildException (Couldn'tFindPkgId))
-import           Stack.Types
 import           Stack.Constants
+import           Stack.Types
 import           System.Directory (createDirectoryIfMissing, doesDirectoryExist, canonicalizePath)
 import           System.Process.Read
 
@@ -60,14 +63,18 @@ ghcPkg :: (MonadIO m, MonadLogger m)
        -> [String]
        -> m (Either ProcessExitedUnsuccessfully S8.ByteString)
 ghcPkg menv pkgDbs args = do
-    $logDebug $ "Calling ghc-pkg with: " <> T.pack (show args')
+    start <- liftIO getCurrentTime
     eres <- go
     r <- case eres of
             Left _ -> do
                 mapM_ (createDatabase menv) pkgDbs
                 go
             Right _ -> return eres
-    $logDebug $ "Done calling ghc-pkg with: " <> T.pack (show args')
+    end <- liftIO getCurrentTime
+    $logDebug $
+        sformat ("ghc-pkg (" % seconds 3 % "s) with args " % build)
+                (diffUTCTime end start)
+                (show args')
     return r
   where
     go = tryProcessStdout Nothing menv "ghc-pkg" args'

@@ -127,6 +127,7 @@ library
                    , yaml >= 0.8.10.1
                    , zlib >= 0.5.4.2
                    , deepseq
+                   , formatting
   if !os(windows)
     build-depends:   unix >= 2.7.0.1
   default-language:    Haskell2010
