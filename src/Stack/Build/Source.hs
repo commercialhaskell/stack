@@ -52,7 +52,7 @@ instance PackageInstallInfo PackageSource where
     piiLocation (PSLocal _) = Local
     piiLocation (PSUpstream _ loc _) = loc
 
-loadSourceMap :: (MonadIO m, MonadCatch m, MonadReader env m, HasBuildConfig env, MonadBaseControl IO m, HasHttpManager env, MonadLogger m)
+loadSourceMap :: (MonadIO m, MonadCatch m, MonadReader env m, HasBuildConfig env, MonadBaseControl IO m, HasHttpManager env, MonadLogger m, HasEnvConfig env)
               => BuildOpts
               -> m ( MiniBuildPlan
                    , [LocalPackage]
@@ -127,7 +127,7 @@ loadSourceMap bopts = do
     return (mbp, locals, nonLocalTargets, sourceMap)
 
 -- | Returns locals and extra target packages
-loadLocals :: (MonadReader env m, HasBuildConfig env, MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m)
+loadLocals :: (MonadReader env m, HasBuildConfig env, MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m,HasEnvConfig env)
            => BuildOpts
            -> Map PackageName Version
            -> m ([LocalPackage], Set PackageName, Set PackageIdentifier)

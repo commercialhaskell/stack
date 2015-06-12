@@ -18,13 +18,11 @@ module Stack.Build.Cache
     ) where
 
 import           Control.Exception.Enclosed (handleIO, tryIO)
-
 import           Control.Monad.Catch        (MonadCatch, MonadThrow, catch,
                                              throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader
-
 import           Data.Binary (Binary)
 import qualified Data.Binary as Binary
 import           Data.ByteString (ByteString)
@@ -37,7 +35,6 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
-
 import           GHC.Generics (Generic)
 import           Path
 import           Path.IO
@@ -87,17 +84,17 @@ data BuildCache = BuildCache
 instance Binary BuildCache
 
 -- | Try to read the dirtiness cache for the given package directory.
-tryGetBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasBuildConfig env)
+tryGetBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
                  => Path Abs Dir -> m (Maybe BuildCache)
 tryGetBuildCache = tryGetCache buildCacheFile
 
 -- | Try to read the dirtiness cache for the given package directory.
-tryGetConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasBuildConfig env)
+tryGetConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
                   => Path Abs Dir -> m (Maybe ConfigCache)
 tryGetConfigCache = tryGetCache configCacheFile
 
 -- | Try to load a cache.
-tryGetCache :: (MonadIO m, Binary a, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasBuildConfig env)
+tryGetCache :: (MonadIO m, Binary a, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
             => (Path Abs Dir -> m (Path Abs File))
             -> Path Abs Dir
             -> m (Maybe a)
@@ -114,7 +111,7 @@ tryGetCache get' dir = do
           where thd (_,_,x) = x
 
 -- | Write the dirtiness cache for this package's files.
-writeBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasBuildConfig env)
+writeBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
                 => Path Abs Dir -> Map FilePath ModTime -> m ()
 writeBuildCache dir times =
     writeCache
@@ -125,7 +122,7 @@ writeBuildCache dir times =
          })
 
 -- | Write the dirtiness cache for this package's configuration.
-writeConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasBuildConfig env)
+writeConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
                 => Path Abs Dir
                 -> [Text]
                 -> Set GhcPkgId -- ^ dependencies
@@ -148,7 +145,7 @@ writeConfigCache dir opts deps cabalfp ttype =
            cache
 
 -- | Delete the caches for the project.
-deleteCaches :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, MonadThrow m, HasBuildConfig env)
+deleteCaches :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, MonadThrow m, HasEnvConfig env)
              => Path Abs Dir -> m ()
 deleteCaches dir = do
     bfp <- buildCacheFile dir
@@ -157,7 +154,7 @@ deleteCaches dir = do
     removeFileIfExists cfp
 
 -- | Write to a cache.
-writeCache :: (Binary a, MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasBuildConfig env)
+writeCache :: (Binary a, MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
            => Path Abs Dir
            -> (Path Abs Dir -> m (Path Abs File))
            -> a

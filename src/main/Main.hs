@@ -37,7 +37,7 @@ import           Stack.Config
 import           Stack.Constants
 import qualified Stack.Docker as Docker
 import           Stack.Fetch
-import           Stack.GhcPkg (envHelper)
+import           Stack.GhcPkg (envHelper,getCabalPkgVer)
 import qualified Stack.PackageIndex
 import           Stack.Path
 import           Stack.Setup
@@ -258,7 +258,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
 
 withBuildConfig :: GlobalOpts
                 -> NoBuildConfigStrategy
-                -> StackT BuildConfig IO ()
+                -> StackT EnvConfig IO ()
                 -> IO ()
 withBuildConfig go@GlobalOpts{..} strat inner = do
     (manager, lc) <- loadConfigWithOpts go
@@ -266,8 +266,18 @@ withBuildConfig go@GlobalOpts{..} strat inner = do
         Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $ do
             bconfig1 <- runStackLoggingT manager globalLogLevel $
                 lcLoadBuildConfig lc strat
-            bconfig2 <- runStackT manager globalLogLevel bconfig1 setupEnv
-            runStackT manager globalLogLevel bconfig2 inner
+            (bconfig2,cabalVer) <-
+                runStackT
+                    manager globalLogLevel bconfig1
+                    (do cfg <- setupEnv
+                        menv <- getMinimalEnvOverride
+                        cabalVer <- getCabalPkgVer menv
+                        return (cfg,cabalVer))
+            runStackT
+                manager
+                globalLogLevel
+                (EnvConfig bconfig2 cabalVer)
+                inner
 
 cleanCmd :: () -> GlobalOpts -> IO ()
 cleanCmd () go = withBuildConfig go ThrowException clean

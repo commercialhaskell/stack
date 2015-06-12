@@ -23,6 +23,8 @@ instance HasConfig config => HasConfig (Env config) where
     getConfig = getConfig . envConfig
 instance HasBuildConfig config => HasBuildConfig (Env config) where
     getBuildConfig = getBuildConfig . envConfig
+instance HasEnvConfig config => HasEnvConfig (Env config) where
+    getEnvConfig = getEnvConfig . envConfig
 
 instance HasHttpManager (Env config) where
   getHttpManager = envManager

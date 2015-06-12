@@ -66,7 +66,6 @@ import           Stack.Types.Config
 import           Stack.Constants
 import qualified Stack.Docker as Docker
 import           Stack.Package
-import           Stack.GhcPkg (getCabalPkgVer)
 import           Stack.Types
 import           System.Directory
 import           System.Environment
@@ -359,8 +358,6 @@ loadBuildConfig menv mproject config noConfigStrat = do
     packages' <- mapM (resolvePackageEntry menv root) (projectPackages project)
     let packages = Map.fromList $ concat packages'
 
-    cabalVer <- getCabalPkgVer menv
-
     return BuildConfig
         { bcConfig = config
         , bcResolver = projectResolver project
@@ -370,7 +367,6 @@ loadBuildConfig menv mproject config noConfigStrat = do
         , bcRoot = root
         , bcStackYaml = stackYamlFP
         , bcFlags = projectFlags project
-        , bcCabalVersion = cabalVer
         }
 
 -- | Resolve a PackageEntry into a list of paths, downloading and cloning as

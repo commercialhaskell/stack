@@ -181,9 +181,21 @@ data BuildConfig = BuildConfig
       -- different from bcRoot </> "stack.yaml"
     , bcFlags      :: !(Map PackageName (Map FlagName Bool))
       -- ^ Per-package flag overrides
-    , bcCabalVersion :: !Version
-      -- ^ Cabal version used.
     }
+
+-- | Configuration after the environment has been setup.
+data EnvConfig = EnvConfig
+    {envConfigBuildConfig :: !BuildConfig
+    ,envConfigCabalVersion :: !Version}
+instance HasBuildConfig EnvConfig where
+    getBuildConfig = envConfigBuildConfig
+instance HasConfig EnvConfig
+instance HasPlatform EnvConfig
+instance HasStackRoot EnvConfig
+class HasEnvConfig r where
+    getEnvConfig :: r -> EnvConfig
+instance HasEnvConfig EnvConfig where
+    getEnvConfig = id
 
 -- | Value returned by 'Stack.Config.loadConfig'.
 data LoadConfig m = LoadConfig

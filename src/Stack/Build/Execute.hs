@@ -67,7 +67,7 @@ import           System.IO.Temp                 (withSystemTempDirectory)
 import           System.Process.Internals       (createProcess_)
 import           System.Process.Read
 
-type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
+type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env)
 
 printPlan :: M env m => Plan -> m ()
 printPlan plan = do
@@ -155,7 +155,7 @@ executePlan menv bopts baseConfigOpts locals plan = do
         idMap <- liftIO $ newTVarIO M.empty
         let setupHs = tmpdir' </> $(mkRelFile "Setup.hs")
         liftIO $ writeFile (toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
-        cabalPkgVer <- asks (bcCabalVersion . getBuildConfig)
+        cabalPkgVer <- asks (envConfigCabalVersion . getEnvConfig)
         executePlan' plan ExecuteEnv
             { eeEnvOverride = menv
             , eeBuildOpts = bopts
