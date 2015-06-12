@@ -79,6 +79,7 @@ library
                    , binary >= 0.7
                    , base64-bytestring
                    , bytestring
+                   , conduit-combinators >= 0.3.1
                    , conduit >= 1.2.4
                    , conduit-extra >= 1.1.7.1
                    , containers >= 0.5.5.1

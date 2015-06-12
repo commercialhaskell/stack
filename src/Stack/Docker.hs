@@ -1,5 +1,5 @@
-{-# LANGUAGE CPP, DeriveDataTypeable, MultiWayIf, NamedFieldPuns, OverloadedStrings, RankNTypes,
-             RecordWildCards, TemplateHaskell, TupleSections #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, FlexibleContexts, MultiWayIf, NamedFieldPuns,
+             OverloadedStrings, RankNTypes, RecordWildCards, TemplateHaskell, TupleSections #-}
 
 -- | Run commands in Docker containers
 module Stack.Docker
@@ -20,17 +20,21 @@ module Stack.Docker
   ) where
 
 import           Control.Applicative
-import           Control.Exception
+import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.IO.Class (MonadIO,liftIO)
 import           Control.Monad.Logger (MonadLogger,logError,logInfo,logWarn)
 import           Control.Monad.Writer (execWriter,runWriter,tell)
+import           Control.Monad.Trans.Control (MonadBaseControl,liftBaseWith)
 import           Data.Aeson (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
 import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Char (isSpace,toUpper,isAscii)
+import           Data.Conduit ((=$=))
+import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.Combinators as CC
 import           Data.List (dropWhileEnd,find,intercalate,intersperse,isPrefixOf,isInfixOf,foldl',sortBy)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -67,10 +71,10 @@ import           System.Posix.Signals (installHandler,sigTERM,Handler(Catch))
 
 -- | If Docker is enabled, re-runs the currently running OS command in a Docker container.
 -- Otherwise, runs the inner action.
-rerunWithOptionalContainer :: (MonadLogger m,MonadIO m,MonadThrow m)
+rerunWithOptionalContainer :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m)
                            => Config -> Maybe (Path Abs Dir) -> IO () -> m ()
-rerunWithOptionalContainer config mprojectRoot inner =
-     rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs inner
+rerunWithOptionalContainer config mprojectRoot =
+     rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs
    where
      getCmdArgs =
        do args <- getArgs
@@ -88,7 +92,7 @@ rerunWithOptionalContainer config mprojectRoot inner =
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
 -- Docker container.  Otherwise, runs the inner action.
-rerunCmdWithOptionalContainer :: (MonadLogger m,MonadIO m,MonadThrow m)
+rerunCmdWithOptionalContainer :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m)
                               => Config
                               -> Maybe (Path Abs Dir)
                               -> IO (FilePath,[String],Config)
@@ -103,7 +107,7 @@ rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs inner =
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
 -- Docker container.  Otherwise, runs the inner action.
-rerunCmdWithRequiredContainer :: (MonadLogger m,MonadIO m,MonadThrow m)
+rerunCmdWithRequiredContainer :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m)
                               => Config
                               -> Maybe (Path Abs Dir)
                               -> IO (FilePath,[String],Config)
@@ -131,7 +135,7 @@ getInContainer =
        Just _ -> return True
 
 -- | Run a command in a new Docker container, then exit the process.
-runContainerAndExit :: (MonadLogger m,MonadIO m,MonadThrow m)
+runContainerAndExit :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m)
                     => Config
                     -> Maybe (Path Abs Dir)
                     -> FilePath
@@ -270,11 +274,12 @@ runContainerAndExit config
     docker = configDocker config
 
 -- | Clean-up old docker images and containers.
-cleanup :: (MonadLogger m,MonadIO m,MonadThrow m) => Config -> CleanupOpts -> m ()
+cleanup :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m)
+        => Config -> CleanupOpts -> m ()
 cleanup config opts =
   do envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride
-     let runDocker = readProcessStdout Nothing envOverride "docker"
+     let runDocker = readProcessStdoutLogStderr Nothing envOverride "docker"
      imagesOut <- runDocker ["images","--no-trunc","-f","dangling=false"]
      danglingImagesOut <- runDocker ["images","--no-trunc","-f","dangling=true"]
      runningContainersOut <- runDocker ["ps","-a","--no-trunc","-f","status=running"]
@@ -493,7 +498,8 @@ cleanup config opts =
     containerStr = "container"
 
 -- | Inspect Docker image or container.
-inspect :: (MonadIO m,MonadThrow m) => EnvOverride -> String -> m (Maybe Inspect)
+inspect :: (MonadIO m,MonadThrow m,MonadLogger m,MonadBaseControl IO m)
+        => EnvOverride -> String -> m (Maybe Inspect)
 inspect envOverride image =
   do results <- inspects envOverride [image]
      case Map.toList results of
@@ -502,10 +508,12 @@ inspect envOverride image =
        _ -> throwM (InvalidInspectOutputException "expect a single result")
 
 -- | Inspect multiple Docker images and/or containers.
-inspects :: (MonadIO m,MonadThrow m) => EnvOverride -> [String] -> m (Map String Inspect)
+inspects :: (MonadIO m,MonadThrow m,MonadLogger m,MonadBaseControl IO m)
+         => EnvOverride -> [String] -> m (Map String Inspect)
 inspects _ [] = return Map.empty
 inspects envOverride images =
-  do maybeInspectOut <- tryProcessStdout Nothing envOverride "docker" ("inspect" : images)
+  do maybeInspectOut <-
+       try (readProcessStdoutLogStderr Nothing envOverride "docker" ("inspect" : images))
      case maybeInspectOut of
        Right inspectOut ->
          -- filtering with 'isAscii' to workaround @docker inspect@ output containing invalid UTF-8
@@ -515,7 +523,8 @@ inspects envOverride images =
        Left (ProcessExitedUnsuccessfully _ _) -> return Map.empty
 
 -- | Pull latest version of configured Docker image from registry.
-pull :: (MonadLogger m,MonadIO m,MonadThrow m) => Config -> m ()
+pull :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m)
+     => Config -> m ()
 pull config =
   do envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride
@@ -544,11 +553,12 @@ pullImage envOverride docker image =
        Right () -> return ()
 
 -- | Check docker version (throws exception if incorrect)
-checkDockerVersion :: (MonadIO m,MonadThrow m) => EnvOverride -> m ()
+checkDockerVersion :: (MonadIO m,MonadThrow m,MonadLogger m,MonadBaseControl IO m)
+                   => EnvOverride -> m ()
 checkDockerVersion envOverride =
   do dockerExists <- doesExecutableExist envOverride "docker"
      unless dockerExists (throwM DockerNotInstalledException)
-     dockerVersionOut <- readProcessStdout Nothing envOverride "docker" ["--version"]
+     dockerVersionOut <- readProcessStdoutLogStderr Nothing envOverride "docker" ["--version"]
      case words (decodeUtf8 dockerVersionOut) of
        (_:_:v:_) ->
          case parseVersionFromString (dropWhileEnd (== ',') v) of
@@ -918,3 +928,19 @@ instance Show StackDockerException where
     "Cannot find 'docker' in PATH.  Is Docker installed?"
   show (InvalidDatabasePathException ex) =
     concat ["Invalid database path: ",show ex]
+
+-- | Produce a strict 'S.ByteString' from the stdout of a
+-- process. Throws a 'ProcessExitedUnsuccessfully' exception if the
+-- process fails.  Logs process's stderr using @$logError@.
+readProcessStdoutLogStderr :: (MonadIO m,MonadLogger m,MonadBaseControl IO m)
+                           => Maybe (Path Abs Dir)
+                           -> EnvOverride
+                           -> String
+                           -> [String]
+                           -> m BS.ByteString
+readProcessStdoutLogStderr wd menv name args = do
+  runInBase <- liftBaseWith $ \run -> return (void . run)
+  let sinkStderr = CC.decodeUtf8 =$= CC.line logSink
+      logSink = CC.mapM_ (liftIO . runInBase . $logError)
+  (_,out) <- sinkProcessStderrStdout wd menv name args sinkStderr CL.consume
+  liftIO (evaluate (BS.concat out))
