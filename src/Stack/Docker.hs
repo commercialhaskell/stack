@@ -127,7 +127,7 @@ preventInContainer inner =
 -- | 'True' if we are currently running inside a Docker container.
 getInContainer :: (MonadIO m) => m Bool
 getInContainer =
-  do maybeEnvVar <- liftIO (lookupEnv sandboxIDEnvVar)
+  do maybeEnvVar <- liftIO (lookupEnv inContainerEnvVar)
      case maybeEnvVar of
        Nothing -> return False
        Just _ -> return True
@@ -212,6 +212,7 @@ runContainerAndExit config
                 (concat
                   [["run"
                    ,"--net=host"
+                   ,"-e",inContainerEnvVar ++ "=1"
                    ,"-e",stackRootEnvVar ++ "=" ++ trimTrailingPathSep stackRoot
                    ,"-e","WORK_UID=" ++ uid
                    ,"-e","WORK_GID=" ++ gid
@@ -756,6 +757,10 @@ fromMaybeProjectRoot = fromMaybe (throw CannotDetermineProjectRootException)
 -- | Environment variable that contains the sandbox ID.
 sandboxIDEnvVar :: String
 sandboxIDEnvVar = "DOCKER_SANDBOX_ID"
+
+-- | Environment variable used to indicate stack is running in container.
+inContainerEnvVar :: String
+inContainerEnvVar = concat [map toUpper stackProgName,"_IN_CONTAINER"]
 
 -- | Command-line argument for "docker"
 dockerCmdName :: String
