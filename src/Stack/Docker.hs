@@ -26,15 +26,12 @@ import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.IO.Class (MonadIO,liftIO)
 import           Control.Monad.Logger (MonadLogger,logError,logInfo,logWarn)
 import           Control.Monad.Writer (execWriter,runWriter,tell)
-import           Control.Monad.Trans.Control (MonadBaseControl,liftBaseWith)
+import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Aeson.Extended (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
 import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Char (isSpace,toUpper,isAscii)
-import           Data.Conduit ((=$=))
-import qualified Data.Conduit.List as CL
-import qualified Data.Conduit.Combinators as CC
 import           Data.List (dropWhileEnd,find,intercalate,intersperse,isPrefixOf,isInfixOf,foldl',sortBy)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -280,7 +277,7 @@ cleanup :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m)
 cleanup config opts =
   do envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride
-     let runDocker = readProcessStdoutLogStderr Nothing envOverride "docker"
+     let runDocker = readDockerProcess envOverride
      imagesOut <- runDocker ["images","--no-trunc","-f","dangling=false"]
      danglingImagesOut <- runDocker ["images","--no-trunc","-f","dangling=true"]
      runningContainersOut <- runDocker ["ps","-a","--no-trunc","-f","status=running"]
@@ -339,11 +336,11 @@ cleanup config opts =
                             do $logInfo (concatT ["Removing container: '",v,"'"])
                                return ["rm","-f",v]
                         | otherwise -> throwM (InvalidCleanupCommandException line)
-             e <- liftIO (try (callProcess Nothing envOverride "docker" args))
+             e <- try (readDockerProcess envOverride args)
              case e of
                Left (ProcessExitedUnsuccessfully _ _) ->
                  $logError (concatT ["Could not remove: '",v,"'"])
-               Right () -> return ()
+               Right _ -> return ()
         _ -> throwM (InvalidCleanupCommandException line)
     parseImagesOut = Map.fromListWith (++) . map parseImageRepo . drop 1 . lines . decodeUtf8
       where parseImageRepo :: String -> (String, [String])
@@ -514,7 +511,7 @@ inspects :: (MonadIO m,MonadThrow m,MonadLogger m,MonadBaseControl IO m)
 inspects _ [] = return Map.empty
 inspects envOverride images =
   do maybeInspectOut <-
-       try (readProcessStdoutLogStderr Nothing envOverride "docker" ("inspect" : images))
+       try (readDockerProcess envOverride ("inspect" : images))
      case maybeInspectOut of
        Right inspectOut ->
          -- filtering with 'isAscii' to workaround @docker inspect@ output containing invalid UTF-8
@@ -559,7 +556,7 @@ checkDockerVersion :: (MonadIO m,MonadThrow m,MonadLogger m,MonadBaseControl IO 
 checkDockerVersion envOverride =
   do dockerExists <- doesExecutableExist envOverride "docker"
      unless dockerExists (throwM DockerNotInstalledException)
-     dockerVersionOut <- readProcessStdoutLogStderr Nothing envOverride "docker" ["--version"]
+     dockerVersionOut <- readDockerProcess envOverride ["--version"]
      case words (decodeUtf8 dockerVersionOut) of
        (_:_:v:_) ->
          case parseVersionFromString (dropWhileEnd (== ',') v) of
@@ -614,6 +611,16 @@ removeDirectoryContents path excludeDirs excludeFiles =
               forM_ lsf
                     (\f -> unless (filename f `elem` excludeFiles)
                                   (removeFile (toFilePath f))))
+
+-- | Produce a strict 'S.ByteString' from the stdout of a
+-- process. Throws a 'ProcessExitedUnsuccessfully' exception if the
+-- process fails.  Logs process's stderr using @$logError@.
+readDockerProcess :: (MonadIO m,MonadLogger m,MonadBaseControl IO m)
+                  => EnvOverride
+                  -> [String]
+                  -> m BS.ByteString
+readDockerProcess envOverride args =
+  readProcessStdoutLogStderr "docker: " Nothing envOverride "docker" args
 
 -- | Subdirectories of the home directory to sandbox between GHC/Stackage versions.
 sandboxedHomeSubdirectories :: [Path Rel Dir]
@@ -929,19 +936,3 @@ instance Show StackDockerException where
     "Cannot find 'docker' in PATH.  Is Docker installed?"
   show (InvalidDatabasePathException ex) =
     concat ["Invalid database path: ",show ex]
-
--- | Produce a strict 'S.ByteString' from the stdout of a
--- process. Throws a 'ProcessExitedUnsuccessfully' exception if the
--- process fails.  Logs process's stderr using @$logError@.
-readProcessStdoutLogStderr :: (MonadIO m,MonadLogger m,MonadBaseControl IO m)
-                           => Maybe (Path Abs Dir)
-                           -> EnvOverride
-                           -> String
-                           -> [String]
-                           -> m BS.ByteString
-readProcessStdoutLogStderr wd menv name args = do
-  runInBase <- liftBaseWith $ \run -> return (void . run)
-  let sinkStderr = CC.decodeUtf8 =$= CC.line logSink
-      logSink = CC.mapM_ (liftIO . runInBase . $logError)
-  (_,out) <- sinkProcessStderrStdout wd menv name args sinkStderr CL.consume
-  liftIO (evaluate (BS.concat out))
