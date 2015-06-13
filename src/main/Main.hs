@@ -13,7 +13,7 @@ import           Control.Exception
 import           Control.Monad (join)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Logger
-import           Control.Monad.Reader (asks)
+import           Control.Monad.Reader (asks, runReaderT)
 import           Data.Char (toLower)
 import           Data.List
 import qualified Data.List as List
@@ -270,7 +270,7 @@ withBuildConfig go@GlobalOpts{..} strat inner = do
                 runStackT
                     manager globalLogLevel bconfig1
                     (do cfg <- setupEnv
-                        menv <- getMinimalEnvOverride
+                        menv <- runReaderT getMinimalEnvOverride cfg
                         cabalVer <- getCabalPkgVer menv
                         return (cfg,cabalVer))
             runStackT
