@@ -713,7 +713,7 @@ dockerOptsFromMonoid mproject stackRoot DockerOptsMonoid{..} = DockerOpts
                  ResolverSnapshot n@(LTS _ _) -> ":" ++  (T.unpack (renderSnapName n))
                  _ -> throw (ResolverNotSupportedException (projectResolver proj))
      in case dockerMonoidRepoOrImage of
-       Nothing -> "fpco/dev" ++ defaultTag
+       Nothing -> "fpco/stack-build" ++ defaultTag
        Just (DockerMonoidImage image) -> image
        Just (DockerMonoidRepo repo) ->
          case find (`elem` (":@" :: String)) repo of
