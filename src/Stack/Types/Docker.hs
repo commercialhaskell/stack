@@ -51,7 +51,7 @@ data DockerOptsMonoid = DockerOptsMonoid
   ,dockerMonoidEnable :: !(Maybe Bool)
     -- ^ Is using Docker enabled?
   ,dockerMonoidRepoOrImage :: !(Maybe DockerMonoidRepoOrImage)
-    -- ^ Docker repository name (e.g. @fpco/dev@ or @fpco/dev:lts-2.8@)
+    -- ^ Docker repository name (e.g. @fpco/stack-build@ or @fpco/stack-full:lts-2.8@)
   ,dockerMonoidRegistryLogin :: !(Maybe Bool)
     -- ^ Does registry require login for pulls?
   ,dockerMonoidRegistryUsername :: !(Maybe String)

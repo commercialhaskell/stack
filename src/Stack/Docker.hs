@@ -72,21 +72,20 @@ import           System.Posix.Signals (installHandler,sigTERM,Handler(Catch))
 rerunWithOptionalContainer :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m)
                            => Config -> Maybe (Path Abs Dir) -> IO () -> m ()
 rerunWithOptionalContainer config mprojectRoot =
-     rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs
-   where
-     getCmdArgs =
-       do args <- getArgs
-          if arch == "x86_64" && os == "linux"
-              then do exePath <- getExecutablePath
-                      let mountDir = concat ["/tmp/host-",stackProgName]
-                          mountPath = concat [mountDir,"/",takeBaseName exePath]
-                      return (mountPath
-                             ,args
-                             ,config{configDocker=docker{dockerMount=Mount exePath mountPath :
-                                                                     dockerMount docker}})
-              else do progName <- getProgName
-                      return (takeBaseName progName,args,config)
-     docker = configDocker config
+  rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs
+  where
+    getCmdArgs =
+      do args <- getArgs
+         if arch == "x86_64" && os == "linux"
+             then do exePath <- getExecutablePath
+                     let mountPath = concat ["/opt/host/bin/",takeBaseName exePath]
+                     return (mountPath
+                            ,args
+                            ,config{configDocker=docker{dockerMount=Mount exePath mountPath :
+                                                                    dockerMount docker}})
+             else do progName <- getProgName
+                     return (takeBaseName progName,args,config)
+    docker = configDocker config
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
 -- Docker container.  Otherwise, runs the inner action.
@@ -710,7 +709,7 @@ dockerOptsFromMonoid mproject stackRoot DockerOptsMonoid{..} = DockerOpts
              Nothing -> ""
              Just proj ->
                case projectResolver proj of
-                 ResolverSnapshot n@(LTS _ _) -> ":" ++  (T.unpack (renderSnapName n))
+                 ResolverSnapshot n@(LTS _ _) -> ":" ++  T.unpack (renderSnapName n)
                  _ -> throw (ResolverNotSupportedException (projectResolver proj))
      in case dockerMonoidRepoOrImage of
        Nothing -> "fpco/stack-build" ++ defaultTag
