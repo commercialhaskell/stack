@@ -301,7 +301,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
             case Map.lookup ident idMap of
                 Nothing -> error "singleBuild: invariant violated, missing package ID missing"
                 Just (Library x) -> Just x
-                Just Executable -> Nothing
+                Just (Executable _) -> Nothing
         missing' = Set.fromList $ mapMaybe getMissing $ Set.toList missing
         TaskConfigOpts missing mkOpts = taskConfigOpts
         configOpts = mkOpts missing'
@@ -347,15 +347,16 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
     mpkgid <- findGhcPkgId eeEnvOverride pkgDbs (packageName package)
     mpkgid' <- case (packageHasLibrary package, mpkgid) of
         (False, _) -> assert (isNothing mpkgid) $ do
-            markExeInstalled (taskLocation task) taskProvides -- FIXME this should also take the options, deps, etc
-            return Executable
+            markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
+            return $ Executable $ PackageIdentifier
+                (packageName package)
+                (packageVersion package)
         (True, Nothing) -> throwM $ Couldn'tFindPkgId $ packageName package
-        (True, Just pkgid) -> do
-            writeFlagCache
-                pkgid
-                (map encodeUtf8 configOpts)
-                allDeps
-            return $ Library pkgid
+        (True, Just pkgid) -> return $ Library pkgid
+    writeFlagCache
+        mpkgid'
+        (map encodeUtf8 configOpts)
+        allDeps
     liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides mpkgid'
   where
     announce x = $logInfo $ T.concat

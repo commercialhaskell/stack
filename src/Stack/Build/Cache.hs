@@ -149,16 +149,19 @@ writeCache dir get' content = do
              (Binary.encode content))
 
 flagCacheFile :: (MonadIO m, MonadThrow m, MonadReader env m, HasBuildConfig env)
-              => GhcPkgId
+              => Installed
               -> m (Path Abs File)
-flagCacheFile gid = do
-    rel <- parseRelFile $ ghcPkgIdString gid
+flagCacheFile installed = do
+    rel <- parseRelFile $
+        case installed of
+            Library gid -> ghcPkgIdString gid
+            Executable ident -> packageIdentifierString ident
     dir <- flagCacheLocal
     return $ dir </> rel
 
 -- | Loads the flag cache for the given installed extra-deps
 tryGetFlagCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasBuildConfig env)
-                => GhcPkgId
+                => Installed
                 -> m (Maybe ConfigCache)
 tryGetFlagCache gid = do
     file <- flagCacheFile gid
@@ -168,7 +171,7 @@ tryGetFlagCache gid = do
         _ -> return Nothing
 
 writeFlagCache :: (MonadIO m, MonadReader env m, HasBuildConfig env, MonadThrow m)
-               => GhcPkgId
+               => Installed
                -> [ByteString]
                -> Set GhcPkgId
                -> m ()

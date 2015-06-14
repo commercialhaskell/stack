@@ -447,3 +447,6 @@ modTime x =
               (utctDay x)
         , toRational
               (utctDayTime x))
+
+data Installed = Library GhcPkgId | Executable PackageIdentifier
+    deriving (Show, Eq, Ord)

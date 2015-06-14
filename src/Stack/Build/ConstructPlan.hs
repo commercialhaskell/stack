@@ -270,7 +270,7 @@ addPackageDeps package = do
                 return $ Left (depname, (range, DependencyMismatch $ adrVersion adr))
             Right (ADRToInstall task) -> return $ Right
                 (Set.singleton $ taskProvides task, Set.empty)
-            Right (ADRFound _ Executable) -> return $ Right
+            Right (ADRFound _ (Executable _)) -> return $ Right
                 (Set.empty, Set.empty)
             Right (ADRFound _ (Library gid)) -> return $ Right
                 (Set.empty, Set.singleton gid)
@@ -290,32 +290,7 @@ checkDirtiness :: PackageSource
                -> Package
                -> Set GhcPkgId
                -> M Bool
-checkDirtiness _ps@(PSLocal _lp) Executable _package _present = do
-    {- FIXME proper dirtiness checking on executables
-    ctx <- ask
-    mtime <- packageSourceCabalModTime ps
-    let configOpts = configureOpts
-            (baseConfigOpts ctx)
-            present
-            (psWanted ps)
-            (piiLocation ps) -- should be Local always
-            (packageFlags package)
-        configCache = ConfigCache
-            { configCacheOpts = map encodeUtf8 configOpts
-            , configCacheDeps = present
-            , configCabalFileModTime = mtime
-            }
-    let moldOpts = lpLastConfigOpts lp
-    case moldOpts of
-        Nothing -> return True
-        Just oldOpts
-            | oldOpts /= configCache -> return True
-            | psDirty ps -> return $ Just SkipConfig
-            | otherwise -> return Nothing
-    -}
-    return False
-checkDirtiness (PSUpstream _ _ _) Executable _ _ = return False -- TODO reinstall executables in the future
-checkDirtiness ps (Library installed) package present = do
+checkDirtiness ps installed package present = do
     ctx <- ask
     let configOpts = configureOpts
             (baseConfigOpts ctx)
