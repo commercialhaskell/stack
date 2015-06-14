@@ -483,6 +483,7 @@ instance Show ConfigException where
         ,"version range ("
         , T.unpack (versionRangeText requiredRange)
         , ") specified in stack.yaml." ]
+    show NoResolverFound = "No resolver was found"
 instance Exception ConfigException
 
 -- | Helper function to ask the environment and apply getConfig
