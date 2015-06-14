@@ -171,3 +171,7 @@ __I heard you can use this with Docker?__
 
 Yes, stack supports using Docker with images that contain preinstalled Stackage
 packages and the tools. See [[Docker]] for details.
+
+__How do I use this with Travis CI?__
+
+Stack is in beta now. Don't do this until after the first stable release of `stack` unless you are having major issues with cabal in your travis build
