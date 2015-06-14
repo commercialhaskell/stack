@@ -145,7 +145,7 @@ displayTask task = T.pack $ concat
 data ExecuteEnv = ExecuteEnv
     { eeEnvOverride    :: !EnvOverride
     , eeConfigureLock  :: !(MVar ())
-    , eeInstallLock    :: !(MVar (Int,Int))
+    , eeInstallLock    :: !(MVar ())
     , eeBuildOpts      :: !BuildOpts
     , eeBaseConfigOpts :: !BaseConfigOpts
     , eeGhcPkgIds      :: !(TVar (Map PackageIdentifier Installed))
@@ -167,8 +167,7 @@ executePlan menv bopts baseConfigOpts locals plan = do
     withSystemTempDirectory stackProgName $ \tmpdir -> do
         tmpdir' <- parseAbsDir tmpdir
         configLock <- newMVar ()
-        installLock <-
-            newMVar (0,installStepCount plan)
+        installLock <- newMVar ()
         idMap <- liftIO $ newTVarIO M.empty
         let setupHs = tmpdir' </> $(mkRelFile "Setup.hs")
         liftIO $ writeFile (toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
@@ -238,11 +237,6 @@ executePlan menv bopts baseConfigOpts locals plan = do
                         Platform _ Windows | FP.equalFilePath destFile currExe ->
                             windowsRenameCopy (toFilePath file) destFile
                         _ -> copyFile (toFilePath file) destFile
-
--- | Calculate how many actual install steps are going to happen for
--- the build.
-installStepCount :: Plan -> Int
-installStepCount = M.size . planTasks
 
 -- | Windows can't write over the current executable. Instead, we rename the
 -- current executable to something else and then do the copy.
@@ -334,6 +328,7 @@ toActions runInBase ee (mbuild, mfinal) =
 -- | Ensure that the configuration for the package matches what is given
 ensureConfig :: M env m
              => Path Abs Dir -- ^ package directory
+             -> ActionContext
              -> ExecuteEnv
              -> Task
              -> m () -- ^ announce
@@ -341,7 +336,7 @@ ensureConfig :: M env m
              -> Path Abs File -- ^ .cabal file
              -> [Text]
              -> m (ConfigCache, Bool)
-ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal cabalfp extra = do
+ensureConfig pkgDir ac ExecuteEnv {..} Task {..} announce cabal cabalfp extra = do
     -- Determine the old and new configuration in the local directory, to
     -- determine if we need to reconfigure.
     mOldConfigCache <- tryGetConfigCache pkgDir
@@ -368,8 +363,8 @@ ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal cabalfp extra = do
                   || mOldCabalMod /= Just newCabalMod
     when needConfig $ withMVar eeConfigureLock $ \_ -> do
         deleteCaches pkgDir
-        withMVar eeInstallLock $ \(done,total) ->
-            $logSticky ("Progress: " <> T.pack (show done) <> "/" <> T.pack (show total))
+        withMVar eeInstallLock $ \() ->
+            $logSticky ("Progress: " <> T.pack (show (acCompleted ac)) <> "/" <> T.pack (show (acTotalActions ac)))
         announce
         cabal False $ "configure" : map T.unpack configOpts
         $logDebug $ T.pack $ show configOpts
@@ -511,7 +506,7 @@ singleBuild :: M env m
             -> m ()
 singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
   withSingleContext ac ee task $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
-    (cache, _neededConfig) <- ensureConfig pkgDir ee task (announce "configure") cabal cabalfp []
+    (cache, _neededConfig) <- ensureConfig pkgDir ac ee task (announce "configure") cabal cabalfp []
 
     fileModTimes <- getPackageFileModTimes package cabalfp
     writeBuildCache pkgDir fileModTimes
@@ -520,15 +515,14 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
     config <- asks getConfig
     cabal (console && configHideTHLoading config) ["build"]
 
-    modifyMVar_ eeInstallLock $ \(done,total) -> do
+    withMVar eeInstallLock $ \() -> do
         announce "install"
         cabal False ["install"]
-        unless (total == 1) $ do
-            let done' = done + 1
-            $logSticky ("Progress: " <> T.pack (show done') <> "/" <> T.pack (show total))
-            when (done' == total)
-                 ($logStickyDone ("Completed all " <> T.pack (show total) <> " packages."))
-        return (done + 1,total)
+        unless (acTotalActions == 1) $ do
+            let done' = acCompleted + 1
+            $logSticky ("Progress: " <> T.pack (show done') <> "/" <> T.pack (show acTotalActions))
+            when (done' == acTotalActions)
+                 ($logStickyDone ("Completed all " <> T.pack (show acTotalActions) <> " packages."))
 
     let pkgDbs =
             case taskLocation task of
@@ -557,7 +551,7 @@ singleTest :: M env m
 singleTest ac ee task =
     withSingleContext ac ee task $ \package cabalfp pkgDir cabal announce console mlogFile ->
     unless (Set.null $ packageTests package) $ do
-        (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (test)") cabal cabalfp ["--enable-tests"]
+        (_cache, neededConfig) <- ensureConfig pkgDir ac ee task (announce "configure (test)") cabal cabalfp ["--enable-tests"]
         config <- asks getConfig
 
         let needBuild = neededConfig ||
@@ -630,7 +624,7 @@ singleBench :: M env m
 singleBench ac ee task =
     withSingleContext ac ee task $ \package cabalfp pkgDir cabal announce console _mlogFile ->
     unless (Set.null $ packageBenchmarks package) $ do
-        (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (benchmarks)") cabal cabalfp ["--enable-benchmarks"]
+        (_cache, neededConfig) <- ensureConfig pkgDir ac ee task (announce "configure (benchmarks)") cabal cabalfp ["--enable-benchmarks"]
 
         let needBuild = neededConfig ||
                 (case taskType task of

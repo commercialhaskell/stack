@@ -37,6 +37,10 @@ data Action = Action
 data ActionContext = ActionContext
     { acRemaining :: !(Set ActionId)
     -- ^ Does not include the current action
+    , acCompleted :: !Int
+    -- ^ Number of actions completed so far
+    , acTotalActions :: !Int
+    -- ^ Total number of actions to be performed
     }
     deriving Show
 
@@ -44,6 +48,8 @@ data ExecuteState = ExecuteState
     { esActions    :: TVar [Action]
     , esExceptions :: TVar [SomeException]
     , esInAction   :: TVar (Set ActionId)
+    , esCompleted  :: TVar Int
+    , esTotalActions :: !Int
     }
 
 data ExecuteException
@@ -63,6 +69,8 @@ runActions threads actions0 = do
         <$> newTVarIO actions0
         <*> newTVarIO []
         <*> newTVarIO Set.empty
+        <*> newTVarIO 0
+        <*> pure (length actions0)
     if threads <= 1
         then runActions' es
         else runConcurrently $ sequenceA_ $ replicate threads $ Concurrently $ runActions' es
@@ -99,17 +107,22 @@ runActions' ExecuteState {..} =
                         inAction
                 writeTVar esActions as'
                 modifyTVar esInAction (Set.insert $ actionId action)
+                completed <- readTVar esCompleted
                 return $ mask $ \restore -> do
                     eres <- try $ restore $ actionDo action ActionContext
                         { acRemaining = remaining
+                        , acCompleted = completed
+                        , acTotalActions = esTotalActions
                         }
                     case eres of
                         Left err -> atomically $ do
                             modifyTVar esExceptions (err:)
                             modifyTVar esInAction (Set.delete $ actionId action)
+                            modifyTVar esCompleted (+1)
                         Right () -> do
                             atomically $ do
                                 modifyTVar esInAction (Set.delete $ actionId action)
+                                modifyTVar esCompleted (+1)
                                 let dropDep a = a { actionDeps = Set.delete (actionId action) $ actionDeps a }
                                 modifyTVar esActions $ map dropDep
                             restore loop
