@@ -166,6 +166,17 @@ executable stack
                 , http-client
   default-language:    Haskell2010
 
+executable stack-integration-tests
+  hs-source-dirs: src/test
+  main-is:        IntegrationTests.hs
+  ghc-options:    -Wall
+  build-depends:  base >= 4.7 && <5
+                , hspec
+                , process
+                , temporary
+                , directory
+  default-language:    Haskell2010
+
 test-suite stack-test
   type:           exitcode-stdio-1.0
   hs-source-dirs: src/test
