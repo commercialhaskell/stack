@@ -339,7 +339,7 @@ ensureConfig :: M env m
              -> m () -- ^ announce
              -> (Bool -> [String] -> m ()) -- ^ cabal
              -> [Text]
-             -> m ConfigCache
+             -> m (ConfigCache, Bool)
 ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal extra = do
     -- Determine the old and new configuration in the local directory, to
     -- determine if we need to reconfigure.
@@ -363,7 +363,8 @@ ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal extra = do
             , configCacheDeps = allDeps
             }
 
-    when (mOldConfigCache /= Just newConfigCache) $ withMVar eeConfigureLock $ \_ -> do
+    let needConfig = mOldConfigCache /= Just newConfigCache
+    when needConfig $ withMVar eeConfigureLock $ \_ -> do
         deleteCaches pkgDir
         withMVar eeInstallLock $ \(done,total) ->
             $logSticky ("Progress: " <> T.pack (show done) <> "/" <> T.pack (show total))
@@ -372,7 +373,7 @@ ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal extra = do
         $logDebug $ T.pack $ show configOpts
         writeConfigCache pkgDir newConfigCache
 
-    return newConfigCache
+    return (newConfigCache, needConfig)
 
 withSingleContext :: M env m
                   => ActionContext
@@ -507,7 +508,7 @@ singleBuild :: M env m
             -> m ()
 singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
   withSingleContext ac ee task $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
-    cache <- ensureConfig pkgDir ee task (announce "configure") cabal []
+    (cache, _neededConfig) <- ensureConfig pkgDir ee task (announce "configure") cabal []
 
     fileModTimes <- getPackageFileModTimes package cabalfp
     writeBuildCache pkgDir fileModTimes
@@ -553,11 +554,16 @@ singleTest :: M env m
 singleTest ac ee task =
     withSingleContext ac ee task $ \package _cabalfp pkgDir cabal announce console mlogFile ->
     unless (Set.null $ packageTests package) $ do
-        _cache <- ensureConfig pkgDir ee task (announce "configure (test)") cabal ["--enable-tests"]
-
-        announce "build (test)" -- TODO only rebuild as necessary
+        (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (test)") cabal ["--enable-tests"]
         config <- asks getConfig
-        cabal (console && configHideTHLoading config) ["build"]
+
+        let needBuild = neededConfig ||
+                (case taskType task of
+                    TTLocal lp -> lpDirtyFiles lp
+                    _ -> assert False True)
+        when needBuild $ do
+            announce "build (test)"
+            cabal (console && configHideTHLoading config) ["build"]
 
         bconfig <- asks getBuildConfig
         distRelativeDir' <- distRelativeDir
@@ -621,11 +627,16 @@ singleBench :: M env m
 singleBench ac ee task =
     withSingleContext ac ee task $ \package _cabalfp pkgDir cabal announce console _mlogFile ->
     unless (Set.null $ packageBenchmarks package) $ do
-        _cache <- ensureConfig pkgDir ee task (announce "configure (benchmarks)") cabal ["--enable-benchmarks"]
+        (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (benchmarks)") cabal ["--enable-benchmarks"]
 
-        announce "build (benchmarks)" -- TODO only rebuild as necessary
-        config <- asks getConfig
-        cabal (console && configHideTHLoading config) ["build"]
+        let needBuild = neededConfig ||
+                (case taskType task of
+                    TTLocal lp -> lpDirtyFiles lp
+                    _ -> assert False True)
+        when needBuild $ do
+            announce "build (benchmarks)"
+            config <- asks getConfig
+            cabal (console && configHideTHLoading config) ["build"]
 
         announce "benchmarks"
         cabal False ["bench"]
