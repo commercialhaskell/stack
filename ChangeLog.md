@@ -9,6 +9,7 @@
 * Merge `stack deps` functionality into `stack build`
 * `install` command [#153](https://github.com/commercialhaskell/stack/issues/153) and [#272](https://github.com/commercialhaskell/stack/issues/272)
 * overriding architecture value (useful to force 64-bit GHC on Windows, for example)
+* Overhauled test running (allows cycles, avoids unnecessary recompilation, etc)
 
 ## 0.0.1
 
