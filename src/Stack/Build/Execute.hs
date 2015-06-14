@@ -279,7 +279,21 @@ executePlan' plan ee = do
             (planTasks plan)
             (planFinals plan)
     threads <- asks $ configJobs . getConfig
-    errs <- liftIO $ runActions threads actions
+    errs <- liftIO $ runActions threads actions $ \doneVar -> do
+        let total = length actions
+            loop prev
+                | prev == total =
+                    runInBase $ $logStickyDone ("Completed all " <> T.pack (show total) <> " actions.")
+                | otherwise = do
+                    runInBase $ $logSticky ("Progress: " <> T.pack (show prev) <> "/" <> T.pack (show total))
+                    done <- atomically $ do
+                        done <- readTVar doneVar
+                        check $ done /= prev
+                        return done
+                    loop done
+        if total > 1
+            then loop 0
+            else return ()
     unless (null errs) $ throwM $ ExecutionFailure errs
 
 toActions :: M env m
@@ -303,8 +317,7 @@ toActions runInBase ee (mbuild, mfinal) =
                 ]
     afinal =
         case (,) <$> mfinal <*> mfunc of
-            Nothing -> []
-            Just (task@Task {..}, func) ->
+            Just (task@Task {..}, (func, checkTask)) | checkTask task ->
                 [ Action
                     { actionId = ActionId taskProvides ATFinal
                     , actionDeps = addBuild taskProvides $
@@ -312,6 +325,7 @@ toActions runInBase ee (mbuild, mfinal) =
                     , actionDo = \ac -> runInBase $ func ac ee task
                     }
                 ]
+            _ -> []
       where
         addBuild ident =
             case mbuild of
@@ -321,14 +335,23 @@ toActions runInBase ee (mbuild, mfinal) =
     mfunc =
         case boptsFinalAction $ eeBuildOpts ee of
             DoNothing -> Nothing
-            DoTests -> Just singleTest
-            DoBenchmarks -> Just singleBench
-            DoHaddock -> Just singleHaddock
+            DoTests -> Just (singleTest, checkTest)
+            DoBenchmarks -> Just (singleBench, checkBench)
+            DoHaddock -> Just (singleHaddock, const True)
+
+    checkTest task =
+        case taskType task of
+            TTLocal lp -> not $ Set.null $ packageTests $ lpPackage lp
+            _ -> assert False False
+
+    checkBench task =
+        case taskType task of
+            TTLocal lp -> not $ Set.null $ packageBenchmarks $ lpPackage lp
+            _ -> assert False False
 
 -- | Ensure that the configuration for the package matches what is given
 ensureConfig :: M env m
              => Path Abs Dir -- ^ package directory
-             -> ActionContext
              -> ExecuteEnv
              -> Task
              -> m () -- ^ announce
@@ -336,7 +359,7 @@ ensureConfig :: M env m
              -> Path Abs File -- ^ .cabal file
              -> [Text]
              -> m (ConfigCache, Bool)
-ensureConfig pkgDir ac ExecuteEnv {..} Task {..} announce cabal cabalfp extra = do
+ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal cabalfp extra = do
     -- Determine the old and new configuration in the local directory, to
     -- determine if we need to reconfigure.
     mOldConfigCache <- tryGetConfigCache pkgDir
@@ -363,8 +386,6 @@ ensureConfig pkgDir ac ExecuteEnv {..} Task {..} announce cabal cabalfp extra = 
                   || mOldCabalMod /= Just newCabalMod
     when needConfig $ withMVar eeConfigureLock $ \_ -> do
         deleteCaches pkgDir
-        withMVar eeInstallLock $ \() ->
-            $logSticky ("Progress: " <> T.pack (show (acCompleted ac)) <> "/" <> T.pack (show (acTotalActions ac)))
         announce
         cabal False $ "configure" : map T.unpack configOpts
         $logDebug $ T.pack $ show configOpts
@@ -506,7 +527,7 @@ singleBuild :: M env m
             -> m ()
 singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
   withSingleContext ac ee task $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
-    (cache, _neededConfig) <- ensureConfig pkgDir ac ee task (announce "configure") cabal cabalfp []
+    (cache, _neededConfig) <- ensureConfig pkgDir ee task (announce "configure") cabal cabalfp []
 
     fileModTimes <- getPackageFileModTimes package cabalfp
     writeBuildCache pkgDir fileModTimes
@@ -518,11 +539,6 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
     withMVar eeInstallLock $ \() -> do
         announce "install"
         cabal False ["install"]
-        unless (acTotalActions == 1) $ do
-            let done' = acCompleted + 1
-            $logSticky ("Progress: " <> T.pack (show done') <> "/" <> T.pack (show acTotalActions))
-            when (done' == acTotalActions)
-                 ($logStickyDone ("Completed all " <> T.pack (show acTotalActions) <> " packages."))
 
     let pkgDbs =
             case taskLocation task of
@@ -549,9 +565,8 @@ singleTest :: M env m
            -> Task
            -> m ()
 singleTest ac ee task =
-    withSingleContext ac ee task $ \package cabalfp pkgDir cabal announce console mlogFile ->
-    unless (Set.null $ packageTests package) $ do
-        (_cache, neededConfig) <- ensureConfig pkgDir ac ee task (announce "configure (test)") cabal cabalfp ["--enable-tests"]
+    withSingleContext ac ee task $ \package cabalfp pkgDir cabal announce console mlogFile -> do
+        (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (test)") cabal cabalfp ["--enable-tests"]
         config <- asks getConfig
 
         let needBuild = neededConfig ||
@@ -622,9 +637,8 @@ singleBench :: M env m
             -> Task
             -> m ()
 singleBench ac ee task =
-    withSingleContext ac ee task $ \package cabalfp pkgDir cabal announce console _mlogFile ->
-    unless (Set.null $ packageBenchmarks package) $ do
-        (_cache, neededConfig) <- ensureConfig pkgDir ac ee task (announce "configure (benchmarks)") cabal cabalfp ["--enable-benchmarks"]
+    withSingleContext ac ee task $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
+        (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (benchmarks)") cabal cabalfp ["--enable-benchmarks"]
 
         let needBuild = neededConfig ||
                 (case taskType task of

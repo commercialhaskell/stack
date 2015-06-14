@@ -11,7 +11,7 @@ module Control.Concurrent.Execute
     ) where
 
 import           Control.Applicative
-import           Control.Concurrent.Async (Concurrently (..))
+import           Control.Concurrent.Async (Concurrently (..), async)
 import           Control.Concurrent.STM
 import           Control.Exception
 import           Control.Monad            (join)
@@ -37,10 +37,6 @@ data Action = Action
 data ActionContext = ActionContext
     { acRemaining :: !(Set ActionId)
     -- ^ Does not include the current action
-    , acCompleted :: !Int
-    -- ^ Number of actions completed so far
-    , acTotalActions :: !Int
-    -- ^ Total number of actions to be performed
     }
     deriving Show
 
@@ -49,7 +45,6 @@ data ExecuteState = ExecuteState
     , esExceptions :: TVar [SomeException]
     , esInAction   :: TVar (Set ActionId)
     , esCompleted  :: TVar Int
-    , esTotalActions :: !Int
     }
 
 data ExecuteException
@@ -63,14 +58,15 @@ instance Show ExecuteException where
 
 runActions :: Int -- ^ threads
            -> [Action]
+           -> (TVar Int -> IO ()) -- ^ progress updated
            -> IO [SomeException]
-runActions threads actions0 = do
+runActions threads actions0 withProgress = do
     es <- ExecuteState
         <$> newTVarIO actions0
         <*> newTVarIO []
         <*> newTVarIO Set.empty
         <*> newTVarIO 0
-        <*> pure (length actions0)
+    _ <- async $ withProgress $ esCompleted es
     if threads <= 1
         then runActions' es
         else runConcurrently $ sequenceA_ $ replicate threads $ Concurrently $ runActions' es
@@ -107,12 +103,9 @@ runActions' ExecuteState {..} =
                         inAction
                 writeTVar esActions as'
                 modifyTVar esInAction (Set.insert $ actionId action)
-                completed <- readTVar esCompleted
                 return $ mask $ \restore -> do
                     eres <- try $ restore $ actionDo action ActionContext
                         { acRemaining = remaining
-                        , acCompleted = completed
-                        , acTotalActions = esTotalActions
                         }
                     case eres of
                         Left err -> atomically $ do
