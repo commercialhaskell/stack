@@ -169,26 +169,5 @@ $ STACK_YAML=stack-7.10.yaml stack build  # builds using the given yaml file
 
 __I heard you can use this with Docker?__
 
-Yes, stack supports using Docker with images that contain all of Stackage and
-the tools pre-installed.  Commands like `stack build` will automatically run
-in a temporary container (with your project bind-mounted into the container).
-To enable, add this to your `stack.yaml`:
-
-```
-docker:
-  enable: true
-```
-
-This will use a Docker image tagged with the same LTS version as your resolver.
-Note that the Docker images are really big (approx. 10 GB), and not all LTS
-versions have a Docker image (they tend to lag behind).  We also recommend
-against using this with Docker's _devicemapper_ storage driver, since its
-default settings have trouble with images this big.  Finally, this is currently
-only supported with a Docker daemon running directly on the host (so
-boot2docker will not work).
-
-You can also add the `stack` tool into an existing docker image that you have.
-There is an example Dockerfile that does this
-
-    cp /etc/docker/haskell-stack/Dockerfile ./
-    docker build -t haskell-stack:7.8 .
+Yes, stack supports using Docker with images that contain preinstalled Stackage
+packages and the tools. See [[Docker]] for details.

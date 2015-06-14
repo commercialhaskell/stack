@@ -16,6 +16,8 @@ The stack.yaml configuration options break down into project specific and non-pr
 
 ### docker
 
+See [Docker](Docker#configuration).
+
 ### connection-count
 
 Integer indicating how many simultaneous downloads are allowed to happen
