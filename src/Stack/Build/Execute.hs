@@ -280,15 +280,15 @@ toActions runInBase ee task@Task {..} =
         }
     ]
 
-singleBuild :: M env m
-            => ActionContext
-            -> ExecuteEnv
-            -> Task
-            -> m ()
-singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
-  withPackage $ \package cabalfp pkgDir ->
-  withLogFile package $ \mlogFile ->
-  withCabal pkgDir mlogFile $ \cabal -> do
+-- | Ensure that the configuration for the package matches what is given
+ensureConfig :: M env m
+             => Path Abs Dir -- ^ package directory
+             -> ExecuteEnv
+             -> Task
+             -> (Text -> m ()) -- ^ announce
+             -> (Bool -> [String] -> m ()) -- ^ cabal
+             -> m ConfigCache
+ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal = do
     -- Determine the old and new configuration in the local directory, to
     -- determine if we need to reconfigure.
     mOldConfigCache <- tryGetConfigCache pkgDir
@@ -319,6 +319,19 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
         cabal False $ "configure" : map T.unpack configOpts
         $logDebug $ T.pack $ show configOpts
         writeConfigCache pkgDir newConfigCache
+
+    return newConfigCache
+
+singleBuild :: M env m
+            => ActionContext
+            -> ExecuteEnv
+            -> Task
+            -> m ()
+singleBuild ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
+  withPackage $ \package cabalfp pkgDir ->
+  withLogFile package $ \mlogFile ->
+  withCabal pkgDir mlogFile $ \cabal -> do
+    cache <- ensureConfig pkgDir ee task announce cabal
 
     fileModTimes <- getPackageFileModTimes package cabalfp
     writeBuildCache pkgDir fileModTimes
@@ -353,10 +366,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
                 (packageVersion package)
         (True, Nothing) -> throwM $ Couldn'tFindPkgId $ packageName package
         (True, Just pkgid) -> return $ Library pkgid
-    writeFlagCache
-        mpkgid'
-        (map encodeUtf8 configOpts)
-        allDeps
+    writeFlagCache mpkgid' cache
     liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides mpkgid'
   where
     announce x = $logInfo $ T.concat

@@ -25,13 +25,11 @@ import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader
 import           Data.Binary (Binary)
 import qualified Data.Binary as Binary
-import           Data.ByteString (ByteString)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (catMaybes, mapMaybe)
-import           Data.Set (Set)
 import qualified Data.Set as Set
 import           GHC.Generics (Generic)
 import           Path
@@ -172,15 +170,10 @@ tryGetFlagCache gid = do
 
 writeFlagCache :: (MonadIO m, MonadReader env m, HasBuildConfig env, MonadThrow m)
                => Installed
-               -> [ByteString]
-               -> Set GhcPkgId
+               -> ConfigCache
                -> m ()
-writeFlagCache gid flags deps = do
+writeFlagCache gid cache = do
     file <- flagCacheFile gid
-    let cache = ConfigCache
-                              { configCacheOpts = flags
-                              , configCacheDeps = deps
-                              }
     liftIO $ do
         createDirectoryIfMissing True $ toFilePath $ parent file
 
