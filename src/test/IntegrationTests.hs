@@ -28,8 +28,15 @@ inDir fp action = do
 
 
 spec :: Spec
-spec = describe "stack" $
-  it "tests cyclic dependencies" $ inTempDir $ do
-    let textPkg = "text-1.2.1.1"
-    stack "unpack" [textPkg]
-    inDir textPkg $ stack "test" []
+spec = describe "stack" $ do
+  let textPkg = "text-1.2.1.1"
+
+  describe "test" $ do
+    it "tests cyclic dependencies" $ inTempDir $ do
+      stack "unpack" [textPkg]
+      inDir textPkg $ stack "test" []
+
+  describe "unpack" $ do
+    it "does not create a stack.yaml" $ inTempDir $ do
+      stack "unpack" [textPkg]
+      doesFileExist "stack.yaml" `shouldReturn` False
