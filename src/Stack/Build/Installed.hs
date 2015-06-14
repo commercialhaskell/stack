@@ -41,13 +41,11 @@ type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig en
 data LoadHelper = LoadHelper
     { lhId   :: !GhcPkgId
     , lhDeps :: ![GhcPkgId]
-    , lhPair :: !(PackageName, (Version, Location, Installed))
+    , lhPair :: !(PackageName, (Version, Location, Installed)) -- TODO Version is now redundant and can be gleaned from Installed
     }
     deriving Show
 
-type InstalledMap = Map PackageName (Version, Location, Installed)
-data Installed = Library GhcPkgId | Executable
-    deriving (Show, Eq, Ord)
+type InstalledMap = Map PackageName (Version, Location, Installed) -- TODO Version is now redundant and can be gleaned from Installed
 
 -- | Returns the new InstalledMap and all of the locally registered packages.
 getInstalled :: (M env m, PackageInstallInfo pii)
@@ -103,7 +101,7 @@ getInstalled menv profiling sourceMap = do
                         -- Passed all the tests, mark this as installed!
                         _ -> m
           where
-            m = Map.singleton name (version, loc, Executable)
+            m = Map.singleton name (version, loc, Executable $ PackageIdentifier name version)
     exesSnap <- getInstalledExes Snap
     exesLocal <- getInstalledExes Local
     let installedMap = Map.unions

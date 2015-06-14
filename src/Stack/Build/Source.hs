@@ -146,24 +146,27 @@ loadLocals bopts latestVersion = do
         cabalfp <- getCabalFileName dir
         name <- parsePackageNameFromFilePath cabalfp
         let wanted = validWanted && isWanted dirs names dir name
-        pkg <- readPackage
-            PackageConfig
-                { packageConfigEnableTests = wanted && boptsFinalAction bopts == DoTests
-                , packageConfigEnableBenchmarks = wanted && boptsFinalAction bopts == DoBenchmarks
+            config = PackageConfig
+                { packageConfigEnableTests = False
+                , packageConfigEnableBenchmarks = False
                 , packageConfigFlags = localFlags bopts bconfig name
                 , packageConfigGhcVersion = bcGhcVersion bconfig
                 , packageConfigPlatform = configPlatform $ getConfig bconfig
                 }
-            cabalfp
+            configFinal = config
+                { packageConfigEnableTests = wanted && boptsFinalAction bopts == DoTests
+                , packageConfigEnableBenchmarks = wanted && boptsFinalAction bopts == DoBenchmarks
+                }
+        pkg <- readPackage config cabalfp
+        pkgFinal <- readPackage configFinal cabalfp
         when (packageName pkg /= name) $ throwM
             $ MismatchedCabalName cabalfp (packageName pkg)
         mbuildCache <- tryGetBuildCache dir
-        mconfigCache <- tryGetConfigCache dir
         fileModTimes <- getPackageFileModTimes pkg cabalfp
         return LocalPackage
             { lpPackage = pkg
+            , lpPackageFinal = pkgFinal
             , lpWanted = wanted
-            , lpLastConfigOpts = mconfigCache
             , lpDirtyFiles =
                   maybe True
                         ((/= fileModTimes) . buildCacheTimes)

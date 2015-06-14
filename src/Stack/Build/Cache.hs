@@ -6,6 +6,7 @@
 module Stack.Build.Cache
     ( tryGetBuildCache
     , tryGetConfigCache
+    , tryGetCabalMod
     , getPackageFileModTimes
     , getInstalledExes
     , buildCacheTimes
@@ -15,6 +16,7 @@ module Stack.Build.Cache
     , writeFlagCache
     , writeBuildCache
     , writeConfigCache
+    , writeCabalMod
     ) where
 
 import           Control.Exception.Enclosed (handleIO, tryIO)
@@ -25,16 +27,12 @@ import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader
 import           Data.Binary (Binary)
 import qualified Data.Binary as Binary
-import           Data.ByteString (ByteString)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (catMaybes, mapMaybe)
-import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Text (Text)
-import           Data.Text.Encoding (encodeUtf8)
 import           GHC.Generics (Generic)
 import           Path
 import           Path.IO
@@ -93,6 +91,11 @@ tryGetConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m,
                   => Path Abs Dir -> m (Maybe ConfigCache)
 tryGetConfigCache = tryGetCache configCacheFile
 
+-- | Try to read the mod time of the cabal file from the last build
+tryGetCabalMod :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
+               => Path Abs Dir -> m (Maybe ModTime)
+tryGetCabalMod = tryGetCache configCabalMod
+
 -- | Try to load a cache.
 tryGetCache :: (MonadIO m, Binary a, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
             => (Path Abs Dir -> m (Path Abs File))
@@ -124,32 +127,25 @@ writeBuildCache dir times =
 -- | Write the dirtiness cache for this package's configuration.
 writeConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
                 => Path Abs Dir
-                -> [Text]
-                -> Set GhcPkgId -- ^ dependencies
-                -> Path Abs file
-                -> TaskType
+                -> ConfigCache
                 -> m ()
-writeConfigCache dir opts deps cabalfp ttype =
-    do now <- liftIO (getModificationTime (toFilePath cabalfp))
-       let cache = ConfigCache
-                   { configCacheOpts = map encodeUtf8 opts
-                   , configCacheDeps = deps
-                   , configCabalFileModTime =
-                         case ttype of
-                           TTLocal lp _ | lpWanted lp -> Just (modTime now)
-                           _ -> Nothing
-                   }
-       writeCache
-           dir
-           configCacheFile
-           cache
+writeConfigCache dir = writeCache dir configCacheFile
+
+-- | See 'tryGetCabalMod'
+writeCabalMod :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
+              => Path Abs Dir
+              -> ModTime
+              -> m ()
+writeCabalMod dir = writeCache dir configCabalMod
 
 -- | Delete the caches for the project.
 deleteCaches :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, MonadThrow m, HasEnvConfig env)
              => Path Abs Dir -> m ()
 deleteCaches dir = do
+    {- FIXME confirm that this is acceptable to remove
     bfp <- buildCacheFile dir
     removeFileIfExists bfp
+    -}
     cfp <- configCacheFile dir
     removeFileIfExists cfp
 
@@ -167,16 +163,19 @@ writeCache dir get' content = do
              (Binary.encode content))
 
 flagCacheFile :: (MonadIO m, MonadThrow m, MonadReader env m, HasBuildConfig env)
-              => GhcPkgId
+              => Installed
               -> m (Path Abs File)
-flagCacheFile gid = do
-    rel <- parseRelFile $ ghcPkgIdString gid
+flagCacheFile installed = do
+    rel <- parseRelFile $
+        case installed of
+            Library gid -> ghcPkgIdString gid
+            Executable ident -> packageIdentifierString ident
     dir <- flagCacheLocal
     return $ dir </> rel
 
 -- | Loads the flag cache for the given installed extra-deps
 tryGetFlagCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasBuildConfig env)
-                => GhcPkgId
+                => Installed
                 -> m (Maybe ConfigCache)
 tryGetFlagCache gid = do
     file <- flagCacheFile gid
@@ -186,22 +185,11 @@ tryGetFlagCache gid = do
         _ -> return Nothing
 
 writeFlagCache :: (MonadIO m, MonadReader env m, HasBuildConfig env, MonadThrow m)
-               => GhcPkgId
-               -> [ByteString]
-               -> Set GhcPkgId
-               -> Path Abs File
-               -> TaskType
+               => Installed
+               -> ConfigCache
                -> m ()
-writeFlagCache gid flags deps cabalfp ttype = do
+writeFlagCache gid cache = do
     file <- flagCacheFile gid
-    now <- liftIO $ getModificationTime (toFilePath cabalfp)
-    let cache = ConfigCache
-                              { configCacheOpts = flags
-                              , configCacheDeps = deps
-                              , configCabalFileModTime = case ttype of
-                                                           TTLocal lp _ | lpWanted lp -> Just (modTime now)
-                                                           _ -> Nothing
-                              }
     liftIO $ do
         createDirectoryIfMissing True $ toFilePath $ parent file
 

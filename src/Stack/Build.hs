@@ -62,7 +62,7 @@ build bopts = do
         constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered loadPackage sourceMap installedMap
 
     if boptsDryrun bopts
-        then printPlan plan
+        then printPlan (boptsFinalAction bopts) plan
         else executePlan menv bopts baseConfigOpts locals plan
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
