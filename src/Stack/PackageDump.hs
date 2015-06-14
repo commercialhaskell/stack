@@ -39,12 +39,11 @@ import qualified Data.Map as Map
 import           Data.Maybe (catMaybes)
 
 import qualified Data.Set as Set
+import qualified Data.Text as T
 
 
 import           Data.Time.Clock
 import           Data.Typeable (Typeable)
-import           Formatting
-import           Formatting.Time
 import           Path
 import           Prelude -- Fix AMP warning
 import           Stack.GhcPkg
@@ -67,10 +66,12 @@ ghcPkgDump menv mpkgDb sink = do
     start <- liftIO getCurrentTime
     a <- sinkProcessStdout Nothing menv "ghc-pkg" args sink
     end <- liftIO getCurrentTime
-    $logDebug $
-        sformat ("ghc-pkg (" % seconds 3 % "s) with args " % build)
-                (diffUTCTime end start)
-                (show args)
+    $logDebug $ T.concat
+        [ "ghc-pkg ("
+        , T.pack $ show $ diffUTCTime end start
+        , "s) with args "
+        , T.pack $ show args
+        ]
     return a
   where
     args = concat

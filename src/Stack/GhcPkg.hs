@@ -28,8 +28,6 @@ import           Data.Streaming.Process
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Time.Clock
-import           Formatting
-import           Formatting.Time
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
 import           Prelude hiding (FilePath)
 import           Stack.Build.Types (StackBuildException (Couldn'tFindPkgId))
@@ -70,10 +68,12 @@ ghcPkg menv pkgDbs args = do
                 go
             Right _ -> return eres
     end <- liftIO getCurrentTime
-    $logDebug $
-        sformat ("ghc-pkg (" % seconds 3 % "s) with args " % build)
-                (diffUTCTime end start)
-                (show args')
+    $logDebug $ T.concat
+        [ "ghc-pkg ("
+        , T.pack $ show $ diffUTCTime end start
+        , "s) with args "
+        , T.pack $ show args'
+        ]
     return r
   where
     go = tryProcessStdout Nothing menv "ghc-pkg" args'
