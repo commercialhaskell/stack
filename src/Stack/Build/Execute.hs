@@ -388,7 +388,6 @@ ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal cabalfp extra = do
         deleteCaches pkgDir
         announce
         cabal False $ "configure" : map T.unpack configOpts
-        $logDebug $ T.pack $ show configOpts
         writeConfigCache pkgDir newConfigCache
         writeCabalMod pkgDir newCabalMod
 
@@ -491,7 +490,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
                             Nothing -> Inherit
                             Just (_, h) -> UseHandle h
                     }
-            $logDebug $ "Running: " <> T.pack (show $ toFilePath exeName : fullArgs)
+            $logProcessRun (toFilePath exeName) fullArgs
 
             -- Use createProcess_ to avoid the log file being closed afterwards
             (Just inH, moutH, Nothing, ph) <- liftIO $ createProcess_ "singleBuild" cp

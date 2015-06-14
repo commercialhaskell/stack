@@ -15,22 +15,20 @@ module Stack.Setup
   ) where
 
 import           Control.Applicative
-import           Control.Exception (Exception)
 import           Control.Monad (liftM, when, join, void)
-import           Control.Monad.Catch (MonadThrow, throwM, MonadMask)
+import           Control.Monad.Catch
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, ReaderT (..), asks)
 import           Control.Monad.State (get, put, modify)
 import           Control.Monad.Trans.Control
-
 import           Data.Aeson.Extended
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import           Data.Conduit (Conduit, ($$), (=$), await, yield, awaitForever)
 import           Data.Conduit.Lift (evalStateC)
-import           Data.Conduit.Process (ProcessExitedUnsuccessfully)
 import qualified Data.Conduit.List as CL
+import           Data.Conduit.Process (ProcessExitedUnsuccessfully)
 import           Data.IORef
 import           Data.List (intercalate)
 import           Data.Map (Map)
@@ -276,12 +274,12 @@ ensureGHC sopts = do
     expected = soptsExpected sopts
 
 -- | Get the major version of the system GHC, if available
-getSystemGHC :: (MonadIO m) => EnvOverride -> m (Maybe Version)
+getSystemGHC :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m) => EnvOverride -> m (Maybe Version)
 getSystemGHC menv = do
     exists <- doesExecutableExist menv "ghc"
     if exists
         then do
-            eres <- liftIO $ tryProcessStdout Nothing menv "ghc" ["--numeric-version"]
+            eres <- tryProcessStdout Nothing menv "ghc" ["--numeric-version"]
             return $ do
                 Right bs <- Just eres
                 parseVersion $ S8.takeWhile isValidChar bs
@@ -491,7 +489,7 @@ data ArchiveType
     | TarXz
     | SevenZ
 
-installGHCPosix :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env)
+installGHCPosix :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
                 => SetupInfo
                 -> Path Abs File
                 -> ArchiveType
@@ -677,7 +675,7 @@ chunksOverTime diff = do
 
 
 -- | Perform a basic sanity check of GHC
-sanityCheck :: (MonadIO m, MonadMask m, MonadLogger m)
+sanityCheck :: (MonadIO m, MonadMask m, MonadLogger m, MonadBaseControl IO m)
             => EnvOverride
             -> m ()
 sanityCheck menv = withSystemTempDirectory "stack-sanity-check" $ \dir -> do

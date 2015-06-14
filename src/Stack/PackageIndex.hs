@@ -27,11 +27,12 @@ import           Control.Applicative
 import           Control.Exception (Exception)
 import           Control.Exception.Enclosed (tryIO)
 import           Control.Monad (unless, when, liftM, mzero)
-import           Control.Monad.Catch (MonadThrow, throwM)
+import           Control.Monad.Catch (MonadThrow, throwM, MonadCatch)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger                  (MonadLogger, logDebug,
                                                         logInfo, logWarn)
 import           Control.Monad.Reader (asks)
+import           Control.Monad.Trans.Control
 
 import           Data.Aeson.Extended
 import qualified Data.Binary as Binary
@@ -99,17 +100,20 @@ data PackageCache = PackageCache
 instance Binary.Binary PackageCache
 
 -- | Stream all of the cabal files from the 00-index tar file.
-sourcePackageIndex :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m)
-                   => EnvOverride
-                   -> PackageIndex
-                   -> Producer m (Either UnparsedCabalFile (PackageIdentifier, L.ByteString))
-sourcePackageIndex menv index = do
+withSourcePackageIndex
+    :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+    => EnvOverride
+    -> PackageIndex
+    -> (Producer m (Either UnparsedCabalFile (PackageIdentifier, L.ByteString)) -> m a)
+    -> m a
+withSourcePackageIndex menv index cont = do
     requireIndex menv index
     -- This uses full on lazy I/O instead of ResourceT to provide some
     -- protections. Caveat emptor
-    path <- configPackageIndex (indexName index)
-    lbs <- liftIO $ L.readFile $ Path.toFilePath path
-    loop 0 (Tar.read lbs)
+    cont $ do
+        path <- configPackageIndex (indexName index)
+        lbs <- liftIO $ L.readFile $ Path.toFilePath path
+        loop 0 (Tar.read lbs)
   where
     loop blockNo (Tar.Next e es) = do
         goE blockNo e
@@ -171,7 +175,7 @@ instance Show PackageIndexException where
 -- | Require that an index be present, updating if it isn't.
 requireIndex :: (MonadIO m,MonadLogger m
                 ,MonadThrow m,MonadReader env m,HasHttpManager env
-                ,HasConfig env)
+                ,HasConfig env,MonadBaseControl IO m,MonadCatch m)
              => EnvOverride
              -> PackageIndex
              -> m ()
@@ -184,7 +188,7 @@ requireIndex menv index = do
 updateAllIndices
     :: (MonadIO m,MonadLogger m
        ,MonadThrow m,MonadReader env m,HasHttpManager env
-       ,HasConfig env)
+       ,HasConfig env,MonadBaseControl IO m, MonadCatch m)
     => EnvOverride
     -> m ()
 updateAllIndices menv =
@@ -193,7 +197,7 @@ updateAllIndices menv =
 -- | Update the index tarball
 updateIndex :: (MonadIO m,MonadLogger m
                ,MonadThrow m,MonadReader env m,HasHttpManager env
-               ,HasConfig env)
+               ,HasConfig env,MonadBaseControl IO m, MonadCatch m)
             => EnvOverride
             -> PackageIndex
             -> m ()
@@ -209,7 +213,7 @@ updateIndex menv index =
         (False, ILGit url) -> logUpdate url >> (throwM $ GitNotAvailable name)
 
 -- | Update the index Git repo and the index tarball
-updateIndexGit :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasConfig env)
+updateIndexGit :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasConfig env,MonadBaseControl IO m, MonadCatch m)
                => EnvOverride
                -> IndexName
                -> PackageIndex
@@ -341,7 +345,7 @@ instance FromJSON PackageDownload where
             }
 
 -- | Load the cached package URLs, or created the cache if necessary.
-getPackageCaches :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env)
+getPackageCaches :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
                  => EnvOverride
                  -> m (Map PackageIdentifier (PackageIndex, PackageCache))
 getPackageCaches menv = do
@@ -353,7 +357,7 @@ getPackageCaches menv = do
         return (fmap (index,) pis')
 
 -- | Populate the package index caches and return them.
-populateCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env)
+populateCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
               => EnvOverride
               -> PackageIndex
               -> m (Map PackageIdentifier PackageCache)
@@ -375,20 +379,21 @@ populateCache menv index = do
                 Nothing -> Nothing
                 Just pd -> Just (ident, pd)
 
-    (pis, pds) <- sourcePackageIndex menv index $$ getZipSink ((,)
-        <$> ZipSink (CL.mapMaybe toIdent =$ CL.consume)
-        <*> ZipSink (Map.fromList <$> (CL.mapMaybe parseDownload =$ CL.consume)))
+    withSourcePackageIndex menv index $ \source -> do
+        (pis, pds) <- source $$ getZipSink ((,)
+            <$> ZipSink (CL.mapMaybe toIdent =$ CL.consume)
+            <*> ZipSink (Map.fromList <$> (CL.mapMaybe parseDownload =$ CL.consume)))
 
-    pis' <- liftM Map.fromList $ forM pis $ \(ident, pc) ->
-        case Map.lookup ident pds of
-            Just d -> return (ident, pc { pcDownload = Just d })
-            Nothing
-                | indexRequireHashes index -> throwM $ MissingRequiredHashes (indexName index) ident
-                | otherwise -> return (ident, pc)
+        pis' <- liftM Map.fromList $ forM pis $ \(ident, pc) ->
+            case Map.lookup ident pds of
+                Just d -> return (ident, pc { pcDownload = Just d })
+                Nothing
+                    | indexRequireHashes index -> throwM $ MissingRequiredHashes (indexName index) ident
+                    | otherwise -> return (ident, pc)
 
-    $logStickyDone "Populated index cache."
+        $logStickyDone "Populated index cache."
 
-    return pis'
+        return pis'
 
 --------------- Lifted from cabal-install, Distribution.Client.Tar:
 -- | Return the number of blocks in an entry.

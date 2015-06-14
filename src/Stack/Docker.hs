@@ -22,7 +22,7 @@ module Stack.Docker
 import           Control.Applicative
 import           Control.Exception.Lifted
 import           Control.Monad
-import           Control.Monad.Catch (MonadThrow, throwM)
+import           Control.Monad.Catch (MonadThrow, throwM, MonadCatch)
 import           Control.Monad.IO.Class (MonadIO,liftIO)
 import           Control.Monad.Logger (MonadLogger,logError,logInfo,logWarn)
 import           Control.Monad.Writer (execWriter,runWriter,tell)
@@ -69,8 +69,9 @@ import           System.Posix.Signals (installHandler,sigTERM,Handler(Catch))
 
 -- | If Docker is enabled, re-runs the currently running OS command in a Docker container.
 -- Otherwise, runs the inner action.
-rerunWithOptionalContainer :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m)
-                           => Config -> Maybe (Path Abs Dir) -> IO () -> m ()
+rerunWithOptionalContainer
+    :: (MonadLogger m, MonadIO m, MonadThrow m, MonadBaseControl IO m, MonadCatch m)
+    => Config -> Maybe (Path Abs Dir) -> IO () -> m ()
 rerunWithOptionalContainer config mprojectRoot =
   rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs
   where
@@ -89,12 +90,13 @@ rerunWithOptionalContainer config mprojectRoot =
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
 -- Docker container.  Otherwise, runs the inner action.
-rerunCmdWithOptionalContainer :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m)
-                              => Config
-                              -> Maybe (Path Abs Dir)
-                              -> IO (FilePath,[String],Config)
-                              -> IO ()
-                              -> m ()
+rerunCmdWithOptionalContainer
+    :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m, MonadCatch m)
+    => Config
+    -> Maybe (Path Abs Dir)
+    -> IO (FilePath,[String],Config)
+    -> IO ()
+    -> m ()
 rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs inner =
   do inContainer <- getInContainer
      if inContainer || not (dockerEnable (configDocker config))
@@ -104,11 +106,12 @@ rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs inner =
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
 -- Docker container.  Otherwise, runs the inner action.
-rerunCmdWithRequiredContainer :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m)
-                              => Config
-                              -> Maybe (Path Abs Dir)
-                              -> IO (FilePath,[String],Config)
-                              -> m ()
+rerunCmdWithRequiredContainer
+    :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m, MonadCatch m)
+    => Config
+    -> Maybe (Path Abs Dir)
+    -> IO (FilePath,[String],Config)
+    -> m ()
 rerunCmdWithRequiredContainer config mprojectRoot getCmdArgs =
   do when (not (dockerEnable (configDocker config)))
           (throwM DockerMustBeEnabledException)
@@ -132,12 +135,12 @@ getInContainer =
        Just _ -> return True
 
 -- | Run a command in a new Docker container, then exit the process.
-runContainerAndExit :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m)
+runContainerAndExit :: (MonadLogger m, MonadIO m, MonadThrow m, MonadBaseControl IO m, MonadCatch m)
                     => Config
                     -> Maybe (Path Abs Dir)
                     -> FilePath
                     -> [String]
-                    -> [(String,String)]
+                    -> [(String, String)]
                     -> IO ()
                     -> m ()
 runContainerAndExit config
@@ -272,7 +275,7 @@ runContainerAndExit config
     docker = configDocker config
 
 -- | Clean-up old docker images and containers.
-cleanup :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m)
+cleanup :: (MonadLogger m, MonadIO m, MonadThrow m, MonadBaseControl IO m, MonadCatch m)
         => Config -> CleanupOpts -> m ()
 cleanup config opts =
   do envOverride <- getEnvOverride (configPlatform config)
@@ -496,7 +499,7 @@ cleanup config opts =
     containerStr = "container"
 
 -- | Inspect Docker image or container.
-inspect :: (MonadIO m,MonadThrow m,MonadLogger m,MonadBaseControl IO m)
+inspect :: (MonadIO m,MonadThrow m,MonadLogger m,MonadBaseControl IO m,MonadCatch m)
         => EnvOverride -> String -> m (Maybe Inspect)
 inspect envOverride image =
   do results <- inspects envOverride [image]
@@ -506,7 +509,7 @@ inspect envOverride image =
        _ -> throwM (InvalidInspectOutputException "expect a single result")
 
 -- | Inspect multiple Docker images and/or containers.
-inspects :: (MonadIO m,MonadThrow m,MonadLogger m,MonadBaseControl IO m)
+inspects :: (MonadIO m, MonadThrow m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
          => EnvOverride -> [String] -> m (Map String Inspect)
 inspects _ [] = return Map.empty
 inspects envOverride images =
@@ -521,7 +524,7 @@ inspects envOverride images =
        Left (ProcessExitedUnsuccessfully _ _) -> return Map.empty
 
 -- | Pull latest version of configured Docker image from registry.
-pull :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m)
+pull :: (MonadLogger m, MonadIO m, MonadThrow m, MonadBaseControl IO m, MonadCatch m)
      => Config -> m ()
 pull config =
   do envOverride <- getEnvOverride (configPlatform config)
@@ -551,8 +554,9 @@ pullImage envOverride docker image =
        Right () -> return ()
 
 -- | Check docker version (throws exception if incorrect)
-checkDockerVersion :: (MonadIO m,MonadThrow m,MonadLogger m,MonadBaseControl IO m)
-                   => EnvOverride -> m ()
+checkDockerVersion
+    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+    => EnvOverride -> m ()
 checkDockerVersion envOverride =
   do dockerExists <- doesExecutableExist envOverride "docker"
      unless dockerExists (throwM DockerNotInstalledException)
@@ -615,12 +619,11 @@ removeDirectoryContents path excludeDirs excludeFiles =
 -- | Produce a strict 'S.ByteString' from the stdout of a
 -- process. Throws a 'ProcessExitedUnsuccessfully' exception if the
 -- process fails.  Logs process's stderr using @$logError@.
-readDockerProcess :: (MonadIO m,MonadLogger m,MonadBaseControl IO m)
-                  => EnvOverride
-                  -> [String]
-                  -> m BS.ByteString
+readDockerProcess
+    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+    => EnvOverride -> [String] -> m BS.ByteString
 readDockerProcess envOverride args =
-  readProcessStdoutLogStderr "docker: " Nothing envOverride "docker" args
+  readProcessStdoutLogStderr Nothing envOverride "docker" args
 
 -- | Subdirectories of the home directory to sandbox between GHC/Stackage versions.
 sandboxedHomeSubdirectories :: [Path Rel Dir]

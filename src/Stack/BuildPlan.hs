@@ -160,7 +160,7 @@ instance Show BuildPlanException where
 -- This function will not provide test suite and benchmark dependencies.
 --
 -- This may fail if a target package is not present in the @BuildPlan@.
-resolveBuildPlan :: (MonadThrow m, MonadIO m, MonadReader env m, HasBuildConfig env, MonadLogger m, HasHttpManager env)
+resolveBuildPlan :: (MonadThrow m, MonadIO m, MonadReader env m, HasBuildConfig env, MonadLogger m, HasHttpManager env, MonadBaseControl IO m,MonadCatch m)
                  => EnvOverride
                  -> MiniBuildPlan
                  -> (PackageName -> Bool) -- ^ is it shadowed by a local package?
@@ -191,7 +191,7 @@ data ResolveState = ResolveState
     , rsUsedBy    :: Map PackageName (Set PackageName)
     }
 
-toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m)
+toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadCatch m)
                 => BuildPlan -> m MiniBuildPlan
 toMiniBuildPlan bp = do
     extras <- addDeps ghcVersion $ fmap goPP $ bpPackages bp
@@ -216,7 +216,7 @@ toMiniBuildPlan bp = do
         )
 
 -- | Add in the resolved dependencies from the package index
-addDeps :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m)
+addDeps :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadCatch m)
         => Version -- ^ GHC version
         -> Map PackageName (Version, Map FlagName Bool)
         -> m (Map PackageName MiniPackageInfo)
@@ -379,7 +379,7 @@ instance FromJSON Snapshots where
 
 -- | Load up a 'MiniBuildPlan', preferably from cache
 loadMiniBuildPlan
-    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m)
+    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m, MonadCatch m)
     => SnapName
     -> m MiniBuildPlan
 loadMiniBuildPlan name = do

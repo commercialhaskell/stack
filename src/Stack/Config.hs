@@ -371,11 +371,13 @@ loadBuildConfig menv mproject config noConfigStrat = do
 
 -- | Resolve a PackageEntry into a list of paths, downloading and cloning as
 -- necessary.
-resolvePackageEntry :: (MonadIO m, MonadThrow m, MonadReader env m, HasHttpManager env, MonadLogger m)
-                    => EnvOverride
-                    -> Path Abs Dir -- ^ project root
-                    -> PackageEntry
-                    -> m [(Path Abs Dir, Bool)]
+resolvePackageEntry
+    :: (MonadIO m, MonadThrow m, MonadReader env m, HasHttpManager env, MonadLogger m, MonadCatch m
+       ,MonadBaseControl IO m)
+    => EnvOverride
+    -> Path Abs Dir -- ^ project root
+    -> PackageEntry
+    -> m [(Path Abs Dir, Bool)]
 resolvePackageEntry menv projRoot pe = do
     entryRoot <- resolvePackageLocation menv projRoot (peLocation pe)
     paths <-
@@ -386,11 +388,13 @@ resolvePackageEntry menv projRoot pe = do
 
 -- | Resolve a PackageLocation into a path, downloading and cloning as
 -- necessary.
-resolvePackageLocation :: (MonadIO m, MonadThrow m, MonadReader env m, HasHttpManager env, MonadLogger m)
-                       => EnvOverride
-                       -> Path Abs Dir -- ^ project root
-                       -> PackageLocation
-                       -> m (Path Abs Dir)
+resolvePackageLocation
+    :: (MonadIO m, MonadThrow m, MonadReader env m, HasHttpManager env, MonadLogger m, MonadCatch m
+       ,MonadBaseControl IO m)
+    => EnvOverride
+    -> Path Abs Dir -- ^ project root
+    -> PackageLocation
+    -> m (Path Abs Dir)
 resolvePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
 resolvePackageLocation _ projRoot (PLHttpTarball url) = do
     let name = T.unpack $ decodeUtf8 $ B16.encode $ SHA256.hash $ encodeUtf8 url

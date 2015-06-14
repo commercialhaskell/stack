@@ -108,7 +108,7 @@ instance Show FetchException where
         intercalate ", " (map packageIdentifierString $ Set.toList idents)
 
 -- | Intended to work for the command line command.
-unpackPackages :: (MonadIO m,MonadBaseControl IO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadThrow m,MonadLogger m)
+unpackPackages :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m, MonadCatch m)
                => EnvOverride
                -> FilePath -- ^ destination
                -> [String] -- ^ names or identifiers
@@ -142,7 +142,7 @@ unpackPackages menv dest input = do
 -- | Ensure that all of the given package idents are unpacked into the build
 -- unpack directory, and return the paths to all of the subdirectories.
 unpackPackageIdents
-    :: (MonadBaseControl IO m, MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m)
+    :: (MonadBaseControl IO m, MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m, MonadCatch m)
     => EnvOverride
     -> Path Abs Dir -- ^ unpack directory
     -> Maybe (Path Rel Dir) -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
@@ -160,7 +160,7 @@ data ResolvedPackage = ResolvedPackage
     }
 
 -- | Resolve a set of package names and identifiers into @FetchPackage@ values.
-resolvePackages :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m,MonadBaseControl IO m)
+resolvePackages :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadLogger m, MonadThrow m, MonadBaseControl IO m, MonadCatch m)
                 => EnvOverride
                 -> Set PackageIdentifier
                 -> Set PackageName
@@ -232,7 +232,7 @@ withCabalFiles name pkgs f = do
 -- | Provide a function which will load up a cabal @ByteString@ from the
 -- package indices.
 withCabalLoader
-    :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env, MonadBaseControl IO m)
+    :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
     => EnvOverride
     -> ((PackageIdentifier -> IO ByteString) -> m a)
     -> m a

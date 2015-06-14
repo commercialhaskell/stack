@@ -13,7 +13,6 @@ module System.Process.Read
   ,readProcessStdout
   ,tryProcessStdout
   ,sinkProcessStdoutLogStderr
-  ,sinkProcessStdout
   ,sinkProcessStderrStdout
   ,EnvOverride
   ,unEnvOverride
@@ -25,15 +24,17 @@ module System.Process.Read
   ,envSearchPath
   ,preProcess
   ,readProcessNull
-  ,readInNull)
+  ,readInNull
+  ,logProcessRun
+  )
   where
 
 import           Control.Applicative
 import           Control.Arrow ((***), first)
 import           Control.Concurrent.Async (Concurrently (..))
-import           Control.Exception
+import           Control.Exception hiding (try)
 import           Control.Monad (join, liftM, void)
-import           Control.Monad.Catch (MonadThrow, throwM)
+import           Control.Monad.Catch (MonadThrow, MonadCatch, throwM, try)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger (MonadLogger, logError)
 import           Control.Monad.Trans.Control (MonadBaseControl,liftBaseWith)
@@ -47,6 +48,7 @@ import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (isJust)
+import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Typeable (Typeable)
@@ -57,6 +59,7 @@ import           System.Directory (createDirectoryIfMissing, doesFileExist, getC
 import           System.Environment (getEnvironment)
 import           System.Exit
 import qualified System.FilePath as FP
+import           System.Process.Log
 
 -- | Override the environment received by a child process
 data EnvOverride = EnvOverride
@@ -107,28 +110,26 @@ envHelper :: EnvOverride -> Maybe [(String, String)]
 envHelper = Just . eoStringList
 
 -- | Read from the process, ignoring any output.
-readProcessNull
-    :: (MonadIO m)
-    => Maybe (Path Abs Dir)
-    -> EnvOverride
-    -> String
-    -> [String]
-    -> m ()
+readProcessNull :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+                => Maybe (Path Abs Dir)
+                -> EnvOverride
+                -> String
+                -> [String]
+                -> m ()
 readProcessNull wd menv name args =
-    sinkProcessStdout wd menv name args CL.sinkNull
+    sinkProcessStdoutLogStderr wd menv name args CL.sinkNull
 
 -- | Run the given command in the given directory. If it exits with anything
 -- but success, prints an error and then calls 'exitWith' to exit the program.
-readInNull :: forall (m :: * -> *).
-               (MonadLogger m,MonadIO m)
-            => Path Abs Dir -- ^ directory to run in
-            -> FilePath -- ^ command to run
-            -> EnvOverride
-            -> [String] -- ^ command line arguments
-            -> Maybe Text
-            -> m ()
+readInNull :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+           => Path Abs Dir -- ^ directory to run in
+           -> FilePath -- ^ command to run
+           -> EnvOverride
+           -> [String] -- ^ command line arguments
+           -> Maybe Text
+           -> m ()
 readInNull wd cmd menv args errMsg = do
-    result <- liftIO (try (readProcessNull (Just wd) menv cmd args))
+    result <- try (readProcessNull (Just wd) menv cmd args)
     case result of
         Left (ProcessExitedUnsuccessfully _ ec) -> do
             $logError $
@@ -146,73 +147,61 @@ readInNull wd cmd menv args errMsg = do
 
 -- | Try to produce a strict 'S.ByteString' from the stdout of a
 -- process.
-tryProcessStdout :: (MonadIO m)
+tryProcessStdout :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
                  => Maybe (Path Abs Dir)
                  -> EnvOverride
                  -> String
                  -> [String]
                  -> m (Either ProcessExitedUnsuccessfully S.ByteString)
-tryProcessStdout wd menv name args = do
-  liftIO (try (readProcessStdout wd menv name args))
+tryProcessStdout wd menv name args =
+    try (readProcessStdout wd menv name args)
 
 -- | Produce a strict 'S.ByteString' from the stdout of a
 -- process. Throws a 'ProcessExitedUnsuccessfully' exception if the
 -- process fails.
-readProcessStdout :: (MonadIO m)
+readProcessStdout :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
                   => Maybe (Path Abs Dir)
                   -> EnvOverride
                   -> String
                   -> [String]
                   -> m S.ByteString
 readProcessStdout wd menv name args =
-  sinkProcessStdout wd menv name args CL.consume >>=
+  sinkProcessStdoutLogStderr wd menv name args CL.consume >>=
   liftIO . evaluate . S.concat
 
 -- | Produce a strict 'S.ByteString' from the stdout of a
 -- process. Throws a 'ProcessExitedUnsuccessfully' exception if the
 -- process fails.  Logs process's stderr using @$logError@.
-readProcessStdoutLogStderr :: (MonadIO m,MonadLogger m,MonadBaseControl IO m)
-                           => Text
-                           -> Maybe (Path Abs Dir)
+readProcessStdoutLogStderr :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+                           => Maybe (Path Abs Dir)
                            -> EnvOverride
                            -> String
                            -> [String]
                            -> m S.ByteString
-readProcessStdoutLogStderr stderrPrefix wd menv name args = do
-  stdout <- sinkProcessStdoutLogStderr stderrPrefix wd menv name args CL.consume
+readProcessStdoutLogStderr wd menv name args = do
+  stdout <- sinkProcessStdoutLogStderr wd menv name args CL.consume
   liftIO (evaluate (S.concat stdout))
 
 -- | Consume the stdout of a process feeding strict 'S.ByteString's to a consumer.
 -- Logs process's stderr using @$logError@.
-sinkProcessStdoutLogStderr :: (MonadIO m,MonadLogger m,MonadBaseControl IO m)
-                           => Text -- ^ Prefix for any logged stderr message
-                           -> Maybe (Path Abs Dir)
+sinkProcessStdoutLogStderr :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+                           => Maybe (Path Abs Dir)
                            -> EnvOverride
                            -> String
                            -> [String]
                            -> Sink S.ByteString IO a -- ^ Sink for stdout
                            -> m a
-sinkProcessStdoutLogStderr stderrPrefix wd menv name args sinkStdout = do
+sinkProcessStdoutLogStderr wd menv name args sinkStdout = do
   runInBase <- liftBaseWith $ \run -> return (void . run)
   let logSink = CC.mapM_ (liftIO . runInBase . $logError . T.append stderrPrefix)
       sinkStderr = CC.decodeUtf8 =$= CC.line logSink
   (_,stdout) <- sinkProcessStderrStdout wd menv name args sinkStderr sinkStdout
   return stdout
-
--- | Consume the stdout of a process feeding strict 'S.ByteString's to a consumer.
-sinkProcessStdout :: (MonadIO m)
-                  => Maybe (Path Abs Dir)
-                  -> EnvOverride
-                  -> String
-                  -> [String]
-                  -> Sink S.ByteString IO a
-                  -> m a
-sinkProcessStdout wd menv name args sink = do
-  (_,stdout) <- sinkProcessStderrStdout wd menv name args CL.sinkNull sink
-  return stdout
+  where stderrPrefix =
+            T.pack name <> " " <> T.intercalate " " (map (T.pack . show) args) <> ": "
 
 -- | Consume the stdout and stderr of a process feeding strict 'S.ByteString's to the consumers.
-sinkProcessStderrStdout :: (MonadIO m)
+sinkProcessStderrStdout :: (MonadIO m, MonadLogger m)
                         => Maybe (Path Abs Dir)
                         -> EnvOverride
                         -> String
@@ -221,6 +210,7 @@ sinkProcessStderrStdout :: (MonadIO m)
                         -> Sink S.ByteString IO o -- ^ Sink for stdout
                         -> m (e,o)
 sinkProcessStderrStdout wd menv name args sinkStderr sinkStdout = do
+  $logProcessRun name args
   name' <- preProcess wd menv name
   liftIO (withCheckedProcess
             (proc name' args) { env = envHelper menv, cwd = fmap toFilePath wd }
@@ -231,7 +221,6 @@ sinkProcessStderrStdout wd menv name args sinkStderr sinkStdout = do
                Concurrently (asBSSource out $$ sinkStdout)))
   where asBSSource :: Source m S.ByteString -> Source m S.ByteString
         asBSSource = id
-
 
 -- | Perform pre-call-process tasks.  Ensure the working directory exists and find the
 -- executable path.

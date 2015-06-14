@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -20,6 +21,7 @@ import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import           Control.Monad.Trans.Control
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either
 import           Data.List
@@ -27,7 +29,6 @@ import           Data.Maybe
 import           Data.Streaming.Process
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Data.Time.Clock
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
 import           Prelude hiding (FilePath)
 import           Stack.Build.Types (StackBuildException (Couldn'tFindPkgId))
@@ -37,9 +38,8 @@ import           System.Directory (createDirectoryIfMissing, doesDirectoryExist,
 import           System.Process.Read
 
 -- | Get the global package database
-getGlobalDB :: (MonadIO m, MonadLogger m, MonadThrow m)
-            => EnvOverride
-            -> m (Path Abs Dir)
+getGlobalDB :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+            => EnvOverride -> m (Path Abs Dir)
 getGlobalDB menv = do
     -- This seems like a strange way to get the global package database
     -- location, but I don't know of a better one
@@ -54,33 +54,26 @@ getGlobalDB menv = do
     firstLine = S8.takeWhile (\c -> c /= '\r' && c /= '\n')
 
 -- | Run the ghc-pkg executable
-ghcPkg :: (MonadIO m, MonadLogger m)
+ghcPkg :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
        => EnvOverride
        -> [Path Abs Dir]
        -> [String]
        -> m (Either ProcessExitedUnsuccessfully S8.ByteString)
 ghcPkg menv pkgDbs args = do
-    start <- liftIO getCurrentTime
     eres <- go
     r <- case eres of
             Left _ -> do
                 mapM_ (createDatabase menv) pkgDbs
                 go
             Right _ -> return eres
-    end <- liftIO getCurrentTime
-    $logDebug $ T.concat
-        [ "ghc-pkg ("
-        , T.pack $ show $ diffUTCTime end start
-        , "s) with args "
-        , T.pack $ show args'
-        ]
     return r
   where
     go = tryProcessStdout Nothing menv "ghc-pkg" args'
     args' = packageDbFlags pkgDbs ++ args
 
 -- | Create a package database in the given directory, if it doesn't exist.
-createDatabase :: (MonadIO m, MonadLogger m) => EnvOverride -> Path Abs Dir -> m ()
+createDatabase :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+               => EnvOverride -> Path Abs Dir -> m ()
 createDatabase menv db = do
     let db' = toFilePath db
     exists <- liftIO $ doesDirectoryExist db'
@@ -99,7 +92,7 @@ packageDbFlags pkgDbs =
         : map (\x -> ("--package-db=" ++ toFilePath x)) pkgDbs
 
 -- | Get the id of the package e.g. @foo-0.0.0-9c293923c0685761dcff6f8c3ad8f8ec@.
-findGhcPkgId :: (MonadIO m, MonadLogger m)
+findGhcPkgId :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
              => EnvOverride
              -> [Path Abs Dir] -- ^ package databases
              -> PackageName
@@ -128,7 +121,7 @@ findGhcPkgId menv pkgDbs name = do
     stripCR t =
         fromMaybe t (T.stripSuffix "\r" t)
 
-unregisterGhcPkgId :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m)
+unregisterGhcPkgId :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadBaseControl IO m)
                     => EnvOverride
                     -> Path Abs Dir -- ^ package database
                     -> GhcPkgId
@@ -143,7 +136,7 @@ unregisterGhcPkgId menv pkgDb gid = do
     args = ["unregister", "--user", "--force", packageIdentifierString $ ghcPkgIdPackageIdentifier gid]
 
 -- | Get the version of Cabal from the global package database.
-getCabalPkgVer :: (MonadThrow m,MonadIO m,MonadLogger m)
+getCabalPkgVer :: (MonadThrow m, MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
                => EnvOverride -> m Version
 getCabalPkgVer menv = do
     db <- getGlobalDB menv -- FIXME shouldn't be necessary, just tell ghc-pkg to look in the global DB

@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -21,9 +22,10 @@ module Stack.PackageDump
 
 import           Control.Applicative
 import           Control.Monad (when, liftM)
-import           Control.Monad.Catch (MonadThrow, Exception, throwM)
+import           Control.Monad.Catch
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger (MonadLogger, logDebug)
+import           Control.Monad.Logger (MonadLogger)
+import           Control.Monad.Trans.Control
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad, taggedEncodeFile)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as S
@@ -37,12 +39,7 @@ import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (catMaybes)
-
 import qualified Data.Set as Set
-import qualified Data.Text as T
-
-
-import           Data.Time.Clock
 import           Data.Typeable (Typeable)
 import           Path
 import           Prelude -- Fix AMP warning
@@ -56,22 +53,14 @@ newtype ProfilingCache = ProfilingCache (IORef (Map GhcPkgId Bool))
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump
-    :: (MonadIO m, MonadLogger m)
+    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
     => EnvOverride
     -> Maybe (Path Abs Dir) -- ^ if Nothing, use global
     -> Sink ByteString IO a
     -> m a
 ghcPkgDump menv mpkgDb sink = do
     F.mapM_ (createDatabase menv) mpkgDb -- TODO maybe use some retry logic instead?
-    start <- liftIO getCurrentTime
-    a <- sinkProcessStdout Nothing menv "ghc-pkg" args sink
-    end <- liftIO getCurrentTime
-    $logDebug $ T.concat
-        [ "ghc-pkg ("
-        , T.pack $ show $ diffUTCTime end start
-        , "s) with args "
-        , T.pack $ show args
-        ]
+    a <- sinkProcessStdoutLogStderr Nothing menv "ghc-pkg" args sink
     return a
   where
     args = concat
