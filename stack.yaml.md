@@ -11,7 +11,12 @@ The stack.yaml configuration options break down into project specific and non-pr
 ### resolver
 
 ### flags
-
+Flags can be set for each package separately, e.g.
+```
+flags:
+  package-name:
+    flag-name: true
+```
 ## Non-project config
 
 ### docker
