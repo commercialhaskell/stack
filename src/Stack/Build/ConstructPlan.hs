@@ -160,6 +160,8 @@ mkUnregisterLocal tasks locallyRegistered =
 
 addFinal :: LocalPackage -> M ()
 addFinal lp = do
+    void $ addDep $ packageName package
+
     depsRes <- addPackageDeps package
     res <- case depsRes of
         Left e -> return $ Left e

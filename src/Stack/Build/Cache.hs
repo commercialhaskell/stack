@@ -128,8 +128,10 @@ writeConfigCache dir = writeCache dir configCacheFile
 deleteCaches :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, MonadThrow m, HasEnvConfig env)
              => Path Abs Dir -> m ()
 deleteCaches dir = do
+    {- FIXME confirm that this is acceptable to remove
     bfp <- buildCacheFile dir
     removeFileIfExists bfp
+    -}
     cfp <- configCacheFile dir
     removeFileIfExists cfp
 
