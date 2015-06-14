@@ -172,8 +172,15 @@ isAllowed mpcache sourceMap mloc dp
   where
     toInclude =
         case Map.lookup name sourceMap of
-            -- The sourceMap has nothing to say about this package, so we can use it
-            Nothing -> True
+            Nothing ->
+                case mloc of
+                    -- The sourceMap has nothing to say about this global
+                    -- package, so we can use it
+                    Nothing -> True
+                    -- For non-global packages, don't include unknown packages.
+                    -- See:
+                    -- https://github.com/commercialhaskell/stack/issues/292
+                    Just _ -> False
 
             Just pii ->
                 version == piiVersion pii -- only accept the desired version
