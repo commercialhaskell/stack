@@ -187,7 +187,10 @@ readProcessStdoutLogStderr wd menv name args = do
   liftIO (evaluate (S.concat stdout))
 
 -- | Consume the stdout of a process feeding strict 'S.ByteString's to a consumer.
--- Logs process's stderr using @$logError@.
+-- Logs process's stderr using @$logError@, on process failure, writes
+-- out all stdout. Should not be used for long-running processes or
+-- ones with lots of output; for that use
+-- 'sinkProcessStdoutLogStderr'.
 sinkProcessStdoutLogStderr :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
                            => Maybe (Path Abs Dir)
                            -> EnvOverride
