@@ -24,8 +24,7 @@ import           Stack.Types
 
 data ActionType
     = ATBuild
-    | ATInstall
-    | ATWanted
+    | ATFinal
     deriving (Show, Eq, Ord)
 data ActionId = ActionId !PackageIdentifier !ActionType
     deriving (Show, Eq, Ord)
@@ -36,7 +35,7 @@ data Action = Action
     }
 
 data ActionContext = ActionContext
-    { acRemaining :: !Int
+    { acRemaining :: !(Set ActionId)
     -- ^ Does not include the current action
     }
     deriving Show
@@ -44,7 +43,7 @@ data ActionContext = ActionContext
 data ExecuteState = ExecuteState
     { esActions    :: TVar [Action]
     , esExceptions :: TVar [SomeException]
-    , esInAction   :: TVar Int
+    , esInAction   :: TVar (Set ActionId)
     }
 
 data ExecuteException
@@ -63,7 +62,7 @@ runActions threads actions0 = do
     es <- ExecuteState
         <$> newTVarIO actions0
         <*> newTVarIO []
-        <*> newTVarIO 0
+        <*> newTVarIO Set.empty
     if threads <= 1
         then runActions' es
         else runConcurrently $ sequenceA_ $ replicate threads $ Concurrently $ runActions' es
@@ -87,7 +86,7 @@ runActions' ExecuteState {..} =
         case break (Set.null . actionDeps) as of
             (_, []) -> do
                 inAction <- readTVar esInAction
-                if inAction == 0
+                if Set.null inAction
                     then do
                         modifyTVar esExceptions (toException InconsistentDependencies:)
                         return $ return ()
@@ -95,9 +94,11 @@ runActions' ExecuteState {..} =
             (xs, action:ys) -> do
                 let as' = xs ++ ys
                 inAction <- readTVar esInAction
-                let remaining = length as' + inAction
+                let remaining = Set.union
+                        (Set.fromList $ map actionId as')
+                        inAction
                 writeTVar esActions as'
-                modifyTVar esInAction (+ 1)
+                modifyTVar esInAction (Set.insert $ actionId action)
                 return $ mask $ \restore -> do
                     eres <- try $ restore $ actionDo action ActionContext
                         { acRemaining = remaining
@@ -105,10 +106,10 @@ runActions' ExecuteState {..} =
                     case eres of
                         Left err -> atomically $ do
                             modifyTVar esExceptions (err:)
-                            modifyTVar esInAction (subtract 1)
+                            modifyTVar esInAction (Set.delete $ actionId action)
                         Right () -> do
                             atomically $ do
-                                modifyTVar esInAction (subtract 1)
+                                modifyTVar esInAction (Set.delete $ actionId action)
                                 let dropDep a = a { actionDeps = Set.delete (actionId action) $ actionDeps a }
                                 modifyTVar esActions $ map dropDep
                             restore loop

@@ -10,6 +10,7 @@ module Stack.Build.Execute
     , executePlan
     ) where
 
+import           Control.Applicative            ((<$>), (<*>))
 import           Control.Concurrent.Lifted (fork)
 import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
@@ -69,8 +70,11 @@ import           System.Process.Read
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env)
 
-printPlan :: M env m => Plan -> m ()
-printPlan plan = do
+printPlan :: M env m
+          => FinalAction
+          -> Plan
+          -> m ()
+printPlan finalAction plan = do
     case Set.toList $ planUnregisterLocal plan of
         [] -> $logInfo "Nothing to unregister"
         xs -> do
@@ -84,6 +88,23 @@ printPlan plan = do
         xs -> do
             $logInfo "Would build:"
             mapM_ ($logInfo . displayTask) xs
+
+    let mfinalLabel =
+            case finalAction of
+                DoNothing -> Nothing
+                DoBenchmarks -> Just "benchmark"
+                DoTests -> Just "test"
+                DoHaddock -> Just "haddock"
+    case mfinalLabel of
+        Nothing -> return ()
+        Just finalLabel -> do
+            $logInfo ""
+
+            case Map.toList $ planFinals plan of
+                [] -> $logInfo $ "Nothing to " <> finalLabel
+                xs -> do
+                    $logInfo $ "Would " <> finalLabel <> ":"
+                    forM_ xs $ \(name, _) -> $logInfo $ T.pack $ packageNameString name
 
     $logInfo ""
 
@@ -257,7 +278,12 @@ executePlan' plan ee = do
     -- stack always using transformer stacks that are safe for this use case.
     runInBase <- liftBaseWith $ \run -> return (void . run)
 
-    let actions = concatMap (toActions runInBase ee) $ Map.elems $ planTasks plan
+    let actions = concatMap (toActions runInBase ee) $ Map.elems $ Map.mergeWithKey
+            (\_ b f -> Just (Just b, Just f))
+            (fmap (\b -> (Just b, Nothing)))
+            (fmap (\f -> (Nothing, Just f)))
+            (planTasks plan)
+            (planFinals plan)
     threads <- asks $ configJobs . getConfig
     errs <- liftIO $ runActions threads actions
     unless (null errs) $ throwM $ ExecutionFailure errs
@@ -265,30 +291,56 @@ executePlan' plan ee = do
 toActions :: M env m
           => (m () -> IO ())
           -> ExecuteEnv
-          -> Task
+          -> (Maybe Task, Maybe Task) -- build and final
           -> [Action]
-toActions runInBase ee task@Task {..} =
-    -- TODO in the future, we need to have proper support for cyclic
-    -- dependencies from test suites, in which case we'll need more than one
-    -- Action here
+toActions runInBase ee (mbuild, mfinal) =
+    abuild ++ afinal
+  where
+    abuild =
+        case mbuild of
+            Nothing -> []
+            Just task@Task {..} ->
+                [ Action
+                    { actionId = ActionId taskProvides ATBuild
+                    , actionDeps =
+                        (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
+                    , actionDo = \ac -> runInBase $ singleBuild ac ee task
+                    }
+                ]
+    afinal =
+        case (,) <$> mfinal <*> mfunc of
+            Nothing -> []
+            Just (task@Task {..}, func) ->
+                [ Action
+                    { actionId = ActionId taskProvides ATFinal
+                    , actionDeps = addBuild taskProvides $
+                        (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
+                    , actionDo = \ac -> runInBase $ func ac ee task
+                    }
+                ]
+      where
+        addBuild ident =
+            case mbuild of
+                Nothing -> id
+                Just _ -> Set.insert $ ActionId ident ATBuild
 
-    [ Action
-        { actionId = ActionId taskProvides ATBuild
-        , actionDeps =
-            (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
-        , actionDo = \ac -> runInBase $ singleBuild ac ee task
-        }
-    ]
+    mfunc =
+        case boptsFinalAction $ eeBuildOpts ee of
+            DoNothing -> Nothing
+            DoTests -> Just singleTest
+            DoBenchmarks -> Just singleBench
+            DoHaddock -> Just singleHaddock
 
 -- | Ensure that the configuration for the package matches what is given
 ensureConfig :: M env m
              => Path Abs Dir -- ^ package directory
              -> ExecuteEnv
              -> Task
-             -> (Text -> m ()) -- ^ announce
+             -> m () -- ^ announce
              -> (Bool -> [String] -> m ()) -- ^ cabal
+             -> [Text]
              -> m ConfigCache
-ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal = do
+ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal extra = do
     -- Determine the old and new configuration in the local directory, to
     -- determine if we need to reconfigure.
     mOldConfigCache <- tryGetConfigCache pkgDir
@@ -304,7 +356,7 @@ ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal = do
                 Just (Executable _) -> Nothing
         missing' = Set.fromList $ mapMaybe getMissing $ Set.toList missing
         TaskConfigOpts missing mkOpts = taskConfigOpts
-        configOpts = mkOpts missing'
+        configOpts = mkOpts missing' ++ extra
         allDeps = Set.union missing' taskPresent
         newConfigCache = ConfigCache
             { configCacheOpts = map encodeUtf8 configOpts
@@ -315,59 +367,31 @@ ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal = do
         deleteCaches pkgDir
         withMVar eeInstallLock $ \(done,total) ->
             $logSticky ("Progress: " <> T.pack (show done) <> "/" <> T.pack (show total))
-        announce "configure"
+        announce
         cabal False $ "configure" : map T.unpack configOpts
         $logDebug $ T.pack $ show configOpts
         writeConfigCache pkgDir newConfigCache
 
     return newConfigCache
 
-singleBuild :: M env m
-            => ActionContext
-            -> ExecuteEnv
-            -> Task
-            -> m ()
-singleBuild ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
-  withPackage $ \package cabalfp pkgDir ->
-  withLogFile package $ \mlogFile ->
-  withCabal pkgDir mlogFile $ \cabal -> do
-    cache <- ensureConfig pkgDir ee task announce cabal
-
-    fileModTimes <- getPackageFileModTimes package cabalfp
-    writeBuildCache pkgDir fileModTimes
-
-    announce "build"
-    config <- asks getConfig
-    cabal (console && configHideTHLoading config) ["build"]
-
-    modifyMVar_ eeInstallLock $ \(done,total) -> do
-        announce "install"
-        cabal False ["install"]
-        unless (total == 1) $ do
-            let done' = done + 1
-            $logSticky ("Progress: " <> T.pack (show done') <> "/" <> T.pack (show total))
-            when (done' == total)
-                 ($logStickyDone ("Completed all " <> T.pack (show total) <> " packages."))
-        return (done + 1,total)
-
-    let pkgDbs =
-            case taskLocation task of
-                Snap -> [bcoSnapDB eeBaseConfigOpts]
-                Local ->
-                    [ bcoSnapDB eeBaseConfigOpts
-                    , bcoLocalDB eeBaseConfigOpts
-                    ]
-    mpkgid <- findGhcPkgId eeEnvOverride pkgDbs (packageName package)
-    mpkgid' <- case (packageHasLibrary package, mpkgid) of
-        (False, _) -> assert (isNothing mpkgid) $ do
-            markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
-            return $ Executable $ PackageIdentifier
-                (packageName package)
-                (packageVersion package)
-        (True, Nothing) -> throwM $ Couldn'tFindPkgId $ packageName package
-        (True, Just pkgid) -> return $ Library pkgid
-    writeFlagCache mpkgid' cache
-    liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides mpkgid'
+withSingleContext :: M env m
+                  => ActionContext
+                  -> ExecuteEnv
+                  -> Task
+                  -> (  Package
+                     -> Path Abs File
+                     -> Path Abs Dir
+                     -> (Bool -> [String] -> m ())
+                     -> (Text -> m ())
+                     -> Bool
+                     -> Maybe (Path Abs File, Handle)
+                     -> m a)
+                  -> m a
+withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
+    withPackage $ \package cabalfp pkgDir ->
+    withLogFile package $ \mlogFile ->
+    withCabal pkgDir mlogFile $ \cabal ->
+    inner0 package cabalfp pkgDir cabal announce console mlogFile
   where
     announce x = $logInfo $ T.concat
         [ T.pack $ packageIdentifierString taskProvides
@@ -380,7 +404,9 @@ singleBuild ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
             TTLocal lp -> lpWanted lp
             TTUpstream _ _ -> False
 
-    console = wanted && acRemaining == 0 && eeTotalWanted == 1
+    console = wanted
+           && all (\(ActionId ident _) -> ident == taskProvides) (Set.toList acRemaining)
+           && eeTotalWanted == 1
 
     withPackage inner =
         case taskType of
@@ -400,7 +426,7 @@ singleBuild ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
     withLogFile package inner
         | console = inner Nothing
         | otherwise = do
-            logPath <- buildLogPath package
+            logPath <- buildLogPath package -- TODO give a difference suffix for test, bench, etc?
             liftIO $ createDirectoryIfMissing True $ toFilePath $ parent logPath
             let fp = toFilePath logPath
             bracket
@@ -474,8 +500,65 @@ singleBuild ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
                         (fmap fst mlogFile)
                         bs
 
-    {- FIXME move to a separate step
-    runTests package pkgDir mlogFile = do
+singleBuild :: M env m
+            => ActionContext
+            -> ExecuteEnv
+            -> Task
+            -> m ()
+singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
+  withSingleContext ac ee task $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
+    cache <- ensureConfig pkgDir ee task (announce "configure") cabal []
+
+    fileModTimes <- getPackageFileModTimes package cabalfp
+    writeBuildCache pkgDir fileModTimes
+
+    announce "build"
+    config <- asks getConfig
+    cabal (console && configHideTHLoading config) ["build"]
+
+    modifyMVar_ eeInstallLock $ \(done,total) -> do
+        announce "install"
+        cabal False ["install"]
+        unless (total == 1) $ do
+            let done' = done + 1
+            $logSticky ("Progress: " <> T.pack (show done') <> "/" <> T.pack (show total))
+            when (done' == total)
+                 ($logStickyDone ("Completed all " <> T.pack (show total) <> " packages."))
+        return (done + 1,total)
+
+    let pkgDbs =
+            case taskLocation task of
+                Snap -> [bcoSnapDB eeBaseConfigOpts]
+                Local ->
+                    [ bcoSnapDB eeBaseConfigOpts
+                    , bcoLocalDB eeBaseConfigOpts
+                    ]
+    mpkgid <- findGhcPkgId eeEnvOverride pkgDbs (packageName package)
+    mpkgid' <- case (packageHasLibrary package, mpkgid) of
+        (False, _) -> assert (isNothing mpkgid) $ do
+            markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
+            return $ Executable $ PackageIdentifier
+                (packageName package)
+                (packageVersion package)
+        (True, Nothing) -> throwM $ Couldn'tFindPkgId $ packageName package
+        (True, Just pkgid) -> return $ Library pkgid
+    writeFlagCache mpkgid' cache
+    liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides mpkgid'
+
+singleTest :: M env m
+           => ActionContext
+           -> ExecuteEnv
+           -> Task
+           -> m ()
+singleTest ac ee task =
+    withSingleContext ac ee task $ \package _cabalfp pkgDir cabal announce console mlogFile ->
+    unless (Set.null $ packageTests package) $ do
+        _cache <- ensureConfig pkgDir ee task (announce "configure (test)") cabal ["--enable-tests"]
+
+        announce "build (test)" -- TODO only rebuild as necessary
+        config <- asks getConfig
+        cabal (console && configHideTHLoading config) ["build"]
+
         bconfig <- asks getBuildConfig
         distRelativeDir' <- distRelativeDir
         let buildDir = pkgDir </> distRelativeDir'
@@ -489,7 +572,6 @@ singleBuild ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
             nameExe <- liftIO $ parseRelFile $ T.unpack testName ++ exeExtension
             let exeName = buildDir </> $(mkRelDir "build") </> nameDir </> nameExe
             exists <- liftIO $ doesFileExist $ toFilePath exeName
-            config <- asks getConfig
             menv <- liftIO $ configEnvOverride config EnvSettings
                 { esIncludeLocals = taskLocation task == Local
                 , esIncludeGhcPackagePath = True
@@ -526,26 +608,45 @@ singleBuild ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
                         , T.pack $ packageNameString $ packageName package
                         ]
                     return $ Map.singleton testName Nothing
-        unless (Map.null errs) $ throwM $ TestSuiteFailure taskProvides errs (fmap fst mlogFile)
+        unless (Map.null errs) $ throwM $ TestSuiteFailure
+            (taskProvides task)
+            errs
+            (fmap fst mlogFile)
 
-    case boptsFinalAction eeBuildOpts of
-        DoTests -> when wanted $ do
-            announce "test"
-            runTests package pkgDir mlogFile
-        DoBenchmarks -> when wanted $ do
-            announce "benchmarks"
-            cabal False ["bench"]
-        DoHaddock -> do
-            announce "haddock"
-            hscolourExists <- doesExecutableExist eeEnvOverride "hscolour"
+singleBench :: M env m
+            => ActionContext
+            -> ExecuteEnv
+            -> Task
+            -> m ()
+singleBench ac ee task =
+    withSingleContext ac ee task $ \package _cabalfp pkgDir cabal announce console _mlogFile ->
+    unless (Set.null $ packageBenchmarks package) $ do
+        _cache <- ensureConfig pkgDir ee task (announce "configure (benchmarks)") cabal ["--enable-benchmarks"]
+
+        announce "build (benchmarks)" -- TODO only rebuild as necessary
+        config <- asks getConfig
+        cabal (console && configHideTHLoading config) ["build"]
+
+        announce "benchmarks"
+        cabal False ["bench"]
+
+singleHaddock :: M env m
+              => ActionContext
+              -> ExecuteEnv
+              -> Task
+              -> m ()
+singleHaddock ac ee task =
+    withSingleContext ac ee task $ \_package _cabalfp _pkgDir cabal announce _console _mlogFile -> do
+        announce "haddock"
+        hscolourExists <- doesExecutableExist (eeEnvOverride ee) "hscolour"
               {- EKB TODO: doc generation for stack-doc-server
  #ifndef mingw32_HOST_OS
               liftIO (removeDocLinks docLoc package)
  #endif
               ifcOpts <- liftIO (haddockInterfaceOpts docLoc package packages)
               -}
-            cabal False (concat [["haddock", "--html"]
-                                ,["--hyperlink-source" | hscolourExists]])
+        cabal False (concat [["haddock", "--html"]
+                            ,["--hyperlink-source" | hscolourExists]])
               {- EKB TODO: doc generation for stack-doc-server
                          ,"--hoogle"
                          ,"--html-location=../$pkg-$version/"
@@ -583,8 +684,6 @@ singleBuild ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
    dist <- distDirFromDir cabalPkgVer (packageDir package')
    return (dist </> $(mkRelDir "doc/"))
                  --}
-        DoNothing -> return ()
-    -}
 
 -- | Grab all output from the given @Handle@ and print it to stdout, stripping
 -- Template Haskell "Loading package" lines. Does work in a separate thread.

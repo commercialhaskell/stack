@@ -297,7 +297,8 @@ class PackageInstallInfo a where
 
 -- | Information on a locally available package of source code
 data LocalPackage = LocalPackage
-    { lpPackage        :: !Package         -- ^ The @Package@ info itself, after resolution with package flags
+    { lpPackage        :: !Package         -- ^ The @Package@ info itself, after resolution with package flags, not including any final actions
+    , lpPackageFinal   :: !Package         -- ^ Same as lpPackage, but with any test suites or benchmarks enabled as necessary
     , lpWanted         :: !Bool            -- ^ Is this package a \"wanted\" target based on command line input
     , lpDir            :: !(Path Abs Dir)  -- ^ Directory of the package.
     , lpCabalFile      :: !(Path Abs File) -- ^ The .cabal file
@@ -352,10 +353,13 @@ data TaskType = TTLocal LocalPackage
 -- | A complete plan of what needs to be built and how to do it
 data Plan = Plan
     { planTasks :: !(Map PackageName Task)
+    , planFinals :: !(Map PackageName Task)
+    -- ^ Final actions to be taken (test, benchmark, etc)
     , planUnregisterLocal :: !(Set GhcPkgId)
     , planInstallExes :: !(Map Text Location)
     -- ^ Executables that should be installed after successful building
     }
+    deriving Show
 
 -- | Basic information used to calculate what the configure options are
 data BaseConfigOpts = BaseConfigOpts
@@ -386,8 +390,6 @@ configureOpts bco deps wanted loc flags = map T.pack $ concat
       ]
     , ["--enable-library-profiling" | boptsLibProfile bopts || boptsExeProfile bopts]
     , ["--enable-executable-profiling" | boptsExeProfile bopts]
-    , ["--enable-tests" | wanted && boptsFinalAction bopts == DoTests]
-    , ["--enable-benchmarks" | wanted && boptsFinalAction bopts == DoBenchmarks]
     , map (\(name,enabled) ->
                        "-f" <>
                        (if enabled

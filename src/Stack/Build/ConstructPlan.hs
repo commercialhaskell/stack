@@ -69,7 +69,7 @@ data AddDepRes
 
 type M = RWST
     Ctx
-    ( Map PackageName Task -- JustFinal
+    ( Map PackageName (Either ConstructPlanException Task) -- finals
     , Map Text Location -- executable to be installed, and location where the binary is placed
     )
     (Map PackageName (Either ConstructPlanException AddDepRes))
@@ -105,28 +105,31 @@ constructPlan :: forall env m.
               -> m Plan
 constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPackage0 sourceMap installedMap = do
     bconfig <- asks getBuildConfig
-    let inner = mapM_ addDep $ Set.toList allTargets
-    ((), m, (justFinals, installExes)) <- liftIO $ runRWST inner (ctx bconfig) M.empty
+    let inner = do
+            mapM_ addFinal $ filter lpWanted locals
+            mapM_ addDep $ Set.toList extraToBuild0
+    ((), m, (efinals, installExes)) <- liftIO $ runRWST inner (ctx bconfig) M.empty
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
-    case partitionEithers $ map toEither $ M.toList m of
-        ([], adrs) -> do
+        (errlibs, adrs) = partitionEithers $ map toEither $ M.toList m
+        (errfinals, finals) = partitionEithers $ map toEither $ M.toList efinals
+        errs = errlibs ++ errfinals
+    if null errs
+        then do
             let toTask (_, ADRFound _ _) = Nothing
                 toTask (name, ADRToInstall task) = Just (name, task)
                 tasks = M.fromList $ mapMaybe toTask adrs
             return Plan
-                { planTasks = Map.union tasks justFinals
+                { planTasks = tasks
+                , planFinals = M.fromList finals
                 , planUnregisterLocal = mkUnregisterLocal tasks locallyRegistered
                 , planInstallExes =
                     if boptsInstallExes $ bcoBuildOpts baseConfigOpts0
                         then installExes
                         else Map.empty
                 }
-        (errs, _) -> throwM $ ConstructPlanExceptions errs
+        else throwM $ ConstructPlanExceptions errs
   where
-    allTargets = Set.fromList (map (packageName . lpPackage) (filter lpWanted locals))
-              <> extraToBuild0
-
     ctx bconfig = Ctx
         { mbp = mbp0
         , baseConfigOpts = baseConfigOpts0
@@ -154,6 +157,32 @@ mkUnregisterLocal tasks locallyRegistered =
       where
         ident = ghcPkgIdPackageIdentifier gid
         name = packageIdentifierName ident
+
+addFinal :: LocalPackage -> M ()
+addFinal lp = do
+    depsRes <- addPackageDeps package
+    res <- case depsRes of
+        Left e -> return $ Left e
+        Right (missing, present) -> do
+            ctx <- ask
+            return $ Right Task
+                { taskProvides = PackageIdentifier
+                    (packageName package)
+                    (packageVersion package)
+                , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
+                    let allDeps = Set.union present missing'
+                     in configureOpts
+                            (baseConfigOpts ctx)
+                            allDeps
+                            True -- wanted
+                            Local
+                            (packageFlags package)
+                , taskPresent = present
+                , taskType = TTLocal lp
+                }
+    tell (Map.singleton (packageName package) res, mempty)
+  where
+    package = lpPackageFinal lp
 
 addDep :: PackageName -> M (Either ConstructPlanException AddDepRes)
 addDep name = do
@@ -194,7 +223,7 @@ addDep'' name = do
                 then installPackage name ps
                 else return $ Right $ ADRFound (piiVersion ps) installed
 
-tellExecutables :: PackageName -> PackageSource -> M ()
+tellExecutables :: PackageName -> PackageSource -> M () -- TODO merge this with addFinal above?
 tellExecutables _ (PSLocal lp)
     | lpWanted lp = tellExecutablesPackage Local $ lpPackage lp
     | otherwise = return ()
@@ -305,31 +334,7 @@ checkDirtiness ps installed package present = do
     moldOpts <- tryGetFlagCache installed
     case moldOpts of
         Nothing -> return True
-        Just oldOpts
-            | oldOpts /= configCache -> return True
-            | psDirty ps -> return True
-            | otherwise -> do
-                case ps of
-                        {- FIXME need to track finals completely differently now
-                    PSLocal lp | lpWanted lp -> do
-
-                        -- track the fact that we need to perform a JustFinal. But
-                        -- don't put this in the main State Map, as that would
-                        -- trigger dependencies to rebuild also.
-                        let task = Task
-                                { taskProvides = PackageIdentifier
-                                    (packageName package)
-                                    (packageVersion package)
-                                , taskType = TTLocal lp JustFinal
-                                , taskConfigOpts = TaskConfigOpts Set.empty $ \missing' ->
-                                    assert (Set.null missing') configOpts
-                                , taskPresent = present
-                                }
-                        tell (Map.singleton (packageName package) task, Map.empty)
-                            -- FIXME need to force reconfigure when GhcPkgId for dependencies change
-                        -}
-                    _ -> return ()
-                return False
+        Just oldOpts -> return $ oldOpts /= configCache || psDirty ps
 
 psDirty :: PackageSource -> Bool
 psDirty (PSLocal lp) = lpDirtyFiles lp
