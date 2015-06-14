@@ -22,6 +22,7 @@ module Stack.Constants
     ,stackProgName
     ,wiredInPackages
     ,cabalPackageName
+    ,implicitGlobalDir
     )
     where
 
@@ -214,3 +215,10 @@ wiredInPackages = fromMaybe (error "Parse error in wiredInPackages") mparsed
 cabalPackageName :: PackageName
 cabalPackageName =
     $(mkPackageName "Cabal")
+
+-- | Implicit global directory used when outside of a project.
+implicitGlobalDir :: Path Abs Dir -- ^ Stack root.
+                  -> Path Abs Dir
+implicitGlobalDir p =
+    p </>
+    $(mkRelDir "global")

@@ -455,6 +455,7 @@ data ConfigException
   | NoProjectConfigFound (Path Abs Dir)
   | UnexpectedTarballContents [Path Abs Dir] [Path Abs File]
   | BadStackVersionException VersionRange
+  | NoResolverFound
   deriving Typeable
 instance Show ConfigException where
     show (ParseResolverException t) = concat

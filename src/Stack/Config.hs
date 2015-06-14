@@ -40,20 +40,20 @@ import           Data.Aeson.Extended
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as L
 import           Data.Either (partitionEithers)
-import           Data.Map (Map)
 import qualified Data.IntMap as IntMap
+import           Data.Map (Map)
 import qualified Data.Map as Map
-import qualified Distribution.Package as C
-import qualified Distribution.PackageDescription as C
-import qualified Distribution.Text
-import           Distribution.Version (simplifyVersionRange)
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Set as S
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import qualified Data.Yaml as Yaml
+import qualified Distribution.Package as C
+import qualified Distribution.PackageDescription as C
 import           Distribution.System (OS (Windows), Platform (..), buildPlatform)
+import qualified Distribution.Text
+import           Distribution.Version (simplifyVersionRange)
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager, parseUrl)
 import           Network.HTTP.Download (download)
 import           Options.Applicative (Parser, idm, strOption, long, short, metavar, help, option, auto)
@@ -62,7 +62,6 @@ import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Stack.BuildPlan
-import           Stack.Types.Config
 import           Stack.Constants
 import qualified Stack.Docker as Docker
 import           Stack.Package
@@ -113,6 +112,24 @@ getDefaultResolver dir = do
                 ]
             $logWarn "This behavior will improve in the future, please see: https://github.com/commercialhaskell/stack/issues/253"
             return (ResolverSnapshot snap, Map.empty)
+
+-- | Get the latest snapshot resolver available.
+getLatestResolver
+    :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m)
+    => m Resolver
+getLatestResolver = do
+    snapshots <- getSnapshots
+    let lts = do
+            (x,y) <- listToMaybe (reverse (IntMap.toList (snapshotsLts snapshots)))
+            return (LTS x y)
+        nightly =
+            Just (Nightly (snapshotsNightly snapshots))
+    case lts <|> nightly of
+        Nothing -> do
+            $logDebug "Downloaded snapshots, but they were empty."
+            throwM NoResolverFound
+        Just snap ->
+            return (ResolverSnapshot snap)
 
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
@@ -289,7 +306,7 @@ loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadThrow m,MonadBaseContro
 loadConfig configArgs = do
     stackRoot <- determineStackRoot
     extraConfigs <- getExtraConfigs stackRoot >>= mapM loadYaml
-    mproject <- loadProjectConfig
+    mproject <- loadProjectConfig stackRoot
     config <- configFromConfigMonoid stackRoot (fmap (\(proj, _, _) -> proj) mproject) $ mconcat $
         case mproject of
             Nothing -> configArgs : extraConfigs
@@ -299,7 +316,7 @@ loadConfig configArgs = do
     menv <- runReaderT getMinimalEnvOverride config
     return $ LoadConfig
         { lcConfig          = config
-        , lcLoadBuildConfig = loadBuildConfig menv mproject config
+        , lcLoadBuildConfig = loadBuildConfig menv mproject config stackRoot
         , lcProjectRoot     = fmap (\(_, fp, _) -> parent fp) mproject
         }
 
@@ -313,13 +330,14 @@ packageEntryCurrDir = PackageEntry
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
-loadBuildConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader env m,HasHttpManager env,MonadBaseControl IO m)
+loadBuildConfig :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m)
                 => EnvOverride
                 -> Maybe (Project, Path Abs File, ConfigMonoid)
                 -> Config
+                -> Path Abs Dir
                 -> NoBuildConfigStrategy
                 -> m BuildConfig
-loadBuildConfig menv mproject config noConfigStrat = do
+loadBuildConfig menv mproject config stackRoot noConfigStrat = do
     env <- ask
     let miniConfig = MiniConfig (getHttpManager env) config
     (project, stackYamlFP) <- case mproject of
@@ -328,8 +346,29 @@ loadBuildConfig menv mproject config noConfigStrat = do
         ThrowException -> do
             currDir <- getWorkingDir
             throwM $ NoProjectConfigFound currDir
-        ExecStrategy ->
-            error "You do not have a stack.yaml. This will be handled in the future, see https://github.com/fpco/stack/issues/59"
+        ExecStrategy -> do
+            r <- runReaderT getLatestResolver miniConfig
+            let dest :: Path Abs File
+                dest = destDir </> stackDotYaml
+                destDir = implicitGlobalDir stackRoot
+                dest' :: FilePath
+                dest' = toFilePath dest
+            liftIO (createDirectoryIfMissing True (toFilePath destDir))
+            exists <- fileExists dest
+            if exists
+               then error "Global config file already exists. This should be picked up earlier in the process. Please report this as a bug."
+               else do
+                   $logInfo ("Using latest snapshot resolver: " <> renderResolver r)
+                   $logInfo ("Writing global (non-project-specific) config file to: " <> T.pack dest')
+                   $logInfo "Note: You can change the snapshot via the resolver field there."
+                   let p = Project
+                           { projectPackages = mempty
+                           , projectExtraDeps = mempty
+                           , projectFlags = mempty
+                           , projectResolver = r
+                           }
+                   liftIO $ Yaml.encodeFile dest' p
+                   return (p, dest)
         CreateConfig -> do
             currDir <- getWorkingDir
             (r, flags) <- runReaderT (getDefaultResolver currDir) miniConfig
@@ -492,10 +531,10 @@ loadYaml path =
     liftIO $ Yaml.decodeFileEither (toFilePath path)
          >>= either throwM return
 
--- | Get the location of the project config file, if it exists
+-- | Get the location of the project config file, if it exists.
 getProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)
-                 => m (Maybe (Path Abs File))
-getProjectConfig = do
+                 => Path Abs Dir -> m (Maybe (Path Abs File))
+getProjectConfig root = do
     env <- liftIO getEnvironment
     case lookup "STACK_YAML" env of
         Just fp -> do
@@ -507,7 +546,15 @@ getProjectConfig = do
                 Right path -> return path
         Nothing -> do
             currDir <- getWorkingDir
-            search currDir
+            mlocal <- search currDir
+            case mlocal of
+              Nothing -> do
+                  let globalConf = implicitGlobalDir root </> stackDotYaml
+                  exists <- fileExists globalConf
+                  if exists
+                     then return (Just globalConf)
+                     else return Nothing
+              Just conf -> return (Just conf)
   where
     search dir = do
         let fp = dir </> stackDotYaml
@@ -527,9 +574,9 @@ getProjectConfig = do
 -- and otherwise traversing parents. If no config is found, we supply a default
 -- based on current directory.
 loadProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)
-                  => m (Maybe (Project, Path Abs File, ConfigMonoid))
-loadProjectConfig = do
-    mfp <- getProjectConfig
+                  => Path Abs Dir -> m (Maybe (Project, Path Abs File, ConfigMonoid))
+loadProjectConfig root = do
+    mfp <- getProjectConfig root
     case mfp of
         Just fp -> do
             currDir <- getWorkingDir
