@@ -103,26 +103,26 @@ main =
                         "Execute a command"
                         execCmd
                         ((,)
-                            <$> strArgument (metavar "[--] CMD")
-                            <*> many (strArgument (metavar "ARGS")))
+                            <$> strArgument (metavar "CMD")
+                            <*> many (strArgument (metavar "-- ARGS (e.g. stack exec -- ghc --version)")))
              addCommand "ghc"
                         "Run ghc"
                         execCmd
                         ((,)
                             <$> pure "ghc"
-                            <*> many (strArgument (metavar "ARGS")))
+                            <*> many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)")))
              addCommand "ghci"
                         "Run ghci"
                         execCmd
                         ((,)
                             <$> pure "ghci"
-                            <*> many (strArgument (metavar "ARGS")))
+                            <*> many (strArgument (metavar "-- ARGS (e.g. stack ghci -- -i<dir>)")))
              addCommand "runghc"
                         "Run runghc"
                         execCmd
                         ((,)
                             <$> pure "runghc"
-                            <*> many (strArgument (metavar "ARGS")))
+                            <*> many (strArgument (metavar "-- ARGS (e.g. stack runghc -- X.hs)")))
              addCommand "clean"
                         "Clean the local packages"
                         cleanCmd
