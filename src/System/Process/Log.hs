@@ -3,7 +3,8 @@
 -- | Separate module because TH.
 
 module System.Process.Log
-    (logProcessRun)
+    (logProcessRun
+    ,showProcessArgDebug)
     where
 
 import           Control.Monad.Logger

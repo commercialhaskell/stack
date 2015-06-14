@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -32,13 +33,14 @@ module System.Process.Read
 import           Control.Applicative
 import           Control.Arrow ((***), first)
 import           Control.Concurrent.Async (Concurrently (..))
-import           Control.Exception hiding (try)
+import           Control.Exception hiding (try, catch)
 import           Control.Monad (join, liftM, void)
-import           Control.Monad.Catch (MonadThrow, MonadCatch, throwM, try)
+import           Control.Monad.Catch (MonadThrow, MonadCatch, throwM, try, catch)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger (MonadLogger, logError)
 import           Control.Monad.Trans.Control (MonadBaseControl,liftBaseWith)
 import qualified Data.ByteString as S
+import           Data.ByteString.Builder
 import           Data.Conduit
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.List as CL
@@ -51,6 +53,8 @@ import           Data.Maybe (isJust)
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Lazy.Encoding as LT
+import qualified Data.Text.Lazy as LT
 import           Data.Typeable (Typeable)
 import           Distribution.System (OS (Windows), Platform (Platform))
 import           Path (Path, Abs, Dir, toFilePath, File, parseAbsFile)
@@ -193,12 +197,27 @@ sinkProcessStdoutLogStderr :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, 
                            -> m a
 sinkProcessStdoutLogStderr wd menv name args sinkStdout = do
   runInBase <- liftBaseWith $ \run -> return (void . run)
-  let logSink = CC.mapM_ (liftIO . runInBase . $logError . T.append stderrPrefix)
+  let logSink = CC.mapM_ (liftIO . runInBase . loggit)
       sinkStderr = CC.decodeUtf8 =$= CC.line logSink
-  (_,stdout) <- sinkProcessStderrStdout wd menv name args sinkStderr sinkStdout
-  return stdout
-  where stderrPrefix =
-            T.pack name <> " " <> T.intercalate " " (map (T.pack . show) args) <> ": "
+  buffer <- liftIO (newIORef mempty)
+  (_,sinkRet) <-
+      catch
+          (sinkProcessStderrStdout
+               wd
+               menv
+               name
+               args
+               sinkStderr
+               (CL.iterM (\bytes -> liftIO (modifyIORef' buffer (<> byteString bytes))) $=
+                sinkStdout))
+          (\(e :: ProcessExitedUnsuccessfully) ->
+               do builder <- liftIO (readIORef buffer)
+                  loggit (LT.toStrict (LT.decodeUtf8 (toLazyByteString builder)))
+                  throw e)
+  return sinkRet
+  where loggit = $logError . T.append stderrPrefix
+        stderrPrefix =
+            T.pack name <> " " <> T.intercalate " " (map showProcessArgDebug args) <> ": "
 
 -- | Consume the stdout and stderr of a process feeding strict 'S.ByteString's to the consumers.
 sinkProcessStderrStdout :: (MonadIO m, MonadLogger m)
