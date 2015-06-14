@@ -17,6 +17,7 @@ module Stack.Constants
     ,stackRootEnvVar
     ,userDocsDir
     ,configCacheFile
+    ,configCabalMod
     ,buildCacheFile
     ,stackProgName
     ,wiredInPackages
@@ -111,6 +112,15 @@ configCacheFile :: (MonadThrow m, MonadReader env m, HasPlatform env,HasEnvConfi
 configCacheFile dir = do
     liftM
         (</> $(mkRelFile "stack-config-cache"))
+        (distDirFromDir dir)
+
+-- | The filename used for modification check of .cabal
+configCabalMod :: (MonadThrow m, MonadReader env m, HasPlatform env,HasEnvConfig env)
+               => Path Abs Dir      -- ^ Package directory.
+               -> m (Path Abs File)
+configCabalMod dir = do
+    liftM
+        (</> $(mkRelFile "stack-cabal-mod"))
         (distDirFromDir dir)
 
 -- | Package's build artifacts directory.

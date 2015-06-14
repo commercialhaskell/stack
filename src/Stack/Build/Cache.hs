@@ -6,6 +6,7 @@
 module Stack.Build.Cache
     ( tryGetBuildCache
     , tryGetConfigCache
+    , tryGetCabalMod
     , getPackageFileModTimes
     , getInstalledExes
     , buildCacheTimes
@@ -15,6 +16,7 @@ module Stack.Build.Cache
     , writeFlagCache
     , writeBuildCache
     , writeConfigCache
+    , writeCabalMod
     ) where
 
 import           Control.Exception.Enclosed (handleIO, tryIO)
@@ -89,6 +91,11 @@ tryGetConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m,
                   => Path Abs Dir -> m (Maybe ConfigCache)
 tryGetConfigCache = tryGetCache configCacheFile
 
+-- | Try to read the mod time of the cabal file from the last build
+tryGetCabalMod :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
+               => Path Abs Dir -> m (Maybe ModTime)
+tryGetCabalMod = tryGetCache configCabalMod
+
 -- | Try to load a cache.
 tryGetCache :: (MonadIO m, Binary a, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
             => (Path Abs Dir -> m (Path Abs File))
@@ -123,6 +130,13 @@ writeConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, 
                 -> ConfigCache
                 -> m ()
 writeConfigCache dir = writeCache dir configCacheFile
+
+-- | See 'tryGetCabalMod'
+writeCabalMod :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
+              => Path Abs Dir
+              -> ModTime
+              -> m ()
+writeCabalMod dir = writeCache dir configCabalMod
 
 -- | Delete the caches for the project.
 deleteCaches :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, MonadThrow m, HasEnvConfig env)
