@@ -292,9 +292,11 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
     -- Determine the old and new configuration in the local directory, to
     -- determine if we need to reconfigure.
     mOldConfigCache <- tryGetConfigCache pkgDir
+    -- FIXME check if the .cabal file has changed
+    -- mOldCabalMod <- tryGetCabalMod pkgDir
+    -- now <- liftIO (getModificationTime (toFilePath cabalfp))
 
     idMap <- liftIO $ readTVarIO eeGhcPkgIds
-    now <- liftIO (getModificationTime (toFilePath cabalfp))
     let getMissing ident =
             case Map.lookup ident idMap of
                 Nothing -> error "singleBuild: invariant violated, missing package ID missing"
@@ -307,7 +309,6 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
         newConfigCache = ConfigCache
             { configCacheOpts = map encodeUtf8 configOpts
             , configCacheDeps = allDeps
-            , configCabalFileModTime = Just $ modTime now
             }
 
     when (mOldConfigCache /= Just newConfigCache) $ withMVar eeConfigureLock $ \_ -> do

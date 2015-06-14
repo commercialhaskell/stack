@@ -326,7 +326,6 @@ checkDirtiness ps (Library installed) package present = do
         configCache = ConfigCache
             { configCacheOpts = map encodeUtf8 configOpts
             , configCacheDeps = present
-            , configCabalFileModTime = Nothing
             }
     moldOpts <- tryGetFlagCache installed
     case moldOpts of

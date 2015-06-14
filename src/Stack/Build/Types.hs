@@ -315,8 +315,6 @@ data ConfigCache = ConfigCache
       -- the complete GhcPkgId (only a PackageIdentifier) in the configure
       -- options, just using the previous value is insufficient to know if
       -- dependencies have changed.
-    , configCabalFileModTime :: !(Maybe ModTime)
-      -- ^ Last time the .cabal file was changed.
     }
     deriving (Generic,Eq,Show)
 instance Binary ConfigCache

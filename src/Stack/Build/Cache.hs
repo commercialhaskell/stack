@@ -177,7 +177,6 @@ writeFlagCache gid flags deps = do
     let cache = ConfigCache
                               { configCacheOpts = flags
                               , configCacheDeps = deps
-                              , configCabalFileModTime = Nothing -- FIXME I'm not convinced this should even be in ConfigCache
                               }
     liftIO $ do
         createDirectoryIfMissing True $ toFilePath $ parent file
