@@ -47,7 +47,7 @@ Docker sub-commands
 -------------------------------------------------------------------------------
 
 These `stack docker` sub-commands have Docker-specific functionality. Most other
-sub-commands will also use a Docker container under the surface if Docker is
+`stack` commands will also use a Docker container under the surface if Docker is
 enabled.
 
 ### pull - Pull latest version of image
@@ -183,11 +183,11 @@ otherwise noted.
 Image Repositories
 -------------------------------------------------------------------------------
 
-FP Complete provides the following public image repositories:
+FP Complete provides the following public image repositories on Docker Hub:
 
 - [fpco/stack-build](https://registry.hub.docker.com/u/fpco/stack-build/) (the
   default) - GHC (patched), tools (stack, cabal-install, happy, alex, etc.), and
-  developer libraries required to build all Stackage packages.
+  system developer libraries required to build all Stackage packages.
 - [fpco/stack-ghcjs-build](https://registry.hub.docker.com/u/fpco/stack-ghcjs-build/) -
   Like `stack-build`, but adds GHCJS.
 - [fpco/stack-full](https://registry.hub.docker.com/u/fpco/stack-full/) -
@@ -195,14 +195,17 @@ FP Complete provides the following public image repositories:
   These images are over 10 GB!
 - [fpco/stack-ghcjs-full](https://registry.hub.docker.com/u/fpco/stack-ghcjs-full/) -
   Like `stack-full`, but adds GHCJS.
-- [fpco/stack-run](https://registry.hub.docker.com/u/fpco/stack-run/) - A
-  runtime environment for binaries built with Stackage. Includes all shared
-  libraries for all Stackage packages. Does not necessarily include all data
-  required for every use (e.g. has texlive-binaries for HaTeX, but does not
+- [fpco/stack-run](https://registry.hub.docker.com/u/fpco/stack-run/) -
+  Runtime environment for binaries built with Stackage. Includes system shared
+  libraries required by all Stackage packages. Does not necessarily include all
+  data required for every use (e.g. has texlive-binaries for HaTeX, but does not
   include LaTeX fonts), as that would be prohibitively large. Based on
-  [phusion/baseimage](https://registry.hub.docker.com/u/phusion/baseimage/)
+  [phusion/baseimage](https://registry.hub.docker.com/u/phusion/baseimage/).
 
 FP Complete also builds custom variants of these images for their clients.
+
+These images can also be used directory with `docker run` and provide a complete
+Haskell build environment.
 
 Prerequisites
 -------------------------------------------------------------------------------
@@ -243,12 +246,12 @@ Security
 -------------------------------------------------------------------------------
 
 Having `docker` usable as a non-root user is always a security risk, and will
-allow root access to your system. It is also possible to craft a stack.yaml that
-will run arbitrary commands in an arbirary docker container through that vector,
-thus a stack.yaml could cause stack to run arbitrary commands as root. While
-this is a risk, it is not really a greater risk than is posed by the docker
-permissions in the first place (for example, if you ever run an unknown shell
-script or executable, or ever compile an unknown Haskell package that uses
+allow root access to your system. It is also possible to craft a `stack.yaml`
+that will run arbitrary commands in an arbirary docker container through that
+vector, thus a `stack.yaml` could cause stack to run arbitrary commands as root.
+While this is a risk, it is not really a greater risk than is posed by the
+docker permissions in the first place (for example, if you ever run an unknown
+shell script or executable, or ever compile an unknown Haskell package that uses
 Template Haskell, you are at equal risk). Nevertheless, there are
 [plans to close the stack.yaml loophole](https://github.com/commercialhaskell/stack/issues/260).
 

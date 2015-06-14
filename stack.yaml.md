@@ -16,7 +16,7 @@ The stack.yaml configuration options break down into project specific and non-pr
 
 ### docker
 
-See [Docker](Docker#configuration).
+See [Docker configuration](Docker#configuration).
 
 ### connection-count
 
