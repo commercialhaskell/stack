@@ -261,15 +261,17 @@ updateIndexGit menv indexName' index gitUrl = do
             $logDebug ("Exporting a tarball to " <>
                        (T.pack . toFilePath) tarFile)
             deleteCache indexName'
+            let tarFileTmp = toFilePath tarFile ++ ".tmp"
             readInNull acfDir
                        "git"
                        menv
                        ["archive"
                        ,"--format=tar"
                        ,"-o"
-                       ,toFilePath tarFile
+                       ,tarFileTmp
                        ,"current-hackage"]
                        Nothing
+            liftIO $ renameFile tarFileTmp (toFilePath tarFile)
 
 -- | Update the index tarball via HTTP
 updateIndexHTTP :: (MonadIO m,MonadLogger m
