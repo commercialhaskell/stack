@@ -9,11 +9,30 @@
 
 -- | All data types.
 
-module Stack.Build.Types where
+module Stack.Build.Types
+    (StackBuildException(..)
+    ,Location(..)
+    ,ModTime
+    ,modTime
+    ,Installed(..)
+    ,PackageInstallInfo(..)
+    ,Task(..)
+    ,LocalPackage(..)
+    ,BaseConfigOpts(..)
+    ,Plan(..)
+    ,FinalAction(..)
+    ,BuildOpts(..)
+    ,TaskType(..)
+    ,TaskConfigOpts(..)
+    ,ConfigCache(..)
+    ,ConstructPlanException(..)
+    ,configureOpts
+    ,BadDependency(..))
+    where
 
 import           Control.DeepSeq
 import           Control.Exception
-import           Data.Aeson.Extended
+
 import           Data.Binary (Binary(..))
 import qualified Data.ByteString as S
 import           Data.Char (isSpace)
@@ -219,46 +238,6 @@ data BuildOpts =
             }
   deriving (Show)
 
--- | Configuration for testing.
-data TestConfig =
-  TestConfig {tconfigTargets :: ![Text]
-             }
-  deriving (Show)
-
--- | Configuration for haddocking.
-data HaddockConfig =
-  HaddockConfig {hconfigTargets :: ![Text]
-                }
-  deriving (Show)
-
--- | Configuration for benchmarking.
-data BenchmarkConfig =
-  BenchmarkConfig {benchTargets :: ![Text]
-                  ,benchInDocker :: !Bool}
-  deriving (Show)
-
--- | Generated config for a package build.
-data GenConfig =
-  GenConfig {gconfigOptimize :: !Bool
-            ,gconfigLibProfiling :: !Bool
-            ,gconfigExeProfiling :: !Bool
-            ,gconfigGhcOptions :: ![Text]
-            ,gconfigFlags :: !(Map FlagName Bool)
-            ,gconfigPkgId :: Maybe GhcPkgId}
-  deriving (Generic,Show)
-
-instance FromJSON GenConfig
-instance ToJSON GenConfig
-
-defaultGenConfig :: GenConfig
-defaultGenConfig =
-    GenConfig {gconfigOptimize = False
-              ,gconfigLibProfiling = False
-              ,gconfigExeProfiling = False
-              ,gconfigGhcOptions = []
-              ,gconfigFlags = mempty
-              ,gconfigPkgId = Nothing}
-
 -- | Run a Setup.hs action after building a package, before installing.
 data FinalAction
   = DoTests
@@ -266,19 +245,6 @@ data FinalAction
   | DoHaddock
   | DoNothing
   deriving (Eq,Bounded,Enum,Show)
-
-data Dependencies =
-  Dependencies {depsLibraries :: [PackageName]
-               ,depsTools :: [PackageName]}
-  deriving (Show,Typeable,Data)
-
--- | Used for mutex locking on the install step. Beats magic ().
-data InstallLock = InstallLock
-
--- | Mutex for reading/writing .config files in dist/ of
--- packages. Shake works in parallel, without this there are race
--- conditions.
-data ConfigLock = ConfigLock
 
 -- | Package dependency oracle.
 newtype PkgDepsOracle =
