@@ -588,7 +588,7 @@ singleTest ac ee task =
             nameDir <- liftIO $ parseRelDir $ T.unpack testName
             nameExe <- liftIO $ parseRelFile $ T.unpack testName ++ exeExtension
             let exeName = buildDir </> $(mkRelDir "build") </> nameDir </> nameExe
-            exists <- liftIO $ doesFileExist $ toFilePath exeName
+            exists <- fileExists exeName
             menv <- liftIO $ configEnvOverride config EnvSettings
                 { esIncludeLocals = taskLocation task == Local
                 , esIncludeGhcPackagePath = True
@@ -735,11 +735,11 @@ taskLocation task =
 getSetupHs :: Path Abs Dir -- ^ project directory
            -> IO (Maybe (Path Abs File))
 getSetupHs dir = do
-    exists1 <- doesFileExist (toFilePath fp1)
+    exists1 <- fileExists fp1
     if exists1
         then return $ Just fp1
         else do
-            exists2 <- doesFileExist (toFilePath fp2)
+            exists2 <- fileExists fp2
             if exists2
                 then return $ Just fp2
                 else return Nothing

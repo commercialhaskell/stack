@@ -68,6 +68,7 @@ import           Network.HTTP.Download
 import           Path                                  (mkRelDir, parent,
                                                         parseRelDir, toFilePath,
                                                         (</>))
+import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Stack.Types
 import           Stack.Types.StackT
@@ -181,7 +182,7 @@ requireIndex :: (MonadIO m,MonadLogger m
              -> m ()
 requireIndex menv index = do
     tarFile <- configPackageIndex $ indexName index
-    exists <- liftIO $ doesFileExist $ toFilePath tarFile
+    exists <- fileExists tarFile
     unless exists $ updateIndex menv index
 
 -- | Update all of the package indices
@@ -286,7 +287,7 @@ updateIndexHTTP indexName' index url = do
     toUnpack <-
         if wasDownloaded
             then return True
-            else liftIO $ fmap not $ doesFileExist $ toFilePath tar
+            else liftM not $ fileExists tar
 
     when toUnpack $ do
         let tmp = toFilePath tar <.> "tmp"

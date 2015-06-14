@@ -12,7 +12,9 @@ module Path.IO
   ,ResolveException(..)
   ,removeFileIfExists
   ,removeTree
-  ,removeTreeIfExists)
+  ,removeTreeIfExists
+  ,fileExists
+  ,dirExists)
   where
 
 import           Control.Exception hiding (catch)
@@ -138,3 +140,13 @@ removeTreeIfExists fp = do
                   (\e -> if isDoesNotExistError e
                             then return ()
                             else throwIO e))
+
+-- | Does the given file exist?
+fileExists :: MonadIO m => Path b File -> m Bool
+fileExists =
+    liftIO . doesFileExist . toFilePath
+
+-- | Does the given directory exist?
+dirExists :: MonadIO m => Path b Dir -> m Bool
+dirExists =
+    liftIO . doesFileExist . toFilePath

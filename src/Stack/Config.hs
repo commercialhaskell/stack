@@ -335,7 +335,7 @@ loadBuildConfig menv mproject config noConfigStrat = do
             (r, flags) <- runReaderT (getDefaultResolver currDir) miniConfig
             let dest = currDir </> stackDotYaml
                 dest' = toFilePath dest
-            exists <- liftIO $ doesFileExist dest'
+            exists <- fileExists dest
             when exists $ error "Invariant violated: in toBuildConfig's Nothing branch, and the stack.yaml file exists"
             $logInfo $ "Writing default config file to: " <> T.pack dest'
             let p = Project
@@ -482,7 +482,7 @@ getExtraConfigs stackRoot = liftIO $ do
     mstackGlobalConfig <-
         maybe (return Nothing) (fmap Just . parseAbsFile)
       $ lookup "STACK_GLOBAL_CONFIG" env
-    filterM (liftIO . doesFileExist . toFilePath)
+    filterM fileExists
         $ fromMaybe (stackRoot </> stackDotYaml) mstackConfig
         : maybe [] return (mstackGlobalConfig <|> defaultStackGlobalConfig)
 
@@ -513,7 +513,7 @@ getProjectConfig = do
         let fp = dir </> stackDotYaml
             fp' = toFilePath fp
         $logDebug $ "Checking for project config at: " <> T.pack fp'
-        exists <- liftIO $ doesFileExist fp'
+        exists <- fileExists fp
         if exists
             then return $ Just fp
             else do
