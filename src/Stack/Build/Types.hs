@@ -301,7 +301,6 @@ data LocalPackage = LocalPackage
     , lpWanted         :: !Bool            -- ^ Is this package a \"wanted\" target based on command line input
     , lpDir            :: !(Path Abs Dir)  -- ^ Directory of the package.
     , lpCabalFile      :: !(Path Abs File) -- ^ The .cabal file
-    , lpLastConfigOpts :: !(Maybe ConfigCache)  -- ^ configure options used during last Setup.hs configure, if available
     , lpDirtyFiles     :: !Bool            -- ^ are there files that have changed since the last build?
     }
     deriving Show
@@ -348,13 +347,9 @@ instance Show TaskConfigOpts where
 
 -- | The type of a task, either building local code or something from the
 -- package index (upstream)
-data TaskType = TTLocal LocalPackage NeededSteps
+data TaskType = TTLocal LocalPackage
               | TTUpstream Package Location
     deriving Show
-
--- | How many steps must be taken when building
-data NeededSteps = AllSteps | SkipConfig | JustFinal
-    deriving (Show, Eq)
 
 -- | A complete plan of what needs to be built and how to do it
 data Plan = Plan

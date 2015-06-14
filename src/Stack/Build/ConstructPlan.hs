@@ -28,7 +28,6 @@ import           Data.Text.Encoding (encodeUtf8)
 import           Distribution.Package (Dependency (..))
 import           Distribution.Version         (anyVersion,
                                                intersectVersionRanges)
-import           Path
 import           Prelude hiding (FilePath, pi, writeFile)
 import           Stack.Build.Cache
 import           Stack.Build.Installed
@@ -38,7 +37,6 @@ import           Stack.BuildPlan
 
 import           Stack.Package
 import           Stack.Types
-import           System.Directory
 
 data PackageInfo
     = PIOnlyInstalled Version Location Installed
@@ -152,10 +150,7 @@ mkUnregisterLocal tasks locallyRegistered =
     toUnregister gid =
         case M.lookup name tasks of
             Nothing -> False
-            Just task ->
-                case taskType task of
-                    TTLocal _ JustFinal -> False
-                    _ -> True
+            Just _ -> True
       where
         ident = ghcPkgIdPackageIdentifier gid
         name = packageIdentifierName ident
@@ -191,13 +186,13 @@ addDep'' name = do
             return $ Right $ ADRFound version installed
         Just (PIOnlySource ps) -> do
             tellExecutables name ps
-            installPackage Nothing name ps
+            installPackage name ps
         Just (PIBoth ps installed) -> do
             tellExecutables name ps
-            mneededSteps <- checkNeededSteps name ps installed
-            case mneededSteps of
-                Nothing -> return $ Right $ ADRFound (piiVersion ps) installed
-                Just neededSteps -> installPackage (Just neededSteps) name ps
+            needInstall <- checkNeedInstall name ps installed
+            if needInstall
+                then installPackage name ps
+                else return $ Right $ ADRFound (piiVersion ps) installed
 
 tellExecutables :: PackageName -> PackageSource -> M ()
 tellExecutables _ (PSLocal lp)
@@ -222,12 +217,11 @@ tellExecutablesPackage loc p =
 -- TODO There are a lot of duplicated computations below. I've kept that for
 -- simplicity right now
 
-installPackage :: Maybe NeededSteps -> PackageName -> PackageSource -> M (Either ConstructPlanException AddDepRes)
-installPackage mneededSteps name ps = do
+installPackage :: PackageName -> PackageSource -> M (Either ConstructPlanException AddDepRes)
+installPackage name ps = do
     ctx <- ask
     package <- psPackage name ps
     depsRes <- addPackageDeps package
-    mtime <- packageSourceCabalModTime ps
     case depsRes of
         Left e -> return $ Left e
         Right (missing, present) -> do
@@ -247,41 +241,18 @@ installPackage mneededSteps name ps = do
                 , taskType =
                     case ps of
                         PSLocal lp -> TTLocal lp
-                            $ case mneededSteps of
-                                Just neededSteps -> neededSteps
-                                Nothing ->
-                                    case lpLastConfigOpts lp of
-                                        Nothing -> AllSteps
-                                        Just configOpts
-                                            | not $ Set.null missing -> AllSteps
-                                            | otherwise -> do
-
-                                                let newOpts = configureOpts
-                                                        (baseConfigOpts ctx)
-                                                        present
-                                                        (psWanted ps)
-                                                        (piiLocation ps)
-                                                        (packageFlags package)
-                                                    configCache = ConfigCache
-                                                        { configCacheOpts = map encodeUtf8 newOpts
-                                                        , configCacheDeps = present
-                                                        , configCabalFileModTime = mtime
-                                                        }
-                                                 in if configCache == configOpts
-                                                        then SkipConfig
-                                                        else AllSteps
                         PSUpstream _ loc _ -> TTUpstream package loc
                 }
 
-checkNeededSteps :: PackageName -> PackageSource -> Installed -> M (Maybe NeededSteps)
-checkNeededSteps name ps installed = assert (piiLocation ps == Local) $ do
+checkNeedInstall :: PackageName -> PackageSource -> Installed -> M Bool
+checkNeedInstall name ps installed = assert (piiLocation ps == Local) $ do
     package <- psPackage name ps
     depsRes <- addPackageDeps package
     case depsRes of
-        Left _e -> return $ Just AllSteps -- installPackage will find the error again
+        Left _e -> return True -- installPackage will find the error again
         Right (missing, present)
             | Set.null missing -> checkDirtiness ps installed package present
-            | otherwise -> return $ Just AllSteps
+            | otherwise -> return True
 
 addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Set GhcPkgId))
 addPackageDeps package = do
@@ -314,20 +285,13 @@ addPackageDeps package = do
     adrVersion (ADRToInstall task) = packageIdentifierVersion $ taskProvides task
     adrVersion (ADRFound v _) = v
 
-packageSourceCabalModTime :: MonadIO m => PackageSource -> m (Maybe ModTime)
-packageSourceCabalModTime (PSLocal lp) | lpWanted lp = do
-    now <-
-        liftIO (getModificationTime
-                    (toFilePath (lpCabalFile lp)))
-    return (Just (modTime now))
-packageSourceCabalModTime _ = return Nothing
-
 checkDirtiness :: PackageSource
                -> Installed
                -> Package
                -> Set GhcPkgId
-               -> M (Maybe NeededSteps)
-checkDirtiness ps@(PSLocal lp) Executable package present = do
+               -> M Bool
+checkDirtiness _ps@(PSLocal _lp) Executable _package _present = do
+    {- FIXME proper dirtiness checking on executables
     ctx <- ask
     mtime <- packageSourceCabalModTime ps
     let configOpts = configureOpts
@@ -343,15 +307,16 @@ checkDirtiness ps@(PSLocal lp) Executable package present = do
             }
     let moldOpts = lpLastConfigOpts lp
     case moldOpts of
-        Nothing -> return $ Just AllSteps
+        Nothing -> return True
         Just oldOpts
-            | oldOpts /= configCache -> return $ Just AllSteps
+            | oldOpts /= configCache -> return True
             | psDirty ps -> return $ Just SkipConfig
             | otherwise -> return Nothing
-checkDirtiness (PSUpstream _ _ _) Executable _ _ = return Nothing -- TODO reinstall executables in the future
+    -}
+    return False
+checkDirtiness (PSUpstream _ _ _) Executable _ _ = return False -- TODO reinstall executables in the future
 checkDirtiness ps (Library installed) package present = do
     ctx <- ask
-    mtime <- packageSourceCabalModTime ps
     let configOpts = configureOpts
             (baseConfigOpts ctx)
             present
@@ -361,17 +326,19 @@ checkDirtiness ps (Library installed) package present = do
         configCache = ConfigCache
             { configCacheOpts = map encodeUtf8 configOpts
             , configCacheDeps = present
-            , configCabalFileModTime = mtime
+            , configCabalFileModTime = Nothing
             }
-    moldOpts <- psOldOpts ps installed
+    moldOpts <- tryGetFlagCache installed
     case moldOpts of
-        Nothing -> return $ Just AllSteps
+        Nothing -> return True
         Just oldOpts
-            | oldOpts /= configCache -> return $ Just AllSteps
-            | psDirty ps -> return $ Just SkipConfig
+            | oldOpts /= configCache -> return True
+            | psDirty ps -> return True
             | otherwise -> do
                 case ps of
+                        {- FIXME need to track finals completely differently now
                     PSLocal lp | lpWanted lp -> do
+
                         -- track the fact that we need to perform a JustFinal. But
                         -- don't put this in the main State Map, as that would
                         -- trigger dependencies to rebuild also.
@@ -386,16 +353,13 @@ checkDirtiness ps (Library installed) package present = do
                                 }
                         tell (Map.singleton (packageName package) task, Map.empty)
                             -- FIXME need to force reconfigure when GhcPkgId for dependencies change
+                        -}
                     _ -> return ()
-                return Nothing
+                return False
 
 psDirty :: PackageSource -> Bool
 psDirty (PSLocal lp) = lpDirtyFiles lp
 psDirty (PSUpstream _ _ _) = False -- files never change in an upstream package
-
-psOldOpts :: PackageSource -> GhcPkgId -> M (Maybe ConfigCache)
-psOldOpts (PSLocal lp) _ = return $ lpLastConfigOpts lp
-psOldOpts (PSUpstream _ _ _) installed = tryGetFlagCache installed
 
 psWanted :: PackageSource -> Bool
 psWanted (PSLocal lp) = lpWanted lp

@@ -158,12 +158,10 @@ loadLocals bopts latestVersion = do
         when (packageName pkg /= name) $ throwM
             $ MismatchedCabalName cabalfp (packageName pkg)
         mbuildCache <- tryGetBuildCache dir
-        mconfigCache <- tryGetConfigCache dir
         fileModTimes <- getPackageFileModTimes pkg cabalfp
         return LocalPackage
             { lpPackage = pkg
             , lpWanted = wanted
-            , lpLastConfigOpts = mconfigCache
             , lpDirtyFiles =
                   maybe True
                         ((/= fileModTimes) . buildCacheTimes)

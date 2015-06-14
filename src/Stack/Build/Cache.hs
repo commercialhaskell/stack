@@ -33,8 +33,6 @@ import qualified Data.Map as Map
 import           Data.Maybe (catMaybes, mapMaybe)
 import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Text (Text)
-import           Data.Text.Encoding (encodeUtf8)
 import           GHC.Generics (Generic)
 import           Path
 import           Path.IO
@@ -124,25 +122,9 @@ writeBuildCache dir times =
 -- | Write the dirtiness cache for this package's configuration.
 writeConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
                 => Path Abs Dir
-                -> [Text]
-                -> Set GhcPkgId -- ^ dependencies
-                -> Path Abs file
-                -> TaskType
+                -> ConfigCache
                 -> m ()
-writeConfigCache dir opts deps cabalfp ttype =
-    do now <- liftIO (getModificationTime (toFilePath cabalfp))
-       let cache = ConfigCache
-                   { configCacheOpts = map encodeUtf8 opts
-                   , configCacheDeps = deps
-                   , configCabalFileModTime =
-                         case ttype of
-                           TTLocal lp _ | lpWanted lp -> Just (modTime now)
-                           _ -> Nothing
-                   }
-       writeCache
-           dir
-           configCacheFile
-           cache
+writeConfigCache dir = writeCache dir configCacheFile
 
 -- | Delete the caches for the project.
 deleteCaches :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, MonadThrow m, HasEnvConfig env)
@@ -189,18 +171,13 @@ writeFlagCache :: (MonadIO m, MonadReader env m, HasBuildConfig env, MonadThrow 
                => GhcPkgId
                -> [ByteString]
                -> Set GhcPkgId
-               -> Path Abs File
-               -> TaskType
                -> m ()
-writeFlagCache gid flags deps cabalfp ttype = do
+writeFlagCache gid flags deps = do
     file <- flagCacheFile gid
-    now <- liftIO $ getModificationTime (toFilePath cabalfp)
     let cache = ConfigCache
                               { configCacheOpts = flags
                               , configCacheDeps = deps
-                              , configCabalFileModTime = case ttype of
-                                                           TTLocal lp _ | lpWanted lp -> Just (modTime now)
-                                                           _ -> Nothing
+                              , configCabalFileModTime = Nothing -- FIXME I'm not convinced this should even be in ConfigCache
                               }
     liftIO $ do
         createDirectoryIfMissing True $ toFilePath $ parent file

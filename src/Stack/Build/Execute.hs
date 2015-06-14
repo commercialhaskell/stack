@@ -110,12 +110,8 @@ displayTask task = T.pack $ concat
         Local -> "local"
     , ", source="
     , case taskType task of
-        TTLocal lp steps -> concat
+        TTLocal lp -> concat
             [ toFilePath $ lpDir lp
-            , case steps of
-                AllSteps -> " (configure)"
-                SkipConfig -> " (build)"
-                JustFinal -> " (already built)"
             ]
         TTUpstream _ _ -> "package index"
     , if Set.null missing
@@ -225,25 +221,7 @@ executePlan menv bopts baseConfigOpts locals plan = do
 -- | Calculate how many actual install steps are going to happen for
 -- the build.
 installStepCount :: Plan -> Int
-installStepCount plan =
-    M.size $
-    M.filter
-        (\t ->
-              case taskType t of
-                  TTUpstream{} ->
-                      True
-                  TTLocal _ step ->
-                      isInstallStep step)
-        (planTasks plan)
-  where
-    isInstallStep step =
-        case step of
-            AllSteps ->
-                True
-            SkipConfig ->
-                True
-            JustFinal ->
-                False
+installStepCount = M.size . planTasks
 
 -- | Windows can't write over the current executable. Instead, we rename the
 -- current executable to something else and then do the copy.
@@ -311,94 +289,44 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
   withPackage $ \package cabalfp pkgDir ->
   withLogFile package $ \mlogFile ->
   withCabal pkgDir mlogFile $ \cabal -> do
-    mconfigOpts <- if needsConfig
-        then withMVar eeConfigureLock $ \_ -> do
-            deleteCaches pkgDir
-            idMap <- liftIO $ readTVarIO eeGhcPkgIds
-            let getMissing ident =
-                    case Map.lookup ident idMap of
-                        Nothing -> error "singleBuild: invariant violated, missing package ID missing"
-                        Just (Library x) -> Just x
-                        Just Executable -> Nothing
-                missing' = Set.fromList $ mapMaybe getMissing $ Set.toList missing
-                TaskConfigOpts missing mkOpts = taskConfigOpts
-                configOpts = mkOpts missing'
-                allDeps = Set.union missing' taskPresent
-            unless justFinal $  withMVar eeInstallLock $ \(done,total) -> do
-              $logSticky ("Progress: " <> T.pack (show done) <> "/" <> T.pack (show total))
-            announce "configure"
-            cabal False $ "configure" : map T.unpack configOpts
-            $logDebug $ T.pack $ show configOpts
-            writeConfigCache pkgDir configOpts allDeps cabalfp taskType
-            return $ Just (configOpts, allDeps)
-        else return Nothing
+    -- Determine the old and new configuration in the local directory, to
+    -- determine if we need to reconfigure.
+    mOldConfigCache <- tryGetConfigCache pkgDir
+
+    idMap <- liftIO $ readTVarIO eeGhcPkgIds
+    now <- liftIO (getModificationTime (toFilePath cabalfp))
+    let getMissing ident =
+            case Map.lookup ident idMap of
+                Nothing -> error "singleBuild: invariant violated, missing package ID missing"
+                Just (Library x) -> Just x
+                Just Executable -> Nothing
+        missing' = Set.fromList $ mapMaybe getMissing $ Set.toList missing
+        TaskConfigOpts missing mkOpts = taskConfigOpts
+        configOpts = mkOpts missing'
+        allDeps = Set.union missing' taskPresent
+        newConfigCache = ConfigCache
+            { configCacheOpts = map encodeUtf8 configOpts
+            , configCacheDeps = allDeps
+            , configCabalFileModTime = Just $ modTime now
+            }
+
+    when (mOldConfigCache /= Just newConfigCache) $ withMVar eeConfigureLock $ \_ -> do
+        deleteCaches pkgDir
+        withMVar eeInstallLock $ \(done,total) ->
+            $logSticky ("Progress: " <> T.pack (show done) <> "/" <> T.pack (show total))
+        announce "configure"
+        cabal False $ "configure" : map T.unpack configOpts
+        $logDebug $ T.pack $ show configOpts
+        writeConfigCache pkgDir newConfigCache
 
     fileModTimes <- getPackageFileModTimes package cabalfp
     writeBuildCache pkgDir fileModTimes
 
-    unless justFinal $ do
-        announce "build"
-        config <- asks getConfig
-        cabal (console && configHideTHLoading config) ["build"]
+    announce "build"
+    config <- asks getConfig
+    cabal (console && configHideTHLoading config) ["build"]
 
-    case boptsFinalAction eeBuildOpts of
-        DoTests -> when wanted $ do
-            announce "test"
-            runTests package pkgDir mlogFile
-        DoBenchmarks -> when wanted $ do
-            announce "benchmarks"
-            cabal False ["bench"]
-        DoHaddock -> do
-            announce "haddock"
-            hscolourExists <- doesExecutableExist eeEnvOverride "hscolour"
-              {- EKB TODO: doc generation for stack-doc-server
- #ifndef mingw32_HOST_OS
-              liftIO (removeDocLinks docLoc package)
- #endif
-              ifcOpts <- liftIO (haddockInterfaceOpts docLoc package packages)
-              -}
-            cabal False (concat [["haddock", "--html"]
-                                ,["--hyperlink-source" | hscolourExists]])
-              {- EKB TODO: doc generation for stack-doc-server
-                         ,"--hoogle"
-                         ,"--html-location=../$pkg-$version/"
-                         ,"--haddock-options=" ++ intercalate " " ifcOpts ]
-              haddockLocs <-
-                liftIO (findFiles (packageDocDir package)
-                                  (\loc -> FilePath.takeExtensions (toFilePath loc) ==
-                                           "." ++ haddockExtension)
-                                  (not . isHiddenDir))
-              forM_ haddockLocs $ \haddockLoc ->
-                do let hoogleTxtPath = FilePath.replaceExtension (toFilePath haddockLoc) "txt"
-                       hoogleDbPath = FilePath.replaceExtension hoogleTxtPath hoogleDbExtension
-                   hoogleExists <- liftIO (doesFileExist hoogleTxtPath)
-                   when hoogleExists
-                        (callProcess
-                             "hoogle"
-                             ["convert"
-                             ,"--haddock"
-                             ,hoogleTxtPath
-                             ,hoogleDbPath])
-                        -}
-                 {- EKB TODO: doc generation for stack-doc-server
-             #ifndef mingw32_HOST_OS
-                 case setupAction of
-                   DoHaddock -> liftIO (createDocLinks docLoc package)
-                   _ -> return ()
-             #endif
-
- -- | Package's documentation directory.
- packageDocDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
-               => PackageIdentifier -- ^ Cabal version
-               -> Package
-               -> m (Path Abs Dir)
- packageDocDir cabalPkgVer package' = do
-   dist <- distDirFromDir cabalPkgVer (packageDir package')
-   return (dist </> $(mkRelDir "doc/"))
-                 --}
-        DoNothing -> return ()
-
-    unless justFinal $ modifyMVar_ eeInstallLock $ \(done,total) -> do
+    modifyMVar_ eeInstallLock $ \(done,total) -> do
         announce "install"
         cabal False ["install"]
         unless (total == 1) $ do
@@ -408,8 +336,6 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
                  ($logStickyDone ("Completed all " <> T.pack (show total) <> " packages."))
         return (done + 1,total)
 
-    -- It seems correct to leave this outside of the "justFinal" check above,
-    -- in case another package depends on a justFinal target
     let pkgDbs =
             case taskLocation task of
                 Snap -> [bcoSnapDB eeBaseConfigOpts]
@@ -420,18 +346,14 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
     mpkgid <- findGhcPkgId eeEnvOverride pkgDbs (packageName package)
     mpkgid' <- case (packageHasLibrary package, mpkgid) of
         (False, _) -> assert (isNothing mpkgid) $ do
-            markExeInstalled (taskLocation task) taskProvides
+            markExeInstalled (taskLocation task) taskProvides -- FIXME this should also take the options, deps, etc
             return Executable
         (True, Nothing) -> throwM $ Couldn'tFindPkgId $ packageName package
         (True, Just pkgid) -> do
-            case mconfigOpts of
-                Nothing -> return ()
-                Just (configOpts, deps) -> writeFlagCache
-                    pkgid
-                    (map encodeUtf8 configOpts)
-                    deps
-                    cabalfp
-                    taskType
+            writeFlagCache
+                pkgid
+                (map encodeUtf8 configOpts)
+                allDeps
             return $ Library pkgid
     liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides mpkgid'
   where
@@ -441,25 +363,16 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
         , x
         ]
 
-    needsConfig =
-        case taskType of
-            TTLocal _ y -> y == AllSteps
-            TTUpstream _ _ -> True
-    justFinal =
-        case taskType of
-            TTLocal _ JustFinal -> True
-            _ -> False
-
     wanted =
         case taskType of
-            TTLocal lp _ -> lpWanted lp
+            TTLocal lp -> lpWanted lp
             TTUpstream _ _ -> False
 
     console = wanted && acRemaining == 0 && eeTotalWanted == 1
 
     withPackage inner =
         case taskType of
-            TTLocal lp _ -> inner (lpPackage lp) (lpCabalFile lp) (lpDir lp)
+            TTLocal lp -> inner (lpPackage lp) (lpCabalFile lp) (lpDir lp)
             TTUpstream package _ -> do
                 mdist <- liftM Just distRelativeDir
                 m <- unpackPackageIdents eeEnvOverride eeTempDir mdist $ Set.singleton taskProvides
@@ -549,6 +462,7 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
                         (fmap fst mlogFile)
                         bs
 
+    {- FIXME move to a separate step
     runTests package pkgDir mlogFile = do
         bconfig <- asks getBuildConfig
         distRelativeDir' <- distRelativeDir
@@ -602,6 +516,64 @@ singleBuild ActionContext {..} ExecuteEnv {..} task@Task {..} =
                     return $ Map.singleton testName Nothing
         unless (Map.null errs) $ throwM $ TestSuiteFailure taskProvides errs (fmap fst mlogFile)
 
+    case boptsFinalAction eeBuildOpts of
+        DoTests -> when wanted $ do
+            announce "test"
+            runTests package pkgDir mlogFile
+        DoBenchmarks -> when wanted $ do
+            announce "benchmarks"
+            cabal False ["bench"]
+        DoHaddock -> do
+            announce "haddock"
+            hscolourExists <- doesExecutableExist eeEnvOverride "hscolour"
+              {- EKB TODO: doc generation for stack-doc-server
+ #ifndef mingw32_HOST_OS
+              liftIO (removeDocLinks docLoc package)
+ #endif
+              ifcOpts <- liftIO (haddockInterfaceOpts docLoc package packages)
+              -}
+            cabal False (concat [["haddock", "--html"]
+                                ,["--hyperlink-source" | hscolourExists]])
+              {- EKB TODO: doc generation for stack-doc-server
+                         ,"--hoogle"
+                         ,"--html-location=../$pkg-$version/"
+                         ,"--haddock-options=" ++ intercalate " " ifcOpts ]
+              haddockLocs <-
+                liftIO (findFiles (packageDocDir package)
+                                  (\loc -> FilePath.takeExtensions (toFilePath loc) ==
+                                           "." ++ haddockExtension)
+                                  (not . isHiddenDir))
+              forM_ haddockLocs $ \haddockLoc ->
+                do let hoogleTxtPath = FilePath.replaceExtension (toFilePath haddockLoc) "txt"
+                       hoogleDbPath = FilePath.replaceExtension hoogleTxtPath hoogleDbExtension
+                   hoogleExists <- liftIO (doesFileExist hoogleTxtPath)
+                   when hoogleExists
+                        (callProcess
+                             "hoogle"
+                             ["convert"
+                             ,"--haddock"
+                             ,hoogleTxtPath
+                             ,hoogleDbPath])
+                        -}
+                 {- EKB TODO: doc generation for stack-doc-server
+             #ifndef mingw32_HOST_OS
+                 case setupAction of
+                   DoHaddock -> liftIO (createDocLinks docLoc package)
+                   _ -> return ()
+             #endif
+
+ -- | Package's documentation directory.
+ packageDocDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
+               => PackageIdentifier -- ^ Cabal version
+               -> Package
+               -> m (Path Abs Dir)
+ packageDocDir cabalPkgVer package' = do
+   dist <- distDirFromDir cabalPkgVer (packageDir package')
+   return (dist </> $(mkRelDir "doc/"))
+                 --}
+        DoNothing -> return ()
+    -}
+
 -- | Grab all output from the given @Handle@ and print it to stdout, stripping
 -- Template Haskell "Loading package" lines. Does work in a separate thread.
 printBuildOutput :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
@@ -623,7 +595,7 @@ printBuildOutput excludeTHLoading outH = void $ fork $
 taskLocation :: Task -> Location
 taskLocation task =
     case taskType task of
-        TTLocal _ _ -> Local
+        TTLocal _ -> Local
         TTUpstream _ loc -> loc
 
 -- | Ensure Setup.hs exists in the given directory. Returns an action
