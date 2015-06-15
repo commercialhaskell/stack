@@ -112,10 +112,20 @@ toPlugin prefix name = do
 
 
 -- | Things that can go wrong when using `callPlugin`.
+-- Note: it may be wiser to catch PluginExitFailure, rather than display it.
 data PluginException
   = PluginNotFound !Plugins !Text
   | PluginExitFailure !Plugin !Int
-  deriving (Show, Typeable)
+  deriving (Typeable)
+instance Show PluginException where
+  show (PluginNotFound plugins requestedPlugin)
+     = "Plugin not found for '" ++ unpack (_pluginsPrefix plugins)
+    ++ "': '" ++ unpack requestedPlugin ++ "'"
+  show (PluginExitFailure plugin exitCode)
+     = "Plugin '" ++ unpack (_pluginName plugin)
+    ++ "' for '" ++ unpack (_pluginPrefix plugin)
+    ++ "' failed with exit code: "
+    ++ show exitCode
 instance Exception PluginException
 
 -- | Look up a particular plugin by name.
