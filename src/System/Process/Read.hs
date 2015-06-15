@@ -10,11 +10,10 @@
 -- | Reading from external processes.
 
 module System.Process.Read
-  (readProcessStdoutLogStderr
-  ,readProcessStdout
+  (readProcessStdout
   ,tryProcessStdout
-  ,sinkProcessStdoutLogStderr
-  ,sinkProcessStderrStdout
+  ,sinkProcessStdout
+  ,readProcess
   ,EnvOverride
   ,unEnvOverride
   ,mkEnvOverride
@@ -34,15 +33,14 @@ import           Control.Applicative
 import           Control.Arrow ((***), first)
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Exception hiding (try, catch)
-import           Control.Monad (join, liftM, void)
+import           Control.Monad (join, liftM)
 import           Control.Monad.Catch (MonadThrow, MonadCatch, throwM, try, catch)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger (MonadLogger, logError)
-import           Control.Monad.Trans.Control (MonadBaseControl,liftBaseWith)
+import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Data.ByteString as S
 import           Data.ByteString.Builder
 import           Data.Conduit
-import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process hiding (callProcess)
 import           Data.Foldable (forM_)
@@ -121,7 +119,7 @@ readProcessNull :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch 
                 -> [String]
                 -> m ()
 readProcessNull wd menv name args =
-    sinkProcessStdoutLogStderr wd menv name args CL.sinkNull
+    sinkProcessStdout wd menv name args CL.sinkNull
 
 -- | Run the given command in the given directory. If it exits with anything
 -- but success, prints an error and then calls 'exitWith' to exit the program.
@@ -170,39 +168,24 @@ readProcessStdout :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatc
                   -> [String]
                   -> m S.ByteString
 readProcessStdout wd menv name args =
-  sinkProcessStdoutLogStderr wd menv name args CL.consume >>=
+  sinkProcessStdout wd menv name args CL.consume >>=
   liftIO . evaluate . S.concat
 
--- | Produce a strict 'S.ByteString' from the stdout of a
--- process. Throws a 'ProcessExitedUnsuccessfully' exception if the
--- process fails.  Logs process's stderr using @$logError@.
-readProcessStdoutLogStderr :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
-                           => Maybe (Path Abs Dir)
-                           -> EnvOverride
-                           -> String
-                           -> [String]
-                           -> m S.ByteString
-readProcessStdoutLogStderr wd menv name args = do
-  stdout <- sinkProcessStdoutLogStderr wd menv name args CL.consume
-  liftIO (evaluate (S.concat stdout))
-
 -- | Consume the stdout of a process feeding strict 'S.ByteString's to a consumer.
--- Logs process's stderr using @$logError@, on process failure, writes
--- out all stdout. Should not be used for long-running processes or
--- ones with lots of output; for that use
--- 'sinkProcessStdoutLogStderr'.
-sinkProcessStdoutLogStderr :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
-                           => Maybe (Path Abs Dir)
-                           -> EnvOverride
-                           -> String
-                           -> [String]
-                           -> Sink S.ByteString IO a -- ^ Sink for stdout
-                           -> m a
-sinkProcessStdoutLogStderr wd menv name args sinkStdout = do
-  runInBase <- liftBaseWith $ \run -> return (void . run)
-  let logSink = CC.mapM_ (liftIO . runInBase . loggit)
-      sinkStderr = CC.decodeUtf8 =$= CC.line logSink
-  buffer <- liftIO (newIORef mempty)
+-- If the process fails, spits out stdout and stderr as error log
+-- level. Should not be used for long-running processes or ones with
+-- lots of output; for that use 'sinkProcessStdoutLogStderr'.
+sinkProcessStdout
+    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+    => Maybe (Path Abs Dir)
+    -> EnvOverride
+    -> String
+    -> [String]
+    -> Sink S.ByteString IO a -- ^ Sink for stdout
+    -> m a
+sinkProcessStdout wd menv name args sinkStdout = do
+  stderrBuffer <- liftIO (newIORef mempty)
+  stdoutBuffer <- liftIO (newIORef mempty)
   (_,sinkRet) <-
       catch
           (sinkProcessStderrStdout
@@ -210,17 +193,21 @@ sinkProcessStdoutLogStderr wd menv name args sinkStdout = do
                menv
                name
                args
-               sinkStderr
-               (CL.iterM (\bytes -> liftIO (modifyIORef' buffer (<> byteString bytes))) $=
+               (CL.mapM_ (\bytes -> liftIO (modifyIORef' stdoutBuffer (<> byteString bytes))))
+               (CL.iterM (\bytes -> liftIO (modifyIORef' stdoutBuffer (<> byteString bytes))) $=
                 sinkStdout))
           (\(e :: ProcessExitedUnsuccessfully) ->
-               do builder <- liftIO (readIORef buffer)
-                  loggit (LT.toStrict (LT.decodeUtf8 (toLazyByteString builder)))
+               do stderrBuilder <- liftIO (readIORef stderrBuffer)
+                  stdoutBuilder <- liftIO (readIORef stdoutBuffer)
+                  loggit
+                      (LT.toStrict
+                          (LT.decodeUtf8
+                              (toLazyByteString (stdoutBuilder <> stderrBuilder))))
                   throw e)
   return sinkRet
   where loggit = $logError . T.append stderrPrefix
         stderrPrefix =
-            T.pack name <> " " <> T.intercalate " " (map showProcessArgDebug args) <> ": "
+            T.pack name <> " " <> T.intercalate " " (map showProcessArgDebug args) <> ":\n"
 
 -- | Consume the stdout and stderr of a process feeding strict 'S.ByteString's to the consumers.
 sinkProcessStderrStdout :: (MonadIO m, MonadLogger m)

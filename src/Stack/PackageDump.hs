@@ -60,7 +60,7 @@ ghcPkgDump
     -> m a
 ghcPkgDump menv mpkgDb sink = do
     F.mapM_ (createDatabase menv) mpkgDb -- TODO maybe use some retry logic instead?
-    a <- sinkProcessStdoutLogStderr Nothing menv "ghc-pkg" args sink
+    a <- sinkProcessStdout Nothing menv "ghc-pkg" args sink
     return a
   where
     args = concat

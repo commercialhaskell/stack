@@ -623,7 +623,7 @@ readDockerProcess
     :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
     => EnvOverride -> [String] -> m BS.ByteString
 readDockerProcess envOverride args =
-  readProcessStdoutLogStderr Nothing envOverride "docker" args
+  readProcessStdout Nothing envOverride "docker" args
 
 -- | Subdirectories of the home directory to sandbox between GHC/Stackage versions.
 sandboxedHomeSubdirectories :: [Path Rel Dir]
