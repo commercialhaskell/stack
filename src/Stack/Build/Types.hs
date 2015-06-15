@@ -72,7 +72,9 @@ data StackBuildException
     (Map PackageName Version) -- not in snapshot, here's the most recent version in the index
     (Path Abs File) -- stack.yaml
   | TestSuiteFailure PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe (Path Abs File))
-  | ConstructPlanExceptions [ConstructPlanException]
+  | ConstructPlanExceptions
+        [ConstructPlanException]
+        (Path Abs File) -- stack.yaml
   | CabalExitedUnsuccessfully
         ExitCode
         PackageIdentifier
@@ -142,12 +144,33 @@ instance Show StackBuildException where
             -- TODO Should we load up the full error output and print it here?
             Just logFile -> "Full log available at " ++ toFilePath logFile
         ]
-    show (ConstructPlanExceptions exceptions) =
+    show (ConstructPlanExceptions exceptions stackYaml) =
         "While constructing the BuildPlan the following exceptions were encountered:" ++
-        appendExceptions (removeDuplicates exceptions)
+        appendExceptions exceptions' ++
+        if Map.null extras then "" else (unlines
+                $ ("\n\nRecommended action: try adding the following to your extra-deps in "
+                    ++ toFilePath stackYaml)
+                : map (\(name, version) -> concat
+                    [ "- "
+                    , packageNameString name
+                    , "-"
+                    , versionString version
+                    ]) (Map.toList extras)
+                )
          where
+             exceptions' = removeDuplicates exceptions
              appendExceptions = foldr (\e -> (++) ("\n\n--" ++ show e)) ""
              removeDuplicates = nub
+             extras = Map.unions $ map getExtras exceptions'
+
+             getExtras (DependencyCycleDetected _) = Map.empty
+             getExtras (UnknownPackage _) = Map.empty
+             getExtras (DependencyPlanFailures _ m) =
+                Map.unions $ map go $ Map.toList m
+              where
+                go (name, (_range, NotInBuildPlan (Just version))) =
+                    Map.singleton name version
+                go _ = Map.empty
      -- Supressing duplicate output
     show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bs) =
         let fullCmd = (dropQuotes (show execName) ++ " " ++ (unwords fullArgs))
@@ -177,7 +200,8 @@ data ConstructPlanException
 
 -- | Reason why a dependency was not used
 data BadDependency
-    = NotInBuildPlan -- TODO add recommended version so it can be added to extra-deps
+    = NotInBuildPlan
+        (Maybe Version) -- recommended version, for extra-deps output
     | Couldn'tResolveItsDependencies
     | DependencyMismatch Version
     deriving (Typeable, Eq)
@@ -206,7 +230,10 @@ instance Show ConstructPlanException where
         , display range
         , "), but "
         , case badDep of
-            NotInBuildPlan -> "not present in build plan"
+            NotInBuildPlan mlatest -> "not present in build plan" ++
+                (case mlatest of
+                    Nothing -> ""
+                    Just latest -> ", latest is " ++ versionString latest)
             Couldn'tResolveItsDependencies -> "couldn't resolve its dependencies"
             DependencyMismatch version -> versionString version ++ " found"
         ]

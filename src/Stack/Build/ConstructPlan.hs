@@ -10,7 +10,9 @@ module Stack.Build.ConstructPlan
 
 import           Control.Exception.Lifted
 import           Control.Monad
+import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.IO.Class
+import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.RWS.Strict
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Char8 as S8
@@ -28,6 +30,7 @@ import           Data.Text.Encoding (encodeUtf8)
 import           Distribution.Package (Dependency (..))
 import           Distribution.Version         (anyVersion,
                                                intersectVersionRanges)
+import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Prelude hiding (FilePath, pi, writeFile)
 import           Stack.Build.Cache
 import           Stack.Build.Installed
@@ -36,6 +39,7 @@ import           Stack.Build.Types
 import           Stack.BuildPlan
 
 import           Stack.Package
+import           Stack.PackageIndex
 import           Stack.Types
 
 data PackageInfo
@@ -84,6 +88,7 @@ data Ctx = Ctx
     , ctxBuildConfig :: !BuildConfig
     , callStack      :: ![PackageName]
     , extraToBuild   :: !(Set PackageName)
+    , latestVersions :: !(Map PackageName Version)
     }
 
 instance HasStackRoot Ctx
@@ -93,7 +98,7 @@ instance HasBuildConfig Ctx where
     getBuildConfig = ctxBuildConfig
 
 constructPlan :: forall env m.
-                 (MonadThrow m, MonadReader env m, HasBuildConfig env, MonadIO m)
+                 (MonadCatch m, MonadReader env m, HasBuildConfig env, MonadIO m, MonadLogger m, MonadBaseControl IO m, HasHttpManager env)
               => MiniBuildPlan
               -> BaseConfigOpts
               -> [LocalPackage]
@@ -104,6 +109,10 @@ constructPlan :: forall env m.
               -> InstalledMap
               -> m Plan
 constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPackage0 sourceMap installedMap = do
+    menv <- getMinimalEnvOverride
+    caches <- getPackageCaches menv
+    let latest = Map.fromListWith max $ map toTuple $ Map.keys caches
+
     bconfig <- asks getBuildConfig
     let onWanted =
             case boptsFinalAction $ bcoBuildOpts baseConfigOpts0 of
@@ -112,7 +121,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
     let inner = do
             mapM_ onWanted $ filter lpWanted locals
             mapM_ addDep $ Set.toList extraToBuild0
-    ((), m, (efinals, installExes)) <- liftIO $ runRWST inner (ctx bconfig) M.empty
+    ((), m, (efinals, installExes)) <- liftIO $ runRWST inner (ctx bconfig latest) M.empty
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
         (errlibs, adrs) = partitionEithers $ map toEither $ M.toList m
@@ -132,9 +141,9 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
                         then installExes
                         else Map.empty
                 }
-        else throwM $ ConstructPlanExceptions errs
+        else throwM $ ConstructPlanExceptions errs (bcStackYaml bconfig)
   where
-    ctx bconfig = Ctx
+    ctx bconfig latest = Ctx
         { mbp = mbp0
         , baseConfigOpts = baseConfigOpts0
         , loadPackage = loadPackage0
@@ -145,6 +154,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
         , ctxBuildConfig = bconfig
         , callStack = []
         , extraToBuild = extraToBuild0
+        , latestVersions = latest
         }
     toolMap = getToolMap mbp0
 
@@ -289,6 +299,7 @@ checkNeedInstall name ps installed = assert (piiLocation ps == Local) $ do
 
 addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Set GhcPkgId))
 addPackageDeps package = do
+    ctx <- ask
     deps' <- packageDepsWithTools package
     deps <- forM (Map.toList deps') $ \(depname, range) -> do
         eres <- addDep depname
@@ -296,7 +307,8 @@ addPackageDeps package = do
             Left e ->
                 let bd =
                         case e of
-                            UnknownPackage _ -> NotInBuildPlan
+                            UnknownPackage name ->
+                                NotInBuildPlan $ Map.lookup name $ latestVersions ctx
                             _ -> Couldn'tResolveItsDependencies
                  in return $ Left (depname, (range, bd))
             Right adr | not $ adrVersion adr `withinRange` range ->
