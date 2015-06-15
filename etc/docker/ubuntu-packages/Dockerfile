@@ -46,10 +46,16 @@ RUN fpm \
     -t deb \
     -n stack \
     -v <<PKG_VERSION>>-<<GIT_REV_COUNT>>-<<GIT_SHA>> \
-    -d libc6 \
-    -d libgmp10 \
-    -d git \
-    -d gnupg2 \
+    --deb-recommends git \
+    --deb-recommends gnupg \
+    -d g++ \
+    -d gcc \
+    -d libc6-dev \
+    -d libffi-dev \
+    -d libgmp-dev \
+    -d make \
+    -d xz-tools \
+    -d zlib1g-dev \
     -C /var/tmp/fpm/stack_<<PKG_VERSION>>-<<GIT_REV_COUNT>>-<<GIT_SHA>> \
     -p /stack_<<PKG_VERSION>>-<<GIT_REV_COUNT>>-<<GIT_SHA>>_amd64.deb \
     usr
