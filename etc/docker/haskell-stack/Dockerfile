@@ -16,10 +16,10 @@ MAINTAINER Greg Weber
 #
 #    docker run --rm haskell-stack:7.8 stack --help
 
-RUN apt-get update && apt-get install sudo \
+RUN apt-get update \
     # install profiling libraries
     # stack needs a profiled base to install profiled packages
- && apt-get install ghc-7.8.4-prof \
+ && apt-get install -y ghc-7.8.4-prof \
     # ssl certificates for uploading to hackage
  && apt-get install -y libssl-dev ca-certificates \
     # stack needs git
@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install sudo \
  && apt-get clean
 
 # install stackage binaries to /opt/stackage
-RUN sudo mkdir -p /opt/stackage/bin
+RUN mkdir -p /opt/stackage/bin
 ENV PATH /opt/stackage/bin:.cabal-sandbox/bin:.cabal/bin:$PATH:./
 COPY . /opt/stackage/lib
 RUN cd /opt/stackage/lib \
