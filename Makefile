@@ -28,7 +28,7 @@ target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)
 deb: | target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)_amd64.deb
 
 upload: | target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)_amd64.deb
-	deb-s3 upload -b fpco --sign=9BEFB442 --prefix=ubuntu/$(UBUNTU_CODENAME) \
+	deb-s3 upload -b download.fpcomplete.com --sign=9BEFB442 --prefix=ubuntu/$(UBUNTU_CODENAME) \
 		target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)_amd64.deb
 
 clean:
