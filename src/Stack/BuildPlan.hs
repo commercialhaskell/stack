@@ -25,7 +25,6 @@ module Stack.BuildPlan
     ) where
 
 import           Control.Applicative
-import           Control.Arrow ((&&&))
 import           Control.Exception (assert)
 import           Control.Exception.Enclosed (handleIO)
 import           Control.Monad (liftM, forM)
@@ -330,13 +329,19 @@ type ToolMap = Map ByteString (Set PackageName)
 -- | Map from tool name to package providing it
 getToolMap :: MiniBuildPlan -> Map ByteString (Set PackageName)
 getToolMap mbp =
-      Map.delete "ghc" -- See: https://github.com/commercialhaskell/stack/issues/308
-    $ Map.unionsWith Set.union
+      Map.unionsWith Set.union
+
+    {- We no longer do this, following discussion at:
+
+        https://github.com/commercialhaskell/stack/issues/308#issuecomment-112076704
+
     -- First grab all of the package names, for times where a build tool is
     -- identified by package name
     $ Map.fromList (map (packageNameByteString &&& Set.singleton) (Map.keys ps))
+    -}
+
     -- And then get all of the explicit executable names
-    : concatMap goPair (Map.toList ps)
+    $ concatMap goPair (Map.toList ps)
   where
     ps = mbpPackages mbp
 
