@@ -105,8 +105,12 @@ constructPlan :: forall env m.
               -> m Plan
 constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPackage0 sourceMap installedMap = do
     bconfig <- asks getBuildConfig
+    let onWanted =
+            case boptsFinalAction $ bcoBuildOpts baseConfigOpts0 of
+                DoNothing -> void . addDep . packageName . lpPackage
+                _ -> addFinal
     let inner = do
-            mapM_ addFinal $ filter lpWanted locals
+            mapM_ onWanted $ filter lpWanted locals
             mapM_ addDep $ Set.toList extraToBuild0
     ((), m, (efinals, installExes)) <- liftIO $ runRWST inner (ctx bconfig) M.empty
     let toEither (_, Left e)  = Left e
@@ -160,8 +164,6 @@ mkUnregisterLocal tasks locallyRegistered =
 
 addFinal :: LocalPackage -> M ()
 addFinal lp = do
-    void $ addDep $ packageName package
-
     depsRes <- addPackageDeps package
     res <- case depsRes of
         Left e -> return $ Left e
