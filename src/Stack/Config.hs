@@ -306,7 +306,7 @@ loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadThrow m,MonadBaseContro
 loadConfig configArgs = do
     stackRoot <- determineStackRoot
     extraConfigs <- getExtraConfigs stackRoot >>= mapM loadYaml
-    mproject <- loadProjectConfig stackRoot
+    mproject <- loadProjectConfig
     config <- configFromConfigMonoid stackRoot (fmap (\(proj, _, _) -> proj) mproject) $ mconcat $
         case mproject of
             Nothing -> configArgs : extraConfigs
@@ -356,7 +356,9 @@ loadBuildConfig menv mproject config stackRoot noConfigStrat = do
             liftIO (createDirectoryIfMissing True (toFilePath destDir))
             exists <- fileExists dest
             if exists
-               then error "Global config file already exists. This should be picked up earlier in the process. Please report this as a bug."
+               then do
+                   ProjectAndConfigMonoid project _ <- loadYaml dest
+                   return (project, dest)
                else do
                    $logInfo ("Using latest snapshot resolver: " <> renderResolver r)
                    $logInfo ("Writing global (non-project-specific) config file to: " <> T.pack dest')
@@ -533,8 +535,8 @@ loadYaml path =
 
 -- | Get the location of the project config file, if it exists.
 getProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)
-                 => Path Abs Dir -> m (Maybe (Path Abs File))
-getProjectConfig root = do
+                 => m (Maybe (Path Abs File))
+getProjectConfig = do
     env <- liftIO getEnvironment
     case lookup "STACK_YAML" env of
         Just fp -> do
@@ -546,15 +548,7 @@ getProjectConfig root = do
                 Right path -> return path
         Nothing -> do
             currDir <- getWorkingDir
-            mlocal <- search currDir
-            case mlocal of
-              Nothing -> do
-                  let globalConf = implicitGlobalDir root </> stackDotYaml
-                  exists <- fileExists globalConf
-                  if exists
-                     then return (Just globalConf)
-                     else return Nothing
-              Just conf -> return (Just conf)
+            search currDir
   where
     search dir = do
         let fp = dir </> stackDotYaml
@@ -574,9 +568,9 @@ getProjectConfig root = do
 -- and otherwise traversing parents. If no config is found, we supply a default
 -- based on current directory.
 loadProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)
-                  => Path Abs Dir -> m (Maybe (Project, Path Abs File, ConfigMonoid))
-loadProjectConfig root = do
-    mfp <- getProjectConfig root
+                  => m (Maybe (Project, Path Abs File, ConfigMonoid))
+loadProjectConfig = do
+    mfp <- getProjectConfig
     case mfp of
         Just fp -> do
             currDir <- getWorkingDir
