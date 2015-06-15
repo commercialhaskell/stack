@@ -68,7 +68,7 @@ import           Stack.Package
 import           Stack.Types
 import           System.Directory
 import           System.Environment
-import           System.IO (IOMode (ReadMode), withBinaryFile)
+import           System.IO
 import           System.Process.Read (getEnvOverride, EnvOverride, unEnvOverride, readInNull)
 
 -- | Get the default resolver value
@@ -347,7 +347,6 @@ loadBuildConfig menv mproject config stackRoot noConfigStrat = do
             currDir <- getWorkingDir
             throwM $ NoProjectConfigFound currDir
         ExecStrategy -> do
-            r <- runReaderT getLatestResolver miniConfig
             let dest :: Path Abs File
                 dest = destDir </> stackDotYaml
                 destDir = implicitGlobalDir stackRoot
@@ -357,9 +356,14 @@ loadBuildConfig menv mproject config stackRoot noConfigStrat = do
             exists <- fileExists dest
             if exists
                then do
+                   inTerminal <- liftIO (hIsTerminalDevice stdout)
                    ProjectAndConfigMonoid project _ <- loadYaml dest
+                   when inTerminal $ do
+                       $logInfo ("Using resolver: " <> renderResolver (projectResolver project) <>
+                                 " from global config file: " <> T.pack dest')
                    return (project, dest)
                else do
+                   r <- runReaderT getLatestResolver miniConfig
                    $logInfo ("Using latest snapshot resolver: " <> renderResolver r)
                    $logInfo ("Writing global (non-project-specific) config file to: " <> T.pack dest')
                    $logInfo "Note: You can change the snapshot via the resolver field there."
