@@ -46,4 +46,4 @@ argsParser = many (P.skipSpace *> (quoted <|> unquoted)) <*
     string = many (escaped <|> nonquote)
     escaped = P.char '\\' *> P.anyChar
     nonquote = P.satisfy (not . (=='"'))
-    naked = P.satisfy (not . flip elem "\" ")
+    naked = P.satisfy (not . flip elem ("\" " :: String))
