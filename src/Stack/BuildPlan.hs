@@ -329,7 +329,9 @@ type ToolMap = Map ByteString (Set PackageName)
 
 -- | Map from tool name to package providing it
 getToolMap :: MiniBuildPlan -> Map ByteString (Set PackageName)
-getToolMap mbp = Map.unionsWith Set.union
+getToolMap mbp =
+      Map.delete "ghc" -- See: https://github.com/commercialhaskell/stack/issues/308
+    $ Map.unionsWith Set.union
     -- First grab all of the package names, for times where a build tool is
     -- identified by package name
     $ Map.fromList (map (packageNameByteString &&& Set.singleton) (Map.keys ps))
