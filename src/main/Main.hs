@@ -349,7 +349,7 @@ updateCmd () go@GlobalOpts{..} = do
 -- | Upload to Hackage
 uploadCmd :: [String] -> GlobalOpts -> IO ()
 uploadCmd args0 go = withBuildConfig go ExecStrategy $ do
-    let args = if null args0 then ["."] else []
+    let args = if null args0 then ["."] else args0
     config <- asks getConfig
     manager <- asks getHttpManager
     menv <- getMinimalEnvOverride

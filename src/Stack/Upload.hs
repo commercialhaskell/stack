@@ -240,21 +240,19 @@ mkUploader runghc config us = do
 -- get the resulting tarball.
 withTarball :: FilePath -- ^ runghc
             -> FilePath -> (FilePath -> IO a) -> IO a
-withTarball runghc fp0 inner = do
+withTarball _runghc fp0 inner = do
     isFile <- doesFileExist fp0
     if isFile then inner fp0 else withSystemTempDirectory "stackage-upload-tarball" $ \dir -> do
         isDir <- doesDirectoryExist fp0
         when (not isDir) $ error $ "Invalid argument: " ++ fp0
 
-        let setuphs = dir </> "Setup.hs"
-        writeFile setuphs "import Distribution.Simple\nmain = defaultMain\n"
-
         (Just h, Nothing, Nothing, ph) <-
-            createProcess $ (proc runghc
-                    [ "-clear-package-db"
-                    , "-global-package-db"
-                    , setuphs
-                    , "sdist"
+        -- The insanity: the Cabal library seems to sometimes generate tarballs
+        -- in the wrong format. For now, just falling back to cabal-install.
+        -- Sigh.
+
+            createProcess $ (proc "cabal"
+                    [ "sdist"
                     , "--builddir=" ++ dir
                     ])
                 { cwd = Just fp0
