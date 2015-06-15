@@ -85,7 +85,7 @@ instance Show SetupException where
         , ", please install manually"
         ]
     show (MissingDependencies tools) =
-        "The following executables are missing and must be installed:" ++
+        "The following executables are missing and must be installed: " ++
         intercalate ", " tools
     show (UnknownGHCVersion version known) = concat
         [ "No information found for GHC version "
