@@ -1,3 +1,7 @@
+## Unreleased
+
+* `--prefetch` [#297](https://github.com/commercialhaskell/stack/issues/297)
+
 ## 0.0.2
 
 * Fix some Windows specific bugs [#216](https://github.com/commercialhaskell/stack/issues/216)

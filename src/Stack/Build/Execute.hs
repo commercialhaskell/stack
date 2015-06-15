@@ -7,6 +7,7 @@
 -- Perform a build
 module Stack.Build.Execute
     ( printPlan
+    , preFetch
     , executePlan
     ) where
 
@@ -69,6 +70,25 @@ import           System.Process.Internals       (createProcess_)
 import           System.Process.Read
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env)
+
+preFetch :: M env m => Plan -> m ()
+preFetch plan
+    | Set.null idents = $logDebug "Nothing to fetch"
+    | otherwise = do
+        $logDebug $ T.pack $
+            "Prefetching: " ++
+            intercalate ", " (map packageIdentifierString $ Set.toList idents)
+        menv <- getMinimalEnvOverride
+        fetchPackages menv idents
+  where
+    idents = Set.unions $ map toIdent $ Map.toList $ planTasks plan
+
+    toIdent (name, task) =
+        case taskType task of
+            TTLocal _ -> Set.empty
+            TTUpstream package _ -> Set.singleton $ PackageIdentifier
+                name
+                (packageVersion package)
 
 printPlan :: M env m
           => FinalAction

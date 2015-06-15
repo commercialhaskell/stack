@@ -395,7 +395,7 @@ buildOpts :: Parser BuildOpts
 buildOpts =
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> finalAction <*> dryRun <*> ghcOpts <*> flags <*>
-            installExes
+            installExes <*> preFetch
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
         target =
@@ -434,6 +434,10 @@ buildOpts =
                <> metavar "PACKAGE:[-]FLAG"
                <> help "Override flags set in stack.yaml (applies to local packages and extra-deps)"
                 ))
+
+        preFetch = flag False True
+            (long "prefetch" <>
+             help "Fetch packages necessary for the build immediately, useful with --dry-run")
 
 -- | Parser for docker cleanup arguments.
 dockerCleanupOpts :: Parser Docker.CleanupOpts

@@ -14,6 +14,7 @@
 module Stack.Fetch
     ( unpackPackages
     , unpackPackageIdents
+    , fetchPackages
     , resolvePackages
     , ResolvedPackage (..)
     , withCabalFiles
@@ -29,6 +30,7 @@ import           Control.Concurrent.MVar.Lifted (newMVar, modifyMVar)
 import           Control.Concurrent.STM          (TVar, atomically, modifyTVar,
                                                   newTVarIO, readTVar,
                                                   readTVarIO, writeTVar)
+import           Control.Exception (assert)
 import           Control.Monad (liftM, when, join, unless, void)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -107,6 +109,18 @@ instance Show FetchException where
         "The following package identifiers were not found in your indices: " ++
         intercalate ", " (map packageIdentifierString $ Set.toList idents)
 
+-- | Fetch packages into the cache without unpacking
+fetchPackages :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m, MonadCatch m)
+              => EnvOverride
+              -> Set PackageIdentifier
+              -> m ()
+fetchPackages menv idents = do
+    resolved <- resolvePackages menv idents Set.empty
+    ToFetchResult toFetch alreadyUnpacked <- getToFetch Nothing resolved
+    assert (Map.null alreadyUnpacked) (return ())
+    nowUnpacked <- fetchPackages' Nothing toFetch
+    assert (Map.null nowUnpacked) (return ())
+
 -- | Intended to work for the command line command.
 unpackPackages :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m, MonadCatch m)
                => EnvOverride
@@ -119,10 +133,10 @@ unpackPackages menv dest input = do
         ([], x) -> return $ partitionEithers x
         (errs, _) -> throwM $ CouldNotParsePackageSelectors errs
     resolved <- resolvePackages menv (Set.fromList idents) (Set.fromList names)
-    ToFetchResult toFetch alreadyUnpacked <- getToFetch dest' resolved
+    ToFetchResult toFetch alreadyUnpacked <- getToFetch (Just dest') resolved
     unless (Map.null alreadyUnpacked) $
         throwM $ UnpackDirectoryAlreadyExists $ Set.fromList $ map toFilePath $ Map.elems alreadyUnpacked
-    unpacked <- fetchPackages Nothing toFetch
+    unpacked <- fetchPackages' Nothing toFetch
     F.forM_ (Map.toList unpacked) $ \(ident, dest'') -> $logInfo $ T.pack $ concat
         [ "Unpacked "
         , packageIdentifierString ident
@@ -150,8 +164,8 @@ unpackPackageIdents
     -> m (Map PackageIdentifier (Path Abs Dir))
 unpackPackageIdents menv unpackDir mdistDir idents = do
     resolved <- resolvePackages menv idents Set.empty
-    ToFetchResult toFetch alreadyUnpacked <- getToFetch unpackDir resolved
-    nowUnpacked <- fetchPackages mdistDir toFetch
+    ToFetchResult toFetch alreadyUnpacked <- getToFetch (Just unpackDir) resolved
+    nowUnpacked <- fetchPackages' mdistDir toFetch
     return $ alreadyUnpacked <> nowUnpacked
 
 data ResolvedPackage = ResolvedPackage
@@ -199,7 +213,7 @@ resolvePackages menv idents0 names0 = do
 
 data ToFetch = ToFetch
     { tfTarball :: !(Path Abs File)
-    , tfDestDir :: !(Path Abs Dir)
+    , tfDestDir :: !(Maybe (Path Abs Dir))
     , tfUrl     :: !T.Text
     , tfSize    :: !(Maybe Word64)
     , tfSHA512  :: !(Maybe ByteString)
@@ -283,10 +297,10 @@ withCabalLoader menv inner = do
 
 -- | Figure out where to fetch from.
 getToFetch :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env)
-           => Path Abs Dir -- ^ directory to unpack into
+           => Maybe (Path Abs Dir) -- ^ directory to unpack into, @Nothing@ means no unpack
            -> Map PackageIdentifier ResolvedPackage
            -> m ToFetchResult
-getToFetch dest resolvedAll = do
+getToFetch mdest resolvedAll = do
     (toFetch0, unpacked) <- liftM partitionEithers $ mapM checkUnpacked $ Map.toList resolvedAll
     toFetch1 <- mapM goIndex $ Map.toList $ Map.fromListWith (++) toFetch0
     return ToFetchResult
@@ -296,18 +310,23 @@ getToFetch dest resolvedAll = do
   where
     checkUnpacked (ident, resolved) = do
         dirRel <- parseRelDir $ packageIdentifierString ident
-        let destDir = dest </> dirRel
-        exists <- liftIO $ doesDirectoryExist $ toFilePath destDir
-        if exists
-            then return $ Right (ident, destDir)
-            else do
+        let mdestDir = (</> dirRel) <$> mdest
+        mexists <-
+            case mdestDir of
+                Nothing -> return Nothing
+                Just destDir -> do
+                    exists <- liftIO $ doesDirectoryExist $ toFilePath destDir
+                    return $ if exists then Just destDir else Nothing
+        case mexists of
+            Just destDir -> return $ Right (ident, destDir)
+            Nothing -> do
                 let index = rpIndex resolved
                     d = pcDownload $ rpCache resolved
                     targz = T.pack $ packageIdentifierString ident ++ ".tar.gz"
                 tarball <- configPackageTarball (indexName index) ident
                 return $ Left (indexName index, [(ident, rpCache resolved, ToFetch
                     { tfTarball = tarball
-                    , tfDestDir = destDir
+                    , tfDestDir = mdestDir
                     , tfUrl = case d of
                         Just d' -> decodeUtf8 $ pdUrl d'
                         Nothing -> indexDownloadPrefix index <> targz
@@ -335,11 +354,11 @@ getToFetch dest resolvedAll = do
 -- @
 --
 -- Since 0.1.0.0
-fetchPackages :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m,MonadBaseControl IO m)
-              => Maybe (Path Rel Dir) -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
-              -> Map PackageIdentifier ToFetch
-              -> m (Map PackageIdentifier (Path Abs Dir))
-fetchPackages mdistDir toFetchAll = do
+fetchPackages' :: (MonadIO m,MonadReader env m,HasHttpManager env,HasConfig env,MonadLogger m,MonadThrow m,MonadBaseControl IO m)
+               => Maybe (Path Rel Dir) -- ^ the dist rename directory, see: https://github.com/fpco/stack/issues/157
+               -> Map PackageIdentifier ToFetch
+               -> m (Map PackageIdentifier (Path Abs Dir))
+fetchPackages' mdistDir toFetchAll = do
     connCount <- asks $ configConnectionCount . getConfig
     outputVar <- liftIO $ newTVarIO Map.empty
 
@@ -371,49 +390,51 @@ fetchPackages mdistDir toFetchAll = do
         _ <- verifiedDownload downloadReq destpath progressSink
 
         let fp = toFilePath destpath
-        let dest = toFilePath $ parent $ tfDestDir toFetch
-            innerDest = toFilePath $ tfDestDir toFetch
 
-        liftIO $ createDirectoryIfMissing True dest
+        F.forM_ (tfDestDir toFetch) $ \destDir -> do
+            let dest = toFilePath $ parent destDir
+                innerDest = toFilePath destDir
 
-        liftIO $ withBinaryFile fp ReadMode $ \h -> do
-            -- Avoid using L.readFile, which is more likely to leak
-            -- resources
-            lbs <- L.hGetContents h
-            let entries = fmap (either wrap wrap)
-                        $ Tar.checkTarbomb identStr
-                        $ Tar.read $ decompress lbs
-                wrap :: Exception e => e -> FetchException
-                wrap = Couldn'tReadPackageTarball fp . toException
-                identStr = packageIdentifierString ident
-            Tar.unpack dest entries
+            liftIO $ createDirectoryIfMissing True dest
 
-            case mdistDir of
-                Nothing -> return ()
-                -- See: https://github.com/fpco/stack/issues/157
-                Just distDir -> do
-                    let inner = dest FP.</> identStr
-                        oldDist = inner FP.</> "dist"
-                        newDist = inner FP.</> toFilePath distDir
-                    exists <- doesDirectoryExist oldDist
-                    when exists $ do
-                        -- Previously used takeDirectory, but that got confused
-                        -- by trailing slashes, see:
-                        -- https://github.com/commercialhaskell/stack/issues/216
-                        --
-                        -- Instead, use Path which is a bit more resilient
-                        newDist' <- parseAbsDir newDist
-                        createDirectoryIfMissing True
-                            $ toFilePath $ parent newDist'
-                        renameDirectory oldDist newDist
+            liftIO $ withBinaryFile fp ReadMode $ \h -> do
+                -- Avoid using L.readFile, which is more likely to leak
+                -- resources
+                lbs <- L.hGetContents h
+                let entries = fmap (either wrap wrap)
+                            $ Tar.checkTarbomb identStr
+                            $ Tar.read $ decompress lbs
+                    wrap :: Exception e => e -> FetchException
+                    wrap = Couldn'tReadPackageTarball fp . toException
+                    identStr = packageIdentifierString ident
+                Tar.unpack dest entries
 
-            let cabalFP =
-                    innerDest FP.</>
-                    packageNameString (packageIdentifierName ident)
-                    <.> "cabal"
-            S.writeFile cabalFP $ tfCabal toFetch
+                case mdistDir of
+                    Nothing -> return ()
+                    -- See: https://github.com/fpco/stack/issues/157
+                    Just distDir -> do
+                        let inner = dest FP.</> identStr
+                            oldDist = inner FP.</> "dist"
+                            newDist = inner FP.</> toFilePath distDir
+                        exists <- doesDirectoryExist oldDist
+                        when exists $ do
+                            -- Previously used takeDirectory, but that got confused
+                            -- by trailing slashes, see:
+                            -- https://github.com/commercialhaskell/stack/issues/216
+                            --
+                            -- Instead, use Path which is a bit more resilient
+                            newDist' <- parseAbsDir newDist
+                            createDirectoryIfMissing True
+                                $ toFilePath $ parent newDist'
+                            renameDirectory oldDist newDist
 
-            atomically $ modifyTVar outputVar $ Map.insert ident $ tfDestDir toFetch
+                let cabalFP =
+                        innerDest FP.</>
+                        packageNameString (packageIdentifierName ident)
+                        <.> "cabal"
+                S.writeFile cabalFP $ tfCabal toFetch
+
+                atomically $ modifyTVar outputVar $ Map.insert ident destDir
 
 parMapM_ :: (F.Foldable f,MonadIO m,MonadBaseControl IO m)
          => Int

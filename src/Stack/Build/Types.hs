@@ -235,6 +235,8 @@ data BuildOpts =
             ,boptsFlags :: !(Map PackageName (Map FlagName Bool))
             ,boptsInstallExes :: !Bool
             -- ^ Install executables to user path after building?
+            ,boptsPreFetch :: !Bool
+            -- ^ Fetch all packages immediately
             }
   deriving (Show)
 

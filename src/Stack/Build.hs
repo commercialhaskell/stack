@@ -61,6 +61,9 @@ build bopts = do
     plan <- withLoadPackage menv $ \loadPackage ->
         constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered loadPackage sourceMap installedMap
 
+    when (boptsPreFetch bopts) $
+        preFetch plan
+
     if boptsDryrun bopts
         then printPlan (boptsFinalAction bopts) plan
         else executePlan menv bopts baseConfigOpts locals plan
