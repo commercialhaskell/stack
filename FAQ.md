@@ -163,4 +163,21 @@ packages and the tools. See [[Docker]] for details.
 
 __How do I use this with Travis CI?__
 
-Stack is in beta now. Don't do this until after the first stable release of `stack` unless you are having major issues with cabal in your travis build
+Stack is in beta now, so keep in mind that the tool's interface is still under flux. For early adopters, here's a sample `.travis.yaml` file:
+
+```YAML
+language: haskell
+
+before_install:
+  # Instructions taken from https://github.com/commercialhaskell/stack/wiki/Downloads
+  - wget -q -O- http://download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
+  - echo 'deb http://download.fpcomplete.com/ubuntu/precise stable main' | sudo tee /etc/apt/sources.list.d/fpco.list
+  - sudo apt-get update
+  - sudo apt-get install stack -y
+
+install:
+  - stack setup
+
+script:
+  - stack test
+```
