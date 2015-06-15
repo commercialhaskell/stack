@@ -92,18 +92,7 @@ any directory and still use your packages.
 
 __Can I get bash autocompletion?__
 
-Yes, just run the following:
-
-    eval "$(stack --bash-completion-script "$(which stack)")"
-
-You can add this to your `.bashrc` file if you like.
-
-If you're using zsh you can add
-
-    autoload -U bashcompinit && bashcompinit
-    eval "$(stack --bash-completion-script "$(which stack)")"
-
-to your `.zshrc`. (This may not work with older zsh versions)
+Yes, see the [Shell-autocompletion](https://github.com/commercialhaskell/stack/wiki/Shell-autocompletion) wiki entry
 
 __How do I update my package index?__
 
