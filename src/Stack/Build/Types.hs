@@ -69,7 +69,7 @@ data StackBuildException
   | Couldn'tParseTargets [Text]
   | UnknownTargets
     (Set PackageName) -- no known version
-    (Map PackageName Version) -- ^ not in snapshot, here's the most recent version in the index
+    (Map PackageName Version) -- not in snapshot, here's the most recent version in the index
     (Path Abs File) -- stack.yaml
   | TestSuiteFailure PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe (Path Abs File))
   | ConstructPlanExceptions [ConstructPlanException]
