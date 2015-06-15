@@ -24,6 +24,7 @@ import           Data.Monoid
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Network.HTTP.Client
+import           Network.HTTP.Client.Conduit (getHttpManager)
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Simple
 import           Options.Applicative.Types (readerAsk)
@@ -43,6 +44,7 @@ import           Stack.Path
 import           Stack.Setup
 import           Stack.Types
 import           Stack.Types.StackT
+import qualified Stack.Upload as Upload
 import           System.Environment (getArgs, getProgName)
 import           System.Exit
 import           System.FilePath (searchPathSeparator)
@@ -99,6 +101,10 @@ main =
                         "Update the package index"
                         updateCmd
                         (pure ())
+             addCommand "upload"
+                        "Upload a package to Hackage"
+                        uploadCmd
+                        (many $ strArgument $ metavar "TARBALL/DIR")
              addCommand "exec"
                         "Execute a command"
                         execCmd
@@ -339,6 +345,22 @@ updateCmd () go@GlobalOpts{..} = do
         Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $
             runStackT manager globalLogLevel (lcConfig lc) $
                 getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
+
+-- | Upload to Hackage
+uploadCmd :: [String] -> GlobalOpts -> IO ()
+uploadCmd args0 go = withBuildConfig go ExecStrategy $ do
+    let args = if null args0 then ["."] else []
+    config <- asks getConfig
+    manager <- asks getHttpManager
+    menv <- getMinimalEnvOverride
+    runghc <- join $ System.Process.Read.findExecutable menv "runghc"
+    liftIO $ do
+        uploader <- Upload.mkUploader
+              (toFilePath runghc)
+              config
+            $ Upload.setGetManager (return manager)
+              Upload.defaultUploadSettings
+        mapM_ (Upload.upload uploader) args
 
 -- | Execute a command
 execCmd :: (String, [String]) -> GlobalOpts -> IO ()

@@ -57,6 +57,7 @@ library
                      Stack.Build.Source
                      Stack.Build.Types
                      Stack.Build.Doc
+                     Stack.Upload
                      System.Process.Read
                      System.Process.Log
                      System.Process.Run

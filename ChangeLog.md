@@ -1,6 +1,7 @@
 ## Unreleased
 
 * `--prefetch` [#297](https://github.com/commercialhaskell/stack/issues/297)
+* `upload` command ported from stackage-upload [#225](https://github.com/commercialhaskell/stack/issues/225)
 
 ## 0.0.2
 
