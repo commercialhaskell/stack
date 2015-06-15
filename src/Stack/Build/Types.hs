@@ -237,6 +237,8 @@ data BuildOpts =
             -- ^ Install executables to user path after building?
             ,boptsPreFetch :: !Bool
             -- ^ Fetch all packages immediately
+            ,boptsTestArgs :: ![String]
+            -- ^ Arguments to pass to the test suites if we're running them.
             }
   deriving (Show)
 

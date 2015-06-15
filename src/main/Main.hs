@@ -19,12 +19,13 @@ import           Data.List
 import qualified Data.List as List
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (isJust)
+import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Network.HTTP.Client
 import           Network.HTTP.Client.Conduit (getHttpManager)
+import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Simple
 import           Options.Applicative.Types (readerAsk)
@@ -417,7 +418,7 @@ buildOpts :: Parser BuildOpts
 buildOpts =
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> finalAction <*> dryRun <*> ghcOpts <*> flags <*>
-            installExes <*> preFetch
+            installExes <*> preFetch <*> testArgs
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
         target =
@@ -460,6 +461,12 @@ buildOpts =
         preFetch = flag False True
             (long "prefetch" <>
              help "Fetch packages necessary for the build immediately, useful with --dry-run")
+        testArgs =
+             fmap (fromMaybe [])
+                  (optional
+                       (argsOption
+                            (long "test-arguments" <> metavar "TEST_ARGS" <>
+                             help "Arguments passed in to the test suite program")))
 
 -- | Parser for docker cleanup arguments.
 dockerCleanupOpts :: Parser Docker.CleanupOpts

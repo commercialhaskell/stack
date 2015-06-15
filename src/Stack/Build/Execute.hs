@@ -68,6 +68,7 @@ import           System.IO
 import           System.IO.Temp                 (withSystemTempDirectory)
 import           System.Process.Internals       (createProcess_)
 import           System.Process.Read
+import           System.Process.Log (showProcessArgDebug)
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env)
 
@@ -633,8 +634,13 @@ singleTest ac ee task =
                 }
             if exists
                 then do
-                    announce $ "test " <> testName
-                    let cp = (proc (toFilePath exeName) [])
+                    let args = boptsTestArgs (eeBuildOpts ee)
+                        argsDisplay =
+                            case args of
+                              [] -> ""
+                              _ -> ", args: " <> T.intercalate " " (map showProcessArgDebug args)
+                    announce $ "test (suite: " <> testName <> argsDisplay <> ")"
+                    let cp = (proc (toFilePath exeName) args)
                             { cwd = Just $ toFilePath pkgDir
                             , Process.env = envHelper menv
                             , std_in = CreatePipe
