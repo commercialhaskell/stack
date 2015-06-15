@@ -574,6 +574,8 @@ singleTest ac ee task =
                     _ -> assert False True)
         when needBuild $ do
             announce "build (test)"
+            fileModTimes <- getPackageFileModTimes package cabalfp
+            writeBuildCache pkgDir fileModTimes
             cabal (console && configHideTHLoading config) ["build"]
 
         bconfig <- asks getBuildConfig
@@ -636,7 +638,7 @@ singleBench :: M env m
             -> Task
             -> m ()
 singleBench ac ee task =
-    withSingleContext ac ee task $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
+    withSingleContext ac ee task $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
         (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (benchmarks)") cabal cabalfp ["--enable-benchmarks"]
 
         let needBuild = neededConfig ||
@@ -645,6 +647,8 @@ singleBench ac ee task =
                     _ -> assert False True)
         when needBuild $ do
             announce "build (benchmarks)"
+            fileModTimes <- getPackageFileModTimes package cabalfp
+            writeBuildCache pkgDir fileModTimes
             config <- asks getConfig
             cabal (console && configHideTHLoading config) ["build"]
 
