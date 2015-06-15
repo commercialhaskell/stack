@@ -67,9 +67,11 @@ In order to install stack from Hackage or from source, you will need the [libtin
 
 (64-bit only)
 
-* Download [stack-0.0.0-x86_64-linux.gz](https://github.com/fpco/stack/releases/download/v0.0.0-beta/stack-0.0.0-x86_64-linux.gz)
+* Download [stack-0.0.2-x86_64-linux.gz](https://github.com/commercialhaskell/stack/releases/download/v0.0.2-beta/stack-0.0.2-x86_64-linux.gz)
 * Extract the `stack` executable somewhere on your `$PATH`  (see [Path section below](#path))
 * Now you can run `stack` from the terminal.
+
+Tested on Fedora 20: make sure to install the following packages `sudo yum install perl make automake gcc gmp-devel`
 
 ## Path
 
