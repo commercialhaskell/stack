@@ -26,6 +26,7 @@ library
   hs-source-dirs:    src/
   ghc-options:       -Wall
   exposed-modules:   Options.Applicative.Builder.Extra
+                     Options.Applicative.Args
                      Stack.BuildPlan
                      Stack.Config
                      Stack.Constants
@@ -186,6 +187,7 @@ test-suite stack-test
                 , Stack.BuildPlanSpec
                 , Stack.ConfigSpec
                 , Stack.PackageDumpSpec
+                , Stack.ArgsSpec
   ghc-options:    -Wall -threaded
   build-depends:  base >=4.7 && <5
                 , hspec
