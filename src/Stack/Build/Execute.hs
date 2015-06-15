@@ -491,8 +491,24 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
                                               eeCabalPkgVer))
                     : "-clear-package-db"
                     : "-global-package-db"
-                    -- TODO: Perhaps we want to include the snapshot package database here
-                    -- as well
+
+                    -- This next line is debatable. It adds access to the
+                    -- snapshot package database for Cabal. There are two
+                    -- possible objections:
+                    --
+                    -- 1. This doesn't isolate the build enough; arbitrary
+                    -- other packages available could cause the build to
+                    -- succeed or fail.
+                    --
+                    -- 2. This doesn't provide enough packages: we should also
+                    -- include the local database when building local packages.
+                    --
+                    -- One possible solution to these points would be to use
+                    -- -hide-all-packages and explicitly list which packages
+                    -- can be used by Setup.hs, and have that based on the
+                    -- dependencies of the package itself.
+                    : ("-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts))
+
                     : toFilePath setuphs
                     : ("--builddir=" ++ toFilePath distRelativeDir')
                     : args
