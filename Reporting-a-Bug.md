@@ -1,4 +1,4 @@
-When reporting a bug, please write in the following format (if you copy/paste this, that's even better):
+When reporting a bug, please write in the following format:
 
 > [Any general summary/comments if desired]
 
