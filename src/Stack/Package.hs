@@ -118,6 +118,7 @@ data Package =
           ,packageTests :: !(Set Text)                    -- ^ names of test suites
           ,packageBenchmarks :: !(Set Text)               -- ^ names of benchmarks
           ,packageExes :: !(Set Text)                     -- ^ names of executables
+          ,packageSourceDirs :: ![Path Rel Dir]           -- ^ Directories specified in the file.
           }
  deriving (Show,Typeable)
 
@@ -228,6 +229,7 @@ resolvePackage packageConfig gpkg = Package
     , packageTests = S.fromList $ [ T.pack (testName t) | t <- testSuites pkg, buildable (testBuildInfo t)]
     , packageBenchmarks = S.fromList $ [ T.pack (benchmarkName b) | b <- benchmarks pkg, buildable (benchmarkBuildInfo b)]
     , packageExes = S.fromList $ [ T.pack (exeName b) | b <- executables pkg, buildable (buildInfo b)]
+    , packageSourceDirs = allHsSourceDirs pkg
     }
 
   where
@@ -235,6 +237,20 @@ resolvePackage packageConfig gpkg = Package
     name = fromCabalPackageName (pkgName pkgId)
     pkg = resolvePackageDescription packageConfig gpkg
     deps = M.filterWithKey (const . (/= name)) (packageDependencies pkg)
+
+-- | Get the source directories.
+allHsSourceDirs :: PackageDescription -> [Path Rel Dir]
+allHsSourceDirs pkg =
+    nub
+        (concatMap
+             (concatMap parseRelDir . concatMap hsSourceDirs)
+             [ maybe
+                   []
+                   (return . libBuildInfo)
+                   (library pkg)
+             , map buildInfo (executables pkg)
+             , map benchmarkBuildInfo (benchmarks pkg)
+             , map testBuildInfo (testSuites pkg)])
 
 -- | Get all dependencies of the package (buildable targets only).
 packageDependencies :: PackageDescription -> Map PackageName VersionRange

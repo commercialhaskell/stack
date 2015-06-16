@@ -8,6 +8,7 @@ module Stack.Build.Source
     ( loadSourceMap
     , SourceMap
     , PackageSource (..)
+    , localFlags
     ) where
 
 import Network.HTTP.Client.Conduit (HasHttpManager)
@@ -149,7 +150,7 @@ loadLocals bopts latestVersion = do
             config = PackageConfig
                 { packageConfigEnableTests = False
                 , packageConfigEnableBenchmarks = False
-                , packageConfigFlags = localFlags bopts bconfig name
+                , packageConfigFlags = localFlags (boptsFlags bopts) bconfig name
                 , packageConfigGhcVersion = bcGhcVersion bconfig
                 , packageConfigPlatform = configPlatform $ getConfig bconfig
                 }
@@ -203,9 +204,12 @@ loadLocals bopts latestVersion = do
         any (== dir) dirs
 
 -- | All flags for a local package
-localFlags :: BuildOpts -> BuildConfig -> PackageName -> Map FlagName Bool
-localFlags bopts bconfig name = Map.union
-    (fromMaybe Map.empty $ Map.lookup name $ boptsFlags bopts)
+localFlags :: (Map PackageName (Map FlagName Bool))
+           -> BuildConfig
+           -> PackageName
+           -> Map FlagName Bool
+localFlags boptsflags bconfig name = Map.union
+    (fromMaybe Map.empty $ Map.lookup name $ boptsflags)
     (fromMaybe Map.empty $ Map.lookup name $ bcFlags bconfig)
 
 -- | Add in necessary packages to extra dependencies
