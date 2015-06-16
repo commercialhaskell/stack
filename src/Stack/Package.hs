@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
@@ -286,6 +287,12 @@ packageDescFiles pkg =
        liftM concat
              (mapM executableFiles
                    (executables pkg))
+     benchfiles <-
+         liftM concat
+               (mapM benchmarkFiles (benchmarks pkg))
+     testfiles <-
+         liftM concat
+               (mapM testFiles (testSuites pkg))
      dfiles <-
        resolveGlobFiles (map (dataDir pkg FilePath.</>) (dataFiles pkg))
      srcfiles <-
@@ -295,7 +302,7 @@ packageDescFiles pkg =
      -- don't error out if not present
      docfiles <-
        resolveGlobFiles (extraDocFiles pkg)
-     return (concat [libfiles,exefiles,dfiles,srcfiles,docfiles])
+     return (concat [libfiles,exefiles,dfiles,srcfiles,docfiles,benchfiles,testfiles])
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
 resolveGlobFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m,MonadCatch m)
@@ -358,6 +365,48 @@ matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
       []      -> die $ "filepath wildcard '" ++ filepath
                     ++ "' does not match any files."
       matches -> return matches
+
+-- | Get all files referenced by the benchmark.
+benchmarkFiles :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File) m)
+               => Benchmark -> m [Path Abs File]
+benchmarkFiles bench = do
+    dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
+    dir <- asks parent
+    exposed <-
+        resolveFiles
+            (dirs ++ [dir])
+            (case benchmarkInterface bench of
+                 BenchmarkExeV10 _ fp ->
+                     [Right fp]
+                 BenchmarkUnsupported _ ->
+                     [])
+            haskellFileExts
+    bfiles <- buildFiles dir build
+    return (mconcat [bfiles, exposed])
+  where
+    build = benchmarkBuildInfo bench
+
+-- | Get all files referenced by the test.
+testFiles :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File) m)
+          => TestSuite -> m [Path Abs File]
+testFiles test = do
+    dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
+    dir <- asks parent
+    exposed <-
+        resolveFiles
+            (dirs ++ [dir])
+            (case testInterface test of
+                 TestSuiteExeV10 _ fp ->
+                     [Right fp]
+                 TestSuiteLibV09 _ mn ->
+                     [Left mn]
+                 TestSuiteUnsupported _ ->
+                     [])
+            haskellFileExts
+    bfiles <- buildFiles dir build
+    return (mconcat [bfiles, exposed])
+  where
+    build = testBuildInfo test
 
 -- | Get all files referenced by the executable.
 executableFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m)
