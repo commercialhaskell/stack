@@ -368,7 +368,7 @@ uploadCmd args0 go = withBuildConfig go ExecStrategy $ do
               Upload.defaultUploadSettings
         mapM_ (Upload.upload uploader) args
 
--- | Execute a command
+-- | Execute a command.
 execCmd :: (String, [String]) -> GlobalOpts -> IO ()
 execCmd (cmd, args) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $ do
       config <- asks getConfig
