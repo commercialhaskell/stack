@@ -423,7 +423,7 @@ buildOpts :: Parser BuildOpts
 buildOpts =
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> finalAction <*> dryRun <*> ghcOpts <*> flags <*>
-            installExes <*> preFetch <*> testArgs
+            installExes <*> preFetch <*> testArgs <*> onlySnapshot
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
         target =
@@ -472,6 +472,10 @@ buildOpts =
                        (argsOption
                             (long "test-arguments" <> metavar "TEST_ARGS" <>
                              help "Arguments passed in to the test suite program")))
+
+        onlySnapshot = flag False True
+            (long "only-snapshot" <>
+             help "Only build packages for the snapshot database, not the local database")
 
 -- | Parser for docker cleanup arguments.
 dockerCleanupOpts :: Parser Docker.CleanupOpts

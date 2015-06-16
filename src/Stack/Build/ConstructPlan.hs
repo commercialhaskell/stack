@@ -132,7 +132,11 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
             let toTask (_, ADRFound _ _) = Nothing
                 toTask (name, ADRToInstall task) = Just (name, task)
                 tasks = M.fromList $ mapMaybe toTask adrs
-            return Plan
+                maybeStripLocals
+                    | boptsOnlySnapshot $ bcoBuildOpts baseConfigOpts0 =
+                        stripLocals
+                    | otherwise = id
+            return $ maybeStripLocals Plan
                 { planTasks = tasks
                 , planFinals = M.fromList finals
                 , planUnregisterLocal = mkUnregisterLocal tasks locallyRegistered
@@ -374,3 +378,18 @@ packageDepsWithTools p = do
     return $ Map.unionsWith intersectVersionRanges
            $ packageDeps p
            : map (toolToPackages ctx) (packageTools p)
+
+-- | Strip out anything from the @Plan@ intended for the local database
+stripLocals :: Plan -> Plan
+stripLocals plan = plan
+    { planTasks = Map.filter checkTask $ planTasks plan
+    , planFinals = Map.empty
+    , planUnregisterLocal = Set.empty
+    , planInstallExes = Map.filter (/= Local) $ planInstallExes plan
+    }
+  where
+    checkTask task =
+        case taskType task of
+            TTLocal _ -> False
+            TTUpstream _ Local -> False
+            TTUpstream _ Snap -> True

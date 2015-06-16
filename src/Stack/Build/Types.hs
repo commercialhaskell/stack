@@ -266,6 +266,9 @@ data BuildOpts =
             -- ^ Fetch all packages immediately
             ,boptsTestArgs :: ![String]
             -- ^ Arguments to pass to the test suites if we're running them.
+            ,boptsOnlySnapshot :: !Bool
+            -- ^ Only install packages in the snapshot database, skipping
+            -- packages intended for the local database.
             }
   deriving (Show)
 
