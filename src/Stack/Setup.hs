@@ -43,11 +43,13 @@ import           Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
 import           Data.Typeable (Typeable)
 import qualified Data.Yaml as Yaml
 import           Distribution.System (OS (..), Arch (..), Platform (..))
+import           Distribution.Text (simpleParse)
 import           Network.HTTP.Client.Conduit
 import           Network.HTTP.Download (verifiedDownload, DownloadRequest(..))
 import           Path
 import           Path.IO
 import           Prelude -- Fix AMP warning
+import           Safe (readMay)
 import           Stack.Build.Types
 import           Stack.GhcPkg (getGlobalDB)
 import           Stack.Types
@@ -216,12 +218,15 @@ ensureGHC sopts = do
             then getSystemGHC menv0
             else return Nothing
 
+    Platform expectedArch _ <- asks getPlatform
+
     let needLocal = case msystem of
             Nothing -> True
-            Just system ->
+            Just (system, arch) ->
                 -- we allow a newer version of GHC within the same major series
                 getMajorVersion system /= getMajorVersion expected ||
-                expected > system
+                expected > system ||
+                arch /= expectedArch
 
     -- If we need to install a GHC, try to do so
     mpaths <- if needLocal
@@ -274,19 +279,19 @@ ensureGHC sopts = do
     expected = soptsExpected sopts
 
 -- | Get the major version of the system GHC, if available
-getSystemGHC :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m) => EnvOverride -> m (Maybe Version)
+getSystemGHC :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m) => EnvOverride -> m (Maybe (Version, Arch))
 getSystemGHC menv = do
     exists <- doesExecutableExist menv "ghc"
     if exists
         then do
-            eres <- tryProcessStdout Nothing menv "ghc" ["--numeric-version"]
+            eres <- tryProcessStdout Nothing menv "ghc" ["--info"]
             return $ do
                 Right bs <- Just eres
-                parseVersion $ S8.takeWhile isValidChar bs
+                pairs <- readMay $ S8.unpack bs :: Maybe [(String, String)]
+                version <- lookup "Project version" pairs >>= parseVersionFromString
+                arch <- lookup "Target platform" pairs >>= simpleParse . takeWhile (/= '-')
+                Just (version, arch)
         else return Nothing
-  where
-    isValidChar '.' = True
-    isValidChar c = '0' <= c && c <= '9'
 
 data DownloadPair = DownloadPair Version Text
     deriving Show
@@ -382,14 +387,16 @@ ensureTool :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConf
            => SetupOpts
            -> [PackageIdentifier] -- ^ already installed
            -> m SetupInfo
-           -> Maybe Version -- ^ installed GHC
+           -> Maybe (Version, Arch) -- ^ installed GHC
            -> (PackageName, Maybe Version)
            -> m (Maybe PackageIdentifier)
 ensureTool sopts installed getSetupInfo' msystem (name, mversion)
     | not $ null available = return $ Just $ PackageIdentifier name $ maximum available
     | not $ soptsInstallIfMissing sopts =
         if name == $(mkPackageName "ghc")
-            then throwM $ GHCVersionMismatch msystem (soptsExpected sopts) (soptsStackYaml sopts)
+            then do
+                Platform arch _ <- asks getPlatform
+                throwM $ GHCVersionMismatch msystem (soptsExpected sopts, arch) (soptsStackYaml sopts)
             else do
                 $logWarn $ "Continuing despite missing tool: " <> T.pack (packageNameString name)
                 return Nothing

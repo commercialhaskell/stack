@@ -51,6 +51,7 @@ import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 import           Data.Time.Calendar
 import           Data.Time.Clock
+import           Distribution.System (Arch)
 import           Distribution.Text (display)
 import           GHC.Generics
 import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, (</>))
@@ -64,7 +65,7 @@ import           System.FilePath (pathSeparator)
 -- Exceptions
 data StackBuildException
   = Couldn'tFindPkgId PackageName
-  | GHCVersionMismatch (Maybe Version) Version (Maybe (Path Abs File))
+  | GHCVersionMismatch (Maybe (Version, Arch)) (Version, Arch) (Maybe (Path Abs File))
   -- ^ Path to the stack.yaml file
   | Couldn'tParseTargets [Text]
   | UnknownTargets
@@ -91,15 +92,21 @@ instance Show StackBuildException where
                ", the package id couldn't be found " <> "(via ghc-pkg describe " <>
                packageNameString name <> "). This shouldn't happen, " <>
                "please report as a bug")
-    show (GHCVersionMismatch mactual expected mstack) = concat
+    show (GHCVersionMismatch mactual (expected, earch) mstack) = concat
                 [ case mactual of
                     Nothing -> "No GHC found, expected version "
-                    Just actual ->
-                        "GHC version mismatched, found " ++
-                        versionString actual ++
-                        ", but expected version "
+                    Just (actual, arch) -> concat
+                        [ "GHC version mismatched, found "
+                        , versionString actual
+                        , " ("
+                        , display arch
+                        , ")"
+                        , ", but expected version "
+                        ]
                 , versionString expected
-                , " (based on "
+                , " ("
+                , display earch
+                , ") (based on "
                 , case mstack of
                     Nothing -> "command line arguments"
                     Just stack -> "resolver setting in " ++ toFilePath stack
