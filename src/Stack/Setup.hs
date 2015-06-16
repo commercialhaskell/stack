@@ -28,7 +28,6 @@ import qualified Data.ByteString.Char8 as S8
 import           Data.Conduit (Conduit, ($$), (=$), await, yield, awaitForever)
 import           Data.Conduit.Lift (evalStateC)
 import qualified Data.Conduit.List as CL
-import           Data.Conduit.Process (ProcessExitedUnsuccessfully)
 import           Data.IORef
 import           Data.List (intercalate)
 import           Data.Map (Map)
@@ -77,7 +76,7 @@ data SetupException = UnsupportedSetupCombo OS Arch
                     | MissingDependencies [String]
                     | UnknownGHCVersion Version (Set MajorVersion)
                     | UnknownOSKey Text
-                    | GHCSanityCheckCompileFailed ProcessExitedUnsuccessfully (Path Abs File)
+                    | GHCSanityCheckCompileFailed ReadProcessException (Path Abs File)
     deriving Typeable
 instance Exception SetupException
 instance Show SetupException where

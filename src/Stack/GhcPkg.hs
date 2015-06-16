@@ -26,7 +26,6 @@ import qualified Data.ByteString.Char8 as S8
 import           Data.Either
 import           Data.List
 import           Data.Maybe
-import           Data.Streaming.Process
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
@@ -58,7 +57,7 @@ ghcPkg :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadT
        => EnvOverride
        -> [Path Abs Dir]
        -> [String]
-       -> m (Either ProcessExitedUnsuccessfully S8.ByteString)
+       -> m (Either ReadProcessException S8.ByteString)
 ghcPkg menv pkgDbs args = do
     eres <- go
     r <- case eres of
