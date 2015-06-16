@@ -26,6 +26,7 @@ module System.Process.Read
   ,readProcessNull
   ,readInNull
   ,logProcessRun
+  ,ReadProcessException (..)
   )
   where
 
@@ -39,6 +40,7 @@ import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger (MonadLogger, logError)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Data.ByteString as S
+import qualified Data.ByteString.Lazy as L
 import           Data.ByteString.Builder
 import           Data.Conduit
 import qualified Data.Conduit.List as CL
@@ -51,6 +53,7 @@ import           Data.Maybe (isJust)
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Data.Text.Lazy.Encoding as LT
 import qualified Data.Text.Lazy as LT
 import           Data.Typeable (Typeable)
@@ -68,7 +71,7 @@ data EnvOverride = EnvOverride
     { eoTextMap :: Map Text Text
     , eoStringList :: [(String, String)]
     , eoPath :: [FilePath]
-    , eoExeCache :: IORef (Map FilePath (Either FindExecutableException (Path Abs File)))
+    , eoExeCache :: IORef (Map FilePath (Either ReadProcessException (Path Abs File)))
     , eoExeExtension :: String
     }
 
@@ -154,7 +157,7 @@ tryProcessStdout :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch
                  -> EnvOverride
                  -> String
                  -> [String]
-                 -> m (Either ProcessExitedUnsuccessfully S.ByteString)
+                 -> m (Either ReadProcessException S.ByteString)
 tryProcessStdout wd menv name args =
     try (readProcessStdout wd menv name args)
 
@@ -170,6 +173,37 @@ readProcessStdout :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatc
 readProcessStdout wd menv name args =
   sinkProcessStdout wd menv name args CL.consume >>=
   liftIO . evaluate . S.concat
+
+data ReadProcessException
+    = ReadProcessException CreateProcess ExitCode L.ByteString L.ByteString
+    | NoPathFound
+    | ExecutableNotFound String [FilePath]
+    deriving Typeable
+instance Show ReadProcessException where
+    show (ReadProcessException cp ec out err) = concat
+        [ "Running "
+        , showSpec $ cmdspec cp
+        , " exited with "
+        , show ec
+        , "\n"
+        , toStr out
+        , "\n"
+        , toStr err
+        ]
+      where
+        toStr = LT.unpack . LT.decodeUtf8With lenientDecode
+
+        showSpec (ShellCommand str) = str
+        showSpec (RawCommand cmd args) =
+            unwords $ cmd : map (T.unpack . showProcessArgDebug) args
+    show NoPathFound = "PATH not found in EnvOverride"
+    show (ExecutableNotFound name path) = concat
+        [ "Executable named "
+        , name
+        , " not found on path: "
+        , show path
+        ]
+instance Exception ReadProcessException
 
 -- | Consume the stdout of a process feeding strict 'S.ByteString's to a consumer.
 -- If the process fails, spits out stdout and stderr as error log
@@ -196,18 +230,15 @@ sinkProcessStdout wd menv name args sinkStdout = do
                (CL.mapM_ (\bytes -> liftIO (modifyIORef' stdoutBuffer (<> byteString bytes))))
                (CL.iterM (\bytes -> liftIO (modifyIORef' stdoutBuffer (<> byteString bytes))) $=
                 sinkStdout))
-          (\(e :: ProcessExitedUnsuccessfully) ->
+          (\(ProcessExitedUnsuccessfully cp ec) ->
                do stderrBuilder <- liftIO (readIORef stderrBuffer)
                   stdoutBuilder <- liftIO (readIORef stdoutBuffer)
-                  loggit
-                      (LT.toStrict
-                          (LT.decodeUtf8
-                              (toLazyByteString (stdoutBuilder <> stderrBuilder))))
-                  throw e)
+                  throwM $ ReadProcessException
+                    cp
+                    ec
+                    (toLazyByteString stdoutBuilder)
+                    (toLazyByteString stderrBuilder))
   return sinkRet
-  where loggit = $logError . T.append stderrPrefix
-        stderrPrefix =
-            T.pack name <> " " <> T.intercalate " " (map showProcessArgDebug args) <> ":\n"
 
 -- | Consume the stdout and stderr of a process feeding strict 'S.ByteString's to the consumers.
 sinkProcessStderrStdout :: (MonadIO m, MonadLogger m)
@@ -283,17 +314,3 @@ getEnvOverride platform =
     getEnvironment >>=
           mkEnvOverride platform
         . Map.fromList . map (T.pack *** T.pack)
-
-data FindExecutableException
-    = NoPathFound
-    | ExecutableNotFound String [FilePath]
-    deriving Typeable
-instance Exception FindExecutableException
-instance Show FindExecutableException where
-    show NoPathFound = "PATH not found in EnvOverride"
-    show (ExecutableNotFound name path) = concat
-        [ "Executable named "
-        , name
-        , " not found on path: "
-        , show path
-        ]
