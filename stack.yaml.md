@@ -6,17 +6,86 @@ The stack.yaml configuration options break down into project specific and non-pr
 
 ### packages
 
+This lists all local packages. In the simplest usage, it will be a list of directories, e.g.:
+
+```yaml
+packages:
+- dir1
+- dir2
+- dir3
+```
+
+However, it supports two other location types: an HTTP URL referring to a tarball that can be downloaded, and information on a Git repo to clone, together with this SHA1 commit. For example:
+
+```yaml
+packages:
+- some-directory
+- https://example.com/foo/bar/baz-0.0.2.tar.gz
+- git: git@github.com:commercialhaskell/stack
+  commit: 6a86ee32e5b869a877151f74064572225e1a0398
+```
+
+Note: it is highly recommended that you only use SHA1 values for a Git commit. Other values may work, but they are not officially supported, and may result in unexpected behavior (namely, stack will not automatically pull to update to new versions).
+
+stack further allows you to tweak your packages by specifying two additional
+settings: a list of subdirectories to build (useful for mega-repos like
+[wai](https://github.com/yesodweb/wai/) or
+[digestive-functors](https://github.com/jaspervdj/digestive-functors)) and
+whether or not a package can be *wanted*. If a package cannot be wanted, then
+stack will never build or run its test suites and benchmarks, which is useful
+when tweaking an upstream package.
+
+To tie this all together, here's an example of the different settings:
+
+```yaml
+packages:
+- local-package
+- location: vendor/binary
+  valid-wanted: false
+- location:
+    git: git@github.com:yesodweb/wai
+    commit: 2f8a8e1b771829f4a8a77c0111352ce45a14c30f
+  subdirs:
+  - auto-update
+  - wai
+```
+
 ### extra-deps
+
+This is a list of package identifiers for additional packages from upstream to
+be included. This is usually used to augment an LTS Haskell or Stackage Nightly
+snapshot with a package that is not present or is at an older version than you
+with to use.
+
+```yaml
+extra-deps:
+- acme-missiles-0.3
+```
 
 ### resolver
 
+Specifies how dependencies are resolved. There are currently three options:
+
+* LTS Haskell snapshot, e.g. `resolver: lts-2.14`
+* Stackage Nightly snapshot, e.g. `resolver: nightly-2015-06-16`
+* No snapshot, just use packages shipped with GHC, e.g. `resolver: ghc-7.10`
+
+It's important to point out that each resolver identifies a GHC major version,
+and stack will require that that version of GHC is used for building your code.
+
 ### flags
+
 Flags can be set for each package separately, e.g.
+
 ```
 flags:
   package-name:
     flag-name: true
 ```
+
+Flags will only affect packages in your `packages` and `extra-deps` settings.
+Packages that come from the snapshot global database or are not affected.
+
 ## Non-project config
 
 ### docker
@@ -43,9 +112,39 @@ Default: https://www.stackage.org/download/snapshots.json
 
 ### package-indices
 
+```yaml
+package-indices:
+- name: hackage.haskell.org
+  download-prefix: https://s3.amazonaws.com/hackage.fpcomplete.com/package/
+
+  # at least one of the following must be present
+  git: https://github.com/commercialhaskell/all-cabal-hashes.git
+  http: https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz
+
+  # optional fields, both default to false
+  gpg-verify: false
+  require-hashes: false
+```
+
+One thing you should be aware of: if you change the contents of package-version
+combination by setting a different package index, this *can* have an effect on
+other projects by installing into your shared snapshot database.
+
 ### system-ghc
 
+Enables or disables using the GHC available on the PATH. Useful to disable if
+you want to force stack to use its own installed GHC (via `stack setup`), in
+cases where your system GHC my be incomplete for some reason. Default is true.
+
+```yaml
+# Turn off system GHC
+system-ghc: false
+```
+
 ### install-ghc
+
+Whether or not to automatically install GHC when necessary. Default is false,
+which means stack will prompt you to run `stack setup` as needed.
 
 ### require-stack-version
 
@@ -63,3 +162,4 @@ Set the architecture and operating system for GHC, build directories, etc. Value
     os: windows, linux
 
 You likely only ever want to change the arch value. This can also be set via the command line.
+

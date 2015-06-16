@@ -113,25 +113,7 @@ of those three. Updating the index will have no impact on stack's behavior.
 
 __I have a custom package index I'd like to use, how do I do so?__
 
-You can configure this in your stack.yaml. Here's what the default configuration looks like:
-
-```yaml
-package-indices:
-- name: hackage.haskell.org
-  download-prefix: https://s3.amazonaws.com/hackage.fpcomplete.com/package/
-
-  # at least one of the following must be present
-  git: https://github.com/commercialhaskell/all-cabal-hashes.git
-  http: https://s3.amazonaws.com/hackage.fpcomplete.com/00-index.tar.gz
-
-  # optional fields, both default to false
-  gpg-verify: false
-  require-hashes: false
-```
-
-One thing you should be aware of: if you change the contents of package-version
-combination by setting a different package index, this *can* have an effect on
-other projects by installing into your shared snapshot database.
+You can configure this in your stack.yaml. See [[stack.yaml]]
 
 __How can I make sure my project builds against multiple ghc versions?__
 
