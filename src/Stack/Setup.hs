@@ -257,7 +257,6 @@ ensureGHC sopts = do
             installed <- runReaderT listInstalled config
             idents <- mapM (ensureTool sopts installed getSetupInfo' msystem) tools
             paths <- runReaderT (mapM binDirs $ catMaybes idents) config
-            -- TODO: strip the trailing slash for prettier PATH output
             return $ Just $ map toFilePath $ concat paths
         else return Nothing
 
