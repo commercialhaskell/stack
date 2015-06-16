@@ -90,6 +90,10 @@ main =
                         "Generate haddocks for the project(s) in this directory/configuration"
                         (buildCmd DoHaddock)
                         buildOpts
+             addCommand "new"
+                        "Create a brand new project"
+                        (error "new command not yet implemented, check out https://github.com/commercialhaskell/stack/issues/137 for status and to get involved")
+                        (pure ())
              addCommand "setup"
                         "Get the appropriate ghc for your project"
                         setupCmd
