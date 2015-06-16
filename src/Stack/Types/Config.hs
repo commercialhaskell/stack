@@ -209,7 +209,6 @@ data LoadConfig m = LoadConfig
 
 data NoBuildConfigStrategy
     = ThrowException
-    | CreateConfig
     | ExecStrategy
     deriving (Show, Eq, Ord)
 
@@ -452,7 +451,7 @@ instance FromJSON VersionRangeJSON where
 
 data ConfigException
   = ParseResolverException Text
-  | NoProjectConfigFound (Path Abs Dir)
+  | NoProjectConfigFound (Path Abs Dir) (Maybe Text)
   | UnexpectedTarballContents [Path Abs Dir] [Path Abs File]
   | BadStackVersionException VersionRange
   | NoResolverFound
@@ -464,10 +463,13 @@ instance Show ConfigException where
         , ". Possible valid values include lts-2.12, nightly-YYYY-MM-DD, and ghc-7.10. "
         , "See https://www.stackage.org/snapshots for a complete list."
         ]
-    show (NoProjectConfigFound dir) = concat
+    show (NoProjectConfigFound dir mcmd) = concat
         [ "Unable to find a stack.yaml file in the current directory ("
         , toFilePath dir
         , ") or its ancestors"
+        , case mcmd of
+            Nothing -> ""
+            Just cmd -> "\nRecommended action: stack " ++ T.unpack cmd
         ]
     show (UnexpectedTarballContents dirs files) = concat
         [ "When unpacking a tarball specified in your stack.yaml file, "

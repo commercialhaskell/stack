@@ -61,6 +61,8 @@ import           Distribution.PackageDescription (GenericPackageDescription,
                                                   flagDefault, flagManual,
                                                   flagName, genPackageFlags,
                                                   executables, exeName, library, libBuildInfo, buildable)
+import qualified Distribution.Package as C
+import qualified Distribution.PackageDescription as C
 import           Network.HTTP.Download
 import           Path
 import           Prelude -- Fix AMP warning
@@ -523,10 +525,10 @@ checkDeps flags deps packages = do
 -- | Find a snapshot and set of flags that is compatible with the given
 -- 'GenericPackageDescription'. Returns 'Nothing' if no such snapshot is found.
 findBuildPlan :: (MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m)
-              => GenericPackageDescription
+              => [GenericPackageDescription]
               -> Snapshots
-              -> m (Maybe (SnapName, Map FlagName Bool))
-findBuildPlan gpd snapshots = do
+              -> m (Maybe (SnapName, Map PackageName (Map FlagName Bool)))
+findBuildPlan gpds0 snapshots = do
     -- Get the most recent LTS and Nightly in the snapshots directory and
     -- prefer them over anything else, since odds are high that something
     -- already exists for them.
@@ -550,10 +552,19 @@ findBuildPlan gpd snapshots = do
         loop [] = return Nothing
         loop (name:names') = do
             mbp <- loadMiniBuildPlan name
-            mflags <- checkBuildPlan name mbp gpd
-            case mflags of
-                Nothing -> loop names'
-                Just flags -> return $ Just (name, flags)
+            let checkGPDs flags [] = return $ Just (name, flags)
+                checkGPDs flags (gpd:gpds) = do
+                    let C.PackageIdentifier pname' _ = C.package $ C.packageDescription gpd
+                        pname = fromCabalPackageName pname'
+                    mflags <- checkBuildPlan name mbp gpd
+                    case mflags of
+                        Nothing -> loop names'
+                        Just flags' -> checkGPDs
+                            (if Map.null flags'
+                                then flags
+                                else Map.insert pname flags' flags)
+                            gpds
+            checkGPDs Map.empty gpds0
     loop names
 
 -- | Same semantics as @nub@, but more efficient by using the @Ord@ constraint.

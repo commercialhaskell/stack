@@ -40,6 +40,8 @@ import qualified Stack.Docker as Docker
 import           Stack.Exec
 import           Stack.Fetch
 import           Stack.GhcPkg (getCabalPkgVer)
+import           Stack.Init
+import           Stack.New
 import qualified Stack.PackageIndex
 import           Stack.Path
 import           Stack.Setup
@@ -92,7 +94,11 @@ main =
                         buildOpts
              addCommand "new"
                         "Create a brand new project"
-                        (error "new command not yet implemented, check out https://github.com/commercialhaskell/stack/issues/137 for status and to get involved")
+                        (\_ _ -> newProject)
+                        (pure ())
+             addCommand "init"
+                        "Initialize a stack project based on one or more cabal packages"
+                        initCmd
                         (pure ())
              addCommand "setup"
                         "Get the appropriate ghc for your project"
@@ -326,7 +332,7 @@ readFlag = do
 
 -- | Build the project.
 buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
-buildCmd finalAction opts go@GlobalOpts{..} = withBuildConfig go CreateConfig $
+buildCmd finalAction opts go@GlobalOpts{..} = withBuildConfig go ThrowException $
     Stack.Build.build opts { boptsFinalAction = finalAction }
 
 -- | Install
@@ -579,3 +585,12 @@ loadConfigWithOpts GlobalOpts{..} = do
               globalLogLevel
               (loadConfig globalConfigMonoid)
     return (manager,lc)
+
+-- | Project initialization
+initCmd :: () -> GlobalOpts -> IO ()
+initCmd () go@GlobalOpts{..} = do
+  (manager,lc) <- loadConfigWithOpts go
+  runStackLoggingT manager globalLogLevel $
+        Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $
+            runStackT manager globalLogLevel (lcConfig lc) $
+                initProject

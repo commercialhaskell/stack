@@ -41,7 +41,6 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as L
 import           Data.Either (partitionEithers)
 import qualified Data.IntMap as IntMap
-import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid
@@ -49,8 +48,6 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import qualified Data.Yaml as Yaml
-import qualified Distribution.Package as C
-import qualified Distribution.PackageDescription as C
 import           Distribution.System (OS (Windows), Platform (..), buildPlatform)
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange)
@@ -64,54 +61,12 @@ import qualified Paths_stack as Meta
 import           Stack.BuildPlan
 import           Stack.Constants
 import qualified Stack.Docker as Docker
-import           Stack.Package
+import           Stack.Init
 import           Stack.Types
 import           System.Directory
 import           System.Environment
 import           System.IO
 import           System.Process.Read (getEnvOverride, EnvOverride, unEnvOverride, readInNull)
-
--- | Get the default resolver value
-getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
-                   => Path Abs Dir
-                   -> m (Resolver, Map PackageName (Map FlagName Bool))
-getDefaultResolver dir = do
-    cabalfp <- getCabalFileName dir
-    gpd <- readPackageUnresolved cabalfp
-    snapshots <- getSnapshots `catch` \e -> do
-        $logError $
-            "Unable to download snapshot list, and therefore could " <>
-            "not generate a stack.yaml file automatically"
-        $logError $
-            "This sometimes happens due to missing Certificate Authorities " <>
-            "on your system. For more information, see:"
-        $logError ""
-        $logError "    https://github.com/commercialhaskell/stack/issues/234"
-        $logError ""
-        $logError "You can try again, or create your stack.yaml file by hand. See:"
-        $logError ""
-        $logError "    https://github.com/commercialhaskell/stack/wiki/stack.yaml"
-        $logError ""
-        throwM (e :: SomeException)
-    mpair <- findBuildPlan gpd snapshots
-    let name =
-            case C.package $ C.packageDescription gpd of
-                C.PackageIdentifier cname _ ->
-                    fromCabalPackageName cname
-    case mpair of
-        Just (snap, flags) ->
-            return (ResolverSnapshot snap, Map.singleton name flags)
-        Nothing -> do
-            let snap = case IntMap.maxViewWithKey (snapshotsLts snapshots) of
-                    Just ((x, y), _) -> LTS x y
-                    Nothing -> Nightly $ snapshotsNightly snapshots
-            $logWarn $ T.concat
-                [ "No matching snapshot was found for your package, "
-                , "falling back to: "
-                , renderSnapName snap
-                ]
-            $logWarn "This behavior will improve in the future, please see: https://github.com/commercialhaskell/stack/issues/253"
-            return (ResolverSnapshot snap, Map.empty)
 
 -- | Get the latest snapshot resolver available.
 getLatestResolver
@@ -346,7 +301,9 @@ loadBuildConfig menv mproject config stackRoot mresolver noConfigStrat = do
       Nothing -> case noConfigStrat of
         ThrowException -> do
             currDir <- getWorkingDir
+            cabalFiles <- findCabalFiles currDir
             throwM $ NoProjectConfigFound currDir
+                $ Just $ if null cabalFiles then "new" else "init"
         ExecStrategy -> do
             let dest :: Path Abs File
                 dest = destDir </> stackDotYaml
@@ -381,22 +338,6 @@ loadBuildConfig menv mproject config stackRoot mresolver noConfigStrat = do
                            }
                    liftIO $ Yaml.encodeFile dest' p
                    return (p, dest)
-        CreateConfig -> do
-            currDir <- getWorkingDir
-            (r, flags) <- runReaderT (getDefaultResolver currDir) miniConfig
-            let dest = currDir </> stackDotYaml
-                dest' = toFilePath dest
-            exists <- fileExists dest
-            when exists $ error "Invariant violated: in toBuildConfig's Nothing branch, and the stack.yaml file exists"
-            $logInfo $ "Writing default config file to: " <> T.pack dest'
-            let p = Project
-                    { projectPackages = [packageEntryCurrDir]
-                    , projectExtraDeps = Map.empty
-                    , projectFlags = flags
-                    , projectResolver = r
-                    }
-            liftIO $ Yaml.encodeFile dest' p
-            return (p, dest)
     let project = project'
             { projectResolver = fromMaybe (projectResolver project') mresolver
             }

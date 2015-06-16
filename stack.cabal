@@ -35,6 +35,8 @@ library
                      Stack.Fetch
                      Stack.Exec
                      Stack.GhcPkg
+                     Stack.Init
+                     Stack.New
                      Stack.Package
                      Stack.PackageDump
                      Stack.PackageIndex
