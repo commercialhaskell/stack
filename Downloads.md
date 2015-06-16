@@ -4,14 +4,14 @@ Distribution packages are available for [Ubuntu](#ubuntu) and [Arch Linux](#arch
 
 (32-bit)
 
-* Download [stack-0.0.2-i386-windows.zip](https://github.com/commercialhaskell/stack/releases/download/v0.0.2-beta/stack-0.0.2-i386-windows.zip)
+* Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest)
 * Unpack the `stack.exe` to somewhere on your `%PATH%` (see [Path section below](#path)) and you can then run `stack` on the commandline.
 
 NOTE: This executable has been built and tested on a Windows 8.1 64-bit machine. It should run on older Windows installs as well, but has not been tested. If you do test, please edit and update this page to indicate as such.
 
 ## OS X
 
-* Download [stack-0.0.2-x86_64-osx.gz](https://github.com/commercialhaskell/stack/releases/download/v0.0.2-beta/stack-0.0.2-x86_64-osx.gz)
+* Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest)
 * Extract the `stack` executable and put it somewhere on your `$PATH` (see [Path section below](#path))
 
 We generally test on the current version of OS X, but stack is known to work on Mavericks as well, and may also work on older versions (YMMV).
@@ -67,7 +67,7 @@ In order to install stack from Hackage or from source, you will need the [libtin
 
 (64-bit only)
 
-* Download [stack-0.0.2-x86_64-linux.gz](https://github.com/commercialhaskell/stack/releases/download/v0.0.2-beta/stack-0.0.2-x86_64-linux.gz)
+* Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest)
 * Extract the `stack` executable somewhere on your `$PATH`  (see [Path section below](#path))
 * Now you can run `stack` from the terminal.
 
