@@ -30,7 +30,7 @@ When reporting a bug, please write in the following format (if you copy/paste th
 > <output>
 > ```
 
-If the above output is larger than a page, paste it in a private [Gist](https://gist.github.com/) instead.
+With `--verbose` mode we can see what the tool is doing and when. Without this output it is much more difficult to surmise what's going on with your issue. If the above output is larger than a page, paste it in a private [Gist](https://gist.github.com/) instead.
 
 Include any `.yaml` configuration if relevant.
 
