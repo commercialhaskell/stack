@@ -37,8 +37,9 @@ import           Stack.Build.Types
 import           Stack.Config
 import           Stack.Constants
 import qualified Stack.Docker as Docker
+import           Stack.Exec
 import           Stack.Fetch
-import           Stack.GhcPkg (envHelper,getCabalPkgVer)
+import           Stack.GhcPkg (getCabalPkgVer)
 import qualified Stack.PackageIndex
 import           Stack.Path
 import           Stack.Setup
@@ -49,7 +50,6 @@ import           System.Environment (getArgs, getProgName)
 import           System.Exit
 import           System.FilePath (searchPathSeparator)
 import           System.IO (stderr)
-import qualified System.Process as P
 import qualified System.Process.Read
 
 -- | Commandline dispatcher.
@@ -370,23 +370,10 @@ uploadCmd args0 go = withBuildConfig go ExecStrategy $ do
 
 -- | Execute a command.
 execCmd :: (String, [String]) -> GlobalOpts -> IO ()
-execCmd (cmd, args) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $ do
-      config <- asks getConfig
-      liftIO $ do
-          menv <- configEnvOverride config
-                          EnvSettings
-                              { esIncludeLocals = True
-                              , esIncludeGhcPackagePath = True
-                              }
-          cmd' <- join $ System.Process.Read.findExecutable menv cmd
-          let cp = (P.proc (toFilePath cmd') args)
-                  { P.env = envHelper menv
-                  , P.delegate_ctlc = True
-                  }
+execCmd (cmd,args) go@GlobalOpts{..} =
+    withBuildConfig go ExecStrategy $
+    exec cmd args
 
-          (Nothing, Nothing, Nothing, ph) <- P.createProcess cp
-          ec <- P.waitForProcess ph
-          exitWith ec
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()

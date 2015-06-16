@@ -33,6 +33,7 @@ library
                      Stack.Docker
                      Stack.Docker.GlobalDB
                      Stack.Fetch
+                     Stack.Exec
                      Stack.GhcPkg
                      Stack.Package
                      Stack.PackageDump
