@@ -191,7 +191,8 @@ main =
 pathCmd :: PathArg -> GlobalOpts -> IO ()
 pathCmd pathArg go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
-  buildConfig <- runStackLoggingT manager globalLogLevel (lcLoadBuildConfig lc ExecStrategy)
+  buildConfig <- runStackLoggingT manager globalLogLevel
+    (lcLoadBuildConfig lc globalResolver ExecStrategy)
   runStackT manager globalLogLevel buildConfig (pathString pathArg) >>= putStrLn
 
 
@@ -250,7 +251,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                   case scoGhcVersion of
                       Just v -> return (v, Nothing)
                       Nothing -> do
-                          bc <- lcLoadBuildConfig lc ThrowException
+                          bc <- lcLoadBuildConfig lc globalResolver ThrowException
                           return (bcGhcVersion bc, Just $ bcStackYaml bc)
               mpaths <- runStackT manager globalLogLevel (lcConfig lc) $ ensureGHC SetupOpts
                   { soptsInstallIfMissing = True
@@ -277,7 +278,7 @@ withBuildConfig go@GlobalOpts{..} strat inner = do
     runStackLoggingT manager globalLogLevel $
         Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $ do
             bconfig1 <- runStackLoggingT manager globalLogLevel $
-                lcLoadBuildConfig lc strat
+                lcLoadBuildConfig lc globalResolver strat
             (bconfig2,cabalVer) <-
                 runStackT
                     manager globalLogLevel bconfig1
@@ -515,6 +516,7 @@ globalOpts =
     GlobalOpts
     <$> logLevelOpt
     <*> configOptsParser False
+    <*> optional resolverParser
 
 -- | Parse for a logging level.
 logLevelOpt :: Parser LogLevel
@@ -543,6 +545,19 @@ logLevelOpt =
             "error" -> LevelError
             _ -> LevelOther (T.pack s)
 
+resolverParser :: Parser Resolver
+resolverParser =
+    option readResolver
+        (long "resolver" <>
+         metavar "RESOLVER" <>
+         help "Override resolver in project file")
+  where
+    readResolver = do
+        s <- readerAsk
+        case parseResolver $ T.pack s of
+            Left e -> readerError $ show e
+            Right x -> return x
+
 -- | Default logging level should be something useful but not crazy.
 defaultLogLevel :: LogLevel
 defaultLogLevel = LevelInfo
@@ -551,6 +566,7 @@ defaultLogLevel = LevelInfo
 data GlobalOpts = GlobalOpts
     { globalLogLevel     :: LogLevel -- ^ Log level
     , globalConfigMonoid :: ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
+    , globalResolver     :: Maybe Resolver -- ^ Resolver override
     } deriving (Show)
 
 -- | Load the configuration with a manager. Convenience function used

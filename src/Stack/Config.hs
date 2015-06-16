@@ -335,12 +335,13 @@ loadBuildConfig :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, H
                 -> Maybe (Project, Path Abs File, ConfigMonoid)
                 -> Config
                 -> Path Abs Dir
+                -> Maybe Resolver -- override resolver
                 -> NoBuildConfigStrategy
                 -> m BuildConfig
-loadBuildConfig menv mproject config stackRoot noConfigStrat = do
+loadBuildConfig menv mproject config stackRoot mresolver noConfigStrat = do
     env <- ask
     let miniConfig = MiniConfig (getHttpManager env) config
-    (project, stackYamlFP) <- case mproject of
+    (project', stackYamlFP) <- case mproject of
       Just (project, fp, _) -> return (project, fp)
       Nothing -> case noConfigStrat of
         ThrowException -> do
@@ -359,8 +360,13 @@ loadBuildConfig menv mproject config stackRoot noConfigStrat = do
                    inTerminal <- liftIO (hIsTerminalDevice stdout)
                    ProjectAndConfigMonoid project _ <- loadYaml dest
                    when inTerminal $ do
-                       $logInfo ("Using resolver: " <> renderResolver (projectResolver project) <>
-                                 " from global config file: " <> T.pack dest')
+                       case mresolver of
+                           Nothing ->
+                               $logInfo ("Using resolver: " <> renderResolver (projectResolver project) <>
+                                         " from global config file: " <> T.pack dest')
+                           Just resolver ->
+                               $logInfo ("Using resolver: " <> renderResolver resolver <>
+                                         " specified on command line")
                    return (project, dest)
                else do
                    r <- runReaderT getLatestResolver miniConfig
@@ -391,6 +397,9 @@ loadBuildConfig menv mproject config stackRoot noConfigStrat = do
                     }
             liftIO $ Yaml.encodeFile dest' p
             return (p, dest)
+    let project = project'
+            { projectResolver = fromMaybe (projectResolver project') mresolver
+            }
 
     ghcVersion <-
         case projectResolver project of

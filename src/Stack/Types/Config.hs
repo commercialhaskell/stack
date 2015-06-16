@@ -201,7 +201,7 @@ instance HasEnvConfig EnvConfig where
 data LoadConfig m = LoadConfig
     { lcConfig          :: !Config
       -- ^ Top-level Stack configuration.
-    , lcLoadBuildConfig :: !(NoBuildConfigStrategy -> m BuildConfig)
+    , lcLoadBuildConfig :: !(Maybe Resolver -> NoBuildConfigStrategy -> m BuildConfig)
         -- ^ Action to load the remaining 'BuildConfig'.
     , lcProjectRoot     :: !(Maybe (Path Abs Dir))
         -- ^ The project root directory, if in a project.
