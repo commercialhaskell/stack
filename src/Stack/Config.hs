@@ -74,17 +74,14 @@ getLatestResolver
     => m Resolver
 getLatestResolver = do
     snapshots <- getSnapshots
-    let lts = do
+    let mlts = do
             (x,y) <- listToMaybe (reverse (IntMap.toList (snapshotsLts snapshots)))
             return (LTS x y)
-        nightly =
-            Just (Nightly (snapshotsNightly snapshots))
-    case lts <|> nightly of
-        Nothing -> do
-            $logDebug "Downloaded snapshots, but they were empty."
-            throwM NoResolverFound
-        Just snap ->
-            return (ResolverSnapshot snap)
+        snap =
+            case mlts of
+                Nothing -> Nightly (snapshotsNightly snapshots)
+                Just lts -> lts
+    return (ResolverSnapshot snap)
 
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid

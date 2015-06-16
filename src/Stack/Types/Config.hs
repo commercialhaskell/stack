@@ -454,7 +454,7 @@ data ConfigException
   | NoProjectConfigFound (Path Abs Dir) (Maybe Text)
   | UnexpectedTarballContents [Path Abs Dir] [Path Abs File]
   | BadStackVersionException VersionRange
-  | NoResolverFound
+  | NoMatchingSnapshot [SnapName]
   deriving Typeable
 instance Show ConfigException where
     show (ParseResolverException t) = concat
@@ -485,7 +485,18 @@ instance Show ConfigException where
         ,"version range ("
         , T.unpack (versionRangeText requiredRange)
         , ") specified in stack.yaml." ]
-    show NoResolverFound = "No resolver was found"
+    show (NoMatchingSnapshot names) = concat
+        [ "There was no snapshot found that matched the package "
+        , "bounds in your .cabal files.\n"
+        , "Please choose one of the following commands to get started.\n\n"
+        , unlines $ map
+            (\name -> "    stack init --resolver " ++ T.unpack (renderSnapName name))
+            names
+        , "\nYou'll then need to add some extra-deps. See:\n\n"
+        , "    https://github.com/commercialhaskell/stack/wiki/stack.yaml#extra-deps"
+        , "\n\nNote that this will be improved in the future, see:\n\n"
+        , "    https://github.com/commercialhaskell/stack/issues/116"
+        ]
 instance Exception ConfigException
 
 -- | Helper function to ask the environment and apply getConfig

@@ -99,7 +99,7 @@ main =
              addCommand "init"
                         "Initialize a stack project based on one or more cabal packages"
                         initCmd
-                        (pure ())
+                        initOptsParser
              addCommand "setup"
                         "Get the appropriate ghc for your project"
                         setupCmd
@@ -557,12 +557,6 @@ resolverParser =
         (long "resolver" <>
          metavar "RESOLVER" <>
          help "Override resolver in project file")
-  where
-    readResolver = do
-        s <- readerAsk
-        case parseResolver $ T.pack s of
-            Left e -> readerError $ show e
-            Right x -> return x
 
 -- | Default logging level should be something useful but not crazy.
 defaultLogLevel :: LogLevel
@@ -587,10 +581,10 @@ loadConfigWithOpts GlobalOpts{..} = do
     return (manager,lc)
 
 -- | Project initialization
-initCmd :: () -> GlobalOpts -> IO ()
-initCmd () go@GlobalOpts{..} = do
+initCmd :: InitOpts -> GlobalOpts -> IO ()
+initCmd initOpts go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
   runStackLoggingT manager globalLogLevel $
         Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $
             runStackT manager globalLogLevel (lcConfig lc) $
-                initProject
+                initProject globalResolver initOpts

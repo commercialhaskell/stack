@@ -26,7 +26,6 @@ module Stack.BuildPlan
 
 import           Control.Applicative
 import           Control.Exception (assert)
-import           Control.Exception.Enclosed (handleIO)
 import           Control.Monad (liftM, forM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -44,7 +43,7 @@ import qualified Data.Foldable as F
 import qualified Data.HashMap.Strict as HM
 import           Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
-import           Data.List (intercalate, sort)
+import           Data.List (intercalate)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (mapMaybe)
@@ -73,7 +72,7 @@ import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.Types
 import           Stack.Types.StackT
-import           System.Directory (createDirectoryIfMissing, getDirectoryContents)
+import           System.Directory (createDirectoryIfMissing)
 import           System.FilePath (takeDirectory)
 
 data BuildPlanException
@@ -450,12 +449,10 @@ loadBuildPlan name = do
 -- only modify non-manual flags, and will prefer default values for flags.
 -- Returns @Nothing@ if no combination exists.
 checkBuildPlan :: (MonadLogger m, MonadThrow m, MonadIO m, MonadReader env m, HasConfig env, MonadCatch m)
-               => SnapName -- ^ used only for debugging purposes
-               -> MiniBuildPlan
+               => MiniBuildPlan
                -> GenericPackageDescription
                -> m (Maybe (Map FlagName Bool))
-checkBuildPlan name mbp gpd = do
-    $logInfo $ "Checking against build plan " <> renderSnapName name
+checkBuildPlan mbp gpd = do
     platform <- asks (configPlatform . getConfig)
     loop platform flagOptions
   where
@@ -526,56 +523,28 @@ checkDeps flags deps packages = do
 -- 'GenericPackageDescription'. Returns 'Nothing' if no such snapshot is found.
 findBuildPlan :: (MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m)
               => [GenericPackageDescription]
-              -> Snapshots
+              -> [SnapName]
               -> m (Maybe (SnapName, Map PackageName (Map FlagName Bool)))
-findBuildPlan gpds0 snapshots = do
-    -- Get the most recent LTS and Nightly in the snapshots directory and
-    -- prefer them over anything else, since odds are high that something
-    -- already exists for them.
-    existing <-
-        liftM (reverse . sort . mapMaybe (parseSnapName . T.pack)) $
-        snapshotsDir >>=
-        liftIO . handleIO (const $ return [])
-               . getDirectoryContents . toFilePath
-    let isLTS LTS{} = True
-        isLTS Nightly{} = False
-        isNightly Nightly{} = True
-        isNightly LTS{} = False
-
-    let names = nubOrd $ concat
-            [ take 2 $ filter isLTS existing
-            , take 2 $ filter isNightly existing
-            , map (uncurry LTS)
-                (take 2 $ reverse $ IntMap.toList $ snapshotsLts snapshots)
-            , [Nightly $ snapshotsNightly snapshots]
-            ]
-        loop [] = return Nothing
-        loop (name:names') = do
-            mbp <- loadMiniBuildPlan name
-            let checkGPDs flags [] = return $ Just (name, flags)
-                checkGPDs flags (gpd:gpds) = do
-                    let C.PackageIdentifier pname' _ = C.package $ C.packageDescription gpd
-                        pname = fromCabalPackageName pname'
-                    mflags <- checkBuildPlan name mbp gpd
-                    case mflags of
-                        Nothing -> loop names'
-                        Just flags' -> checkGPDs
-                            (if Map.null flags'
-                                then flags
-                                else Map.insert pname flags' flags)
-                            gpds
-            checkGPDs Map.empty gpds0
-    loop names
-
--- | Same semantics as @nub@, but more efficient by using the @Ord@ constraint.
-nubOrd :: Ord a => [a] -> [a]
-nubOrd =
-    go Set.empty
+findBuildPlan gpds0 =
+    loop
   where
-    go _ [] = []
-    go s (x:xs)
-        | x `Set.member` s = go s xs
-        | otherwise = x : go (Set.insert x s) xs
+    loop [] = return Nothing
+    loop (name:names') = do
+        mbp <- loadMiniBuildPlan name
+        $logInfo $ "Checking against build plan " <> renderSnapName name
+        let checkGPDs flags [] = return $ Just (name, flags)
+            checkGPDs flags (gpd:gpds) = do
+                let C.PackageIdentifier pname' _ = C.package $ C.packageDescription gpd
+                    pname = fromCabalPackageName pname'
+                mflags <- checkBuildPlan mbp gpd
+                case mflags of
+                    Nothing -> loop names'
+                    Just flags' -> checkGPDs
+                        (if Map.null flags'
+                            then flags
+                            else Map.insert pname flags' flags)
+                        gpds
+        checkGPDs Map.empty gpds0
 
 shadowMiniBuildPlan :: MiniBuildPlan
                     -> Set PackageName
