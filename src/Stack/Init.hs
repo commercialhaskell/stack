@@ -69,7 +69,7 @@ initProject mresolver initOpts = do
     let dest = currDir </> stackDotYaml
         dest' = toFilePath dest
     exists <- fileExists dest
-    when exists $ error "Invariant violated: in toBuildConfig's Nothing branch, and the stack.yaml file exists"
+    when exists $ error "Refusing to overwrite existing stack.yaml, please delete before running stack init"
 
     cabalfps <- findCabalFiles currDir
     $logInfo $ "Writing default config file to: " <> T.pack dest'
@@ -92,7 +92,9 @@ initProject mresolver initOpts = do
             { peValidWanted = True
             , peLocation = PLFilePath $
                 case stripDir currDir $ parent fp of
-                    Nothing -> assert False $ toFilePath fp
+                    Nothing
+                        | currDir == parent fp -> "."
+                        | otherwise -> assert False $ toFilePath $ parent fp
                     Just rel -> toFilePath rel
             , peSubdirs = []
             }
