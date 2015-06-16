@@ -10,7 +10,7 @@
 module Main where
 
 import           Control.Exception
-import           Control.Monad (join)
+import           Control.Monad (join, when)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Logger
 import           Control.Monad.Reader (asks, runReaderT)
@@ -32,7 +32,6 @@ import           Options.Applicative.Types (readerAsk)
 import           Path (toFilePath)
 import qualified Paths_stack as Meta
 import           Plugins
-import           Plugins.Commands
 import           Stack.Build
 import           Stack.Build.Types
 import           Stack.Config
@@ -56,8 +55,9 @@ import qualified System.Process.Read
 -- | Commandline dispatcher.
 main :: IO ()
 main =
-  do plugins <- findPlugins (T.pack stackProgName)
-     tryRunPlugin plugins
+  do when False $ do -- https://github.com/commercialhaskell/stack/issues/322
+       plugins <- findPlugins (T.pack stackProgName)
+       tryRunPlugin plugins
      progName <- getProgName
      args <- getArgs
      execExtraHelp args
@@ -174,7 +174,8 @@ main =
                               dockerExecCmd
                               ((,) <$> strArgument (metavar "[--] CMD")
                                    <*> many (strArgument (metavar "ARGS"))))
-             commandsFromPlugins plugins pluginShouldHaveRun)
+             )
+             -- commandsFromPlugins plugins pluginShouldHaveRun) https://github.com/commercialhaskell/stack/issues/322
      run level `catch` \e -> do
         -- This special handler stops "stack: " from being printed before the
         -- exception
