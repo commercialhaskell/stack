@@ -31,7 +31,13 @@ upload: | target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-
 	deb-s3 upload -b download.fpcomplete.com --sign=9BEFB442 --prefix=ubuntu/$(UBUNTU_CODENAME) \
 		target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)_amd64.deb
 
+release:
+	@UBUNTU_CODENAME=precise UBUNTU_VERSION=12.04 make upload
+	@UBUNTU_CODENAME=trusty  UBUNTU_VERSION=14.04 make upload
+	@UBUNTU_CODENAME=utopic  UBUNTU_VERSION=14.10 make upload
+	@UBUNTU_CODENAME=vivid   UBUNTU_VERSION=15.04 make upload
+
 clean:
 	@rm -rf Dockerfile target
 
-.PHONY: clean deb docker default ubuntu-stack upload
+.PHONY: clean deb docker default ubuntu-stack upload release
