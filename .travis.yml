@@ -40,6 +40,7 @@ script:
  - cabal sdist   # tests that a source-distribution can be generated
 
  - cd test/integration
+ - stack setup
  - stack test
 
 # Check that the resulting source distribution can be built & installed.
