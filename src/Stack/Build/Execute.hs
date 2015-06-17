@@ -232,19 +232,21 @@ executePlan menv bopts baseConfigOpts locals plan = do
 
         currExe <- liftIO getExecutablePath -- needed for windows, see below
 
-        forM_ (Map.toList $ planInstallExes plan) $ \(name, loc) -> do
+        installed <- forM (Map.toList $ planInstallExes plan) $ \(name, loc) -> do
             let bindir =
                     case loc of
                         Snap -> snapBin
                         Local -> localBin
             mfp <- resolveFileMaybe bindir $ T.unpack name ++ ext
             case mfp of
-                Nothing -> $logWarn $ T.concat
-                    [ "Couldn't find executable "
-                    , name
-                    , " in directory "
-                    , T.pack $ toFilePath bindir
-                    ]
+                Nothing -> do
+                    $logWarn $ T.concat
+                        [ "Couldn't find executable "
+                        , name
+                        , " in directory "
+                        , T.pack $ toFilePath bindir
+                        ]
+                    return Nothing
                 Just file -> do
                     let destFile = destDir' FP.</> T.unpack name ++ ext
                     $logInfo $ T.concat
@@ -258,6 +260,16 @@ executePlan menv bopts baseConfigOpts locals plan = do
                         Platform _ Windows | FP.equalFilePath destFile currExe ->
                             windowsRenameCopy (toFilePath file) destFile
                         _ -> copyFile (toFilePath file) destFile
+                    return $ Just (destDir', [T.append name (T.pack ext)])
+
+        let destToInstalled = Map.fromListWith (++) (catMaybes installed)
+        unless (Map.null destToInstalled) $ $logInfo ""
+        forM_ (Map.toList destToInstalled) $ \(dest, executables) -> do
+            $logInfo $ T.concat
+                [ "Installed executables to "
+                , T.pack dest
+                , ":"]
+            forM_ executables $ \exe -> $logInfo $ T.append "- " exe
 
 -- | Windows can't write over the current executable. Instead, we rename the
 -- current executable to something else and then do the copy.
