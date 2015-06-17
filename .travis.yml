@@ -39,6 +39,7 @@ script:
  - cabal check
  - cabal sdist   # tests that a source-distribution can be generated
 
+ - cabal copy
  - cd test/integration
  - stack setup
  - stack test
