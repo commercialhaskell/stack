@@ -413,6 +413,10 @@ ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal cabalfp extra = do
         newConfigCache = ConfigCache
             { configCacheOpts = map encodeUtf8 configOpts
             , configCacheDeps = allDeps
+            , configCacheComponents =
+                case taskType of
+                    TTLocal lp -> Set.map encodeUtf8 $ lpComponents lp
+                    TTUpstream _ _ -> Set.empty
             }
 
     let needConfig = mOldConfigCache /= Just newConfigCache
@@ -582,7 +586,10 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
 
     announce "build"
     config <- asks getConfig
-    cabal (console && configHideTHLoading config) ["build"]
+    cabal (console && configHideTHLoading config) $
+        case taskType of
+            TTLocal lp -> "build" : map T.unpack (Set.toList $ lpComponents lp)
+            TTUpstream _ _ -> ["build"]
 
     withMVar eeInstallLock $ \() -> do
         announce "install"

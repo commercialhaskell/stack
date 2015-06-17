@@ -12,7 +12,7 @@ module Stack.Build.Source
     ) where
 
 import Network.HTTP.Client.Conduit (HasHttpManager)
-import           Control.Applicative          ((<|>))
+import           Control.Applicative          ((<|>), (<$>))
 import           Control.Monad
 import           Control.Monad.Catch          (MonadCatch)
 import           Control.Monad.IO.Class
@@ -29,6 +29,7 @@ import           Data.Maybe
 import           Data.Monoid                  ((<>))
 import           Data.Set                     (Set)
 import qualified Data.Set                     as Set
+import           Data.Text                    (Text)
 import qualified Data.Text                    as T
 import           Path
 import           Prelude                      hiding (FilePath, writeFile)
@@ -137,10 +138,10 @@ loadLocals bopts latestVersion = do
         case boptsTargets bopts of
             [] -> ["."]
             x -> x
-    (dirs, (names0, idents)) <- case partitionEithers targets of
-        ([], targets') -> return $ fmap partitionEithers $ partitionEithers targets'
-        (bad, _) -> throwM $ Couldn'tParseTargets bad
-    let names = Set.fromList names0
+    (dirs, names, idents) <-
+        case partitionEithers targets of
+            ([], targets') -> return $ partitionTargetSpecs targets'
+            (bad, _) -> throwM $ Couldn'tParseTargets bad
 
     bconfig <- asks getBuildConfig
     lps <- forM (Map.toList $ bcPackages bconfig) $ \(dir, validWanted) -> do
@@ -174,34 +175,57 @@ loadLocals bopts latestVersion = do
                         mbuildCache
             , lpCabalFile = cabalfp
             , lpDir = dir
+            , lpComponents = fromMaybe Set.empty $ Map.lookup name names
             }
 
     let known = Set.fromList $ map (packageName . lpPackage) lps
-        unknown = Set.difference names known
+        unknown = Set.difference (Map.keysSet names) known
 
-    return (lps, unknown, Set.fromList idents)
+    return (lps, unknown, idents)
   where
     parseTarget t = do
         let s = T.unpack t
         isDir <- liftIO $ doesDirectoryExist s
         if isDir
-            then liftM (Right . Left) $ liftIO (canonicalizePath s) >>= parseAbsDir
-            else return $ case parsePackageNameFromString s of
-                     Left _ ->
-                        case parsePackageIdentifierFromString s of
-                            Left _ ->
-                                case T.stripSuffix ":latest" t of
-                                    Just t'
-                                        | Just name <- parsePackageNameFromString $ T.unpack t'
-                                        , Just version <- Map.lookup name latestVersion
-                                        -> Right $ Right $ Right $ PackageIdentifier name version
-                                    _ -> Left t
-                            Right ident -> Right $ Right $ Right ident
-                     Right pname -> Right $ Right $ Left pname
+            then liftM (Right . TSDir) $ liftIO (canonicalizePath s) >>= parseAbsDir
+            else return
+                    $ maybe (Left t) Right
+                    $ (flip TSName Set.empty <$> parsePackageNameFromString s)
+                  <|> (TSIdent <$> parsePackageIdentifierFromString s)
+                  <|> (do
+                        t' <- T.stripSuffix ":latest" t
+                        name <- parsePackageNameFromString $ T.unpack t'
+                        version <- Map.lookup name latestVersion
+                        Just $ TSIdent $ PackageIdentifier name version)
+                  <|> (do
+                        let (name', rest) = T.break (== ':') t
+                        component <- T.stripPrefix ":" rest
+                        name <- parsePackageNameFromString $ T.unpack name'
+                        Just $ TSName name $ Set.singleton component)
     isWanted dirs names dir name =
-        name `Set.member` names ||
+        name `Map.member` names ||
         any (`isParentOf` dir) dirs ||
         any (== dir) dirs
+
+data TargetSpec
+    = TSName PackageName (Set Text)
+    | TSIdent PackageIdentifier
+    | TSDir (Path Abs Dir)
+
+partitionTargetSpecs :: [TargetSpec] -> ([Path Abs Dir], Map PackageName (Set Text), Set PackageIdentifier)
+partitionTargetSpecs =
+    loop id Map.empty Set.empty
+  where
+    loop dirs names idents ts0 =
+        case ts0 of
+            [] -> (dirs [], names, idents)
+            TSName name comps:ts -> loop
+                dirs
+                (Map.insertWith Set.union name comps names)
+                idents
+                ts
+            TSIdent ident:ts -> loop dirs names (Set.insert ident idents) ts
+            TSDir dir:ts -> loop (dirs . (dir:)) names idents ts
 
 -- | All flags for a local package
 localFlags :: (Map PackageName (Map FlagName Bool))

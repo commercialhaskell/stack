@@ -6,6 +6,7 @@
 * `--resolver` [#224](https://github.com/commercialhaskell/stack/issues/224)
 * `stack init` [#253](https://github.com/commercialhaskell/stack/issues/253)
 * `--extra-include-dirs` and `--extra-lib-dirs` [#333](https://github.com/commercialhaskell/stack/issues/333)
+* Specify intra-package target [#201](https://github.com/commercialhaskell/stack/issues/201)
 
 ## 0.0.2
 

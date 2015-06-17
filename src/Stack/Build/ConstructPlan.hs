@@ -353,6 +353,10 @@ checkDirtiness ps installed package present = do
         configCache = ConfigCache
             { configCacheOpts = map encodeUtf8 configOpts
             , configCacheDeps = present
+            , configCacheComponents =
+                case ps of
+                    PSLocal lp -> Set.map encodeUtf8 $ lpComponents lp
+                    PSUpstream _ _ _ -> Set.empty
             }
     moldOpts <- tryGetFlagCache installed
     case moldOpts of

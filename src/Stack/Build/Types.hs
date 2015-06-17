@@ -310,6 +310,7 @@ data LocalPackage = LocalPackage
     , lpDir            :: !(Path Abs Dir)  -- ^ Directory of the package.
     , lpCabalFile      :: !(Path Abs File) -- ^ The .cabal file
     , lpDirtyFiles     :: !Bool            -- ^ are there files that have changed since the last build?
+    , lpComponents     :: !(Set Text)      -- ^ components to build, passed directly to Setup.hs build
     }
     deriving Show
 
@@ -323,6 +324,10 @@ data ConfigCache = ConfigCache
       -- the complete GhcPkgId (only a PackageIdentifier) in the configure
       -- options, just using the previous value is insufficient to know if
       -- dependencies have changed.
+    , configCacheComponents :: !(Set S.ByteString)
+      -- ^ The components to be built. It's a bit of a hack to include this in
+      -- here, as it's not a configure option (just a build option), but this
+      -- is a convenient way to force compilation when the components change.
     }
     deriving (Generic,Eq,Show)
 instance Binary ConfigCache
