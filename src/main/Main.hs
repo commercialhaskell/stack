@@ -204,10 +204,9 @@ main =
 pathCmd :: PathArg -> GlobalOpts -> IO ()
 pathCmd pathArg go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
-  buildConfig <- runStackLoggingT manager globalLogLevel
+  buildConfig <- runStackLoggingT manager globalLogLevel globalTerminal
     (lcLoadBuildConfig lc globalResolver ExecStrategy)
-  runStackT manager globalLogLevel buildConfig (pathString pathArg) >>= putStrLn
-
+  runStackT manager globalLogLevel buildConfig globalTerminal (pathString pathArg) >>= putStrLn
 
 -- Try to run a plugin
 tryRunPlugin :: Plugins -> IO ()
@@ -255,18 +254,18 @@ setupParser = SetupCmdOpts
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
-  runStackLoggingT manager globalLogLevel $
+  runStackLoggingT manager globalLogLevel globalTerminal $
       Docker.rerunWithOptionalContainer
           (lcConfig lc)
           (lcProjectRoot lc)
-          (runStackLoggingT manager globalLogLevel $ do
+          (runStackLoggingT manager globalLogLevel globalTerminal $ do
               (ghc, mstack) <-
                   case scoGhcVersion of
                       Just v -> return (v, Nothing)
                       Nothing -> do
                           bc <- lcLoadBuildConfig lc globalResolver ThrowException
                           return (bcGhcVersion bc, Just $ bcStackYaml bc)
-              mpaths <- runStackT manager globalLogLevel (lcConfig lc) $ ensureGHC SetupOpts
+              mpaths <- runStackT manager globalLogLevel (lcConfig lc) globalTerminal $ ensureGHC SetupOpts
                   { soptsInstallIfMissing = True
                   , soptsUseSystem =
                     (configSystemGHC $ lcConfig lc)
@@ -288,13 +287,13 @@ withBuildConfig :: GlobalOpts
                 -> IO ()
 withBuildConfig go@GlobalOpts{..} strat inner = do
     (manager, lc) <- loadConfigWithOpts go
-    runStackLoggingT manager globalLogLevel $
+    runStackLoggingT manager globalLogLevel globalTerminal $
         Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $ do
-            bconfig1 <- runStackLoggingT manager globalLogLevel $
+            bconfig1 <- runStackLoggingT manager globalLogLevel globalTerminal $
                 lcLoadBuildConfig lc globalResolver strat
             (bconfig2,cabalVer) <-
                 runStackT
-                    manager globalLogLevel bconfig1
+                    manager globalLogLevel bconfig1 globalTerminal
                     (do cfg <- setupEnv
                         menv <- runReaderT getMinimalEnvOverride cfg
                         cabalVer <- getCabalPkgVer menv
@@ -303,6 +302,7 @@ withBuildConfig go@GlobalOpts{..} strat inner = do
                 manager
                 globalLogLevel
                 (EnvConfig bconfig2 cabalVer)
+                globalTerminal
                 inner
 
 cleanCmd :: () -> GlobalOpts -> IO ()
@@ -351,9 +351,9 @@ installCmd opts go@GlobalOpts{..} = withBuildConfig go ExecStrategy $
 unpackCmd :: [String] -> GlobalOpts -> IO ()
 unpackCmd names go@GlobalOpts{..} = do
     (manager,lc) <- loadConfigWithOpts go
-    runStackLoggingT manager globalLogLevel $
+    runStackLoggingT manager globalLogLevel globalTerminal $
         Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $
-            runStackT manager globalLogLevel (lcConfig lc) $ do
+            runStackT manager globalLogLevel (lcConfig lc) globalTerminal $ do
                 menv <- getMinimalEnvOverride
                 Stack.Fetch.unpackPackages menv "." names
 
@@ -361,9 +361,9 @@ unpackCmd names go@GlobalOpts{..} = do
 updateCmd :: () -> GlobalOpts -> IO ()
 updateCmd () go@GlobalOpts{..} = do
     (manager,lc) <- loadConfigWithOpts go
-    runStackLoggingT manager globalLogLevel $
+    runStackLoggingT manager globalLogLevel globalTerminal $
         Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $
-            runStackT manager globalLogLevel (lcConfig lc) $
+            runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
                 getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
 
 -- | Upload to Hackage
@@ -397,28 +397,28 @@ replCmd (targets,args) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $ do
 dockerPullCmd :: () -> GlobalOpts -> IO ()
 dockerPullCmd _ go@GlobalOpts{..} = do
     (manager,lc) <- liftIO $ loadConfigWithOpts go
-    runStackLoggingT manager globalLogLevel $ Docker.preventInContainer $
+    runStackLoggingT manager globalLogLevel globalTerminal $ Docker.preventInContainer $
         Docker.pull (lcConfig lc)
 
 -- | Reset the Docker sandbox.
 dockerResetCmd :: Bool -> GlobalOpts -> IO ()
 dockerResetCmd keepHome go@GlobalOpts{..} = do
     (manager,lc) <- liftIO (loadConfigWithOpts go)
-    runStackLoggingT manager globalLogLevel $ Docker.preventInContainer $
+    runStackLoggingT manager globalLogLevel globalTerminal$ Docker.preventInContainer $
         Docker.reset (lcProjectRoot lc) keepHome
 
 -- | Cleanup Docker images and containers.
 dockerCleanupCmd :: Docker.CleanupOpts -> GlobalOpts -> IO ()
 dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
     (manager,lc) <- liftIO $ loadConfigWithOpts go
-    runStackLoggingT manager globalLogLevel $ Docker.preventInContainer $
+    runStackLoggingT manager globalLogLevel globalTerminal$ Docker.preventInContainer $
         Docker.cleanup (lcConfig lc) cleanupOpts
 
 -- | Execute a command
 dockerExecCmd :: (String, [String]) -> GlobalOpts -> IO ()
 dockerExecCmd (cmd,args) go@GlobalOpts{..} = do
     (manager,lc) <- liftIO $ loadConfigWithOpts go
-    runStackLoggingT manager globalLogLevel $ Docker.preventInContainer $
+    runStackLoggingT manager globalLogLevel globalTerminal$ Docker.preventInContainer $
         Docker.rerunCmdWithRequiredContainer (lcConfig lc)
                                              (lcProjectRoot lc)
                                              (return (cmd,args,lcConfig lc))
@@ -530,10 +530,15 @@ dockerCleanupOpts =
 -- | Parser for global command-line options.
 globalOpts :: Parser GlobalOpts
 globalOpts =
-    GlobalOpts
-    <$> logLevelOpt
-    <*> configOptsParser False
-    <*> optional resolverParser
+    GlobalOpts <$> logLevelOpt <*>
+    configOptsParser False <*>
+    optional resolverParser <*>
+    flag
+        True
+        False
+        (long "no-terminal" <>
+         help
+             "Override terminal detection in the case of running in a false terminal")
 
 -- | Parse for a logging level.
 logLevelOpt :: Parser LogLevel
@@ -578,6 +583,7 @@ data GlobalOpts = GlobalOpts
     { globalLogLevel     :: LogLevel -- ^ Log level
     , globalConfigMonoid :: ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalResolver     :: Maybe Resolver -- ^ Resolver override
+    , globalTerminal     :: Bool -- ^ We're in a terminal?
     } deriving (Show)
 
 -- | Load the configuration with a manager. Convenience function used
@@ -588,6 +594,7 @@ loadConfigWithOpts GlobalOpts{..} = do
     lc <- runStackLoggingT
               manager
               globalLogLevel
+              globalTerminal
               (loadConfig globalConfigMonoid)
     return (manager,lc)
 
@@ -595,7 +602,7 @@ loadConfigWithOpts GlobalOpts{..} = do
 initCmd :: InitOpts -> GlobalOpts -> IO ()
 initCmd initOpts go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
-  runStackLoggingT manager globalLogLevel $
+  runStackLoggingT manager globalLogLevel globalTerminal $
         Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $
-            runStackT manager globalLogLevel (lcConfig lc) $
+            runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
                 initProject globalResolver initOpts

@@ -81,10 +81,14 @@ instance (MonadIO m) => MonadLogger (StackT config m) where
 
 -- | Run a Stack action.
 runStackT :: (MonadIO m,MonadBaseControl IO m)
-          => Manager -> LogLevel -> config -> StackT config m a -> m a
-runStackT manager logLevel config m =
-     withSticky (\sticky -> runReaderT (unStackT m)
-                                       (Env config logLevel manager sticky))
+          => Manager -> LogLevel -> config -> Bool -> StackT config m a -> m a
+runStackT manager logLevel config terminal m =
+    withSticky
+        terminal
+        (\sticky ->
+              runReaderT
+                  (unStackT m)
+                  (Env config logLevel terminal manager sticky))
 
 --------------------------------------------------------------------------------
 -- Logging only StackLoggingT monad transformer
@@ -122,11 +126,14 @@ instance HasHttpManager (LogLevel,Manager,Sticky) where
 
 -- | Run the logging monad.
 runStackLoggingT :: MonadIO m
-                 => Manager -> LogLevel -> StackLoggingT m a -> m a
-runStackLoggingT manager logLevel m =
-     withSticky (\sticky ->
-                     runReaderT (unStackLoggingT m)
-                                (logLevel,manager,sticky))
+                 => Manager -> LogLevel -> Bool -> StackLoggingT m a -> m a
+runStackLoggingT manager logLevel terminal m =
+    withSticky
+        terminal
+        (\sticky ->
+              runReaderT
+                  (unStackLoggingT m)
+                  (logLevel, manager, sticky))
 
 -- | Convenience for getting a 'Manager'
 newTLSManager :: MonadIO m => m Manager
@@ -237,10 +244,9 @@ loggerFunc loc _src level msg =
                         char = show . snd . loc_start
 
 -- | With a sticky state, do the thing.
-withSticky :: MonadIO m
-           => (Sticky -> m b) -> m b
-withSticky m = do
-    terminal <- liftIO (hIsTerminalDevice stdout)
+withSticky :: (MonadIO m)
+           => Bool -> (Sticky -> m b) -> m b
+withSticky terminal m = do
     if terminal
        then do state <- liftIO (newMVar Nothing)
                originalMode <- liftIO (hGetBuffering stdout)

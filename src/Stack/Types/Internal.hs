@@ -12,6 +12,7 @@ import Stack.Types.Config
 data Env config =
   Env {envConfig :: !config
       ,envLogLevel :: !LogLevel
+      ,envTerminal :: !Bool
       ,envManager :: !Manager
       ,envSticky :: !Sticky}
 
@@ -37,6 +38,12 @@ instance HasLogLevel (Env config) where
 
 instance HasLogLevel LogLevel where
   getLogLevel = id
+
+class HasTerminal r where
+  getTerminal :: r -> Bool
+
+instance HasTerminal (Env config) where
+  getTerminal = envTerminal
 
 newtype Sticky = Sticky
     { unSticky :: Maybe (MVar (Maybe Text))
