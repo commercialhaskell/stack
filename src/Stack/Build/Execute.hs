@@ -70,7 +70,7 @@ import           System.Process.Internals       (createProcess_)
 import           System.Process.Read
 import           System.Process.Log (showProcessArgDebug)
 
-type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env)
+type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
 
 preFetch :: M env m => Plan -> m ()
 preFetch plan
@@ -312,13 +312,15 @@ executePlan' plan ee = do
             (planTasks plan)
             (planFinals plan)
     threads <- asks $ configJobs . getConfig
+    terminal <- asks getTerminal
     errs <- liftIO $ runActions threads actions $ \doneVar -> do
         let total = length actions
             loop prev
                 | prev == total =
                     runInBase $ $logStickyDone ("Completed all " <> T.pack (show total) <> " actions.")
                 | otherwise = do
-                    runInBase $ $logSticky ("Progress: " <> T.pack (show prev) <> "/" <> T.pack (show total))
+                    when terminal $ runInBase $
+                        $logSticky ("Progress: " <> T.pack (show prev) <> "/" <> T.pack (show total))
                     done <- atomically $ do
                         done <- readTVar doneVar
                         check $ done /= prev

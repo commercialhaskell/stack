@@ -47,7 +47,7 @@ import           System.Posix.Files (createSymbolicLink,removeLink)
 #endif
 --}
 
-type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env)
+type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
 
 -- | Build
 build :: M env m => BuildOpts -> m ()
