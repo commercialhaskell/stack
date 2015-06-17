@@ -21,6 +21,7 @@ module Stack.Package
   ,getCabalFileName
   ,Package(..)
   ,GetPackageFiles(..)
+  ,GetPackageOpts(..)
   ,PackageConfig(..)
   ,buildLogPath
   ,PackageException (..)
@@ -54,13 +55,14 @@ import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 import           Distribution.Compiler
 import           Distribution.InstalledPackageInfo (PError)
-import qualified Distribution.ModuleName as Cabal
 import           Distribution.ModuleName (ModuleName)
+import qualified Distribution.ModuleName as Cabal
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
 import           Distribution.PackageDescription hiding (FlagName)
 import           Distribution.PackageDescription.Parse
 import           Distribution.Simple.Utils
 import           Distribution.System (OS, Arch, Platform (..))
+import           Distribution.Text (display)
 import           Distribution.Version (intersectVersionRanges)
 import           Path as FL
 import           Path.Find
@@ -118,9 +120,19 @@ data Package =
           ,packageTests :: !(Set Text)                    -- ^ names of test suites
           ,packageBenchmarks :: !(Set Text)               -- ^ names of benchmarks
           ,packageExes :: !(Set Text)                     -- ^ names of executables
-          ,packageSourceDirs :: ![Path Rel Dir]           -- ^ Directories specified in the file.
+          ,packageOpts :: !GetPackageOpts              -- ^ Args to pass to GHC.
           }
  deriving (Show,Typeable)
+
+-- | Files that the package depends on, relative to package directory.
+-- Argument is the location of the .cabal file
+newtype GetPackageOpts = GetPackageOpts
+    { getPackageOpts :: forall env m. (MonadIO m,HasEnvConfig env, HasPlatform env, MonadThrow m, MonadReader env m)
+                     => Path Abs File
+                     -> m [String]
+    }
+instance Show GetPackageOpts where
+    show _ = "<GetPackageOpts>"
 
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the .cabal file
@@ -229,7 +241,8 @@ resolvePackage packageConfig gpkg = Package
     , packageTests = S.fromList $ [ T.pack (testName t) | t <- testSuites pkg, buildable (testBuildInfo t)]
     , packageBenchmarks = S.fromList $ [ T.pack (benchmarkName b) | b <- benchmarks pkg, buildable (benchmarkBuildInfo b)]
     , packageExes = S.fromList $ [ T.pack (exeName b) | b <- executables pkg, buildable (buildInfo b)]
-    , packageSourceDirs = allHsSourceDirs pkg
+    , packageOpts = GetPackageOpts $ \cabalfp ->
+        generatePkgDescOpts cabalfp pkg
     }
 
   where
@@ -238,19 +251,65 @@ resolvePackage packageConfig gpkg = Package
     pkg = resolvePackageDescription packageConfig gpkg
     deps = M.filterWithKey (const . (/= name)) (packageDependencies pkg)
 
--- | Get the source directories.
-allHsSourceDirs :: PackageDescription -> [Path Rel Dir]
-allHsSourceDirs pkg =
-    nub
-        (concatMap
-             (concatMap parseRelDir . concatMap hsSourceDirs)
-             [ maybe
-                   []
-                   (return . libBuildInfo)
-                   (library pkg)
-             , map buildInfo (executables pkg)
-             , map benchmarkBuildInfo (benchmarks pkg)
-             , map testBuildInfo (testSuites pkg)])
+-- | Generate GHC options for the package.
+generatePkgDescOpts :: (HasEnvConfig env, HasPlatform env, MonadThrow m, MonadReader env m, MonadIO m)
+                    => Path Abs File -> PackageDescription -> m [String]
+generatePkgDescOpts cabalfp pkg =
+    do distDir <- distDirFromDir cabalDir
+       let cabalmacros = autogenDir distDir </> $(mkRelFile "cabal_macros.h")
+       exists <- fileExists cabalmacros
+       let mcabalmacros =
+               if exists
+                  then Just cabalmacros
+                  else Nothing
+       return (nub
+                   (concatMap
+                        (concatMap (generateBuildInfoOpts mcabalmacros cabalDir distDir))
+                        [ maybe
+                              []
+                              (return . libBuildInfo)
+                              (library pkg)
+                        , map buildInfo (executables pkg)
+                        , map benchmarkBuildInfo (benchmarks pkg)
+                        , map testBuildInfo (testSuites pkg)]))
+  where cabalDir =
+            parent cabalfp
+
+-- | Generate GHC options for the target.
+generateBuildInfoOpts :: Maybe (Path Abs File) -> Path Abs Dir -> Path Abs Dir -> BuildInfo -> [String]
+generateBuildInfoOpts mcabalmacros cabalDir distDir b =
+    nub (concat [ghcOpts b, extOpts b, srcOpts, macros])
+  where
+    macros =
+        case mcabalmacros of
+            Nothing ->
+                []
+            Just cabalmacros ->
+                ["-optP-include", "-optP" <> toFilePath cabalmacros]
+    ghcOpts =
+        concatMap snd .
+        filter (isGhc . fst) .
+        options
+      where
+        isGhc GHC =
+            True
+        isGhc _ =
+            False
+    extOpts =
+        map (("-X" ++) . display) .
+        allExtensions
+    srcOpts =
+        map
+            (("-i" <>) . toFilePath)
+            (cabalDir :
+             map (cabalDir </>) (mapMaybe parseRelDir (hsSourceDirs b)) <>
+             [autogenDir distDir])
+
+-- | Make the autogen dir.
+autogenDir :: Path Abs Dir -> Path Abs Dir
+autogenDir distDir =
+        distDir </>
+        $(mkRelDir "build/autogen")
 
 -- | Get all dependencies of the package (buildable targets only).
 packageDependencies :: PackageDescription -> Map PackageName VersionRange

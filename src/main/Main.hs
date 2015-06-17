@@ -21,6 +21,7 @@ import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid
+import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Network.HTTP.Client
@@ -44,6 +45,7 @@ import           Stack.Init
 import           Stack.New
 import qualified Stack.PackageIndex
 import           Stack.Path
+import           Stack.Repl
 import           Stack.Setup
 import           Stack.Types
 import           Stack.Types.StackT
@@ -129,11 +131,16 @@ main =
                             <$> pure "ghc"
                             <*> many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)")))
              addCommand "ghci"
-                        "Run ghci"
-                        execCmd
-                        ((,)
-                            <$> pure "ghci"
-                            <*> many (strArgument (metavar "-- ARGS (e.g. stack ghci -- -i<dir>)")))
+                        "Run ghci in the context of project(s)"
+                        replCmd
+                        ((,) <$>
+                         fmap (map T.pack)
+                              (many (strArgument
+                                       (metavar "TARGET" <>
+                                        help "If none specified, use all packages defined in current directory"))) <*>
+                         many (strOption (long "ghc-options" <>
+                                          metavar "OPTION" <>
+                                          help "Additional options passed to GHCi")))
              addCommand "runghc"
                         "Run runghc"
                         execCmd
@@ -381,6 +388,10 @@ execCmd (cmd,args) go@GlobalOpts{..} =
     withBuildConfig go ExecStrategy $
     exec cmd args
 
+-- | Run the REPL in the context of a project, with
+replCmd :: ([Text], [String]) -> GlobalOpts -> IO ()
+replCmd (targets,args) go@GlobalOpts{..} = withBuildConfig go CreateConfig $ do
+      repl targets args
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
