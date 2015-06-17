@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 import           Control.Applicative
 import           Control.Arrow
@@ -113,14 +114,15 @@ copyStackRoot src dst =
         Just suffix <- return $ stripPrefix src srcfp
         let dstfp = dst ++ "/" ++ suffix
         createDirectoryIfMissing True $ takeDirectory dstfp
-        createSymbolicLink srcfp dstfp
+        createSymbolicLink srcfp dstfp `catch` \(_ :: IOException) ->
+            copyFile srcfp dstfp -- for Windows
       where
         toCopy = any (`isSuffixOf` srcfp)
             -- FIXME command line parameters to control how many of these get
             -- copied, trade-off of runtime/bandwidth vs isolation of tests
             [ ".tar"
             , ".xz"
-            , ".gz"
+            -- , ".gz"
             , ".7z.exe"
             , "00-index.cache"
             ]
