@@ -59,7 +59,7 @@ repl targets opts = do
                         return (Just (packageName pkg, pkgOpts))
                     else return Nothing
     $logInfo
-        ("Configuring GHCi with the following projects: " <>
+        ("Configuring GHCi with the following packages: " <>
          T.intercalate
              ", "
              (map packageNameText (map fst pkgOpts)))
