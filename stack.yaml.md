@@ -163,3 +163,13 @@ Set the architecture and operating system for GHC, build directories, etc. Value
 
 You likely only ever want to change the arch value. This can also be set via the command line.
 
+### extra-include-dirs/extra-lib-dirs
+
+A list of extra paths to be searched for header files and libraries, respectively. Paths should be absolute
+
+```yaml
+extra-include-dirs:
+- /opt/foo/include
+extra-lib-dirs:
+- /opt/foo/lib
+```
