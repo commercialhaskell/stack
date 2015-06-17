@@ -1,0 +1,3 @@
+packages:
+- '.'
+resolver: lts-2.9
