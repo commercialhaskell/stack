@@ -341,8 +341,9 @@ cleanup config opts =
                         | otherwise -> throwM (InvalidCleanupCommandException line)
              e <- try (readDockerProcess envOverride args)
              case e of
-               Left (ProcessExitedUnsuccessfully _ _) ->
+               Left (ReadProcessException _ _ _ _) ->
                  $logError (concatT ["Could not remove: '",v,"'"])
+               Left e' -> throwM e'
                Right _ -> return ()
         _ -> throwM (InvalidCleanupCommandException line)
     parseImagesOut = Map.fromListWith (++) . map parseImageRepo . drop 1 . lines . decodeUtf8
@@ -521,7 +522,8 @@ inspects envOverride images =
          case eitherDecode (LBS.pack (filter isAscii (decodeUtf8 inspectOut))) of
            Left msg -> throwM (InvalidInspectOutputException msg)
            Right results -> return (Map.fromList (map (\r -> (iiId r,r)) results))
-       Left (ProcessExitedUnsuccessfully _ _) -> return Map.empty
+       Left (ReadProcessException _ _ _ _) -> return Map.empty
+       Left e -> throwM e
 
 -- | Pull latest version of configured Docker image from registry.
 pull :: (MonadLogger m, MonadIO m, MonadThrow m, MonadBaseControl IO m, MonadCatch m)
@@ -617,7 +619,7 @@ removeDirectoryContents path excludeDirs excludeFiles =
                                   (removeFile (toFilePath f))))
 
 -- | Produce a strict 'S.ByteString' from the stdout of a
--- process. Throws a 'ProcessExitedUnsuccessfully' exception if the
+-- process. Throws a 'ReadProcessException' exception if the
 -- process fails.  Logs process's stderr using @$logError@.
 readDockerProcess
     :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
