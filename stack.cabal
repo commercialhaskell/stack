@@ -22,11 +22,6 @@ homepage:            https://github.com/commercialhaskell/stack
                      test/package-dump/ghc-7.8.txt
                      test/package-dump/ghc-7.10.txt
 
-flag integration-tests
-  manual: True
-  default: False
-  description: Build the integration test executable
-
 library
   hs-source-dirs:    src/
   ghc-options:       -Wall
@@ -176,21 +171,6 @@ executable stack
                 , transformers
                 , http-client
   default-language:    Haskell2010
-
-executable stack-integration-tests
-  hs-source-dirs: src/test
-  main-is:        IntegrationTests.hs
-  ghc-options:    -Wall
-  build-depends:  base >= 4.7 && <5
-                , hspec
-                , process
-                , temporary
-                , directory
-  default-language:    Haskell2010
-  if flag(integration-tests)
-    buildable: True
-  else
-    buildable: False
 
 test-suite stack-test
   type:           exitcode-stdio-1.0
