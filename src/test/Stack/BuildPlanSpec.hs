@@ -39,8 +39,8 @@ main = hspec spec
 spec :: Spec
 spec = beforeAll setup $ afterAll teardown $ do
     let logLevel = LevelDebug
-    let loadConfig' m = runStackLoggingT m logLevel (loadConfig mempty)
-    let loadBuildConfigRest m = runStackLoggingT m logLevel
+    let loadConfig' m = runStackLoggingT m logLevel False (loadConfig mempty)
+    let loadBuildConfigRest m = runStackLoggingT m logLevel False
     let inTempDir action = do
             currentDirectory <- getCurrentDirectory
             withSystemTempDirectory "Stack_BuildPlanSpec" $ \tempDir -> do
@@ -54,7 +54,7 @@ spec = beforeAll setup $ afterAll teardown $ do
         writeFile "stack.yaml" "resolver: lts-2.9"
         LoadConfig{..} <- loadConfig' manager
         bconfig <- loadBuildConfigRest manager (lcLoadBuildConfig Nothing ThrowException)
-        runStackT manager logLevel bconfig $ do
+        runStackT manager logLevel bconfig False $ do
             menv <- getMinimalEnvOverride
             mbp <- loadMiniBuildPlan $ LTS 2 9
             eres <- try $ resolveBuildPlan
