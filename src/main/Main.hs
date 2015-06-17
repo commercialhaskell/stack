@@ -390,7 +390,7 @@ execCmd (cmd,args) go@GlobalOpts{..} =
 
 -- | Run the REPL in the context of a project, with
 replCmd :: ([Text], [String]) -> GlobalOpts -> IO ()
-replCmd (targets,args) go@GlobalOpts{..} = withBuildConfig go CreateConfig $ do
+replCmd (targets,args) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $ do
       repl targets args
 
 -- | Pull the current Docker image.
