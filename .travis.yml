@@ -43,6 +43,7 @@ script:
  - cd test/integration
  - stack setup
  - stack test
+ - cd ../..
 
 # Check that the resulting source distribution can be built & installed.
 # If there are no other `.tar.gz` files in `dist`, this can be even simpler:
