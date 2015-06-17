@@ -190,6 +190,7 @@ addFinal lp = do
                 , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
                     let allDeps = Set.union present missing'
                      in configureOpts
+                            (getConfig ctx)
                             (baseConfigOpts ctx)
                             allDeps
                             True -- wanted
@@ -279,6 +280,7 @@ installPackage name ps = do
                 , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
                     let allDeps = Set.union present missing'
                      in configureOpts
+                            (getConfig ctx)
                             (baseConfigOpts ctx)
                             allDeps
                             (psWanted ps)
@@ -342,6 +344,7 @@ checkDirtiness :: PackageSource
 checkDirtiness ps installed package present = do
     ctx <- ask
     let configOpts = configureOpts
+            (getConfig ctx)
             (baseConfigOpts ctx)
             present
             (psWanted ps)

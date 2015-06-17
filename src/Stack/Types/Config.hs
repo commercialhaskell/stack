@@ -22,6 +22,8 @@ import qualified Data.ByteString.Char8 as S8
 import           Data.Hashable (Hashable)
 import           Data.Map (Map)
 import qualified Data.Map as Map
+import           Data.Set (Set)
+import qualified Data.Set as Set
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -87,6 +89,10 @@ data Config =
          -- ^ Require a version of stack within this range.
          ,configJobs                :: !Int
          -- ^ How many concurrent jobs to run, defaults to number of capabilities
+         ,configExtraIncludeDirs    :: !(Set Text)
+         -- ^ --extra-include-dirs arguments
+         ,configExtraLibDirs        :: !(Set Text)
+         -- ^ --extra-lib-dirs arguments
          }
 
 -- | Information on a single package index
@@ -388,6 +394,10 @@ data ConfigMonoid =
     -- ^ Used for overriding the platform
     ,configMonoidJobs                :: !(Maybe Int)
     -- ^ See: 'configJobs'
+    ,configMonoidExtraIncludeDirs    :: !(Set Text)
+    -- ^ See: 'configExtraIncludeDirs'
+    ,configMonoidExtraLibDirs        :: !(Set Text)
+    -- ^ See: 'configExtraLibDirs'
     }
   deriving Show
 
@@ -404,6 +414,8 @@ instance Monoid ConfigMonoid where
     , configMonoidOS = Nothing
     , configMonoidArch = Nothing
     , configMonoidJobs = Nothing
+    , configMonoidExtraIncludeDirs = Set.empty
+    , configMonoidExtraLibDirs = Set.empty
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -411,13 +423,14 @@ instance Monoid ConfigMonoid where
     , configMonoidHideTHLoading = configMonoidHideTHLoading l <|> configMonoidHideTHLoading r
     , configMonoidLatestSnapshotUrl = configMonoidLatestSnapshotUrl l <|> configMonoidLatestSnapshotUrl r
     , configMonoidPackageIndices = configMonoidPackageIndices l <|> configMonoidPackageIndices r
-    , configMonoidSystemGHC = configMonoidSystemGHC l <|> configMonoidSystemGHC r
-    , configMonoidInstallGHC = configMonoidInstallGHC l <|> configMonoidInstallGHC r
+    , configMonoidSystemGHC = configMonoidSystemGHC l <|> configMonoidSystemGHC r , configMonoidInstallGHC = configMonoidInstallGHC l <|> configMonoidInstallGHC r
     , configMonoidRequireStackVersion = intersectVersionRanges (configMonoidRequireStackVersion l)
                                                                (configMonoidRequireStackVersion r)
     , configMonoidOS = configMonoidOS l <|> configMonoidOS r
     , configMonoidArch = configMonoidArch l <|> configMonoidArch r
     , configMonoidJobs = configMonoidJobs l <|> configMonoidJobs r
+    , configMonoidExtraIncludeDirs = Set.union (configMonoidExtraIncludeDirs l) (configMonoidExtraIncludeDirs r)
+    , configMonoidExtraLibDirs = Set.union (configMonoidExtraLibDirs l) (configMonoidExtraLibDirs r)
     }
 
 instance FromJSON ConfigMonoid where
@@ -437,6 +450,8 @@ instance FromJSON ConfigMonoid where
          configMonoidOS <- obj .:? "os"
          configMonoidArch <- obj .:? "arch"
          configMonoidJobs <- obj .:? "jobs"
+         configMonoidExtraIncludeDirs <- obj .:? "extra-include-dirs" .!= Set.empty
+         configMonoidExtraLibDirs <- obj .:? "extra-lib-dirs" .!= Set.empty
          return ConfigMonoid {..}
 
 -- | Newtype for non-orphan FromJSON instance.

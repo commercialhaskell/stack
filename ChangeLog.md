@@ -4,6 +4,8 @@
 * `upload` command ported from stackage-upload [#225](https://github.com/commercialhaskell/stack/issues/225)
 * `--only-snapshot` [#310](https://github.com/commercialhaskell/stack/issues/310)
 * `--resolver` [#224](https://github.com/commercialhaskell/stack/issues/224)
+* `stack init` [#253](https://github.com/commercialhaskell/stack/issues/253)
+* `--extra-include-dirs` and `--extra-lib-dirs` [#333](https://github.com/commercialhaskell/stack/issues/333)
 
 ## 0.0.2
 

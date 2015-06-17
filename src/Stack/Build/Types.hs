@@ -378,13 +378,14 @@ data BaseConfigOpts = BaseConfigOpts
     }
 
 -- | Render a @BaseConfigOpts@ to an actual list of options
-configureOpts :: BaseConfigOpts
+configureOpts :: Config
+              -> BaseConfigOpts
               -> Set GhcPkgId -- ^ dependencies
               -> Bool -- ^ wanted?
               -> Location
               -> Map FlagName Bool
               -> [Text]
-configureOpts bco deps wanted loc flags = map T.pack $ concat
+configureOpts config bco deps wanted loc flags = map T.pack $ concat
     [ ["--user", "--package-db=clear", "--package-db=global"]
     , map (("--package-db=" ++) . toFilePath) $ case loc of
         Snap -> [bcoSnapDB bco]
@@ -408,6 +409,8 @@ configureOpts bco deps wanted loc flags = map T.pack $ concat
     , if wanted
         then concatMap (\x -> ["--ghc-options", T.unpack x]) (boptsGhcOptions bopts)
         else []
+    , map (("--extra-include-dirs=" ++) . T.unpack) (Set.toList (configExtraIncludeDirs config))
+    , map (("--extra-lib-dirs=" ++) . T.unpack) (Set.toList (configExtraLibDirs config))
     ]
   where
     bopts = bcoBuildOpts bco

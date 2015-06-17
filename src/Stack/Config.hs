@@ -156,6 +156,9 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
          configSystemGHC = fromMaybe True configMonoidSystemGHC
          configInstallGHC = fromMaybe False configMonoidInstallGHC
 
+         configExtraIncludeDirs = configMonoidExtraIncludeDirs
+         configExtraLibDirs = configMonoidExtraLibDirs
+
          -- Only place in the codebase where platform is hard-coded. In theory
          -- in the future, allow it to be configured.
          (Platform defArch defOS) = buildPlatform
@@ -193,13 +196,15 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser docker =
-    (\opts systemGHC installGHC arch os jobs -> mempty
+    (\opts systemGHC installGHC arch os jobs includes libs -> mempty
         { configMonoidDockerOpts = opts
         , configMonoidSystemGHC = systemGHC
         , configMonoidInstallGHC = installGHC
         , configMonoidArch = arch
         , configMonoidOS = os
         , configMonoidJobs = jobs
+        , configMonoidExtraIncludeDirs = includes
+        , configMonoidExtraLibDirs = libs
         })
     <$> Docker.dockerOptsParser docker
     <*> maybeBoolFlags
@@ -225,6 +230,16 @@ configOptsParser docker =
            <> short 'j'
            <> metavar "JOBS"
            <> help "Number of concurrent jobs to run"
+            ))
+    <*> fmap (S.fromList . map T.pack) (many $ strOption
+            ( long "extra-include-dirs"
+           <> metavar "DIR"
+           <> help "Extra directories to check for C header files"
+            ))
+    <*> fmap (S.fromList . map T.pack) (many $ strOption
+            ( long "extra-lib-dirs"
+           <> metavar "DIR"
+           <> help "Extra directories to check for libraries"
             ))
 
 -- | Get the directory on Windows where we should install extra programs. For
