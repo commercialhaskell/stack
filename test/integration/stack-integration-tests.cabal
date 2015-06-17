@@ -11,7 +11,15 @@ build-type:          Simple
 cabal-version:       >=1.10
 homepage:            https://github.com/commercialhaskell/stack
 
-executable stack-integration-tests
+-- This is only present because cabal won't allow a test suite without a
+-- library or executable
+executable stack-integration-dummy
+  main-is:        Dummy.hs
+  build-depends:  base
+  default-language:    Haskell2010
+
+test-suite stack-integration-tests
+  type:           exitcode-stdio-1.0
   main-is:        Spec.hs
 
   build-depends:  base >= 4.7 && < 10

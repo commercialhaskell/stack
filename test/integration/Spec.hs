@@ -68,6 +68,7 @@ test :: FilePath -- ^ runghc
      -> String
      -> Spec
 test runghc env' currDir origStackRoot newHome name = it name $ withDir $ \dir -> do
+    removeDirectoryRecursive newHome
     copyStackRoot origStackRoot (newHome </> takeFileName origStackRoot)
     let testDir = currDir </> "tests" </> name
         mainFile = testDir </> "Main.hs"

@@ -9,3 +9,4 @@ main = do
     stackErr ["command-does-not-exist"]
     stackErr ["unpack", "invalid-package-name-"]
     stackErr ["build"]
+    doesNotExist "stack.yaml"

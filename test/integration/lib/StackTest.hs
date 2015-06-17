@@ -29,3 +29,15 @@ stackErr args = do
     if ec == ExitSuccess
         then error "stack was supposed to fail, but didn't"
         else return ()
+
+doesNotExist :: FilePath -> IO ()
+doesNotExist fp = do
+    putStrLn $ "doesNotExist " ++ fp
+    isFile <- doesFileExist fp
+    if isFile
+        then error $ "File exists: " ++ fp
+        else do
+            isDir <- doesDirectoryExist fp
+            if isDir
+                then error $ "Directory exists: " ++ fp
+                else return ()
