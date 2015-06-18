@@ -27,17 +27,20 @@ Downloads are available by operating system:
 
 #### How to use
 
-Go into a Haskell project directory and run `stack build`. This will
-do the following:
+Go into a Haskell project directory and run `stack build`. If everything is
+already configured, this will:
 
-* Automatically create a stack configuration file in the current
-  directory.
-* Figure out what Stackage release (LTS or nightly) is appropriate
-  for the dependencies.
-* Download and install GHC.
 * Download the package index.
 * Download and install all necessary dependencies for the project.
 * Build and install the project.
+
+You may be prompted to run some of the following along the way:
+
+* `stack new` to create a brand new project.
+* `stack init` to create a stack configuration file for an existing project.
+  stack will figure out what Stackage release (LTS or nightly) is appropriate
+  for the dependencies.
+* `stack setup` to download and install the correct GHC version.
 
 Run `stack` for a complete list of commands.
 
