@@ -43,6 +43,7 @@ library
                      Stack.Path
                      Stack.Repl
                      Stack.Setup
+                     Stack.Solver
                      Stack.Types
                      Stack.Types.Internal
                      Stack.Types.BuildPlan

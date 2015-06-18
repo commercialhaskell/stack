@@ -11,10 +11,9 @@ module Stack.Init
     ) where
 
 import           Control.Exception               (assert)
-import           Control.Exception.Enclosed      (handleIO)
+import           Control.Exception.Enclosed      (handleIO, tryAny, catchAny)
 import           Control.Monad                   (liftM, when)
-import           Control.Monad.Catch             (MonadCatch, SomeException,
-                                                  catch, throwM)
+import           Control.Monad.Catch             (MonadMask, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader            (MonadReader)
@@ -40,6 +39,7 @@ import           Path.IO
 import           Stack.BuildPlan
 import           Stack.Constants
 import           Stack.Package
+import           Stack.Solver
 import           Stack.Types
 import           System.Directory                (getDirectoryContents)
 
@@ -60,7 +60,7 @@ ignoredDirs = Set.fromList
     ]
 
 -- | Generate stack.yaml
-initProject :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
+initProject :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
             => Maybe Resolver -- ^ force this resolver to be used
             -> InitOpts
             -> m ()
@@ -80,10 +80,10 @@ initProject mresolver initOpts = do
     when (null cabalfps) $ error "In order to init, you should have an existing .cabal file. Please try \"stack new\" instead"
     gpds <- mapM readPackageUnresolved cabalfps
 
-    (r, flags) <- getDefaultResolver gpds mresolver initOpts
+    (r, flags, extraDeps) <- getDefaultResolver cabalfps gpds mresolver initOpts
     let p = Project
             { projectPackages = pkgs
-            , projectExtraDeps = Map.empty
+            , projectExtraDeps = extraDeps
             , projectFlags = flags
             , projectResolver = r
             }
@@ -102,10 +102,10 @@ initProject mresolver initOpts = do
     liftIO $ Yaml.encodeFile dest' p
     $logInfo $ "Wrote project config to: " <> T.pack dest'
 
-getSnapshots' :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
-              => m Snapshots
+getSnapshots' :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
+              => m (Maybe Snapshots)
 getSnapshots' =
-    getSnapshots `catch` \e -> do
+    liftM Just getSnapshots `catchAny` \e -> do
         $logError $
             "Unable to download snapshot list, and therefore could " <>
             "not generate a stack.yaml file automatically"
@@ -119,20 +119,25 @@ getSnapshots' =
         $logError ""
         $logError "    https://github.com/commercialhaskell/stack/wiki/stack.yaml"
         $logError ""
-        throwM (e :: SomeException)
+        $logError $ "Exception was: " <> T.pack (show e)
+        return Nothing
 
 -- | Get the default resolver value
-getDefaultResolver :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
-                   => [C.GenericPackageDescription] -- ^ cabal files
+getDefaultResolver :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
+                   => [Path Abs File] -- ^ cabal files
+                   -> [C.GenericPackageDescription] -- ^ cabal descriptions
                    -> Maybe Resolver -- ^ resolver override
                    -> InitOpts
-                   -> m (Resolver, Map PackageName (Map FlagName Bool))
-getDefaultResolver gpds mresolver initOpts = do
+                   -> m (Resolver, Map PackageName (Map FlagName Bool), Map PackageName Version)
+getDefaultResolver cabalfps gpds mresolver initOpts = do
     names <-
         case mresolver of
+            Nothing | ioUseSolver initOpts -> return []
             Nothing -> do
-                snapshots <- getSnapshots'
-                getRecommendedSnapshots snapshots initOpts
+                msnapshots <- getSnapshots'
+                case msnapshots of
+                    Nothing -> return []
+                    Just snapshots -> getRecommendedSnapshots snapshots initOpts
             Just resolver ->
                 return $
                     case resolver of
@@ -141,16 +146,27 @@ getDefaultResolver gpds mresolver initOpts = do
     mpair <- findBuildPlan gpds names
     case mpair of
         Just (snap, flags) ->
-            return (ResolverSnapshot snap, flags)
+            return (ResolverSnapshot snap, flags, Map.empty)
         Nothing ->
             case mresolver of
                 Nothing ->
                     case ioFallback initOpts of
-                        Nothing -> throwM $ NoMatchingSnapshot names
-                        Just resolver -> return (resolver, Map.empty)
-                Just resolver -> return (resolver, Map.empty)
+                        Nothing -> do
+                            eres <- tryAny $ cabalSolver cabalfps
+                            case eres of
+                                Left e -> do
+                                    $logInfo $ T.pack $ "Using cabal solver failed: " ++ show e
+                                    throwM $ NoMatchingSnapshot names
+                                Right (ghcVersion, extraDeps) -> do
+                                    return
+                                        ( ResolverGhc ghcVersion
+                                        , Map.filter (not . Map.null) $ fmap snd extraDeps
+                                        , fmap fst extraDeps
+                                        )
+                        Just resolver -> return (resolver, Map.empty, Map.empty)
+                Just resolver -> return (resolver, Map.empty, Map.empty)
 
-getRecommendedSnapshots :: (MonadIO m, MonadCatch m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
+getRecommendedSnapshots :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
                         => Snapshots
                         -> InitOpts
                         -> m [SnapName]
@@ -188,6 +204,8 @@ data InitOpts = InitOpts
     { ioPref     :: !SnapPref
     -- ^ Preferred snapshots
     , ioFallback :: !(Maybe Resolver)
+    , ioUseSolver :: !Bool
+    -- ^ Force usage of a dependency solver instead of snapshots
     }
 
 data SnapPref = PrefNone | PrefLTS | PrefNightly
@@ -196,6 +214,9 @@ initOptsParser :: Parser InitOpts
 initOptsParser = InitOpts
     <$> pref
     <*> optional fallback
+    <*> flag False True
+            (long "use-solver" <>
+             help "Force usage of a dependency solver")
   where
     pref =
         flag' PrefLTS
