@@ -78,18 +78,6 @@ import           System.IO                             (IOMode (ReadMode, WriteM
                                                         withBinaryFile)
 import           System.Process.Read (readInNull, EnvOverride, doesExecutableExist)
 
--- | A cabal file with name and version parsed from the filepath, and the
--- package description itself ready to be parsed. It's left in unparsed form
--- for efficiency.
-data UnparsedCabalFile = UnparsedCabalFile
-    { ucfName    :: PackageName
-    , ucfVersion :: Version
-    , ucfOffset  :: !Int64
-    -- ^ Byte offset into the 00-index.tar file for the entry contents
-    , ucfSize    :: !Int64
-    -- ^ Size of the entry contents, in bytes
-    }
-
 data PackageCache = PackageCache
     { pcOffset :: !Int64
     -- ^ offset in bytes into the 00-index.tar file for the .cabal file contents
@@ -105,7 +93,7 @@ withSourcePackageIndex
     :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
     => EnvOverride
     -> PackageIndex
-    -> (Producer m (Either UnparsedCabalFile (PackageIdentifier, L.ByteString)) -> m a)
+    -> (Producer m (PackageIdentifier, Either PackageCache L.ByteString) -> m a)
     -> m a
 withSourcePackageIndex menv index cont = do
     requireIndex menv index
@@ -124,21 +112,19 @@ withSourcePackageIndex menv index cont = do
     loop _ Tar.Done = return ()
     loop _ (Tar.Fail e) = throwM e
 
-    goE blockNo e
-        | Just front <- T.stripSuffix ".cabal" $ T.pack $ Tar.entryPath e
-        , Tar.NormalFile _ size <- Tar.entryContent e = do
-            PackageIdentifier name version <- parseNameVersion front
-            yield $ Left UnparsedCabalFile
-                { ucfName = name
-                , ucfVersion = version
-                , ucfOffset = (blockNo + 1) * 512
-                , ucfSize = size
-                }
-        | Just front <- T.stripSuffix ".json" $ T.pack $ Tar.entryPath e
-        , Tar.NormalFile lbs _size <- Tar.entryContent e = do
-            ident <- parseNameVersion front
-            yield $ Right (ident, lbs)
-        | otherwise = return ()
+    goE blockNo e =
+        case Tar.entryContent e of
+            Tar.NormalFile lbs size ->
+                case parseNameVersion $ T.pack $ Tar.entryPath e of
+                    Just (ident, ".cabal") ->
+                        yield (ident, Left PackageCache
+                            { pcOffset = (blockNo + 1) * 512
+                            , pcSize = size
+                            , pcDownload = Nothing
+                            })
+                    Just (ident, ".json") -> yield (ident, Right lbs)
+                    _ -> return ()
+            _ -> return ()
 
     parseNameVersion t1 = do
         let (p', t2) = T.break (== '/') $ T.replace "\\" "/" t1
@@ -147,8 +133,10 @@ withSourcePackageIndex menv index cont = do
             $ T.stripPrefix "/" t2
         let (v', t4) = T.break (== '/') t3
         v <- parseVersionFromString $ T.unpack v'
-        when (t4 /= T.cons '/' p') $ throwM $ InvalidCabalPath t1 $ "Expected at end: " <> p'
-        return $ PackageIdentifier p v
+        t5 <- T.stripPrefix "/" t4
+        let (t6, suffix) = T.break (== '.') t5
+        when (t6 /= p') $ throwM $ InvalidCabalPath t1 $ "Expected at end: " <> p'
+        return (PackageIdentifier p v, suffix)
 
 data PackageIndexException
   = InvalidCabalPath Text Text
@@ -366,17 +354,13 @@ populateCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, Mon
               -> m (Map PackageIdentifier PackageCache)
 populateCache menv index = do
     $logSticky "Populating index cache ..."
-    let add m (Left ucf) =
+    let add m (ident, Left pcNew) =
             Map.insertWith
-                (\_ pc -> pc { pcOffset = ucfOffset ucf, pcSize = ucfSize ucf })
-                (PackageIdentifier (ucfName ucf) (ucfVersion ucf))
-                PackageCache
-                    { pcOffset = ucfOffset ucf
-                    , pcSize = ucfSize ucf
-                    , pcDownload = Nothing
-                    }
+                (\_ pcOld -> pcNew { pcDownload = pcDownload pcOld })
+                ident
+                pcNew
                 m
-        add m (Right (ident, lbs)) =
+        add m (ident, Right lbs) =
             case decode lbs of
                 Nothing -> m
                 Just pd ->
@@ -389,15 +373,6 @@ populateCache menv index = do
                             , pcDownload = Just pd
                             }
                         m
-                {-
-        toIdent (Right _) = Nothing
-
-        parseDownload m (Left _) = m
-        parseDownload m (Right (ident, lbs)) = do
-            case decode lbs of
-                Nothing -> m
-                Just pd -> HashMap.insert ident pd m
-                -}
 
     withSourcePackageIndex menv index $ \source -> do
         pis <- source $$ CL.fold add Map.empty
