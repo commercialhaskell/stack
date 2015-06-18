@@ -23,7 +23,6 @@ module Stack.PackageIndex
     ) where
 
 import qualified Codec.Archive.Tar as Tar
-import           Control.Applicative
 import           Control.Exception (Exception)
 import           Control.Exception.Enclosed (tryIO)
 import           Control.Monad (unless, when, liftM, mzero)
@@ -39,14 +38,15 @@ import qualified Data.Binary as Binary
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as L
-import           Data.Conduit (($$), (=$), yield, Producer, ZipSink (..))
+import           Data.Conduit (($$), (=$), yield, Producer)
 import           Data.Conduit.Binary                   (sinkHandle,
                                                         sourceHandle)
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Zlib (ungzip)
+import           Data.Foldable (forM_)
 import           Data.Int (Int64)
 import           Data.Map (Map)
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -366,37 +366,50 @@ populateCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, Mon
               -> m (Map PackageIdentifier PackageCache)
 populateCache menv index = do
     $logSticky "Populating index cache ..."
-    let toIdent (Left ucf) = Just
-            ( PackageIdentifier (ucfName ucf) (ucfVersion ucf)
-            , PackageCache
-                { pcOffset = ucfOffset ucf
-                , pcSize = ucfSize ucf
-                , pcDownload = Nothing
-                }
-            )
+    let add m (Left ucf) =
+            Map.insertWith
+                (\_ pc -> pc { pcOffset = ucfOffset ucf, pcSize = ucfSize ucf })
+                (PackageIdentifier (ucfName ucf) (ucfVersion ucf))
+                PackageCache
+                    { pcOffset = ucfOffset ucf
+                    , pcSize = ucfSize ucf
+                    , pcDownload = Nothing
+                    }
+                m
+        add m (Right (ident, lbs)) =
+            case decode lbs of
+                Nothing -> m
+                Just pd ->
+                    Map.insertWith
+                        (\_ pc -> pc { pcDownload = Just pd })
+                        ident
+                        PackageCache
+                            { pcOffset = 0
+                            , pcSize = 0
+                            , pcDownload = Just pd
+                            }
+                        m
+                {-
         toIdent (Right _) = Nothing
 
-        parseDownload (Left _) = Nothing
-        parseDownload (Right (ident, lbs)) = do
+        parseDownload m (Left _) = m
+        parseDownload m (Right (ident, lbs)) = do
             case decode lbs of
-                Nothing -> Nothing
-                Just pd -> Just (ident, pd)
+                Nothing -> m
+                Just pd -> HashMap.insert ident pd m
+                -}
 
     withSourcePackageIndex menv index $ \source -> do
-        (pis, pds) <- source $$ getZipSink ((,)
-            <$> ZipSink (CL.mapMaybe toIdent =$ CL.consume)
-            <*> ZipSink (Map.fromList <$> (CL.mapMaybe parseDownload =$ CL.consume)))
+        pis <- source $$ CL.fold add Map.empty
 
-        pis' <- liftM Map.fromList $ forM pis $ \(ident, pc) ->
-            case Map.lookup ident pds of
-                Just d -> return (ident, pc { pcDownload = Just d })
-                Nothing
-                    | indexRequireHashes index -> throwM $ MissingRequiredHashes (indexName index) ident
-                    | otherwise -> return (ident, pc)
+        when (indexRequireHashes index) $ forM_ (Map.toList pis) $ \(ident, pc) ->
+            case pcDownload pc of
+                Just _ -> return ()
+                Nothing -> throwM $ MissingRequiredHashes (indexName index) ident
 
         $logStickyDone "Populated index cache."
 
-        return pis'
+        return pis
 
 --------------- Lifted from cabal-install, Distribution.Client.Tar:
 -- | Return the number of blocks in an entry.
