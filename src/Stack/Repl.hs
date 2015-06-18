@@ -29,8 +29,9 @@ import           Stack.Types
 repl :: (HasConfig r, HasBuildConfig r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m)
      => [Text] -- ^ Targets.
      -> [String] -- ^ GHC options.
+     -> FilePath
      -> m ()
-repl targets opts = do
+repl targets opts ghciPath = do
     bconfig <- asks getBuildConfig
     pwd <- getWorkingDir
     pkgOpts <-
@@ -64,7 +65,7 @@ repl targets opts = do
              ", "
              (map packageNameText (map fst pkgOpts)))
     exec
-        "ghc"
+        ghciPath
         ("--interactive" :
          filter (not . badForGhci) (concat (map snd pkgOpts)) <>
          opts)

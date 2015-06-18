@@ -133,14 +133,18 @@ main =
              addCommand "ghci"
                         "Run ghci in the context of project(s)"
                         replCmd
-                        ((,) <$>
+                        ((,,) <$>
                          fmap (map T.pack)
                               (many (strArgument
                                        (metavar "TARGET" <>
                                         help "If none specified, use all packages defined in current directory"))) <*>
                          many (strOption (long "ghc-options" <>
                                           metavar "OPTION" <>
-                                          help "Additional options passed to GHCi")))
+                                          help "Additional options passed to GHCi")) <*>
+                         fmap (fromMaybe "ghc")
+                              (optional (strOption (long "with-ghc" <>
+                                                    metavar "GHC" <>
+                                                    help "Use this command for the GHC to run"))))
              addCommand "runghc"
                         "Run runghc"
                         execCmd
@@ -389,9 +393,9 @@ execCmd (cmd,args) go@GlobalOpts{..} =
     exec cmd args
 
 -- | Run the REPL in the context of a project, with
-replCmd :: ([Text], [String]) -> GlobalOpts -> IO ()
-replCmd (targets,args) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $ do
-      repl targets args
+replCmd :: ([Text], [String], FilePath) -> GlobalOpts -> IO ()
+replCmd (targets,args,path) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $ do
+      repl targets args path
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
