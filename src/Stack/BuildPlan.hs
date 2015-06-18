@@ -194,6 +194,8 @@ data ResolveState = ResolveState
 toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadCatch m)
                 => BuildPlan -> m MiniBuildPlan
 toMiniBuildPlan bp = do
+    $logInfo "Caching build plan"
+
     -- Determine the dependencies of all of the packages in the build plan. We
     -- handle core packages specially, because some of them will not be in the
     -- package index. For those, we allow missing packages to exist, and then
