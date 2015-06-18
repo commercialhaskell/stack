@@ -114,7 +114,7 @@ Default: https://www.stackage.org/download/snapshots.json
 
 ```yaml
 package-indices:
-- name: hackage.haskell.org
+- name: Hackage
   download-prefix: https://s3.amazonaws.com/hackage.fpcomplete.com/package/
 
   # at least one of the following must be present
