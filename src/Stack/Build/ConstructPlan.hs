@@ -279,12 +279,15 @@ installPackage name ps = do
                     (packageVersion package)
                 , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
                     let allDeps = Set.union present missing'
+                        destLoc = piiLocation ps <> minLoc
                      in configureOpts
                             (getConfig ctx)
                             (baseConfigOpts ctx)
                             allDeps
                             (psWanted ps)
-                            (piiLocation ps <> minLoc)
+                            -- An assertion to check for a recurrence of
+                            -- https://github.com/commercialhaskell/stack/issues/345
+                            (assert (destLoc == piiLocation ps) destLoc)
                             (packageFlags package)
                 , taskPresent = present
                 , taskType =

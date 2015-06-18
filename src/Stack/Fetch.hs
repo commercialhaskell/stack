@@ -16,6 +16,7 @@ module Stack.Fetch
     , unpackPackageIdents
     , fetchPackages
     , resolvePackages
+    , resolvePackagesAllowMissing
     , ResolvedPackage (..)
     , withCabalFiles
     , withCabalLoader
@@ -188,21 +189,32 @@ resolvePackages menv idents0 names0 = do
         Right x -> return x
   where
     go = do
-        caches <- getPackageCaches menv
-        let versions = Map.fromListWith max $ map toTuple $ Map.keys caches
-            (missing, idents1) = partitionEithers $ map
-                (\name -> maybe (Left name ) (Right . PackageIdentifier name)
-                    (Map.lookup name versions))
-                (Set.toList names0)
-        return $ if null missing
-            then goIdents caches $ idents0 <> Set.fromList idents1
-            else Left $ UnknownPackageNames $ Set.fromList missing
+        (missingNames, missingIdents, idents) <- resolvePackagesAllowMissing menv idents0 names0
+        return $
+            case () of
+                ()
+                    | not $ Set.null missingNames -> Left $ UnknownPackageNames missingNames
+                    | not $ Set.null missingIdents -> Left $ UnknownPackageIdentifiers missingIdents
+                    | otherwise -> Right idents
 
-    goIdents caches idents =
-        case partitionEithers $ map (goIdent caches) $ Set.toList idents of
-            ([], resolved) -> Right $ Map.fromList resolved
-            (missing, _) -> Left $ UnknownPackageIdentifiers $ Set.fromList missing
-
+resolvePackagesAllowMissing
+    :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadLogger m, MonadThrow m, MonadBaseControl IO m, MonadCatch m)
+    => EnvOverride
+    -> Set PackageIdentifier
+    -> Set PackageName
+    -> m (Set PackageName, Set PackageIdentifier, Map PackageIdentifier ResolvedPackage)
+resolvePackagesAllowMissing menv idents0 names0 = do
+    caches <- getPackageCaches menv
+    let versions = Map.fromListWith max $ map toTuple $ Map.keys caches
+        (missingNames, idents1) = partitionEithers $ map
+            (\name -> maybe (Left name ) (Right . PackageIdentifier name)
+                (Map.lookup name versions))
+            (Set.toList names0)
+        (missingIdents, resolved) = partitionEithers $ map (goIdent caches)
+                                  $ Set.toList
+                                  $ idents0 <> Set.fromList idents1
+    return (Set.fromList missingNames, Set.fromList missingIdents, Map.fromList resolved)
+  where
     goIdent caches ident =
         case Map.lookup ident caches of
             Nothing -> Left ident

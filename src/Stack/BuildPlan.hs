@@ -194,36 +194,63 @@ data ResolveState = ResolveState
 toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadCatch m)
                 => BuildPlan -> m MiniBuildPlan
 toMiniBuildPlan bp = do
-    extras <- addDeps ghcVersion $ fmap goPP $ bpPackages bp
-    return MiniBuildPlan
+    -- Determine the dependencies of all of the packages in the build plan. We
+    -- handle core packages specially, because some of them will not be in the
+    -- package index. For those, we allow missing packages to exist, and then
+    -- remove those from the list of dependencies, since there's no way we'll
+    -- ever reinstall them anyway.
+    (cores, missingCores) <- addDeps True ghcVersion
+        $ fmap (, Map.empty) (siCorePackages $ bpSystemInfo bp)
+
+    (extras, missing) <- addDeps False ghcVersion $ fmap goPP $ bpPackages bp
+
+    assert (Set.null missing) $ return MiniBuildPlan
         { mbpGhcVersion = ghcVersion
-        , mbpPackages = Map.union cores extras
+        , mbpPackages = Map.unions
+            [ fmap (removeMissingDeps (Map.keysSet cores)) cores
+            , extras
+            , Map.fromList $ map goCore $ Set.toList missingCores
+            ]
         }
   where
     ghcVersion = siGhcVersion $ bpSystemInfo bp
-    cores = fmap (\v -> MiniPackageInfo
-                { mpiVersion = v
+    goCore (PackageIdentifier name version) = (name, MiniPackageInfo
+                { mpiVersion = version
                 , mpiFlags = Map.empty
                 , mpiPackageDeps = Set.empty
                 , mpiToolDeps = Set.empty
                 , mpiExes = Set.empty
                 , mpiHasLibrary = True
-                }) $ siCorePackages $ bpSystemInfo bp
+                })
 
     goPP pp =
         ( ppVersion pp
         , pcFlagOverrides $ ppConstraints pp
         )
 
+    removeMissingDeps cores mpi = mpi
+        { mpiPackageDeps = Set.intersection cores (mpiPackageDeps mpi)
+        }
+
 -- | Add in the resolved dependencies from the package index
 addDeps :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadCatch m)
-        => Version -- ^ GHC version
+        => Bool -- ^ allow missing
+        -> Version -- ^ GHC version
         -> Map PackageName (Version, Map FlagName Bool)
-        -> m (Map PackageName MiniPackageInfo)
-addDeps ghcVersion toCalc = do
+        -> m (Map PackageName MiniPackageInfo, Set PackageIdentifier)
+addDeps allowMissing ghcVersion toCalc = do
     menv <- getMinimalEnvOverride
     platform <- asks $ configPlatform . getConfig
-    resolvedMap <- resolvePackages menv (Map.keysSet idents0) Set.empty
+    (resolvedMap, missingIdents) <-
+        if allowMissing
+            then do
+                (missingNames, missingIdents, m) <-
+                    resolvePackagesAllowMissing menv (Map.keysSet idents0) Set.empty
+                assert (Set.null missingNames)
+                    $ return (m, missingIdents)
+            else do
+                m <- resolvePackages menv (Map.keysSet idents0) Set.empty
+                return (m, Set.empty)
     let byIndex = Map.fromListWith (++) $ flip map (Map.toList resolvedMap)
             $ \(ident, rp) ->
                 (indexName $ rpIndex rp,
@@ -256,7 +283,7 @@ addDeps ghcVersion toCalc = do
                     (buildable . libBuildInfo)
                     (library pd)
                 })
-    return $ Map.fromList $ concat res
+    return (Map.fromList $ concat res, missingIdents)
   where
     idents0 = Map.fromList
         $ map (\(n, (v, f)) -> (PackageIdentifier n v, Left f))
