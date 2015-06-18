@@ -172,14 +172,11 @@ populateCache menv index = do
             else Nothing
 
 data PackageIndexException
-  = InvalidCabalPath Text Text
-  | GitNotAvailable IndexName
+  = GitNotAvailable IndexName
   | MissingRequiredHashes IndexName PackageIdentifier
   deriving Typeable
 instance Exception PackageIndexException
 instance Show PackageIndexException where
-    show (InvalidCabalPath x y) =
-        "Invalid cabal path " ++ T.unpack x ++ ": " ++ T.unpack y
     show (GitNotAvailable name) = concat
         [ "Package index "
         , T.unpack $ indexNameText name
