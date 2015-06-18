@@ -284,7 +284,7 @@ installPackage name ps = do
                             (baseConfigOpts ctx)
                             allDeps
                             (psWanted ps)
-                            (piiLocation ps)
+                            (piiLocation ps <> minLoc)
                             (packageFlags package)
                 , taskPresent = present
                 , taskType =
