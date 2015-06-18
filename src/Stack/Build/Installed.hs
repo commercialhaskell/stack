@@ -84,22 +84,9 @@ getInstalled menv profiling sourceMap = do
                 Nothing -> m
                 Just pii
                     -- Not the version we want, ignore it
-                    | version /= piiVersion pii -> Map.empty
-                    | otherwise -> case pii of
-                        {- FIXME revisit this logic
-                        -- Never mark locals as installed, instead do dirty
-                        -- checking
-                        PSLocal _ -> Map.empty
+                    | version /= piiVersion pii || loc /= piiLocation pii -> Map.empty
 
-                        -- FIXME start recording build flags for installed
-                        -- executables, and only count as installed if it
-                        -- matches
-
-                        PSUpstream loc' _flags | loc == loc' -> Map.empty
-                        -}
-
-                        -- Passed all the tests, mark this as installed!
-                        _ -> m
+                    | otherwise -> m
           where
             m = Map.singleton name (version, loc, Executable $ PackageIdentifier name version)
     exesSnap <- getInstalledExes Snap
