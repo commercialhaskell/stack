@@ -39,6 +39,7 @@ import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
 import           Data.ByteString (ByteString)
 import qualified Data.Word8 as Word8
 import qualified Data.ByteString as S
+import qualified Data.ByteString.Unsafe as SU
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.Conduit (($$), (=$))
@@ -152,21 +153,19 @@ populateCache menv index = do
                         }
                     m
 
+    breakSlash x
+        | S.null z = Nothing
+        | otherwise = Just (y, SU.unsafeTail z)
+      where
+        (y, z) = S.break (== Word8._slash) x
+
     parseNameVersion t1 = do
-        let (p', t2) = S.break (== Word8._slash)
-                     $ S.map (\c -> if c == Word8._backslash then Word8._slash else c)
-                     $ S8.pack t1
+        (p', t3) <- breakSlash
+                  $ S.map (\c -> if c == Word8._backslash then Word8._slash else c)
+                  $ S8.pack t1
         p <- parsePackageName p'
-        t3 <-
-            if not (S.null t2) && S.head t2 == Word8._slash
-                then return $ S.tail t2
-                else Nothing
-        let (v', t4) = S.break (== Word8._slash) t3
+        (v', t5) <- breakSlash t3
         v <- parseVersion v'
-        t5 <-
-            if not (S.null t4) && S.head t4 == Word8._slash
-                then return $ S.tail t4
-                else Nothing
         let (t6, suffix) = S.break (== Word8._period) t5
         if t6 == p'
             then return (PackageIdentifier p v, suffix)
