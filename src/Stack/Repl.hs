@@ -67,7 +67,9 @@ repl targets opts ghciPath = do
     exec
         ghciPath
         ("--interactive" :
-         filter (not . badForGhci) (concat (map snd pkgOpts)) <>
+         filter
+             (not . badForGhci)
+             (concat (map snd pkgOpts)) <>
          opts)
   where
     wanted pwd cabalfp pkg =
@@ -83,4 +85,6 @@ repl targets opts ghciPath = do
             isParentOf
                 (parent cabalfp)
                 pwd
-    badForGhci = isPrefixOf "-O"
+    badForGhci x =
+        isPrefixOf "-O" x ||
+        elem x (words "-debug -threaded -ticky")
