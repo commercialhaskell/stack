@@ -70,7 +70,7 @@ test :: FilePath -- ^ runghc
      -> Spec
 test runghc env' currDir origStackRoot newHome name = it name $ withDir $ \dir -> do
     removeDirectoryRecursive newHome
-    copyStackRoot origStackRoot (newHome </> takeFileName origStackRoot)
+    copyTree toCopyRoot origStackRoot (newHome </> takeFileName origStackRoot)
     let testDir = currDir </> "tests" </> name
         mainFile = testDir </> "Main.hs"
         libDir = currDir </> "lib"
@@ -83,6 +83,9 @@ test runghc env' currDir origStackRoot newHome name = it name $ withDir $ \dir -
                 { cwd = Just dir
                 , env = Just env'
                 }
+
+    copyTree (const True) (testDir </> "files") dir
+
     (ClosedStream, outSrc, errSrc, sph) <- streamingProcess cp
     (out, err, ec) <- runConcurrently $ (,,)
         <$> Concurrently (outSrc $$ sinkLbs)
@@ -106,23 +109,25 @@ instance Show TestFailure where
         toStr = TL.unpack . TL.decodeUtf8With lenientDecode
 instance Exception TestFailure
 
-copyStackRoot :: FilePath -> FilePath -> IO ()
-copyStackRoot src dst =
-    runResourceT $ sourceDirectoryDeep False src $$ CL.mapM_ go
+copyTree :: (FilePath -> Bool) -> FilePath -> FilePath -> IO ()
+copyTree toCopy src dst =
+    runResourceT (sourceDirectoryDeep False src $$ CL.mapM_ go)
+        `catch` \(_ :: IOException) -> return ()
   where
-    go srcfp = when toCopy $ liftIO $ do
+    go srcfp = when (toCopy srcfp) $ liftIO $ do
         Just suffix <- return $ stripPrefix src srcfp
         let dstfp = dst ++ "/" ++ suffix
         createDirectoryIfMissing True $ takeDirectory dstfp
         createSymbolicLink srcfp dstfp `catch` \(_ :: IOException) ->
             copyFile srcfp dstfp -- for Windows
-      where
-        toCopy = any (`isSuffixOf` srcfp)
-            -- FIXME command line parameters to control how many of these get
-            -- copied, trade-off of runtime/bandwidth vs isolation of tests
-            [ ".tar"
-            , ".xz"
-            -- , ".gz"
-            , ".7z.exe"
-            , "00-index.cache"
-            ]
+
+toCopyRoot :: FilePath -> Bool
+toCopyRoot srcfp = any (`isSuffixOf` srcfp)
+    -- FIXME command line parameters to control how many of these get
+    -- copied, trade-off of runtime/bandwidth vs isolation of tests
+    [ ".tar"
+    , ".xz"
+    -- , ".gz"
+    , ".7z.exe"
+    , "00-index.cache"
+    ]
