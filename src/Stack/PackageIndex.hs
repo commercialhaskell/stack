@@ -37,6 +37,9 @@ import           Data.Aeson.Extended
 import qualified Data.Binary as Binary
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
 import           Data.ByteString (ByteString)
+import qualified Data.Word8 as Word8
+import qualified Data.ByteString as S
+import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.Conduit (($$), (=$))
 import           Data.Conduit.Binary                   (sinkHandle,
@@ -119,7 +122,7 @@ populateCache menv index = do
     goE blockNo m e =
         case Tar.entryContent e of
             Tar.NormalFile lbs size ->
-                case parseNameVersion $ T.pack $ Tar.entryPath e of
+                case parseNameVersion $ Tar.entryPath e of
                     Just (ident, ".cabal") -> addCabal ident size
                     Just (ident, ".json") -> addJSON ident lbs
                     _ -> m
@@ -150,16 +153,24 @@ populateCache menv index = do
                     m
 
     parseNameVersion t1 = do
-        let (p', t2) = T.break (== '/') $ T.replace "\\" "/" t1
-        p <- parsePackageNameFromString $ T.unpack p'
-        t3 <- maybe (throwM $ InvalidCabalPath t1 "no slash") return
-            $ T.stripPrefix "/" t2
-        let (v', t4) = T.break (== '/') t3
-        v <- parseVersionFromString $ T.unpack v'
-        t5 <- T.stripPrefix "/" t4
-        let (t6, suffix) = T.break (== '.') t5
-        when (t6 /= p') $ throwM $ InvalidCabalPath t1 $ "Expected at end: " <> p'
-        return (PackageIdentifier p v, suffix)
+        let (p', t2) = S.break (== Word8._slash)
+                     $ S.map (\c -> if c == Word8._backslash then Word8._slash else c)
+                     $ S8.pack t1
+        p <- parsePackageName p'
+        t3 <-
+            if not (S.null t2) && S.head t2 == Word8._slash
+                then return $ S.tail t2
+                else Nothing
+        let (v', t4) = S.break (== Word8._slash) t3
+        v <- parseVersion v'
+        t5 <-
+            if not (S.null t4) && S.head t4 == Word8._slash
+                then return $ S.tail t4
+                else Nothing
+        let (t6, suffix) = S.break (== Word8._period) t5
+        if t6 == p'
+            then return (PackageIdentifier p v, suffix)
+            else Nothing
 
 data PackageIndexException
   = InvalidCabalPath Text Text

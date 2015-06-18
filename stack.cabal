@@ -144,6 +144,7 @@ library
                    , zlib >= 0.5.4.2
                    , deepseq
                    , file-embed
+                   , word8
   if !os(windows)
     build-depends:   unix >= 2.7.0.1
   default-language:    Haskell2010
