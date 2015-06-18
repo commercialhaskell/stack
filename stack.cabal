@@ -13,14 +13,21 @@ maintainer:          chrisdone@fpcomplete.com
 category:            Development
 build-type:          Simple
 cabal-version:       >=1.10
-extra-source-files:  README.md ChangeLog.md
 homepage:            https://github.com/commercialhaskell/stack
+extra-source-files:  README.md ChangeLog.md
 
                      -- Glob would be nice, but apparently Cabal doesn't support it:
                      --     cabal: filepath wildcard 'test/package-dump/*.txt' does not match any files.
                      -- Happened during cabal sdist
                      test/package-dump/ghc-7.8.txt
                      test/package-dump/ghc-7.10.txt
+
+                     new-template/src/Lib.hs
+                     new-template/new-template.cabal
+                     new-template/test/Spec.hs
+                     new-template/app/Main.hs
+                     new-template/LICENSE
+                     new-template/Setup.hs
 
 library
   hs-source-dirs:    src/
@@ -136,6 +143,7 @@ library
                    , yaml >= 0.8.10.1
                    , zlib >= 0.5.4.2
                    , deepseq
+                   , file-embed
   if !os(windows)
     build-depends:   unix >= 2.7.0.1
   default-language:    Haskell2010

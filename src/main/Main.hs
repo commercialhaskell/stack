@@ -96,8 +96,8 @@ main =
                         buildOpts
              addCommand "new"
                         "Create a brand new project"
-                        (\_ _ -> newProject)
-                        (pure ())
+                        newCmd
+                        initOptsParser
              addCommand "init"
                         "Initialize a stack project based on one or more cabal packages"
                         initCmd
@@ -609,4 +609,14 @@ initCmd initOpts go@GlobalOpts{..} = do
   runStackLoggingT manager globalLogLevel globalTerminal $
         Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $
             runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
+                initProject globalResolver initOpts
+
+-- | Project creation
+newCmd :: InitOpts -> GlobalOpts -> IO ()
+newCmd initOpts go@GlobalOpts{..} = do
+  (manager,lc) <- loadConfigWithOpts go
+  runStackLoggingT manager globalLogLevel globalTerminal $
+        Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $
+            runStackT manager globalLogLevel (lcConfig lc) globalTerminal $ do
+                newProject
                 initProject globalResolver initOpts
