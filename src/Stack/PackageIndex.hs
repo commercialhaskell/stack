@@ -87,19 +87,29 @@ data PackageCache = PackageCache
     deriving Generic
 instance Binary.Binary PackageCache
 
--- | Stream all of the cabal files from the 00-index tar file.
-parsePackageIndex
+-- | Populate the package index caches and return them.
+populateCache
     :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
     => EnvOverride
     -> PackageIndex
     -> m (Map PackageIdentifier PackageCache)
-parsePackageIndex menv index = do
+populateCache menv index = do
+    $logSticky "Populating index cache ..."
     requireIndex menv index
     -- This uses full on lazy I/O instead of ResourceT to provide some
     -- protections. Caveat emptor
     path <- configPackageIndex (indexName index)
     lbs <- liftIO $ L.readFile $ Path.toFilePath path
-    loop 0 Map.empty (Tar.read lbs)
+    pis <- loop 0 Map.empty (Tar.read lbs)
+
+    when (indexRequireHashes index) $ forM_ (Map.toList pis) $ \(ident, pc) ->
+        case pcDownload pc of
+            Just _ -> return ()
+            Nothing -> throwM $ MissingRequiredHashes (indexName index) ident
+
+    $logStickyDone "Populated index cache."
+
+    return pis
   where
     loop !blockNo !m (Tar.Next e es) =
         loop (blockNo + entrySizeInBlocks e) (goE blockNo m e) es
@@ -359,25 +369,6 @@ getPackageCaches menv = do
         pis' <- taggedDecodeOrLoad fp $ populateCache menv index
 
         return (fmap (index,) pis')
-
--- | Populate the package index caches and return them.
-populateCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
-              => EnvOverride
-              -> PackageIndex
-              -> m (Map PackageIdentifier PackageCache)
-populateCache menv index = do
-    $logSticky "Populating index cache ..."
-
-    pis <- parsePackageIndex menv index
-
-    when (indexRequireHashes index) $ forM_ (Map.toList pis) $ \(ident, pc) ->
-        case pcDownload pc of
-            Just _ -> return ()
-            Nothing -> throwM $ MissingRequiredHashes (indexName index) ident
-
-    $logStickyDone "Populated index cache."
-
-    return pis
 
 --------------- Lifted from cabal-install, Distribution.Client.Tar:
 -- | Return the number of blocks in an entry.
