@@ -1,5 +1,9 @@
 ## Unreleased
 
+* Fall back to cabal dependency solver when a snapshot can't be found
+
+## 0.0.3
+
 * `--prefetch` [#297](https://github.com/commercialhaskell/stack/issues/297)
 * `upload` command ported from stackage-upload [#225](https://github.com/commercialhaskell/stack/issues/225)
 * `--only-snapshot` [#310](https://github.com/commercialhaskell/stack/issues/310)
