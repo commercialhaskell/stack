@@ -68,7 +68,7 @@ combineMap = Map.mergeWithKey
 
 data AddDepRes
     = ADRToInstall Task
-    | ADRFound Version Installed
+    | ADRFound Location Version Installed
     deriving Show
 
 type M = RWST
@@ -129,7 +129,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
         errs = errlibs ++ errfinals
     if null errs
         then do
-            let toTask (_, ADRFound _ _) = Nothing
+            let toTask (_, ADRFound _ _ _) = Nothing
                 toTask (name, ADRToInstall task) = Just (name, task)
                 tasks = M.fromList $ mapMaybe toTask adrs
                 maybeStripLocals
@@ -181,7 +181,7 @@ addFinal lp = do
     depsRes <- addPackageDeps package
     res <- case depsRes of
         Left e -> return $ Left e
-        Right (missing, present) -> do
+        Right (missing, present, _minLoc) -> do
             ctx <- ask
             return $ Right Task
                 { taskProvides = PackageIdentifier
@@ -231,7 +231,7 @@ addDep'' name = do
         Nothing -> return $ Left $ UnknownPackage name
         Just (PIOnlyInstalled version loc installed) -> do
             tellExecutablesUpstream name version loc Map.empty -- slightly hacky, no flags since they likely won't affect executable names
-            return $ Right $ ADRFound version installed
+            return $ Right $ ADRFound loc version installed
         Just (PIOnlySource ps) -> do
             tellExecutables name ps
             installPackage name ps
@@ -240,7 +240,7 @@ addDep'' name = do
             needInstall <- checkNeedInstall name ps installed
             if needInstall
                 then installPackage name ps
-                else return $ Right $ ADRFound (piiVersion ps) installed
+                else return $ Right $ ADRFound (piiLocation ps) (piiVersion ps) installed
 
 tellExecutables :: PackageName -> PackageSource -> M () -- TODO merge this with addFinal above?
 tellExecutables _ (PSLocal lp)
@@ -272,7 +272,7 @@ installPackage name ps = do
     depsRes <- addPackageDeps package
     case depsRes of
         Left e -> return $ Left e
-        Right (missing, present) -> do
+        Right (missing, present, minLoc) -> do
             return $ Right $ ADRToInstall Task
                 { taskProvides = PackageIdentifier
                     (packageName package)
@@ -290,7 +290,7 @@ installPackage name ps = do
                 , taskType =
                     case ps of
                         PSLocal lp -> TTLocal lp
-                        PSUpstream _ loc _ -> TTUpstream package loc
+                        PSUpstream _ loc _ -> TTUpstream package $ loc <> minLoc
                 }
 
 checkNeedInstall :: PackageName -> PackageSource -> Installed -> M Bool
@@ -299,11 +299,11 @@ checkNeedInstall name ps installed = assert (piiLocation ps == Local) $ do
     depsRes <- addPackageDeps package
     case depsRes of
         Left _e -> return True -- installPackage will find the error again
-        Right (missing, present)
+        Right (missing, present, _loc)
             | Set.null missing -> checkDirtiness ps installed package present
             | otherwise -> return True
 
-addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Set GhcPkgId))
+addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Set GhcPkgId, Location))
 addPackageDeps package = do
     ctx <- ask
     deps' <- packageDepsWithTools package
@@ -320,11 +320,11 @@ addPackageDeps package = do
             Right adr | not $ adrVersion adr `withinRange` range ->
                 return $ Left (depname, (range, DependencyMismatch $ adrVersion adr))
             Right (ADRToInstall task) -> return $ Right
-                (Set.singleton $ taskProvides task, Set.empty)
-            Right (ADRFound _ (Executable _)) -> return $ Right
-                (Set.empty, Set.empty)
-            Right (ADRFound _ (Library gid)) -> return $ Right
-                (Set.empty, Set.singleton gid)
+                (Set.singleton $ taskProvides task, Set.empty, taskLocation task)
+            Right (ADRFound loc _ (Executable _)) -> return $ Right
+                (Set.empty, Set.empty, loc)
+            Right (ADRFound loc _ (Library gid)) -> return $ Right
+                (Set.empty, Set.singleton gid, loc)
     case partitionEithers deps of
         ([], pairs) -> return $ Right $ mconcat pairs
         (errs, _) -> return $ Left $ DependencyPlanFailures
@@ -334,7 +334,7 @@ addPackageDeps package = do
             (Map.fromList errs)
   where
     adrVersion (ADRToInstall task) = packageIdentifierVersion $ taskProvides task
-    adrVersion (ADRFound v _) = v
+    adrVersion (ADRFound _ v _) = v
 
 checkDirtiness :: PackageSource
                -> Installed
@@ -400,3 +400,10 @@ stripLocals plan = plan
             TTLocal _ -> False
             TTUpstream _ Local -> False
             TTUpstream _ Snap -> True
+
+taskLocation :: Task -> Location
+taskLocation =
+    go . taskType
+  where
+    go (TTLocal _) = Local
+    go (TTUpstream _ loc) = loc

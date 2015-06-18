@@ -47,6 +47,7 @@ type SourceMap = Map PackageName PackageSource
 data PackageSource
     = PSLocal LocalPackage
     | PSUpstream Version Location (Map FlagName Bool)
+    deriving Show
 instance PackageInstallInfo PackageSource where
     piiVersion (PSLocal lp) = packageVersion $ lpPackage lp
     piiVersion (PSUpstream v _ _) = v

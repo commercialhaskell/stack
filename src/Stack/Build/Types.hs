@@ -295,6 +295,11 @@ newtype PkgDepsOracle =
 -- | A location to install a package into, either snapshot or local
 data Location = Snap | Local
     deriving (Show, Eq)
+instance Monoid Location where
+    mempty = Snap
+    mappend Local _ = Local
+    mappend _ Local = Local
+    mappend Snap Snap = Snap
 
 -- | Datatype which tells how which version of a package to install and where
 -- to install it into
