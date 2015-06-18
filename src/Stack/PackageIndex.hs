@@ -38,10 +38,9 @@ import qualified Data.Binary as Binary
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as L
-import           Data.Conduit (($$), (=$), yield, Producer)
+import           Data.Conduit (($$), (=$))
 import           Data.Conduit.Binary                   (sinkHandle,
                                                         sourceHandle)
-import qualified Data.Conduit.List as CL
 import           Data.Conduit.Zlib (ungzip)
 import           Data.Foldable (forM_)
 import           Data.Int (Int64)
@@ -89,42 +88,56 @@ data PackageCache = PackageCache
 instance Binary.Binary PackageCache
 
 -- | Stream all of the cabal files from the 00-index tar file.
-withSourcePackageIndex
+parsePackageIndex
     :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
     => EnvOverride
     -> PackageIndex
-    -> (Producer m (PackageIdentifier, Either PackageCache L.ByteString) -> m a)
-    -> m a
-withSourcePackageIndex menv index cont = do
+    -> m (Map PackageIdentifier PackageCache)
+parsePackageIndex menv index = do
     requireIndex menv index
     -- This uses full on lazy I/O instead of ResourceT to provide some
     -- protections. Caveat emptor
-    cont $ do
-        path <- configPackageIndex (indexName index)
-        lbs <- liftIO $ L.readFile $ Path.toFilePath path
-        loop 0 (Tar.read lbs)
+    path <- configPackageIndex (indexName index)
+    lbs <- liftIO $ L.readFile $ Path.toFilePath path
+    loop 0 Map.empty (Tar.read lbs)
   where
-    loop blockNo (Tar.Next e es) = do
-        goE blockNo e
-        loop blockNo' es
-      where
-        blockNo' = blockNo + entrySizeInBlocks e
-    loop _ Tar.Done = return ()
-    loop _ (Tar.Fail e) = throwM e
+    loop !blockNo !m (Tar.Next e es) =
+        loop (blockNo + entrySizeInBlocks e) (goE blockNo m e) es
+    loop _ m Tar.Done = return m
+    loop _ _ (Tar.Fail e) = throwM e
 
-    goE blockNo e =
+    goE blockNo m e =
         case Tar.entryContent e of
             Tar.NormalFile lbs size ->
                 case parseNameVersion $ T.pack $ Tar.entryPath e of
-                    Just (ident, ".cabal") ->
-                        yield (ident, Left PackageCache
-                            { pcOffset = (blockNo + 1) * 512
-                            , pcSize = size
-                            , pcDownload = Nothing
-                            })
-                    Just (ident, ".json") -> yield (ident, Right lbs)
-                    _ -> return ()
-            _ -> return ()
+                    Just (ident, ".cabal") -> addCabal ident size
+                    Just (ident, ".json") -> addJSON ident lbs
+                    _ -> m
+            _ -> m
+      where
+        addCabal ident size = Map.insertWith
+            (\_ pcOld -> pcNew { pcDownload = pcDownload pcOld })
+            ident
+            pcNew
+            m
+          where
+            pcNew = PackageCache
+                { pcOffset = (blockNo + 1) * 512
+                , pcSize = size
+                , pcDownload = Nothing
+                }
+        addJSON ident lbs =
+            case decode lbs of
+                Nothing -> m
+                Just pd -> Map.insertWith
+                    (\_ pc -> pc { pcDownload = Just pd })
+                    ident
+                    PackageCache
+                        { pcOffset = 0
+                        , pcSize = 0
+                        , pcDownload = Just pd
+                        }
+                    m
 
     parseNameVersion t1 = do
         let (p', t2) = T.break (== '/') $ T.replace "\\" "/" t1
@@ -354,37 +367,17 @@ populateCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, Mon
               -> m (Map PackageIdentifier PackageCache)
 populateCache menv index = do
     $logSticky "Populating index cache ..."
-    let add m (ident, Left pcNew) =
-            Map.insertWith
-                (\_ pcOld -> pcNew { pcDownload = pcDownload pcOld })
-                ident
-                pcNew
-                m
-        add m (ident, Right lbs) =
-            case decode lbs of
-                Nothing -> m
-                Just pd ->
-                    Map.insertWith
-                        (\_ pc -> pc { pcDownload = Just pd })
-                        ident
-                        PackageCache
-                            { pcOffset = 0
-                            , pcSize = 0
-                            , pcDownload = Just pd
-                            }
-                        m
 
-    withSourcePackageIndex menv index $ \source -> do
-        pis <- source $$ CL.fold add Map.empty
+    pis <- parsePackageIndex menv index
 
-        when (indexRequireHashes index) $ forM_ (Map.toList pis) $ \(ident, pc) ->
-            case pcDownload pc of
-                Just _ -> return ()
-                Nothing -> throwM $ MissingRequiredHashes (indexName index) ident
+    when (indexRequireHashes index) $ forM_ (Map.toList pis) $ \(ident, pc) ->
+        case pcDownload pc of
+            Just _ -> return ()
+            Nothing -> throwM $ MissingRequiredHashes (indexName index) ident
 
-        $logStickyDone "Populated index cache."
+    $logStickyDone "Populated index cache."
 
-        return pis
+    return pis
 
 --------------- Lifted from cabal-install, Distribution.Client.Tar:
 -- | Return the number of blocks in an entry.
