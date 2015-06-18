@@ -5,7 +5,7 @@
 *~
 .hsenv
 .shake/
-.stack-work/
+/.stack-work/
 /.cabal-sandbox/
 /Dockerfile
 /target/
@@ -16,3 +16,4 @@ dist-stack/
 dist/
 tags
 /.docker-sandbox/
+/test/integration/.stack-work/
