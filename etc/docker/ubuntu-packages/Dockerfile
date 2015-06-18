@@ -54,7 +54,7 @@ RUN fpm \
     -d libffi-dev \
     -d libgmp-dev \
     -d make \
-    -d xz-tools \
+    -d xz-utils \
     -d zlib1g-dev \
     -C /var/tmp/fpm/stack_<<PKG_VERSION>>-<<GIT_REV_COUNT>>-<<GIT_SHA>> \
     -p /stack_<<PKG_VERSION>>-<<GIT_REV_COUNT>>-<<GIT_SHA>>_amd64.deb \
