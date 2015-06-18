@@ -1,0 +1,5 @@
+resolver: lts-2.14
+extra-deps:
+- bytestring-0.10.6.0
+packages:
+- .
