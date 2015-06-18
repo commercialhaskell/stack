@@ -40,7 +40,9 @@ You may be prompted to run some of the following along the way:
 * `stack init` to create a stack configuration file for an existing project.
   stack will figure out what Stackage release (LTS or nightly) is appropriate
   for the dependencies.
-* `stack setup` to download and install the correct GHC version.
+* `stack setup` to download and install the correct GHC version (installs to
+  `~/.stack/programs` on POSIX OSes, `$APPDATALOCAL\Programs\stack` on
+  Windows).
 
 Run `stack` for a complete list of commands.
 
