@@ -52,13 +52,16 @@ import qualified Stack.Upload as Upload
 import           System.Environment (getArgs, getProgName)
 import           System.Exit
 import           System.FilePath (searchPathSeparator)
-import           System.IO (stderr)
+import           System.IO (stderr, stdin, stdout, hSetBuffering, BufferMode(..))
 import qualified System.Process.Read
 
 -- | Commandline dispatcher.
 main :: IO ()
 main =
-  do when False $ do -- https://github.com/commercialhaskell/stack/issues/322
+  do hSetBuffering stdout LineBuffering
+     hSetBuffering stdin  LineBuffering
+     hSetBuffering stderr NoBuffering
+     when False $ do -- https://github.com/commercialhaskell/stack/issues/322
        plugins <- findPlugins (T.pack stackProgName)
        tryRunPlugin plugins
      progName <- getProgName
