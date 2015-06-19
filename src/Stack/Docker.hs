@@ -54,7 +54,7 @@ import           System.Directory (createDirectoryIfMissing,removeDirectoryRecur
 import           System.Directory (doesDirectoryExist)
 import           System.Environment (lookupEnv,getProgName,getArgs,getExecutablePath)
 import           System.Exit (ExitCode(ExitSuccess),exitWith)
-import           System.FilePath (takeBaseName,isPathSeparator)
+import           System.FilePath (dropTrailingPathSeparator,takeBaseName)
 import           System.Info (arch,os)
 import           System.IO (stderr,stdin,stdout,hIsTerminalDevice)
 import qualified System.Process as Proc
@@ -215,16 +215,16 @@ runContainerAndExit config
                   [["run"
                    ,"--net=host"
                    ,"-e",inContainerEnvVar ++ "=1"
-                   ,"-e",stackRootEnvVar ++ "=" ++ trimTrailingPathSep stackRoot
+                   ,"-e",stackRootEnvVar ++ "=" ++ toFPNoTrailingSep stackRoot
                    ,"-e","WORK_UID=" ++ uid
                    ,"-e","WORK_GID=" ++ gid
-                   ,"-e","WORK_WD=" ++ trimTrailingPathSep pwd
-                   ,"-e","WORK_HOME=" ++ trimTrailingPathSep sandboxRepoDir
-                   ,"-e","WORK_ROOT=" ++ trimTrailingPathSep projectRoot
-                   ,"-v",trimTrailingPathSep stackRoot ++ ":" ++ trimTrailingPathSep stackRoot
-                   ,"-v",trimTrailingPathSep projectRoot ++ ":" ++ trimTrailingPathSep projectRoot
-                   ,"-v",trimTrailingPathSep sandboxSandboxDir ++ ":" ++ trimTrailingPathSep sandboxDir
-                   ,"-v",trimTrailingPathSep sandboxHomeDir ++ ":" ++ trimTrailingPathSep sandboxRepoDir]
+                   ,"-e","WORK_WD=" ++ toFPNoTrailingSep pwd
+                   ,"-e","WORK_HOME=" ++ toFPNoTrailingSep sandboxRepoDir
+                   ,"-e","WORK_ROOT=" ++ toFPNoTrailingSep projectRoot
+                   ,"-v",toFPNoTrailingSep stackRoot ++ ":" ++ toFPNoTrailingSep stackRoot
+                   ,"-v",toFPNoTrailingSep projectRoot ++ ":" ++ toFPNoTrailingSep projectRoot
+                   ,"-v",toFPNoTrailingSep sandboxSandboxDir ++ ":" ++ toFPNoTrailingSep sandboxDir
+                   ,"-v",toFPNoTrailingSep sandboxHomeDir ++ ":" ++ toFPNoTrailingSep sandboxRepoDir]
                   ,if oldImage
                      then ["-e",sandboxIDEnvVar ++ "=" ++ sandboxID
                           ,"--entrypoint=/root/entrypoint.sh"]
@@ -269,8 +269,8 @@ runContainerAndExit config
         Just ('=':val) -> Just val
         _ -> Nothing
     mountArg (Mount host container) = ["-v",host ++ ":" ++ container]
-    sandboxSubdirArg subdir = ["-v",trimTrailingPathSep subdir++ ":" ++ trimTrailingPathSep subdir]
-    trimTrailingPathSep = dropWhileEnd isPathSeparator . toFilePath
+    sandboxSubdirArg subdir = ["-v",toFPNoTrailingSep subdir++ ":" ++ toFPNoTrailingSep subdir]
+    toFPNoTrailingSep = dropTrailingPathSeparator . toFilePath
     projectRoot = fromMaybeProjectRoot mprojectRoot
     docker = configDocker config
 
