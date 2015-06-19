@@ -30,7 +30,8 @@ module Stack.Constants
 import           Control.Monad.Catch (MonadThrow)
 import           Control.Monad.Reader
 
-import           Data.Maybe (fromMaybe)
+import           Data.HashSet (HashSet)
+import qualified Data.HashSet as HashSet
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Path as FL
@@ -195,8 +196,9 @@ stackRootEnvVar :: String
 stackRootEnvVar = "STACK_ROOT"
 
 -- See https://downloads.haskell.org/~ghc/7.10.1/docs/html/libraries/ghc/src/Module.html#integerPackageKey
-wiredInPackages :: [PackageName]
-wiredInPackages = fromMaybe (error "Parse error in wiredInPackages") mparsed
+wiredInPackages :: HashSet PackageName
+wiredInPackages =
+    maybe (error "Parse error in wiredInPackages") HashSet.fromList mparsed
   where
     mparsed = sequence $ map parsePackageName
       [ "ghc-prim"

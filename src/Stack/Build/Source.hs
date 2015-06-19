@@ -22,6 +22,7 @@ import           Control.Monad.Trans.Resource
 import           Data.Either
 import qualified Data.Foldable                as F
 import           Data.Function
+import qualified Data.HashSet                 as HashSet
 import           Data.List
 import qualified Data.Map                     as Map
 import           Data.Map.Strict              (Map)
@@ -112,7 +113,7 @@ loadSourceMap bopts = do
             , extraDeps3
             , flip fmap (mbpPackages mbp) $ \mpi ->
                 (PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi))
-            ] `Map.difference` Map.fromList (map (, ()) wiredInPackages)
+            ] `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
 
     let unknown = Set.difference nonLocalTargets $ Map.keysSet sourceMap
     unless (Set.null unknown) $ do

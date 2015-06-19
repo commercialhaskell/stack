@@ -19,6 +19,7 @@ import           Control.Monad.Trans.Resource
 import           Data.Conduit
 import qualified Data.Conduit.List            as CL
 import           Data.Function
+import qualified Data.HashSet                 as HashSet
 import           Data.List
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
@@ -158,7 +159,7 @@ isAllowed mpcache sourceMap mloc dp
             -- minor versions of GHC, where the dependencies of wired-in
             -- packages may change slightly and therefore not match the
             -- snapshot.
-            if name `elem` wiredInPackages
+            if name `HashSet.member` wiredInPackages
                 then []
                 else dpDepends dp
         , lhPair = (name, (version, fromMaybe Snap mloc, Library gid))
