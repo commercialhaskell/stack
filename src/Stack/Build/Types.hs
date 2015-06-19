@@ -388,14 +388,14 @@ data BaseConfigOpts = BaseConfigOpts
     }
 
 -- | Render a @BaseConfigOpts@ to an actual list of options
-configureOpts :: Config
+configureOpts :: EnvConfig
               -> BaseConfigOpts
               -> Set GhcPkgId -- ^ dependencies
               -> Bool -- ^ wanted?
               -> Location
               -> Map FlagName Bool
               -> [Text]
-configureOpts config bco deps wanted loc flags = map T.pack $ concat
+configureOpts econfig bco deps wanted loc flags = map T.pack $ concat
     [ ["--user", "--package-db=clear", "--package-db=global"]
     , map (("--package-db=" ++) . toFilePath) $ case loc of
         Snap -> [bcoSnapDB bco]
@@ -423,6 +423,7 @@ configureOpts config bco deps wanted loc flags = map T.pack $ concat
     , map (("--extra-lib-dirs=" ++) . T.unpack) (Set.toList (configExtraLibDirs config))
     ]
   where
+    config = getConfig econfig
     bopts = bcoBuildOpts bco
     toFilePathNoTrailingSlash =
         loop . toFilePath
@@ -438,16 +439,20 @@ configureOpts config bco deps wanted loc flags = map T.pack $ concat
             Local -> bcoLocalInstallRoot bco
 
     depOptions = map toDepOption $ Set.toList deps
+      where
+        toDepOption =
+            if envConfigCabalVersion econfig >= $(mkVersion "1.22")
+                then toDepOption1_22
+                else toDepOption1_18
 
-    {- TODO does this work with some versions of Cabal?
-    toDepOption gid = T.pack $ concat
+    toDepOption1_22 gid = concat
         [ "--dependency="
         , packageNameString $ packageIdentifierName $ ghcPkgIdPackageIdentifier gid
         , "="
         , ghcPkgIdString gid
         ]
-    -}
-    toDepOption gid = concat
+
+    toDepOption1_18 gid = concat
         [ "--constraint="
         , packageNameString name
         , "=="

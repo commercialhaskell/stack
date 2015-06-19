@@ -192,7 +192,7 @@ addFinal lp = do
                 , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
                     let allDeps = Set.union present missing'
                      in configureOpts
-                            (getConfig ctx)
+                            (getEnvConfig ctx)
                             (baseConfigOpts ctx)
                             allDeps
                             True -- wanted
@@ -283,7 +283,7 @@ installPackage name ps = do
                     let allDeps = Set.union present missing'
                         destLoc = piiLocation ps <> minLoc
                      in configureOpts
-                            (getConfig ctx)
+                            (getEnvConfig ctx)
                             (baseConfigOpts ctx)
                             allDeps
                             (psWanted ps)
@@ -349,7 +349,7 @@ checkDirtiness :: PackageSource
 checkDirtiness ps installed package present = do
     ctx <- ask
     let configOpts = configureOpts
-            (getConfig ctx)
+            (getEnvConfig ctx)
             (baseConfigOpts ctx)
             present
             (psWanted ps)
