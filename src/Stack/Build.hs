@@ -71,7 +71,7 @@ build bopts = do
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
 
 -- | Get the @BaseConfigOpts@ necessary for constructing configure options
-mkBaseConfigOpts :: (MonadIO m, MonadReader env m, HasBuildConfig env, MonadThrow m)
+mkBaseConfigOpts :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m)
                  => BuildOpts -> m BaseConfigOpts
 mkBaseConfigOpts bopts = do
     snapDBPath <- packageDatabaseDeps
@@ -92,20 +92,20 @@ withLoadPackage :: M env m
                 -> ((PackageName -> Version -> Map FlagName Bool -> IO Package) -> m a)
                 -> m a
 withLoadPackage menv inner = do
-    bconfig <- asks getBuildConfig
+    econfig <- asks getEnvConfig
     withCabalLoader menv $ \cabalLoader ->
         inner $ \name version flags -> do
             bs <- cabalLoader $ PackageIdentifier name version -- TODO automatically update index the first time this fails
-            readPackageBS (depPackageConfig bconfig flags) bs
+            readPackageBS (depPackageConfig econfig flags) bs
   where
     -- | Package config to be used for dependencies
-    depPackageConfig :: BuildConfig -> Map FlagName Bool -> PackageConfig
-    depPackageConfig bconfig flags = PackageConfig
+    depPackageConfig :: EnvConfig -> Map FlagName Bool -> PackageConfig
+    depPackageConfig econfig flags = PackageConfig
         { packageConfigEnableTests = False
         , packageConfigEnableBenchmarks = False
         , packageConfigFlags = flags
-        , packageConfigGhcVersion = bcGhcVersion bconfig
-        , packageConfigPlatform = configPlatform (getConfig bconfig)
+        , packageConfigGhcVersion = envConfigGhcVersion econfig
+        , packageConfigPlatform = configPlatform (getConfig econfig)
         }
 
 -- | Reset the build (remove Shake database and .gen files).

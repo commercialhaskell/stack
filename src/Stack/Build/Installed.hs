@@ -38,7 +38,7 @@ import           Stack.PackageDump
 import           Stack.Types
 import           Stack.Types.Internal
 
-type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
+type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasEnvConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
 
 data LoadHelper = LoadHelper
     { lhId   :: !GhcPkgId

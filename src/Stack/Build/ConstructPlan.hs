@@ -85,7 +85,7 @@ data Ctx = Ctx
     , loadPackage    :: !(PackageName -> Version -> Map FlagName Bool -> IO Package)
     , combinedMap    :: !CombinedMap
     , toolToPackages :: !(Dependency -> Map PackageName VersionRange)
-    , ctxBuildConfig :: !BuildConfig
+    , ctxEnvConfig   :: !EnvConfig
     , callStack      :: ![PackageName]
     , extraToBuild   :: !(Set PackageName)
     , latestVersions :: !(Map PackageName Version)
@@ -95,10 +95,12 @@ instance HasStackRoot Ctx
 instance HasPlatform Ctx
 instance HasConfig Ctx
 instance HasBuildConfig Ctx where
-    getBuildConfig = ctxBuildConfig
+    getBuildConfig = getBuildConfig . getEnvConfig
+instance HasEnvConfig Ctx where
+    getEnvConfig = ctxEnvConfig
 
 constructPlan :: forall env m.
-                 (MonadCatch m, MonadReader env m, HasBuildConfig env, MonadIO m, MonadLogger m, MonadBaseControl IO m, HasHttpManager env)
+                 (MonadCatch m, MonadReader env m, HasEnvConfig env, MonadIO m, MonadLogger m, MonadBaseControl IO m, HasHttpManager env)
               => MiniBuildPlan
               -> BaseConfigOpts
               -> [LocalPackage]
@@ -113,7 +115,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
     caches <- getPackageCaches menv
     let latest = Map.fromListWith max $ map toTuple $ Map.keys caches
 
-    bconfig <- asks getBuildConfig
+    econfig <- asks getEnvConfig
     let onWanted =
             case boptsFinalAction $ bcoBuildOpts baseConfigOpts0 of
                 DoNothing -> void . addDep . packageName . lpPackage
@@ -121,7 +123,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
     let inner = do
             mapM_ onWanted $ filter lpWanted locals
             mapM_ addDep $ Set.toList extraToBuild0
-    ((), m, (efinals, installExes)) <- liftIO $ runRWST inner (ctx bconfig latest) M.empty
+    ((), m, (efinals, installExes)) <- liftIO $ runRWST inner (ctx econfig latest) M.empty
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
         (errlibs, adrs) = partitionEithers $ map toEither $ M.toList m
@@ -145,9 +147,9 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
                         then installExes
                         else Map.empty
                 }
-        else throwM $ ConstructPlanExceptions errs (bcStackYaml bconfig)
+        else throwM $ ConstructPlanExceptions errs (bcStackYaml $ getBuildConfig econfig)
   where
-    ctx bconfig latest = Ctx
+    ctx econfig latest = Ctx
         { mbp = mbp0
         , baseConfigOpts = baseConfigOpts0
         , loadPackage = loadPackage0
@@ -155,7 +157,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
         , toolToPackages = \ (Dependency name _) ->
           maybe Map.empty (Map.fromSet (\_ -> anyVersion)) $
           Map.lookup (S8.pack . packageNameString . fromCabalPackageName $ name) toolMap
-        , ctxBuildConfig = bconfig
+        , ctxEnvConfig = econfig
         , callStack = []
         , extraToBuild = extraToBuild0
         , latestVersions = latest

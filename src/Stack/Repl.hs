@@ -32,6 +32,7 @@ repl :: (HasConfig r, HasBuildConfig r, HasEnvConfig r, MonadReader r m, MonadIO
      -> FilePath
      -> m ()
 repl targets opts ghciPath = do
+    econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
     pwd <- getWorkingDir
     pkgOpts <-
@@ -45,7 +46,7 @@ repl targets opts ghciPath = do
                         { packageConfigEnableTests = True
                         , packageConfigEnableBenchmarks = True
                         , packageConfigFlags = localFlags mempty bconfig name
-                        , packageConfigGhcVersion = bcGhcVersion bconfig
+                        , packageConfigGhcVersion = envConfigGhcVersion econfig
                         , packageConfigPlatform = configPlatform
                               (getConfig bconfig)
                         }

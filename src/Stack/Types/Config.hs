@@ -167,9 +167,8 @@ data BuildConfig = BuildConfig
     , bcResolver   :: !Resolver
       -- ^ How we resolve which dependencies to install given a set of
       -- packages.
-    , bcGhcVersion :: !Version
-      -- ^ Version of GHC we'll be using for this build, @Nothing@ if no
-      -- preference
+    , bcGhcVersionExpected :: !Version
+      -- ^ Version of GHC we expected for this build
     , bcPackages   :: !(Map (Path Abs Dir) Bool)
       -- ^ Local packages identified by a path, Bool indicates whether it is
       -- allowed to be wanted (see 'peValidWanted')
@@ -192,13 +191,14 @@ data BuildConfig = BuildConfig
 -- | Configuration after the environment has been setup.
 data EnvConfig = EnvConfig
     {envConfigBuildConfig :: !BuildConfig
-    ,envConfigCabalVersion :: !Version}
+    ,envConfigCabalVersion :: !Version
+    ,envConfigGhcVersion :: !Version}
 instance HasBuildConfig EnvConfig where
     getBuildConfig = envConfigBuildConfig
 instance HasConfig EnvConfig
 instance HasPlatform EnvConfig
 instance HasStackRoot EnvConfig
-class HasEnvConfig r where
+class HasBuildConfig r => HasEnvConfig r where
     getEnvConfig :: r -> EnvConfig
 instance HasEnvConfig EnvConfig where
     getEnvConfig = id
@@ -583,37 +583,39 @@ snapshotsDir = do
     return $ configStackRoot config </> $(mkRelDir "snapshots") </> platform
 
 -- | Installation root for dependencies
-installationRootDeps :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
+installationRootDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
 installationRootDeps = do
     snapshots <- snapshotsDir
     bc <- asks getBuildConfig
+    ec <- asks getEnvConfig
     name <- parseRelDir $ T.unpack $ renderResolver $ bcResolver bc
-    ghc <- parseRelDir $ versionString $ bcGhcVersion bc
+    ghc <- parseRelDir $ versionString $ envConfigGhcVersion ec
     return $ snapshots </> name </> ghc
 
 -- | Installation root for locals
-installationRootLocal :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
+installationRootLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
 installationRootLocal = do
     bc <- asks getBuildConfig
+    ec <- asks getEnvConfig
     name <- parseRelDir $ T.unpack $ renderResolver $ bcResolver bc
-    ghc <- parseRelDir $ versionString $ bcGhcVersion bc
+    ghc <- parseRelDir $ versionString $ envConfigGhcVersion ec
     platform <- platformRelDir
     return $ configProjectWorkDir bc </> $(mkRelDir "install") </> platform </> name </> ghc
 
 -- | Package database for installing dependencies into
-packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
+packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
 packageDatabaseDeps = do
     root <- installationRootDeps
     return $ root </> $(mkRelDir "pkgdb")
 
 -- | Package database for installing local packages into
-packageDatabaseLocal :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
+packageDatabaseLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
 packageDatabaseLocal = do
     root <- installationRootLocal
     return $ root </> $(mkRelDir "pkgdb")
 
 -- | Directory for holding flag cache information
-flagCacheLocal :: (MonadThrow m, MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
+flagCacheLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
 flagCacheLocal = do
     root <- installationRootLocal
     return $ root </> $(mkRelDir "flag-cache")
@@ -636,7 +638,7 @@ bindirSuffix = $(mkRelDir "bin")
 -- | Get the extra bin directories (for the PATH). Puts more local first
 --
 -- Bool indicates whether or not to include the locals
-extraBinDirs :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
+extraBinDirs :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
              => m (Bool -> [Path Abs Dir])
 extraBinDirs = do
     deps <- installationRootDeps

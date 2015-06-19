@@ -46,13 +46,13 @@ import           System.Directory           (createDirectoryIfMissing,
 import           System.IO.Error (isDoesNotExistError)
 
 -- | Directory containing files to mark an executable as installed
-exeInstalledDir :: (MonadReader env m, HasBuildConfig env, MonadThrow m)
+exeInstalledDir :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
                 => Location -> m (Path Abs Dir)
 exeInstalledDir Snap = (</> $(mkRelDir "installed-packages")) `liftM` installationRootDeps
 exeInstalledDir Local = (</> $(mkRelDir "installed-packages")) `liftM` installationRootLocal
 
 -- | Get all of the installed executables
-getInstalledExes :: (MonadReader env m, HasBuildConfig env, MonadIO m, MonadThrow m)
+getInstalledExes :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)
                  => Location -> m [PackageIdentifier]
 getInstalledExes loc = do
     dir <- exeInstalledDir loc
@@ -60,7 +60,7 @@ getInstalledExes loc = do
     return $ mapMaybe parsePackageIdentifierFromString files
 
 -- | Mark the given executable as installed
-markExeInstalled :: (MonadReader env m, HasBuildConfig env, MonadIO m, MonadThrow m)
+markExeInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)
                  => Location -> PackageIdentifier -> m ()
 markExeInstalled loc ident = do
     dir <- exeInstalledDir loc
@@ -162,7 +162,7 @@ writeCache dir get' content = do
              (toFilePath fp)
              (Binary.encode content))
 
-flagCacheFile :: (MonadIO m, MonadThrow m, MonadReader env m, HasBuildConfig env)
+flagCacheFile :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
               => Installed
               -> m (Path Abs File)
 flagCacheFile installed = do
@@ -174,7 +174,7 @@ flagCacheFile installed = do
     return $ dir </> rel
 
 -- | Loads the flag cache for the given installed extra-deps
-tryGetFlagCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasBuildConfig env)
+tryGetFlagCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
                 => Installed
                 -> m (Maybe ConfigCache)
 tryGetFlagCache gid = do
@@ -184,7 +184,7 @@ tryGetFlagCache gid = do
         Right (Right x) -> return $ Just x
         _ -> return Nothing
 
-writeFlagCache :: (MonadIO m, MonadReader env m, HasBuildConfig env, MonadThrow m)
+writeFlagCache :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m)
                => Installed
                -> ConfigCache
                -> m ()

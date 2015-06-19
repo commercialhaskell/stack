@@ -145,6 +145,7 @@ loadLocals bopts latestVersion = do
             ([], targets') -> return $ partitionTargetSpecs targets'
             (bad, _) -> throwM $ Couldn'tParseTargets bad
 
+    econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
     lps <- forM (Map.toList $ bcPackages bconfig) $ \(dir, validWanted) -> do
         cabalfp <- getCabalFileName dir
@@ -154,7 +155,7 @@ loadLocals bopts latestVersion = do
                 { packageConfigEnableTests = False
                 , packageConfigEnableBenchmarks = False
                 , packageConfigFlags = localFlags (boptsFlags bopts) bconfig name
-                , packageConfigGhcVersion = bcGhcVersion bconfig
+                , packageConfigGhcVersion = envConfigGhcVersion econfig
                 , packageConfigPlatform = configPlatform $ getConfig bconfig
                 }
             configFinal = config

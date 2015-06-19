@@ -13,7 +13,7 @@ import           Control.Exception
 import           Control.Monad (join, when)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Logger
-import           Control.Monad.Reader (asks, runReaderT)
+import           Control.Monad.Reader (asks)
 import           Data.Char (toLower)
 import           Data.List
 import qualified Data.List as List
@@ -40,7 +40,6 @@ import           Stack.Constants
 import qualified Stack.Docker as Docker
 import           Stack.Exec
 import           Stack.Fetch
-import           Stack.GhcPkg (getCabalPkgVer)
 import           Stack.Init
 import           Stack.New
 import qualified Stack.PackageIndex
@@ -268,7 +267,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                       Just v -> return (v, Nothing)
                       Nothing -> do
                           bc <- lcLoadBuildConfig lc globalResolver ThrowException
-                          return (bcGhcVersion bc, Just $ bcStackYaml bc)
+                          return (bcGhcVersionExpected bc, Just $ bcStackYaml bc)
               mpaths <- runStackT manager globalLogLevel (lcConfig lc) globalTerminal $ ensureGHC SetupOpts
                   { soptsInstallIfMissing = True
                   , soptsUseSystem =
@@ -293,19 +292,16 @@ withBuildConfig go@GlobalOpts{..} strat inner = do
     (manager, lc) <- loadConfigWithOpts go
     runStackLoggingT manager globalLogLevel globalTerminal $
         Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $ do
-            bconfig1 <- runStackLoggingT manager globalLogLevel globalTerminal $
+            bconfig <- runStackLoggingT manager globalLogLevel globalTerminal $
                 lcLoadBuildConfig lc globalResolver strat
-            (bconfig2,cabalVer) <-
+            envConfig <-
                 runStackT
-                    manager globalLogLevel bconfig1 globalTerminal
-                    (do cfg <- setupEnv
-                        menv <- runReaderT getMinimalEnvOverride cfg
-                        cabalVer <- getCabalPkgVer menv
-                        return (cfg,cabalVer))
+                    manager globalLogLevel bconfig globalTerminal
+                    setupEnv
             runStackT
                 manager
                 globalLogLevel
-                (EnvConfig bconfig2 cabalVer)
+                envConfig
                 globalTerminal
                 inner
 

@@ -368,7 +368,7 @@ loadBuildConfig menv mproject config stackRoot mresolver noConfigStrat = do
     return BuildConfig
         { bcConfig = config
         , bcResolver = projectResolver project
-        , bcGhcVersion = ghcVersion
+        , bcGhcVersionExpected = ghcVersion
         , bcPackages = packages
         , bcExtraDeps = projectExtraDeps project
         , bcRoot = root

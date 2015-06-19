@@ -50,7 +50,8 @@ import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Safe (readMay)
 import           Stack.Build.Types
-import           Stack.GhcPkg (getGlobalDB)
+import           Stack.GhcPkg (getCabalPkgVer, getGlobalDB)
+import           Stack.Solver (getGhcVersion)
 import           Stack.Types
 import           Stack.Types.StackT
 import           System.Directory (doesDirectoryExist, createDirectoryIfMissing)
@@ -108,14 +109,14 @@ instance Show SetupException where
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasBuildConfig env, HasHttpManager env, MonadBaseControl IO m)
-         => m BuildConfig
+         => m EnvConfig
 setupEnv = do
     bconfig <- asks getBuildConfig
     let platform = getPlatform bconfig
         sopts = SetupOpts
             { soptsInstallIfMissing = configInstallGHC $ bcConfig bconfig
             , soptsUseSystem = configSystemGHC $ bcConfig bconfig
-            , soptsExpected = bcGhcVersion bconfig
+            , soptsExpected = bcGhcVersionExpected bconfig
             , soptsStackYaml = Just $ bcStackYaml bconfig
             , soptsForceReinstall = False
             , soptsSanityCheck = False
@@ -141,16 +142,25 @@ setupEnv = do
              $ Map.delete "HASKELL_PACKAGE_SANDBOXES"
                env0
 
+    menv1 <- mkEnvOverride platform env1
+    ghcVer <- getGhcVersion menv1
+    cabalVer <- getCabalPkgVer menv1
+    let envConfig0 = EnvConfig
+            { envConfigBuildConfig = bconfig
+            , envConfigCabalVersion = cabalVer
+            , envConfigGhcVersion = ghcVer
+            }
+
     -- extra installation bin directories
-    mkDirs <- runReaderT extraBinDirs bconfig
+    mkDirs <- runReaderT extraBinDirs envConfig0
     let mpath = Map.lookup "PATH" env1
         mkDirs' = map toFilePath . mkDirs
         depsPath = augmentPath (mkDirs' False) mpath
         localsPath = augmentPath (mkDirs' True) mpath
 
-    deps <- runReaderT packageDatabaseDeps bconfig
+    deps <- runReaderT packageDatabaseDeps envConfig0
     depsExists <- liftIO $ doesDirectoryExist $ toFilePath deps
-    localdb <- runReaderT packageDatabaseLocal bconfig
+    localdb <- runReaderT packageDatabaseLocal envConfig0
     localdbExists <- liftIO $ doesDirectoryExist $ toFilePath localdb
     globalDB <- mkEnvOverride platform env1 >>= getGlobalDB
     let mkGPP locals = T.pack $ intercalate [searchPathSeparator] $ concat
@@ -189,7 +199,13 @@ setupEnv = do
                         (Map.insert es eo m', ())
                     return eo
 
-    return bconfig { bcConfig = (bcConfig bconfig) { configEnvOverride = getEnvOverride' } }
+    return EnvConfig
+        { envConfigBuildConfig = bconfig
+            { bcConfig = (bcConfig bconfig) { configEnvOverride = getEnvOverride' }
+            }
+        , envConfigCabalVersion = cabalVer
+        , envConfigGhcVersion = ghcVer
+        }
 
 -- | Augment the PATH environment variable with the given extra paths
 augmentPath :: [FilePath] -> Maybe Text -> Text

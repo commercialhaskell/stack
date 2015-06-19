@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 module Stack.Solver
     ( cabalSolver
+    , getGhcVersion
     ) where
 
 import           Control.Exception.Enclosed  (tryIO)
@@ -77,14 +78,19 @@ cabalSolver cabalfps = withSystemTempDirectory "cabal-solver" $ \dir -> do
                 Nothing -> (t0, True)
                 Just x -> (x, False)
 
+getGhcVersion :: (MonadLogger m, MonadCatch m, MonadBaseControl IO m, MonadIO m)
+              => EnvOverride -> m Version
+getGhcVersion menv = do
+    bs <- readProcessStdout Nothing menv "ghc" ["--numeric-version"]
+    parseVersion $ S8.takeWhile isValid bs
+  where
+    isValid c = c == '.' || ('0' <= c && c <= '9')
+
 getGhcMajorVersion :: (MonadLogger m, MonadCatch m, MonadBaseControl IO m, MonadIO m)
                    => EnvOverride -> m MajorVersion
 getGhcMajorVersion menv = do
-    bs <- readProcessStdout Nothing menv "ghc" ["--numeric-version"]
-    version <- parseVersion $ S8.takeWhile isValid bs
+    version <- getGhcVersion menv
     return $ getMajorVersion version
-  where
-    isValid c = c == '.' || ('0' <= c && c <= '9')
 
 getCabalConfig :: (MonadReader env m, HasConfig env, MonadIO m, MonadThrow m)
                => FilePath -- ^ temp dir
