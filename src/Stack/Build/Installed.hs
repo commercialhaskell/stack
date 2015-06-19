@@ -31,6 +31,7 @@ import           Path
 import           Prelude                      hiding (FilePath, writeFile)
 import           Stack.Build.Cache
 import           Stack.Build.Types
+import           Stack.Constants
 import           Stack.GhcPkg
 import           Stack.PackageDump
 import           Stack.Types
@@ -150,7 +151,16 @@ isAllowed mpcache sourceMap mloc dp
     | isJust mpcache && not (dpProfiling dp) = Nothing
     | toInclude = Just LoadHelper
         { lhId = gid
-        , lhDeps = dpDepends dp
+        , lhDeps =
+            -- We always want to consider the wired in packages as having all
+            -- of their dependencies installed, since we have no ability to
+            -- reinstall them. This is especially important for using different
+            -- minor versions of GHC, where the dependencies of wired-in
+            -- packages may change slightly and therefore not match the
+            -- snapshot.
+            if name `elem` wiredInPackages
+                then []
+                else dpDepends dp
         , lhPair = (name, (version, fromMaybe Snap mloc, Library gid))
         }
     | otherwise = Nothing
