@@ -76,23 +76,23 @@ main =
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
-                        buildOpts
+                        (buildOpts False)
              addCommand "install"
                         "Build executables and install to a user path"
                         installCmd
-                        buildOpts
+                        (buildOpts False)
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
                         (buildCmd DoTests)
-                        buildOpts
+                        (buildOpts False)
              addCommand "bench"
                         "Build and benchmark the project(s) in this directory/configuration"
                         (buildCmd DoBenchmarks)
-                        buildOpts
+                        (buildOpts False)
              addCommand "haddock"
                         "Generate haddocks for the project(s) in this directory/configuration"
-                        (buildCmd DoHaddock)
-                        buildOpts
+                        (buildCmd DoNothing)
+                        (buildOpts True)
              addCommand "new"
                         "Create a brand new project"
                         newCmd
@@ -424,10 +424,10 @@ dockerExecCmd (cmd,args) go@GlobalOpts{..} = do
                                              (return (cmd,args,lcConfig lc))
 
 -- | Parser for build arguments.
-buildOpts :: Parser BuildOpts
-buildOpts =
+buildOpts :: Bool -> Parser BuildOpts
+buildOpts defaultHaddock =
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
-            optimize <*> finalAction <*> dryRun <*> ghcOpts <*> flags <*>
+            optimize <*> localHaddock <*> depsHaddock <*> finalAction <*> dryRun <*> ghcOpts <*> flags <*>
             installExes <*> preFetch <*> testArgs <*> onlySnapshot
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
@@ -445,6 +445,16 @@ buildOpts =
           boolFlags False
                     "executable-profiling"
                     "library profiling for TARGETs and all its dependencies"
+                    idm
+        localHaddock =
+          boolFlags defaultHaddock
+                    "haddock"
+                    "building Haddocks"
+                    idm
+        depsHaddock =
+          maybeBoolFlags
+                    "deps-haddock"
+                    "building Haddocks for dependencies"
                     idm
         finalAction = pure DoNothing
         installExes = pure False

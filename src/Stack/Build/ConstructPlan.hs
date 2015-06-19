@@ -89,6 +89,7 @@ data Ctx = Ctx
     , callStack      :: ![PackageName]
     , extraToBuild   :: !(Set PackageName)
     , latestVersions :: !(Map PackageName Version)
+    , wanted         :: !(Set PackageName)
     }
 
 instance HasStackRoot Ctx
@@ -161,6 +162,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
         , callStack = []
         , extraToBuild = extraToBuild0
         , latestVersions = latest
+        , wanted = wantedLocalPackages locals
         }
     toolMap = getToolMap mbp0
 
@@ -197,7 +199,7 @@ addFinal lp = do
                             allDeps
                             True -- wanted
                             Local
-                            (packageFlags package)
+                            package
                 , taskPresent = present
                 , taskType = TTLocal lp
                 }
@@ -239,7 +241,7 @@ addDep'' name = do
             installPackage name ps
         Just (PIBoth ps installed) -> do
             tellExecutables name ps
-            needInstall <- checkNeedInstall name ps installed
+            needInstall <- checkNeedInstall name ps installed (wanted ctx)
             if needInstall
                 then installPackage name ps
                 else return $ Right $ ADRFound (piiLocation ps) (piiVersion ps) installed
@@ -290,7 +292,7 @@ installPackage name ps = do
                             -- An assertion to check for a recurrence of
                             -- https://github.com/commercialhaskell/stack/issues/345
                             (assert (destLoc == piiLocation ps) destLoc)
-                            (packageFlags package)
+                            package
                 , taskPresent = present
                 , taskType =
                     case ps of
@@ -298,14 +300,14 @@ installPackage name ps = do
                         PSUpstream _ loc _ -> TTUpstream package $ loc <> minLoc
                 }
 
-checkNeedInstall :: PackageName -> PackageSource -> Installed -> M Bool
-checkNeedInstall name ps installed = assert (piiLocation ps == Local) $ do
+checkNeedInstall :: PackageName -> PackageSource -> Installed -> Set PackageName -> M Bool
+checkNeedInstall name ps installed wanted = assert (piiLocation ps == Local) $ do
     package <- psPackage name ps
     depsRes <- addPackageDeps package
     case depsRes of
         Left _e -> return True -- installPackage will find the error again
         Right (missing, present, _loc)
-            | Set.null missing -> checkDirtiness ps installed package present
+            | Set.null missing -> checkDirtiness ps installed package present wanted
             | otherwise -> return True
 
 addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Set GhcPkgId, Location))
@@ -345,28 +347,35 @@ checkDirtiness :: PackageSource
                -> Installed
                -> Package
                -> Set GhcPkgId
+               -> Set PackageName
                -> M Bool
-checkDirtiness ps installed package present = do
+checkDirtiness ps installed package present wanted = do
     ctx <- ask
+    moldOpts <- tryGetFlagCache installed
     let configOpts = configureOpts
             (getEnvConfig ctx)
             (baseConfigOpts ctx)
             present
             (psWanted ps)
             (piiLocation ps) -- should be Local always
-            (packageFlags package)
-        configCache = ConfigCache
+            package
+        buildOpts = bcoBuildOpts (baseConfigOpts ctx)
+        wantConfigCache = ConfigCache
             { configCacheOpts = map encodeUtf8 configOpts
             , configCacheDeps = present
             , configCacheComponents =
                 case ps of
                     PSLocal lp -> Set.map encodeUtf8 $ lpComponents lp
                     PSUpstream _ _ _ -> Set.empty
+            , configCacheHaddock =
+                shouldBuildHaddock buildOpts wanted (packageName package) ||
+                -- Disabling haddocks when old config had haddocks doesn't make dirty.
+                maybe False configCacheHaddock moldOpts
             }
-    moldOpts <- tryGetFlagCache installed
     case moldOpts of
         Nothing -> return True
-        Just oldOpts -> return $ oldOpts /= configCache || psDirty ps
+        Just oldOpts -> return $ oldOpts /= wantConfigCache ||
+                                 psDirty ps
 
 psDirty :: PackageSource -> Bool
 psDirty (PSLocal lp) = lpDirtyFiles lp

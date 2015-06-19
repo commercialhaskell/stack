@@ -36,6 +36,7 @@ import           Data.Map.Strict                (Map)
 import qualified Data.Map.Strict                as M
 import qualified Data.Map.Strict                as Map
 import           Data.Maybe
+import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
 import           Data.Streaming.Process         hiding (callProcess, env)
 import qualified Data.Streaming.Process         as Process
@@ -115,7 +116,6 @@ printPlan finalAction plan = do
                 DoNothing -> Nothing
                 DoBenchmarks -> Just "benchmark"
                 DoTests -> Just "test"
-                DoHaddock -> Just "haddock"
     case mfinalLabel of
         Nothing -> return ()
         Just finalLabel -> do
@@ -174,6 +174,7 @@ data ExecuteEnv = ExecuteEnv
     , eeSetupHs        :: !(Path Abs File)
     , eeCabalPkgVer    :: !Version
     , eeTotalWanted    :: !Int
+    , eeWanted         :: !(Set PackageName)
     }
 
 -- | Perform the actual plan
@@ -208,6 +209,7 @@ executePlan menv bopts baseConfigOpts locals plan = do
             , eeSetupHs = setupHs
             , eeCabalPkgVer = cabalPkgVer
             , eeTotalWanted = length $ filter lpWanted locals
+            , eeWanted = wantedLocalPackages locals
             }
 
     unless (Map.null $ planInstallExes plan) $ do
@@ -372,7 +374,6 @@ toActions runInBase ee (mbuild, mfinal) =
             DoNothing -> Nothing
             DoTests -> Just (singleTest, checkTest)
             DoBenchmarks -> Just (singleBench, checkBench)
-            DoHaddock -> Just (singleHaddock, const True)
 
     checkTest task =
         case taskType task of
@@ -419,6 +420,8 @@ ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal cabalfp extra = do
                 case taskType of
                     TTLocal lp -> Set.map encodeUtf8 $ lpComponents lp
                     TTUpstream _ _ -> Set.empty
+            , configCacheHaddock =
+                shouldBuildHaddock eeBuildOpts eeWanted (packageIdentifierName taskProvides)
             }
 
     let needConfig = mOldConfigCache /= Just newConfigCache
@@ -593,6 +596,16 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
             TTLocal lp -> "build" : map T.unpack (Set.toList $ lpComponents lp)
             TTUpstream _ _ -> ["build"]
 
+    when (shouldBuildHaddock eeBuildOpts eeWanted (packageName package) &&
+          packageHasLibrary package &&
+          -- Works around haddock failing on bytestring-builder since it has no modules when
+          -- bytestring is new enough.
+          packageHasExposedModules package) $ do
+        announce "haddock"
+        hscolourExists <- doesExecutableExist eeEnvOverride "hscolour"
+        cabal False (concat [["haddock", "--html"]
+                            ,["--hyperlink-source" | hscolourExists]])
+
     withMVar eeInstallLock $ \() -> do
         announce "install"
         cabal False ["install"]
@@ -719,61 +732,6 @@ singleBench ac ee task =
 
         announce "benchmarks"
         cabal False ["bench"]
-
-singleHaddock :: M env m
-              => ActionContext
-              -> ExecuteEnv
-              -> Task
-              -> m ()
-singleHaddock ac ee task =
-    withSingleContext ac ee task $ \_package _cabalfp _pkgDir cabal announce _console _mlogFile -> do
-        announce "haddock"
-        hscolourExists <- doesExecutableExist (eeEnvOverride ee) "hscolour"
-              {- EKB TODO: doc generation for stack-doc-server
- #ifndef mingw32_HOST_OS
-              liftIO (removeDocLinks docLoc package)
- #endif
-              ifcOpts <- liftIO (haddockInterfaceOpts docLoc package packages)
-              -}
-        cabal False (concat [["haddock", "--html"]
-                            ,["--hyperlink-source" | hscolourExists]])
-              {- EKB TODO: doc generation for stack-doc-server
-                         ,"--hoogle"
-                         ,"--html-location=../$pkg-$version/"
-                         ,"--haddock-options=" ++ intercalate " " ifcOpts ]
-              haddockLocs <-
-                liftIO (findFiles (packageDocDir package)
-                                  (\loc -> FilePath.takeExtensions (toFilePath loc) ==
-                                           "." ++ haddockExtension)
-                                  (not . isHiddenDir))
-              forM_ haddockLocs $ \haddockLoc ->
-                do let hoogleTxtPath = FilePath.replaceExtension (toFilePath haddockLoc) "txt"
-                       hoogleDbPath = FilePath.replaceExtension hoogleTxtPath hoogleDbExtension
-                   hoogleExists <- liftIO (doesFileExist hoogleTxtPath)
-                   when hoogleExists
-                        (callProcess
-                             "hoogle"
-                             ["convert"
-                             ,"--haddock"
-                             ,hoogleTxtPath
-                             ,hoogleDbPath])
-                        -}
-                 {- EKB TODO: doc generation for stack-doc-server
-             #ifndef mingw32_HOST_OS
-                 case setupAction of
-                   DoHaddock -> liftIO (createDocLinks docLoc package)
-                   _ -> return ()
-             #endif
-
- -- | Package's documentation directory.
- packageDocDir :: (MonadThrow m, MonadReader env m, HasPlatform env)
-               => PackageIdentifier -- ^ Cabal version
-               -> Package
-               -> m (Path Abs Dir)
- packageDocDir cabalPkgVer package' = do
-   dist <- distDirFromDir cabalPkgVer (packageDir package')
-   return (dist </> $(mkRelDir "doc/"))
-                 --}
 
 -- | Grab all output from the given @Handle@ and print it to stdout, stripping
 -- Template Haskell "Loading package" lines. Does work in a separate thread.

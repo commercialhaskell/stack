@@ -120,7 +120,8 @@ data Package =
           ,packageTests :: !(Set Text)                    -- ^ names of test suites
           ,packageBenchmarks :: !(Set Text)               -- ^ names of benchmarks
           ,packageExes :: !(Set Text)                     -- ^ names of executables
-          ,packageOpts :: !GetPackageOpts              -- ^ Args to pass to GHC.
+          ,packageOpts :: !GetPackageOpts                 -- ^ Args to pass to GHC.
+          ,packageHasExposedModules :: !Bool              -- ^ Does the package have exposed modules?
           }
  deriving (Show,Typeable)
 
@@ -243,6 +244,7 @@ resolvePackage packageConfig gpkg = Package
     , packageExes = S.fromList $ [ T.pack (exeName b) | b <- executables pkg, buildable (buildInfo b)]
     , packageOpts = GetPackageOpts $ \cabalfp ->
         generatePkgDescOpts cabalfp pkg
+    , packageHasExposedModules = maybe False (not . null . exposedModules) (library pkg)
     }
 
   where
