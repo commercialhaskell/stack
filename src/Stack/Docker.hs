@@ -206,7 +206,8 @@ runContainerAndExit config
          execDockerProcess =
            do mapM_ (createDirectoryIfMissing True)
                     (concat [[toFilePath sandboxHomeDir
-                             ,toFilePath sandboxSandboxDir] ++
+                             ,toFilePath sandboxSandboxDir
+                             ,toFilePath stackRoot] ++
                              map toFilePath sandboxSubdirs])
               execProcessAndExit
                 envOverride
@@ -224,7 +225,9 @@ runContainerAndExit config
                    ,"-v",toFPNoTrailingSep stackRoot ++ ":" ++ toFPNoTrailingSep stackRoot
                    ,"-v",toFPNoTrailingSep projectRoot ++ ":" ++ toFPNoTrailingSep projectRoot
                    ,"-v",toFPNoTrailingSep sandboxSandboxDir ++ ":" ++ toFPNoTrailingSep sandboxDir
-                   ,"-v",toFPNoTrailingSep sandboxHomeDir ++ ":" ++ toFPNoTrailingSep sandboxRepoDir]
+                   ,"-v",toFPNoTrailingSep sandboxHomeDir ++ ":" ++ toFPNoTrailingSep sandboxRepoDir
+                   ,"-v",toFPNoTrailingSep stackRoot ++ ":" ++
+                         toFPNoTrailingSep (sandboxRepoDir </> $(mkRelDir ("." ++ stackProgName ++ "/")))]
                   ,if oldImage
                      then ["-e",sandboxIDEnvVar ++ "=" ++ sandboxID
                           ,"--entrypoint=/root/entrypoint.sh"]
