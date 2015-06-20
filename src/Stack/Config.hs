@@ -497,7 +497,7 @@ getExtraConfigs stackRoot = liftIO $ do
 loadYaml :: (FromJSON a,MonadIO m) => Path Abs File -> m a
 loadYaml path =
     liftIO $ Yaml.decodeFileEither (toFilePath path)
-         >>= either throwM return
+         >>= either (throwM . ParseConfigFileException path) return
 
 -- | Get the location of the project config file, if it exists.
 getProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)
