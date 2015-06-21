@@ -50,9 +50,9 @@ type SourceMap = Map PackageName PackageSource
 -- | Where the package's source is located: local directory or package index
 data PackageSource
     = PSLocal LocalPackage
-    | PSUpstream Version Location (Map FlagName Bool)
+    | PSUpstream Version InstallLocation (Map FlagName Bool)
     -- ^ Upstream packages could be installed in either local or snapshot
-    -- databases; this is what 'Location' specifies.
+    -- databases; this is what 'InstallLocation' specifies.
     deriving Show
 instance PackageInstallInfo PackageSource where
     piiVersion (PSLocal lp) = packageVersion $ lpPackage lp

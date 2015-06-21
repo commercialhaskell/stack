@@ -43,12 +43,12 @@ import           Stack.PackageIndex
 import           Stack.Types
 
 data PackageInfo
-    = PIOnlyInstalled Version Location Installed
+    = PIOnlyInstalled Version InstallLocation Installed
     | PIOnlySource PackageSource
     | PIBoth PackageSource Installed
 
 combineSourceInstalled :: PackageSource
-                       -> (Version, Location, Installed)
+                       -> (Version, InstallLocation, Installed)
                        -> PackageInfo
 combineSourceInstalled ps (version, location, installed) =
     assert (piiVersion ps == version) $
@@ -68,13 +68,13 @@ combineMap = Map.mergeWithKey
 
 data AddDepRes
     = ADRToInstall Task
-    | ADRFound Location Version Installed
+    | ADRFound InstallLocation Version Installed
     deriving Show
 
 type M = RWST
     Ctx
     ( Map PackageName (Either ConstructPlanException Task) -- finals
-    , Map Text Location -- executable to be installed, and location where the binary is placed
+    , Map Text InstallLocation -- executable to be installed, and location where the binary is placed
     )
     (Map PackageName (Either ConstructPlanException AddDepRes))
     IO
@@ -253,14 +253,14 @@ tellExecutables _ (PSLocal lp)
 tellExecutables name (PSUpstream version loc flags) = do
     tellExecutablesUpstream name version loc flags
 
-tellExecutablesUpstream :: PackageName -> Version -> Location -> Map FlagName Bool -> M ()
+tellExecutablesUpstream :: PackageName -> Version -> InstallLocation -> Map FlagName Bool -> M ()
 tellExecutablesUpstream name version loc flags = do
     ctx <- ask
     when (name `Set.member` extraToBuild ctx) $ do
         p <- liftIO $ loadPackage ctx name version flags
         tellExecutablesPackage loc p
 
-tellExecutablesPackage :: Location -> Package -> M ()
+tellExecutablesPackage :: InstallLocation -> Package -> M ()
 tellExecutablesPackage loc p =
     tell (Map.empty, m)
   where
@@ -310,7 +310,7 @@ checkNeedInstall name ps installed wanted = assert (piiLocation ps == Local) $ d
             | Set.null missing -> checkDirtiness ps installed package present wanted
             | otherwise -> return True
 
-addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Set GhcPkgId, Location))
+addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Set GhcPkgId, InstallLocation))
 addPackageDeps package = do
     ctx <- ask
     deps' <- packageDepsWithTools package
@@ -415,7 +415,7 @@ stripLocals plan = plan
             TTUpstream _ Local -> False
             TTUpstream _ Snap -> True
 
-taskLocation :: Task -> Location
+taskLocation :: Task -> InstallLocation
 taskLocation =
     go . taskType
   where

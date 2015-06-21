@@ -11,7 +11,7 @@
 
 module Stack.Build.Types
     (StackBuildException(..)
-    ,Location(..)
+    ,InstallLocation(..)
     ,ModTime
     ,modTime
     ,Installed(..)
@@ -299,9 +299,9 @@ newtype PkgDepsOracle =
     deriving (Show,Typeable,Eq,Hashable,Binary,NFData)
 
 -- | A location to install a package into, either snapshot or local
-data Location = Snap | Local
+data InstallLocation = Snap | Local
     deriving (Show, Eq)
-instance Monoid Location where
+instance Monoid InstallLocation where
     mempty = Snap
     mappend Local _ = Local
     mappend _ Local = Local
@@ -311,7 +311,7 @@ instance Monoid Location where
 -- to install it into
 class PackageInstallInfo a where
     piiVersion :: a -> Version
-    piiLocation :: a -> Location
+    piiLocation :: a -> InstallLocation
 
 -- | Information on a locally available package of source code
 data LocalPackage = LocalPackage
@@ -372,7 +372,7 @@ instance Show TaskConfigOpts where
 -- | The type of a task, either building local code or something from the
 -- package index (upstream)
 data TaskType = TTLocal LocalPackage
-              | TTUpstream Package Location
+              | TTUpstream Package InstallLocation
     deriving Show
 
 -- | A complete plan of what needs to be built and how to do it
@@ -381,7 +381,7 @@ data Plan = Plan
     , planFinals :: !(Map PackageName Task)
     -- ^ Final actions to be taken (test, benchmark, etc)
     , planUnregisterLocal :: !(Set GhcPkgId)
-    , planInstallExes :: !(Map Text Location)
+    , planInstallExes :: !(Map Text InstallLocation)
     -- ^ Executables that should be installed after successful building
     }
     deriving Show
@@ -400,7 +400,7 @@ configureOpts :: EnvConfig
               -> BaseConfigOpts
               -> Set GhcPkgId -- ^ dependencies
               -> Bool -- ^ wanted?
-              -> Location
+              -> InstallLocation
               -> Package
               -> [Text]
 configureOpts econfig bco deps wanted loc package = map T.pack $ concat

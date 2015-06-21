@@ -784,7 +784,7 @@ printBuildOutput excludeTHLoading outH = void $ fork $
         "Loading package " `S8.isPrefixOf` bs &&
         ("done." `S8.isSuffixOf` bs || "done.\r" `S8.isSuffixOf` bs)
 
-taskLocation :: Task -> Location
+taskLocation :: Task -> InstallLocation
 taskLocation task =
     case taskType task of
         TTLocal _ -> Local
