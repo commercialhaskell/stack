@@ -47,7 +47,6 @@ library
                      Stack.Package
                      Stack.PackageDump
                      Stack.PackageIndex
-                     Stack.Path
                      Stack.Repl
                      Stack.Setup
                      Stack.Solver

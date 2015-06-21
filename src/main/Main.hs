@@ -43,7 +43,6 @@ import           Stack.Fetch
 import           Stack.Init
 import           Stack.New
 import qualified Stack.PackageIndex
-import           Stack.Path
 import           Stack.Repl
 import           Stack.Setup
 import           Stack.Solver (solveExtraDeps)
@@ -161,21 +160,6 @@ main =
                         cleanCmd
                         (pure ())
              addSubCommands
-               "path"
-               "Print path information for certain things"
-               (do addCommand "ghc"
-                              "Print path to the ghc executable in use"
-                              pathCmd
-                              (pure PathGhc)
-                   addCommand "log"
-                              "Print path to the log directory in use"
-                              pathCmd
-                              (pure PathLog)
-                   addCommand "package-db"
-                              "Print the package databases in use"
-                              pathCmd
-                              (pure PathPackageDb))
-             addSubCommands
                Docker.dockerCmdName
                "Subcommands specific to Docker use"
                (do addCommand Docker.dockerPullCmdName
@@ -209,14 +193,6 @@ main =
                 exitFailure
   where
     dockerHelpOptName = Docker.dockerCmdName ++ "-help"
-
-
-pathCmd :: PathArg -> GlobalOpts -> IO ()
-pathCmd pathArg go@GlobalOpts{..} = do
-  (manager,lc) <- loadConfigWithOpts go
-  buildConfig <- runStackLoggingT manager globalLogLevel globalTerminal
-    (lcLoadBuildConfig lc globalResolver ExecStrategy)
-  runStackT manager globalLogLevel buildConfig globalTerminal (pathString pathArg) >>= putStrLn
 
 -- Try to run a plugin
 tryRunPlugin :: Plugins -> IO ()
