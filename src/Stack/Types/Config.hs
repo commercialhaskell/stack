@@ -644,6 +644,10 @@ configMiniBuildPlanCache name = do
 bindirSuffix :: Path Rel Dir
 bindirSuffix = $(mkRelDir "bin")
 
+-- | Suffix applied to an installation root to get the doc dir
+docdirSuffix :: Path Rel Dir
+docdirSuffix = $(mkRelDir "doc")
+
 -- | Get the extra bin directories (for the PATH). Puts more local first
 --
 -- Bool indicates whether or not to include the locals
