@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -30,7 +31,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Trans.Control
 import           Data.Binary (Binary)
-import           Data.Binary.VersionTagged (taggedDecodeOrLoad, taggedEncodeFile)
+import           Data.Binary.VersionTagged (taggedDecodeOrLoad, taggedEncodeFile, BinarySchema (..))
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
@@ -54,7 +55,12 @@ import           System.Directory (createDirectoryIfMissing, getDirectoryContent
 import           System.Process.Read
 
 -- | Cached information on whether package have profiling libraries and haddocks.
-newtype InstalledCache = InstalledCache (IORef (Map GhcPkgId InstalledCacheEntry))
+newtype InstalledCache = InstalledCache (IORef InstalledCacheInner)
+newtype InstalledCacheInner = InstalledCacheInner (Map GhcPkgId InstalledCacheEntry)
+    deriving Binary
+instance BinarySchema InstalledCacheInner where
+    -- Don't forget to update this if you change the datatype in any way!
+    binarySchema _ = 1
 
 -- | Cached information on whether a package has profiling libraries and haddocks.
 data InstalledCacheEntry = InstalledCacheEntry
@@ -84,13 +90,13 @@ ghcPkgDump menv mpkgDb sink = do
 
 -- | Create a new, empty @InstalledCache@
 newInstalledCache :: MonadIO m => m InstalledCache
-newInstalledCache = liftIO $ InstalledCache <$> newIORef Map.empty
+newInstalledCache = liftIO $ InstalledCache <$> newIORef (InstalledCacheInner Map.empty)
 
 -- | Load a @InstalledCache@ from disk, swallowing any errors and returning an
 -- empty cache.
 loadInstalledCache :: MonadIO m => Path Abs File -> m InstalledCache
 loadInstalledCache path = do
-    m <- taggedDecodeOrLoad (toFilePath path) (return Map.empty)
+    m <- taggedDecodeOrLoad (toFilePath path) (return $ InstalledCacheInner Map.empty)
     liftIO $ fmap InstalledCache $ newIORef m
 
 -- | Save a @InstalledCache@ to disk
@@ -175,7 +181,7 @@ addProfiling (InstalledCache ref) =
     CL.mapM go
   where
     go dp = liftIO $ do
-        m <- readIORef ref
+        InstalledCacheInner m <- readIORef ref
         let gid = dpGhcPkgId dp
         p <- case Map.lookup gid m of
             Just installed -> return (installedCacheProfiling installed)
@@ -209,7 +215,7 @@ addHaddock (InstalledCache ref) =
     CL.mapM go
   where
     go dp = liftIO $ do
-        m <- readIORef ref
+        InstalledCacheInner m <- readIORef ref
         let gid = dpGhcPkgId dp
         h <- case Map.lookup gid m of
             Just installed -> return (installedCacheHaddock installed)
