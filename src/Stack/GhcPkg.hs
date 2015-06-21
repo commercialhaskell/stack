@@ -137,11 +137,10 @@ unregisterGhcPkgId menv pkgDb gid = do
 -- | Get the version of Cabal from the global package database.
 getCabalPkgVer :: (MonadThrow m, MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
                => EnvOverride -> m Version
-getCabalPkgVer menv = do
-    db <- getGlobalDB menv -- FIXME shouldn't be necessary, just tell ghc-pkg to look in the global DB
+getCabalPkgVer menv =
     findGhcPkgId
         menv
-        [db]
+        [] -- global DB
         cabalPackageName >>=
         maybe
             (throwM $ Couldn'tFindPkgId cabalPackageName)
