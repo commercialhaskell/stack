@@ -34,8 +34,6 @@ cabalSolver :: (MonadIO m, MonadLogger m, MonadMask m, MonadBaseControl IO m, Mo
             => [Path Abs File] -- ^ cabal files
             -> m (MajorVersion, Map PackageName (Version, Map FlagName Bool))
 cabalSolver cabalfps = withSystemTempDirectory "cabal-solver" $ \dir -> do
-    $logInfo "Trying out the cabal dependency solver as a last resort"
-
     configLines <- getCabalConfig dir
     let configFile = dir FP.</> "cabal.config"
     liftIO $ S.writeFile configFile $ encodeUtf8 $ T.unlines configLines
@@ -61,6 +59,9 @@ cabalSolver cabalfps = withSystemTempDirectory "cabal-solver" $ \dir -> do
              : "--package-db=clear"
              : "--package-db=global"
              : map (toFilePath . parent) cabalfps
+
+    $logInfo "Asking cabal to calculate a build plan, please wait"
+
     bs <- readProcessStdout (Just tmpdir) menv "cabal" args
     let ls = drop 1
            $ dropWhile (not . T.isPrefixOf "In order, ")

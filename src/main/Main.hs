@@ -615,7 +615,7 @@ initCmd initOpts go@GlobalOpts{..} = do
   runStackLoggingT manager globalLogLevel globalTerminal $
         Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $
             runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-                initProject globalResolver initOpts
+                initProject initOpts
 
 -- | Project creation
 newCmd :: InitOpts -> GlobalOpts -> IO ()
@@ -625,4 +625,4 @@ newCmd initOpts go@GlobalOpts{..} = do
         Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $
             runStackT manager globalLogLevel (lcConfig lc) globalTerminal $ do
                 newProject
-                initProject globalResolver initOpts
+                initProject initOpts

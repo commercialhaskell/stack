@@ -518,8 +518,8 @@ instance Show ConfigException where
             names
         , "\nYou'll then need to add some extra-deps. See:\n\n"
         , "    https://github.com/commercialhaskell/stack/wiki/stack.yaml#extra-deps"
-        , "\n\nNote that this will be improved in the future, see:\n\n"
-        , "    https://github.com/commercialhaskell/stack/issues/116"
+        , "\n\nYou can also try falling back to a dependency solver with:\n\n"
+        , "    stack init --solver"
         ]
 instance Exception ConfigException
 
