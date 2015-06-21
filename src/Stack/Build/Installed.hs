@@ -44,11 +44,11 @@ type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasEnvConfig env,
 data LoadHelper = LoadHelper
     { lhId   :: !GhcPkgId
     , lhDeps :: ![GhcPkgId]
-    , lhPair :: !(PackageName, (Version, Location, Installed)) -- TODO Version is now redundant and can be gleaned from Installed
+    , lhPair :: !(PackageName, (Version, InstallLocation, Installed)) -- TODO Version is now redundant and can be gleaned from Installed
     }
     deriving Show
 
-type InstalledMap = Map PackageName (Version, Location, Installed) -- TODO Version is now redundant and can be gleaned from Installed
+type InstalledMap = Map PackageName (Version, InstallLocation, Installed) -- TODO Version is now redundant and can be gleaned from Installed
 
 -- | Options for 'getInstalled'.
 data GetInstalledOpts = GetInstalledOpts
@@ -120,7 +120,7 @@ loadDatabase :: (M env m, PackageInstallInfo pii)
              -> GetInstalledOpts
              -> Maybe InstalledCache -- ^ if Just, profiling or haddock is required
              -> Map PackageName pii -- ^ to determine which installed things we should include
-             -> Maybe (Location, Path Abs Dir) -- ^ package database, Nothing for global
+             -> Maybe (InstallLocation, Path Abs Dir) -- ^ package database, Nothing for global
              -> [LoadHelper] -- ^ from parent databases
              -> m ([LoadHelper], Set GhcPkgId)
 loadDatabase menv opts mcache sourceMap mdb lhs0 = do
@@ -162,7 +162,7 @@ isAllowed :: PackageInstallInfo pii
           => GetInstalledOpts
           -> Maybe InstalledCache
           -> Map PackageName pii
-          -> Maybe Location
+          -> Maybe InstallLocation
           -> DumpPackage Bool Bool
           -> Maybe LoadHelper
 isAllowed opts mcache sourceMap mloc dp
