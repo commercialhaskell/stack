@@ -20,6 +20,7 @@ module Stack.Build.Types
     ,LocalPackage(..)
     ,BaseConfigOpts(..)
     ,Plan(..)
+    ,InstallExesPlan(..)
     ,FinalAction(..)
     ,BuildOpts(..)
     ,TaskType(..)
@@ -273,7 +274,7 @@ data BuildOpts =
             ,boptsDryrun :: !Bool
             ,boptsGhcOptions :: ![Text]
             ,boptsFlags :: !(Map PackageName (Map FlagName Bool))
-            ,boptsInstallExes :: !Bool
+            ,boptsInstallExes :: !(Bool, Maybe (Path Abs Dir))
             -- ^ Install executables to user path after building?
             ,boptsPreFetch :: !Bool
             -- ^ Fetch all packages immediately
@@ -380,8 +381,18 @@ data Plan = Plan
     , planFinals :: !(Map PackageName Task)
     -- ^ Final actions to be taken (test, benchmark, etc)
     , planUnregisterLocal :: !(Set GhcPkgId)
-    , planInstallExes :: !(Map Text InstallLocation)
+    , planInstallExes :: !InstallExesPlan
     -- ^ Executables that should be installed after successful building
+    }
+    deriving Show
+
+data InstallExesPlan = InstallExesPlan
+    { installExesPlanFlag :: !Bool
+      -- ^ Install executables if True
+    , installExesPlanDestDir :: !(Maybe (Path Abs Dir))
+      -- ^ custom destination directory
+    , installExesNamesLoc :: !(Map Text InstallLocation)
+      -- ^ Map exename bindir. Default Map.Empty for configLocalBin
     }
     deriving Show
 

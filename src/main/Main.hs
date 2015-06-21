@@ -85,7 +85,10 @@ main =
              addCommand "install"
                         "Build executables and install to a user path"
                         installCmd
-                        (buildOpts False)
+                        ((,) <$> (optional (strOption (long "path" <> 
+                                                        metavar "DIRECTORY" <> 
+                                                        help "Write binaries to DIRECTORY"))) <*>
+                         buildOpts)
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
                         (buildCmd DoTests)
@@ -451,10 +454,13 @@ buildCmd finalAction opts go@GlobalOpts{..} = withBuildConfig go ThrowException 
     Stack.Build.build opts { boptsFinalAction = finalAction }
 
 -- | Install
-installCmd :: BuildOpts -> GlobalOpts -> IO ()
-installCmd opts go@GlobalOpts{..} = withBuildConfig go ExecStrategy $
-    Stack.Build.build opts { boptsInstallExes = True }
-
+installCmd :: (Maybe String, BuildOpts) -> GlobalOpts -> IO ()
+installCmd (mPath, opts) go@GlobalOpts{..} = do
+    specifiedDir <- case mPath of
+                      (Just userPath) -> parseAbsDir userPath >>= return . Just
+                      Nothing -> return $ Nothing
+    withBuildConfig go ExecStrategy 
+                       (Stack.Build.build opts { boptsInstallExes = (True, specifiedDir) }) 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
 unpackCmd names go@GlobalOpts{..} = do
@@ -566,7 +572,7 @@ buildOpts forHaddock =
                     "building Haddocks for dependencies"
                     idm
         finalAction = pure DoNothing
-        installExes = pure False
+        installExes = pure (False, Nothing)
         dryRun = flag False True (long "dry-run" <>
                                   help "Don't build anything, just prepare to")
         ghcOpts = (++)

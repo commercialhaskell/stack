@@ -130,7 +130,7 @@ printPlan finalAction plan = do
 
     $logInfo ""
 
-    case Map.toList $ planInstallExes plan of
+    case Map.toList . installExesNamesLoc $ planInstallExes plan of
         [] -> $logInfo "No executables to be installed"
         xs -> do
             $logInfo "Would install executables:"
@@ -221,10 +221,13 @@ executePlan menv bopts baseConfigOpts locals sourceMap plan = do
             , eeGlobalDB = globalDB
             }
 
-    unless (Map.null $ planInstallExes plan) $ do
+    when (installExesPlanFlag $ planInstallExes plan) $ do
+        -- Also install executables
         snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
         localBin <- (</> bindirSuffix) `liftM` installationRootLocal
-        destDir <- asks $ configLocalBin . getConfig
+        destDir <- case (installExesPlanDestDir $ planInstallExes plan) of 
+                     Just userDestDir -> return userDestDir
+                     Nothing -> asks $ configLocalBin . getConfig
         let destDir' = toFilePath destDir
         liftIO $ createDirectoryIfMissing True destDir'
 
@@ -243,7 +246,8 @@ executePlan menv bopts baseConfigOpts locals sourceMap plan = do
 
         currExe <- liftIO getExecutablePath -- needed for windows, see below
 
-        installed <- forM (Map.toList $ planInstallExes plan) $ \(name, loc) -> do
+        installed <- forM (Map.toList . installExesNamesLoc $ planInstallExes plan) $
+          \(name, loc) -> do
             let bindir =
                     case loc of
                         Snap -> snapBin
