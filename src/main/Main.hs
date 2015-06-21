@@ -266,7 +266,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                   case scoGhcVersion of
                       Just v -> return (v, Nothing)
                       Nothing -> do
-                          bc <- lcLoadBuildConfig lc globalResolver ThrowException
+                          bc <- lcLoadBuildConfig lc globalResolver ExecStrategy
                           return (bcGhcVersionExpected bc, Just $ bcStackYaml bc)
               mpaths <- runStackT manager globalLogLevel (lcConfig lc) globalTerminal $ ensureGHC SetupOpts
                   { soptsInstallIfMissing = True
