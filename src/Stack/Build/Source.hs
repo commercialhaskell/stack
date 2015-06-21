@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 -- Load information on package sources
 module Stack.Build.Source
     ( loadSourceMap
@@ -45,9 +46,13 @@ import           Stack.Types
 import           System.Directory             hiding (findExecutable, findFiles)
 
 type SourceMap = Map PackageName PackageSource
+
+-- | Where the package's source is located: local directory or package index
 data PackageSource
     = PSLocal LocalPackage
     | PSUpstream Version Location (Map FlagName Bool)
+    -- ^ Upstream packages could be installed in either local or snapshot
+    -- databases; this is what 'Location' specifies.
     deriving Show
 instance PackageInstallInfo PackageSource where
     piiVersion (PSLocal lp) = packageVersion $ lpPackage lp
@@ -79,7 +84,12 @@ loadSourceMap bopts = do
     let latestVersion = Map.fromList $ map toTuple $ Map.keys caches
     (locals, extraNames, extraIdents) <- loadLocals bopts latestVersion
 
-    let nonLocalTargets = extraNames <> Set.map packageIdentifierName extraIdents
+    let
+        -- loadLocals returns PackageName (foo) and PackageIdentifier (bar-1.2.3) targets separately;
+        -- here we combine them into nonLocalTargets. This is one of the
+        -- return values of this function.
+        nonLocalTargets :: Set PackageName
+        nonLocalTargets = extraNames <> Set.map packageIdentifierName extraIdents
 
         -- Extend extra-deps to encompass targets requested on the command line
         -- that are not in the snapshot.
@@ -129,8 +139,24 @@ loadSourceMap bopts = do
 
     return (mbp, locals, nonLocalTargets, sourceMap)
 
--- | Returns locals and extra target packages
-loadLocals :: (MonadReader env m, HasBuildConfig env, MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m,HasEnvConfig env)
+-- | 'loadLocals' combines two pieces of information:
+--
+-- 1. Targets, i.e. arguments passed to stack such as @foo@ and @bar@ in the @stack foo bar@ invocation
+--
+-- 2. Local packages listed in @stack.yaml@
+--
+-- It returns:
+--
+-- 1. For every local package, a 'LocalPackage' structure
+--
+-- 2. If a target does not correspond to a local package but is a valid
+-- 'PackageName' or 'PackageIdentifier', it is returned as such.
+--
+-- NOTE: as the function is written right now, it may "drop" targets if
+-- they correspond to existing directories not listed in stack.yaml. This
+-- may be a bug.
+loadLocals :: forall m env .
+              (MonadReader env m, HasBuildConfig env, MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m,HasEnvConfig env)
            => BuildOpts
            -> Map PackageName Version
            -> m ([LocalPackage], Set PackageName, Set PackageIdentifier)
@@ -139,6 +165,8 @@ loadLocals bopts latestVersion = do
         case boptsTargets bopts of
             [] -> ["."]
             x -> x
+
+    -- Group targets by their kind
     (dirs, names, idents) <-
         case partitionEithers targets of
             ([], targets') -> return $ partitionTargetSpecs targets'
@@ -146,6 +174,9 @@ loadLocals bopts latestVersion = do
 
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
+    -- Iterate over local packages declared in stack.yaml and turn them
+    -- into LocalPackage structures. The targets affect whether these
+    -- packages will be marked as wanted.
     lps <- forM (Map.toList $ bcPackages bconfig) $ \(dir, validWanted) -> do
         cabalfp <- getCabalFileName dir
         name <- parsePackageNameFromFilePath cabalfp
@@ -185,6 +216,11 @@ loadLocals bopts latestVersion = do
 
     return (lps, unknown, idents)
   where
+    -- Attempt to parse a TargetSpec based on its textual form and on
+    -- whether it is a name of an existing directory.
+    --
+    -- If a TargetSpec is not recognized, return it verbatim as Left.
+    parseTarget :: Text -> m (Either Text TargetSpec)
     parseTarget t = do
         let s = T.unpack t
         isDir <- liftIO $ doesDirectoryExist s
