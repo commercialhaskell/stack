@@ -68,8 +68,7 @@ loadSourceMap bopts = do
     mbp0 <- case bcResolver bconfig of
         ResolverSnapshot snapName -> do
             $logDebug $ "Checking resolver: " <> renderSnapName snapName
-            mbp <- loadMiniBuildPlan snapName
-            return mbp
+            loadMiniBuildPlan snapName
         ResolverGhc ghc -> return MiniBuildPlan
             { mbpGhcVersion = fromMajorVersion ghc
             , mbpPackages = Map.empty
