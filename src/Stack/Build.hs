@@ -26,6 +26,7 @@ import           Control.Monad.Trans.Resource
 import           Data.Function
 import           Data.Map.Strict (Map)
 import qualified Data.Map as Map
+import           Data.Maybe (fromMaybe)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path.IO
 import           Prelude hiding (FilePath, writeFile)
@@ -55,7 +56,12 @@ build bopts = do
     menv <- getMinimalEnvOverride
 
     (mbp, locals, extraToBuild, sourceMap) <- loadSourceMap bopts
-    (installedMap, locallyRegistered) <- getInstalled menv profiling sourceMap
+    (installedMap, locallyRegistered) <-
+        getInstalled menv
+                     GetInstalledOpts
+                         { getInstalledProfiling = profiling
+                         , getInstalledHaddock   = fromMaybe (boptsHaddock bopts) (boptsDepsHaddock bopts) }
+                     sourceMap
 
     baseConfigOpts <- mkBaseConfigOpts bopts
     plan <- withLoadPackage menv $ \loadPackage ->

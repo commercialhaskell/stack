@@ -27,7 +27,9 @@ module Stack.Build.Types
     ,ConfigCache(..)
     ,ConstructPlanException(..)
     ,configureOpts
-    ,BadDependency(..))
+    ,BadDependency(..)
+    ,wantedLocalPackages
+    ,shouldBuildHaddock)
     where
 
 import           Control.DeepSeq
@@ -54,12 +56,12 @@ import           Data.Time.Clock
 import           Distribution.System (Arch)
 import           Distribution.Text (display)
 import           GHC.Generics
-import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, (</>))
-import           Prelude hiding (FilePath)
+import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, parseRelDir, (</>))
+import           Prelude
 import           Stack.Package
 import           Stack.Types
 import           System.Exit (ExitCode)
-import           System.FilePath (pathSeparator)
+import           System.FilePath (dropTrailingPathSeparator, pathSeparator)
 
 ----------------------------------------------
 -- Exceptions
@@ -263,6 +265,10 @@ data BuildOpts =
             ,boptsLibProfile :: !Bool
             ,boptsExeProfile :: !Bool
             ,boptsEnableOptimizations :: !(Maybe Bool)
+            ,boptsHaddock :: !Bool
+            -- ^ Build haddocks?
+            ,boptsDepsHaddock :: !(Maybe Bool)
+            -- ^ Build haddocks for dependencies?
             ,boptsFinalAction :: !FinalAction
             ,boptsDryrun :: !Bool
             ,boptsGhcOptions :: ![Text]
@@ -283,7 +289,6 @@ data BuildOpts =
 data FinalAction
   = DoTests
   | DoBenchmarks
-  | DoHaddock
   | DoNothing
   deriving (Eq,Bounded,Enum,Show)
 
@@ -333,6 +338,8 @@ data ConfigCache = ConfigCache
       -- ^ The components to be built. It's a bit of a hack to include this in
       -- here, as it's not a configure option (just a build option), but this
       -- is a convenient way to force compilation when the components change.
+    , configCacheHaddock :: !Bool
+      -- ^ Are haddocks to be built?
     }
     deriving (Generic,Eq,Show)
 instance Binary ConfigCache
@@ -393,19 +400,20 @@ configureOpts :: EnvConfig
               -> Set GhcPkgId -- ^ dependencies
               -> Bool -- ^ wanted?
               -> Location
-              -> Map FlagName Bool
+              -> Package
               -> [Text]
-configureOpts econfig bco deps wanted loc flags = map T.pack $ concat
+configureOpts econfig bco deps wanted loc package = map T.pack $ concat
     [ ["--user", "--package-db=clear", "--package-db=global"]
     , map (("--package-db=" ++) . toFilePath) $ case loc of
         Snap -> [bcoSnapDB bco]
         Local -> [bcoSnapDB bco, bcoLocalDB bco]
     , depOptions
     , [ "--libdir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "lib"))
-      , "--bindir=" ++ toFilePathNoTrailingSlash  (installRoot </> bindirSuffix)
-      , "--datadir=" ++ toFilePathNoTrailingSlash  (installRoot </> $(mkRelDir "share"))
-      , "--docdir=" ++ toFilePathNoTrailingSlash  (installRoot </> $(mkRelDir "doc"))
-      ]
+      , "--bindir=" ++ toFilePathNoTrailingSlash (installRoot </> bindirSuffix)
+      , "--datadir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "share"))
+      , "--docdir=" ++ toFilePathNoTrailingSlash docDir
+      , "--htmldir=" ++ toFilePathNoTrailingSlash docDir
+      , "--haddockdir=" ++ toFilePathNoTrailingSlash docDir]
     , ["--enable-library-profiling" | boptsLibProfile bopts || boptsExeProfile bopts]
     , ["--enable-executable-profiling" | boptsExeProfile bopts]
     , map (\(name,enabled) ->
@@ -414,7 +422,7 @@ configureOpts econfig bco deps wanted loc flags = map T.pack $ concat
                            then ""
                            else "-") <>
                        flagNameString name)
-                    (Map.toList flags)
+                    (Map.toList (packageFlags package))
     -- FIXME Chris: where does this come from now? , ["--ghc-options=-O2" | gconfigOptimize gconfig]
     , if wanted
         then concatMap (\x -> ["--ghc-options", T.unpack x]) (boptsGhcOptions bopts)
@@ -425,18 +433,19 @@ configureOpts econfig bco deps wanted loc flags = map T.pack $ concat
   where
     config = getConfig econfig
     bopts = bcoBuildOpts bco
-    toFilePathNoTrailingSlash =
-        loop . toFilePath
-      where
-        loop [] = []
-        loop [c]
-            | c == pathSeparator = []
-            | otherwise = [c]
-        loop (c:cs) = c : loop cs
+    toFilePathNoTrailingSlash = dropTrailingPathSeparator . toFilePath
+    docDir =
+        case pkgVerDir of
+            Nothing -> installRoot </> $(mkRelDir "doc")
+            Just dir -> installRoot </> $(mkRelDir "doc") </> dir
     installRoot =
         case loc of
             Snap -> bcoSnapInstallRoot bco
             Local -> bcoLocalInstallRoot bco
+    pkgVerDir =
+        parseRelDir (packageIdentifierString (PackageIdentifier (packageName package)
+                                                                (packageVersion package)) ++
+                     [pathSeparator])
 
     depOptions = map toDepOption $ Set.toList deps
       where
@@ -460,6 +469,17 @@ configureOpts econfig bco deps wanted loc flags = map T.pack $ concat
         ]
       where
         PackageIdentifier name version = ghcPkgIdPackageIdentifier gid
+
+-- | Get set of wanted package names from locals.
+wantedLocalPackages :: [LocalPackage] -> Set PackageName
+wantedLocalPackages = Set.fromList . map (packageName . lpPackage) . filter lpWanted
+
+-- | Determine whether we should build haddocks for a package.
+shouldBuildHaddock :: BuildOpts -> Set PackageName -> PackageName -> Bool
+shouldBuildHaddock bopts wanted name =
+    if Set.member name wanted
+        then boptsHaddock bopts
+        else fromMaybe (boptsHaddock bopts) (boptsDepsHaddock bopts)
 
 -- | Used for storage and comparison.
 newtype ModTime = ModTime (Integer,Rational)

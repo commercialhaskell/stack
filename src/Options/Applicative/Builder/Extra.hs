@@ -2,8 +2,10 @@
 
 module Options.Applicative.Builder.Extra
   (boolFlags
+  ,boolFlagsNoDefault
   ,maybeBoolFlags
   ,enableDisableFlags
+  ,enableDisableFlagsNoDefault
   ,extraHelpOption
   ,execExtraHelp)
   where
@@ -17,6 +19,10 @@ import System.FilePath (takeBaseName)
 boolFlags :: Bool -> String -> String -> Mod FlagFields Bool -> Parser Bool
 boolFlags defaultValue = enableDisableFlags defaultValue True False
 
+-- | Enable/disable flags for a @Bool@, without a default case (to allow chaining @<|>@s).
+boolFlagsNoDefault :: String -> String -> Mod FlagFields Bool -> Parser Bool
+boolFlagsNoDefault = enableDisableFlagsNoDefault True False
+
 -- | Enable/disable flags for a @(Maybe Bool)@.
 maybeBoolFlags :: String -> String -> Mod FlagFields (Maybe Bool) -> Parser (Maybe Bool)
 maybeBoolFlags = enableDisableFlags Nothing (Just True) (Just False)
@@ -24,6 +30,12 @@ maybeBoolFlags = enableDisableFlags Nothing (Just True) (Just False)
 -- | Enable/disable flags for any type.
 enableDisableFlags :: a -> a -> a -> String -> String -> Mod FlagFields a -> Parser a
 enableDisableFlags defaultValue enabledValue disabledValue name helpSuffix mods =
+  enableDisableFlagsNoDefault enabledValue disabledValue name helpSuffix mods <|>
+  pure defaultValue
+
+-- | Enable/disable flags for any type, without a default (to allow chaining @<|>@s)
+enableDisableFlagsNoDefault :: a -> a -> String -> String -> Mod FlagFields a -> Parser a
+enableDisableFlagsNoDefault enabledValue disabledValue name helpSuffix mods =
   flag' enabledValue
         (long name <>
          help ("Enable " ++ helpSuffix) <>
@@ -41,8 +53,7 @@ enableDisableFlags defaultValue enabledValue disabledValue name helpSuffix mods 
         (internal <>
          long ("disable-" ++ name) <>
          help ("Disable " ++ helpSuffix) <>
-         mods) <|>
-  pure defaultValue
+         mods)
 
 -- | Show an extra help option (e.g. @--docker-help@ shows help for all @--docker*@ args).
 -- To actually show have that help appear, use 'execExtraHelp' before executing the main parser.
