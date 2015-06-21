@@ -68,9 +68,10 @@ main =
                    dockerHelpOptName
                    (Docker.dockerOptsParser True)
                    ("Only showing --" ++ Docker.dockerCmdName ++ "* options.")
+     let versionString' = $(simpleVersion Meta.version)
      (level,run) <-
        simpleOptions
-         $(simpleVersion Meta.version)
+         versionString'
          "stack - The Haskell Tool Stack"
          ""
          (extraHelpOption progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*> globalOpts)
@@ -197,6 +198,7 @@ main =
                                    <*> many (strArgument (metavar "ARGS"))))
              )
              -- commandsFromPlugins plugins pluginShouldHaveRun) https://github.com/commercialhaskell/stack/issues/322
+     when (globalLogLevel level == LevelDebug) $ putStrLn versionString'
      run level `catch` \e -> do
         -- This special handler stops "stack: " from being printed before the
         -- exception
