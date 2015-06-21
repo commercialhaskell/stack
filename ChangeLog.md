@@ -3,6 +3,7 @@
 * Fall back to cabal dependency solver when a snapshot can't be found
 * Basic implementation of `stack new` [#137](https://github.com/commercialhaskell/stack/issues/137)
 * Build haddocks for dependencies [#143](https://github.com/commercialhaskell/stack/issues/143)
+* `stack solver` command [#364](https://github.com/commercialhaskell/stack/issues/364)
 
 ## 0.0.3
 

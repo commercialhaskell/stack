@@ -46,6 +46,7 @@ import qualified Stack.PackageIndex
 import           Stack.Path
 import           Stack.Repl
 import           Stack.Setup
+import           Stack.Solver (solveExtraDeps)
 import           Stack.Types
 import           Stack.Types.StackT
 import qualified Stack.Upload as Upload
@@ -101,6 +102,10 @@ main =
                         "Initialize a stack project based on one or more cabal packages"
                         initCmd
                         initOptsParser
+             addCommand "solver"
+                        "Use a dependency solver to try and determine missing extra-deps"
+                        solverCmd
+                        solverOptsParser
              addCommand "setup"
                         "Get the appropriate ghc for your project"
                         setupCmd
@@ -626,3 +631,17 @@ newCmd initOpts go@GlobalOpts{..} = do
             runStackT manager globalLogLevel (lcConfig lc) globalTerminal $ do
                 newProject
                 initProject initOpts
+
+-- | Fix up extra-deps for a project
+solverCmd :: Bool -- ^ modify stack.yaml automatically?
+          -> GlobalOpts
+          -> IO ()
+solverCmd fixStackYaml go =
+    withBuildConfig go ThrowException (solveExtraDeps fixStackYaml)
+
+-- | Parser for @solverCmd@
+solverOptsParser :: Parser Bool
+solverOptsParser = boolFlags False
+    "modify-stack-yaml"
+    "Automatically modify stack.yaml with the solver's recommendations"
+    idm

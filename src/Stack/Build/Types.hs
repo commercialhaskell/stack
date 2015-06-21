@@ -165,6 +165,7 @@ instance Show StackBuildException where
                     , "-"
                     , versionString version
                     ]) (Map.toList extras)
+                    ++ ["", "You may also want to try the 'stack solver' command"]
                 )
          where
              exceptions' = removeDuplicates exceptions

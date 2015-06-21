@@ -5,6 +5,7 @@
 module Stack.Solver
     ( cabalSolver
     , getGhcVersion
+    , solveExtraDeps
     ) where
 
 import           Control.Exception.Enclosed  (tryIO)
@@ -13,15 +14,20 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
+import           Data.Aeson                  (object, (.=), toJSON)
 import qualified Data.ByteString             as S
 import qualified Data.ByteString.Char8       as S8
 import           Data.Either
+import qualified Data.HashMap.Strict         as HashMap
 import           Data.Map                    (Map)
 import qualified Data.Map                    as Map
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import           Data.Text.Encoding          (decodeUtf8, encodeUtf8)
+import qualified Data.Yaml                   as Yaml
+import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
+import           Stack.BuildPlan
 import           Stack.Types
 import           System.Directory            (copyFile,
                                               createDirectoryIfMissing,
@@ -31,9 +37,10 @@ import           System.IO.Temp
 import           System.Process.Read
 
 cabalSolver :: (MonadIO m, MonadLogger m, MonadMask m, MonadBaseControl IO m, MonadReader env m, HasConfig env)
-            => [Path Abs File] -- ^ cabal files
+            => [Path Abs Dir] -- ^ cabal files
+            -> [String] -- ^ additional arguments, usually constraints
             -> m (MajorVersion, Map PackageName (Version, Map FlagName Bool))
-cabalSolver cabalfps = withSystemTempDirectory "cabal-solver" $ \dir -> do
+cabalSolver cabalfps cabalArgs = withSystemTempDirectory "cabal-solver" $ \dir -> do
     configLines <- getCabalConfig dir
     let configFile = dir FP.</> "cabal.config"
     liftIO $ S.writeFile configFile $ encodeUtf8 $ T.unlines configLines
@@ -58,7 +65,8 @@ cabalSolver cabalfps = withSystemTempDirectory "cabal-solver" $ \dir -> do
              : "--max-backjumps=-1"
              : "--package-db=clear"
              : "--package-db=global"
-             : map (toFilePath . parent) cabalfps
+             : cabalArgs ++
+               (map toFilePath cabalfps)
 
     $logInfo "Asking cabal to calculate a build plan, please wait"
 
@@ -85,7 +93,10 @@ cabalSolver cabalfps = withSystemTempDirectory "cabal-solver" $ \dir -> do
       where
         (t1, enabled) =
             case T.stripPrefix "-" t0 of
-                Nothing -> (t0, True)
+                Nothing ->
+                    case T.stripPrefix "+" t0 of
+                        Nothing -> (t0, True)
+                        Just x -> (x, True)
                 Just x -> (x, False)
 
 getGhcVersion :: (MonadLogger m, MonadCatch m, MonadBaseControl IO m, MonadIO m)
@@ -123,3 +134,59 @@ getCabalConfig dir = do
             , indexNameText $ indexName index
             , ":http://0.0.0.0/fake-url"
             ]
+
+-- | Determine missing extra-deps
+solveExtraDeps :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadMask m, MonadLogger m, MonadBaseControl IO m, HasHttpManager env)
+               => Bool -- ^ modify stack.yaml?
+               -> m ()
+solveExtraDeps modStackYaml = do
+    $logInfo "This command is not guaranteed to give you a perfect build plan"
+    $logInfo "It's possible that even with the changes generated below, you will still need to do some manual tweaking"
+    bconfig <- asks getBuildConfig
+    snapshot <-
+        case bcResolver bconfig of
+            ResolverSnapshot snapName -> liftM mbpPackages $ loadMiniBuildPlan snapName
+            ResolverGhc _ -> return Map.empty
+
+    let packages = Map.union
+            (bcExtraDeps bconfig)
+            (fmap mpiVersion snapshot)
+        constraints = map
+            (\(k, v) -> concat
+                [ "--constraint="
+                , packageNameString k
+                , "=="
+                , versionString v
+                ])
+            (Map.toList packages)
+
+    (_ghc, extraDeps) <- cabalSolver
+        (Map.keys $ bcPackages bconfig)
+        constraints
+
+    let newDeps = extraDeps `Map.difference` packages
+        newFlags = Map.filter (not . Map.null) $ fmap snd newDeps
+
+    if Map.null newDeps
+        then $logInfo "No needed changes found"
+        else do
+            let o = object
+                    $ ("extra-deps" .= (map fromTuple $ Map.toList $ fmap fst newDeps))
+                    : (if Map.null newFlags
+                        then []
+                        else ["flags" .= newFlags])
+            mapM_ $logInfo $ T.lines $ decodeUtf8 $ Yaml.encode o
+
+    when modStackYaml $ do
+        let fp = toFilePath $ bcStackYaml bconfig
+        obj <- liftIO (Yaml.decodeFileEither fp) >>= either throwM return
+        ProjectAndConfigMonoid project _ <- liftIO (Yaml.decodeFileEither fp) >>= either throwM return
+        let obj' =
+                HashMap.insert "extra-deps"
+                    (toJSON $ map fromTuple $ Map.toList
+                            $ Map.union (projectExtraDeps project) (fmap fst newDeps))
+              $ HashMap.insert ("flags" :: Text)
+                    (toJSON $ Map.union (projectFlags project) newFlags)
+                obj
+        liftIO $ Yaml.encodeFile fp obj'
+        $logInfo $ T.pack $ "Updated " ++ fp

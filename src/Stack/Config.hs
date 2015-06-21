@@ -39,7 +39,6 @@ import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson.Extended
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as L
-import           Data.Either (partitionEithers)
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import           Data.Maybe
@@ -82,46 +81,6 @@ getLatestResolver = do
                 Nothing -> Nightly (snapshotsNightly snapshots)
                 Just lts -> lts
     return (ResolverSnapshot snap)
-
-data ProjectAndConfigMonoid
-  = ProjectAndConfigMonoid !Project !ConfigMonoid
-
-instance FromJSON ProjectAndConfigMonoid where
-    parseJSON = withObject "Project, ConfigMonoid" $ \o -> do
-        dirs <- o .:? "packages" .!= [packageEntryCurrDir]
-        extraDeps' <- o .:? "extra-deps" .!= []
-        extraDeps <-
-            case partitionEithers $ goDeps extraDeps' of
-                ([], x) -> return $ Map.fromList x
-                (errs, _) -> fail $ unlines errs
-
-        flags <- o .:? "flags" .!= mempty
-        resolver <- o .: "resolver"
-        config <- parseJSON $ Object o
-        let project = Project
-                { projectPackages = dirs
-                , projectExtraDeps = extraDeps
-                , projectFlags = flags
-                , projectResolver = resolver
-                }
-        return $ ProjectAndConfigMonoid project config
-      where
-        goDeps =
-            map toSingle . Map.toList . Map.unionsWith S.union . map toMap
-          where
-            toMap i = Map.singleton
-                (packageIdentifierName i)
-                (S.singleton (packageIdentifierVersion i))
-
-        toSingle (k, s) =
-            case S.toList s of
-                [x] -> Right (k, x)
-                xs -> Left $ concat
-                    [ "Multiple versions for package "
-                    , packageNameString k
-                    , ": "
-                    , unwords $ map versionString xs
-                    ]
 
 -- | Note that this will be @Nothing@ on Windows, which is by design.
 defaultStackGlobalConfig :: Maybe (Path Abs File)
@@ -286,14 +245,6 @@ loadConfig configArgs = do
         , lcLoadBuildConfig = loadBuildConfig menv mproject config stackRoot
         , lcProjectRoot     = fmap (\(_, fp, _) -> parent fp) mproject
         }
-
--- | A PackageEntry for the current directory, used as a default
-packageEntryCurrDir :: PackageEntry
-packageEntryCurrDir = PackageEntry
-    { peValidWanted = True
-    , peLocation = PLFilePath "."
-    , peSubdirs = []
-    }
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.

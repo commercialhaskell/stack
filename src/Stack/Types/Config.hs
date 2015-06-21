@@ -15,10 +15,11 @@ import           Control.Monad (liftM, mzero)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
 import           Data.Aeson.Extended (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, object
-                            ,(.=), (.:?), (.!=), (.:), Value (String))
+                            ,(.=), (.:?), (.!=), (.:), Value (String, Object))
 import           Data.Binary (Binary)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
+import           Data.Either (partitionEithers)
 import           Data.Hashable (Hashable)
 import           Data.Map (Map)
 import qualified Data.Map as Map
@@ -669,3 +670,51 @@ getMinimalEnvOverride = do
                     { esIncludeLocals = False
                     , esIncludeGhcPackagePath = False
                     }
+
+data ProjectAndConfigMonoid
+  = ProjectAndConfigMonoid !Project !ConfigMonoid
+
+instance FromJSON ProjectAndConfigMonoid where
+    parseJSON = withObject "Project, ConfigMonoid" $ \o -> do
+        dirs <- o .:? "packages" .!= [packageEntryCurrDir]
+        extraDeps' <- o .:? "extra-deps" .!= []
+        extraDeps <-
+            case partitionEithers $ goDeps extraDeps' of
+                ([], x) -> return $ Map.fromList x
+                (errs, _) -> fail $ unlines errs
+
+        flags <- o .:? "flags" .!= mempty
+        resolver <- o .: "resolver"
+        config <- parseJSON $ Object o
+        let project = Project
+                { projectPackages = dirs
+                , projectExtraDeps = extraDeps
+                , projectFlags = flags
+                , projectResolver = resolver
+                }
+        return $ ProjectAndConfigMonoid project config
+      where
+        goDeps =
+            map toSingle . Map.toList . Map.unionsWith Set.union . map toMap
+          where
+            toMap i = Map.singleton
+                (packageIdentifierName i)
+                (Set.singleton (packageIdentifierVersion i))
+
+        toSingle (k, s) =
+            case Set.toList s of
+                [x] -> Right (k, x)
+                xs -> Left $ concat
+                    [ "Multiple versions for package "
+                    , packageNameString k
+                    , ": "
+                    , unwords $ map versionString xs
+                    ]
+
+-- | A PackageEntry for the current directory, used as a default
+packageEntryCurrDir :: PackageEntry
+packageEntryCurrDir = PackageEntry
+    { peValidWanted = True
+    , peLocation = PLFilePath "."
+    , peSubdirs = []
+    }
