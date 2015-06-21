@@ -29,6 +29,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.Typeable
+import           Data.Yaml (ParseException)
 import           Distribution.System (Platform)
 import qualified Distribution.Text
 import           Distribution.Version (anyVersion, intersectVersionRanges)
@@ -465,13 +466,21 @@ instance FromJSON VersionRangeJSON where
                              (Distribution.Text.simpleParse (T.unpack s)))
 
 data ConfigException
-  = ParseResolverException Text
+  = ParseConfigFileException (Path Abs File) ParseException
+  | ParseResolverException Text
   | NoProjectConfigFound (Path Abs Dir) (Maybe Text)
   | UnexpectedTarballContents [Path Abs Dir] [Path Abs File]
   | BadStackVersionException VersionRange
   | NoMatchingSnapshot [SnapName]
   deriving Typeable
 instance Show ConfigException where
+    show (ParseConfigFileException configFile exception) = concat
+        [ "Could not parse '"
+        , toFilePath configFile
+        , "':\n"
+        , show exception
+        , "\nSee https://github.com/commercialhaskell/stack/wiki/stack.yaml."
+        ]
     show (ParseResolverException t) = concat
         [ "Invalid resolver value: "
         , T.unpack t

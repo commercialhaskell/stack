@@ -41,8 +41,9 @@ script:
 
  - cabal copy
  - cd test/integration
- - stack setup
- - stack test
+ # Takes too long for now
+ # - stack setup
+ # - stack test
  - cd ../..
 
 # Check that the resulting source distribution can be built & installed.

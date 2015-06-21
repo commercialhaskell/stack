@@ -15,9 +15,9 @@ import Data.Text (unpack, Text)
 import Data.Monoid ((<>))
 
 (.:) :: FromJSON a => Object -> Text -> Parser a
-(.:) o p = modifyFailure (("failed to parse field " <> unpack p <> ": ") <>) (o A..: p)
+(.:) o p = modifyFailure (("failed to parse field '" <> unpack p <> "': ") <>) (o A..: p)
 {-# INLINE (.:) #-}
 
 (.:?) :: FromJSON a => Object -> Text -> Parser (Maybe a)
-(.:?) o p = modifyFailure (("failed to parse field " <> unpack p <> ": ") <>) (o A..:? p)
+(.:?) o p = modifyFailure (("failed to parse field '" <> unpack p <> "': ") <>) (o A..:? p)
 {-# INLINE (.:?) #-}
