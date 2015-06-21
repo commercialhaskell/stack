@@ -56,8 +56,7 @@ A full description of the architecture
   please see
   [the FAQ](https://github.com/commercialhaskell/stack/wiki/FAQ).
 * For general questions, comments, feedback and support please write
-  to
-  [the Commercial Haskell mailing list](https://groups.google.com/d/forum/commercialhaskell).
+  to [the stack mailing list](https://groups.google.com/d/forum/haskell-stack).
 * For bugs, issues, or requests please
   [open an issue](https://github.com/commercialhaskell/stack/issues/new).
 
