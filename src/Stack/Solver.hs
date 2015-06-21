@@ -24,7 +24,8 @@ import           Data.Text.Encoding          (decodeUtf8, encodeUtf8)
 import           Path
 import           Stack.Types
 import           System.Directory            (copyFile,
-                                              createDirectoryIfMissing)
+                                              createDirectoryIfMissing,
+                                              getTemporaryDirectory)
 import qualified System.FilePath             as FP
 import           System.IO.Temp
 import           System.Process.Read
@@ -42,6 +43,14 @@ cabalSolver cabalfps = withSystemTempDirectory "cabal-solver" $ \dir -> do
     menv <- getMinimalEnvOverride
     ghcMajorVersion <- getGhcMajorVersion menv
 
+    -- Run from a temporary directory to avoid cabal getting confused by any
+    -- sandbox files, see:
+    -- https://github.com/commercialhaskell/stack/issues/356
+    --
+    -- In theory we could use --ignore-sandbox, but not all versions of cabal
+    -- support it.
+    tmpdir <- liftIO getTemporaryDirectory >>= parseAbsDir
+
     let args = ("--config-file=" ++ configFile)
              : "install"
              : "-v"
@@ -52,7 +61,7 @@ cabalSolver cabalfps = withSystemTempDirectory "cabal-solver" $ \dir -> do
              : "--package-db=clear"
              : "--package-db=global"
              : map (toFilePath . parent) cabalfps
-    bs <- readProcessStdout Nothing menv "cabal" args
+    bs <- readProcessStdout (Just tmpdir) menv "cabal" args
     let ls = drop 1
            $ dropWhile (not . T.isPrefixOf "In order, ")
            $ T.lines
