@@ -20,6 +20,7 @@ extra-source-files:  README.md ChangeLog.md
                      --     cabal: filepath wildcard 'test/package-dump/*.txt' does not match any files.
                      -- Happened during cabal sdist
                      test/package-dump/ghc-7.8.txt
+                     test/package-dump/ghc-7.8.4-osx.txt
                      test/package-dump/ghc-7.10.txt
 
                      new-template/src/Lib.hs
