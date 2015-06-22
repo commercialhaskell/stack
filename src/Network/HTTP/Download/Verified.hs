@@ -72,29 +72,35 @@ type LengthCheck = Int
 -- | An exception regarding verification of a download.
 data VerifiedDownloadException
     = WrongContentLength
+          Request
           Int -- expected
           ByteString -- actual (as listed in the header)
     | WrongStreamLength
+          Request
           Int -- expected
           Int -- actual
     | WrongDigest
+          Request
           String -- algorithm
           CheckHexDigest -- expected
           String -- actual (shown)
   deriving (Typeable)
 instance Show VerifiedDownloadException where
-    show (WrongContentLength expected actual) =
+    show (WrongContentLength req expected actual) =
         "Download expectation failure: ContentLength header\n"
         ++ "Expected: " ++ show expected ++ "\n"
-        ++ "Actual:   " ++ displayByteString actual
-    show (WrongStreamLength expected actual) =
+        ++ "Actual:   " ++ displayByteString actual ++ "\n"
+        ++ "For: " ++ show (getUri req)
+    show (WrongStreamLength req expected actual) =
         "Download expectation failure: download size\n"
         ++ "Expected: " ++ show expected ++ "\n"
-        ++ "Actual:   " ++ show actual
-    show (WrongDigest algo expected actual) =
+        ++ "Actual:   " ++ show actual ++ "\n"
+        ++ "For: " ++ show (getUri req)
+    show (WrongDigest req algo expected actual) =
         "Download expectation failure: content hash (" ++ algo ++  ")\n"
         ++ "Expected: " ++ displayCheckHexDigest expected ++ "\n"
-        ++ "Actual:   " ++ actual
+        ++ "Actual:   " ++ actual ++ "\n"
+        ++ "For: " ++ show (getUri req)
 
 instance Exception VerifiedDownloadException
 
@@ -125,9 +131,10 @@ displayCheckHexDigest (CheckHexDigestHeader h) =
 --
 -- Throws WrongDigest (VerifiedDownloadException)
 sinkCheckHash :: MonadThrow m
-    => HashCheck
+    => Request
+    -> HashCheck
     -> Consumer ByteString m ()
-sinkCheckHash HashCheck{..} = do
+sinkCheckHash req HashCheck{..} = do
     digest <- sinkHashUsing hashCheckAlgorithm
     let actualDigestString = show digest
     let actualDigestHexByteString = digestToHexByteString digest
@@ -142,23 +149,24 @@ sinkCheckHash HashCheck{..} = do
             || b == actualDigestHexByteString
 
     when (not passedCheck) $
-        throwM $ WrongDigest (show hashCheckAlgorithm) hashCheckHexDigest actualDigestString
+        throwM $ WrongDigest req (show hashCheckAlgorithm) hashCheckHexDigest actualDigestString
 
 assertLengthSink :: MonadThrow m
-    => LengthCheck
+    => Request
+    -> LengthCheck
     -> ZipSink ByteString m ()
-assertLengthSink expectedStreamLength = ZipSink $ do
+assertLengthSink req expectedStreamLength = ZipSink $ do
   Sum actualStreamLength <- CL.foldMap (Sum . ByteString.length)
   when (actualStreamLength /= expectedStreamLength) $
-    throwM $ WrongStreamLength expectedStreamLength actualStreamLength
+    throwM $ WrongStreamLength req expectedStreamLength actualStreamLength
 
 -- | A more explicitly type-guided sinkHash.
 sinkHashUsing :: (Monad m, HashAlgorithm a) => a -> Consumer ByteString m (Digest a)
 sinkHashUsing _ = sinkHash
 
 -- | Turns a list of hash checks into a ZipSink that checks all of them.
-hashChecksToZipSink :: MonadThrow m => [HashCheck] -> ZipSink ByteString m ()
-hashChecksToZipSink = traverse_ (ZipSink . sinkCheckHash)
+hashChecksToZipSink :: MonadThrow m => Request -> [HashCheck] -> ZipSink ByteString m ()
+hashChecksToZipSink req = traverse_ (ZipSink . sinkCheckHash req)
 
 -- | Copied and extended version of Network.HTTP.Download.download.
 --
@@ -215,7 +223,7 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
 
     checkExpectations = bracket (openFile fp ReadMode) hClose $ \h -> do
         whenJust drLengthCheck $ checkFileSizeExpectations h
-        sourceHandle h $$ getZipSink (hashChecksToZipSink drHashChecks)
+        sourceHandle h $$ getZipSink (hashChecksToZipSink drRequest drHashChecks)
 
     -- doesn't move the handle
     checkFileSizeExpectations h expectedFileSize = do
@@ -231,7 +239,7 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
             Just lengthBS -> do
               let lengthStr = displayByteString lengthBS
               when (lengthStr /= show expectedContentLength) $
-                throwM $ WrongContentLength expectedContentLength lengthBS
+                throwM $ WrongContentLength drRequest expectedContentLength lengthBS
             _ -> return ()
 
     go h res = do
@@ -250,7 +258,7 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
         responseBody res
             $= maybe (awaitForever yield) CB.isolate drLengthCheck
             $$ getZipSink
-                ( hashChecksToZipSink hashChecks
-                  *> maybe (pure ()) assertLengthSink drLengthCheck
+                ( hashChecksToZipSink drRequest hashChecks
+                  *> maybe (pure ()) (assertLengthSink drRequest) drLengthCheck
                   *> ZipSink (sinkHandle h)
                   *> ZipSink progressSink)
