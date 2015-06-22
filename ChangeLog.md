@@ -2,9 +2,12 @@
 
 * Fall back to cabal dependency solver when a snapshot can't be found
 * Basic implementation of `stack new` [#137](https://github.com/commercialhaskell/stack/issues/137)
-* Build haddocks for dependencies [#143](https://github.com/commercialhaskell/stack/issues/143)
 * `stack solver` command [#364](https://github.com/commercialhaskell/stack/issues/364)
 * `stack path` command [#95](https://github.com/commercialhaskell/stack/issues/95)
+* Haddocks [#143](https://github.com/commercialhaskell/stack/issues/143):
+    * Build for dependencies
+    * Use relative links
+    * Generate module contents and index for all packages in project
 
 ## 0.0.3
 
