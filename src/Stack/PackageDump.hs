@@ -25,6 +25,7 @@ module Stack.PackageDump
     ) where
 
 import           Control.Applicative
+import           Control.Exception.Enclosed (tryIO)
 import           Control.Monad (when, liftM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -189,11 +190,12 @@ addProfiling (InstalledCache ref) =
             Nothing -> do
                 let loop [] = return False
                     loop (dir:dirs) = do
-                        contents <- getDirectoryContents $ S8.unpack dir
+                        econtents <- tryIO $ getDirectoryContents $ S8.unpack dir
+                        let contents = either (const []) id econtents
                         if or [isProfiling content lib
                               | content <- contents
                               , lib <- dpLibraries dp
-                              ]
+                              ] && not (null contents)
                             then return True
                             else loop dirs
                 loop $ dpLibDirs dp
