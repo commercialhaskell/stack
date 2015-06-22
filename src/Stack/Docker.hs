@@ -163,10 +163,10 @@ runContainerAndExit modConfig
        liftIO ((,,) <$> lookupEnv "DOCKER_HOST"
                     <*> lookupEnv "DOCKER_CERT_PATH"
                     <*> lookupEnv "DOCKER_TLS_VERIFY")
-     (isStdinTerminal,isStdoutTerminal,isStderrTerminal) <-
-       liftIO ((,,) <$> hIsTerminalDevice stdin
-                    <*> hIsTerminalDevice stdout
-                    <*> hIsTerminalDevice stderr)
+     isStdoutTerminal <- asks getTerminal
+     (isStdinTerminal,isStderrTerminal) <-
+       liftIO ((,) <$> hIsTerminalDevice stdin
+                   <*> hIsTerminalDevice stderr)
      pwd <- getWorkingDir
      when (maybe False (isPrefixOf "tcp://") dockerHost &&
            maybe False (isInfixOf "boot2docker") dockerCertPath)
