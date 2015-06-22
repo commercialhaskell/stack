@@ -31,6 +31,8 @@ import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Trans.Control
+import           Data.Attoparsec.Args
+import           Data.Attoparsec.Text as P
 import           Data.Binary (Binary)
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad, taggedEncodeFile, BinarySchema (..))
 import           Data.ByteString (ByteString)
@@ -46,6 +48,7 @@ import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (catMaybes)
 import qualified Data.Set as Set
+import qualified Data.Text.Encoding as T
 import           Data.Typeable (Typeable)
 import           GHC.Generics (Generic)
 import           Path
@@ -190,7 +193,7 @@ addProfiling (InstalledCache ref) =
             Nothing -> do
                 let loop [] = return False
                     loop (dir:dirs) = do
-                        econtents <- tryIO $ getDirectoryContents $ S8.unpack dir
+                        econtents <- tryIO $ getDirectoryContents dir
                         let contents = either (const []) id econtents
                         if or [isProfiling content lib
                               | content <- contents
@@ -235,7 +238,7 @@ addHaddock (InstalledCache ref) =
 -- | Dump information for a single package
 data DumpPackage profiling haddock = DumpPackage
     { dpGhcPkgId :: !GhcPkgId
-    , dpLibDirs :: ![ByteString]
+    , dpLibDirs :: ![FilePath]
     , dpLibraries :: ![ByteString]
     , dpDepends :: ![GhcPkgId]
     , dpHaddockInterfaces :: ![ByteString]
@@ -247,6 +250,7 @@ data DumpPackage profiling haddock = DumpPackage
 data PackageDumpException
     = MissingSingleField ByteString (Map ByteString [Line])
     | MismatchedId PackageName Version GhcPkgId
+    | Couldn'tParseField ByteString [Line]
     deriving Typeable
 instance Exception PackageDumpException
 instance Show PackageDumpException where
@@ -261,6 +265,8 @@ instance Show PackageDumpException where
     show (MismatchedId name version gid) =
         "Invalid id/name/version in ghc-pkg dump output: " ++
         show (name, version, gid)
+    show (Couldn'tParseField name ls) =
+        "Couldn't parse the field " ++ show name ++ " from lines: " ++ show ls
 
 -- | Convert a stream of bytes into a stream of @DumpPackage@s
 conduitDumpPackage :: MonadThrow m
@@ -301,14 +307,20 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 $ throwM $ MismatchedId name version ghcPkgId
 
             -- if a package has no modules, these won't exist
-            let libDirs = parseM "library-dirs"
+            let libDirKey = "library-dirs"
+                libDirs = parseM libDirKey
                 libraries = parseM "hs-libraries"
                 haddockInterfaces = parseM "haddock-interfaces"
             depends <- mapM parseDepend $ parseM "depends"
 
+            libDirPaths <-
+                case mapM (P.parseOnly (argsParser NoEscaping) . T.decodeUtf8) libDirs of
+                    Left{} -> throwM (Couldn'tParseField libDirKey libDirs)
+                    Right dirs -> return (concat dirs)
+
             return $ Just DumpPackage
                 { dpGhcPkgId = ghcPkgId
-                , dpLibDirs = libDirs
+                , dpLibDirs = libDirPaths
                 , dpLibraries = S8.words $ S8.unwords libraries
                 , dpDepends = catMaybes (depends :: [Maybe GhcPkgId])
                 , dpHaddockInterfaces = S8.words $ S8.unwords haddockInterfaces
