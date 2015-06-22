@@ -1,4 +1,4 @@
-## Unreleased
+## 0.1.0.0
 
 * Fall back to cabal dependency solver when a snapshot can't be found
 * Basic implementation of `stack new` [#137](https://github.com/commercialhaskell/stack/issues/137)
