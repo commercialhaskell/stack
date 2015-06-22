@@ -23,7 +23,6 @@ module Stack.PackageIndex
     ) where
 
 import qualified Codec.Archive.Tar as Tar
-import           Control.Applicative
 import           Control.Exception (Exception)
 import           Control.Exception.Enclosed (tryIO)
 import           Control.Monad (unless, when, liftM, mzero)
@@ -38,15 +37,19 @@ import           Data.Aeson.Extended
 import qualified Data.Binary as Binary
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad, BinarySchema (..))
 import           Data.ByteString (ByteString)
+import qualified Data.Word8 as Word8
+import qualified Data.ByteString as S
+import qualified Data.ByteString.Unsafe as SU
+import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
-import           Data.Conduit (($$), (=$), yield, Producer, ZipSink (..))
+import           Data.Conduit (($$), (=$))
 import           Data.Conduit.Binary                   (sinkHandle,
                                                         sourceHandle)
-import qualified Data.Conduit.List as CL
 import           Data.Conduit.Zlib (ungzip)
+import           Data.Foldable (forM_)
 import           Data.Int (Int64)
 import           Data.Map (Map)
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -78,18 +81,6 @@ import           System.IO                             (IOMode (ReadMode, WriteM
                                                         withBinaryFile)
 import           System.Process.Read (readInNull, EnvOverride, doesExecutableExist)
 
--- | A cabal file with name and version parsed from the filepath, and the
--- package description itself ready to be parsed. It's left in unparsed form
--- for efficiency.
-data UnparsedCabalFile = UnparsedCabalFile
-    { ucfName    :: PackageName
-    , ucfVersion :: Version
-    , ucfOffset  :: !Int64
-    -- ^ Byte offset into the 00-index.tar file for the entry contents
-    , ucfSize    :: !Int64
-    -- ^ Size of the entry contents, in bytes
-    }
-
 data PackageCache = PackageCache
     { pcOffset :: !Int64
     -- ^ offset in bytes into the 00-index.tar file for the .cabal file contents
@@ -100,65 +91,97 @@ data PackageCache = PackageCache
     deriving Generic
 instance Binary.Binary PackageCache
 
--- | Stream all of the cabal files from the 00-index tar file.
-withSourcePackageIndex
+newtype PackageCacheMap = PackageCacheMap (Map PackageIdentifier PackageCache)
+    deriving Binary.Binary
+instance BinarySchema PackageCacheMap where
+    -- Don't forget to update this if you change the datatype in any way!
+    binarySchema _ = 1
+-- | Populate the package index caches and return them.
+populateCache
     :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
     => EnvOverride
     -> PackageIndex
-    -> (Producer m (Either UnparsedCabalFile (PackageIdentifier, L.ByteString)) -> m a)
-    -> m a
-withSourcePackageIndex menv index cont = do
+    -> m (Map PackageIdentifier PackageCache)
+populateCache menv index = do
+    $logSticky "Populating index cache ..."
     requireIndex menv index
     -- This uses full on lazy I/O instead of ResourceT to provide some
     -- protections. Caveat emptor
-    cont $ do
-        path <- configPackageIndex (indexName index)
-        lbs <- liftIO $ L.readFile $ Path.toFilePath path
-        loop 0 (Tar.read lbs)
-  where
-    loop blockNo (Tar.Next e es) = do
-        goE blockNo e
-        loop blockNo' es
-      where
-        blockNo' = blockNo + entrySizeInBlocks e
-    loop _ Tar.Done = return ()
-    loop _ (Tar.Fail e) = throwM e
+    path <- configPackageIndex (indexName index)
+    lbs <- liftIO $ L.readFile $ Path.toFilePath path
+    pis <- loop 0 Map.empty (Tar.read lbs)
 
-    goE blockNo e
-        | Just front <- T.stripSuffix ".cabal" $ T.pack $ Tar.entryPath e
-        , Tar.NormalFile _ size <- Tar.entryContent e = do
-            PackageIdentifier name version <- parseNameVersion front
-            yield $ Left UnparsedCabalFile
-                { ucfName = name
-                , ucfVersion = version
-                , ucfOffset = (blockNo + 1) * 512
-                , ucfSize = size
+    when (indexRequireHashes index) $ forM_ (Map.toList pis) $ \(ident, pc) ->
+        case pcDownload pc of
+            Just _ -> return ()
+            Nothing -> throwM $ MissingRequiredHashes (indexName index) ident
+
+    $logStickyDone "Populated index cache."
+
+    return pis
+  where
+    loop !blockNo !m (Tar.Next e es) =
+        loop (blockNo + entrySizeInBlocks e) (goE blockNo m e) es
+    loop _ m Tar.Done = return m
+    loop _ _ (Tar.Fail e) = throwM e
+
+    goE blockNo m e =
+        case Tar.entryContent e of
+            Tar.NormalFile lbs size ->
+                case parseNameVersion $ Tar.entryPath e of
+                    Just (ident, ".cabal") -> addCabal ident size
+                    Just (ident, ".json") -> addJSON ident lbs
+                    _ -> m
+            _ -> m
+      where
+        addCabal ident size = Map.insertWith
+            (\_ pcOld -> pcNew { pcDownload = pcDownload pcOld })
+            ident
+            pcNew
+            m
+          where
+            pcNew = PackageCache
+                { pcOffset = (blockNo + 1) * 512
+                , pcSize = size
+                , pcDownload = Nothing
                 }
-        | Just front <- T.stripSuffix ".json" $ T.pack $ Tar.entryPath e
-        , Tar.NormalFile lbs _size <- Tar.entryContent e = do
-            ident <- parseNameVersion front
-            yield $ Right (ident, lbs)
-        | otherwise = return ()
+        addJSON ident lbs =
+            case decode lbs of
+                Nothing -> m
+                Just pd -> Map.insertWith
+                    (\_ pc -> pc { pcDownload = Just pd })
+                    ident
+                    PackageCache
+                        { pcOffset = 0
+                        , pcSize = 0
+                        , pcDownload = Just pd
+                        }
+                    m
+
+    breakSlash x
+        | S.null z = Nothing
+        | otherwise = Just (y, SU.unsafeTail z)
+      where
+        (y, z) = S.break (== Word8._slash) x
 
     parseNameVersion t1 = do
-        let (p', t2) = T.break (== '/') $ T.replace "\\" "/" t1
-        p <- parsePackageNameFromString $ T.unpack p'
-        t3 <- maybe (throwM $ InvalidCabalPath t1 "no slash") return
-            $ T.stripPrefix "/" t2
-        let (v', t4) = T.break (== '/') t3
-        v <- parseVersionFromString $ T.unpack v'
-        when (t4 /= T.cons '/' p') $ throwM $ InvalidCabalPath t1 $ "Expected at end: " <> p'
-        return $ PackageIdentifier p v
+        (p', t3) <- breakSlash
+                  $ S.map (\c -> if c == Word8._backslash then Word8._slash else c)
+                  $ S8.pack t1
+        p <- parsePackageName p'
+        (v', t5) <- breakSlash t3
+        v <- parseVersion v'
+        let (t6, suffix) = S.break (== Word8._period) t5
+        if t6 == p'
+            then return (PackageIdentifier p v, suffix)
+            else Nothing
 
 data PackageIndexException
-  = InvalidCabalPath Text Text
-  | GitNotAvailable IndexName
+  = GitNotAvailable IndexName
   | MissingRequiredHashes IndexName PackageIdentifier
   deriving Typeable
 instance Exception PackageIndexException
 instance Show PackageIndexException where
-    show (InvalidCabalPath x y) =
-        "Invalid cabal path " ++ T.unpack x ++ ": " ++ T.unpack y
     show (GitNotAvailable name) = concat
         [ "Package index "
         , T.unpack $ indexNameText name
@@ -358,51 +381,6 @@ getPackageCaches menv = do
         PackageCacheMap pis' <- taggedDecodeOrLoad fp $ liftM PackageCacheMap $ populateCache menv index
 
         return (fmap (index,) pis')
-
-newtype PackageCacheMap = PackageCacheMap (Map PackageIdentifier PackageCache)
-    deriving Binary.Binary
-instance BinarySchema PackageCacheMap where
-    -- Don't forget to update this if you change the datatype in any way!
-    binarySchema _ = 1
-
--- | Populate the package index caches and return them.
-populateCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, MonadLogger m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
-              => EnvOverride
-              -> PackageIndex
-              -> m (Map PackageIdentifier PackageCache)
-populateCache menv index = do
-    $logSticky "Populating index cache ..."
-    let toIdent (Left ucf) = Just
-            ( PackageIdentifier (ucfName ucf) (ucfVersion ucf)
-            , PackageCache
-                { pcOffset = ucfOffset ucf
-                , pcSize = ucfSize ucf
-                , pcDownload = Nothing
-                }
-            )
-        toIdent (Right _) = Nothing
-
-        parseDownload (Left _) = Nothing
-        parseDownload (Right (ident, lbs)) = do
-            case decode lbs of
-                Nothing -> Nothing
-                Just pd -> Just (ident, pd)
-
-    withSourcePackageIndex menv index $ \source -> do
-        (pis, pds) <- source $$ getZipSink ((,)
-            <$> ZipSink (CL.mapMaybe toIdent =$ CL.consume)
-            <*> ZipSink (Map.fromList <$> (CL.mapMaybe parseDownload =$ CL.consume)))
-
-        pis' <- liftM Map.fromList $ forM pis $ \(ident, pc) ->
-            case Map.lookup ident pds of
-                Just d -> return (ident, pc { pcDownload = Just d })
-                Nothing
-                    | indexRequireHashes index -> throwM $ MissingRequiredHashes (indexName index) ident
-                    | otherwise -> return (ident, pc)
-
-        $logStickyDone "Populated index cache."
-
-        return pis'
 
 --------------- Lifted from cabal-install, Distribution.Client.Tar:
 -- | Return the number of blocks in an entry.
