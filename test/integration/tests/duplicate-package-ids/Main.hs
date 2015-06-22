@@ -2,6 +2,7 @@ import StackTest
 
 main :: IO ()
 main = do
+    readFile "stack1.yaml" >>= writeFile "stack.yaml"
     stack ["setup"]
     stack ["build", "auto-update"]
     readFile "stack2.yaml" >>= writeFile "stack.yaml"

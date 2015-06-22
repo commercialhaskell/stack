@@ -1,3 +1,0 @@
-resolver: lts-2.9
-packages:
-- auto-update-0.1.2.1
