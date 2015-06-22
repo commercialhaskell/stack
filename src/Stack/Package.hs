@@ -122,6 +122,7 @@ data Package =
           ,packageExes :: !(Set Text)                     -- ^ names of executables
           ,packageOpts :: !GetPackageOpts                 -- ^ Args to pass to GHC.
           ,packageHasExposedModules :: !Bool              -- ^ Does the package have exposed modules?
+          ,packageSimpleType :: !Bool                     -- ^ Does the package of build-type: Simple
           }
  deriving (Show,Typeable)
 
@@ -245,6 +246,7 @@ resolvePackage packageConfig gpkg = Package
     , packageOpts = GetPackageOpts $ \cabalfp ->
         generatePkgDescOpts cabalfp pkg
     , packageHasExposedModules = maybe False (not . null . exposedModules) (library pkg)
+    , packageSimpleType = buildType (packageDescription gpkg) == Just Simple
     }
 
   where

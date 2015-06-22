@@ -455,7 +455,7 @@ withSingleContext :: M env m
 withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
     withPackage $ \package cabalfp pkgDir ->
     withLogFile package $ \mlogFile ->
-    withCabal pkgDir mlogFile $ \cabal ->
+    withCabal package pkgDir mlogFile $ \cabal ->
     inner0 package cabalfp pkgDir cabal announce console mlogFile
   where
     announce x = $logInfo $ T.concat
@@ -499,7 +499,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
                 (liftIO . hClose)
                 $ \h -> inner (Just (logPath, h))
 
-    withCabal pkgDir mlogFile inner = do
+    withCabal package pkgDir mlogFile inner = do
         config <- asks getConfig
         menv <- liftIO $ configEnvOverride config EnvSettings
             { esIncludeLocals = taskLocation task == Local
@@ -507,7 +507,13 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
             }
         exeName <- liftIO $ join $ findExecutable menv "runhaskell"
         distRelativeDir' <- distRelativeDir
-        msetuphs <- liftIO $ getSetupHs pkgDir
+        msetuphs <-
+            -- Avoid broken Setup.hs files causing problems for simple build
+            -- types, see:
+            -- https://github.com/commercialhaskell/stack/issues/370
+            if packageSimpleType package
+                then return Nothing
+                else liftIO $ getSetupHs pkgDir
         let setuphs = fromMaybe eeSetupHs msetuphs
         inner $ \stripTHLoading args -> do
             let fullArgs =
