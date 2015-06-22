@@ -534,10 +534,10 @@ dockerExecCmd (cmd,args) go@GlobalOpts{..} = do
 
 -- | Parser for build arguments.
 buildOpts :: Bool -> Parser BuildOpts
-buildOpts defaultHaddock =
+buildOpts forHaddock =
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
-            optimize <*> localHaddock <*> depsHaddock <*> finalAction <*> dryRun <*> ghcOpts <*> flags <*>
-            installExes <*> preFetch <*> testArgs <*> onlySnapshot
+            optimize <*> haddock <*> haddockDeps <*> finalAction <*> dryRun <*> ghcOpts <*>
+            flags <*> installExes <*> preFetch <*> testArgs <*> onlySnapshot
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
         target =
@@ -555,14 +555,14 @@ buildOpts defaultHaddock =
                     "executable-profiling"
                     "library profiling for TARGETs and all its dependencies"
                     idm
-        localHaddock =
-          boolFlags defaultHaddock
+        haddock =
+          boolFlags forHaddock
                     "haddock"
                     "building Haddocks"
                     idm
-        depsHaddock =
+        haddockDeps =
           maybeBoolFlags
-                    "deps-haddock"
+                    "haddock-deps"
                     "building Haddocks for dependencies"
                     idm
         finalAction = pure DoNothing
