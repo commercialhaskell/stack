@@ -4,6 +4,7 @@
 * Basic implementation of `stack new` [#137](https://github.com/commercialhaskell/stack/issues/137)
 * Build haddocks for dependencies [#143](https://github.com/commercialhaskell/stack/issues/143)
 * `stack solver` command [#364](https://github.com/commercialhaskell/stack/issues/364)
+* `stack path` command [#95](https://github.com/commercialhaskell/stack/issues/95)
 
 ## 0.0.3
 
