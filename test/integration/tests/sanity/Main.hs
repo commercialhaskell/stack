@@ -10,3 +10,5 @@ main = do
     stackErr ["unpack", "invalid-package-name-"]
     stackErr ["build"]
     doesNotExist "stack.yaml"
+
+    stack ["exec", "./foo.bat"]

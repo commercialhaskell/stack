@@ -76,7 +76,9 @@ spec = do
                 , dpLibDirs = ["/opt/ghc/7.8.4/lib/ghc-7.8.4/haskell2010-1.1.2.0"]
                 , dpDepends = depends
                 , dpLibraries = ["HShaskell2010-1.1.2.0"]
+                , dpHaddockInterfaces = ["/opt/ghc/7.8.4/share/doc/ghc/html/libraries/haskell2010-1.1.2.0/haskell2010.haddock"]
                 , dpProfiling = ()
+                , dpHaddock = ()
                 }
 
         it "ghc 7.10" $ do
@@ -104,28 +106,32 @@ spec = do
             haskell2010 `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpLibDirs = ["/opt/ghc/7.10.1/lib/ghc-7.10.1/ghc_EMlWrQ42XY0BNVbSrKixqY"]
+                , dpHaddockInterfaces = ["/opt/ghc/7.10.1/share/doc/ghc/html/libraries/ghc-7.10.1/ghc.haddock"]
                 , dpDepends = depends
                 , dpLibraries = ["HSghc-7.10.1-EMlWrQ42XY0BNVbSrKixqY"]
                 , dpProfiling = ()
+                , dpHaddock = ()
                 }
 
-    it "ghcPkgDump + addProfiling" $ (id :: IO () -> IO ()) $ runNoLoggingT $ do
+    it "ghcPkgDump + addProfiling + addHaddock" $ (id :: IO () -> IO ()) $ runNoLoggingT $ do
         menv' <- getEnvOverride buildPlatform
         menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
-        pcache <- newProfilingCache
+        icache <- newInstalledCache
         ghcPkgDump menv Nothing
             $  conduitDumpPackage
-            =$ addProfiling pcache
+            =$ addProfiling icache
+            =$ addHaddock icache
             =$ CL.sinkNull
 
     it "sinkMatching" $ do
         menv' <- getEnvOverride buildPlatform
         menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
-        pcache <- newProfilingCache
+        icache <- newInstalledCache
         m <- runNoLoggingT $ ghcPkgDump menv Nothing
             $  conduitDumpPackage
-            =$ addProfiling pcache
-            =$ sinkMatching False (Map.singleton $(mkPackageName "transformers") $(mkVersion "0.0.0.0.0.0.1"))
+            =$ addProfiling icache
+            =$ addHaddock icache
+            =$ sinkMatching False False (Map.singleton $(mkPackageName "transformers") $(mkVersion "0.0.0.0.0.0.1"))
         case Map.lookup $(mkPackageName "base") m of
             Nothing -> error "base not present"
             Just _ -> return ()

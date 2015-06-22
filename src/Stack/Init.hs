@@ -11,7 +11,7 @@ module Stack.Init
     ) where
 
 import           Control.Exception               (assert)
-import           Control.Exception.Enclosed      (handleIO, tryAny, catchAny)
+import           Control.Exception.Enclosed      (handleIO, catchAny)
 import           Control.Monad                   (liftM, when)
 import           Control.Monad.Catch             (MonadMask, throwM)
 import           Control.Monad.IO.Class
@@ -61,10 +61,9 @@ ignoredDirs = Set.fromList
 
 -- | Generate stack.yaml
 initProject :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
-            => Maybe Resolver -- ^ force this resolver to be used
-            -> InitOpts
+            => InitOpts
             -> m ()
-initProject mresolver initOpts = do
+initProject initOpts = do
     currDir <- getWorkingDir
     let dest = currDir </> stackDotYaml
         dest' = toFilePath dest
@@ -80,7 +79,7 @@ initProject mresolver initOpts = do
     when (null cabalfps) $ error "In order to init, you should have an existing .cabal file. Please try \"stack new\" instead"
     gpds <- mapM readPackageUnresolved cabalfps
 
-    (r, flags, extraDeps) <- getDefaultResolver cabalfps gpds mresolver initOpts
+    (r, flags, extraDeps) <- getDefaultResolver cabalfps gpds initOpts
     let p = Project
             { projectPackages = pkgs
             , projectExtraDeps = extraDeps
@@ -126,51 +125,43 @@ getSnapshots' =
 getDefaultResolver :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
                    => [Path Abs File] -- ^ cabal files
                    -> [C.GenericPackageDescription] -- ^ cabal descriptions
-                   -> Maybe Resolver -- ^ resolver override
                    -> InitOpts
                    -> m (Resolver, Map PackageName (Map FlagName Bool), Map PackageName Version)
-getDefaultResolver cabalfps gpds mresolver initOpts = do
-    names <-
-        case mresolver of
-            Nothing | ioUseSolver initOpts -> return []
-            Nothing -> do
-                msnapshots <- getSnapshots'
+getDefaultResolver cabalfps gpds initOpts = do
+    case ioMethod initOpts of
+        MethodSnapshot snapPref -> do
+            msnapshots <- getSnapshots'
+            names <-
                 case msnapshots of
                     Nothing -> return []
-                    Just snapshots -> getRecommendedSnapshots snapshots initOpts
-            Just resolver ->
-                return $
-                    case resolver of
-                        ResolverSnapshot name -> [name]
-                        ResolverGhc _ -> []
-    mpair <- findBuildPlan gpds names
-    case mpair of
-        Just (snap, flags) ->
-            return (ResolverSnapshot snap, flags, Map.empty)
-        Nothing ->
-            case mresolver of
-                Nothing ->
-                    case ioFallback initOpts of
-                        Nothing -> do
-                            eres <- tryAny $ cabalSolver cabalfps
-                            case eres of
-                                Left e -> do
-                                    $logInfo $ T.pack $ "Using cabal solver failed: " ++ show e
-                                    throwM $ NoMatchingSnapshot names
-                                Right (ghcVersion, extraDeps) -> do
-                                    return
-                                        ( ResolverGhc ghcVersion
-                                        , Map.filter (not . Map.null) $ fmap snd extraDeps
-                                        , fmap fst extraDeps
-                                        )
-                        Just resolver -> return (resolver, Map.empty, Map.empty)
-                Just resolver -> return (resolver, Map.empty, Map.empty)
+                    Just snapshots -> getRecommendedSnapshots snapshots snapPref
+            mpair <- findBuildPlan gpds names
+            case mpair of
+                Just (snap, flags) ->
+                    return (ResolverSnapshot snap, flags, Map.empty)
+                Nothing -> throwM $ NoMatchingSnapshot names
+        MethodResolver resolver -> do
+            mpair <-
+                case resolver of
+                    ResolverSnapshot name -> findBuildPlan gpds [name]
+                    ResolverGhc _ -> return Nothing
+            case mpair of
+                Just (snap, flags) ->
+                    return (ResolverSnapshot snap, flags, Map.empty)
+                Nothing -> return (resolver, Map.empty, Map.empty)
+        MethodSolver -> do
+            (ghcVersion, extraDeps) <- cabalSolver (map parent cabalfps) []
+            return
+                ( ResolverGhc ghcVersion
+                , Map.filter (not . Map.null) $ fmap snd extraDeps
+                , fmap fst extraDeps
+                )
 
 getRecommendedSnapshots :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
                         => Snapshots
-                        -> InitOpts
+                        -> SnapPref
                         -> m [SnapName]
-getRecommendedSnapshots snapshots initOpts = do
+getRecommendedSnapshots snapshots pref = do
     -- Get the most recent LTS and Nightly in the snapshots directory and
     -- prefer them over anything else, since odds are high that something
     -- already exists for them.
@@ -195,30 +186,35 @@ getRecommendedSnapshots snapshots initOpts = do
         namesLTS = filter isLTS names
         namesNightly = filter isNightly names
 
-    case ioPref initOpts of
+    case pref of
         PrefNone -> return names
         PrefLTS -> return $ namesLTS ++ namesNightly
         PrefNightly -> return $ namesNightly ++ namesLTS
 
 data InitOpts = InitOpts
-    { ioPref     :: !SnapPref
+    { ioMethod :: !Method
     -- ^ Preferred snapshots
-    , ioFallback :: !(Maybe Resolver)
-    , ioUseSolver :: !Bool
-    -- ^ Force usage of a dependency solver instead of snapshots
     }
 
 data SnapPref = PrefNone | PrefLTS | PrefNightly
 
+-- | Method of initializing
+data Method = MethodSnapshot SnapPref | MethodResolver Resolver | MethodSolver
+
 initOptsParser :: Parser InitOpts
-initOptsParser = InitOpts
-    <$> pref
-    <*> optional fallback
-    <*> flag False True
-            (long "use-solver" <>
-             help "Force usage of a dependency solver")
+initOptsParser =
+    InitOpts <$> method
   where
-    pref =
+    method = solver
+         <|> (MethodResolver <$> resolver)
+         <|> (MethodSnapshot <$> snapPref)
+
+    solver =
+        flag' MethodSolver
+            (long "solver" <>
+             help "Use a dependency solver to determine dependencies")
+
+    snapPref =
         flag' PrefLTS
             (long "prefer-lts" <>
              help "Prefer LTS snapshots over Nightly snapshots") <|>
@@ -227,10 +223,10 @@ initOptsParser = InitOpts
              help "Prefer Nightly snapshots over LTS snapshots") <|>
         pure PrefNone
 
-    fallback = option readResolver
-        (long "fallback" <>
+    resolver = option readResolver
+        (long "resolver" <>
          metavar "RESOLVER" <>
-         help "Fallback resolver if none of the tested snapshots work")
+         help "Use the given resolver, even if not all dependencies are met")
 
 readResolver :: ReadM Resolver
 readResolver = do

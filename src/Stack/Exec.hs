@@ -13,6 +13,7 @@ import           Control.Monad.Catch
 
 import           Path
 import           Stack.Types
+import           System.Directory (doesFileExist)
 import           System.Exit
 import qualified System.Process as P
 import           System.Process.Read
@@ -28,12 +29,16 @@ exec cmd args = do
                                 { esIncludeLocals = True
                                 , esIncludeGhcPackagePath = True
                                 })
-    cmd' <- join $ System.Process.Read.findExecutable menv cmd
-    let cp = (P.proc (toFilePath cmd') args)
+    exists <- liftIO $ doesFileExist cmd
+    cmd' <-
+        if exists
+            then return cmd
+            else liftM toFilePath $ join $ System.Process.Read.findExecutable menv cmd
+    let cp = (P.proc cmd' args)
             { P.env = envHelper menv
             , P.delegate_ctlc = True
             }
-    $logProcessRun (toFilePath cmd') args
+    $logProcessRun cmd' args
     (Nothing, Nothing, Nothing, ph) <- liftIO (P.createProcess cp)
     ec <- liftIO (P.waitForProcess ph)
     liftIO (exitWith ec)

@@ -35,7 +35,7 @@ import           Control.Monad.Trans.Control
 
 import           Data.Aeson.Extended
 import qualified Data.Binary as Binary
-import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
+import           Data.Binary.VersionTagged (taggedDecodeOrLoad, BinarySchema (..))
 import           Data.ByteString (ByteString)
 import qualified Data.Word8 as Word8
 import qualified Data.ByteString as S
@@ -91,6 +91,11 @@ data PackageCache = PackageCache
     deriving Generic
 instance Binary.Binary PackageCache
 
+newtype PackageCacheMap = PackageCacheMap (Map PackageIdentifier PackageCache)
+    deriving Binary.Binary
+instance BinarySchema PackageCacheMap where
+    -- Don't forget to update this if you change the datatype in any way!
+    binarySchema _ = 1
 -- | Populate the package index caches and return them.
 populateCache
     :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
@@ -373,7 +378,7 @@ getPackageCaches menv = do
     config <- askConfig
     liftM mconcat $ forM (configPackageIndices config) $ \index -> do
         fp <- liftM toFilePath $ configPackageIndexCache (indexName index)
-        pis' <- taggedDecodeOrLoad fp $ populateCache menv index
+        PackageCacheMap pis' <- taggedDecodeOrLoad fp $ liftM PackageCacheMap $ populateCache menv index
 
         return (fmap (index,) pis')
 

@@ -47,7 +47,6 @@ library
                      Stack.Package
                      Stack.PackageDump
                      Stack.PackageIndex
-                     Stack.Path
                      Stack.Repl
                      Stack.Setup
                      Stack.Solver
@@ -69,7 +68,6 @@ library
                      Stack.Build.Installed
                      Stack.Build.Source
                      Stack.Build.Types
-                     Stack.Build.Doc
                      Stack.Upload
                      System.Process.Read
                      System.Process.Log

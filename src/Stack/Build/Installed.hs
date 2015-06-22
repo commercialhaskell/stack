@@ -6,6 +6,7 @@
 module Stack.Build.Installed
     ( InstalledMap
     , Installed (..)
+    , GetInstalledOpts (..)
     , getInstalled
     ) where
 
@@ -19,6 +20,7 @@ import           Control.Monad.Trans.Resource
 import           Data.Conduit
 import qualified Data.Conduit.List            as CL
 import           Data.Function
+import qualified Data.HashSet                 as HashSet
 import           Data.List
 import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
@@ -31,49 +33,58 @@ import           Path
 import           Prelude                      hiding (FilePath, writeFile)
 import           Stack.Build.Cache
 import           Stack.Build.Types
+import           Stack.Constants
 import           Stack.GhcPkg
 import           Stack.PackageDump
 import           Stack.Types
 import           Stack.Types.Internal
 
-type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
+type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasEnvConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
 
 data LoadHelper = LoadHelper
     { lhId   :: !GhcPkgId
     , lhDeps :: ![GhcPkgId]
-    , lhPair :: !(PackageName, (Version, Location, Installed)) -- TODO Version is now redundant and can be gleaned from Installed
+    , lhPair :: !(PackageName, (Version, InstallLocation, Installed)) -- TODO Version is now redundant and can be gleaned from Installed
     }
     deriving Show
 
-type InstalledMap = Map PackageName (Version, Location, Installed) -- TODO Version is now redundant and can be gleaned from Installed
+type InstalledMap = Map PackageName (Version, InstallLocation, Installed) -- TODO Version is now redundant and can be gleaned from Installed
+
+-- | Options for 'getInstalled'.
+data GetInstalledOpts = GetInstalledOpts
+    { getInstalledProfiling :: !Bool
+      -- ^ Require profiling libraries?
+    , getInstalledHaddock   :: !Bool
+      -- ^ Require haddocks?
+    }
 
 -- | Returns the new InstalledMap and all of the locally registered packages.
 getInstalled :: (M env m, PackageInstallInfo pii)
              => EnvOverride
-             -> Bool -- ^ profiling?
+             -> GetInstalledOpts
              -> Map PackageName pii -- ^ does not contain any installed information
              -> m (InstalledMap, Set GhcPkgId)
-getInstalled menv profiling sourceMap = do
+getInstalled menv opts sourceMap = do
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
 
     bconfig <- asks getBuildConfig
 
-    mpcache <-
-        if profiling
-            then liftM Just $ loadProfilingCache $ configProfilingCache bconfig
+    mcache <-
+        if getInstalledProfiling opts || getInstalledHaddock opts
+            then liftM Just $ loadInstalledCache $ configInstalledCache bconfig
             else return Nothing
 
-    let loadDatabase' = loadDatabase menv mpcache sourceMap
+    let loadDatabase' = loadDatabase menv opts mcache sourceMap
     (installedLibs', localInstalled) <-
         loadDatabase' Nothing [] >>=
         loadDatabase' (Just (Snap, snapDBPath)) . fst >>=
         loadDatabase' (Just (Local, localDBPath)) . fst
     let installedLibs = M.fromList $ map lhPair installedLibs'
 
-    case mpcache of
+    case mcache of
         Nothing -> return ()
-        Just pcache -> saveProfilingCache (configProfilingCache bconfig) pcache
+        Just pcache -> saveInstalledCache (configInstalledCache bconfig) pcache
 
     -- Add in the executables that are installed, making sure to only trust a
     -- listed installation under the right circumstances (see below)
@@ -84,22 +95,9 @@ getInstalled menv profiling sourceMap = do
                 Nothing -> m
                 Just pii
                     -- Not the version we want, ignore it
-                    | version /= piiVersion pii -> Map.empty
-                    | otherwise -> case pii of
-                        {- FIXME revisit this logic
-                        -- Never mark locals as installed, instead do dirty
-                        -- checking
-                        PSLocal _ -> Map.empty
+                    | version /= piiVersion pii || loc /= piiLocation pii -> Map.empty
 
-                        -- FIXME start recording build flags for installed
-                        -- executables, and only count as installed if it
-                        -- matches
-
-                        PSUpstream loc' _flags | loc == loc' -> Map.empty
-                        -}
-
-                        -- Passed all the tests, mark this as installed!
-                        _ -> m
+                    | otherwise -> m
           where
             m = Map.singleton name (version, loc, Executable $ PackageIdentifier name version)
     exesSnap <- getInstalledExes Snap
@@ -119,12 +117,13 @@ getInstalled menv profiling sourceMap = do
 -- location needed by the SourceMap
 loadDatabase :: (M env m, PackageInstallInfo pii)
              => EnvOverride
-             -> Maybe ProfilingCache -- ^ if Just, profiling is required
+             -> GetInstalledOpts
+             -> Maybe InstalledCache -- ^ if Just, profiling or haddock is required
              -> Map PackageName pii -- ^ to determine which installed things we should include
-             -> Maybe (Location, Path Abs Dir) -- ^ package database, Nothing for global
+             -> Maybe (InstallLocation, Path Abs Dir) -- ^ package database, Nothing for global
              -> [LoadHelper] -- ^ from parent databases
              -> m ([LoadHelper], Set GhcPkgId)
-loadDatabase menv mpcache sourceMap mdb lhs0 = do
+loadDatabase menv opts mcache sourceMap mdb lhs0 = do
     (lhs1, gids) <- ghcPkgDump menv (fmap snd mdb)
                   $ conduitDumpPackage =$ sink
     let lhs = pruneDeps
@@ -135,14 +134,21 @@ loadDatabase menv mpcache sourceMap mdb lhs0 = do
             (lhs0 ++ lhs1)
     return (map (\lh -> lh { lhDeps = [] }) $ Map.elems lhs, Set.fromList gids)
   where
-    conduitCache =
-        case mpcache of
-            Just pcache -> addProfiling pcache
+    conduitProfilingCache =
+        case mcache of
+            Just cache | getInstalledProfiling opts -> addProfiling cache
             -- Just an optimization to avoid calculating the profiling
             -- values when they aren't necessary
-            Nothing -> CL.map (\dp -> dp { dpProfiling = False })
-    sinkDP = conduitCache
-          =$ CL.mapMaybe (isAllowed mpcache sourceMap (fmap fst mdb))
+            _ -> CL.map (\dp -> dp { dpProfiling = False })
+    conduitHaddockCache =
+        case mcache of
+            Just cache | getInstalledHaddock opts -> addHaddock cache
+            -- Just an optimization to avoid calculating the haddock
+            -- values when they aren't necessary
+            _ -> CL.map (\dp -> dp { dpHaddock = False })
+    sinkDP = conduitProfilingCache
+          =$ conduitHaddockCache
+          =$ CL.mapMaybe (isAllowed opts mcache sourceMap (fmap fst mdb))
           =$ CL.consume
     sinkGIDs = CL.map dpGhcPkgId =$ CL.consume
     sink = getZipSink $ (,)
@@ -153,17 +159,29 @@ loadDatabase menv mpcache sourceMap mdb lhs0 = do
 -- on the package selections made by the user. This does not perform any
 -- dirtiness or flag change checks.
 isAllowed :: PackageInstallInfo pii
-          => Maybe ProfilingCache
+          => GetInstalledOpts
+          -> Maybe InstalledCache
           -> Map PackageName pii
-          -> Maybe Location
-          -> DumpPackage Bool
+          -> Maybe InstallLocation
+          -> DumpPackage Bool Bool
           -> Maybe LoadHelper
-isAllowed mpcache sourceMap mloc dp
+isAllowed opts mcache sourceMap mloc dp
     -- Check that it can do profiling if necessary
-    | isJust mpcache && not (dpProfiling dp) = Nothing
+    | getInstalledProfiling opts && isJust mcache && not (dpProfiling dp) = Nothing
+    -- Check that it has haddocks if necessary
+    | getInstalledHaddock opts && isJust mcache && not (dpHaddock dp) = Nothing
     | toInclude = Just LoadHelper
         { lhId = gid
-        , lhDeps = dpDepends dp
+        , lhDeps =
+            -- We always want to consider the wired in packages as having all
+            -- of their dependencies installed, since we have no ability to
+            -- reinstall them. This is especially important for using different
+            -- minor versions of GHC, where the dependencies of wired-in
+            -- packages may change slightly and therefore not match the
+            -- snapshot.
+            if name `HashSet.member` wiredInPackages
+                then []
+                else dpDepends dp
         , lhPair = (name, (version, fromMaybe Snap mloc, Library gid))
         }
     | otherwise = Nothing
