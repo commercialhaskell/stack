@@ -33,6 +33,7 @@ import           Distribution.Version         (anyVersion,
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Prelude hiding (FilePath, pi, writeFile)
 import           Stack.Build.Cache
+import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Build.Types
@@ -368,7 +369,7 @@ checkDirtiness ps installed package present wanted = do
                     PSLocal lp -> Set.map encodeUtf8 $ lpComponents lp
                     PSUpstream _ _ _ -> Set.empty
             , configCacheHaddock =
-                shouldBuildHaddock buildOpts wanted (packageName package) ||
+                shouldHaddockPackage buildOpts wanted (packageName package) ||
                 -- Disabling haddocks when old config had haddocks doesn't make dirty.
                 maybe False configCacheHaddock moldOpts
             }

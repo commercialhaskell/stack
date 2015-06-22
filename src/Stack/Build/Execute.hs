@@ -33,7 +33,6 @@ import qualified Data.Conduit.List              as CL
 import           Data.Function
 import           Data.List
 import           Data.Map.Strict                (Map)
-import qualified Data.Map.Strict                as M
 import qualified Data.Map.Strict                as Map
 import           Data.Maybe
 import           Data.Set                       (Set)
@@ -51,7 +50,9 @@ import           Path
 import           Path.IO
 import           Prelude                        hiding (FilePath, writeFile)
 import           Stack.Build.Cache
+import           Stack.Build.Haddock
 import           Stack.Build.Installed
+import           Stack.Build.Source
 import           Stack.Build.Types
 import           Stack.Fetch                    as Fetch
 import           Stack.GhcPkg
@@ -176,6 +177,8 @@ data ExecuteEnv = ExecuteEnv
     , eeTotalWanted    :: !Int
     , eeWanted         :: !(Set PackageName)
     , eeLocals         :: ![LocalPackage]
+    , eeSourceMap      :: !SourceMap
+    , eeGlobalDB       :: !(Path Abs Dir)
     }
 
 -- | Perform the actual plan
@@ -184,17 +187,19 @@ executePlan :: M env m
             -> BuildOpts
             -> BaseConfigOpts
             -> [LocalPackage]
+            -> SourceMap
             -> Plan
             -> m ()
-executePlan menv bopts baseConfigOpts locals plan = do
+executePlan menv bopts baseConfigOpts locals sourceMap plan = do
     withSystemTempDirectory stackProgName $ \tmpdir -> do
         tmpdir' <- parseAbsDir tmpdir
         configLock <- newMVar ()
         installLock <- newMVar ()
-        idMap <- liftIO $ newTVarIO M.empty
+        idMap <- liftIO $ newTVarIO Map.empty
         let setupHs = tmpdir' </> $(mkRelFile "Setup.hs")
         liftIO $ writeFile (toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
         cabalPkgVer <- asks (envConfigCabalVersion . getEnvConfig)
+        globalDB <- getGlobalDB menv
         executePlan' plan ExecuteEnv
             { eeEnvOverride = menv
             , eeBuildOpts = bopts
@@ -212,6 +217,8 @@ executePlan menv bopts baseConfigOpts locals plan = do
             , eeTotalWanted = length $ filter lpWanted locals
             , eeWanted = wantedLocalPackages locals
             , eeLocals = locals
+            , eeSourceMap = sourceMap
+            , eeGlobalDB = globalDB
             }
 
     unless (Map.null $ planInstallExes plan) $ do
@@ -335,7 +342,7 @@ executePlan' plan ee@ExecuteEnv {..} = do
             else return ()
     unless (null errs) $ throwM $ ExecutionFailure errs
     when (boptsHaddock eeBuildOpts && not (null actions))
-        (generateHaddockIndex ee)
+        (generateHaddockIndex eeEnvOverride eeBaseConfigOpts eeLocals)
 
 toActions :: M env m
           => (m () -> IO ())
@@ -425,7 +432,7 @@ ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal cabalfp extra = do
                     TTLocal lp -> Set.map encodeUtf8 $ lpComponents lp
                     TTUpstream _ _ -> Set.empty
             , configCacheHaddock =
-                shouldBuildHaddock eeBuildOpts eeWanted (packageIdentifierName taskProvides)
+                shouldHaddockPackage eeBuildOpts eeWanted (packageIdentifierName taskProvides)
             }
 
     let needConfig = mOldConfigCache /= Just newConfigCache
@@ -479,7 +486,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
             TTUpstream package _ -> do
                 mdist <- liftM Just distRelativeDir
                 m <- unpackPackageIdents eeEnvOverride eeTempDir mdist $ Set.singleton taskProvides
-                case M.toList m of
+                case Map.toList m of
                     [(ident, dir)]
                         | ident == taskProvides -> do
                             let name = packageIdentifierName taskProvides
@@ -606,13 +613,14 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
             TTLocal lp -> "build" : map T.unpack (Set.toList $ lpComponents lp)
             TTUpstream _ _ -> ["build"]
 
-    when (shouldBuildHaddock eeBuildOpts eeWanted (packageName package) &&
-          -- Works around haddock failing on bytestring-builder since it has no modules when
-          -- bytestring is new enough.
-          packageHasExposedModules package) $ do
+    let doHaddock = shouldHaddockPackage eeBuildOpts eeWanted (packageName package) &&
+                    -- Works around haddock failing on bytestring-builder since it has no modules
+                    -- when bytestring is new enough.
+                    packageHasExposedModules package
+    when doHaddock $ do
         announce "haddock"
         hscolourExists <- doesExecutableExist eeEnvOverride "hscolour"
-        cabal False (concat [["haddock", "--html", "--hoogle"]
+        cabal False (concat [["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
                             ,["--hyperlink-source" | hscolourExists]])
 
     withMVar eeInstallLock $ \() -> do
@@ -637,6 +645,13 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
         (True, Just pkgid) -> return $ Library pkgid
     writeFlagCache mpkgid' cache
     liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides mpkgid'
+
+    when (doHaddock && shouldHaddockDeps eeBuildOpts) $
+        copyDepHaddocks
+            eeEnvOverride
+            (pkgDbs ++ [eeGlobalDB])
+            (PackageIdentifier (packageName package) (packageVersion package))
+            Set.empty
 
 singleTest :: M env m
            => ActionContext
@@ -703,8 +718,8 @@ singleTest ac ee task =
                     liftIO $ hClose inH
                     ec <- liftIO $ waitForProcess ph
                     return $ case ec of
-                        ExitSuccess -> M.empty
-                        _ -> M.singleton testName $ Just ec
+                        ExitSuccess -> Map.empty
+                        _ -> Map.singleton testName $ Just ec
                 else do
                     $logError $ T.concat
                         [ "Test suite "
@@ -741,36 +756,6 @@ singleBench ac ee task =
 
         announce "benchmarks"
         cabal False ["bench"]
-
--- | Generate Haddock index and contents for local packages.
-generateHaddockIndex :: M env m
-                     => ExecuteEnv
-                     -> m ()
-generateHaddockIndex ExecuteEnv {..} = do
-    $logInfo ("Generating Haddock index/contents in\n" <>
-              T.pack (toFilePath (docDir </> $(mkRelFile "index.html"))))
-    interfaceArgs <- mapM (\LocalPackage {lpPackage = Package {..}} ->
-                              toInterfaceOpt (PackageIdentifier packageName packageVersion))
-                          eeLocals
-    readProcessNull
-        (Just docDir)
-        eeEnvOverride
-        "haddock"
-        (["--gen-contents", "--gen-index"] ++ concat interfaceArgs)
-  where
-    docDir = bcoLocalInstallRoot eeBaseConfigOpts </> docdirSuffix
-    toInterfaceOpt pid@(PackageIdentifier name _) = do
-        interfaceRelFile <- parseRelFile (packageIdentifierString pid FP.</>
-                                          packageNameString name FP.<.>
-                                          "haddock")
-        interfaceExists <- fileExists (docDir </> interfaceRelFile)
-        return $ if interfaceExists
-            then [ "-i"
-                 , concat
-                     [ packageIdentifierString pid
-                     , ","
-                     , toFilePath interfaceRelFile ] ]
-            else []
 
 -- | Grab all output from the given @Handle@ and print it to stdout, stripping
 -- Template Haskell "Loading package" lines. Does work in a separate thread.

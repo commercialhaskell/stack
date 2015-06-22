@@ -65,6 +65,7 @@ library
                      Stack.Build.Cache
                      Stack.Build.ConstructPlan
                      Stack.Build.Execute
+                     Stack.Build.Haddock
                      Stack.Build.Installed
                      Stack.Build.Source
                      Stack.Build.Types

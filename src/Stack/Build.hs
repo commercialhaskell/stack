@@ -26,12 +26,12 @@ import           Control.Monad.Trans.Resource
 import           Data.Function
 import           Data.Map.Strict (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (fromMaybe)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path.IO
 import           Prelude hiding (FilePath, writeFile)
 import           Stack.Build.ConstructPlan
 import           Stack.Build.Execute
+import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Build.Types
@@ -54,7 +54,7 @@ build bopts = do
         getInstalled menv
                      GetInstalledOpts
                          { getInstalledProfiling = profiling
-                         , getInstalledHaddock   = fromMaybe (boptsHaddock bopts) (boptsDepsHaddock bopts) }
+                         , getInstalledHaddock   = shouldHaddockDeps bopts }
                      sourceMap
 
     baseConfigOpts <- mkBaseConfigOpts bopts
@@ -66,7 +66,7 @@ build bopts = do
 
     if boptsDryrun bopts
         then printPlan (boptsFinalAction bopts) plan
-        else executePlan menv bopts baseConfigOpts locals plan
+        else executePlan menv bopts baseConfigOpts locals sourceMap plan
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
 

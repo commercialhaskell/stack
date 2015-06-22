@@ -28,8 +28,7 @@ module Stack.Build.Types
     ,ConstructPlanException(..)
     ,configureOpts
     ,BadDependency(..)
-    ,wantedLocalPackages
-    ,shouldBuildHaddock)
+    ,wantedLocalPackages)
     where
 
 import           Control.DeepSeq
@@ -268,7 +267,7 @@ data BuildOpts =
             ,boptsEnableOptimizations :: !(Maybe Bool)
             ,boptsHaddock :: !Bool
             -- ^ Build haddocks?
-            ,boptsDepsHaddock :: !(Maybe Bool)
+            ,boptsHaddockDeps :: !(Maybe Bool)
             -- ^ Build haddocks for dependencies?
             ,boptsFinalAction :: !FinalAction
             ,boptsDryrun :: !Bool
@@ -474,13 +473,6 @@ configureOpts econfig bco deps wanted loc package = map T.pack $ concat
 -- | Get set of wanted package names from locals.
 wantedLocalPackages :: [LocalPackage] -> Set PackageName
 wantedLocalPackages = Set.fromList . map (packageName . lpPackage) . filter lpWanted
-
--- | Determine whether we should build haddocks for a package.
-shouldBuildHaddock :: BuildOpts -> Set PackageName -> PackageName -> Bool
-shouldBuildHaddock bopts wanted name =
-    if Set.member name wanted
-        then boptsHaddock bopts
-        else fromMaybe (boptsHaddock bopts) (boptsDepsHaddock bopts)
 
 -- | Used for storage and comparison.
 newtype ModTime = ModTime (Integer,Rational)
