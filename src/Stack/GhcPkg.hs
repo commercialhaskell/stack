@@ -95,24 +95,26 @@ packageDbFlags pkgDbs =
         : map (\x -> ("--package-db=" ++ toFilePath x)) pkgDbs
 
 -- | Get the value of a field of the package.
-findGhcPkgField :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
-             => EnvOverride
-             -> [Path Abs Dir] -- ^ package databases
-             -> Text
-             -> Text
-             -> m (Maybe Text)
+findGhcPkgField
+    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+    => EnvOverride
+    -> [Path Abs Dir] -- ^ package databases
+    -> Text
+    -> Text
+    -> m (Maybe Text)
 findGhcPkgField menv pkgDbs name field = do
-    result <- ghcPkg menv pkgDbs ["field", T.unpack name, T.unpack field]
-    return $ case result of
-        Left{} -> Nothing
-        Right lbs ->
-            case map (stripCR . T.decodeUtf8) (S8.lines lbs) of
-                [] -> Nothing
-                (line:lines_) ->
-                    case T.stripPrefix (T.append field ": ") line of
-                        Nothing -> Nothing
-                        Just line' -> Just $ T.intercalate "\n" (line':lines_)
-  where stripCR t = fromMaybe t (T.stripSuffix "\r" t)
+    result <-
+        ghcPkg
+            menv
+            pkgDbs
+            ["field", "--simple-output", T.unpack name, T.unpack field]
+    return $
+        case result of
+            Left{} -> Nothing
+            Right lbs ->
+                fmap (stripCR . T.decodeUtf8) $ listToMaybe $ S8.lines lbs
+  where
+    stripCR t = fromMaybe t (T.stripSuffix "\r" t)
 
 -- | Get the id of the package e.g. @foo-0.0.0-9c293923c0685761dcff6f8c3ad8f8ec@.
 findGhcPkgId :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
