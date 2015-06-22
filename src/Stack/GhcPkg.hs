@@ -37,6 +37,7 @@ import           Stack.Build.Types (StackBuildException (Couldn'tFindPkgId))
 import           Stack.Constants
 import           Stack.Types
 import           System.Directory (createDirectoryIfMissing, doesDirectoryExist, canonicalizePath)
+import           System.FilePath (normalise)
 import           System.Process.Read
 
 -- | Get the global package database
@@ -134,7 +135,7 @@ findGhcPkgHaddockHtml :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, Monad
 findGhcPkgHaddockHtml menv pkgDbs pkgId = do
     mpath <- findGhcPkgField menv pkgDbs (packageIdentifierText pkgId) "haddock-html"
     case mpath of
-        Just !path -> return (parseAbsDir (T.unpack path))
+        Just !path -> return $ parseAbsDir $ normalise $ T.unpack path
         _ -> return Nothing
 
 -- | Get the dependencies of the package.
