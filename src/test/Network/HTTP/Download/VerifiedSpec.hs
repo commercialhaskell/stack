@@ -2,6 +2,7 @@
 module Network.HTTP.Download.VerifiedSpec where
 
 import Crypto.Hash
+import Control.Monad (unless)
 import Control.Monad.Trans.Reader
 import Data.Maybe
 import Network.HTTP.Client.Conduit
@@ -78,6 +79,15 @@ setup = do
 teardown :: T -> IO ()
 teardown _ = return ()
 
+shouldNotBe :: (Show a, Eq a) => a -> a -> Expectation
+actual `shouldNotBe` expected =
+    unless (actual /= expected) (expectationFailure msg)
+  where
+    msg = "Value was exactly what it shouldn't be: " ++ show expected
+
+shouldNotReturn :: (Show a, Eq a) => IO a -> a -> Expectation
+action `shouldNotReturn` unexpected = action >>= (`shouldNotBe` unexpected)
+
 spec :: Spec
 spec = beforeAll setup $ afterAll teardown $ do
   let exampleProgressHook = return ()
@@ -104,14 +114,17 @@ spec = beforeAll setup $ afterAll teardown $ do
       go `shouldReturn` False
       doesFileExist exampleFilePath `shouldReturn` True
 
+    -- https://github.com/commercialhaskell/stack/issues/372
     it "does redownload when the destination file is wrong" $ \T{..} -> withTempDir $ \dir -> do
       examplePath <- getExamplePath dir
       let exampleFilePath = toFilePath examplePath
       writeFile exampleFilePath exampleWrongContent
       doesFileExist exampleFilePath `shouldReturn` True
+      readFile exampleFilePath `shouldReturn` exampleWrongContent
       let go = runWith manager $ verifiedDownload exampleReq examplePath exampleProgressHook
       go `shouldReturn` True
       doesFileExist exampleFilePath `shouldReturn` True
+      readFile exampleFilePath `shouldNotReturn` exampleWrongContent
 
     it "rejects incorrect content length" $ \T{..} -> withTempDir $ \dir -> do
       examplePath <- getExamplePath dir
