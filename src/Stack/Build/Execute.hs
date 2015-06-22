@@ -562,20 +562,16 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
                                 Just (_, h) -> UseHandle h
                     , std_err =
                         case mlogFile of
-                            Nothing -> Inherit
+                            Nothing -> CreatePipe
                             Just (_, h) -> UseHandle h
                     }
             $logProcessRun (toFilePath exeName) fullArgs
 
             -- Use createProcess_ to avoid the log file being closed afterwards
-            (Just inH, moutH, Nothing, ph) <- liftIO $ createProcess_ "singleBuild" cp
+            (Just inH, moutH, merrH, ph) <- liftIO $ createProcess_ "singleBuild" cp
             liftIO $ hClose inH
-            case moutH of
-                Just outH ->
-                    case mlogFile of
-                      Just{} -> return ()
-                      Nothing -> printBuildOutput stripTHLoading outH
-                Nothing -> return ()
+            maybePrintBuildOutput stripTHLoading LevelInfo mlogFile moutH
+            maybePrintBuildOutput stripTHLoading LevelWarn mlogFile merrH
             ec <- liftIO $ waitForProcess ph
             case ec of
                 ExitSuccess -> return ()
@@ -593,6 +589,14 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
                         fullArgs
                         (fmap fst mlogFile)
                         bs
+
+    maybePrintBuildOutput stripTHLoading level mlogFile mh =
+        case mh of
+            Just h ->
+                case mlogFile of
+                  Just{} -> return ()
+                  Nothing -> printBuildOutput stripTHLoading level h
+            Nothing -> return ()
 
 singleBuild :: M env m
             => ActionContext
@@ -760,12 +764,12 @@ singleBench ac ee task =
 -- | Grab all output from the given @Handle@ and print it to stdout, stripping
 -- Template Haskell "Loading package" lines. Does work in a separate thread.
 printBuildOutput :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
-                 => Bool -> Handle -> m ()
-printBuildOutput excludeTHLoading outH = void $ fork $
+                 => Bool -> LogLevel -> Handle -> m ()
+printBuildOutput excludeTHLoading level outH = void $ fork $
          CB.sourceHandle outH
     $$ CB.lines
     =$ CL.filter (not . isTHLoading)
-    =$ CL.mapM_ ($logInfo . T.decodeUtf8)
+    =$ CL.mapM_ (logOtherN level . T.decodeUtf8)
   where
     -- | Is this line a Template Haskell "Loading package" line
     -- ByteString
