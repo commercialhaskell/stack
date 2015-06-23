@@ -1,3 +1,7 @@
+## Unreleased
+
+* Remove GHC uncompressed tar file after installation [#376](https://github.com/commercialhaskell/stack/issues/376)
+
 ## 0.1.0.0
 
 * Fall back to cabal dependency solver when a snapshot can't be found

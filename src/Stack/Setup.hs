@@ -15,6 +15,7 @@ module Stack.Setup
   ) where
 
 import           Control.Applicative
+import           Control.Exception.Enclosed (catchIO)
 import           Control.Monad (liftM, when, join, void)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class (MonadIO, liftIO)
@@ -54,7 +55,7 @@ import           Stack.GhcPkg (getCabalPkgVer, getGlobalDB)
 import           Stack.Solver (getGhcVersion)
 import           Stack.Types
 import           Stack.Types.StackT
-import           System.Directory (doesDirectoryExist, createDirectoryIfMissing)
+import           System.Directory (doesDirectoryExist, createDirectoryIfMissing, removeFile)
 import           System.Exit (ExitCode (ExitSuccess))
 import           System.FilePath (searchPathSeparator)
 import qualified System.FilePath as FP
@@ -580,6 +581,13 @@ installGHCWindows si archiveFile archiveType destDir _ = do
 
     run7z (parent archiveFile) archiveFile
     run7z (parent archiveFile) tarFile
+    liftIO (removeFile $ toFilePath tarFile) `catchIO` \e ->
+        $logWarn (T.concat
+            [ "Exception when removing "
+            , T.pack $ toFilePath tarFile
+            , ": "
+            , T.pack $ show e
+            ])
 
     $logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
 
