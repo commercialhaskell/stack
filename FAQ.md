@@ -43,6 +43,14 @@ extra-deps: []
 
 The above example specifies that the `proprietary-dep` package is found in the project's `third-party` folder, that the `conduit` package is found in the project's `github-version-of` folder, and that the `diagrams` package is found in the project's `patched` folder. This autodetects changes and reinstalls the package.
 
+__What is the meaning of the arguments given to stack build, test, etc?__
+
+Those are the targets of the build, and can have one of three formats:
+
+* A package name (e.g., `my-package`) will mean that the `my-package` package must be built
+* A package identifier (e.g., `my-package-1.2.3`), which includes a specific version. This is useful for passing to `stack install` for getting a specific version from upstream
+* A directory (e.g., `./my-package`) for including a local directory's package, including any packages in subdirectories
+
 __I need to modify an upstream package, how should I do it?__
 
 Typically, you will want to get the source for the package and then add it to
