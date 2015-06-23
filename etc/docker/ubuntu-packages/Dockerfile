@@ -38,6 +38,8 @@ RUN stack install
 # DEB PKG
 RUN mkdir -p /var/tmp/fpm/stack_<<PKG_VERSION>>-<<GIT_REV_COUNT>>-<<GIT_SHA>>/usr/bin
 RUN cp $HOME/.local/bin/stack /var/tmp/fpm/stack_<<PKG_VERSION>>-<<GIT_REV_COUNT>>-<<GIT_SHA>>/usr/bin/
+RUN mkdir -p /var/tmp/fpm/stack_<<PKG_VERSION>>-<<GIT_REV_COUNT>>-<<GIT_SHA>>/usr/share/man/man1
+RUN gzip -c < man/man1/stack.1 >/var/tmp/fpm/stack_<<PKG_VERSION>>-<<GIT_REV_COUNT>>-<<GIT_SHA>>/usr/share/man/man1/stack.1.gz
 RUN fpm \
     -s dir \
     -t deb \
