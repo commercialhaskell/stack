@@ -1,0 +1,222 @@
+.TH STACK 1 "" "1.14.0.4"
+.SH NAME
+stack - The Haskell Tool Stack
+.SH SYNOPSIS
+.sp
+.nf
+\fIstack [\-\-version] [\-\-help] [\-\-docker*] ([\-\-verbosity VERBOSITY] |
+      [\-v|\-\-verbose]) ([\-\-system\-ghc] | [\-\-no\-system\-ghc])
+      ([\-\-install\-ghc] | [\-\-no\-install\-ghc]) [\-\-arch ARCH] [\-\-os OS]
+      [\-j|\-\-jobs JOBS] [\-\-extra\-include\-dirs DIR] [\-\-extra\-lib\-dirs DIR]
+      [\-\-resolver RESOLVER] [\-\-no\-terminal] COMMAND
+.fi
+.sp
+.SH "DESCRIPTION"
+.SS The Haskell Tool Stack
+.PP
+\f[B]stack\fR is a cross\-platform program for developing Haskell
+projects.
+It is aimed at Haskellers both new and experienced.
+.PP
+.PP
+It features:
+.IP \[bu] 2
+Installing GHC automatically.
+.IP \[bu] 2
+Installing packages needed for your project.
+.IP \[bu] 2
+Building your project.
+.IP \[bu] 2
+Testing your project.
+.IP \[bu] 2
+Benchmarking your project.
+.SS How to use
+.PP
+Go into a Haskell project directory and run \f[C]stack\ build\f[].
+If everything is already configured, this will:
+.IP \[bu] 2
+Download the package index.
+.IP \[bu] 2
+Download and install all necessary dependencies for the project.
+.IP \[bu] 2
+Build and install the project.
+.PP
+You may be prompted to run some of the following along the way:
+.IP \[bu] 2
+\f[B]stack\ new\f[] to create a brand new project.
+.IP \[bu] 2
+\f[B]stack\ init\f[] to create a stack configuration file for an
+existing project. stack will figure out what Stackage release (LTS or nightly) is
+appropriate for the dependencies.
+.IP \[bu] 2
+\f[B]stack\ setup\f[] to download and install the correct GHC version.
+(For information on installation paths, please use the
+\f[B]stack\ path\f[] command.)
+.PP
+.PP stack - The Haskell Tool Stack
+
+.SH "STACK COMMANDS"
+
+.PP
+\fBbuild\fR
+.RS 4
+Build the project(s) in this directory/configuration\&
+.RE
+.PP
+\fBinstall\fR
+.RS 4
+Build executables and install to a user path\&
+.RE
+.PP
+\fBtest\fR
+.RS 4
+Build and test the project(s) in this directory /configuration\&
+.RE
+.PP
+\fBbench\fR
+.RS 4
+Build and benchmark the project(s) in this directory /configuration\&
+.RE
+.PP
+\fBhaddock\fR
+.RS 4
+Generate haddocks for the project(s) in this directory /configuration\&
+.RE
+.PP
+\fBnew\fR
+.RS 4
+Create a brand new project\&
+.RE
+.PP
+\fBinit\fR
+.RS 4
+Initialize a stack project based on one or more cabal packages\&
+.RE
+.PP
+\fBsetup\fR
+.RS 4
+Get the appropriate ghc for your project\&
+.RE
+.PP
+\fBunpack\fR
+.RS 4
+Unpack one or more packages locally\&
+.RE
+.PP
+\fBupdate\fR
+.RS 4
+Update the package index\&
+.RE
+.PP
+\fBupload\fR
+.RS 4
+Upload a package to Hackage\&
+.RE
+.PP
+\fBexec\fR
+.RS 4
+Execute a command\&
+.RE
+.PP
+\fBghc\fR
+.RS 4
+Run ghc\&
+.RE
+.PP
+\fBghci\fR
+.RS 4
+Run ghci in the context of project(s)\&
+.RE
+.PP
+\fBrunghc\fR
+.RS 4
+Run runghc\&
+.RE
+.PP
+\fBclean\fR
+.RS 4
+Clean the local packages\&
+.RE
+.PP
+\fBpath\fR
+.RS 4
+Print path information for certain things
+.RE
+.PP
+\fBdocker\fR
+.RS 4
+Subcommands specific to Docker use
+.RE
+.PP
+
+.SH "OPTIONS"
+.SS "GLOBAL OPTIONS"
+.nf
+  \-\-version                Show version
+  \-\-help                   Show this help text
+  \-\-docker*                Run 'stack \-\-docker\-help' for details
+  \-\-verbosity VERBOSITY    Verbosity: silent, error, warn, info, debug
+  \-v,\-\-verbose             Enable verbose mode: verbosity level "debug"
+  \-\-system\-ghc             Enable using the system installed GHC (on the PATH)
+                           if available and a matching version
+  \-\-no\-system\-ghc          Disable using the system installed GHC (on the PATH)
+                           if available and a matching version
+  \-\-install\-ghc            Enable downloading and installing GHC if necessary
+                           (can be done manually with stack setup)
+  \-\-no\-install\-ghc         Disable downloading and installing GHC if necessary
+                           (can be done manually with stack setup)
+  \-\-arch ARCH              System architecture, e.g. i386, x86_64
+  \-\-os OS                  Operating system, e.g. linux, windows
+  \-j,\-\-jobs JOBS           Number of concurrent jobs to run
+  \-\-extra\-include\-dirs DIR Extra directories to check for C header files
+  \-\-extra\-lib\-dirs DIR     Extra directories to check for libraries
+  \-\-resolver RESOLVER      Override resolver in project file
+  \-\-no\-terminal            Override terminal detection in the case of running in
+                           a false terminal
+.fi
+.PP
+.SS "BUILD OPTIONS"
+The following options are shared between the build, install, test, bench commands.
+.nf
+  TARGET                   If none specified, use all packages defined in
+                           current directory
+  \-\-library\-profiling      Enable library profiling for TARGETs and all its
+                           dependencies
+  \-\-no\-library\-profiling   Disable library profiling for TARGETs and all its
+                           dependencies
+  \-\-executable\-profiling   Enable library profiling for TARGETs and all its
+                           dependencies
+  \-\-no\-executable\-profiling
+                           Disable library profiling for TARGETs and all its
+                           dependencies
+  \-\-optimizations          Enable optimizations for TARGETs and all its
+                           dependencies
+  \-\-no\-optimizations       Disable optimizations for TARGETs and all its
+                           dependencies
+  \-\-dry\-run                Don't build anything, just prepare to
+  \-\-pedantic               Turn on \-Wall and \-Werror (note: option name may
+                           change in the future
+  \-\-ghc\-options OPTION     Additional options passed to GHC
+  \-\-flag PACKAGE:[\-]FLAG   Override flags set in stack.yaml (applies to local
+                           packages and extra\-deps)
+  \-\-prefetch               Fetch packages necessary for the build immediately,
+                           useful with \-\-dry\-run
+  \-\-test\-arguments TEST_ARGS
+                           Arguments passed in to the test suite program
+  \-\-only\-snapshot          Only build packages for the snapshot database, not
+                           the local database
+.fi
+.PP
+.SS "ADDITIONAL OPTIONS"
+Additional options can be read by running \fBstack\fR <command> \fB\-\-help\fR
+
+.SS "ENVIRONMENTAL VARIABLES"
+\fBSTACK_YAML\fR
+.RS 4
+The path to the project's yaml config file, if unset will default to "./stack.yaml"\&
+.RE
+.PP
+
+.SH "REPORTING BUGS"
+.sp
+Report bugs to the issue tracker<https://www.github.com/commercialhaskell/stack> where the development and maintenance is primarily done\&.
