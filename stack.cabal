@@ -30,6 +30,8 @@ extra-source-files:  README.md ChangeLog.md
                      new-template/LICENSE
                      new-template/Setup.hs
 
+                     stack.yaml
+
 flag integration-tests
   manual: True
   default: False
