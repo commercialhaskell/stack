@@ -18,6 +18,8 @@ We generally test on the current version of OS X, but stack is known to work on 
 
 **Note**: due to [GHC bug 10322](https://ghc.haskell.org/trac/ghc/ticket/10322), building `stack` from source fails with GHC 7.10.1. This bug will be fixed in 7.10.2, but in the meantime, we recommend using GHC 7.8.4 on OS X.
 
+**Note**: If you see the message `bash: <PATH_TO_STACK>/stack: Permission denied` set the executable bit `chmod +x <PATH_TO_STACK>/stack`
+
 ## Ubuntu
 
 * Ubuntu 15.04 (amd64)
