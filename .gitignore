@@ -12,5 +12,6 @@ TAGS
 cabal-dev/
 cabal.sandbox.config
 dist/
+dist-stack/
 tags
 /.docker-sandbox/
