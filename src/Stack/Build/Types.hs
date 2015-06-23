@@ -282,6 +282,9 @@ data BuildOpts =
             ,boptsOnlySnapshot :: !Bool
             -- ^ Only install packages in the snapshot database, skipping
             -- packages intended for the local database.
+            ,boptsCoverage :: !Bool
+            -- ^ Enable code coverage report generation for test
+            -- suites.
             }
   deriving (Show)
 

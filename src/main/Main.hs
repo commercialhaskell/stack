@@ -543,11 +543,17 @@ data Command
 
 -- | Parser for build arguments.
 buildOpts :: Command -> Parser BuildOpts
-buildOpts cmd =
+buildOpts cmd = fmap process $
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> haddock <*> haddockDeps <*> finalAction <*> dryRun <*> ghcOpts <*>
-            flags <*> installExes <*> preFetch <*> testArgs <*> onlySnapshot
-  where optimize =
+            flags <*> installExes <*> preFetch <*> testArgs <*> onlySnapshot <*> coverage
+  where process bopts =
+            if boptsCoverage bopts
+               then bopts { boptsExeProfile = True
+                          , boptsLibProfile = True
+                          , boptsGhcOptions = "-fhpc" : boptsGhcOptions bopts}
+               else bopts
+        optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
         target =
           fmap (map T.pack)
@@ -613,6 +619,12 @@ buildOpts cmd =
         onlySnapshot = flag False True
             (long "only-snapshot" <>
              help "Only build packages for the snapshot database, not the local database")
+        coverage =
+            if cmd == Test
+               then flag False True
+                        (long "coverage" <>
+                         help "Generate a code coverage report")
+               else pure False
 
 -- | Parser for docker cleanup arguments.
 dockerCleanupOpts :: Parser Docker.CleanupOpts

@@ -672,6 +672,7 @@ singleTest ac ee task =
                     TTLocal lp -> lpDirtyFiles lp
                     _ -> assert False True)
                 || True -- FIXME above logic is incorrect, see: https://github.com/commercialhaskell/stack/issues/319
+            needHpc = boptsCoverage (eeBuildOpts ee)
         when needBuild $ do
             announce "build (test)"
             fileModTimes <- getPackageFileModTimes package cabalfp
@@ -679,16 +680,19 @@ singleTest ac ee task =
             cabal (console && configHideTHLoading config) ["build"]
 
         bconfig <- asks getBuildConfig
-        distRelativeDir' <- distRelativeDir
-        let buildDir = pkgDir </> distRelativeDir'
-        let exeExtension =
+        buildDir <- distDirFromDir pkgDir
+        hpcDir <- hpcDirFromDir pkgDir
+        when needHpc (createTree hpcDir)
+        let dotHpcDir = pkgDir </> dotHpc
+            exeExtension =
                 case configPlatform $ getConfig bconfig of
                     Platform _ Windows -> ".exe"
                     _ -> ""
 
         errs <- liftM Map.unions $ forM (Set.toList $ packageTests package) $ \testName -> do
-            nameDir <- liftIO $ parseRelDir $ T.unpack testName
-            nameExe <- liftIO $ parseRelFile $ T.unpack testName ++ exeExtension
+            nameDir <- parseRelDir $ T.unpack testName
+            nameExe <- parseRelFile $ T.unpack testName ++ exeExtension
+            nameTix <- liftM (pkgDir </>) $ parseRelFile $ T.unpack testName ++ ".tix"
             let exeName = buildDir </> $(mkRelDir "build") </> nameDir </> nameExe
             exists <- fileExists exeName
             menv <- liftIO $ configEnvOverride config EnvSettings
@@ -697,6 +701,13 @@ singleTest ac ee task =
                 }
             if exists
                 then do
+                    -- We clear out the .tix files before doing a run.
+                    when needHpc $ do
+                        tixexists <- fileExists nameTix
+                        when tixexists $
+                            $logWarn ("Removing HPC file " <> T.pack (toFilePath nameTix))
+                        removeFileIfExists nameTix
+
                     let args = boptsTestArgs (eeBuildOpts ee)
                         argsDisplay =
                             case args of
@@ -721,6 +732,10 @@ singleTest ac ee task =
                     (Just inH, Nothing, Nothing, ph) <- liftIO $ createProcess_ "singleBuild.runTests" cp
                     liftIO $ hClose inH
                     ec <- liftIO $ waitForProcess ph
+                    -- Move the .tix file out of the package directory
+                    -- into the hpc work dir, for tidiness.
+                    when needHpc $
+                        moveFileIfExists nameTix hpcDir
                     return $ case ec of
                         ExitSuccess -> Map.empty
                         _ -> Map.singleton testName $ Just ec
@@ -732,10 +747,45 @@ singleTest ac ee task =
                         , T.pack $ packageNameString $ packageName package
                         ]
                     return $ Map.singleton testName Nothing
+        when needHpc $ do
+            createTree (hpcDir </> dotHpc)
+            exists <- dirExists dotHpcDir
+            when exists $ do
+                copyDirectoryRecursive dotHpcDir (hpcDir </> dotHpc)
+                removeTree dotHpcDir
+            (_,files) <- listDirectory hpcDir
+            let tixes =
+                    filter (isSuffixOf ".tix" . toFilePath . filename) files
+            generateHpcReport pkgDir hpcDir (hpcDir </> dotHpc) tixes
+
         unless (Map.null errs) $ throwM $ TestSuiteFailure
             (taskProvides task)
             errs
             (fmap fst mlogFile)
+
+-- | Generate the HTML report and
+generateHpcReport
+    :: M env m
+    => Path Abs Dir -> Path Abs Dir -> Path Abs Dir -> [Path Abs File] -> m ()
+generateHpcReport _ _ _ [] = return ()
+generateHpcReport pkgDir hpcDir dotHpcDir tixes = do
+    menv <- getMinimalEnvOverride
+    $logInfo "Generating HPC HTML ..."
+    subdir <- stripDir pkgDir dotHpcDir
+    _ <- readProcessStdout (Just hpcDir) menv "hpc" ("markup" : args subdir)
+    output <-
+        readProcessStdout (Just hpcDir) menv "hpc" ("report" : args subdir)
+    forM_ (S8.lines output) ($logInfo . T.decodeUtf8)
+    $logInfo
+        ("The HTML report is available at " <>
+         T.pack (toFilePath (hpcDir </> $(mkRelFile "hpc_index.html"))))
+  where
+    args subdir =
+        concat
+            [ map (toFilePath . filename) tixes
+            , ["--srcdir", toFilePath pkgDir]
+            , ["--hpcdir", toFilePath subdir]
+            , ["--reset-hpcdirs"]]
 
 singleBench :: M env m
             => ActionContext

@@ -23,7 +23,8 @@ module Stack.Constants
     ,wiredInPackages
     ,cabalPackageName
     ,implicitGlobalDir
-    )
+    ,hpcDirFromDir
+    ,dotHpc)
     where
 
 
@@ -125,6 +126,14 @@ configCabalMod dir = do
         (</> $(mkRelFile "stack-cabal-mod"))
         (distDirFromDir dir)
 
+-- | Directory for HPC work.
+hpcDirFromDir
+    :: (MonadThrow m, MonadReader env m, HasPlatform env, HasEnvConfig env)
+    => Path Abs Dir  -- ^ Package directory.
+    -> m (Path Abs Dir)
+hpcDirFromDir dir = do
+    liftM (</> $(mkRelDir "hpc")) (distDirFromDir dir)
+
 -- | Package's build artifacts directory.
 distDirFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env, HasEnvConfig env)
                => Path Abs Dir
@@ -224,3 +233,7 @@ implicitGlobalDir :: Path Abs Dir -- ^ Stack root.
 implicitGlobalDir p =
     p </>
     $(mkRelDir "global")
+
+-- | Where .mix files go.
+dotHpc :: Path Rel Dir
+dotHpc = $(mkRelDir ".hpc")
