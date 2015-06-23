@@ -272,7 +272,7 @@ data BuildOpts =
             ,boptsFinalAction :: !FinalAction
             ,boptsDryrun :: !Bool
             ,boptsGhcOptions :: ![Text]
-            ,boptsFlags :: !(Map PackageName (Map FlagName Bool))
+            ,boptsFlags :: !(Map (Maybe PackageName) (Map FlagName Bool))
             ,boptsInstallExes :: !Bool
             -- ^ Install executables to user path after building?
             ,boptsPreFetch :: !Bool

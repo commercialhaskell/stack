@@ -266,13 +266,15 @@ partitionTargetSpecs =
             TSDir dir:ts -> loop (dirs . (dir:)) names idents ts
 
 -- | All flags for a local package
-localFlags :: (Map PackageName (Map FlagName Bool))
+localFlags :: (Map (Maybe PackageName) (Map FlagName Bool))
            -> BuildConfig
            -> PackageName
            -> Map FlagName Bool
-localFlags boptsflags bconfig name = Map.union
-    (fromMaybe Map.empty $ Map.lookup name $ boptsflags)
-    (fromMaybe Map.empty $ Map.lookup name $ bcFlags bconfig)
+localFlags boptsflags bconfig name = Map.unions
+    [ fromMaybe Map.empty $ Map.lookup (Just name) $ boptsflags
+    , fromMaybe Map.empty $ Map.lookup Nothing $ boptsflags
+    , fromMaybe Map.empty $ Map.lookup name $ bcFlags bconfig
+    ]
 
 -- | Add in necessary packages to extra dependencies
 --

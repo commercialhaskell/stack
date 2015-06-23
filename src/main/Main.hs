@@ -425,15 +425,17 @@ readPackageName = do
         Just x -> return x
 
 -- | Parser for package:[-]flag
-readFlag :: ReadM (Map PackageName (Map FlagName Bool))
+readFlag :: ReadM (Map (Maybe PackageName) (Map FlagName Bool))
 readFlag = do
     s <- readerAsk
     case break (== ':') s of
         (pn, ':':mflag) -> do
             pn' <-
                 case parsePackageNameFromString pn of
-                    Nothing -> readerError $ "Invalid package name: " ++ pn
-                    Just x -> return x
+                    Nothing
+                        | pn == "*" -> return Nothing
+                        | otherwise -> readerError $ "Invalid package name: " ++ pn
+                    Just x -> return $ Just x
             let (b, flagS) =
                     case mflag of
                         '-':x -> (False, x)
