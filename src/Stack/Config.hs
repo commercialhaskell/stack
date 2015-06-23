@@ -98,7 +98,7 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
          configConnectionCount = fromMaybe 8 configMonoidConnectionCount
          configHideTHLoading = fromMaybe True configMonoidHideTHLoading
          configLatestSnapshotUrl = fromMaybe
-            "https://www.stackage.org/download/snapshots.json"
+            "https://s3.amazonaws.com/haddock.stackage.org/snapshots.json"
             configMonoidLatestSnapshotUrl
          configPackageIndices = fromMaybe
             [PackageIndex
