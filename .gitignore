@@ -4,7 +4,6 @@
 *.tag
 *~
 .hsenv
-.shake/
 /.stack-work/
 /.cabal-sandbox/
 /Dockerfile
@@ -12,8 +11,6 @@
 TAGS
 cabal-dev/
 cabal.sandbox.config
-dist-stack/
 dist/
 tags
 /.docker-sandbox/
-/test/integration/.stack-work/
