@@ -58,7 +58,9 @@ import qualified System.Process.Read
 -- | Commandline dispatcher.
 main :: IO ()
 main =
-  do hSetBuffering stdout LineBuffering
+  do -- Line buffer the output by default, particularly for non-terminal runs.
+     -- See https://github.com/commercialhaskell/stack/pull/360
+     hSetBuffering stdout LineBuffering
      hSetBuffering stdin  LineBuffering
      hSetBuffering stderr NoBuffering
      when False $ do -- https://github.com/commercialhaskell/stack/issues/322
