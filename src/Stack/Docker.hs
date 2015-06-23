@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, DeriveDataTypeable, FlexibleContexts, MultiWayIf, NamedFieldPuns,
+{-# LANGUAGE CPP, ConstraintKinds, DeriveDataTypeable, FlexibleContexts, MultiWayIf, NamedFieldPuns,
              OverloadedStrings, RankNTypes, RecordWildCards, TemplateHaskell, TupleSections #-}
 
 -- | Run commands in Docker containers
@@ -22,9 +22,10 @@ module Stack.Docker
 import           Control.Applicative
 import           Control.Exception.Lifted
 import           Control.Monad
-import           Control.Monad.Catch (MonadThrow, throwM, MonadCatch)
+import           Control.Monad.Catch (MonadThrow,throwM,MonadCatch)
 import           Control.Monad.IO.Class (MonadIO,liftIO)
 import           Control.Monad.Logger (MonadLogger,logError,logInfo,logWarn)
+import           Control.Monad.Reader (MonadReader,asks)
 import           Control.Monad.Writer (execWriter,runWriter,tell)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Aeson.Extended (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
@@ -49,12 +50,13 @@ import           Path
 import           Path.IO (getWorkingDir,listDirectory)
 import           Stack.Constants (projectDockerSandboxDir,stackProgName,stackDotYaml,stackRootEnvVar)
 import           Stack.Types
+import           Stack.Types.Internal
 import           Stack.Docker.GlobalDB
 import           System.Directory (createDirectoryIfMissing,removeDirectoryRecursive,removeFile)
 import           System.Directory (doesDirectoryExist)
 import           System.Environment (lookupEnv,getProgName,getArgs,getExecutablePath)
 import           System.Exit (ExitCode(ExitSuccess),exitWith)
-import           System.FilePath (takeBaseName,isPathSeparator)
+import           System.FilePath (dropTrailingPathSeparator,takeBaseName)
 import           System.Info (arch,os)
 import           System.IO (stderr,stdin,stdout,hIsTerminalDevice)
 import qualified System.Process as Proc
@@ -70,10 +72,12 @@ import           System.Posix.Signals (installHandler,sigTERM,Handler(Catch))
 -- | If Docker is enabled, re-runs the currently running OS command in a Docker container.
 -- Otherwise, runs the inner action.
 rerunWithOptionalContainer
-    :: (MonadLogger m, MonadIO m, MonadThrow m, MonadBaseControl IO m, MonadCatch m)
-    => Config -> Maybe (Path Abs Dir) -> IO () -> m ()
-rerunWithOptionalContainer config mprojectRoot =
-  rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs
+    :: M env m
+    => Maybe (Path Abs Dir)
+    -> IO ()
+    -> m ()
+rerunWithOptionalContainer mprojectRoot =
+  rerunCmdWithOptionalContainer mprojectRoot getCmdArgs
   where
     getCmdArgs =
       do args <- getArgs
@@ -82,41 +86,41 @@ rerunWithOptionalContainer config mprojectRoot =
                      let mountPath = concat ["/opt/host/bin/",takeBaseName exePath]
                      return (mountPath
                             ,args
-                            ,config{configDocker=docker{dockerMount=Mount exePath mountPath :
-                                                                    dockerMount docker}})
+                            ,\c -> c{configDocker=(configDocker c)
+                                                  {dockerMount=Mount exePath mountPath :
+                                                               dockerMount (configDocker c)}})
              else do progName <- getProgName
-                     return (takeBaseName progName,args,config)
-    docker = configDocker config
+                     return (takeBaseName progName,args,id)
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
 -- Docker container.  Otherwise, runs the inner action.
 rerunCmdWithOptionalContainer
-    :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m, MonadCatch m)
-    => Config
-    -> Maybe (Path Abs Dir)
-    -> IO (FilePath,[String],Config)
+    :: M env m
+    => Maybe (Path Abs Dir)
+    -> IO (FilePath,[String],Config -> Config)
     -> IO ()
     -> m ()
-rerunCmdWithOptionalContainer config mprojectRoot getCmdArgs inner =
-  do inContainer <- getInContainer
+rerunCmdWithOptionalContainer mprojectRoot getCmdArgs inner =
+  do config <- asks getConfig
+     inContainer <- getInContainer
      if inContainer || not (dockerEnable (configDocker config))
         then liftIO inner
-        else do (cmd_,args,config') <- liftIO getCmdArgs
-                runContainerAndExit config' mprojectRoot cmd_ args [] (return ())
+        else do (cmd_,args,modConfig) <- liftIO getCmdArgs
+                runContainerAndExit modConfig mprojectRoot cmd_ args [] (return ())
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
 -- Docker container.  Otherwise, runs the inner action.
 rerunCmdWithRequiredContainer
-    :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m, MonadCatch m)
-    => Config
-    -> Maybe (Path Abs Dir)
-    -> IO (FilePath,[String],Config)
+    :: M env m
+    => Maybe (Path Abs Dir)
+    -> IO (FilePath,[String],Config -> Config)
     -> m ()
-rerunCmdWithRequiredContainer config mprojectRoot getCmdArgs =
-  do when (not (dockerEnable (configDocker config)))
+rerunCmdWithRequiredContainer mprojectRoot getCmdArgs =
+  do config <- asks getConfig
+     when (not (dockerEnable (configDocker config)))
           (throwM DockerMustBeEnabledException)
-     (cmd_,args,config') <- liftIO getCmdArgs
-     runContainerAndExit config' mprojectRoot cmd_ args [] (return ())
+     (cmd_,args,modConfig) <- liftIO getCmdArgs
+     runContainerAndExit modConfig mprojectRoot cmd_ args [] (return ())
 
 -- | Error if running in a container.
 preventInContainer :: (MonadIO m,MonadThrow m) => m () -> m ()
@@ -135,21 +139,23 @@ getInContainer =
        Just _ -> return True
 
 -- | Run a command in a new Docker container, then exit the process.
-runContainerAndExit :: (MonadLogger m, MonadIO m, MonadThrow m, MonadBaseControl IO m, MonadCatch m)
-                    => Config
+runContainerAndExit :: M env m
+                    => (Config -> Config)
                     -> Maybe (Path Abs Dir)
                     -> FilePath
                     -> [String]
                     -> [(String, String)]
                     -> IO ()
                     -> m ()
-runContainerAndExit config
+runContainerAndExit modConfig
                     mprojectRoot
                     cmnd
                     args
                     envVars
                     successPostAction =
-  do envOverride <- getEnvOverride (configPlatform config)
+  do config <- fmap modConfig (asks getConfig)
+     let docker = configDocker config
+     envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride
      uidOut <- readProcessStdout Nothing envOverride "id" ["-u"]
      gidOut <- readProcessStdout Nothing envOverride "id" ["-g"]
@@ -157,10 +163,10 @@ runContainerAndExit config
        liftIO ((,,) <$> lookupEnv "DOCKER_HOST"
                     <*> lookupEnv "DOCKER_CERT_PATH"
                     <*> lookupEnv "DOCKER_TLS_VERIFY")
-     (isStdinTerminal,isStdoutTerminal,isStderrTerminal) <-
-       liftIO ((,,) <$> hIsTerminalDevice stdin
-                    <*> hIsTerminalDevice stdout
-                    <*> hIsTerminalDevice stderr)
+     isStdoutTerminal <- asks getTerminal
+     (isStdinTerminal,isStderrTerminal) <-
+       liftIO ((,) <$> hIsTerminalDevice stdin
+                   <*> hIsTerminalDevice stderr)
      pwd <- getWorkingDir
      when (maybe False (isPrefixOf "tcp://") dockerHost &&
            maybe False (isInfixOf "boot2docker") dockerCertPath)
@@ -206,7 +212,8 @@ runContainerAndExit config
          execDockerProcess =
            do mapM_ (createDirectoryIfMissing True)
                     (concat [[toFilePath sandboxHomeDir
-                             ,toFilePath sandboxSandboxDir] ++
+                             ,toFilePath sandboxSandboxDir
+                             ,toFilePath stackRoot] ++
                              map toFilePath sandboxSubdirs])
               execProcessAndExit
                 envOverride
@@ -215,16 +222,18 @@ runContainerAndExit config
                   [["run"
                    ,"--net=host"
                    ,"-e",inContainerEnvVar ++ "=1"
-                   ,"-e",stackRootEnvVar ++ "=" ++ trimTrailingPathSep stackRoot
+                   ,"-e",stackRootEnvVar ++ "=" ++ toFPNoTrailingSep stackRoot
                    ,"-e","WORK_UID=" ++ uid
                    ,"-e","WORK_GID=" ++ gid
-                   ,"-e","WORK_WD=" ++ trimTrailingPathSep pwd
-                   ,"-e","WORK_HOME=" ++ trimTrailingPathSep sandboxRepoDir
-                   ,"-e","WORK_ROOT=" ++ trimTrailingPathSep projectRoot
-                   ,"-v",trimTrailingPathSep stackRoot ++ ":" ++ trimTrailingPathSep stackRoot
-                   ,"-v",trimTrailingPathSep projectRoot ++ ":" ++ trimTrailingPathSep projectRoot
-                   ,"-v",trimTrailingPathSep sandboxSandboxDir ++ ":" ++ trimTrailingPathSep sandboxDir
-                   ,"-v",trimTrailingPathSep sandboxHomeDir ++ ":" ++ trimTrailingPathSep sandboxRepoDir]
+                   ,"-e","WORK_WD=" ++ toFPNoTrailingSep pwd
+                   ,"-e","WORK_HOME=" ++ toFPNoTrailingSep sandboxRepoDir
+                   ,"-e","WORK_ROOT=" ++ toFPNoTrailingSep projectRoot
+                   ,"-v",toFPNoTrailingSep stackRoot ++ ":" ++ toFPNoTrailingSep stackRoot
+                   ,"-v",toFPNoTrailingSep projectRoot ++ ":" ++ toFPNoTrailingSep projectRoot
+                   ,"-v",toFPNoTrailingSep sandboxSandboxDir ++ ":" ++ toFPNoTrailingSep sandboxDir
+                   ,"-v",toFPNoTrailingSep sandboxHomeDir ++ ":" ++ toFPNoTrailingSep sandboxRepoDir
+                   ,"-v",toFPNoTrailingSep stackRoot ++ ":" ++
+                         toFPNoTrailingSep (sandboxRepoDir </> $(mkRelDir ("." ++ stackProgName ++ "/")))]
                   ,if oldImage
                      then ["-e",sandboxIDEnvVar ++ "=" ++ sandboxID
                           ,"--entrypoint=/root/entrypoint.sh"]
@@ -269,16 +278,16 @@ runContainerAndExit config
         Just ('=':val) -> Just val
         _ -> Nothing
     mountArg (Mount host container) = ["-v",host ++ ":" ++ container]
-    sandboxSubdirArg subdir = ["-v",trimTrailingPathSep subdir++ ":" ++ trimTrailingPathSep subdir]
-    trimTrailingPathSep = dropWhileEnd isPathSeparator . toFilePath
+    sandboxSubdirArg subdir = ["-v",toFPNoTrailingSep subdir++ ":" ++ toFPNoTrailingSep subdir]
+    toFPNoTrailingSep = dropTrailingPathSeparator . toFilePath
     projectRoot = fromMaybeProjectRoot mprojectRoot
-    docker = configDocker config
 
 -- | Clean-up old docker images and containers.
-cleanup :: (MonadLogger m, MonadIO m, MonadThrow m, MonadBaseControl IO m, MonadCatch m)
-        => Config -> CleanupOpts -> m ()
-cleanup config opts =
-  do envOverride <- getEnvOverride (configPlatform config)
+cleanup :: M env m
+        => CleanupOpts -> m ()
+cleanup opts =
+  do config <- asks getConfig
+     envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride
      let runDocker = readDockerProcess envOverride
      imagesOut <- runDocker ["images","--no-trunc","-f","dangling=false"]
@@ -526,13 +535,13 @@ inspects envOverride images =
        Left e -> throwM e
 
 -- | Pull latest version of configured Docker image from registry.
-pull :: (MonadLogger m, MonadIO m, MonadThrow m, MonadBaseControl IO m, MonadCatch m)
-     => Config -> m ()
-pull config =
-  do envOverride <- getEnvOverride (configPlatform config)
+pull :: M env m => m ()
+pull =
+  do config <- asks getConfig
+     let docker = configDocker config
+     envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride
      pullImage envOverride docker (dockerImage docker)
-  where docker = configDocker config
 
 -- | Pull Docker image from registry.
 pullImage :: (MonadLogger m,MonadIO m,MonadThrow m)
@@ -945,3 +954,6 @@ instance Show StackDockerException where
     "Cannot find 'docker' in PATH.  Is Docker installed?"
   show (InvalidDatabasePathException ex) =
     concat ["Invalid database path: ",show ex]
+
+type M env m = (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadCatch m
+               ,HasConfig env,HasTerminal env)

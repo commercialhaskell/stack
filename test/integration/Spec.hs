@@ -31,7 +31,7 @@ import           Test.Hspec
 
 main :: IO ()
 main = do
-    currDir <- getCurrentDirectory
+    currDir <- canonicalizePath "test/integration"
 
     let findExe name = do
             mexe <- findExecutable name
@@ -41,7 +41,8 @@ main = do
     runghc <- findExe "runghc"
     stack <- findExe "stack"
 
-    tests <- getDirectoryContents "tests" >>= filterM hasTest
+    let testDir = currDir </> "tests"
+    tests <- getDirectoryContents testDir >>= filterM (hasTest testDir)
 
     envOrig <- getEnvironment
 
@@ -58,8 +59,8 @@ main = do
 
         hspec $ mapM_ (test runghc env' currDir origStackRoot newHome) tests
 
-hasTest :: FilePath -> IO Bool
-hasTest dir = doesFileExist $ "tests" </> dir </> "Main.hs"
+hasTest :: FilePath -> FilePath -> IO Bool
+hasTest root dir = doesFileExist $ root </> dir </> "Main.hs"
 
 test :: FilePath -- ^ runghc
      -> [(String, String)] -- ^ env

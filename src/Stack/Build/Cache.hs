@@ -47,13 +47,13 @@ import           System.IO.Error (isDoesNotExistError)
 
 -- | Directory containing files to mark an executable as installed
 exeInstalledDir :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
-                => Location -> m (Path Abs Dir)
+                => InstallLocation -> m (Path Abs Dir)
 exeInstalledDir Snap = (</> $(mkRelDir "installed-packages")) `liftM` installationRootDeps
 exeInstalledDir Local = (</> $(mkRelDir "installed-packages")) `liftM` installationRootLocal
 
 -- | Get all of the installed executables
 getInstalledExes :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)
-                 => Location -> m [PackageIdentifier]
+                 => InstallLocation -> m [PackageIdentifier]
 getInstalledExes loc = do
     dir <- exeInstalledDir loc
     files <- liftIO $ handleIO (const $ return []) $ getDirectoryContents $ toFilePath dir
@@ -61,7 +61,7 @@ getInstalledExes loc = do
 
 -- | Mark the given executable as installed
 markExeInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)
-                 => Location -> PackageIdentifier -> m ()
+                 => InstallLocation -> PackageIdentifier -> m ()
 markExeInstalled loc ident = do
     dir <- exeInstalledDir loc
     liftIO $ createDirectoryIfMissing True $ toFilePath dir

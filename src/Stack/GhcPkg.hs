@@ -14,7 +14,9 @@ module Stack.GhcPkg
   ,envHelper
   ,createDatabase
   ,unregisterGhcPkgId
-  ,getCabalPkgVer)
+  ,getCabalPkgVer
+  ,findGhcPkgHaddockHtml
+  ,findGhcPkgDepends)
   where
 
 import           Control.Monad
@@ -26,6 +28,7 @@ import qualified Data.ByteString.Char8 as S8
 import           Data.Either
 import           Data.List
 import           Data.Maybe
+import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
@@ -90,6 +93,26 @@ packageDbFlags pkgDbs =
           "--no-user-package-db"
         : map (\x -> ("--package-db=" ++ toFilePath x)) pkgDbs
 
+-- | Get the value of a field of the package.
+findGhcPkgField :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+             => EnvOverride
+             -> [Path Abs Dir] -- ^ package databases
+             -> Text
+             -> Text
+             -> m (Maybe Text)
+findGhcPkgField menv pkgDbs name field = do
+    result <- ghcPkg menv pkgDbs ["field", T.unpack name, T.unpack field]
+    return $ case result of
+        Left{} -> Nothing
+        Right lbs ->
+            case map (stripCR . T.decodeUtf8) (S8.lines lbs) of
+                [] -> Nothing
+                (line:lines_) ->
+                    case T.stripPrefix (T.append field ": ") line of
+                        Nothing -> Nothing
+                        Just line' -> Just $ T.intercalate "\n" (line':lines_)
+  where stripCR t = fromMaybe t (T.stripSuffix "\r" t)
+
 -- | Get the id of the package e.g. @foo-0.0.0-9c293923c0685761dcff6f8c3ad8f8ec@.
 findGhcPkgId :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
              => EnvOverride
@@ -97,28 +120,34 @@ findGhcPkgId :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, 
              -> PackageName
              -> m (Maybe GhcPkgId)
 findGhcPkgId menv pkgDbs name = do
-    result <-
-        ghcPkg menv pkgDbs ["describe", packageNameString name]
-    case result of
-        Left{} ->
-            return Nothing
-        Right lbs -> do
-            let mpid =
-                    fmap
-                        T.encodeUtf8
-                        (listToMaybe
-                             (mapMaybe
-                                  (fmap stripCR .
-                                   T.stripPrefix "id: ")
-                                  (map T.decodeUtf8 (S8.lines lbs))))
-            case mpid of
-                Just !pid ->
-                    return (parseGhcPkgId pid)
-                _ ->
-                    return Nothing
-  where
-    stripCR t =
-        fromMaybe t (T.stripSuffix "\r" t)
+    mpid <- findGhcPkgField menv pkgDbs (packageNameText name) "id"
+    case mpid of
+        Just !pid -> return (parseGhcPkgId (T.encodeUtf8 pid))
+        _ -> return Nothing
+
+-- | Get the Haddock HTML documentation path of the package.
+findGhcPkgHaddockHtml :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+                      => EnvOverride
+                      -> [Path Abs Dir] -- ^ package databases
+                      -> PackageIdentifier
+                      -> m (Maybe (Path Abs Dir))
+findGhcPkgHaddockHtml menv pkgDbs pkgId = do
+    mpath <- findGhcPkgField menv pkgDbs (packageIdentifierText pkgId) "haddock-html"
+    case mpath of
+        Just !path -> return (parseAbsDir (T.unpack path))
+        _ -> return Nothing
+
+-- | Get the dependencies of the package.
+findGhcPkgDepends :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+                  => EnvOverride
+                  -> [Path Abs Dir] -- ^ package databases
+                  -> PackageIdentifier
+                  -> m [GhcPkgId]
+findGhcPkgDepends menv pkgDbs pkgId = do
+    mdeps <- findGhcPkgField menv pkgDbs (packageIdentifierText pkgId) "depends"
+    case mdeps of
+        Just !deps -> return (mapMaybe (parseGhcPkgId . T.encodeUtf8) (T.words deps))
+        _ -> return []
 
 unregisterGhcPkgId :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadBaseControl IO m)
                     => EnvOverride
@@ -137,11 +166,10 @@ unregisterGhcPkgId menv pkgDb gid = do
 -- | Get the version of Cabal from the global package database.
 getCabalPkgVer :: (MonadThrow m, MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
                => EnvOverride -> m Version
-getCabalPkgVer menv = do
-    db <- getGlobalDB menv -- FIXME shouldn't be necessary, just tell ghc-pkg to look in the global DB
+getCabalPkgVer menv =
     findGhcPkgId
         menv
-        [db]
+        [] -- global DB
         cabalPackageName >>=
         maybe
             (throwM $ Couldn'tFindPkgId cabalPackageName)

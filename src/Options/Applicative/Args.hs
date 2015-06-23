@@ -5,15 +5,11 @@
 module Options.Applicative.Args
     (argsArgument
     ,argsOption
-    ,parseArgsFromString
-    ,argsParser)
+    ,parseArgsFromString)
     where
 
-import           Control.Applicative
-import           Data.Attoparsec.Text ((<?>))
+import           Data.Attoparsec.Args
 import qualified Data.Attoparsec.Text as P
-import           Data.Attoparsec.Types (Parser)
-import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Options.Applicative as O
 
@@ -33,17 +29,4 @@ argsOption =
 
 -- | Parse from a string.
 parseArgsFromString :: String -> Either String [String]
-parseArgsFromString = P.parseOnly argsParser . T.pack
-
--- | A basic argument parser. It supports space-separated text, and
--- string quotation with identity escaping: \x -> x.
-argsParser :: Parser Text [String]
-argsParser = many (P.skipSpace *> (quoted <|> unquoted)) <*
-             P.skipSpace <* (P.endOfInput <?> "unterminated string")
-  where
-    unquoted = P.many1 naked
-    quoted = P.char '"' *> string <* P.char '"'
-    string = many (escaped <|> nonquote)
-    escaped = P.char '\\' *> P.anyChar
-    nonquote = P.satisfy (not . (=='"'))
-    naked = P.satisfy (not . flip elem ("\" " :: String))
+parseArgsFromString = P.parseOnly (argsParser Escaping) . T.pack

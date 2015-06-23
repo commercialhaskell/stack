@@ -15,10 +15,11 @@ import           Control.Monad (liftM, mzero)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
 import           Data.Aeson.Extended (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, object
-                            ,(.=), (.:?), (.!=), (.:), Value (String))
+                            ,(.=), (.:?), (.!=), (.:), Value (String, Object))
 import           Data.Binary (Binary)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
+import           Data.Either (partitionEithers)
 import           Data.Hashable (Hashable)
 import           Data.Map (Map)
 import qualified Data.Map as Map
@@ -29,6 +30,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.Typeable
+import           Data.Yaml (ParseException)
 import           Distribution.System (Platform)
 import qualified Distribution.Text
 import           Distribution.Version (anyVersion, intersectVersionRanges)
@@ -465,13 +467,21 @@ instance FromJSON VersionRangeJSON where
                              (Distribution.Text.simpleParse (T.unpack s)))
 
 data ConfigException
-  = ParseResolverException Text
+  = ParseConfigFileException (Path Abs File) ParseException
+  | ParseResolverException Text
   | NoProjectConfigFound (Path Abs Dir) (Maybe Text)
   | UnexpectedTarballContents [Path Abs Dir] [Path Abs File]
   | BadStackVersionException VersionRange
   | NoMatchingSnapshot [SnapName]
   deriving Typeable
 instance Show ConfigException where
+    show (ParseConfigFileException configFile exception) = concat
+        [ "Could not parse '"
+        , toFilePath configFile
+        , "':\n"
+        , show exception
+        , "\nSee https://github.com/commercialhaskell/stack/wiki/stack.yaml."
+        ]
     show (ParseResolverException t) = concat
         [ "Invalid resolver value: "
         , T.unpack t
@@ -509,8 +519,8 @@ instance Show ConfigException where
             names
         , "\nYou'll then need to add some extra-deps. See:\n\n"
         , "    https://github.com/commercialhaskell/stack/wiki/stack.yaml#extra-deps"
-        , "\n\nNote that this will be improved in the future, see:\n\n"
-        , "    https://github.com/commercialhaskell/stack/issues/116"
+        , "\n\nYou can also try falling back to a dependency solver with:\n\n"
+        , "    stack init --solver"
         ]
 instance Exception ConfigException
 
@@ -559,9 +569,9 @@ configProjectWorkDir = do
     bc <- asks getBuildConfig
     return (bcRoot bc </> workDirRel)
 
--- | File containing the profiling cache, see "Stack.PackageDump"
-configProfilingCache :: (HasBuildConfig env, MonadReader env m) => m (Path Abs File)
-configProfilingCache = liftM (</> $(mkRelFile "profiling-cache.bin")) configProjectWorkDir
+-- | File containing the installed cache, see "Stack.PackageDump"
+configInstalledCache :: (HasBuildConfig env, MonadReader env m) => m (Path Abs File)
+configInstalledCache = liftM (</> $(mkRelFile "installed-cache.bin")) configProjectWorkDir
 
 -- | Relative directory for the platform identifier
 platformRelDir :: (MonadReader env m, HasPlatform env, MonadThrow m) => m (Path Rel Dir)
@@ -635,6 +645,10 @@ configMiniBuildPlanCache name = do
 bindirSuffix :: Path Rel Dir
 bindirSuffix = $(mkRelDir "bin")
 
+-- | Suffix applied to an installation root to get the doc dir
+docdirSuffix :: Path Rel Dir
+docdirSuffix = $(mkRelDir "doc")
+
 -- | Get the extra bin directories (for the PATH). Puts more local first
 --
 -- Bool indicates whether or not to include the locals
@@ -656,3 +670,51 @@ getMinimalEnvOverride = do
                     { esIncludeLocals = False
                     , esIncludeGhcPackagePath = False
                     }
+
+data ProjectAndConfigMonoid
+  = ProjectAndConfigMonoid !Project !ConfigMonoid
+
+instance FromJSON ProjectAndConfigMonoid where
+    parseJSON = withObject "Project, ConfigMonoid" $ \o -> do
+        dirs <- o .:? "packages" .!= [packageEntryCurrDir]
+        extraDeps' <- o .:? "extra-deps" .!= []
+        extraDeps <-
+            case partitionEithers $ goDeps extraDeps' of
+                ([], x) -> return $ Map.fromList x
+                (errs, _) -> fail $ unlines errs
+
+        flags <- o .:? "flags" .!= mempty
+        resolver <- o .: "resolver"
+        config <- parseJSON $ Object o
+        let project = Project
+                { projectPackages = dirs
+                , projectExtraDeps = extraDeps
+                , projectFlags = flags
+                , projectResolver = resolver
+                }
+        return $ ProjectAndConfigMonoid project config
+      where
+        goDeps =
+            map toSingle . Map.toList . Map.unionsWith Set.union . map toMap
+          where
+            toMap i = Map.singleton
+                (packageIdentifierName i)
+                (Set.singleton (packageIdentifierVersion i))
+
+        toSingle (k, s) =
+            case Set.toList s of
+                [x] -> Right (k, x)
+                xs -> Left $ concat
+                    [ "Multiple versions for package "
+                    , packageNameString k
+                    , ": "
+                    , unwords $ map versionString xs
+                    ]
+
+-- | A PackageEntry for the current directory, used as a default
+packageEntryCurrDir :: PackageEntry
+packageEntryCurrDir = PackageEntry
+    { peValidWanted = True
+    , peLocation = PLFilePath "."
+    , peSubdirs = []
+    }

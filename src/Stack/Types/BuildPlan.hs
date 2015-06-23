@@ -32,6 +32,7 @@ import           Data.Aeson                      (FromJSON (..), ToJSON (..),
                                                   object, withObject, withText,
                                                   (.!=), (.:), (.:?), (.=))
 import           Data.Binary                     as Binary (Binary)
+import           Data.Binary.VersionTagged       (BinarySchema (..))
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Char8           as S8
 import           Data.Hashable                   (Hashable)
@@ -364,6 +365,9 @@ data MiniBuildPlan = MiniBuildPlan
     }
     deriving (Generic, Show, Eq)
 instance Binary.Binary MiniBuildPlan
+instance BinarySchema MiniBuildPlan where
+    -- Don't forget to update this if you change the datatype in any way!
+    binarySchema _ = 1
 
 -- | Information on a single package for the 'MiniBuildPlan'.
 data MiniPackageInfo = MiniPackageInfo

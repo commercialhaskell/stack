@@ -1,9 +1,11 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Stack.PackageDump
     ( Line
     , eachSection
@@ -11,22 +13,28 @@ module Stack.PackageDump
     , DumpPackage (..)
     , conduitDumpPackage
     , ghcPkgDump
-    , ProfilingCache
-    , newProfilingCache
-    , loadProfilingCache
-    , saveProfilingCache
+    , InstalledCache
+    , InstalledCacheEntry (..)
+    , newInstalledCache
+    , loadInstalledCache
+    , saveInstalledCache
     , addProfiling
+    , addHaddock
     , sinkMatching
     , pruneDeps
     ) where
 
 import           Control.Applicative
+import           Control.Exception.Enclosed (tryIO)
 import           Control.Monad (when, liftM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Trans.Control
-import           Data.Binary.VersionTagged (taggedDecodeOrLoad, taggedEncodeFile)
+import           Data.Attoparsec.Args
+import           Data.Attoparsec.Text as P
+import           Data.Binary (Binary)
+import           Data.Binary.VersionTagged (taggedDecodeOrLoad, taggedEncodeFile, BinarySchema (..))
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
@@ -40,16 +48,30 @@ import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (catMaybes)
 import qualified Data.Set as Set
+import qualified Data.Text.Encoding as T
 import           Data.Typeable (Typeable)
+import           GHC.Generics (Generic)
 import           Path
 import           Prelude -- Fix AMP warning
 import           Stack.GhcPkg
 import           Stack.Types
-import           System.Directory (createDirectoryIfMissing, getDirectoryContents)
+import           System.Directory (createDirectoryIfMissing, getDirectoryContents, doesFileExist)
 import           System.Process.Read
 
--- | Cached information on whether a package has profiling libraries
-newtype ProfilingCache = ProfilingCache (IORef (Map GhcPkgId Bool))
+-- | Cached information on whether package have profiling libraries and haddocks.
+newtype InstalledCache = InstalledCache (IORef InstalledCacheInner)
+newtype InstalledCacheInner = InstalledCacheInner (Map GhcPkgId InstalledCacheEntry)
+    deriving Binary
+instance BinarySchema InstalledCacheInner where
+    -- Don't forget to update this if you change the datatype in any way!
+    binarySchema _ = 1
+
+-- | Cached information on whether a package has profiling libraries and haddocks.
+data InstalledCacheEntry = InstalledCacheEntry
+    { installedCacheProfiling :: !Bool
+    , installedCacheHaddock :: !Bool }
+    deriving (Eq, Generic)
+instance Binary InstalledCacheEntry
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump
@@ -70,20 +92,20 @@ ghcPkgDump menv mpkgDb sink = do
         , ["dump", "--expand-pkgroot"]
         ]
 
--- | Create a new, empty @ProfilingCache@
-newProfilingCache :: MonadIO m => m ProfilingCache
-newProfilingCache = liftIO $ ProfilingCache <$> newIORef Map.empty
+-- | Create a new, empty @InstalledCache@
+newInstalledCache :: MonadIO m => m InstalledCache
+newInstalledCache = liftIO $ InstalledCache <$> newIORef (InstalledCacheInner Map.empty)
 
--- | Load a @ProfilingCache@ from disk, swallowing any errors and returning an
+-- | Load a @InstalledCache@ from disk, swallowing any errors and returning an
 -- empty cache.
-loadProfilingCache :: MonadIO m => Path Abs File -> m ProfilingCache
-loadProfilingCache path = do
-    m <- taggedDecodeOrLoad (toFilePath path) (return Map.empty)
-    liftIO $ fmap ProfilingCache $ newIORef m
+loadInstalledCache :: MonadIO m => Path Abs File -> m InstalledCache
+loadInstalledCache path = do
+    m <- taggedDecodeOrLoad (toFilePath path) (return $ InstalledCacheInner Map.empty)
+    liftIO $ fmap InstalledCache $ newIORef m
 
--- | Save a @ProfilingCache@ to disk
-saveProfilingCache :: MonadIO m => Path Abs File -> ProfilingCache -> m ()
-saveProfilingCache path (ProfilingCache ref) = liftIO $ do
+-- | Save a @InstalledCache@ to disk
+saveInstalledCache :: MonadIO m => Path Abs File -> InstalledCache -> m ()
+saveInstalledCache path (InstalledCache ref) = liftIO $ do
     createDirectoryIfMissing True $ toFilePath $ parent path
     readIORef ref >>= taggedEncodeFile (toFilePath path)
 
@@ -131,10 +153,15 @@ pruneDeps getName getId getDepends chooseBest =
 -- Packages not mentioned in the provided @Map@ are allowed to be present too.
 sinkMatching :: Monad m
              => Bool -- ^ require profiling?
+             -> Bool -- ^ require haddock?
              -> Map PackageName Version -- ^ allowed versions
-             -> Consumer (DumpPackage Bool) m (Map PackageName (DumpPackage Bool))
-sinkMatching reqProfiling allowed = do
-    dps <- CL.filter (\dp -> isAllowed (dpGhcPkgId dp) && (not reqProfiling || dpProfiling dp))
+             -> Consumer (DumpPackage Bool Bool)
+                         m
+                         (Map PackageName (DumpPackage Bool Bool))
+sinkMatching reqProfiling reqHaddock allowed = do
+    dps <- CL.filter (\dp -> isAllowed (dpGhcPkgId dp) &&
+                             (not reqProfiling || dpProfiling dp) &&
+                             (not reqHaddock || dpHaddock dp))
        =$= CL.consume
     return $ pruneDeps
         (packageIdentifierName . ghcPkgIdPackageIdentifier)
@@ -152,25 +179,26 @@ sinkMatching reqProfiling allowed = do
 
 -- | Add profiling information to the stream of @DumpPackage@s
 addProfiling :: MonadIO m
-             => ProfilingCache
-             -> Conduit (DumpPackage a) m (DumpPackage Bool)
-addProfiling (ProfilingCache ref) =
+             => InstalledCache
+             -> Conduit (DumpPackage a b) m (DumpPackage Bool b)
+addProfiling (InstalledCache ref) =
     CL.mapM go
   where
     go dp = liftIO $ do
-        m <- readIORef ref
+        InstalledCacheInner m <- readIORef ref
         let gid = dpGhcPkgId dp
         p <- case Map.lookup gid m of
-            Just p -> return p
+            Just installed -> return (installedCacheProfiling installed)
             Nothing | null (dpLibraries dp) -> return True
             Nothing -> do
                 let loop [] = return False
                     loop (dir:dirs) = do
-                        contents <- getDirectoryContents $ S8.unpack dir
+                        econtents <- tryIO $ getDirectoryContents dir
+                        let contents = either (const []) id econtents
                         if or [isProfiling content lib
                               | content <- contents
                               , lib <- dpLibraries dp
-                              ]
+                              ] && not (null contents)
                             then return True
                             else loop dirs
                 loop $ dpLibDirs dp
@@ -184,19 +212,45 @@ isProfiling content lib =
   where
     prefix = S.concat ["lib", lib, "_p"]
 
+-- | Add haddock information to the stream of @DumpPackage@s
+addHaddock :: MonadIO m
+           => InstalledCache
+           -> Conduit (DumpPackage a b) m (DumpPackage a Bool)
+addHaddock (InstalledCache ref) =
+    CL.mapM go
+  where
+    go dp = liftIO $ do
+        InstalledCacheInner m <- readIORef ref
+        let gid = dpGhcPkgId dp
+        h <- case Map.lookup gid m of
+            Just installed -> return (installedCacheHaddock installed)
+            Nothing | null (dpLibraries dp) -> return True
+            Nothing -> do
+                let loop [] = return False
+                    loop (ifc:ifcs) = do
+                        exists <- doesFileExist (S8.unpack ifc)
+                        if exists
+                            then return True
+                            else loop ifcs
+                loop $ dpHaddockInterfaces dp
+        return dp { dpHaddock = h }
+
 -- | Dump information for a single package
-data DumpPackage profiling = DumpPackage
+data DumpPackage profiling haddock = DumpPackage
     { dpGhcPkgId :: !GhcPkgId
-    , dpLibDirs :: ![ByteString]
+    , dpLibDirs :: ![FilePath]
     , dpLibraries :: ![ByteString]
     , dpDepends :: ![GhcPkgId]
+    , dpHaddockInterfaces :: ![ByteString]
     , dpProfiling :: !profiling
+    , dpHaddock :: !haddock
     }
     deriving (Show, Eq, Ord)
 
 data PackageDumpException
     = MissingSingleField ByteString (Map ByteString [Line])
     | MismatchedId PackageName Version GhcPkgId
+    | Couldn'tParseField ByteString [Line]
     deriving Typeable
 instance Exception PackageDumpException
 instance Show PackageDumpException where
@@ -211,10 +265,12 @@ instance Show PackageDumpException where
     show (MismatchedId name version gid) =
         "Invalid id/name/version in ghc-pkg dump output: " ++
         show (name, version, gid)
+    show (Couldn'tParseField name ls) =
+        "Couldn't parse the field " ++ show name ++ " from lines: " ++ show ls
 
 -- | Convert a stream of bytes into a stream of @DumpPackage@s
 conduitDumpPackage :: MonadThrow m
-                   => Conduit ByteString m (DumpPackage ())
+                   => Conduit ByteString m (DumpPackage () ())
 conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
     pairs <- eachPair (\k -> (k, ) <$> CL.consume) =$= CL.consume
     let m = Map.fromList pairs
@@ -251,16 +307,25 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 $ throwM $ MismatchedId name version ghcPkgId
 
             -- if a package has no modules, these won't exist
-            let libDirs = parseM "library-dirs"
+            let libDirKey = "library-dirs"
+                libDirs = parseM libDirKey
                 libraries = parseM "hs-libraries"
+                haddockInterfaces = parseM "haddock-interfaces"
             depends <- mapM parseDepend $ parseM "depends"
+
+            libDirPaths <-
+                case mapM (P.parseOnly (argsParser NoEscaping) . T.decodeUtf8) libDirs of
+                    Left{} -> throwM (Couldn'tParseField libDirKey libDirs)
+                    Right dirs -> return (concat dirs)
 
             return $ Just DumpPackage
                 { dpGhcPkgId = ghcPkgId
-                , dpLibDirs = libDirs
+                , dpLibDirs = libDirPaths
                 , dpLibraries = S8.words $ S8.unwords libraries
                 , dpDepends = catMaybes (depends :: [Maybe GhcPkgId])
+                , dpHaddockInterfaces = S8.words $ S8.unwords haddockInterfaces
                 , dpProfiling = ()
+                , dpHaddock = ()
                 }
 
 stripPrefixBS :: ByteString -> ByteString -> Maybe ByteString

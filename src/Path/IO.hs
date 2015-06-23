@@ -14,7 +14,8 @@ module Path.IO
   ,removeTree
   ,removeTreeIfExists
   ,fileExists
-  ,dirExists)
+  ,dirExists
+  ,copyDirectoryRecursive)
   where
 
 import           Control.Exception hiding (catch)
@@ -150,3 +151,24 @@ fileExists =
 dirExists :: MonadIO m => Path b Dir -> m Bool
 dirExists =
     liftIO . doesFileExist . toFilePath
+
+-- | Copy a directory recursively.  This just uses 'copyFile', so it is not smart about symbolic
+-- links or other special files.
+copyDirectoryRecursive :: (MonadIO m,MonadThrow m)
+                       => Path Abs Dir -- ^ Source directory
+                       -> Path Abs Dir -- ^ Destination directory
+                       -> m ()
+copyDirectoryRecursive srcDir destDir =
+    do liftIO (createDirectoryIfMissing False (toFilePath destDir))
+       (srcSubDirs,srcFiles) <- listDirectory srcDir
+       forM_ srcFiles
+             (\srcFile ->
+                case stripDir srcDir srcFile of
+                  Nothing -> return ()
+                  Just relFile -> liftIO (copyFile (toFilePath srcFile)
+                                                   (toFilePath (destDir </> relFile))))
+       forM_ srcSubDirs
+             (\srcSubDir ->
+                case stripDir srcDir srcSubDir of
+                  Nothing -> return ()
+                  Just relSubDir -> copyDirectoryRecursive srcSubDir (destDir </> relSubDir))

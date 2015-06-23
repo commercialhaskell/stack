@@ -11,7 +11,7 @@
 
 module Stack.Build.Types
     (StackBuildException(..)
-    ,Location(..)
+    ,InstallLocation(..)
     ,ModTime
     ,modTime
     ,Installed(..)
@@ -27,7 +27,8 @@ module Stack.Build.Types
     ,ConfigCache(..)
     ,ConstructPlanException(..)
     ,configureOpts
-    ,BadDependency(..))
+    ,BadDependency(..)
+    ,wantedLocalPackages)
     where
 
 import           Control.DeepSeq
@@ -54,12 +55,12 @@ import           Data.Time.Clock
 import           Distribution.System (Arch)
 import           Distribution.Text (display)
 import           GHC.Generics
-import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, (</>))
-import           Prelude hiding (FilePath)
+import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, parseRelDir, (</>))
+import           Prelude
 import           Stack.Package
 import           Stack.Types
 import           System.Exit (ExitCode)
-import           System.FilePath (pathSeparator)
+import           System.FilePath (dropTrailingPathSeparator, pathSeparator)
 
 ----------------------------------------------
 -- Exceptions
@@ -163,6 +164,7 @@ instance Show StackBuildException where
                     , "-"
                     , versionString version
                     ]) (Map.toList extras)
+                    ++ ["", "You may also want to try the 'stack solver' command"]
                 )
          where
              exceptions' = removeDuplicates exceptions
@@ -263,6 +265,10 @@ data BuildOpts =
             ,boptsLibProfile :: !Bool
             ,boptsExeProfile :: !Bool
             ,boptsEnableOptimizations :: !(Maybe Bool)
+            ,boptsHaddock :: !Bool
+            -- ^ Build haddocks?
+            ,boptsHaddockDeps :: !(Maybe Bool)
+            -- ^ Build haddocks for dependencies?
             ,boptsFinalAction :: !FinalAction
             ,boptsDryrun :: !Bool
             ,boptsGhcOptions :: ![Text]
@@ -283,7 +289,6 @@ data BuildOpts =
 data FinalAction
   = DoTests
   | DoBenchmarks
-  | DoHaddock
   | DoNothing
   deriving (Eq,Bounded,Enum,Show)
 
@@ -293,9 +298,9 @@ newtype PkgDepsOracle =
     deriving (Show,Typeable,Eq,Hashable,Binary,NFData)
 
 -- | A location to install a package into, either snapshot or local
-data Location = Snap | Local
+data InstallLocation = Snap | Local
     deriving (Show, Eq)
-instance Monoid Location where
+instance Monoid InstallLocation where
     mempty = Snap
     mappend Local _ = Local
     mappend _ Local = Local
@@ -305,7 +310,7 @@ instance Monoid Location where
 -- to install it into
 class PackageInstallInfo a where
     piiVersion :: a -> Version
-    piiLocation :: a -> Location
+    piiLocation :: a -> InstallLocation
 
 -- | Information on a locally available package of source code
 data LocalPackage = LocalPackage
@@ -333,6 +338,8 @@ data ConfigCache = ConfigCache
       -- ^ The components to be built. It's a bit of a hack to include this in
       -- here, as it's not a configure option (just a build option), but this
       -- is a convenient way to force compilation when the components change.
+    , configCacheHaddock :: !Bool
+      -- ^ Are haddocks to be built?
     }
     deriving (Generic,Eq,Show)
 instance Binary ConfigCache
@@ -364,7 +371,7 @@ instance Show TaskConfigOpts where
 -- | The type of a task, either building local code or something from the
 -- package index (upstream)
 data TaskType = TTLocal LocalPackage
-              | TTUpstream Package Location
+              | TTUpstream Package InstallLocation
     deriving Show
 
 -- | A complete plan of what needs to be built and how to do it
@@ -373,7 +380,7 @@ data Plan = Plan
     , planFinals :: !(Map PackageName Task)
     -- ^ Final actions to be taken (test, benchmark, etc)
     , planUnregisterLocal :: !(Set GhcPkgId)
-    , planInstallExes :: !(Map Text Location)
+    , planInstallExes :: !(Map Text InstallLocation)
     -- ^ Executables that should be installed after successful building
     }
     deriving Show
@@ -392,20 +399,21 @@ configureOpts :: EnvConfig
               -> BaseConfigOpts
               -> Set GhcPkgId -- ^ dependencies
               -> Bool -- ^ wanted?
-              -> Location
-              -> Map FlagName Bool
+              -> InstallLocation
+              -> Package
               -> [Text]
-configureOpts econfig bco deps wanted loc flags = map T.pack $ concat
+configureOpts econfig bco deps wanted loc package = map T.pack $ concat
     [ ["--user", "--package-db=clear", "--package-db=global"]
     , map (("--package-db=" ++) . toFilePath) $ case loc of
         Snap -> [bcoSnapDB bco]
         Local -> [bcoSnapDB bco, bcoLocalDB bco]
     , depOptions
     , [ "--libdir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "lib"))
-      , "--bindir=" ++ toFilePathNoTrailingSlash  (installRoot </> bindirSuffix)
-      , "--datadir=" ++ toFilePathNoTrailingSlash  (installRoot </> $(mkRelDir "share"))
-      , "--docdir=" ++ toFilePathNoTrailingSlash  (installRoot </> $(mkRelDir "doc"))
-      ]
+      , "--bindir=" ++ toFilePathNoTrailingSlash (installRoot </> bindirSuffix)
+      , "--datadir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "share"))
+      , "--docdir=" ++ toFilePathNoTrailingSlash docDir
+      , "--htmldir=" ++ toFilePathNoTrailingSlash docDir
+      , "--haddockdir=" ++ toFilePathNoTrailingSlash docDir]
     , ["--enable-library-profiling" | boptsLibProfile bopts || boptsExeProfile bopts]
     , ["--enable-executable-profiling" | boptsExeProfile bopts]
     , map (\(name,enabled) ->
@@ -414,7 +422,7 @@ configureOpts econfig bco deps wanted loc flags = map T.pack $ concat
                            then ""
                            else "-") <>
                        flagNameString name)
-                    (Map.toList flags)
+                    (Map.toList (packageFlags package))
     -- FIXME Chris: where does this come from now? , ["--ghc-options=-O2" | gconfigOptimize gconfig]
     , if wanted
         then concatMap (\x -> ["--ghc-options", T.unpack x]) (boptsGhcOptions bopts)
@@ -425,18 +433,19 @@ configureOpts econfig bco deps wanted loc flags = map T.pack $ concat
   where
     config = getConfig econfig
     bopts = bcoBuildOpts bco
-    toFilePathNoTrailingSlash =
-        loop . toFilePath
-      where
-        loop [] = []
-        loop [c]
-            | c == pathSeparator = []
-            | otherwise = [c]
-        loop (c:cs) = c : loop cs
+    toFilePathNoTrailingSlash = dropTrailingPathSeparator . toFilePath
+    docDir =
+        case pkgVerDir of
+            Nothing -> installRoot </> docdirSuffix
+            Just dir -> installRoot </> docdirSuffix </> dir
     installRoot =
         case loc of
             Snap -> bcoSnapInstallRoot bco
             Local -> bcoLocalInstallRoot bco
+    pkgVerDir =
+        parseRelDir (packageIdentifierString (PackageIdentifier (packageName package)
+                                                                (packageVersion package)) ++
+                     [pathSeparator])
 
     depOptions = map toDepOption $ Set.toList deps
       where
@@ -460,6 +469,10 @@ configureOpts econfig bco deps wanted loc flags = map T.pack $ concat
         ]
       where
         PackageIdentifier name version = ghcPkgIdPackageIdentifier gid
+
+-- | Get set of wanted package names from locals.
+wantedLocalPackages :: [LocalPackage] -> Set PackageName
+wantedLocalPackages = Set.fromList . map (packageName . lpPackage) . filter lpWanted
 
 -- | Used for storage and comparison.
 newtype ModTime = ModTime (Integer,Rational)

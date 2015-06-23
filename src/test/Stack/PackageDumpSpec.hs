@@ -76,7 +76,9 @@ spec = do
                 , dpLibDirs = ["/opt/ghc/7.8.4/lib/ghc-7.8.4/haskell2010-1.1.2.0"]
                 , dpDepends = depends
                 , dpLibraries = ["HShaskell2010-1.1.2.0"]
+                , dpHaddockInterfaces = ["/opt/ghc/7.8.4/share/doc/ghc/html/libraries/haskell2010-1.1.2.0/haskell2010.haddock"]
                 , dpProfiling = ()
+                , dpHaddock = ()
                 }
 
         it "ghc 7.10" $ do
@@ -104,28 +106,61 @@ spec = do
             haskell2010 `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpLibDirs = ["/opt/ghc/7.10.1/lib/ghc-7.10.1/ghc_EMlWrQ42XY0BNVbSrKixqY"]
+                , dpHaddockInterfaces = ["/opt/ghc/7.10.1/share/doc/ghc/html/libraries/ghc-7.10.1/ghc.haddock"]
                 , dpDepends = depends
                 , dpLibraries = ["HSghc-7.10.1-EMlWrQ42XY0BNVbSrKixqY"]
                 , dpProfiling = ()
+                , dpHaddock = ()
+                }
+        it "ghc 7.8.4 (osx)" $ do
+            hmatrix:_ <- runResourceT
+                $ CB.sourceFile "test/package-dump/ghc-7.8.4-osx.txt"
+               $$ conduitDumpPackage
+               =$ CL.consume
+            ghcPkgId <- parseGhcPkgId "hmatrix-0.16.1.5-12d5d21f26aa98774cdd8edbc343fbfe"
+            depends <- mapM parseGhcPkgId
+                [ "array-0.5.0.0-470385a50d2b78598af85cfe9d988e1b"
+                , "base-4.7.0.2-918c7ac27f65a87103264a9f51652d63"
+                , "binary-0.7.1.0-108d06eea2ef05e517f9c1facf10f63c"
+                , "bytestring-0.10.4.0-78bc8f2c724c765c78c004a84acf6cc3"
+                , "deepseq-1.3.0.2-0ddc77716bd2515426e1ba39f6788a4f"
+                , "random-1.1-822c19b7507b6ac1aaa4c66731e775ae"
+                , "split-0.2.2-34cfb851cc3784e22bfae7a7bddda9c5"
+                , "storable-complex-0.2.2-e962c368d58acc1f5b41d41edc93da72"
+                , "vector-0.10.12.3-f4222db607fd5fdd7545d3e82419b307"]
+            hmatrix `shouldBe` DumpPackage
+                { dpGhcPkgId = ghcPkgId
+                , dpLibDirs =
+                      [ "/Users/alexbiehl/.stack/snapshots/x86_64-osx/lts-2.13/7.8.4/lib/x86_64-osx-ghc-7.8.4/hmatrix-0.16.1.5"
+                      , "/opt/local/lib/"
+                      , "/usr/local/lib/"
+                      ,  "C:/Program Files/Example/"]
+                , dpHaddockInterfaces = ["/Users/alexbiehl/.stack/snapshots/x86_64-osx/lts-2.13/7.8.4/doc/html/hmatrix.haddock"]
+                , dpDepends = depends
+                , dpLibraries = ["HShmatrix-0.16.1.5"]
+                , dpProfiling = ()
+                , dpHaddock = ()
                 }
 
-    it "ghcPkgDump + addProfiling" $ (id :: IO () -> IO ()) $ runNoLoggingT $ do
+    it "ghcPkgDump + addProfiling + addHaddock" $ (id :: IO () -> IO ()) $ runNoLoggingT $ do
         menv' <- getEnvOverride buildPlatform
         menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
-        pcache <- newProfilingCache
+        icache <- newInstalledCache
         ghcPkgDump menv Nothing
             $  conduitDumpPackage
-            =$ addProfiling pcache
+            =$ addProfiling icache
+            =$ addHaddock icache
             =$ CL.sinkNull
 
     it "sinkMatching" $ do
         menv' <- getEnvOverride buildPlatform
         menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
-        pcache <- newProfilingCache
+        icache <- newInstalledCache
         m <- runNoLoggingT $ ghcPkgDump menv Nothing
             $  conduitDumpPackage
-            =$ addProfiling pcache
-            =$ sinkMatching False (Map.singleton $(mkPackageName "transformers") $(mkVersion "0.0.0.0.0.0.1"))
+            =$ addProfiling icache
+            =$ addHaddock icache
+            =$ sinkMatching False False (Map.singleton $(mkPackageName "transformers") $(mkVersion "0.0.0.0.0.0.1"))
         case Map.lookup $(mkPackageName "base") m of
             Nothing -> error "base not present"
             Just _ -> return ()

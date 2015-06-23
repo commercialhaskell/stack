@@ -1,5 +1,5 @@
 name:                stack
-version:             0.0.3.1
+version:             0.1.0.0
 synopsis:            The Haskell Tool Stack
 description:         Please see the README.md for usage information, and
                      the wiki on Github for more details.  Also, note that
@@ -20,6 +20,7 @@ extra-source-files:  README.md ChangeLog.md
                      --     cabal: filepath wildcard 'test/package-dump/*.txt' does not match any files.
                      -- Happened during cabal sdist
                      test/package-dump/ghc-7.8.txt
+                     test/package-dump/ghc-7.8.4-osx.txt
                      test/package-dump/ghc-7.10.txt
 
                      new-template/src/Lib.hs
@@ -28,6 +29,11 @@ extra-source-files:  README.md ChangeLog.md
                      new-template/app/Main.hs
                      new-template/LICENSE
                      new-template/Setup.hs
+
+flag integration-tests
+  manual: True
+  default: False
+  description: Run the integration test suite
 
 library
   hs-source-dirs:    src/
@@ -47,7 +53,6 @@ library
                      Stack.Package
                      Stack.PackageDump
                      Stack.PackageIndex
-                     Stack.Path
                      Stack.Repl
                      Stack.Setup
                      Stack.Solver
@@ -66,10 +71,10 @@ library
                      Stack.Build.Cache
                      Stack.Build.ConstructPlan
                      Stack.Build.Execute
+                     Stack.Build.Haddock
                      Stack.Build.Installed
                      Stack.Build.Source
                      Stack.Build.Types
-                     Stack.Build.Doc
                      Stack.Upload
                      System.Process.Read
                      System.Process.Log
@@ -86,6 +91,7 @@ library
                      Data.Binary.VersionTagged
                      Data.Set.Monad
                      Data.Maybe.Extra
+                     Data.Attoparsec.Args
   build-depends:     Cabal >= 1.18.1.5
                    , aeson >= 0.8.0.2
                    , async >= 2.0.2
@@ -144,6 +150,7 @@ library
                    , zlib >= 0.5.4.2
                    , deepseq
                    , file-embed
+                   , word8
   if !os(windows)
     build-depends:   unix >= 2.7.0.1
   default-language:    Haskell2010
@@ -208,6 +215,34 @@ test-suite stack-test
                 , conduit-extra
                 , resourcet
                 , Cabal
+  default-language:    Haskell2010
+
+test-suite stack-integration-test
+  type:           exitcode-stdio-1.0
+  hs-source-dirs: test/integration
+  main-is:        Spec.hs
+  ghc-options:    -Wall -threaded -rtsopts -with-rtsopts=-N
+
+  if flag(integration-tests)
+    buildable: True
+  else
+    buildable: False
+
+  build-depends:  base >= 4.7 && < 10
+                , temporary
+                , hspec
+                , process
+                , filepath
+                , directory
+                , text
+                , unix-compat
+                , containers
+                , conduit
+                , conduit-extra
+                , resourcet
+                , async
+                , transformers
+                , bytestring
   default-language:    Haskell2010
 
 source-repository head

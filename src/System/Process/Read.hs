@@ -14,7 +14,7 @@ module System.Process.Read
   ,tryProcessStdout
   ,sinkProcessStdout
   ,readProcess
-  ,EnvOverride
+  ,EnvOverride(..)
   ,unEnvOverride
   ,mkEnvOverride
   ,envHelper

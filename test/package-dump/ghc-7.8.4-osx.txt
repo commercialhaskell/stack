@@ -1,0 +1,67 @@
+name: hmatrix
+version: 0.16.1.5
+id: hmatrix-0.16.1.5-12d5d21f26aa98774cdd8edbc343fbfe
+license: BSD3
+copyright:
+maintainer: Alberto Ruiz
+stability: provisional
+homepage: https://github.com/albertoruiz/hmatrix
+package-url:
+synopsis: Numeric Linear Algebra
+description: Linear algebra based on BLAS and LAPACK.
+             .
+             The package is organized as follows:
+             .
+             ["Numeric.LinearAlgebra.HMatrix"] Starting point and recommended import module for most applications.
+             .
+             ["Numeric.LinearAlgebra.Static"] Experimental alternative interface.
+             .
+             ["Numeric.LinearAlgebra.Devel"] Tools for extending the library.
+             .
+             (Other modules are exposed with hidden documentation for backwards compatibility.)
+             .
+             Code examples: <http://dis.um.es/~alberto/hmatrix/hmatrix.html>
+category: Math
+author: Alberto Ruiz
+exposed: True
+exposed-modules: Data.Packed Data.Packed.Vector Data.Packed.Matrix
+                 Data.Packed.Foreign Data.Packed.ST Data.Packed.Development
+                 Numeric.LinearAlgebra Numeric.LinearAlgebra.LAPACK
+                 Numeric.LinearAlgebra.Algorithms Numeric.Container
+                 Numeric.LinearAlgebra.Util Numeric.LinearAlgebra.Devel
+                 Numeric.LinearAlgebra.Data Numeric.LinearAlgebra.HMatrix
+                 Numeric.LinearAlgebra.Static
+hidden-modules: Data.Packed.Internal Data.Packed.Internal.Common
+                Data.Packed.Internal.Signatures Data.Packed.Internal.Vector
+                Data.Packed.Internal.Matrix Data.Packed.IO Numeric.Chain
+                Numeric.Vectorized Numeric.Vector Numeric.Matrix
+                Data.Packed.Internal.Numeric Data.Packed.Numeric
+                Numeric.LinearAlgebra.Util.Convolution
+                Numeric.LinearAlgebra.Util.CG Numeric.LinearAlgebra.Random
+                Numeric.Conversion Numeric.Sparse
+                Numeric.LinearAlgebra.Static.Internal
+trusted: False
+import-dirs: /Users/alexbiehl/.stack/snapshots/x86_64-osx/lts-2.13/7.8.4/lib/x86_64-osx-ghc-7.8.4/hmatrix-0.16.1.5
+library-dirs: /Users/alexbiehl/.stack/snapshots/x86_64-osx/lts-2.13/7.8.4/lib/x86_64-osx-ghc-7.8.4/hmatrix-0.16.1.5
+              /opt/local/lib/ /usr/local/lib/ "C:/Program Files/Example/"
+hs-libraries: HShmatrix-0.16.1.5
+extra-libraries: blas lapack
+extra-ghci-libraries:
+include-dirs: /opt/local/include/ /usr/local/include/
+includes:
+depends: array-0.5.0.0-470385a50d2b78598af85cfe9d988e1b
+         base-4.7.0.2-918c7ac27f65a87103264a9f51652d63
+         binary-0.7.1.0-108d06eea2ef05e517f9c1facf10f63c
+         bytestring-0.10.4.0-78bc8f2c724c765c78c004a84acf6cc3
+         deepseq-1.3.0.2-0ddc77716bd2515426e1ba39f6788a4f
+         random-1.1-822c19b7507b6ac1aaa4c66731e775ae
+         split-0.2.2-34cfb851cc3784e22bfae7a7bddda9c5
+         storable-complex-0.2.2-e962c368d58acc1f5b41d41edc93da72
+         vector-0.10.12.3-f4222db607fd5fdd7545d3e82419b307
+hugs-options:
+cc-options:
+ld-options:
+framework-dirs:
+frameworks: Accelerate
+haddock-interfaces: /Users/alexbiehl/.stack/snapshots/x86_64-osx/lts-2.13/7.8.4/doc/html/hmatrix.haddock
+haddock-html: /Users/alexbiehl/.stack/snapshots/x86_64-osx/lts-2.13/7.8.4/doc/html
