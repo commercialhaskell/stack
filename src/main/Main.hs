@@ -81,23 +81,23 @@ main =
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
-                        (buildOpts False)
+                        (buildOpts Build)
              addCommand "install"
                         "Build executables and install to a user path"
                         installCmd
-                        (buildOpts False)
+                        (buildOpts Build)
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
                         (buildCmd DoTests)
-                        (buildOpts False)
+                        (buildOpts Test)
              addCommand "bench"
                         "Build and benchmark the project(s) in this directory/configuration"
                         (buildCmd DoBenchmarks)
-                        (buildOpts False)
+                        (buildOpts Build)
              addCommand "haddock"
                         "Generate haddocks for the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
-                        (buildOpts True)
+                        (buildOpts Haddock)
              addCommand "new"
                         "Create a brand new project"
                         newCmd
@@ -534,9 +534,16 @@ dockerExecCmd (cmd,args) go@GlobalOpts{..} = do
             Docker.rerunCmdWithRequiredContainer (lcProjectRoot lc)
                                                  (return (cmd,args,id))
 
+-- | Command sum type for conditional arguments.
+data Command
+    = Build
+    | Test
+    | Haddock
+    deriving (Eq)
+
 -- | Parser for build arguments.
-buildOpts :: Bool -> Parser BuildOpts
-buildOpts forHaddock =
+buildOpts :: Command -> Parser BuildOpts
+buildOpts cmd =
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> haddock <*> haddockDeps <*> finalAction <*> dryRun <*> ghcOpts <*>
             flags <*> installExes <*> preFetch <*> testArgs <*> onlySnapshot
@@ -558,15 +565,17 @@ buildOpts forHaddock =
                     "library profiling for TARGETs and all its dependencies"
                     idm
         haddock =
-          boolFlags forHaddock
+          boolFlags (cmd == Haddock)
                     "haddock"
                     "building Haddocks"
                     idm
         haddockDeps =
-          maybeBoolFlags
-                    "haddock-deps"
-                    "building Haddocks for dependencies"
-                    idm
+          if cmd == Haddock
+             then maybeBoolFlags
+                            "haddock-deps"
+                            "building Haddocks for dependencies"
+                            idm
+             else pure Nothing
         finalAction = pure DoNothing
         installExes = pure False
         dryRun = flag False True (long "dry-run" <>
@@ -594,10 +603,12 @@ buildOpts forHaddock =
              help "Fetch packages necessary for the build immediately, useful with --dry-run")
         testArgs =
              fmap (fromMaybe [])
-                  (optional
-                       (argsOption
-                            (long "test-arguments" <> metavar "TEST_ARGS" <>
-                             help "Arguments passed in to the test suite program")))
+                  (if cmd == Test
+                      then optional
+                               (argsOption
+                                    (long "test-arguments" <> metavar "TEST_ARGS" <>
+                                     help "Arguments passed in to the test suite program"))
+                      else pure Nothing)
 
         onlySnapshot = flag False True
             (long "only-snapshot" <>
