@@ -274,7 +274,7 @@ data BuildOpts =
             ,boptsDryrun :: !Bool
             ,boptsGhcOptions :: ![Text]
             ,boptsFlags :: !(Map PackageName (Map FlagName Bool))
-            ,boptsInstallExes :: !(Bool, Maybe (Path Abs Dir))
+            ,boptsInstallExes :: !(Bool, Maybe FilePath)
             -- ^ Install executables to user path after building?
             ,boptsPreFetch :: !Bool
             -- ^ Fetch all packages immediately

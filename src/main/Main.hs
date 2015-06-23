@@ -88,7 +88,7 @@ main =
                         ((,) <$> (optional (strOption (long "path" <> 
                                                         metavar "DIRECTORY" <> 
                                                         help "Write binaries to DIRECTORY"))) <*>
-                         buildOpts)
+                         buildOpts False)
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
                         (buildCmd DoTests)
@@ -457,8 +457,14 @@ buildCmd finalAction opts go@GlobalOpts{..} = withBuildConfig go ThrowException 
 installCmd :: (Maybe String, BuildOpts) -> GlobalOpts -> IO ()
 installCmd (mPath, opts) go@GlobalOpts{..} = do
     specifiedDir <- case mPath of
-                      (Just userPath) -> parseAbsDir userPath >>= return . Just
-                      Nothing -> return $ Nothing
+                      (Just userPath) -> do
+                            tryParse <- try $ return ((toFilePath =<< (parseAbsDir userPath)) <|> 
+                                            (toFilePath =<< (parseRelDir userPath)))
+                            case tryParse of
+                              Left (e :: SomeException) ->
+                                 error $ "Could not parse user specified directory" ++ userPath 
+                              Right path -> return (Just path)
+                      Nothing -> return Nothing
     withBuildConfig go ExecStrategy 
                        (Stack.Build.build opts { boptsInstallExes = (True, specifiedDir) }) 
 -- | Unpack packages to the filesystem
