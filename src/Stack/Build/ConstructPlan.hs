@@ -169,6 +169,9 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
         , latestVersions = latest
         , wanted = wantedLocalPackages locals
         }
+    -- TODO Currently, this will only consider and install tools from the
+    -- snapshot. It will not automatically install build tools from extra-deps
+    -- or local packages.
     toolMap = getToolMap mbp0
 
 -- | Determine which packages to unregister based on the given tasks and
