@@ -27,12 +27,14 @@ import           Stack.Types
 -- | Launch a GHCi REPL for the given local project targets with the
 -- given options and configure it with the load paths and extensions
 -- of those targets.
-repl :: (HasConfig r, HasBuildConfig r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m)
-     => [Text] -- ^ Targets.
-     -> [String] -- ^ GHC options.
-     -> FilePath
-     -> m ()
-repl targets useropts ghciPath = do
+repl
+    :: (HasConfig r, HasBuildConfig r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m)
+    => [Text] -- ^ Targets.
+    -> [String] -- ^ GHC options.
+    -> FilePath
+    -> Bool
+    -> m ()
+repl targets useropts ghciPath noload = do
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
     pwd <- getWorkingDir
@@ -56,14 +58,14 @@ repl targets useropts ghciPath = do
                     then do
                         pkgOpts <- getPackageOpts (packageOpts pkg) cabalfp
                         srcfiles <-
-                            getPackageFiles
-                                (packageFiles pkg)
-                                Modules
-                                cabalfp
-                        return (Just (packageName pkg, pkgOpts, S.toList srcfiles))
+                            getPackageFiles (packageFiles pkg) Modules cabalfp
+                        return
+                            (Just (packageName pkg, pkgOpts, S.toList srcfiles))
                     else return Nothing
     let pkgopts = filter (not . badForGhci) (concat (map _2 pkgs))
-        srcfiles = concatMap (map toFilePath . _3) pkgs
+        srcfiles
+          | noload = []
+          | otherwise = concatMap (map toFilePath . _3) pkgs
     $logInfo
         ("Configuring GHCi with the following packages: " <>
          T.intercalate ", " (map packageNameText (map _1 pkgs)))
