@@ -55,7 +55,7 @@ import qualified Stack.Upload as Upload
 import           System.Environment (getArgs, getProgName)
 import           System.Exit
 import           System.FilePath (searchPathSeparator)
-import           System.IO (stderr)
+import           System.IO (hIsTerminalDevice, stderr, stdout)
 import           System.Process.Read
 
 -- | Commandline dispatcher.
@@ -66,6 +66,7 @@ main =
        tryRunPlugin plugins
      progName <- getProgName
      args <- getArgs
+     isTerminal <- hIsTerminalDevice stdout
      execExtraHelp args
                    dockerHelpOptName
                    (Docker.dockerOptsParser True)
@@ -76,7 +77,8 @@ main =
          versionString'
          "stack - The Haskell Tool Stack"
          ""
-         (extraHelpOption progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*> globalOpts)
+         (extraHelpOption progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
+          globalOpts isTerminal)
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
@@ -681,13 +683,13 @@ dockerCleanupOpts =
         toDescr = map (\c -> if c == '-' then ' ' else c)
 
 -- | Parser for global command-line options.
-globalOpts :: Parser GlobalOpts
-globalOpts =
+globalOpts :: Bool -> Parser GlobalOpts
+globalOpts defaultTerminal =
     GlobalOpts <$> logLevelOpt <*>
     configOptsParser False <*>
     optional resolverParser <*>
     flag
-        True
+        defaultTerminal
         False
         (long "no-terminal" <>
          help
