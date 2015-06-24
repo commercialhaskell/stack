@@ -344,33 +344,30 @@ allBuildInfo' pkg_descr = [ bi | Just lib <- [library pkg_descr]
                               , benchmarkEnabled tst ]
 
 -- | Get all files referenced by the package.
-packageDescFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m,MonadCatch m)
-                 => PackageDescription -> m [Path Abs File]
-packageDescFiles pkg =
-  do libfiles <-
-       liftM concat
-             (mapM libraryFiles
-                   (maybe [] return (library pkg)))
-     exefiles <-
-       liftM concat
-             (mapM executableFiles
-                   (executables pkg))
-     benchfiles <-
-         liftM concat
-               (mapM benchmarkFiles (benchmarks pkg))
-     testfiles <-
-         liftM concat
-               (mapM testFiles (testSuites pkg))
-     dfiles <-
-       resolveGlobFiles (map (dataDir pkg FilePath.</>) (dataFiles pkg))
-     srcfiles <-
-       resolveGlobFiles (extraSrcFiles pkg)
-     -- extraTmpFiles purposely not included here, as those are files generated
-     -- by the build script. Another possible implementation: include them, but
-     -- don't error out if not present
-     docfiles <-
-       resolveGlobFiles (extraDocFiles pkg)
-     return (concat [libfiles,exefiles,dfiles,srcfiles,docfiles,benchfiles,testfiles])
+packageDescFiles
+    :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File) m, MonadCatch m)
+    => PackageDescription -> m [Path Abs File]
+packageDescFiles pkg = do
+    libfiles <-
+        liftM concat (mapM libraryFiles (maybe [] return (library pkg)))
+    exefiles <- liftM concat (mapM executableFiles (executables pkg))
+    benchfiles <- liftM concat (mapM benchmarkFiles (benchmarks pkg))
+    testfiles <- liftM concat (mapM testFiles (testSuites pkg))
+    dfiles <- resolveGlobFiles (map (dataDir pkg FilePath.</>) (dataFiles pkg))
+    srcfiles <- resolveGlobFiles (extraSrcFiles pkg)
+    -- extraTmpFiles purposely not included here, as those are files generated
+    -- by the build script. Another possible implementation: include them, but
+    -- don't error out if not present
+    docfiles <- resolveGlobFiles (extraDocFiles pkg)
+    return
+        (concat
+             [ libfiles
+             , exefiles
+             , dfiles
+             , srcfiles
+             , docfiles
+             , benchfiles
+             , testfiles])
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
 resolveGlobFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m,MonadCatch m)
