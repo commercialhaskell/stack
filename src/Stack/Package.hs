@@ -168,7 +168,7 @@ data PackageConfig =
 -- | Files to get for a cabal package.
 data CabalFileType
     = AllFiles
-    | HaskellSources
+    | Modules
 
 -- | Compares the package name.
 instance Ord Package where
@@ -242,7 +242,10 @@ resolvePackage packageConfig gpkg = Package
     , packageDeps = deps
     , packageFiles = GetPackageFiles $ \ty cabalfp -> do
         files <- runReaderT (packageDescFiles ty pkg) cabalfp
-        return $ S.fromList $ cabalfp : files
+        return $ S.fromList $
+          case ty of
+             Modules -> files
+             AllFiles -> cabalfp : files
     , packageTools = packageDescTools pkg
     , packageFlags = packageConfigFlags packageConfig
     , packageAllDeps = S.fromList (M.keys deps)
@@ -288,9 +291,8 @@ generatePkgDescOpts cabalfp pkg = do
 -- | Generate GHC options for the target.
 generateBuildInfoOpts :: Maybe (Path Abs File) -> Path Abs Dir -> Path Abs Dir -> BuildInfo -> [String]
 generateBuildInfoOpts mcabalmacros cabalDir distDir b =
-    nub (concat [modules, ghcOpts b, extOpts b, srcOpts, macros])
+    nub (concat [ghcOpts b, extOpts b, srcOpts, macros])
   where
-    modules = map display (otherModules b)
     macros =
         case mcabalmacros of
             Nothing -> []
@@ -368,18 +370,19 @@ packageDescFiles ty pkg = do
     -- don't error out if not present
     docfiles <- resolveGlobFiles (extraDocFiles pkg)
     case ty of
-        HaskellSources ->
-            return (concat [libfiles, exefiles, testfiles, benchfiles])
+        Modules ->
+            return (nub (concat [libfiles, exefiles, testfiles, benchfiles]))
         AllFiles ->
             return
-                (concat
-                     [ libfiles
-                     , exefiles
-                     , dfiles
-                     , srcfiles
-                     , docfiles
-                     , benchfiles
-                     , testfiles])
+                (nub
+                     (concat
+                          [ libfiles
+                          , exefiles
+                          , dfiles
+                          , srcfiles
+                          , docfiles
+                          , benchfiles
+                          , testfiles]))
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
 resolveGlobFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m,MonadCatch m)
@@ -461,7 +464,7 @@ benchmarkFiles ty bench = do
     bfiles <- buildFiles ty dir build
     case ty of
       AllFiles -> return (concat [bfiles,exposed])
-      HaskellSources -> return (concat [bfiles,exposed])
+      Modules -> return (concat [bfiles])
   where
     build = benchmarkBuildInfo bench
 
@@ -485,7 +488,7 @@ testFiles ty test = do
     bfiles <- buildFiles ty dir build
     case ty of
       AllFiles -> return (concat [bfiles,exposed])
-      HaskellSources -> return (concat [bfiles,exposed])
+      Modules -> return (concat [bfiles])
   where
     build = testBuildInfo test
 
@@ -503,7 +506,7 @@ executableFiles ty exe =
      bfiles <- buildFiles ty dir build
      case ty of
        AllFiles -> return (concat [bfiles,exposed])
-       HaskellSources -> return (concat [bfiles,exposed])
+       Modules -> return (concat [bfiles])
   where build = buildInfo exe
 
 -- | Get all files referenced by the library.
@@ -519,7 +522,7 @@ libraryFiles ty lib =
      bfiles <- buildFiles ty dir build
      case ty of
        AllFiles -> return (concat [bfiles,exposed])
-       HaskellSources -> return (concat [bfiles,exposed])
+       Modules -> return (concat [bfiles,exposed])
   where build = libBuildInfo lib
 
 -- | Get all files in a build.
@@ -534,7 +537,7 @@ buildFiles ty dir build = do
             haskellFileExts
     cSources' <- mapMaybeM resolveFileOrWarn (cSources build)
     case ty of
-        HaskellSources -> return other
+        Modules -> return other
         AllFiles -> return (other ++ cSources')
 
 -- | Get all dependencies of a package, including library,

@@ -14,6 +14,7 @@ import           Data.List
 import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Monoid
+import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Path
@@ -31,11 +32,11 @@ repl :: (HasConfig r, HasBuildConfig r, HasEnvConfig r, MonadReader r m, MonadIO
      -> [String] -- ^ GHC options.
      -> FilePath
      -> m ()
-repl targets opts ghciPath = do
+repl targets useropts ghciPath = do
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
     pwd <- getWorkingDir
-    pkgOpts <-
+    pkgs <-
         liftM catMaybes $
         forM (M.toList (bcPackages bconfig)) $
         \(dir,validWanted) ->
@@ -54,15 +55,19 @@ repl targets opts ghciPath = do
                 if validWanted && wanted pwd cabalfp pkg
                     then do
                         pkgOpts <- getPackageOpts (packageOpts pkg) cabalfp
-                        return (Just (packageName pkg, pkgOpts))
+                        srcfiles <-
+                            getPackageFiles
+                                (packageFiles pkg)
+                                Modules
+                                cabalfp
+                        return (Just (packageName pkg, pkgOpts, S.toList srcfiles))
                     else return Nothing
+    let pkgopts = filter (not . badForGhci) (concat (map _2 pkgs))
+        srcfiles = concatMap (map toFilePath . _3) pkgs
     $logInfo
         ("Configuring GHCi with the following packages: " <>
-         T.intercalate ", " (map packageNameText (map fst pkgOpts)))
-    exec
-        ghciPath
-        ("--interactive" :
-         filter (not . badForGhci) (concat (map snd pkgOpts)) <> opts)
+         T.intercalate ", " (map packageNameText (map _1 pkgs)))
+    exec ghciPath ("--interactive" : pkgopts <> srcfiles <> useropts)
   where
     wanted pwd cabalfp pkg = isInWantedList || targetsEmptyAndInDir
       where
@@ -70,3 +75,6 @@ repl targets opts ghciPath = do
         targetsEmptyAndInDir = null targets || isParentOf (parent cabalfp) pwd
     badForGhci x =
         isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky")
+    _1 (x,_,_) = x
+    _2 (_,x,_) = x
+    _3 (_,_,x) = x
