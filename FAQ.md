@@ -59,6 +59,9 @@ your `packages` list in stack.yaml. (See the previous question.)
 Another would be to add the upstream package as a submodule to your
 project.
 
+__Am I required to use a Stackage snapshot to use stack?__
+
+No, not at all. If you prefer dependency solving to curation, you can continue with that workflow. Instead of describing the details of how that works here, it's probably easiest to just say: run `stack init --solver` and look at the generated stack.yaml.
 
 __How do I use this with sandboxes?__
 
