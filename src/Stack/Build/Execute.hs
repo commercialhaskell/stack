@@ -98,11 +98,16 @@ printPlan :: M env m
           -> Plan
           -> m ()
 printPlan finalAction plan = do
-    case Set.toList $ planUnregisterLocal plan of
+    case Map.toList $ planUnregisterLocal plan of
         [] -> $logInfo "Nothing to unregister"
         xs -> do
             $logInfo "Would unregister locally:"
-            mapM_ ($logInfo . T.pack . ghcPkgIdString) xs
+            forM_ xs $ \(gid, reason) -> $logInfo $ T.concat
+                [ T.pack $ ghcPkgIdString gid
+                , " ("
+                , reason
+                , ")"
+                ]
 
     $logInfo ""
 
@@ -299,14 +304,16 @@ executePlan' :: M env m
              -> ExecuteEnv
              -> m ()
 executePlan' plan ee@ExecuteEnv {..} = do
-    case Set.toList $ planUnregisterLocal plan of
+    case Map.toList $ planUnregisterLocal plan of
         [] -> return ()
         ids -> do
             localDB <- packageDatabaseLocal
-            forM_ ids $ \id' -> do
+            forM_ ids $ \(id', reason) -> do
                 $logInfo $ T.concat
                     [ T.pack $ ghcPkgIdString id'
-                    , ": unregistering"
+                    , ": unregistering ("
+                    , reason
+                    , ")"
                     ]
                 unregisterGhcPkgId eeEnvOverride localDB id'
 

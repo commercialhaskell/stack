@@ -388,7 +388,8 @@ data Plan = Plan
     { planTasks :: !(Map PackageName Task)
     , planFinals :: !(Map PackageName Task)
     -- ^ Final actions to be taken (test, benchmark, etc)
-    , planUnregisterLocal :: !(Set GhcPkgId)
+    , planUnregisterLocal :: !(Map GhcPkgId Text)
+    -- ^ Text is reason we're unregistering, for display only
     , planInstallExes :: !(Map Text InstallLocation)
     -- ^ Executables that should be installed after successful building
     }

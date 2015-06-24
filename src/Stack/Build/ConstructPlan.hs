@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
@@ -76,6 +77,7 @@ type M = RWST
     Ctx
     ( Map PackageName (Either ConstructPlanException Task) -- finals
     , Map Text InstallLocation -- executable to be installed, and location where the binary is placed
+    , Map PackageName Text -- why a local package is considered dirty
     )
     (Map PackageName (Either ConstructPlanException AddDepRes))
     IO
@@ -125,7 +127,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
     let inner = do
             mapM_ onWanted $ filter lpWanted locals
             mapM_ addDep $ Set.toList extraToBuild0
-    ((), m, (efinals, installExes)) <- liftIO $ runRWST inner (ctx econfig latest) M.empty
+    ((), m, (efinals, installExes, dirtyReason)) <- liftIO $ runRWST inner (ctx econfig latest) M.empty
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
         (errlibs, adrs) = partitionEithers $ map toEither $ M.toList m
@@ -143,7 +145,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
             return $ maybeStripLocals Plan
                 { planTasks = tasks
                 , planFinals = M.fromList finals
-                , planUnregisterLocal = mkUnregisterLocal tasks locallyRegistered
+                , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason locallyRegistered
                 , planInstallExes =
                     if boptsInstallExes $ bcoBuildOpts baseConfigOpts0
                         then installExes
@@ -169,14 +171,19 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
 
 -- | Determine which packages to unregister based on the given tasks and
 -- already registered local packages
-mkUnregisterLocal :: Map PackageName Task -> Set GhcPkgId -> Set GhcPkgId
-mkUnregisterLocal tasks locallyRegistered =
-    Set.filter toUnregister locallyRegistered
+mkUnregisterLocal :: Map PackageName Task
+                  -> Map PackageName Text
+                  -> Set GhcPkgId
+                  -> Map GhcPkgId Text
+mkUnregisterLocal tasks dirtyReason locallyRegistered =
+    Map.unions $ map toUnregisterMap $ Set.toList locallyRegistered
   where
-    toUnregister gid =
+    toUnregisterMap gid =
         case M.lookup name tasks of
-            Nothing -> False
-            Just _ -> True
+            Nothing -> Map.empty
+            Just _ -> Map.singleton gid
+                    $ fromMaybe "likely unregistering due to a version change"
+                    $ Map.lookup name dirtyReason
       where
         ident = ghcPkgIdPackageIdentifier gid
         name = packageIdentifierName ident
@@ -204,7 +211,7 @@ addFinal lp = do
                 , taskPresent = present
                 , taskType = TTLocal lp
                 }
-    tell (Map.singleton (packageName package) res, mempty)
+    tell (Map.singleton (packageName package) res, mempty, mempty)
   where
     package = lpPackageFinal lp
 
@@ -263,7 +270,7 @@ tellExecutablesUpstream name version loc flags = do
 
 tellExecutablesPackage :: InstallLocation -> Package -> M ()
 tellExecutablesPackage loc p =
-    tell (Map.empty, m)
+    tell (Map.empty, m, Map.empty)
   where
     m = Map.fromList $ map (, loc) $ Set.toList $ packageExes p
 
@@ -373,10 +380,18 @@ checkDirtiness ps installed package present wanted = do
                 -- Disabling haddocks when old config had haddocks doesn't make dirty.
                 maybe False configCacheHaddock moldOpts
             }
-    case moldOpts of
-        Nothing -> return True
-        Just oldOpts -> return $ oldOpts /= wantConfigCache ||
-                                 psDirty ps
+    let mreason =
+            case moldOpts of
+                Nothing -> Just "old configure information not found"
+                Just oldOpts
+                    | oldOpts /= wantConfigCache -> Just "configure flags changed"
+                    | psDirty ps -> Just "local file changes"
+                    | otherwise -> Nothing
+    case mreason of
+        Nothing -> return False
+        Just reason -> do
+            tell (Map.empty, Map.empty, Map.singleton (packageName package) reason)
+            return True
 
 psDirty :: PackageSource -> Bool
 psDirty (PSLocal lp) = lpDirtyFiles lp
@@ -406,7 +421,7 @@ stripLocals :: Plan -> Plan
 stripLocals plan = plan
     { planTasks = Map.filter checkTask $ planTasks plan
     , planFinals = Map.empty
-    , planUnregisterLocal = Set.empty
+    , planUnregisterLocal = Map.empty
     , planInstallExes = Map.filter (/= Local) $ planInstallExes plan
     }
   where
