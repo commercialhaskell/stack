@@ -39,3 +39,11 @@ The [[Architecture]] page goes into much more detail on this.
 
 ### running an executable.
 There is no `stack run` that does what `cabal run` does, but `stack build && stack exec foo` accomplishes the same thing.
+
+### I prefer dependency solving to curation
+
+stack can handle that workflow. There's a [Reddit answer](http://www.reddit.com/r/haskell/comments/3awgj1/stack_01_released_a_new_build_tool_for_haskell/csgwmpi?context=2) going into more detail, but basically:
+
+* stack has explicit dependency solving
+* When we want to kick off solving, run `rm -f stack.yaml && stack init --solver`
+* No dependency solving will occur until you next run that command
