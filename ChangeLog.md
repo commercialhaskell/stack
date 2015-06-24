@@ -10,6 +10,10 @@
 * Give a reason for unregistering packages [#389](https://github.com/commercialhaskell/stack/issues/389)
 * `stack exec` accepts the `--no-ghc-package-path` parameter
 
+Bug fixes:
+
+* Haddock links to global packages no longer broken on Windows [#375](https://github.com/commercialhaskell/stack/issues/375)
+
 ## 0.1.0.0
 
 * Fall back to cabal dependency solver when a snapshot can't be found
