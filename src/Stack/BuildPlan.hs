@@ -594,7 +594,15 @@ shadowMiniBuildPlan (MiniBuildPlan ghc pkgs0) shadowed =
                 Just x -> return x
                 Nothing ->
                     case Map.lookup name pkgs1 of
-                        Nothing -> assert (name `Set.member` shadowed) (return False)
+                        Nothing
+                            | name `Set.member` shadowed -> return False
+
+                            -- In this case, we have to assume that we're
+                            -- constructing a build plan on a different OS or
+                            -- architecture, and therefore different packages
+                            -- are being chosen. The common example of this is
+                            -- the Win32 package.
+                            | otherwise -> return True
                         Just mpi -> do
                             let visited' = Set.insert name visited
                             ress <- mapM (check visited') (Set.toList $ mpiPackageDeps mpi)
