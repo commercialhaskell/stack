@@ -62,6 +62,7 @@ import           Stack.Constants
 import qualified Stack.Docker as Docker
 import           Stack.Init
 import           Stack.Types
+import           Stack.Types.Internal
 import           System.Directory
 import           System.Environment
 import           System.IO
@@ -225,7 +226,7 @@ instance HasPlatform MiniConfig
 
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.
-loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadThrow m,MonadBaseControl IO m,MonadReader env m,HasHttpManager env)
+loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadThrow m,MonadBaseControl IO m,MonadReader env m,HasHttpManager env,HasTerminal env)
            => ConfigMonoid
            -- ^ Config monoid from parsed command-line arguments
            -> m (LoadConfig m)
@@ -248,7 +249,7 @@ loadConfig configArgs = do
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
-loadBuildConfig :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m)
+loadBuildConfig :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m, HasTerminal env)
                 => EnvOverride
                 -> Maybe (Project, Path Abs File, ConfigMonoid)
                 -> Config
@@ -277,9 +278,8 @@ loadBuildConfig menv mproject config stackRoot mresolver noConfigStrat = do
             exists <- fileExists dest
             if exists
                then do
-                   inTerminal <- liftIO (hIsTerminalDevice stdout)
                    ProjectAndConfigMonoid project _ <- loadYaml dest
-                   when inTerminal $ do
+                   when (getTerminal env) $
                        case mresolver of
                            Nothing ->
                                $logInfo ("Using resolver: " <> renderResolver (projectResolver project) <>
