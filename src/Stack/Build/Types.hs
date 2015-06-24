@@ -73,7 +73,7 @@ data StackBuildException
     (Set PackageName) -- no known version
     (Map PackageName Version) -- not in snapshot, here's the most recent version in the index
     (Path Abs File) -- stack.yaml
-  | TestSuiteFailure PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe (Path Abs File))
+  | TestSuiteFailure PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe (Path Abs File)) S.ByteString
   | ConstructPlanExceptions
         [ConstructPlanException]
         (Path Abs File) -- stack.yaml
@@ -137,7 +137,7 @@ instance Show StackBuildException where
                     (\(name, version) -> "- " ++ packageIdentifierString
                         (PackageIdentifier name version))
                     (Map.toList notInSnapshot)
-    show (TestSuiteFailure ident codes mlogFile) = unlines $ concat
+    show (TestSuiteFailure ident codes mlogFile bs) = unlines $ concat
         [ ["Test suite failure for package " ++ packageIdentifierString ident]
         , flip map (Map.toList codes) $ \(name, mcode) -> concat
             [ "    "
@@ -151,7 +151,13 @@ instance Show StackBuildException where
             Nothing -> "Logs printed to console"
             -- TODO Should we load up the full error output and print it here?
             Just logFile -> "Full log available at " ++ toFilePath logFile
+        , if S.null bs
+            then []
+            else ["", "", doubleIndent $ T.unpack $ decodeUtf8With lenientDecode bs]
         ]
+         where
+          indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
+          doubleIndent = indent . indent
     show (ConstructPlanExceptions exceptions stackYaml) =
         "While constructing the BuildPlan the following exceptions were encountered:" ++
         appendExceptions exceptions' ++

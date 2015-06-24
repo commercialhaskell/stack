@@ -3,6 +3,7 @@
 * Remove GHC uncompressed tar file after installation [#376](https://github.com/commercialhaskell/stack/issues/376)
 * Put stackage snapshots JSON on S3 [#380](https://github.com/commercialhaskell/stack/issues/380)
 * Specifying flags for multiple packages [#335](https://github.com/commercialhaskell/stack/issues/335)
+* single test suite failure should show entire log [#388](https://github.com/commercialhaskell/stack/issues/388)
 
 ## 0.1.0.0
 

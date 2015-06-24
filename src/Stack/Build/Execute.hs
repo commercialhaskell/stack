@@ -758,10 +758,18 @@ singleTest ac ee task =
                     filter (isSuffixOf ".tix" . toFilePath . filename) files
             generateHpcReport pkgDir hpcDir (hpcDir </> dotHpc) tixes
 
+        bs <- liftIO $
+            case mlogFile of
+                Nothing -> return ""
+                Just (logFile, h) -> do
+                    hClose h
+                    S.readFile $ toFilePath logFile
+
         unless (Map.null errs) $ throwM $ TestSuiteFailure
             (taskProvides task)
             errs
             (fmap fst mlogFile)
+            bs
 
 -- | Generate the HTML report and
 generateHpcReport
