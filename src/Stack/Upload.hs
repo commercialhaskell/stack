@@ -191,9 +191,8 @@ promptPassword = do
 -- | Turn the given settings into an @Uploader@.
 --
 -- Since 0.1.0.0
-mkUploader :: FilePath -- ^ runghc
-           -> Config -> UploadSettings -> IO Uploader
-mkUploader runghc config us = do
+mkUploader :: Config -> UploadSettings -> IO Uploader
+mkUploader config us = do
     manager <- usGetManager us
     (creds, fromFile') <- loadCreds $ usCredsSource us config
     when (not fromFile' && usSaveCreds us) $ saveCreds config creds
@@ -203,7 +202,7 @@ mkUploader runghc config us = do
             , checkStatus = \_ _ _ -> Nothing
             }
     return Uploader
-        { upload_ = \fp0 -> withTarball runghc fp0 $ \fp -> do
+        { upload_ = \fp0 -> withTarball fp0 $ \fp -> do
             let formData = [partFile "package" fp]
             req2 <- formDataBody formData req1
             let req3 = applyBasicAuth
@@ -238,9 +237,8 @@ mkUploader runghc config us = do
 
 -- | Given either a file, return it. Given a directory, run @cabal sdist@ and
 -- get the resulting tarball.
-withTarball :: FilePath -- ^ runghc
-            -> FilePath -> (FilePath -> IO a) -> IO a
-withTarball _runghc fp0 inner = do
+withTarball :: FilePath -> (FilePath -> IO a) -> IO a
+withTarball fp0 inner = do
     isFile <- doesFileExist fp0
     if isFile then inner fp0 else withSystemTempDirectory "stackage-upload-tarball" $ \dir -> do
         isDir <- doesDirectoryExist fp0

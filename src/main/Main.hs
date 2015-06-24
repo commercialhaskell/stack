@@ -13,7 +13,7 @@ import           Control.Exception
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (ask,asks)
+import           Control.Monad.Reader (ask)
 import           Data.Char (toLower)
 import           Data.List
 import qualified Data.List as List
@@ -27,7 +27,6 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Data.Traversable
 import           Network.HTTP.Client
-import           Network.HTTP.Client.Conduit (getHttpManager)
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Simple
@@ -491,15 +490,12 @@ updateCmd () go@GlobalOpts{..} = do
 
 -- | Upload to Hackage
 uploadCmd :: [String] -> GlobalOpts -> IO ()
-uploadCmd args0 go = withBuildConfig go ExecStrategy $ do
-    let args = if null args0 then ["."] else args0
-    config <- asks getConfig
-    manager <- asks getHttpManager
-    menv <- getMinimalEnvOverride
-    runghc <- join $ System.Process.Read.findExecutable menv "runghc"
+uploadCmd args0 go = do
+    (manager,lc) <- loadConfigWithOpts go
+    let config = lcConfig lc
+        args = if null args0 then ["."] else args0
     liftIO $ do
         uploader <- Upload.mkUploader
-              (toFilePath runghc)
               config
             $ Upload.setGetManager (return manager)
               Upload.defaultUploadSettings
