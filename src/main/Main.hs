@@ -159,9 +159,10 @@ main =
                               (many (strArgument
                                        (metavar "TARGET" <>
                                         help "If none specified, use all packages defined in current directory"))) <*>
-                         many (strOption (long "ghc-options" <>
-                                          metavar "OPTION" <>
-                                          help "Additional options passed to GHCi")) <*>
+                         fmap (fromMaybe [])
+                              (optional (argsOption (long "ghc-options" <>
+                                                     metavar "OPTION" <>
+                                                     help "Additional options passed to GHCi"))) <*>
                          fmap (fromMaybe "ghc")
                               (optional (strOption (long "with-ghc" <>
                                                     metavar "GHC" <>
