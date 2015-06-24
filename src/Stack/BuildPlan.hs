@@ -478,16 +478,18 @@ loadBuildPlan name = do
 -- only modify non-manual flags, and will prefer default values for flags.
 -- Returns @Nothing@ if no combination exists.
 checkBuildPlan :: (MonadLogger m, MonadThrow m, MonadIO m, MonadReader env m, HasConfig env, MonadCatch m)
-               => MiniBuildPlan
+               => Map PackageName Version -- ^ locally available packages
+               -> MiniBuildPlan
                -> GenericPackageDescription
                -> m (Maybe (Map FlagName Bool))
-checkBuildPlan mbp gpd = do
+checkBuildPlan locals mbp gpd = do
     platform <- asks (configPlatform . getConfig)
     loop platform flagOptions
   where
+    packages = Map.union locals $ fmap mpiVersion $ mbpPackages mbp
     loop _ [] = return Nothing
     loop platform (flags:rest) = do
-        passes <- checkDeps flags (packageDeps pkg) (mbpPackages mbp)
+        passes <- checkDeps flags (packageDeps pkg) packages
         if passes
             then return $ Just flags
             else loop platform rest
@@ -523,7 +525,7 @@ checkBuildPlan mbp gpd = do
 checkDeps :: MonadLogger m
           => Map FlagName Bool -- ^ used only for debugging purposes
           -> Map PackageName VersionRange
-          -> Map PackageName MiniPackageInfo
+          -> Map PackageName Version
           -> m Bool
 checkDeps flags deps packages = do
     let errs = mapMaybe go $ Map.toList deps
@@ -536,7 +538,7 @@ checkDeps flags deps packages = do
   where
     go :: (PackageName, VersionRange) -> Maybe Text
     go (name, range) =
-        case fmap mpiVersion $ Map.lookup name packages of
+        case Map.lookup name packages of
             Nothing -> Just $ "Package not present: " <> packageNameText name
             Just v
                 | withinRange v range -> Nothing
@@ -565,7 +567,7 @@ findBuildPlan gpds0 =
             checkGPDs flags (gpd:gpds) = do
                 let C.PackageIdentifier pname' _ = C.package $ C.packageDescription gpd
                     pname = fromCabalPackageName pname'
-                mflags <- checkBuildPlan mbp gpd
+                mflags <- checkBuildPlan localNames mbp gpd
                 case mflags of
                     Nothing -> loop names'
                     Just flags' -> checkGPDs
@@ -574,6 +576,11 @@ findBuildPlan gpds0 =
                             else Map.insert pname flags' flags)
                         gpds
         checkGPDs Map.empty gpds0
+
+    localNames = Map.fromList $ map (fromCabalIdent . C.package . C.packageDescription) gpds0
+
+    fromCabalIdent (C.PackageIdentifier name version) =
+        (fromCabalPackageName name, fromCabalVersion version)
 
 shadowMiniBuildPlan :: MiniBuildPlan
                     -> Set PackageName

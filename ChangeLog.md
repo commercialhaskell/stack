@@ -5,6 +5,7 @@
 * Specifying flags for multiple packages [#335](https://github.com/commercialhaskell/stack/issues/335)
 * single test suite failure should show entire log [#388](https://github.com/commercialhaskell/stack/issues/388)
 * valid-wanted is a confusing option name [#386](https://github.com/commercialhaskell/stack/issues/386)
+* stack init in multi-package project should use local packages for dependency checking [#384](https://github.com/commercialhaskell/stack/issues/384)
 
 ## 0.1.0.0
 
