@@ -258,26 +258,25 @@ resolvePackage packageConfig gpkg = Package
 -- | Generate GHC options for the package.
 generatePkgDescOpts :: (HasEnvConfig env, HasPlatform env, MonadThrow m, MonadReader env m, MonadIO m)
                     => Path Abs File -> PackageDescription -> m [String]
-generatePkgDescOpts cabalfp pkg =
-    do distDir <- distDirFromDir cabalDir
-       let cabalmacros = autogenDir distDir </> $(mkRelFile "cabal_macros.h")
-       exists <- fileExists cabalmacros
-       let mcabalmacros =
-               if exists
-                  then Just cabalmacros
-                  else Nothing
-       return (nub
-                   (concatMap
-                        (concatMap (generateBuildInfoOpts mcabalmacros cabalDir distDir))
-                        [ maybe
-                              []
-                              (return . libBuildInfo)
-                              (library pkg)
-                        , map buildInfo (executables pkg)
-                        , map benchmarkBuildInfo (benchmarks pkg)
-                        , map testBuildInfo (testSuites pkg)]))
-  where cabalDir =
-            parent cabalfp
+generatePkgDescOpts cabalfp pkg = do
+    distDir <- distDirFromDir cabalDir
+    let cabalmacros = autogenDir distDir </> $(mkRelFile "cabal_macros.h")
+    exists <- fileExists cabalmacros
+    let mcabalmacros =
+            if exists
+                then Just cabalmacros
+                else Nothing
+    return
+        (nub
+             (concatMap
+                  (concatMap
+                       (generateBuildInfoOpts mcabalmacros cabalDir distDir))
+                  [ maybe [] (return . libBuildInfo) (library pkg)
+                  , map buildInfo (executables pkg)
+                  , map benchmarkBuildInfo (benchmarks pkg)
+                  , map testBuildInfo (testSuites pkg)]))
+  where
+    cabalDir = parent cabalfp
 
 -- | Generate GHC options for the target.
 generateBuildInfoOpts :: Maybe (Path Abs File) -> Path Abs Dir -> Path Abs Dir -> BuildInfo -> [String]
@@ -286,22 +285,14 @@ generateBuildInfoOpts mcabalmacros cabalDir distDir b =
   where
     macros =
         case mcabalmacros of
-            Nothing ->
-                []
+            Nothing -> []
             Just cabalmacros ->
                 ["-optP-include", "-optP" <> toFilePath cabalmacros]
-    ghcOpts =
-        concatMap snd .
-        filter (isGhc . fst) .
-        options
+    ghcOpts = concatMap snd . filter (isGhc . fst) . options
       where
-        isGhc GHC =
-            True
-        isGhc _ =
-            False
-    extOpts =
-        map (("-X" ++) . display) .
-        allExtensions
+        isGhc GHC = True
+        isGhc _ = False
+    extOpts = map (("-X" ++) . display) . allExtensions
     srcOpts =
         map
             (("-i" <>) . toFilePath)
@@ -311,9 +302,7 @@ generateBuildInfoOpts mcabalmacros cabalDir distDir b =
 
 -- | Make the autogen dir.
 autogenDir :: Path Abs Dir -> Path Abs Dir
-autogenDir distDir =
-        distDir </>
-        $(mkRelDir "build/autogen")
+autogenDir distDir = distDir </> $(mkRelDir "build/autogen")
 
 -- | Get all dependencies of the package (buildable targets only).
 packageDependencies :: PackageDescription -> Map PackageName VersionRange
