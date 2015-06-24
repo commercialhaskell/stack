@@ -278,7 +278,8 @@ generatePkgDescOpts cabalfp pkg = do
                 else Nothing
     return
         (nub
-             (concatMap
+             (["-hide-all-packages"] ++
+              concatMap
                   (concatMap
                        (generateBuildInfoOpts mcabalmacros cabalDir distDir))
                   [ maybe [] (return . libBuildInfo) (library pkg)
@@ -291,8 +292,12 @@ generatePkgDescOpts cabalfp pkg = do
 -- | Generate GHC options for the target.
 generateBuildInfoOpts :: Maybe (Path Abs File) -> Path Abs Dir -> Path Abs Dir -> BuildInfo -> [String]
 generateBuildInfoOpts mcabalmacros cabalDir distDir b =
-    nub (concat [ghcOpts b, extOpts b, srcOpts, macros])
+    nub (concat [ghcOpts b, extOpts b, srcOpts, macros, deps])
   where
+    deps =
+        concat
+            [ ["-package=" <> display name]
+            | Dependency name _ <- targetBuildDepends b]
     macros =
         case mcabalmacros of
             Nothing -> []
