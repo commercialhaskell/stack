@@ -13,3 +13,5 @@ to go. This list will likely expand over time:
 * Make sure to bump the version number in the .cabal file and the ChangeLog appropriately
 
 For more information, see: https://github.com/commercialhaskell/stack/issues/324
+
+* Review man page and other documentation for any changes that need to be made. 
