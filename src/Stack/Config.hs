@@ -342,7 +342,10 @@ resolvePackageEntry menv projRoot pe = do
         case peSubdirs pe of
             [] -> return [entryRoot]
             subs -> mapM (resolveDir entryRoot) subs
-    return $ map (, peValidWanted pe) paths
+    case peValidWanted pe of
+        Nothing -> return ()
+        Just _ -> $logWarn "Warning: you are using the deprecated valid-wanted field. You should instead use extra-dep. See: https://github.com/commercialhaskell/stack/wiki/stack.yaml#packages"
+    return $ map (, not $ peExtraDep pe) paths
 
 -- | Resolve a PackageLocation into a path, downloading and cloning as
 -- necessary.

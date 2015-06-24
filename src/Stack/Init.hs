@@ -88,7 +88,8 @@ initProject initOpts = do
             }
         pkgs = map toPkg cabalfps
         toPkg fp = PackageEntry
-            { peValidWanted = True
+            { peValidWanted = Nothing
+            , peExtraDepMaybe = Nothing
             , peLocation = PLFilePath $
                 case stripDir currDir $ parent fp of
                     Nothing

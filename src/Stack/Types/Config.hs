@@ -173,7 +173,7 @@ data BuildConfig = BuildConfig
       -- ^ Version of GHC we expected for this build
     , bcPackages   :: !(Map (Path Abs Dir) Bool)
       -- ^ Local packages identified by a path, Bool indicates whether it is
-      -- allowed to be wanted (see 'peValidWanted')
+      -- a non-dependency (the opposite of 'peExtraDep')
     , bcExtraDeps  :: !(Map PackageName Version)
       -- ^ Extra dependencies specified in configuration.
       --
@@ -221,19 +221,37 @@ data NoBuildConfigStrategy
     deriving (Show, Eq, Ord)
 
 data PackageEntry = PackageEntry
-    { peValidWanted :: !Bool
-    -- ^ Can this package be considered wanted? Useful to disable when simply
-    -- modifying an upstream package, see:
+    { peExtraDepMaybe :: !(Maybe Bool)
+    -- ^ Is this package a dependency? This means the local package will be
+    -- treated just like an extra-deps: it will only be built as a dependency
+    -- for others, and its test suite/benchmarks will not be run.
+    --
+    -- Useful modifying an upstream package, see:
     -- https://github.com/commercialhaskell/stack/issues/219
+    -- https://github.com/commercialhaskell/stack/issues/386
+    , peValidWanted :: !(Maybe Bool)
+    -- ^ Deprecated name meaning the opposite of peExtraDep. Only present to
+    -- provide deprecation warnings to users.
     , peLocation :: !PackageLocation
     , peSubdirs :: ![FilePath]
     }
     deriving Show
+
+-- | Once peValidWanted is removed, this should just become the field name in PackageEntry.
+peExtraDep :: PackageEntry -> Bool
+peExtraDep pe =
+    case peExtraDepMaybe pe of
+        Just x -> x
+        Nothing ->
+            case peValidWanted pe of
+                Just x -> not x
+                Nothing -> False
+
 instance ToJSON PackageEntry where
-    toJSON pe | peValidWanted pe && null (peSubdirs pe) =
+    toJSON pe | not (peExtraDep pe) && null (peSubdirs pe) =
         toJSON $ peLocation pe
     toJSON pe = object
-        [ "valid-wanted" .= peValidWanted pe
+        [ "extra-dep" .= peExtraDep pe
         , "location" .= peLocation pe
         , "subdirs" .= peSubdirs pe
         ]
@@ -241,12 +259,14 @@ instance FromJSON PackageEntry where
     parseJSON (String t) = do
         loc <- parseJSON $ String t
         return PackageEntry
-            { peValidWanted = True
+            { peExtraDepMaybe = Nothing
+            , peValidWanted = Nothing
             , peLocation = loc
             , peSubdirs = []
             }
     parseJSON v = withObject "PackageEntry" (\o -> PackageEntry
-        <$> o .:? "valid-wanted" .!= True
+        <$> o .:? "extra-dep"
+        <*> o .:? "valid-wanted"
         <*> o .: "location"
         <*> o .:? "subdirs" .!= []) v
 
@@ -714,7 +734,8 @@ instance FromJSON ProjectAndConfigMonoid where
 -- | A PackageEntry for the current directory, used as a default
 packageEntryCurrDir :: PackageEntry
 packageEntryCurrDir = PackageEntry
-    { peValidWanted = True
+    { peValidWanted = Nothing
+    , peExtraDepMaybe = Nothing
     , peLocation = PLFilePath "."
     , peSubdirs = []
     }
