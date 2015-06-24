@@ -202,7 +202,7 @@ getPackageFileModTimes :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m)
                        -> Path Abs File -- ^ cabal file
                        -> m (Map FilePath ModTime)
 getPackageFileModTimes pkg cabalfp = do
-    files <- getPackageFiles (packageFiles pkg) cabalfp
+    files <- getPackageFiles (packageFiles pkg) AllFiles cabalfp
     liftM (Map.fromList . catMaybes)
         $ mapM getModTimeMaybe
         $ Set.toList files
