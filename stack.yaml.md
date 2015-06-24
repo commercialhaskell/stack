@@ -28,12 +28,13 @@ packages:
 Note: it is highly recommended that you only use SHA1 values for a Git commit. Other values may work, but they are not officially supported, and may result in unexpected behavior (namely, stack will not automatically pull to update to new versions).
 
 stack further allows you to tweak your packages by specifying two additional
-settings: a list of subdirectories to build (useful for mega-repos like
+settings:
+
+* A list of subdirectories to build (useful for mega-repos like
 [wai](https://github.com/yesodweb/wai/) or
-[digestive-functors](https://github.com/jaspervdj/digestive-functors)) and
-whether or not a package can be *wanted*. If a package cannot be wanted, then
-stack will never build or run its test suites and benchmarks, which is useful
-when tweaking an upstream package.
+[digestive-functors](https://github.com/jaspervdj/digestive-functors))
+* Whether a package should be treated as a dependency, in which case it will only be built if demanded by a non-dependency, and its test suites and benchmarks will not be run. This is useful for tweaking an upstream package.
+    * The current name for this is `valid-wanted`, which when `false` means "treat as a dependency." That's a confusing name choice, and therefore we're switching it to be `extra-dep: true` to mean "treat as dependency." You'll get a deprecation warning once that new naming is release.
 
 To tie this all together, here's an example of the different settings:
 
