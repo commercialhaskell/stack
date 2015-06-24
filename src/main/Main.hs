@@ -257,7 +257,9 @@ pathCmd keys go =
                      paths)
                 (\(_,key,path) ->
                       $logInfo
-                          (key <> ": " <>
+                          ((if length keys == 1
+                               then ""
+                               else key <> ": ") <>
                            path
                                (PathInfo
                                     bc
