@@ -57,6 +57,7 @@ library
                      Stack.PackageDump
                      Stack.PackageIndex
                      Stack.Repl
+                     Stack.Ide
                      Stack.Setup
                      Stack.Solver
                      Stack.Types
@@ -203,6 +204,7 @@ test-suite stack-test
                 , Stack.ConfigSpec
                 , Stack.PackageDumpSpec
                 , Stack.ArgsSpec
+                , Network.HTTP.Download.VerifiedSpec
   ghc-options:    -Wall -threaded
   build-depends:  base >=4.7 && <5
                 , hspec
