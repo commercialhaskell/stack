@@ -27,7 +27,9 @@ import           Data.Maybe
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
-import           Data.Text.Encoding (encodeUtf8)
+import qualified Data.Text as T
+import           Data.Text.Encoding (encodeUtf8, decodeUtf8With)
+import           Data.Text.Encoding.Error (lenientDecode)
 import           Distribution.Package (Dependency (..))
 import           Distribution.Version         (anyVersion,
                                                intersectVersionRanges)
@@ -316,7 +318,14 @@ checkNeedInstall name ps installed wanted = assert (piiLocation ps == Local) $ d
         Left _e -> return True -- installPackage will find the error again
         Right (missing, present, _loc)
             | Set.null missing -> checkDirtiness ps installed package present wanted
-            | otherwise -> return True
+            | otherwise -> do
+                tell (Map.empty, Map.empty, Map.singleton name $
+                    let t = T.intercalate ", " $ map (T.pack . packageNameString . packageIdentifierName) (Set.toList missing)
+                     in T.append "missing dependencies: " $
+                            if T.length t < 100
+                                then t
+                                else T.take 97 t <> "...")
+                return True
 
 addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Set GhcPkgId, InstallLocation))
 addPackageDeps package = do
@@ -384,7 +393,7 @@ checkDirtiness ps installed package present wanted = do
             case moldOpts of
                 Nothing -> Just "old configure information not found"
                 Just oldOpts
-                    | oldOpts /= wantConfigCache -> Just "configure flags changed"
+                    | oldOpts /= wantConfigCache -> Just $ describeConfigDiff oldOpts wantConfigCache
                     | psDirty ps -> Just "local file changes"
                     | otherwise -> Nothing
     case mreason of
@@ -392,6 +401,39 @@ checkDirtiness ps installed package present wanted = do
         Just reason -> do
             tell (Map.empty, Map.empty, Map.singleton (packageName package) reason)
             return True
+
+describeConfigDiff :: ConfigCache -> ConfigCache -> Text
+describeConfigDiff old new
+    | configCacheDeps old /= configCacheDeps new = "dependencies changed"
+    | configCacheComponents old /= configCacheComponents new = "components changed"
+    | configCacheHaddock old && not (configCacheHaddock new) = "no longer building haddocks"
+    | not (configCacheHaddock old) && configCacheHaddock new = "building haddocks"
+    | oldOpts /= newOpts = T.pack $ concat
+        [ "flags changed from "
+        , show oldOpts
+        , " to "
+        , show newOpts
+        ]
+    | otherwise = "unknown config cache difference"
+  where
+    -- options set by stack
+    isStackOpt t = any (`T.isPrefixOf` t)
+        [ "--dependency="
+        , "--constraint="
+        , "--package-db="
+        , "--libdir="
+        , "--bindir="
+        ]
+
+    userOpts = filter (not . isStackOpt)
+             . map (decodeUtf8With lenientDecode)
+             . configCacheOpts
+
+    (oldOpts, newOpts) = removeMatching (userOpts old) (userOpts new)
+
+    removeMatching (x:xs) (y:ys)
+        | x == y = removeMatching xs ys
+    removeMatching xs ys = (xs, ys)
 
 psDirty :: PackageSource -> Bool
 psDirty (PSLocal lp) = lpDirtyFiles lp
