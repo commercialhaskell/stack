@@ -490,7 +490,10 @@ checkBuildPlan locals mbp gpd = do
     packages = Map.union locals $ fmap mpiVersion $ mbpPackages mbp
     loop _ [] = assert False $ Left Map.empty
     loop platform (flags:rest)
-        | Map.null errs = Right $ Map.singleton (packageName pkg) flags
+        | Map.null errs = Right $
+            if Map.null flags
+                then Map.empty
+                else Map.singleton (packageName pkg) flags
         | null rest = Left errs
         | otherwise = loop platform rest
       where
