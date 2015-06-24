@@ -9,6 +9,8 @@ module Stack.Build.Execute
     ( printPlan
     , preFetch
     , executePlan
+    -- TESTING
+    , compareTestsComponents
     ) where
 
 import           Control.Applicative            ((<$>), (<*>))
@@ -680,11 +682,19 @@ singleTest ac ee task =
                     _ -> assert False True)
                 || True -- FIXME above logic is incorrect, see: https://github.com/commercialhaskell/stack/issues/319
             needHpc = boptsCoverage (eeBuildOpts ee)
+
+            componentsRaw =
+                case taskType task of
+                    TTLocal lp -> Set.toList $ lpComponents lp
+                    TTUpstream _ _ -> assert False []
+            testsToRun = compareTestsComponents componentsRaw $ Set.toList $ packageTests package
+            components = map (T.unpack . T.append "test:") testsToRun
+
         when needBuild $ do
             announce "build (test)"
             fileModTimes <- getPackageFileModTimes package cabalfp
             writeBuildCache pkgDir fileModTimes
-            cabal (console && configHideTHLoading config) ["build"]
+            cabal (console && configHideTHLoading config) $ "build" : components
 
         bconfig <- asks getBuildConfig
         buildDir <- distDirFromDir pkgDir
@@ -696,7 +706,7 @@ singleTest ac ee task =
                     Platform _ Windows -> ".exe"
                     _ -> ""
 
-        errs <- liftM Map.unions $ forM (Set.toList $ packageTests package) $ \testName -> do
+        errs <- liftM Map.unions $ forM testsToRun $ \testName -> do
             nameDir <- parseRelDir $ T.unpack testName
             nameExe <- parseRelFile $ T.unpack testName ++ exeExtension
             nameTix <- liftM (pkgDir </>) $ parseRelFile $ T.unpack testName ++ ".tix"
@@ -777,6 +787,22 @@ singleTest ac ee task =
             errs
             (fmap fst mlogFile)
             bs
+
+-- | Determine the tests to be run based on the list of components.
+compareTestsComponents :: [Text] -- ^ components
+                       -> [Text] -- ^ all test names
+                       -> [Text] -- ^ tests to be run
+compareTestsComponents [] tests = tests -- no components -- all tests
+compareTestsComponents comps tests2 =
+    Set.toList $ Set.intersection tests1 $ Set.fromList tests2
+  where
+    tests1 = Set.unions $ map toSet comps
+
+    toSet x =
+        case T.break (== ':') x of
+            (y, "") -> assert (x == y) (Set.singleton x)
+            ("test", y) -> Set.singleton $ T.drop 1 y
+            _ -> Set.empty
 
 -- | Generate the HTML report and
 generateHpcReport
