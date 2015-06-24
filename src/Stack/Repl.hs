@@ -51,41 +51,22 @@ repl targets opts ghciPath = do
                               (getConfig bconfig)
                         }
                 pkg <- readPackage config cabalfp
-                if validWanted &&
-                   wanted pwd cabalfp pkg
+                if validWanted && wanted pwd cabalfp pkg
                     then do
-                        pkgOpts <-
-                            getPackageOpts
-                                (packageOpts pkg)
-                                cabalfp
+                        pkgOpts <- getPackageOpts (packageOpts pkg) cabalfp
                         return (Just (packageName pkg, pkgOpts))
                     else return Nothing
     $logInfo
         ("Configuring GHCi with the following packages: " <>
-         T.intercalate
-             ", "
-             (map packageNameText (map fst pkgOpts)))
+         T.intercalate ", " (map packageNameText (map fst pkgOpts)))
     exec
         ghciPath
         ("--interactive" :
-         filter
-             (not . badForGhci)
-             (concat (map snd pkgOpts)) <>
-         opts)
+         filter (not . badForGhci) (concat (map snd pkgOpts)) <> opts)
   where
-    wanted pwd cabalfp pkg =
-        isInWantedList || targetsEmptyAndInDir
+    wanted pwd cabalfp pkg = isInWantedList || targetsEmptyAndInDir
       where
-        isInWantedList =
-            elem
-                (packageNameText
-                     (packageName pkg))
-                targets
-        targetsEmptyAndInDir =
-            null targets ||
-            isParentOf
-                (parent cabalfp)
-                pwd
+        isInWantedList = elem (packageNameText (packageName pkg)) targets
+        targetsEmptyAndInDir = null targets || isParentOf (parent cabalfp) pwd
     badForGhci x =
-        isPrefixOf "-O" x ||
-        elem x (words "-debug -threaded -ticky")
+        isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky")
