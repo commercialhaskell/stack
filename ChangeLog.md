@@ -8,6 +8,7 @@
 * stack init in multi-package project should use local packages for dependency checking [#384](https://github.com/commercialhaskell/stack/issues/384)
 * Display information on why a snapshot was rejected [#381](https://github.com/commercialhaskell/stack/issues/381)
 * Give a reason for unregistering packages [#389](https://github.com/commercialhaskell/stack/issues/389)
+* `stack exec` accepts the `--no-ghc-package-path` parameter
 
 ## 0.1.0.0
 

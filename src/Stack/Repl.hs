@@ -69,7 +69,7 @@ repl targets useropts ghciPath noload = do
     $logInfo
         ("Configuring GHCi with the following packages: " <>
          T.intercalate ", " (map packageNameText (map _1 pkgs)))
-    exec ghciPath ("--interactive" : pkgopts <> srcfiles <> useropts)
+    exec defaultEnvSettings ghciPath ("--interactive" : pkgopts <> srcfiles <> useropts)
   where
     wanted pwd cabalfp pkg = isInWantedList || targetsEmptyAndInDir
       where

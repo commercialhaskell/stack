@@ -142,15 +142,22 @@ main =
              addCommand "exec"
                         "Execute a command"
                         execCmd
-                        ((,)
+                        ((,,)
                             <$> strArgument (metavar "CMD")
-                            <*> many (strArgument (metavar "-- ARGS (e.g. stack exec -- ghc --version)")))
+                            <*> many (strArgument (metavar "-- ARGS (e.g. stack exec -- ghc --version)"))
+                            <*> (EnvSettings
+                                    <$> pure True
+                                    <*> boolFlags True
+                                            "ghc-package-path"
+                                            "setting the GHC_PACKAGE_PATH variable for the subprocess"
+                                            idm))
              addCommand "ghc"
                         "Run ghc"
                         execCmd
-                        ((,)
+                        ((,,)
                             <$> pure "ghc"
-                            <*> many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)")))
+                            <*> many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)"))
+                            <*> pure defaultEnvSettings)
              addCommand "ghci"
                         "Run ghci in the context of project(s)"
                         replCmd
@@ -172,9 +179,10 @@ main =
              addCommand "runghc"
                         "Run runghc"
                         execCmd
-                        ((,)
+                        ((,,)
                             <$> pure "runghc"
-                            <*> many (strArgument (metavar "-- ARGS (e.g. stack runghc -- X.hs)")))
+                            <*> many (strArgument (metavar "-- ARGS (e.g. stack runghc -- X.hs)"))
+                            <*> pure defaultEnvSettings)
              addCommand "clean"
                         "Clean the local packages"
                         cleanCmd
@@ -498,10 +506,10 @@ uploadCmd args0 go = withBuildConfig go ExecStrategy $ do
         mapM_ (Upload.upload uploader) args
 
 -- | Execute a command.
-execCmd :: (String, [String]) -> GlobalOpts -> IO ()
-execCmd (cmd,args) go@GlobalOpts{..} =
+execCmd :: (String, [String],EnvSettings) -> GlobalOpts -> IO ()
+execCmd (cmd,args,envSettings) go@GlobalOpts{..} =
     withBuildConfig go ExecStrategy $
-    exec cmd args
+    exec envSettings cmd args
 
 -- | Run the REPL in the context of a project, with
 replCmd :: ([Text], [String], FilePath, Bool) -> GlobalOpts -> IO ()
