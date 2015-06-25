@@ -47,6 +47,7 @@ import qualified Data.Text.Encoding             as T
 import           Data.Text.Encoding             (encodeUtf8)
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
+import           Language.Haskell.TH            (Loc(..))
 import           Network.HTTP.Client.Conduit    (HasHttpManager)
 import           Path
 import           Path.IO
@@ -860,7 +861,7 @@ printBuildOutput excludeTHLoading level outH = void $ fork $
          CB.sourceHandle outH
     $$ CB.lines
     =$ CL.filter (not . isTHLoading)
-    =$ CL.mapM_ (logOtherN level . T.decodeUtf8)
+    =$ CL.mapM_ (monadLoggerLog (Loc "<unknown>" "<unknown>" "<unknown>" (0,0) (0,0)) "" level)
   where
     -- | Is this line a Template Haskell "Loading package" line
     -- ByteString
