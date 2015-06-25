@@ -15,6 +15,7 @@
 Bug fixes:
 
 * Haddock links to global packages no longer broken on Windows [#375](https://github.com/commercialhaskell/stack/issues/375)
+* Make flags case-insensitive [#397](https://github.com/commercialhaskell/stack/issues/397)
 
 ## 0.1.0.0
 
