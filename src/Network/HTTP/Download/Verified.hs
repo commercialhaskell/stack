@@ -33,7 +33,7 @@ import Crypto.Hash.Conduit (sinkHash)
 import Data.ByteString (ByteString)
 import Data.Conduit
 import Data.Conduit.Binary (sourceHandle, sinkHandle)
-import Data.Foldable (traverse_)
+import Data.Foldable (traverse_,for_)
 import Data.Monoid
 import Data.String
 import Data.Typeable (Typeable)
@@ -217,12 +217,8 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
           `catch` \(_ :: VerifyFileException) -> return False
           `catch` \(_ :: VerifiedDownloadException) -> return False
 
-    whenJust :: Monad m => Maybe a -> (a -> m ()) -> m ()
-    whenJust (Just a) f = f a
-    whenJust _ _ = return ()
-
     checkExpectations = bracket (openFile fp ReadMode) hClose $ \h -> do
-        whenJust drLengthCheck $ checkFileSizeExpectations h
+        for_ drLengthCheck $ checkFileSizeExpectations h
         sourceHandle h $$ getZipSink (hashChecksToZipSink drRequest drHashChecks)
 
     -- doesn't move the handle
@@ -244,7 +240,7 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
 
     go h res = do
         let headers = responseHeaders res
-        whenJust drLengthCheck $ checkContentLengthHeader headers
+        for_ drLengthCheck $ checkContentLengthHeader headers
         let hashChecks = (case List.lookup hContentMD5 headers of
                 Just md5BS ->
                     [ HashCheck
