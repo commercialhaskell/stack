@@ -292,7 +292,7 @@ generatePkgDescOpts cabalfp pkg = do
 -- | Generate GHC options for the target.
 generateBuildInfoOpts :: Maybe (Path Abs File) -> Path Abs Dir -> Path Abs Dir -> BuildInfo -> [String]
 generateBuildInfoOpts mcabalmacros cabalDir distDir b =
-    nub (concat [ghcOpts b, extOpts b, srcOpts, macros, deps])
+    nub (concat [ghcOpts b, extOpts b, srcOpts, includeOpts b, macros, deps])
   where
     deps =
         concat
@@ -314,6 +314,10 @@ generateBuildInfoOpts mcabalmacros cabalDir distDir b =
             (cabalDir :
              map (cabalDir </>) (mapMaybe parseRelDir (hsSourceDirs b)) <>
              [autogenDir distDir])
+    includeOpts
+       = map (("-I" <>) . toFilePath . (cabalDir </>))
+       . mapMaybe parseRelDir
+       . includeDirs
 
 -- | Make the autogen dir.
 autogenDir :: Path Abs Dir -> Path Abs Dir
