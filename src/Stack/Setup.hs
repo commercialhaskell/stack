@@ -15,6 +15,7 @@ module Stack.Setup
   ) where
 
 import           Control.Applicative
+import           Control.Exception.Enclosed (catchIO)
 import           Control.Monad (liftM, when, join, void)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class (MonadIO, liftIO)
@@ -54,7 +55,8 @@ import           Stack.GhcPkg (getCabalPkgVer, getGlobalDB)
 import           Stack.Solver (getGhcVersion)
 import           Stack.Types
 import           Stack.Types.StackT
-import           System.Directory (doesDirectoryExist, createDirectoryIfMissing)
+import           System.Directory (doesDirectoryExist, createDirectoryIfMissing, removeFile)
+import           System.Environment (getExecutablePath)
 import           System.Exit (ExitCode (ExitSuccess))
 import           System.FilePath (searchPathSeparator)
 import qualified System.FilePath as FP
@@ -164,10 +166,12 @@ setupEnv = do
     localdbExists <- liftIO $ doesDirectoryExist $ toFilePath localdb
     globalDB <- mkEnvOverride platform env1 >>= getGlobalDB
     let mkGPP locals = T.pack $ intercalate [searchPathSeparator] $ concat
-            [ [toFilePath localdb | locals && localdbExists]
-            , [toFilePath deps | depsExists]
-            , [toFilePath globalDB]
+            [ [toFilePathNoTrailingSlash localdb | locals && localdbExists]
+            , [toFilePathNoTrailingSlash deps | depsExists]
+            , [toFilePathNoTrailingSlash globalDB]
             ]
+
+    executablePath <- liftIO getExecutablePath
 
     envRef <- liftIO $ newIORef Map.empty
     let getEnvOverride' es = do
@@ -181,17 +185,21 @@ setupEnv = do
                                 then Map.insert "GHC_PACKAGE_PATH" (mkGPP (esIncludeLocals es))
                                 else id)
 
+                        $ (if esStackExe es
+                                then Map.insert "STACK_EXE" (T.pack executablePath)
+                                else id)
+
                         -- For reasoning and duplication, see: https://github.com/fpco/stack/issues/70
-                        $ Map.insert "HASKELL_PACKAGE_SANDBOX" (T.pack $ toFilePath deps)
+                        $ Map.insert "HASKELL_PACKAGE_SANDBOX" (T.pack $ toFilePathNoTrailingSlash deps)
                         $ Map.insert "HASKELL_PACKAGE_SANDBOXES"
                             (T.pack $ if esIncludeLocals es
                                 then intercalate [searchPathSeparator]
-                                        [ toFilePath localdb
-                                        , toFilePath deps
+                                        [ toFilePathNoTrailingSlash localdb
+                                        , toFilePathNoTrailingSlash deps
                                         , ""
                                         ]
                                 else intercalate [searchPathSeparator]
-                                        [ toFilePath deps
+                                        [ toFilePathNoTrailingSlash deps
                                         , ""
                                         ])
                         $ env1
@@ -272,7 +280,7 @@ ensureGHC sopts = do
             installed <- runReaderT listInstalled config
             idents <- mapM (ensureTool sopts installed getSetupInfo' msystem) tools
             paths <- runReaderT (mapM binDirs $ catMaybes idents) config
-            return $ Just $ map toFilePath $ concat paths
+            return $ Just $ map toFilePathNoTrailingSlash $ concat paths
         else return Nothing
 
     when (soptsSanityCheck sopts) $ do
@@ -580,6 +588,13 @@ installGHCWindows si archiveFile archiveType destDir _ = do
 
     run7z (parent archiveFile) archiveFile
     run7z (parent archiveFile) tarFile
+    liftIO (removeFile $ toFilePath tarFile) `catchIO` \e ->
+        $logWarn (T.concat
+            [ "Exception when removing "
+            , T.pack $ toFilePath tarFile
+            , ": "
+            , T.pack $ show e
+            ])
 
     $logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
 
@@ -712,3 +727,6 @@ sanityCheck menv = withSystemTempDirectory "stack-sanity-check" $ \dir -> do
     case eres of
         Left e -> throwM $ GHCSanityCheckCompileFailed e ghc
         Right _ -> return () -- TODO check that the output of running the command is correct
+
+toFilePathNoTrailingSlash :: Path loc Dir -> FilePath
+toFilePathNoTrailingSlash = FP.dropTrailingPathSeparator . toFilePath

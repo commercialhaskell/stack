@@ -1,3 +1,25 @@
+## Unreleased
+
+* Remove GHC uncompressed tar file after installation [#376](https://github.com/commercialhaskell/stack/issues/376)
+* Put stackage snapshots JSON on S3 [#380](https://github.com/commercialhaskell/stack/issues/380)
+* Specifying flags for multiple packages [#335](https://github.com/commercialhaskell/stack/issues/335)
+* single test suite failure should show entire log [#388](https://github.com/commercialhaskell/stack/issues/388)
+* valid-wanted is a confusing option name [#386](https://github.com/commercialhaskell/stack/issues/386)
+* stack init in multi-package project should use local packages for dependency checking [#384](https://github.com/commercialhaskell/stack/issues/384)
+* Display information on why a snapshot was rejected [#381](https://github.com/commercialhaskell/stack/issues/381)
+* Give a reason for unregistering packages [#389](https://github.com/commercialhaskell/stack/issues/389)
+* `stack exec` accepts the `--no-ghc-package-path` parameter
+* Don't require build plan to upload [#400](https://github.com/commercialhaskell/stack/issues/400)
+* Specifying test components only builds/runs those tests [#398](https://github.com/commercialhaskell/stack/issues/398)
+* `STACK_EXE` environment variable
+* Add the `stack dot` command
+
+Bug fixes:
+
+* Haddock links to global packages no longer broken on Windows [#375](https://github.com/commercialhaskell/stack/issues/375)
+* Make flags case-insensitive [#397](https://github.com/commercialhaskell/stack/issues/397)
+* Mark packages uninstalled before rebuilding [#365](https://github.com/commercialhaskell/stack/issues/365)
+
 ## 0.1.0.0
 
 * Fall back to cabal dependency solver when a snapshot can't be found

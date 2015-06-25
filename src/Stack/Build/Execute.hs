@@ -9,6 +9,8 @@ module Stack.Build.Execute
     ( printPlan
     , preFetch
     , executePlan
+    -- TESTING
+    , compareTestsComponents
     ) where
 
 import           Control.Applicative            ((<$>), (<*>))
@@ -45,6 +47,7 @@ import qualified Data.Text.Encoding             as T
 import           Data.Text.Encoding             (encodeUtf8)
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
+import           Language.Haskell.TH            (Loc(..))
 import           Network.HTTP.Client.Conduit    (HasHttpManager)
 import           Path
 import           Path.IO
@@ -98,11 +101,16 @@ printPlan :: M env m
           -> Plan
           -> m ()
 printPlan finalAction plan = do
-    case Set.toList $ planUnregisterLocal plan of
+    case Map.toList $ planUnregisterLocal plan of
         [] -> $logInfo "Nothing to unregister"
         xs -> do
             $logInfo "Would unregister locally:"
-            mapM_ ($logInfo . T.pack . ghcPkgIdString) xs
+            forM_ xs $ \(gid, reason) -> $logInfo $ T.concat
+                [ T.pack $ ghcPkgIdString gid
+                , " ("
+                , reason
+                , ")"
+                ]
 
     $logInfo ""
 
@@ -303,14 +311,16 @@ executePlan' :: M env m
              -> ExecuteEnv
              -> m ()
 executePlan' plan ee@ExecuteEnv {..} = do
-    case Set.toList $ planUnregisterLocal plan of
+    case Map.toList $ planUnregisterLocal plan of
         [] -> return ()
         ids -> do
             localDB <- packageDatabaseLocal
-            forM_ ids $ \id' -> do
+            forM_ ids $ \(id', reason) -> do
                 $logInfo $ T.concat
                     [ T.pack $ ghcPkgIdString id'
-                    , ": unregistering"
+                    , ": unregistering ("
+                    , reason
+                    , ")"
                     ]
                 unregisterGhcPkgId eeEnvOverride localDB id'
 
@@ -515,6 +525,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
         menv <- liftIO $ configEnvOverride config EnvSettings
             { esIncludeLocals = taskLocation task == Local
             , esIncludeGhcPackagePath = False
+            , esStackExe = False
             }
         exeName <- liftIO $ join $ findExecutable menv "runhaskell"
         distRelativeDir' <- distRelativeDir
@@ -612,6 +623,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
     (cache, _neededConfig) <- ensureConfig pkgDir ee task (announce "configure") cabal cabalfp []
 
     fileModTimes <- getPackageFileModTimes package cabalfp
+    markExeNotInstalled (taskLocation task) taskProvides
     writeBuildCache pkgDir fileModTimes
 
     announce "build"
@@ -676,31 +688,51 @@ singleTest ac ee task =
                     TTLocal lp -> lpDirtyFiles lp
                     _ -> assert False True)
                 || True -- FIXME above logic is incorrect, see: https://github.com/commercialhaskell/stack/issues/319
+            needHpc = boptsCoverage (eeBuildOpts ee)
+
+            componentsRaw =
+                case taskType task of
+                    TTLocal lp -> Set.toList $ lpComponents lp
+                    TTUpstream _ _ -> assert False []
+            testsToRun = compareTestsComponents componentsRaw $ Set.toList $ packageTests package
+            components = map (T.unpack . T.append "test:") testsToRun
+
         when needBuild $ do
             announce "build (test)"
             fileModTimes <- getPackageFileModTimes package cabalfp
             writeBuildCache pkgDir fileModTimes
-            cabal (console && configHideTHLoading config) ["build"]
+            cabal (console && configHideTHLoading config) $ "build" : components
 
         bconfig <- asks getBuildConfig
-        distRelativeDir' <- distRelativeDir
-        let buildDir = pkgDir </> distRelativeDir'
-        let exeExtension =
+        buildDir <- distDirFromDir pkgDir
+        hpcDir <- hpcDirFromDir pkgDir
+        when needHpc (createTree hpcDir)
+        let dotHpcDir = pkgDir </> dotHpc
+            exeExtension =
                 case configPlatform $ getConfig bconfig of
                     Platform _ Windows -> ".exe"
                     _ -> ""
 
-        errs <- liftM Map.unions $ forM (Set.toList $ packageTests package) $ \testName -> do
-            nameDir <- liftIO $ parseRelDir $ T.unpack testName
-            nameExe <- liftIO $ parseRelFile $ T.unpack testName ++ exeExtension
+        errs <- liftM Map.unions $ forM testsToRun $ \testName -> do
+            nameDir <- parseRelDir $ T.unpack testName
+            nameExe <- parseRelFile $ T.unpack testName ++ exeExtension
+            nameTix <- liftM (pkgDir </>) $ parseRelFile $ T.unpack testName ++ ".tix"
             let exeName = buildDir </> $(mkRelDir "build") </> nameDir </> nameExe
             exists <- fileExists exeName
             menv <- liftIO $ configEnvOverride config EnvSettings
                 { esIncludeLocals = taskLocation task == Local
                 , esIncludeGhcPackagePath = True
+                , esStackExe = True
                 }
             if exists
                 then do
+                    -- We clear out the .tix files before doing a run.
+                    when needHpc $ do
+                        tixexists <- fileExists nameTix
+                        when tixexists $
+                            $logWarn ("Removing HPC file " <> T.pack (toFilePath nameTix))
+                        removeFileIfExists nameTix
+
                     let args = boptsTestArgs (eeBuildOpts ee)
                         argsDisplay =
                             case args of
@@ -725,6 +757,10 @@ singleTest ac ee task =
                     (Just inH, Nothing, Nothing, ph) <- liftIO $ createProcess_ "singleBuild.runTests" cp
                     liftIO $ hClose inH
                     ec <- liftIO $ waitForProcess ph
+                    -- Move the .tix file out of the package directory
+                    -- into the hpc work dir, for tidiness.
+                    when needHpc $
+                        moveFileIfExists nameTix hpcDir
                     return $ case ec of
                         ExitSuccess -> Map.empty
                         _ -> Map.singleton testName $ Just ec
@@ -736,10 +772,69 @@ singleTest ac ee task =
                         , T.pack $ packageNameString $ packageName package
                         ]
                     return $ Map.singleton testName Nothing
+        when needHpc $ do
+            createTree (hpcDir </> dotHpc)
+            exists <- dirExists dotHpcDir
+            when exists $ do
+                copyDirectoryRecursive dotHpcDir (hpcDir </> dotHpc)
+                removeTree dotHpcDir
+            (_,files) <- listDirectory hpcDir
+            let tixes =
+                    filter (isSuffixOf ".tix" . toFilePath . filename) files
+            generateHpcReport pkgDir hpcDir (hpcDir </> dotHpc) tixes
+
+        bs <- liftIO $
+            case mlogFile of
+                Nothing -> return ""
+                Just (logFile, h) -> do
+                    hClose h
+                    S.readFile $ toFilePath logFile
+
         unless (Map.null errs) $ throwM $ TestSuiteFailure
             (taskProvides task)
             errs
             (fmap fst mlogFile)
+            bs
+
+-- | Determine the tests to be run based on the list of components.
+compareTestsComponents :: [Text] -- ^ components
+                       -> [Text] -- ^ all test names
+                       -> [Text] -- ^ tests to be run
+compareTestsComponents [] tests = tests -- no components -- all tests
+compareTestsComponents comps tests2 =
+    Set.toList $ Set.intersection tests1 $ Set.fromList tests2
+  where
+    tests1 = Set.unions $ map toSet comps
+
+    toSet x =
+        case T.break (== ':') x of
+            (y, "") -> assert (x == y) (Set.singleton x)
+            ("test", y) -> Set.singleton $ T.drop 1 y
+            _ -> Set.empty
+
+-- | Generate the HTML report and
+generateHpcReport
+    :: M env m
+    => Path Abs Dir -> Path Abs Dir -> Path Abs Dir -> [Path Abs File] -> m ()
+generateHpcReport _ _ _ [] = return ()
+generateHpcReport pkgDir hpcDir dotHpcDir tixes = do
+    menv <- getMinimalEnvOverride
+    $logInfo "Generating HPC HTML ..."
+    subdir <- stripDir pkgDir dotHpcDir
+    _ <- readProcessStdout (Just hpcDir) menv "hpc" ("markup" : args subdir)
+    output <-
+        readProcessStdout (Just hpcDir) menv "hpc" ("report" : args subdir)
+    forM_ (S8.lines output) ($logInfo . T.decodeUtf8)
+    $logInfo
+        ("The HTML report is available at " <>
+         T.pack (toFilePath (hpcDir </> $(mkRelFile "hpc_index.html"))))
+  where
+    args subdir =
+        concat
+            [ map (toFilePath . filename) tixes
+            , ["--srcdir", toFilePath pkgDir]
+            , ["--hpcdir", toFilePath subdir]
+            , ["--reset-hpcdirs"]]
 
 singleBench :: M env m
             => ActionContext
@@ -773,7 +868,7 @@ printBuildOutput excludeTHLoading level outH = void $ fork $
          CB.sourceHandle outH
     $$ CB.lines
     =$ CL.filter (not . isTHLoading)
-    =$ CL.mapM_ (logOtherN level . T.decodeUtf8)
+    =$ CL.mapM_ (monadLoggerLog (Loc "<unknown>" "<unknown>" "<unknown>" (0,0) (0,0)) "" level)
   where
     -- | Is this line a Template Haskell "Loading package" line
     -- ByteString

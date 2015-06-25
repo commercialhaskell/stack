@@ -27,6 +27,7 @@ import           Data.Aeson.Extended
 import           Data.Attoparsec.ByteString.Char8
 import           Data.Attoparsec.Combinators
 import           Data.Binary (Binary)
+import qualified Data.ByteString as S
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Char (isLetter)
@@ -36,6 +37,7 @@ import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Text (Text)
 import qualified Data.Text.Encoding as T
+import qualified Data.Word8 as Word8
 import qualified Distribution.PackageDescription as Cabal
 import           GHC.Generics
 import           Language.Haskell.TH
@@ -52,7 +54,12 @@ instance Show FlagNameParseFail where
 -- | A flag name.
 newtype FlagName =
   FlagName ByteString
-  deriving (Eq,Ord,Typeable,Data,Generic,Hashable,Binary)
+  deriving (Typeable,Data,Generic,Hashable,Binary)
+instance Eq FlagName where
+    x == y = (compare x y) == EQ
+instance Ord FlagName where
+    compare (FlagName x) (FlagName y) =
+        compare (S.map Word8.toLower x) (S.map Word8.toLower y)
 
 instance Lift FlagName where
   lift (FlagName n) =

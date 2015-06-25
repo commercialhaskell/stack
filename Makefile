@@ -19,6 +19,7 @@ target/ubuntu-$(UBUNTU_VERSION):
 target/ubuntu-$(UBUNTU_VERSION)/stack_$(PKG_VERSION)-$(GIT_REV_COUNT)-$(GIT_SHA)_amd64.deb: | target/ubuntu-$(UBUNTU_VERSION)
 	@cp etc/docker/ubuntu-packages/Dockerfile Dockerfile
 	@perl -p -i -e "s/<<UBUNTU_VERSION>>/$(UBUNTU_VERSION)/g" Dockerfile
+	@perl -p -i -e "s/<<UBUNTU_CODENAME>>/$(UBUNTU_CODENAME)/g" Dockerfile
 	@perl -p -i -e "s/<<PKG_VERSION>>/$(PKG_VERSION)/g" Dockerfile
 	@perl -p -i -e "s/<<GIT_REV_COUNT>>/$(GIT_REV_COUNT)/g" Dockerfile
 	@perl -p -i -e "s/<<GIT_SHA>>/$(GIT_SHA)/g" Dockerfile

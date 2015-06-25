@@ -18,17 +18,20 @@ import           System.Exit
 import qualified System.Process as P
 import           System.Process.Read
 
+-- | Default @EnvSettings@ which includes locals and GHC_PACKAGE_PATH
+defaultEnvSettings :: EnvSettings
+defaultEnvSettings = EnvSettings
+    { esIncludeLocals = True
+    , esIncludeGhcPackagePath = True
+    , esStackExe = True
+    }
 
 -- | Execute a process within the Stack configured environment.
 exec :: (HasConfig r, MonadReader r m, MonadIO m, MonadLogger m, MonadThrow m)
-        => String -> [String] -> m b
-exec cmd args = do
+        => EnvSettings -> String -> [String] -> m b
+exec envSettings cmd args = do
     config <- asks getConfig
-    menv <- liftIO (configEnvOverride config
-                            EnvSettings
-                                { esIncludeLocals = True
-                                , esIncludeGhcPackagePath = True
-                                })
+    menv <- liftIO (configEnvOverride config envSettings)
     exists <- liftIO $ doesFileExist cmd
     cmd' <-
         if exists

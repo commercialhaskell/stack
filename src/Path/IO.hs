@@ -14,8 +14,13 @@ module Path.IO
   ,removeTree
   ,removeTreeIfExists
   ,fileExists
+  ,renameFileIfExists
+  ,renameDirIfExists
+  ,moveFileIfExists
+  ,moveDirIfExists
   ,dirExists
-  ,copyDirectoryRecursive)
+  ,copyDirectoryRecursive
+  ,createTree)
   where
 
 import           Control.Exception hiding (catch)
@@ -129,6 +134,63 @@ removeFileIfExists fp =
                           then return ()
                           else throwIO e))
 
+-- | Move the given file. Optimistically assumes it exists. If it
+-- doesn't, doesn't complain.
+renameFileIfExists :: MonadIO m => Path b File -> Path b File -> m ()
+renameFileIfExists from to =
+    liftIO
+        (catch
+             (renameFile (toFilePath from)
+                         (toFilePath to))
+             (\e ->
+                   if isDoesNotExistError e
+                       then return ()
+                       else throwIO e))
+
+-- | Rename the directory. Optimistically assumes it exists. If it
+-- doesn't, doesn't complain.
+renameDirIfExists :: MonadIO m => Path b Dir -> Path b Dir -> m ()
+renameDirIfExists from to =
+    liftIO
+        (catch
+             (renameDirectory (toFilePath from)
+                              (toFilePath to))
+             (\e ->
+                   if isDoesNotExistError e
+                       then return ()
+                       else throwIO e))
+
+-- | Make a directory tree, creating parents if needed.
+createTree :: MonadIO m => Path b Dir -> m ()
+createTree = liftIO . createDirectoryIfMissing True . toFilePath
+
+-- | Move the given file. Optimistically assumes it exists. If it
+-- doesn't, doesn't complain.
+moveFileIfExists :: MonadIO m => Path b File -> Path b Dir -> m ()
+moveFileIfExists from to =
+    liftIO
+        (catch
+             (renameFile (toFilePath from)
+                         (toFilePath (to </> filename from)))
+             (\e ->
+                   if isDoesNotExistError e
+                       then return ()
+                       else throwIO e))
+
+-- | Move the given dir. Optimistically assumes it exists. If it
+-- doesn't, doesn't complain.
+moveDirIfExists :: MonadIO m => Path b Dir -> Path b Dir -> m ()
+moveDirIfExists from to =
+    liftIO
+        (catch
+             (renameDirectory
+                  (toFilePath from)
+                  (toFilePath (to </> dirname from)))
+             (\e ->
+                   if isDoesNotExistError e
+                       then return ()
+                       else throwIO e))
+
 -- | Remove the given tree. Bails out if the directory doesn't exist.
 removeTree :: MonadIO m => Path b Dir -> m ()
 removeTree =
@@ -150,7 +212,7 @@ fileExists =
 -- | Does the given directory exist?
 dirExists :: MonadIO m => Path b Dir -> m Bool
 dirExists =
-    liftIO . doesFileExist . toFilePath
+    liftIO . doesDirectoryExist . toFilePath
 
 -- | Copy a directory recursively.  This just uses 'copyFile', so it is not smart about symbolic
 -- links or other special files.

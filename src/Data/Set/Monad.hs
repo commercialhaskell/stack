@@ -22,7 +22,7 @@ mapM_ :: (Ord a,Ord b,Monad m)
        => (a -> m b) -> Set a -> m ()
 mapM_ f = L.mapM_ f . S.toList
 
--- | Map over a 'Set' in a monad.
+-- | Filter elements of a 'Set' in a monad.
 filterM :: (Ord a,Monad m)
          => (a -> m Bool) -> Set a -> m (Set a)
 filterM f = liftM S.fromList . L.filterM f . S.toList

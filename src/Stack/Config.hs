@@ -62,6 +62,7 @@ import           Stack.Constants
 import qualified Stack.Docker as Docker
 import           Stack.Init
 import           Stack.Types
+import           Stack.Types.Internal
 import           System.Directory
 import           System.Environment
 import           System.IO
@@ -98,7 +99,7 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
          configConnectionCount = fromMaybe 8 configMonoidConnectionCount
          configHideTHLoading = fromMaybe True configMonoidHideTHLoading
          configLatestSnapshotUrl = fromMaybe
-            "https://www.stackage.org/download/snapshots.json"
+            "https://s3.amazonaws.com/haddock.stackage.org/snapshots.json"
             configMonoidLatestSnapshotUrl
          configPackageIndices = fromMaybe
             [PackageIndex
@@ -225,7 +226,7 @@ instance HasPlatform MiniConfig
 
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.
-loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadThrow m,MonadBaseControl IO m,MonadReader env m,HasHttpManager env)
+loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadThrow m,MonadBaseControl IO m,MonadReader env m,HasHttpManager env,HasTerminal env)
            => ConfigMonoid
            -- ^ Config monoid from parsed command-line arguments
            -> m (LoadConfig m)
@@ -248,7 +249,7 @@ loadConfig configArgs = do
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
-loadBuildConfig :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m)
+loadBuildConfig :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m, HasTerminal env)
                 => EnvOverride
                 -> Maybe (Project, Path Abs File, ConfigMonoid)
                 -> Config
@@ -277,9 +278,8 @@ loadBuildConfig menv mproject config stackRoot mresolver noConfigStrat = do
             exists <- fileExists dest
             if exists
                then do
-                   inTerminal <- liftIO (hIsTerminalDevice stdout)
                    ProjectAndConfigMonoid project _ <- loadYaml dest
-                   when inTerminal $ do
+                   when (getTerminal env) $
                        case mresolver of
                            Nothing ->
                                $logInfo ("Using resolver: " <> renderResolver (projectResolver project) <>
@@ -342,7 +342,10 @@ resolvePackageEntry menv projRoot pe = do
         case peSubdirs pe of
             [] -> return [entryRoot]
             subs -> mapM (resolveDir entryRoot) subs
-    return $ map (, peValidWanted pe) paths
+    case peValidWanted pe of
+        Nothing -> return ()
+        Just _ -> $logWarn "Warning: you are using the deprecated valid-wanted field. You should instead use extra-dep. See: https://github.com/commercialhaskell/stack/wiki/stack.yaml#packages"
+    return $ map (, not $ peExtraDep pe) paths
 
 -- | Resolve a PackageLocation into a path, downloading and cloning as
 -- necessary.

@@ -30,6 +30,8 @@ extra-source-files:  README.md ChangeLog.md
                      new-template/LICENSE
                      new-template/Setup.hs
 
+                     stack.yaml
+
 flag integration-tests
   manual: True
   default: False
@@ -45,6 +47,7 @@ library
                      Stack.Constants
                      Stack.Docker
                      Stack.Docker.GlobalDB
+                     Stack.Dot
                      Stack.Fetch
                      Stack.Exec
                      Stack.GhcPkg
@@ -194,6 +197,7 @@ test-suite stack-test
   main-is:        Test.hs
   other-modules:  Spec
                 , Stack.BuildPlanSpec
+                , Stack.Build.ExecuteSpec
                 , Stack.ConfigSpec
                 , Stack.PackageDumpSpec
                 , Stack.ArgsSpec
@@ -215,6 +219,7 @@ test-suite stack-test
                 , conduit-extra
                 , resourcet
                 , Cabal
+                , text
   default-language:    Haskell2010
 
 test-suite stack-integration-test

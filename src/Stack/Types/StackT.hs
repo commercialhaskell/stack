@@ -93,11 +93,19 @@ runStackT manager logLevel config terminal m =
 --------------------------------------------------------------------------------
 -- Logging only StackLoggingT monad transformer
 
+-- | Monadic environment for 'StackLoggingT'.
+data LoggingEnv = LoggingEnv
+    { lenvLogLevel :: !LogLevel
+    , lenvTerminal :: !Bool
+    , lenvManager :: !Manager
+    , lenvSticky :: !Sticky
+    }
+
 -- | The monad used for logging in the executable @stack@ before
 -- anything has been initialized.
-newtype StackLoggingT m a =
-  StackLoggingT {unStackLoggingT :: ReaderT (LogLevel,Manager,Sticky) m a}
-  deriving (Functor,Applicative,Monad,MonadIO,MonadThrow,MonadReader (LogLevel,Manager,Sticky),MonadCatch,MonadMask,MonadTrans)
+newtype StackLoggingT m a = StackLoggingT
+    { unStackLoggingT :: ReaderT LoggingEnv m a
+    } deriving (Functor,Applicative,Monad,MonadIO,MonadThrow,MonadReader LoggingEnv,MonadCatch,MonadMask,MonadTrans)
 
 deriving instance (MonadBase b m) => MonadBase b (StackLoggingT m)
 
@@ -107,22 +115,25 @@ instance MonadBaseControl b m => MonadBaseControl b (StackLoggingT m) where
     restoreM         = defaultRestoreM
 
 instance MonadTransControl StackLoggingT where
-    type StT StackLoggingT a = StT (ReaderT (LogLevel,Manager,Sticky)) a
+    type StT StackLoggingT a = StT (ReaderT LoggingEnv) a
     liftWith = defaultLiftWith StackLoggingT unStackLoggingT
     restoreT = defaultRestoreT StackLoggingT
 
 -- | Takes the configured log level into account.
 instance (MonadIO m) => MonadLogger (StackLoggingT m) where
-  monadLoggerLog = stickyLoggerFunc
+    monadLoggerLog = stickyLoggerFunc
 
-instance HasSticky (LogLevel,Manager,Sticky) where
-    getSticky (_,_,s) = s
+instance HasSticky LoggingEnv where
+    getSticky = lenvSticky
 
-instance HasLogLevel (LogLevel,Manager,Sticky) where
-  getLogLevel (l,_,_) = l
+instance HasLogLevel LoggingEnv where
+    getLogLevel = lenvLogLevel
 
-instance HasHttpManager (LogLevel,Manager,Sticky) where
-  getHttpManager (_,m,_) = m
+instance HasHttpManager LoggingEnv where
+    getHttpManager = lenvManager
+
+instance HasTerminal LoggingEnv where
+    getTerminal = lenvTerminal
 
 -- | Run the logging monad.
 runStackLoggingT :: MonadIO m
@@ -133,7 +144,12 @@ runStackLoggingT manager logLevel terminal m =
         (\sticky ->
               runReaderT
                   (unStackLoggingT m)
-                  (logLevel, manager, sticky))
+                  LoggingEnv
+                  { lenvLogLevel = logLevel
+                  , lenvManager = manager
+                  , lenvSticky = sticky
+                  , lenvTerminal = terminal
+                  })
 
 -- | Convenience for getting a 'Manager'
 newTLSManager :: MonadIO m => m Manager

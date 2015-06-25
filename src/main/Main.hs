@@ -13,7 +13,7 @@ import           Control.Exception
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (ask,asks)
+import           Control.Monad.Reader (ask)
 import           Data.Char (toLower)
 import           Data.List
 import qualified Data.List as List
@@ -27,7 +27,6 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Data.Traversable
 import           Network.HTTP.Client
-import           Network.HTTP.Client.Conduit (getHttpManager)
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Simple
@@ -41,6 +40,7 @@ import           Stack.Build.Types
 import           Stack.Config
 import           Stack.Constants
 import qualified Stack.Docker as Docker
+import           Stack.Dot
 import           Stack.Exec
 import           Stack.Fetch
 import           Stack.Init
@@ -56,8 +56,7 @@ import qualified Stack.Upload as Upload
 import           System.Environment (getArgs, getProgName)
 import           System.Exit
 import           System.FilePath (searchPathSeparator)
-import           System.IO (stderr)
-import           System.Directory (getCurrentDirectory)
+import           System.IO (hIsTerminalDevice, stderr, stdout)
 import           System.Process.Read
 
 -- | Commandline dispatcher.
@@ -68,6 +67,7 @@ main =
        tryRunPlugin plugins
      progName <- getProgName
      args <- getArgs
+     isTerminal <- hIsTerminalDevice stdout
      execExtraHelp args
                    dockerHelpOptName
                    (Docker.dockerOptsParser True)
@@ -78,11 +78,12 @@ main =
          versionString'
          "stack - The Haskell Tool Stack"
          ""
-         (extraHelpOption progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*> globalOpts)
+         (extraHelpOption progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
+          globalOpts isTerminal)
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
-                        (buildOpts False)
+                        (buildOpts Build)
              addCommand "install"
                         "Build executables and install to a user path"
                         installCmd
@@ -93,15 +94,15 @@ main =
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
                         (buildCmd DoTests)
-                        (buildOpts False)
+                        (buildOpts Test)
              addCommand "bench"
                         "Build and benchmark the project(s) in this directory/configuration"
                         (buildCmd DoBenchmarks)
-                        (buildOpts False)
+                        (buildOpts Build)
              addCommand "haddock"
                         "Generate haddocks for the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
-                        (buildOpts True)
+                        (buildOpts Haddock)
              addCommand "new"
                         "Create a brand new project"
                         newCmd
@@ -143,39 +144,58 @@ main =
                         "Upload a package to Hackage"
                         uploadCmd
                         (many $ strArgument $ metavar "TARBALL/DIR")
+             addCommand "dot"
+                        "Visualize your project's dependency graph using Graphviz dot"
+                        dotCmd
+                        (pure ())
              addCommand "exec"
                         "Execute a command"
                         execCmd
-                        ((,)
+                        ((,,)
                             <$> strArgument (metavar "CMD")
-                            <*> many (strArgument (metavar "-- ARGS (e.g. stack exec -- ghc --version)")))
+                            <*> many (strArgument (metavar "-- ARGS (e.g. stack exec -- ghc --version)"))
+                            <*> (EnvSettings
+                                    <$> pure True
+                                    <*> boolFlags True
+                                            "ghc-package-path"
+                                            "setting the GHC_PACKAGE_PATH variable for the subprocess"
+                                            idm
+                                    <*> boolFlags True
+                                            "stack-exe"
+                                            "setting the STACK_EXE environment variable to the path for the stack executable"
+                                            idm))
              addCommand "ghc"
                         "Run ghc"
                         execCmd
-                        ((,)
+                        ((,,)
                             <$> pure "ghc"
-                            <*> many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)")))
+                            <*> many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)"))
+                            <*> pure defaultEnvSettings)
              addCommand "ghci"
                         "Run ghci in the context of project(s)"
                         replCmd
-                        ((,,) <$>
+                        ((,,,) <$>
                          fmap (map T.pack)
                               (many (strArgument
                                        (metavar "TARGET" <>
                                         help "If none specified, use all packages defined in current directory"))) <*>
-                         many (strOption (long "ghc-options" <>
-                                          metavar "OPTION" <>
-                                          help "Additional options passed to GHCi")) <*>
+                         fmap (fromMaybe [])
+                              (optional (argsOption (long "ghc-options" <>
+                                                     metavar "OPTION" <>
+                                                     help "Additional options passed to GHCi"))) <*>
                          fmap (fromMaybe "ghc")
                               (optional (strOption (long "with-ghc" <>
                                                     metavar "GHC" <>
-                                                    help "Use this command for the GHC to run"))))
+                                                    help "Use this command for the GHC to run"))) <*>
+                         flag False True (long "no-load" <>
+                                         help "Don't load modules on start-up"))
              addCommand "runghc"
                         "Run runghc"
                         execCmd
-                        ((,)
+                        ((,,)
                             <$> pure "runghc"
-                            <*> many (strArgument (metavar "-- ARGS (e.g. stack runghc -- X.hs)")))
+                            <*> many (strArgument (metavar "-- ARGS (e.g. stack runghc -- X.hs)"))
+                            <*> pure defaultEnvSettings)
              addCommand "clean"
                         "Clean the local packages"
                         cleanCmd
@@ -261,7 +281,9 @@ pathCmd keys go =
                      paths)
                 (\(_,key,path) ->
                       $logInfo
-                          (key <> ": " <>
+                          ((if length keys == 1
+                               then ""
+                               else key <> ": ") <>
                            path
                                (PathInfo
                                     bc
@@ -429,15 +451,17 @@ readPackageName = do
         Just x -> return x
 
 -- | Parser for package:[-]flag
-readFlag :: ReadM (Map PackageName (Map FlagName Bool))
+readFlag :: ReadM (Map (Maybe PackageName) (Map FlagName Bool))
 readFlag = do
     s <- readerAsk
     case break (== ':') s of
         (pn, ':':mflag) -> do
             pn' <-
                 case parsePackageNameFromString pn of
-                    Nothing -> readerError $ "Invalid package name: " ++ pn
-                    Just x -> return x
+                    Nothing
+                        | pn == "*" -> return Nothing
+                        | otherwise -> readerError $ "Invalid package name: " ++ pn
+                    Just x -> return $ Just x
             let (b, flagS) =
                     case mflag of
                         '-':x -> (False, x)
@@ -455,10 +479,11 @@ buildCmd finalAction opts go@GlobalOpts{..} = withBuildConfig go ThrowException 
     Stack.Build.build opts { boptsFinalAction = finalAction }
 
 -- | Install
-installCmd :: (Maybe String, BuildOpts) -> GlobalOpts -> IO ()
+installCmd :: (Maybe FilePath, BuildOpts) -> GlobalOpts -> IO ()
 installCmd (mPath, opts) go@GlobalOpts{..} = do
     specifiedDir <- case mPath of
                       (Just userPath) -> do
+                            -- Fixme canonicalize Path
                             tryParseAbs <- try (parseAbsDir userPath)
                             tryParseRel <- try (do cwd <- liftIO (parseAbsDir =<< getCurrentDirectory)
                                                    relPath <- parseRelDir userPath
@@ -495,30 +520,27 @@ updateCmd () go@GlobalOpts{..} = do
 
 -- | Upload to Hackage
 uploadCmd :: [String] -> GlobalOpts -> IO ()
-uploadCmd args0 go = withBuildConfig go ExecStrategy $ do
-    let args = if null args0 then ["."] else args0
-    config <- asks getConfig
-    manager <- asks getHttpManager
-    menv <- getMinimalEnvOverride
-    runghc <- join $ System.Process.Read.findExecutable menv "runghc"
+uploadCmd args0 go = do
+    (manager,lc) <- loadConfigWithOpts go
+    let config = lcConfig lc
+        args = if null args0 then ["."] else args0
     liftIO $ do
         uploader <- Upload.mkUploader
-              (toFilePath runghc)
               config
             $ Upload.setGetManager (return manager)
               Upload.defaultUploadSettings
         mapM_ (Upload.upload uploader) args
 
 -- | Execute a command.
-execCmd :: (String, [String]) -> GlobalOpts -> IO ()
-execCmd (cmd,args) go@GlobalOpts{..} =
+execCmd :: (String, [String],EnvSettings) -> GlobalOpts -> IO ()
+execCmd (cmd,args,envSettings) go@GlobalOpts{..} =
     withBuildConfig go ExecStrategy $
-    exec cmd args
+    exec envSettings cmd args
 
 -- | Run the REPL in the context of a project, with
-replCmd :: ([Text], [String], FilePath) -> GlobalOpts -> IO ()
-replCmd (targets,args,path) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $ do
-      repl targets args path
+replCmd :: ([Text], [String], FilePath, Bool) -> GlobalOpts -> IO ()
+replCmd (targets,args,path,noload) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $ do
+      repl targets args path noload
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
@@ -551,13 +573,26 @@ dockerExecCmd (cmd,args) go@GlobalOpts{..} = do
             Docker.rerunCmdWithRequiredContainer (lcProjectRoot lc)
                                                  (return (cmd,args,id))
 
+-- | Command sum type for conditional arguments.
+data Command
+    = Build
+    | Test
+    | Haddock
+    deriving (Eq)
+
 -- | Parser for build arguments.
-buildOpts :: Bool -> Parser BuildOpts
-buildOpts forHaddock =
+buildOpts :: Command -> Parser BuildOpts
+buildOpts cmd = fmap process $
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> haddock <*> haddockDeps <*> finalAction <*> dryRun <*> ghcOpts <*>
-            flags <*> installExes <*> preFetch <*> testArgs <*> onlySnapshot
-  where optimize =
+            flags <*> installExes <*> preFetch <*> testArgs <*> onlySnapshot <*> coverage
+  where process bopts =
+            if boptsCoverage bopts
+               then bopts { boptsExeProfile = True
+                          , boptsLibProfile = True
+                          , boptsGhcOptions = "-fhpc" : boptsGhcOptions bopts}
+               else bopts
+        optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
         target =
           fmap (map T.pack)
@@ -575,15 +610,17 @@ buildOpts forHaddock =
                     "library profiling for TARGETs and all its dependencies"
                     idm
         haddock =
-          boolFlags forHaddock
+          boolFlags (cmd == Haddock)
                     "haddock"
                     "building Haddocks"
                     idm
         haddockDeps =
-          maybeBoolFlags
-                    "haddock-deps"
-                    "building Haddocks for dependencies"
-                    idm
+          if cmd == Haddock
+             then maybeBoolFlags
+                            "haddock-deps"
+                            "building Haddocks for dependencies"
+                            idm
+             else pure Nothing
         finalAction = pure DoNothing
         installExes = pure (False, Nothing)
         dryRun = flag False True (long "dry-run" <>
@@ -611,14 +648,22 @@ buildOpts forHaddock =
              help "Fetch packages necessary for the build immediately, useful with --dry-run")
         testArgs =
              fmap (fromMaybe [])
-                  (optional
-                       (argsOption
-                            (long "test-arguments" <> metavar "TEST_ARGS" <>
-                             help "Arguments passed in to the test suite program")))
+                  (if cmd == Test
+                      then optional
+                               (argsOption
+                                    (long "test-arguments" <> metavar "TEST_ARGS" <>
+                                     help "Arguments passed in to the test suite program"))
+                      else pure Nothing)
 
         onlySnapshot = flag False True
             (long "only-snapshot" <>
              help "Only build packages for the snapshot database, not the local database")
+        coverage =
+            if cmd == Test
+               then flag False True
+                        (long "coverage" <>
+                         help "Generate a code coverage report")
+               else pure False
 
 -- | Parser for docker cleanup arguments.
 dockerCleanupOpts :: Parser Docker.CleanupOpts
@@ -666,13 +711,13 @@ dockerCleanupOpts =
         toDescr = map (\c -> if c == '-' then ' ' else c)
 
 -- | Parser for global command-line options.
-globalOpts :: Parser GlobalOpts
-globalOpts =
+globalOpts :: Bool -> Parser GlobalOpts
+globalOpts defaultTerminal =
     GlobalOpts <$> logLevelOpt <*>
     configOptsParser False <*>
     optional resolverParser <*>
     flag
-        True
+        defaultTerminal
         False
         (long "no-terminal" <>
          help
@@ -768,3 +813,7 @@ solverOptsParser = boolFlags False
     "modify-stack-yaml"
     "Automatically modify stack.yaml with the solver's recommendations"
     idm
+
+-- | Visualize dependencies
+dotCmd :: () -> GlobalOpts -> IO ()
+dotCmd () go = withBuildConfig go ThrowException dot

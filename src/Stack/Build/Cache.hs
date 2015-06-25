@@ -13,13 +13,14 @@ module Stack.Build.Cache
     , tryGetFlagCache
     , deleteCaches
     , markExeInstalled
+    , markExeNotInstalled
     , writeFlagCache
     , writeBuildCache
     , writeConfigCache
     , writeCabalMod
     ) where
 
-import           Control.Exception.Enclosed (handleIO, tryIO)
+import           Control.Exception.Enclosed (catchIO, handleIO, tryIO)
 import           Control.Monad.Catch        (MonadCatch, MonadThrow, catch,
                                              throwM)
 import           Control.Monad.IO.Class
@@ -42,7 +43,8 @@ import           Stack.Package
 import           Stack.Types
 import           System.Directory           (createDirectoryIfMissing,
                                              getDirectoryContents,
-                                             getModificationTime)
+                                             getModificationTime,
+                                             removeFile)
 import           System.IO.Error (isDoesNotExistError)
 
 -- | Directory containing files to mark an executable as installed
@@ -71,6 +73,15 @@ markExeInstalled loc ident = do
     -- installed, and invalidate this file in getInstalledExes if they no
     -- longer exist
     liftIO $ writeFile fp "Installed"
+
+-- | Mark the given executable as not installed
+markExeNotInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)
+                    => InstallLocation -> PackageIdentifier -> m ()
+markExeNotInstalled loc ident = do
+    dir <- exeInstalledDir loc
+    ident' <- parseRelFile $ packageIdentifierString ident
+    let fp = toFilePath $ dir </> ident'
+    liftIO $ catchIO (removeFile fp) (\_ -> return ())
 
 -- | Stored on disk to know whether the flags have changed or any
 -- files have changed.
@@ -202,7 +213,7 @@ getPackageFileModTimes :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m)
                        -> Path Abs File -- ^ cabal file
                        -> m (Map FilePath ModTime)
 getPackageFileModTimes pkg cabalfp = do
-    files <- getPackageFiles (packageFiles pkg) cabalfp
+    files <- getPackageFiles (packageFiles pkg) AllFiles cabalfp
     liftM (Map.fromList . catMaybes)
         $ mapM getModTimeMaybe
         $ Set.toList files

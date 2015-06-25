@@ -47,10 +47,9 @@ import           Data.List (intercalate)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (mapMaybe)
-import           Data.Monoid ((<>))
+import           Data.Monoid ((<>), Monoid (..))
 import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Time (Day)
 import qualified Data.Traversable as Tr
@@ -62,6 +61,8 @@ import           Distribution.PackageDescription (GenericPackageDescription,
                                                   executables, exeName, library, libBuildInfo, buildable)
 import qualified Distribution.Package as C
 import qualified Distribution.PackageDescription as C
+import qualified Distribution.Version as C
+import           Distribution.Text (display)
 import           Network.HTTP.Download
 import           Path
 import           Prelude -- Fix AMP warning
@@ -478,20 +479,25 @@ loadBuildPlan name = do
 -- only modify non-manual flags, and will prefer default values for flags.
 -- Returns @Nothing@ if no combination exists.
 checkBuildPlan :: (MonadLogger m, MonadThrow m, MonadIO m, MonadReader env m, HasConfig env, MonadCatch m)
-               => MiniBuildPlan
+               => Map PackageName Version -- ^ locally available packages
+               -> MiniBuildPlan
                -> GenericPackageDescription
-               -> m (Maybe (Map FlagName Bool))
-checkBuildPlan mbp gpd = do
+               -> m (Either DepErrors (Map PackageName (Map FlagName Bool)))
+checkBuildPlan locals mbp gpd = do
     platform <- asks (configPlatform . getConfig)
-    loop platform flagOptions
+    return $ loop platform flagOptions
   where
-    loop _ [] = return Nothing
-    loop platform (flags:rest) = do
-        passes <- checkDeps flags (packageDeps pkg) (mbpPackages mbp)
-        if passes
-            then return $ Just flags
-            else loop platform rest
+    packages = Map.union locals $ fmap mpiVersion $ mbpPackages mbp
+    loop _ [] = assert False $ Left Map.empty
+    loop platform (flags:rest)
+        | Map.null errs = Right $
+            if Map.null flags
+                then Map.empty
+                else Map.singleton (packageName pkg) flags
+        | null rest = Left errs
+        | otherwise = loop platform rest
       where
+        errs = checkDeps (packageName pkg) (packageDeps pkg) packages
         pkg = resolvePackage pkgConfig gpd
         pkgConfig = PackageConfig
             { packageConfigEnableTests = True
@@ -520,33 +526,37 @@ checkBuildPlan mbp gpd = do
 -- | Checks if the given package dependencies can be satisfied by the given set
 -- of packages. Will fail if a package is either missing or has a version
 -- outside of the version range.
-checkDeps :: MonadLogger m
-          => Map FlagName Bool -- ^ used only for debugging purposes
+checkDeps :: PackageName -- ^ package using dependencies, for constructing DepErrors
           -> Map PackageName VersionRange
-          -> Map PackageName MiniPackageInfo
-          -> m Bool
-checkDeps flags deps packages = do
-    let errs = mapMaybe go $ Map.toList deps
-    if null errs
-        then return True
-        else do
-            $logDebug $ "Checked against following flags: " <> T.pack (show flags)
-            mapM_ $logDebug errs
-            return False
+          -> Map PackageName Version
+          -> DepErrors
+checkDeps myName deps packages =
+    Map.unionsWith mappend $ map go $ Map.toList deps
   where
-    go :: (PackageName, VersionRange) -> Maybe Text
+    go :: (PackageName, VersionRange) -> DepErrors
     go (name, range) =
-        case fmap mpiVersion $ Map.lookup name packages of
-            Nothing -> Just $ "Package not present: " <> packageNameText name
+        case Map.lookup name packages of
+            Nothing -> Map.singleton name DepError
+                { deVersion = Nothing
+                , deNeededBy = Map.singleton myName range
+                }
             Just v
-                | withinRange v range -> Nothing
-                | otherwise -> Just $ T.concat
-                    [ packageNameText name
-                    , " version available: "
-                    , versionText v
-                    , " does not match "
-                    , versionRangeText range
-                    ]
+                | withinRange v range -> Map.empty
+                | otherwise -> Map.singleton name DepError
+                    { deVersion = Just v
+                    , deNeededBy = Map.singleton myName range
+                    }
+
+type DepErrors = Map PackageName DepError
+data DepError = DepError
+    { deVersion :: !(Maybe Version)
+    , deNeededBy :: !(Map PackageName VersionRange)
+    }
+instance Monoid DepError where
+    mempty = DepError Nothing Map.empty
+    mappend (DepError a x) (DepError b y) = DepError
+        (maybe a Just b)
+        (Map.unionWith C.intersectVersionRanges x y)
 
 -- | Find a snapshot and set of flags that is compatible with the given
 -- 'GenericPackageDescription'. Returns 'Nothing' if no such snapshot is found.
@@ -561,19 +571,42 @@ findBuildPlan gpds0 =
     loop (name:names') = do
         mbp <- loadMiniBuildPlan name
         $logInfo $ "Checking against build plan " <> renderSnapName name
-        let checkGPDs flags [] = return $ Just (name, flags)
-            checkGPDs flags (gpd:gpds) = do
-                let C.PackageIdentifier pname' _ = C.package $ C.packageDescription gpd
-                    pname = fromCabalPackageName pname'
-                mflags <- checkBuildPlan mbp gpd
-                case mflags of
-                    Nothing -> loop names'
-                    Just flags' -> checkGPDs
-                        (if Map.null flags'
-                            then flags
-                            else Map.insert pname flags' flags)
-                        gpds
-        checkGPDs Map.empty gpds0
+        res <- mapM (checkBuildPlan localNames mbp) gpds0
+        case partitionEithers res of
+            ([], flags) -> return $ Just (name, Map.unions flags)
+            (errs, _) -> do
+                $logInfo ""
+                $logInfo "* Build plan did not match your requirements:"
+                displayDepErrors $ Map.unionsWith mappend errs
+                $logInfo ""
+                loop names'
+
+    localNames = Map.fromList $ map (fromCabalIdent . C.package . C.packageDescription) gpds0
+
+    fromCabalIdent (C.PackageIdentifier name version) =
+        (fromCabalPackageName name, fromCabalVersion version)
+
+displayDepErrors :: MonadLogger m => DepErrors -> m ()
+displayDepErrors errs =
+    F.forM_ (Map.toList errs) $ \(depName, DepError mversion neededBy) -> do
+        $logInfo $ T.concat
+            [ "    "
+            , T.pack $ packageNameString depName
+            , case mversion of
+                Nothing -> " not found"
+                Just version -> T.concat
+                    [ " version "
+                    , T.pack $ versionString version
+                    , " found"
+                    ]
+            ]
+        F.forM_ (Map.toList neededBy) $ \(user, range) -> $logInfo $ T.concat
+            [ "    - "
+            , T.pack $ packageNameString user
+            , " requires "
+            , T.pack $ display range
+            ]
+        $logInfo ""
 
 shadowMiniBuildPlan :: MiniBuildPlan
                     -> Set PackageName
@@ -594,7 +627,15 @@ shadowMiniBuildPlan (MiniBuildPlan ghc pkgs0) shadowed =
                 Just x -> return x
                 Nothing ->
                     case Map.lookup name pkgs1 of
-                        Nothing -> assert (name `Set.member` shadowed) (return False)
+                        Nothing
+                            | name `Set.member` shadowed -> return False
+
+                            -- In this case, we have to assume that we're
+                            -- constructing a build plan on a different OS or
+                            -- architecture, and therefore different packages
+                            -- are being chosen. The common example of this is
+                            -- the Win32 package.
+                            | otherwise -> return True
                         Just mpi -> do
                             let visited' = Set.insert name visited
                             ress <- mapM (check visited') (Set.toList $ mpiPackageDeps mpi)

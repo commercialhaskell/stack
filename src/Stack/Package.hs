@@ -28,7 +28,8 @@ module Stack.Package
   ,resolvePackageDescription
   ,packageToolDependencies
   ,packageDependencies
-  ,packageIdentifier)
+  ,packageIdentifier
+  ,CabalFileType(..))
   where
 
 import           Control.Exception hiding (try,catch)
@@ -140,7 +141,8 @@ instance Show GetPackageOpts where
 -- Argument is the location of the .cabal file
 newtype GetPackageFiles = GetPackageFiles
     { getPackageFiles :: forall m. (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m)
-                      => Path Abs File
+                      => CabalFileType
+                      -> Path Abs File
                       -> m (Set (Path Abs File))
     }
 instance Show GetPackageFiles where
@@ -162,6 +164,11 @@ data PackageConfig =
                 ,packageConfigPlatform :: !Platform       -- ^ host platform
                 }
  deriving (Show,Typeable)
+
+-- | Files to get for a cabal package.
+data CabalFileType
+    = AllFiles
+    | Modules
 
 -- | Compares the package name.
 instance Ord Package where
@@ -233,9 +240,12 @@ resolvePackage packageConfig gpkg = Package
     { packageName = name
     , packageVersion = fromCabalVersion (pkgVersion pkgId)
     , packageDeps = deps
-    , packageFiles = GetPackageFiles $ \cabalfp -> do
-        files <- runReaderT (packageDescFiles pkg) cabalfp
-        return $ S.fromList $ cabalfp : files
+    , packageFiles = GetPackageFiles $ \ty cabalfp -> do
+        files <- runReaderT (packageDescFiles ty pkg) cabalfp
+        return $ S.fromList $
+          case ty of
+             Modules -> files
+             AllFiles -> cabalfp : files
     , packageTools = packageDescTools pkg
     , packageFlags = packageConfigFlags packageConfig
     , packageAllDeps = S.fromList (M.keys deps)
@@ -258,62 +268,60 @@ resolvePackage packageConfig gpkg = Package
 -- | Generate GHC options for the package.
 generatePkgDescOpts :: (HasEnvConfig env, HasPlatform env, MonadThrow m, MonadReader env m, MonadIO m)
                     => Path Abs File -> PackageDescription -> m [String]
-generatePkgDescOpts cabalfp pkg =
-    do distDir <- distDirFromDir cabalDir
-       let cabalmacros = autogenDir distDir </> $(mkRelFile "cabal_macros.h")
-       exists <- fileExists cabalmacros
-       let mcabalmacros =
-               if exists
-                  then Just cabalmacros
-                  else Nothing
-       return (nub
-                   (concatMap
-                        (concatMap (generateBuildInfoOpts mcabalmacros cabalDir distDir))
-                        [ maybe
-                              []
-                              (return . libBuildInfo)
-                              (library pkg)
-                        , map buildInfo (executables pkg)
-                        , map benchmarkBuildInfo (benchmarks pkg)
-                        , map testBuildInfo (testSuites pkg)]))
-  where cabalDir =
-            parent cabalfp
+generatePkgDescOpts cabalfp pkg = do
+    distDir <- distDirFromDir cabalDir
+    let cabalmacros = autogenDir distDir </> $(mkRelFile "cabal_macros.h")
+    exists <- fileExists cabalmacros
+    let mcabalmacros =
+            if exists
+                then Just cabalmacros
+                else Nothing
+    return
+        (nub
+             (["-hide-all-packages"] ++
+              concatMap
+                  (concatMap
+                       (generateBuildInfoOpts mcabalmacros cabalDir distDir))
+                  [ maybe [] (return . libBuildInfo) (library pkg)
+                  , map buildInfo (executables pkg)
+                  , map benchmarkBuildInfo (benchmarks pkg)
+                  , map testBuildInfo (testSuites pkg)]))
+  where
+    cabalDir = parent cabalfp
 
 -- | Generate GHC options for the target.
 generateBuildInfoOpts :: Maybe (Path Abs File) -> Path Abs Dir -> Path Abs Dir -> BuildInfo -> [String]
 generateBuildInfoOpts mcabalmacros cabalDir distDir b =
-    nub (concat [ghcOpts b, extOpts b, srcOpts, macros])
+    nub (concat [ghcOpts b, extOpts b, srcOpts, includeOpts b, macros, deps])
   where
+    deps =
+        concat
+            [ ["-package=" <> display name]
+            | Dependency name _ <- targetBuildDepends b]
     macros =
         case mcabalmacros of
-            Nothing ->
-                []
+            Nothing -> []
             Just cabalmacros ->
                 ["-optP-include", "-optP" <> toFilePath cabalmacros]
-    ghcOpts =
-        concatMap snd .
-        filter (isGhc . fst) .
-        options
+    ghcOpts = concatMap snd . filter (isGhc . fst) . options
       where
-        isGhc GHC =
-            True
-        isGhc _ =
-            False
-    extOpts =
-        map (("-X" ++) . display) .
-        allExtensions
+        isGhc GHC = True
+        isGhc _ = False
+    extOpts = map (("-X" ++) . display) . allExtensions
     srcOpts =
         map
             (("-i" <>) . toFilePath)
             (cabalDir :
              map (cabalDir </>) (mapMaybe parseRelDir (hsSourceDirs b)) <>
              [autogenDir distDir])
+    includeOpts
+       = map (("-I" <>) . toFilePath . (cabalDir </>))
+       . mapMaybe parseRelDir
+       . includeDirs
 
 -- | Make the autogen dir.
 autogenDir :: Path Abs Dir -> Path Abs Dir
-autogenDir distDir =
-        distDir </>
-        $(mkRelDir "build/autogen")
+autogenDir distDir = distDir </> $(mkRelDir "build/autogen")
 
 -- | Get all dependencies of the package (buildable targets only).
 packageDependencies :: PackageDescription -> Map PackageName VersionRange
@@ -355,33 +363,35 @@ allBuildInfo' pkg_descr = [ bi | Just lib <- [library pkg_descr]
                               , benchmarkEnabled tst ]
 
 -- | Get all files referenced by the package.
-packageDescFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m,MonadCatch m)
-                 => PackageDescription -> m [Path Abs File]
-packageDescFiles pkg =
-  do libfiles <-
-       liftM concat
-             (mapM libraryFiles
-                   (maybe [] return (library pkg)))
-     exefiles <-
-       liftM concat
-             (mapM executableFiles
-                   (executables pkg))
-     benchfiles <-
-         liftM concat
-               (mapM benchmarkFiles (benchmarks pkg))
-     testfiles <-
-         liftM concat
-               (mapM testFiles (testSuites pkg))
-     dfiles <-
-       resolveGlobFiles (map (dataDir pkg FilePath.</>) (dataFiles pkg))
-     srcfiles <-
-       resolveGlobFiles (extraSrcFiles pkg)
-     -- extraTmpFiles purposely not included here, as those are files generated
-     -- by the build script. Another possible implementation: include them, but
-     -- don't error out if not present
-     docfiles <-
-       resolveGlobFiles (extraDocFiles pkg)
-     return (concat [libfiles,exefiles,dfiles,srcfiles,docfiles,benchfiles,testfiles])
+packageDescFiles
+    :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File) m, MonadCatch m)
+    => CabalFileType -> PackageDescription -> m [Path Abs File]
+packageDescFiles ty pkg = do
+    libfiles <-
+        liftM concat (mapM (libraryFiles ty) (maybe [] return (library pkg)))
+    exefiles <- liftM concat (mapM (executableFiles ty) (executables pkg))
+    benchfiles <- liftM concat (mapM (benchmarkFiles ty) (benchmarks pkg))
+    testfiles <- liftM concat (mapM (testFiles ty) (testSuites pkg))
+    dfiles <- resolveGlobFiles (map (dataDir pkg FilePath.</>) (dataFiles pkg))
+    srcfiles <- resolveGlobFiles (extraSrcFiles pkg)
+    -- extraTmpFiles purposely not included here, as those are files generated
+    -- by the build script. Another possible implementation: include them, but
+    -- don't error out if not present
+    docfiles <- resolveGlobFiles (extraDocFiles pkg)
+    case ty of
+        Modules ->
+            return (nub (concat [libfiles, exefiles, testfiles, benchfiles]))
+        AllFiles ->
+            return
+                (nub
+                     (concat
+                          [ libfiles
+                          , exefiles
+                          , dfiles
+                          , srcfiles
+                          , docfiles
+                          , benchfiles
+                          , testfiles]))
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
 resolveGlobFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m,MonadCatch m)
@@ -447,8 +457,8 @@ matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
 
 -- | Get all files referenced by the benchmark.
 benchmarkFiles :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File) m)
-               => Benchmark -> m [Path Abs File]
-benchmarkFiles bench = do
+               => CabalFileType -> Benchmark -> m [Path Abs File]
+benchmarkFiles ty bench = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks parent
     exposed <-
@@ -460,15 +470,17 @@ benchmarkFiles bench = do
                  BenchmarkUnsupported _ ->
                      [])
             haskellFileExts
-    bfiles <- buildFiles dir build
-    return (mconcat [bfiles, exposed])
+    bfiles <- buildFiles ty dir build
+    case ty of
+      AllFiles -> return (concat [bfiles,exposed])
+      Modules -> return (concat [bfiles])
   where
     build = benchmarkBuildInfo bench
 
 -- | Get all files referenced by the test.
 testFiles :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File) m)
-          => TestSuite -> m [Path Abs File]
-testFiles test = do
+          => CabalFileType -> TestSuite -> m [Path Abs File]
+testFiles ty test = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks parent
     exposed <-
@@ -482,15 +494,17 @@ testFiles test = do
                  TestSuiteUnsupported _ ->
                      [])
             haskellFileExts
-    bfiles <- buildFiles dir build
-    return (mconcat [bfiles, exposed])
+    bfiles <- buildFiles ty dir build
+    case ty of
+      AllFiles -> return (concat [bfiles,exposed])
+      Modules -> return (concat [bfiles])
   where
     build = testBuildInfo test
 
 -- | Get all files referenced by the executable.
 executableFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m)
-                => Executable -> m [Path Abs File]
-executableFiles exe =
+                => CabalFileType -> Executable -> m [Path Abs File]
+executableFiles ty exe =
   do dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
      dir <- asks parent
      exposed <-
@@ -498,35 +512,42 @@ executableFiles exe =
          (dirs ++ [dir])
          [Right (modulePath exe)]
          haskellFileExts
-     bfiles <- buildFiles dir build
-     return (concat [bfiles,exposed])
+     bfiles <- buildFiles ty dir build
+     case ty of
+       AllFiles -> return (concat [bfiles,exposed])
+       Modules -> return (concat [bfiles])
   where build = buildInfo exe
 
 -- | Get all files referenced by the library.
 libraryFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m)
-             => Library -> m [Path Abs File]
-libraryFiles lib =
+             => CabalFileType -> Library -> m [Path Abs File]
+libraryFiles ty lib =
   do dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
      dir <- asks parent
      exposed <- resolveFiles
                   (dirs ++ [dir])
                   (map Left (exposedModules lib))
                   haskellFileExts
-     bfiles <- buildFiles dir build
-     return (concat [bfiles,exposed])
+     bfiles <- buildFiles ty dir build
+     case ty of
+       AllFiles -> return (concat [bfiles,exposed])
+       Modules -> return (concat [bfiles,exposed])
   where build = libBuildInfo lib
 
 -- | Get all files in a build.
 buildFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File) m)
-           => Path Abs Dir -> BuildInfo -> m [Path Abs File]
-buildFiles dir build = do
+           => CabalFileType -> Path Abs Dir -> BuildInfo -> m [Path Abs File]
+buildFiles ty dir build = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
-    other <- resolveFiles
-                (dirs ++ [dir])
-                (map Left (otherModules build))
-                haskellFileExts
+    other <-
+        resolveFiles
+            (dirs ++ [dir])
+            (map Left (otherModules build))
+            haskellFileExts
     cSources' <- mapMaybeM resolveFileOrWarn (cSources build)
-    return (other ++ cSources')
+    case ty of
+        Modules -> return other
+        AllFiles -> return (other ++ cSources')
 
 -- | Get all dependencies of a package, including library,
 -- executables, tests, benchmarks.
