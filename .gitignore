@@ -4,7 +4,7 @@
 *.tag
 *~
 .hsenv
-/.stack-work/
+.stack-work/
 /.cabal-sandbox/
 /Dockerfile
 /target/
@@ -14,3 +14,4 @@ cabal.sandbox.config
 dist/
 tags
 /.docker-sandbox/
+/_release/
