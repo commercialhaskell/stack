@@ -619,6 +619,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
     (cache, _neededConfig) <- ensureConfig pkgDir ee task (announce "configure") cabal cabalfp []
 
     fileModTimes <- getPackageFileModTimes package cabalfp
+    markExeNotInstalled (taskLocation task) taskProvides
     writeBuildCache pkgDir fileModTimes
 
     announce "build"
