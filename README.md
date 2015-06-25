@@ -44,7 +44,7 @@ You may be prompted to run some of the following along the way:
   information on installation paths, please use the `stack path` command.)
 
 If you just want to install a package using stack, then all you have
-to is `stack install <package-name>`.
+to do is `stack install <package-name>`.
 
 Run `stack` for a complete list of commands.
 
