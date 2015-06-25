@@ -166,9 +166,9 @@ setupEnv = do
     localdbExists <- liftIO $ doesDirectoryExist $ toFilePath localdb
     globalDB <- mkEnvOverride platform env1 >>= getGlobalDB
     let mkGPP locals = T.pack $ intercalate [searchPathSeparator] $ concat
-            [ [toFilePath localdb | locals && localdbExists]
-            , [toFilePath deps | depsExists]
-            , [toFilePath globalDB]
+            [ [toFilePathNoTrailingSlash localdb | locals && localdbExists]
+            , [toFilePathNoTrailingSlash deps | depsExists]
+            , [toFilePathNoTrailingSlash globalDB]
             ]
 
     executablePath <- liftIO getExecutablePath
@@ -190,16 +190,16 @@ setupEnv = do
                                 else id)
 
                         -- For reasoning and duplication, see: https://github.com/fpco/stack/issues/70
-                        $ Map.insert "HASKELL_PACKAGE_SANDBOX" (T.pack $ toFilePath deps)
+                        $ Map.insert "HASKELL_PACKAGE_SANDBOX" (T.pack $ toFilePathNoTrailingSlash deps)
                         $ Map.insert "HASKELL_PACKAGE_SANDBOXES"
                             (T.pack $ if esIncludeLocals es
                                 then intercalate [searchPathSeparator]
-                                        [ toFilePath localdb
-                                        , toFilePath deps
+                                        [ toFilePathNoTrailingSlash localdb
+                                        , toFilePathNoTrailingSlash deps
                                         , ""
                                         ]
                                 else intercalate [searchPathSeparator]
-                                        [ toFilePath deps
+                                        [ toFilePathNoTrailingSlash deps
                                         , ""
                                         ])
                         $ env1
@@ -280,7 +280,7 @@ ensureGHC sopts = do
             installed <- runReaderT listInstalled config
             idents <- mapM (ensureTool sopts installed getSetupInfo' msystem) tools
             paths <- runReaderT (mapM binDirs $ catMaybes idents) config
-            return $ Just $ map toFilePath $ concat paths
+            return $ Just $ map toFilePathNoTrailingSlash $ concat paths
         else return Nothing
 
     when (soptsSanityCheck sopts) $ do
@@ -727,3 +727,6 @@ sanityCheck menv = withSystemTempDirectory "stack-sanity-check" $ \dir -> do
     case eres of
         Left e -> throwM $ GHCSanityCheckCompileFailed e ghc
         Right _ -> return () -- TODO check that the output of running the command is correct
+
+toFilePathNoTrailingSlash :: Path loc Dir -> FilePath
+toFilePathNoTrailingSlash = FP.dropTrailingPathSeparator . toFilePath
