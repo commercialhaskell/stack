@@ -47,6 +47,7 @@ library
                      Stack.Constants
                      Stack.Docker
                      Stack.Docker.GlobalDB
+                     Stack.Dot
                      Stack.Fetch
                      Stack.Exec
                      Stack.GhcPkg

@@ -10,6 +10,7 @@ module Stack.Build.Source
     , SourceMap
     , PackageSource (..)
     , localFlags
+    , loadLocals
     ) where
 
 import Network.HTTP.Client.Conduit (HasHttpManager)

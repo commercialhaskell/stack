@@ -40,6 +40,7 @@ import           Stack.Build.Types
 import           Stack.Config
 import           Stack.Constants
 import qualified Stack.Docker as Docker
+import           Stack.Dot
 import           Stack.Exec
 import           Stack.Fetch
 import           Stack.Init
@@ -140,6 +141,10 @@ main =
                         "Upload a package to Hackage"
                         uploadCmd
                         (many $ strArgument $ metavar "TARBALL/DIR")
+             addCommand "dot"
+                        "Visualize your project's dependency graph using Graphviz dot"
+                        dotCmd
+                        (pure ())
              addCommand "exec"
                         "Execute a command"
                         execCmd
@@ -789,3 +794,7 @@ solverOptsParser = boolFlags False
     "modify-stack-yaml"
     "Automatically modify stack.yaml with the solver's recommendations"
     idm
+
+-- | Visualize dependencies
+dotCmd :: () -> GlobalOpts -> IO ()
+dotCmd () go = withBuildConfig go ThrowException dot
