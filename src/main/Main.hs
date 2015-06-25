@@ -53,7 +53,7 @@ import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Types.StackT
 import qualified Stack.Upload as Upload
-import           System.Environment (getArgs, getProgName)
+import           System.Environment (getArgs, getProgName, setEnv)
 import           System.Exit
 import           System.FilePath (searchPathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdout)
@@ -221,6 +221,9 @@ main =
              )
              -- commandsFromPlugins plugins pluginShouldHaveRun) https://github.com/commercialhaskell/stack/issues/322
      when (globalLogLevel level == LevelDebug) $ putStrLn versionString'
+     case globalStackYaml level of
+       Just stackYaml -> setEnv "STACK_YAML" stackYaml
+       Nothing -> return ()
      run level `catch` \e -> do
         -- This special handler stops "stack: " from being printed before the
         -- exception
@@ -697,12 +700,19 @@ globalOpts defaultTerminal =
     GlobalOpts <$> logLevelOpt <*>
     configOptsParser False <*>
     optional resolverParser <*>
+    optional stackYamlOpt <*>
     flag
         defaultTerminal
         False
         (long "no-terminal" <>
          help
              "Override terminal detection in the case of running in a false terminal")
+
+stackYamlOpt :: Parser FilePath
+stackYamlOpt = strOption mods where
+  mods = long "stack-yaml"
+      <> metavar "FILE"
+      <> help "The config file to use instead of stack.yaml"
 
 -- | Parse for a logging level.
 logLevelOpt :: Parser LogLevel
@@ -747,6 +757,7 @@ data GlobalOpts = GlobalOpts
     { globalLogLevel     :: LogLevel -- ^ Log level
     , globalConfigMonoid :: ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalResolver     :: Maybe Resolver -- ^ Resolver override
+    , globalStackYaml    :: Maybe String -- ^ Path to the stack.yaml override file
     , globalTerminal     :: Bool -- ^ We're in a terminal?
     } deriving (Show)
 
