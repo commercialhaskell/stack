@@ -57,6 +57,7 @@ import           System.Environment (getArgs, getProgName)
 import           System.Exit
 import           System.FilePath (searchPathSeparator)
 import           System.IO (stderr)
+import           System.Directory (getCurrentDirectory)
 import           System.Process.Read
 
 -- | Commandline dispatcher.
@@ -458,12 +459,18 @@ installCmd :: (Maybe String, BuildOpts) -> GlobalOpts -> IO ()
 installCmd (mPath, opts) go@GlobalOpts{..} = do
     specifiedDir <- case mPath of
                       (Just userPath) -> do
-                            tryParse <- try $ return ((toFilePath =<< (parseAbsDir userPath)) <|> 
-                                            (toFilePath =<< (parseRelDir userPath)))
-                            case tryParse of
-                              Left (e :: SomeException) ->
-                                 error $ "Could not parse user specified directory" ++ userPath 
-                              Right path -> return (Just path)
+                            tryParseAbs <- try (parseAbsDir userPath)
+                            tryParseRel <- try (do cwd <- liftIO (parseAbsDir =<< getCurrentDirectory)
+                                                   relPath <- parseRelDir userPath
+                                                   return $ cwd </> relPath)
+                                              
+                            case (tryParseAbs) of
+                              Left (_ :: SomeException) ->
+                                case (tryParseRel) of
+                                  Left (_ :: SomeException) ->
+                                    error $ "Could not parse user specified directory \"" ++ userPath ++ "\"" 
+                                  Right relPath -> return (Just relPath)
+                              Right absPath -> return (Just absPath)
                       Nothing -> return Nothing
     withBuildConfig go ExecStrategy 
                        (Stack.Build.build opts { boptsInstallExes = (True, specifiedDir) }) 
