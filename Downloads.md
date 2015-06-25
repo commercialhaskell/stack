@@ -83,4 +83,10 @@ If you're curious about the choice of these paths, see [issue #153](https://gith
 
 ## Upgrade
 
-Once you have stack (version 0.0.2 or later), you can upgrade by running `stack update && stack install stack:latest`.
+We're still [working out the best recommendation](https://github.com/commercialhaskell/stack/issues/237) for upgrades. Options for now are:
+
+* Clone the Git repository and run `stack install` inside of it
+* Anywhere after the 0.1.0.0 release: run `stack update && stack unpack stack`, change into the new directory, and run `stack install`. Note that you may need to run `stack setup`
+* Use your package manager when supported
+* Manually download new binaries from this page
+* In some cases, you'll be able to run `stack update && stack install stack:latest`, but this is not guaranteed to work (yet).
