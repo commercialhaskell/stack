@@ -158,6 +158,8 @@ data EnvSettings = EnvSettings
     -- ^ include local project bin directory, GHC_PACKAGE_PATH, etc
     , esIncludeGhcPackagePath :: !Bool
     -- ^ include the GHC_PACKAGE_PATH variable
+    , esStackExe :: !Bool
+    -- ^ set the STACK_EXE variable to the current executable name
     }
     deriving (Show, Eq, Ord)
 
@@ -689,6 +691,7 @@ getMinimalEnvOverride = do
     liftIO $ configEnvOverride config EnvSettings
                     { esIncludeLocals = False
                     , esIncludeGhcPackagePath = False
+                    , esStackExe = False
                     }
 
 data ProjectAndConfigMonoid

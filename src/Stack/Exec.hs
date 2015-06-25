@@ -23,6 +23,7 @@ defaultEnvSettings :: EnvSettings
 defaultEnvSettings = EnvSettings
     { esIncludeLocals = True
     , esIncludeGhcPackagePath = True
+    , esStackExe = True
     }
 
 -- | Execute a process within the Stack configured environment.

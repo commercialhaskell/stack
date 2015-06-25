@@ -521,6 +521,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
         menv <- liftIO $ configEnvOverride config EnvSettings
             { esIncludeLocals = taskLocation task == Local
             , esIncludeGhcPackagePath = False
+            , esStackExe = False
             }
         exeName <- liftIO $ join $ findExecutable menv "runhaskell"
         distRelativeDir' <- distRelativeDir
@@ -716,6 +717,7 @@ singleTest ac ee task =
             menv <- liftIO $ configEnvOverride config EnvSettings
                 { esIncludeLocals = taskLocation task == Local
                 , esIncludeGhcPackagePath = True
+                , esStackExe = True
                 }
             if exists
                 then do

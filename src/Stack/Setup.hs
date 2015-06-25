@@ -56,6 +56,7 @@ import           Stack.Solver (getGhcVersion)
 import           Stack.Types
 import           Stack.Types.StackT
 import           System.Directory (doesDirectoryExist, createDirectoryIfMissing, removeFile)
+import           System.Environment (getExecutablePath)
 import           System.Exit (ExitCode (ExitSuccess))
 import           System.FilePath (searchPathSeparator)
 import qualified System.FilePath as FP
@@ -170,6 +171,8 @@ setupEnv = do
             , [toFilePath globalDB]
             ]
 
+    executablePath <- liftIO getExecutablePath
+
     envRef <- liftIO $ newIORef Map.empty
     let getEnvOverride' es = do
             m <- readIORef envRef
@@ -180,6 +183,10 @@ setupEnv = do
                         $ Map.insert "PATH" (if esIncludeLocals es then localsPath else depsPath)
                         $ (if esIncludeGhcPackagePath es
                                 then Map.insert "GHC_PACKAGE_PATH" (mkGPP (esIncludeLocals es))
+                                else id)
+
+                        $ (if esStackExe es
+                                then Map.insert "STACK_EXE" (T.pack executablePath)
                                 else id)
 
                         -- For reasoning and duplication, see: https://github.com/fpco/stack/issues/70

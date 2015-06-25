@@ -151,6 +151,10 @@ main =
                                     <*> boolFlags True
                                             "ghc-package-path"
                                             "setting the GHC_PACKAGE_PATH variable for the subprocess"
+                                            idm
+                                    <*> boolFlags True
+                                            "stack-exe"
+                                            "setting the STACK_EXE environment variable to the path for the stack executable"
                                             idm))
              addCommand "ghc"
                         "Run ghc"

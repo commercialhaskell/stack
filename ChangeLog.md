@@ -11,6 +11,7 @@
 * `stack exec` accepts the `--no-ghc-package-path` parameter
 * Don't require build plan to upload [#400](https://github.com/commercialhaskell/stack/issues/400)
 * Specifying test components only builds/runs those tests [#398](https://github.com/commercialhaskell/stack/issues/398)
+* `STACK_EXE` environment variable
 
 Bug fixes:
 
