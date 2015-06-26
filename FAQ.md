@@ -77,10 +77,7 @@ compatible version with the snapshot you're using, it will simply use it.
 Otherwise, it will prompt you to run `stack setup`.
 
 Note that GHC installation doesn't work for all OSes, so in some cases the
-first option will need to install GHC yourself. Also, the `stack setup` command
-gives you more direct control of installing GHC. When the necessary GHC is
-already installed, `stack setup` is a no-op, so it's safe to run it from an
-automated script, for example.
+first option will need to install GHC yourself.
 
 __How does stack determine what GHC to use?__
 
