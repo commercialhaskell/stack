@@ -60,7 +60,7 @@ spec = beforeAll setup $ afterAll teardown $ do
 
 
   describe "loadConfig" $ do
-    let loadConfig' m = runStackLoggingT m logLevel False (loadConfig mempty)
+    let loadConfig' m = runStackLoggingT m logLevel False (loadConfig mempty Nothing)
     let loadBuildConfigRest m = runStackLoggingT m logLevel False
     -- TODO(danburton): make sure parent dirs also don't have config file
     it "works even if no config file exists" $ \T{..} -> example $ do

@@ -39,7 +39,7 @@ main = hspec spec
 spec :: Spec
 spec = beforeAll setup $ afterAll teardown $ do
     let logLevel = LevelDebug
-    let loadConfig' m = runStackLoggingT m logLevel False (loadConfig mempty)
+    let loadConfig' m = runStackLoggingT m logLevel False (loadConfig mempty Nothing)
     let loadBuildConfigRest m = runStackLoggingT m logLevel False
     let inTempDir action = do
             currentDirectory <- getCurrentDirectory

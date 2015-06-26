@@ -52,7 +52,9 @@ import           Stack.Solver (solveExtraDeps)
 import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Types.StackT
+import           Stack.Upgrade
 import qualified Stack.Upload as Upload
+import           System.Directory (canonicalizePath)
 import           System.Environment (getArgs, getProgName)
 import           System.Exit
 import           System.FilePath (searchPathSeparator)
@@ -137,6 +139,13 @@ main =
                         "Update the package index"
                         updateCmd
                         (pure ())
+             addCommand "upgrade"
+                        "Upgrade to the latest stack (experimental)"
+                        upgradeCmd
+                        (switch
+                            ( long "git"
+                           <> help "Clone from Git instead of downloading from Hackage (more dangerous)"
+                            ))
              addCommand "upload"
                         "Upload a package to Hackage"
                         uploadCmd
@@ -499,6 +508,14 @@ updateCmd () go@GlobalOpts{..} = do
             runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
                 getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
 
+upgradeCmd :: Bool -> GlobalOpts -> IO ()
+upgradeCmd fromGit go@GlobalOpts{..} = do
+    (manager,lc) <- loadConfigWithOpts go
+    runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
+        Docker.rerunWithOptionalContainer (lcProjectRoot lc) $
+            runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
+                upgrade fromGit globalResolver
+
 -- | Upload to Hackage
 uploadCmd :: [String] -> GlobalOpts -> IO ()
 uploadCmd args0 go = do
@@ -702,7 +719,11 @@ globalOpts defaultTerminal =
         False
         (long "no-terminal" <>
          help
-             "Override terminal detection in the case of running in a false terminal")
+             "Override terminal detection in the case of running in a false terminal") <*>
+    (optional (strOption
+        (long "stack-yaml" <>
+         metavar "STACK-YAML" <>
+         help "Override project stack.yaml file (overrides any STACK_YAML environment variable)")))
 
 -- | Parse for a logging level.
 logLevelOpt :: Parser LogLevel
@@ -748,6 +769,7 @@ data GlobalOpts = GlobalOpts
     , globalConfigMonoid :: ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalResolver     :: Maybe Resolver -- ^ Resolver override
     , globalTerminal     :: Bool -- ^ We're in a terminal?
+    , globalStackYaml    :: Maybe FilePath -- ^ Override project stack.yaml
     } deriving (Show)
 
 -- | Load the configuration with a manager. Convenience function used
@@ -755,11 +777,17 @@ data GlobalOpts = GlobalOpts
 loadConfigWithOpts :: GlobalOpts -> IO (Manager,LoadConfig (StackLoggingT IO))
 loadConfigWithOpts GlobalOpts{..} = do
     manager <- newTLSManager
+    mstackYaml <-
+        case globalStackYaml of
+            Nothing -> return Nothing
+            Just fp -> do
+                path <- canonicalizePath fp >>= parseAbsFile
+                return $ Just path
     lc <- runStackLoggingT
               manager
               globalLogLevel
               globalTerminal
-              (loadConfig globalConfigMonoid)
+              (loadConfig globalConfigMonoid mstackYaml)
     return (manager,lc)
 
 -- | Project initialization

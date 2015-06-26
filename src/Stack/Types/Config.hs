@@ -95,6 +95,8 @@ data Config =
          -- ^ --extra-include-dirs arguments
          ,configExtraLibDirs        :: !(Set Text)
          -- ^ --extra-lib-dirs arguments
+         ,configConfigMonoid        :: !ConfigMonoid
+         -- ^ @ConfigMonoid@ used to generate this
          }
 
 -- | Information on a single package index
