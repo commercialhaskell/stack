@@ -167,6 +167,7 @@ executable stack
                      Plugins.Commands
 
   build-depends:  base >=4.7 && < 5
+                , blaze-builder
                 , bytestring >= 0.10.4.0
                 , containers
                 , exceptions

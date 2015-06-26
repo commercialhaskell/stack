@@ -9,11 +9,14 @@
 
 module Main where
 
+import           Blaze.ByteString.Builder (toLazyByteString, copyByteString)
+import           Blaze.ByteString.Builder.Char.Utf8 (fromShow)
 import           Control.Exception
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask)
+import qualified Data.ByteString.Lazy as L
 import           Data.Char (toLower)
 import           Data.List
 import qualified Data.List as List
@@ -236,7 +239,7 @@ main =
         case fromException e of
             Just ec -> exitWith ec
             Nothing -> do
-                print e
+                L.hPut stderr $ toLazyByteString $ fromShow e <> copyByteString "\n"
                 exitFailure
   where
     dockerHelpOptName = Docker.dockerCmdName ++ "-help"
