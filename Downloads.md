@@ -25,7 +25,7 @@ We generally test on the current version of OS X, but stack is known to work on 
 * Ubuntu 15.04 (amd64)
 
 ```sh
-wget -q -O- http://download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
+wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
 echo 'deb http://download.fpcomplete.com/ubuntu/vivid stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 sudo apt-get update
 sudo apt-get install stack -y
@@ -34,7 +34,7 @@ sudo apt-get install stack -y
 * Ubuntu 14.10 (amd64)
 
 ```sh
-wget -q -O- http://download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
+wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
 echo 'deb http://download.fpcomplete.com/ubuntu/utopic stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 sudo apt-get update
 sudo apt-get install stack -y
@@ -43,7 +43,7 @@ sudo apt-get install stack -y
 * Ubuntu 14.04 (amd64)
 
 ```sh
-wget -q -O- http://download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
+wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
 echo 'deb http://download.fpcomplete.com/ubuntu/trusty stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 sudo apt-get update
 sudo apt-get install stack -y
@@ -52,7 +52,7 @@ sudo apt-get install stack -y
 * Ubuntu 12.04 (amd64)
 
 ```sh
-wget -q -O- http://download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
+wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
 echo 'deb http://download.fpcomplete.com/ubuntu/precise stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 sudo apt-get update
 sudo apt-get install stack -y
