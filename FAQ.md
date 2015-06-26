@@ -83,6 +83,11 @@ gives you more direct control of installing GHC. When the necessary GHC is
 already installed, `stack setup` is a no-op, so it's safe to run it from an
 automated script, for example.
 
+__How does stack determine what GHC to use?__
+It uses the first GHC that it finds on the `PATH`. If that GHC does not comply with the various requirements (version, architecture) that your project needs, it will prompt you to run `stack setup` to get it. `stack` is fully aware of all GHCs that it has installed itself.
+
+See [this issue](https://github.com/commercialhaskell/stack/issues/420) for a detailed discussion.
+
 __How do I get extra build tools?__
 
 stack will automatically install build tools required by your packages or their
