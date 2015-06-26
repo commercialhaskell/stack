@@ -61,13 +61,18 @@ import           System.Directory (canonicalizePath)
 import           System.Environment (getArgs, getProgName)
 import           System.Exit
 import           System.FilePath (searchPathSeparator)
-import           System.IO (hIsTerminalDevice, stderr, stdout)
+import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..))
 import           System.Process.Read
 
 -- | Commandline dispatcher.
 main :: IO ()
 main =
-  do when False $ do -- https://github.com/commercialhaskell/stack/issues/322
+  do -- Line buffer the output by default, particularly for non-terminal runs.
+     -- See https://github.com/commercialhaskell/stack/pull/360
+     hSetBuffering stdout LineBuffering
+     hSetBuffering stdin  LineBuffering
+     hSetBuffering stderr NoBuffering
+     when False $ do -- https://github.com/commercialhaskell/stack/issues/322
        plugins <- findPlugins (T.pack stackProgName)
        tryRunPlugin plugins
      progName <- getProgName
