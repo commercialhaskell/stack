@@ -724,40 +724,34 @@ buildLogPath package' = do
     ]
   return $ stack </> $(mkRelDir "logs") </> fp
 
+-- Internal helper to define resolveFileOrWarn and resolveDirOrWarn
+resolveOrWarn :: (MonadLogger m, MonadIO m, MonadReader (Path Abs File) m)
+              => Text
+              -> (Path Abs Dir -> String -> m (Maybe a))
+              -> FilePath.FilePath
+              -> m (Maybe a)
+resolveOrWarn subject resolver path =
+  do cwd <- getWorkingDir
+     file <- ask
+     dir <- asks parent
+     result <- resolver dir path
+     when (isNothing result) $
+       $logWarn ("Warning: " <> subject <> " listed in " <>
+         T.pack (maybe (FL.toFilePath file) FL.toFilePath (stripDir cwd file)) <>
+         " file does not exist: " <>
+         T.pack path)
+     return result
+
 -- | Resolve the file, if it can't be resolved, warn for the user
 -- (purely to be helpful).
 resolveFileOrWarn :: (MonadThrow m,MonadIO m,MonadLogger m,MonadReader (Path Abs File) m)
                   => FilePath.FilePath
                   -> m (Maybe (Path Abs File))
-resolveFileOrWarn y =
-  do cwd <- getWorkingDir
-     file <- ask
-     dir <- asks parent
-     result <- resolveFileMaybe dir y
-     case result of
-       Nothing ->
-         $logWarn ("Warning: File listed in " <>
-                   T.pack (maybe (FL.toFilePath file) FL.toFilePath (stripDir cwd file)) <>
-                   " file does not exist: " <>
-                   T.pack y)
-       _ -> return ()
-     return result
+resolveFileOrWarn = resolveOrWarn "File" resolveFileMaybe
 
 -- | Resolve the directory, if it can't be resolved, warn for the user
 -- (purely to be helpful).
 resolveDirOrWarn :: (MonadThrow m,MonadIO m,MonadLogger m,MonadReader (Path Abs File) m)
                  => FilePath.FilePath
                  -> m (Maybe (Path Abs Dir))
-resolveDirOrWarn y =
-  do cwd <- getWorkingDir
-     file <- ask
-     dir <- asks parent
-     result <- resolveDirMaybe dir y
-     case result of
-       Nothing ->
-         $logWarn ("Warning: Directory listed in " <>
-                   T.pack (maybe (FL.toFilePath file) FL.toFilePath (stripDir cwd file)) <>
-                   " file does not exist: " <>
-                   T.pack y)
-       _ -> return ()
-     return result
+resolveDirOrWarn = resolveOrWarn "Directory" resolveDirMaybe

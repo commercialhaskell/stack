@@ -72,33 +72,35 @@ resolveFile x y =
          where fp = toFilePath x FP.</> y
        Just fp -> return fp
 
+-- Internal helper to define resolveDirMaybe and resolveFileMaybe in one
+resolveCheckParse :: (Functor m, MonadIO m)
+                 => (FilePath -> IO Bool) -- check if file/dir does exist
+                 -> (FilePath -> m a)     -- parse into absolute file/dir
+                 -> Path Abs Dir
+                 -> FilePath
+                 -> m (Maybe a)
+resolveCheckParse check parse x y = do
+    let fp = toFilePath x FP.</> y
+    exists <- liftIO $ check fp
+    if exists
+        then do
+            canonic <- liftIO $ canonicalizePath fp
+            fmap Just (parse canonic)
+        else return Nothing
+
 -- | Appends a stringly-typed relative path to an absolute path, and then
 -- canonicalizes it. If the path doesn't exist (and therefore cannot
 -- be canonicalized, 'Nothing' is returned).
 resolveDirMaybe :: (MonadIO m,MonadThrow m)
                 => Path Abs Dir -> FilePath -> m (Maybe (Path Abs Dir))
-resolveDirMaybe x y = do
-    let fp = toFilePath x FP.</> y
-    exists <- liftIO $ doesDirectoryExist fp
-    if exists
-        then do
-            dir <- liftIO $ canonicalizePath fp
-            liftM Just (parseAbsDir dir)
-        else return Nothing
+resolveDirMaybe = resolveCheckParse doesDirectoryExist parseAbsDir
 
 -- | Appends a stringly-typed relative path to an absolute path, and then
 -- canonicalizes it. If the path doesn't exist (and therefore cannot
 -- be canonicalized, 'Nothing' is returned).
 resolveFileMaybe :: (MonadIO m,MonadThrow m)
                  => Path Abs Dir -> FilePath -> m (Maybe (Path Abs File))
-resolveFileMaybe x y = do
-    let fp = toFilePath x FP.</> y
-    exists <- liftIO $ doesFileExist fp
-    if exists
-        then do
-            file <- liftIO $ canonicalizePath fp
-            liftM Just (parseAbsFile file)
-        else return Nothing
+resolveFileMaybe = resolveCheckParse doesFileExist parseAbsFile
 
 -- | List objects in a directory, excluding "@.@" and "@..@".  Entries are not sorted.
 listDirectory :: (MonadIO m,MonadThrow m) => Path Abs Dir -> m ([Path Abs Dir],[Path Abs File])
