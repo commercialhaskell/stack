@@ -18,7 +18,10 @@
 module Stack.PackageIndex
     ( updateAllIndices
     , PackageDownload (..)
-    , PackageCache (..)
+    , PackageCache
+    , pcOffset
+    , pcSize
+    , pcDownload
     , getPackageCaches
     ) where
 
@@ -81,21 +84,31 @@ import           System.IO                             (IOMode (ReadMode, WriteM
                                                         withBinaryFile)
 import           System.Process.Read (readInNull, EnvOverride, doesExecutableExist)
 
-data PackageCache = PackageCache
-    { pcOffset :: !Int64
-    -- ^ offset in bytes into the 00-index.tar file for the .cabal file contents
-    , pcSize :: !Int64
-    -- ^ size in bytes of the .cabal file
-    , pcDownload :: !(Maybe PackageDownload)
-    }
+data PackageCache
+    = PackageCache !Int64 !Int64
+    | PackageCacheDownload !Int64 !Int64 {-# UNPACK #-} !PackageDownload
     deriving Generic
 instance Binary.Binary PackageCache
+
+-- | offset in bytes into the 00-index.tar file for the .cabal file contents
+pcOffset :: PackageCache -> Int64
+pcOffset (PackageCache x _) = x
+pcOffset (PackageCacheDownload x _ _) = x
+
+-- | size in bytes of the .cabal file
+pcSize :: PackageCache -> Int64
+pcSize (PackageCache _ x) = x
+pcSize (PackageCacheDownload _ x _) = x
+
+pcDownload :: PackageCache -> Maybe PackageDownload
+pcDownload (PackageCache _ _) = Nothing
+pcDownload (PackageCacheDownload _ _ x) = Just x
 
 newtype PackageCacheMap = PackageCacheMap (Map PackageIdentifier PackageCache)
     deriving Binary.Binary
 instance BinarySchema PackageCacheMap where
     -- Don't forget to update this if you change the datatype in any way!
-    binarySchema _ = 1
+    binarySchema _ = 2
 -- | Populate the package index caches and return them.
 populateCache
     :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
@@ -135,27 +148,27 @@ populateCache menv index = do
             _ -> m
       where
         addCabal ident size = Map.insertWith
-            (\_ pcOld -> pcNew { pcDownload = pcDownload pcOld })
+            (\_ pcOld ->
+                case pcOld of
+                    PackageCache _ _ -> PackageCache offset size
+                    PackageCacheDownload _ _ pd ->
+                        PackageCacheDownload offset size pd)
             ident
             pcNew
             m
           where
-            pcNew = PackageCache
-                { pcOffset = (blockNo + 1) * 512
-                , pcSize = size
-                , pcDownload = Nothing
-                }
+            offset = (blockNo + 1) * 512
+            pcNew = PackageCache offset size
         addJSON ident lbs =
             case decode lbs of
                 Nothing -> m
                 Just pd -> Map.insertWith
-                    (\_ pc -> pc { pcDownload = Just pd })
+                    (\_ pc ->
+                        case pc of
+                            PackageCache x y -> PackageCacheDownload x y pd
+                            PackageCacheDownload x y _ -> PackageCacheDownload x y pd)
                     ident
-                    PackageCache
-                        { pcOffset = 0
-                        , pcSize = 0
-                        , pcDownload = Just pd
-                        }
+                    (PackageCacheDownload 0 0 pd)
                     m
 
     breakSlash x
