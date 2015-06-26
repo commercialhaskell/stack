@@ -14,6 +14,7 @@
 * `STACK_EXE` environment variable
 * Add the `stack dot` command
 * `stack upgrade` added [#237](https://github.com/commercialhaskell/stack/issues/237)
+* `--stack-yaml` command line flag [#378](https://github.com/commercialhaskell/stack/issues/378)
 
 Bug fixes:
 
