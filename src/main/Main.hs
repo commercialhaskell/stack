@@ -427,6 +427,16 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                       <> T.pack (intercalate [searchPathSeparator] ps)
                   )
 
+withConfig :: GlobalOpts
+           -> StackT Config IO ()
+           -> IO ()
+withConfig go@GlobalOpts{..} inner = do
+    (manager, lc) <- loadConfigWithOpts go
+    runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
+        Docker.rerunWithOptionalContainer (lcProjectRoot lc) $
+            runStackT manager globalLogLevel (lcConfig lc) globalTerminal
+                inner
+
 withBuildConfig :: GlobalOpts
                 -> NoBuildConfigStrategy
                 -> StackT EnvConfig IO ()
@@ -494,30 +504,18 @@ installCmd opts go@GlobalOpts{..} = withBuildConfig go ExecStrategy $
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
-unpackCmd names go@GlobalOpts{..} = do
-    (manager,lc) <- loadConfigWithOpts go
-    runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-        Docker.rerunWithOptionalContainer (lcProjectRoot lc) $
-            runStackT manager globalLogLevel (lcConfig lc) globalTerminal $ do
-                menv <- getMinimalEnvOverride
-                Stack.Fetch.unpackPackages menv "." names
+unpackCmd names go = withConfig go $ do
+    menv <- getMinimalEnvOverride
+    Stack.Fetch.unpackPackages menv "." names
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()
-updateCmd () go@GlobalOpts{..} = do
-    (manager,lc) <- loadConfigWithOpts go
-    runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-        Docker.rerunWithOptionalContainer (lcProjectRoot lc) $
-            runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-                getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
+updateCmd () go = withConfig go $
+    getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
 
 upgradeCmd :: Bool -> GlobalOpts -> IO ()
-upgradeCmd fromGit go@GlobalOpts{..} = do
-    (manager,lc) <- loadConfigWithOpts go
-    runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-        Docker.rerunWithOptionalContainer (lcProjectRoot lc) $
-            runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-                upgrade fromGit globalResolver
+upgradeCmd fromGit go = withConfig go $
+    upgrade fromGit (globalResolver go)
 
 -- | Upload to Hackage
 uploadCmd :: [String] -> GlobalOpts -> IO ()
@@ -795,22 +793,13 @@ loadConfigWithOpts GlobalOpts{..} = do
 
 -- | Project initialization
 initCmd :: InitOpts -> GlobalOpts -> IO ()
-initCmd initOpts go@GlobalOpts{..} = do
-  (manager,lc) <- loadConfigWithOpts go
-  runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-        Docker.rerunWithOptionalContainer (lcProjectRoot lc) $
-            runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-                initProject initOpts
+initCmd initOpts go = withConfig go $ initProject initOpts
 
 -- | Project creation
 newCmd :: InitOpts -> GlobalOpts -> IO ()
-newCmd initOpts go@GlobalOpts{..} = do
-  (manager,lc) <- loadConfigWithOpts go
-  runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-        Docker.rerunWithOptionalContainer (lcProjectRoot lc) $
-            runStackT manager globalLogLevel (lcConfig lc) globalTerminal $ do
-                newProject
-                initProject initOpts
+newCmd initOpts go@GlobalOpts{..} = withConfig go $ do
+    newProject
+    initProject initOpts
 
 -- | Fix up extra-deps for a project
 solverCmd :: Bool -- ^ modify stack.yaml automatically?
