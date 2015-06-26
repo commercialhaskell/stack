@@ -148,7 +148,7 @@ populateCache menv index = do
         addJSON ident lbs =
             case decode lbs of
                 Nothing -> m
-                Just pd -> Map.insertWith
+                Just !pd -> Map.insertWith
                     (\_ pc -> pc { pcDownload = Just pd })
                     ident
                     PackageCache
