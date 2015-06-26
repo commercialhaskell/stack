@@ -45,9 +45,8 @@ upgrade fromGit mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> d
                     ]
                     Nothing
                 return $ tmp </> $(mkRelDir "stack")
-                    -- Stack.PackageIndex.updateAllIndices menv
             else do
-                -- updateAllIndices menv
+                updateAllIndices menv
                 caches <- getPackageCaches menv
                 let latest = Map.fromListWith max
                            $ map toTuple
