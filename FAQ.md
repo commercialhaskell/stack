@@ -72,10 +72,9 @@ installed packages with actions taken in other projects.
 
 __I already have GHC installed, can I still use stack?__
 
-Yes. stack will default to using whatever GHC is on your PATH. If that GHC is a
+Yes. stack will default to using whatever GHC is on your `PATH`. If that GHC is a
 compatible version with the snapshot you're using, it will simply use it.
-Otherwise, if will install the new version for you. (If you don't want this
-automatic installation, you can use the `--no-install-ghc` option.)
+Otherwise, it will prompt you to run `stack setup`.
 
 Note that GHC installation doesn't work for all OSes, so in some cases the
 first option will need to install GHC yourself. Also, the `stack setup` command
@@ -84,6 +83,7 @@ already installed, `stack setup` is a no-op, so it's safe to run it from an
 automated script, for example.
 
 __How does stack determine what GHC to use?__
+
 It uses the first GHC that it finds on the `PATH`. If that GHC does not comply with the various requirements (version, architecture) that your project needs, it will prompt you to run `stack setup` to get it. `stack` is fully aware of all GHCs that it has installed itself.
 
 See [this issue](https://github.com/commercialhaskell/stack/issues/420) for a detailed discussion.
