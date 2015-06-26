@@ -483,6 +483,8 @@ getOSKey = do
         Platform X86_64 OSX -> return "macosx"
         Platform I386 FreeBSD -> return "freebsd32"
         Platform X86_64 FreeBSD -> return "freebsd64"
+        Platform I386 OpenBSD -> return "openbsd32"
+        Platform X86_64 OpenBSD -> return "openbsd64"
         Platform I386 Windows -> return "windows32"
         Platform X86_64 Windows -> return "windows64"
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
