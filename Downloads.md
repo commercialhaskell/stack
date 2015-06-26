@@ -85,6 +85,7 @@ If you're curious about the choice of these paths, see [issue #153](https://gith
 
 We're still [working out the best recommendation](https://github.com/commercialhaskell/stack/issues/237) for upgrades. Options for now are:
 
+* If you have a recent `stack` (post 0.1.0.0 release), you can try the experimental `stack upgrade` or `stack upgrade --git` command.
 * Clone the Git repository and run `stack install` inside of it
 * Anywhere after the 0.1.0.0 release: run `stack update && stack unpack stack`, change into the new directory, and run `stack install`. Note that you may need to run `stack setup`
 * Use your package manager when supported
