@@ -73,7 +73,7 @@ resolveFile x y =
        Just fp -> return fp
 
 -- Internal helper to define resolveDirMaybe and resolveFileMaybe in one
-resolveCheckParse :: (Functor m, MonadIO m)
+resolveCheckParse :: (MonadIO m)
                  => (FilePath -> IO Bool) -- check if file/dir does exist
                  -> (FilePath -> m a)     -- parse into absolute file/dir
                  -> Path Abs Dir
@@ -85,7 +85,7 @@ resolveCheckParse check parse x y = do
     if exists
         then do
             canonic <- liftIO $ canonicalizePath fp
-            fmap Just (parse canonic)
+            liftM Just (parse canonic)
         else return Nothing
 
 -- | Appends a stringly-typed relative path to an absolute path, and then
