@@ -115,6 +115,7 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
 
          configSystemGHC = fromMaybe True configMonoidSystemGHC
          configInstallGHC = fromMaybe False configMonoidInstallGHC
+         configSkipGHCCheck = fromMaybe False configMonoidSkipGHCCheck
 
          configExtraIncludeDirs = configMonoidExtraIncludeDirs
          configExtraLibDirs = configMonoidExtraLibDirs
@@ -158,10 +159,11 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser docker =
-    (\opts systemGHC installGHC arch os jobs includes libs -> mempty
+    (\opts systemGHC installGHC arch os jobs includes libs skipGHCCheck -> mempty
         { configMonoidDockerOpts = opts
         , configMonoidSystemGHC = systemGHC
         , configMonoidInstallGHC = installGHC
+        , configMonoidSkipGHCCheck = skipGHCCheck
         , configMonoidArch = arch
         , configMonoidOS = os
         , configMonoidJobs = jobs
@@ -203,6 +205,10 @@ configOptsParser docker =
            <> metavar "DIR"
            <> help "Extra directories to check for libraries"
             ))
+    <*> maybeBoolFlags
+            "skip-ghc-check"
+            "skipping the GHC version and architecture check"
+            idm
 
 -- | Get the directory on Windows where we should install extra programs. For
 -- more information, see discussion at:

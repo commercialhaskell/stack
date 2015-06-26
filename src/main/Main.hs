@@ -425,6 +425,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                   , soptsStackYaml = mstack
                   , soptsForceReinstall = scoForceReinstall
                   , soptsSanityCheck = True
+                  , soptsSkipGhcCheck = False
                   }
               case mpaths of
                   Nothing -> $logInfo "GHC on PATH would be used"

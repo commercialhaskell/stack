@@ -85,6 +85,8 @@ data Config =
          ,configInstallGHC          :: !Bool
          -- ^ Should we automatically install GHC if missing or the wrong
          -- version is available? Can be overridden by command line options.
+         ,configSkipGHCCheck        :: !Bool
+         -- ^ Don't bother checking the GHC version or architecture.
          ,configLocalBin            :: !(Path Abs Dir)
          -- ^ Directory we should install executables into
          ,configRequireStackVersion :: !VersionRange
@@ -412,6 +414,8 @@ data ConfigMonoid =
     -- ^ See: 'configSystemGHC'
     ,configMonoidInstallGHC          :: !(Maybe Bool)
     -- ^ See: 'configInstallGHC'
+    ,configMonoidSkipGHCCheck        :: !(Maybe Bool)
+    -- ^ See: 'configSkipGHCCheck'
     ,configMonoidRequireStackVersion :: !VersionRange
     -- ^ See: 'configRequireStackVersion'
     ,configMonoidOS                  :: !(Maybe String)
@@ -436,6 +440,7 @@ instance Monoid ConfigMonoid where
     , configMonoidPackageIndices = Nothing
     , configMonoidSystemGHC = Nothing
     , configMonoidInstallGHC = Nothing
+    , configMonoidSkipGHCCheck = Nothing
     , configMonoidRequireStackVersion = anyVersion
     , configMonoidOS = Nothing
     , configMonoidArch = Nothing
@@ -449,7 +454,9 @@ instance Monoid ConfigMonoid where
     , configMonoidHideTHLoading = configMonoidHideTHLoading l <|> configMonoidHideTHLoading r
     , configMonoidLatestSnapshotUrl = configMonoidLatestSnapshotUrl l <|> configMonoidLatestSnapshotUrl r
     , configMonoidPackageIndices = configMonoidPackageIndices l <|> configMonoidPackageIndices r
-    , configMonoidSystemGHC = configMonoidSystemGHC l <|> configMonoidSystemGHC r , configMonoidInstallGHC = configMonoidInstallGHC l <|> configMonoidInstallGHC r
+    , configMonoidSystemGHC = configMonoidSystemGHC l <|> configMonoidSystemGHC r
+    , configMonoidInstallGHC = configMonoidInstallGHC l <|> configMonoidInstallGHC r
+    , configMonoidSkipGHCCheck = configMonoidSkipGHCCheck l <|> configMonoidSkipGHCCheck r
     , configMonoidRequireStackVersion = intersectVersionRanges (configMonoidRequireStackVersion l)
                                                                (configMonoidRequireStackVersion r)
     , configMonoidOS = configMonoidOS l <|> configMonoidOS r
@@ -470,6 +477,7 @@ instance FromJSON ConfigMonoid where
          configMonoidPackageIndices <- obj .:? "package-indices"
          configMonoidSystemGHC <- obj .:? "system-ghc"
          configMonoidInstallGHC <- obj .:? "install-ghc"
+         configMonoidSkipGHCCheck <- obj .:? "skip-ghc-check"
          configMonoidRequireStackVersion <- unVersionRangeJSON <$>
                                             obj .:? "require-stack-version"
                                                 .!= VersionRangeJSON anyVersion

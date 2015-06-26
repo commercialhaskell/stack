@@ -15,6 +15,7 @@
 * Add the `stack dot` command
 * `stack upgrade` added [#237](https://github.com/commercialhaskell/stack/issues/237)
 * `--stack-yaml` command line flag [#378](https://github.com/commercialhaskell/stack/issues/378)
+* `--skip-ghc-check` command line flag [#423](https://github.com/commercialhaskell/stack/issues/423)
 
 Bug fixes:
 
