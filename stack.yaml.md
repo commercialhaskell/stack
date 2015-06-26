@@ -147,6 +147,10 @@ system-ghc: false
 Whether or not to automatically install GHC when necessary. Default is false,
 which means stack will prompt you to run `stack setup` as needed.
 
+### skip-ghc-check
+
+Should we confirm that your system GHC version (on the PATH) matches what your project expects? Default is true.
+
 ### require-stack-version
 
 Require a version of stack within the specified range
