@@ -2,6 +2,7 @@
 
 * Add --ignore-subdirs flag to init command [#435](https://github.com/commercialhaskell/stack/pull/435)
 * Handle attempt to use non-existing resolver [#436](https://github.com/commercialhaskell/stack/pull/436)
+* Add `--force` flag to `init` command
 
 ## 0.1.1.0
 
