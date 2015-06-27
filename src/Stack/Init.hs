@@ -68,7 +68,10 @@ initProject initOpts = do
     let dest = currDir </> stackDotYaml
         dest' = toFilePath dest
     exists <- fileExists dest
-    when exists $ error "Refusing to overwrite existing stack.yaml, please delete before running stack init"
+    when ((not $ forceOverwrite initOpts) && exists) $
+      error ("Refusing to overwrite existing stack.yaml, " <>
+             "please delete before running stack init " <>
+             "or if you are sure use \"--force\"")
 
     cabalfps <- findCabalFiles currDir
     $logInfo $ "Writing default config file to: " <> T.pack dest'
@@ -195,6 +198,7 @@ getRecommendedSnapshots snapshots pref = do
 data InitOpts = InitOpts
     { ioMethod :: !Method
     -- ^ Preferred snapshots
+    , forceOverwrite :: Bool
     }
 
 data SnapPref = PrefNone | PrefLTS | PrefNightly
@@ -204,8 +208,12 @@ data Method = MethodSnapshot SnapPref | MethodResolver Resolver | MethodSolver
 
 initOptsParser :: Parser InitOpts
 initOptsParser =
-    InitOpts <$> method
+    InitOpts <$> method <*> overwrite
   where
+    overwrite = flag False
+                     True
+                     (long "force" <>
+                      help "Force overwriting of an existing stack.yaml if it exists")
     method = solver
          <|> (MethodResolver <$> resolver)
          <|> (MethodSnapshot <$> snapPref)
