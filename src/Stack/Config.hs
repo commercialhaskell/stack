@@ -275,7 +275,7 @@ loadBuildConfig menv mproject config stackRoot mresolver noConfigStrat = do
       Nothing -> case noConfigStrat of
         ThrowException -> do
             currDir <- getWorkingDir
-            cabalFiles <- findCabalFiles currDir
+            cabalFiles <- findCabalFiles True currDir
             throwM $ NoProjectConfigFound currDir
                 $ Just $ if null cabalFiles then "new" else "init"
         ExecStrategy -> do
