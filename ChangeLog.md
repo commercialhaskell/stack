@@ -1,3 +1,7 @@
+## Unreleased
+
+* Handle attempt to use non-existing resolver [#436](https://github.com/commercialhaskell/stack/pull/436)
+
 ## 0.1.1.0
 
 * Remove GHC uncompressed tar file after installation [#376](https://github.com/commercialhaskell/stack/issues/376)
