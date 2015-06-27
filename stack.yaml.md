@@ -56,7 +56,7 @@ packages:
 This is a list of package identifiers for additional packages from upstream to
 be included. This is usually used to augment an LTS Haskell or Stackage Nightly
 snapshot with a package that is not present or is at an older version than you
-with to use.
+wish to use.
 
 ```yaml
 extra-deps:
