@@ -3,7 +3,8 @@ Stack release tool
 
 This tool automates some aspects of releasing a new version of Stack. It
 currently handles some tasks that need to be performed on each platform:
-building the release, running some pre-release checks, and uploading to Github.
+building the release, running some pre-release checks, and uploading binaries to
+a Github release.
 
 See [Checklist](https://github.com/commercialhaskell/stack/wiki/Checklist) of
 additional manual release steps.
@@ -14,13 +15,12 @@ Prerequisites
 These must be installed in the PATH to use the release tool:
 
 - stack
-- Git
-- GPG
-
-(for Windows, [msysgit](https://msysgit.github.io) includes both Git and GPG).
+- git (for Windows, [msysgit](https://msysgit.github.io) is recommended).
 
 To create a signed binary, you need:
 
+- GPG installed and in the PATH (included with
+  [msysgit](https://msysgit.github.io) on Windows)
 - Private key installed in GPG.
 
 To upload a binary to a Github release, you also need:
