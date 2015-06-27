@@ -1,7 +1,7 @@
 The following should be tested minimally before a release is considered good
 to go. This list will likely expand over time:
 
-* `stack install && stack clean && stack install --pedantic && stack test --flag stack:integration-tests` on Linux, Windows, and OS X, which covers:
+* `stack install && stack clean && stack install --pedantic && stack test --flag stack:integration-tests` on Linux, Windows (32-bit and 64-bit), and OS X, which covers:
     * Self-hosting
     * Unit tests
     * Integration tests
