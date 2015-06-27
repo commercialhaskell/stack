@@ -22,41 +22,32 @@ We generally test on the current version of OS X, but stack is known to work on 
 
 ## Ubuntu
 
-* Ubuntu 15.04 (amd64)
+1. Get the FP Complete key:
 
-```sh
-wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
-echo 'deb http://download.fpcomplete.com/ubuntu/vivid stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
-sudo apt-get update
-sudo apt-get install stack -y
-```
+        wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
 
-* Ubuntu 14.10 (amd64)
+2. Add the appropriate source repository:
 
-```sh
-wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
-echo 'deb http://download.fpcomplete.com/ubuntu/utopic stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
-sudo apt-get update
-sudo apt-get install stack -y
-```
+    * Ubuntu 15.04 (amd64):
 
-* Ubuntu 14.04 (amd64)
+            echo 'deb http://download.fpcomplete.com/ubuntu/vivid stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
-```sh
-wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
-echo 'deb http://download.fpcomplete.com/ubuntu/trusty stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
-sudo apt-get update
-sudo apt-get install stack -y
-```
+    * Ubuntu 14.10 (amd64)
 
-* Ubuntu 12.04 (amd64)
+            echo 'deb http://download.fpcomplete.com/ubuntu/utopic stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
-```sh
-wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
-echo 'deb http://download.fpcomplete.com/ubuntu/precise stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
-sudo apt-get update
-sudo apt-get install stack -y
-```
+    * Ubuntu 14.04 (amd64)
+
+            echo 'deb http://download.fpcomplete.com/ubuntu/trusty stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
+
+    * Ubuntu 12.04 (amd64)
+
+            echo 'deb http://download.fpcomplete.com/ubuntu/precise stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
+
+3. Update apt and install
+
+        sudo apt-get update && sudo apt-get install stack -y
+
 ## Arch Linux
 
 stack can be found in the AUR:
