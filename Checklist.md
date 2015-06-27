@@ -20,5 +20,6 @@ Release checklist after testing:
 - Package uploaded to Hackage.
 - Github release published.
 - Git tag signed.
+- Announced to haskell-cafe, commercialhaskell, and haskell-stack mailing lists.
 
 For more information, see: https://github.com/commercialhaskell/stack/issues/324
