@@ -94,7 +94,7 @@ configFromConfigMonoid
     -> Maybe Project
     -> ConfigMonoid
     -> m Config
-configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
+configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = do
      let configDocker = Docker.dockerOptsFromMonoid mproject configStackRoot configMonoidDockerOpts
          configConnectionCount = fromMaybe 8 configMonoidConnectionCount
          configHideTHLoading = fromMaybe True configMonoidHideTHLoading
@@ -115,6 +115,7 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
 
          configSystemGHC = fromMaybe True configMonoidSystemGHC
          configInstallGHC = fromMaybe False configMonoidInstallGHC
+         configSkipGHCCheck = fromMaybe False configMonoidSkipGHCCheck
 
          configExtraIncludeDirs = configMonoidExtraIncludeDirs
          configExtraLibDirs = configMonoidExtraLibDirs
@@ -129,6 +130,8 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
          configPlatform = Platform arch os
 
          configRequireStackVersion = simplifyVersionRange configMonoidRequireStackVersion
+
+         configConfigMonoid = configMonoid
 
      origEnv <- getEnvOverride configPlatform
      let configEnvOverride _ = return origEnv
@@ -156,10 +159,11 @@ configFromConfigMonoid configStackRoot mproject ConfigMonoid{..} = do
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser docker =
-    (\opts systemGHC installGHC arch os jobs includes libs -> mempty
+    (\opts systemGHC installGHC arch os jobs includes libs skipGHCCheck -> mempty
         { configMonoidDockerOpts = opts
         , configMonoidSystemGHC = systemGHC
         , configMonoidInstallGHC = installGHC
+        , configMonoidSkipGHCCheck = skipGHCCheck
         , configMonoidArch = arch
         , configMonoidOS = os
         , configMonoidJobs = jobs
@@ -201,6 +205,10 @@ configOptsParser docker =
            <> metavar "DIR"
            <> help "Extra directories to check for libraries"
             ))
+    <*> maybeBoolFlags
+            "skip-ghc-check"
+            "skipping the GHC version and architecture check"
+            idm
 
 -- | Get the directory on Windows where we should install extra programs. For
 -- more information, see discussion at:
@@ -229,11 +237,13 @@ instance HasPlatform MiniConfig
 loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadThrow m,MonadBaseControl IO m,MonadReader env m,HasHttpManager env,HasTerminal env)
            => ConfigMonoid
            -- ^ Config monoid from parsed command-line arguments
+           -> Maybe (Path Abs File)
+           -- ^ Override stack.yaml
            -> m (LoadConfig m)
-loadConfig configArgs = do
+loadConfig configArgs mstackYaml = do
     stackRoot <- determineStackRoot
     extraConfigs <- getExtraConfigs stackRoot >>= mapM loadYaml
-    mproject <- loadProjectConfig
+    mproject <- loadProjectConfig mstackYaml
     config <- configFromConfigMonoid stackRoot (fmap (\(proj, _, _) -> proj) mproject) $ mconcat $
         case mproject of
             Nothing -> configArgs : extraConfigs
@@ -265,7 +275,7 @@ loadBuildConfig menv mproject config stackRoot mresolver noConfigStrat = do
       Nothing -> case noConfigStrat of
         ThrowException -> do
             currDir <- getWorkingDir
-            cabalFiles <- findCabalFiles currDir
+            cabalFiles <- findCabalFiles True currDir
             throwM $ NoProjectConfigFound currDir
                 $ Just $ if null cabalFiles then "new" else "init"
         ExecStrategy -> do
@@ -455,8 +465,11 @@ loadYaml path =
 
 -- | Get the location of the project config file, if it exists.
 getProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)
-                 => m (Maybe (Path Abs File))
-getProjectConfig = do
+                 => Maybe (Path Abs File)
+                 -- ^ Override stack.yaml
+                 -> m (Maybe (Path Abs File))
+getProjectConfig (Just stackYaml) = return $ Just stackYaml
+getProjectConfig Nothing = do
     env <- liftIO getEnvironment
     case lookup "STACK_YAML" env of
         Just fp -> do
@@ -488,9 +501,11 @@ getProjectConfig = do
 -- and otherwise traversing parents. If no config is found, we supply a default
 -- based on current directory.
 loadProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)
-                  => m (Maybe (Project, Path Abs File, ConfigMonoid))
-loadProjectConfig = do
-    mfp <- getProjectConfig
+                  => Maybe (Path Abs File)
+                  -- ^ Override stack.yaml
+                  -> m (Maybe (Project, Path Abs File, ConfigMonoid))
+loadProjectConfig mstackYaml = do
+    mfp <- getProjectConfig mstackYaml
     case mfp of
         Just fp -> do
             currDir <- getWorkingDir

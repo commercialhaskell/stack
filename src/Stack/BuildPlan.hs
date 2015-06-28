@@ -64,6 +64,8 @@ import qualified Distribution.PackageDescription as C
 import qualified Distribution.Version as C
 import           Distribution.Text (display)
 import           Network.HTTP.Download
+import           Network.HTTP.Types (Status(..))
+import           Network.HTTP.Client (checkStatus)
 import           Path
 import           Prelude -- Fix AMP warning
 import           Stack.Constants
@@ -81,9 +83,16 @@ data BuildPlanException
         (Path Abs File) -- stack.yaml file
         (Map PackageName (Maybe Version, (Set PackageName))) -- truly unknown
         (Map PackageName (Set PackageIdentifier)) -- shadowed
+    | SnapshotNotFound SnapName
     deriving (Typeable)
 instance Exception BuildPlanException
 instance Show BuildPlanException where
+    show (SnapshotNotFound snapName) = unlines
+        [ "SnapshotNotFound " ++ snapName'
+        , "Non existing resolver: " ++ snapName' ++ "."
+        , "For a complete list of available snapshots see https://www.stackage.org/snapshots"
+        ]
+        where snapName' = show $ renderSnapName snapName
     show (UnknownPackages stackYaml unknown shadowed) =
         unlines $ unknown' ++ shadowed'
       where
@@ -462,7 +471,7 @@ loadBuildPlan name = do
             req <- parseUrl $ T.unpack url
             $logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
             $logDebug $ "Downloading build plan from: " <> url
-            _ <- download req fp
+            _ <- download req { checkStatus = handle404 } fp
             $logStickyDone $ "Downloaded " <> renderSnapName name <> " build plan."
             liftIO (decodeFileEither $ toFilePath fp) >>= either throwM return
 
@@ -473,6 +482,8 @@ loadBuildPlan name = do
             LTS _ _ -> "lts-haskell"
             Nightly _ -> "stackage-nightly"
     url = rawGithubUrl "fpco" reponame "master" file
+    handle404 (Status 404 _) _ _ = Just $ SomeException $ SnapshotNotFound name
+    handle404 _ _ _              = Nothing
 
 -- | Find the set of @FlagName@s necessary to get the given
 -- @GenericPackageDescription@ to compile against the given @BuildPlan@. Will

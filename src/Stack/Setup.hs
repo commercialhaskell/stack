@@ -73,6 +73,8 @@ data SetupOpts = SetupOpts
     , soptsForceReinstall :: !Bool
     , soptsSanityCheck :: !Bool
     -- ^ Run a sanity check on the selected GHC
+    , soptsSkipGhcCheck :: !Bool
+    -- ^ Don't check for a compatible GHC version/architecture
     }
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
@@ -122,6 +124,7 @@ setupEnv = do
             , soptsStackYaml = Just $ bcStackYaml bconfig
             , soptsForceReinstall = False
             , soptsSanityCheck = False
+            , soptsSkipGhcCheck = configSkipGHCCheck $ bcConfig bconfig
             }
     mghcBin <- ensureGHC sopts
     menv0 <- getMinimalEnvOverride
@@ -245,6 +248,7 @@ ensureGHC sopts = do
 
     let needLocal = case msystem of
             Nothing -> True
+            Just _ | soptsSkipGhcCheck sopts -> False
             Just (system, arch) ->
                 -- we allow a newer version of GHC within the same major series
                 getMajorVersion system /= getMajorVersion expected ||
@@ -483,6 +487,8 @@ getOSKey = do
         Platform X86_64 OSX -> return "macosx"
         Platform I386 FreeBSD -> return "freebsd32"
         Platform X86_64 FreeBSD -> return "freebsd64"
+        Platform I386 OpenBSD -> return "openbsd32"
+        Platform X86_64 OpenBSD -> return "openbsd64"
         Platform I386 Windows -> return "windows32"
         Platform X86_64 Windows -> return "windows64"
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch

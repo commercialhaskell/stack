@@ -1,0 +1,27 @@
+name:                stack-release-tool
+version:             0.0.0.0
+description:         Tool to release new versions of stack
+build-type:          Simple
+cabal-version:       >=1.10
+
+executable stack-release-tool
+  main-is:             release-tool.hs
+  ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , shake
+                     , mime-types
+                     , http-types
+                     , http-conduit
+                     , text
+                     , extra
+                     , conduit-combinators
+                     , conduit
+                     , case-insensitive
+                     , aeson
+                     , zlib
+                     , zip-archive
+                     , process
+                     , directory
+                     , Cabal
+                     , bytestring
+  default-language:    Haskell2010

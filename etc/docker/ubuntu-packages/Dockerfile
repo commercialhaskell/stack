@@ -40,6 +40,9 @@ RUN mkdir -p /var/tmp/fpm/stack_<<PKG_VERSION>>-<<GIT_REV_COUNT>>-<<GIT_SHA>>/us
 RUN cp $HOME/.local/bin/stack /var/tmp/fpm/stack_<<PKG_VERSION>>-<<GIT_REV_COUNT>>-<<GIT_SHA>>/usr/bin/
 RUN mkdir -p /var/tmp/fpm/stack_<<PKG_VERSION>>-<<GIT_REV_COUNT>>-<<GIT_SHA>>/usr/share/man/man1
 RUN gzip -c < man/man1/stack.1 >/var/tmp/fpm/stack_<<PKG_VERSION>>-<<GIT_REV_COUNT>>-<<GIT_SHA>>/usr/share/man/man1/stack.1.gz
+RUN mkdir -p /var/tmp/fpm/stack_<<PKG_VERSION>>-<<GIT_REV_COUNT>>-<<GIT_SHA>>/etc/bash_completion.d
+RUN $HOME/.local/bin/stack --bash-completion-script /usr/bin/stack >/var/tmp/fpm/stack_<<PKG_VERSION>>-<<GIT_REV_COUNT>>-<<GIT_SHA>>/etc/bash_completion.d/stack
+RUN ls -lR /var/tmp/fpm/stack_<<PKG_VERSION>>-<<GIT_REV_COUNT>>-<<GIT_SHA>>
 RUN fpm \
     -s dir \
     -t deb \
@@ -57,7 +60,7 @@ RUN fpm \
     -d zlib1g-dev \
     -C /var/tmp/fpm/stack_<<PKG_VERSION>>-<<GIT_REV_COUNT>>-<<GIT_SHA>> \
     -p /stack_<<PKG_VERSION>>-<<GIT_REV_COUNT>>-<<GIT_SHA>>_amd64.deb \
-    usr
+    etc usr
 
 # SHIP THE DEB TO THE HOST O.S.
 VOLUME /mnt

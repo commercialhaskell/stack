@@ -56,6 +56,7 @@ import qualified Stack.Upload as Upload
 import           System.Environment (getArgs, getProgName)
 import           System.Exit
 import           System.FilePath (searchPathSeparator)
+import           System.Directory (canonicalizePath)
 import           System.IO (hIsTerminalDevice, stderr, stdout)
 import           System.Process.Read
 
@@ -483,18 +484,11 @@ installCmd :: (Maybe FilePath, BuildOpts) -> GlobalOpts -> IO ()
 installCmd (mPath, opts) go@GlobalOpts{..} = do
     specifiedDir <- case mPath of
                       (Just userPath) -> do
-                            -- Fixme canonicalize Path
-                            tryParseAbs <- try (parseAbsDir userPath)
-                            tryParseRel <- try (do cwd <- liftIO (parseAbsDir =<< getCurrentDirectory)
-                                                   relPath <- parseRelDir userPath
-                                                   return $ cwd </> relPath)
-                                              
+                            canonPath <- liftIO $ canonicalizePath userPath
+                            tryParseAbs <- try (parseAbsDir canonPath)
                             case (tryParseAbs) of
-                              Left (_ :: SomeException) ->
-                                case (tryParseRel) of
-                                  Left (_ :: SomeException) ->
+                              Left (_ :: SomeException) -> 
                                     error $ "Could not parse user specified directory \"" ++ userPath ++ "\"" 
-                                  Right relPath -> return (Just relPath)
                               Right absPath -> return (Just absPath)
                       Nothing -> return Nothing
     withBuildConfig go ExecStrategy 

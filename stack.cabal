@@ -1,5 +1,5 @@
 name:                stack
-version:             0.1.0.0
+version:             0.1.1.0
 synopsis:            The Haskell Tool Stack
 description:         Please see the README.md for usage information, and
                      the wiki on Github for more details.  Also, note that
@@ -78,6 +78,7 @@ library
                      Stack.Build.Installed
                      Stack.Build.Source
                      Stack.Build.Types
+                     Stack.Upgrade
                      Stack.Upload
                      System.Process.Read
                      System.Process.Log
@@ -166,6 +167,7 @@ executable stack
                      Plugins.Commands
 
   build-depends:  base >=4.7 && < 5
+                , blaze-builder
                 , bytestring >= 0.10.4.0
                 , containers
                 , exceptions

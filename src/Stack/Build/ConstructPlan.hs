@@ -470,7 +470,7 @@ stripLocals :: Plan -> Plan
 stripLocals plan = plan
     { planTasks = Map.filter checkTask $ planTasks plan
     , planFinals = Map.empty
-    , planUnregisterLocal = Set.empty
+    , planUnregisterLocal = Map.empty
     , planInstallExes = 
           (\install -> 
                install {installExesNamesLoc = Map.filter (/= Local) $ 

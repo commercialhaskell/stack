@@ -43,9 +43,9 @@ import           Stack.Solver
 import           Stack.Types
 import           System.Directory                (getDirectoryContents)
 
-findCabalFiles :: MonadIO m => Path Abs Dir -> m [Path Abs File]
-findCabalFiles dir =
-    liftIO $ findFiles dir isCabal (not . isIgnored)
+findCabalFiles :: MonadIO m => Bool -> Path Abs Dir -> m [Path Abs File]
+findCabalFiles recurse dir =
+    liftIO $ findFiles dir isCabal (\subdir -> recurse && not (isIgnored subdir))
   where
     isCabal path = ".cabal" `isSuffixOf` toFilePath path
 
@@ -68,9 +68,12 @@ initProject initOpts = do
     let dest = currDir </> stackDotYaml
         dest' = toFilePath dest
     exists <- fileExists dest
-    when exists $ error "Refusing to overwrite existing stack.yaml, please delete before running stack init"
+    when (not (forceOverwrite initOpts) && exists) $
+      error ("Refusing to overwrite existing stack.yaml, " <>
+             "please delete before running stack init " <>
+             "or if you are sure use \"--force\"")
 
-    cabalfps <- findCabalFiles currDir
+    cabalfps <- findCabalFiles (includeSubDirs initOpts) currDir
     $logInfo $ "Writing default config file to: " <> T.pack dest'
     $logInfo $ "Basing on cabal files:"
     mapM_ (\path -> $logInfo $ "- " <> T.pack (toFilePath path)) cabalfps
@@ -128,7 +131,7 @@ getDefaultResolver :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env,
                    -> [C.GenericPackageDescription] -- ^ cabal descriptions
                    -> InitOpts
                    -> m (Resolver, Map PackageName (Map FlagName Bool), Map PackageName Version)
-getDefaultResolver cabalfps gpds initOpts = do
+getDefaultResolver cabalfps gpds initOpts =
     case ioMethod initOpts of
         MethodSnapshot snapPref -> do
             msnapshots <- getSnapshots'
@@ -195,6 +198,10 @@ getRecommendedSnapshots snapshots pref = do
 data InitOpts = InitOpts
     { ioMethod :: !Method
     -- ^ Preferred snapshots
+    , forceOverwrite :: Bool
+    -- ^ Force overwrite of existing stack.yaml
+    , includeSubDirs :: Bool
+    -- ^ If True, include all .cabal files found in any sub directories
     }
 
 data SnapPref = PrefNone | PrefLTS | PrefNightly
@@ -204,8 +211,16 @@ data Method = MethodSnapshot SnapPref | MethodResolver Resolver | MethodSolver
 
 initOptsParser :: Parser InitOpts
 initOptsParser =
-    InitOpts <$> method
+    InitOpts <$> method <*> overwrite <*> fmap not ignoreSubDirs
   where
+    ignoreSubDirs = flag False
+                         True
+                         (long "ignore-subdirs" <>
+                         help "Do not search for .cabal files in sub directories")
+    overwrite = flag False
+                     True
+                     (long "force" <>
+                      help "Force overwriting of an existing stack.yaml if it exists")
     method = solver
          <|> (MethodResolver <$> resolver)
          <|> (MethodSnapshot <$> snapPref)

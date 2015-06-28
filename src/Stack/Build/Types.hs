@@ -23,6 +23,7 @@ module Stack.Build.Types
     ,InstallExesPlan(..)
     ,FinalAction(..)
     ,BuildOpts(..)
+    ,defaultBuildOpts
     ,TaskType(..)
     ,TaskConfigOpts(..)
     ,ConfigCache(..)
@@ -279,7 +280,7 @@ data BuildOpts =
             ,boptsFinalAction :: !FinalAction
             ,boptsDryrun :: !Bool
             ,boptsGhcOptions :: ![Text]
-            ,boptsFlags :: !(Map PackageName (Map FlagName Bool))
+            ,boptsFlags :: !(Map (Maybe PackageName) (Map FlagName Bool))
             ,boptsInstallExes :: !(Bool, Maybe (Path Abs Dir))
             -- ^ Install executables to user path after building?
             ,boptsPreFetch :: !Bool
@@ -294,6 +295,25 @@ data BuildOpts =
             -- suites.
             }
   deriving (Show)
+
+defaultBuildOpts :: BuildOpts
+defaultBuildOpts = BuildOpts
+    { boptsTargets = []
+    , boptsLibProfile = False
+    , boptsExeProfile = False
+    , boptsEnableOptimizations = Nothing
+    , boptsHaddock = False
+    , boptsHaddockDeps = Nothing
+    , boptsFinalAction = DoNothing
+    , boptsDryrun = False
+    , boptsGhcOptions = []
+    , boptsFlags = Map.empty
+    , boptsInstallExes = (False, Nothing)
+    , boptsPreFetch = False
+    , boptsTestArgs = []
+    , boptsOnlySnapshot = False
+    , boptsCoverage = False
+    }
 
 -- | Run a Setup.hs action after building a package, before installing.
 data FinalAction
@@ -389,7 +409,8 @@ data Plan = Plan
     { planTasks :: !(Map PackageName Task)
     , planFinals :: !(Map PackageName Task)
     -- ^ Final actions to be taken (test, benchmark, etc)
-    , planUnregisterLocal :: !(Set GhcPkgId)
+    , planUnregisterLocal :: !(Map GhcPkgId Text)
+    -- ^ Text is reason we're unregistering, for display only
     , planInstallExes :: !InstallExesPlan
     -- ^ Executables that should be installed after successful building
     }

@@ -398,7 +398,7 @@ fetchPackages' mdistDir toFetchAll = do
                 , drLengthCheck = fmap fromIntegral $ tfSize toFetch
                 }
         let progressSink = do
-                liftIO $ runInBase $ $logInfo $ packageIdentifierText ident <> ": downloading"
+                liftIO $ runInBase $ $logInfo $ packageIdentifierText ident <> ": download"
         _ <- verifiedDownload downloadReq destpath progressSink
 
         let fp = toFilePath destpath

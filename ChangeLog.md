@@ -1,5 +1,12 @@
 ## Unreleased
 
+* Add --ignore-subdirs flag to init command [#435](https://github.com/commercialhaskell/stack/pull/435)
+* Handle attempt to use non-existing resolver [#436](https://github.com/commercialhaskell/stack/pull/436)
+* Add `--force` flag to `init` command
+* exec style commands accept the `--package` option (see [Reddit discussion](http://www.reddit.com/r/haskell/comments/3bd66h/stack_runghc_turtle_as_haskell_script_solution/))
+
+## 0.1.1.0
+
 * Remove GHC uncompressed tar file after installation [#376](https://github.com/commercialhaskell/stack/issues/376)
 * Put stackage snapshots JSON on S3 [#380](https://github.com/commercialhaskell/stack/issues/380)
 * Specifying flags for multiple packages [#335](https://github.com/commercialhaskell/stack/issues/335)
@@ -13,6 +20,9 @@
 * Specifying test components only builds/runs those tests [#398](https://github.com/commercialhaskell/stack/issues/398)
 * `STACK_EXE` environment variable
 * Add the `stack dot` command
+* `stack upgrade` added [#237](https://github.com/commercialhaskell/stack/issues/237)
+* `--stack-yaml` command line flag [#378](https://github.com/commercialhaskell/stack/issues/378)
+* `--skip-ghc-check` command line flag [#423](https://github.com/commercialhaskell/stack/issues/423)
 
 Bug fixes:
 

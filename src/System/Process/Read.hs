@@ -294,13 +294,20 @@ findExecutable eo name = liftIO $ do
         Nothing -> do
             let loop [] = return $ Left $ ExecutableNotFound name (eoPath eo)
                 loop (dir:dirs) = do
-                    let fp = dir FP.</> name ++ eoExeExtension eo
-                    exists <- doesFileExist fp
-                    if exists
-                        then do
-                            fp' <- makeAbsolute fp >>= parseAbsFile
-                            return $ return fp'
-                        else loop dirs
+                    let fp0 = dir FP.</> name
+                        fps0
+                            | null (eoExeExtension eo) = [fp0]
+                            -- Support `stack exec foo.exe` on Windows
+                            | otherwise = [fp0 ++ eoExeExtension eo, fp0]
+                        testFPs [] = loop dirs
+                        testFPs (fp:fps) = do
+                            exists <- doesFileExist fp
+                            if exists
+                                then do
+                                    fp' <- makeAbsolute fp >>= parseAbsFile
+                                    return $ return fp'
+                                else testFPs fps
+                    testFPs fps0
             epath <- loop $ eoPath eo
             !() <- atomicModifyIORef (eoExeCache eo) $ \m' ->
                 (Map.insert name epath m', ())
