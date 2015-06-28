@@ -46,7 +46,6 @@ import qualified Stack.Docker as Docker
 import           Stack.Dot
 import           Stack.Exec
 import           Stack.Fetch
-import           Stack.Ide
 import           Stack.Init
 import           Stack.New
 import qualified Stack.PackageIndex
@@ -260,7 +259,7 @@ pluginShouldHaveRun _plugin _globalOpts = do
 pathCmd :: [Text] -> GlobalOpts -> IO ()
 pathCmd keys go =
     withBuildConfig
-        go {globalLogLevel = LevelError}
+        go
         ExecStrategy
         (do env <- ask
             let cfg = envConfig env
@@ -277,20 +276,19 @@ pathCmd keys go =
                            null keys || elem key keys)
                      paths)
                 (\(_,key,path) ->
-                      liftIO
-                          (T.putStrLn
-                               ((if length keys == 1
-                                     then ""
-                                     else key <> ": ") <>
-                                path
-                                    (PathInfo
-                                         bc
-                                         menv
-                                         snap
-                                         local
-                                         snaproot
-                                         localroot
-                                         distDir)))))
+                      $logInfo
+                          ((if length keys == 1
+                               then ""
+                               else key <> ": ") <>
+                           path
+                               (PathInfo
+                                    bc
+                                    menv
+                                    snap
+                                    local
+                                    snaproot
+                                    localroot
+                                    distDir))))
 
 -- | Passed to all the path printers as a source of info.
 data PathInfo = PathInfo
