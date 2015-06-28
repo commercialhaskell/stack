@@ -184,3 +184,18 @@ Also, note that `stack setup` has been known to take longer than 20 minutes when
 __What is licensing restrictions on Windows?__
 
 Currently on Windows GHC produces binaries linked statically with [GNU Multiple Precision Arithmetic Library](https://gmplib.org/) (GMP), which is used by [integer-gmp](https://hackage.haskell.org/package/integer-gmp) library to provide big integer implementation for Haskell. Contrary to the majority of Haskell code licensed under permissive BSD3 license, GMP library is licensed under LGPL, which means resulting binaries [have to be provided with source code or object files](http://www.gnu.org/licenses/gpl-faq.html#LGPLStaticVsDynamic). That may or may not be acceptable for your situation. Current workaround is to use GHC built with alternative big integer implementation called integer-simple, which is free from LGPL limitations as it's pure Haskell and does not use GMP. Unfortunately it has yet to be available out of the box with stack. See [issue #399](https://github.com/commercialhaskell/stack/issues/399) for the ongoing effort and information on workarounds.
+
+__How to get a working executable on Windows?__
+
+When executing a binary after building with `stack build` (e.g. for target "foo"), the command `foo.exe` might complain about missing runtime libraries (whereas `stack exec foo` works).
+
+Windows is not able to find the necessary C++ libraries from the standard prompt because they're not in the PATH environment variable. `stack exec` works because it's modifying PATH to include extra things.
+
+Those libraries are shipped with GHC (and, theoretically in some cases, MSYS). The easiest way to find them is `stack exec which`. E.g.
+
+    >stack exec which libstdc++-6.dll
+    /c/Users/Michael/AppData/Local/Programs/stack/i386-windows/ghc-7.8.4/mingw/bin/libstdc++-6.dll
+
+A quick workaround is adding this path to the PATH environment variable or copying the files somewhere Windows finds them (cf. https://msdn.microsoft.com/de-de/library/7d83bc18.aspx).
+
+Cf. issue [#425](https://github.com/commercialhaskell/stack/issues/425).
