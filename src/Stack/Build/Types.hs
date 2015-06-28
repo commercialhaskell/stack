@@ -22,6 +22,7 @@ module Stack.Build.Types
     ,Plan(..)
     ,FinalAction(..)
     ,BuildOpts(..)
+    ,defaultBuildOpts
     ,TaskType(..)
     ,TaskConfigOpts(..)
     ,ConfigCache(..)
@@ -293,6 +294,25 @@ data BuildOpts =
             -- suites.
             }
   deriving (Show)
+
+defaultBuildOpts :: BuildOpts
+defaultBuildOpts = BuildOpts
+    { boptsTargets = []
+    , boptsLibProfile = False
+    , boptsExeProfile = False
+    , boptsEnableOptimizations = Nothing
+    , boptsHaddock = False
+    , boptsHaddockDeps = Nothing
+    , boptsFinalAction = DoNothing
+    , boptsDryrun = False
+    , boptsGhcOptions = []
+    , boptsFlags = Map.empty
+    , boptsInstallExes = False
+    , boptsPreFetch = False
+    , boptsTestArgs = []
+    , boptsOnlySnapshot = False
+    , boptsCoverage = False
+    }
 
 -- | Run a Setup.hs action after building a package, before installing.
 data FinalAction

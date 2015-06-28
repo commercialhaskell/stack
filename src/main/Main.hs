@@ -165,26 +165,11 @@ main =
              addCommand "exec"
                         "Execute a command"
                         execCmd
-                        ((,,)
-                            <$> strArgument (metavar "CMD")
-                            <*> many (strArgument (metavar "-- ARGS (e.g. stack exec -- ghc --version)"))
-                            <*> (EnvSettings
-                                    <$> pure True
-                                    <*> boolFlags True
-                                            "ghc-package-path"
-                                            "setting the GHC_PACKAGE_PATH variable for the subprocess"
-                                            idm
-                                    <*> boolFlags True
-                                            "stack-exe"
-                                            "setting the STACK_EXE environment variable to the path for the stack executable"
-                                            idm))
+                        (execOptsParser Nothing)
              addCommand "ghc"
                         "Run ghc"
                         execCmd
-                        ((,,)
-                            <$> pure "ghc"
-                            <*> many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)"))
-                            <*> pure defaultEnvSettings)
+                        (execOptsParser $ Just "ghc")
              addCommand "ghci"
                         "Run ghci in the context of project(s)"
                         replCmd
@@ -206,10 +191,7 @@ main =
              addCommand "runghc"
                         "Run runghc"
                         execCmd
-                        ((,,)
-                            <$> pure "runghc"
-                            <*> many (strArgument (metavar "-- ARGS (e.g. stack runghc -- X.hs)"))
-                            <*> pure defaultEnvSettings)
+                        (execOptsParser $ Just "runghc")
              addCommand "clean"
                         "Clean the local packages"
                         cleanCmd
@@ -536,11 +518,52 @@ uploadCmd args0 go = do
               Upload.defaultUploadSettings
         mapM_ (Upload.upload uploader) args
 
+data ExecOpts = ExecOpts
+    { eoCmd :: !String
+    , eoArgs :: ![String]
+    , eoEnvSettings :: !EnvSettings
+    , eoPackages :: ![String]
+    }
+
+execOptsParser :: Maybe String -- ^ command
+               -> Parser ExecOpts
+execOptsParser mcmd =
+    ExecOpts
+        <$> maybe eoCmdParser pure mcmd
+        <*> eoArgsParser
+        <*> eoEnvSettingsParser
+        <*> eoPackagesParser
+  where
+    eoCmdParser :: Parser String
+    eoCmdParser = strArgument (metavar "CMD")
+
+    eoArgsParser :: Parser [String]
+    eoArgsParser = many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)"))
+
+    eoEnvSettingsParser :: Parser EnvSettings
+    eoEnvSettingsParser = EnvSettings
+        <$> pure True
+        <*> boolFlags True
+                "ghc-package-path"
+                "setting the GHC_PACKAGE_PATH variable for the subprocess"
+                idm
+        <*> boolFlags True
+                "stack-exe"
+                "setting the STACK_EXE environment variable to the path for the stack executable"
+                idm
+
+    eoPackagesParser :: Parser [String]
+    eoPackagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))
+
 -- | Execute a command.
-execCmd :: (String, [String],EnvSettings) -> GlobalOpts -> IO ()
-execCmd (cmd,args,envSettings) go@GlobalOpts{..} =
-    withBuildConfig go ExecStrategy $
-    exec envSettings cmd args
+execCmd :: ExecOpts -> GlobalOpts -> IO ()
+execCmd ExecOpts {..} go = withBuildConfig go ExecStrategy $ do
+    let targets = concatMap words eoPackages
+    unless (null targets) $ do
+        Stack.Build.build defaultBuildOpts
+            { boptsTargets = map T.pack targets
+            }
+    exec eoEnvSettings eoCmd eoArgs
 
 -- | Run the REPL in the context of a project, with
 replCmd :: ([Text], [String], FilePath, Bool) -> GlobalOpts -> IO ()

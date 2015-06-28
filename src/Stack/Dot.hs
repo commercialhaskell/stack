@@ -27,23 +27,7 @@ dot :: (MonadReader env m, HasBuildConfig env, MonadIO m, MonadLogger m, MonadCa
     => m ()
 dot = do
     (locals, _names, _idents) <- loadLocals
-        BuildOpts
-            { boptsTargets = []
-            , boptsLibProfile = False
-            , boptsExeProfile = False
-            , boptsEnableOptimizations = Nothing
-            , boptsHaddock = False
-            , boptsHaddockDeps = Nothing
-            , boptsFinalAction = DoNothing
-            , boptsDryrun = False
-            , boptsGhcOptions = []
-            , boptsFlags = Map.empty
-            , boptsInstallExes = False
-            , boptsPreFetch = False
-            , boptsTestArgs = []
-            , boptsOnlySnapshot = False
-            , boptsCoverage = False
-            }
+        defaultBuildOpts
         Map.empty
     let localNames = Set.fromList $ map (packageName . lpPackage) locals
 
