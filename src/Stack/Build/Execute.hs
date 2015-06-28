@@ -18,6 +18,7 @@ import           Control.Concurrent.Lifted (fork)
 import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
+import           Control.Exception.Enclosed     (catchIO)
 import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.Catch            (MonadCatch, MonadMask)
@@ -70,7 +71,9 @@ import           System.Environment             (getExecutablePath)
 import           System.Exit                    (ExitCode (ExitSuccess))
 import qualified System.FilePath                as FP
 import           System.IO
+import           System.IO.Error                (isIllegalOperation)
 import           System.IO.Temp                 (withSystemTempDirectory)
+import           System.PosixCompat.Files       (createSymbolicLink)
 import           System.Process.Internals       (createProcess_)
 import           System.Process.Read
 import           System.Process.Log             (showProcessArgDebug)
@@ -200,6 +203,8 @@ executePlan :: M env m
             -> m ()
 executePlan menv bopts baseConfigOpts locals sourceMap plan = do
     withSystemTempDirectory stackProgName $ \tmpdir -> do
+        addLastInstallSymlink
+        addLastDistSymlink
         tmpdir' <- parseAbsDir tmpdir
         configLock <- newMVar ()
         installLock <- newMVar ()
@@ -896,3 +901,29 @@ getSetupHs dir = do
   where
     fp1 = dir </> $(mkRelFile "Setup.hs")
     fp2 = dir </> $(mkRelFile "Setup.lhs")
+
+-- | Update the symlink in @.stack-work\/install\/last@ to point to the
+-- current local install directory.
+addLastInstallSymlink :: M env m => m ()
+addLastInstallSymlink = do
+    target <- installationRootLocal
+    source <- lastInstallSymlink
+    updateSymlink target source
+
+-- | Update the symlink in @.stack-work\/dist\/last@ to point to the
+-- current local install directory.
+addLastDistSymlink :: M env m => m ()
+addLastDistSymlink = do
+    bc <- asks getBuildConfig
+    target <- distDirFromDir (bcRoot bc)
+    source <- lastInstallSymlink
+    updateSymlink target source
+
+updateSymlink :: M env m => Path Abs Dir -> Path Abs File -> m ()
+updateSymlink target source = do
+    createTree target
+    removeFileIfExists source
+    -- Ignore illegal operation errors, because these are thrown by
+    -- 'createSymbolicLink' on windows.
+    liftIO $ createSymbolicLink (toFilePath target) (toFilePath source)
+        `catchIO` \err -> unless (isIllegalOperation err) (throwIO err)
