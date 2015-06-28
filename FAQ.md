@@ -199,3 +199,11 @@ Those libraries are shipped with GHC (and, theoretically in some cases, MSYS). T
 A quick workaround is adding this path to the PATH environment variable or copying the files somewhere Windows finds them (cf. https://msdn.microsoft.com/de-de/library/7d83bc18.aspx).
 
 Cf. issue [#425](https://github.com/commercialhaskell/stack/issues/425).
+
+__Can I change stack's default temporary directory ?__
+
+Stack makes use of a temporary directory for some commands (/tmp by default on linux). If there is not enough free space in this directory, stack may fail (see issue [#429](https://github.com/commercialhaskell/stack/issues/429) ). For instance `stack setup` with a GHC installation requires roughly 1GB free.
+
+A custom temporary directory can be forced:
+* on Linux by setting the environment variable TMPDIR (eg `$ TMPDIR=path-to-tmp stack setup`)
+* on Windows by setting one of the environment variable (given in priority order), TMP, TEMP, USERPROFILE
