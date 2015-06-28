@@ -16,6 +16,7 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask)
+import           Data.Attoparsec.Args (withInterpreterArgs)
 import qualified Data.ByteString.Lazy as L
 import           Data.Char (toLower)
 import           Data.List
@@ -67,7 +68,7 @@ import           System.Process.Read
 
 -- | Commandline dispatcher.
 main :: IO ()
-main =
+main = withInterpreterArgs stackProgName $ \args isInterpreter ->
   do -- Line buffer the output by default, particularly for non-terminal runs.
      -- See https://github.com/commercialhaskell/stack/pull/360
      hSetBuffering stdout LineBuffering
@@ -77,14 +78,13 @@ main =
        plugins <- findPlugins (T.pack stackProgName)
        tryRunPlugin plugins
      progName <- getProgName
-     args <- getArgs
      isTerminal <- hIsTerminalDevice stdout
      execExtraHelp args
                    dockerHelpOptName
                    (Docker.dockerOptsParser True)
                    ("Only showing --" ++ Docker.dockerCmdName ++ "* options.")
      let versionString' = $(simpleVersion Meta.version)
-     (level,run) <-
+     eGlobalRun <- try $
        simpleOptions
          versionString'
          "stack - The Haskell Tool Stack"
@@ -237,15 +237,27 @@ main =
                                    <*> many (strArgument (metavar "ARGS"))))
              )
              -- commandsFromPlugins plugins pluginShouldHaveRun) https://github.com/commercialhaskell/stack/issues/322
-     when (globalLogLevel level == LevelDebug) $ putStrLn versionString'
-     run level `catch` \e -> do
-        -- This special handler stops "stack: " from being printed before the
-        -- exception
-        case fromException e of
-            Just ec -> exitWith ec
-            Nothing -> do
-                L.hPut stderr $ toLazyByteString $ fromShow e <> copyByteString "\n"
-                exitFailure
+     case eGlobalRun of
+       Left (exitCode :: ExitCode) -> do
+         when isInterpreter $
+           putStrLn $ concat
+             [ "\nIf you are trying to use "
+             , stackProgName
+             , " as a script interpreter, a\n'-- "
+             , stackProgName
+             , " [options] runghc [options]' comment is required."
+             , "\nSee https://github.com/commercialhaskell/stack/wiki/Script-interpreter" ]
+         throwIO exitCode
+       Right (global,run) -> do
+         when (globalLogLevel global == LevelDebug) $ putStrLn versionString'
+         run global `catch` \e -> do
+            -- This special handler stops "stack: " from being printed before the
+            -- exception
+            case fromException e of
+                Just ec -> exitWith ec
+                Nothing -> do
+                    L.hPut stderr $ toLazyByteString $ fromShow e <> copyByteString "\n"
+                    exitFailure
   where
     dockerHelpOptName = Docker.dockerCmdName ++ "-help"
 

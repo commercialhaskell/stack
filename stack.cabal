@@ -85,6 +85,7 @@ library
                      System.Process.Log
                      System.Process.Run
                      Network.HTTP.Download.Verified
+                     Data.Attoparsec.Args
   other-modules:     Network.HTTP.Download
                      Control.Concurrent.Execute
                      Path.Find
@@ -96,7 +97,6 @@ library
                      Data.Binary.VersionTagged
                      Data.Set.Monad
                      Data.Maybe.Extra
-                     Data.Attoparsec.Args
   build-depends:     Cabal >= 1.18.1.5
                    , aeson >= 0.8.0.2
                    , async >= 2.0.2
