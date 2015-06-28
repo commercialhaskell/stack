@@ -12,6 +12,7 @@ module Path.Find
 import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.IO.Class
+import System.IO.Error (isPermissionError)
 import Data.List
 import Path
 import Path.IO
@@ -60,7 +61,11 @@ findFiles :: Path Abs Dir            -- ^ Root directory to begin with.
           -> (Path Abs Dir -> Bool)  -- ^ Predicate for which directories to traverse.
           -> IO [Path Abs File]      -- ^ List of matching files.
 findFiles dir p traversep =
-  do (dirs,files) <- listDirectory dir
+  do (dirs,files) <- catchJust (\ e -> if isPermissionError e
+                                         then Just ()
+                                         else Nothing)
+                               (listDirectory dir)
+                               (\ _ -> return ([], []))
      subResults <-
        forM dirs
             (\entry ->
