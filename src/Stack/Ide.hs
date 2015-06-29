@@ -24,7 +24,6 @@ import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Set as S
 import           Data.Text (Text)
-import qualified Data.Text as T
 import           Path
 import           Path.IO
 import           Stack.Build.Source

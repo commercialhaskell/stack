@@ -1,7 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- | Parsing argument-like things.
 
-module Data.Attoparsec.Args (EscapingMode(..), argsParser, withInterpreterArgs) where
+module Data.Attoparsec.Args
+    ( EscapingMode(..)
+    , argsParser
+    , parseArgs
+    , withInterpreterArgs
+    ) where
 
 import           Control.Applicative
 import           Data.Attoparsec.Text ((<?>))
@@ -23,6 +28,10 @@ data EscapingMode
     = Escaping
     | NoEscaping
     deriving (Show,Eq,Enum)
+
+-- | Parse arguments using 'argsParser'.
+parseArgs :: EscapingMode -> Text -> Either String [String]
+parseArgs mode t = P.parseOnly (argsParser mode) t
 
 -- | A basic argument parser. It supports space-separated text, and
 -- string quotation with identity escaping: \x -> x.
@@ -77,10 +86,10 @@ sinkInterpreterArgs progName =
     await >>= maybe (return Nothing) checkShebang
   where
     checkShebang bs
-        | "#!" `S.isPrefixOf` bs = fmap (maybe Nothing parseArgs) await
-        | otherwise = return (parseArgs bs)
+        | "#!" `S.isPrefixOf` bs = fmap (maybe Nothing parseArgs') await
+        | otherwise = return (parseArgs' bs)
 
-    parseArgs bs =
+    parseArgs' bs =
         case decodeUtf8' bs of
             Left _ -> Nothing
             Right t ->

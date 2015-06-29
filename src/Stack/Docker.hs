@@ -29,6 +29,7 @@ import           Control.Monad.Reader (MonadReader,asks)
 import           Control.Monad.Writer (execWriter,runWriter,tell)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Aeson.Extended (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
+import           Data.Attoparsec.Args (EscapingMode (Escaping), parseArgs)
 import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
@@ -688,7 +689,7 @@ dockerOptsParser showOptions =
                         hide <>
                         metavar "NAME" <>
                         help "Docker container name")
-    <*> wordsStrOption (long (dockerOptName dockerRunArgsArgName) <>
+    <*> argsStrOption (long (dockerOptName dockerRunArgsArgName) <>
                         hide <>
                         value [] <>
                         metavar "'ARG1 [ARG2 ...]'" <>
@@ -708,7 +709,7 @@ dockerOptsParser showOptions =
   where
     dockerOptName optName = dockerCmdName ++ "-" ++ T.unpack optName
     maybeStrOption = optional . option str
-    wordsStrOption = option (fmap words str)
+    argsStrOption = option (fmap (either error id . parseArgs Escaping . T.pack) str)
     hide = if showOptions
               then idm
               else internal <> hidden
