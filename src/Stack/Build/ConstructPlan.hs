@@ -149,13 +149,13 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
                 , planFinals = M.fromList finals
                 , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason locallyRegistered
                 , planInstallExes =
-                    let (doInstallFlag,maybeUserDir) = 
+                    let installExesPlan = 
                             boptsInstallExes $ bcoBuildOpts baseConfigOpts0
-                        in if (doInstallFlag)
-                           then case maybeUserDir of
-                                  Just destDir -> InstallExesPlan True (Just destDir) installExes
-                                  Nothing -> InstallExesPlan True Nothing installExes
-                           else InstallExesPlan False Nothing Map.empty
+                        in case installExesPlan of
+                           NoInstall -> InstallExesPlan False Nothing Map.empty
+                           DefaultInstall -> InstallExesPlan True Nothing Map.empty
+                           InstallDir (userDir) -> InstallExesPlan True (Just userDir) installExes
+
                 }
         else throwM $ ConstructPlanExceptions errs (bcStackYaml $ getBuildConfig econfig)
   where

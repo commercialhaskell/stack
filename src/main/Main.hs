@@ -510,7 +510,7 @@ installCmd (mPath,opts) go@GlobalOpts{..} = do
         ExecStrategy
         (Stack.Build.build
              opts
-             { boptsInstallExes = (True, specifiedDir)
+             { boptsInstallExes = maybe DefaultInstall InstallDir specifiedDir
              }) 
 
 -- | Unpack packages to the filesystem
@@ -673,7 +673,7 @@ buildOpts cmd = fmap process $
                             idm
              else pure Nothing
         finalAction = pure DoNothing
-        installExes = pure (False, Nothing)
+        installExes = pure NoInstall
         dryRun = flag False True (long "dry-run" <>
                                   help "Don't build anything, just prepare to")
         ghcOpts = (++)

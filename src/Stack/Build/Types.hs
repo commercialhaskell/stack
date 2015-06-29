@@ -21,6 +21,7 @@ module Stack.Build.Types
     ,BaseConfigOpts(..)
     ,Plan(..)
     ,InstallExesPlan(..)
+    ,InstallDest(..)
     ,FinalAction(..)
     ,BuildOpts(..)
     ,defaultBuildOpts
@@ -281,7 +282,7 @@ data BuildOpts =
             ,boptsDryrun :: !Bool
             ,boptsGhcOptions :: ![Text]
             ,boptsFlags :: !(Map (Maybe PackageName) (Map FlagName Bool))
-            ,boptsInstallExes :: !(Bool, Maybe (Path Abs Dir))
+            ,boptsInstallExes :: InstallDest
             -- ^ Install executables to user path after building?
             ,boptsPreFetch :: !Bool
             -- ^ Fetch all packages immediately
@@ -308,7 +309,7 @@ defaultBuildOpts = BuildOpts
     , boptsDryrun = False
     , boptsGhcOptions = []
     , boptsFlags = Map.empty
-    , boptsInstallExes = (False, Nothing)
+    , boptsInstallExes = NoInstall
     , boptsPreFetch = False
     , boptsTestArgs = []
     , boptsOnlySnapshot = False
@@ -424,6 +425,9 @@ data InstallExesPlan = InstallExesPlan
     , installExesNamesLoc :: !(Map Text InstallLocation)
       -- ^ Map exename bindir. Default Map.Empty for configLocalBin
     }
+    deriving Show
+
+data InstallDest = NoInstall | DefaultInstall | InstallDir (Path Abs Dir)
     deriving Show
 
 -- | Basic information used to calculate what the configure options are
