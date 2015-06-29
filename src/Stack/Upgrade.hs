@@ -88,4 +88,5 @@ upgrade fromGit mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> d
             , boptsTestArgs = []
             , boptsOnlySnapshot = False
             , boptsCoverage = False
+            , boptsNoTests = False
             }

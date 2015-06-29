@@ -43,6 +43,7 @@ dot = do
             , boptsTestArgs = []
             , boptsOnlySnapshot = False
             , boptsCoverage = False
+            , boptsNoTests = False
             }
         Map.empty
     let localNames = Set.fromList $ map (packageName . lpPackage) locals

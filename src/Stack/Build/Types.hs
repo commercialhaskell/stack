@@ -291,6 +291,8 @@ data BuildOpts =
             ,boptsCoverage :: !Bool
             -- ^ Enable code coverage report generation for test
             -- suites.
+            ,boptsNoTests :: !Bool
+            -- ^ If set, don't run the tests
             }
   deriving (Show)
 

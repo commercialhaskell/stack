@@ -700,7 +700,6 @@ singleTest ac ee task =
             cabal (console && configHideTHLoading config) $ "build" : components
 
         bconfig <- asks getBuildConfig
-        buildDir <- distDirFromDir pkgDir
         hpcDir <- hpcDirFromDir pkgDir
         when needHpc (createTree hpcDir)
         let dotHpcDir = pkgDir </> dotHpc
@@ -709,7 +708,41 @@ singleTest ac ee task =
                     Platform _ Windows -> ".exe"
                     _ -> ""
 
-        errs <- liftM Map.unions $ forM testsToRun $ \testName -> do
+        errs <- if (boptsNoTests (eeBuildOpts ee)) then
+             do
+               announce "Test running disabled."
+               return mempty
+           else
+             executeTest ee task testsToRun exeExtension pkgDir config needHpc announce mlogFile package
+        when needHpc $ do
+            createTree (hpcDir </> dotHpc)
+            exists <- dirExists dotHpcDir
+            when exists $ do
+                copyDirectoryRecursive dotHpcDir (hpcDir </> dotHpc)
+                removeTree dotHpcDir
+            (_,files) <- listDirectory hpcDir
+            let tixes =
+                    filter (isSuffixOf ".tix" . toFilePath . filename) files
+            generateHpcReport pkgDir hpcDir (hpcDir </> dotHpc) tixes
+
+        bs <- liftIO $
+            case mlogFile of
+                Nothing -> return ""
+                Just (logFile, h) -> do
+                    hClose h
+                    S.readFile $ toFilePath logFile
+
+        unless (Map.null errs) $ throwM $ TestSuiteFailure
+            (taskProvides task)
+            errs
+            (fmap fst mlogFile)
+            bs
+
+executeTest :: M env m => ExecuteEnv -> Task -> [Text] -> String -> Path Abs Dir -> Config -> Bool -> (Text -> m ()) -> Maybe (Path Abs File, Handle) -> Package -> m (Map Text (Maybe ExitCode))
+executeTest ee task testsToRun exeExtension pkgDir config needHpc announce mlogFile package =
+  liftM Map.unions $ forM testsToRun $ \testName -> do
+            hpcDir <- hpcDirFromDir pkgDir
+            buildDir <- distDirFromDir pkgDir
             nameDir <- parseRelDir $ T.unpack testName
             nameExe <- parseRelFile $ T.unpack testName ++ exeExtension
             nameTix <- liftM (pkgDir </>) $ parseRelFile $ T.unpack testName ++ ".tix"
@@ -768,29 +801,6 @@ singleTest ac ee task =
                         , T.pack $ packageNameString $ packageName package
                         ]
                     return $ Map.singleton testName Nothing
-        when needHpc $ do
-            createTree (hpcDir </> dotHpc)
-            exists <- dirExists dotHpcDir
-            when exists $ do
-                copyDirectoryRecursive dotHpcDir (hpcDir </> dotHpc)
-                removeTree dotHpcDir
-            (_,files) <- listDirectory hpcDir
-            let tixes =
-                    filter (isSuffixOf ".tix" . toFilePath . filename) files
-            generateHpcReport pkgDir hpcDir (hpcDir </> dotHpc) tixes
-
-        bs <- liftIO $
-            case mlogFile of
-                Nothing -> return ""
-                Just (logFile, h) -> do
-                    hClose h
-                    S.readFile $ toFilePath logFile
-
-        unless (Map.null errs) $ throwM $ TestSuiteFailure
-            (taskProvides task)
-            errs
-            (fmap fst mlogFile)
-            bs
 
 -- | Determine the tests to be run based on the list of components.
 compareTestsComponents :: [Text] -- ^ components
