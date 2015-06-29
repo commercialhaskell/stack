@@ -3,14 +3,14 @@ import System.Directory
 
 main :: IO ()
 main = do
-  -- Custom Path
+  -- install in relative path
   createDirectory "bin"
   stack ["install", "--path", "./bin", "happy"]
   doesExist "./bin/happy"
 
   -- Default install
   -- This seems to fail due to direcory being cleaned up, 
-  -- manaual stack install test required
+  -- a manual test of the default stack install is required
   -- defaultDir <- getAppUserDataDirectory "local"
   -- stack ["install", "happy"]
   -- doesExist (defaultDir ++ "/bin/happy")
