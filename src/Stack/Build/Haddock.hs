@@ -55,11 +55,12 @@ shouldHaddockDeps bopts = fromMaybe (boptsHaddock bopts) (boptsHaddockDeps bopts
 -- available where viewing the docs (e.g. if building in a Docker container).
 copyDepHaddocks :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadBaseControl IO m)
                 => EnvOverride
+                -> BaseConfigOpts
                 -> [Path Abs Dir]
                 -> PackageIdentifier
                 -> Set (Path Abs Dir)
                 -> m ()
-copyDepHaddocks envOverride pkgDbs pkgId extraDestDirs = do
+copyDepHaddocks envOverride bco pkgDbs pkgId extraDestDirs = do
     mpkgHtmlDir <- findGhcPkgHaddockHtml envOverride pkgDbs pkgId
     case mpkgHtmlDir of
         Nothing -> return ()
@@ -72,9 +73,14 @@ copyDepHaddocks envOverride pkgDbs pkgId extraDestDirs = do
         mDepOrigDir <- findGhcPkgHaddockHtml envOverride pkgDbs depId
         case mDepOrigDir of
             Nothing -> return ()
-            Just depOrigDir ->
-                copyWhenNeeded (Set.insert (parent pkgHtmlDir) extraDestDirs)
-                               depId depOrigDir
+            Just depOrigDir -> do
+                let extraDestDirs' =
+                        -- Parent test ensures we don't try to copy docs to global locations
+                        if (bcoSnapInstallRoot bco) `isParentOf` pkgHtmlDir ||
+                           (bcoLocalInstallRoot bco) `isParentOf` pkgHtmlDir
+                            then Set.insert (parent pkgHtmlDir) extraDestDirs
+                            else extraDestDirs
+                copyWhenNeeded extraDestDirs' depId depOrigDir
     copyWhenNeeded destDirs depId depOrigDir = do
         depRelDir <- parseRelDir (packageIdentifierString depId)
         copied <- forM (Set.toList destDirs) $ \destDir -> do
@@ -86,7 +92,7 @@ copyDepHaddocks envOverride pkgDbs pkgId extraDestDirs = do
                     when needCopy $ doCopy depOrigDir depCopyDir
                     return needCopy
         when (or copied) $
-            copyDepHaddocks envOverride pkgDbs depId destDirs
+            copyDepHaddocks envOverride bco pkgDbs depId destDirs
     getNeedCopy depOrigDir depCopyDir = do
         let depOrigIndex = haddockIndexFile depOrigDir
             depCopyIndex = haddockIndexFile depCopyDir
