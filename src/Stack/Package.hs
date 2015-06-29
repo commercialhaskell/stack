@@ -29,7 +29,8 @@ module Stack.Package
   ,packageToolDependencies
   ,packageDependencies
   ,packageIdentifier
-  ,CabalFileType(..))
+  ,CabalFileType(..)
+  ,autogenDir)
   where
 
 import           Control.Exception hiding (try,catch)

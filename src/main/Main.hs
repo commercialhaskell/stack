@@ -50,6 +50,7 @@ import           Stack.Init
 import           Stack.New
 import qualified Stack.PackageIndex
 import           Stack.Repl
+import           Stack.Ide
 import           Stack.Setup
 import           Stack.Solver (solveExtraDeps)
 import           Stack.Types
@@ -191,6 +192,18 @@ main =
                                                     help "Use this command for the GHC to run"))) <*>
                          flag False True (long "no-load" <>
                                          help "Don't load modules on start-up"))
+             addCommand "ide"
+                        "Run ide-backend-client with the correct arguments"
+                        ideCmd
+                        ((,) <$>
+                         fmap (map T.pack)
+                              (many (strArgument
+                                       (metavar "TARGET" <>
+                                        help "If none specified, use all packages defined in current directory"))) <*>
+                         fmap (fromMaybe [])
+                              (optional (argsOption (long "ghc-options" <>
+                                                     metavar "OPTION" <>
+                                                     help "Additional options passed to GHCi"))))
              addCommand "runghc"
                         "Run runghc"
                         execCmd
@@ -530,16 +543,17 @@ upgradeCmd fromGit go = withConfig go $
 
 -- | Upload to Hackage
 uploadCmd :: [String] -> GlobalOpts -> IO ()
-uploadCmd args0 go = do
+uploadCmd args go = do
     (manager,lc) <- loadConfigWithOpts go
     let config = lcConfig lc
-        args = if null args0 then ["."] else args0
-    liftIO $ do
-        uploader <- Upload.mkUploader
-              config
-            $ Upload.setGetManager (return manager)
-              Upload.defaultUploadSettings
-        mapM_ (Upload.upload uploader) args
+    if null args
+        then error "To upload the current project, please run 'stack upload .'"
+        else liftIO $ do
+            uploader <- Upload.mkUploader
+                  config
+                $ Upload.setGetManager (return manager)
+                  Upload.defaultUploadSettings
+            mapM_ (Upload.upload uploader) args
 
 data ExecOpts = ExecOpts
     { eoCmd :: !String
@@ -588,10 +602,15 @@ execCmd ExecOpts {..} go = withBuildConfig go ExecStrategy $ do
             }
     exec eoEnvSettings eoCmd eoArgs
 
--- | Run the REPL in the context of a project, with
+-- | Run the REPL in the context of a project.
 replCmd :: ([Text], [String], FilePath, Bool) -> GlobalOpts -> IO ()
 replCmd (targets,args,path,noload) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $ do
       repl targets args path noload
+
+-- | Run ide-backend in the context of a project.
+ideCmd :: ([Text], [String]) -> GlobalOpts -> IO ()
+ideCmd (targets,args) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $ do
+      ide targets args
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()

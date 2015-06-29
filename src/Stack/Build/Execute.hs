@@ -669,6 +669,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
     when (doHaddock && shouldHaddockDeps eeBuildOpts) $
         copyDepHaddocks
             eeEnvOverride
+            eeBaseConfigOpts
             (pkgDbs ++ [eeGlobalDB])
             (PackageIdentifier (packageName package) (packageVersion package))
             Set.empty
