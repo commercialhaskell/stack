@@ -207,3 +207,19 @@ Stack makes use of a temporary directory for some commands (/tmp by default on l
 A custom temporary directory can be forced:
 * on Linux by setting the environment variable TMPDIR (eg `$ TMPDIR=path-to-tmp stack setup`)
 * on Windows by setting one of the environment variable (given in priority order), TMP, TEMP, USERPROFILE
+
+__Can I use stack as a script interpreter?__
+
+Yes!  Here is an example using the [turtle](http://www.stackage.org/package/turtle) package:
+
+```
+#!/usr/bin/env stack
+-- stack --resolver lts-2.9 --install-ghc runghc --package turtle
+{-# LANGUAGE OverloadedStrings #-}
+import Turtle
+main = echo "Hello World!"
+```
+
+Set the executable bit on the script, and then you can run it as a regular command (on Windows, you will have to run `stack <script>.hs`).
+
+The first line is the usual "shebang" syntax to use `stack` as a script interpreter.  The second line, which is required, provides additional options to stack (due to the common limitation of the script interpreter only being allowed a single argument).  In this case, the options tell stack to use the lts-2.9 resolver, to automatically install GHC if it is not already installed, and to ensure the `turtle` package is available.
