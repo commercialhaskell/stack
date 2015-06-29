@@ -9,11 +9,14 @@
 
 module Main where
 
+import           Blaze.ByteString.Builder (toLazyByteString, copyByteString)
+import           Blaze.ByteString.Builder.Char.Utf8 (fromShow)
 import           Control.Exception
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask)
+import qualified Data.ByteString.Lazy as L
 import           Data.Char (toLower)
 import           Data.List
 import qualified Data.List as List
@@ -52,18 +55,24 @@ import           Stack.Solver (solveExtraDeps)
 import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Types.StackT
+import           Stack.Upgrade
 import qualified Stack.Upload as Upload
+import           System.Directory (canonicalizePath)
 import           System.Environment (getArgs, getProgName)
 import           System.Exit
 import           System.FilePath (searchPathSeparator)
-import           System.Directory (canonicalizePath)
-import           System.IO (hIsTerminalDevice, stderr, stdout)
+import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..))
 import           System.Process.Read
 
 -- | Commandline dispatcher.
 main :: IO ()
 main =
-  do when False $ do -- https://github.com/commercialhaskell/stack/issues/322
+  do -- Line buffer the output by default, particularly for non-terminal runs.
+     -- See https://github.com/commercialhaskell/stack/pull/360
+     hSetBuffering stdout LineBuffering
+     hSetBuffering stdin  LineBuffering
+     hSetBuffering stderr NoBuffering
+     when False $ do -- https://github.com/commercialhaskell/stack/issues/322
        plugins <- findPlugins (T.pack stackProgName)
        tryRunPlugin plugins
      progName <- getProgName
@@ -91,7 +100,7 @@ main =
                         ((,) <$> (optional (strOption (long "path" <> 
                                                         metavar "DIRECTORY" <> 
                                                         help "Write binaries to DIRECTORY"))) <*>
-                         buildOpts False)
+                         buildOpts Build)
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
                         (buildCmd DoTests)
@@ -141,6 +150,13 @@ main =
                         "Update the package index"
                         updateCmd
                         (pure ())
+             addCommand "upgrade"
+                        "Upgrade to the latest stack (experimental)"
+                        upgradeCmd
+                        (switch
+                            ( long "git"
+                           <> help "Clone from Git instead of downloading from Hackage (more dangerous)"
+                            ))
              addCommand "upload"
                         "Upload a package to Hackage"
                         uploadCmd
@@ -152,26 +168,11 @@ main =
              addCommand "exec"
                         "Execute a command"
                         execCmd
-                        ((,,)
-                            <$> strArgument (metavar "CMD")
-                            <*> many (strArgument (metavar "-- ARGS (e.g. stack exec -- ghc --version)"))
-                            <*> (EnvSettings
-                                    <$> pure True
-                                    <*> boolFlags True
-                                            "ghc-package-path"
-                                            "setting the GHC_PACKAGE_PATH variable for the subprocess"
-                                            idm
-                                    <*> boolFlags True
-                                            "stack-exe"
-                                            "setting the STACK_EXE environment variable to the path for the stack executable"
-                                            idm))
+                        (execOptsParser Nothing)
              addCommand "ghc"
                         "Run ghc"
                         execCmd
-                        ((,,)
-                            <$> pure "ghc"
-                            <*> many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)"))
-                            <*> pure defaultEnvSettings)
+                        (execOptsParser $ Just "ghc")
              addCommand "ghci"
                         "Run ghci in the context of project(s)"
                         replCmd
@@ -193,10 +194,7 @@ main =
              addCommand "runghc"
                         "Run runghc"
                         execCmd
-                        ((,,)
-                            <$> pure "runghc"
-                            <*> many (strArgument (metavar "-- ARGS (e.g. stack runghc -- X.hs)"))
-                            <*> pure defaultEnvSettings)
+                        (execOptsParser $ Just "runghc")
              addCommand "clean"
                         "Clean the local packages"
                         cleanCmd
@@ -231,7 +229,7 @@ main =
         case fromException e of
             Just ec -> exitWith ec
             Nothing -> do
-                print e
+                L.hPut stderr $ toLazyByteString $ fromShow e <> copyByteString "\n"
                 exitFailure
   where
     dockerHelpOptName = Docker.dockerCmdName ++ "-help"
@@ -412,12 +410,23 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                   , soptsStackYaml = mstack
                   , soptsForceReinstall = scoForceReinstall
                   , soptsSanityCheck = True
+                  , soptsSkipGhcCheck = False
                   }
               case mpaths of
                   Nothing -> $logInfo "GHC on PATH would be used"
                   Just ps -> $logInfo $ "Would add the following to PATH: "
                       <> T.pack (intercalate [searchPathSeparator] ps)
                   )
+
+withConfig :: GlobalOpts
+           -> StackT Config IO ()
+           -> IO ()
+withConfig go@GlobalOpts{..} inner = do
+    (manager, lc) <- loadConfigWithOpts go
+    runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
+        Docker.rerunWithOptionalContainer (lcProjectRoot lc) $
+            runStackT manager globalLogLevel (lcConfig lc) globalTerminal
+                inner
 
 withBuildConfig :: GlobalOpts
                 -> NoBuildConfigStrategy
@@ -481,36 +490,43 @@ buildCmd finalAction opts go@GlobalOpts{..} = withBuildConfig go ThrowException 
 
 -- | Install
 installCmd :: (Maybe FilePath, BuildOpts) -> GlobalOpts -> IO ()
-installCmd (mPath, opts) go@GlobalOpts{..} = do
-    specifiedDir <- case mPath of
-                      (Just userPath) -> do
-                            canonPath <- liftIO $ canonicalizePath userPath
-                            tryParseAbs <- try (parseAbsDir canonPath)
-                            case (tryParseAbs) of
-                              Left (_ :: SomeException) -> 
-                                    error $ "Could not parse user specified directory \"" ++ userPath ++ "\"" 
-                              Right absPath -> return (Just absPath)
-                      Nothing -> return Nothing
-    withBuildConfig go ExecStrategy 
-                       (Stack.Build.build opts { boptsInstallExes = (True, specifiedDir) }) 
+installCmd (mPath,opts) go@GlobalOpts{..} = do
+    specifiedDir <-
+        case mPath of
+            (Just userPath) -> do
+                canonPath <- liftIO $ canonicalizePath userPath
+                tryParseAbs <-
+                    try (parseAbsDir canonPath)
+                case (tryParseAbs) of
+                    Left (_ :: SomeException) ->
+                        error $ "Could not parse user specified directory \"" ++
+                                userPath ++ "\""
+                    Right absPath ->
+                        return (Just absPath)
+            Nothing ->
+                return Nothing
+    withBuildConfig
+        go
+        ExecStrategy
+        (Stack.Build.build
+             opts
+             { boptsInstallExes = (True, specifiedDir)
+             }) 
+
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
-unpackCmd names go@GlobalOpts{..} = do
-    (manager,lc) <- loadConfigWithOpts go
-    runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-        Docker.rerunWithOptionalContainer (lcProjectRoot lc) $
-            runStackT manager globalLogLevel (lcConfig lc) globalTerminal $ do
-                menv <- getMinimalEnvOverride
-                Stack.Fetch.unpackPackages menv "." names
+unpackCmd names go = withConfig go $ do
+    menv <- getMinimalEnvOverride
+    Stack.Fetch.unpackPackages menv "." names
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()
-updateCmd () go@GlobalOpts{..} = do
-    (manager,lc) <- loadConfigWithOpts go
-    runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-        Docker.rerunWithOptionalContainer (lcProjectRoot lc) $
-            runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-                getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
+updateCmd () go = withConfig go $
+    getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
+
+upgradeCmd :: Bool -> GlobalOpts -> IO ()
+upgradeCmd fromGit go = withConfig go $
+    upgrade fromGit (globalResolver go)
 
 -- | Upload to Hackage
 uploadCmd :: [String] -> GlobalOpts -> IO ()
@@ -525,11 +541,52 @@ uploadCmd args0 go = do
               Upload.defaultUploadSettings
         mapM_ (Upload.upload uploader) args
 
+data ExecOpts = ExecOpts
+    { eoCmd :: !String
+    , eoArgs :: ![String]
+    , eoEnvSettings :: !EnvSettings
+    , eoPackages :: ![String]
+    }
+
+execOptsParser :: Maybe String -- ^ command
+               -> Parser ExecOpts
+execOptsParser mcmd =
+    ExecOpts
+        <$> maybe eoCmdParser pure mcmd
+        <*> eoArgsParser
+        <*> eoEnvSettingsParser
+        <*> eoPackagesParser
+  where
+    eoCmdParser :: Parser String
+    eoCmdParser = strArgument (metavar "CMD")
+
+    eoArgsParser :: Parser [String]
+    eoArgsParser = many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)"))
+
+    eoEnvSettingsParser :: Parser EnvSettings
+    eoEnvSettingsParser = EnvSettings
+        <$> pure True
+        <*> boolFlags True
+                "ghc-package-path"
+                "setting the GHC_PACKAGE_PATH variable for the subprocess"
+                idm
+        <*> boolFlags True
+                "stack-exe"
+                "setting the STACK_EXE environment variable to the path for the stack executable"
+                idm
+
+    eoPackagesParser :: Parser [String]
+    eoPackagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))
+
 -- | Execute a command.
-execCmd :: (String, [String],EnvSettings) -> GlobalOpts -> IO ()
-execCmd (cmd,args,envSettings) go@GlobalOpts{..} =
-    withBuildConfig go ExecStrategy $
-    exec envSettings cmd args
+execCmd :: ExecOpts -> GlobalOpts -> IO ()
+execCmd ExecOpts {..} go = withBuildConfig go ExecStrategy $ do
+    let targets = concatMap words eoPackages
+    unless (null targets) $ do
+        Stack.Build.build defaultBuildOpts
+            { boptsTargets = map T.pack targets
+            }
+    exec eoEnvSettings eoCmd eoArgs
 
 -- | Run the REPL in the context of a project, with
 replCmd :: ([Text], [String], FilePath, Bool) -> GlobalOpts -> IO ()
@@ -761,6 +818,7 @@ data GlobalOpts = GlobalOpts
     , globalConfigMonoid :: ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalResolver     :: Maybe Resolver -- ^ Resolver override
     , globalTerminal     :: Bool -- ^ We're in a terminal?
+    , globalStackYaml    :: Maybe FilePath -- ^ Override project stack.yaml
     } deriving (Show)
 
 -- | Load the configuration with a manager. Convenience function used
@@ -768,31 +826,28 @@ data GlobalOpts = GlobalOpts
 loadConfigWithOpts :: GlobalOpts -> IO (Manager,LoadConfig (StackLoggingT IO))
 loadConfigWithOpts GlobalOpts{..} = do
     manager <- newTLSManager
+    mstackYaml <-
+        case globalStackYaml of
+            Nothing -> return Nothing
+            Just fp -> do
+                path <- canonicalizePath fp >>= parseAbsFile
+                return $ Just path
     lc <- runStackLoggingT
               manager
               globalLogLevel
               globalTerminal
-              (loadConfig globalConfigMonoid)
+              (loadConfig globalConfigMonoid mstackYaml)
     return (manager,lc)
 
 -- | Project initialization
 initCmd :: InitOpts -> GlobalOpts -> IO ()
-initCmd initOpts go@GlobalOpts{..} = do
-  (manager,lc) <- loadConfigWithOpts go
-  runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-        Docker.rerunWithOptionalContainer (lcProjectRoot lc) $
-            runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-                initProject initOpts
+initCmd initOpts go = withConfig go $ initProject initOpts
 
 -- | Project creation
 newCmd :: InitOpts -> GlobalOpts -> IO ()
-newCmd initOpts go@GlobalOpts{..} = do
-  (manager,lc) <- loadConfigWithOpts go
-  runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-        Docker.rerunWithOptionalContainer (lcProjectRoot lc) $
-            runStackT manager globalLogLevel (lcConfig lc) globalTerminal $ do
-                newProject
-                initProject initOpts
+newCmd initOpts go@GlobalOpts{..} = withConfig go $ do
+    newProject
+    initProject initOpts
 
 -- | Fix up extra-deps for a project
 solverCmd :: Bool -- ^ modify stack.yaml automatically?
