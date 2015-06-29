@@ -153,7 +153,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
                             boptsInstallExes $ bcoBuildOpts baseConfigOpts0
                         in case installExesPlan of
                            NoInstall -> InstallExesPlan False Nothing Map.empty
-                           DefaultInstall -> InstallExesPlan True Nothing Map.empty
+                           DefaultInstall -> InstallExesPlan True Nothing installExes
                            InstallDir (userDir) -> InstallExesPlan True (Just userDir) installExes
 
                 }
