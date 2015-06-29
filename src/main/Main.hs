@@ -772,7 +772,11 @@ globalOpts defaultTerminal =
         False
         (long "no-terminal" <>
          help
-             "Override terminal detection in the case of running in a false terminal")
+             "Override terminal detection in the case of running in a false terminal") <*>
+    (optional (strOption
+        (long "stack-yaml" <>
+         metavar "STACK-YAML" <>
+         help "Override project stack.yaml file (overrides any STACK_YAML environment variable)")))
 
 -- | Parse for a logging level.
 logLevelOpt :: Parser LogLevel
