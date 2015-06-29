@@ -507,16 +507,17 @@ upgradeCmd fromGit go = withConfig go $
 
 -- | Upload to Hackage
 uploadCmd :: [String] -> GlobalOpts -> IO ()
-uploadCmd args0 go = do
+uploadCmd args go = do
     (manager,lc) <- loadConfigWithOpts go
     let config = lcConfig lc
-        args = if null args0 then ["."] else args0
-    liftIO $ do
-        uploader <- Upload.mkUploader
-              config
-            $ Upload.setGetManager (return manager)
-              Upload.defaultUploadSettings
-        mapM_ (Upload.upload uploader) args
+    if null args
+        then error "To upload the current project, please run 'stack upload .'"
+        else liftIO $ do
+            uploader <- Upload.mkUploader
+                  config
+                $ Upload.setGetManager (return manager)
+                  Upload.defaultUploadSettings
+            mapM_ (Upload.upload uploader) args
 
 data ExecOpts = ExecOpts
     { eoCmd :: !String

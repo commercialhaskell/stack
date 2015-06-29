@@ -4,6 +4,7 @@
 * Handle attempt to use non-existing resolver [#436](https://github.com/commercialhaskell/stack/pull/436)
 * Add `--force` flag to `init` command
 * exec style commands accept the `--package` option (see [Reddit discussion](http://www.reddit.com/r/haskell/comments/3bd66h/stack_runghc_turtle_as_haskell_script_solution/))
+* `stack upload` without arguments doesn't do anything [#439](https://github.com/commercialhaskell/stack/issues/439)
 
 ## 0.1.1.0
 
