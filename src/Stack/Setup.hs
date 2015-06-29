@@ -51,11 +51,11 @@ import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Safe (readMay)
 import           Stack.Build.Types
-import           Stack.GhcPkg (getCabalPkgVer, getGlobalDB)
+import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB)
 import           Stack.Solver (getGhcVersion)
 import           Stack.Types
 import           Stack.Types.StackT
-import           System.Directory (doesDirectoryExist, createDirectoryIfMissing, removeFile)
+import           System.Directory (createDirectoryIfMissing, removeFile)
 import           System.Environment (getExecutablePath)
 import           System.Exit (ExitCode (ExitSuccess))
 import           System.FilePath (searchPathSeparator)
@@ -164,13 +164,13 @@ setupEnv = do
         localsPath = augmentPath (mkDirs' True) mpath
 
     deps <- runReaderT packageDatabaseDeps envConfig0
-    depsExists <- liftIO $ doesDirectoryExist $ toFilePath deps
+    createDatabase menv1 deps
     localdb <- runReaderT packageDatabaseLocal envConfig0
-    localdbExists <- liftIO $ doesDirectoryExist $ toFilePath localdb
+    createDatabase menv1 localdb
     globalDB <- mkEnvOverride platform env1 >>= getGlobalDB
     let mkGPP locals = T.pack $ intercalate [searchPathSeparator] $ concat
-            [ [toFilePathNoTrailingSlash localdb | locals && localdbExists]
-            , [toFilePathNoTrailingSlash deps | depsExists]
+            [ [toFilePathNoTrailingSlash localdb | locals]
+            , [toFilePathNoTrailingSlash deps]
             , [toFilePathNoTrailingSlash globalDB]
             ]
 
