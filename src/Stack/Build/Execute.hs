@@ -684,7 +684,6 @@ singleTest ac ee task =
                 (case taskType task of
                     TTLocal lp -> lpDirtyFiles lp
                     _ -> assert False True)
-                || True -- FIXME above logic is incorrect, see: https://github.com/commercialhaskell/stack/issues/319
             needHpc = boptsCoverage (eeBuildOpts ee)
 
             componentsRaw =
@@ -846,7 +845,6 @@ singleBench ac ee task =
                 (case taskType task of
                     TTLocal lp -> lpDirtyFiles lp
                     _ -> assert False True)
-                || True -- FIXME above logic is incorrect, see: https://github.com/commercialhaskell/stack/issues/319
         when needBuild $ do
             announce "build (benchmarks)"
             fileModTimes <- getPackageFileModTimes package cabalfp
