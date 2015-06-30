@@ -508,19 +508,23 @@ readFlag = do
             return $ Map.singleton pn' $ Map.singleton flagN b
         _ -> readerError "Must have a colon"
 
--- | Build the project.
-buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
-buildCmd finalAction opts go
+-- | Helper for build and install commands
+buildCmdHelper :: NoBuildConfigStrategy -> FinalAction -> BuildOpts -> GlobalOpts -> IO ()
+buildCmdHelper strat finalAction opts go
     | boptsFileWatch opts = fileWatch inner
     | otherwise = inner $ const $ return ()
   where
     inner setLocalFiles =
-        withBuildConfig go ThrowException $
+        withBuildConfig go strat $
         Stack.Build.build setLocalFiles opts { boptsFinalAction = finalAction }
+
+-- | Build the project.
+buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
+buildCmd = buildCmdHelper ThrowException
 
 -- | Install
 installCmd :: BuildOpts -> GlobalOpts -> IO ()
-installCmd opts = buildCmd DoNothing opts { boptsInstallExes = True }
+installCmd opts = buildCmdHelper ExecStrategy DoNothing opts { boptsInstallExes = True }
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
