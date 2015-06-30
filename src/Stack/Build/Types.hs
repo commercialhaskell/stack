@@ -295,6 +295,8 @@ data BuildOpts =
             ,boptsCoverage :: !Bool
             -- ^ Enable code coverage report generation for test
             -- suites.
+            ,boptsFileWatch :: !Bool
+            -- ^ Watch files for changes and automatically rebuild
             }
   deriving (Show)
 
@@ -315,6 +317,7 @@ defaultBuildOpts = BuildOpts
     , boptsTestArgs = []
     , boptsOnlySnapshot = False
     , boptsCoverage = False
+    , boptsFileWatch = False
     }
 
 -- | Run a Setup.hs action after building a package, before installing.
@@ -353,6 +356,7 @@ data LocalPackage = LocalPackage
     , lpDir            :: !(Path Abs Dir)  -- ^ Directory of the package.
     , lpCabalFile      :: !(Path Abs File) -- ^ The .cabal file
     , lpDirtyFiles     :: !Bool            -- ^ are there files that have changed since the last build?
+    , lpFiles          :: !(Set (Path Abs File)) -- ^ all files used by this package
     , lpComponents     :: !(Set Text)      -- ^ components to build, passed directly to Setup.hs build
     }
     deriving Show

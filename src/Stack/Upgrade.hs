@@ -72,20 +72,7 @@ upgrade fromGit mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> d
                 (Just $ dir </> $(mkRelFile "stack.yaml"))
             lcLoadBuildConfig lc mresolver ThrowException
         envConfig1 <- runStackT manager logLevel bconfig terminal setupEnv
-        runStackT manager logLevel envConfig1 terminal $ build BuildOpts
+        runStackT manager logLevel envConfig1 terminal $ build (const $ return ()) defaultBuildOpts
             { boptsTargets = ["stack"]
-            , boptsLibProfile = False
-            , boptsExeProfile = False
-            , boptsEnableOptimizations = Nothing
-            , boptsHaddock = False
-            , boptsHaddockDeps = Nothing
-            , boptsFinalAction = DoNothing
-            , boptsDryrun = False
-            , boptsGhcOptions = []
-            , boptsFlags = Map.empty
             , boptsInstallExes = True
-            , boptsPreFetch = False
-            , boptsTestArgs = []
-            , boptsOnlySnapshot = False
-            , boptsCoverage = False
             }

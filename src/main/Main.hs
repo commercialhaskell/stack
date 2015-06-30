@@ -9,15 +9,12 @@
 
 module Main where
 
-import           Blaze.ByteString.Builder (toLazyByteString, copyByteString)
-import           Blaze.ByteString.Builder.Char.Utf8 (fromShow)
 import           Control.Exception
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask)
 import           Data.Attoparsec.Args (withInterpreterArgs)
-import qualified Data.ByteString.Lazy as L
 import           Data.Char (toLower)
 import           Data.List
 import qualified Data.List as List
@@ -47,6 +44,7 @@ import qualified Stack.Docker as Docker
 import           Stack.Dot
 import           Stack.Exec
 import           Stack.Fetch
+import           Stack.FileWatch
 import           Stack.Init
 import           Stack.New
 import qualified Stack.PackageIndex
@@ -256,7 +254,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
             case fromException e of
                 Just ec -> exitWith ec
                 Nothing -> do
-                    L.hPut stderr $ toLazyByteString $ fromShow e <> copyByteString "\n"
+                    displayException e
                     exitFailure
   where
     dockerHelpOptName = Docker.dockerCmdName ++ "-help"
@@ -512,13 +510,17 @@ readFlag = do
 
 -- | Build the project.
 buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
-buildCmd finalAction opts go@GlobalOpts{..} = withBuildConfig go ThrowException $
-    Stack.Build.build opts { boptsFinalAction = finalAction }
+buildCmd finalAction opts go
+    | boptsFileWatch opts = fileWatch inner
+    | otherwise = inner $ const $ return ()
+  where
+    inner setLocalFiles =
+        withBuildConfig go ThrowException $
+        Stack.Build.build setLocalFiles opts { boptsFinalAction = finalAction }
 
 -- | Install
 installCmd :: BuildOpts -> GlobalOpts -> IO ()
-installCmd opts go@GlobalOpts{..} = withBuildConfig go ExecStrategy $
-    Stack.Build.build opts { boptsInstallExes = True }
+installCmd opts = buildCmd DoNothing opts { boptsInstallExes = True }
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
@@ -591,7 +593,7 @@ execCmd :: ExecOpts -> GlobalOpts -> IO ()
 execCmd ExecOpts {..} go = withBuildConfig go ExecStrategy $ do
     let targets = concatMap words eoPackages
     unless (null targets) $ do
-        Stack.Build.build defaultBuildOpts
+        Stack.Build.build (const $ return ()) defaultBuildOpts
             { boptsTargets = map T.pack targets
             }
     exec eoEnvSettings eoCmd eoArgs
@@ -649,7 +651,8 @@ buildOpts :: Command -> Parser BuildOpts
 buildOpts cmd = fmap process $
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> haddock <*> haddockDeps <*> finalAction <*> dryRun <*> ghcOpts <*>
-            flags <*> installExes <*> preFetch <*> testArgs <*> onlySnapshot <*> coverage
+            flags <*> installExes <*> preFetch <*> testArgs <*> onlySnapshot <*> coverage <*>
+            fileWatch'
   where process bopts =
             if boptsCoverage bopts
                then bopts { boptsExeProfile = True
@@ -728,6 +731,10 @@ buildOpts cmd = fmap process $
                         (long "coverage" <>
                          help "Generate a code coverage report")
                else pure False
+
+        fileWatch' = flag False True
+            (long "file-watch" <>
+             help "Watch for changes in local files and automatically rebuild")
 
 -- | Parser for docker cleanup arguments.
 dockerCleanupOpts :: Parser Docker.CleanupOpts
