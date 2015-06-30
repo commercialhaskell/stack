@@ -13,5 +13,4 @@ cabal-dev/
 cabal.sandbox.config
 dist/
 tags
-/.docker-sandbox/
 /_release/
