@@ -254,7 +254,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
             case fromException e of
                 Just ec -> exitWith ec
                 Nothing -> do
-                    displayException e
+                    printExceptionStderr e
                     exitFailure
   where
     dockerHelpOptName = Docker.dockerCmdName ++ "-help"

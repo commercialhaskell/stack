@@ -2,7 +2,7 @@
 {-# LANGUAGE TupleSections #-}
 module Stack.FileWatch
     ( fileWatch
-    , displayException
+    , printExceptionStderr
     ) where
 
 import Blaze.ByteString.Builder (toLazyByteString, copyByteString)
@@ -23,9 +23,9 @@ import Path
 import System.FSNotify
 import System.IO (stderr)
 
--- | Display an exception to stderr
-displayException :: Exception e => e -> IO ()
-displayException e =
+-- | Print an exception to stderr
+printExceptionStderr :: Exception e => e -> IO ()
+printExceptionStderr e =
     L.hPut stderr $ toLazyByteString $ fromShow e <> copyByteString "\n"
 
 -- | Run an action, watching for file changes
@@ -96,7 +96,7 @@ fileWatch inner = withManager $ \manager -> do
 
         eres <- tryAny $ inner setWatched
         case eres of
-            Left e -> displayException e
+            Left e -> printExceptionStderr e
             Right () -> putStrLn "Success! Waiting for next file change."
 
         putStrLn "Type help for available commands"
