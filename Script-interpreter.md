@@ -1,4 +1,4 @@
-You can use stack as a script interpreter.  Here is an example using the [turtle](http://www.stackage.org/package/turtle) package:
+You can use stack as a script interpreter.  Here is an example that uses the [turtle](http://www.stackage.org/package/turtle) package:
 
 ```haskell
 #!/usr/bin/env stack
