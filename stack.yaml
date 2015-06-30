@@ -5,4 +5,5 @@ extra-deps:
 - path-0.5.1
 - monad-unlift-0.1.1.0
 - Win32-notify-0.3.0.1
+- hfsevents-0.1.5
 resolver: lts-2.9
