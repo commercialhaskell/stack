@@ -184,7 +184,7 @@ instance Show StackBuildException where
              getExtras (DependencyPlanFailures _ m) =
                 Map.unions $ map go $ Map.toList m
               where
-                go (name, (_range, NotInBuildPlan (Just version))) =
+                go (name, (_range, Just version, NotInBuildPlan)) =
                     Map.singleton name version
                 go _ = Map.empty
      -- Supressing duplicate output
@@ -209,15 +209,17 @@ instance Exception StackBuildException
 
 data ConstructPlanException
     = DependencyCycleDetected [PackageName]
-    | DependencyPlanFailures PackageIdentifier (Map PackageName (VersionRange, BadDependency))
+    | DependencyPlanFailures PackageIdentifier (Map PackageName (VersionRange, LatestVersion, BadDependency))
     | UnknownPackage PackageName -- TODO perhaps this constructor will be removed, and BadDependency will handle it all
     -- ^ Recommend adding to extra-deps, give a helpful version number?
     deriving (Typeable, Eq)
 
+-- | For display purposes only, Nothing if package not found
+type LatestVersion = Maybe Version
+
 -- | Reason why a dependency was not used
 data BadDependency
     = NotInBuildPlan
-        (Maybe Version) -- recommended version, for extra-deps output
     | Couldn'tResolveItsDependencies
     | DependencyMismatch Version
     deriving (Typeable, Eq)
@@ -240,16 +242,17 @@ instance Show ConstructPlanException where
       indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
       doubleIndent = indent . indent
       appendDeps = foldr (\dep-> (++) ("\n" ++ showDep dep)) ""
-      showDep (name, (range, badDep)) = concat
+      showDep (name, (range, mlatest, badDep)) = concat
         [ show name
         , ": needed ("
         , display range
-        , "), but "
+        , ")"
+        , case mlatest of
+            Nothing -> ""
+            Just latest -> ", latest is " ++ versionString latest
+        , ", but "
         , case badDep of
-            NotInBuildPlan mlatest -> "not present in build plan" ++
-                (case mlatest of
-                    Nothing -> ""
-                    Just latest -> ", latest is " ++ versionString latest)
+            NotInBuildPlan -> "not present in build plan"
             Couldn'tResolveItsDependencies -> "couldn't resolve its dependencies"
             DependencyMismatch version -> versionString version ++ " found"
         ]
