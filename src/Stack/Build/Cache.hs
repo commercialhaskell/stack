@@ -18,6 +18,9 @@ module Stack.Build.Cache
     , writeBuildCache
     , writeConfigCache
     , writeCabalMod
+    , setTestSuccess
+    , unsetTestSuccess
+    , checkTestSuccess
     ) where
 
 import           Control.Exception.Enclosed (catchIO, handleIO, tryIO)
@@ -32,7 +35,7 @@ import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (catMaybes, mapMaybe)
+import           Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 import qualified Data.Set as Set
 import           GHC.Generics (Generic)
 import           Path
@@ -228,3 +231,32 @@ getPackageFileModTimes pkg cabalfp = do
                        if isDoesNotExistError e
                            then return Nothing
                            else throwM e))
+
+-- | Mark a test suite as having succeeded
+setTestSuccess :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
+               => Path Abs Dir
+               -> m ()
+setTestSuccess dir =
+    writeCache
+        dir
+        testSuccessFile
+        True
+
+-- | Mark a test suite as not having succeeded
+unsetTestSuccess :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
+                 => Path Abs Dir
+                 -> m ()
+unsetTestSuccess dir =
+    writeCache
+        dir
+        testSuccessFile
+        False
+
+-- | Check if the test suite already passed
+checkTestSuccess :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
+                 => Path Abs Dir
+                 -> m Bool
+checkTestSuccess dir =
+    liftM
+        (fromMaybe False)
+        (tryGetCache testSuccessFile dir)

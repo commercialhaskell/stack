@@ -320,9 +320,10 @@ defaultBuildOpts = BuildOpts
 -- | Run a Setup.hs action after building a package, before installing.
 data FinalAction
   = DoTests
+      Bool -- rerun tests which already passed?
   | DoBenchmarks
   | DoNothing
-  deriving (Eq,Bounded,Enum,Show)
+  deriving (Eq,Show)
 
 -- | Package dependency oracle.
 newtype PkgDepsOracle =

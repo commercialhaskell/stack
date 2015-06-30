@@ -190,7 +190,10 @@ loadLocals bopts latestVersion = do
                 , packageConfigPlatform = configPlatform $ getConfig bconfig
                 }
             configFinal = config
-                { packageConfigEnableTests = wanted && boptsFinalAction bopts == DoTests
+                { packageConfigEnableTests =
+                    case boptsFinalAction bopts of
+                        DoTests _ -> wanted
+                        _ -> False
                 , packageConfigEnableBenchmarks = wanted && boptsFinalAction bopts == DoBenchmarks
                 }
         pkg <- readPackage config cabalfp

@@ -19,6 +19,7 @@ module Stack.Constants
     ,configCacheFile
     ,configCabalMod
     ,buildCacheFile
+    ,testSuccessFile
     ,stackProgName
     ,wiredInPackages
     ,cabalPackageName
@@ -106,6 +107,15 @@ buildCacheFile :: (MonadThrow m, MonadReader env m, HasPlatform env,HasEnvConfig
 buildCacheFile dir = do
     liftM
         (</> $(mkRelFile "stack-build-cache"))
+        (distDirFromDir dir)
+
+-- | The filename used to mark tests as having succeeded
+testSuccessFile :: (MonadThrow m, MonadReader env m, HasPlatform env,HasEnvConfig env)
+                => Path Abs Dir -- ^ Package directory
+                -> m (Path Abs File)
+testSuccessFile dir =
+    liftM
+        (</> $(mkRelFile "stack-test-success"))
         (distDirFromDir dir)
 
 -- | The filename used for dirtiness check of config.

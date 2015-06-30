@@ -101,8 +101,13 @@ main =
                         (buildOpts Build)
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
-                        (buildCmd DoTests)
-                        (buildOpts Test)
+                        (\(rerun, bopts) -> buildCmd (DoTests rerun) bopts)
+                        ((,)
+                            <$> boolFlags True
+                                "rerun-tests"
+                                "running already successful tests"
+                                idm
+                            <*> (buildOpts Test))
              addCommand "bench"
                         "Build and benchmark the project(s) in this directory/configuration"
                         (buildCmd DoBenchmarks)

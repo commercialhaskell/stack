@@ -6,6 +6,7 @@
 * exec style commands accept the `--package` option (see [Reddit discussion](http://www.reddit.com/r/haskell/comments/3bd66h/stack_runghc_turtle_as_haskell_script_solution/))
 * `stack upload` without arguments doesn't do anything [#439](https://github.com/commercialhaskell/stack/issues/439)
 * Print latest version of packages on conflicts [#450](https://github.com/commercialhaskell/stack/issues/450)
+* Flag to avoid rerunning tests that haven't changed [#451](https://github.com/commercialhaskell/stack/issues/451)
 
 ## 0.1.1.0
 
