@@ -378,7 +378,7 @@ eachPair inner =
     start' bs1 =
         toConsumer (valSrc =$= inner key) >>= yield >> start
       where
-        (key, bs2) = S.breakByte _colon bs1
+        (key, bs2) = S.break (== _colon) bs1
         (spaces, bs3) = S.span (== _space) $ S.drop 1 bs2
         indent = S.length key + 1 + S.length spaces
 
