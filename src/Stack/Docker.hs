@@ -11,11 +11,11 @@ module Stack.Docker
   ,dockerOptsParser
   ,dockerOptsFromMonoid
   ,dockerPullCmdName
+  ,execWithOptionalContainer
+  ,execWithRequiredContainer
   ,preventInContainer
   ,pull
-  ,rerunCmdWithOptionalContainer
-  ,rerunCmdWithRequiredContainer
-  ,rerunWithOptionalContainer
+  ,reexecWithOptionalContainer
   ,reset
   ) where
 
@@ -50,35 +50,30 @@ import           Options.Applicative (Parser,str,option,help,auto,metavar,long,v
 import           Path
 import           Path.IO (getWorkingDir,listDirectory)
 import           Stack.Constants (projectDockerSandboxDir,stackProgName,stackDotYaml,stackRootEnvVar)
+import           Stack.Exec
 import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Docker.GlobalDB
 import           System.Directory (createDirectoryIfMissing,removeDirectoryRecursive,removeFile)
 import           System.Directory (doesDirectoryExist)
 import           System.Environment (lookupEnv,getProgName,getArgs,getExecutablePath)
-import           System.Exit (ExitCode(ExitSuccess),exitWith)
 import           System.FilePath (dropTrailingPathSeparator,takeBaseName)
 import           System.Info (arch,os)
 import           System.IO (stderr,stdin,stdout,hIsTerminalDevice)
-import qualified System.Process as Proc
 import           System.Process.PagerEditor (editByteString)
 import           System.Process.Read
 import           System.Process.Run
 import           Text.Printf (printf)
 
-#ifndef mingw32_HOST_OS
-import           System.Posix.Signals (installHandler,sigTERM,Handler(Catch))
-#endif
-
 -- | If Docker is enabled, re-runs the currently running OS command in a Docker container.
 -- Otherwise, runs the inner action.
-rerunWithOptionalContainer
+reexecWithOptionalContainer
     :: M env m
     => Maybe (Path Abs Dir)
     -> IO ()
     -> m ()
-rerunWithOptionalContainer mprojectRoot =
-  rerunCmdWithOptionalContainer mprojectRoot getCmdArgs
+reexecWithOptionalContainer mprojectRoot =
+  execWithOptionalContainer mprojectRoot getCmdArgs
   where
     getCmdArgs =
       do args <- getArgs
@@ -95,33 +90,33 @@ rerunWithOptionalContainer mprojectRoot =
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
 -- Docker container.  Otherwise, runs the inner action.
-rerunCmdWithOptionalContainer
+execWithOptionalContainer
     :: M env m
     => Maybe (Path Abs Dir)
     -> IO (FilePath,[String],Config -> Config)
     -> IO ()
     -> m ()
-rerunCmdWithOptionalContainer mprojectRoot getCmdArgs inner =
+execWithOptionalContainer mprojectRoot getCmdArgs inner =
   do config <- asks getConfig
      inContainer <- getInContainer
      if inContainer || not (dockerEnable (configDocker config))
         then liftIO inner
         else do (cmd_,args,modConfig) <- liftIO getCmdArgs
-                runContainerAndExit modConfig mprojectRoot cmd_ args [] (return ())
+                runContainerAndExit modConfig mprojectRoot cmd_ args []
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
--- Docker container.  Otherwise, runs the inner action.
-rerunCmdWithRequiredContainer
+-- Docker container.  Otherwise, throws 'DockerMustBeEnabledException'.
+execWithRequiredContainer
     :: M env m
     => Maybe (Path Abs Dir)
     -> IO (FilePath,[String],Config -> Config)
     -> m ()
-rerunCmdWithRequiredContainer mprojectRoot getCmdArgs =
+execWithRequiredContainer mprojectRoot getCmdArgs =
   do config <- asks getConfig
-     when (not (dockerEnable (configDocker config)))
+     unless (dockerEnable (configDocker config))
           (throwM DockerMustBeEnabledException)
      (cmd_,args,modConfig) <- liftIO getCmdArgs
-     runContainerAndExit modConfig mprojectRoot cmd_ args [] (return ())
+     runContainerAndExit modConfig mprojectRoot cmd_ args []
 
 -- | Error if running in a container.
 preventInContainer :: (MonadIO m,MonadThrow m) => m () -> m ()
@@ -146,14 +141,12 @@ runContainerAndExit :: M env m
                     -> FilePath
                     -> [String]
                     -> [(String, String)]
-                    -> IO ()
                     -> m ()
 runContainerAndExit modConfig
                     mprojectRoot
                     cmnd
                     args
-                    envVars
-                    successPostAction =
+                    envVars =
   do config <- fmap modConfig (asks getConfig)
      let docker = configDocker config
      envOverride <- getEnvOverride (configPlatform config)
@@ -210,68 +203,67 @@ runContainerAndExit modConfig
          sandboxSubdirs = map (\d -> sandboxRepoDir </> d)
                               sandboxedHomeSubdirectories
          isTerm = isStdinTerminal && isStdoutTerminal && isStderrTerminal
-         execDockerProcess =
-           do mapM_ (createDirectoryIfMissing True)
-                    (concat [[toFilePath sandboxHomeDir
-                             ,toFilePath sandboxSandboxDir
-                             ,toFilePath stackRoot] ++
-                             map toFilePath sandboxSubdirs])
-              execProcessAndExit
-                envOverride
-                "docker"
-                (concat
-                  [["run"
-                   ,"--net=host"
-                   ,"-e",inContainerEnvVar ++ "=1"
-                   ,"-e",stackRootEnvVar ++ "=" ++ toFPNoTrailingSep stackRoot
-                   ,"-e","WORK_UID=" ++ uid
-                   ,"-e","WORK_GID=" ++ gid
-                   ,"-e","WORK_WD=" ++ toFPNoTrailingSep pwd
-                   ,"-e","WORK_HOME=" ++ toFPNoTrailingSep sandboxRepoDir
-                   ,"-e","WORK_ROOT=" ++ toFPNoTrailingSep projectRoot
-                   ,"-v",toFPNoTrailingSep stackRoot ++ ":" ++ toFPNoTrailingSep stackRoot
-                   ,"-v",toFPNoTrailingSep projectRoot ++ ":" ++ toFPNoTrailingSep projectRoot
-                   ,"-v",toFPNoTrailingSep sandboxSandboxDir ++ ":" ++ toFPNoTrailingSep sandboxDir
-                   ,"-v",toFPNoTrailingSep sandboxHomeDir ++ ":" ++ toFPNoTrailingSep sandboxRepoDir
-                   ,"-v",toFPNoTrailingSep stackRoot ++ ":" ++
-                         toFPNoTrailingSep (sandboxRepoDir </> $(mkRelDir ("." ++ stackProgName ++ "/")))]
-                  ,if oldImage
-                     then ["-e",sandboxIDEnvVar ++ "=" ++ sandboxID
-                          ,"--entrypoint=/root/entrypoint.sh"]
-                     else []
-                  ,case (dockerPassHost docker,dockerHost) of
-                     (True,Just x@('u':'n':'i':'x':':':'/':'/':s)) -> ["-e","DOCKER_HOST=" ++ x
-                                                                      ,"-v",s ++ ":" ++ s]
-                     (True,Just x) -> ["-e","DOCKER_HOST=" ++ x]
-                     (True,Nothing) -> ["-v","/var/run/docker.sock:/var/run/docker.sock"]
-                     (False,_) -> []
-                  ,case (dockerPassHost docker,dockerCertPath) of
-                     (True,Just x) -> ["-e","DOCKER_CERT_PATH=" ++ x
-                                      ,"-v",x ++ ":" ++ x]
-                     _ -> []
-                  ,case (dockerPassHost docker,dockerTlsVerify) of
-                     (True,Just x )-> ["-e","DOCKER_TLS_VERIFY=" ++ x]
-                     _ -> []
-                  ,concatMap sandboxSubdirArg sandboxSubdirs
-                  ,concatMap mountArg (dockerMount docker)
-                  ,case dockerContainerName docker of
-                     Just name -> ["--name=" ++ name]
-                     Nothing -> []
-                  ,if dockerDetach docker
-                      then ["-d"]
-                      else concat [["--rm" | not (dockerPersist docker)]
-                                  ,["-t" | isTerm]
-                                  ,["-i" | isTerm]]
-                  ,dockerRunArgs docker
-                  ,[image]
-                  ,map (\(k,v) -> k ++ "=" ++ v) envVars
-                  ,[cmnd]
-                  ,args])
-                successPostAction
-     liftIO (do updateDockerImageLastUsed config
-                                          (iiId imageInfo)
-                                          (toFilePath projectRoot)
-                execDockerProcess)
+     liftIO
+       (do updateDockerImageLastUsed config
+                                     (iiId imageInfo)
+                                     (toFilePath projectRoot)
+
+           mapM_ (createDirectoryIfMissing True)
+                 (concat [[toFilePath sandboxHomeDir
+                          ,toFilePath sandboxSandboxDir
+                          ,toFilePath stackRoot] ++
+                          map toFilePath sandboxSubdirs]))
+     exec
+       plainEnvSettings
+       "docker"
+       (concat
+         [["run"
+          ,"--net=host"
+          ,"-e",inContainerEnvVar ++ "=1"
+          ,"-e",stackRootEnvVar ++ "=" ++ toFPNoTrailingSep stackRoot
+          ,"-e","WORK_UID=" ++ uid
+          ,"-e","WORK_GID=" ++ gid
+          ,"-e","WORK_WD=" ++ toFPNoTrailingSep pwd
+          ,"-e","WORK_HOME=" ++ toFPNoTrailingSep sandboxRepoDir
+          ,"-e","WORK_ROOT=" ++ toFPNoTrailingSep projectRoot
+          ,"-v",toFPNoTrailingSep stackRoot ++ ":" ++ toFPNoTrailingSep stackRoot
+          ,"-v",toFPNoTrailingSep projectRoot ++ ":" ++ toFPNoTrailingSep projectRoot
+          ,"-v",toFPNoTrailingSep sandboxSandboxDir ++ ":" ++ toFPNoTrailingSep sandboxDir
+          ,"-v",toFPNoTrailingSep sandboxHomeDir ++ ":" ++ toFPNoTrailingSep sandboxRepoDir
+          ,"-v",toFPNoTrailingSep stackRoot ++ ":" ++
+                toFPNoTrailingSep (sandboxRepoDir </> $(mkRelDir ("." ++ stackProgName ++ "/")))]
+         ,if oldImage
+            then ["-e",sandboxIDEnvVar ++ "=" ++ sandboxID
+                 ,"--entrypoint=/root/entrypoint.sh"]
+            else []
+         ,case (dockerPassHost docker,dockerHost) of
+            (True,Just x@('u':'n':'i':'x':':':'/':'/':s)) -> ["-e","DOCKER_HOST=" ++ x
+                                                             ,"-v",s ++ ":" ++ s]
+            (True,Just x) -> ["-e","DOCKER_HOST=" ++ x]
+            (True,Nothing) -> ["-v","/var/run/docker.sock:/var/run/docker.sock"]
+            (False,_) -> []
+         ,case (dockerPassHost docker,dockerCertPath) of
+            (True,Just x) -> ["-e","DOCKER_CERT_PATH=" ++ x
+                             ,"-v",x ++ ":" ++ x]
+            _ -> []
+         ,case (dockerPassHost docker,dockerTlsVerify) of
+            (True,Just x )-> ["-e","DOCKER_TLS_VERIFY=" ++ x]
+            _ -> []
+         ,concatMap sandboxSubdirArg sandboxSubdirs
+         ,concatMap mountArg (dockerMount docker)
+         ,case dockerContainerName docker of
+            Just name -> ["--name=" ++ name]
+            Nothing -> []
+         ,if dockerDetach docker
+             then ["-d"]
+             else concat [["--rm" | not (dockerPersist docker)]
+                         ,["-t" | isTerm]
+                         ,["-i" | isTerm]]
+         ,dockerRunArgs docker
+         ,[image]
+         ,map (\(k,v) -> k ++ "=" ++ v) envVars
+         ,[cmnd]
+         ,args])
 
   where
     lookupImageEnv name vars =
@@ -587,19 +579,6 @@ checkDockerVersion envOverride =
        _ -> throwM InvalidVersionOutputException
   where minimumDockerVersion = $(mkVersion "1.3.0")
         prohibitedDockerVersions = [$(mkVersion "1.2.0")]
-
--- | Run a process, then exit with the same exit code.
-execProcessAndExit :: EnvOverride -> FilePath -> [String] -> IO () -> IO ()
-execProcessAndExit envOverride cmnd args successPostAction =
-  do (_, _, _, h) <- Proc.createProcess (Proc.proc cmnd args){Proc.delegate_ctlc = True
-                                                             ,Proc.env = envHelper envOverride}
-#ifndef mingw32_HOST_OS
-     _ <- installHandler sigTERM (Catch (Proc.terminateProcess h)) Nothing
-#endif
-     exitCode <- Proc.waitForProcess h
-     when (exitCode == ExitSuccess)
-          successPostAction
-     exitWith exitCode
 
 -- | Remove the project's Docker sandbox.
 reset :: (MonadIO m) => Maybe (Path Abs Dir) -> Bool -> m ()

@@ -412,7 +412,7 @@ setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
   runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-      Docker.rerunWithOptionalContainer
+      Docker.reexecWithOptionalContainer
           (lcProjectRoot lc)
           (runStackLoggingT manager globalLogLevel globalTerminal $ do
               (ghc, mstack) <-
@@ -444,7 +444,7 @@ withConfig :: GlobalOpts
 withConfig go@GlobalOpts{..} inner = do
     (manager, lc) <- loadConfigWithOpts go
     runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-        Docker.rerunWithOptionalContainer (lcProjectRoot lc) $
+        Docker.reexecWithOptionalContainer (lcProjectRoot lc) $
             runStackT manager globalLogLevel (lcConfig lc) globalTerminal
                 inner
 
@@ -455,7 +455,7 @@ withBuildConfig :: GlobalOpts
 withBuildConfig go@GlobalOpts{..} strat inner = do
     (manager, lc) <- loadConfigWithOpts go
     runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-        Docker.rerunWithOptionalContainer (lcProjectRoot lc) $ do
+        Docker.reexecWithOptionalContainer (lcProjectRoot lc) $ do
             bconfig <- runStackLoggingT manager globalLogLevel globalTerminal $
                 lcLoadBuildConfig lc globalResolver strat
             envConfig <-
@@ -607,7 +607,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
         ExecOptsPlain -> do
             (manager,lc) <- liftIO $ loadConfigWithOpts go
             runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-                Docker.rerunCmdWithOptionalContainer
+                Docker.execWithOptionalContainer
                     (lcProjectRoot lc)
                     (return (eoCmd, eoArgs, id)) $
                     runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
