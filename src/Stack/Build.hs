@@ -14,7 +14,8 @@
 
 module Stack.Build
   (build
-  ,clean)
+  ,clean
+  ,withLoadPackage)
   where
 
 import           Control.Monad
@@ -101,7 +102,13 @@ mkBaseConfigOpts bopts = do
         }
 
 -- | Provide a function for loading package information from the package index
-withLoadPackage :: M env m
+withLoadPackage :: ( MonadIO m
+                   , HasHttpManager env
+                   , MonadReader env m
+                   , MonadBaseControl IO m
+                   , MonadCatch m
+                   , MonadLogger m
+                   , HasEnvConfig env)
                 => EnvOverride
                 -> ((PackageName -> Version -> Map FlagName Bool -> IO Package) -> m a)
                 -> m a

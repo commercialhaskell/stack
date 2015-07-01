@@ -165,7 +165,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
              addCommand "dot"
                         "Visualize your project's dependency graph using Graphviz dot"
                         dotCmd
-                        (pure ())
+                        dotOptsParser
              addCommand "exec"
                         "Execute a command"
                         execCmd
@@ -892,5 +892,5 @@ solverOptsParser = boolFlags False
     idm
 
 -- | Visualize dependencies
-dotCmd :: () -> GlobalOpts -> IO ()
-dotCmd () go = withBuildConfig go ThrowException dot
+dotCmd :: DotOpts -> GlobalOpts -> IO ()
+dotCmd dotOpts go = withBuildConfig go ThrowException (dot dotOpts)

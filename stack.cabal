@@ -226,6 +226,8 @@ test-suite stack-test
                 , resourcet
                 , Cabal
                 , text
+                , optparse-applicative
+                , bytestring
   default-language:    Haskell2010
 
 test-suite stack-integration-test
