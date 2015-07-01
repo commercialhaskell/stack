@@ -644,6 +644,16 @@ installationRootLocal = do
     platform <- platformRelDir
     return $ configProjectWorkDir bc </> $(mkRelDir "install") </> platform </> name </> ghc
 
+-- | Location of symlink which points to the last local installation
+-- root.  This path points to a file, since operations like symlink
+-- removal use file operations.  This also discourages any stack code
+-- from using paths into this directory - instead
+-- 'installationRootLocal' should be used.
+lastInstallSymlink :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs File)
+lastInstallSymlink = do
+   bc <- asks getBuildConfig
+   return $ configProjectWorkDir bc </> $(mkRelFile "install/last")
+
 -- | Package database for installing dependencies into
 packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
 packageDatabaseDeps = do

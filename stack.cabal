@@ -150,6 +150,7 @@ library
                    , time >= 1.4.2
                    , transformers >= 0.3.0.0
                    , transformers-base >= 0.4.4
+                   , unix-compat
                    , unordered-containers >= 0.2.5.1
                    , vector >= 0.10.12.3
                    , vector-binary-instances
