@@ -119,7 +119,14 @@ initialRequest srcfiles =
     object
         [ "tag" .= "RequestUpdateSession"
         , "contents" .=
-          [object ["tag" .= "TargetsInclude", "contents" .= srcfiles]]]
+            [ object
+                [ "tag" .= "RequestUpdateTargets"
+                , "contents" .= object
+                    [ "tag" .= "TargetsInclude"
+                    , "contents" .= srcfiles ]
+                ]
+            ]
+        ]
 
 -- | Execute a process within the Stack configured environment.
 exec :: (HasConfig r, MonadReader r m, MonadIO m, MonadLogger m, MonadThrow m)
