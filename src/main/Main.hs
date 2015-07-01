@@ -227,12 +227,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                    addCommand Docker.dockerCleanupCmdName
                               "Clean up Docker images and containers"
                               dockerCleanupCmd
-                              dockerCleanupOpts
-                   addCommand "exec"
-                              "Execute a command in a Docker container without setting up Haskell environment first"
-                              dockerExecCmd
-                              ((,) <$> strArgument (metavar "[--] CMD")
-                                   <*> many (strArgument (metavar "ARGS"))))
+                              dockerCleanupOpts)
              )
              -- commandsFromPlugins plugins pluginShouldHaveRun) https://github.com/commercialhaskell/stack/issues/322
      case eGlobalRun of
@@ -558,9 +553,15 @@ uploadCmd args go = do
 data ExecOpts = ExecOpts
     { eoCmd :: !String
     , eoArgs :: ![String]
-    , eoEnvSettings :: !EnvSettings
-    , eoPackages :: ![String]
+    , eoExtra :: !ExecOptsExtra
     }
+
+data ExecOptsExtra
+    = ExecOptsPlain
+    | ExecOptsEmbellished
+        { eoEnvSettings :: !EnvSettings
+        , eoPackages :: ![String]
+        }
 
 execOptsParser :: Maybe String -- ^ command
                -> Parser ExecOpts
@@ -568,8 +569,10 @@ execOptsParser mcmd =
     ExecOpts
         <$> maybe eoCmdParser pure mcmd
         <*> eoArgsParser
-        <*> eoEnvSettingsParser
-        <*> eoPackagesParser
+        <*> (eoPlainParser <|>
+             ExecOptsEmbellished
+                <$> eoEnvSettingsParser
+                <*> eoPackagesParser)
   where
     eoCmdParser :: Parser String
     eoCmdParser = strArgument (metavar "CMD")
@@ -592,15 +595,31 @@ execOptsParser mcmd =
     eoPackagesParser :: Parser [String]
     eoPackagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))
 
+    eoPlainParser :: Parser ExecOptsExtra
+    eoPlainParser = flag' ExecOptsPlain
+                          (long "plain" <>
+                           help "Use an unmodified environment (only useful with Docker)")
+
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
-execCmd ExecOpts {..} go = withBuildConfig go ExecStrategy $ do
-    let targets = concatMap words eoPackages
-    unless (null targets) $ do
-        Stack.Build.build (const $ return ()) defaultBuildOpts
-            { boptsTargets = map T.pack targets
-            }
-    exec eoEnvSettings eoCmd eoArgs
+execCmd ExecOpts {..} go@GlobalOpts{..} =
+    case eoExtra of
+        ExecOptsPlain -> do
+            (manager,lc) <- liftIO $ loadConfigWithOpts go
+            runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
+                Docker.rerunCmdWithOptionalContainer
+                    (lcProjectRoot lc)
+                    (return (eoCmd, eoArgs, id)) $
+                    runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
+                        exec plainEnvSettings eoCmd eoArgs
+        ExecOptsEmbellished {..} ->
+           withBuildConfig go ExecStrategy $ do
+               let targets = concatMap words eoPackages
+               unless (null targets) $
+                   Stack.Build.build (const $ return ()) defaultBuildOpts
+                       { boptsTargets = map T.pack targets
+                       }
+               exec eoEnvSettings eoCmd eoArgs
 
 -- | Run the REPL in the context of a project.
 replCmd :: ([Text], [String], FilePath, Bool) -> GlobalOpts -> IO ()
@@ -633,15 +652,6 @@ dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
     runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
         Docker.preventInContainer $
             Docker.cleanup cleanupOpts
-
--- | Execute a command
-dockerExecCmd :: (String, [String]) -> GlobalOpts -> IO ()
-dockerExecCmd (cmd,args) go@GlobalOpts{..} = do
-    (manager,lc) <- liftIO $ loadConfigWithOpts go
-    runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-        Docker.preventInContainer $
-            Docker.rerunCmdWithRequiredContainer (lcProjectRoot lc)
-                                                 (return (cmd,args,id))
 
 -- | Command sum type for conditional arguments.
 data Command
