@@ -75,6 +75,8 @@ data SetupOpts = SetupOpts
     -- ^ Run a sanity check on the selected GHC
     , soptsSkipGhcCheck :: !Bool
     -- ^ Don't check for a compatible GHC version/architecture
+    , soptsSkipMsys :: !Bool
+    -- ^ Do not use a custom msys installation on Windows
     }
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
@@ -125,6 +127,7 @@ setupEnv = do
             , soptsForceReinstall = False
             , soptsSanityCheck = False
             , soptsSkipGhcCheck = configSkipGHCCheck $ bcConfig bconfig
+            , soptsSkipMsys = configSkipMsys $ bcConfig bconfig
             }
     mghcBin <- ensureGHC sopts
     menv0 <- getMinimalEnvOverride
@@ -262,9 +265,10 @@ ensureGHC sopts = do
             let tools =
                     case configPlatform config of
                         Platform _ Windows ->
-                            [ ($(mkPackageName "ghc"), Just expected)
-                            , ($(mkPackageName "git"), Nothing)
-                            ]
+                              ($(mkPackageName "ghc"), Just expected)
+                            : (if soptsSkipMsys sopts
+                                then []
+                                else [($(mkPackageName "git"), Nothing)])
                         _ ->
                             [ ($(mkPackageName "ghc"), Just expected)
                             ]

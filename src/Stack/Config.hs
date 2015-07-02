@@ -116,6 +116,7 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
          configSystemGHC = fromMaybe True configMonoidSystemGHC
          configInstallGHC = fromMaybe False configMonoidInstallGHC
          configSkipGHCCheck = fromMaybe False configMonoidSkipGHCCheck
+         configSkipMsys = fromMaybe False configMonoidSkipMsys
 
          configExtraIncludeDirs = configMonoidExtraIncludeDirs
          configExtraLibDirs = configMonoidExtraLibDirs
@@ -159,7 +160,7 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser docker =
-    (\opts systemGHC installGHC arch os jobs includes libs skipGHCCheck -> mempty
+    (\opts systemGHC installGHC arch os jobs includes libs skipGHCCheck skipMsys -> mempty
         { configMonoidDockerOpts = opts
         , configMonoidSystemGHC = systemGHC
         , configMonoidInstallGHC = installGHC
@@ -169,6 +170,7 @@ configOptsParser docker =
         , configMonoidJobs = jobs
         , configMonoidExtraIncludeDirs = includes
         , configMonoidExtraLibDirs = libs
+        , configMonoidSkipMsys = skipMsys
         })
     <$> Docker.dockerOptsParser docker
     <*> maybeBoolFlags
@@ -208,6 +210,10 @@ configOptsParser docker =
     <*> maybeBoolFlags
             "skip-ghc-check"
             "skipping the GHC version and architecture check"
+            idm
+    <*> maybeBoolFlags
+            "skip-msys"
+            "skipping the local MSYS installation (Windows only)"
             idm
 
 -- | Get the directory on Windows where we should install extra programs. For
