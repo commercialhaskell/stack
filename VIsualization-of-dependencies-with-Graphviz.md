@@ -13,14 +13,14 @@ $ stack dot --external | dot -Tpng -o wreq.png
 ```
 [![wreq_ext](https://cloud.githubusercontent.com/assets/591567/8478621/d247247e-20d2-11e5-993d-79096e382abd.png)](https://cloud.githubusercontent.com/assets/591567/8478621/d247247e-20d2-11e5-993d-79096e382abd.png)
 
-Well that is certainly a lot.  Depending on our needs we can either limit the depth:
+Well that is certainly a lot.  As a start we can exclude `base` and then depending on our needs we can either limit the depth:
 
 ```
-$ stack dot --external --depth 1 | dot -Tpng -o wreq.png
+$ stack dot --no-include-base --external --depth 1 | dot -Tpng -o wreq.png
 ```
-[![wreq_depth](https://cloud.githubusercontent.com/assets/591567/8478713/6d258a3a-20d3-11e5-920b-30586d3993d6.png)](https://cloud.githubusercontent.com/assets/591567/8478713/6d258a3a-20d3-11e5-920b-30586d3993d6.png)
+[![wreq_depth](https://cloud.githubusercontent.com/assets/591567/8484310/45b399a0-20f7-11e5-8068-031c2b352961.png)](https://cloud.githubusercontent.com/assets/591567/8484310/45b399a0-20f7-11e5-8068-031c2b352961.png)
 
-Or we can prune packages explicitly:
+or prune packages explicitly:
 
 ```
 $ stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | dot -Tpng -o wreq_pruned.png
