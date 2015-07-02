@@ -141,6 +141,7 @@ library
                    , process >= 1.2.0.0
                    , resourcet >= 1.1.4.1
                    , safe >= 0.3
+                   , split
                    , stm >= 2.4.4
                    , streaming-commons >= 0.1.10.0
                    , tar >= 0.4.1.0
@@ -204,6 +205,7 @@ test-suite stack-test
                 , Stack.BuildPlanSpec
                 , Stack.Build.ExecuteSpec
                 , Stack.ConfigSpec
+                , Stack.DotSpec
                 , Stack.PackageDumpSpec
                 , Stack.ArgsSpec
                 , Network.HTTP.Download.VerifiedSpec
@@ -228,6 +230,7 @@ test-suite stack-test
                 , text
                 , optparse-applicative
                 , bytestring
+                , QuickCheck
   default-language:    Haskell2010
 
 test-suite stack-integration-test

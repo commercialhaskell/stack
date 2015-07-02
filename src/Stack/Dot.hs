@@ -7,6 +7,7 @@ module Stack.Dot (dot
                  ,dotOptsParser
                  ,resolveDependencies
                  ,printGraph
+                 ,pruneGraph
                  ) where
 
 import           Control.Monad (void)
@@ -15,8 +16,10 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger, logInfo)
 import           Control.Monad.Reader (MonadReader)
 import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Data.Char (isSpace)
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
+import           Data.List.Split (splitOn)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Set (Set)
@@ -42,11 +45,17 @@ data DotOpts = DotOpts
     -- ^ Include dependencies on base
     , dotDependencyDepth :: Maybe Int
     -- ^ Limit the depth of dependency resolution to (Just n) or continue until fixpoint
+    , dotPrune :: Set String
+    -- ^ Package names to prune from the graph
     }
 
 -- | Parser for arguments to `stack dot`
 dotOptsParser :: Parser DotOpts
-dotOptsParser = DotOpts <$> includeExternal <*> includeBase <*> depthLimit
+dotOptsParser = DotOpts
+            <$> includeExternal
+            <*> includeBase
+            <*> depthLimit
+            <*> fmap (maybe Set.empty Set.fromList . fmap splitNames) prunedPkgs
   where includeExternal = boolFlags False
                                     "external"
                                     "inclusion of external dependencies"
@@ -61,6 +70,15 @@ dotOptsParser = DotOpts <$> includeExternal <*> includeBase <*> depthLimit
                               metavar "DEPTH" <>
                               help ("Limit the depth of dependency resolution " <>
                                     "(Default: No limit)")))
+        prunedPkgs = optional (strOption
+                                   (long "prune" <>
+                                    metavar "PACKAGES" <>
+                                    help ("Prune each package name " <>
+                                          "from the comma separated list " <>
+                                          "of package names PACKAGES")))
+
+        splitNames :: String -> [String]
+        splitNames = map (takeWhile (not . isSpace) . dropWhile isSpace) . splitOn ","
 
 -- | Visualize the project's dependencies as a graphviz graph
 dot :: (HasEnvConfig env
@@ -81,14 +99,45 @@ dot dotOpts = do
     resultGraph <- withLoadPackage menv (\loader -> do
       let depLoader = createDepLoader sourceMap (fmap3 packageAllDeps loader)
       liftIO $ resolveDependencies (dotDependencyDepth dotOpts) graph depLoader)
-    printGraph dotOpts locals (if dotIncludeBase dotOpts
-                                 then resultGraph
-                                 else filterOutDepsOnBase resultGraph)
-  where filterOutDepsOnBase = Map.filterWithKey (\k _ -> show k /= "base") .
-                              fmap (Set.filter ((/= "base") . show))
-        -- fmap a function over the result of a function with 3 arguments
-        fmap3 :: Functor f => (d -> e) -> (a -> b -> c -> f d) -> (a -> b -> c -> f e)
+    let pkgsToPrune = if dotIncludeBase dotOpts
+                         then dotPrune dotOpts
+                         else Set.insert "base" (dotPrune dotOpts)
+        localNames = Set.fromList (map (packageName . lpPackage) locals)
+        prunedGraph = pruneGraph localNames pkgsToPrune resultGraph
+    printGraph dotOpts locals prunedGraph
+  where -- fmap a function over the result of a function with 3 arguments
+        fmap3 :: Functor f => (d -> e) -> (a -> b -> c -> f d) -> a -> b -> c -> f e
         fmap3 f g a b c = f <$> g a b c
+
+-- | `pruneGraph dontPrune toPrune graph` prunes all packages in
+-- `graph` with a name in `toPrune` and removes resulting orphans
+-- unless they are in `dontPrune`
+pruneGraph :: (F.Foldable f, F.Foldable g)
+           => f PackageName
+           -> g String
+           -> Map PackageName (Set PackageName)
+           -> Map PackageName (Set PackageName)
+pruneGraph dontPrune names =
+  pruneUnreachable dontPrune . Map.mapMaybeWithKey (\pkg pkgDeps ->
+    if show pkg `F.elem` names
+      then Nothing
+      else let filtered = Set.filter (\n -> show n `F.notElem` names) pkgDeps
+           in if Set.null filtered && not (Set.null pkgDeps)
+                then Nothing
+                else Just filtered)
+
+-- | Make sure that all unreachable nodes (orphans) are pruned
+pruneUnreachable :: F.Foldable f
+                 => f PackageName
+                 -> Map PackageName (Set PackageName)
+                 -> Map PackageName (Set PackageName)
+pruneUnreachable dontPrune = fixpoint prune
+  where fixpoint :: Eq a => (a -> a) -> a -> a
+        fixpoint f v = if f v == v then v else fixpoint f (f v)
+        prune graph' = Map.filterWithKey (\k _ -> reachable k) graph'
+          where reachable k = k `F.elem` dontPrune || k `Set.member` reachables
+                reachables = F.fold graph'
+
 
 -- | Resolve the dependency graph up to (Just depth) or until fixpoint is reached
 resolveDependencies :: (Applicative m, Monad m)
@@ -138,10 +187,12 @@ printGraph :: (Applicative m, MonadLogger m)
            -> m ()
 printGraph dotOpts locals graph = do
   $logInfo "strict digraph deps {"
-  printLocalNodes dotOpts locals
+  printLocalNodes dotOpts filteredLocals
   printLeaves graph
   void (Map.traverseWithKey printEdges graph)
   $logInfo "}"
+  where filteredLocals = filter (\local ->
+          show (packageName (lpPackage local)) `Set.notMember` dotPrune dotOpts) locals
 
 -- | Print the local nodes with a different style depending on options
 printLocalNodes :: (F.Foldable t, MonadLogger m)

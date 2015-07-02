@@ -3,7 +3,9 @@
 module Stack.DotSpec where
 
 import           Data.ByteString.Char8 (ByteString)
+import qualified Data.Foldable as F
 import           Data.Functor.Identity
+import           Data.List ((\\))
 import qualified Data.Map as Map
 import           Data.Maybe (fromMaybe)
 import           Data.Set (Set)
@@ -11,6 +13,8 @@ import qualified Data.Set as Set
 import           Options.Applicative (execParserPure,idm,prefs,info,getParseResult)
 import           Stack.Types
 import           Test.Hspec
+import           Test.Hspec.QuickCheck (prop)
+import           Test.QuickCheck (forAll,sublistOf)
 
 import           Stack.Dot
 
@@ -38,6 +42,21 @@ spec = do
            resultGraph' = resolveDependencies Nothing graph' stubLoader
        fmap Map.size resultGraph' `shouldBe` fmap ((+1) . Map.size) resultGraph
 
+    prop "requested packages are pruned" $ do
+      let resolvedGraph = runIdentity (resolveDependencies Nothing graph stubLoader)
+          allPackages g = Set.map show (Map.keysSet g `Set.union` F.fold g)
+      forAll (sublistOf (Set.toList (allPackages resolvedGraph))) $ \toPrune ->
+        let pruned = pruneGraph [pkgName "one", pkgName "two"] toPrune resolvedGraph
+        in Set.null (allPackages pruned `Set.intersection` Set.fromList toPrune)
+
+    prop "pruning removes orhpans" $ do
+      let resolvedGraph = runIdentity (resolveDependencies Nothing graph stubLoader)
+          allPackages g = Set.map show (Map.keysSet g `Set.union` F.fold g)
+          orphans g = Map.filterWithKey (\k _ -> not (graphElem k g)) g
+      forAll (sublistOf (Set.toList (allPackages resolvedGraph))) $ \toPrune ->
+        let pruned = pruneGraph [pkgName "one", pkgName "two"] toPrune resolvedGraph
+        in null (Map.keys (orphans pruned) \\ [pkgName "one", pkgName "two"])
+
   where graphElem e graph = Set.member e . Set.unions . Map.elems $ graph
 
 {- Helper functions below -}
@@ -46,7 +65,7 @@ spec = do
 pkgName :: ByteString -> PackageName
 pkgName = fromMaybe failure . parsePackageName
   where
-   failure = (error "Internal error during package name creation in DotSpec.pkgName")
+   failure = error "Internal error during package name creation in DotSpec.pkgName"
 
 -- Stub, simulates the function to load package dependecies
 stubLoader :: PackageName -> Identity (Set PackageName)
