@@ -1,3 +1,5 @@
+#!/usr/bin/env stack
+-- stack runghc --package=shake --package=extra --package=zip-archive --package=mime-types --package=http-types --package=http-conduit --package=text --package=conduit-combinators --package=conduit --package=case-insensitive --package=aeson --package=zlib
 {-# LANGUAGE RecordWildCards #-}
 
 import Control.Applicative
