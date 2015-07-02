@@ -32,17 +32,25 @@ To upload a binary to a Github release, you also need:
   (probably as a draft) with a tag for the stack package's version (e.g.
   `vX.Y.Z`).
 
+Build
+-----
+
+Build and install the release tool using:
+```
+(cd etc/release-tool && stack install)
+```
+
 Invocation
 ----------
 
-Usage: `scripts/release.hs [OPTIONS] TARGET`
+Usage: `stack-release-tool [OPTIONS] TARGET`
 
 The tool must be run in the root of the working tree.
 
 ### Options
 
-release.hs is shake-based, so all standard shake options apply. In addition, the
-following options are accepted:
+stack-release-tool is shake-based, so all standard shake options apply. In
+addition, the following options are accepted:
 
 * `--gpg-key`: use a non-default GPG key to sign the binaries.
   dirty, but this will allow it to continue.
