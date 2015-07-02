@@ -207,3 +207,11 @@ Stack makes use of a temporary directory for some commands (/tmp by default on l
 A custom temporary directory can be forced:
 * on Linux by setting the environment variable TMPDIR (eg `$ TMPDIR=path-to-tmp stack setup`)
 * on Windows by setting one of the environment variable (given in priority order), TMP, TEMP, USERPROFILE
+
+#### stack sometimes rebuilds based on flag changes when I wouldn't expect it to. How come?
+
+stack tries to give you reproducibility whenever possible. In some cases, this means that you get a recompile when one may not seem necessary. The most common exactly is running something like this in a multi-package project:
+
+    stack build --ghc-options -O0 && stack build --ghc-options -O0 one-of-the-packages
+
+This may end up recompiling local dependencies of `one-of-the-packages` without optimizations on. Whether stack should or shouldn't do this depends on the needs of the user at the time, and unfortunately we can't make a solution that will make everyone happy in all cases. If you're curious for details, there's [a long discussion about it](https://github.com/commercialhaskell/stack/issues/382) on the issue tracker.
