@@ -1,6 +1,8 @@
 ## Unreleased
 
-* Add --ignore-subdirs flag to init command [#435](https://github.com/commercialhaskell/stack/pull/435)
+* Add `--prune` flag to `stack dot` [#487](https://github.com/commercialhaskell/stack/issues/487)
+* Add `--[no-]external`,`--[no-]include-base` flags to `stack dot` [#437](https://github.com/commercialhaskell/stack/issues/437)
+* Add `--ignore-subdirs` flag to init command [#435](https://github.com/commercialhaskell/stack/pull/435)
 * Handle attempt to use non-existing resolver [#436](https://github.com/commercialhaskell/stack/pull/436)
 * Add `--force` flag to `init` command
 * exec style commands accept the `--package` option (see [Reddit discussion](http://www.reddit.com/r/haskell/comments/3bd66h/stack_runghc_turtle_as_haskell_script_solution/))
