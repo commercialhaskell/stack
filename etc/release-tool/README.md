@@ -21,7 +21,7 @@ To create a signed binary, you need:
 
 - GPG installed and in the PATH (included with
   [msysgit](https://msysgit.github.io) on Windows)
-- Private key installed in GPG.
+- Your private key in GPG keyring.
 
 To upload a binary to a Github release, you also need:
 
@@ -31,6 +31,14 @@ To upload a binary to a Github release, you also need:
 - A [Github release](https://github.com/commercialhaskell/stack/releases)
   (probably as a draft) with a tag for the stack package's version (e.g.
   `vX.Y.Z`).
+
+To create and upload Ubuntu packages, you need:
+
+- Docker installed.
+- deb-s3 installed (`sudo gem install deb-s3`).
+- `dev@fpcomplete.com` secret key in GPG keyring.
+- Set `AWS_SECRET_ACCESS_KEY` and `AWS_ACCESS_KEY_ID` environment variables with
+  credentials that allow uploading to download.fpcomplete.com S3 bucket.
 
 Build
 -----
@@ -65,3 +73,5 @@ addition, the following options are accepted:
 * `check`: run pre-release checks.
 * `build`: build and sign the binary distribution.
 * `upload`: upload the binary distribution to the Github release.
+* `ubuntu-packages`: build Ubuntu packages.
+* `ubuntu-upload`: upload Ubuntu packages to private package repository.

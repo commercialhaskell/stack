@@ -6,8 +6,6 @@
 .hsenv
 .stack-work/
 /.cabal-sandbox/
-/Dockerfile
-/target/
 TAGS
 cabal-dev/
 cabal.sandbox.config

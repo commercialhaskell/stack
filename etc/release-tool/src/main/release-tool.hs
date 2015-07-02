@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 import Control.Applicative
 import Control.Exception
@@ -7,6 +8,7 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy.Char8 as L8
 import Data.List
 import Data.Maybe
+import Data.String.Here
 import Distribution.PackageDescription.Parse
 import Distribution.Text
 import Distribution.System
@@ -42,14 +44,21 @@ main =
                      , shakeChange = ChangeModtimeAndDigestInput }
         options $
         \flags args -> do
-            gPkgDescr <- readPackageDescription silent "stack.cabal"
+            gStackPackageDescription <-
+                packageDescription <$> readPackageDescription silent "stack.cabal"
             gGithubAuthToken <- lookupEnv githubAuthTokenEnvVar
-            instRoot <- readProcess "stack" ["path", "--local-install-root"] ""
-            let gLocalInstallRoot = trim (fromMaybe instRoot (stripPrefix "local-install-root:" instRoot))
-                gGpgKey = Nothing
+            gLocalInstallRoot <- getStackPath "local-install-root"
+            gProjectRoot <- getStackPath "project-root"
+            gGitRevCount <- read . trim <$> readProcess "git" ["rev-list", "HEAD", "--count"] ""
+            gGitSha <- trim <$> readProcess "git" ["rev-parse", "HEAD"] ""
+            let gGpgKey = Nothing
                 gAllowDirty = False
                 gGithubReleaseTag = Nothing
             return $ Just $ rules (foldl (flip id) Global{..} flags) args
+  where
+    getStackPath path = do
+      out <- readProcess "stack" ["path", "--" ++ path] ""
+      return $ trim $ fromMaybe out $ stripPrefix (path ++ ":") out
 
 -- | Additional command-line options.
 options :: [OptDescr (Either String (Global -> Global))]
@@ -75,6 +84,16 @@ rules global@Global{..} args = do
         [] -> error "No wanted target(s) specified."
         _ -> want args
 
+    phony ubuntuUploadPhony $
+        mapM_
+            (\v -> need [ubuntuVersionDebDir (fst v) </> ubuntuVersionDebFileName <.> uploadExt])
+            ubuntuVersions
+
+    phony ubuntuPackagesPhony $
+        mapM_
+            (\v -> need [ubuntuVersionDebDir (fst v) </> ubuntuVersionDebFileName])
+            ubuntuVersions
+
     phony releasePhony $ do
         need [checkPhony]
         need [uploadPhony]
@@ -86,15 +105,15 @@ rules global@Global{..} args = do
         need [releaseCheckDir </> stackExeFileName]
 
     phony uploadPhony $
-        need $ map (releaseUploadDir </>) releaseFileNames
+        mapM_ (\f -> need [releaseDir </> f <.> uploadExt]) releaseFileNames
 
     phony buildPhony $
-        need $ map (releaseDir </>) releaseFileNames
+        mapM_ (\f -> need [releaseDir </> f]) releaseFileNames
 
-    releaseUploadDir </> "*" %> \out -> do
-        need [releaseDir </> takeFileName out]
-        uploadToGithubRelease global (releaseDir </> takeFileName out)
-        copyFile' (releaseDir </> takeFileName out) out
+    releaseDir </> "*" <.> uploadExt %> \out -> do
+        need [dropExtension out]
+        uploadToGithubRelease global (dropExtension out)
+        copyFile' (dropExtension out) out
 
     releaseCheckDir </> stackExeFileName %> \out -> do
         need [installBinDir </> stackExeFileName]
@@ -155,18 +174,76 @@ rules global@Global{..} args = do
         alwaysRerun
         cmd "stack build"
 
+    ubuntuVersionDebDir "*" </> ubuntuVersionDebFileName <.> uploadExt %> \out -> do
+        let ubuntuVersion = ubuntuVersionFromPath out
+        need [ubuntuVersionDebDir ubuntuVersion </> ubuntuVersionDebFileName]
+        () <- cmd "deb-s3 upload -b download.fpcomplete.com --sign=9BEFB442"
+            [ "--prefix=ubuntu/" ++ ubuntuCodeName ubuntuVersion
+            , dropExtension out ]
+        copyFileChanged (dropExtension out) out
+
+    ubuntuVersionDebDir "*" </> ubuntuVersionDebFileName %> \out -> do
+        alwaysRerun
+        let ubuntuVersion = ubuntuVersionFromPath out
+        need [ubuntuVersionDir ubuntuVersion </> imageIDFileName]
+        liftIO $ createDirectoryIfMissing True (takeDirectory out)
+        cmd "docker run --rm"
+            [ "--volume=" ++ gProjectRoot </> ubuntuVersionDir ubuntuVersion </> "stack-root" ++
+              ":/mnt/stack-root"
+            , "--env=STACK_ROOT=/mnt/stack-root"
+            , "--volume=" ++ gProjectRoot </> ubuntuVersionDir ubuntuVersion </> "stack-work" ++
+              ":/mnt/src/.stack-work"
+            , "--volume=" ++ gProjectRoot ++ ":/mnt/src"
+            , "--workdir=/mnt/src"
+            , "--volume=" ++ gProjectRoot </> ubuntuVersionDebDir ubuntuVersion ++ ":/mnt/deb"
+            , "--env=OUTPUT_DEB=/mnt/deb/" ++ ubuntuVersionDebFileName
+            , "--env=DEB_VERSION=" ++ ubuntuVersionDebVersionStr
+            , "--env=PKG_MAINTAINER=" ++ maintainer gStackPackageDescription
+            , "--env=PKG_DESCRIPTION=" ++ synopsis gStackPackageDescription
+            , "--env=PKG_LICENSE=" ++ display (license gStackPackageDescription)
+            , "--env=PKG_URL=" ++ homepage gStackPackageDescription
+            , ubuntuDockerImageTag ubuntuVersion]
+
+    ubuntuVersionDir "*" </> imageIDFileName %> \out -> do
+        alwaysRerun
+        let ubuntuVersion = ubuntuVersionFromPath out
+            imageTag = ubuntuDockerImageTag ubuntuVersion
+        need
+            [ ubuntuVersionDockerDir ubuntuVersion </> "Dockerfile"
+            , ubuntuVersionDockerDir ubuntuVersion </> "run.sh" ]
+        _ <- buildDockerImage (ubuntuVersionDockerDir ubuntuVersion) imageTag out
+        return ()
+
+    ubuntuVersionDockerDir "*" </> "Dockerfile" %> \out -> do
+        alwaysRerun
+        let ubuntuVersion = ubuntuVersionFromPath out
+        writeFileChanged out [template|templates/ubuntu-packages/docker/Dockerfile|]
+
+    ubuntuVersionDockerDir "*" </> "run.sh" %> \out -> do
+        alwaysRerun
+        writeFileChanged out [hereFile|templates/ubuntu-packages/docker/run.sh|]
+
   where
+    ubuntuVersionFromPath path =
+        case stripPrefix (ubuntuVersionDir "" ++ "/") path of
+            Nothing -> error ("Cannot determine Ubuntu version from path: " ++ path)
+            Just path' -> takeDirectory1 path'
+
     releasePhony = "release"
     checkPhony = "check"
     uploadPhony = "upload"
     cleanPhony = "clean"
     buildPhony = "build"
+    ubuntuPackagesPhony = "ubuntu-packages"
+    ubuntuUploadPhony = "ubuntu-upload"
 
     releaseCheckDir = releaseDir </> "check"
-    releaseUploadDir = releaseDir </> "upload"
     installBinDir = gLocalInstallRoot </> "bin"
+    ubuntuVersionDir ver = releaseDir </> "ubuntu" </> ver
+    ubuntuVersionDockerDir ver = ubuntuVersionDir ver </> "docker"
+    ubuntuVersionDebDir ver = ubuntuVersionDir ver </> "deb"
 
-    stackExeFileName = "stack" <.> exe
+    stackExeFileName = stackProgName <.> exe
     releaseFileNames = [releaseExeCompressedFileName, releaseExeCompressedAscFileName]
     releaseExeCompressedAscFileName = releaseExeCompressedFileName <.> ascExt
     releaseExeCompressedFileName =
@@ -177,10 +254,28 @@ rules global@Global{..} args = do
     releaseExeGzFileName = releaseExeFileName <.> gzExt
     releaseExeFileName = releaseExeFileNameNoExt <.> exe
     releaseExeFileNameNoExt = releaseName global
+    ubuntuVersionDebFileName =
+        concat [stackProgName, "_", ubuntuVersionDebVersionStr, "_amd64"] <.> "deb"
+    imageIDFileName = "image-id"
 
     zipExt = "zip"
     gzExt = "gz"
     ascExt = "asc"
+    uploadExt = "upload"
+
+    ubuntuDockerImageTag ver = "stack_release_tool/ubuntu:" ++ ver
+    ubuntuVersionDebVersionStr =
+        concat [stackVersionStr global, "-", show gGitRevCount, "-", gGitSha]
+
+    ubuntuVersions =
+        [ ("12.04", "precise")
+        , ("14.04", "trusty")
+        , ("14.10", "utopic")
+        , ("15.04", "vivid") ]
+    ubuntuCodeName v =
+        fromMaybe
+            ("Unknown Ubuntu version: " ++ v)
+            (lookup v ubuntuVersions)
 
 -- | Upload file to Github release.
 uploadToGithubRelease :: Global -> FilePath -> Action ()
@@ -243,13 +338,22 @@ callGithubApi Global{..} headers mpostFile url = do
         res <- http req manager
         responseBody res $$+- CC.sinkLazy
 
+-- | Build a Docker image and write its ID to a file if changed.
+buildDockerImage :: FilePath -> String -> FilePath -> Action String
+buildDockerImage buildDir imageTag out = do
+    alwaysRerun
+    () <- cmd "docker build" ["--tag=" ++ imageTag, buildDir]
+    (Stdout imageIdOut) <- cmd "docker inspect --format={{.Id}}" [imageTag]
+    writeFileChanged out imageIdOut
+    return (trim imageIdOut)
+
 -- | Name of the release binary (e.g. @stack-x.y.x-arch-os@)
 releaseName :: Global -> String
-releaseName global = "stack-" ++ stackVersionStr global ++ "-" ++ platformName
+releaseName global = concat [stackProgName, "-", stackVersionStr global, "-", platformName]
 
 -- | String representation of stack package version.
 stackVersionStr :: Global -> String
-stackVersionStr = display . pkgVersion . package . packageDescription . gPkgDescr
+stackVersionStr = display . pkgVersion . package . gStackPackageDescription
 
 -- | Name of current platform.
 platformName :: String
@@ -285,6 +389,10 @@ gpgKeyOptName = "gpg-key"
 allowDirtyOptName :: String
 allowDirtyOptName = "allow-dirty"
 
+-- | Name of the 'stack' program.
+stackProgName :: FilePath
+stackProgName = "stack"
+
 -- | A Github release, as returned by the Github API.
 data GithubRelease = GithubRelease
     { relUploadUrl :: !String
@@ -307,10 +415,13 @@ instance FromJSON GithubReleaseAsset where
 
 -- | Global values and options.
 data Global = Global
-    { gPkgDescr :: !GenericPackageDescription
+    { gStackPackageDescription :: !PackageDescription
     , gLocalInstallRoot :: !FilePath
     , gGpgKey :: !(Maybe String)
     , gAllowDirty :: !Bool
     , gGithubAuthToken :: !(Maybe String)
     , gGithubReleaseTag :: !(Maybe String)
+    , gGitRevCount :: !Integer
+    , gGitSha :: !String
+    , gProjectRoot :: !FilePath
     }
