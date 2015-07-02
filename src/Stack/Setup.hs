@@ -234,6 +234,11 @@ stripTrailingSlashT t = fromMaybe t $ T.stripSuffix
         (T.singleton FP.pathSeparator)
         t
 
+isWindows :: OS -> Bool
+isWindows Windows = True
+isWindows (OtherOS "windowsintegersimple") = True
+isWindows _ = False
+
 -- | Ensure GHC is installed and provide the PATHs to add if necessary
 ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
           => SetupOpts
@@ -264,7 +269,7 @@ ensureGHC sopts = do
             config <- asks getConfig
             let tools =
                     case configPlatform config of
-                        Platform _ Windows ->
+                        Platform _ os | isWindows os ->
                               ($(mkPackageName "ghc"), Just expected)
                             : (if soptsSkipMsys sopts
                                 then []
@@ -398,11 +403,11 @@ binDirs ident = do
     config <- asks getConfig
     dir <- installDir ident
     case (configPlatform config, packageNameString $ packageIdentifierName ident) of
-        (Platform _ Windows, "ghc") -> return
+        (Platform _ (isWindows -> True), "ghc") -> return
             [ dir </> $(mkRelDir "bin")
             , dir </> $(mkRelDir "mingw") </> $(mkRelDir "bin")
             ]
-        (Platform _ Windows, "git") -> return
+        (Platform _ (isWindows -> True), "git") -> return
             [ dir </> $(mkRelDir "cmd")
             , dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
             ]
@@ -454,7 +459,7 @@ ensureTool sopts installed getSetupInfo' msystem (name, mversion)
                     platform <- asks $ configPlatform . getConfig
                     let installer =
                             case platform of
-                                Platform _ Windows -> installGHCWindows
+                                Platform _ os | isWindows os -> installGHCWindows
                                 _ -> installGHCPosix
                     return (pair, installer)
                 x -> error $ "Invariant violated: ensureTool on " ++ x
@@ -589,11 +594,13 @@ installGHCWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, 
                   -> PackageIdentifier
                   -> m ()
 installGHCWindows si archiveFile archiveType destDir _ = do
-    case archiveType of
-        TarXz -> return ()
-        _ -> error $ "GHC on Windows must be a .tar.xz file"
+    suffix <-
+        case archiveType of
+            TarXz -> return ".xz"
+            TarBz2 -> return ".bz2"
+            _ -> error $ "GHC on Windows must be a tarball file"
     tarFile <-
-        case T.stripSuffix ".xz" $ T.pack $ toFilePath archiveFile of
+        case T.stripSuffix suffix $ T.pack $ toFilePath archiveFile of
             Nothing -> error $ "Invalid GHC filename: " ++ show archiveFile
             Just x -> parseAbsFile $ T.unpack x
 
