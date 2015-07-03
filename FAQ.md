@@ -224,4 +224,4 @@ This may end up recompiling local dependencies of `one-of-the-packages` without 
 
 If you are using a powershell session, it is easy to automate even that step:
 
-    $env:Path = ( stack setup | %{ $_ -replace '[^ ]+ ', ''} ) + ";" + $env:Path
+    $env:Path = ( stack setup | %{ $_ -replace '[^ ]+ ', ''} ), $env:Path -join ";"
