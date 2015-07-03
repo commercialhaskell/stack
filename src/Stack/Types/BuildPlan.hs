@@ -22,6 +22,7 @@ module Stack.Types.BuildPlan
     , MiniPackageInfo (..)
     , renderSnapName
     , parseSnapName
+    , isWindows
     ) where
 
 import           Control.Applicative
@@ -51,7 +52,7 @@ import           Data.Time                       (Day)
 import qualified Data.Traversable                as T
 import           Data.Typeable                   (TypeRep, Typeable, typeOf)
 import           Data.Vector                     (Vector)
-import           Distribution.System             (Arch, OS)
+import           Distribution.System             (Arch, OS (..))
 import qualified Distribution.Text               as DT
 import qualified Distribution.Version            as C
 import           GHC.Generics                    (Generic)
@@ -386,3 +387,9 @@ data MiniPackageInfo = MiniPackageInfo
     }
     deriving (Generic, Show, Eq)
 instance Binary.Binary MiniPackageInfo
+
+
+isWindows :: OS -> Bool
+isWindows Windows = True
+isWindows (OtherOS "windowsintegersimple") = True
+isWindows _ = False
