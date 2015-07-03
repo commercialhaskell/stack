@@ -39,6 +39,8 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified Data.Text.Encoding.Error as T
 import           Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
 import           Data.Typeable (Typeable)
 import qualified Data.Yaml as Yaml
@@ -49,7 +51,7 @@ import           Network.HTTP.Download (verifiedDownload, DownloadRequest(..))
 import           Path
 import           Path.IO
 import           Prelude -- Fix AMP warning
-import           Safe (readMay)
+import           Safe (headMay, readMay)
 import           Stack.Build.Types
 import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB)
 import           Stack.Solver (getGhcVersion)
@@ -81,7 +83,7 @@ data SetupOpts = SetupOpts
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
                     | MissingDependencies [String]
-                    | UnknownGHCVersion Version (Set MajorVersion)
+                    | UnknownGHCVersion Text Version (Set MajorVersion)
                     | UnknownOSKey Text
                     | GHCSanityCheckCompileFailed ReadProcessException (Path Abs File)
     deriving Typeable
@@ -95,10 +97,10 @@ instance Show SetupException where
     show (MissingDependencies tools) =
         "The following executables are missing and must be installed: " ++
         intercalate ", " tools
-    show (UnknownGHCVersion version known) = concat
+    show (UnknownGHCVersion oskey version known) = concat
         [ "No information found for GHC version "
         , versionString version
-        , ". Known GHC major versions: "
+        , ".\nSupported GHC major versions for OS key '" ++ T.unpack oskey ++ "': "
         , intercalate ", " (map show $ Set.toList known)
         ]
     show (UnknownOSKey oskey) =
@@ -286,7 +288,7 @@ ensureGHC sopts = do
                             return si
 
             installed <- runReaderT listInstalled config
-            idents <- mapM (ensureTool sopts installed getSetupInfo' msystem) tools
+            idents <- mapM (ensureTool menv0 sopts installed getSetupInfo' msystem) tools
             paths <- runReaderT (mapM binDirs $ catMaybes idents) config
             return $ Just $ map toFilePathNoTrailingSlash $ concat paths
         else return Nothing
@@ -414,13 +416,14 @@ binDirs ident = do
             return []
 
 ensureTool :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
-           => SetupOpts
+           => EnvOverride
+           -> SetupOpts
            -> [PackageIdentifier] -- ^ already installed
            -> m SetupInfo
            -> Maybe (Version, Arch) -- ^ installed GHC
            -> (PackageName, Maybe Version)
            -> m (Maybe PackageIdentifier)
-ensureTool sopts installed getSetupInfo' msystem (name, mversion)
+ensureTool menv sopts installed getSetupInfo' msystem (name, mversion)
     | not $ null available = return $ Just $ PackageIdentifier name $ maximum available
     | not $ soptsInstallIfMissing sopts =
         if name == $(mkPackageName "ghc")
@@ -438,7 +441,7 @@ ensureTool sopts installed getSetupInfo' msystem (name, mversion)
                     let pair = siPortableGit si
                     return (pair, installGitWindows)
                 "ghc" -> do
-                    osKey <- getOSKey
+                    osKey <- getOSKey menv
                     pairs <-
                         case Map.lookup osKey $ siGHCs si of
                             Nothing -> throwM $ UnknownOSKey osKey
@@ -449,7 +452,7 @@ ensureTool sopts installed getSetupInfo' msystem (name, mversion)
                             Just version -> return version
                     pair <-
                         case Map.lookup (getMajorVersion version) pairs of
-                            Nothing -> throwM $ UnknownGHCVersion version (Map.keysSet pairs)
+                            Nothing -> throwM $ UnknownGHCVersion osKey version (Map.keysSet pairs)
                             Just pair -> return pair
                     platform <- asks $ configPlatform . getConfig
                     let installer =
@@ -481,12 +484,13 @@ ensureTool sopts installed getSetupInfo' msystem (name, mversion)
                 getMajorVersion expected == getMajorVersion actual &&
                 actual >= expected
 
-getOSKey :: (MonadReader env m, MonadThrow m, HasConfig env) => m Text
-getOSKey = do
+getOSKey :: (MonadReader env m, MonadThrow m, HasConfig env, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
+         => EnvOverride -> m Text
+getOSKey menv = do
     platform <- asks $ configPlatform . getConfig
     case platform of
-        Platform I386 Linux -> return "linux32"
-        Platform X86_64 Linux -> return "linux64"
+        Platform I386 Linux -> ("linux32" <>) <$> getLinuxSuffix
+        Platform X86_64 Linux -> ("linux64" <>) <$> getLinuxSuffix
         Platform I386 OSX -> return "macosx"
         Platform X86_64 OSX -> return "macosx"
         Platform I386 FreeBSD -> return "freebsd32"
@@ -500,6 +504,15 @@ getOSKey = do
         Platform X86_64 (OtherOS "windowsintegersimple") -> return "windowsintegersimple64"
 
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
+  where
+    getLinuxSuffix = do
+        executablePath <- liftIO getExecutablePath
+        elddOut <- tryProcessStdout Nothing menv "ldd" [executablePath]
+        return $ case elddOut of
+            Left _ -> ""
+            Right lddOut -> if hasLineWithFirstWord "libgmp.so.3" lddOut then "-gmp4" else ""
+    hasLineWithFirstWord w =
+      elem (Just w) . map (headMay . T.words) . T.lines . T.decodeUtf8With T.lenientDecode
 
 downloadPair :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
              => DownloadPair
