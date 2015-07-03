@@ -154,6 +154,7 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
         case configMonoidJobs of
             Nothing -> liftIO getNumCapabilities
             Just i -> return i
+     let configConcurrentTests = fromMaybe True configMonoidConcurrentTests
 
      return Config {..}
 

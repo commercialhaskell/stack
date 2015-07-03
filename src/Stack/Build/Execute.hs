@@ -333,6 +333,7 @@ executePlan' plan ee@ExecuteEnv {..} = do
             (planTasks plan)
             (planFinals plan)
     threads <- asks $ configJobs . getConfig
+    concurrentTests <- asks $ configConcurrentTests . getConfig
     let keepGoing =
             case boptsKeepGoing eeBuildOpts of
                 Just kg -> kg
@@ -340,8 +341,12 @@ executePlan' plan ee@ExecuteEnv {..} = do
                     case boptsFinalAction eeBuildOpts of
                         DoNothing -> False
                         _ -> True
+        concurrentFinal =
+            case boptsFinalAction eeBuildOpts of
+                DoTests _ -> concurrentTests
+                _ -> True
     terminal <- asks getTerminal
-    errs <- liftIO $ runActions threads keepGoing actions $ \doneVar -> do
+    errs <- liftIO $ runActions threads keepGoing concurrentFinal actions $ \doneVar -> do
         let total = length actions
             loop prev
                 | prev == total =

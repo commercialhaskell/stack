@@ -45,6 +45,7 @@ data ExecuteState = ExecuteState
     , esExceptions :: TVar [SomeException]
     , esInAction   :: TVar (Set ActionId)
     , esCompleted  :: TVar Int
+    , esFinalLock  :: Maybe (TMVar ())
     , esKeepGoing  :: Bool
     }
 
@@ -59,15 +60,19 @@ instance Show ExecuteException where
 
 runActions :: Int -- ^ threads
            -> Bool -- ^ keep going after one task has failed
+           -> Bool -- ^ run final actions concurrently?
            -> [Action]
            -> (TVar Int -> IO ()) -- ^ progress updated
            -> IO [SomeException]
-runActions threads keepGoing actions0 withProgress = do
+runActions threads keepGoing concurrentFinal actions0 withProgress = do
     es <- ExecuteState
         <$> newTVarIO actions0
         <*> newTVarIO []
         <*> newTVarIO Set.empty
         <*> newTVarIO 0
+        <*> (if concurrentFinal
+                then pure Nothing
+                else Just <$> atomically (newTMVar ()))
         <*> pure keepGoing
     _ <- async $ withProgress $ esCompleted es
     if threads <= 1
@@ -100,6 +105,13 @@ runActions' ExecuteState {..} =
                         return $ return ()
                     else retry
             (xs, action:ys) -> do
+                unlock <-
+                    case (actionId action, esFinalLock) of
+                        (ActionId _ ATFinal, Just lock) -> do
+                            takeTMVar lock
+                            return $ putTMVar lock ()
+                        _ -> return $ return ()
+
                 let as' = xs ++ ys
                 inAction <- readTVar esInAction
                 let remaining = Set.union
@@ -112,6 +124,7 @@ runActions' ExecuteState {..} =
                         { acRemaining = remaining
                         }
                     atomically $ do
+                        unlock
                         modifyTVar esInAction (Set.delete $ actionId action)
                         modifyTVar esCompleted (+1)
                         case eres of
