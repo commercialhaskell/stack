@@ -752,7 +752,10 @@ sanityCheck menv = withSystemTempDirectory "stack-sanity-check" $ \dir -> do
         ]
     ghc <- join $ findExecutable menv "ghc"
     $logDebug $ "Performing a sanity check on: " <> T.pack (toFilePath ghc)
-    eres <- tryProcessStdout (Just dir') menv "ghc" [fp]
+    eres <- tryProcessStdout (Just dir') menv "ghc"
+        [ fp
+        , "-no-user-package-db"
+        ]
     case eres of
         Left e -> throwM $ GHCSanityCheckCompileFailed e ghc
         Right _ -> return () -- TODO check that the output of running the command is correct
