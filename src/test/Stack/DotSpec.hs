@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 -- | Test suite for Stack.Dot
 module Stack.DotSpec where
@@ -14,7 +15,9 @@ import           Options.Applicative (execParserPure,idm,prefs,info,getParseResu
 import           Stack.Types
 import           Test.Hspec
 import           Test.Hspec.QuickCheck (prop)
+#if MIN_VERSION_QuickCheck(2,8,0)
 import           Test.QuickCheck (forAll,sublistOf)
+#endif
 
 import           Stack.Dot
 
@@ -42,6 +45,7 @@ spec = do
            resultGraph' = resolveDependencies Nothing graph' stubLoader
        fmap Map.size resultGraph' `shouldBe` fmap ((+1) . Map.size) resultGraph
 
+#if MIN_VERSION_QuickCheck(2,8,0)
     prop "requested packages are pruned" $ do
       let resolvedGraph = runIdentity (resolveDependencies Nothing graph stubLoader)
           allPackages g = Set.map show (Map.keysSet g `Set.union` F.fold g)
@@ -56,6 +60,7 @@ spec = do
       forAll (sublistOf (Set.toList (allPackages resolvedGraph))) $ \toPrune ->
         let pruned = pruneGraph [pkgName "one", pkgName "two"] toPrune resolvedGraph
         in null (Map.keys (orphans pruned) \\ [pkgName "one", pkgName "two"])
+#endif
 
   where graphElem e graph = Set.member e . Set.unions . Map.elems $ graph
 
