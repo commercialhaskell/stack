@@ -129,10 +129,3 @@ guarantees:
 * Since snapshots are immutable, the snapshot package database will not be invalidated by any action. If you change the snapshot you're using, however, you may need to build those packages from scratch.
 * If you modify your extra-deps, stack may need to unregister and reinstall them.
 * Any changes to your local packages trigger a rebuild of that package and its dependencies.
-
-## Projects
-
-Again, a project is when a `stack.yaml` lists multiple local packages (instead of just `.`).
-
-One can still conveniently cd to the directory of an individual package and get expected behavior.
-When at the top-level, all packages will be built and tested in parallel. Test suites which assume no other suites are accessing global resources can fail when running `stack test` from the project root.
