@@ -219,3 +219,9 @@ stack tries to give you reproducibility whenever possible. In some cases, this m
     stack build --ghc-options -O0 && stack build --ghc-options -O0 one-of-the-packages
 
 This may end up recompiling local dependencies of `one-of-the-packages` without optimizations on. Whether stack should or shouldn't do this depends on the needs of the user at the time, and unfortunately we can't make a solution that will make everyone happy in all cases. If you're curious for details, there's [a long discussion about it](https://github.com/commercialhaskell/stack/issues/382) on the issue tracker.
+
+#### stack setup on a windows system only tells me to add certain paths to the PATH variable instead of doing it
+
+If you are using a powershell session, it is easy to automate even that step:
+
+    $env:Path = ( stack setup | %{ $_ -replace '[^ ]+ ', ''} ) + $env:Path
