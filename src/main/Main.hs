@@ -109,7 +109,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
              addCommand "bench"
                         "Build and benchmark the project(s) in this directory/configuration"
                         (buildCmd DoBenchmarks)
-                        (buildOpts Build)
+                        (buildOpts Bench)
              addCommand "haddock"
                         "Generate haddocks for the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
@@ -661,6 +661,7 @@ data Command
     = Build
     | Test
     | Haddock
+    | Bench
     deriving (Eq)
 
 -- | Parser for build arguments.
@@ -668,7 +669,7 @@ buildOpts :: Command -> Parser BuildOpts
 buildOpts cmd = fmap process $
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> haddock <*> haddockDeps <*> finalAction <*> dryRun <*> ghcOpts <*>
-            flags <*> installExes <*> preFetch <*> testArgs <*> onlySnapshot <*> coverage <*>
+            flags <*> installExes <*> preFetch <*> additionalArgs <*> onlySnapshot <*> coverage <*>
             fileWatch' <*> keepGoing <*> noTests
   where process bopts =
             if boptsCoverage bopts
@@ -730,15 +731,21 @@ buildOpts cmd = fmap process $
         preFetch = flag False True
             (long "prefetch" <>
              help "Fetch packages necessary for the build immediately, useful with --dry-run")
-        testArgs =
+        additionalArgs =
              fmap (fromMaybe [])
-                  (if cmd == Test
-                      then optional
-                               (argsOption
-                                    (long "test-arguments" <> metavar "TEST_ARGS" <>
-                                     help "Arguments passed in to the test suite program"))
-                      else pure Nothing)
-
+                  (case cmd of
+                     Test -> optional
+                                 (argsOption
+                                      (long "test-arguments" <> metavar "TEST_ARGS" <>
+                                       help "Arguments passed in to the test suite program"))
+                     Bench -> fmap (fmap (:[]))
+                                   (optional
+                                      (strOption
+                                      (long "benchmark-arguments" <>
+                                      metavar "BENCH_ARGS" <>
+                                      help ("Forward BENCH_ARGS to the benchmark suite." <>
+                                            "Supports templates from `cabal bench`"))))
+                     _ -> pure Nothing)
         onlySnapshot = flag False True
             (long "only-snapshot" <>
              help "Only build packages for the snapshot database, not the local database")

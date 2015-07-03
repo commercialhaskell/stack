@@ -766,7 +766,7 @@ singleTest rerunTests ac ee task =
                                 $logWarn ("Removing HPC file " <> T.pack (toFilePath nameTix))
                             removeFileIfExists nameTix
 
-                        let args = boptsTestArgs (eeBuildOpts ee)
+                        let args = boptsAdditionalArgs (eeBuildOpts ee)
                             argsDisplay =
                                 case args of
                                   [] -> ""
@@ -897,8 +897,9 @@ singleBench ac ee task =
             cabal (console && configHideTHLoading config) ["build"]
             setBenchBuilt pkgDir
 
+        let args = boptsAdditionalArgs (eeBuildOpts ee)
         announce "benchmarks"
-        cabal False ["bench"]
+        cabal False ["bench","--benchmark-options=" <> unwords args]
 
 -- | Grab all output from the given @Handle@ and print it to stdout, stripping
 -- Template Haskell "Loading package" lines. Does work in a separate thread.
