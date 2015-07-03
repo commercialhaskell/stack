@@ -1,3 +1,6 @@
+#!/usr/bin/env stack
+-- stack --install-ghc runghc --package=shake --package=extra --package=zip-archive --package=mime-types --package=http-types --package=http-conduit --package=text --package=conduit-combinators --package=conduit --package=case-insensitive --package=aeson --package=zlib --package executable-path
+
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE QuasiQuotes #-}
 
@@ -8,7 +11,6 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy.Char8 as L8
 import Data.List
 import Data.Maybe
-import Data.String.Here
 import Distribution.PackageDescription.Parse
 import Distribution.Text
 import Distribution.System
@@ -34,6 +36,7 @@ import Development.Shake.FilePath
 import Network.HTTP.Conduit
 import Network.HTTP.Types
 import Network.Mime
+import System.Environment.Executable
 
 -- | Entrypoint.
 main :: IO ()
@@ -49,8 +52,10 @@ main =
             gGithubAuthToken <- lookupEnv githubAuthTokenEnvVar
             gLocalInstallRoot <- getStackPath "local-install-root"
             gProjectRoot <- getStackPath "project-root"
-            gGitRevCount <- read . trim <$> readProcess "git" ["rev-list", "HEAD", "--count"] ""
+            gGitRevCount <- length . lines <$> readProcess "git" ["rev-list", "HEAD"] ""
             gGitSha <- trim <$> readProcess "git" ["rev-parse", "HEAD"] ""
+            gHomeDir <- getHomeDirectory
+            RunGHC gScriptPath <- getScriptPath
             let gGpgKey = Nothing
                 gAllowDirty = False
                 gGithubReleaseTag = Nothing
@@ -84,16 +89,6 @@ rules global@Global{..} args = do
         [] -> error "No wanted target(s) specified."
         _ -> want args
 
-    phony ubuntuUploadPhony $
-        mapM_
-            (\v -> need [ubuntuVersionDebDir (fst v) </> ubuntuVersionDebFileName <.> uploadExt])
-            ubuntuVersions
-
-    phony ubuntuPackagesPhony $
-        mapM_
-            (\v -> need [ubuntuVersionDebDir (fst v) </> ubuntuVersionDebFileName])
-            ubuntuVersions
-
     phony releasePhony $ do
         need [checkPhony]
         need [uploadPhony]
@@ -110,6 +105,26 @@ rules global@Global{..} args = do
     phony buildPhony $
         mapM_ (\f -> need [releaseDir </> f]) releaseFileNames
 
+    phony ubuntuUploadPhony $
+        mapM_
+            (\v -> need [ubuntuVersionDebDir (fst v) </> ubuntuVersionDebFileName <.> uploadExt])
+            ubuntuVersions
+
+    phony ubuntuPackagesPhony $
+        mapM_
+            (\v -> need [ubuntuVersionDebDir (fst v) </> ubuntuVersionDebFileName])
+            ubuntuVersions
+
+    phony centosUploadPhony $
+        mapM_
+            (\v -> need [centosVersionRpmDir v </> centosVersionRpmFileName <.> uploadExt])
+            centosVersions
+
+    phony centosPackagesPhony $
+        mapM_
+            (\v -> need [centosVersionRpmDir v </> centosVersionRpmFileName])
+            centosVersions
+
     releaseDir </> "*" <.> uploadExt %> \out -> do
         need [dropExtension out]
         uploadToGithubRelease global (dropExtension out)
@@ -122,7 +137,7 @@ rules global@Global{..} args = do
             error ("Working tree is dirty.  Use --" ++ allowDirtyOptName ++ " option to continue anyway.")
         let instExeFile = installBinDir </> stackExeFileName
             tmpExeFile = installBinDir </> stackExeFileName <.> "tmp"
-        --FIXME: once 'stack install --path' implemented, use it instead of this temp file.
+        --EKB FIXME: once 'stack install --path' implemented, use it instead of this temp file.
         liftIO $ renameFile instExeFile tmpExeFile
         actionFinally
             (do opt <- addPath [installBinDir] []
@@ -177,7 +192,7 @@ rules global@Global{..} args = do
     ubuntuVersionDebDir "*" </> ubuntuVersionDebFileName <.> uploadExt %> \out -> do
         let ubuntuVersion = ubuntuVersionFromPath out
         need [ubuntuVersionDebDir ubuntuVersion </> ubuntuVersionDebFileName]
-        () <- cmd "deb-s3 upload -b download.fpcomplete.com --sign=9BEFB442"
+        () <- cmd "deb-s3 upload -b download.fpcomplete.com" ["--sign=" ++ osPackageSigningKey]
             [ "--prefix=ubuntu/" ++ ubuntuCodeName ubuntuVersion
             , dropExtension out ]
         copyFileChanged (dropExtension out) out
@@ -215,19 +230,81 @@ rules global@Global{..} args = do
         return ()
 
     ubuntuVersionDockerDir "*" </> "Dockerfile" %> \out -> do
-        alwaysRerun
         let ubuntuVersion = ubuntuVersionFromPath out
-        writeFileChanged out [template|templates/ubuntu-packages/docker/Dockerfile|]
+        template <- readTemplate "ubuntu-packages/docker/Dockerfile"
+        writeFileChanged out $ replace "<<UBUNTU-VERSION>>" ubuntuVersion template
 
-    ubuntuVersionDockerDir "*" </> "run.sh" %> \out -> do
+    ubuntuVersionDockerDir "*" </> "run.sh" %> \out ->
+        writeFileChanged out =<< readTemplate "ubuntu-packages/docker/run.sh"
+
+    centosVersionRpmDir "*" </> centosVersionRpmFileName <.> uploadExt %> \out -> do
+        let centosVersion = centosVersionFromPath out
+        need [centosVersionRpmDir centosVersion </> centosVersionRpmFileName]
+        let rpmmacrosFile = gHomeDir </> ".rpmmacros"
+        rpmmacrosExists <- liftIO $ System.Directory.doesFileExist rpmmacrosFile
+        when rpmmacrosExists $
+            error ("'" ++ rpmmacrosFile ++ "' already exists, move it out of the way first.")
+        actionFinally
+            (do writeFileLines rpmmacrosFile
+                    [ "%_signature gpg"
+                    , "%_gpg_name " ++ osPackageSigningKey ]
+                () <- cmd "rpm-s3 --verbose --sign --bucket=download.fpcomplete.com"
+                    [ "--repopath=centos/" ++ centosVersion
+                    , dropExtension out ]
+                copyFileChanged (dropExtension out) out)
+            (liftIO $ removeFile rpmmacrosFile)
+
+    centosVersionRpmDir "*" </> centosVersionRpmFileName %> \out -> do
         alwaysRerun
-        writeFileChanged out [hereFile|templates/ubuntu-packages/docker/run.sh|]
+        let centosVersion = centosVersionFromPath out
+        need [centosVersionDir centosVersion </> imageIDFileName]
+        liftIO $ createDirectoryIfMissing True (takeDirectory out)
+        cmd "docker run --rm"
+            [ "--volume=" ++ gProjectRoot </> centosVersionDir centosVersion </> "stack-root" ++
+              ":/mnt/stack-root"
+            , "--env=STACK_ROOT=/mnt/stack-root"
+            , "--volume=" ++ gProjectRoot </> centosVersionDir centosVersion </> "stack-work" ++
+              ":/mnt/src/.stack-work"
+            , "--volume=" ++ gProjectRoot ++ ":/mnt/src"
+            , "--workdir=/mnt/src"
+            , "--volume=" ++ gProjectRoot </> centosVersionRpmDir centosVersion ++ ":/mnt/rpm"
+            , "--env=OUTPUT_RPM=/mnt/rpm/" ++ centosVersionRpmFileName
+            , "--env=RPM_VERSION=" ++ centosVersionRpmVersionStr
+            , "--env=PKG_MAINTAINER=" ++ maintainer gStackPackageDescription
+            , "--env=PKG_DESCRIPTION=" ++ synopsis gStackPackageDescription
+            , "--env=PKG_LICENSE=" ++ display (license gStackPackageDescription)
+            , "--env=PKG_URL=" ++ homepage gStackPackageDescription
+            , centosDockerImageTag centosVersion]
+
+    centosVersionDir "*" </> imageIDFileName %> \out -> do
+        alwaysRerun
+        let centosVersion = centosVersionFromPath out
+            imageTag = centosDockerImageTag centosVersion
+        need
+            [ centosVersionDockerDir centosVersion </> "Dockerfile"
+            , centosVersionDockerDir centosVersion </> "run.sh" ]
+        _ <- buildDockerImage (centosVersionDockerDir centosVersion) imageTag out
+        return ()
+
+    centosVersionDockerDir "*" </> "Dockerfile" %> \out -> do
+        let centosVersion = centosVersionFromPath out
+        template <- readTemplate "centos-packages/docker/Dockerfile"
+        writeFileChanged out $ replace "<<CENTOS-VERSION>>" centosVersion template
+
+    centosVersionDockerDir "*" </> "run.sh" %> \out ->
+        writeFileChanged out =<< readTemplate "centos-packages/docker/run.sh"
 
   where
     ubuntuVersionFromPath path =
         case stripPrefix (ubuntuVersionDir "" ++ "/") path of
             Nothing -> error ("Cannot determine Ubuntu version from path: " ++ path)
             Just path' -> takeDirectory1 path'
+    centosVersionFromPath path =
+        case stripPrefix (centosVersionDir "" ++ "/") path of
+            Nothing -> error ("Cannot determine centos version from path: " ++ path)
+            Just path' -> takeDirectory1 path'
+    readTemplate path =
+        readFile' (takeDirectory gScriptPath </> "templates" </> path)
 
     releasePhony = "release"
     checkPhony = "check"
@@ -236,12 +313,17 @@ rules global@Global{..} args = do
     buildPhony = "build"
     ubuntuPackagesPhony = "ubuntu-packages"
     ubuntuUploadPhony = "ubuntu-upload"
+    centosPackagesPhony = "centos-packages"
+    centosUploadPhony = "centos-upload"
 
     releaseCheckDir = releaseDir </> "check"
     installBinDir = gLocalInstallRoot </> "bin"
     ubuntuVersionDir ver = releaseDir </> "ubuntu" </> ver
     ubuntuVersionDockerDir ver = ubuntuVersionDir ver </> "docker"
     ubuntuVersionDebDir ver = ubuntuVersionDir ver </> "deb"
+    centosVersionDir ver = releaseDir </> "centos" </> ver
+    centosVersionDockerDir ver = centosVersionDir ver </> "docker"
+    centosVersionRpmDir ver = centosVersionDir ver </> "rpm"
 
     stackExeFileName = stackProgName <.> exe
     releaseFileNames = [releaseExeCompressedFileName, releaseExeCompressedAscFileName]
@@ -256,6 +338,8 @@ rules global@Global{..} args = do
     releaseExeFileNameNoExt = releaseName global
     ubuntuVersionDebFileName =
         concat [stackProgName, "_", ubuntuVersionDebVersionStr, "_amd64"] <.> "deb"
+    centosVersionRpmFileName =
+        concat [stackProgName, "-", centosVersionRpmVersionStr] <.> "x86_64.rpm"
     imageIDFileName = "image-id"
 
     zipExt = "zip"
@@ -266,6 +350,9 @@ rules global@Global{..} args = do
     ubuntuDockerImageTag ver = "stack_release_tool/ubuntu:" ++ ver
     ubuntuVersionDebVersionStr =
         concat [stackVersionStr global, "-", show gGitRevCount, "-", gGitSha]
+    centosDockerImageTag ver = "stack_release_tool/centos:" ++ ver
+    centosVersionRpmVersionStr =
+        concat [stackVersionStr global, "_", show gGitRevCount, "_", gGitSha]
 
     ubuntuVersions =
         [ ("12.04", "precise")
@@ -276,6 +363,10 @@ rules global@Global{..} args = do
         fromMaybe
             ("Unknown Ubuntu version: " ++ v)
             (lookup v ubuntuVersions)
+
+    centosVersions = ["7", "6"]
+
+    osPackageSigningKey = "9BEFB442"
 
 -- | Upload file to Github release.
 uploadToGithubRelease :: Global -> FilePath -> Action ()
@@ -421,7 +512,9 @@ data Global = Global
     , gAllowDirty :: !Bool
     , gGithubAuthToken :: !(Maybe String)
     , gGithubReleaseTag :: !(Maybe String)
-    , gGitRevCount :: !Integer
+    , gGitRevCount :: !Int
     , gGitSha :: !String
     , gProjectRoot :: !FilePath
+    , gHomeDir :: !FilePath
+    , gScriptPath :: !FilePath
     }

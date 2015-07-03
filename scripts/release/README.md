@@ -32,7 +32,7 @@ To upload a binary to a Github release, you also need:
   (probably as a draft) with a tag for the stack package's version (e.g.
   `vX.Y.Z`).
 
-To create and upload Ubuntu packages, you need:
+To create and upload Debian/Ubuntu packages, you need:
 
 - Docker installed.
 - deb-s3 installed (`sudo gem install deb-s3`).
@@ -40,24 +40,24 @@ To create and upload Ubuntu packages, you need:
 - Set `AWS_SECRET_ACCESS_KEY` and `AWS_ACCESS_KEY_ID` environment variables with
   credentials that allow uploading to download.fpcomplete.com S3 bucket.
 
-Build
------
+To create and upload Red Hat/CentOS packages, you need:
 
-Build and install the release tool using:
-```
-(cd etc/release-tool && stack install)
-```
+- Docker installed.
+- rpm-s3 installed (see https://github.com/crohr/rpm-s3).
+- `dev@fpcomplete.com` secret key in GPG keyring.
+- Set `AWS_SECRET_ACCESS_KEY` and `AWS_ACCESS_KEY_ID` environment variables with
+  credentials that allow uploading to download.fpcomplete.com S3 bucket.
 
 Invocation
 ----------
 
-Usage: `stack-release-tool [OPTIONS] TARGET`
+Usage: `scripts/release/release.hs [OPTIONS] TARGET`
 
 The tool must be run in the root of the working tree.
 
 ### Options
 
-stack-release-tool is shake-based, so all standard shake options apply. In
+The release tool is shake-based, so all standard shake options apply. In
 addition, the following options are accepted:
 
 * `--gpg-key`: use a non-default GPG key to sign the binaries.
@@ -73,5 +73,7 @@ addition, the following options are accepted:
 * `check`: run pre-release checks.
 * `build`: build and sign the binary distribution.
 * `upload`: upload the binary distribution to the Github release.
-* `ubuntu-packages`: build Ubuntu packages.
-* `ubuntu-upload`: upload Ubuntu packages to private package repository.
+* `ubuntu-packages`: build Ubuntu .deb packages.
+* `ubuntu-upload`: upload Ubuntu .deb packages to private package repository.
+* `centos-packages`: build CentOS .rpm packages.
+* `centos-upload`: upload CentOS .rpm packages to private package repository.

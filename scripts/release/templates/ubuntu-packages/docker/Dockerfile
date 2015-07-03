@@ -1,20 +1,17 @@
-FROM ubuntu:${ubuntuVersion}
+FROM ubuntu:<<UBUNTU-VERSION>>
 
-ENV DEBIAN_FRONTEND=noninteractive \\
+ENV DEBIAN_FRONTEND=noninteractive \
     LANG=en_US.UTF-8
 RUN locale-gen $LANG
 
 RUN apt-get update
-RUN apt-get install -y net-tools wget python-software-properties software-properties-common
+RUN apt-get install -y net-tools wget zlib1g-dev lsb-release
 
-# HASKELL
-ENV GHCVER=7.8.4
+# STACK
 RUN wget -q -O- http://download.fpcomplete.com/ubuntu/fpco.key | apt-key add -
 RUN echo "deb http://download.fpcomplete.com/ubuntu/$(lsb_release -cs) stable main"|tee /etc/apt/sources.list.d/fpco.list
-RUN apt-add-repository -y ppa:hvr/ghc
 RUN apt-get update
-RUN apt-get install -y ghc-$GHCVER stack zlib1g-dev
-ENV PATH=/opt/ghc/$GHCVER/bin:$PATH
+RUN apt-get install -y stack
 
 # RUBY & FPM
 RUN apt-get install -y ruby-dev libffi-dev make
