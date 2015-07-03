@@ -105,7 +105,7 @@ any directory and still use your packages.
 
 #### My tests are failing. What should I do?
 
-A common cause of unexpected failures is that your test suites are non-deterministic. While `stack` can all but guarantee reproducible builds, the onus is on the project developers to ensure that test results are repeatable where appropriate. Further, note that like all other targets `stack test` runs test suites in parallel by default. This can cause problems with test suites that content on global resources such as a database or binding to a fixed port number. A quick hack is to force stack to run all test suites in sequence, using `stack test --jobs=1`. The correct fix is that developers should ensure that their test suites do not depend on global resources (e.g. by asking the OS for a random port to bind to) and where unavoidable, add a lock in order to serialize access to shared resources.
+A common cause of unexpected failures is that your test suites are non-deterministic. While `stack` can all but guarantee reproducible builds, the onus is on the project developers to ensure that test results are repeatable where appropriate. Further, note that like all other targets `stack test` runs test suites in parallel by default. This can cause problems with test suites that depend on global resources such as a database or binding to a fixed port number. A quick hack is to force stack to run all test suites in sequence, using `stack test --jobs=1`. The correct fix is that developers should ensure that their test suites do not depend on global resources (e.g. by asking the OS for a random port to bind to) and where unavoidable, add a lock in order to serialize access to shared resources.
 
 #### Can I get bash autocompletion?
 
