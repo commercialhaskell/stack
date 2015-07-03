@@ -29,7 +29,8 @@ module Stack.Build.Types
     ,ConstructPlanException(..)
     ,configureOpts
     ,BadDependency(..)
-    ,wantedLocalPackages)
+    ,wantedLocalPackages
+    ,FileCacheInfo (..))
     where
 
 import           Control.DeepSeq
@@ -53,6 +54,7 @@ import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 import           Data.Time.Calendar
 import           Data.Time.Clock
+import           Data.Word (Word64)
 import           Distribution.System (Arch)
 import           Distribution.Text (display)
 import           GHC.Generics
@@ -359,6 +361,7 @@ data LocalPackage = LocalPackage
     , lpDir            :: !(Path Abs Dir)  -- ^ Directory of the package.
     , lpCabalFile      :: !(Path Abs File) -- ^ The .cabal file
     , lpDirtyFiles     :: !Bool            -- ^ are there files that have changed since the last build?
+    , lpNewBuildCache  :: !(Map FilePath FileCacheInfo) -- ^ current state of the files
     , lpFiles          :: !(Set (Path Abs File)) -- ^ all files used by this package
     , lpComponents     :: !(Set Text)      -- ^ components to build, passed directly to Setup.hs build
     }
@@ -531,3 +534,11 @@ modTime x =
 
 data Installed = Library GhcPkgId | Executable PackageIdentifier
     deriving (Show, Eq, Ord)
+
+data FileCacheInfo = FileCacheInfo
+    { fciModTime :: !ModTime
+    , fciSize :: !Word64
+    , fciHash :: !S.ByteString
+    }
+    deriving (Generic, Show)
+instance Binary FileCacheInfo

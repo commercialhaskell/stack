@@ -108,6 +108,7 @@ library
                    , bifunctors >= 4.2.1
                    , binary >= 0.7
                    , blaze-builder
+                   , byteable
                    , bytestring
                    , conduit-combinators >= 0.3.1
                    , conduit >= 1.2.4

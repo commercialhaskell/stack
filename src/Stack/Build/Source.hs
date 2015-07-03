@@ -14,13 +14,21 @@ module Stack.Build.Source
     ) where
 
 import Network.HTTP.Client.Conduit (HasHttpManager)
-import           Control.Applicative          ((<|>), (<$>))
+import           Control.Applicative          ((<|>), (<$>), (<*>))
+import           Control.Exception            (catch)
 import           Control.Monad
 import           Control.Monad.Catch          (MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader         (MonadReader, asks)
 import           Control.Monad.Trans.Resource
+import           Crypto.Hash                  (Digest, SHA256)
+import           Crypto.Hash.Conduit          (sinkHash)
+import           Data.Byteable                (toBytes)
+import qualified Data.ByteString              as S
+import           Data.Conduit                 (($$), ZipSink (..))
+import qualified Data.Conduit.Binary          as CB
+import qualified Data.Conduit.List            as CL
 import           Data.Either
 import qualified Data.Foldable                as F
 import           Data.Function
@@ -29,13 +37,13 @@ import           Data.List
 import qualified Data.Map                     as Map
 import           Data.Map.Strict              (Map)
 import           Data.Maybe
-import           Data.Monoid                  ((<>))
+import           Data.Monoid                  ((<>), Any (..), mconcat)
 import           Data.Set                     (Set)
 import qualified Data.Set                     as Set
 import           Data.Text                    (Text)
 import qualified Data.Text                    as T
 import           Path
-import           Prelude                      hiding (FilePath, writeFile)
+import           Prelude                      hiding (writeFile)
 import           Stack.Build.Cache
 import           Stack.Build.Types
 import           Stack.BuildPlan              (loadMiniBuildPlan,
@@ -45,6 +53,8 @@ import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.Types
 import           System.Directory             hiding (findExecutable, findFiles)
+import           System.IO                    (withBinaryFile, IOMode (ReadMode))
+import           System.IO.Error              (isDoesNotExistError)
 
 type SourceMap = Map PackageName PackageSource
 
@@ -202,16 +212,16 @@ loadLocals bopts latestVersion = do
             $ MismatchedCabalName cabalfp (packageName pkg)
         mbuildCache <- tryGetBuildCache dir
         files <- getPackageFiles (packageFiles pkg) AllFiles cabalfp
-        fileModTimes <- getPackageFileModTimes pkg cabalfp
+        (isDirty, newBuildCache) <- checkBuildCache
+            (fromMaybe Map.empty mbuildCache)
+            (map toFilePath $ Set.toList files)
         return LocalPackage
             { lpPackage = pkg
             , lpPackageFinal = pkgFinal
             , lpWanted = wanted
             , lpFiles = files
-            , lpDirtyFiles =
-                  maybe True
-                        ((/= fileModTimes) . buildCacheTimes)
-                        mbuildCache
+            , lpDirtyFiles = isDirty
+            , lpNewBuildCache = newBuildCache
             , lpCabalFile = cabalfp
             , lpDir = dir
             , lpComponents = fromMaybe Set.empty $ Map.lookup name names
@@ -314,3 +324,58 @@ extendExtraDeps extraDeps0 mbp latestVersion extraNames extraIdents =
             -- the version matches what's in the snapshot, so just use the snapshot version
             Just version' | version == version' -> m
             _ -> Map.insert name version m
+
+-- | Compare the current filesystem state to the cached information, and
+-- determine (1) if the files are dirty, and (2) the new cache values.
+checkBuildCache :: MonadIO m
+                => Map FilePath FileCacheInfo -- ^ old cache
+                -> [FilePath] -- ^ files in package
+                -> m (Bool, Map FilePath FileCacheInfo)
+checkBuildCache oldCache files = liftIO $ do
+    (Any isDirty, m) <- fmap mconcat $ mapM go files
+    return (isDirty, m)
+  where
+    go fp = do
+        mmodTime <- getModTimeMaybe fp
+        case mmodTime of
+            Nothing -> return (Any False, Map.empty)
+            Just modTime' -> do
+                (isDirty, newFci) <-
+                    case Map.lookup fp oldCache of
+                        Just fci
+                            | fciModTime fci == modTime' -> return (False, fci)
+                            | otherwise -> do
+                                newFci <- calcFci modTime' fp
+                                let isDirty =
+                                        fciSize fci /= fciSize newFci ||
+                                        fciHash fci /= fciHash newFci
+                                return (isDirty, newFci)
+                        Nothing -> do
+                            newFci <- calcFci modTime' fp
+                            return (True, newFci)
+                return (Any isDirty, Map.singleton fp newFci)
+
+    getModTimeMaybe fp =
+        liftIO
+            (catch
+                 (liftM
+                      (Just . modTime)
+                      (getModificationTime fp))
+                 (\e ->
+                       if isDoesNotExistError e
+                           then return Nothing
+                           else throwM e))
+
+    calcFci modTime' fp =
+        withBinaryFile fp ReadMode $ \h -> do
+            (size, digest) <- CB.sourceHandle h $$ getZipSink
+                ((,)
+                    <$> ZipSink (CL.fold
+                        (\x y -> x + fromIntegral (S.length y))
+                        0)
+                    <*> ZipSink sinkHash)
+            return FileCacheInfo
+                { fciModTime = modTime'
+                , fciSize = size
+                , fciHash = toBytes (digest :: Digest SHA256)
+                }

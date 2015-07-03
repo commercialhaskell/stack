@@ -630,9 +630,10 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
   withSingleContext ac ee task $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
     (cache, _neededConfig) <- ensureConfig pkgDir ee task (announce "configure") cabal cabalfp []
 
-    fileModTimes <- getPackageFileModTimes package cabalfp
     markExeNotInstalled (taskLocation task) taskProvides
-    writeBuildCache pkgDir fileModTimes
+    case taskType of
+        TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
+        TTUpstream _ _ -> return ()
 
     announce "build"
     config <- asks getConfig
@@ -709,8 +710,9 @@ singleTest rerunTests ac ee task =
         when needBuild $ do
             announce "build (test)"
             unsetTestSuccess pkgDir
-            fileModTimes <- getPackageFileModTimes package cabalfp
-            writeBuildCache pkgDir fileModTimes
+            case taskType task of
+                TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
+                TTUpstream _ _ -> assert False $ return ()
             cabal (console && configHideTHLoading config) $ "build" : components
 
         toRun <-
@@ -866,7 +868,7 @@ singleBench :: M env m
             -> Task
             -> m ()
 singleBench ac ee task =
-    withSingleContext ac ee task $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
+    withSingleContext ac ee task $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
         (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (benchmarks)") cabal cabalfp ["--enable-benchmarks"]
 
         let needBuild = neededConfig ||
@@ -875,8 +877,9 @@ singleBench ac ee task =
                     _ -> assert False True)
         when needBuild $ do
             announce "build (benchmarks)"
-            fileModTimes <- getPackageFileModTimes package cabalfp
-            writeBuildCache pkgDir fileModTimes
+            case taskType task of
+                TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
+                TTUpstream _ _ -> assert False $ return ()
             config <- asks getConfig
             cabal (console && configHideTHLoading config) ["build"]
 

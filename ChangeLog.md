@@ -15,6 +15,7 @@
 * Add the `--skip-msys` flag [#377](https://github.com/commercialhaskell/stack/issues/377)
 * `--keep-going`, turned on by default for tests and benchmarks [#478](https://github.com/commercialhaskell/stack/issues/478)
 * `concurrent-tests: BOOL` [#492](https://github.com/commercialhaskell/stack/issues/492)
+* Use hashes to check file dirtiness [#502](https://github.com/commercialhaskell/stack/issues/502)
 
 ## 0.1.1.0
 
