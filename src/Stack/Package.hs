@@ -63,7 +63,7 @@ import           Distribution.Package hiding (Package,PackageName,packageName,pa
 import           Distribution.PackageDescription hiding (FlagName)
 import           Distribution.PackageDescription.Parse
 import           Distribution.Simple.Utils
-import           Distribution.System (OS, Arch, Platform (..))
+import           Distribution.System (OS (..), Arch, Platform (..))
 import           Distribution.Text (display)
 import           Distribution.Version (intersectVersionRanges)
 import           Path as FL
@@ -615,7 +615,7 @@ mkResolveConditions :: Version -- ^ GHC version
 mkResolveConditions ghcVersion (Platform arch os) flags = ResolveConditions
     { rcFlags = flags
     , rcGhcVersion = ghcVersion
-    , rcOS = os
+    , rcOS = if isWindows os then Windows else os
     , rcArch = arch
     }
 

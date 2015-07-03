@@ -234,11 +234,6 @@ stripTrailingSlashT t = fromMaybe t $ T.stripSuffix
         (T.singleton FP.pathSeparator)
         t
 
-isWindows :: OS -> Bool
-isWindows Windows = True
-isWindows (OtherOS "windowsintegersimple") = True
-isWindows _ = False
-
 -- | Ensure GHC is installed and provide the PATHs to add if necessary
 ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
           => SetupOpts
