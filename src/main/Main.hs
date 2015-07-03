@@ -667,7 +667,7 @@ buildOpts cmd = fmap process $
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> haddock <*> haddockDeps <*> finalAction <*> dryRun <*> ghcOpts <*>
             flags <*> installExes <*> preFetch <*> testArgs <*> onlySnapshot <*> coverage <*>
-            fileWatch'
+            fileWatch' <*> keepGoing
   where process bopts =
             if boptsCoverage bopts
                then bopts { boptsExeProfile = True
@@ -750,6 +750,11 @@ buildOpts cmd = fmap process $
         fileWatch' = flag False True
             (long "file-watch" <>
              help "Watch for changes in local files and automatically rebuild")
+
+        keepGoing = maybeBoolFlags
+            "keep-going"
+            "continue running after a step fails (default: false for build, true for test/bench)"
+            idm
 
 -- | Parser for docker cleanup arguments.
 dockerCleanupOpts :: Parser Docker.CleanupOpts

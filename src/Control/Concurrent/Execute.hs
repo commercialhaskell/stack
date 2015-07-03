@@ -14,7 +14,7 @@ import           Control.Applicative
 import           Control.Concurrent.Async (Concurrently (..), async)
 import           Control.Concurrent.STM
 import           Control.Exception
-import           Control.Monad            (join)
+import           Control.Monad            (join, unless)
 import           Data.Foldable            (sequenceA_)
 import           Data.Set                 (Set)
 import qualified Data.Set                 as Set
@@ -45,6 +45,7 @@ data ExecuteState = ExecuteState
     , esExceptions :: TVar [SomeException]
     , esInAction   :: TVar (Set ActionId)
     , esCompleted  :: TVar Int
+    , esKeepGoing  :: Bool
     }
 
 data ExecuteException
@@ -57,15 +58,17 @@ instance Show ExecuteException where
         "Inconsistent dependencies were discovered while executing your build plan. This should never happen, please report it as a bug to the stack team."
 
 runActions :: Int -- ^ threads
+           -> Bool -- ^ keep going after one task has failed
            -> [Action]
            -> (TVar Int -> IO ()) -- ^ progress updated
            -> IO [SomeException]
-runActions threads actions0 withProgress = do
+runActions threads keepGoing actions0 withProgress = do
     es <- ExecuteState
         <$> newTVarIO actions0
         <*> newTVarIO []
         <*> newTVarIO Set.empty
         <*> newTVarIO 0
+        <*> pure keepGoing
     _ <- async $ withProgress $ esCompleted es
     if threads <= 1
         then runActions' es
@@ -78,7 +81,7 @@ runActions' ExecuteState {..} =
   where
     breakOnErrs inner = do
         errs <- readTVar esExceptions
-        if null errs
+        if null errs || esKeepGoing
             then inner
             else return $ return ()
     withActions inner = do
@@ -92,7 +95,8 @@ runActions' ExecuteState {..} =
                 inAction <- readTVar esInAction
                 if Set.null inAction
                     then do
-                        modifyTVar esExceptions (toException InconsistentDependencies:)
+                        unless esKeepGoing $
+                            modifyTVar esExceptions (toException InconsistentDependencies:)
                         return $ return ()
                     else retry
             (xs, action:ys) -> do
@@ -107,15 +111,12 @@ runActions' ExecuteState {..} =
                     eres <- try $ restore $ actionDo action ActionContext
                         { acRemaining = remaining
                         }
-                    case eres of
-                        Left err -> atomically $ do
-                            modifyTVar esExceptions (err:)
-                            modifyTVar esInAction (Set.delete $ actionId action)
-                            modifyTVar esCompleted (+1)
-                        Right () -> do
-                            atomically $ do
-                                modifyTVar esInAction (Set.delete $ actionId action)
-                                modifyTVar esCompleted (+1)
+                    atomically $ do
+                        modifyTVar esInAction (Set.delete $ actionId action)
+                        modifyTVar esCompleted (+1)
+                        case eres of
+                            Left err -> modifyTVar esExceptions (err:)
+                            Right () ->
                                 let dropDep a = a { actionDeps = Set.delete (actionId action) $ actionDeps a }
-                                modifyTVar esActions $ map dropDep
-                            restore loop
+                                 in modifyTVar esActions $ map dropDep
+                    restore loop
