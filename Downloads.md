@@ -48,11 +48,11 @@ We generally test on the current version of OS X, but stack is known to work on 
 
         sudo apt-get update && sudo apt-get install stack -y
 
-## CentOS / Red Hat / Fedora
+## CentOS / Red Hat
 
 1. Add the appropriate source repository:
 
-    * CentOS 7 / RHEL 7 / Fedora 20+
+    * CentOS 7 / RHEL 7
 
             curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/centos/7/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 
@@ -60,7 +60,31 @@ We generally test on the current version of OS X, but stack is known to work on 
 
         sudo yum -y install stack
 
-    (on Fedora 22+, replace `yum` with `dnf`).
+## Fedora
+
+1. Add the appropriate source repository:
+
+    * Fedora 22
+
+            curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/22/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
+
+    * Fedora 21
+
+            curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/21/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
+
+    * Fedora 20
+
+            curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/20/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
+
+2. Install:
+
+    * Fedora 22+
+
+            sudo dnf -y install stack
+
+    * Fedora < 22
+
+            sudo yum -y install stack
 
 ## Arch Linux
 
