@@ -72,7 +72,7 @@ installed packages with actions taken in other projects.
 
 #### Can I run `cabal` commands inside `stack exec`?
 
-Currently you cannot, due to a variation of https://github.com/haskell/cabal/issues/1800. However, virtually all `cabal` commands have an equivalent in stack, so this should not be necessary. In particular, `cabal` users may be accustomed to the `cabal run` command. In stack:
+Currently you cannot, due to a variation of [haskell/cabal#1800](https://github.com/haskell/cabal/issues/1800). However, virtually all `cabal` commands have an equivalent in stack, so this should not be necessary. In particular, `cabal` users may be accustomed to the `cabal run` command. In stack:
 ```
 $ stack build && stack exec <program-name>
 ````
