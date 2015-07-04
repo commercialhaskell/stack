@@ -70,6 +70,19 @@ builds are automatically isolated into separate package databases without any
 user interaction. This ensures that you won't accidentally corrupt your
 installed packages with actions taken in other projects.
 
+#### Can I run `cabal` commands inside `stack exec`?
+
+Currently you cannot, due to a variation of https://github.com/haskell/cabal/issues/1800. However, virtually all `cabal` commands have an equivalent in stack, so this should not be necessary. In particular, `cabal` users may be accustomed to the `cabal run` command. In stack:
+```
+$ stack build && stack exec <program-name>
+````
+Or, if you want to install the binaries in a shared location:
+```
+$ stack install
+$ <program-name>
+```
+assuming your `$PATH` has been set appropriately.
+
 #### I already have GHC installed, can I still use stack?
 
 Yes. stack will default to using whatever GHC is on your `PATH`. If that GHC is a
