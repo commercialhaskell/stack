@@ -72,7 +72,7 @@ installed packages with actions taken in other projects.
 
 #### Can I run `cabal` commands inside `stack exec`?
 
-With a recent enough version of cabal-install, you can. For older versions, due to [haskell/cabal#1800](https://github.com/haskell/cabal/issues/1800), this does not work. Note that even with recent versions, for some commands you may need this extra level of indirection:
+With a recent enough version of cabal-install (>= 1.22), you can. For older versions, due to [haskell/cabal#1800](https://github.com/haskell/cabal/issues/1800), this does not work. Note that even with recent versions, for some commands you may need this extra level of indirection:
 ```
 $ stack exec -- cabal exec -- cabal <command>
 ```
