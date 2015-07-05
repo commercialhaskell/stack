@@ -2,12 +2,10 @@ Distribution packages are available for [Ubuntu](#ubuntu), [Debian](#debian), [C
 
 ## Windows
 
-(32-bit)
-
-* Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest)
+* Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest).  Note: 32-bit GHC is better tested on Windows. 
 * Unpack the `stack.exe` to somewhere on your `%PATH%` (see [Path section below](#path)) and you can then run `stack` on the commandline.
 
-NOTE: This executable has been built and tested on a Windows 8.1 64-bit machine. It should run on older Windows installs as well, but has not been tested. If you do test, please edit and update this page to indicate as such.
+NOTE: These executables have been built and tested on a Windows 8.1 64-bit machine. They should run on older Windows installs as well, but have not been tested. If you do test, please edit and update this page to indicate as such.
 
 ## OS X
 
