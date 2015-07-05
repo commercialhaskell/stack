@@ -50,7 +50,14 @@ upgrade fromGit mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> d
                 caches <- getPackageCaches menv
                 let latest = Map.fromListWith max
                            $ map toTuple
-                           $ Map.keys caches
+                           $ Map.keys
+
+                           -- Mistaken upload to Hackage, just ignore it
+                           $ Map.delete (PackageIdentifier
+                                $(mkPackageName "stack")
+                                $(mkVersion "9.9.9"))
+
+                             caches
                 case Map.lookup $(mkPackageName "stack") latest of
                     Nothing -> error "No stack found in package indices"
                     Just version -> do
