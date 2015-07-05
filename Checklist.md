@@ -20,9 +20,11 @@ to go. This list will likely expand over time:
 Release checklist after testing:
 
 * Create a draft Github release with tag `vX.Y.Z` (where X.Y.Z is the stack package's version).
-* Run `stack-release-tool upload` on Linux, Windows, and OS X.  This performs the following tasks automatically:
+* Run `scripts/release/release.hs upload` on Linux (Debian 7), Windows (32-bit and 64-bit), and OS X.  This performs the following tasks automatically:
     * Binaries for Linux, Windows, and OS X uploaded to draft Github release.
-* Upload Ubuntu and Arch packages.
+* Run `stack/release/release.hs ubuntu-upload debian-upload` in Linux (Ubuntu or Debian)
+* Run `stack/release/release.hs centos-upload fedora-upload` on Linux (CentOS or Fedora)
+* Upload Arch Linux packages (manual process)
 
 After binaries uploaded:
 
