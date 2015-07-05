@@ -10,7 +10,7 @@ RUN bash -c 'if [[ "<<DISTRO>>" == "centos" && "<<DISTRO-VERSION>>" < "7" ]]; th
 RUN gem install fpm
 
 # STACK
-RUN curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/<<DISTRO>>/<<DISTRO-VERSION>>/fpco.repo >tee /etc/yum.repos.d/fpco.repo
+RUN curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/<<DISTRO>>/<<DISTRO-VERSION>>/fpco.repo >/etc/yum.repos.d/fpco.repo
 RUN yum -y install stack
 
 # GHC
