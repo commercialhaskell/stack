@@ -10,7 +10,7 @@ import Network.HTTP.Download.Verified
 import Path
 import System.Directory
 import System.IO.Temp
-import Test.Hspec
+import Test.Hspec hiding (shouldNotBe)
 
 
 -- TODO: share across test files
