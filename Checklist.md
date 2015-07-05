@@ -20,10 +20,10 @@ to go. This list will likely expand over time:
 Release checklist after testing:
 
 * Create a draft Github release with tag `vX.Y.Z` (where X.Y.Z is the stack package's version).
-* Run `scripts/release/release.hs upload` on Linux (Debian 7), Windows (32-bit and 64-bit), and OS X.  This performs the following tasks automatically:
+* Run `scripts/release/release.hs upload` on Linux (Debian 7 [Vagrantfile](https://github.com/commercialhaskell/stack/tree/master/etc/vagrant/debian-7-amd64)), Windows (32-bit and 64-bit), and OS X.  This performs the following tasks automatically:
     * Binaries for Linux, Windows, and OS X uploaded to draft Github release.
-* Run `stack/release/release.hs ubuntu-upload debian-upload` in Linux (Ubuntu or Debian)
-* Run `stack/release/release.hs centos-upload fedora-upload` on Linux (CentOS or Fedora)
+* Run `stack/release/release.hs ubuntu-upload debian-upload` in Linux (Ubuntu or Debian - [Vagrantfile](https://github.com/commercialhaskell/stack/tree/master/etc/vagrant/debian-7-amd64))
+* Run `stack/release/release.hs centos-upload fedora-upload` on Linux (CentOS or Fedora - [Vagrantfile](https://github.com/commercialhaskell/stack/tree/master/etc/vagrant/centos-7-x86_64))
 * Upload Arch Linux packages (manual process)
 
 After binaries uploaded:
