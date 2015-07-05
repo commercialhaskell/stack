@@ -2,7 +2,7 @@ The following should be tested minimally before a release is considered good
 to go. This list will likely expand over time:
 
 * Run `scripts/release/release.hs check` on Linux, Windows (32-bit and 64-bit), and OS X. See its
-  [README](https://github.com/commercialhaskell/stack/blob/master/etc/release-tool/README.md) for build and invocation instructions.
+  [README](https://github.com/commercialhaskell/stack/blob/master/scripts/release/README.md) for build and invocation instructions.
   This performs the following checks automatically:
     * `stack install && stack clean && stack install --pedantic && stack test --flag stack:integration-tests` on Linux, Windows, and OS X, which covers:
         * Self-hosting
