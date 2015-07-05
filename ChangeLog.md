@@ -1,4 +1,4 @@
-## Unreleased
+## 0.1.2.0
 
 * Add `--prune` flag to `stack dot` [#487](https://github.com/commercialhaskell/stack/issues/487)
 * Add `--[no-]external`,`--[no-]include-base` flags to `stack dot` [#437](https://github.com/commercialhaskell/stack/issues/437)
