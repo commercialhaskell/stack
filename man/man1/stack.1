@@ -8,7 +8,9 @@ stack - The Haskell Tool Stack
       [\-v|\-\-verbose]) ([\-\-system\-ghc] | [\-\-no\-system\-ghc])
       ([\-\-install\-ghc] | [\-\-no\-install\-ghc]) [\-\-arch ARCH] [\-\-os OS]
       [\-j|\-\-jobs JOBS] [\-\-extra\-include\-dirs DIR] [\-\-extra\-lib\-dirs DIR]
-      [\-\-resolver RESOLVER] [\-\-no\-terminal] COMMAND
+      ([\-\-skip\-ghc\-check] | [\-\-no\-skip\-ghc\-check]) ([\-\-skip\-msys] |
+      [\-\-no\-skip\-msys]) [\-\-resolver RESOLVER] [\-\-no\-terminal]
+      [\-\-stack\-yaml STACK\-YAML] COMMAND
 .fi
 .sp
 .SH "DESCRIPTION"
@@ -70,17 +72,17 @@ Build executables and install to a user path\&
 .PP
 \fBtest\fR
 .RS 4
-Build and test the project(s) in this directory /configuration\&
+Build and test the project(s) in this directory/configuration\&
 .RE
 .PP
 \fBbench\fR
 .RS 4
-Build and benchmark the project(s) in this directory /configuration\&
+Build and benchmark the project(s) in this directory/configuration\&
 .RE
 .PP
 \fBhaddock\fR
 .RS 4
-Generate haddocks for the project(s) in this directory /configuration\&
+Generate haddocks for the project(s) in this directory/configuration\&
 .RE
 .PP
 \fBnew\fR
@@ -93,9 +95,19 @@ Create a brand new project\&
 Initialize a stack project based on one or more cabal packages\&
 .RE
 .PP
+\fBsolver\fR
+.RS 4
+Use a dependency solver to try and determine missing extra-deps\&
+.RE
+.PP
 \fBsetup\fR
 .RS 4
 Get the appropriate ghc for your project\&
+.RE
+.PP
+\fBpath\fR
+.RS 4
+Print out handy path information\&
 .RE
 .PP
 \fBunpack\fR
@@ -108,9 +120,19 @@ Unpack one or more packages locally\&
 Update the package index\&
 .RE
 .PP
+\fBupgrade\fR
+.RS 4
+Upgrade to the latest stack (experimental)\&
+.RE
+.PP
 \fBupload\fR
 .RS 4
 Upload a package to Hackage\&
+.RE
+.PP
+\fBdot\fR
+.RS 4
+Visualize your project's dependency graph using Graphviz dot\&
 .RE
 .PP
 \fBexec\fR
@@ -128,6 +150,11 @@ Run ghc\&
 Run ghci in the context of project(s)\&
 .RE
 .PP
+\fBide\fR
+.RS 4
+Run ide-backend-client with the correct arguments\&
+.RE
+.PP
 \fBrunghc\fR
 .RS 4
 Run runghc\&
@@ -138,74 +165,214 @@ Run runghc\&
 Clean the local packages\&
 .RE
 .PP
-\fBpath\fR
-.RS 4
-Print path information for certain things
-.RE
-.PP
 \fBdocker\fR
 .RS 4
-Subcommands specific to Docker use
+Subcommands specific to Docker use\&
 .RE
 .PP
 
 .SH "OPTIONS"
 .SS "GLOBAL OPTIONS"
-.nf
-  \-\-version                Show version
-  \-\-help                   Show this help text
-  \-\-docker*                Run 'stack \-\-docker\-help' for details
-  \-\-verbosity VERBOSITY    Verbosity: silent, error, warn, info, debug
-  \-v,\-\-verbose             Enable verbose mode: verbosity level "debug"
-  \-\-system\-ghc             Enable using the system installed GHC (on the PATH)
-                           if available and a matching version
-  \-\-no\-system\-ghc          Disable using the system installed GHC (on the PATH)
-                           if available and a matching version
-  \-\-install\-ghc            Enable downloading and installing GHC if necessary
-                           (can be done manually with stack setup)
-  \-\-no\-install\-ghc         Disable downloading and installing GHC if necessary
-                           (can be done manually with stack setup)
-  \-\-arch ARCH              System architecture, e.g. i386, x86_64
-  \-\-os OS                  Operating system, e.g. linux, windows
-  \-j,\-\-jobs JOBS           Number of concurrent jobs to run
-  \-\-extra\-include\-dirs DIR Extra directories to check for C header files
-  \-\-extra\-lib\-dirs DIR     Extra directories to check for libraries
-  \-\-resolver RESOLVER      Override resolver in project file
-  \-\-no\-terminal            Override terminal detection in the case of running in
-                           a false terminal
-.fi
+.if
+.PP
+\-\-version
+.RS 4
+Show version\&
+.RE
+.PP
+\-\-help
+.RS 4
+Show this help text\&
+.RE
+.PP
+\-\-docker*
+.RS 4
+Run 'stack \-\-docker\-help' for details\&
+.RE
+.PP
+\-\-verbosity VERBOSITY
+.RS 4
+Verbosity: silent, error, warn, info, debug\&
+.RE
+.PP
+\-v,\-\-verbose
+.RS 4
+Enable verbose mode: verbosity level "debug"\&
+.RE
+.PP
+\-\-system\-ghc
+.RS 4
+Enable using the system installed GHC (on the PATH) if available and a matching version\&
+.RE
+.PP
+\-\-no\-system\-ghc
+.RS 4
+Disable using the system installed GHC (on the PATH) if available and a matching version
+.RE
+.PP
+\-\-install\-ghc
+.RS 4
+Enable downloading and installing GHC if necessary (can be done manually with stack setup)
+.RE
+.PP
+\-\-no\-install\-ghc
+.RS 4
+Disable downloading and installing GHC if necessary (can be done manually with stack setup)
+.RE
+.PP
+\-\-arch ARCH
+.RS 4
+System architecture, e.g. i386, x86_64
+.RE
+.PP
+\-\-os OS
+.RS 4
+Operating system, e.g. linux, windows
+.RE
+.PP
+\-j,\-\-jobs JOBS
+.RS 4
+Number of concurrent jobs to run
+.RE
+.PP
+\-\-extra\-include\-dirs DIR
+.RS 4
+Extra directories to check for C header files
+.RE
+.PP
+\-\-extra\-lib\-dirs DIR
+.RS 4
+Extra directories to check for libraries
+.RE
+.PP
+\-\-skip\-ghc\-check
+.RS 4
+Enable skipping the GHC version and architecture check
+.RE
+.PP
+\-\-no\-skip\-ghc\-check
+.RS 4
+Disable skipping the GHC version and architecture check
+.RE
+.PP
+\-\-skip\-msys
+.RS 4
+Enable skipping the local MSYS installation (Windows only)
+.RE
+.PP
+\-\-no\-skip\-msys
+.RS 4
+Disable skipping the local MSYS installation (Windows only)
+.RE
+.PP
+\-\-resolver RESOLVER
+.RS 4
+Override resolver in project file
+.RE
+.PP
+\-\-no\-terminal
+.RS 4
+Override terminal detection in the case of running in a false terminal
+.RE
+.PP
+\-\-stack\-yaml STACK\-YAML
+.RS 4
+Override project stack.yaml file (overrides any STACK_YAML environment variable)
+.RE
 .PP
 .SS "BUILD OPTIONS"
-The following options are shared between the build, install, test, bench commands.
-.nf
-  TARGET                   If none specified, use all packages defined in
-                           current directory
-  \-\-library\-profiling      Enable library profiling for TARGETs and all its
-                           dependencies
-  \-\-no\-library\-profiling   Disable library profiling for TARGETs and all its
-                           dependencies
-  \-\-executable\-profiling   Enable library profiling for TARGETs and all its
-                           dependencies
-  \-\-no\-executable\-profiling
-                           Disable library profiling for TARGETs and all its
-                           dependencies
-  \-\-optimizations          Enable optimizations for TARGETs and all its
-                           dependencies
-  \-\-no\-optimizations       Disable optimizations for TARGETs and all its
-                           dependencies
-  \-\-dry\-run                Don't build anything, just prepare to
-  \-\-pedantic               Turn on \-Wall and \-Werror (note: option name may
-                           change in the future
-  \-\-ghc\-options OPTION     Additional options passed to GHC
-  \-\-flag PACKAGE:[\-]FLAG   Override flags set in stack.yaml (applies to local
-                           packages and extra\-deps)
-  \-\-prefetch               Fetch packages necessary for the build immediately,
-                           useful with \-\-dry\-run
-  \-\-test\-arguments TEST_ARGS
-                           Arguments passed in to the test suite program
-  \-\-only\-snapshot          Only build packages for the snapshot database, not
-                           the local database
+The following options are shared between the build, install, test, haddock, and bench commands.
 .fi
+.PP
+TARGET
+.RS 4
+If none specified, use all packages defined in current directory
+.RE
+.PP
+\-\-library\-profiling
+.RS 4
+Enable library profiling for TARGETs and all its dependencies
+.RE
+.PP
+\-\-no\-library\-profiling
+.RS 4
+Disable library profiling for TARGETs and all its dependencies
+.RE
+.PP
+\-\-executable\-profiling
+.RS 4
+Enable library profiling for TARGETs and all its dependencies
+.RE
+.PP
+\-\-no\-executable\-profiling
+.RS 4
+Disable library profiling for TARGETs and all its dependencies
+.RE
+.PP
+\-\-optimizations
+.RS 4
+Enable optimizations for TARGETs and all its dependencies
+.RE
+.PP
+\-\-no\-optimizations
+.RS 4
+Disable optimizations for TARGETs and all its dependencies
+.RE
+.PP
+\-\-haddock
+.RS 4
+Enable building Haddocks
+.RE
+.PP
+\-\-no\-haddock
+.RS 4
+Disable building Haddocks
+.RE
+.PP
+\-\-dry\-run
+.RS 4
+Don't build anything, just prepare to
+.RE
+.PP
+\-\-pedantic
+.RS 4
+Turn on \-Wall and \-Werror (note: option name may change in the future
+.RE
+.PP
+\-\-ghc\-options OPTION
+.RS 4
+Additional options passed to GHC
+.RE
+.PP
+\-\-flag PACKAGE:[\-]FLAG
+.RS 4
+Override flags set in stack.yaml (applies to local packages and extra\-deps)
+.RE
+.PP
+\-\-prefetch
+.RS 4
+Fetch packages necessary for the build immediately, useful with \-\-dry\-run
+.RE
+.PP
+\-\-only\-snapshot
+.RS 4
+Only build packages for the snapshot database, not the local database
+.RE
+.PP
+\-\-file\-watch
+.RS 4
+Watch for changes in local files and automatically rebuild
+.RE
+.PP
+\-\-keep\-going
+.RS 4
+Enable continue running after a step fails (default: false for build, true for test/bench)
+.RE
+.PP
+\-\-no\-keep\-going
+.RS 4
+Disable continue running after a step fails (default: false for build, true for test/bench)
+.RE
 .PP
 .SS "ADDITIONAL OPTIONS"
 Additional options can be read by running \fBstack\fR <command> \fB\-\-help\fR
