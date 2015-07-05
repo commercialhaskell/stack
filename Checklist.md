@@ -28,6 +28,7 @@ Release checklist after testing:
 
 After binaries uploaded:
 
+* On the Github release, edit the Windows 32-bit binary description to indicate recommended over 64-bit.
 * Publish Github release.
 * Sign Git tag.
 * Upload package to Hackage.
