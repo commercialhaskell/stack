@@ -7,12 +7,14 @@ module Stack.Upgrade (upgrade) where
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader
+import           Control.Monad.Reader        (MonadReader, asks)
 import           Control.Monad.Trans.Control
+import           Data.Foldable               (forM_)
 import qualified Data.Map                    as Map
 import qualified Data.Set                    as Set
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager)
 import           Path
+import qualified Paths_stack as Paths
 import           Stack.Build
 import           Stack.Build.Types
 import           Stack.Config
@@ -32,7 +34,7 @@ upgrade :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpMan
 upgrade fromGit mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> do
     menv <- getMinimalEnvOverride
     tmp <- parseAbsDir tmp'
-    dir <-
+    mdir <-
         if fromGit
             then do
                 $logInfo "Cloning stack"
@@ -44,7 +46,7 @@ upgrade fromGit mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> d
                     , "1"
                     ]
                     Nothing
-                return $ tmp </> $(mkRelDir "stack")
+                return $ Just $ tmp </> $(mkRelDir "stack")
             else do
                 updateAllIndices menv
                 caches <- getPackageCaches menv
@@ -60,19 +62,22 @@ upgrade fromGit mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> d
                              caches
                 case Map.lookup $(mkPackageName "stack") latest of
                     Nothing -> error "No stack found in package indices"
+                    Just version | version <= fromCabalVersion Paths.version -> do
+                        $logInfo "Already at latest version, no upgrade required"
+                        return Nothing
                     Just version -> do
                         let ident = PackageIdentifier $(mkPackageName "stack") version
                         paths <- unpackPackageIdents menv tmp Nothing $ Set.singleton ident
                         case Map.lookup ident paths of
                             Nothing -> error "Stack.Upgrade.upgrade: invariant violated, unpacked directory not found"
-                            Just path -> return path
+                            Just path -> return $ Just path
 
     manager <- asks getHttpManager
     logLevel <- asks getLogLevel
     terminal <- asks getTerminal
     configMonoid <- asks $ configConfigMonoid . getConfig
 
-    liftIO $ do
+    forM_ mdir $ \dir -> liftIO $ do
         bconfig <- runStackLoggingT manager logLevel terminal $ do
             lc <- loadConfig
                 configMonoid
