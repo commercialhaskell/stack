@@ -48,11 +48,31 @@ We generally test on the current version of OS X, but stack is known to work on 
 
         sudo apt-get update && sudo apt-get install stack -y
 
+## Debian
+
+1. Get the FP Complete key:
+
+        wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/debian/fpco.key | sudo apt-key add -
+
+2. Add the appropriate source repository:
+
+    * Debian 8 (amd64):
+
+            echo 'deb http://download.fpcomplete.com/debian/jessie stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
+
+    * Debian 7 (amd64)
+
+            echo 'deb http://download.fpcomplete.com/debian/wheezy stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
+
+3. Update apt and install
+
+        sudo apt-get update && sudo apt-get install stack -y
+
 ## CentOS / Red Hat
 
 1. Add the appropriate source repository:
 
-    * CentOS 7 / RHEL 7
+    * CentOS 7 / RHEL 7 (x86_64)
 
             curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/centos/7/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 
@@ -64,15 +84,15 @@ We generally test on the current version of OS X, but stack is known to work on 
 
 1. Add the appropriate source repository:
 
-    * Fedora 22
+    * Fedora 22 (x86_64)
 
             curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/22/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 
-    * Fedora 21
+    * Fedora 21 (x86_64)
 
             curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/21/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 
-    * Fedora 20
+    * Fedora 20 (x86_64)
 
             curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/20/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 
