@@ -2,7 +2,7 @@
 
 # BUILD
 stack --install-ghc build
-[[ $(stack path --local-install-root)/bin/stack -nt $OUTPUT_RPM ]] || exit 0
+[[ "$(stack path --local-install-root)/bin/stack" -nt "$OUTPUT_PKG" ]] || exit 0
 
 # PKG
 mkdir -p /fpm/usr/bin
@@ -15,7 +15,7 @@ fpm \
     -s dir \
     -t rpm \
     -n stack \
-    -v $RPM_VERSION \
+    -v "$PKG_VERSION" \
     -d perl \
     -d make \
     -d automake \
@@ -26,7 +26,7 @@ fpm \
     -d xz \
     -d tar \
     -C /fpm \
-    -p $OUTPUT_RPM \
+    -p "$OUTPUT_PKG" \
     -m "$PKG_MAINTAINER" \
     --description "$PKG_DESCRIPTION" \
     --license "$PKG_LICENSE" \

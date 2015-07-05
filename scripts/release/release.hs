@@ -1,8 +1,7 @@
 #!/usr/bin/env stack
 -- stack --install-ghc runghc --package=shake --package=extra --package=zip-archive --package=mime-types --package=http-types --package=http-conduit --package=text --package=conduit-combinators --package=conduit --package=case-insensitive --package=aeson --package=zlib --package executable-path
-
+{-# OPTIONS_GHC -Wall -Werror #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE QuasiQuotes #-}
 
 import Control.Applicative
 import Control.Exception
@@ -56,7 +55,7 @@ main =
             gGitSha <- trim <$> readProcess "git" ["rev-parse", "HEAD"] ""
             gHomeDir <- getHomeDirectory
             RunGHC gScriptPath <- getScriptPath
-            let gGpgKey = Nothing
+            let gGpgKey = "9BEFB442"
                 gAllowDirty = False
                 gGithubReleaseTag = Nothing
             return $ Just $ rules (foldl (flip id) Global{..} flags) args
@@ -69,7 +68,7 @@ main =
 options :: [OptDescr (Either String (Global -> Global))]
 options =
     [ Option "" [gpgKeyOptName]
-        (ReqArg (\v -> Right $ \g -> g{gGpgKey = Just v}) "USER-ID")
+        (ReqArg (\v -> Right $ \g -> g{gGpgKey = v}) "USER-ID")
         "GPG user ID to sign distribution package with"
     , Option "" [allowDirtyOptName] (NoArg $ Right $ \g -> g{gAllowDirty = True})
         "Allow a dirty working tree for release."
@@ -105,25 +104,17 @@ rules global@Global{..} args = do
     phony buildPhony $
         mapM_ (\f -> need [releaseDir </> f]) releaseFileNames
 
-    phony ubuntuUploadPhony $
-        mapM_
-            (\v -> need [ubuntuVersionDebDir (fst v) </> ubuntuVersionDebFileName <.> uploadExt])
-            ubuntuVersions
+    forM_ distros $ \distro -> do
 
-    phony ubuntuPackagesPhony $
-        mapM_
-            (\v -> need [ubuntuVersionDebDir (fst v) </> ubuntuVersionDebFileName])
-            ubuntuVersions
+        phony (distroUploadPhony distro) $
+            mapM_
+                (\v -> need [distroVersionDir (DistroVersion distro (fst v)) </> distroPackageFileName distro <.> uploadExt])
+                (distroVersions distro)
 
-    phony centosUploadPhony $
-        mapM_
-            (\v -> need [centosVersionRpmDir v </> centosVersionRpmFileName <.> uploadExt])
-            centosVersions
-
-    phony centosPackagesPhony $
-        mapM_
-            (\v -> need [centosVersionRpmDir v </> centosVersionRpmFileName])
-            centosVersions
+        phony (distroPackagesPhony distro) $
+            mapM_
+                (\v -> need [distroVersionDir (DistroVersion distro (fst v)) </> distroPackageFileName distro])
+                (distroVersions distro)
 
     releaseDir </> "*" <.> uploadExt %> \out -> do
         need [dropExtension out]
@@ -182,127 +173,69 @@ rules global@Global{..} args = do
         need [out -<.> ""]
         _ <- liftIO $ tryJust (guard . isDoesNotExistError) (removeFile out)
         cmd "gpg --detach-sig --armor"
-            (maybe [] (\k -> ["-u", k]) gGpgKey)
-            [out -<.> ""]
+            [ "-u", gGpgKey
+            , out -<.> "" ]
 
     installBinDir </> stackExeFileName %> \_ -> do
         alwaysRerun
         cmd "stack build"
 
-    ubuntuVersionDebDir "*" </> ubuntuVersionDebFileName <.> uploadExt %> \out -> do
-        let ubuntuVersion = ubuntuVersionFromPath out
-        need [ubuntuVersionDebDir ubuntuVersion </> ubuntuVersionDebFileName]
-        () <- cmd "deb-s3 upload -b download.fpcomplete.com" ["--sign=" ++ osPackageSigningKey]
-            [ "--prefix=ubuntu/" ++ ubuntuCodeName ubuntuVersion
-            , dropExtension out ]
-        copyFileChanged (dropExtension out) out
+    forM_ distros $ \distro0 -> do
 
-    ubuntuVersionDebDir "*" </> ubuntuVersionDebFileName %> \out -> do
-        alwaysRerun
-        let ubuntuVersion = ubuntuVersionFromPath out
-        need [ubuntuVersionDir ubuntuVersion </> imageIDFileName]
-        liftIO $ createDirectoryIfMissing True (takeDirectory out)
-        cmd "docker run --rm"
-            [ "--volume=" ++ gProjectRoot </> ubuntuVersionDir ubuntuVersion </> "stack-root" ++
-              ":/mnt/stack-root"
-            , "--env=STACK_ROOT=/mnt/stack-root"
-            , "--volume=" ++ gProjectRoot </> ubuntuVersionDir ubuntuVersion </> "stack-work" ++
-              ":/mnt/src/.stack-work"
-            , "--volume=" ++ gProjectRoot ++ ":/mnt/src"
-            , "--workdir=/mnt/src"
-            , "--volume=" ++ gProjectRoot </> ubuntuVersionDebDir ubuntuVersion ++ ":/mnt/deb"
-            , "--env=OUTPUT_DEB=/mnt/deb/" ++ ubuntuVersionDebFileName
-            , "--env=DEB_VERSION=" ++ ubuntuVersionDebVersionStr
-            , "--env=PKG_MAINTAINER=" ++ maintainer gStackPackageDescription
-            , "--env=PKG_DESCRIPTION=" ++ synopsis gStackPackageDescription
-            , "--env=PKG_LICENSE=" ++ display (license gStackPackageDescription)
-            , "--env=PKG_URL=" ++ homepage gStackPackageDescription
-            , ubuntuDockerImageTag ubuntuVersion]
+        distroVersionDir (anyDistroVersion' distro0) </> distroPackageFileName distro0 <.> uploadExt %> \out -> do
+            let dv@DistroVersion{..} = distroVersionFromPath out
+            need [dropExtension out]
+            uploadPackage (distroPackageExt dvDistro) dv (dropExtension out)
+            copyFileChanged (dropExtension out) out
 
-    ubuntuVersionDir "*" </> imageIDFileName %> \out -> do
+        distroVersionDir (anyDistroVersion' distro0) </> distroPackageFileName distro0 %> \out -> do
+            alwaysRerun
+            let dv@DistroVersion{..} = distroVersionFromPath out
+            need [distroVersionDir dv </> imageIDFileName]
+            liftIO $ createDirectoryIfMissing True (takeDirectory out)
+            cmd "docker run --rm"
+                [ "--volume=" ++ gProjectRoot </> distroVersionDir dv </> "stack-root" ++
+                ":/mnt/stack-root"
+                , "--env=STACK_ROOT=/mnt/stack-root"
+                , "--volume=" ++ gProjectRoot </> distroVersionDir dv </> "stack-work" ++
+                ":/mnt/src/.stack-work"
+                , "--volume=" ++ gProjectRoot ++ ":/mnt/src"
+                , "--workdir=/mnt/src"
+                , "--volume=" ++ gProjectRoot </> distroVersionDir dv ++ ":/mnt/out"
+                , "--env=OUTPUT_PKG=/mnt/out/" ++ distroPackageFileName dvDistro
+                , "--env=PKG_VERSION=" ++ distroPackageVersionStr dvDistro
+                , "--env=PKG_MAINTAINER=" ++ maintainer gStackPackageDescription
+                , "--env=PKG_DESCRIPTION=" ++ synopsis gStackPackageDescription
+                , "--env=PKG_LICENSE=" ++ display (license gStackPackageDescription)
+                , "--env=PKG_URL=" ++ homepage gStackPackageDescription
+                , distroVersionDockerImageTag dv ]
+
+    distroVersionDir anyDistroVersion </> imageIDFileName %> \out -> do
         alwaysRerun
-        let ubuntuVersion = ubuntuVersionFromPath out
-            imageTag = ubuntuDockerImageTag ubuntuVersion
+        let dv@DistroVersion{..} = distroVersionFromPath out
+            imageTag = distroVersionDockerImageTag dv
         need
-            [ ubuntuVersionDockerDir ubuntuVersion </> "Dockerfile"
-            , ubuntuVersionDockerDir ubuntuVersion </> "run.sh" ]
-        _ <- buildDockerImage (ubuntuVersionDockerDir ubuntuVersion) imageTag out
+            [ distroVersionDockerDir dv </> "Dockerfile"
+            , distroVersionDockerDir dv </> "run.sh" ]
+        _ <- buildDockerImage (distroVersionDockerDir dv) imageTag out
         return ()
 
-    ubuntuVersionDockerDir "*" </> "Dockerfile" %> \out -> do
-        let ubuntuVersion = ubuntuVersionFromPath out
-        template <- readTemplate "ubuntu-packages/docker/Dockerfile"
-        writeFileChanged out $ replace "<<UBUNTU-VERSION>>" ubuntuVersion template
+    distroVersionDockerDir anyDistroVersion </> "Dockerfile" %> \out -> do
+        let DistroVersion{..} = distroVersionFromPath out
+        template <- readTemplate (distroPackageExt dvDistro </> "docker/Dockerfile")
+        writeFileChanged out $
+            replace "<<DISTRO-VERSION>>" dvVersion $
+            replace "<<DISTRO>>" dvDistro template
 
-    ubuntuVersionDockerDir "*" </> "run.sh" %> \out ->
-        writeFileChanged out =<< readTemplate "ubuntu-packages/docker/run.sh"
-
-    centosVersionRpmDir "*" </> centosVersionRpmFileName <.> uploadExt %> \out -> do
-        let centosVersion = centosVersionFromPath out
-        need [centosVersionRpmDir centosVersion </> centosVersionRpmFileName]
-        let rpmmacrosFile = gHomeDir </> ".rpmmacros"
-        rpmmacrosExists <- liftIO $ System.Directory.doesFileExist rpmmacrosFile
-        when rpmmacrosExists $
-            error ("'" ++ rpmmacrosFile ++ "' already exists, move it out of the way first.")
-        actionFinally
-            (do writeFileLines rpmmacrosFile
-                    [ "%_signature gpg"
-                    , "%_gpg_name " ++ osPackageSigningKey ]
-                () <- cmd "rpm-s3 --verbose --sign --bucket=download.fpcomplete.com"
-                    [ "--repopath=centos/" ++ centosVersion
-                    , dropExtension out ]
-                copyFileChanged (dropExtension out) out)
-            (liftIO $ removeFile rpmmacrosFile)
-
-    centosVersionRpmDir "*" </> centosVersionRpmFileName %> \out -> do
-        alwaysRerun
-        let centosVersion = centosVersionFromPath out
-        need [centosVersionDir centosVersion </> imageIDFileName]
-        liftIO $ createDirectoryIfMissing True (takeDirectory out)
-        cmd "docker run --rm"
-            [ "--volume=" ++ gProjectRoot </> centosVersionDir centosVersion </> "stack-root" ++
-              ":/mnt/stack-root"
-            , "--env=STACK_ROOT=/mnt/stack-root"
-            , "--volume=" ++ gProjectRoot </> centosVersionDir centosVersion </> "stack-work" ++
-              ":/mnt/src/.stack-work"
-            , "--volume=" ++ gProjectRoot ++ ":/mnt/src"
-            , "--workdir=/mnt/src"
-            , "--volume=" ++ gProjectRoot </> centosVersionRpmDir centosVersion ++ ":/mnt/rpm"
-            , "--env=OUTPUT_RPM=/mnt/rpm/" ++ centosVersionRpmFileName
-            , "--env=RPM_VERSION=" ++ centosVersionRpmVersionStr
-            , "--env=PKG_MAINTAINER=" ++ maintainer gStackPackageDescription
-            , "--env=PKG_DESCRIPTION=" ++ synopsis gStackPackageDescription
-            , "--env=PKG_LICENSE=" ++ display (license gStackPackageDescription)
-            , "--env=PKG_URL=" ++ homepage gStackPackageDescription
-            , centosDockerImageTag centosVersion]
-
-    centosVersionDir "*" </> imageIDFileName %> \out -> do
-        alwaysRerun
-        let centosVersion = centosVersionFromPath out
-            imageTag = centosDockerImageTag centosVersion
-        need
-            [ centosVersionDockerDir centosVersion </> "Dockerfile"
-            , centosVersionDockerDir centosVersion </> "run.sh" ]
-        _ <- buildDockerImage (centosVersionDockerDir centosVersion) imageTag out
-        return ()
-
-    centosVersionDockerDir "*" </> "Dockerfile" %> \out -> do
-        let centosVersion = centosVersionFromPath out
-        template <- readTemplate "centos-packages/docker/Dockerfile"
-        writeFileChanged out $ replace "<<CENTOS-VERSION>>" centosVersion template
-
-    centosVersionDockerDir "*" </> "run.sh" %> \out ->
-        writeFileChanged out =<< readTemplate "centos-packages/docker/run.sh"
+    distroVersionDockerDir anyDistroVersion </> "run.sh" %> \out -> do
+        let DistroVersion{..} = distroVersionFromPath out
+        writeFileChanged out =<< readTemplate (distroPackageExt dvDistro </> "docker/run.sh")
 
   where
-    ubuntuVersionFromPath path =
-        case stripPrefix (ubuntuVersionDir "" ++ "/") path of
+    distroVersionFromPath path =
+        case stripPrefix (releaseDir ++ "/") path of
             Nothing -> error ("Cannot determine Ubuntu version from path: " ++ path)
-            Just path' -> takeDirectory1 path'
-    centosVersionFromPath path =
-        case stripPrefix (centosVersionDir "" ++ "/") path of
-            Nothing -> error ("Cannot determine centos version from path: " ++ path)
-            Just path' -> takeDirectory1 path'
+            Just path' -> DistroVersion (takeDirectory1 path') (takeDirectory1 (dropDirectory1 path'))
     readTemplate path =
         readFile' (takeDirectory gScriptPath </> "templates" </> path)
 
@@ -311,19 +244,13 @@ rules global@Global{..} args = do
     uploadPhony = "upload"
     cleanPhony = "clean"
     buildPhony = "build"
-    ubuntuPackagesPhony = "ubuntu-packages"
-    ubuntuUploadPhony = "ubuntu-upload"
-    centosPackagesPhony = "centos-packages"
-    centosUploadPhony = "centos-upload"
+    distroPackagesPhony distro = distro ++ "-packages"
+    distroUploadPhony distro = distro ++ "-upload"
 
     releaseCheckDir = releaseDir </> "check"
     installBinDir = gLocalInstallRoot </> "bin"
-    ubuntuVersionDir ver = releaseDir </> "ubuntu" </> ver
-    ubuntuVersionDockerDir ver = ubuntuVersionDir ver </> "docker"
-    ubuntuVersionDebDir ver = ubuntuVersionDir ver </> "deb"
-    centosVersionDir ver = releaseDir </> "centos" </> ver
-    centosVersionDockerDir ver = centosVersionDir ver </> "docker"
-    centosVersionRpmDir ver = centosVersionDir ver </> "rpm"
+    distroVersionDockerDir dv = distroVersionDir dv </> "docker"
+    distroVersionDir DistroVersion{..} = releaseDir </> dvDistro </> dvVersion
 
     stackExeFileName = stackProgName <.> exe
     releaseFileNames = [releaseExeCompressedFileName, releaseExeCompressedAscFileName]
@@ -336,37 +263,93 @@ rules global@Global{..} args = do
     releaseExeGzFileName = releaseExeFileName <.> gzExt
     releaseExeFileName = releaseExeFileNameNoExt <.> exe
     releaseExeFileNameNoExt = releaseName global
-    ubuntuVersionDebFileName =
-        concat [stackProgName, "_", ubuntuVersionDebVersionStr, "_amd64"] <.> "deb"
-    centosVersionRpmFileName =
-        concat [stackProgName, "-", centosVersionRpmVersionStr] <.> "x86_64.rpm"
+    distroPackageFileName distro
+        | distroPackageExt distro == debExt =
+            concat [stackProgName, "_", distroPackageVersionStr distro, "_amd64"] <.> debExt
+        | distroPackageExt distro == rpmExt =
+            concat [stackProgName, "-", distroPackageVersionStr distro] <.> "x86_64" <.> rpmExt
+        | otherwise = error ("distroPackageFileName: unknown extension: " ++ distroPackageExt distro)
     imageIDFileName = "image-id"
 
     zipExt = "zip"
     gzExt = "gz"
     ascExt = "asc"
     uploadExt = "upload"
+    debExt = "deb"
+    rpmExt = "rpm"
 
-    ubuntuDockerImageTag ver = "stack_release_tool/ubuntu:" ++ ver
-    ubuntuVersionDebVersionStr =
-        concat [stackVersionStr global, "-", show gGitRevCount, "-", gGitSha]
-    centosDockerImageTag ver = "stack_release_tool/centos:" ++ ver
-    centosVersionRpmVersionStr =
-        concat [stackVersionStr global, "_", show gGitRevCount, "_", gGitSha]
+    distroVersionDockerImageTag DistroVersion{..} =
+        "stack_release_tool/" ++ dvDistro ++ ":" ++ dvVersion
+    distroPackageVersionStr distro
+        | distroPackageExt distro == debExt =
+            concat [stackVersionStr global, "-", show gGitRevCount, "-", gGitSha]
+        | distroPackageExt distro == rpmExt =
+            concat [stackVersionStr global, "_", show gGitRevCount, "_", gGitSha]
+        | otherwise = error ("distroPackageVersionStr: unknown extension: " ++ distroPackageExt distro)
 
-    ubuntuVersions =
-        [ ("12.04", "precise")
-        , ("14.04", "trusty")
-        , ("14.10", "utopic")
-        , ("15.04", "vivid") ]
-    ubuntuCodeName v =
+    distroPackageExt distro
+        | distro `elem` [ubuntuDistro, debianDistro] = debExt
+        | distro `elem` [centosDistro, fedoraDistro] = rpmExt
+        | otherwise = error ("distroPackageExt: unknown distro: " ++ distro)
+
+    distroVersions distro
+        | distro == ubuntuDistro =
+            [ ("12.04", "precise")
+            , ("14.04", "trusty")
+            , ("14.10", "utopic")
+            , ("15.04", "vivid") ]
+        | distro == debianDistro =
+            [ ("7", "wheezy")
+            , ("8", "jessie") ]
+        | distro == centosDistro =
+            [ ("7", "7")
+            , ("6", "6") ]
+        | distro == fedoraDistro =
+            [ ("20", "20")
+            , ("21", "21")
+            , ("22", "22") ]
+        | otherwise = error ("distroVersions: unknown distro: " ++ distro)
+
+    distroVersionCodeName DistroVersion{..} =
         fromMaybe
-            ("Unknown Ubuntu version: " ++ v)
-            (lookup v ubuntuVersions)
+            ("distroVersionCodeName: unknown " ++ dvDistro ++ " version: " ++ dvVersion)
+            (lookup dvVersion (distroVersions dvDistro))
 
-    centosVersions = ["7", "6"]
+    distros =
+        [ ubuntuDistro
+        , debianDistro
+        , centosDistro
+        , fedoraDistro ]
+    ubuntuDistro = "ubuntu"
+    debianDistro = "debian"
+    centosDistro = "centos"
+    fedoraDistro = "fedora"
 
-    osPackageSigningKey = "9BEFB442"
+    anyDistroVersion = DistroVersion "*" "*"
+    anyDistroVersion' distro = DistroVersion distro "*"
+
+    uploadPackage :: String -> DistroVersion -> FilePath -> Action ()
+    uploadPackage ext dv@DistroVersion{..} pkgFile
+        | ext == debExt =
+            cmd "deb-s3 upload -b download.fpcomplete.com"
+                [ "--sign=" ++ gGpgKey
+                , "--prefix=" ++ dvDistro ++ "/" ++ distroVersionCodeName dv
+                , pkgFile ]
+        | ext == rpmExt = do
+            let rpmmacrosFile = gHomeDir </> ".rpmmacros"
+            rpmmacrosExists <- liftIO $ System.Directory.doesFileExist rpmmacrosFile
+            when rpmmacrosExists $
+                error ("'" ++ rpmmacrosFile ++ "' already exists.  Move it out of the way first.")
+            actionFinally
+                (do writeFileLines rpmmacrosFile
+                        [ "%_signature gpg"
+                        , "%_gpg_name " ++ gGpgKey ]
+                    cmd "rpm-s3 --verbose --sign --bucket=download.fpcomplete.com"
+                        [ "--repopath=" ++ dvDistro ++ "/" ++ dvVersion
+                        , pkgFile ])
+                (liftIO $ removeFile rpmmacrosFile)
+        | otherwise = error ("uploadPackage: unknown extension: " ++ ext)
+
 
 -- | Upload file to Github release.
 uploadToGithubRelease :: Global -> FilePath -> Action ()
@@ -484,6 +467,11 @@ allowDirtyOptName = "allow-dirty"
 stackProgName :: FilePath
 stackProgName = "stack"
 
+-- | Linux distribution/version combination.
+data DistroVersion = DistroVersion
+    { dvDistro :: !String
+    , dvVersion :: !String }
+
 -- | A Github release, as returned by the Github API.
 data GithubRelease = GithubRelease
     { relUploadUrl :: !String
@@ -508,7 +496,7 @@ instance FromJSON GithubReleaseAsset where
 data Global = Global
     { gStackPackageDescription :: !PackageDescription
     , gLocalInstallRoot :: !FilePath
-    , gGpgKey :: !(Maybe String)
+    , gGpgKey :: !String
     , gAllowDirty :: !Bool
     , gGithubAuthToken :: !(Maybe String)
     , gGithubReleaseTag :: !(Maybe String)

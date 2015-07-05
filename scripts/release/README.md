@@ -60,12 +60,13 @@ The tool must be run in the root of the working tree.
 The release tool is shake-based, so all standard shake options apply. In
 addition, the following options are accepted:
 
-* `--gpg-key`: use a non-default GPG key to sign the binaries.
-  dirty, but this will allow it to continue.
-  uploaded to.
+* `--gpg-key`: override GPG key used to sign the distribution packages. By
+  default the `dev@fpcomplete.com` key is used.
 * `--github-auth-token`: override the Github authorization token.
 * `--github-release-tag`: overrides the Github Release tag that binaries are
 * `--allow-dirty`: by default, the `check` rule aborts if the working tree is
+  dirty, but this will allow it to continue.
+  uploaded to.
 
 ### Targets
 
@@ -75,5 +76,9 @@ addition, the following options are accepted:
 * `upload`: upload the binary distribution to the Github release.
 * `ubuntu-packages`: build Ubuntu .deb packages.
 * `ubuntu-upload`: upload Ubuntu .deb packages to private package repository.
+* `debian-packages`: build Debian .deb packages.
+* `debian-upload`: upload Debian .deb packages to private package repository.
 * `centos-packages`: build CentOS .rpm packages.
 * `centos-upload`: upload CentOS .rpm packages to private package repository.
+* `fedora-packages`: build Fedora .rpm packages.
+* `fedora-upload`: upload Fedora .rpm packages to private package repository.

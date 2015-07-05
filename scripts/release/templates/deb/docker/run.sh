@@ -2,7 +2,7 @@
 
 # BUILD
 stack --install-ghc build
-[[ $(stack path --local-install-root)/bin/stack -nt $OUTPUT_DEB ]] || exit 0
+[[ "$(stack path --local-install-root)/bin/stack" -nt "$OUTPUT_PKG" ]] || exit 0
 
 # PKG
 mkdir -p /fpm/usr/bin
@@ -15,7 +15,7 @@ fpm \
     -s dir \
     -t deb \
     -n stack \
-    -v $DEB_VERSION \
+    -v "$PKG_VERSION" \
     --deb-recommends git \
     --deb-recommends gnupg \
     -d g++ \
@@ -27,7 +27,7 @@ fpm \
     -d xz-utils \
     -d zlib1g-dev \
     -C /fpm \
-    -p $OUTPUT_DEB \
+    -p "$OUTPUT_PKG" \
     -m "$PKG_MAINTAINER" \
     --description "$PKG_DESCRIPTION" \
     --license "$PKG_LICENSE" \
