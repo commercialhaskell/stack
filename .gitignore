@@ -12,3 +12,4 @@ cabal.sandbox.config
 dist/
 tags
 /_release/
+.vagrant/
