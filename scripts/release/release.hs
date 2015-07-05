@@ -49,8 +49,6 @@ main =
             gStackPackageDescription <-
                 packageDescription <$> readPackageDescription silent "stack.cabal"
             gGithubAuthToken <- lookupEnv githubAuthTokenEnvVar
-            gLocalInstallRoot <- getStackPath "local-install-root"
-            gProjectRoot <- getStackPath "project-root"
             gGitRevCount <- length . lines <$> readProcess "git" ["rev-list", "HEAD"] ""
             gGitSha <- trim <$> readProcess "git" ["rev-parse", "HEAD"] ""
             gHomeDir <- getHomeDirectory
@@ -58,10 +56,22 @@ main =
             let gGpgKey = "9BEFB442"
                 gAllowDirty = False
                 gGithubReleaseTag = Nothing
-            return $ Just $ rules (foldl (flip id) Global{..} flags) args
+                Platform arch _ = buildPlatform
+                gArch = arch
+                gBinarySuffix = ""
+                gLocalInstallRoot = "" -- Set to real value below.
+                gProjectRoot = "" -- Set to real value velow.
+                global0 = foldl (flip id) Global{..} flags
+            -- Need to get paths after options since the '--arch' argument can effect them.
+            localInstallRoot' <- getStackPath global0 "local-install-root"
+            projectRoot' <- getStackPath global0 "project-root"
+	    let global = global0
+                    { gLocalInstallRoot = localInstallRoot'
+                    , gProjectRoot = projectRoot' }
+            return $ Just $ rules global args
   where
-    getStackPath path = do
-      out <- readProcess "stack" ["path", "--" ++ path] ""
+    getStackPath global path = do
+      out <- readProcess stackProgName (stackArgs global ++ ["path", "--" ++ path]) ""
       return $ trim $ fromMaybe out $ stripPrefix (path ++ ":") out
 
 -- | Additional command-line options.
@@ -69,7 +79,7 @@ options :: [OptDescr (Either String (Global -> Global))]
 options =
     [ Option "" [gpgKeyOptName]
         (ReqArg (\v -> Right $ \g -> g{gGpgKey = v}) "USER-ID")
-        "GPG user ID to sign distribution package with"
+        "GPG user ID to sign distribution package with."
     , Option "" [allowDirtyOptName] (NoArg $ Right $ \g -> g{gAllowDirty = True})
         "Allow a dirty working tree for release."
     , Option "" [githubAuthTokenOptName]
@@ -79,7 +89,17 @@ options =
          " environment variable).")
     , Option "" [githubReleaseTagOptName]
         (ReqArg (\v -> Right $ \g -> g{gGithubReleaseTag = Just v}) "TAG")
-        "Github release tag to upload to." ]
+        "Github release tag to upload to."
+    , Option "" [archOptName]
+        (ReqArg
+	    (\v -> case simpleParse v of
+	        Nothing -> Left $ "Unknown architecture in --arch option: " ++ v
+		Just arch -> Right $ \g -> g{gArch = arch})
+	    "ARCHITECTURE")
+        "Architecture to build (e.g. 'i386' or 'x86_64')."
+    , Option "" [binarySuffixOptName]
+        (ReqArg (\v -> Right $ \g -> g{gBinarySuffix = v}) "SUFFIX")
+        "Extra suffix to add to binary executable archive filename." ]
 
 -- | Shake rules.
 rules :: Global -> [String] -> Rules ()
@@ -96,13 +116,13 @@ rules global@Global{..} args = do
         removeFilesAfter releaseDir ["//*"]
 
     phony checkPhony $
-        need [releaseCheckDir </> stackExeFileName]
+        need [releaseCheckDir </> binaryExeFileName]
 
     phony uploadPhony $
-        mapM_ (\f -> need [releaseDir </> f <.> uploadExt]) releaseFileNames
+        mapM_ (\f -> need [releaseDir </> f <.> uploadExt]) binaryFileNames
 
     phony buildPhony $
-        mapM_ (\f -> need [releaseDir </> f]) releaseFileNames
+        mapM_ (\f -> need [releaseDir </> f]) binaryFileNames
 
     forM_ distros $ \distro -> do
 
@@ -121,64 +141,64 @@ rules global@Global{..} args = do
         uploadToGithubRelease global (dropExtension out)
         copyFile' (dropExtension out) out
 
-    releaseCheckDir </> stackExeFileName %> \out -> do
-        need [installBinDir </> stackExeFileName]
+    releaseCheckDir </> binaryExeFileName %> \out -> do
+        need [installBinDir </> stackOrigExeFileName]
         Stdout dirty <- cmd "git status --porcelain"
         when (not gAllowDirty && not (null (trim dirty))) $
             error ("Working tree is dirty.  Use --" ++ allowDirtyOptName ++ " option to continue anyway.")
-        let instExeFile = installBinDir </> stackExeFileName
-            tmpExeFile = installBinDir </> stackExeFileName <.> "tmp"
+        let instExeFile = installBinDir </> stackOrigExeFileName
+            tmpExeFile = installBinDir </> stackOrigExeFileName <.> "tmp"
         --EKB FIXME: once 'stack install --path' implemented, use it instead of this temp file.
         liftIO $ renameFile instExeFile tmpExeFile
         actionFinally
             (do opt <- addPath [installBinDir] []
-                () <- cmd opt "stack build"
-                () <- cmd opt "stack clean"
-                () <- cmd opt "stack build --pedantic"
-                () <- cmd opt "stack test --flag stack:integration-tests"
+                () <- cmd opt stackProgName (stackArgs global) "build"
+                () <- cmd opt stackProgName (stackArgs global) "clean"
+                () <- cmd opt stackProgName (stackArgs global) "build --pedantic"
+                () <- cmd opt stackProgName (stackArgs global) "test --flag stack:integration-tests"
                 return ())
             (renameFile tmpExeFile instExeFile)
-        copyFileChanged (installBinDir </> stackExeFileName) out
+        copyFileChanged (installBinDir </> stackOrigExeFileName) out
 
-    releaseDir </> releaseExeZipFileName %> \out -> do
-        need [releaseDir </> stackExeFileName]
-        putNormal $ "zip " ++ (releaseDir </> stackExeFileName)
+    releaseDir </> binaryExeZipFileName %> \out -> do
+        need [releaseDir </> binaryExeFileName]
+        putNormal $ "zip " ++ (releaseDir </> binaryExeFileName)
         liftIO $ do
-            entry <- Zip.readEntry [] (releaseDir </> stackExeFileName)
-            let entry' = entry{Zip.eRelativePath = stackExeFileName}
+            entry <- Zip.readEntry [] (releaseDir </> binaryExeFileName)
+            let entry' = entry{Zip.eRelativePath = binaryExeFileName}
                 archive = Zip.addEntryToArchive entry' Zip.emptyArchive
             L8.writeFile out (Zip.fromArchive archive)
 
-    releaseDir </> releaseExeGzFileName %> \out -> do
-        need [releaseDir </> stackExeFileName]
-        putNormal $ "gzip " ++ (releaseDir </> stackExeFileName)
+    releaseDir </> binaryExeGzFileName %> \out -> do
+        need [releaseDir </> binaryExeFileName]
+        putNormal $ "gzip " ++ (releaseDir </> binaryExeFileName)
         liftIO $ do
-            fc <- L8.readFile (releaseDir </> stackExeFileName)
+            fc <- L8.readFile (releaseDir </> binaryExeFileName)
             L8.writeFile out $ GZip.compress fc
 
-    releaseDir </> stackExeFileName %> \out -> do
-        need [installBinDir </> stackExeFileName]
+    releaseDir </> binaryExeFileName %> \out -> do
+        need [installBinDir </> stackOrigExeFileName]
         case platformOS of
             Windows ->
                 -- Windows doesn't have or need a 'strip' command, so skip it.
-                liftIO $ copyFile (installBinDir </> stackExeFileName) out
+                liftIO $ copyFile (installBinDir </> stackOrigExeFileName) out
             Linux ->
                 cmd "strip -p --strip-unneeded --remove-section=.comment -o"
-                    [out, installBinDir </> stackExeFileName]
+                    [out, installBinDir </> stackOrigExeFileName]
             _ ->
                 cmd "strip -o"
-                    [out, installBinDir </> stackExeFileName]
+                    [out, installBinDir </> stackOrigExeFileName]
 
-    releaseDir </> releaseExeCompressedAscFileName %> \out -> do
+    releaseDir </> binaryExeCompressedAscFileName %> \out -> do
         need [out -<.> ""]
         _ <- liftIO $ tryJust (guard . isDoesNotExistError) (removeFile out)
         cmd "gpg --detach-sig --armor"
             [ "-u", gGpgKey
-            , out -<.> "" ]
+            , dropExtension out ]
 
-    installBinDir </> stackExeFileName %> \_ -> do
+    installBinDir </> stackOrigExeFileName %> \_ -> do
         alwaysRerun
-        cmd "stack build"
+        cmd stackProgName (stackArgs global) "build"
 
     forM_ distros $ \distro0 -> do
 
@@ -252,17 +272,17 @@ rules global@Global{..} args = do
     distroVersionDockerDir dv = distroVersionDir dv </> "docker"
     distroVersionDir DistroVersion{..} = releaseDir </> dvDistro </> dvVersion
 
-    stackExeFileName = stackProgName <.> exe
-    releaseFileNames = [releaseExeCompressedFileName, releaseExeCompressedAscFileName]
-    releaseExeCompressedAscFileName = releaseExeCompressedFileName <.> ascExt
-    releaseExeCompressedFileName =
+    stackOrigExeFileName = stackProgName <.> exe
+    binaryFileNames = [binaryExeCompressedFileName, binaryExeCompressedAscFileName]
+    binaryExeCompressedAscFileName = binaryExeCompressedFileName <.> ascExt
+    binaryExeCompressedFileName =
         case platformOS of
-            Windows -> releaseExeZipFileName
-            _ -> releaseExeGzFileName
-    releaseExeZipFileName = releaseExeFileNameNoExt <.> zipExt
-    releaseExeGzFileName = releaseExeFileName <.> gzExt
-    releaseExeFileName = releaseExeFileNameNoExt <.> exe
-    releaseExeFileNameNoExt = releaseName global
+            Windows -> binaryExeZipFileName
+            _ -> binaryExeGzFileName
+    binaryExeZipFileName = binaryExeFileNameNoExt <.> zipExt
+    binaryExeGzFileName = binaryExeFileName <.> gzExt
+    binaryExeFileName = binaryExeFileNameNoExt <.> exe
+    binaryExeFileNameNoExt = binaryName global
     distroPackageFileName distro
         | distroPackageExt distro == debExt =
             concat [stackProgName, "_", distroPackageVersionStr distro, "_amd64"] <.> debExt
@@ -422,16 +442,25 @@ buildDockerImage buildDir imageTag out = do
     return (trim imageIdOut)
 
 -- | Name of the release binary (e.g. @stack-x.y.x-arch-os@)
-releaseName :: Global -> String
-releaseName global = concat [stackProgName, "-", stackVersionStr global, "-", platformName]
+binaryName :: Global -> String
+binaryName global@Global{..} =
+    concat
+        [ stackProgName
+        , "-"
+	, stackVersionStr global
+	, "-"
+	, platformName global
+	, if null gBinarySuffix then "" else "-" ++ gBinarySuffix ]
 
 -- | String representation of stack package version.
 stackVersionStr :: Global -> String
-stackVersionStr = display . pkgVersion . package . gStackPackageDescription
+stackVersionStr =
+    display . pkgVersion . package . gStackPackageDescription
 
 -- | Name of current platform.
-platformName :: String
-platformName = display buildPlatform
+platformName :: Global -> String
+platformName Global{..} =
+    display (Platform gArch platformOS)
 
 -- | Current operating system.
 platformOS :: OS
@@ -462,6 +491,18 @@ gpgKeyOptName = "gpg-key"
 -- | @--allow-dirty@ command-line option name.
 allowDirtyOptName :: String
 allowDirtyOptName = "allow-dirty"
+
+-- | @--arch@ command-line option name.
+archOptName :: String
+archOptName = "arch"
+
+-- | @--binary-suffix@ command-line option name.
+binarySuffixOptName :: String
+binarySuffixOptName = "binary-suffix"
+
+-- | Arguments to pass to all 'stack' invocations.
+stackArgs :: Global -> [String]
+stackArgs Global{..} = ["--arch=" ++ display gArch]
 
 -- | Name of the 'stack' program.
 stackProgName :: FilePath
@@ -505,4 +546,6 @@ data Global = Global
     , gProjectRoot :: !FilePath
     , gHomeDir :: !FilePath
     , gScriptPath :: !FilePath
-    }
+    , gArch :: !Arch
+    , gBinarySuffix :: !String }
+    deriving (Show)
