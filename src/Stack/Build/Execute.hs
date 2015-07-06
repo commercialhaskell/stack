@@ -694,10 +694,13 @@ singleTest rerunTests ac ee task =
         (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (test)") cabal cabalfp ["--enable-tests"]
         config <- asks getConfig
 
+        testBuilt <- checkTestBuilt pkgDir
+
         let needBuild = neededConfig ||
                 (case taskType task of
                     TTLocal lp -> lpDirtyFiles lp
-                    _ -> assert False True)
+                    _ -> assert False True) ||
+                not testBuilt
             needHpc = boptsCoverage (eeBuildOpts ee)
 
             componentsRaw =
@@ -709,11 +712,13 @@ singleTest rerunTests ac ee task =
 
         when needBuild $ do
             announce "build (test)"
+            unsetTestBuilt pkgDir
             unsetTestSuccess pkgDir
             case taskType task of
                 TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
                 TTUpstream _ _ -> assert False $ return ()
             cabal (console && configHideTHLoading config) $ "build" : components
+            setTestBuilt pkgDir
 
         toRun <-
             if rerunTests
@@ -871,17 +876,22 @@ singleBench ac ee task =
     withSingleContext ac ee task $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
         (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (benchmarks)") cabal cabalfp ["--enable-benchmarks"]
 
+        benchBuilt <- checkBenchBuilt pkgDir
+
         let needBuild = neededConfig ||
                 (case taskType task of
                     TTLocal lp -> lpDirtyFiles lp
-                    _ -> assert False True)
+                    _ -> assert False True) ||
+                not benchBuilt
         when needBuild $ do
             announce "build (benchmarks)"
+            unsetBenchBuilt pkgDir
             case taskType task of
                 TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
                 TTUpstream _ _ -> assert False $ return ()
             config <- asks getConfig
             cabal (console && configHideTHLoading config) ["build"]
+            setBenchBuilt pkgDir
 
         announce "benchmarks"
         cabal False ["bench"]
