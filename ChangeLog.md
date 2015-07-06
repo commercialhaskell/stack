@@ -1,3 +1,7 @@
+## Unreleased
+
+* Set the `HASKELL_DIST_DIR` environment variable [#524](https://github.com/commercialhaskell/stack/pull/524)
+
 ## 0.1.2.0
 
 * Add `--prune` flag to `stack dot` [#487](https://github.com/commercialhaskell/stack/issues/487)
