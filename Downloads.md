@@ -74,7 +74,7 @@ We generally test on the current version of OS X, but stack is known to work on 
 
             curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/centos/7/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 
-    (looking for CentOS 6 / RHEL 6?  See [#465](https://github.com/commercialhaskell/stack/issues/465#issuecomment-118844397))
+    Looking for CentOS 6 / RHEL 6?  See [#465](https://github.com/commercialhaskell/stack/issues/465#issuecomment-118844397).
 
 2. Install:
 
