@@ -53,6 +53,7 @@ import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Safe (headMay, readMay)
 import           Stack.Build.Types
+import           Stack.Constants (distRelativeDir)
 import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB)
 import           Stack.Solver (getGhcVersion)
 import           Stack.Types
@@ -150,6 +151,7 @@ setupEnv = do
         env1 = Map.delete "GHC_PACKAGE_PATH"
              $ Map.delete "HASKELL_PACKAGE_SANDBOX"
              $ Map.delete "HASKELL_PACKAGE_SANDBOXES"
+             $ Map.delete "HASKELL_DIST_DIR"
                env0
 
     menv1 <- mkEnvOverride platform env1
@@ -178,6 +180,8 @@ setupEnv = do
             , [toFilePathNoTrailingSlash deps]
             , [toFilePathNoTrailingSlash globalDB]
             ]
+
+    distDir <- runReaderT distRelativeDir envConfig0
 
     executablePath <- liftIO getExecutablePath
 
@@ -210,6 +214,7 @@ setupEnv = do
                                         [ toFilePathNoTrailingSlash deps
                                         , ""
                                         ])
+                        $ Map.insert "HASKELL_DIST_DIR" (T.pack $ toFilePathNoTrailingSlash distDir)
                         $ env1
                     !() <- atomicModifyIORef envRef $ \m' ->
                         (Map.insert es eo m', ())
