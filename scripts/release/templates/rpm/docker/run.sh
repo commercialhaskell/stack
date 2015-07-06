@@ -21,8 +21,8 @@ fpm \
     -d automake \
     -d gcc \
     -d gmp-devel \
-    -d libffi-devel \
-    -d zlib-devel \
+    -d libffi \
+    -d zlib \
     -d xz \
     -d tar \
     -C /fpm \

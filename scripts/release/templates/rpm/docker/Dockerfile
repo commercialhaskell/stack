@@ -13,10 +13,6 @@ RUN gem install fpm
 RUN curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/<<DISTRO>>/<<DISTRO-VERSION>>/fpco.repo >/etc/yum.repos.d/fpco.repo
 RUN yum -y install stack
 
-# GHC
-#EKB FIXME: remove this once stack can install GHC itself on CentOS 6
-RUN bash -c 'if [[ "<<DISTRO>>" == "centos" && "<<DISTRO-VERSION>>" < "7" ]]; then curl -sSL https://www.haskell.org/ghc/dist/7.8.4/ghc-7.8.4-x86_64-unknown-linux-centos65.tar.xz |tar xJf - && cd ghc-7.8.4 && ./configure --prefix=/usr/local && make install; fi'
-
 # RUN ENVIRONMENT
 COPY run.sh /run.sh
 RUN chmod a+x /run.sh
