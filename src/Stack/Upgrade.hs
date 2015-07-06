@@ -40,7 +40,7 @@ upgrade fromGit mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> d
                 $logInfo "Cloning stack"
                 runIn tmp "git" menv
                     [ "clone"
-                    , "git@github.com:commercialhaskell/stack" -- TODO allow to be configured
+                    , "https://github.com/commercialhaskell/stack" -- TODO allow to be configured
                     , "stack"
                     , "--depth"
                     , "1"
