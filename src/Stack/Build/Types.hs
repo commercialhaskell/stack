@@ -20,6 +20,8 @@ module Stack.Build.Types
     ,LocalPackage(..)
     ,BaseConfigOpts(..)
     ,Plan(..)
+    ,TestOpts(..)
+    ,BenchmarkOpts(..)
     ,FinalAction(..)
     ,BuildOpts(..)
     ,defaultBuildOpts
@@ -328,11 +330,21 @@ defaultBuildOpts = BuildOpts
     , boptsNoTests = False
     }
 
+-- | Options for the 'FinalAction' 'DoTests'
+data TestOpts =
+  TestOpts {toRerunTests :: !Bool -- ^ Whether successful tests will be run gain
+           ,toAdditionalArgs :: ![String] -- ^ Arguments passed to the test program
+           } deriving (Eq,Show)
+
+-- | Options for the 'FinalAction' 'DoBenchmarks'
+data BenchmarkOpts =
+  BenchmarkOpts {beoAdditionalArgs :: !(Maybe String) -- ^ Arguments passed to the benchmark program
+                } deriving (Eq,Show)
+
 -- | Run a Setup.hs action after building a package, before installing.
 data FinalAction
-  = DoTests
-      Bool -- rerun tests which already passed?
-  | DoBenchmarks
+  = DoTests TestOpts
+  | DoBenchmarks BenchmarkOpts
   | DoNothing
   deriving (Eq,Show)
 

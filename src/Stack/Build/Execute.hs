@@ -123,7 +123,7 @@ printPlan finalAction plan = do
     let mfinalLabel =
             case finalAction of
                 DoNothing -> Nothing
-                DoBenchmarks -> Just "benchmark"
+                DoBenchmarks _ -> Just "benchmark"
                 DoTests _ -> Just "test"
     case mfinalLabel of
         Nothing -> return ()
@@ -405,8 +405,8 @@ toActions runInBase ee (mbuild, mfinal) =
     mfunc =
         case boptsFinalAction $ eeBuildOpts ee of
             DoNothing -> Nothing
-            DoTests rerunTests -> Just (singleTest rerunTests, checkTest)
-            DoBenchmarks -> Just (singleBench, checkBench)
+            DoTests topts -> Just (singleTest (toRerunSuccessful topts), checkTest)
+            DoBenchmarks _ -> Just (singleBench, checkBench)
 
     checkTest task =
         case taskType task of

@@ -99,17 +99,12 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                         (buildOpts Build)
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
-                        (\(rerun, bopts) -> buildCmd (DoTests rerun) bopts)
-                        ((,)
-                            <$> boolFlags True
-                                "rerun-tests"
-                                "running already successful tests"
-                                idm
-                            <*> (buildOpts Test))
+                        (\(topts, bopts) -> buildCmd (DoTests topts) bopts)
+                        ((,) <$> testOpts <*> buildOpts Test)
              addCommand "bench"
                         "Build and benchmark the project(s) in this directory/configuration"
-                        (buildCmd DoBenchmarks)
-                        (buildOpts Bench)
+                        (\(beopts, bopts) -> buildCmd (DoBenchmarks beopts) bopts)
+                        ((,) <$> benchOpts <*> buildOpts Bench)
              addCommand "haddock"
                         "Generate haddocks for the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
@@ -663,6 +658,26 @@ data Command
     | Haddock
     | Bench
     deriving (Eq)
+
+-- | Parser for test arguments.
+testOpts :: Parser TestOpts
+testOpts = TestOpts
+       <$> boolFlags True
+                     "rerun-tests"
+                     "running already successful tests"
+                     idm
+       <*> fmap (fromMaybe [])
+                (optional (argsOption(long "test-arguments" <>
+                                      metavar "TEST_ARGS" <>
+                                      help "Arguments passed in to the test suite program")))
+
+-- | Parser for bench arguments.
+benchOpts :: Parser BenchmarkOpts
+benchOpts = BenchmarkOpts
+        <$> optional (strOption (long "benchmark-arguments" <>
+                                 metavar "BENCH_ARGS" <>
+                                 help ("Forward BENCH_ARGS to the benchmark suite. " <>
+                                       "Supports templates from `cabal bench`")))
 
 -- | Parser for build arguments.
 buildOpts :: Command -> Parser BuildOpts
