@@ -723,7 +723,7 @@ singleTest rerunTests ac ee task =
         toRun <-
             if (boptsNoTests (eeBuildOpts ee))
                 then do
-                    announce "Test running disabled by --no-tests flag."
+                    announce "Test running disabled by --no-run-tests flag."
                     return False
                 else if rerunTests
                     then return True
