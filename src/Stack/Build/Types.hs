@@ -291,8 +291,6 @@ data BuildOpts =
             -- ^ Install executables to user path after building?
             ,boptsPreFetch :: !Bool
             -- ^ Fetch all packages immediately
-            ,boptsAdditionalArgs :: ![String]
-            -- ^ Arguments to pass to the test/benchmark suites if we're running them.
             ,boptsOnlySnapshot :: !Bool
             -- ^ Only install packages in the snapshot database, skipping
             -- packages intended for the local database.
@@ -322,7 +320,6 @@ defaultBuildOpts = BuildOpts
     , boptsFlags = Map.empty
     , boptsInstallExes = False
     , boptsPreFetch = False
-    , boptsAdditionalArgs = []
     , boptsOnlySnapshot = False
     , boptsCoverage = False
     , boptsFileWatch = False
