@@ -436,6 +436,8 @@ data ConfigMonoid =
     -- ^ See: 'configExtraLibDirs'
     ,configMonoidConcurrentTests     :: !(Maybe Bool)
     -- ^ See: 'configConcurrentTests'
+    ,configMonoidLocalBin            :: !(Maybe FilePath)
+    -- ^ Used to override the binary installation dir
     }
   deriving Show
 
@@ -457,6 +459,7 @@ instance Monoid ConfigMonoid where
     , configMonoidExtraIncludeDirs = Set.empty
     , configMonoidExtraLibDirs = Set.empty
     , configMonoidConcurrentTests = Nothing
+    , configMonoidLocalBin = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -476,6 +479,7 @@ instance Monoid ConfigMonoid where
     , configMonoidExtraIncludeDirs = Set.union (configMonoidExtraIncludeDirs l) (configMonoidExtraIncludeDirs r)
     , configMonoidExtraLibDirs = Set.union (configMonoidExtraLibDirs l) (configMonoidExtraLibDirs r)
     , configMonoidConcurrentTests = configMonoidConcurrentTests l <|> configMonoidConcurrentTests r
+    , configMonoidLocalBin = configMonoidLocalBin l <|> configMonoidLocalBin r
     }
 
 instance FromJSON ConfigMonoid where
@@ -500,6 +504,7 @@ instance FromJSON ConfigMonoid where
          configMonoidExtraIncludeDirs <- obj .:? "extra-include-dirs" .!= Set.empty
          configMonoidExtraLibDirs <- obj .:? "extra-lib-dirs" .!= Set.empty
          configMonoidConcurrentTests <- obj .:? "concurrent-tests"
+         configMonoidLocalBin <- obj .:? "local-bin"
          return ConfigMonoid {..}
 
 -- | Newtype for non-orphan FromJSON instance.
