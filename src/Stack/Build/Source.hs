@@ -172,16 +172,18 @@ loadLocals :: forall m env .
            -> Map PackageName Version
            -> m ([LocalPackage], Set PackageName, Set PackageIdentifier)
 loadLocals bopts latestVersion = do
-    targets <- mapM parseTarget $
+    (isWanted', names, idents) <-
         case boptsTargets bopts of
-            [] -> ["."]
-            x -> x
-
-    -- Group targets by their kind
-    (dirs, names, idents) <-
-        case partitionEithers targets of
-            ([], targets') -> return $ partitionTargetSpecs targets'
-            (bad, _) -> throwM $ Couldn'tParseTargets bad
+            -- If there are no targets specified: build all locals
+            [] -> return (\_ _ -> True, Map.empty, Set.empty)
+            targets -> do
+                targets' <- mapM parseTarget $ boptsTargets bopts
+                -- Group targets by their kind
+                (dirs, names, idents) <-
+                    case partitionEithers targets' of
+                        ([], targets') -> return $ partitionTargetSpecs targets'
+                        (bad, _) -> throwM $ Couldn'tParseTargets bad
+                return (isWanted dirs names, names, idents)
 
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
@@ -191,7 +193,7 @@ loadLocals bopts latestVersion = do
     lps <- forM (Map.toList $ bcPackages bconfig) $ \(dir, validWanted) -> do
         cabalfp <- getCabalFileName dir
         name <- parsePackageNameFromFilePath cabalfp
-        let wanted = validWanted && isWanted dirs names dir name
+        let wanted = validWanted && isWanted' dir name
             config = PackageConfig
                 { packageConfigEnableTests = False
                 , packageConfigEnableBenchmarks = False
