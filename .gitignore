@@ -3,6 +3,7 @@
 *.swp
 *.tag
 *~
+*_flymake.hs
 .hsenv
 .stack-work/
 /.cabal-sandbox/

@@ -721,15 +721,19 @@ singleTest rerunTests ac ee task =
             setTestBuilt pkgDir
 
         toRun <-
-            if rerunTests
-                then return True
-                else do
-                    success <- checkTestSuccess pkgDir
-                    if success
-                        then do
-                            unless (null testsToRun) $ announce "skipping already passed test"
-                            return False
-                        else return True
+            if (boptsNoTests (eeBuildOpts ee))
+                then do
+                    announce "Test running disabled by --no-tests flag."
+                    return False
+                else if rerunTests
+                    then return True
+                    else do
+                        success <- checkTestSuccess pkgDir
+                        if success
+                            then do
+                                unless (null testsToRun) $ announce "skipping already passed test"
+                                return False
+                            else return True
 
         when toRun $ do
             bconfig <- asks getBuildConfig

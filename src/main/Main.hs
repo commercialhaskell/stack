@@ -669,7 +669,7 @@ buildOpts cmd = fmap process $
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> haddock <*> haddockDeps <*> finalAction <*> dryRun <*> ghcOpts <*>
             flags <*> installExes <*> preFetch <*> testArgs <*> onlySnapshot <*> coverage <*>
-            fileWatch' <*> keepGoing
+            fileWatch' <*> keepGoing <*> noTests
   where process bopts =
             if boptsCoverage bopts
                then bopts { boptsExeProfile = True
@@ -747,6 +747,12 @@ buildOpts cmd = fmap process $
                then flag False True
                         (long "coverage" <>
                          help "Generate a code coverage report")
+               else pure False
+        noTests =
+            if cmd == Test
+               then flag False True
+                        (long "no-run-tests" <>
+                         help "Disable running of tests. (Tests will still be built.)")
                else pure False
 
         fileWatch' = flag False True

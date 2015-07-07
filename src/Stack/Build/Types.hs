@@ -301,6 +301,8 @@ data BuildOpts =
             -- ^ Watch files for changes and automatically rebuild
             ,boptsKeepGoing :: !(Maybe Bool)
             -- ^ Keep building/running after failure
+            ,boptsNoTests :: !Bool
+            -- ^ If set, don't run the tests
             }
   deriving (Show)
 
@@ -323,6 +325,7 @@ defaultBuildOpts = BuildOpts
     , boptsCoverage = False
     , boptsFileWatch = False
     , boptsKeepGoing = Nothing
+    , boptsNoTests = False
     }
 
 -- | Run a Setup.hs action after building a package, before installing.
