@@ -61,6 +61,7 @@ import qualified Paths_stack as Meta
 import           Stack.BuildPlan
 import           Stack.Constants
 import qualified Stack.Docker as Docker
+import qualified Stack.Image as Image
 import           Stack.Init
 import           Stack.Types
 import           Stack.Types.Internal
@@ -134,6 +135,8 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
          configRequireStackVersion = simplifyVersionRange configMonoidRequireStackVersion
 
          configConfigMonoid = configMonoid
+
+         configImage = Image.imgOptsFromMonoid configMonoidImageOpts
 
      origEnv <- getEnvOverride configPlatform
      let configEnvOverride _ = return origEnv
@@ -478,4 +481,3 @@ loadProjectConfig mstackYaml = do
 
 packagesParser :: Parser [String]
 packagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))
-
