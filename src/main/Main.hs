@@ -524,7 +524,8 @@ buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
 buildCmd = buildCmdHelper ThrowException
 
 -- | Install
-installCmd (mPath,opts) go@GlobalOpts{..} = do
+installCmd :: (Maybe String, BuildOpts) -> GlobalOpts -> IO ()
+installCmd (mPath,opts) = do
     specifiedDir <-
         case mPath of
             (Just userPath) -> do
@@ -539,13 +540,10 @@ installCmd (mPath,opts) go@GlobalOpts{..} = do
                         return (Just absPath)
             Nothing ->
                 return Nothing
-    withBuildConfig
-        go
-        ExecStrategy
-        (Stack.Build.build
-             opts
-             { boptsInstallExes = maybe DefaultInstall InstallDir specifiedDir
-             }) 
+    (buildCmdHelper
+           ExecStrategy
+           DoNothing
+           (opts { boptsInstallExes = maybe DefaultInstall InstallDir specifiedDir })) 
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
