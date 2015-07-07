@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -fdefer-type-errors #-}
 
 -- | Main stack tool entry point.
 
@@ -525,7 +526,7 @@ buildCmd = buildCmdHelper ThrowException
 
 -- | Install
 installCmd :: (Maybe String, BuildOpts) -> GlobalOpts -> IO ()
-installCmd (mPath,opts) = do
+installCmd (mPath,opts) go@GlobalOpts{..} = do
     specifiedDir <-
         case mPath of
             (Just userPath) -> do
@@ -540,10 +541,11 @@ installCmd (mPath,opts) = do
                         return (Just absPath)
             Nothing ->
                 return Nothing
-    (buildCmdHelper
-           ExecStrategy
-           DoNothing
-           (opts { boptsInstallExes = maybe DefaultInstall InstallDir specifiedDir })) 
+    let opts' = opts { boptsInstallExes = maybe DefaultInstall InstallDir specifiedDir }
+    buildCmdHelper ExecStrategy DoNothing opts' go
+    -- (manager,lc) <- liftIO $ loadConfigWithOpts go
+    -- runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
+    --     Docker.preventInContainer Docker.pull
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
@@ -892,6 +894,7 @@ data GlobalOpts = GlobalOpts
     , globalResolver     :: Maybe Resolver -- ^ Resolver override
     , globalTerminal     :: Bool -- ^ We're in a terminal?
     , globalStackYaml    :: Maybe FilePath -- ^ Override project stack.yaml
+    , globalUserBinPath  :: Maybe (Path Abs Dir)
     } deriving (Show)
 
 -- | Load the configuration with a manager. Convenience function used

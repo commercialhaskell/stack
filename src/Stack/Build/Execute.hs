@@ -233,9 +233,7 @@ executePlan menv bopts baseConfigOpts locals sourceMap plan = do
         -- Also install executables
         snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
         localBin <- (</> bindirSuffix) `liftM` installationRootLocal
-        destDir <- case (installExesPlanDestDir $ planInstallExes plan) of 
-                     Just userDestDir -> return userDestDir
-                     Nothing -> asks $ configLocalBin . getConfig
+        destDir <- asks $ configLocalBin . getConfig
         let destDir' = toFilePath destDir
         liftIO $ createDirectoryIfMissing True destDir'
 
