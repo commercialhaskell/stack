@@ -701,7 +701,8 @@ singleTest topts ac ee task =
                     TTLocal lp -> lpDirtyFiles lp
                     _ -> assert False True) ||
                 not testBuilt
-            needHpc = boptsCoverage (eeBuildOpts ee)
+
+            needHpc = toCoverage topts
 
             componentsRaw =
                 case taskType task of
@@ -721,19 +722,19 @@ singleTest topts ac ee task =
             setTestBuilt pkgDir
 
         toRun <-
-            if (boptsNoTests (eeBuildOpts ee))
-                then do
-                    announce "Test running disabled by --no-run-tests flag."
-                    return False
-                else if toRerunTests topts
-                    then return True
-                    else do
-                        success <- checkTestSuccess pkgDir
-                        if success
-                            then do
-                                unless (null testsToRun) $ announce "skipping already passed test"
-                                return False
-                            else return True
+            if toDisableRun topts
+              then do
+                  announce "Test running disabled by --no-run-tests flag."
+                  return False
+              else if toRerunTests topts
+                  then return True
+                  else do
+                      success <- checkTestSuccess pkgDir
+                      if success
+                          then do
+                              unless (null testsToRun) $ announce "skipping already passed test"
+                              return False
+                          else return True
 
         when toRun $ do
             bconfig <- asks getBuildConfig

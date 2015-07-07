@@ -99,7 +99,13 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                         (buildOpts Build)
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
-                        (\(topts, bopts) -> buildCmd (DoTests topts) bopts)
+                        (\(topts, bopts) ->
+                             let bopts' = if toCoverage topts
+                                             then bopts { boptsExeProfile = True
+                                                        , boptsLibProfile = True
+                                                        , boptsGhcOptions = "-fhpc" : boptsGhcOptions bopts}
+                                             else bopts
+                             in buildCmd (DoTests topts) bopts')
                         ((,) <$> testOpts <*> buildOpts Test)
              addCommand "bench"
                         "Build and benchmark the project(s) in this directory/configuration"
@@ -670,6 +676,16 @@ testOpts = TestOpts
                 (optional (argsOption(long "test-arguments" <>
                                       metavar "TEST_ARGS" <>
                                       help "Arguments passed in to the test suite program")))
+      <*> flag False
+               True
+               (long "coverage" <>
+               help "Generate a code coverage report")
+      <*> flag False
+               True
+               (long "no-run-tests" <>
+                help "Disable running of tests. (Tests will still be built.)")
+
+
 
 -- | Parser for bench arguments.
 benchOpts :: Parser BenchmarkOpts
@@ -681,18 +697,12 @@ benchOpts = BenchmarkOpts
 
 -- | Parser for build arguments.
 buildOpts :: Command -> Parser BuildOpts
-buildOpts cmd = fmap process $
+buildOpts cmd =
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> haddock <*> haddockDeps <*> finalAction <*> dryRun <*> ghcOpts <*>
-            flags <*> installExes <*> preFetch <*> onlySnapshot <*> coverage <*>
-            fileWatch' <*> keepGoing <*> noTests
-  where process bopts =
-            if boptsCoverage bopts
-               then bopts { boptsExeProfile = True
-                          , boptsLibProfile = True
-                          , boptsGhcOptions = "-fhpc" : boptsGhcOptions bopts}
-               else bopts
-        optimize =
+            flags <*> installExes <*> preFetch <*> onlySnapshot <*>
+            fileWatch' <*> keepGoing
+  where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
         target =
           fmap (map T.pack)
@@ -749,18 +759,6 @@ buildOpts cmd = fmap process $
         onlySnapshot = flag False True
             (long "only-snapshot" <>
              help "Only build packages for the snapshot database, not the local database")
-        coverage =
-            if cmd == Test
-               then flag False True
-                        (long "coverage" <>
-                         help "Generate a code coverage report")
-               else pure False
-        noTests =
-            if cmd == Test
-               then flag False True
-                        (long "no-run-tests" <>
-                         help "Disable running of tests. (Tests will still be built.)")
-               else pure False
 
         fileWatch' = flag False True
             (long "file-watch" <>

@@ -294,15 +294,10 @@ data BuildOpts =
             ,boptsOnlySnapshot :: !Bool
             -- ^ Only install packages in the snapshot database, skipping
             -- packages intended for the local database.
-            ,boptsCoverage :: !Bool
-            -- ^ Enable code coverage report generation for test
-            -- suites.
             ,boptsFileWatch :: !Bool
             -- ^ Watch files for changes and automatically rebuild
             ,boptsKeepGoing :: !(Maybe Bool)
             -- ^ Keep building/running after failure
-            ,boptsNoTests :: !Bool
-            -- ^ If set, don't run the tests
             }
   deriving (Show)
 
@@ -321,16 +316,16 @@ defaultBuildOpts = BuildOpts
     , boptsInstallExes = False
     , boptsPreFetch = False
     , boptsOnlySnapshot = False
-    , boptsCoverage = False
     , boptsFileWatch = False
     , boptsKeepGoing = Nothing
-    , boptsNoTests = False
     }
 
 -- | Options for the 'FinalAction' 'DoTests'
 data TestOpts =
   TestOpts {toRerunTests :: !Bool -- ^ Whether successful tests will be run gain
            ,toAdditionalArgs :: ![String] -- ^ Arguments passed to the test program
+           ,toCoverage :: !Bool -- ^ Generate a code coverage report
+           ,toDisableRun :: !Bool -- ^ Disable running of tests
            } deriving (Eq,Show)
 
 -- | Options for the 'FinalAction' 'DoBenchmarks'
