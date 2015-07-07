@@ -14,7 +14,8 @@
 
 module Stack.Build
   (build
-  ,clean)
+  ,clean
+  ,withLoadPackage)
   where
 
 import           Control.Monad
@@ -26,7 +27,10 @@ import           Control.Monad.Trans.Resource
 import           Data.Function
 import           Data.Map.Strict (Map)
 import qualified Data.Map as Map
+import           Data.Set (Set)
+import qualified Data.Set as Set
 import           Network.HTTP.Client.Conduit (HasHttpManager)
+import           Path
 import           Path.IO
 import           Prelude hiding (FilePath, writeFile)
 import           Stack.Build.ConstructPlan
@@ -45,11 +49,22 @@ import           Stack.Types.Internal
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
 
 -- | Build
-build :: M env m => BuildOpts -> m ()
-build bopts = do
+build :: M env m
+      => (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
+      -> BuildOpts
+      -> m ()
+build setLocalFiles bopts = do
     menv <- getMinimalEnvOverride
 
     (mbp, locals, extraToBuild, sourceMap) <- loadSourceMap bopts
+
+    -- Set local files, necessary for file watching
+    stackYaml <- asks $ bcStackYaml . getBuildConfig
+    liftIO $ setLocalFiles
+           $ Set.insert stackYaml
+           $ Set.unions
+           $ map lpFiles locals
+
     (installedMap, locallyRegistered) <-
         getInstalled menv
                      GetInstalledOpts
@@ -87,7 +102,13 @@ mkBaseConfigOpts bopts = do
         }
 
 -- | Provide a function for loading package information from the package index
-withLoadPackage :: M env m
+withLoadPackage :: ( MonadIO m
+                   , HasHttpManager env
+                   , MonadReader env m
+                   , MonadBaseControl IO m
+                   , MonadCatch m
+                   , MonadLogger m
+                   , HasEnvConfig env)
                 => EnvOverride
                 -> ((PackageName -> Version -> Map FlagName Bool -> IO Package) -> m a)
                 -> m a

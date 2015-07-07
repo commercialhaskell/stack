@@ -39,6 +39,8 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified Data.Text.Encoding.Error as T
 import           Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
 import           Data.Typeable (Typeable)
 import qualified Data.Yaml as Yaml
@@ -49,8 +51,9 @@ import           Network.HTTP.Download (verifiedDownload, DownloadRequest(..))
 import           Path
 import           Path.IO
 import           Prelude -- Fix AMP warning
-import           Safe (readMay)
+import           Safe (headMay, readMay)
 import           Stack.Build.Types
+import           Stack.Constants (distRelativeDir)
 import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB)
 import           Stack.Solver (getGhcVersion)
 import           Stack.Types
@@ -75,11 +78,13 @@ data SetupOpts = SetupOpts
     -- ^ Run a sanity check on the selected GHC
     , soptsSkipGhcCheck :: !Bool
     -- ^ Don't check for a compatible GHC version/architecture
+    , soptsSkipMsys :: !Bool
+    -- ^ Do not use a custom msys installation on Windows
     }
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
                     | MissingDependencies [String]
-                    | UnknownGHCVersion Version (Set MajorVersion)
+                    | UnknownGHCVersion Text Version (Set MajorVersion)
                     | UnknownOSKey Text
                     | GHCSanityCheckCompileFailed ReadProcessException (Path Abs File)
     deriving Typeable
@@ -93,10 +98,10 @@ instance Show SetupException where
     show (MissingDependencies tools) =
         "The following executables are missing and must be installed: " ++
         intercalate ", " tools
-    show (UnknownGHCVersion version known) = concat
+    show (UnknownGHCVersion oskey version known) = concat
         [ "No information found for GHC version "
         , versionString version
-        , ". Known GHC major versions: "
+        , ".\nSupported GHC major versions for OS key '" ++ T.unpack oskey ++ "': "
         , intercalate ", " (map show $ Set.toList known)
         ]
     show (UnknownOSKey oskey) =
@@ -125,6 +130,7 @@ setupEnv = do
             , soptsForceReinstall = False
             , soptsSanityCheck = False
             , soptsSkipGhcCheck = configSkipGHCCheck $ bcConfig bconfig
+            , soptsSkipMsys = configSkipMsys $ bcConfig bconfig
             }
     mghcBin <- ensureGHC sopts
     menv0 <- getMinimalEnvOverride
@@ -145,6 +151,7 @@ setupEnv = do
         env1 = Map.delete "GHC_PACKAGE_PATH"
              $ Map.delete "HASKELL_PACKAGE_SANDBOX"
              $ Map.delete "HASKELL_PACKAGE_SANDBOXES"
+             $ Map.delete "HASKELL_DIST_DIR"
                env0
 
     menv1 <- mkEnvOverride platform env1
@@ -173,6 +180,8 @@ setupEnv = do
             , [toFilePathNoTrailingSlash deps]
             , [toFilePathNoTrailingSlash globalDB]
             ]
+
+    distDir <- runReaderT distRelativeDir envConfig0
 
     executablePath <- liftIO getExecutablePath
 
@@ -205,6 +214,7 @@ setupEnv = do
                                         [ toFilePathNoTrailingSlash deps
                                         , ""
                                         ])
+                        $ Map.insert "HASKELL_DIST_DIR" (T.pack $ toFilePathNoTrailingSlash distDir)
                         $ env1
                     !() <- atomicModifyIORef envRef $ \m' ->
                         (Map.insert es eo m', ())
@@ -261,10 +271,11 @@ ensureGHC sopts = do
             config <- asks getConfig
             let tools =
                     case configPlatform config of
-                        Platform _ Windows ->
-                            [ ($(mkPackageName "ghc"), Just expected)
-                            , ($(mkPackageName "git"), Nothing)
-                            ]
+                        Platform _ os | isWindows os ->
+                              ($(mkPackageName "ghc"), Just expected)
+                            : (if soptsSkipMsys sopts
+                                then []
+                                else [($(mkPackageName "git"), Nothing)])
                         _ ->
                             [ ($(mkPackageName "ghc"), Just expected)
                             ]
@@ -282,7 +293,7 @@ ensureGHC sopts = do
                             return si
 
             installed <- runReaderT listInstalled config
-            idents <- mapM (ensureTool sopts installed getSetupInfo' msystem) tools
+            idents <- mapM (ensureTool menv0 sopts installed getSetupInfo' msystem) tools
             paths <- runReaderT (mapM binDirs $ catMaybes idents) config
             return $ Just $ map toFilePathNoTrailingSlash $ concat paths
         else return Nothing
@@ -394,11 +405,11 @@ binDirs ident = do
     config <- asks getConfig
     dir <- installDir ident
     case (configPlatform config, packageNameString $ packageIdentifierName ident) of
-        (Platform _ Windows, "ghc") -> return
+        (Platform _ (isWindows -> True), "ghc") -> return
             [ dir </> $(mkRelDir "bin")
             , dir </> $(mkRelDir "mingw") </> $(mkRelDir "bin")
             ]
-        (Platform _ Windows, "git") -> return
+        (Platform _ (isWindows -> True), "git") -> return
             [ dir </> $(mkRelDir "cmd")
             , dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
             ]
@@ -410,13 +421,14 @@ binDirs ident = do
             return []
 
 ensureTool :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
-           => SetupOpts
+           => EnvOverride
+           -> SetupOpts
            -> [PackageIdentifier] -- ^ already installed
            -> m SetupInfo
            -> Maybe (Version, Arch) -- ^ installed GHC
            -> (PackageName, Maybe Version)
            -> m (Maybe PackageIdentifier)
-ensureTool sopts installed getSetupInfo' msystem (name, mversion)
+ensureTool menv sopts installed getSetupInfo' msystem (name, mversion)
     | not $ null available = return $ Just $ PackageIdentifier name $ maximum available
     | not $ soptsInstallIfMissing sopts =
         if name == $(mkPackageName "ghc")
@@ -434,7 +446,7 @@ ensureTool sopts installed getSetupInfo' msystem (name, mversion)
                     let pair = siPortableGit si
                     return (pair, installGitWindows)
                 "ghc" -> do
-                    osKey <- getOSKey
+                    osKey <- getOSKey menv
                     pairs <-
                         case Map.lookup osKey $ siGHCs si of
                             Nothing -> throwM $ UnknownOSKey osKey
@@ -445,12 +457,12 @@ ensureTool sopts installed getSetupInfo' msystem (name, mversion)
                             Just version -> return version
                     pair <-
                         case Map.lookup (getMajorVersion version) pairs of
-                            Nothing -> throwM $ UnknownGHCVersion version (Map.keysSet pairs)
+                            Nothing -> throwM $ UnknownGHCVersion osKey version (Map.keysSet pairs)
                             Just pair -> return pair
                     platform <- asks $ configPlatform . getConfig
                     let installer =
                             case platform of
-                                Platform _ Windows -> installGHCWindows
+                                Platform _ os | isWindows os -> installGHCWindows
                                 _ -> installGHCPosix
                     return (pair, installer)
                 x -> error $ "Invariant violated: ensureTool on " ++ x
@@ -477,12 +489,13 @@ ensureTool sopts installed getSetupInfo' msystem (name, mversion)
                 getMajorVersion expected == getMajorVersion actual &&
                 actual >= expected
 
-getOSKey :: (MonadReader env m, MonadThrow m, HasConfig env) => m Text
-getOSKey = do
+getOSKey :: (MonadReader env m, MonadThrow m, HasConfig env, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
+         => EnvOverride -> m Text
+getOSKey menv = do
     platform <- asks $ configPlatform . getConfig
     case platform of
-        Platform I386 Linux -> return "linux32"
-        Platform X86_64 Linux -> return "linux64"
+        Platform I386 Linux -> ("linux32" <>) <$> getLinuxSuffix
+        Platform X86_64 Linux -> ("linux64" <>) <$> getLinuxSuffix
         Platform I386 OSX -> return "macosx"
         Platform X86_64 OSX -> return "macosx"
         Platform I386 FreeBSD -> return "freebsd32"
@@ -491,7 +504,20 @@ getOSKey = do
         Platform X86_64 OpenBSD -> return "openbsd64"
         Platform I386 Windows -> return "windows32"
         Platform X86_64 Windows -> return "windows64"
+
+        Platform I386 (OtherOS "windowsintegersimple") -> return "windowsintegersimple32"
+        Platform X86_64 (OtherOS "windowsintegersimple") -> return "windowsintegersimple64"
+
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
+  where
+    getLinuxSuffix = do
+        executablePath <- liftIO getExecutablePath
+        elddOut <- tryProcessStdout Nothing menv "ldd" [executablePath]
+        return $ case elddOut of
+            Left _ -> ""
+            Right lddOut -> if hasLineWithFirstWord "libgmp.so.3" lddOut then "-gmp4" else ""
+    hasLineWithFirstWord w =
+      elem (Just w) . map (headMay . T.words) . T.lines . T.decodeUtf8With T.lenientDecode
 
 downloadPair :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
              => DownloadPair
@@ -581,11 +607,13 @@ installGHCWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, 
                   -> PackageIdentifier
                   -> m ()
 installGHCWindows si archiveFile archiveType destDir _ = do
-    case archiveType of
-        TarXz -> return ()
-        _ -> error $ "GHC on Windows must be a .tar.xz file"
+    suffix <-
+        case archiveType of
+            TarXz -> return ".xz"
+            TarBz2 -> return ".bz2"
+            _ -> error $ "GHC on Windows must be a tarball file"
     tarFile <-
-        case T.stripSuffix ".xz" $ T.pack $ toFilePath archiveFile of
+        case T.stripSuffix suffix $ T.pack $ toFilePath archiveFile of
             Nothing -> error $ "Invalid GHC filename: " ++ show archiveFile
             Just x -> parseAbsFile $ T.unpack x
 
@@ -729,7 +757,10 @@ sanityCheck menv = withSystemTempDirectory "stack-sanity-check" $ \dir -> do
         ]
     ghc <- join $ findExecutable menv "ghc"
     $logDebug $ "Performing a sanity check on: " <> T.pack (toFilePath ghc)
-    eres <- tryProcessStdout (Just dir') menv "ghc" [fp]
+    eres <- tryProcessStdout (Just dir') menv "ghc"
+        [ fp
+        , "-no-user-package-db"
+        ]
     case eres of
         Left e -> throwM $ GHCSanityCheckCompileFailed e ghc
         Right _ -> return () -- TODO check that the output of running the command is correct

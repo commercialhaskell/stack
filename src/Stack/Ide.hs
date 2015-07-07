@@ -24,7 +24,6 @@ import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Set as S
 import           Data.Text (Text)
-import qualified Data.Text as T
 import           Path
 import           Path.IO
 import           Stack.Build.Source
@@ -120,7 +119,14 @@ initialRequest srcfiles =
     object
         [ "tag" .= "RequestUpdateSession"
         , "contents" .=
-          [object ["tag" .= "TargetsInclude", "contents" .= srcfiles]]]
+            [ object
+                [ "tag" .= "RequestUpdateTargets"
+                , "contents" .= object
+                    [ "tag" .= "TargetsInclude"
+                    , "contents" .= srcfiles ]
+                ]
+            ]
+        ]
 
 -- | Execute a process within the Stack configured environment.
 exec :: (HasConfig r, MonadReader r m, MonadIO m, MonadLogger m, MonadThrow m)

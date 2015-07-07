@@ -47,7 +47,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import qualified Data.Yaml as Yaml
-import           Distribution.System (OS (Windows), Platform (..), buildPlatform)
+import           Distribution.System (OS (..), Platform (..), buildPlatform)
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange)
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager, parseUrl)
@@ -116,6 +116,7 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
          configSystemGHC = fromMaybe True configMonoidSystemGHC
          configInstallGHC = fromMaybe False configMonoidInstallGHC
          configSkipGHCCheck = fromMaybe False configMonoidSkipGHCCheck
+         configSkipMsys = fromMaybe False configMonoidSkipMsys
 
          configExtraIncludeDirs = configMonoidExtraIncludeDirs
          configExtraLibDirs = configMonoidExtraLibDirs
@@ -153,13 +154,14 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
         case configMonoidJobs of
             Nothing -> liftIO getNumCapabilities
             Just i -> return i
+     let configConcurrentTests = fromMaybe True configMonoidConcurrentTests
 
      return Config {..}
 
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser docker =
-    (\opts systemGHC installGHC arch os jobs includes libs skipGHCCheck -> mempty
+    (\opts systemGHC installGHC arch os jobs includes libs skipGHCCheck skipMsys -> mempty
         { configMonoidDockerOpts = opts
         , configMonoidSystemGHC = systemGHC
         , configMonoidInstallGHC = installGHC
@@ -169,6 +171,7 @@ configOptsParser docker =
         , configMonoidJobs = jobs
         , configMonoidExtraIncludeDirs = includes
         , configMonoidExtraLibDirs = libs
+        , configMonoidSkipMsys = skipMsys
         })
     <$> Docker.dockerOptsParser docker
     <*> maybeBoolFlags
@@ -208,6 +211,10 @@ configOptsParser docker =
     <*> maybeBoolFlags
             "skip-ghc-check"
             "skipping the GHC version and architecture check"
+            idm
+    <*> maybeBoolFlags
+            "skip-msys"
+            "skipping the local MSYS installation (Windows only)"
             idm
 
 -- | Get the directory on Windows where we should install extra programs. For

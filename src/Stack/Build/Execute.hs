@@ -124,7 +124,7 @@ printPlan finalAction plan = do
             case finalAction of
                 DoNothing -> Nothing
                 DoBenchmarks -> Just "benchmark"
-                DoTests -> Just "test"
+                DoTests _ -> Just "test"
     case mfinalLabel of
         Nothing -> return ()
         Just finalLabel -> do
@@ -337,8 +337,20 @@ executePlan' plan ee@ExecuteEnv {..} = do
             (planTasks plan)
             (planFinals plan)
     threads <- asks $ configJobs . getConfig
+    concurrentTests <- asks $ configConcurrentTests . getConfig
+    let keepGoing =
+            case boptsKeepGoing eeBuildOpts of
+                Just kg -> kg
+                Nothing ->
+                    case boptsFinalAction eeBuildOpts of
+                        DoNothing -> False
+                        _ -> True
+        concurrentFinal =
+            case boptsFinalAction eeBuildOpts of
+                DoTests _ -> concurrentTests
+                _ -> True
     terminal <- asks getTerminal
-    errs <- liftIO $ runActions threads actions $ \doneVar -> do
+    errs <- liftIO $ runActions threads keepGoing concurrentFinal actions $ \doneVar -> do
         let total = length actions
             loop prev
                 | prev == total =
@@ -397,7 +409,7 @@ toActions runInBase ee (mbuild, mfinal) =
     mfunc =
         case boptsFinalAction $ eeBuildOpts ee of
             DoNothing -> Nothing
-            DoTests -> Just (singleTest, checkTest)
+            DoTests rerunTests -> Just (singleTest rerunTests, checkTest)
             DoBenchmarks -> Just (singleBench, checkBench)
 
     checkTest task =
@@ -622,9 +634,10 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
   withSingleContext ac ee task $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
     (cache, _neededConfig) <- ensureConfig pkgDir ee task (announce "configure") cabal cabalfp []
 
-    fileModTimes <- getPackageFileModTimes package cabalfp
     markExeNotInstalled (taskLocation task) taskProvides
-    writeBuildCache pkgDir fileModTimes
+    case taskType of
+        TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
+        TTUpstream _ _ -> return ()
 
     announce "build"
     config <- asks getConfig
@@ -675,20 +688,23 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
             Set.empty
 
 singleTest :: M env m
-           => ActionContext
+           => Bool -- ^ rerun tests?
+           -> ActionContext
            -> ExecuteEnv
            -> Task
            -> m ()
-singleTest ac ee task =
+singleTest rerunTests ac ee task =
     withSingleContext ac ee task $ \package cabalfp pkgDir cabal announce console mlogFile -> do
         (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (test)") cabal cabalfp ["--enable-tests"]
         config <- asks getConfig
 
+        testBuilt <- checkTestBuilt pkgDir
+
         let needBuild = neededConfig ||
                 (case taskType task of
                     TTLocal lp -> lpDirtyFiles lp
-                    _ -> assert False True)
-                || True -- FIXME above logic is incorrect, see: https://github.com/commercialhaskell/stack/issues/319
+                    _ -> assert False True) ||
+                not testBuilt
             needHpc = boptsCoverage (eeBuildOpts ee)
 
             componentsRaw =
@@ -700,102 +716,124 @@ singleTest ac ee task =
 
         when needBuild $ do
             announce "build (test)"
-            fileModTimes <- getPackageFileModTimes package cabalfp
-            writeBuildCache pkgDir fileModTimes
+            unsetTestBuilt pkgDir
+            unsetTestSuccess pkgDir
+            case taskType task of
+                TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
+                TTUpstream _ _ -> assert False $ return ()
             cabal (console && configHideTHLoading config) $ "build" : components
+            setTestBuilt pkgDir
 
-        bconfig <- asks getBuildConfig
-        buildDir <- distDirFromDir pkgDir
-        hpcDir <- hpcDirFromDir pkgDir
-        when needHpc (createTree hpcDir)
-        let dotHpcDir = pkgDir </> dotHpc
-            exeExtension =
-                case configPlatform $ getConfig bconfig of
-                    Platform _ Windows -> ".exe"
-                    _ -> ""
-
-        errs <- liftM Map.unions $ forM testsToRun $ \testName -> do
-            nameDir <- parseRelDir $ T.unpack testName
-            nameExe <- parseRelFile $ T.unpack testName ++ exeExtension
-            nameTix <- liftM (pkgDir </>) $ parseRelFile $ T.unpack testName ++ ".tix"
-            let exeName = buildDir </> $(mkRelDir "build") </> nameDir </> nameExe
-            exists <- fileExists exeName
-            menv <- liftIO $ configEnvOverride config EnvSettings
-                { esIncludeLocals = taskLocation task == Local
-                , esIncludeGhcPackagePath = True
-                , esStackExe = True
-                }
-            if exists
+        toRun <-
+            if (boptsNoTests (eeBuildOpts ee))
                 then do
-                    -- We clear out the .tix files before doing a run.
-                    when needHpc $ do
-                        tixexists <- fileExists nameTix
-                        when tixexists $
-                            $logWarn ("Removing HPC file " <> T.pack (toFilePath nameTix))
-                        removeFileIfExists nameTix
+                    announce "Test running disabled by --no-tests flag."
+                    return False
+                else if rerunTests
+                    then return True
+                    else do
+                        success <- checkTestSuccess pkgDir
+                        if success
+                            then do
+                                unless (null testsToRun) $ announce "skipping already passed test"
+                                return False
+                            else return True
 
-                    let args = boptsTestArgs (eeBuildOpts ee)
-                        argsDisplay =
-                            case args of
-                              [] -> ""
-                              _ -> ", args: " <> T.intercalate " " (map showProcessArgDebug args)
-                    announce $ "test (suite: " <> testName <> argsDisplay <> ")"
-                    let cp = (proc (toFilePath exeName) args)
-                            { cwd = Just $ toFilePath pkgDir
-                            , Process.env = envHelper menv
-                            , std_in = CreatePipe
-                            , std_out =
-                                case mlogFile of
-                                    Nothing -> Inherit
-                                    Just (_, h) -> UseHandle h
-                            , std_err =
-                                case mlogFile of
-                                    Nothing -> Inherit
-                                    Just (_, h) -> UseHandle h
-                            }
+        when toRun $ do
+            bconfig <- asks getBuildConfig
+            buildDir <- distDirFromDir pkgDir
+            hpcDir <- hpcDirFromDir pkgDir
+            when needHpc (createTree hpcDir)
+            let dotHpcDir = pkgDir </> dotHpc
+                exeExtension =
+                    case configPlatform $ getConfig bconfig of
+                        Platform _ Windows -> ".exe"
+                        _ -> ""
 
-                    -- Use createProcess_ to avoid the log file being closed afterwards
-                    (Just inH, Nothing, Nothing, ph) <- liftIO $ createProcess_ "singleBuild.runTests" cp
-                    liftIO $ hClose inH
-                    ec <- liftIO $ waitForProcess ph
-                    -- Move the .tix file out of the package directory
-                    -- into the hpc work dir, for tidiness.
-                    when needHpc $
-                        moveFileIfExists nameTix hpcDir
-                    return $ case ec of
-                        ExitSuccess -> Map.empty
-                        _ -> Map.singleton testName $ Just ec
-                else do
-                    $logError $ T.concat
-                        [ "Test suite "
-                        , testName
-                        , " executable not found for "
-                        , T.pack $ packageNameString $ packageName package
-                        ]
-                    return $ Map.singleton testName Nothing
-        when needHpc $ do
-            createTree (hpcDir </> dotHpc)
-            exists <- dirExists dotHpcDir
-            when exists $ do
-                copyDirectoryRecursive dotHpcDir (hpcDir </> dotHpc)
-                removeTree dotHpcDir
-            (_,files) <- listDirectory hpcDir
-            let tixes =
-                    filter (isSuffixOf ".tix" . toFilePath . filename) files
-            generateHpcReport pkgDir hpcDir (hpcDir </> dotHpc) tixes
+            errs <- liftM Map.unions $ forM testsToRun $ \testName -> do
+                nameDir <- parseRelDir $ T.unpack testName
+                nameExe <- parseRelFile $ T.unpack testName ++ exeExtension
+                nameTix <- liftM (pkgDir </>) $ parseRelFile $ T.unpack testName ++ ".tix"
+                let exeName = buildDir </> $(mkRelDir "build") </> nameDir </> nameExe
+                exists <- fileExists exeName
+                menv <- liftIO $ configEnvOverride config EnvSettings
+                    { esIncludeLocals = taskLocation task == Local
+                    , esIncludeGhcPackagePath = True
+                    , esStackExe = True
+                    }
+                if exists
+                    then do
+                        -- We clear out the .tix files before doing a run.
+                        when needHpc $ do
+                            tixexists <- fileExists nameTix
+                            when tixexists $
+                                $logWarn ("Removing HPC file " <> T.pack (toFilePath nameTix))
+                            removeFileIfExists nameTix
 
-        bs <- liftIO $
-            case mlogFile of
-                Nothing -> return ""
-                Just (logFile, h) -> do
-                    hClose h
-                    S.readFile $ toFilePath logFile
+                        let args = boptsTestArgs (eeBuildOpts ee)
+                            argsDisplay =
+                                case args of
+                                  [] -> ""
+                                  _ -> ", args: " <> T.intercalate " " (map showProcessArgDebug args)
+                        announce $ "test (suite: " <> testName <> argsDisplay <> ")"
+                        let cp = (proc (toFilePath exeName) args)
+                                { cwd = Just $ toFilePath pkgDir
+                                , Process.env = envHelper menv
+                                , std_in = CreatePipe
+                                , std_out =
+                                    case mlogFile of
+                                        Nothing -> Inherit
+                                        Just (_, h) -> UseHandle h
+                                , std_err =
+                                    case mlogFile of
+                                        Nothing -> Inherit
+                                        Just (_, h) -> UseHandle h
+                                }
 
-        unless (Map.null errs) $ throwM $ TestSuiteFailure
-            (taskProvides task)
-            errs
-            (fmap fst mlogFile)
-            bs
+                        -- Use createProcess_ to avoid the log file being closed afterwards
+                        (Just inH, Nothing, Nothing, ph) <- liftIO $ createProcess_ "singleBuild.runTests" cp
+                        liftIO $ hClose inH
+                        ec <- liftIO $ waitForProcess ph
+                        -- Move the .tix file out of the package directory
+                        -- into the hpc work dir, for tidiness.
+                        when needHpc $
+                            moveFileIfExists nameTix hpcDir
+                        return $ case ec of
+                            ExitSuccess -> Map.empty
+                            _ -> Map.singleton testName $ Just ec
+                    else do
+                        $logError $ T.concat
+                            [ "Test suite "
+                            , testName
+                            , " executable not found for "
+                            , T.pack $ packageNameString $ packageName package
+                            ]
+                        return $ Map.singleton testName Nothing
+            when needHpc $ do
+                createTree (hpcDir </> dotHpc)
+                exists <- dirExists dotHpcDir
+                when exists $ do
+                    copyDirectoryRecursive dotHpcDir (hpcDir </> dotHpc)
+                    removeTree dotHpcDir
+                (_,files) <- listDirectory hpcDir
+                let tixes =
+                        filter (isSuffixOf ".tix" . toFilePath . filename) files
+                generateHpcReport pkgDir hpcDir (hpcDir </> dotHpc) tixes
+
+            bs <- liftIO $
+                case mlogFile of
+                    Nothing -> return ""
+                    Just (logFile, h) -> do
+                        hClose h
+                        S.readFile $ toFilePath logFile
+
+            unless (Map.null errs) $ throwM $ TestSuiteFailure
+                (taskProvides task)
+                errs
+                (fmap fst mlogFile)
+                bs
+
+            setTestSuccess pkgDir
 
 -- | Determine the tests to be run based on the list of components.
 compareTestsComponents :: [Text] -- ^ components
@@ -843,20 +881,25 @@ singleBench :: M env m
             -> Task
             -> m ()
 singleBench ac ee task =
-    withSingleContext ac ee task $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
+    withSingleContext ac ee task $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
         (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (benchmarks)") cabal cabalfp ["--enable-benchmarks"]
+
+        benchBuilt <- checkBenchBuilt pkgDir
 
         let needBuild = neededConfig ||
                 (case taskType task of
                     TTLocal lp -> lpDirtyFiles lp
-                    _ -> assert False True)
-                || True -- FIXME above logic is incorrect, see: https://github.com/commercialhaskell/stack/issues/319
+                    _ -> assert False True) ||
+                not benchBuilt
         when needBuild $ do
             announce "build (benchmarks)"
-            fileModTimes <- getPackageFileModTimes package cabalfp
-            writeBuildCache pkgDir fileModTimes
+            unsetBenchBuilt pkgDir
+            case taskType task of
+                TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
+                TTUpstream _ _ -> assert False $ return ()
             config <- asks getConfig
             cabal (console && configHideTHLoading config) ["build"]
+            setBenchBuilt pkgDir
 
         announce "benchmarks"
         cabal False ["bench"]

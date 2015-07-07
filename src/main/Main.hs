@@ -9,14 +9,12 @@
 
 module Main where
 
-import           Blaze.ByteString.Builder (toLazyByteString, copyByteString)
-import           Blaze.ByteString.Builder.Char.Utf8 (fromShow)
 import           Control.Exception
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask)
-import qualified Data.ByteString.Lazy as L
+import           Data.Attoparsec.Args (withInterpreterArgs)
 import           Data.Char (toLower)
 import           Data.List
 import qualified Data.List as List
@@ -46,6 +44,7 @@ import qualified Stack.Docker as Docker
 import           Stack.Dot
 import           Stack.Exec
 import           Stack.Fetch
+import           Stack.FileWatch
 import           Stack.Init
 import           Stack.New
 import qualified Stack.PackageIndex
@@ -61,13 +60,13 @@ import qualified Stack.Upload as Upload
 import           System.Directory (canonicalizePath)
 import           System.Environment (getArgs, getProgName)
 import           System.Exit
-import           System.FilePath (searchPathSeparator)
+import           System.FilePath (searchPathSeparator,dropTrailingPathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..))
 import           System.Process.Read
 
 -- | Commandline dispatcher.
 main :: IO ()
-main =
+main = withInterpreterArgs stackProgName $ \args isInterpreter ->
   do -- Line buffer the output by default, particularly for non-terminal runs.
      -- See https://github.com/commercialhaskell/stack/pull/360
      hSetBuffering stdout LineBuffering
@@ -77,14 +76,13 @@ main =
        plugins <- findPlugins (T.pack stackProgName)
        tryRunPlugin plugins
      progName <- getProgName
-     args <- getArgs
      isTerminal <- hIsTerminalDevice stdout
      execExtraHelp args
                    dockerHelpOptName
                    (Docker.dockerOptsParser True)
                    ("Only showing --" ++ Docker.dockerCmdName ++ "* options.")
      let versionString' = $(simpleVersion Meta.version)
-     (level,run) <-
+     eGlobalRun <- try $
        simpleOptions
          versionString'
          "stack - The Haskell Tool Stack"
@@ -104,8 +102,13 @@ main =
                          buildOpts Build)
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
-                        (buildCmd DoTests)
-                        (buildOpts Test)
+                        (\(rerun, bopts) -> buildCmd (DoTests rerun) bopts)
+                        ((,)
+                            <$> boolFlags True
+                                "rerun-tests"
+                                "running already successful tests"
+                                idm
+                            <*> (buildOpts Test))
              addCommand "bench"
                         "Build and benchmark the project(s) in this directory/configuration"
                         (buildCmd DoBenchmarks)
@@ -165,7 +168,7 @@ main =
              addCommand "dot"
                         "Visualize your project's dependency graph using Graphviz dot"
                         dotCmd
-                        (pure ())
+                        dotOptsParser
              addCommand "exec"
                         "Execute a command"
                         execCmd
@@ -227,23 +230,30 @@ main =
                    addCommand Docker.dockerCleanupCmdName
                               "Clean up Docker images and containers"
                               dockerCleanupCmd
-                              dockerCleanupOpts
-                   addCommand "exec"
-                              "Execute a command in a Docker container without setting up Haskell environment first"
-                              dockerExecCmd
-                              ((,) <$> strArgument (metavar "[--] CMD")
-                                   <*> many (strArgument (metavar "ARGS"))))
+                              dockerCleanupOpts)
              )
              -- commandsFromPlugins plugins pluginShouldHaveRun) https://github.com/commercialhaskell/stack/issues/322
-     when (globalLogLevel level == LevelDebug) $ putStrLn versionString'
-     run level `catch` \e -> do
-        -- This special handler stops "stack: " from being printed before the
-        -- exception
-        case fromException e of
-            Just ec -> exitWith ec
-            Nothing -> do
-                L.hPut stderr $ toLazyByteString $ fromShow e <> copyByteString "\n"
-                exitFailure
+     case eGlobalRun of
+       Left (exitCode :: ExitCode) -> do
+         when isInterpreter $
+           putStrLn $ concat
+             [ "\nIf you are trying to use "
+             , stackProgName
+             , " as a script interpreter, a\n'-- "
+             , stackProgName
+             , " [options] runghc [options]' comment is required."
+             , "\nSee https://github.com/commercialhaskell/stack/wiki/Script-interpreter" ]
+         throwIO exitCode
+       Right (global,run) -> do
+         when (globalLogLevel global == LevelDebug) $ putStrLn versionString'
+         run global `catch` \e -> do
+            -- This special handler stops "stack: " from being printed before the
+            -- exception
+            case fromException e of
+                Just ec -> exitWith ec
+                Nothing -> do
+                    printExceptionStderr e
+                    exitFailure
   where
     dockerHelpOptName = Docker.dockerCmdName ++ "-help"
 
@@ -324,21 +334,22 @@ data PathInfo = PathInfo
 -- really it's mainly for the documentation aspect.
 --
 -- When printing output we generate @PathInfo@ and pass it to the
--- function to generate an appropriate string.
+-- function to generate an appropriate string.  Trailing slashes are
+-- removed, see #506
 paths :: [(String, Text, PathInfo -> Text)]
 paths =
     [ ( "Global stack root directory"
       , "global-stack-root"
       , \pi ->
-             T.pack (toFilePath (configStackRoot (bcConfig (piBuildConfig pi)))))
+             T.pack (toFilePathNoTrailing (configStackRoot (bcConfig (piBuildConfig pi)))))
     , ( "Project root (derived from stack.yaml file)"
       , "project-root"
       , \pi ->
-             T.pack (toFilePath (bcRoot (piBuildConfig pi))))
+             T.pack (toFilePathNoTrailing (bcRoot (piBuildConfig pi))))
     , ( "Configuration location (where the stack.yaml file is)"
       , "config-location"
       , \pi ->
-             T.pack (toFilePath (bcStackYaml (piBuildConfig pi))))
+             T.pack (toFilePathNoTrailing (bcStackYaml (piBuildConfig pi))))
     , ( "PATH environment variable"
       , "bin-path"
       , \pi ->
@@ -346,11 +357,11 @@ paths =
     , ( "Installed GHCs (unpacked and archives)"
       , "ghc-paths"
       , \pi ->
-             T.pack (toFilePath (configLocalPrograms (bcConfig (piBuildConfig pi)))))
+             T.pack (toFilePathNoTrailing (configLocalPrograms (bcConfig (piBuildConfig pi)))))
     , ( "Local bin path where stack installs executables"
       , "local-bin-path"
       , \pi ->
-             T.pack (toFilePath (configLocalBin (bcConfig (piBuildConfig pi)))))
+             T.pack (toFilePathNoTrailing (configLocalBin (bcConfig (piBuildConfig pi)))))
     , ( "Extra include directories"
       , "extra-include-dirs"
       , \pi ->
@@ -364,23 +375,24 @@ paths =
     , ( "Snapshot package database"
       , "snapshot-pkg-db"
       , \pi ->
-             T.pack (toFilePath (piSnapDb pi)))
+             T.pack (toFilePathNoTrailing (piSnapDb pi)))
     , ( "Local project package database"
       , "local-pkg-db"
       , \pi ->
-             T.pack (toFilePath (piLocalDb pi)))
+             T.pack (toFilePathNoTrailing (piLocalDb pi)))
     , ( "Snapshot installation root"
       , "snapshot-install-root"
       , \pi ->
-             T.pack (toFilePath (piSnapRoot pi)))
+             T.pack (toFilePathNoTrailing (piSnapRoot pi)))
     , ( "Local project installation root"
       , "local-install-root"
       , \pi ->
-             T.pack (toFilePath (piLocalRoot pi)))
+             T.pack (toFilePathNoTrailing (piLocalRoot pi)))
     , ( "Dist work directory"
       , "dist-dir"
       , \pi ->
-             T.pack (toFilePath (piDistDir pi)))]
+             T.pack (toFilePathNoTrailing (piDistDir pi)))]
+  where toFilePathNoTrailing = dropTrailingPathSeparator . toFilePath
 
 data SetupCmdOpts = SetupCmdOpts
     { scoGhcVersion :: !(Maybe Version)
@@ -405,7 +417,7 @@ setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
   runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-      Docker.rerunWithOptionalContainer
+      Docker.reexecWithOptionalContainer
           (lcProjectRoot lc)
           (runStackLoggingT manager globalLogLevel globalTerminal $ do
               (ghc, mstack) <-
@@ -424,6 +436,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                   , soptsForceReinstall = scoForceReinstall
                   , soptsSanityCheck = True
                   , soptsSkipGhcCheck = False
+                  , soptsSkipMsys = configSkipMsys $ lcConfig lc
                   }
               case mpaths of
                   Nothing -> $logInfo "GHC on PATH would be used"
@@ -437,7 +450,7 @@ withConfig :: GlobalOpts
 withConfig go@GlobalOpts{..} inner = do
     (manager, lc) <- loadConfigWithOpts go
     runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-        Docker.rerunWithOptionalContainer (lcProjectRoot lc) $
+        Docker.reexecWithOptionalContainer (lcProjectRoot lc) $
             runStackT manager globalLogLevel (lcConfig lc) globalTerminal
                 inner
 
@@ -448,7 +461,7 @@ withBuildConfig :: GlobalOpts
 withBuildConfig go@GlobalOpts{..} strat inner = do
     (manager, lc) <- loadConfigWithOpts go
     runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-        Docker.rerunWithOptionalContainer (lcProjectRoot lc) $ do
+        Docker.reexecWithOptionalContainer (lcProjectRoot lc) $ do
             bconfig <- runStackLoggingT manager globalLogLevel globalTerminal $
                 lcLoadBuildConfig lc globalResolver strat
             envConfig <-
@@ -496,13 +509,21 @@ readFlag = do
             return $ Map.singleton pn' $ Map.singleton flagN b
         _ -> readerError "Must have a colon"
 
+-- | Helper for build and install commands
+buildCmdHelper :: NoBuildConfigStrategy -> FinalAction -> BuildOpts -> GlobalOpts -> IO ()
+buildCmdHelper strat finalAction opts go
+    | boptsFileWatch opts = fileWatch inner
+    | otherwise = inner $ const $ return ()
+  where
+    inner setLocalFiles =
+        withBuildConfig go strat $
+        Stack.Build.build setLocalFiles opts { boptsFinalAction = finalAction }
+
 -- | Build the project.
 buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
-buildCmd finalAction opts go@GlobalOpts{..} = withBuildConfig go ThrowException $
-    Stack.Build.build opts { boptsFinalAction = finalAction }
+buildCmd = buildCmdHelper ThrowException
 
 -- | Install
-installCmd :: (Maybe FilePath, BuildOpts) -> GlobalOpts -> IO ()
 installCmd (mPath,opts) go@GlobalOpts{..} = do
     specifiedDir <-
         case mPath of
@@ -558,9 +579,15 @@ uploadCmd args go = do
 data ExecOpts = ExecOpts
     { eoCmd :: !String
     , eoArgs :: ![String]
-    , eoEnvSettings :: !EnvSettings
-    , eoPackages :: ![String]
+    , eoExtra :: !ExecOptsExtra
     }
+
+data ExecOptsExtra
+    = ExecOptsPlain
+    | ExecOptsEmbellished
+        { eoEnvSettings :: !EnvSettings
+        , eoPackages :: ![String]
+        }
 
 execOptsParser :: Maybe String -- ^ command
                -> Parser ExecOpts
@@ -568,8 +595,10 @@ execOptsParser mcmd =
     ExecOpts
         <$> maybe eoCmdParser pure mcmd
         <*> eoArgsParser
-        <*> eoEnvSettingsParser
-        <*> eoPackagesParser
+        <*> (eoPlainParser <|>
+             ExecOptsEmbellished
+                <$> eoEnvSettingsParser
+                <*> eoPackagesParser)
   where
     eoCmdParser :: Parser String
     eoCmdParser = strArgument (metavar "CMD")
@@ -592,15 +621,31 @@ execOptsParser mcmd =
     eoPackagesParser :: Parser [String]
     eoPackagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))
 
+    eoPlainParser :: Parser ExecOptsExtra
+    eoPlainParser = flag' ExecOptsPlain
+                          (long "plain" <>
+                           help "Use an unmodified environment (only useful with Docker)")
+
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
-execCmd ExecOpts {..} go = withBuildConfig go ExecStrategy $ do
-    let targets = concatMap words eoPackages
-    unless (null targets) $ do
-        Stack.Build.build defaultBuildOpts
-            { boptsTargets = map T.pack targets
-            }
-    exec eoEnvSettings eoCmd eoArgs
+execCmd ExecOpts {..} go@GlobalOpts{..} =
+    case eoExtra of
+        ExecOptsPlain -> do
+            (manager,lc) <- liftIO $ loadConfigWithOpts go
+            runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
+                Docker.execWithOptionalContainer
+                    (lcProjectRoot lc)
+                    (return (eoCmd, eoArgs, id)) $
+                    runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
+                        exec plainEnvSettings eoCmd eoArgs
+        ExecOptsEmbellished {..} ->
+           withBuildConfig go ExecStrategy $ do
+               let targets = concatMap words eoPackages
+               unless (null targets) $
+                   Stack.Build.build (const $ return ()) defaultBuildOpts
+                       { boptsTargets = map T.pack targets
+                       }
+               exec eoEnvSettings eoCmd eoArgs
 
 -- | Run the REPL in the context of a project.
 replCmd :: ([Text], [String], FilePath, Bool) -> GlobalOpts -> IO ()
@@ -634,15 +679,6 @@ dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
         Docker.preventInContainer $
             Docker.cleanup cleanupOpts
 
--- | Execute a command
-dockerExecCmd :: (String, [String]) -> GlobalOpts -> IO ()
-dockerExecCmd (cmd,args) go@GlobalOpts{..} = do
-    (manager,lc) <- liftIO $ loadConfigWithOpts go
-    runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-        Docker.preventInContainer $
-            Docker.rerunCmdWithRequiredContainer (lcProjectRoot lc)
-                                                 (return (cmd,args,id))
-
 -- | Command sum type for conditional arguments.
 data Command
     = Build
@@ -655,7 +691,8 @@ buildOpts :: Command -> Parser BuildOpts
 buildOpts cmd = fmap process $
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> haddock <*> haddockDeps <*> finalAction <*> dryRun <*> ghcOpts <*>
-            flags <*> installExes <*> preFetch <*> testArgs <*> onlySnapshot <*> coverage
+            flags <*> installExes <*> preFetch <*> testArgs <*> onlySnapshot <*> coverage <*>
+            fileWatch' <*> keepGoing <*> noTests
   where process bopts =
             if boptsCoverage bopts
                then bopts { boptsExeProfile = True
@@ -734,6 +771,21 @@ buildOpts cmd = fmap process $
                         (long "coverage" <>
                          help "Generate a code coverage report")
                else pure False
+        noTests =
+            if cmd == Test
+               then flag False True
+                        (long "no-run-tests" <>
+                         help "Disable running of tests. (Tests will still be built.)")
+               else pure False
+
+        fileWatch' = flag False True
+            (long "file-watch" <>
+             help "Watch for changes in local files and automatically rebuild")
+
+        keepGoing = maybeBoolFlags
+            "keep-going"
+            "continue running after a step fails (default: false for build, true for test/bench)"
+            idm
 
 -- | Parser for docker cleanup arguments.
 dockerCleanupOpts :: Parser Docker.CleanupOpts
@@ -887,5 +939,5 @@ solverOptsParser = boolFlags False
     idm
 
 -- | Visualize dependencies
-dotCmd :: () -> GlobalOpts -> IO ()
-dotCmd () go = withBuildConfig go ThrowException dot
+dotCmd :: DotOpts -> GlobalOpts -> IO ()
+dotCmd dotOpts go = withBuildConfig go ThrowException (dot dotOpts)

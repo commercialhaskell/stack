@@ -87,6 +87,8 @@ data Config =
          -- version is available? Can be overridden by command line options.
          ,configSkipGHCCheck        :: !Bool
          -- ^ Don't bother checking the GHC version or architecture.
+         ,configSkipMsys            :: !Bool
+         -- ^ On Windows: don't use a locally installed MSYS
          ,configLocalBin            :: !(Path Abs Dir)
          -- ^ Directory we should install executables into
          ,configRequireStackVersion :: !VersionRange
@@ -99,6 +101,8 @@ data Config =
          -- ^ --extra-lib-dirs arguments
          ,configConfigMonoid        :: !ConfigMonoid
          -- ^ @ConfigMonoid@ used to generate this
+         ,configConcurrentTests     :: !Bool
+         -- ^ Run test suites concurrently
          }
 
 -- | Information on a single package index
@@ -416,6 +420,8 @@ data ConfigMonoid =
     -- ^ See: 'configInstallGHC'
     ,configMonoidSkipGHCCheck        :: !(Maybe Bool)
     -- ^ See: 'configSkipGHCCheck'
+    ,configMonoidSkipMsys            :: !(Maybe Bool)
+    -- ^ See: 'configSkipMsys'
     ,configMonoidRequireStackVersion :: !VersionRange
     -- ^ See: 'configRequireStackVersion'
     ,configMonoidOS                  :: !(Maybe String)
@@ -428,6 +434,8 @@ data ConfigMonoid =
     -- ^ See: 'configExtraIncludeDirs'
     ,configMonoidExtraLibDirs        :: !(Set Text)
     -- ^ See: 'configExtraLibDirs'
+    ,configMonoidConcurrentTests     :: !(Maybe Bool)
+    -- ^ See: 'configConcurrentTests'
     }
   deriving Show
 
@@ -441,12 +449,14 @@ instance Monoid ConfigMonoid where
     , configMonoidSystemGHC = Nothing
     , configMonoidInstallGHC = Nothing
     , configMonoidSkipGHCCheck = Nothing
+    , configMonoidSkipMsys = Nothing
     , configMonoidRequireStackVersion = anyVersion
     , configMonoidOS = Nothing
     , configMonoidArch = Nothing
     , configMonoidJobs = Nothing
     , configMonoidExtraIncludeDirs = Set.empty
     , configMonoidExtraLibDirs = Set.empty
+    , configMonoidConcurrentTests = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -457,6 +467,7 @@ instance Monoid ConfigMonoid where
     , configMonoidSystemGHC = configMonoidSystemGHC l <|> configMonoidSystemGHC r
     , configMonoidInstallGHC = configMonoidInstallGHC l <|> configMonoidInstallGHC r
     , configMonoidSkipGHCCheck = configMonoidSkipGHCCheck l <|> configMonoidSkipGHCCheck r
+    , configMonoidSkipMsys = configMonoidSkipMsys l <|> configMonoidSkipMsys r
     , configMonoidRequireStackVersion = intersectVersionRanges (configMonoidRequireStackVersion l)
                                                                (configMonoidRequireStackVersion r)
     , configMonoidOS = configMonoidOS l <|> configMonoidOS r
@@ -464,6 +475,7 @@ instance Monoid ConfigMonoid where
     , configMonoidJobs = configMonoidJobs l <|> configMonoidJobs r
     , configMonoidExtraIncludeDirs = Set.union (configMonoidExtraIncludeDirs l) (configMonoidExtraIncludeDirs r)
     , configMonoidExtraLibDirs = Set.union (configMonoidExtraLibDirs l) (configMonoidExtraLibDirs r)
+    , configMonoidConcurrentTests = configMonoidConcurrentTests l <|> configMonoidConcurrentTests r
     }
 
 instance FromJSON ConfigMonoid where
@@ -478,6 +490,7 @@ instance FromJSON ConfigMonoid where
          configMonoidSystemGHC <- obj .:? "system-ghc"
          configMonoidInstallGHC <- obj .:? "install-ghc"
          configMonoidSkipGHCCheck <- obj .:? "skip-ghc-check"
+         configMonoidSkipMsys <- obj .:? "skip-msys"
          configMonoidRequireStackVersion <- unVersionRangeJSON <$>
                                             obj .:? "require-stack-version"
                                                 .!= VersionRangeJSON anyVersion
@@ -486,6 +499,7 @@ instance FromJSON ConfigMonoid where
          configMonoidJobs <- obj .:? "jobs"
          configMonoidExtraIncludeDirs <- obj .:? "extra-include-dirs" .!= Set.empty
          configMonoidExtraLibDirs <- obj .:? "extra-lib-dirs" .!= Set.empty
+         configMonoidConcurrentTests <- obj .:? "concurrent-tests"
          return ConfigMonoid {..}
 
 -- | Newtype for non-orphan FromJSON instance.

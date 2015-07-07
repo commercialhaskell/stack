@@ -31,7 +31,8 @@ module Stack.Build.Types
     ,ConstructPlanException(..)
     ,configureOpts
     ,BadDependency(..)
-    ,wantedLocalPackages)
+    ,wantedLocalPackages
+    ,FileCacheInfo (..))
     where
 
 import           Control.DeepSeq
@@ -55,6 +56,7 @@ import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 import           Data.Time.Calendar
 import           Data.Time.Clock
+import           Data.Word (Word64)
 import           Distribution.System (Arch)
 import           Distribution.Text (display)
 import           GHC.Generics
@@ -186,7 +188,7 @@ instance Show StackBuildException where
              getExtras (DependencyPlanFailures _ m) =
                 Map.unions $ map go $ Map.toList m
               where
-                go (name, (_range, NotInBuildPlan (Just version))) =
+                go (name, (_range, Just version, NotInBuildPlan)) =
                     Map.singleton name version
                 go _ = Map.empty
      -- Supressing duplicate output
@@ -211,15 +213,17 @@ instance Exception StackBuildException
 
 data ConstructPlanException
     = DependencyCycleDetected [PackageName]
-    | DependencyPlanFailures PackageIdentifier (Map PackageName (VersionRange, BadDependency))
+    | DependencyPlanFailures PackageIdentifier (Map PackageName (VersionRange, LatestVersion, BadDependency))
     | UnknownPackage PackageName -- TODO perhaps this constructor will be removed, and BadDependency will handle it all
     -- ^ Recommend adding to extra-deps, give a helpful version number?
     deriving (Typeable, Eq)
 
+-- | For display purposes only, Nothing if package not found
+type LatestVersion = Maybe Version
+
 -- | Reason why a dependency was not used
 data BadDependency
     = NotInBuildPlan
-        (Maybe Version) -- recommended version, for extra-deps output
     | Couldn'tResolveItsDependencies
     | DependencyMismatch Version
     deriving (Typeable, Eq)
@@ -242,16 +246,17 @@ instance Show ConstructPlanException where
       indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
       doubleIndent = indent . indent
       appendDeps = foldr (\dep-> (++) ("\n" ++ showDep dep)) ""
-      showDep (name, (range, badDep)) = concat
+      showDep (name, (range, mlatest, badDep)) = concat
         [ show name
         , ": needed ("
         , display range
-        , "), but "
+        , ")"
+        , case mlatest of
+            Nothing -> ""
+            Just latest -> ", latest is " ++ versionString latest
+        , ", but "
         , case badDep of
-            NotInBuildPlan mlatest -> "not present in build plan" ++
-                (case mlatest of
-                    Nothing -> ""
-                    Just latest -> ", latest is " ++ versionString latest)
+            NotInBuildPlan -> "not present in build plan"
             Couldn'tResolveItsDependencies -> "couldn't resolve its dependencies"
             DependencyMismatch version -> versionString version ++ " found"
         ]
@@ -294,6 +299,12 @@ data BuildOpts =
             ,boptsCoverage :: !Bool
             -- ^ Enable code coverage report generation for test
             -- suites.
+            ,boptsFileWatch :: !Bool
+            -- ^ Watch files for changes and automatically rebuild
+            ,boptsKeepGoing :: !(Maybe Bool)
+            -- ^ Keep building/running after failure
+            ,boptsNoTests :: !Bool
+            -- ^ If set, don't run the tests
             }
   deriving (Show)
 
@@ -314,14 +325,18 @@ defaultBuildOpts = BuildOpts
     , boptsTestArgs = []
     , boptsOnlySnapshot = False
     , boptsCoverage = False
+    , boptsFileWatch = False
+    , boptsKeepGoing = Nothing
+    , boptsNoTests = False
     }
 
 -- | Run a Setup.hs action after building a package, before installing.
 data FinalAction
   = DoTests
+      Bool -- rerun tests which already passed?
   | DoBenchmarks
   | DoNothing
-  deriving (Eq,Bounded,Enum,Show)
+  deriving (Eq,Show)
 
 -- | Package dependency oracle.
 newtype PkgDepsOracle =
@@ -351,6 +366,8 @@ data LocalPackage = LocalPackage
     , lpDir            :: !(Path Abs Dir)  -- ^ Directory of the package.
     , lpCabalFile      :: !(Path Abs File) -- ^ The .cabal file
     , lpDirtyFiles     :: !Bool            -- ^ are there files that have changed since the last build?
+    , lpNewBuildCache  :: !(Map FilePath FileCacheInfo) -- ^ current state of the files
+    , lpFiles          :: !(Set (Path Abs File)) -- ^ all files used by this package
     , lpComponents     :: !(Set Text)      -- ^ components to build, passed directly to Setup.hs build
     }
     deriving Show
@@ -535,3 +552,11 @@ modTime x =
 
 data Installed = Library GhcPkgId | Executable PackageIdentifier
     deriving (Show, Eq, Ord)
+
+data FileCacheInfo = FileCacheInfo
+    { fciModTime :: !ModTime
+    , fciSize :: !Word64
+    , fciHash :: !S.ByteString
+    }
+    deriving (Generic, Show)
+instance Binary FileCacheInfo

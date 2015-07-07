@@ -340,16 +340,16 @@ addPackageDeps package = do
     deps' <- packageDepsWithTools package
     deps <- forM (Map.toList deps') $ \(depname, range) -> do
         eres <- addDep depname
+        let mlatest = Map.lookup depname $ latestVersions ctx
         case eres of
             Left e ->
                 let bd =
                         case e of
-                            UnknownPackage name ->
-                                NotInBuildPlan $ Map.lookup name $ latestVersions ctx
+                            UnknownPackage name -> assert (name == depname) NotInBuildPlan
                             _ -> Couldn'tResolveItsDependencies
-                 in return $ Left (depname, (range, bd))
+                 in return $ Left (depname, (range, mlatest, bd))
             Right adr | not $ adrVersion adr `withinRange` range ->
-                return $ Left (depname, (range, DependencyMismatch $ adrVersion adr))
+                return $ Left (depname, (range, mlatest, DependencyMismatch $ adrVersion adr))
             Right (ADRToInstall task) -> return $ Right
                 (Set.singleton $ taskProvides task, Set.empty, taskLocation task)
             Right (ADRFound loc _ (Executable _)) -> return $ Right

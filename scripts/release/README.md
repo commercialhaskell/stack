@@ -21,7 +21,7 @@ To create a signed binary, you need:
 
 - GPG installed and in the PATH (included with
   [msysgit](https://msysgit.github.io) on Windows)
-- Private key installed in GPG.
+- Your private key in GPG keyring.
 
 To upload a binary to a Github release, you also need:
 
@@ -32,32 +32,41 @@ To upload a binary to a Github release, you also need:
   (probably as a draft) with a tag for the stack package's version (e.g.
   `vX.Y.Z`).
 
-Build
------
+To create and upload Debian/Ubuntu packages, you need:
 
-Build and install the release tool using:
-```
-(cd etc/release-tool && stack install)
-```
+- Docker installed.
+- deb-s3 installed (`sudo gem install deb-s3`).
+- `dev@fpcomplete.com` secret key in GPG keyring.
+- Set `AWS_SECRET_ACCESS_KEY` and `AWS_ACCESS_KEY_ID` environment variables with
+  credentials that allow uploading to download.fpcomplete.com S3 bucket.
+
+To create and upload Red Hat/CentOS packages, you need:
+
+- Docker installed.
+- rpm-s3 installed (see https://github.com/crohr/rpm-s3).
+- `dev@fpcomplete.com` secret key in GPG keyring.
+- Set `AWS_SECRET_ACCESS_KEY` and `AWS_ACCESS_KEY_ID` environment variables with
+  credentials that allow uploading to download.fpcomplete.com S3 bucket.
 
 Invocation
 ----------
 
-Usage: `stack-release-tool [OPTIONS] TARGET`
+Usage: `scripts/release/release.hs [OPTIONS] TARGET`
 
 The tool must be run in the root of the working tree.
 
 ### Options
 
-stack-release-tool is shake-based, so all standard shake options apply. In
+The release tool is shake-based, so all standard shake options apply. In
 addition, the following options are accepted:
 
-* `--gpg-key`: use a non-default GPG key to sign the binaries.
-  dirty, but this will allow it to continue.
-  uploaded to.
+* `--gpg-key`: override GPG key used to sign the distribution packages. By
+  default the `dev@fpcomplete.com` key is used.
 * `--github-auth-token`: override the Github authorization token.
 * `--github-release-tag`: overrides the Github Release tag that binaries are
 * `--allow-dirty`: by default, the `check` rule aborts if the working tree is
+  dirty, but this will allow it to continue.
+  uploaded to.
 
 ### Targets
 
@@ -65,3 +74,11 @@ addition, the following options are accepted:
 * `check`: run pre-release checks.
 * `build`: build and sign the binary distribution.
 * `upload`: upload the binary distribution to the Github release.
+* `ubuntu-packages`: build Ubuntu .deb packages.
+* `ubuntu-upload`: upload Ubuntu .deb packages to private package repository.
+* `debian-packages`: build Debian .deb packages.
+* `debian-upload`: upload Debian .deb packages to private package repository.
+* `centos-packages`: build CentOS .rpm packages.
+* `centos-upload`: upload CentOS .rpm packages to private package repository.
+* `fedora-packages`: build Fedora .rpm packages.
+* `fedora-upload`: upload Fedora .rpm packages to private package repository.

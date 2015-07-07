@@ -1,6 +1,7 @@
 ## The Haskell Tool Stack
 
 [![Build Status](https://travis-ci.org/commercialhaskell/stack.svg?branch=master)](https://travis-ci.org/commercialhaskell/stack)
+![Release](https://img.shields.io/github/release/commercialhaskell/stack.svg)
 
 `stack` is a cross-platform program for developing Haskell
 projects. It is aimed at Haskellers both new and experienced.
@@ -22,6 +23,9 @@ Downloads are available by operating system:
 * [Windows](https://github.com/commercialhaskell/stack/wiki/Downloads#windows)
 * [OS X](https://github.com/commercialhaskell/stack/wiki/Downloads#os-x)
 * [Ubuntu](https://github.com/commercialhaskell/stack/wiki/Downloads#ubuntu)
+* [Debian](https://github.com/commercialhaskell/stack/wiki/Downloads#debian)
+* [CentOS / Red Hat](https://github.com/commercialhaskell/stack/wiki/Downloads#centos--red-hat)
+* [Fedora](https://github.com/commercialhaskell/stack/wiki/Downloads#fedora)
 * [Arch Linux](https://github.com/commercialhaskell/stack/wiki/Downloads#arch-linux)
 * [Linux (general)](https://github.com/commercialhaskell/stack/wiki/Downloads#linux)
 

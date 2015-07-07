@@ -1,10 +1,28 @@
 ## Unreleased
 
-* Add --ignore-subdirs flag to init command [#435](https://github.com/commercialhaskell/stack/pull/435)
+* Set the `HASKELL_DIST_DIR` environment variable [#524](https://github.com/commercialhaskell/stack/pull/524)
+* Track build status of tests and benchmarks [#525](https://github.com/commercialhaskell/stack/issues/525)
+
+## 0.1.2.0
+
+* Add `--prune` flag to `stack dot` [#487](https://github.com/commercialhaskell/stack/issues/487)
+* Add `--[no-]external`,`--[no-]include-base` flags to `stack dot` [#437](https://github.com/commercialhaskell/stack/issues/437)
+* Add `--ignore-subdirs` flag to init command [#435](https://github.com/commercialhaskell/stack/pull/435)
 * Handle attempt to use non-existing resolver [#436](https://github.com/commercialhaskell/stack/pull/436)
 * Add `--force` flag to `init` command
 * exec style commands accept the `--package` option (see [Reddit discussion](http://www.reddit.com/r/haskell/comments/3bd66h/stack_runghc_turtle_as_haskell_script_solution/))
 * `stack upload` without arguments doesn't do anything [#439](https://github.com/commercialhaskell/stack/issues/439)
+* Print latest version of packages on conflicts [#450](https://github.com/commercialhaskell/stack/issues/450)
+* Flag to avoid rerunning tests that haven't changed [#451](https://github.com/commercialhaskell/stack/issues/451)
+* stack can act as a script interpreter (see [Script interpreter] (https://github.com/commercialhaskell/stack/wiki/Script-interpreter) and [Reddit discussion](http://www.reddit.com/r/haskell/comments/3bd66h/stack_runghc_turtle_as_haskell_script_solution/))
+* Add the __`--file-watch`__ flag to auto-rebuild on file changes [#113](https://github.com/commercialhaskell/stack/issues/113)
+* Rename `stack docker exec` to `stack exec --plain`
+* Add the `--skip-msys` flag [#377](https://github.com/commercialhaskell/stack/issues/377)
+* `--keep-going`, turned on by default for tests and benchmarks [#478](https://github.com/commercialhaskell/stack/issues/478)
+* `concurrent-tests: BOOL` [#492](https://github.com/commercialhaskell/stack/issues/492)
+* Use hashes to check file dirtiness [#502](https://github.com/commercialhaskell/stack/issues/502)
+* Install correct GHC build on systems with libgmp.so.3 [#465](https://github.com/commercialhaskell/stack/issues/465)
+* `stack upgrade` checks version before upgrading [#447](https://github.com/commercialhaskell/stack/issues/447)
 
 ## 0.1.1.0
 

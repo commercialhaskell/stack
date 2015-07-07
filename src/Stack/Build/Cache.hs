@@ -7,7 +7,6 @@ module Stack.Build.Cache
     ( tryGetBuildCache
     , tryGetConfigCache
     , tryGetCabalMod
-    , getPackageFileModTimes
     , getInstalledExes
     , buildCacheTimes
     , tryGetFlagCache
@@ -18,11 +17,19 @@ module Stack.Build.Cache
     , writeBuildCache
     , writeConfigCache
     , writeCabalMod
+    , setTestSuccess
+    , unsetTestSuccess
+    , checkTestSuccess
+    , setTestBuilt
+    , unsetTestBuilt
+    , checkTestBuilt
+    , setBenchBuilt
+    , unsetBenchBuilt
+    , checkBenchBuilt
     ) where
 
 import           Control.Exception.Enclosed (catchIO, handleIO, tryIO)
-import           Control.Monad.Catch        (MonadCatch, MonadThrow, catch,
-                                             throwM)
+import           Control.Monad.Catch        (MonadThrow, catch, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader
@@ -31,19 +38,15 @@ import qualified Data.Binary as Binary
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import           Data.Map (Map)
-import qualified Data.Map as Map
-import           Data.Maybe (catMaybes, mapMaybe)
-import qualified Data.Set as Set
+import           Data.Maybe (fromMaybe, mapMaybe)
 import           GHC.Generics (Generic)
 import           Path
 import           Path.IO
 import           Stack.Build.Types
 import           Stack.Constants
-import           Stack.Package
 import           Stack.Types
 import           System.Directory           (createDirectoryIfMissing,
                                              getDirectoryContents,
-                                             getModificationTime,
                                              removeFile)
 import           System.IO.Error (isDoesNotExistError)
 
@@ -86,16 +89,16 @@ markExeNotInstalled loc ident = do
 -- | Stored on disk to know whether the flags have changed or any
 -- files have changed.
 data BuildCache = BuildCache
-    { buildCacheTimes :: !(Map FilePath ModTime)
+    { buildCacheTimes :: !(Map FilePath FileCacheInfo)
       -- ^ Modification times of files.
     }
-    deriving (Generic,Eq)
+    deriving (Generic)
 instance Binary BuildCache
 
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
-                 => Path Abs Dir -> m (Maybe BuildCache)
-tryGetBuildCache = tryGetCache buildCacheFile
+                 => Path Abs Dir -> m (Maybe (Map FilePath FileCacheInfo))
+tryGetBuildCache = liftM (fmap buildCacheTimes) . tryGetCache buildCacheFile
 
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
@@ -126,7 +129,7 @@ tryGetCache get' dir = do
 
 -- | Write the dirtiness cache for this package's files.
 writeBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
-                => Path Abs Dir -> Map FilePath ModTime -> m ()
+                => Path Abs Dir -> Map FilePath FileCacheInfo -> m ()
 writeBuildCache dir times =
     writeCache
         dir
@@ -206,25 +209,89 @@ writeFlagCache gid cache = do
 
         Binary.encodeFile (toFilePath file) cache
 
--- | Get the modified times of all known files in the package,
--- including the package's cabal file itself.
-getPackageFileModTimes :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m)
-                       => Package
-                       -> Path Abs File -- ^ cabal file
-                       -> m (Map FilePath ModTime)
-getPackageFileModTimes pkg cabalfp = do
-    files <- getPackageFiles (packageFiles pkg) AllFiles cabalfp
-    liftM (Map.fromList . catMaybes)
-        $ mapM getModTimeMaybe
-        $ Set.toList files
-  where
-    getModTimeMaybe fp =
-        liftIO
-            (catch
-                 (liftM
-                      (Just . (toFilePath fp,) . modTime)
-                      (getModificationTime (toFilePath fp)))
-                 (\e ->
-                       if isDoesNotExistError e
-                           then return Nothing
-                           else throwM e))
+-- | Mark a test suite as having succeeded
+setTestSuccess :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
+               => Path Abs Dir
+               -> m ()
+setTestSuccess dir =
+    writeCache
+        dir
+        testSuccessFile
+        True
+
+-- | Mark a test suite as not having succeeded
+unsetTestSuccess :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
+                 => Path Abs Dir
+                 -> m ()
+unsetTestSuccess dir =
+    writeCache
+        dir
+        testSuccessFile
+        False
+
+-- | Check if the test suite already passed
+checkTestSuccess :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
+                 => Path Abs Dir
+                 -> m Bool
+checkTestSuccess dir =
+    liftM
+        (fromMaybe False)
+        (tryGetCache testSuccessFile dir)
+
+-- | Mark a test suite as having built
+setTestBuilt :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
+               => Path Abs Dir
+               -> m ()
+setTestBuilt dir =
+    writeCache
+        dir
+        testBuiltFile
+        True
+
+-- | Mark a test suite as not having built
+unsetTestBuilt :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
+                 => Path Abs Dir
+                 -> m ()
+unsetTestBuilt dir =
+    writeCache
+        dir
+        testBuiltFile
+        False
+
+-- | Check if the test suite already built
+checkTestBuilt :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
+                 => Path Abs Dir
+                 -> m Bool
+checkTestBuilt dir =
+    liftM
+        (fromMaybe False)
+        (tryGetCache testBuiltFile dir)
+
+-- | Mark a bench suite as having built
+setBenchBuilt :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
+               => Path Abs Dir
+               -> m ()
+setBenchBuilt dir =
+    writeCache
+        dir
+        benchBuiltFile
+        True
+
+-- | Mark a bench suite as not having built
+unsetBenchBuilt :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
+                 => Path Abs Dir
+                 -> m ()
+unsetBenchBuilt dir =
+    writeCache
+        dir
+        benchBuiltFile
+        False
+
+-- | Check if the bench suite already built
+checkBenchBuilt :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
+                 => Path Abs Dir
+                 -> m Bool
+checkBenchBuilt dir =
+    liftM
+        (fromMaybe False)
+        (tryGetCache benchBuiltFile dir)
