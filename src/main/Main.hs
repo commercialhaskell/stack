@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -fdefer-type-errors #-}
 
 -- | Main stack tool entry point.
 
@@ -96,7 +97,10 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
              addCommand "install"
                         "Build executables and install to a user path"
                         installCmd
-                        (buildOpts Build)
+                        ((,) <$> (optional (strOption (long "path" <> 
+                                                        metavar "DIRECTORY" <> 
+                                                        help "Write binaries to DIRECTORY"))) <*>
+                         buildOpts Build)
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
                         (\(rerun, bopts) -> buildCmd (DoTests rerun) bopts)
@@ -521,8 +525,27 @@ buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
 buildCmd = buildCmdHelper ThrowException
 
 -- | Install
-installCmd :: BuildOpts -> GlobalOpts -> IO ()
-installCmd opts = buildCmdHelper ExecStrategy DoNothing opts { boptsInstallExes = True }
+installCmd :: (Maybe String, BuildOpts) -> GlobalOpts -> IO ()
+installCmd (mPath,opts) go@GlobalOpts{..} = do
+    specifiedDir <-
+        case mPath of
+            (Just userPath) -> do
+                canonPath <- liftIO $ canonicalizePath userPath
+                tryParseAbs <-
+                    try (parseAbsDir canonPath)
+                case (tryParseAbs) of
+                    Left (_ :: SomeException) ->
+                        error $ "Could not parse user specified directory \"" ++
+                                userPath ++ "\""
+                    Right absPath ->
+                        return (Just absPath)
+            Nothing ->
+                return Nothing
+    let opts' = opts { boptsInstallExes = maybe DefaultInstall InstallDir specifiedDir }
+    buildCmdHelper ExecStrategy DoNothing opts' go
+    -- (manager,lc) <- liftIO $ loadConfigWithOpts go
+    -- runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
+    --     Docker.preventInContainer Docker.pull
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
@@ -706,7 +729,7 @@ buildOpts cmd = fmap process $
                             idm
              else pure Nothing
         finalAction = pure DoNothing
-        installExes = pure False
+        installExes = pure NoInstall
         dryRun = flag False True (long "dry-run" <>
                                   help "Don't build anything, just prepare to")
         ghcOpts = (++)
@@ -871,6 +894,7 @@ data GlobalOpts = GlobalOpts
     , globalResolver     :: Maybe Resolver -- ^ Resolver override
     , globalTerminal     :: Bool -- ^ We're in a terminal?
     , globalStackYaml    :: Maybe FilePath -- ^ Override project stack.yaml
+    , globalUserBinPath  :: Maybe (Path Abs Dir)
     } deriving (Show)
 
 -- | Load the configuration with a manager. Convenience function used

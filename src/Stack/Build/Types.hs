@@ -20,6 +20,8 @@ module Stack.Build.Types
     ,LocalPackage(..)
     ,BaseConfigOpts(..)
     ,Plan(..)
+    ,InstallExesPlan(..)
+    ,InstallDest(..)
     ,FinalAction(..)
     ,BuildOpts(..)
     ,defaultBuildOpts
@@ -285,7 +287,7 @@ data BuildOpts =
             ,boptsDryrun :: !Bool
             ,boptsGhcOptions :: ![Text]
             ,boptsFlags :: !(Map (Maybe PackageName) (Map FlagName Bool))
-            ,boptsInstallExes :: !Bool
+            ,boptsInstallExes :: InstallDest
             -- ^ Install executables to user path after building?
             ,boptsPreFetch :: !Bool
             -- ^ Fetch all packages immediately
@@ -318,7 +320,7 @@ defaultBuildOpts = BuildOpts
     , boptsDryrun = False
     , boptsGhcOptions = []
     , boptsFlags = Map.empty
-    , boptsInstallExes = False
+    , boptsInstallExes = NoInstall
     , boptsPreFetch = False
     , boptsTestArgs = []
     , boptsOnlySnapshot = False
@@ -427,9 +429,22 @@ data Plan = Plan
     -- ^ Final actions to be taken (test, benchmark, etc)
     , planUnregisterLocal :: !(Map GhcPkgId Text)
     -- ^ Text is reason we're unregistering, for display only
-    , planInstallExes :: !(Map Text InstallLocation)
+    , planInstallExes :: !InstallExesPlan
     -- ^ Executables that should be installed after successful building
     }
+    deriving Show
+
+data InstallExesPlan = InstallExesPlan
+    { installExesPlanFlag :: !Bool
+      -- ^ Install executables if True
+    , installExesPlanDestDir :: !(Maybe (Path Abs Dir))
+      -- ^ custom destination directory
+    , installExesNamesLoc :: !(Map Text InstallLocation)
+      -- ^ Map exename bindir. Default Map.Empty for configLocalBin
+    }
+    deriving Show
+
+data InstallDest = NoInstall | DefaultInstall | InstallDir (Path Abs Dir)
     deriving Show
 
 -- | Basic information used to calculate what the configure options are

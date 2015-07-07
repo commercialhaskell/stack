@@ -149,9 +149,13 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
                 , planFinals = M.fromList finals
                 , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason locallyRegistered
                 , planInstallExes =
-                    if boptsInstallExes $ bcoBuildOpts baseConfigOpts0
-                        then installExes
-                        else Map.empty
+                    let installExesPlan = 
+                            boptsInstallExes $ bcoBuildOpts baseConfigOpts0
+                        in case installExesPlan of
+                           NoInstall -> InstallExesPlan False Nothing Map.empty
+                           DefaultInstall -> InstallExesPlan True Nothing installExes
+                           InstallDir (userDir) -> InstallExesPlan True (Just userDir) installExes
+
                 }
         else throwM $ ConstructPlanExceptions errs (bcStackYaml $ getBuildConfig econfig)
   where
@@ -467,7 +471,11 @@ stripLocals plan = plan
     { planTasks = Map.filter checkTask $ planTasks plan
     , planFinals = Map.empty
     , planUnregisterLocal = Map.empty
-    , planInstallExes = Map.filter (/= Local) $ planInstallExes plan
+    , planInstallExes = 
+          (\install -> 
+               install {installExesNamesLoc = Map.filter (/= Local) $ 
+                                              installExesNamesLoc install}) 
+          $ planInstallExes plan
     }
   where
     checkTask task =

@@ -86,5 +86,18 @@ upgrade fromGit mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> d
         envConfig1 <- runStackT manager logLevel bconfig terminal setupEnv
         runStackT manager logLevel envConfig1 terminal $ build (const $ return ()) defaultBuildOpts
             { boptsTargets = ["stack"]
-            , boptsInstallExes = True
+            , boptsLibProfile = False
+            , boptsExeProfile = False
+            , boptsEnableOptimizations = Nothing
+            , boptsHaddock = False
+            , boptsHaddockDeps = Nothing
+            , boptsFinalAction = DoNothing
+            , boptsDryrun = False
+            , boptsGhcOptions = []
+            , boptsFlags = Map.empty
+            , boptsInstallExes = DefaultInstall
+            , boptsPreFetch = False
+            , boptsTestArgs = []
+            , boptsOnlySnapshot = False
+            , boptsCoverage = False
             }
