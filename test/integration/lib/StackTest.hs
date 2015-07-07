@@ -7,7 +7,6 @@ import System.Directory
 import System.IO
 import System.Process
 import System.Exit
-import System.Environment
 
 run' :: FilePath -> [String] -> IO ExitCode
 run' cmd args = do
@@ -44,11 +43,26 @@ stackErr args = do
 doesNotExist :: FilePath -> IO ()
 doesNotExist fp = do
     putStrLn $ "doesNotExist " ++ fp
+    exists <- doesFileOrDirExist fp
+    case exists of
+      (Right msg) -> error msg
+      (Left _) -> return ()
+
+doesExist :: FilePath -> IO ()
+doesExist fp = do
+    putStrLn $ "doesExist " ++ fp
+    exists <- doesFileOrDirExist fp
+    case exists of
+      (Right msg) -> return ()
+      (Left _) -> error "No file or directory exists"
+
+doesFileOrDirExist :: FilePath -> IO (Either () String) 
+doesFileOrDirExist fp = do
     isFile <- doesFileExist fp
     if isFile
-        then error $ "File exists: " ++ fp
+        then return (Right ("File exists: " ++ fp))
         else do
             isDir <- doesDirectoryExist fp
             if isDir
-                then error $ "Directory exists: " ++ fp
-                else return ()
+                then return (Right ("Directory exists: " ++ fp))
+                else return (Left ())

@@ -146,9 +146,17 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
                 return $ progsDir </> $(mkRelDir stackProgName) </> platform
             _ -> return $ configStackRoot </> $(mkRelDir "programs") </> platform
 
-     configLocalBin <- do
-        localDir <- liftIO (getAppUserDataDirectory "local") >>= parseAbsDir
-        return $ localDir </> $(mkRelDir "bin")
+     configLocalBin <- case configMonoidLocalBin of
+       Nothing -> do
+           localDir <- liftIO (getAppUserDataDirectory "local") >>= parseAbsDir
+           return $ localDir </> $(mkRelDir "bin")
+       Just userPath -> do
+           tryPath <- try (liftIO $ canonicalizePath userPath >>= parseAbsDir)
+           case tryPath of
+               Left (_ :: SomeException) ->
+                   error $ "Could not locate user specified directory \"" ++
+                      userPath ++ "\""
+               Right absPath -> return absPath
 
      configJobs <-
         case configMonoidJobs of
@@ -161,7 +169,7 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser docker =
-    (\opts systemGHC installGHC arch os jobs includes libs skipGHCCheck skipMsys -> mempty
+    (\opts systemGHC installGHC arch os jobs includes libs skipGHCCheck skipMsys localBin -> mempty
         { configMonoidDockerOpts = opts
         , configMonoidSystemGHC = systemGHC
         , configMonoidInstallGHC = installGHC
@@ -172,6 +180,7 @@ configOptsParser docker =
         , configMonoidExtraIncludeDirs = includes
         , configMonoidExtraLibDirs = libs
         , configMonoidSkipMsys = skipMsys
+        , configMonoidLocalBin = localBin
         })
     <$> Docker.dockerOptsParser docker
     <*> maybeBoolFlags
@@ -216,6 +225,12 @@ configOptsParser docker =
             "skip-msys"
             "skipping the local MSYS installation (Windows only)"
             idm
+    <*> optional (strOption
+             ( long "local-bin-path"
+             <> short 'p'
+             <> metavar "DIR"
+             <> help "Install binaries to DIR"
+              )) 
 
 -- | Get the directory on Windows where we should install extra programs. For
 -- more information, see discussion at:
