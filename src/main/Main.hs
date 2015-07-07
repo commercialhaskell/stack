@@ -99,17 +99,18 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                         (buildOpts Build)
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
-                        (\(rerun, bopts) -> buildCmd (DoTests rerun) bopts)
-                        ((,)
-                            <$> boolFlags True
-                                "rerun-tests"
-                                "running already successful tests"
-                                idm
-                            <*> (buildOpts Test))
+                        (\(topts, bopts) ->
+                             let bopts' = if toCoverage topts
+                                             then bopts { boptsExeProfile = True
+                                                        , boptsLibProfile = True
+                                                        , boptsGhcOptions = "-fhpc" : boptsGhcOptions bopts}
+                                             else bopts
+                             in buildCmd (DoTests topts) bopts')
+                        ((,) <$> testOpts <*> buildOpts Test)
              addCommand "bench"
                         "Build and benchmark the project(s) in this directory/configuration"
-                        (buildCmd DoBenchmarks)
-                        (buildOpts Build)
+                        (\(beopts, bopts) -> buildCmd (DoBenchmarks beopts) bopts)
+                        ((,) <$> benchOpts <*> buildOpts Bench)
              addCommand "haddock"
                         "Generate haddocks for the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
@@ -661,22 +662,47 @@ data Command
     = Build
     | Test
     | Haddock
+    | Bench
     deriving (Eq)
+
+-- | Parser for test arguments.
+testOpts :: Parser TestOpts
+testOpts = TestOpts
+       <$> boolFlags True
+                     "rerun-tests"
+                     "running already successful tests"
+                     idm
+       <*> fmap (fromMaybe [])
+                (optional (argsOption(long "test-arguments" <>
+                                      metavar "TEST_ARGS" <>
+                                      help "Arguments passed in to the test suite program")))
+      <*> flag False
+               True
+               (long "coverage" <>
+               help "Generate a code coverage report")
+      <*> flag False
+               True
+               (long "no-run-tests" <>
+                help "Disable running of tests. (Tests will still be built.)")
+
+
+
+-- | Parser for bench arguments.
+benchOpts :: Parser BenchmarkOpts
+benchOpts = BenchmarkOpts
+        <$> optional (strOption (long "benchmark-arguments" <>
+                                 metavar "BENCH_ARGS" <>
+                                 help ("Forward BENCH_ARGS to the benchmark suite. " <>
+                                       "Supports templates from `cabal bench`")))
 
 -- | Parser for build arguments.
 buildOpts :: Command -> Parser BuildOpts
-buildOpts cmd = fmap process $
+buildOpts cmd =
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> haddock <*> haddockDeps <*> finalAction <*> dryRun <*> ghcOpts <*>
-            flags <*> installExes <*> preFetch <*> testArgs <*> onlySnapshot <*> coverage <*>
-            fileWatch' <*> keepGoing <*> noTests
-  where process bopts =
-            if boptsCoverage bopts
-               then bopts { boptsExeProfile = True
-                          , boptsLibProfile = True
-                          , boptsGhcOptions = "-fhpc" : boptsGhcOptions bopts}
-               else bopts
-        optimize =
+            flags <*> installExes <*> preFetch <*> onlySnapshot <*>
+            fileWatch' <*> keepGoing
+  where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
         target =
           fmap (map T.pack)
@@ -730,30 +756,9 @@ buildOpts cmd = fmap process $
         preFetch = flag False True
             (long "prefetch" <>
              help "Fetch packages necessary for the build immediately, useful with --dry-run")
-        testArgs =
-             fmap (fromMaybe [])
-                  (if cmd == Test
-                      then optional
-                               (argsOption
-                                    (long "test-arguments" <> metavar "TEST_ARGS" <>
-                                     help "Arguments passed in to the test suite program"))
-                      else pure Nothing)
-
         onlySnapshot = flag False True
             (long "only-snapshot" <>
              help "Only build packages for the snapshot database, not the local database")
-        coverage =
-            if cmd == Test
-               then flag False True
-                        (long "coverage" <>
-                         help "Generate a code coverage report")
-               else pure False
-        noTests =
-            if cmd == Test
-               then flag False True
-                        (long "no-run-tests" <>
-                         help "Disable running of tests. (Tests will still be built.)")
-               else pure False
 
         fileWatch' = flag False True
             (long "file-watch" <>

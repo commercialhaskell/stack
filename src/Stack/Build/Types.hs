@@ -20,6 +20,8 @@ module Stack.Build.Types
     ,LocalPackage(..)
     ,BaseConfigOpts(..)
     ,Plan(..)
+    ,TestOpts(..)
+    ,BenchmarkOpts(..)
     ,FinalAction(..)
     ,BuildOpts(..)
     ,defaultBuildOpts
@@ -289,20 +291,13 @@ data BuildOpts =
             -- ^ Install executables to user path after building?
             ,boptsPreFetch :: !Bool
             -- ^ Fetch all packages immediately
-            ,boptsTestArgs :: ![String]
-            -- ^ Arguments to pass to the test suites if we're running them.
             ,boptsOnlySnapshot :: !Bool
             -- ^ Only install packages in the snapshot database, skipping
             -- packages intended for the local database.
-            ,boptsCoverage :: !Bool
-            -- ^ Enable code coverage report generation for test
-            -- suites.
             ,boptsFileWatch :: !Bool
             -- ^ Watch files for changes and automatically rebuild
             ,boptsKeepGoing :: !(Maybe Bool)
             -- ^ Keep building/running after failure
-            ,boptsNoTests :: !Bool
-            -- ^ If set, don't run the tests
             }
   deriving (Show)
 
@@ -320,19 +315,28 @@ defaultBuildOpts = BuildOpts
     , boptsFlags = Map.empty
     , boptsInstallExes = False
     , boptsPreFetch = False
-    , boptsTestArgs = []
     , boptsOnlySnapshot = False
-    , boptsCoverage = False
     , boptsFileWatch = False
     , boptsKeepGoing = Nothing
-    , boptsNoTests = False
     }
+
+-- | Options for the 'FinalAction' 'DoTests'
+data TestOpts =
+  TestOpts {toRerunTests :: !Bool -- ^ Whether successful tests will be run gain
+           ,toAdditionalArgs :: ![String] -- ^ Arguments passed to the test program
+           ,toCoverage :: !Bool -- ^ Generate a code coverage report
+           ,toDisableRun :: !Bool -- ^ Disable running of tests
+           } deriving (Eq,Show)
+
+-- | Options for the 'FinalAction' 'DoBenchmarks'
+data BenchmarkOpts =
+  BenchmarkOpts {beoAdditionalArgs :: !(Maybe String) -- ^ Arguments passed to the benchmark program
+                } deriving (Eq,Show)
 
 -- | Run a Setup.hs action after building a package, before installing.
 data FinalAction
-  = DoTests
-      Bool -- rerun tests which already passed?
-  | DoBenchmarks
+  = DoTests TestOpts
+  | DoBenchmarks BenchmarkOpts
   | DoNothing
   deriving (Eq,Show)
 

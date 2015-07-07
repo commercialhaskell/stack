@@ -206,7 +206,9 @@ loadLocals bopts latestVersion = do
                     case boptsFinalAction bopts of
                         DoTests _ -> wanted
                         _ -> False
-                , packageConfigEnableBenchmarks = wanted && boptsFinalAction bopts == DoBenchmarks
+                , packageConfigEnableBenchmarks = wanted && case boptsFinalAction bopts of
+                                                              (DoBenchmarks _) -> True
+                                                              _ -> False
                 }
         pkg <- readPackage config cabalfp
         pkgFinal <- readPackage configFinal cabalfp
