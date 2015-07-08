@@ -1,8 +1,8 @@
-name:                new-template
+name:                {{name}}
 version:             0.1.0.0
 synopsis:            Initial project template from stack
 description:         Please see README.md
-homepage:            http://github.com/name/project
+homepage:            http://github.com/commercialhaskell/{{name}}#readme
 license:             BSD3
 license-file:        LICENSE
 author:              Your name here
@@ -19,23 +19,23 @@ library
   build-depends:       base >= 4.7 && < 5
   default-language:    Haskell2010
 
-executable new-template-exe
+executable {{name}}-exe
   hs-source-dirs:      app
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
-                     , new-template
+                     , {{name}}
   default-language:    Haskell2010
 
-test-suite new-template-test
+test-suite {{name}}-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
   build-depends:       base
-                     , new-template
+                     , {{name}}
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 
 source-repository head
   type:     git
-  location: https://github.com/name/project
+  location: https://github.com/commercialhaskell/{{name}}

@@ -123,7 +123,7 @@ printPlan finalAction plan = do
     let mfinalLabel =
             case finalAction of
                 DoNothing -> Nothing
-                DoBenchmarks -> Just "benchmark"
+                DoBenchmarks _ -> Just "benchmark"
                 DoTests _ -> Just "test"
     case mfinalLabel of
         Nothing -> return ()
@@ -405,8 +405,8 @@ toActions runInBase ee (mbuild, mfinal) =
     mfunc =
         case boptsFinalAction $ eeBuildOpts ee of
             DoNothing -> Nothing
-            DoTests rerunTests -> Just (singleTest rerunTests, checkTest)
-            DoBenchmarks -> Just (singleBench, checkBench)
+            DoTests topts -> Just (singleTest topts, checkTest)
+            DoBenchmarks beopts -> Just (singleBench beopts, checkBench)
 
     checkTest task =
         case taskType task of
@@ -684,12 +684,12 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
             Set.empty
 
 singleTest :: M env m
-           => Bool -- ^ rerun tests?
+           => TestOpts
            -> ActionContext
            -> ExecuteEnv
            -> Task
            -> m ()
-singleTest rerunTests ac ee task =
+singleTest topts ac ee task =
     withSingleContext ac ee task $ \package cabalfp pkgDir cabal announce console mlogFile -> do
         (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (test)") cabal cabalfp ["--enable-tests"]
         config <- asks getConfig
@@ -701,7 +701,8 @@ singleTest rerunTests ac ee task =
                     TTLocal lp -> lpDirtyFiles lp
                     _ -> assert False True) ||
                 not testBuilt
-            needHpc = boptsCoverage (eeBuildOpts ee)
+
+            needHpc = toCoverage topts
 
             componentsRaw =
                 case taskType task of
@@ -721,19 +722,19 @@ singleTest rerunTests ac ee task =
             setTestBuilt pkgDir
 
         toRun <-
-            if (boptsNoTests (eeBuildOpts ee))
-                then do
-                    announce "Test running disabled by --no-run-tests flag."
-                    return False
-                else if rerunTests
-                    then return True
-                    else do
-                        success <- checkTestSuccess pkgDir
-                        if success
-                            then do
-                                unless (null testsToRun) $ announce "skipping already passed test"
-                                return False
-                            else return True
+            if toDisableRun topts
+              then do
+                  announce "Test running disabled by --no-run-tests flag."
+                  return False
+              else if toRerunTests topts
+                  then return True
+                  else do
+                      success <- checkTestSuccess pkgDir
+                      if success
+                          then do
+                              unless (null testsToRun) $ announce "skipping already passed test"
+                              return False
+                          else return True
 
         when toRun $ do
             bconfig <- asks getBuildConfig
@@ -766,11 +767,10 @@ singleTest rerunTests ac ee task =
                                 $logWarn ("Removing HPC file " <> T.pack (toFilePath nameTix))
                             removeFileIfExists nameTix
 
-                        let args = boptsTestArgs (eeBuildOpts ee)
-                            argsDisplay =
-                                case args of
-                                  [] -> ""
-                                  _ -> ", args: " <> T.intercalate " " (map showProcessArgDebug args)
+                        let args = toAdditionalArgs topts
+                            argsDisplay = case args of
+                                            [] -> ""
+                                            _ -> ", args: " <> T.intercalate " " (map showProcessArgDebug args)
                         announce $ "test (suite: " <> testName <> argsDisplay <> ")"
                         let cp = (proc (toFilePath exeName) args)
                                 { cwd = Just $ toFilePath pkgDir
@@ -872,11 +872,12 @@ generateHpcReport pkgDir hpcDir dotHpcDir tixes = do
             , ["--reset-hpcdirs"]]
 
 singleBench :: M env m
-            => ActionContext
+            => BenchmarkOpts
+            -> ActionContext
             -> ExecuteEnv
             -> Task
             -> m ()
-singleBench ac ee task =
+singleBench beopts ac ee task =
     withSingleContext ac ee task $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
         (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (benchmarks)") cabal cabalfp ["--enable-benchmarks"]
 
@@ -896,9 +897,11 @@ singleBench ac ee task =
             config <- asks getConfig
             cabal (console && configHideTHLoading config) ["build"]
             setBenchBuilt pkgDir
-
+        let args = maybe []
+                         ((:[]) . ("--benchmark-options=" <>))
+                         (beoAdditionalArgs beopts)
         announce "benchmarks"
-        cabal False ["bench"]
+        cabal False ("bench" : args)
 
 -- | Grab all output from the given @Handle@ and print it to stdout, stripping
 -- Template Haskell "Loading package" lines. Does work in a separate thread.

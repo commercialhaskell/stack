@@ -4,7 +4,7 @@ module Stack.New
     ( newProject
     ) where
 
-import           Control.Monad          (filterM, forM_, unless)
+import           Control.Monad          (filterM, forM_, forM, unless)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger   (MonadLogger, logInfo)
 import           Data.ByteString        (ByteString)
@@ -13,9 +13,16 @@ import           Data.FileEmbed         (embedDir)
 import           Data.Map               (Map)
 import qualified Data.Map               as Map
 import qualified Data.Text              as T
+import qualified Data.Text.Encoding     as T
+import qualified Data.Text.Lazy         as LT
 import           System.Directory       (createDirectoryIfMissing,
-                                         doesFileExist)
-import           System.FilePath        (takeDirectory)
+                                         doesFileExist,
+                                         getCurrentDirectory)
+import           System.FilePath        (takeDirectory,
+                                         takeFileName,
+                                         dropTrailingPathSeparator)
+import           Text.Hastache
+import           Text.Hastache.Context
 
 newProject :: (MonadIO m, MonadLogger m)
            => m ()
@@ -32,7 +39,35 @@ newProject = do
             : map ("- " ++) exist
 
     $logInfo ""
-    forM_ (Map.toList files) $ \(fp, bs) -> do
+
+    -- Detect settings for mustache template.
+    currentDirectory <- liftIO getCurrentDirectory
+    let name = takeFileName $ dropTrailingPathSeparator currentDirectory
+
+    let contextLookup "name" = MuVariable name
+        contextLookup _ = MuNothing
+
+    let runHastache template =
+            hastacheStr defaultConfig template (mkStrContext contextLookup)
+
+    -- Render file paths and file contents via mustache.
+    -- There is some unsafety in `unMustache` on file names,
+    -- because file names could collide.
+    -- I believe the correct way to handle this is to tell template creators
+    -- to be careful to avoid this if they use mustache in file names.
+    -- ~ Dan Burton
+    files' <- liftIO $ forM (Map.toList files) $ \(fp, bs) -> do
+        let fpText = T.pack fp
+        fpLText' <- runHastache fpText
+        let fp' = LT.unpack fpLText'
+
+        let bsText = T.decodeUtf8 bs
+        bsLText' <- runHastache bsText
+        let bs' = T.encodeUtf8 $ LT.toStrict bsLText'
+
+        return (fp', bs')
+
+    forM_ files' $ \(fp, bs) -> do
         $logInfo $ T.pack $ "Writing: " ++ fp
         liftIO $ do
             createDirectoryIfMissing True $ takeDirectory fp

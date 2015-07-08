@@ -522,7 +522,11 @@ checkBuildPlan locals mbp gpd = do
 
     flagName' = fromCabalFlagName . flagName
 
-    flagOptions = map Map.fromList $ mapM getOptions $ genPackageFlags gpd
+    -- Avoid exponential complexity in flag combinations making us sad pandas.
+    -- See: https://github.com/commercialhaskell/stack/issues/543
+    maxFlagOptions = 128
+
+    flagOptions = take maxFlagOptions $ map Map.fromList $ mapM getOptions $ genPackageFlags gpd
     getOptions f
         | flagManual f = [(flagName' f, flagDefault f)]
         | flagDefault f =

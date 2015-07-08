@@ -4,6 +4,7 @@
 * Track build status of tests and benchmarks [#525](https://github.com/commercialhaskell/stack/issues/525)
 * `--no-run-tests` [#517](https://github.com/commercialhaskell/stack/pull/517)
 * Targets outside of root dir don't build [#366](https://github.com/commercialhaskell/stack/issues/366)
+* Upper limit on number of flag combinations to test [#543](https://github.com/commercialhaskell/stack/issues/543)
 
 ## 0.1.2.0
 
