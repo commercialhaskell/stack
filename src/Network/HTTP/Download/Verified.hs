@@ -91,8 +91,6 @@ data VerifiedDownloadException
           String -- algorithm
           CheckHexDigest -- expected
           String -- actual (shown)
-    | ZeroTries
-          Request
   deriving (Typeable)
 instance Show VerifiedDownloadException where
     show (WrongContentLength req expected actual) =
@@ -109,10 +107,6 @@ instance Show VerifiedDownloadException where
         "Download expectation failure: content hash (" ++ algo ++  ")\n"
         ++ "Expected: " ++ displayCheckHexDigest expected ++ "\n"
         ++ "Actual:   " ++ actual ++ "\n"
-        ++ "For: " ++ show (getUri req)
-    show (ZeroTries req) =
-        "Download expectation failure:\n"
-        ++ "Download was needed but <= 0 retries were requested.\n"
         ++ "For: " ++ show (getUri req)
 
 instance Exception VerifiedDownloadException
