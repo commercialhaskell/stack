@@ -141,6 +141,7 @@ library
                    , pretty
                    , process >= 1.2.0.0
                    , resourcet >= 1.1.4.1
+                   , retry >= 0.6
                    , safe >= 0.3
                    , split
                    , stm >= 2.4.4
