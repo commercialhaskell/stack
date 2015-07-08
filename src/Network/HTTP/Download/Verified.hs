@@ -28,6 +28,7 @@ import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Monad.Reader
+import Control.Retry (recovering,limitRetries)
 import Control.Applicative
 import Crypto.Hash
 import Crypto.Hash.Conduit (sinkHash)
@@ -180,24 +181,6 @@ sinkHashUsing _ = sinkHash
 hashChecksToZipSink :: MonadThrow m => Request -> [HashCheck] -> ZipSink ByteString m ()
 hashChecksToZipSink req = traverse_ (ZipSink . sinkCheckHash req)
 
--- TODO(DanBurton): use Control.Retry instead.
--- Type inference drives the decision of which exceptions merit a retry.
-retry :: (MonadCatch m, Exception e)
-  => Int -- ^ The number of times to retry
-  -> m a -- ^ Action to retry
-  -> m (Either [e] a)
-retry n0 action =
-    go n0 []
-  where
-    go n es
-      | n <= 0 = return (Left es)
-      | otherwise = do
-          eRes <- try action
-          case eRes of
-            Left e -> go (n - 1) (e : es)
-            Right a -> return (Right a)
-
-
 -- | Copied and extended version of Network.HTTP.Download.download.
 --
 -- Has the following additional features:
@@ -222,15 +205,14 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
     liftIO $ whenM' getShouldDownload $ do
         createDirectoryIfMissing True dir
         withBinaryFile fptmp WriteMode $ \h -> do
-            eRes <- retry drRetries $
+            recovering (limitRetries drRetries) [const $ Handler alwaysRetryHttp] $
                 flip runReaderT env $
                     withResponse req (go h)
-            case (eRes :: Either [HttpException] ()) of
-                Left [] -> throwM $ ZeroTries req
-                Left (e:_) -> throwM e -- just re-throw the latest HttpException
-                Right () -> return ()
         renameFile fptmp fp
   where
+    alwaysRetryHttp :: Monad m => HttpException -> m Bool
+    alwaysRetryHttp _ = return True
+
     whenM' mp m = do
         p <- mp
         if p then m >> return True else return False
