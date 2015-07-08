@@ -147,17 +147,23 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
                 return $ progsDir </> $(mkRelDir stackProgName) </> platform
             _ -> return $ configStackRoot </> $(mkRelDir "programs") </> platform
 
-     configLocalBin <- case configMonoidLocalBin of
-       Nothing -> do
-           localDir <- liftIO (getAppUserDataDirectory "local") >>= parseAbsDir
-           return $ localDir </> $(mkRelDir "bin")
-       Just userPath -> do
-           tryPath <- try (liftIO $ canonicalizePath userPath >>= parseAbsDir)
-           case tryPath of
-               Left (e :: IOException) ->
-                   error ("Could not locate user specified directory \"" ++ userPath ++ "\"\n" ++
-                          "IOException: " ++ (show e))
-               Right absPath -> return absPath
+     configLocalBin <-
+         case configMonoidLocalBin of
+             Nothing -> do
+                 localDir <- liftIO (getAppUserDataDirectory "local") >>= parseAbsDir
+                 return $ localDir </> $(mkRelDir "bin")
+             Just userPath ->
+                 (liftIO $ canonicalizePath userPath >>= parseAbsDir)
+                 `catches`
+                 [Handler (\(ex :: IOException) -> error
+                                (unlines ["Could not install to user specified directory \""
+                                              ++ userPath ++ "\""
+                                         ,"IOException: " ++ (show ex)]))
+                 ,Handler (\(ex :: PathParseException) -> error
+                                (unlines ["Could not parse user specified directory \""
+                                              ++ userPath ++ "\""
+                                         ,"PathParseException: " ++ (show ex)]))]
+
 
      configJobs <-
         case configMonoidJobs of
