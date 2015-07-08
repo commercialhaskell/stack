@@ -34,6 +34,7 @@ exampleReq = fromMaybe (error "exampleReq") $ do
         { drRequest = req
         , drHashChecks = [exampleHashCheck]
         , drLengthCheck = Just exampleLengthCheck
+        , drRetries = 1
         }
 
 exampleHashCheck :: HashCheck
@@ -154,6 +155,7 @@ spec = beforeAll setup $ afterAll teardown $ do
             { drRequest = req
             , drHashChecks = []
             , drLengthCheck = Nothing
+            , drRetries = 1
             }
       let progressHook = return ()
       let go = runWith manager $ verifiedDownload dReq dest progressHook
