@@ -24,7 +24,10 @@ extra-source-files:  README.md ChangeLog.md
                      test/package-dump/ghc-7.10.txt
 
                      new-template/src/Lib.hs
-                     new-template/new-template.cabal
+                     -- new-template/{{name}}.cabal
+                     -- Cabal doesn't like curly braces.
+                     -- Luckily this can be described via glob.
+                     new-template/*.cabal
                      new-template/test/Spec.hs
                      new-template/app/Main.hs
                      new-template/LICENSE
