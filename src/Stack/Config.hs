@@ -29,6 +29,7 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Concurrent (getNumCapabilities)
+import           Control.Exception  (IOException)
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -153,9 +154,9 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
        Just userPath -> do
            tryPath <- try (liftIO $ canonicalizePath userPath >>= parseAbsDir)
            case tryPath of
-               Left (_ :: SomeException) ->
-                   error $ "Could not locate user specified directory \"" ++
-                      userPath ++ "\""
+               Left (e :: IOException) ->
+                   error ("Could not locate user specified directory \"" ++ userPath ++ "\"\n" ++
+                          "IOException: " ++ (show e))
                Right absPath -> return absPath
 
      configJobs <-
@@ -227,7 +228,6 @@ configOptsParser docker =
             idm
     <*> optional (strOption
              ( long "local-bin-path"
-             <> short 'p'
              <> metavar "DIR"
              <> help "Install binaries to DIR"
               )) 
