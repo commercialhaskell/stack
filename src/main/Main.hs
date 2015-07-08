@@ -99,18 +99,18 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                         (buildOpts Build)
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
-                        (\(topts, bopts) ->
+                        (\(bopts, topts) ->
                              let bopts' = if toCoverage topts
                                              then bopts { boptsExeProfile = True
                                                         , boptsLibProfile = True
                                                         , boptsGhcOptions = "-fhpc" : boptsGhcOptions bopts}
                                              else bopts
                              in buildCmd (DoTests topts) bopts')
-                        ((,) <$> testOpts <*> buildOpts Test)
+                        ((,) <$> buildOpts Test <*> testOpts)
              addCommand "bench"
                         "Build and benchmark the project(s) in this directory/configuration"
-                        (\(beopts, bopts) -> buildCmd (DoBenchmarks beopts) bopts)
-                        ((,) <$> benchOpts <*> buildOpts Bench)
+                        (\(bopts, beopts) -> buildCmd (DoBenchmarks beopts) bopts)
+                        ((,) <$> buildOpts Bench <*> benchOpts)
              addCommand "haddock"
                         "Generate haddocks for the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
