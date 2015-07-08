@@ -730,11 +730,12 @@ buildOpts cmd =
                     "executable-profiling"
                     "library profiling for TARGETs and all its dependencies"
                     idm
-        haddock =
-          boolFlags (cmd == Haddock)
-                    "haddock"
-                    "building Haddocks"
-                    idm
+        haddock = if cmd == Haddock
+                     then pure True
+                     else boolFlags False
+                                    "haddock"
+                                    "building Haddocks"
+                                    idm
         haddockDeps =
           if cmd == Haddock
              then maybeBoolFlags
