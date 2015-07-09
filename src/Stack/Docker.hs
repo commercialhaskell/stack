@@ -258,7 +258,7 @@ runContainerAndExit modConfig
              then ["-d"]
              else concat [["--rm" | not (dockerPersist docker)]
                          ,["-t" | isTerm]
-                         ,["-i"]]
+                         ,["-i" | isTerm]]
          ,dockerRunArgs docker
          ,[image]
          ,map (\(k,v) -> k ++ "=" ++ v) envVars
