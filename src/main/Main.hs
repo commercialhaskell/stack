@@ -183,14 +183,15 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                               (many (strArgument
                                        (metavar "TARGET" <>
                                         help "If none specified, use all packages defined in current directory"))) <*>
-                         fmap (fromMaybe [])
-                              (optional (argsOption (long "ghc-options" <>
-                                                     metavar "OPTION" <>
-                                                     help "Additional options passed to GHCi"))) <*>
-                         fmap (fromMaybe "ghc")
-                              (optional (strOption (long "with-ghc" <>
-                                                    metavar "GHC" <>
-                                                    help "Use this command for the GHC to run"))) <*>
+                         argsOption (long "ghc-options" <>
+                                      metavar "OPTION" <>
+                                      help "Additional options passed to GHCi" <>
+                                      value []) <*>
+                         strOption (long "with-ghc" <>
+                                    metavar "GHC" <>
+                                    help "Use this command for the GHC to run" <>
+                                    value "ghc" <>
+                                    showDefault) <*>
                          flag False True (long "no-load" <>
                                          help "Don't load modules on start-up") <*>
                          packagesParser)
@@ -202,10 +203,10 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                               (many (strArgument
                                        (metavar "TARGET" <>
                                         help "If none specified, use all packages defined in current directory"))) <*>
-                         fmap (fromMaybe [])
-                              (optional (argsOption (long "ghc-options" <>
-                                                     metavar "OPTION" <>
-                                                     help "Additional options passed to GHCi"))))
+                         argsOption (long "ghc-options" <>
+                                     metavar "OPTION" <>
+                                     help "Additional options passed to GHCi" <>
+                                     value []))
              addCommand "runghc"
                         "Run runghc"
                         execCmd
@@ -682,10 +683,10 @@ testOpts = TestOpts
                      "rerun-tests"
                      "running already successful tests"
                      idm
-       <*> fmap (fromMaybe [])
-                (optional (argsOption(long "test-arguments" <>
-                                      metavar "TEST_ARGS" <>
-                                      help "Arguments passed in to the test suite program")))
+       <*> argsOption(long "test-arguments" <>
+                      metavar "TEST_ARGS" <>
+                      help "Arguments passed in to the test suite program" <>
+                      value [])
       <*> flag False
                True
                (long "coverage" <>
