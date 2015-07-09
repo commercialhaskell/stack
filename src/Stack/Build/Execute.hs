@@ -851,7 +851,7 @@ compareTestsComponents comps tests2 =
             ("test", y) -> Set.singleton $ T.drop 1 y
             _ -> Set.empty
 
--- | Generate the HTML report and
+-- | Generate the HTML report and textual report.
 generateHpcReport
     :: M env m
     => Path Abs Dir -> Path Rel Dir -> [Path Abs File] -> m ()
