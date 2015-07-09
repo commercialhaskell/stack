@@ -814,7 +814,11 @@ singleTest topts ac ee task =
                 (_,files) <- listDirectory hpcDir
                 let tixes =
                         filter (isSuffixOf ".tix" . toFilePath . filename) files
-                generateHpcReport pkgDir hpcDir (hpcDir </> dotHpc) tixes
+                -- This is a path to the .hpc directory, which holds *.mix files.  It's relative to the package
+                -- directory.  Since the hpc program only takes one specification for "--hpcdir", this must be
+                -- the same for all packages (something which is currently true).
+                subdir <- stripDir pkgDir (hpcDir </> dotHpc)
+                generateHpcReport hpcDir subdir tixes
 
             bs <- liftIO $
                 case mlogFile of
@@ -850,26 +854,23 @@ compareTestsComponents comps tests2 =
 -- | Generate the HTML report and
 generateHpcReport
     :: M env m
-    => Path Abs Dir -> Path Abs Dir -> Path Abs Dir -> [Path Abs File] -> m ()
-generateHpcReport _ _ _ [] = return ()
-generateHpcReport pkgDir hpcDir dotHpcDir tixes = do
+    => Path Abs Dir -> Path Rel Dir -> [Path Abs File] -> m ()
+generateHpcReport _ _ [] = return ()
+generateHpcReport hpcDir subdir tixes = do
+    pkgDirs <- Map.keys . bcPackages <$> asks getBuildConfig
+    let args = concat
+            [ map (toFilePath . filename) tixes
+            , concatMap (\x -> ["--srcdir", toFilePath x]) pkgDirs
+            , ["--hpcdir", toFilePath subdir]]
     menv <- getMinimalEnvOverride
     $logInfo "Generating HPC HTML ..."
-    subdir <- stripDir pkgDir dotHpcDir
-    _ <- readProcessStdout (Just hpcDir) menv "hpc" ("markup" : args subdir)
+    _ <- readProcessStdout (Just hpcDir) menv "hpc" ("markup" : args)
     output <-
-        readProcessStdout (Just hpcDir) menv "hpc" ("report" : args subdir)
+        readProcessStdout (Just hpcDir) menv "hpc" ("report" : args)
     forM_ (S8.lines output) ($logInfo . T.decodeUtf8)
     $logInfo
         ("The HTML report is available at " <>
          T.pack (toFilePath (hpcDir </> $(mkRelFile "hpc_index.html"))))
-  where
-    args subdir =
-        concat
-            [ map (toFilePath . filename) tixes
-            , ["--srcdir", toFilePath pkgDir]
-            , ["--hpcdir", toFilePath subdir]
-            , ["--reset-hpcdirs"]]
 
 singleBench :: M env m
             => BenchmarkOpts
