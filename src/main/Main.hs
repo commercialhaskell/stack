@@ -178,7 +178,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
              addCommand "ghci"
                         "Run ghci in the context of project(s)"
                         replCmd
-                        ((,,,) <$>
+                        ((,,,,) <$>
                          fmap (map T.pack)
                               (many (strArgument
                                        (metavar "TARGET" <>
@@ -192,7 +192,8 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                                                     metavar "GHC" <>
                                                     help "Use this command for the GHC to run"))) <*>
                          flag False True (long "no-load" <>
-                                         help "Don't load modules on start-up"))
+                                         help "Don't load modules on start-up") <*>
+                         packagesParser)
              addCommand "ide"
                         "Run ide-backend-client with the correct arguments"
                         ideCmd
@@ -554,6 +555,9 @@ uploadCmd args go = do
                   Upload.defaultUploadSettings
             mapM_ (Upload.upload uploader) args
 
+packagesParser :: Parser [String]
+packagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))
+
 data ExecOpts = ExecOpts
     { eoCmd :: !String
     , eoArgs :: ![String]
@@ -597,7 +601,7 @@ execOptsParser mcmd =
                 idm
 
     eoPackagesParser :: Parser [String]
-    eoPackagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))
+    eoPackagesParser = packagesParser
 
     eoPlainParser :: Parser ExecOptsExtra
     eoPlainParser = flag' ExecOptsPlain
@@ -626,9 +630,15 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                exec eoEnvSettings eoCmd eoArgs
 
 -- | Run the REPL in the context of a project.
-replCmd :: ([Text], [String], FilePath, Bool) -> GlobalOpts -> IO ()
-replCmd (targets,args,path,noload) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $ do
-      repl targets args path noload
+replCmd :: ([Text], [String], FilePath, Bool, [String]) -> GlobalOpts -> IO ()
+replCmd (targets,args,path,noload,packages) go@GlobalOpts{..} = do
+  withBuildConfig go ExecStrategy $ do
+    let packageTargets = concatMap words packages
+    unless (null packageTargets) $
+       Stack.Build.build (const $ return ()) defaultBuildOpts
+           { boptsTargets = map T.pack packageTargets
+           }
+    repl targets args path noload
 
 -- | Run ide-backend in the context of a project.
 ideCmd :: ([Text], [String]) -> GlobalOpts -> IO ()
