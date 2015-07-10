@@ -22,57 +22,59 @@ module Stack.Fetch
     , withCabalLoader
     ) where
 
-import qualified Codec.Archive.Tar as Tar
-import qualified Codec.Archive.Tar.Check as Tar
-import           Codec.Compression.GZip (decompress)
+import qualified Codec.Archive.Tar              as Tar
+import qualified Codec.Archive.Tar.Check        as Tar
+import           Codec.Compression.GZip         (decompress)
 import           Control.Applicative
-import           Control.Concurrent.Async (Concurrently (..))
-import           Control.Concurrent.MVar.Lifted (newMVar, modifyMVar)
-import           Control.Concurrent.STM          (TVar, atomically, modifyTVar,
-                                                  newTVarIO, readTVar,
-                                                  readTVarIO, writeTVar)
-import           Control.Exception (assert)
-import           Control.Monad (liftM, when, join, unless, void)
+import           Control.Concurrent.Async       (Concurrently (..))
+import           Control.Concurrent.MVar.Lifted (modifyMVar, newMVar)
+import           Control.Concurrent.STM         (TVar, atomically, modifyTVar,
+                                                 newTVarIO, readTVar,
+                                                 readTVarIO, writeTVar)
+import           Control.Exception              (assert)
+import           Control.Monad                  (join, liftM, unless, void,
+                                                 when)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (asks)
-import           Control.Monad.Reader (runReaderT)
+import           Control.Monad.Reader           (asks)
+import           Control.Monad.Reader           (runReaderT)
 import           Control.Monad.Trans.Control
-import           Crypto.Hash (SHA512(..))
-import           Data.ByteString (ByteString)
-import qualified Data.ByteString as S
-import qualified Data.ByteString.Lazy as L
-import           Data.Either (partitionEithers)
-import qualified Data.Foldable as F
-import           Data.Function (fix)
-import           Data.IORef (newIORef, readIORef, writeIORef)
-import           Data.List (intercalate)
-import           Data.Map (Map)
-import qualified Data.Map as Map
-import           Data.Maybe (maybeToList)
-import           Data.Monoid ((<>))
-import           Data.Set (Set)
-import qualified Data.Set as Set
-import qualified Data.Text as T
-import           Data.Text.Encoding (decodeUtf8)
-import           Data.Typeable (Typeable)
-import           Data.Word (Word64)
+import           Crypto.Hash                    (SHA512 (..))
+import           Data.ByteString                (ByteString)
+import qualified Data.ByteString                as S
+import qualified Data.ByteString.Lazy           as L
+import           Data.Either                    (partitionEithers)
+import qualified Data.Foldable                  as F
+import           Data.Function                  (fix)
+import           Data.IORef                     (newIORef, readIORef,
+                                                 writeIORef)
+import           Data.List                      (intercalate, intersperse)
+import           Data.Map                       (Map)
+import qualified Data.Map                       as Map
+import           Data.Maybe                     (maybeToList)
+import           Data.Monoid                    ((<>))
+import           Data.Set                       (Set)
+import qualified Data.Set                       as Set
+import qualified Data.Text                      as T
+import           Data.Text.Encoding             (decodeUtf8)
+import           Data.Typeable                  (Typeable)
+import           Data.Word                      (Word64)
 import           Network.HTTP.Download
 import           Path
-import           Prelude -- Fix AMP warning
+import           Prelude
 import           Stack.GhcPkg
 import           Stack.PackageIndex
 import           Stack.Types
-import           System.Directory                (canonicalizePath,
-                                                  createDirectoryIfMissing,
-                                                  doesDirectoryExist,
-                                                  renameDirectory)
-import           System.FilePath ((<.>))
-import qualified System.FilePath as FP
-import           System.IO                       (IOMode (ReadMode),
-                                                  SeekMode (AbsoluteSeek),
-                                                  hSeek, withBinaryFile)
+import           System.Directory               (canonicalizePath,
+                                                 createDirectoryIfMissing,
+                                                 doesDirectoryExist,
+                                                 renameDirectory)
+import           System.FilePath                ((<.>))
+import qualified System.FilePath                as FP
+import           System.IO                      (IOMode (ReadMode),
+                                                 SeekMode (AbsoluteSeek), hSeek,
+                                                 withBinaryFile)
 
 data FetchException
     = Couldn'tReadIndexTarball FilePath Tar.FormatError
@@ -170,8 +172,8 @@ unpackPackageIdents menv unpackDir mdistDir idents = do
     return $ alreadyUnpacked <> nowUnpacked
 
 data ResolvedPackage = ResolvedPackage
-    { rpCache    :: !PackageCache
-    , rpIndex    :: !PackageIndex
+    { rpCache :: !PackageCache
+    , rpIndex :: !PackageIndex
     }
 
 -- | Resolve a set of package names and identifiers into @FetchPackage@ values.
@@ -274,38 +276,66 @@ withCabalLoader menv inner = do
     runInBase <- liftBaseWith $ \run -> return (void . run)
 
     -- TODO in the future, keep all of the necessary @Handle@s open
-    let doLookup ident = do
-            eres <- doLookup' ident
+    let doLookup :: PackageIdentifier
+                 -> IO ByteString
+        doLookup ident = do
+            cachesCurr <- liftIO $ readIORef icaches
+            eres <- lookupPackageIdentifierExact ident env cachesCurr
             case eres of
-                Right bs -> return bs
+                Just bs -> return bs
                 -- Update the cache and try again
-                Left e -> join $ modifyMVar updateRef $ \toUpdate ->
-                    if toUpdate
-                        then do
+                Nothing -> do
+                    let fuzzy = fuzzyLookupCandidates ident cachesCurr
+                        fuzzyCandidatesText = case fuzzy of
+                            Nothing -> ""
+                            Just cs -> "Possible candidates: "
+                                       <> commaSeparatedIdents cs
+                                       <> ". "
+                    join $ modifyMVar updateRef $ \toUpdate ->
+                        if toUpdate then do
                             runInBase $ do
                                 $logInfo $ T.concat
                                     [ "Didn't see "
                                     , T.pack $ packageIdentifierString ident
-                                    , " in your package indices, updating and trying again"
+                                    , " in your package indices. "
+                                    , T.pack fuzzyCandidatesText
+                                    , "Updating and trying again."
                                     ]
                                 updateAllIndices menv
                                 caches <- getPackageCaches menv
                                 liftIO $ writeIORef icaches caches
                             return (False, doLookup ident)
-                        else return (toUpdate, throwM e)
-
-        doLookup' ident = do
-            caches <- liftIO $ readIORef icaches
-            case Map.lookup ident caches of
-                Nothing ->
-                    return $ Left $ UnknownPackageIdentifiers $ Set.singleton ident
-                Just (index, cache) -> do
-                    [bs] <- flip runReaderT env
-                          $ withCabalFiles (indexName index) [(ident, cache, ())]
-                          $ \_ _ bs -> return bs
-                    return $ Right bs
-
+                        else return (toUpdate, throwM (unknownIdent ident))
     inner doLookup
+  where
+    unknownIdent = UnknownPackageIdentifiers . Set.singleton
+    commaSeparatedIdents = F.fold . intersperse ", " . map packageIdentifierString
+
+type PackageCaches = Map PackageIdentifier (PackageIndex, PackageCache)
+
+lookupPackageIdentifierExact :: HasConfig env
+                             => PackageIdentifier -> env -> PackageCaches
+                             -> IO (Maybe ByteString)
+lookupPackageIdentifierExact ident env caches = do
+    case Map.lookup ident caches of
+        Nothing -> return Nothing
+        Just (index, cache) -> do
+            [bs] <- flip runReaderT env
+                  $ withCabalFiles (indexName index) [(ident, cache, ())]
+                  $ \_ _ bs -> return bs
+            return $ Just bs
+
+-- TODO: use 'Maybe (NonEmpty PackageIdentifier)' return-type
+fuzzyLookupCandidates :: PackageIdentifier -> PackageCaches
+                      -> Maybe [PackageIdentifier]
+fuzzyLookupCandidates (PackageIdentifier name ver) caches =
+    if null sameMajor then Nothing else Just (map fst sameMajor)
+  where
+    sameIdentCaches = filter (\(PackageIdentifier n _, _) -> name == n)
+                             (Map.toList caches)
+    sameMajor = filter (\(PackageIdentifier _ v, _) ->
+                             getMajorVersion ver == getMajorVersion v)
+                       sameIdentCaches
 
 -- | Figure out where to fetch from.
 getToFetch :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env)
