@@ -9,7 +9,7 @@
 module Network.HTTP.Download.Verified
   ( verifiedDownload
   , DownloadRequest(..)
-  , drRetriesDefault
+  , drRetryPolicyDefault
   , HashCheck(..)
   , CheckHexDigest(..)
   , LengthCheck
@@ -28,7 +28,7 @@ import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Monad.Reader
-import Control.Retry (recovering,limitRetries)
+import Control.Retry (recovering,limitRetries,RetryPolicy,constantDelay)
 import Control.Applicative
 import Crypto.Hash
 import Crypto.Hash.Conduit (sinkHash)
@@ -52,13 +52,13 @@ data DownloadRequest = DownloadRequest
     { drRequest :: Request
     , drHashChecks :: [HashCheck]
     , drLengthCheck :: Maybe LengthCheck
-    , drRetries :: Int
+    , drRetryPolicy :: RetryPolicy
     }
-  deriving Show
 
--- | Default to retrying thrice.
-drRetriesDefault :: Int
-drRetriesDefault = 3
+-- | Default to retrying thrice with a short constant delay.
+drRetryPolicyDefault :: RetryPolicy
+drRetryPolicyDefault = limitRetries 3 <> constantDelay onehundredMilliseconds
+  where onehundredMilliseconds = 100000
 
 data HashCheck = forall a. (Show a, HashAlgorithm a) => HashCheck
   { hashCheckAlgorithm :: a
@@ -199,7 +199,7 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
     liftIO $ whenM' getShouldDownload $ do
         createDirectoryIfMissing True dir
         withBinaryFile fptmp WriteMode $ \h -> do
-            recovering (limitRetries drRetries) [const $ Handler alwaysRetryHttp] $
+            recovering drRetryPolicy [const $ Handler alwaysRetryHttp] $
                 flip runReaderT env $
                     withResponse req (go h)
         renameFile fptmp fp
