@@ -235,6 +235,7 @@ test-suite stack-test
                 , optparse-applicative
                 , bytestring
                 , QuickCheck
+                , retry >= 0.6
   default-language:    Haskell2010
 
 test-suite stack-integration-test
