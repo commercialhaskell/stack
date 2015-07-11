@@ -1,5 +1,7 @@
 Distribution packages are available for [Ubuntu](#ubuntu), [Debian](#debian), [CentOS / Red Hat](#centos--red-hat), [Fedora](#fedora) and [Arch Linux](#arch-linux). Binaries for other operating systems are available on [the releases page](https://github.com/fpco/stack/releases). For the future, we have plans to support more OSes.
 
+Binaries are signed with this [[Signature]].
+
 ## Windows
 
 * Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest). Note: while generally i386/32-bit GHC is better tested on Windows, there are reports that recent versions of Windows only work with the 64-bit version of stack (see [issue #393](https://github.com/commercialhaskell/stack/issues/393)).
