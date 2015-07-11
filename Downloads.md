@@ -1,6 +1,6 @@
 Distribution packages are available for [Ubuntu](#ubuntu), [Debian](#debian), [CentOS / Red Hat](#centos--red-hat), [Fedora](#fedora) and [Arch Linux](#arch-linux). Binaries for other operating systems are available on [the releases page](https://github.com/fpco/stack/releases). For the future, we have plans to support more OSes.
 
-Binaries are signed with this [[Signature]].
+Binaries are signed with this [[Signing key]].
 
 ## Windows
 
