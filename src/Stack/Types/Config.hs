@@ -436,7 +436,7 @@ data ConfigMonoid =
     -- ^ See: 'configExtraLibDirs'
     ,configMonoidConcurrentTests     :: !(Maybe Bool)
     -- ^ See: 'configConcurrentTests'
-    ,configMonoidLocalBin            :: !(Maybe FilePath)
+    ,configMonoidLocalBinPath        :: !(Maybe FilePath)
     -- ^ Used to override the binary installation dir
     }
   deriving Show
@@ -459,7 +459,7 @@ instance Monoid ConfigMonoid where
     , configMonoidExtraIncludeDirs = Set.empty
     , configMonoidExtraLibDirs = Set.empty
     , configMonoidConcurrentTests = Nothing
-    , configMonoidLocalBin = Nothing
+    , configMonoidLocalBinPath = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -479,7 +479,7 @@ instance Monoid ConfigMonoid where
     , configMonoidExtraIncludeDirs = Set.union (configMonoidExtraIncludeDirs l) (configMonoidExtraIncludeDirs r)
     , configMonoidExtraLibDirs = Set.union (configMonoidExtraLibDirs l) (configMonoidExtraLibDirs r)
     , configMonoidConcurrentTests = configMonoidConcurrentTests l <|> configMonoidConcurrentTests r
-    , configMonoidLocalBin = configMonoidLocalBin l <|> configMonoidLocalBin r
+    , configMonoidLocalBinPath = configMonoidLocalBinPath l <|> configMonoidLocalBinPath r
     }
 
 instance FromJSON ConfigMonoid where
@@ -504,7 +504,7 @@ instance FromJSON ConfigMonoid where
          configMonoidExtraIncludeDirs <- obj .:? "extra-include-dirs" .!= Set.empty
          configMonoidExtraLibDirs <- obj .:? "extra-lib-dirs" .!= Set.empty
          configMonoidConcurrentTests <- obj .:? "concurrent-tests"
-         configMonoidLocalBin <- obj .:? "local-bin"
+         configMonoidLocalBinPath <- obj .:? "local-bin-path"
          return ConfigMonoid {..}
 
 -- | Newtype for non-orphan FromJSON instance.
@@ -524,6 +524,7 @@ data ConfigException
   | UnexpectedTarballContents [Path Abs Dir] [Path Abs File]
   | BadStackVersionException VersionRange
   | NoMatchingSnapshot [SnapName]
+  | NoSuchDirectory FilePath
   deriving Typeable
 instance Show ConfigException where
     show (ParseConfigFileException configFile exception) = concat
@@ -572,6 +573,10 @@ instance Show ConfigException where
         , "    https://github.com/commercialhaskell/stack/wiki/stack.yaml#extra-deps"
         , "\n\nYou can also try falling back to a dependency solver with:\n\n"
         , "    stack init --solver"
+        ]
+    show (NoSuchDirectory dir) = concat
+        ["No directory could be located matching the supplied path: "
+        ,dir
         ]
 instance Exception ConfigException
 

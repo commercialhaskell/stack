@@ -148,23 +148,16 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
             _ -> return $ configStackRoot </> $(mkRelDir "programs") </> platform
 
      configLocalBin <-
-         case configMonoidLocalBin of
+         case configMonoidLocalBinPath of
              Nothing -> do
                  localDir <- liftIO (getAppUserDataDirectory "local") >>= parseAbsDir
                  return $ localDir </> $(mkRelDir "bin")
              Just userPath ->
                  (liftIO $ canonicalizePath userPath >>= parseAbsDir)
                  `catches`
-                 [Handler (\(ex :: IOException) -> error
-                                (unlines ["Could not install to user specified directory \""
-                                              ++ userPath ++ "\""
-                                         ,"IOException: " ++ (show ex)]))
-                 ,Handler (\(ex :: PathParseException) -> error
-                                (unlines ["Could not parse user specified directory \""
-                                              ++ userPath ++ "\""
-                                         ,"PathParseException: " ++ (show ex)]))]
-
-
+                 [Handler (\(_ :: IOException) -> throwM $ NoSuchDirectory userPath)
+                 ,Handler (\(_ :: PathParseException) -> throwM $ NoSuchDirectory userPath)
+                 ]
      configJobs <-
         case configMonoidJobs of
             Nothing -> liftIO getNumCapabilities
@@ -187,7 +180,7 @@ configOptsParser docker =
         , configMonoidExtraIncludeDirs = includes
         , configMonoidExtraLibDirs = libs
         , configMonoidSkipMsys = skipMsys
-        , configMonoidLocalBin = localBin
+        , configMonoidLocalBinPath = localBin
         })
     <$> Docker.dockerOptsParser docker
     <*> maybeBoolFlags
