@@ -1,0 +1,1 @@
+We're converging on using the same dev@fpcomplete.com key for all of these, and you can get it here: https://s3.amazonaws.com/download.fpcomplete.com/ubuntu/fpco.key
