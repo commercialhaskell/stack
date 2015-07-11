@@ -29,6 +29,7 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Concurrent (getNumCapabilities)
+import           Control.Exception  (IOException)
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -146,10 +147,17 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
                 return $ progsDir </> $(mkRelDir stackProgName) </> platform
             _ -> return $ configStackRoot </> $(mkRelDir "programs") </> platform
 
-     configLocalBin <- do
-        localDir <- liftIO (getAppUserDataDirectory "local") >>= parseAbsDir
-        return $ localDir </> $(mkRelDir "bin")
-
+     configLocalBin <-
+         case configMonoidLocalBinPath of
+             Nothing -> do
+                 localDir <- liftIO (getAppUserDataDirectory "local") >>= parseAbsDir
+                 return $ localDir </> $(mkRelDir "bin")
+             Just userPath ->
+                 (liftIO $ canonicalizePath userPath >>= parseAbsDir)
+                 `catches`
+                 [Handler (\(_ :: IOException) -> throwM $ NoSuchDirectory userPath)
+                 ,Handler (\(_ :: PathParseException) -> throwM $ NoSuchDirectory userPath)
+                 ]
      configJobs <-
         case configMonoidJobs of
             Nothing -> liftIO getNumCapabilities
@@ -161,7 +169,7 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser docker =
-    (\opts systemGHC installGHC arch os jobs includes libs skipGHCCheck skipMsys -> mempty
+    (\opts systemGHC installGHC arch os jobs includes libs skipGHCCheck skipMsys localBin -> mempty
         { configMonoidDockerOpts = opts
         , configMonoidSystemGHC = systemGHC
         , configMonoidInstallGHC = installGHC
@@ -172,6 +180,7 @@ configOptsParser docker =
         , configMonoidExtraIncludeDirs = includes
         , configMonoidExtraLibDirs = libs
         , configMonoidSkipMsys = skipMsys
+        , configMonoidLocalBinPath = localBin
         })
     <$> Docker.dockerOptsParser docker
     <*> maybeBoolFlags
@@ -216,6 +225,11 @@ configOptsParser docker =
             "skip-msys"
             "skipping the local MSYS installation (Windows only)"
             idm
+    <*> optional (strOption
+             ( long "local-bin-path"
+             <> metavar "DIR"
+             <> help "Install binaries to DIR"
+              )) 
 
 -- | Get the directory on Windows where we should install extra programs. For
 -- more information, see discussion at:
