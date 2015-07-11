@@ -60,6 +60,7 @@ import           Data.Typeable (Typeable)
 import           Data.Word (Word64)
 import           Network.HTTP.Download
 import           Path
+import           Path.IO                         (dirExists, createTree)
 import           Prelude -- Fix AMP warning
 import           Stack.GhcPkg
 import           Stack.PackageIndex
@@ -327,7 +328,7 @@ getToFetch mdest resolvedAll = do
             case mdestDir of
                 Nothing -> return Nothing
                 Just destDir -> do
-                    exists <- liftIO $ doesDirectoryExist $ toFilePath destDir
+                    exists <- dirExists destDir
                     return $ if exists then Just destDir else Nothing
         case mexists of
             Just destDir -> return $ Right (ident, destDir)
@@ -436,9 +437,7 @@ fetchPackages' mdistDir toFetchAll = do
                             -- https://github.com/commercialhaskell/stack/issues/216
                             --
                             -- Instead, use Path which is a bit more resilient
-                            newDist' <- parseAbsDir newDist
-                            createDirectoryIfMissing True
-                                $ toFilePath $ parent newDist'
+                            createTree . parent =<< parseAbsDir newDist
                             renameDirectory oldDist newDist
 
                 let cabalFP =

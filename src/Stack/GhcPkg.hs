@@ -32,12 +32,12 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
+import           Path.IO (dirExists, createTree)
 import           Prelude hiding (FilePath)
 import           Stack.Build.Types (StackBuildException (Couldn'tFindPkgId))
 import           Stack.Constants
 import           Stack.Types
-import           System.Directory (createDirectoryIfMissing, doesDirectoryExist, canonicalizePath,
-                                   doesDirectoryExist)
+import           System.Directory (canonicalizePath, doesDirectoryExist)
 import           System.Process.Read
 
 -- | Get the global package database
@@ -78,14 +78,13 @@ ghcPkg menv pkgDbs args = do
 createDatabase :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
                => EnvOverride -> Path Abs Dir -> m ()
 createDatabase menv db = do
-    let db' = toFilePath db
-    exists <- liftIO $ doesDirectoryExist db'
+    exists <- dirExists db
     unless exists $ do
         -- Creating the parent doesn't seem necessary, as ghc-pkg
         -- seems to be sufficiently smart. But I don't feel like
         -- finding out it isn't the hard way
-        liftIO $ createDirectoryIfMissing True $ toFilePath $ parent db
-        _ <- tryProcessStdout Nothing menv "ghc-pkg" ["init", db']
+        createTree (parent db)
+        _ <- tryProcessStdout Nothing menv "ghc-pkg" ["init", toFilePath db]
         return ()
 
 -- | Get the necessary ghc-pkg flags for setting up the given package database

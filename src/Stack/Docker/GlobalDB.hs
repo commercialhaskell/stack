@@ -25,7 +25,7 @@ import           Database.Persist
 import           Database.Persist.Sqlite
 import           Database.Persist.TH
 import           Path (toFilePath, parent)
-import           System.Directory (createDirectoryIfMissing)
+import           Path.IO (createTree)
 import           Stack.Types.Config
 import           Stack.Types.Docker
 
@@ -75,7 +75,7 @@ pruneDockerImagesLastUsed config existingHashes =
 withGlobalDB :: forall a. Config -> SqlPersistT (NoLoggingT (ResourceT IO)) a -> IO a
 withGlobalDB config action =
   do let db = dockerDatabasePath (configDocker config)
-     createDirectoryIfMissing True (toFilePath (parent db))
+     createTree (parent db)
      runSqlite (T.pack (toFilePath db))
                (do _ <- runMigrationSilent migrateTables
                    action)

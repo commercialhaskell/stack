@@ -64,8 +64,7 @@ import           Stack.Constants
 import           Stack.Types
 import           Stack.Types.StackT
 import           Stack.Types.Internal
-import           System.Directory               hiding (findExecutable,
-                                                 findFiles)
+import qualified System.Directory               as D
 import           System.Environment             (getExecutablePath)
 import           System.Exit                    (ExitCode (ExitSuccess))
 import qualified System.FilePath                as FP
@@ -233,9 +232,9 @@ executePlan menv bopts baseConfigOpts locals sourceMap plan = do
         snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
         localBin <- (</> bindirSuffix) `liftM` installationRootLocal
         destDir <- asks $ configLocalBin . getConfig
-        let destDir' = toFilePath destDir
-        liftIO $ createDirectoryIfMissing True destDir'
+        createTree destDir
 
+        let destDir' = toFilePath destDir
         when (not $ any (FP.equalFilePath destDir') (envSearchPath menv)) $
             $logWarn $ T.concat
                 [ "Installation path "
@@ -278,7 +277,7 @@ executePlan menv bopts baseConfigOpts locals sourceMap plan = do
                     liftIO $ case platform of
                         Platform _ Windows | FP.equalFilePath destFile currExe ->
                             windowsRenameCopy (toFilePath file) destFile
-                        _ -> copyFile (toFilePath file) destFile
+                        _ -> D.copyFile (toFilePath file) destFile
                     return $ Just (destDir', [T.append name (T.pack ext)])
 
         let destToInstalled = Map.fromListWith (++) (catMaybes installed)
@@ -294,9 +293,9 @@ executePlan menv bopts baseConfigOpts locals sourceMap plan = do
 -- current executable to something else and then do the copy.
 windowsRenameCopy :: FilePath -> FilePath -> IO ()
 windowsRenameCopy src dest = do
-    copyFile src new
-    renameFile dest old
-    renameFile new dest
+    D.copyFile src new
+    D.renameFile dest old
+    D.renameFile new dest
   where
     new = dest ++ ".new"
     old = dest ++ ".old"
@@ -434,7 +433,7 @@ ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal cabalfp extra = do
     mOldConfigCache <- tryGetConfigCache pkgDir
 
     mOldCabalMod <- tryGetCabalMod pkgDir
-    newCabalMod <- liftIO (fmap modTime (getModificationTime (toFilePath cabalfp)))
+    newCabalMod <- liftIO (fmap modTime (D.getModificationTime (toFilePath cabalfp)))
 
     idMap <- liftIO $ readTVarIO eeGhcPkgIds
     let getMissing ident =
@@ -521,7 +520,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
         | console = inner Nothing
         | otherwise = do
             logPath <- buildLogPath package -- TODO give a difference suffix for test, bench, etc?
-            liftIO $ createDirectoryIfMissing True $ toFilePath $ parent logPath
+            createTree (parent logPath)
             let fp = toFilePath logPath
             bracket
                 (liftIO $ openBinaryFile fp WriteMode)

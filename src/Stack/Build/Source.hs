@@ -13,7 +13,6 @@ module Stack.Build.Source
     , loadLocals
     ) where
 
-import Network.HTTP.Client.Conduit (HasHttpManager)
 import           Control.Applicative          ((<|>), (<$>), (<*>))
 import           Control.Exception            (catch)
 import           Control.Monad
@@ -42,8 +41,9 @@ import           Data.Set                     (Set)
 import qualified Data.Set                     as Set
 import           Data.Text                    (Text)
 import qualified Data.Text                    as T
+import           Network.HTTP.Client.Conduit  (HasHttpManager)
 import           Path
-import           Prelude                      hiding (writeFile)
+import           Prelude
 import           Stack.Build.Cache
 import           Stack.Build.Types
 import           Stack.BuildPlan              (loadMiniBuildPlan,
@@ -52,7 +52,7 @@ import           Stack.Constants              (wiredInPackages)
 import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.Types
-import           System.Directory             hiding (findExecutable, findFiles)
+import           System.Directory
 import           System.IO                    (withBinaryFile, IOMode (ReadMode))
 import           System.IO.Error              (isDoesNotExistError)
 

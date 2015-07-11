@@ -67,6 +67,7 @@ import           Network.HTTP.Download
 import           Network.HTTP.Types (Status(..))
 import           Network.HTTP.Client (checkStatus)
 import           Path
+import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Stack.Constants
 import           Stack.Fetch
@@ -75,8 +76,6 @@ import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.Types
 import           Stack.Types.StackT
-import           System.Directory (createDirectoryIfMissing)
-import           System.FilePath (takeDirectory)
 
 data BuildPlanException
     = UnknownPackages
@@ -467,7 +466,7 @@ loadBuildPlan name = do
         Right bp -> return bp
         Left e -> do
             $logDebug $ "Decoding build plan from file failed: " <> T.pack (show e)
-            liftIO $ createDirectoryIfMissing True $ takeDirectory $ toFilePath fp
+            createTree (parent fp)
             req <- parseUrl $ T.unpack url
             $logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
             $logDebug $ "Downloading build plan from: " <> url

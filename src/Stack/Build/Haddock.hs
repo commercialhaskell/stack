@@ -27,13 +27,12 @@ import qualified Data.Set                       as Set
 import qualified Data.Text                      as T
 import           Path
 import           Path.IO
-import           Prelude                        hiding (FilePath, writeFile)
+import           Prelude
 import           Stack.Build.Types
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.Types
-import           System.Directory               hiding (findExecutable,
-                                                 findFiles)
+import           System.Directory               (getModificationTime)
 import qualified System.FilePath                as FP
 import           System.Process.Read
 
@@ -106,11 +105,8 @@ copyDepHaddocks envOverride bco pkgDbs pkgId extraDestDirs = do
                 origMod <- liftIO $ getModificationTime (toFilePath depOrigIndex)
                 return (copyMod <= origMod)
     doCopy depOrigDir depCopyDir = do
-        depCopyDirExists <- dirExists depCopyDir
-        liftIO $ do
-            when depCopyDirExists $
-                removeDirectoryRecursive (toFilePath depCopyDir)
-            createDirectoryIfMissing True (toFilePath depCopyDir)
+        removeTreeIfExists depCopyDir
+        createTree depCopyDir
         copyDirectoryRecursive depOrigDir depCopyDir
 
 -- | Generate Haddock index and contents for local packages.

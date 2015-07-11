@@ -58,7 +58,6 @@ import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB)
 import           Stack.Solver (getGhcVersion)
 import           Stack.Types
 import           Stack.Types.StackT
-import           System.Directory (createDirectoryIfMissing, removeFile)
 import           System.Environment (getExecutablePath)
 import           System.Exit (ExitCode (ExitSuccess))
 import           System.FilePath (searchPathSeparator)
@@ -381,7 +380,7 @@ listInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
               => m [PackageIdentifier]
 listInstalled = do
     dir <- asks $ configLocalPrograms . getConfig
-    liftIO $ createDirectoryIfMissing True $ toFilePath dir
+    createTree dir
     (_, files) <- listDirectory dir
     return $ mapMaybe toIdent files
   where
@@ -622,7 +621,7 @@ installGHCWindows si archiveFile archiveType destDir _ = do
 
     run7z (parent archiveFile) archiveFile
     run7z (parent archiveFile) tarFile
-    liftIO (removeFile $ toFilePath tarFile) `catchIO` \e ->
+    removeFile tarFile `catchIO` \e ->
         $logWarn (T.concat
             [ "Exception when removing "
             , T.pack $ toFilePath tarFile

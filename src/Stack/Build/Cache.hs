@@ -28,7 +28,7 @@ module Stack.Build.Cache
     , checkBenchBuilt
     ) where
 
-import           Control.Exception.Enclosed (catchIO, handleIO, tryIO)
+import           Control.Exception.Enclosed (handleIO, tryIO)
 import           Control.Monad.Catch        (MonadThrow, catch, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
@@ -45,9 +45,6 @@ import           Path.IO
 import           Stack.Build.Types
 import           Stack.Constants
 import           Stack.Types
-import           System.Directory           (createDirectoryIfMissing,
-                                             getDirectoryContents,
-                                             removeFile)
 import           System.IO.Error (isDoesNotExistError)
 
 -- | Directory containing files to mark an executable as installed
@@ -61,15 +58,15 @@ getInstalledExes :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow 
                  => InstallLocation -> m [PackageIdentifier]
 getInstalledExes loc = do
     dir <- exeInstalledDir loc
-    files <- liftIO $ handleIO (const $ return []) $ getDirectoryContents $ toFilePath dir
-    return $ mapMaybe parsePackageIdentifierFromString files
+    (_, files) <- liftIO $ handleIO (const $ return ([], [])) $ listDirectory dir
+    return $ mapMaybe (parsePackageIdentifierFromString . toFilePath) files
 
 -- | Mark the given executable as installed
 markExeInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)
                  => InstallLocation -> PackageIdentifier -> m ()
 markExeInstalled loc ident = do
     dir <- exeInstalledDir loc
-    liftIO $ createDirectoryIfMissing True $ toFilePath dir
+    createTree dir
     ident' <- parseRelFile $ packageIdentifierString ident
     let fp = toFilePath $ dir </> ident'
     -- TODO consideration for the future: list all of the executables
@@ -83,8 +80,7 @@ markExeNotInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThr
 markExeNotInstalled loc ident = do
     dir <- exeInstalledDir loc
     ident' <- parseRelFile $ packageIdentifierString ident
-    let fp = toFilePath $ dir </> ident'
-    liftIO $ catchIO (removeFile fp) (\_ -> return ())
+    removeFileIfExists (dir </> ident')
 
 -- | Stored on disk to know whether the flags have changed or any
 -- files have changed.
@@ -205,8 +201,7 @@ writeFlagCache :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m)
 writeFlagCache gid cache = do
     file <- flagCacheFile gid
     liftIO $ do
-        createDirectoryIfMissing True $ toFilePath $ parent file
-
+        createTree (parent file)
         Binary.encodeFile (toFilePath file) cache
 
 -- | Mark a test suite as having succeeded

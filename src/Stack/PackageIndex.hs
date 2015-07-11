@@ -70,12 +70,11 @@ import           GHC.Generics (Generic)
 import           Network.HTTP.Download
 import           Path                                  (mkRelDir, parent,
                                                         parseRelDir, toFilePath,
-                                                        (</>))
+                                                        parseAbsFile, (</>))
 import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Stack.Types
 import           Stack.Types.StackT
-import           System.Directory
 import           System.FilePath (takeBaseName, (<.>))
 import           System.IO                             (IOMode (ReadMode, WriteMode),
                                                         withBinaryFile)
@@ -246,7 +245,7 @@ updateIndexGit :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasCon
 updateIndexGit menv indexName' index gitUrl = do
      tarFile <- configPackageIndex indexName'
      let idxPath = parent tarFile
-     liftIO (createDirectoryIfMissing True (toFilePath idxPath))
+     createTree idxPath
      do
             repoName <- parseRelDir $ takeBaseName $ T.unpack gitUrl
             let cloneArgs =
@@ -262,15 +261,13 @@ updateIndexGit menv indexName' index gitUrl = do
                   sDir </>
                   $(mkRelDir "git-update")
                 acfDir = suDir </> repoName
-            repoExists <-
-              liftIO (doesDirectoryExist (toFilePath acfDir))
+            repoExists <- dirExists acfDir
             unless repoExists
                    (readInNull suDir "git" menv cloneArgs Nothing)
             $logSticky "Fetching package index ..."
             readInNull acfDir "git" menv ["fetch","--tags","--depth=1"] Nothing
             $logStickyDone "Fetched package index."
-            _ <-
-              (liftIO . tryIO) (removeFile (toFilePath tarFile))
+            removeFileIfExists tarFile
             when (indexGpgVerify index)
                  (do readInNull acfDir
                                 "git"
@@ -294,7 +291,8 @@ updateIndexGit menv indexName' index gitUrl = do
                        ,tarFileTmp
                        ,"current-hackage"]
                        Nothing
-            liftIO $ renameFile tarFileTmp (toFilePath tarFile)
+            tarFileTmpPath <- parseAbsFile tarFileTmp
+            renameFile tarFileTmpPath tarFile
 
 -- | Update the index tarball via HTTP
 updateIndexHTTP :: (MonadIO m,MonadLogger m
@@ -316,6 +314,7 @@ updateIndexHTTP indexName' index url = do
 
     when toUnpack $ do
         let tmp = toFilePath tar <.> "tmp"
+        tmpPath <- parseAbsFile tmp
 
         deleteCache indexName'
 
@@ -325,7 +324,7 @@ updateIndexHTTP indexName' index url = do
                     sourceHandle input
                     $$ ungzip
                     =$ sinkHandle output
-            renameFile tmp $ toFilePath tar
+            renameFile tmpPath tar
 
     when (indexGpgVerify index)
         $ $logWarn
@@ -341,11 +340,11 @@ isGitInstalled = flip doesExecutableExist "git"
 -- | Delete the package index cache
 deleteCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadLogger m, MonadThrow m) => IndexName -> m ()
 deleteCache indexName' = do
-    fp <- liftM toFilePath $ configPackageIndexCache indexName'
+    fp <- configPackageIndexCache indexName'
     eres <- liftIO $ tryIO $ removeFile fp
     case eres of
         Left e -> $logDebug $ "Could not delete cache: " <> T.pack (show e)
-        Right () -> $logDebug $ "Deleted index cache at " <> T.pack fp
+        Right () -> $logDebug $ "Deleted index cache at " <> T.pack (toFilePath fp)
 
 data PackageDownload = PackageDownload
     { pdSHA512 :: !ByteString

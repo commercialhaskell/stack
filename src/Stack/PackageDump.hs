@@ -52,10 +52,11 @@ import qualified Data.Text.Encoding as T
 import           Data.Typeable (Typeable)
 import           GHC.Generics (Generic)
 import           Path
+import           Path.IO (createTree)
 import           Prelude -- Fix AMP warning
 import           Stack.GhcPkg
 import           Stack.Types
-import           System.Directory (createDirectoryIfMissing, getDirectoryContents, doesFileExist)
+import           System.Directory (getDirectoryContents, doesFileExist)
 import           System.Process.Read
 
 -- | Cached information on whether package have profiling libraries and haddocks.
@@ -106,7 +107,7 @@ loadInstalledCache path = do
 -- | Save a @InstalledCache@ to disk
 saveInstalledCache :: MonadIO m => Path Abs File -> InstalledCache -> m ()
 saveInstalledCache path (InstalledCache ref) = liftIO $ do
-    createDirectoryIfMissing True $ toFilePath $ parent path
+    createTree (parent path)
     readIORef ref >>= taggedEncodeFile (toFilePath path)
 
 -- | Prune a list of possible packages down to those whose dependencies are met.

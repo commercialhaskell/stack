@@ -59,8 +59,9 @@ import qualified Data.Text.Lazy as LT
 import           Data.Typeable (Typeable)
 import           Distribution.System (OS (Windows, OtherOS), Platform (Platform))
 import           Path (Path, Abs, Dir, toFilePath, File, parseAbsFile)
+import           Path.IO (createTree)
 import           Prelude -- Fix AMP warning
-import           System.Directory (createDirectoryIfMissing, doesFileExist, getCurrentDirectory)
+import           System.Directory (doesFileExist, getCurrentDirectory)
 import           System.Environment (getEnvironment)
 import           System.Exit
 import qualified System.FilePath as FP
@@ -268,7 +269,7 @@ sinkProcessStderrStdout wd menv name args sinkStderr sinkStdout = do
 preProcess :: (MonadIO m) => Maybe (Path Abs Dir) -> EnvOverride -> String -> m FilePath
 preProcess wd menv name = do
   name' <- liftIO $ liftM toFilePath $ join $ findExecutable menv name
-  liftIO (maybe (return ()) (createDirectoryIfMissing True . toFilePath) wd)
+  maybe (return ()) createTree wd
   return name'
 
 -- | Check if the given executable exists on the given PATH

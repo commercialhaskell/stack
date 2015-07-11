@@ -48,14 +48,12 @@ import           Data.Typeable (Typeable)
 import           Options.Applicative.Builder.Extra (maybeBoolFlags)
 import           Options.Applicative (Parser,str,option,help,auto,metavar,long,value,hidden,internal,idm)
 import           Path
-import           Path.IO (getWorkingDir,listDirectory)
+import           Path.IO (getWorkingDir,listDirectory,createTree,removeFile,removeTree,dirExists)
 import           Stack.Constants (projectDockerSandboxDir,stackProgName,stackDotYaml,stackRootEnvVar)
 import           Stack.Exec
 import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Docker.GlobalDB
-import           System.Directory (createDirectoryIfMissing,removeDirectoryRecursive,removeFile)
-import           System.Directory (doesDirectoryExist)
 import           System.Environment (lookupEnv,getProgName,getArgs,getExecutablePath)
 import           System.FilePath (dropTrailingPathSeparator,takeBaseName)
 import           System.Info (arch,os)
@@ -208,11 +206,9 @@ runContainerAndExit modConfig
                                      (iiId imageInfo)
                                      (toFilePath projectRoot)
 
-           mapM_ (createDirectoryIfMissing True)
-                 (concat [[toFilePath sandboxHomeDir
-                          ,toFilePath sandboxSandboxDir
-                          ,toFilePath stackRoot] ++
-                          map toFilePath sandboxSubdirs]))
+           mapM_ createTree
+                 (concat [[sandboxHomeDir, sandboxSandboxDir, stackRoot] ++
+                          sandboxSubdirs]))
      exec
        plainEnvSettings
        "docker"
@@ -597,15 +593,15 @@ removeDirectoryContents :: Path Abs Dir -- ^ Directory to remove contents of
                         -> [Path Rel File] -- ^ Top-level file names to exclude from removal
                         -> IO ()
 removeDirectoryContents path excludeDirs excludeFiles =
-  do isRootDir <- doesDirectoryExist (toFilePath path)
+  do isRootDir <- dirExists path
      when isRootDir
           (do (lsd,lsf) <- listDirectory path
               forM_ lsd
                     (\d -> unless (dirname d `elem` excludeDirs)
-                                  (removeDirectoryRecursive (toFilePath d)))
+                                  (removeTree d))
               forM_ lsf
                     (\f -> unless (filename f `elem` excludeFiles)
-                                  (removeFile (toFilePath f))))
+                                  (removeFile f)))
 
 -- | Produce a strict 'S.ByteString' from the stdout of a
 -- process. Throws a 'ReadProcessException' exception if the

@@ -63,7 +63,7 @@ import qualified Stack.Docker as Docker
 import           Stack.Init
 import           Stack.Types
 import           Stack.Types.Internal
-import           System.Directory
+import           System.Directory (getAppUserDataDirectory, createDirectoryIfMissing, canonicalizePath)
 import           System.Environment
 import           System.IO
 import           System.Process.Read (getEnvOverride, EnvOverride, unEnvOverride, readInNull)
@@ -291,7 +291,7 @@ loadBuildConfig menv mproject config stackRoot mresolver noConfigStrat = do
                 destDir = implicitGlobalDir stackRoot
                 dest' :: FilePath
                 dest' = toFilePath dest
-            liftIO (createDirectoryIfMissing True (toFilePath destDir))
+            createTree destDir
             exists <- fileExists dest
             if exists
                then do
@@ -384,7 +384,7 @@ resolvePackageLocation _ projRoot (PLHttpTarball url) = do
         dir = root </> dirRel
         dirTmp = root </> dirRelTmp
 
-    exists <- liftIO $ doesDirectoryExist $ toFilePath dir
+    exists <- dirExists dir
     unless exists $ do
         req <- parseUrl $ T.unpack url
         _ <- download req file
@@ -394,7 +394,7 @@ resolvePackageLocation _ projRoot (PLHttpTarball url) = do
             lbs <- L.hGetContents h
             let entries = Tar.read $ GZip.decompress lbs
             Tar.unpack (toFilePath dirTmp) entries
-            renameDirectory (toFilePath dirTmp) (toFilePath dir)
+            renameDir dirTmp dir
 
     x <- listDirectory dir
     case x of
@@ -412,10 +412,10 @@ resolvePackageLocation menv projRoot (PLGit url commit) = do
     let dir = root </> dirRel
         dirTmp = root </> dirRelTmp
 
-    exists <- liftIO $ doesDirectoryExist $ toFilePath dir
+    exists <- dirExists dir
     unless exists $ do
         removeTreeIfExists dirTmp
-        liftIO $ createDirectoryIfMissing True $ toFilePath $ parent dirTmp
+        createTree (parent dirTmp)
         readInNull (parent dirTmp) "git" menv
             [ "clone"
             , T.unpack url
@@ -428,7 +428,7 @@ resolvePackageLocation menv projRoot (PLGit url commit) = do
             , T.unpack commit
             ]
             Nothing
-        liftIO $ renameDirectory (toFilePath dirTmp) (toFilePath dir)
+        renameDir dirTmp dir
 
     return dir
 

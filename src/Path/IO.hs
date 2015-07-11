@@ -10,15 +10,22 @@ module Path.IO
   ,resolveDirMaybe
   ,resolveFileMaybe
   ,ResolveException(..)
+  ,removeFile
   ,removeFileIfExists
   ,removeTree
   ,removeTreeIfExists
-  ,fileExists
+  ,renameFile
   ,renameFileIfExists
+  ,renameDir
   ,renameDirIfExists
+  ,moveFile
   ,moveFileIfExists
+  ,moveDir
   ,moveDirIfExists
+  ,fileExists
   ,dirExists
+  ,copyFile
+  ,copyFileIfExists
   ,copyDirectoryRecursive
   ,createTree)
   where
@@ -31,7 +38,7 @@ import           Data.Either
 import           Data.Maybe
 import           Data.Typeable
 import           Path
-import           System.Directory
+import qualified System.Directory as D
 import qualified System.FilePath as FP
 import           System.IO.Error
 
@@ -47,7 +54,7 @@ instance Show ResolveException where
 
 -- | Get the current working directory.
 getWorkingDir :: (MonadIO m) => m (Path Abs Dir)
-getWorkingDir = liftIO (canonicalizePath "." >>= parseAbsDir)
+getWorkingDir = liftIO (D.canonicalizePath "." >>= parseAbsDir)
 
 -- | Appends a stringly-typed relative path to an absolute path, and then
 -- canonicalizes it.
@@ -84,7 +91,7 @@ resolveCheckParse check parse x y = do
     exists <- liftIO $ check fp
     if exists
         then do
-            canonic <- liftIO $ canonicalizePath fp
+            canonic <- liftIO $ D.canonicalizePath fp
             liftM Just (parse canonic)
         else return Nothing
 
@@ -93,23 +100,23 @@ resolveCheckParse check parse x y = do
 -- be canonicalized, 'Nothing' is returned).
 resolveDirMaybe :: (MonadIO m,MonadThrow m)
                 => Path Abs Dir -> FilePath -> m (Maybe (Path Abs Dir))
-resolveDirMaybe = resolveCheckParse doesDirectoryExist parseAbsDir
+resolveDirMaybe = resolveCheckParse D.doesDirectoryExist parseAbsDir
 
 -- | Appends a stringly-typed relative path to an absolute path, and then
 -- canonicalizes it. If the path doesn't exist (and therefore cannot
 -- be canonicalized, 'Nothing' is returned).
 resolveFileMaybe :: (MonadIO m,MonadThrow m)
                  => Path Abs Dir -> FilePath -> m (Maybe (Path Abs File))
-resolveFileMaybe = resolveCheckParse doesFileExist parseAbsFile
+resolveFileMaybe = resolveCheckParse D.doesFileExist parseAbsFile
 
 -- | List objects in a directory, excluding "@.@" and "@..@".  Entries are not sorted.
 listDirectory :: (MonadIO m,MonadThrow m) => Path Abs Dir -> m ([Path Abs Dir],[Path Abs File])
 listDirectory dir =
-  do entriesFP <- liftIO (getDirectoryContents dirFP)
+  do entriesFP <- liftIO (D.getDirectoryContents dirFP)
      maybeEntries <-
        forM (map (dirFP ++) entriesFP)
             (\entryFP ->
-               do isDir <- liftIO (doesDirectoryExist entryFP)
+               do isDir <- liftIO (D.doesDirectoryExist entryFP)
                   if isDir
                      then case parseAbsDir entryFP of
                             Nothing -> return Nothing
@@ -124,97 +131,78 @@ listDirectory dir =
      return (lefts entries,rights entries)
   where dirFP = toFilePath dir
 
--- | Remove the given file. Optimistically assumes it exists. If it
--- doesn't, doesn't complain.
+-- | Remove a file. Bails out if it doesn't exist.
+removeFile :: MonadIO m => Path b File -> m ()
+removeFile = liftIO . D.removeFile . toFilePath
+
+-- | Remove a file. Optimistically assumes it exists. If it doesn't,
+-- doesn't complain.
 removeFileIfExists :: MonadIO m => Path b File -> m ()
-removeFileIfExists fp =
-    liftIO (catch
-                (removeFile
-                     (toFilePath fp))
-                (\e ->
-                      if isDoesNotExistError e
-                          then return ()
-                          else throwIO e))
+removeFileIfExists = ignoreDoesNotExist . removeFile
 
--- | Move the given file. Optimistically assumes it exists. If it
--- doesn't, doesn't complain.
-renameFileIfExists :: MonadIO m => Path b File -> Path b File -> m ()
-renameFileIfExists from to =
-    liftIO
-        (catch
-             (renameFile (toFilePath from)
-                         (toFilePath to))
-             (\e ->
-                   if isDoesNotExistError e
-                       then return ()
-                       else throwIO e))
+-- | Rename a file. Bails out if it doesn't exist.
+renameFile :: MonadIO m => Path b1 File -> Path b2 File -> m ()
+renameFile from to = liftIO (D.renameFile (toFilePath from) (toFilePath to))
 
--- | Rename the directory. Optimistically assumes it exists. If it
+-- | Rename a file. Optimistically assumes it exists. If it doesn't,
+-- doesn't complain.
+renameFileIfExists :: MonadIO m => Path b1 File -> Path b2 File -> m ()
+renameFileIfExists from to = ignoreDoesNotExist (renameFile from to)
+
+renameDir :: MonadIO m => Path b1 Dir -> Path b2 Dir -> m ()
+renameDir from to = liftIO (D.renameDirectory (toFilePath from) (toFilePath to))
+
+-- | Rename a directory. Optimistically assumes it exists. If it
 -- doesn't, doesn't complain.
-renameDirIfExists :: MonadIO m => Path b Dir -> Path b Dir -> m ()
-renameDirIfExists from to =
-    liftIO
-        (catch
-             (renameDirectory (toFilePath from)
-                              (toFilePath to))
-             (\e ->
-                   if isDoesNotExistError e
-                       then return ()
-                       else throwIO e))
+renameDirIfExists :: MonadIO m => Path b1 Dir -> Path b2 Dir -> m ()
+renameDirIfExists from to = ignoreDoesNotExist (renameDir from to)
 
 -- | Make a directory tree, creating parents if needed.
 createTree :: MonadIO m => Path b Dir -> m ()
-createTree = liftIO . createDirectoryIfMissing True . toFilePath
+createTree = liftIO . D.createDirectoryIfMissing True . toFilePath
 
--- | Move the given file. Optimistically assumes it exists. If it
--- doesn't, doesn't complain.
-moveFileIfExists :: MonadIO m => Path b File -> Path b Dir -> m ()
-moveFileIfExists from to =
-    liftIO
-        (catch
-             (renameFile (toFilePath from)
-                         (toFilePath (to </> filename from)))
-             (\e ->
-                   if isDoesNotExistError e
-                       then return ()
-                       else throwIO e))
+-- | Move a file. Bails out if it doesn't exist.
+moveFile :: MonadIO m => Path b1 File -> Path b2 Dir -> m ()
+moveFile from to = renameFile from (to </> filename from)
 
--- | Move the given dir. Optimistically assumes it exists. If it
--- doesn't, doesn't complain.
-moveDirIfExists :: MonadIO m => Path b Dir -> Path b Dir -> m ()
-moveDirIfExists from to =
-    liftIO
-        (catch
-             (renameDirectory
-                  (toFilePath from)
-                  (toFilePath (to </> dirname from)))
-             (\e ->
-                   if isDoesNotExistError e
-                       then return ()
-                       else throwIO e))
+-- | Move a file. Optimistically assumes it exists. If it doesn't,
+-- doesn't complain.
+moveFileIfExists :: MonadIO m => Path b1 File -> Path b2 Dir -> m ()
+moveFileIfExists from to = ignoreDoesNotExist (moveFile from to)
 
--- | Remove the given tree. Bails out if the directory doesn't exist.
+-- | Move a dir. Bails out if it doesn't exist.
+moveDir :: MonadIO m => Path b1 Dir -> Path b2 Dir -> m ()
+moveDir from to = renameDir from (to </> dirname from)
+
+-- | Move a dir. Optimistically assumes it exists. If it doesn't,
+-- doesn't complain.
+moveDirIfExists :: MonadIO m => Path b1 Dir -> Path b2 Dir -> m ()
+moveDirIfExists from to = ignoreDoesNotExist (moveDir from to)
+
+-- | Remove a tree. Bails out if it doesn't exist.
 removeTree :: MonadIO m => Path b Dir -> m ()
-removeTree =
-    liftIO . removeDirectoryRecursive . toFilePath
+removeTree = liftIO . D.removeDirectoryRecursive . toFilePath
 
 -- | Remove tree, don't complain about non-existent directories.
 removeTreeIfExists :: MonadIO m => Path b Dir -> m ()
-removeTreeIfExists fp = do
-    liftIO (catch (removeTree fp)
-                  (\e -> if isDoesNotExistError e
-                            then return ()
-                            else throwIO e))
+removeTreeIfExists = ignoreDoesNotExist . removeTree
 
--- | Does the given file exist?
+-- | Does the file exist?
 fileExists :: MonadIO m => Path b File -> m Bool
-fileExists =
-    liftIO . doesFileExist . toFilePath
+fileExists = liftIO . D.doesFileExist . toFilePath
 
--- | Does the given directory exist?
+-- | Does the directory exist?
 dirExists :: MonadIO m => Path b Dir -> m Bool
-dirExists =
-    liftIO . doesDirectoryExist . toFilePath
+dirExists = liftIO . D.doesDirectoryExist . toFilePath
+
+-- | Copies a file to another path. Bails out if it doesn't exist.
+copyFile :: MonadIO m => Path b1 File -> Path b2 File -> m ()
+copyFile from to = liftIO (D.copyFile (toFilePath from) (toFilePath to))
+
+-- | Copies a file to another path. Optimistically assumes it exists. If
+-- it doesn't, doesn't complain.
+copyFileIfExists :: MonadIO m => Path b1 File -> Path b2 File -> m ()
+copyFileIfExists from to = ignoreDoesNotExist (copyFile from to)
 
 -- | Copy a directory recursively.  This just uses 'copyFile', so it is not smart about symbolic
 -- links or other special files.
@@ -223,16 +211,20 @@ copyDirectoryRecursive :: (MonadIO m,MonadThrow m)
                        -> Path Abs Dir -- ^ Destination directory
                        -> m ()
 copyDirectoryRecursive srcDir destDir =
-    do liftIO (createDirectoryIfMissing False (toFilePath destDir))
+    do liftIO (D.createDirectoryIfMissing False (toFilePath destDir))
        (srcSubDirs,srcFiles) <- listDirectory srcDir
        forM_ srcFiles
              (\srcFile ->
                 case stripDir srcDir srcFile of
                   Nothing -> return ()
-                  Just relFile -> liftIO (copyFile (toFilePath srcFile)
-                                                   (toFilePath (destDir </> relFile))))
+                  Just relFile -> copyFile srcFile (destDir </> relFile))
        forM_ srcSubDirs
              (\srcSubDir ->
                 case stripDir srcDir srcSubDir of
                   Nothing -> return ()
                   Just relSubDir -> copyDirectoryRecursive srcSubDir (destDir </> relSubDir))
+
+-- Utility function for a common pattern of ignoring does-not-exist errors.
+ignoreDoesNotExist :: MonadIO m => IO () -> m ()
+ignoreDoesNotExist f =
+    liftIO $ catch f $ \e -> unless (isDoesNotExistError e) (throwIO e)
