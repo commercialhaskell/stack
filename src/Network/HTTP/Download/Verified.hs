@@ -32,6 +32,7 @@ import Control.Applicative
 import Crypto.Hash
 import Crypto.Hash.Conduit (sinkHash)
 import Data.ByteString (ByteString)
+import Data.ByteString.Char8 (readInteger)
 import Data.Conduit
 import Data.Conduit.Binary (sourceHandle, sinkHandle)
 import Data.Foldable (traverse_,for_)
@@ -214,7 +215,7 @@ retry n0 action =
 verifiedDownload :: (MonadReader env m, HasHttpManager env, MonadIO m)
          => DownloadRequest
          -> Path Abs File -- ^ destination
-         -> Sink ByteString (ReaderT env IO) () -- ^ custom hook to observe progress
+         -> (Maybe Integer -> Sink ByteString (ReaderT env IO) ()) -- ^ custom hook to observe progress
          -> m Bool -- ^ Whether a download was performed
 verifiedDownload DownloadRequest{..} destpath progressSink = do
     let req = drRequest
@@ -277,6 +278,10 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
 
     go h res = do
         let headers = responseHeaders res
+            mcontentLength = do
+              hLength <- List.lookup hContentLength headers
+              (i,_) <- readInteger hLength
+              return i
         for_ drLengthCheck $ checkContentLengthHeader headers
         let hashChecks = (case List.lookup hContentMD5 headers of
                 Just md5BS ->
@@ -294,4 +299,4 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
                 ( hashChecksToZipSink drRequest hashChecks
                   *> maybe (pure ()) (assertLengthSink drRequest) drLengthCheck
                   *> ZipSink (sinkHandle h)
-                  *> ZipSink progressSink)
+                  *> ZipSink (progressSink mcontentLength))

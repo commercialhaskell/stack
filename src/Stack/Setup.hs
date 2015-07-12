@@ -41,11 +41,13 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Encoding.Error as T
+import           Data.Text.Lazy.Builder (Builder)
 import           Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
 import           Data.Typeable (Typeable)
 import qualified Data.Yaml as Yaml
 import           Distribution.System (OS (..), Arch (..), Platform (..))
 import           Distribution.Text (simpleParse)
+import           Formatting
 import           Network.HTTP.Client.Conduit
 import           Network.HTTP.Download (verifiedDownload, DownloadRequest(..), drRetriesDefault)
 import           Path
@@ -703,7 +705,7 @@ chattyDownload label url path = do
         then $logStickyDone ("Downloaded " <> label <> ".")
         else $logStickyDone "Already downloaded."
   where
-    chattyDownloadProgress runInBase = do
+    chattyDownloadProgress runInBase mcontentLength = do
         _ <- liftIO $ runInBase $ $logSticky $
           label <> ": download has begun"
         CL.map (Sum . S.length)
@@ -714,8 +716,36 @@ chattyDownload label url path = do
             modify (+ size)
             totalSoFar <- get
             liftIO $ runInBase $ $logSticky $
-                label <> ": " <> T.pack (show totalSoFar) <> " bytes downloaded..."
+              case mcontentLength of
+                Nothing -> chattyProgressNoTotal totalSoFar
+                Just 0 -> chattyProgressNoTotal totalSoFar
+                Just total -> chattyProgressWithTotal totalSoFar total
+        chattyProgressNoTotal =
+          -- Example: ghc: 42.13 KiB downloaded...
+          sformat (stext % ": " % bytes (fixed 2) % " downloaded...") label
 
+        chattyProgressWithTotal totalSoFar total =
+          -- Example: ghc: 50.00 MiB / 100.00 MiB (50.00%) downloaded...
+          sformat (stext % ": " % bytes (fixed 2) % " / " % bytes (fixed 2) %
+                   " (" % (fixed 2) % "%) downloaded...")
+                   label
+                   totalSoFar
+                   total
+                   percentage
+          where percentage :: Double
+                percentage = (fromIntegral totalSoFar / fromIntegral total * 100)
+
+-- | Renders a given byte count using an appropiate binary suffix, e.g. MiB
+bytes :: Integral a
+      => Format Builder (Double -> Builder) -- ^ formatter for the decimal part
+      -> Format r (a -> r)
+bytes d = later go
+  where
+    go bs = bprint d (fromIntegral (signum bs) * dec) <> " " <> bytesSuffixes !! i
+      where (dec,i) = getSuffix (abs bs)
+    getSuffix n = until p (\(x,y) -> (x / 1024, y+1)) (fromIntegral n,0)
+      where p (n',numDivs) = n' < 1024 || numDivs == (length bytesSuffixes - 1)
+    bytesSuffixes = ["B","KiB","MiB","GiB","TiB","PiB","EiB","ZiB","YiB"]
 
 -- Await eagerly (collect with monoidal append),
 -- but space out yields by at least the given amount of time.
