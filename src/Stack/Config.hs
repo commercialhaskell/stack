@@ -21,8 +21,8 @@
 -- probably default to behaving like cabal, possibly with spitting out
 -- a warning that "you should run `stk init` to make things better".
 module Stack.Config
-  ( configOptsParser
-  , loadConfig
+  (loadConfig
+  ,packagesParser
   ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -165,71 +165,6 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
      let configConcurrentTests = fromMaybe True configMonoidConcurrentTests
 
      return Config {..}
-
--- | Command-line arguments parser for configuration.
-configOptsParser :: Bool -> Parser ConfigMonoid
-configOptsParser docker =
-    (\opts systemGHC installGHC arch os jobs includes libs skipGHCCheck skipMsys localBin -> mempty
-        { configMonoidDockerOpts = opts
-        , configMonoidSystemGHC = systemGHC
-        , configMonoidInstallGHC = installGHC
-        , configMonoidSkipGHCCheck = skipGHCCheck
-        , configMonoidArch = arch
-        , configMonoidOS = os
-        , configMonoidJobs = jobs
-        , configMonoidExtraIncludeDirs = includes
-        , configMonoidExtraLibDirs = libs
-        , configMonoidSkipMsys = skipMsys
-        , configMonoidLocalBinPath = localBin
-        })
-    <$> Docker.dockerOptsParser docker
-    <*> maybeBoolFlags
-            "system-ghc"
-            "using the system installed GHC (on the PATH) if available and a matching version"
-            idm
-    <*> maybeBoolFlags
-            "install-ghc"
-            "downloading and installing GHC if necessary (can be done manually with stack setup)"
-            idm
-    <*> optional (strOption
-            ( long "arch"
-           <> metavar "ARCH"
-           <> help "System architecture, e.g. i386, x86_64"
-            ))
-    <*> optional (strOption
-            ( long "os"
-           <> metavar "OS"
-           <> help "Operating system, e.g. linux, windows"
-            ))
-    <*> optional (option auto
-            ( long "jobs"
-           <> short 'j'
-           <> metavar "JOBS"
-           <> help "Number of concurrent jobs to run"
-            ))
-    <*> fmap (S.fromList . map T.pack) (many $ strOption
-            ( long "extra-include-dirs"
-           <> metavar "DIR"
-           <> help "Extra directories to check for C header files"
-            ))
-    <*> fmap (S.fromList . map T.pack) (many $ strOption
-            ( long "extra-lib-dirs"
-           <> metavar "DIR"
-           <> help "Extra directories to check for libraries"
-            ))
-    <*> maybeBoolFlags
-            "skip-ghc-check"
-            "skipping the GHC version and architecture check"
-            idm
-    <*> maybeBoolFlags
-            "skip-msys"
-            "skipping the local MSYS installation (Windows only)"
-            idm
-    <*> optional (strOption
-             ( long "local-bin-path"
-             <> metavar "DIR"
-             <> help "Install binaries to DIR"
-              )) 
 
 -- | Get the directory on Windows where we should install extra programs. For
 -- more information, see discussion at:
@@ -540,3 +475,7 @@ loadProjectConfig mstackYaml = do
     load fp = do
         ProjectAndConfigMonoid project config <- loadYaml fp
         return $ Just (project, fp, config)
+
+packagesParser :: Parser [String]
+packagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))
+

@@ -47,12 +47,14 @@ import           Stack.Fetch
 import           Stack.FileWatch
 import           Stack.Init
 import           Stack.New
+import           Stack.Options
 import qualified Stack.PackageIndex
 import           Stack.Repl
 import           Stack.Ide
 import           Stack.Setup
 import           Stack.Solver (solveExtraDeps)
 import           Stack.Types
+import           Stack.Types.Config
 import           Stack.Types.Internal
 import           Stack.Types.StackT
 import           Stack.Upgrade
@@ -79,7 +81,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
      isTerminal <- hIsTerminalDevice stdout
      execExtraHelp args
                    dockerHelpOptName
-                   (Docker.dockerOptsParser True)
+                   (dockerOptsParser True)
                    ("Only showing --" ++ Docker.dockerCmdName ++ "* options.")
      let versionString' = $(simpleVersion Meta.version)
      eGlobalRun <- try $
@@ -88,15 +90,15 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
          "stack - The Haskell Tool Stack"
          ""
          (extraHelpOption progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
-          globalOpts isTerminal)
+          globalOptsParser isTerminal)
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
-                        (buildOpts Build)
+                        (buildOptsParser Build)
              addCommand "install"
                         "Build executables and install to a user path"
                         installCmd
-                        (buildOpts Build)
+                        (buildOptsParser Build)
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
                         (\(bopts, topts) ->
@@ -106,15 +108,15 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                                                         , boptsGhcOptions = "-fhpc" : boptsGhcOptions bopts}
                                              else bopts
                              in buildCmd (DoTests topts) bopts')
-                        ((,) <$> buildOpts Test <*> testOpts)
+                        ((,) <$> buildOptsParser Test <*> testOptsParser)
              addCommand "bench"
                         "Build and benchmark the project(s) in this directory/configuration"
                         (\(bopts, beopts) -> buildCmd (DoBenchmarks beopts) bopts)
-                        ((,) <$> buildOpts Bench <*> benchOpts)
+                        ((,) <$> buildOptsParser Bench <*> benchOptsParser)
              addCommand "haddock"
                         "Generate haddocks for the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
-                        (buildOpts Haddock)
+                        (buildOptsParser Haddock)
              addCommand "new"
                         "Create a brand new project"
                         newCmd
@@ -230,7 +232,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                    addCommand Docker.dockerCleanupCmdName
                               "Clean up Docker images and containers"
                               dockerCleanupCmd
-                              dockerCleanupOpts)
+                              dockerCleanupOptsParser)
              )
              -- commandsFromPlugins plugins pluginShouldHaveRun) https://github.com/commercialhaskell/stack/issues/322
      case eGlobalRun of
@@ -478,37 +480,6 @@ withBuildConfig go@GlobalOpts{..} strat inner = do
 cleanCmd :: () -> GlobalOpts -> IO ()
 cleanCmd () go = withBuildConfig go ThrowException clean
 
--- | Parser for package names
-readPackageName :: ReadM PackageName
-readPackageName = do
-    s <- readerAsk
-    case parsePackageNameFromString s of
-        Nothing -> readerError $ "Invalid package name: " ++ s
-        Just x -> return x
-
--- | Parser for package:[-]flag
-readFlag :: ReadM (Map (Maybe PackageName) (Map FlagName Bool))
-readFlag = do
-    s <- readerAsk
-    case break (== ':') s of
-        (pn, ':':mflag) -> do
-            pn' <-
-                case parsePackageNameFromString pn of
-                    Nothing
-                        | pn == "*" -> return Nothing
-                        | otherwise -> readerError $ "Invalid package name: " ++ pn
-                    Just x -> return $ Just x
-            let (b, flagS) =
-                    case mflag of
-                        '-':x -> (False, x)
-                        _ -> (True, mflag)
-            flagN <-
-                case parseFlagNameFromString flagS of
-                    Nothing -> readerError $ "Invalid flag name: " ++ flagS
-                    Just x -> return x
-            return $ Map.singleton pn' $ Map.singleton flagN b
-        _ -> readerError "Must have a colon"
-
 -- | Helper for build and install commands
 buildCmdHelper :: NoBuildConfigStrategy -> FinalAction -> BuildOpts -> GlobalOpts -> IO ()
 buildCmdHelper strat finalAction opts go
@@ -556,58 +527,6 @@ uploadCmd args go = do
                   Upload.defaultUploadSettings
             mapM_ (Upload.upload uploader) args
 
-packagesParser :: Parser [String]
-packagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))
-
-data ExecOpts = ExecOpts
-    { eoCmd :: !String
-    , eoArgs :: ![String]
-    , eoExtra :: !ExecOptsExtra
-    }
-
-data ExecOptsExtra
-    = ExecOptsPlain
-    | ExecOptsEmbellished
-        { eoEnvSettings :: !EnvSettings
-        , eoPackages :: ![String]
-        }
-
-execOptsParser :: Maybe String -- ^ command
-               -> Parser ExecOpts
-execOptsParser mcmd =
-    ExecOpts
-        <$> maybe eoCmdParser pure mcmd
-        <*> eoArgsParser
-        <*> (eoPlainParser <|>
-             ExecOptsEmbellished
-                <$> eoEnvSettingsParser
-                <*> eoPackagesParser)
-  where
-    eoCmdParser :: Parser String
-    eoCmdParser = strArgument (metavar "CMD")
-
-    eoArgsParser :: Parser [String]
-    eoArgsParser = many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)"))
-
-    eoEnvSettingsParser :: Parser EnvSettings
-    eoEnvSettingsParser = EnvSettings
-        <$> pure True
-        <*> boolFlags True
-                "ghc-package-path"
-                "setting the GHC_PACKAGE_PATH variable for the subprocess"
-                idm
-        <*> boolFlags True
-                "stack-exe"
-                "setting the STACK_EXE environment variable to the path for the stack executable"
-                idm
-
-    eoPackagesParser :: Parser [String]
-    eoPackagesParser = packagesParser
-
-    eoPlainParser :: Parser ExecOptsExtra
-    eoPlainParser = flag' ExecOptsPlain
-                          (long "plain" <>
-                           help "Use an unmodified environment (only useful with Docker)")
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
@@ -668,228 +587,6 @@ dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
         Docker.preventInContainer $
             Docker.cleanup cleanupOpts
 
--- | Command sum type for conditional arguments.
-data Command
-    = Build
-    | Test
-    | Haddock
-    | Bench
-    deriving (Eq)
-
--- | Parser for test arguments.
-testOpts :: Parser TestOpts
-testOpts = TestOpts
-       <$> boolFlags True
-                     "rerun-tests"
-                     "running already successful tests"
-                     idm
-       <*> argsOption(long "test-arguments" <>
-                      metavar "TEST_ARGS" <>
-                      help "Arguments passed in to the test suite program" <>
-                      value [])
-      <*> flag False
-               True
-               (long "coverage" <>
-               help "Generate a code coverage report")
-      <*> flag False
-               True
-               (long "no-run-tests" <>
-                help "Disable running of tests. (Tests will still be built.)")
-
-
-
--- | Parser for bench arguments.
-benchOpts :: Parser BenchmarkOpts
-benchOpts = BenchmarkOpts
-        <$> optional (strOption (long "benchmark-arguments" <>
-                                 metavar "BENCH_ARGS" <>
-                                 help ("Forward BENCH_ARGS to the benchmark suite. " <>
-                                       "Supports templates from `cabal bench`")))
-
--- | Parser for build arguments.
-buildOpts :: Command -> Parser BuildOpts
-buildOpts cmd =
-            BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
-            optimize <*> haddock <*> haddockDeps <*> finalAction <*> dryRun <*> ghcOpts <*>
-            flags <*> installExes <*> preFetch <*> onlySnapshot <*>
-            fileWatch' <*> keepGoing
-  where optimize =
-          maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
-        target =
-          fmap (map T.pack)
-               (many (strArgument
-                        (metavar "TARGET" <>
-                         help "If none specified, use all packages defined in current directory")))
-        libProfiling =
-          boolFlags False
-                    "library-profiling"
-                    "library profiling for TARGETs and all its dependencies"
-                    idm
-        exeProfiling =
-          boolFlags False
-                    "executable-profiling"
-                    "library profiling for TARGETs and all its dependencies"
-                    idm
-        haddock = if cmd == Haddock
-                     then pure True
-                     else boolFlags False
-                                    "haddock"
-                                    "building Haddocks"
-                                    idm
-        haddockDeps =
-          if cmd == Haddock
-             then maybeBoolFlags
-                            "haddock-deps"
-                            "building Haddocks for dependencies"
-                            idm
-             else pure Nothing
-        finalAction = pure DoNothing
-        installExes = pure False
-        dryRun = flag False True (long "dry-run" <>
-                                  help "Don't build anything, just prepare to")
-        ghcOpts = (++)
-          <$> flag [] ["-Wall", "-Werror"]
-              ( long "pedantic"
-             <> help "Turn on -Wall and -Werror (note: option name may change in the future"
-              )
-          <*> many (fmap T.pack
-                     (strOption (long "ghc-options" <>
-                                 metavar "OPTION" <>
-                                 help "Additional options passed to GHC")))
-
-        flags =
-          fmap (Map.unionsWith Map.union) $ many
-            (option readFlag
-                ( long "flag"
-               <> metavar "PACKAGE:[-]FLAG"
-               <> help "Override flags set in stack.yaml (applies to local packages and extra-deps)"
-                ))
-
-        preFetch = flag False True
-            (long "prefetch" <>
-             help "Fetch packages necessary for the build immediately, useful with --dry-run")
-        onlySnapshot = flag False True
-            (long "only-snapshot" <>
-             help "Only build packages for the snapshot database, not the local database")
-
-        fileWatch' = flag False True
-            (long "file-watch" <>
-             help "Watch for changes in local files and automatically rebuild")
-
-        keepGoing = maybeBoolFlags
-            "keep-going"
-            "continue running after a step fails (default: false for build, true for test/bench)"
-            idm
-
--- | Parser for docker cleanup arguments.
-dockerCleanupOpts :: Parser Docker.CleanupOpts
-dockerCleanupOpts =
-  Docker.CleanupOpts <$>
-  (flag' Docker.CleanupInteractive
-         (short 'i' <>
-          long "interactive" <>
-          help "Show cleanup plan in editor and allow changes (default)") <|>
-   flag' Docker.CleanupImmediate
-         (short 'y' <>
-          long "immediate" <>
-          help "Immediately execute cleanup plan") <|>
-   flag' Docker.CleanupDryRun
-         (short 'n' <>
-          long "dry-run" <>
-          help "Display cleanup plan but do not execute") <|>
-   pure Docker.CleanupInteractive) <*>
-  opt (Just 14) "known-images" "LAST-USED" <*>
-  opt Nothing "unknown-images" "CREATED" <*>
-  opt (Just 0) "dangling-images" "CREATED" <*>
-  opt Nothing "stopped-containers" "CREATED" <*>
-  opt Nothing "running-containers" "CREATED"
-  where opt def' name mv =
-          fmap Just
-               (option auto
-                       (long name <>
-                        metavar (mv ++ "-DAYS-AGO") <>
-                        help ("Remove " ++
-                              toDescr name ++
-                              " " ++
-                              map toLower (toDescr mv) ++
-                              " N days ago" ++
-                              case def' of
-                                Just n -> " (default " ++ show n ++ ")"
-                                Nothing -> ""))) <|>
-          flag' Nothing
-                (long ("no-" ++ name) <>
-                 help ("Do not remove " ++
-                       toDescr name ++
-                       case def' of
-                         Just _ -> ""
-                         Nothing -> " (default)")) <|>
-          pure def'
-        toDescr = map (\c -> if c == '-' then ' ' else c)
-
--- | Parser for global command-line options.
-globalOpts :: Bool -> Parser GlobalOpts
-globalOpts defaultTerminal =
-    GlobalOpts <$> logLevelOpt <*>
-    configOptsParser False <*>
-    optional resolverParser <*>
-    flag
-        defaultTerminal
-        False
-        (long "no-terminal" <>
-         help
-             "Override terminal detection in the case of running in a false terminal") <*>
-    (optional (strOption
-        (long "stack-yaml" <>
-         metavar "STACK-YAML" <>
-         help "Override project stack.yaml file (overrides any STACK_YAML environment variable)")))
-
--- | Parse for a logging level.
-logLevelOpt :: Parser LogLevel
-logLevelOpt =
-  fmap parse
-       (strOption (long "verbosity" <>
-                   metavar "VERBOSITY" <>
-                   help "Verbosity: silent, error, warn, info, debug")) <|>
-  flag defaultLogLevel
-       verboseLevel
-       (short 'v' <> long "verbose" <>
-        help ("Enable verbose mode: verbosity level \"" <> showLevel verboseLevel <> "\""))
-  where verboseLevel = LevelDebug
-        showLevel l =
-          case l of
-            LevelDebug -> "debug"
-            LevelInfo -> "info"
-            LevelWarn -> "warn"
-            LevelError -> "error"
-            LevelOther x -> T.unpack x
-        parse s =
-          case s of
-            "debug" -> LevelDebug
-            "info" -> LevelInfo
-            "warn" -> LevelWarn
-            "error" -> LevelError
-            _ -> LevelOther (T.pack s)
-
-resolverParser :: Parser Resolver
-resolverParser =
-    option readResolver
-        (long "resolver" <>
-         metavar "RESOLVER" <>
-         help "Override resolver in project file")
-
--- | Default logging level should be something useful but not crazy.
-defaultLogLevel :: LogLevel
-defaultLogLevel = LevelInfo
-
--- | Parsed global command-line options.
-data GlobalOpts = GlobalOpts
-    { globalLogLevel     :: LogLevel -- ^ Log level
-    , globalConfigMonoid :: ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
-    , globalResolver     :: Maybe Resolver -- ^ Resolver override
-    , globalTerminal     :: Bool -- ^ We're in a terminal?
-    , globalStackYaml    :: Maybe FilePath -- ^ Override project stack.yaml
-    } deriving (Show)
-
 -- | Load the configuration with a manager. Convenience function used
 -- throughout this module.
 loadConfigWithOpts :: GlobalOpts -> IO (Manager,LoadConfig (StackLoggingT IO))
@@ -924,13 +621,6 @@ solverCmd :: Bool -- ^ modify stack.yaml automatically?
           -> IO ()
 solverCmd fixStackYaml go =
     withBuildConfig go ThrowException (solveExtraDeps fixStackYaml)
-
--- | Parser for @solverCmd@
-solverOptsParser :: Parser Bool
-solverOptsParser = boolFlags False
-    "modify-stack-yaml"
-    "Automatically modify stack.yaml with the solver's recommendations"
-    idm
 
 -- | Visualize dependencies
 dotCmd :: DotOpts -> GlobalOpts -> IO ()
