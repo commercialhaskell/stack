@@ -91,7 +91,7 @@ action `shouldNotReturn` unexpected = action >>= (`shouldNotBe` unexpected)
 
 spec :: Spec
 spec = beforeAll setup $ afterAll teardown $ do
-  let exampleProgressHook = return ()
+  let exampleProgressHook _ = return ()
 
   describe "verifiedDownload" $ do
     -- Preconditions:
@@ -157,8 +157,7 @@ spec = beforeAll setup $ afterAll teardown $ do
             , drLengthCheck = Nothing
             , drRetries = 1
             }
-      let progressHook = return ()
-      let go = runWith manager $ verifiedDownload dReq dest progressHook
+      let go = runWith manager $ verifiedDownload dReq dest exampleProgressHook
       doesFileExist destFp `shouldReturn` False
       go `shouldReturn` True
       doesFileExist destFp `shouldReturn` True

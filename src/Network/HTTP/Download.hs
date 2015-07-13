@@ -72,7 +72,7 @@ download req destpath = do
             , drLengthCheck = Nothing
             , drRetries = drRetriesDefault
             }
-    let progressHook = return ()
+    let progressHook _ = return ()
     verifiedDownload downloadReq destpath progressHook
 
 -- | Same as 'download', but will download a file a second time if it is already present.

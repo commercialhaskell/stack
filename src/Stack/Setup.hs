@@ -67,6 +67,7 @@ import qualified System.FilePath as FP
 import           System.IO.Temp (withSystemTempDirectory)
 import           System.Process (rawSystem)
 import           System.Process.Read
+import           Text.Printf (printf)
 
 data SetupOpts = SetupOpts
     { soptsInstallIfMissing :: !Bool
@@ -731,7 +732,7 @@ chattyDownload label url path = do
         then $logStickyDone ("Downloaded " <> label <> ".")
         else $logStickyDone "Already downloaded."
   where
-    chattyDownloadProgress runInBase = do
+    chattyDownloadProgress runInBase mcontentLength = do
         _ <- liftIO $ runInBase $ $logSticky $
           label <> ": download has begun"
         CL.map (Sum . S.length)
@@ -741,9 +742,42 @@ chattyDownload label url path = do
         go = evalStateC 0 $ awaitForever $ \(Sum size) -> do
             modify (+ size)
             totalSoFar <- get
-            liftIO $ runInBase $ $logSticky $
-                label <> ": " <> T.pack (show totalSoFar) <> " bytes downloaded..."
+            liftIO $ runInBase $ $logSticky $ T.pack $
+              case mcontentLength of
+                Nothing -> chattyProgressNoTotal totalSoFar
+                Just 0 -> chattyProgressNoTotal totalSoFar
+                Just total -> chattyProgressWithTotal totalSoFar total
+        -- Example: ghc: 42.13 KiB downloaded...
+        chattyProgressNoTotal totalSoFar =
+            printf ("%s: " <> bytesfmt "%7.2f" totalSoFar <> " downloaded...")
+                   (T.unpack label)
+        -- Example: ghc: 50.00 MiB / 100.00 MiB (50.00%) downloaded...
+        chattyProgressWithTotal totalSoFar total =
+          printf ("%s: " <>
+                  bytesfmt "%7.2f" totalSoFar <> " / " <>
+                  bytesfmt "%.2f" total <>
+                  " (%6.2f%%) downloaded...")
+                 (T.unpack label)
+                 percentage
+          where percentage :: Double
+                percentage = (fromIntegral totalSoFar / fromIntegral total * 100)
 
+-- | Given a printf format string for the decimal part and a number of
+-- bytes, formats the bytes using an appropiate unit and returns the
+-- formatted string.
+--
+-- >>> bytesfmt "%.2" 512368
+-- "500.359375 KiB"
+bytesfmt :: Integral a => String -> a -> String
+bytesfmt formatter bs = printf (formatter <> " %s")
+                               (fromIntegral (signum bs) * dec :: Double)
+                               (bytesSuffixes !! i)
+  where
+    (dec,i) = getSuffix (abs bs)
+    getSuffix n = until p (\(x,y) -> (x / 1024, y+1)) (fromIntegral n,0)
+      where p (n',numDivs) = n' < 1024 || numDivs == (length bytesSuffixes - 1)
+    bytesSuffixes :: [String]
+    bytesSuffixes = ["B","KiB","MiB","GiB","TiB","PiB","EiB","ZiB","YiB"]
 
 -- Await eagerly (collect with monoidal append),
 -- but space out yields by at least the given amount of time.
