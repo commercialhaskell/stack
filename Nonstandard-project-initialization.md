@@ -5,7 +5,7 @@ The purpose of this page is to collect information about issues that arise when 
 New users may be confused by the fast that you must add dependencies to the projects cabal file, even in the case when you have already listed the package in the `stack.yaml`. In most cases, dependencies for your project that are in the Stackage snapshot need *only* be added to the cabal file. stack makes heavy use of Cabal the library under the hood. In general, your stack packages should also end up being valid cabal-install packages.
 
 ## Issues Referenced
-https://github.com/commercialhaskell/stack/issues/105
+  - https://github.com/commercialhaskell/stack/issues/105
 
 # Passing Flags to Cabal
 
@@ -29,12 +29,12 @@ Currently one needs to list all of your modules that interpret flags in the `oth
 
 
 ## Issues Referenced
-https://github.com/commercialhaskell/stack/issues/191
-https://github.com/commercialhaskell/stack/issues/417
-https://github.com/commercialhaskell/stack/issues/335
-https://github.com/commercialhaskell/stack/issues/301
-https://github.com/commercialhaskell/stack/issues/365
-https://github.com/commercialhaskell/stack/issues/105
+  - https://github.com/commercialhaskell/stack/issues/191
+  - https://github.com/commercialhaskell/stack/issues/417
+  - https://github.com/commercialhaskell/stack/issues/335
+  - https://github.com/commercialhaskell/stack/issues/301
+  - https://github.com/commercialhaskell/stack/issues/365
+  - https://github.com/commercialhaskell/stack/issues/105
 
 # Selecting a Resolver
 
@@ -43,8 +43,8 @@ https://github.com/commercialhaskell/stack/issues/105
 :TODO: Document `--solver`
 
 ## Issues Referenced
-https://github.com/commercialhaskell/stack/issues/468
-https://github.com/commercialhaskell/stack/issues/464
+  - https://github.com/commercialhaskell/stack/issues/468
+  - https://github.com/commercialhaskell/stack/issues/464
 
 # Using git Repositories
 stack has support for packages that reside in remote git locations.
@@ -57,19 +57,34 @@ Example:
     commit: 8debedd3fcb6525ac0d7de2dd49217dce2abc0d9
 ```
 
-https://github.com/commercialhaskell/stack/issues/254
-https://github.com/commercialhaskell/stack/issues/199
+## Issues Referenced 
+  - https://github.com/commercialhaskell/stack/issues/254
+  - https://github.com/commercialhaskell/stack/issues/199
+
 # Private Hackage
-https://github.com/commercialhaskell/stack/issues/445
+Working with a private Hackage is currently supported in certain situations.
+There exist special entries in `stack.yaml` that may help you. In a `stack.yaml` file, it is possible 
+to add lines for packages in your database referencing the sdist locations via an `http` entry, or to use a `Hackage` entry.
+
+The recommended stack workflow is to use git submodules instead of a private Hackage. Either by using git submodules and listing the directories in the packages section of `stack.yaml`, or by adding the private dependencies as git URIs with a commit SHA to the `stack.yaml`. This has the large benefit of eliminating the need to manage a Hackage database and pointless version bumps.
+
+For further information see [[stack.yaml]]
+
+## Issues Referenced
+  - https://github.com/commercialhaskell/stack/issues/445
+  - https://github.com/commercialhaskell/stack/issues/565
 
 # Custom Snapshots
-https://github.com/commercialhaskell/stack/issues/111
+Currently WIP?
+## Issues Referenced
+  - https://github.com/commercialhaskell/stack/issues/111
+  - https://github.com/commercialhaskell/stack/issues/253
+  - https://github.com/commercialhaskell/stack/issues/137
 
 # Intra-package Targets
 stack supports intra-package targets, similar to `cabal build COMPONENTS` for situations when you don't want to build every target inside your package. 
 
 Example:
-
 ```
 stack build stack:lib:stack
 stack test stack:test:stack-integration-test
@@ -78,4 +93,4 @@ stack test stack:test:stack-integration-test
 Note: this does require prefixing the component name with the package name.
 
 ## Issues referenced
- https://github.com/commercialhaskell/stack/issues/201
+  - https://github.com/commercialhaskell/stack/issues/201
