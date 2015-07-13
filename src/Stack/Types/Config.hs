@@ -14,6 +14,7 @@ import           Control.Exception
 import           Control.Monad (liftM, mzero)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
+import           Control.Monad.Logger (LogLevel(..))
 import           Data.Aeson.Extended (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, object
                             ,(.=), (.:?), (.!=), (.:), Value (String, Object))
 import           Data.Binary (Binary)
@@ -170,6 +171,31 @@ data EnvSettings = EnvSettings
     -- ^ set the STACK_EXE variable to the current executable name
     }
     deriving (Show, Eq, Ord)
+
+data ExecOpts = ExecOpts
+    { eoCmd :: !String
+    , eoArgs :: ![String]
+    , eoExtra :: !ExecOptsExtra
+    }
+
+data ExecOptsExtra
+    = ExecOptsPlain
+    | ExecOptsEmbellished
+        { eoEnvSettings :: !EnvSettings
+        , eoPackages :: ![String]
+        }
+-- | Parsed global command-line options.
+data GlobalOpts = GlobalOpts
+    { globalLogLevel     :: LogLevel -- ^ Log level
+    , globalConfigMonoid :: ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
+    , globalResolver     :: Maybe Resolver -- ^ Resolver override
+    , globalTerminal     :: Bool -- ^ We're in a terminal?
+    , globalStackYaml    :: Maybe FilePath -- ^ Override project stack.yaml
+    } deriving (Show)
+
+-- | Default logging level should be something useful but not crazy.
+defaultLogLevel :: LogLevel
+defaultLogLevel = LevelInfo
 
 -- | A superset of 'Config' adding information on how to build code. The reason
 -- for this breakdown is because we will need some of the information from

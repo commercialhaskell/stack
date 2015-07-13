@@ -6,8 +6,8 @@ module Stack.Init
     ( findCabalFiles
     , initProject
     , InitOpts (..)
-    , initOptsParser
-    , readResolver
+    , SnapPref (..)
+    , Method (..)
     ) where
 
 import           Control.Exception               (assert)
@@ -31,8 +31,6 @@ import qualified Data.Text                       as T
 import qualified Data.Yaml                       as Yaml
 import qualified Distribution.PackageDescription as C
 import           Network.HTTP.Client.Conduit     (HasHttpManager)
-import           Options.Applicative
-import           Options.Applicative.Types       (readerAsk)
 import           Path
 import           Path.Find
 import           Path.IO
@@ -208,48 +206,6 @@ data SnapPref = PrefNone | PrefLTS | PrefNightly
 
 -- | Method of initializing
 data Method = MethodSnapshot SnapPref | MethodResolver Resolver | MethodSolver
-
-initOptsParser :: Parser InitOpts
-initOptsParser =
-    InitOpts <$> method <*> overwrite <*> fmap not ignoreSubDirs
-  where
-    ignoreSubDirs = flag False
-                         True
-                         (long "ignore-subdirs" <>
-                         help "Do not search for .cabal files in sub directories")
-    overwrite = flag False
-                     True
-                     (long "force" <>
-                      help "Force overwriting of an existing stack.yaml if it exists")
-    method = solver
-         <|> (MethodResolver <$> resolver)
-         <|> (MethodSnapshot <$> snapPref)
-
-    solver =
-        flag' MethodSolver
-            (long "solver" <>
-             help "Use a dependency solver to determine dependencies")
-
-    snapPref =
-        flag' PrefLTS
-            (long "prefer-lts" <>
-             help "Prefer LTS snapshots over Nightly snapshots") <|>
-        flag' PrefNightly
-            (long "prefer-nightly" <>
-             help "Prefer Nightly snapshots over LTS snapshots") <|>
-        pure PrefNone
-
-    resolver = option readResolver
-        (long "resolver" <>
-         metavar "RESOLVER" <>
-         help "Use the given resolver, even if not all dependencies are met")
-
-readResolver :: ReadM Resolver
-readResolver = do
-    s <- readerAsk
-    case parseResolver $ T.pack s of
-        Left e -> readerError $ show e
-        Right x -> return x
 
 -- | Same semantics as @nub@, but more efficient by using the @Ord@ constraint.
 nubOrd :: Ord a => [a] -> [a]

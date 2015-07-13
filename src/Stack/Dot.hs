@@ -4,7 +4,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Stack.Dot (dot
                  ,DotOpts(..)
-                 ,dotOptsParser
                  ,resolveDependencies
                  ,printGraph
                  ,pruneGraph
@@ -22,14 +21,14 @@ import qualified Data.HashSet as HashSet
 import           Data.List.Split (splitOn)
 import           Data.Map (Map)
 import qualified Data.Map as Map
+import           Data.Monoid ((<>))
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Traversable as T
 import           Network.HTTP.Client.Conduit (HasHttpManager)
-import           Options.Applicative
-import           Options.Applicative.Builder.Extra (boolFlags)
+import           Control.Applicative
 import           Stack.Build (withLoadPackage)
 import           Stack.Build.Source
 import           Stack.Build.Types
@@ -48,37 +47,6 @@ data DotOpts = DotOpts
     , dotPrune :: Set String
     -- ^ Package names to prune from the graph
     }
-
--- | Parser for arguments to `stack dot`
-dotOptsParser :: Parser DotOpts
-dotOptsParser = DotOpts
-            <$> includeExternal
-            <*> includeBase
-            <*> depthLimit
-            <*> fmap (maybe Set.empty Set.fromList . fmap splitNames) prunedPkgs
-  where includeExternal = boolFlags False
-                                    "external"
-                                    "inclusion of external dependencies"
-                                    idm
-        includeBase = boolFlags True
-                                "include-base"
-                                "inclusion of dependencies on base"
-                                idm
-        depthLimit =
-            optional (option auto
-                             (long "depth" <>
-                              metavar "DEPTH" <>
-                              help ("Limit the depth of dependency resolution " <>
-                                    "(Default: No limit)")))
-        prunedPkgs = optional (strOption
-                                   (long "prune" <>
-                                    metavar "PACKAGES" <>
-                                    help ("Prune each package name " <>
-                                          "from the comma separated list " <>
-                                          "of package names PACKAGES")))
-
-        splitNames :: String -> [String]
-        splitNames = map (takeWhile (not . isSpace) . dropWhile isSpace) . splitOn ","
 
 -- | Visualize the project's dependencies as a graphviz graph
 dot :: (HasEnvConfig env

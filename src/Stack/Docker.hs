@@ -8,7 +8,6 @@ module Stack.Docker
   ,CleanupAction(..)
   ,dockerCleanupCmdName
   ,dockerCmdName
-  ,dockerOptsParser
   ,dockerOptsFromMonoid
   ,dockerPullCmdName
   ,execWithOptionalContainer
@@ -29,7 +28,6 @@ import           Control.Monad.Reader (MonadReader,asks)
 import           Control.Monad.Writer (execWriter,runWriter,tell)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Aeson.Extended (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
-import           Data.Attoparsec.Args (EscapingMode (Escaping), parseArgs)
 import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
@@ -38,15 +36,12 @@ import           Data.List (dropWhileEnd,find,intercalate,intersperse,isPrefixOf
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
-import           Data.Monoid
 import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
 import           Data.Typeable (Typeable)
-import           Options.Applicative.Builder.Extra (maybeBoolFlags)
-import           Options.Applicative (Parser,str,option,help,auto,metavar,long,value,hidden,internal,idm)
 import           Path
 import           Path.IO (getWorkingDir,listDirectory,createTree,removeFile,removeTree,dirExists)
 import           Stack.Constants (projectDockerSandboxDir,stackProgName,stackDotYaml,stackRootEnvVar)
@@ -622,72 +617,6 @@ sandboxedHomeSubdirectories =
 -- | Name of home directory within docker sandbox.
 homeDirName :: Path Rel Dir
 homeDirName = $(mkRelDir "_home/")
-
--- | Options parser configuration for Docker.
-dockerOptsParser :: Bool -> Parser DockerOptsMonoid
-dockerOptsParser showOptions =
-    DockerOptsMonoid
-    <$> pure Nothing
-    <*> maybeBoolFlags dockerCmdName
-                       "using a Docker container"
-                       hide
-    <*> ((Just . DockerMonoidRepo) <$> option str (long (dockerOptName dockerRepoArgName) <>
-                                                   hide <>
-                                                   metavar "NAME" <>
-                                                   help "Docker repository name") <|>
-         (Just . DockerMonoidImage) <$> option str (long (dockerOptName dockerImageArgName) <>
-                                                    hide <>
-                                                    metavar "IMAGE" <>
-                                                    help "Exact Docker image ID (overrides docker-repo)") <|>
-         pure Nothing)
-    <*> maybeBoolFlags (dockerOptName dockerRegistryLoginArgName)
-                       "registry requires login"
-                       hide
-    <*> maybeStrOption (long (dockerOptName dockerRegistryUsernameArgName) <>
-                        hide <>
-                        metavar "USERNAME" <>
-                        help "Docker registry username")
-    <*> maybeStrOption (long (dockerOptName dockerRegistryPasswordArgName) <>
-                        hide <>
-                        metavar "PASSWORD" <>
-                        help "Docker registry password")
-    <*> maybeBoolFlags (dockerOptName dockerAutoPullArgName)
-                       "automatic pulling latest version of image"
-                       hide
-    <*> maybeBoolFlags (dockerOptName dockerDetachArgName)
-                       "running a detached Docker container"
-                       hide
-    <*> maybeBoolFlags (dockerOptName dockerPersistArgName)
-                       "not deleting container after it exits"
-                       hide
-    <*> maybeStrOption (long (dockerOptName dockerContainerNameArgName) <>
-                        hide <>
-                        metavar "NAME" <>
-                        help "Docker container name")
-    <*> argsStrOption (long (dockerOptName dockerRunArgsArgName) <>
-                        hide <>
-                        value [] <>
-                        metavar "'ARG1 [ARG2 ...]'" <>
-                        help "Additional arguments to pass to 'docker run'")
-    <*> many (option auto (long (dockerOptName dockerMountArgName) <>
-                           hide <>
-                           metavar "(PATH | HOST-PATH:CONTAINER-PATH)" <>
-                           help ("Mount volumes from host in container " ++
-                                 "(may specify mutliple times)")))
-    <*> maybeBoolFlags (dockerOptName dockerPassHostArgName)
-                       "passing Docker daemon connection information into container"
-                       hide
-    <*> maybeStrOption (long (dockerOptName dockerDatabasePathArgName) <>
-                        hide <>
-                        metavar "PATH" <>
-                        help "Location of image usage tracking database")
-  where
-    dockerOptName optName = dockerCmdName ++ "-" ++ T.unpack optName
-    maybeStrOption = optional . option str
-    argsStrOption = option (fmap (either error id . parseArgs Escaping . T.pack) str)
-    hide = if showOptions
-              then idm
-              else internal <> hidden
 
 -- | Interprets DockerOptsMonoid options.
 dockerOptsFromMonoid :: Maybe Project -> Path Abs Dir -> DockerOptsMonoid -> DockerOpts
