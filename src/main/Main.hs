@@ -612,7 +612,7 @@ initCmd initOpts go = withConfig go $ initProject initOpts
 -- | Project creation
 newCmd :: InitOpts -> GlobalOpts -> IO ()
 newCmd initOpts go@GlobalOpts{..} = withConfig go $ do
-    newProject
+    newProject initOpts
     initProject initOpts
 
 -- | Fix up extra-deps for a project

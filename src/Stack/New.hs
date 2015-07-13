@@ -24,19 +24,22 @@ import           System.FilePath        (takeDirectory,
 import           Text.Hastache
 import           Text.Hastache.Context
 
+import           Stack.Init (InitOpts(forceOverwrite))
+
 newProject :: (MonadIO m, MonadLogger m)
-           => m ()
-newProject = do
+           => InitOpts
+           -> m ()
+newProject initOpts = do
     $logInfo "NOTE: Currently stack new functionality is very rudimentary"
     $logInfo "There are plans to make this feature more useful in the future"
     $logInfo "For more information, see: https://github.com/commercialhaskell/stack/issues/137"
     $logInfo "For now, we'll just be generating a basic project structure in your current directory"
 
     exist <- filterM (liftIO . doesFileExist) (Map.keys files)
-    unless (null exist) $
-        error $ unlines
-            $ "The following files already exist, refusing to overwrite:"
-            : map ("- " ++) exist
+    unless (forceOverwrite initOpts || null exist) $
+       error $ unlines
+           $ "The following files already exist, refusing to overwrite (no --force):"
+           : map ("- " ++) exist
 
     $logInfo ""
 

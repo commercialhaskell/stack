@@ -197,7 +197,7 @@ data InitOpts = InitOpts
     { ioMethod :: !Method
     -- ^ Preferred snapshots
     , forceOverwrite :: Bool
-    -- ^ Force overwrite of existing stack.yaml
+    -- ^ Overwrite existing files
     , includeSubDirs :: Bool
     -- ^ If True, include all .cabal files found in any sub directories
     }
