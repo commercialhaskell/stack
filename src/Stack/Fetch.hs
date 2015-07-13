@@ -331,11 +331,16 @@ fuzzyLookupCandidates :: PackageIdentifier -> PackageCaches
 fuzzyLookupCandidates (PackageIdentifier name ver) caches =
     if null sameMajor then Nothing else Just (map fst sameMajor)
   where
-    sameIdentCaches = filter (\(PackageIdentifier n _, _) -> name == n)
-                             (Map.toList caches)
     sameMajor = filter (\(PackageIdentifier _ v, _) ->
                              getMajorVersion ver == getMajorVersion v)
                        sameIdentCaches
+    sameIdentCaches = maybe biggerFiltered
+                            (\z -> (zeroIdent, z) : biggerFiltered)
+                            zeroVer
+    biggerFiltered = takeWhile (\(PackageIdentifier n _, _) -> name == n)
+                               (Map.toList bigger)
+    zeroIdent = PackageIdentifier name (fromMajorVersion (MajorVersion 0 0))
+    (_, zeroVer, bigger) = Map.splitLookup zeroIdent caches
 
 -- | Figure out where to fetch from.
 getToFetch :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env)
