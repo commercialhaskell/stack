@@ -72,6 +72,7 @@ Example:
 
 ```
 stack build stack:lib:stack
+stack test stack:test:stack-integration-test
 ```
 
 Note: this does require prefixing the component name with the package name.
