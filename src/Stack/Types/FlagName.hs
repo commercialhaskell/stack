@@ -26,7 +26,7 @@ import           Control.Monad.Catch
 import           Data.Aeson.Extended
 import           Data.Attoparsec.ByteString.Char8
 import           Data.Attoparsec.Combinators
-import           Data.Binary (Binary)
+import           Data.Binary.VersionTagged
 import qualified Data.ByteString as S
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as S8
@@ -54,7 +54,7 @@ instance Show FlagNameParseFail where
 -- | A flag name.
 newtype FlagName =
   FlagName ByteString
-  deriving (Typeable,Data,Generic,Hashable,Binary)
+  deriving (Typeable,Data,Generic,Hashable,Binary,NFData)
 instance Eq FlagName where
     x == y = (compare x y) == EQ
 instance Ord FlagName where

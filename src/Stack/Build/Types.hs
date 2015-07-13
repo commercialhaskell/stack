@@ -38,7 +38,7 @@ module Stack.Build.Types
 import           Control.DeepSeq
 import           Control.Exception
 
-import           Data.Binary (Binary(..))
+import           Data.Binary.VersionTagged
 import qualified Data.ByteString as S
 import           Data.Char (isSpace)
 import           Data.Data
@@ -393,6 +393,8 @@ data ConfigCache = ConfigCache
     }
     deriving (Generic,Eq,Show)
 instance Binary ConfigCache
+instance NFData ConfigCache where
+    rnf = genericRnf
 
 -- | A task to perform when building
 data Task = Task
@@ -527,8 +529,7 @@ wantedLocalPackages = Set.fromList . map (packageName . lpPackage) . filter lpWa
 
 -- | Used for storage and comparison.
 newtype ModTime = ModTime (Integer,Rational)
-  deriving (Ord,Show,Generic,Eq)
-instance Binary ModTime
+  deriving (Ord,Show,Generic,Eq,NFData,Binary)
 
 -- | One-way conversion to serialized time.
 modTime :: UTCTime -> ModTime
@@ -549,3 +550,5 @@ data FileCacheInfo = FileCacheInfo
     }
     deriving (Generic, Show)
 instance Binary FileCacheInfo
+instance NFData FileCacheInfo where
+    rnf = genericRnf

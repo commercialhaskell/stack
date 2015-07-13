@@ -16,7 +16,7 @@ import           Control.Applicative
 import           Control.Monad.Catch
 import           Data.Aeson.Extended
 import           Data.Attoparsec.ByteString.Char8
-import           Data.Binary (Binary)
+import           Data.Binary.VersionTagged
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Char (isLetter)
@@ -43,6 +43,8 @@ data GhcPkgId =
 
 instance Hashable GhcPkgId
 instance Binary GhcPkgId
+instance NFData GhcPkgId where
+    rnf = genericRnf
 
 instance Show GhcPkgId where
   show = show . ghcPkgIdString

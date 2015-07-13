@@ -35,7 +35,7 @@ import           Control.Monad.Trans.Control
 
 import           Data.Aeson.Extended
 import qualified Data.Binary as Binary
-import           Data.Binary.VersionTagged (taggedDecodeOrLoad, BinarySchema (..))
+import           Data.Binary.VersionTagged
 import           Data.ByteString (ByteString)
 import qualified Data.Word8 as Word8
 import qualified Data.ByteString as S
@@ -89,9 +89,11 @@ data PackageCache = PackageCache
     }
     deriving Generic
 instance Binary.Binary PackageCache
+instance NFData PackageCache where
+    rnf = genericRnf
 
 newtype PackageCacheMap = PackageCacheMap (Map PackageIdentifier PackageCache)
-    deriving Binary.Binary
+    deriving (Binary.Binary, NFData)
 instance BinarySchema PackageCacheMap where
     -- Don't forget to update this if you change the datatype in any way!
     binarySchema _ = 1
@@ -353,6 +355,8 @@ data PackageDownload = PackageDownload
     }
     deriving (Show, Generic)
 instance Binary.Binary PackageDownload
+instance NFData PackageDownload where
+    rnf = genericRnf
 instance FromJSON PackageDownload where
     parseJSON = withObject "Package" $ \o -> do
         hashes <- o .: "package-hashes"

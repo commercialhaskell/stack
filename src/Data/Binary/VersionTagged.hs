@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -- | Tag a Binary instance with the stack version number to ensure we're
@@ -5,12 +7,22 @@
 module Data.Binary.VersionTagged
     ( taggedDecodeOrLoad
     , taggedEncodeFile
+    , Binary (..)
     , BinarySchema (..)
+    , decodeFileOrFailDeep
+    , encodeFile
+    , NFData (..)
+    , genericRnf
     ) where
 
+import Control.DeepSeq.Generics (NFData (..), genericRnf)
+import Control.Exception (Exception)
+import Control.Monad.Catch (MonadThrow (..))
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Binary (Binary (..), encodeFile, decodeFileOrFail, putWord8, getWord8)
-import Control.Exception.Enclosed (tryIO)
+import Data.Binary.Get (ByteOffset)
+import Data.Typeable (Typeable)
+import Control.Exception.Enclosed (tryAnyDeep)
 import System.FilePath (takeDirectory)
 import System.Directory (createDirectoryIfMissing)
 import qualified Data.ByteString as S
@@ -22,10 +34,11 @@ magic :: ByteString
 magic = "stack"
 
 -- | A @Binary@ instance that also has a schema version
-class Binary a => BinarySchema a where
+class (Binary a, NFData a) => BinarySchema a where
     binarySchema :: Proxy a -> Int
 
 newtype WithTag a = WithTag a
+    deriving NFData
 instance forall a. BinarySchema a => Binary (WithTag a) where
     get = do
         forM_ (S.unpack magic) $ \w -> do
@@ -58,10 +71,35 @@ taggedDecodeOrLoad :: (BinarySchema a, MonadIO m)
                    -> m a
                    -> m a
 taggedDecodeOrLoad fp mx = do
-    eres <- liftIO $ tryIO $ decodeFileOrFail fp
+    eres <- decodeFileOrFailDeep fp
     case eres of
-        Right (Right (WithTag x)) -> return x
-        _ -> do
+        Left _ -> do
             x <- mx
             taggedEncodeFile fp x
             return x
+        Right (WithTag x) -> return x
+
+-- | Ensure that there are no lurking exceptions deep inside the parsed
+-- value... because that happens unfortunately. See
+-- https://github.com/commercialhaskell/stack/issues/554
+decodeFileOrFailDeep :: (Binary a, NFData a, MonadIO m, MonadThrow n)
+                     => FilePath
+                     -> m (n a)
+decodeFileOrFailDeep fp = liftIO $ fmap (either throwM return) $ tryAnyDeep $ do
+    eres <- decodeFileOrFail fp
+    case eres of
+        Left (offset, str) -> throwM $ DecodeFileFailure fp offset str
+        Right x -> return x
+
+data DecodeFileFailure = DecodeFileFailure FilePath ByteOffset String
+    deriving Typeable
+instance Show DecodeFileFailure where
+    show (DecodeFileFailure fp offset str) = concat
+        [ "Decoding of "
+        , fp
+        , " failed at offset "
+        , show offset
+        , ": "
+        , str
+        ]
+instance Exception DecodeFileFailure

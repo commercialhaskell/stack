@@ -33,8 +33,7 @@ import           Control.Monad.Catch        (MonadThrow, catch, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader
-import           Data.Binary (Binary)
-import qualified Data.Binary as Binary
+import           Data.Binary.VersionTagged
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import           Data.Map (Map)
@@ -90,6 +89,8 @@ data BuildCache = BuildCache
     }
     deriving (Generic)
 instance Binary BuildCache
+instance NFData BuildCache where
+    rnf = genericRnf
 
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
@@ -107,21 +108,11 @@ tryGetCabalMod :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, Mo
 tryGetCabalMod = tryGetCache configCabalMod
 
 -- | Try to load a cache.
-tryGetCache :: (MonadIO m, Binary a, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
+tryGetCache :: (MonadIO m, Binary a, NFData a)
             => (Path Abs Dir -> m (Path Abs File))
             -> Path Abs Dir
             -> m (Maybe a)
-tryGetCache get' dir = do
-    fp <- get' dir
-    liftIO
-        (catch
-             (fmap (decodeMaybe . L.fromStrict) (S.readFile (toFilePath fp)))
-             (\e -> if isDoesNotExistError e
-                       then return Nothing
-                       else throwM e))
-  where decodeMaybe =
-            either (const Nothing) (Just . thd) . Binary.decodeOrFail
-          where thd (_,_,x) = x
+tryGetCache get' dir = get' dir >>= decodeFileOrFailDeep . toFilePath
 
 -- | Write the dirtiness cache for this package's files.
 writeBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
@@ -160,17 +151,14 @@ deleteCaches dir = do
     removeFileIfExists cfp
 
 -- | Write to a cache.
-writeCache :: (Binary a, MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
+writeCache :: (Binary a, MonadIO m)
            => Path Abs Dir
            -> (Path Abs Dir -> m (Path Abs File))
            -> a
            -> m ()
 writeCache dir get' content = do
     fp <- get' dir
-    liftIO
-        (L.writeFile
-             (toFilePath fp)
-             (Binary.encode content))
+    liftIO $ encodeFile (toFilePath fp) content
 
 flagCacheFile :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
               => Installed
@@ -187,12 +175,8 @@ flagCacheFile installed = do
 tryGetFlagCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
                 => Installed
                 -> m (Maybe ConfigCache)
-tryGetFlagCache gid = do
-    file <- flagCacheFile gid
-    eres <- liftIO $ tryIO $ Binary.decodeFileOrFail $ toFilePath file
-    case eres of
-        Right (Right x) -> return $ Just x
-        _ -> return Nothing
+tryGetFlagCache gid =
+    flagCacheFile gid >>= decodeFileOrFailDeep . toFilePath
 
 writeFlagCache :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m)
                => Installed
@@ -202,7 +186,7 @@ writeFlagCache gid cache = do
     file <- flagCacheFile gid
     liftIO $ do
         createTree (parent file)
-        Binary.encodeFile (toFilePath file) cache
+        encodeFile (toFilePath file) cache
 
 -- | Mark a test suite as having succeeded
 setTestSuccess :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)

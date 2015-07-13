@@ -33,8 +33,7 @@ import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Trans.Control
 import           Data.Attoparsec.Args
 import           Data.Attoparsec.Text as P
-import           Data.Binary (Binary)
-import           Data.Binary.VersionTagged (taggedDecodeOrLoad, taggedEncodeFile, BinarySchema (..))
+import           Data.Binary.VersionTagged
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
@@ -62,7 +61,7 @@ import           System.Process.Read
 -- | Cached information on whether package have profiling libraries and haddocks.
 newtype InstalledCache = InstalledCache (IORef InstalledCacheInner)
 newtype InstalledCacheInner = InstalledCacheInner (Map GhcPkgId InstalledCacheEntry)
-    deriving Binary
+    deriving (Binary, NFData)
 instance BinarySchema InstalledCacheInner where
     -- Don't forget to update this if you change the datatype in any way!
     binarySchema _ = 1
@@ -73,6 +72,8 @@ data InstalledCacheEntry = InstalledCacheEntry
     , installedCacheHaddock :: !Bool }
     deriving (Eq, Generic)
 instance Binary InstalledCacheEntry
+instance NFData InstalledCacheEntry where
+    rnf = genericRnf
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump

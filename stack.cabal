@@ -119,6 +119,7 @@ library
                    , containers >= 0.5.5.1
                    , cryptohash >= 0.11.6
                    , cryptohash-conduit
+                   , deepseq-generics
                    , directory >= 1.2.1.0
                    , enclosed-exceptions
                    , exceptions >= 0.8.0.2

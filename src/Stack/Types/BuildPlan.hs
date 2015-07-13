@@ -32,8 +32,7 @@ import           Control.Monad.Catch             (MonadThrow, throwM)
 import           Data.Aeson                      (FromJSON (..), ToJSON (..),
                                                   object, withObject, withText,
                                                   (.!=), (.:), (.:?), (.=))
-import           Data.Binary                     as Binary (Binary)
-import           Data.Binary.VersionTagged       (BinarySchema (..))
+import           Data.Binary.VersionTagged
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Char8           as S8
 import           Data.Hashable                   (Hashable)
@@ -241,7 +240,7 @@ newtype Maintainer = Maintainer { unMaintainer :: Text }
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: ByteString }
-    deriving (Show, Eq, Ord, Hashable, IsString, Generic)
+    deriving (Show, Eq, Ord, Hashable, IsString, Generic, NFData)
 instance Binary ExeName
 instance ToJSON ExeName where
     toJSON = toJSON . S8.unpack . unExeName
@@ -365,7 +364,9 @@ data MiniBuildPlan = MiniBuildPlan
     , mbpPackages :: !(Map PackageName MiniPackageInfo)
     }
     deriving (Generic, Show, Eq)
-instance Binary.Binary MiniBuildPlan
+instance Binary MiniBuildPlan
+instance NFData MiniBuildPlan where
+    rnf = genericRnf
 instance BinarySchema MiniBuildPlan where
     -- Don't forget to update this if you change the datatype in any way!
     binarySchema _ = 1
@@ -386,7 +387,9 @@ data MiniPackageInfo = MiniPackageInfo
     -- ^ Is there a library present?
     }
     deriving (Generic, Show, Eq)
-instance Binary.Binary MiniPackageInfo
+instance Binary MiniPackageInfo
+instance NFData MiniPackageInfo where
+    rnf = genericRnf
 
 
 isWindows :: OS -> Bool
