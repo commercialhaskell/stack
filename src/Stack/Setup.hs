@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -16,7 +17,7 @@ module Stack.Setup
 
 import           Control.Applicative
 import           Control.Exception.Enclosed (catchIO)
-import           Control.Monad (liftM, liftM2, mplus, when, join, void)
+import           Control.Monad (liftM, when, join, void)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger
@@ -559,14 +560,17 @@ installGHCPosix :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, Ha
                 -> m ()
 installGHCPosix _ archiveFile archiveType destDir ident = do
     menv <- getMinimalEnvOverride
-    zipTool <-
+    zipTool' <-
         case archiveType of
             TarXz -> return "xz"
             TarBz2 -> return "bzip2"
             SevenZ -> error "Don't know how to deal with .7z files on non-Windows"
-    [_zipTool, makeTool, tarTool] <- checkDependencies $ zipTool : ["make", "tar"]
+    (zipTool, makeTool, tarTool) <- checkDependencies $ (,,)
+        <$> checkDependency zipTool'
+        <*> (checkDependency "gmake" <|> checkDependency "make")
+        <*> checkDependency "tar"
 
-    $logDebug $ "ziptool: " <> T.pack _zipTool
+    $logDebug $ "ziptool: " <> T.pack zipTool
     $logDebug $ "make: " <> T.pack makeTool
     $logDebug $ "tar: " <> T.pack tarTool
 
@@ -591,23 +595,36 @@ installGHCPosix _ archiveFile archiveType destDir ident = do
     -- | Check if given processes appear to be present, throwing an exception if
     -- missing.
     checkDependencies :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env)
-                      => [String] -> m [String]
-    checkDependencies tools = do
+                      => CheckDependency a -> m a
+    checkDependencies (CheckDependency f) = do
         menv <- getMinimalEnvOverride
-        tools' <- mapM (checkDependency menv) tools
-        let missing = lefts tools'
-        if null missing
-           then return $ rights tools'
-           else throwM $ MissingDependencies missing
+        liftIO (f menv) >>= either (throwM . MissingDependencies) return
 
-    checkDependency, checkDependency' :: MonadIO m
-                                      => EnvOverride -> String -> m (Either String String)
-    checkDependency menv "make" = liftM2 mplus (checkDependency' menv "gmake") (checkDependency' menv "make")
-    checkDependency menv tool   = checkDependency' menv tool
+checkDependency :: String -> CheckDependency String
+checkDependency tool = CheckDependency $ \menv -> do
+    exists <- doesExecutableExist menv tool
+    return $ if exists then Right tool else Left [tool]
 
-    checkDependency' menv tool = do
-        exists <- doesExecutableExist menv tool
-        return $ if exists then Right tool else Left tool
+newtype CheckDependency a = CheckDependency (EnvOverride -> IO (Either [String] a))
+    deriving Functor
+instance Applicative CheckDependency where
+    pure x = CheckDependency $ \_ -> return (Right x)
+    CheckDependency f <*> CheckDependency x = CheckDependency $ \menv -> do
+        f' <- f menv
+        x' <- x menv
+        return $
+            case (f', x') of
+                (Left e1, Left e2) -> Left $ e1 ++ e2
+                (Left e, Right _) -> Left e
+                (Right _, Left e) -> Left e
+                (Right f'', Right x'') -> Right $ f'' x''
+instance Alternative CheckDependency where
+    empty = CheckDependency $ \_ -> return $ Left []
+    CheckDependency x <|> CheckDependency y = CheckDependency $ \menv -> do
+        res1 <- x menv
+        case res1 of
+            Left _ -> y menv
+            Right x' -> return $ Right x'
 
 installGHCWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
                   => SetupInfo
