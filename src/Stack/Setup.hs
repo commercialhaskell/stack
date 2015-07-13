@@ -16,7 +16,7 @@ module Stack.Setup
 
 import           Control.Applicative
 import           Control.Exception.Enclosed (catchIO)
-import           Control.Monad (liftM, when, join, void)
+import           Control.Monad (liftM, liftM2, mplus, when, join, void)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger
@@ -29,6 +29,7 @@ import qualified Data.ByteString.Char8 as S8
 import           Data.Conduit (Conduit, ($$), (=$), await, yield, awaitForever)
 import           Data.Conduit.Lift (evalStateC)
 import qualified Data.Conduit.List as CL
+import           Data.Either
 import           Data.IORef
 import           Data.List (intercalate)
 import           Data.Map (Map)
@@ -563,7 +564,11 @@ installGHCPosix _ archiveFile archiveType destDir ident = do
             TarXz -> return "xz"
             TarBz2 -> return "bzip2"
             SevenZ -> error "Don't know how to deal with .7z files on non-Windows"
-    checkDependencies $ zipTool : ["make", "tar"]
+    [_zipTool, makeTool, tarTool] <- checkDependencies $ zipTool : ["make", "tar"]
+
+    $logDebug $ "ziptool: " <> T.pack _zipTool
+    $logDebug $ "make: " <> T.pack makeTool
+    $logDebug $ "tar: " <> T.pack tarTool
 
     withSystemTempDirectory "stack-setup" $ \root' -> do
         root <- parseAbsDir root'
@@ -571,14 +576,14 @@ installGHCPosix _ archiveFile archiveType destDir ident = do
 
         $logSticky $ "Unpacking GHC ..."
         $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
-        readInNull root "tar" menv ["xf", toFilePath archiveFile] Nothing
+        readInNull root tarTool menv ["xf", toFilePath archiveFile] Nothing
 
         $logSticky "Configuring GHC ..."
         readInNull dir (toFilePath $ dir Path.</> $(mkRelFile "configure"))
                    menv ["--prefix=" ++ toFilePath destDir] Nothing
 
         $logSticky "Installing GHC ..."
-        readInNull dir "make" menv ["install"] Nothing
+        readInNull dir makeTool menv ["install"] Nothing
 
         $logStickyDone $ "Installed GHC."
         $logDebug $ "GHC installed to " <> T.pack (toFilePath destDir)
@@ -586,17 +591,23 @@ installGHCPosix _ archiveFile archiveType destDir ident = do
     -- | Check if given processes appear to be present, throwing an exception if
     -- missing.
     checkDependencies :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env)
-                      => [String] -> m ()
+                      => [String] -> m [String]
     checkDependencies tools = do
         menv <- getMinimalEnvOverride
-        missing <- liftM catMaybes $ mapM (check menv) tools
+        tools' <- mapM (checkDependency menv) tools
+        let missing = lefts tools'
         if null missing
-            then return ()
-            else throwM $ MissingDependencies missing
-      where
-        check menv tool = do
-            exists <- doesExecutableExist menv tool
-            return $ if exists then Nothing else Just tool
+           then return $ rights tools'
+           else throwM $ MissingDependencies missing
+
+    checkDependency, checkDependency' :: MonadIO m
+                                      => EnvOverride -> String -> m (Either String String)
+    checkDependency menv "make" = liftM2 mplus (checkDependency' menv "gmake") (checkDependency' menv "make")
+    checkDependency menv tool   = checkDependency' menv tool
+
+    checkDependency' menv tool = do
+        exists <- doesExecutableExist menv tool
+        return $ if exists then Right tool else Left tool
 
 installGHCWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
                   => SetupInfo
