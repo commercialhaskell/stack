@@ -31,8 +31,14 @@ https://github.com/commercialhaskell/stack/issues/365
 https://github.com/commercialhaskell/stack/issues/105
 
 # Selecting a resolver
-Stack should intelligently select a resolver based on a installed GHC version https://github.com/commercialhaskell/stack/issues/468
 
+`stack init` or `stack new` will try to default to the current Haskell LTS present on `https://www.stackage.org/snapshots`. Using an incorrect resolver can cause a build to fail if the version of GHC it requires is not present. In order to override the resolver entry at project initialization one can pass the `--resolver` option with the name of any snapshots on Stackage. Alternatively `--prefer-lts` and `--prefer-nightly` will choose a current lts or nightly versions accordingly. 
+
+:TODO: Document `--solver`
+
+## Issues Referenced
+https://github.com/commercialhaskell/stack/issues/468
+https://github.com/commercialhaskell/stack/issues/464
 # Using git repos
 Use YAML syntax for remote git location identification. https://github.com/commercialhaskell/stack/issues/254
 
