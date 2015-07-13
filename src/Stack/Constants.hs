@@ -26,6 +26,7 @@ module Stack.Constants
     ,wiredInPackages
     ,cabalPackageName
     ,implicitGlobalDir
+    ,hpcRelativeDir
     ,hpcDirFromDir
     ,dotHpc)
     where
@@ -161,8 +162,14 @@ hpcDirFromDir
     :: (MonadThrow m, MonadReader env m, HasPlatform env, HasEnvConfig env)
     => Path Abs Dir  -- ^ Package directory.
     -> m (Path Abs Dir)
-hpcDirFromDir dir = do
-    liftM (</> $(mkRelDir "hpc")) (distDirFromDir dir)
+hpcDirFromDir fp =
+    liftM (fp </>) hpcRelativeDir
+
+-- | Relative location of directory for HPC work.
+hpcRelativeDir :: (MonadThrow m, MonadReader env m, HasPlatform env, HasEnvConfig env)
+               => m (Path Rel Dir)
+hpcRelativeDir =
+    liftM (</> $(mkRelDir "hpc")) distRelativeDir
 
 -- | Package's build artifacts directory.
 distDirFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env, HasEnvConfig env)

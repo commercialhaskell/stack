@@ -19,28 +19,30 @@ import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
 import           Control.Exception.Lifted
-import           Control.Monad
+import           Control.Monad                  (liftM, when, unless, void, join)
 import           Control.Monad.Catch            (MonadCatch, MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader           (MonadReader, asks)
 import           Control.Monad.Trans.Control    (liftBaseWith)
 import           Control.Monad.Trans.Resource
-import           Control.Monad.Writer
 import qualified Data.ByteString                as S
 import qualified Data.ByteString.Char8          as S8
 import           Data.Conduit
 import qualified Data.Conduit.Binary            as CB
 import qualified Data.Conduit.List              as CL
+import           Data.Foldable                  (forM_)
 import           Data.Function
 import           Data.List
 import           Data.Map.Strict                (Map)
 import qualified Data.Map.Strict                as Map
 import           Data.Maybe
+import           Data.Monoid                    ((<>))
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
 import           Data.Streaming.Process         hiding (callProcess, env)
 import qualified Data.Streaming.Process         as Process
+import           Data.Traversable               (forM)
 import           Data.Text                      (Text)
 import qualified Data.Text                      as T
 import qualified Data.Text.Encoding             as T
@@ -52,6 +54,7 @@ import           Network.HTTP.Client.Conduit    (HasHttpManager)
 import           Path
 import           Path.IO
 import           Prelude                        hiding (FilePath, writeFile)
+import           Safe                           (lastMay)
 import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
@@ -717,7 +720,9 @@ singleTest topts ac ee task =
             case taskType task of
                 TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
                 TTUpstream _ _ -> assert False $ return ()
-            cabal (console && configHideTHLoading config) $ "build" : components
+            hpcIndexDir <- toFilePath . (</> dotHpc) <$> hpcRelativeDir
+            cabal (console && configHideTHLoading config) $
+                "build" : "--ghc-options" : ("-hpcdir " ++ hpcIndexDir) : components
             setTestBuilt pkgDir
 
         toRun <-
@@ -740,8 +745,7 @@ singleTest topts ac ee task =
             buildDir <- distDirFromDir pkgDir
             hpcDir <- hpcDirFromDir pkgDir
             when needHpc (createTree hpcDir)
-            let dotHpcDir = pkgDir </> dotHpc
-                exeExtension =
+            let exeExtension =
                     case configPlatform $ getConfig bconfig of
                         Platform _ Windows -> ".exe"
                         _ -> ""
@@ -804,20 +808,18 @@ singleTest topts ac ee task =
                             , T.pack $ packageNameString $ packageName package
                             ]
                         return $ Map.singleton testName Nothing
-            when needHpc $ do
-                createTree (hpcDir </> dotHpc)
-                exists <- dirExists dotHpcDir
-                when exists $ do
-                    copyDirectoryRecursive dotHpcDir (hpcDir </> dotHpc)
-                    removeTree dotHpcDir
-                (_,files) <- listDirectory hpcDir
-                let tixes =
-                        filter (isSuffixOf ".tix" . toFilePath . filename) files
-                -- This is a path to the .hpc directory, which holds *.mix files.  It's relative to the package
-                -- directory.  Since the hpc program only takes one specification for "--hpcdir", this must be
-                -- the same for all packages (something which is currently true).
-                subdir <- stripDir pkgDir (hpcDir </> dotHpc)
-                mapM_ (generateHpcReport hpcDir subdir . toFilePath . filename) tixes
+
+            when needHpc $ forM_ (lastMay testsToRun) $ \testName -> do
+                let pkgName = packageNameText (packageName package)
+                when (not $ null $ tail testsToRun) $ $logWarn $ T.concat
+                    [ "Error: The --coverage flag does not yet support multiple test suites in a single cabal file. "
+                    , "All of the tests have been run, however, the HPC report will only supply coverage info for "
+                    , pkgName
+                    , "'s last test, "
+                    , testName
+                    , "."
+                    ]
+                generateHpcReport pkgDir pkgName testName
 
             bs <- liftIO $
                 case mlogFile of
@@ -850,29 +852,38 @@ compareTestsComponents comps tests2 =
             ("test", y) -> Set.singleton $ T.drop 1 y
             _ -> Set.empty
 
--- | Generate the HTML report and show textual coverage summary.
-generateHpcReport
-    :: M env m
-    => Path Abs Dir -> Path Rel Dir -> String -> m ()
-generateHpcReport _ _ [] = return ()
-generateHpcReport hpcDir subdir tixName = do
+-- | Generate the HTML report and show a textual coverage summary.
+generateHpcReport :: M env m => Path Abs Dir -> Text -> Text -> m ()
+generateHpcReport pkgDir pkgName testName = do
+    let whichTest = pkgName <> "'s test-suite \"" <> testName <> "\""
+    hpcDir <- hpcDirFromDir pkgDir
+    hpcRelDir <- (</> dotHpc) <$> hpcRelativeDir
     pkgDirs <- Map.keys . bcPackages <$> asks getBuildConfig
-    outputSubdir <- parseRelDir (FP.dropExtension tixName)
-    let outputDir = hpcDir </> outputSubdir
-        args = concat
-            [ [tixName]
-            , concatMap (\x -> ["--srcdir", toFilePath x]) pkgDirs
-            , ["--hpcdir", toFilePath subdir, "--reset-hpcdirs"]]
-        markupArgs = "--destdir" : toFilePath outputDir : args
-    menv <- getMinimalEnvOverride
-    $logInfo "Generating HPC HTML ..."
-    _ <- readProcessStdout (Just hpcDir) menv "hpc" ("markup" : markupArgs)
-    output <-
-        readProcessStdout (Just hpcDir) menv "hpc" ("report" : args)
-    forM_ (S8.lines output) ($logInfo . T.decodeUtf8)
-    $logInfo
-        ("The HTML report is available at " <>
-         T.pack (toFilePath (outputDir </> $(mkRelFile "hpc_index.html"))))
+    let args =
+            concatMap (\x -> ["--srcdir", toFilePath x]) pkgDirs ++
+            ["--hpcdir", toFilePath hpcRelDir, "--reset-hpcdirs"]
+    tixFile <- parseRelFile (T.unpack testName ++ ".tix")
+    let tixFileAbs = hpcDir </> tixFile
+    tixFileExists <- fileExists tixFileAbs
+    if not tixFileExists
+        then $logError $ T.concat
+            [ "Didn't find .tix coverage file for "
+            , whichTest
+            , " - expected to find it at "
+            , T.pack (toFilePath tixFileAbs)
+            , "."
+            ]
+        else do
+            menv <- getMinimalEnvOverride
+            $logInfo $ "Generating HTML coverage report for " <> whichTest
+            _ <- readProcessStdout (Just hpcDir) menv "hpc"
+                ("markup" : toFilePath tixFile : args)
+            output <- readProcessStdout (Just hpcDir) menv "hpc"
+                ("report" : toFilePath tixFile : args)
+            forM_ (S8.lines output) ($logInfo . T.decodeUtf8)
+            $logInfo
+                ("The HTML coverage report for " <> whichTest <> " is available at " <>
+                 T.pack (toFilePath (hpcDir </> $(mkRelFile "hpc_index.html"))))
 
 singleBench :: M env m
             => BenchmarkOpts
