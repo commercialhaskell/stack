@@ -25,6 +25,3 @@ https://github.com/commercialhaskell/stack/issues/111
 ## Common Gotchas 
 Add an example of how to add a dependency to a project to the README and/or Wiki 
  https://github.com/commercialhaskell/stack/issues/510
-
-# Cabal file aaaaa.cabal has a mismatched package name: bbbbb
-https://github.com/commercialhaskell/stack/issues/317
