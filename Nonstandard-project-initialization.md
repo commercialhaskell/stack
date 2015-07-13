@@ -39,9 +39,20 @@ https://github.com/commercialhaskell/stack/issues/105
 ## Issues Referenced
 https://github.com/commercialhaskell/stack/issues/468
 https://github.com/commercialhaskell/stack/issues/464
-# Using git repos
-Use YAML syntax for remote git location identification. https://github.com/commercialhaskell/stack/issues/254
 
+# Using git repos
+stack has support for packages that reside in remote git locations.
+
+Example,
+
+```
+- location:
+    git: https://github.com/kolmodin/binary
+    commit: 8debedd3fcb6525ac0d7de2dd49217dce2abc0d9
+```
+
+https://github.com/commercialhaskell/stack/issues/254
+https://github.com/commercialhaskell/stack/issues/199
 # Private Hackage
 https://github.com/commercialhaskell/stack/issues/445
 
