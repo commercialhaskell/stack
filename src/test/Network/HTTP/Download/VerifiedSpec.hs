@@ -4,6 +4,7 @@ module Network.HTTP.Download.VerifiedSpec where
 import Crypto.Hash
 import Control.Monad (unless)
 import Control.Monad.Trans.Reader
+import Control.Retry (limitRetries)
 import Data.Maybe
 import Network.HTTP.Client.Conduit
 import Network.HTTP.Download.Verified
@@ -34,7 +35,7 @@ exampleReq = fromMaybe (error "exampleReq") $ do
         { drRequest = req
         , drHashChecks = [exampleHashCheck]
         , drLengthCheck = Just exampleLengthCheck
-        , drRetries = 1
+        , drRetryPolicy = limitRetries 1
         }
 
 exampleHashCheck :: HashCheck
@@ -155,7 +156,7 @@ spec = beforeAll setup $ afterAll teardown $ do
             { drRequest = req
             , drHashChecks = []
             , drLengthCheck = Nothing
-            , drRetries = 1
+            , drRetryPolicy = limitRetries 1
             }
       let progressHook = return ()
       let go = runWith manager $ verifiedDownload dReq dest progressHook
