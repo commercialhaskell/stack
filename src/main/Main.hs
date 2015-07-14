@@ -120,7 +120,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
              addCommand "new"
                         "Create a brand new project"
                         newCmd
-                        initOptsParser
+                        newOptsParser
              addCommand "init"
                         "Initialize a stack project based on one or more cabal packages"
                         initCmd
@@ -610,10 +610,10 @@ initCmd :: InitOpts -> GlobalOpts -> IO ()
 initCmd initOpts go = withConfig go $ initProject initOpts
 
 -- | Project creation
-newCmd :: InitOpts -> GlobalOpts -> IO ()
-newCmd initOpts go@GlobalOpts{..} = withConfig go $ do
-    newProject initOpts
-    initProject initOpts
+newCmd :: NewOpts -> GlobalOpts -> IO ()
+newCmd newOpts go@GlobalOpts{..} = withConfig go $ do
+    newProject newOpts
+    initProject (newOptsInitOpts newOpts)
 
 -- | Fix up extra-deps for a project
 solverCmd :: Bool -- ^ modify stack.yaml automatically?

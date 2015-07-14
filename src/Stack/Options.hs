@@ -11,6 +11,7 @@ module Stack.Options
     ,execOptsParser
     ,globalOptsParser
     ,initOptsParser
+    ,newOptsParser
     ,logLevelOptsParser
     ,resolverOptsParser
     ,solverOptsParser
@@ -38,6 +39,7 @@ import Stack.Docker
 import qualified Stack.Docker as Docker
 import Stack.Dot
 import Stack.Init
+import Stack.New (NewOpts(..))
 import Stack.Solver
 import Stack.Types
 import Data.Attoparsec.Args (EscapingMode (Escaping), parseArgs)
@@ -529,3 +531,19 @@ testOptsParser = TestOpts
                True
                (long "no-run-tests" <>
                 help "Disable running of tests. (Tests will still be built.)")
+
+newOptsParser :: Parser NewOpts
+newOptsParser =
+    NewOpts <$> templateRepositoryParser
+            <*> optional templateParser
+            <*> many templateArgParser
+            <*> initOptsParser
+  where
+    templateRepositoryParser = strOption
+         $ long "template-repository"
+        <> metavar "REPO"
+        <> value "https://github.com/commercialhaskell/stack-templates"
+    -- TODO(DanBurton): reject argument if it has a colon.
+    templateParser = strArgument $ metavar "TEMPLATE"
+    -- TODO(DanBurton): reject argument if it doesn't have a colon.
+    templateArgParser = strArgument $ metavar "ARG:VAL"
