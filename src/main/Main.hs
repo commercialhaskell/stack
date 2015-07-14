@@ -51,6 +51,7 @@ import           Stack.Options
 import qualified Stack.PackageIndex
 import           Stack.Repl
 import           Stack.Ide
+import qualified Stack.Image as Image
 import           Stack.Setup
 import           Stack.Solver (solveExtraDeps)
 import           Stack.Types
@@ -233,7 +234,13 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                               "Clean up Docker images and containers"
                               dockerCleanupCmd
                               dockerCleanupOptsParser)
-             )
+             addSubCommands
+               Image.imgCmdName
+               "Subcommands specific to imaging (EXPERIMENTAL)"
+               (addCommand Image.imgDockerCmdName
+                "Build a Docker image for the project"
+                imgDockerCmd
+                (pure ())))
              -- commandsFromPlugins plugins pluginShouldHaveRun) https://github.com/commercialhaskell/stack/issues/322
      case eGlobalRun of
        Left (exitCode :: ExitCode) -> do
@@ -586,6 +593,10 @@ dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
     runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
         Docker.preventInContainer $
             Docker.cleanup cleanupOpts
+
+imgDockerCmd :: () -> GlobalOpts -> IO ()
+imgDockerCmd () go@GlobalOpts{..} = do
+    withBuildConfig go ExecStrategy Image.imageDocker
 
 -- | Load the configuration with a manager. Convenience function used
 -- throughout this module.

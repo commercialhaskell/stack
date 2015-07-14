@@ -27,7 +27,8 @@ module Path.IO
   ,copyFile
   ,copyFileIfExists
   ,copyDirectoryRecursive
-  ,createTree)
+  ,createTree
+  ,dropRoot)
   where
 
 import           Control.Exception hiding (catch)
@@ -38,6 +39,7 @@ import           Data.Either
 import           Data.Maybe
 import           Data.Typeable
 import           Path
+import           Path.Internal (Path(..))
 import qualified System.Directory as D
 import qualified System.FilePath as FP
 import           System.IO.Error
@@ -223,6 +225,12 @@ copyDirectoryRecursive srcDir destDir =
                 case stripDir srcDir srcSubDir of
                   Nothing -> return ()
                   Just relSubDir -> copyDirectoryRecursive srcSubDir (destDir </> relSubDir))
+
+
+-- | Drop the root (either @\/@ on POSIX or @C:\\@, @D:\\@, etc. on
+-- Windows).
+dropRoot :: Path Abs t -> Path Rel t
+dropRoot (Path l) = Path (FP.dropDrive l)
 
 -- Utility function for a common pattern of ignoring does-not-exist errors.
 ignoreDoesNotExist :: MonadIO m => IO () -> m ()

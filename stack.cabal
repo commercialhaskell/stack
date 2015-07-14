@@ -63,6 +63,7 @@ library
                      Stack.PackageIndex
                      Stack.Repl
                      Stack.Ide
+                     Stack.Image
                      Stack.Setup
                      Stack.Solver
                      Stack.Types
@@ -72,6 +73,7 @@ library
                      Stack.Types.Docker
                      Stack.Types.FlagName
                      Stack.Types.GhcPkgId
+                     Stack.Types.Image
                      Stack.Types.PackageIdentifier
                      Stack.Types.PackageName
                      Stack.Types.Version
