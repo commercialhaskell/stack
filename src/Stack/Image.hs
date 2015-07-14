@@ -88,17 +88,10 @@ projectPkgs = do
 -- subdirectory of a temp directory.
 stageExesInDir :: M e m => FilePath -> m ()
 stageExesInDir dir = do
-    config <- asks getConfig
-    dirPath <- parseAbsDir dir
+    srcBinPath <- (</> $(mkRelDir "bin")) <$> installationRootLocal
+    destBinPath <- (</> $(mkRelDir "usr/local/bin")) <$> parseAbsDir dir
+    createTree destBinPath
     pkgs <- projectPkgs
-    let binPath = dirPath </>
-            $(mkRelDir "usr") </>
-            $(mkRelDir "local") </>
-            $(mkRelDir "bin")
-    liftIO
-        (SD.createDirectoryIfMissing
-             True
-             (toFilePath binPath))
     forM_
         (concatMap (Set.toList . packageExes) pkgs)
         (\exe ->
@@ -106,8 +99,8 @@ stageExesInDir dir = do
                      parseRelFile
                          (T.unpack exe)
                  copyFile
-                     (configLocalBin config </> exePath)
-                     (binPath </> exePath))
+                     (srcBinPath </> exePath)
+                     (destBinPath </> exePath))
 
 -- | Add any additional files into the temp directory, respecting the
 -- (Source, Destination) mapping.
@@ -123,10 +116,7 @@ syncAddContentToDir dir = do
               do sourcePath <- parseRelDir source
                  destPath <- parseAbsDir dest
                  let destFullPath = dirPath </> dropRoot destPath
-                 liftIO
-                     (SD.createDirectoryIfMissing
-                          True
-                          (toFilePath destFullPath))
+                 createTree destFullPath
                  copyDirectoryRecursive
                      (bcRoot bconfig </> sourcePath)
                      destFullPath)
