@@ -139,7 +139,7 @@ setupEnv = do
 
     -- Modify the initial environment to include the GHC path, if a local GHC
     -- is being used
-    let env0 = case mghcBin of
+    let env = removeHaskellEnvVars $ case mghcBin of
             Nothing -> unEnvOverride menv0
             Just ghcBin ->
                 let x = unEnvOverride menv0
@@ -149,16 +149,9 @@ setupEnv = do
                        ++ maybe [] return mpath
                  in Map.insert "PATH" path x
 
-    -- Remove potentially confusing environment variables
-        env1 = Map.delete "GHC_PACKAGE_PATH"
-             $ Map.delete "HASKELL_PACKAGE_SANDBOX"
-             $ Map.delete "HASKELL_PACKAGE_SANDBOXES"
-             $ Map.delete "HASKELL_DIST_DIR"
-               env0
-
-    menv1 <- mkEnvOverride platform env1
-    ghcVer <- getGhcVersion menv1
-    cabalVer <- getCabalPkgVer menv1
+    menv <- mkEnvOverride platform env
+    ghcVer <- getGhcVersion menv
+    cabalVer <- getCabalPkgVer menv
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bconfig
             , envConfigCabalVersion = cabalVer
@@ -167,16 +160,16 @@ setupEnv = do
 
     -- extra installation bin directories
     mkDirs <- runReaderT extraBinDirs envConfig0
-    let mpath = Map.lookup "PATH" env1
+    let mpath = Map.lookup "PATH" env
         mkDirs' = map toFilePath . mkDirs
         depsPath = augmentPath (mkDirs' False) mpath
         localsPath = augmentPath (mkDirs' True) mpath
 
     deps <- runReaderT packageDatabaseDeps envConfig0
-    createDatabase menv1 deps
+    createDatabase menv deps
     localdb <- runReaderT packageDatabaseLocal envConfig0
-    createDatabase menv1 localdb
-    globalDB <- mkEnvOverride platform env1 >>= getGlobalDB
+    createDatabase menv localdb
+    globalDB <- getGlobalDB menv
     let mkGPP locals = T.pack $ intercalate [searchPathSeparator] $ concat
             [ [toFilePathNoTrailingSlash localdb | locals]
             , [toFilePathNoTrailingSlash deps]
@@ -217,7 +210,7 @@ setupEnv = do
                                         , ""
                                         ])
                         $ Map.insert "HASKELL_DIST_DIR" (T.pack $ toFilePathNoTrailingSlash distDir)
-                        $ env1
+                        $ env
                     !() <- atomicModifyIORef envRef $ \m' ->
                         (Map.insert es eo m', ())
                     return eo
@@ -310,7 +303,7 @@ ensureGHC sopts = do
                         path0 = Map.lookup "PATH" m0
                         path = augmentPath paths path0
                         m = Map.insert "PATH" path m0
-                    mkEnvOverride (configPlatform config) m
+                    mkEnvOverride (configPlatform config) (removeHaskellEnvVars m)
         sanityCheck menv
 
     return mpaths
@@ -560,7 +553,10 @@ installGHCPosix :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, Ha
                 -> PackageIdentifier
                 -> m ()
 installGHCPosix _ archiveFile archiveType destDir ident = do
-    menv <- getMinimalEnvOverride
+    platform <- asks getPlatform
+    menv0 <- getMinimalEnvOverride
+    menv <- mkEnvOverride platform (removeHaskellEnvVars (unEnvOverride menv0))
+    $logInfo $ "menv = " <> T.pack (show (unEnvOverride menv))
     zipTool' <-
         case archiveType of
             TarXz -> return "xz"
@@ -829,3 +825,11 @@ sanityCheck menv = withSystemTempDirectory "stack-sanity-check" $ \dir -> do
 
 toFilePathNoTrailingSlash :: Path loc Dir -> FilePath
 toFilePathNoTrailingSlash = FP.dropTrailingPathSeparator . toFilePath
+
+-- Remove potentially confusing environment variables
+removeHaskellEnvVars :: Map Text Text -> Map Text Text
+removeHaskellEnvVars =
+    Map.delete "GHC_PACKAGE_PATH" .
+    Map.delete "HASKELL_PACKAGE_SANDBOX" .
+    Map.delete "HASKELL_PACKAGE_SANDBOXES" .
+    Map.delete "HASKELL_DIST_DIR"
