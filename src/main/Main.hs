@@ -236,7 +236,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                               dockerCleanupOptsParser)
              addSubCommands
                Image.imgCmdName
-               "Subcommands specific to imaging"
+               "Subcommands specific to imaging (EXPERIMENTAL)"
                (addCommand Image.imgDockerCmdName
                 "Build a Docker image for the project"
                 imgDockerCmd
