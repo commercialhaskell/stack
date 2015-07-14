@@ -204,7 +204,9 @@ imgOptsParser = ImageOptsMonoid <$>
         (subparser
              (command
                   imgDockerCmdName
-                  (info imgDockerOptsParser (progDesc "Create a docker image"))))
+                  (info
+                       imgDockerOptsParser
+                       (progDesc "Create a container image (EXPERIMENTAL)"))))
 
 -- | A parser for ImageDockerOptsMonoid.
 imgDockerOptsParser :: Parser ImageDockerOptsMonoid
