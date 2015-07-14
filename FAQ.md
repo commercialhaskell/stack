@@ -92,7 +92,7 @@ assuming your `$PATH` has been set appropriately.
 
 Yes. stack will default to using whatever GHC is on your `PATH`. If that GHC is a
 compatible version with the snapshot you're using, it will simply use it.
-Otherwise, it will prompt you to run `stack setup`.
+Otherwise, it will prompt you to run `stack setup`. Note that `stack setup` installs GHC into `~/.stack/programs/$platform/ghc-$version/` and not a global location.
 
 Note that GHC installation doesn't work for all OSes, so in some cases the
 first option will need to install GHC yourself.
