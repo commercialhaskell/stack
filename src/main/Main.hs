@@ -448,10 +448,12 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                   , soptsSkipMsys = configSkipMsys $ lcConfig lc
                   }
               case mpaths of
-                  Nothing -> $logInfo "GHC on PATH would be used"
-                  Just ps -> $logInfo $ "Would add the following to PATH: "
-                      <> T.pack (intercalate [searchPathSeparator] ps)
-                  )
+                  Nothing -> $logInfo "stack will use the GHC on your PATH"
+                  Just _ -> $logInfo "stack will use a locally installed GHC"
+              $logInfo "For more information on paths, see 'stack path' and 'stack exec env'"
+              $logInfo "To use this GHC and packages outside of a project, consider using:"
+              $logInfo "stack ghc, stack ghci, stack runghc, or stack exec"
+              )
 
 withConfig :: GlobalOpts
            -> StackT Config IO ()
