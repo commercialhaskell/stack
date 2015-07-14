@@ -224,8 +224,11 @@ loggerFunc loc _src level msg =
   do maxLogLevel <- asks getLogLevel
      when (level >= maxLogLevel)
           (liftIO (do out <- getOutput maxLogLevel
-                      S8.putStrLn (S8.pack out)))
-  where getOutput maxLogLevel =
+                      S8.hPutStrLn outputChannel (S8.pack out)))
+  where outputChannel = if level `elem` [LevelError,LevelWarn]
+                           then stderr
+                           else stdout
+        getOutput maxLogLevel =
           do date <- getDate
              l <- getLevel
              lc <- getLoc
