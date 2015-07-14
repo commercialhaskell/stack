@@ -66,6 +66,8 @@ A full description of the architecture
   to [the stack mailing list](https://groups.google.com/d/forum/haskell-stack).
 * For bugs, issues, or requests please
   [open an issue](https://github.com/commercialhaskell/stack/issues/new).
+* When using Stack Overflow, please use [the haskell-stack
+  tag](http://stackoverflow.com/questions/tagged/haskell-stack).
 
 #### Why stack?
 
