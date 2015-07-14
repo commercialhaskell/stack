@@ -118,6 +118,22 @@ In order to install stack from Hackage or from source, you will need the [libtin
 
 If you use the [ArchHaskell repository](https://wiki.archlinux.org/index.php/ArchHaskell), you can also get the `haskell-stack` package from there.
 
+## NixOS
+
+1. Clone the git repo:
+
+         git clone https://github.com/commercialhaskell/stack.git
+
+2. Create a `shell.nix` file:
+
+         cabal2nix --shell ./. --no-check > shell.nix
+
+   Note that the tests fail on NixOS, so disable them with `--no-check`.
+
+3. Install stack to your user profile:
+
+         nix-env -i -f shell.nix
+
 ## Linux
 
 (64-bit only)
