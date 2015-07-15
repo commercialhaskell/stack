@@ -278,6 +278,9 @@ loadBuildConfig menv mproject config stackRoot mresolver noConfigStrat = do
                 mbp <- runReaderT (loadMiniBuildPlan snapName) miniConfig
                 return $ mbpGhcVersion mbp
             ResolverGhc m -> return $ fromMajorVersion m
+            ResolverCustom url -> do
+                mbp <- runReaderT (parseCustomMiniBuildPlan url) miniConfig
+                return $ mbpGhcVersion mbp
 
     let root = parent stackYamlFP
     packages' <- mapM (resolvePackageEntry menv root) (projectPackages project)

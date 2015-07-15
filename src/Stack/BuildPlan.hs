@@ -22,6 +22,7 @@ module Stack.BuildPlan
     , ToolMap
     , getToolMap
     , shadowMiniBuildPlan
+    , parseCustomMiniBuildPlan
     ) where
 
 import           Control.Applicative
@@ -34,9 +35,11 @@ import           Control.Monad.Reader (asks)
 import           Control.Monad.State.Strict      (State, execState, get, modify,
                                                   put)
 import           Control.Monad.Trans.Control (MonadBaseControl)
+import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson.Extended (FromJSON (..), withObject, withText, (.:))
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
 import           Data.ByteString (ByteString)
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
 import qualified Data.Foldable as F
@@ -46,11 +49,12 @@ import qualified Data.IntMap as IntMap
 import           Data.List (intercalate)
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (mapMaybe)
+import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Monoid ((<>), Monoid (..))
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as T
+import           Data.Text.Encoding (encodeUtf8)
 import           Data.Time (Day)
 import qualified Data.Traversable as Tr
 import           Data.Typeable (Typeable)
@@ -76,6 +80,7 @@ import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.Types
 import           Stack.Types.StackT
+import           System.Directory (canonicalizePath)
 
 data BuildPlanException
     = UnknownPackages
@@ -667,3 +672,20 @@ shadowMiniBuildPlan (MiniBuildPlan ghc pkgs0) shadowed =
                 Just True -> Left
                 Just False -> Right
                 Nothing -> assert False Right
+
+parseCustomMiniBuildPlan :: (MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m)
+                         => T.Text -> m MiniBuildPlan
+parseCustomMiniBuildPlan url = do
+    fp <-
+        case parseUrl $ T.unpack url of
+            Just req -> do
+                root <- asks $ configStackRoot . getConfig
+                hashFP <- parseRelFile $ S8.unpack $ B16.encode $ SHA256.hash $ encodeUtf8 url
+                let cacheFP = root </> $(mkRelDir "custom-plan-cache") </> hashFP
+                _ <- download req cacheFP
+                return cacheFP
+            Nothing -> do
+                fp <- liftIO $ canonicalizePath $ T.unpack $ fromMaybe url $
+                    T.stripPrefix "file://" url <|> T.stripPrefix "file:" url
+                parseAbsFile fp
+    error $ show fp

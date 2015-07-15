@@ -147,6 +147,7 @@ getDefaultResolver cabalfps gpds initOpts =
                 case resolver of
                     ResolverSnapshot name -> findBuildPlan gpds [name]
                     ResolverGhc _ -> return Nothing
+                    ResolverCustom _ -> return Nothing
             case mpair of
                 Just (snap, flags) ->
                     return (ResolverSnapshot snap, flags, Map.empty)

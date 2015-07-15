@@ -365,6 +365,10 @@ data Resolver
   -- ^ Require a specific GHC major version, but otherwise provide no build
   -- plan. Intended for use cases where end user wishes to specify all upstream
   -- dependencies manually, such as using a dependency solver.
+
+  | ResolverCustom !Text
+  -- ^ A custom resolver based on the given URL. This file is assumed to be
+  -- completely immutable.
   deriving (Show)
 
 instance ToJSON Resolver where
@@ -377,6 +381,7 @@ instance FromJSON Resolver where
 renderResolver :: Resolver -> Text
 renderResolver (ResolverSnapshot name) = renderSnapName name
 renderResolver (ResolverGhc (MajorVersion x y)) = T.pack $ concat ["ghc-", show x, ".", show y]
+renderResolver (ResolverCustom url) = "custom: " <> url
 
 -- | Try to parse a @Resolver@, using same format as JSON/YAML/'renderResolver'
 parseResolver :: MonadThrow m => Text -> m Resolver
@@ -386,7 +391,10 @@ parseResolver t =
         Left _ ->
             case parseGhc of
                 Just m -> return $ ResolverGhc m
-                Nothing -> throwM $ ParseResolverException t
+                Nothing ->
+                    case T.stripPrefix "custom:" t of
+                        Just url -> return $ ResolverCustom $ T.stripStart url
+                        Nothing -> throwM $ ParseResolverException t
   where
     parseGhc = T.stripPrefix "ghc-" t >>= parseMajorVersionFromString . T.unpack
 

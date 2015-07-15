@@ -46,7 +46,8 @@ import           Path
 import           Prelude
 import           Stack.Build.Cache
 import           Stack.Build.Types
-import           Stack.BuildPlan (loadMiniBuildPlan, shadowMiniBuildPlan)
+import           Stack.BuildPlan (loadMiniBuildPlan, shadowMiniBuildPlan,
+                                  parseCustomMiniBuildPlan)
 import           Stack.Constants (wiredInPackages)
 import           Stack.Package
 import           Stack.PackageIndex
@@ -88,6 +89,7 @@ loadSourceMap bopts = do
             { mbpGhcVersion = fromMajorVersion ghc
             , mbpPackages = Map.empty
             }
+        ResolverCustom url -> parseCustomMiniBuildPlan url
 
     menv <- getMinimalEnvOverride
     caches <- getPackageCaches menv
