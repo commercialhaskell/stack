@@ -60,6 +60,7 @@ import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.ModuleName (ModuleName)
 import qualified Distribution.ModuleName as Cabal
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
+import qualified Distribution.Package as Cabal
 import           Distribution.PackageDescription hiding (FlagName)
 import           Distribution.PackageDescription.Parse
 import           Distribution.Simple.Utils
@@ -282,7 +283,7 @@ generatePkgDescOpts cabalfp pkg = do
              (["-hide-all-packages"] ++
               concatMap
                   (concatMap
-                       (generateBuildInfoOpts mcabalmacros cabalDir distDir))
+                       (generateBuildInfoOpts mcabalmacros cabalDir distDir (Cabal.packageName pkg)))
                   [ maybe [] (return . libBuildInfo) (library pkg)
                   , map buildInfo (executables pkg)
                   , map benchmarkBuildInfo (benchmarks pkg)
@@ -291,14 +292,14 @@ generatePkgDescOpts cabalfp pkg = do
     cabalDir = parent cabalfp
 
 -- | Generate GHC options for the target.
-generateBuildInfoOpts :: Maybe (Path Abs File) -> Path Abs Dir -> Path Abs Dir -> BuildInfo -> [String]
-generateBuildInfoOpts mcabalmacros cabalDir distDir b =
+generateBuildInfoOpts :: Maybe (Path Abs File) -> Path Abs Dir -> Path Abs Dir -> Cabal.PackageName -> BuildInfo -> [String]
+generateBuildInfoOpts mcabalmacros cabalDir distDir pkgname b =
     nub (concat [ghcOpts b, extOpts b, srcOpts, includeOpts b, macros, deps])
   where
     deps =
         concat
             [ ["-package=" <> display name]
-            | Dependency name _ <- targetBuildDepends b]
+            | Dependency name _ <- targetBuildDepends b, pkgname /= name]
     macros =
         case mcabalmacros of
             Nothing -> []
