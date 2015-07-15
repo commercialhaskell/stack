@@ -293,7 +293,7 @@ generatePkgDescOpts cabalfp pkg = do
 -- | Generate GHC options for the target.
 generateBuildInfoOpts :: Maybe (Path Abs File) -> Path Abs Dir -> Path Abs Dir -> BuildInfo -> [String]
 generateBuildInfoOpts mcabalmacros cabalDir distDir b =
-    nub (concat [ghcOpts b, extOpts b, srcOpts, includeOpts b, macros, deps])
+    nub (concat [ghcOpts b, extOpts b, srcOpts, includeOpts, macros, deps, extra b, extraDirs, fworks b])
   where
     deps =
         concat
@@ -315,10 +315,26 @@ generateBuildInfoOpts mcabalmacros cabalDir distDir b =
             (cabalDir :
              map (cabalDir </>) (mapMaybe parseRelDir (hsSourceDirs b)) <>
              [autogenDir distDir])
-    includeOpts
-       = map (("-I" <>) . toFilePath . (cabalDir </>))
-       . mapMaybe parseRelDir
-       . includeDirs
+    includeOpts =
+        [ "-I" <> toFilePath absDir
+        | dir <- includeDirs b
+        , absDir <- case (parseAbsDir dir, parseRelDir dir) of
+          (Just ab, _       ) -> [ab]
+          (_      , Just rel) -> [cabalDir </> rel]
+          (Nothing, Nothing ) -> []
+        ]
+    extra
+        = map ("-l" <>)
+        . extraLibs
+    extraDirs =
+        [ "-L" <> toFilePath absDir
+        | dir <- extraLibDirs b
+        , absDir <- case (parseAbsDir dir, parseRelDir dir) of
+          (Just ab, _       ) -> [ab]
+          (_      , Just rel) -> [cabalDir </> rel]
+          (Nothing, Nothing ) -> []
+        ]
+    fworks = map (\fwk -> "-framework=" <> fwk) . frameworks
 
 -- | Make the autogen dir.
 autogenDir :: Path Abs Dir -> Path Abs Dir
