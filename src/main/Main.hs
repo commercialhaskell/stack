@@ -100,6 +100,10 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                         "DEPRECATED: Use stack copy instead"
                         installCmd
                         (buildOptsParser Build)
+             addCommand "uninstall"
+                        "DEPRECATED: This command performs no actions, and is present for documentation only"
+                        uninstallCmd
+                        (many $ strArgument $ metavar "IGNORED")
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
                         (\(bopts, topts) ->
@@ -516,6 +520,12 @@ installCmd opts =
 
 copyCmd :: BuildOpts -> GlobalOpts -> IO ()
 copyCmd opts = buildCmdHelper (return ()) ExecStrategy DoNothing opts { boptsInstallExes = True }
+
+uninstallCmd :: [String] -> GlobalOpts -> IO ()
+uninstallCmd _ go = withConfig go $ do
+    $logError "stack does not manage installations in global locations"
+    $logError "The only global mutation stack performs is executable copying"
+    $logError "For the default executable destination, please run 'stack path --local-bin-path'"
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
