@@ -756,7 +756,8 @@ logPossibilities dirs mn = do
                  "\", but did find: " <>
                  T.intercalate ", " (map (T.pack . toFilePath) possibilities) <>
                  ". If you are using a custom preprocessor for this module \
-                 \with its own file extension, please see the FAQ.")
+                 \with its own file extension, consider adding the file(s) \
+                 \to your .cabal under extra-source-files.")
   where
     makePossibilities name =
         mapM
