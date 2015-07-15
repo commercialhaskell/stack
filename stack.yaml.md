@@ -87,6 +87,17 @@ flags:
 Flags will only affect packages in your `packages` and `extra-deps` settings.
 Packages that come from the snapshot global database or are not affected.
 
+### image
+The image settings are used for the creation of container images using `stack container image`, e.g.
+```
+image:
+  docker:
+    base: "fpco/stack-build"
+    add:
+      static: /data/static
+```
+`base` is the docker image that will be used to built upon. The `add` lines allow you to add additional directories to your image. You can also specify `entrypoints`.
+
 ## Non-project config
 
 ### docker
