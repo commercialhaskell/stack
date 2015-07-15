@@ -89,7 +89,7 @@ Packages that come from the snapshot global database or are not affected.
 
 ### image
 The image settings are used for the creation of container images using `stack container image`, e.g.
-```
+```yaml
 image:
   docker:
     base: "fpco/stack-build"
