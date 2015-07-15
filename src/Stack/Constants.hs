@@ -10,7 +10,7 @@ module Stack.Constants
     ,defaultShakeThreads
     ,distDirFromDir
     ,distRelativeDir
-    ,haskellFileExts
+    ,haskellModuleExts
     ,projectDockerSandboxDir
     ,rawGithubUrl
     ,stackDotYaml
@@ -43,13 +43,19 @@ import           Path as FL
 import           Prelude
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
-
 import           Stack.Types.PackageName
 
+-- | Extensions for anything that can be a Haskell module.
+haskellModuleExts :: [Text]
+haskellModuleExts = haskellFileExts ++ haskellPreprocessorExts
 
--- | Extensions used for Haskell files.
+-- | Extensions used for Haskell modules. Excludes preprocessor ones.
 haskellFileExts :: [Text]
-haskellFileExts = ["hs","hsc","lhs"]
+haskellFileExts = ["hs", "hsc", "lhs"]
+
+-- | Extensions for modules that are preprocessed by common preprocessors.
+haskellPreprocessorExts :: [Text]
+haskellPreprocessorExts = ["gc", "chs", "hsc", "x", "y", "ly", "cpphs"]
 
 -- | The filename used for completed build indicators.
 builtFileFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env,HasEnvConfig env)

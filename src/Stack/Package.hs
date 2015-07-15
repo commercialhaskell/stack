@@ -471,7 +471,7 @@ benchmarkFiles ty bench = do
                      [Right fp]
                  BenchmarkUnsupported _ ->
                      [])
-            haskellFileExts
+            haskellModuleExts
     bfiles <- buildFiles ty dir build
     case ty of
       AllFiles -> return (concat [bfiles,exposed])
@@ -495,7 +495,7 @@ testFiles ty test = do
                      [Left mn]
                  TestSuiteUnsupported _ ->
                      [])
-            haskellFileExts
+            haskellModuleExts
     bfiles <- buildFiles ty dir build
     case ty of
       AllFiles -> return (concat [bfiles,exposed])
@@ -513,7 +513,7 @@ executableFiles ty exe =
        resolveFiles
          (dirs ++ [dir])
          [Right (modulePath exe)]
-         haskellFileExts
+         haskellModuleExts
      bfiles <- buildFiles ty dir build
      case ty of
        AllFiles -> return (concat [bfiles,exposed])
@@ -529,7 +529,7 @@ libraryFiles ty lib =
      exposed <- resolveFiles
                   (dirs ++ [dir])
                   (map Left (exposedModules lib))
-                  haskellFileExts
+                  haskellModuleExts
      bfiles <- buildFiles ty dir build
      case ty of
        AllFiles -> return (concat [bfiles,exposed])
@@ -545,7 +545,7 @@ buildFiles ty dir build = do
         resolveFiles
             (dirs ++ [dir])
             (map Left (otherModules build))
-            haskellFileExts
+            haskellModuleExts
     cSources' <- mapMaybeM resolveFileOrWarn (cSources build)
     case ty of
         Modules -> return other
