@@ -7,6 +7,7 @@
 * Upper limit on number of flag combinations to test [#543](https://github.com/commercialhaskell/stack/issues/543)
 * Fuzzy matching support to give better error messages for close version numbers [#504](https://github.com/commercialhaskell/stack/issues/504)
 * --local-bin-path global option. Use to change where binaries get placed on an `stack install` [#342](https://github.com/commercialhaskell/stack/issues/342)
+* Custom snapshots [#111](https://github.com/commercialhaskell/stack/issues/111)
 
 ## 0.1.2.0
 

@@ -36,7 +36,7 @@ import           Control.Monad.State.Strict      (State, execState, get, modify,
                                                   put)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
-import           Data.Aeson.Extended (FromJSON (..), withObject, withText, (.:))
+import           Data.Aeson.Extended (FromJSON (..), withObject, withText, (.:), (.:?), (.!=))
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Base16 as B16
@@ -206,8 +206,11 @@ data ResolveState = ResolveState
     }
 
 toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadCatch m)
-                => BuildPlan -> m MiniBuildPlan
-toMiniBuildPlan bp = do
+                => Version -- ^ GHC version
+                -> Map PackageName Version -- ^ cores
+                -> Map PackageName (Version, Map FlagName Bool) -- ^ non-core packages
+                -> m MiniBuildPlan
+toMiniBuildPlan ghcVersion corePackages packages = do
     $logInfo "Caching build plan"
 
     -- Determine the dependencies of all of the packages in the build plan. We
@@ -216,9 +219,9 @@ toMiniBuildPlan bp = do
     -- remove those from the list of dependencies, since there's no way we'll
     -- ever reinstall them anyway.
     (cores, missingCores) <- addDeps True ghcVersion
-        $ fmap (, Map.empty) (siCorePackages $ bpSystemInfo bp)
+        $ fmap (, Map.empty) corePackages
 
-    (extras, missing) <- addDeps False ghcVersion $ fmap goPP $ bpPackages bp
+    (extras, missing) <- addDeps False ghcVersion packages
 
     assert (Set.null missing) $ return MiniBuildPlan
         { mbpGhcVersion = ghcVersion
@@ -229,7 +232,6 @@ toMiniBuildPlan bp = do
             ]
         }
   where
-    ghcVersion = siGhcVersion $ bpSystemInfo bp
     goCore (PackageIdentifier name version) = (name, MiniPackageInfo
                 { mpiVersion = version
                 , mpiFlags = Map.empty
@@ -238,11 +240,6 @@ toMiniBuildPlan bp = do
                 , mpiExes = Set.empty
                 , mpiHasLibrary = True
                 })
-
-    goPP pp =
-        ( ppVersion pp
-        , pcFlagOverrides $ ppConstraints pp
-        )
 
     removeMissingDeps cores mpi = mpi
         { mpiPackageDeps = Set.intersection cores (mpiPackageDeps mpi)
@@ -436,8 +433,17 @@ loadMiniBuildPlan
 loadMiniBuildPlan name = do
     path <- configMiniBuildPlanCache name
     let fp = toFilePath path
-    taggedDecodeOrLoad fp $ liftM buildPlanFixes $
-        loadBuildPlan name >>= toMiniBuildPlan
+    taggedDecodeOrLoad fp $ liftM buildPlanFixes $ do
+        bp <- loadBuildPlan name
+        toMiniBuildPlan
+            (siGhcVersion $ bpSystemInfo bp)
+            (siCorePackages $ bpSystemInfo bp)
+            (fmap goPP $ bpPackages bp)
+  where
+    goPP pp =
+        ( ppVersion pp
+        , pcFlagOverrides $ ppConstraints pp
+        )
 
 -- | Some hard-coded fixes for build plans, hopefully to be irrelevant over
 -- time.
@@ -676,16 +682,39 @@ shadowMiniBuildPlan (MiniBuildPlan ghc pkgs0) shadowed =
 parseCustomMiniBuildPlan :: (MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m)
                          => T.Text -> m MiniBuildPlan
 parseCustomMiniBuildPlan url = do
-    fp <-
-        case parseUrl $ T.unpack url of
-            Just req -> do
-                root <- asks $ configStackRoot . getConfig
-                hashFP <- parseRelFile $ S8.unpack $ B16.encode $ SHA256.hash $ encodeUtf8 url
-                let cacheFP = root </> $(mkRelDir "custom-plan-cache") </> hashFP
-                _ <- download req cacheFP
-                return cacheFP
-            Nothing -> do
-                fp <- liftIO $ canonicalizePath $ T.unpack $ fromMaybe url $
-                    T.stripPrefix "file://" url <|> T.stripPrefix "file:" url
-                parseAbsFile fp
-    error $ show fp
+    root <- asks $ configStackRoot . getConfig
+    let hashStr = S8.unpack $ B16.encode $ SHA256.hash $ encodeUtf8 url
+    hashFP <- parseRelFile hashStr
+    hashFPBin <- parseRelFile $ hashStr ++ ".bin"
+    let cacheDir = root </> $(mkRelDir "custom-plan-cache")
+        binaryFP = cacheDir </> hashFPBin
+    taggedDecodeOrLoad (toFilePath binaryFP) $ do
+        fp <-
+            case parseUrl $ T.unpack url of
+                Just req -> do
+                    let cacheFP = cacheDir </> hashFP
+                    _ <- download req cacheFP
+                    return cacheFP
+                Nothing -> do
+                    fp <- liftIO $ canonicalizePath $ T.unpack $ fromMaybe url $
+                        T.stripPrefix "file://" url <|> T.stripPrefix "file:" url
+                    parseAbsFile fp
+        cs <- liftIO (Data.Yaml.decodeFileEither $ toFilePath fp) >>= either throwM return
+        let addFlags :: PackageIdentifier -> (PackageName, (Version, Map FlagName Bool))
+            addFlags (PackageIdentifier name ver) =
+                (name, (ver, fromMaybe Map.empty $ Map.lookup name $ csFlags cs))
+        toMiniBuildPlan
+            (csGhcVersion cs)
+            Map.empty
+            (Map.fromList $ map addFlags $ Set.toList $ csPackages cs)
+
+data CustomSnapshot = CustomSnapshot
+    { csGhcVersion :: !Version
+    , csPackages :: !(Set PackageIdentifier)
+    , csFlags :: !(Map PackageName (Map FlagName Bool))
+    }
+instance FromJSON CustomSnapshot where
+    parseJSON = withObject "CustomSnapshot" $ \o -> CustomSnapshot
+        <$> o .: "ghc"
+        <*> o .: "packages"
+        <*> o .:? "flags" .!= Map.empty
