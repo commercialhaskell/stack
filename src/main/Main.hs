@@ -92,8 +92,12 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                         "Build the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
                         (buildOptsParser Build)
+             addCommand "copy"
+                        "Build executables and copy to a user path"
+                        copyCmd
+                        (buildOptsParser Build)
              addCommand "install"
-                        "Build executables and install to a user path"
+                        "DEPRECATED: Use stack copy instead"
                         installCmd
                         (buildOptsParser Build)
              addCommand "test"
@@ -486,22 +490,32 @@ cleanCmd :: () -> GlobalOpts -> IO ()
 cleanCmd () go = withBuildConfig go ThrowException clean
 
 -- | Helper for build and install commands
-buildCmdHelper :: NoBuildConfigStrategy -> FinalAction -> BuildOpts -> GlobalOpts -> IO ()
-buildCmdHelper strat finalAction opts go
+buildCmdHelper :: StackT EnvConfig IO () -- ^ do before build
+               -> NoBuildConfigStrategy -> FinalAction -> BuildOpts -> GlobalOpts -> IO ()
+buildCmdHelper beforeBuild strat finalAction opts go
     | boptsFileWatch opts = fileWatch inner
     | otherwise = inner $ const $ return ()
   where
-    inner setLocalFiles =
-        withBuildConfig go strat $
+    inner setLocalFiles = withBuildConfig go strat $ do
+        beforeBuild
         Stack.Build.build setLocalFiles opts { boptsFinalAction = finalAction }
 
 -- | Build the project.
 buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
-buildCmd = buildCmdHelper ThrowException
+buildCmd = buildCmdHelper (return ()) ThrowException
 
 -- | Install
 installCmd :: BuildOpts -> GlobalOpts -> IO ()
-installCmd opts = buildCmdHelper ExecStrategy DoNothing opts { boptsInstallExes = True }
+installCmd opts =
+    buildCmdHelper warning ExecStrategy DoNothing opts { boptsInstallExes = True }
+  where
+    warning = do
+        $logWarn "NOTE: stack is not a package manager"
+        $logWarn "The install command is only used to copy executables to a destination directory, not manage them"
+        $logWarn "You probably want to use 'stack copy' for clarity"
+
+copyCmd :: BuildOpts -> GlobalOpts -> IO ()
+copyCmd opts = buildCmdHelper (return ()) ExecStrategy DoNothing opts { boptsInstallExes = True }
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
