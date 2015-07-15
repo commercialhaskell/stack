@@ -55,7 +55,7 @@ getInstalledExes :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow 
 getInstalledExes loc = do
     dir <- exeInstalledDir loc
     (_, files) <- liftIO $ handleIO (const $ return ([], [])) $ listDirectory dir
-    return $ mapMaybe (parsePackageIdentifierFromString . toFilePath) files
+    return $ mapMaybe (parsePackageIdentifierFromString . toFilePath . filename) files
 
 -- | Mark the given executable as installed
 markExeInstalled :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadThrow m)
