@@ -670,28 +670,34 @@ depRange = \(Dependency _ r) -> r
 -- | Try to resolve the list of base names in the given directory by
 -- looking for unique instances of base names applied with the given
 -- extensions.
-resolveFiles :: MonadIO m
-             => [Path Abs Dir] -- ^ Directories to look in.
-             -> [Either ModuleName String] -- ^ Base names.
-             -> [Text] -- ^ Extentions.
-             -> m [Path Abs File]
+resolveFiles
+    :: MonadIO m
+    => [Path Abs Dir] -- ^ Directories to look in.
+    -> [Either ModuleName String] -- ^ Base names.
+    -> [Text] -- ^ Extentions.
+    -> m [Path Abs File]
 resolveFiles dirs names exts =
-  liftM catMaybes (forM names (liftIO . makeNameCandidates))
-  where makeNameCandidates name =
-          fmap (listToMaybe . rights . concat)
-               (mapM (makeDirCandidates name) dirs)
-        makeDirCandidates :: Either ModuleName String
-                          -> Path Abs Dir
-                          -> IO [Either ResolveException (Path Abs File)]
-        makeDirCandidates name dir =
-          mapM (\ext ->
-                  try (case name of
-                         Left mn ->
-                           resolveFile dir
-                                       (Cabal.toFilePath mn ++ "." ++ ext)
-                         Right fp ->
-                           resolveFile dir fp))
-               (map T.unpack exts)
+    liftM catMaybes (forM names (liftIO . makeNameCandidates))
+  where
+    makeNameCandidates name =
+        fmap
+            (listToMaybe . rights . concat)
+            (mapM (makeDirCandidates name) dirs)
+    makeDirCandidates
+        :: Either ModuleName String
+        -> Path Abs Dir
+        -> IO [Either ResolveException (Path Abs File)]
+    makeDirCandidates name dir =
+        mapM
+            (\ext ->
+                  try
+                      (case name of
+                           Left mn ->
+                               resolveFile
+                                   dir
+                                   (Cabal.toFilePath mn ++ "." ++ ext)
+                           Right fp -> resolveFile dir fp))
+            (map T.unpack exts)
 
 -- | Get the filename for the cabal file in the given directory.
 --
