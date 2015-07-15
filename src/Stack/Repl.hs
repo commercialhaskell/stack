@@ -38,13 +38,19 @@ repl targets useropts ghciPath noload = do
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
     pwd <- getWorkingDir
-    pkgs <-
+    locals <-
         liftM catMaybes $
         forM (M.toList (bcPackages bconfig)) $
         \(dir,validWanted) ->
              do cabalfp <- getCabalFileName dir
                 name <- parsePackageNameFromFilePath cabalfp
-                let config =
+                if validWanted && wanted pwd cabalfp name
+                    then return (Just (name, cabalfp))
+                    else return Nothing
+    pkgs <-
+        forM locals $
+        \(name,cabalfp) ->
+             do let config =
                         PackageConfig
                         { packageConfigEnableTests = True
                         , packageConfigEnableBenchmarks = True
@@ -54,14 +60,9 @@ repl targets useropts ghciPath noload = do
                               (getConfig bconfig)
                         }
                 pkg <- readPackage config cabalfp
-                if validWanted && wanted pwd cabalfp pkg
-                    then do
-                        pkgOpts <- getPackageOpts (packageOpts pkg) cabalfp
-                        srcfiles <-
-                            getPackageFiles (packageFiles pkg) Modules cabalfp
-                        return
-                            (Just (packageName pkg, pkgOpts, S.toList srcfiles))
-                    else return Nothing
+                pkgOpts <- getPackageOpts (packageOpts pkg) (map fst locals) cabalfp
+                srcfiles <- getPackageFiles (packageFiles pkg) Modules cabalfp
+                return (packageName pkg, pkgOpts, S.toList srcfiles)
     let pkgopts = filter (not . badForGhci) (concat (map _2 pkgs))
         srcfiles
           | noload = []
@@ -69,11 +70,14 @@ repl targets useropts ghciPath noload = do
     $logInfo
         ("Configuring GHCi with the following packages: " <>
          T.intercalate ", " (map packageNameText (map _1 pkgs)))
-    exec defaultEnvSettings ghciPath ("--interactive" : pkgopts <> srcfiles <> useropts)
+    exec
+        defaultEnvSettings
+        ghciPath
+        ("--interactive" : pkgopts <> srcfiles <> useropts)
   where
-    wanted pwd cabalfp pkg = isInWantedList || targetsEmptyAndInDir
+    wanted pwd cabalfp name = isInWantedList || targetsEmptyAndInDir
       where
-        isInWantedList = elem (packageNameText (packageName pkg)) targets
+        isInWantedList = elem (packageNameText name) targets
         targetsEmptyAndInDir = null targets || isParentOf (parent cabalfp) pwd
     badForGhci x =
         isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky")

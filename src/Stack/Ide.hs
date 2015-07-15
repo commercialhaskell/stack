@@ -49,6 +49,15 @@ ide targets useropts = do
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
     pwd <- getWorkingDir
+    locals <-
+        liftM catMaybes $
+        forM (M.toList (bcPackages bconfig)) $
+        \(dir,validWanted) ->
+             do cabalfp <- getCabalFileName dir
+                name <- parsePackageNameFromFilePath cabalfp
+                if validWanted && wanted pwd cabalfp name
+                    then return (Just (name, cabalfp))
+                    else return Nothing
     pkgs <-
         liftM catMaybes $
         forM (M.toList (bcPackages bconfig)) $
@@ -65,9 +74,9 @@ ide targets useropts = do
                               (getConfig bconfig)
                         }
                 pkg <- readPackage config cabalfp
-                if validWanted && wanted pwd cabalfp pkg
+                if validWanted && wanted pwd cabalfp name
                     then do
-                        pkgOpts <- getPackageOpts (packageOpts pkg) cabalfp
+                        pkgOpts <- getPackageOpts (packageOpts pkg) (map fst locals) cabalfp
                         srcfiles <-
                             getPackageFiles (packageFiles pkg) Modules cabalfp
                         dist <- distDirFromDir dir
@@ -103,9 +112,9 @@ ide targets useropts = do
          map ("--ghc-option=" ++) (filter (not . badForGhci) useropts) <> pkgopts <> pkgdbs)
         (encode (initialRequest srcfiles))
   where
-    wanted pwd cabalfp pkg = isInWantedList || targetsEmptyAndInDir
+    wanted pwd cabalfp name = isInWantedList || targetsEmptyAndInDir
       where
-        isInWantedList = elem (packageNameText (packageName pkg)) targets
+        isInWantedList = elem (packageNameText name) targets
         targetsEmptyAndInDir = null targets || isParentOf (parent cabalfp) pwd
     badForGhci x =
         isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky")

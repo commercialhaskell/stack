@@ -132,7 +132,8 @@ data Package =
 -- Argument is the location of the .cabal file
 newtype GetPackageOpts = GetPackageOpts
     { getPackageOpts :: forall env m. (MonadIO m,HasEnvConfig env, HasPlatform env, MonadThrow m, MonadReader env m)
-                     => Path Abs File
+                     => [PackageName]
+                     -> Path Abs File
                      -> m [String]
     }
 instance Show GetPackageOpts where
@@ -254,8 +255,8 @@ resolvePackage packageConfig gpkg = Package
     , packageTests = S.fromList $ [ T.pack (testName t) | t <- testSuites pkg, buildable (testBuildInfo t)]
     , packageBenchmarks = S.fromList $ [ T.pack (benchmarkName b) | b <- benchmarks pkg, buildable (benchmarkBuildInfo b)]
     , packageExes = S.fromList $ [ T.pack (exeName b) | b <- executables pkg, buildable (buildInfo b)]
-    , packageOpts = GetPackageOpts $ \cabalfp ->
-        generatePkgDescOpts cabalfp pkg
+    , packageOpts = GetPackageOpts $ \locals cabalfp ->
+        generatePkgDescOpts locals cabalfp pkg
     , packageHasExposedModules = maybe False (not . null . exposedModules) (library pkg)
     , packageSimpleType = buildType (packageDescription gpkg) == Just Simple
     }
@@ -268,8 +269,8 @@ resolvePackage packageConfig gpkg = Package
 
 -- | Generate GHC options for the package.
 generatePkgDescOpts :: (HasEnvConfig env, HasPlatform env, MonadThrow m, MonadReader env m, MonadIO m)
-                    => Path Abs File -> PackageDescription -> m [String]
-generatePkgDescOpts cabalfp pkg = do
+                    => [PackageName] -> Path Abs File -> PackageDescription -> m [String]
+generatePkgDescOpts locals cabalfp pkg = do
     distDir <- distDirFromDir cabalDir
     let cabalmacros = autogenDir distDir </> $(mkRelFile "cabal_macros.h")
     exists <- fileExists cabalmacros
@@ -282,7 +283,7 @@ generatePkgDescOpts cabalfp pkg = do
              (["-hide-all-packages"] ++
               concatMap
                   (concatMap
-                       (generateBuildInfoOpts mcabalmacros cabalDir distDir))
+                       (generateBuildInfoOpts mcabalmacros cabalDir distDir locals))
                   [ maybe [] (return . libBuildInfo) (library pkg)
                   , map buildInfo (executables pkg)
                   , map benchmarkBuildInfo (benchmarks pkg)
@@ -291,14 +292,14 @@ generatePkgDescOpts cabalfp pkg = do
     cabalDir = parent cabalfp
 
 -- | Generate GHC options for the target.
-generateBuildInfoOpts :: Maybe (Path Abs File) -> Path Abs Dir -> Path Abs Dir -> BuildInfo -> [String]
-generateBuildInfoOpts mcabalmacros cabalDir distDir b =
+generateBuildInfoOpts :: Maybe (Path Abs File) -> Path Abs Dir -> Path Abs Dir -> [PackageName] -> BuildInfo -> [String]
+generateBuildInfoOpts mcabalmacros cabalDir distDir locals b =
     nub (concat [ghcOpts b, extOpts b, srcOpts, includeOpts b, macros, deps])
   where
     deps =
         concat
             [ ["-package=" <> display name]
-            | Dependency name _ <- targetBuildDepends b]
+            | Dependency name _ <- targetBuildDepends b, not (elem name (map toCabalPackageName locals))]
     macros =
         case mcabalmacros of
             Nothing -> []
