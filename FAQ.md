@@ -88,6 +88,27 @@ $ <program-name>
 ```
 assuming your `$PATH` has been set appropriately.
 
+#### Using custom preprocessors
+
+If you have a custom preprocessor, for example, Ruby, you may have a
+file like:
+
+***B.erb***
+
+``` haskell
+module B where
+
+<% (1..5).each do |i| %>
+test<%= i %> :: Int
+test<%= i %> = <%= i %>
+<% end %>
+```
+
+To ensure that Stack picks up changes to this file for rebuilds, add
+the following line to your .cabal file:
+
+    extra-source-files:   B.erb
+
 #### I already have GHC installed, can I still use stack?
 
 Yes. stack will default to using whatever GHC is on your `PATH`. If that GHC is a
