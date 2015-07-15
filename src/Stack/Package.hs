@@ -671,33 +671,105 @@ depRange = \(Dependency _ r) -> r
 -- looking for unique instances of base names applied with the given
 -- extensions.
 resolveFiles
-    :: MonadIO m
+    :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader (Path Abs File) m)
     => [Path Abs Dir] -- ^ Directories to look in.
     -> [Either ModuleName String] -- ^ Base names.
     -> [Text] -- ^ Extentions.
     -> m [Path Abs File]
-resolveFiles dirs names exts =
-    liftM catMaybes (forM names (liftIO . makeNameCandidates))
+resolveFiles dirs names exts = do
+    liftM catMaybes (forM names (findCandidate dirs exts))
+
+-- | Find a candidate for the given module-or-filename from the list
+-- of directories and given extensions.
+findCandidate
+    :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader (Path Abs File) m)
+    => [Path Abs Dir]
+    -> [Text]
+    -> Either ModuleName String
+    -> m (Maybe (Path Abs File))
+findCandidate dirs exts name = do
+    pkg <- ask >>= parsePackageNameFromFilePath
+    candidates <- liftIO makeNameCandidates
+    case candidates of
+        [candidate] -> return (Just candidate)
+        [] -> do
+            case name of
+                Left mn
+                  | not (display mn == paths_pkg pkg) -> do
+                      logPossibilities dirs mn
+                _ -> return ()
+            return Nothing
+        (candidate:rest) -> do
+            warnMultiple name candidate rest
+            return (Just candidate)
   where
-    makeNameCandidates name =
-        fmap
-            (listToMaybe . rights . concat)
-            (mapM (makeDirCandidates name) dirs)
+    paths_pkg pkg = "Paths_" ++ packageNameString pkg
+    makeNameCandidates =
+        liftM (rights . concat) (mapM makeDirCandidates dirs)
     makeDirCandidates
-        :: Either ModuleName String
-        -> Path Abs Dir
+        :: Path Abs Dir
         -> IO [Either ResolveException (Path Abs File)]
-    makeDirCandidates name dir =
-        mapM
-            (\ext ->
-                  try
-                      (case name of
-                           Left mn ->
-                               resolveFile
+    makeDirCandidates dir =
+        case name of
+            Right fp -> liftM return (try (resolveFile dir fp))
+            Left mn ->
+                mapM
+                    (\ext ->
+                          try
+                              (resolveFile
                                    dir
-                                   (Cabal.toFilePath mn ++ "." ++ ext)
-                           Right fp -> resolveFile dir fp))
-            (map T.unpack exts)
+                                   (Cabal.toFilePath mn ++ "." ++ ext)))
+                    (map T.unpack exts)
+
+-- | Warn the user that multiple candidates are available for an
+-- entry, but that we picked one anyway and continued.
+warnMultiple
+    :: MonadLogger m
+    => Either ModuleName String -> Path b t -> [Path b t] -> m ()
+warnMultiple name candidate rest =
+    $logWarn
+        ("There were multiple candidates for the Cabal entry \"" <>
+         showName name <>
+         "(" <>
+         T.intercalate "," (map (T.pack . toFilePath) rest) <>
+         "), picking " <>
+         T.pack (toFilePath candidate))
+  where showName (Left name') = T.pack (display name')
+        showName (Right fp) = T.pack fp
+
+-- | Log that we couldn't find a candidate, but there are
+-- possibilities for custom preprocessor extensions.
+--
+-- For example: .erb for a Ruby file might exist in one of the
+-- directories.
+logPossibilities
+    :: (MonadIO m, MonadThrow m, MonadLogger m)
+    => [Path Abs Dir] -> ModuleName -> m ()
+logPossibilities dirs mn = do
+    possibilities <- liftM concat (makePossibilities mn)
+    case possibilities of
+        [] -> return ()
+        _ ->
+            $logWarn
+                ("Unable to find a known candidate for the Cabal entry \"" <>
+                 T.pack (display mn) <>
+                 "\", but did find: " <>
+                 T.intercalate ", " (map (T.pack . toFilePath) possibilities) <>
+                 ". If you are using a custom preprocessor for this module \
+                 \with its own file extension, please see the FAQ.")
+  where
+    makePossibilities name =
+        mapM
+            (\dir ->
+                  do (_,files) <- listDirectory dir
+                     return
+                         (map
+                              filename
+                              (filter
+                                   (isPrefixOf (display name) .
+                                    toFilePath . filename)
+                                   files)))
+            dirs
 
 -- | Get the filename for the cabal file in the given directory.
 --
