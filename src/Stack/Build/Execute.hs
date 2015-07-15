@@ -136,7 +136,7 @@ printPlan finalAction plan = do
                 [] -> $logInfo $ "Nothing to " <> finalLabel
                 xs -> do
                     $logInfo $ "Would " <> finalLabel <> ":"
-                    forM_ xs $ \(name, _) -> $logInfo $ T.pack $ packageNameString name
+                    forM_ xs $ \(name, _) -> $logInfo $ packageNameText name
 
     $logInfo ""
 
@@ -806,7 +806,7 @@ singleTest topts ac ee task =
                             [ "Test suite "
                             , testName
                             , " executable not found for "
-                            , T.pack $ packageNameString $ packageName package
+                            , packageNameText $ packageName package
                             ]
                         return $ Map.singleton testName Nothing
 
