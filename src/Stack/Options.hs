@@ -528,9 +528,9 @@ newOptsParser =
             <*> initOptsParser
   where
     templateRepositoryParser = strOption
-         $ long "template-repository"
-        <> metavar "REPO"
-        <> value "https://github.com/commercialhaskell/stack-templates"
+         $ long "template-url-base"
+        <> metavar "URL"
+        <> value "raw.githubusercontent.com/commercialhaskell/stack-templates/master/"
     -- TODO(DanBurton): reject argument if it has a colon.
     templateParser = strArgument $ metavar "TEMPLATE"
     -- TODO(DanBurton): reject argument if it doesn't have a colon.

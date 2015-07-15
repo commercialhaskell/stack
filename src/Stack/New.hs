@@ -1,34 +1,42 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Stack.New
     ( newProject
     , NewOpts(..)
     ) where
 
-import           Control.Monad          (filterM, forM_, forM, unless)
+import           Control.Monad          (filterM, forM_, unless)
+import           Control.Monad.Catch    (MonadCatch, catch)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Control.Monad.Logger   (MonadLogger, logInfo, logDebug, logError)
+import           Control.Monad.Logger   (MonadLogger, logInfo, logDebug)
+import           Control.Monad.Reader   (MonadReader, asks)
+import           Control.Monad.Trans.Writer (execWriterT)
 import           Data.ByteString        (ByteString)
-import qualified Data.ByteString        as S
-import           Data.FileEmbed         (embedDir)
-import qualified Data.List              as List
-import           Data.Map               (Map)
+import qualified Data.ByteString        as ByteString
+import qualified Data.ByteString.Lazy   as LByteString
+import           Data.Conduit           (($$), yield)
 import qualified Data.Map               as Map
 import           Data.Monoid            ((<>))
-import qualified Data.Text              as T
-import qualified Data.Text.Encoding     as T
-import qualified Data.Text.Lazy         as LT
+import qualified Data.Text              as Text
+import qualified Data.Text.Encoding     as Text
+import qualified Data.Text.Lazy         as LText
+import           Network.HTTP.Client    (HttpException, getUri)
+import           Network.HTTP.Download  (parseUrl, redownload, HasHttpManager)
+import           Path                   (parseRelFile, mkRelDir, toFilePath, (</>))
+import           Path.IO                (fileExists)
 import           System.Directory       (createDirectoryIfMissing,
                                          doesFileExist,
                                          getCurrentDirectory)
 import           System.FilePath        (takeDirectory,
                                          takeFileName,
                                          dropTrailingPathSeparator)
-import           System.Exit            (exitFailure)
 import           Text.Hastache
 import           Text.Hastache.Context
+import           Text.ProjectTemplate   (unpackTemplate, receiveMem)
 
 import           Stack.Init (InitOpts(forceOverwrite))
+import           Stack.Types.Config (HasStackRoot, getStackRoot)
 
 data NewOpts = NewOpts
     { newOptsTemplateRepository :: String
@@ -42,20 +50,35 @@ type Template = String
 defaultTemplate :: Template
 defaultTemplate = "new-template"
 
--- TODO(DanBurton): support multiple templates
--- Get the files associated with a given template
-getFiles :: (MonadIO m, MonadLogger m)
-         => String -> Template -> m (Map FilePath ByteString)
-getFiles _repo "new-template" = return $  Map.fromList $(embedDir "new-template")
-getFiles repo template = do
-    $logError $
-        "Error fetching template: " <> T.pack template <> "\n"
-        <> "     from repository: " <> T.pack repo <> "\n"
-        <> "\n"
-        <> "Sorry, only new-template is supported right now.\n"
-        <> "Support for more templates soon to come.\n"
-        <> "See: https://github.com/commercialhaskell/stack/issues/137"
-    liftIO exitFailure -- the end
+-- Get the files associated with a given template as a single ByteString.
+-- Templates are expected to be in "project-template" format.
+getFiles :: (MonadIO m, MonadLogger m, MonadCatch m, MonadReader env m, HasStackRoot env, HasHttpManager env)
+         => String -> Template -> m ByteString
+getFiles urlBase template = do
+    -- TODO(DanBurton): gracefully handle absence of trailing slash in urlBase.
+    -- TODO(DanBurton): gracefully handle urls with https:// already present.
+    let url = urlBase <> template <> ".hsfiles"
+    req <- parseUrl ("https://" <> url)
+
+    stackRoot <- asks getStackRoot
+    relFile <- parseRelFile url
+    let path = stackRoot </> $(mkRelDir "templates") </> relFile
+
+    let uriString = show $ getUri req
+    $logDebug "Attempting to redownload template"
+    downloaded <- redownload req path `catch` \(e :: HttpException) -> do
+        $logDebug $ "redownload failed for " <> Text.pack uriString
+        $logDebug $ "HttpException: " <> Text.pack (show e)
+        return False
+    exists <- fileExists path
+    unless exists $ error $ unlines
+        $ "Failed to download template:"
+        : uriString
+        : []
+    unless downloaded $ do
+        $logDebug "Using already-downloaded template."
+
+    liftIO $ ByteString.readFile (toFilePath path)
 
 -- Detect default key:value pairs for mustache template.
 getDefaultArgs :: (MonadIO m, MonadLogger m) => m [(String, String)]
@@ -72,7 +95,7 @@ toArgs = map toArg
         (key, ':':val) -> (key, val)
         _-> (s, "") -- TODO(DanBurton): Handle this error case better.
 
-newProject :: (MonadIO m, MonadLogger m)
+newProject :: (MonadIO m, MonadLogger m, MonadCatch m, MonadReader env m, HasStackRoot env, HasHttpManager env)
            => NewOpts
            -> m ()
 newProject newOpts = do
@@ -80,6 +103,7 @@ newProject newOpts = do
 
     $logDebug "Calculating template arguments"
     defaultArgs <- getDefaultArgs
+
     -- TODO(DanBurton): Do this logic in the arg parser instead.
     let (template, args1) = case templateMay of
             Nothing -> (defaultTemplate, args0)
@@ -87,38 +111,37 @@ newProject newOpts = do
             Just template0 -> case break (== ':') template0 of
                (_, []) -> (template0, args0)
                (_key, _colonVal) -> (defaultTemplate, template0:args0)
-    let args = toArgs args1 ++ defaultArgs
+
+    -- Note: this map prefers user-specified args over defaultArgs.
+    let args = Map.union
+            (Map.fromList $ toArgs args1)
+            (Map.fromList defaultArgs)
 
     $logDebug "Loading template files"
-    files <- getFiles repo template
+    filesBS <- getFiles repo template
 
-    let contextLookup key = case List.lookup key args of
+    let contextLookup key = case Map.lookup key args of
             Just val -> MuVariable val
             Nothing  -> MuNothing
 
-    let runHastache text =
-            hastacheStr defaultConfig text (mkStrContext contextLookup)
-
-    -- Render file paths and file contents via mustache.
-    -- There is some unsafety in `unMustache` on file names,
-    -- because file names could collide.
+    $logDebug "Rendering templates"
+    -- There is some unsafety in this regarding file names,
+    -- because interpolated file names could collide.
     -- I believe the correct way to handle this is to tell template creators
     -- to be careful to avoid this if they use mustache in file names.
     -- ~ Dan Burton
-    $logDebug "Rendering templates"
-    files' <- liftIO $ forM (Map.toList files) $ \(fp, bs) -> do
-        let fpText = T.pack fp
-        fpLText' <- runHastache fpText
-        let fp' = LT.unpack fpLText'
+    filesLText <- hastacheStr
+        defaultConfig
+        (Text.decodeUtf8 filesBS)
+        (mkStrContext contextLookup)
+    let filesText = LText.toStrict filesLText
 
-        let bsText = T.decodeUtf8 bs
-        bsLText' <- runHastache bsText
-        let bs' = T.encodeUtf8 $ LT.toStrict bsLText'
-
-        return (fp', bs')
+    files <- execWriterT
+         $ yield (Text.encodeUtf8 filesText)
+        $$ unpackTemplate receiveMem id
 
     $logDebug "Checking presence of template files"
-    exist <- filterM (liftIO . doesFileExist) (map fst files')
+    exist <- filterM (liftIO . doesFileExist) (Map.keys files)
     unless (forceOverwrite initOpts || null exist) $
        error $ unlines
            $ "The following files already exist, refusing to overwrite (no --force):"
@@ -127,8 +150,8 @@ newProject newOpts = do
     $logDebug "Writing template files"
     $logInfo ""
 
-    forM_ files' $ \(fp, bs) -> do
-        $logInfo $ T.pack $ "Writing: " ++ fp
+    forM_ (Map.toList files) $ \(fp, lbs) -> do
+        $logInfo $ Text.pack $ "Writing: " ++ fp
         liftIO $ do
             createDirectoryIfMissing True $ takeDirectory fp
-            S.writeFile fp bs
+            LByteString.writeFile fp lbs
