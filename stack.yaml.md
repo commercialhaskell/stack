@@ -96,7 +96,7 @@ image:
     add:
       static: /data/static
 ```
-`base` is the docker image that will be used to built upon. The `add` lines allow you to add additional directories to your image. You can also specify `entrypoints`.
+`base` is the docker image that will be used to built upon. The `add` lines allow you to add additional directories to your image. You can also specify `entrypoints`. Your executables are placed in `/usr/local/bin`.
 
 ## Non-project config
 
