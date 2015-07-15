@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Stack.Options 
+module Stack.Options
     (Command(..)
     ,benchOptsParser
     ,buildOptsParser
@@ -18,31 +18,27 @@ module Stack.Options
     ,testOptsParser
     ) where
 
-import Control.Monad.Logger (LogLevel(..))
-import qualified Data.ByteString as S
-import Data.Char (isSpace, toLower)
-import Data.List.Split (splitOn)
+import           Control.Monad.Logger (LogLevel(..))
+import           Data.Attoparsec.Args (EscapingMode (Escaping), parseArgs)
+import           Data.Char (isSpace, toLower)
+import           Data.List.Split (splitOn)
 import qualified Data.Map as Map
-import Data.Map.Strict (Map)
-import Data.Maybe
-import Data.Monoid
-import Data.Set (Set)
+import           Data.Map.Strict (Map)
+import           Data.Maybe
+import           Data.Monoid
 import qualified Data.Set as Set
-import Data.Text (Text)
 import qualified Data.Text as T
-import Options.Applicative.Args
-import Options.Applicative.Builder.Extra
-import Options.Applicative.Simple
-import Options.Applicative.Types (readerAsk)
-import Stack.Build.Types
-import Stack.Docker
+import           Options.Applicative.Args
+import           Options.Applicative.Builder.Extra
+import           Options.Applicative.Simple
+import           Options.Applicative.Types (readerAsk)
+import           Stack.Build.Types
+import           Stack.Docker
 import qualified Stack.Docker as Docker
-import Stack.Dot
-import Stack.Init
-import Stack.New (NewOpts(..))
-import Stack.Solver
-import Stack.Types
-import Data.Attoparsec.Args (EscapingMode (Escaping), parseArgs)
+import           Stack.Dot
+import           Stack.Init
+import           Stack.New (NewOpts(..))
+import           Stack.Types
 
 -- | Command sum type for conditional arguments.
 data Command
@@ -134,14 +130,6 @@ buildOptsParser cmd =
             "continue running after a step fails (default: false for build, true for test/bench)"
             idm
 
--- | Parser for package names
-readPackageName :: ReadM PackageName
-readPackageName = do
-    s <- readerAsk
-    case parsePackageNameFromString s of
-        Nothing -> readerError $ "Invalid package name: " ++ s
-        Just x -> return x
-
 -- | Parser for package:[-]flag
 readFlag :: ReadM (Map (Maybe PackageName) (Map FlagName Bool))
 readFlag = do
@@ -228,7 +216,7 @@ configOptsParser docker =
              ( long "local-bin-path"
              <> metavar "DIR"
              <> help "Install binaries to DIR"
-              )) 
+              ))
 
 -- | Options parser configuration for Docker.
 dockerOptsParser :: Bool -> Parser DockerOptsMonoid

@@ -13,48 +13,47 @@ module Stack.Build.Source
     , loadLocals
     ) where
 
-import           Control.Applicative          ((<|>), (<$>), (<*>))
-import           Control.Exception            (catch)
+import           Control.Applicative ((<|>), (<$>), (<*>))
+import           Control.Exception (catch)
 import           Control.Monad
-import           Control.Monad.Catch          (MonadCatch)
+import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader         (MonadReader, asks)
+import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Resource
-import           Crypto.Hash                  (Digest, SHA256)
-import           Crypto.Hash.Conduit          (sinkHash)
-import           Data.Byteable                (toBytes)
-import qualified Data.ByteString              as S
-import           Data.Conduit                 (($$), ZipSink (..))
-import qualified Data.Conduit.Binary          as CB
-import qualified Data.Conduit.List            as CL
+import           Crypto.Hash (Digest, SHA256)
+import           Crypto.Hash.Conduit (sinkHash)
+import qualified Data.ByteString as S
+import           Data.Byteable (toBytes)
+import           Data.Conduit (($$), ZipSink (..))
+import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.List as CL
 import           Data.Either
-import qualified Data.Foldable                as F
+import qualified Data.Foldable as F
 import           Data.Function
-import qualified Data.HashSet                 as HashSet
+import qualified Data.HashSet as HashSet
 import           Data.List
-import qualified Data.Map                     as Map
-import           Data.Map.Strict              (Map)
+import qualified Data.Map as Map
+import           Data.Map.Strict (Map)
 import           Data.Maybe
-import           Data.Monoid                  ((<>), Any (..), mconcat)
-import           Data.Set                     (Set)
-import qualified Data.Set                     as Set
-import           Data.Text                    (Text)
-import qualified Data.Text                    as T
-import           Network.HTTP.Client.Conduit  (HasHttpManager)
+import           Data.Monoid ((<>), Any (..), mconcat)
+import           Data.Set (Set)
+import qualified Data.Set as Set
+import           Data.Text (Text)
+import qualified Data.Text as T
+import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Prelude
 import           Stack.Build.Cache
 import           Stack.Build.Types
-import           Stack.BuildPlan              (loadMiniBuildPlan,
-                                               shadowMiniBuildPlan)
-import           Stack.Constants              (wiredInPackages)
+import           Stack.BuildPlan (loadMiniBuildPlan, shadowMiniBuildPlan)
+import           Stack.Constants (wiredInPackages)
 import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.Types
 import           System.Directory
-import           System.IO                    (withBinaryFile, IOMode (ReadMode))
-import           System.IO.Error              (isDoesNotExistError)
+import           System.IO (withBinaryFile, IOMode (ReadMode))
+import           System.IO.Error (isDoesNotExistError)
 
 type SourceMap = Map PackageName PackageSource
 
@@ -176,12 +175,12 @@ loadLocals bopts latestVersion = do
         case boptsTargets bopts of
             -- If there are no targets specified: build all locals
             [] -> return (\_ _ -> True, Map.empty, Set.empty)
-            targets -> do
+            _targets -> do
                 targets' <- mapM parseTarget $ boptsTargets bopts
                 -- Group targets by their kind
                 (dirs, names, idents) <-
                     case partitionEithers targets' of
-                        ([], targets') -> return $ partitionTargetSpecs targets'
+                        ([], targets'') -> return $ partitionTargetSpecs targets''
                         (bad, _) -> throwM $ Couldn'tParseTargets bad
                 return (isWanted dirs names, names, idents)
 

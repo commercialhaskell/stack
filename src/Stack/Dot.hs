@@ -9,16 +9,15 @@ module Stack.Dot (dot
                  ,pruneGraph
                  ) where
 
+import           Control.Applicative
 import           Control.Monad (void)
 import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger, logInfo)
 import           Control.Monad.Reader (MonadReader)
 import           Control.Monad.Trans.Control (MonadBaseControl)
-import           Data.Char (isSpace)
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
-import           Data.List.Split (splitOn)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Monoid ((<>))
@@ -28,7 +27,6 @@ import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Traversable as T
 import           Network.HTTP.Client.Conduit (HasHttpManager)
-import           Control.Applicative
 import           Stack.Build (withLoadPackage)
 import           Stack.Build.Source
 import           Stack.Build.Types

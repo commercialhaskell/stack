@@ -28,14 +28,12 @@ module Stack.Build.Cache
     , checkBenchBuilt
     ) where
 
-import           Control.Exception.Enclosed (handleIO, tryIO)
-import           Control.Monad.Catch        (MonadThrow, catch, throwM)
+import           Control.Exception.Enclosed (handleIO)
+import           Control.Monad.Catch (MonadThrow)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader
 import           Data.Binary.VersionTagged
-import qualified Data.ByteString as S
-import qualified Data.ByteString.Lazy as L
 import           Data.Map (Map)
 import           Data.Maybe (fromMaybe, mapMaybe)
 import           GHC.Generics (Generic)
@@ -44,7 +42,6 @@ import           Path.IO
 import           Stack.Build.Types
 import           Stack.Constants
 import           Stack.Types
-import           System.IO.Error (isDoesNotExistError)
 
 -- | Directory containing files to mark an executable as installed
 exeInstalledDir :: (MonadReader env m, HasEnvConfig env, MonadThrow m)

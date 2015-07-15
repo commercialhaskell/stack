@@ -15,11 +15,8 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask)
 import           Data.Attoparsec.Args (withInterpreterArgs)
-import           Data.Char (toLower)
 import           Data.List
 import qualified Data.List as List
-import           Data.Map (Map)
-import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Set as Set
@@ -45,17 +42,16 @@ import           Stack.Dot
 import           Stack.Exec
 import           Stack.Fetch
 import           Stack.FileWatch
+import           Stack.Ide
+import qualified Stack.Image as Image
 import           Stack.Init
 import           Stack.New
 import           Stack.Options
 import qualified Stack.PackageIndex
 import           Stack.Repl
-import           Stack.Ide
-import qualified Stack.Image as Image
 import           Stack.Setup
 import           Stack.Solver (solveExtraDeps)
 import           Stack.Types
-import           Stack.Types.Config
 import           Stack.Types.Internal
 import           Stack.Types.StackT
 import           Stack.Upgrade
@@ -63,7 +59,7 @@ import qualified Stack.Upload as Upload
 import           System.Directory (canonicalizePath)
 import           System.Environment (getArgs, getProgName)
 import           System.Exit
-import           System.FilePath (searchPathSeparator,dropTrailingPathSeparator)
+import           System.FilePath (dropTrailingPathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..))
 import           System.Process.Read
 

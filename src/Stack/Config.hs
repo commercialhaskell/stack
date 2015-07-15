@@ -29,9 +29,9 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Concurrent (getNumCapabilities)
-import           Control.Exception  (IOException)
+import           Control.Exception (IOException)
 import           Control.Monad
-import           Control.Monad.Catch
+import           Control.Monad.Catch (Handler(..), MonadCatch, MonadThrow, catches, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
 import           Control.Monad.Reader (MonadReader, ask, runReaderT)
@@ -44,7 +44,6 @@ import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid
-import qualified Data.Set as S
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import qualified Data.Yaml as Yaml
@@ -53,8 +52,7 @@ import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange)
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager, parseUrl)
 import           Network.HTTP.Download (download)
-import           Options.Applicative (Parser, idm, strOption, long, short, metavar, help, option, auto)
-import           Options.Applicative.Builder.Extra (maybeBoolFlags)
+import           Options.Applicative (Parser, strOption, long, help)
 import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
