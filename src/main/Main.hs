@@ -100,9 +100,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                         "Build and test the project(s) in this directory/configuration"
                         (\(bopts, topts) ->
                              let bopts' = if toCoverage topts
-                                             then bopts { boptsExeProfile = True
-                                                        , boptsLibProfile = True
-                                                        , boptsGhcOptions = "-fhpc" : boptsGhcOptions bopts}
+                                             then bopts { boptsGhcOptions = "-fhpc" : boptsGhcOptions bopts}
                                              else bopts
                              in buildCmd (DoTests topts) bopts')
                         ((,) <$> buildOptsParser Test <*> testOptsParser)
