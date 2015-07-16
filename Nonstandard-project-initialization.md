@@ -2,7 +2,7 @@
 The purpose of this page is to collect information about issues that arise when users either have an existing cabal project or another nonstandard setup such as a private hackage database. 
 
 # Using a Cabal File
-New users may be confused by the fast that you must add dependencies to the projects cabal file, even in the case when you have already listed the package in the `stack.yaml`. In most cases, dependencies for your project that are in the Stackage snapshot need *only* be added to the cabal file. stack makes heavy use of Cabal the library under the hood. In general, your stack packages should also end up being valid cabal-install packages.
+New users may be confused by the fact that you must add dependencies to the projects cabal file, even in the case when you have already listed the package in the `stack.yaml`. In most cases, dependencies for your project that are in the Stackage snapshot need *only* be added to the cabal file. stack makes heavy use of Cabal the library under the hood. In general, your stack packages should also end up being valid cabal-install packages.
 
 ## Issues Referenced
   - https://github.com/commercialhaskell/stack/issues/105
