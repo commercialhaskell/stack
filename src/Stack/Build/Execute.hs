@@ -874,7 +874,7 @@ generateHpcReport pkgDir pkgName testName = do
             , T.pack (toFilePath tixFileAbs)
             , "."
             ]
-        else do
+        else (`onException` $logError ("Error occurred while producing coverage report for " <> whichTest)) $ do
             menv <- getMinimalEnvOverride
             $logInfo $ "Generating HTML coverage report for " <> whichTest
             _ <- readProcessStdout (Just hpcDir) menv "hpc"
