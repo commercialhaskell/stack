@@ -76,7 +76,11 @@ ide targets useropts = do
                 pkg <- readPackage config cabalfp
                 if validWanted && wanted pwd cabalfp name
                     then do
-                        pkgOpts <- getPackageOpts (packageOpts pkg) (map fst locals) cabalfp
+                        pkgOpts <-
+                            getPackageOpts
+                                (packageOpts pkg)
+                                (map fst locals)
+                                cabalfp
                         srcfiles <-
                             getPackageFiles (packageFiles pkg) Modules cabalfp
                         dist <- distDirFromDir dir
@@ -92,7 +96,9 @@ ide targets useropts = do
                             (Just
                                  ( packageName pkg
                                  , ["--dist-dir=" <> toFilePath dist] ++
-                                   map ("--ghc-option=" ++) (filter (not . badForGhci) pkgOpts)
+                                   map
+                                       ("--ghc-option=" ++)
+                                       (filter (not . badForGhci) pkgOpts)
                                  , mapMaybe
                                        (stripDir pwd)
                                        (S.toList srcfiles <>
@@ -108,8 +114,10 @@ ide targets useropts = do
             ["--package-db=" <> toFilePath depsdb <> ":" <> toFilePath localdb]
     exec
         "stack-ide"
-        (["--local-work-dir="++toFilePath pwd] ++
-         map ("--ghc-option=" ++) (filter (not . badForGhci) useropts) <> pkgopts <> pkgdbs)
+        (["--local-work-dir=" ++ toFilePath pwd] ++
+         map ("--ghc-option=" ++) (filter (not . badForGhci) useropts) <>
+         pkgopts <>
+         pkgdbs)
         (encode (initialRequest srcfiles))
   where
     wanted pwd cabalfp name = isInWantedList || targetsEmptyAndInDir
