@@ -27,6 +27,7 @@ import           Control.Monad.Reader           (MonadReader, asks)
 import           Control.Monad.Trans.Control    (liftBaseWith)
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                as S
+import           Data.ByteString                (ByteString)
 import qualified Data.ByteString.Char8          as S8
 import           Data.Conduit
 import qualified Data.Conduit.Binary            as CB
@@ -881,7 +882,7 @@ generateHpcReport pkgDir pkgName testName = do
                 ("markup" : toFilePath tixFileAbs : args)
             output <- readProcessStdout (Just hpcDir) menv "hpc"
                 ("report" : toFilePath tixFileAbs : args)
-            forM_ (S8.lines output) ($logInfo . T.decodeUtf8)
+            forM_ (S8.lines output) ($logInfo . T.decodeUtf8 . stripCharacterReturn)
             $logInfo
                 ("The HTML coverage report for " <> whichTest <> " is available at " <>
                  T.pack (toFilePath (hpcDir </> $(mkRelFile "hpc_index.html"))))
@@ -926,6 +927,7 @@ printBuildOutput :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
 printBuildOutput excludeTHLoading level outH = void $ fork $
          CB.sourceHandle outH
     $$ CB.lines
+    =$ CL.map stripCharacterReturn
     =$ CL.filter (not . isTHLoading)
     =$ CL.mapM_ (monadLoggerLog (Loc "<unknown>" "<unknown>" "<unknown>" (0,0) (0,0)) "" level)
   where
@@ -936,6 +938,10 @@ printBuildOutput excludeTHLoading level outH = void $ fork $
     isTHLoading bs =
         "Loading package " `S8.isPrefixOf` bs &&
         ("done." `S8.isSuffixOf` bs || "done.\r" `S8.isSuffixOf` bs)
+
+-- | Strip a @\r@ character from the byte vector. Used because Windows.
+stripCharacterReturn :: ByteString -> ByteString
+stripCharacterReturn = S8.filter (not . (=='\r'))
 
 taskLocation :: Task -> InstallLocation
 taskLocation task =
