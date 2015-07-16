@@ -878,9 +878,9 @@ generateHpcReport pkgDir pkgName testName = do
             menv <- getMinimalEnvOverride
             $logInfo $ "Generating HTML coverage report for " <> whichTest
             _ <- readProcessStdout (Just hpcDir) menv "hpc"
-                ("markup" : toFilePath tixFile : args)
+                ("markup" : toFilePath tixFileAbs : args)
             output <- readProcessStdout (Just hpcDir) menv "hpc"
-                ("report" : toFilePath tixFile : args)
+                ("report" : toFilePath tixFileAbs : args)
             forM_ (S8.lines output) ($logInfo . T.decodeUtf8)
             $logInfo
                 ("The HTML coverage report for " <> whichTest <> " is available at " <>
