@@ -78,7 +78,7 @@ and stack will require that that version of GHC is used for building your code.
 
 Flags can be set for each package separately, e.g.
 
-```
+```yaml
 flags:
   package-name:
     flag-name: true
