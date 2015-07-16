@@ -705,7 +705,7 @@ findCandidate dirs exts name = do
   where
     paths_pkg pkg = "Paths_" ++ packageNameString pkg
     makeNameCandidates =
-        liftM (rights . concat) (mapM makeDirCandidates dirs)
+        liftM (nub . rights . concat) (mapM makeDirCandidates dirs)
     makeDirCandidates
         :: Path Abs Dir
         -> IO [Either ResolveException (Path Abs File)]
