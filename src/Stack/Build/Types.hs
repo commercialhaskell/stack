@@ -311,6 +311,8 @@ data BuildOpts =
             -- ^ Watch files for changes and automatically rebuild
             ,boptsKeepGoing :: !(Maybe Bool)
             -- ^ Keep building/running after failure
+            ,boptsForceDirty :: !Bool
+            -- ^ Force treating all local packages as having dirty files
             }
   deriving (Show)
 
@@ -331,6 +333,7 @@ defaultBuildOpts = BuildOpts
     , boptsOnlySnapshot = False
     , boptsFileWatch = False
     , boptsKeepGoing = Nothing
+    , boptsForceDirty = False
     }
 
 -- | Options for the 'FinalAction' 'DoTests'
