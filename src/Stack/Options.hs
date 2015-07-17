@@ -57,11 +57,13 @@ benchOptsParser = BenchmarkOpts
                                        "Supports templates from `cabal bench`")))
 
 -- | Parser for build arguments.
-buildOptsParser :: Command -> Parser BuildOpts
-buildOptsParser cmd =
+buildOptsParser :: Command
+                -> Bool -- ^ default copy-bins value
+                -> Parser BuildOpts
+buildOptsParser cmd defCopyBins =
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> haddock <*> haddockDeps <*> finalAction <*> dryRun <*> ghcOpts <*>
-            flags <*> installExes <*> preFetch <*> onlySnapshot <*>
+            flags <*> copyBins <*> preFetch <*> onlySnapshot <*>
             fileWatch' <*> keepGoing
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
@@ -93,7 +95,12 @@ buildOptsParser cmd =
                             idm
              else pure Nothing
         finalAction = pure DoNothing
-        installExes = pure False
+
+        copyBins = boolFlags defCopyBins
+            "copy-bins"
+            "copying binaries to the local-bin-path (see 'stack path')"
+            idm
+
         dryRun = flag False True (long "dry-run" <>
                                   help "Don't build anything, just prepare to")
         ghcOpts = (++)

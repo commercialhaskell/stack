@@ -91,15 +91,11 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
-                        (buildOptsParser Build)
-             addCommand "copy"
-                        "Build executables and copy to a user path"
-                        copyCmd
-                        (buildOptsParser Build)
+                        (buildOptsParser Build False)
              addCommand "install"
-                        "DEPRECATED: Use stack copy instead"
+                        "Identical to 'build --copy-bins', not actually a managed installation tool!"
                         installCmd
-                        (buildOptsParser Build)
+                        (buildOptsParser Build True)
              addCommand "uninstall"
                         "DEPRECATED: This command performs no actions, and is present for documentation only"
                         uninstallCmd
@@ -113,15 +109,15 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                                                         , boptsGhcOptions = "-fhpc" : boptsGhcOptions bopts}
                                              else bopts
                              in buildCmd (DoTests topts) bopts')
-                        ((,) <$> buildOptsParser Test <*> testOptsParser)
+                        ((,) <$> buildOptsParser Test False <*> testOptsParser)
              addCommand "bench"
                         "Build and benchmark the project(s) in this directory/configuration"
                         (\(bopts, beopts) -> buildCmd (DoBenchmarks beopts) bopts)
-                        ((,) <$> buildOptsParser Bench <*> benchOptsParser)
+                        ((,) <$> buildOptsParser Bench False <*> benchOptsParser)
              addCommand "haddock"
                         "Generate haddocks for the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
-                        (buildOptsParser Haddock)
+                        (buildOptsParser Haddock False)
              addCommand "new"
                         "Create a brand new project"
                         newCmd
@@ -510,13 +506,13 @@ buildCmd = buildCmdHelper (return ()) ThrowException
 
 -- | Install
 installCmd :: BuildOpts -> GlobalOpts -> IO ()
-installCmd opts =
-    buildCmdHelper warning ExecStrategy DoNothing opts { boptsInstallExes = True }
+installCmd =
+    buildCmdHelper warning ExecStrategy DoNothing
   where
     warning = do
         $logWarn "NOTE: stack is not a package manager"
         $logWarn "The install command is only used to copy executables to a destination directory, not manage them"
-        $logWarn "You probably want to use 'stack copy' for clarity"
+        $logWarn "You may want to use 'stack build --copy-bins' for clarity"
 
 copyCmd :: BuildOpts -> GlobalOpts -> IO ()
 copyCmd opts = buildCmdHelper (return ()) ExecStrategy DoNothing opts { boptsInstallExes = True }
