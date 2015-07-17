@@ -183,6 +183,7 @@ loadLocals bopts latestVersion = do
                         ([], targets'') -> return $ partitionTargetSpecs targets''
                         (bad, _) -> throwM $ Couldn'tParseTargets bad
                 return (isWanted dirs names, names, idents)
+    let identsMap = Map.fromList $ map toTuple $ Set.toList idents
 
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
@@ -218,6 +219,15 @@ loadLocals bopts latestVersion = do
         (isDirty, newBuildCache) <- checkBuildCache
             (fromMaybe Map.empty mbuildCache)
             (map toFilePath $ Set.toList files)
+
+        case Map.lookup (packageName pkg) identsMap of
+            Just version | version /= packageVersion pkg ->
+                throwM $ LocalPackageDoesn'tMatchTarget
+                    (packageName pkg)
+                    (packageVersion pkg)
+                    version
+            _ -> return ()
+
         return LocalPackage
             { lpPackage = pkg
             , lpPackageFinal = pkgFinal
