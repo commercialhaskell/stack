@@ -50,7 +50,7 @@ import qualified Data.Text.Encoding             as T
 import           Data.Text.Encoding             (encodeUtf8)
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
-import           Language.Haskell.TH            (Loc(..))
+import           Language.Haskell.TH            as TH (location)
 import           Network.HTTP.Client.Conduit    (HasHttpManager)
 import           Path
 import           Path.IO
@@ -929,7 +929,7 @@ printBuildOutput excludeTHLoading level outH = void $ fork $
     $$ CB.lines
     =$ CL.map stripCharacterReturn
     =$ CL.filter (not . isTHLoading)
-    =$ CL.mapM_ (monadLoggerLog (Loc "<unknown>" "<unknown>" "<unknown>" (0,0) (0,0)) "" level)
+    =$ CL.mapM_ (monadLoggerLog $(TH.location >>= liftLoc) "" level)
   where
     -- | Is this line a Template Haskell "Loading package" line
     -- ByteString
