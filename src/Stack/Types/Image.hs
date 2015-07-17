@@ -26,6 +26,8 @@ data ImageDockerOpts = ImageDockerOpts
     , imgDockerAdd :: !(Map FilePath FilePath)
       -- ^ Maybe have some static project content to include in a
       -- specific directory in all the images.
+    , imgDockerImageName :: !(Maybe String)
+      -- ^ Maybe have a name for the image we are creating
     } deriving (Show)
 
 data ImageOptsMonoid = ImageOptsMonoid
@@ -36,6 +38,7 @@ data ImageDockerOptsMonoid = ImageDockerOptsMonoid
     { imgDockerMonoidBase :: !(Maybe String)
     , imgDockerMonoidEntrypoints :: !(Maybe [String])
     , imgDockerMonoidAdd :: !(Maybe (Map String FilePath))
+    , imgDockerMonoidImageName :: !(Maybe String)
     } deriving (Show)
 
 instance FromJSON (ImageOptsMonoid, [JSONWarning]) where
@@ -64,6 +67,7 @@ instance FromJSON (ImageDockerOptsMonoid, [JSONWarning]) where
                      imgDockerMonoidEntrypoints <- o ..:?
                                                    imgDockerEntrypointsArgName
                      imgDockerMonoidAdd <- o ..:? imgDockerAddArgName
+                     imgDockerMonoidImageName <- o ..:? imgDockerImageNameArgName
                      return
                          ImageDockerOptsMonoid
                          { ..
@@ -74,12 +78,14 @@ instance Monoid ImageDockerOptsMonoid where
         { imgDockerMonoidBase = Nothing
         , imgDockerMonoidEntrypoints = Nothing
         , imgDockerMonoidAdd = Nothing
+        , imgDockerMonoidImageName = Nothing
         }
     mappend l r = ImageDockerOptsMonoid
         { imgDockerMonoidBase = imgDockerMonoidBase l <|> imgDockerMonoidBase r
         , imgDockerMonoidEntrypoints = imgDockerMonoidEntrypoints l <|> imgDockerMonoidEntrypoints
                                                                             r
         , imgDockerMonoidAdd = imgDockerMonoidAdd l <|> imgDockerMonoidAdd r
+        , imgDockerMonoidImageName = imgDockerMonoidImageName l <|> imgDockerMonoidImageName r
         }
 
 imgArgName :: Text
@@ -96,3 +102,6 @@ imgDockerAddArgName = "add"
 
 imgDockerEntrypointsArgName :: Text
 imgDockerEntrypointsArgName = "entrypoints"
+
+imgDockerImageNameArgName :: Text
+imgDockerImageNameArgName = "name"
