@@ -305,7 +305,7 @@ pathCmd keys go =
                            null keys || elem key keys)
                      paths)
                 (\(_,key,path) ->
-                      $logInfo
+                      liftIO $ T.putStrLn
                           ((if length keys == 1
                                then ""
                                else key <> ": ") <>
