@@ -125,7 +125,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                         solverCmd
                         solverOptsParser
              addCommand "setup"
-                        "Get the appropriate ghc for your project"
+                        "Get the appropriate GHC for your project"
                         setupCmd
                         setupParser
              addCommand "path"
@@ -404,7 +404,10 @@ data SetupCmdOpts = SetupCmdOpts
 
 setupParser :: Parser SetupCmdOpts
 setupParser = SetupCmdOpts
-    <$> (optional $ argument readVersion (metavar "VERSION"))
+    <$> (optional $ argument readVersion
+            (metavar "GHC_MAJOR_VERSION" <>
+             help ("Major version of GHC to install, e.g. 7.10. " ++
+                   "The default is to install the version implied by the resolver.")))
     <*> boolFlags False
             "reinstall"
             "Reinstall GHC, even if available (implies no-system-ghc)"
