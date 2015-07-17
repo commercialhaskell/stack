@@ -76,6 +76,7 @@ spec = do
                 , dpLibDirs = ["/opt/ghc/7.8.4/lib/ghc-7.8.4/haskell2010-1.1.2.0"]
                 , dpDepends = depends
                 , dpLibraries = ["HShaskell2010-1.1.2.0"]
+                , dpHasExposedModules = True
                 , dpHaddockInterfaces = ["/opt/ghc/7.8.4/share/doc/ghc/html/libraries/haskell2010-1.1.2.0/haskell2010.haddock"]
                 , dpProfiling = ()
                 , dpHaddock = ()
@@ -109,6 +110,7 @@ spec = do
                 , dpHaddockInterfaces = ["/opt/ghc/7.10.1/share/doc/ghc/html/libraries/ghc-7.10.1/ghc.haddock"]
                 , dpDepends = depends
                 , dpLibraries = ["HSghc-7.10.1-EMlWrQ42XY0BNVbSrKixqY"]
+                , dpHasExposedModules = True
                 , dpProfiling = ()
                 , dpHaddock = ()
                 }
@@ -138,6 +140,7 @@ spec = do
                 , dpHaddockInterfaces = ["/Users/alexbiehl/.stack/snapshots/x86_64-osx/lts-2.13/7.8.4/doc/html/hmatrix.haddock"]
                 , dpDepends = depends
                 , dpLibraries = ["HShmatrix-0.16.1.5"]
+                , dpHasExposedModules = True
                 , dpProfiling = ()
                 , dpHaddock = ()
                 }
