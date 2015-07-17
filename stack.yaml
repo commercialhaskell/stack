@@ -6,3 +6,10 @@ extra-deps:
 - hfsevents-0.1.5
 - project-template-0.2.0
 resolver: lts-2.17
+image:
+  container:
+    base: "fpco/ubuntu-with-libgmp:14.04"
+    add:
+      man/: /usr/local/share/man/
+    entrypoints:
+      - stack
