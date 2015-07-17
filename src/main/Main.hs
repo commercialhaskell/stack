@@ -592,7 +592,10 @@ dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
 
 imgDockerCmd :: () -> GlobalOpts -> IO ()
 imgDockerCmd () go@GlobalOpts{..} = do
-    withBuildConfig go ExecStrategy Image.imageDocker
+    withBuildConfig
+        go
+        ExecStrategy
+        (Docker.preventInContainer Image.imageDocker)
 
 -- | Load the configuration with a manager. Convenience function used
 -- throughout this module.
