@@ -595,7 +595,10 @@ imgDockerCmd () go@GlobalOpts{..} = do
     withBuildConfig
         go
         ExecStrategy
-        (Docker.preventInContainer Image.imageDocker)
+        (do Stack.Build.build
+                (const (return ()))
+                defaultBuildOpts
+            Docker.preventInContainer Image.imageDocker)
 
 -- | Load the configuration with a manager. Convenience function used
 -- throughout this module.
