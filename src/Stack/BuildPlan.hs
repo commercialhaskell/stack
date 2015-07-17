@@ -40,6 +40,7 @@ import           Data.Aeson.Extended (FromJSON (..), withObject, withText, (.:),
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
 import qualified Data.Foldable as F
@@ -58,7 +59,7 @@ import           Data.Text.Encoding (encodeUtf8)
 import           Data.Time (Day)
 import qualified Data.Traversable as Tr
 import           Data.Typeable (Typeable)
-import           Data.Yaml (decodeFileEither)
+import           Data.Yaml (decodeEither', decodeFileEither)
 import           Distribution.PackageDescription (GenericPackageDescription,
                                                   flagDefault, flagManual,
                                                   flagName, genPackageFlags,
@@ -681,25 +682,17 @@ shadowMiniBuildPlan (MiniBuildPlan ghc pkgs0) shadowed =
 
 parseCustomMiniBuildPlan :: (MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m)
                          => T.Text -> m MiniBuildPlan
-parseCustomMiniBuildPlan url = do
-    root <- asks $ configStackRoot . getConfig
-    let hashStr = S8.unpack $ B16.encode $ SHA256.hash $ encodeUtf8 url
-    hashFP <- parseRelFile hashStr
-    hashFPBin <- parseRelFile $ hashStr ++ ".bin"
-    let cacheDir = root </> $(mkRelDir "custom-plan-cache")
-        binaryFP = cacheDir </> hashFPBin
+parseCustomMiniBuildPlan url0 = do
+    yamlFP <- getYamlFP url0
+
+    yamlBS <- liftIO $ S.readFile $ toFilePath yamlFP
+    let yamlHash = S8.unpack $ B16.encode $ SHA256.hash yamlBS
+    binaryFilename <- parseRelFile $ yamlHash ++ ".bin"
+    customPlanDir <- getCustomPlanDir
+    let binaryFP = customPlanDir </> $(mkRelDir "bin") </> binaryFilename
+
     taggedDecodeOrLoad (toFilePath binaryFP) $ do
-        fp <-
-            case parseUrl $ T.unpack url of
-                Just req -> do
-                    let cacheFP = cacheDir </> hashFP
-                    _ <- download req cacheFP
-                    return cacheFP
-                Nothing -> do
-                    fp <- liftIO $ canonicalizePath $ T.unpack $ fromMaybe url $
-                        T.stripPrefix "file://" url <|> T.stripPrefix "file:" url
-                    parseAbsFile fp
-        cs <- liftIO (Data.Yaml.decodeFileEither $ toFilePath fp) >>= either throwM return
+        cs <- either throwM return $ decodeEither' yamlBS
         let addFlags :: PackageIdentifier -> (PackageName, (Version, Map FlagName Bool))
             addFlags (PackageIdentifier name ver) =
                 (name, (ver, fromMaybe Map.empty $ Map.lookup name $ csFlags cs))
@@ -707,6 +700,30 @@ parseCustomMiniBuildPlan url = do
             (csGhcVersion cs)
             Map.empty
             (Map.fromList $ map addFlags $ Set.toList $ csPackages cs)
+  where
+    getCustomPlanDir = do
+        root <- asks $ configStackRoot . getConfig
+        return $ root </> $(mkRelDir "custom-plan")
+
+    -- Get the path to the YAML file
+    getYamlFP url =
+        case parseUrl $ T.unpack url of
+            Just req -> getYamlFPFromReq url req
+            Nothing -> getYamlFPFromFile url
+
+    getYamlFPFromReq url req = do
+        let hashStr = S8.unpack $ B16.encode $ SHA256.hash $ encodeUtf8 url
+        hashFP <- parseRelFile $ hashStr ++ ".yaml"
+        customPlanDir <- getCustomPlanDir
+
+        let cacheFP = customPlanDir </> $(mkRelDir "yaml") </> hashFP
+        _ <- download req cacheFP
+        return cacheFP
+
+    getYamlFPFromFile url = do
+        fp <- liftIO $ canonicalizePath $ T.unpack $ fromMaybe url $
+            T.stripPrefix "file://" url <|> T.stripPrefix "file:" url
+        parseAbsFile fp
 
 data CustomSnapshot = CustomSnapshot
     { csGhcVersion :: !Version

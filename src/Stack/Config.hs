@@ -249,15 +249,15 @@ loadBuildConfig menv mproject config stackRoot mresolver noConfigStrat = do
                    when (getTerminal env) $
                        case mresolver of
                            Nothing ->
-                               $logInfo ("Using resolver: " <> renderResolver (projectResolver project) <>
+                               $logInfo ("Using resolver: " <> resolverName (projectResolver project) <>
                                          " from global config file: " <> T.pack dest')
                            Just resolver ->
-                               $logInfo ("Using resolver: " <> renderResolver resolver <>
+                               $logInfo ("Using resolver: " <> resolverName resolver <>
                                          " specified on command line")
                    return (project, dest)
                else do
                    r <- runReaderT getLatestResolver miniConfig
-                   $logInfo ("Using latest snapshot resolver: " <> renderResolver r)
+                   $logInfo ("Using latest snapshot resolver: " <> resolverName r)
                    $logInfo ("Writing global (non-project-specific) config file to: " <> T.pack dest')
                    $logInfo "Note: You can change the snapshot via the resolver field there."
                    let p = Project
@@ -278,7 +278,7 @@ loadBuildConfig menv mproject config stackRoot mresolver noConfigStrat = do
                 mbp <- runReaderT (loadMiniBuildPlan snapName) miniConfig
                 return $ mbpGhcVersion mbp
             ResolverGhc m -> return $ fromMajorVersion m
-            ResolverCustom url -> do
+            ResolverCustom _name url -> do
                 mbp <- runReaderT (parseCustomMiniBuildPlan url) miniConfig
                 return $ mbpGhcVersion mbp
 

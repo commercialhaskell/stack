@@ -89,7 +89,7 @@ loadSourceMap bopts = do
             { mbpGhcVersion = fromMajorVersion ghc
             , mbpPackages = Map.empty
             }
-        ResolverCustom url -> parseCustomMiniBuildPlan url
+        ResolverCustom _ url -> parseCustomMiniBuildPlan url
 
     menv <- getMinimalEnvOverride
     caches <- getPackageCaches menv

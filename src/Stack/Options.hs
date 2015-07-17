@@ -489,7 +489,7 @@ resolverOptsParser =
 readResolver :: ReadM Resolver
 readResolver = do
     s <- readerAsk
-    case parseResolver $ T.pack s of
+    case parseResolverText $ T.pack s of
         Left e -> readerError $ show e
         Right x -> return x
 

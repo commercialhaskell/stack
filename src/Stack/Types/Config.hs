@@ -366,37 +366,43 @@ data Resolver
   -- plan. Intended for use cases where end user wishes to specify all upstream
   -- dependencies manually, such as using a dependency solver.
 
-  | ResolverCustom !Text
-  -- ^ A custom resolver based on the given URL. This file is assumed to be
-  -- completely immutable.
+  | ResolverCustom !Text !Text
+  -- ^ A custom resolver based on the given name and URL. This file is assumed
+  -- to be completely immutable.
   deriving (Show)
 
 instance ToJSON Resolver where
-    toJSON = toJSON . renderResolver
+    toJSON (ResolverSnapshot name) = toJSON $ renderSnapName name
+    toJSON (ResolverGhc (MajorVersion x y)) = toJSON $ T.pack $ concat ["ghc-", show x, ".", show y]
+    toJSON (ResolverCustom name location) = object
+        [ "name" .= name
+        , "location" .= location
+        ]
 instance FromJSON Resolver where
-    parseJSON = withText "Resolver" $
-        either (fail . show) return . parseResolver
+    -- Strange structuring is to give consistent error messages
+    parseJSON v@(Object _) = withObject "Resolver" (\o -> ResolverCustom
+        <$> o .: "name"
+        <*> o .: "location") v
 
--- | Convert a Resolver into its @Text@ representation, as will be used by JSON/YAML
-renderResolver :: Resolver -> Text
-renderResolver (ResolverSnapshot name) = renderSnapName name
-renderResolver (ResolverGhc (MajorVersion x y)) = T.pack $ concat ["ghc-", show x, ".", show y]
-renderResolver (ResolverCustom url) = "custom: " <> url
+    parseJSON (String t) = either (fail . show) return (parseResolverText t)
 
--- | Try to parse a @Resolver@, using same format as JSON/YAML/'renderResolver'
-parseResolver :: MonadThrow m => Text -> m Resolver
-parseResolver t =
-    case parseSnapName t of
-        Right x -> return $ ResolverSnapshot x
-        Left _ ->
-            case parseGhc of
-                Just m -> return $ ResolverGhc m
-                Nothing ->
-                    case T.stripPrefix "custom:" t of
-                        Just url -> return $ ResolverCustom $ T.stripStart url
-                        Nothing -> throwM $ ParseResolverException t
-  where
-    parseGhc = T.stripPrefix "ghc-" t >>= parseMajorVersionFromString . T.unpack
+    parseJSON _ = fail $ "Invalid Resolver, must be Object or String"
+
+-- | Convert a Resolver into its @Text@ representation, as will be used by
+-- directory names
+resolverName :: Resolver -> Text
+resolverName (ResolverSnapshot name) = renderSnapName name
+resolverName (ResolverGhc (MajorVersion x y)) = T.pack $ concat ["ghc-", show x, ".", show y]
+resolverName (ResolverCustom name _) = "custom-" <> name
+
+-- | Try to parse a @Resolver@ from a @Text@. Won't work for complex resolvers (like custom).
+parseResolverText :: MonadThrow m => Text -> m Resolver
+parseResolverText t
+    | Right x <- parseSnapName t = return $ ResolverSnapshot x
+    | Just t' <- T.stripPrefix "ghc-" t
+    , Just v <- parseMajorVersionFromString $ T.unpack t'
+        = return $ ResolverGhc v
+    | otherwise = throwM $ ParseResolverException t
 
 -- | Class for environment values which have access to the stack root
 class HasStackRoot env where
@@ -695,7 +701,7 @@ installationRootDeps = do
     snapshots <- snapshotsDir
     bc <- asks getBuildConfig
     ec <- asks getEnvConfig
-    name <- parseRelDir $ T.unpack $ renderResolver $ bcResolver bc
+    name <- parseRelDir $ T.unpack $ resolverName $ bcResolver bc
     ghc <- parseRelDir $ versionString $ envConfigGhcVersion ec
     return $ snapshots </> name </> ghc
 
@@ -704,7 +710,7 @@ installationRootLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => 
 installationRootLocal = do
     bc <- asks getBuildConfig
     ec <- asks getEnvConfig
-    name <- parseRelDir $ T.unpack $ renderResolver $ bcResolver bc
+    name <- parseRelDir $ T.unpack $ resolverName $ bcResolver bc
     ghc <- parseRelDir $ versionString $ envConfigGhcVersion ec
     platform <- platformRelDir
     return $ configProjectWorkDir bc </> $(mkRelDir "install") </> platform </> name </> ghc

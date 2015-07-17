@@ -99,7 +99,7 @@ initProject initOpts = do
                     Just rel -> toFilePath rel
             , peSubdirs = []
             }
-    $logInfo $ "Selected resolver: " <> renderResolver r
+    $logInfo $ "Selected resolver: " <> resolverName r
     liftIO $ Yaml.encodeFile dest' p
     $logInfo $ "Wrote project config to: " <> T.pack dest'
 
@@ -147,7 +147,7 @@ getDefaultResolver cabalfps gpds initOpts =
                 case resolver of
                     ResolverSnapshot name -> findBuildPlan gpds [name]
                     ResolverGhc _ -> return Nothing
-                    ResolverCustom _ -> return Nothing
+                    ResolverCustom _ _ -> return Nothing
             case mpair of
                 Just (snap, flags) ->
                     return (ResolverSnapshot snap, flags, Map.empty)

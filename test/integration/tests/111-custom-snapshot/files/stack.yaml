@@ -1,1 +1,3 @@
-resolver: "custom: my-snapshot.yaml"
+resolver:
+    name: my-snapshot
+    location: my-snapshot.yaml
