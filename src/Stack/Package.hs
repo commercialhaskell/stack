@@ -309,7 +309,7 @@ generateBuildInfoOpts mcabalmacros cabalDir distDir locals b =
       where
         isGhc GHC = True
         isGhc _ = False
-    extOpts = map (("-X" ++) . display) . allExtensions
+    extOpts = map (("-X" ++) . display) . usedExtensions
     srcOpts =
         map
             (("-i" <>) . toFilePath)

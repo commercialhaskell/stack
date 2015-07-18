@@ -9,6 +9,10 @@
 * --local-bin-path global option. Use to change where binaries get placed on an `stack install` [#342](https://github.com/commercialhaskell/stack/issues/342)
 * --force-dirty flag: Force treating all local packages as having dirty files (useful for cases where stack can't detect a file change)
 
+Bug fixes:
+
+* Extensions from the `other-extensions` field no longer enabled by default [#449](https://github.com/commercialhaskell/stack/issues/449)
+
 ## 0.1.2.0
 
 * Add `--prune` flag to `stack dot` [#487](https://github.com/commercialhaskell/stack/issues/487)
