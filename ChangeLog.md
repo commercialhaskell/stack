@@ -8,6 +8,7 @@
 * Fuzzy matching support to give better error messages for close version numbers [#504](https://github.com/commercialhaskell/stack/issues/504)
 * --local-bin-path global option. Use to change where binaries get placed on an `stack install` [#342](https://github.com/commercialhaskell/stack/issues/342)
 * --force-dirty flag: Force treating all local packages as having dirty files (useful for cases where stack can't detect a file change)
+* GHC error messages: display file paths as absolute instead of relative for better editor integration
 
 Bug fixes:
 
