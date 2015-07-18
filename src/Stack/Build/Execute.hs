@@ -18,8 +18,9 @@ import           Control.Concurrent.Lifted (fork)
 import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
+import           Control.Exception.Enclosed     (tryIO)
 import           Control.Exception.Lifted
-import           Control.Monad                  (liftM, when, unless, void, join)
+import           Control.Monad                  (liftM, when, unless, void, join, guard)
 import           Control.Monad.Catch            (MonadCatch, MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -48,6 +49,7 @@ import           Data.Text                      (Text)
 import qualified Data.Text                      as T
 import qualified Data.Text.Encoding             as T
 import           Data.Text.Encoding             (encodeUtf8)
+import           Data.Word8                     (_colon)
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
 import           Language.Haskell.TH            as TH (location)
@@ -596,8 +598,11 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
             -- Use createProcess_ to avoid the log file being closed afterwards
             (Just inH, moutH, merrH, ph) <- liftIO $ createProcess_ "singleBuild" cp
             liftIO $ hClose inH
-            maybePrintBuildOutput stripTHLoading LevelInfo mlogFile moutH
-            maybePrintBuildOutput stripTHLoading LevelWarn mlogFile merrH
+
+            let makeAbsolute = stripTHLoading -- If users want control, we should add a config option for this
+
+            maybePrintBuildOutput stripTHLoading makeAbsolute LevelInfo mlogFile moutH
+            maybePrintBuildOutput stripTHLoading makeAbsolute LevelWarn mlogFile merrH
             ec <- liftIO $ waitForProcess ph
             case ec of
                 ExitSuccess -> return ()
@@ -616,12 +621,12 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
                         (fmap fst mlogFile)
                         bs
 
-    maybePrintBuildOutput stripTHLoading level mlogFile mh =
+    maybePrintBuildOutput stripTHLoading makeAbsolute level mlogFile mh =
         case mh of
             Just h ->
                 case mlogFile of
                   Just{} -> return ()
-                  Nothing -> printBuildOutput stripTHLoading level h
+                  Nothing -> printBuildOutput stripTHLoading makeAbsolute level h
             Nothing -> return ()
 
 singleBuild :: M env m
@@ -923,12 +928,16 @@ singleBench beopts ac ee task =
 -- | Grab all output from the given @Handle@ and print it to stdout, stripping
 -- Template Haskell "Loading package" lines. Does work in a separate thread.
 printBuildOutput :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
-                 => Bool -> LogLevel -> Handle -> m ()
-printBuildOutput excludeTHLoading level outH = void $ fork $
+                 => Bool -- ^ exclude TH loading?
+                 -> Bool -- ^ convert paths to absolute?
+                 -> LogLevel
+                 -> Handle -> m ()
+printBuildOutput excludeTHLoading makeAbsolute level outH = void $ fork $
          CB.sourceHandle outH
     $$ CB.lines
     =$ CL.map stripCharacterReturn
     =$ CL.filter (not . isTHLoading)
+    =$ CL.mapM toAbsolutePath
     =$ CL.mapM_ (monadLoggerLog $(TH.location >>= liftLoc) "" level)
   where
     -- | Is this line a Template Haskell "Loading package" line
@@ -938,6 +947,34 @@ printBuildOutput excludeTHLoading level outH = void $ fork $
     isTHLoading bs =
         "Loading package " `S8.isPrefixOf` bs &&
         ("done." `S8.isSuffixOf` bs || "done.\r" `S8.isSuffixOf` bs)
+
+    -- | Convert GHC error lines with file paths to have absolute file paths
+    toAbsolutePath bs | not makeAbsolute = return bs
+    toAbsolutePath bs = do
+        let (x, y) = S.break (== _colon) bs
+        mabs <-
+            if isValidSuffix y
+                then do
+                    efp <- liftIO $ tryIO $ D.canonicalizePath $ S8.unpack x
+                    case efp of
+                        Left _ -> return Nothing
+                        Right fp -> return $ Just $ S8.pack fp
+                else return Nothing
+        case mabs of
+            Nothing -> return bs
+            Just fp -> return $ fp `S.append` y
+
+    -- | Match the line:column format at the end of lines
+    isValidSuffix bs0 = maybe False (const True) $ do
+        guard $ not $ S.null bs0
+        guard $ S.head bs0 == _colon
+        (_, bs1) <- S8.readInt $ S.drop 1 bs0
+
+        guard $ not $ S.null bs1
+        guard $ S.head bs1 == _colon
+        (_, bs2) <- S8.readInt $ S.drop 1 bs1
+
+        guard $ bs2 == ":"
 
 -- | Strip a @\r@ character from the byte vector. Used because Windows.
 stripCharacterReturn :: ByteString -> ByteString
