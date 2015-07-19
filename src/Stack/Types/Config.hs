@@ -18,7 +18,7 @@ import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
 import           Control.Monad.Logger (LogLevel(..))
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, object,
-                  (.=), (.:), (..:), (..:?), (..!=), Value(String),
+                  (.=), (.:), (..:), (..:?), (..!=), Value(String, Object),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings, JSONWarning,
                   jsonSubWarningsMT)
 import           Data.Binary (Binary)
