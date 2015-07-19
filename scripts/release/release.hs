@@ -351,7 +351,7 @@ rules global@Global{..} args = do
     uploadPackage :: String -> DistroVersion -> FilePath -> Action ()
     uploadPackage ext dv@DistroVersion{..} pkgFile
         | ext == debExt =
-            cmd "deb-s3 upload -b download.fpcomplete.com"
+            cmd "deb-s3 upload -b download.fpcomplete.com --preserve-versions"
                 [ "--sign=" ++ gGpgKey
                 , "--prefix=" ++ dvDistro ++ "/" ++ distroVersionCodeName dv
                 , pkgFile ]
