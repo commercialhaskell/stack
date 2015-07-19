@@ -1,5 +1,6 @@
 import StackTest
 import System.Directory
+import System.FilePath
 
 main :: IO ()
 main = do
@@ -20,6 +21,7 @@ main = do
   doesExist "happy"
 
   -- install in absolute path
-  tmpDirectory <- getTemporaryDirectory
+  tmpDirectory <- fmap (</> "absolute-bin") getCurrentDirectory
+  createDirectory tmpDirectory
   stack ["--local-bin-path", tmpDirectory, "install", "happy" ]
-  doesExist "/tmp/happy"
+  doesExist (tmpDirectory </> "happy")
