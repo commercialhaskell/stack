@@ -19,7 +19,6 @@ module Stack.Options
     ) where
 
 import           Control.Monad.Logger (LogLevel(..))
-import           Data.Attoparsec.Args (EscapingMode (Escaping), parseArgs)
 import           Data.Char (isSpace, toLower)
 import           Data.List.Split (splitOn)
 import qualified Data.Map as Map
@@ -270,11 +269,11 @@ dockerOptsParser showOptions =
                         hide <>
                         metavar "NAME" <>
                         help "Docker container name")
-    <*> argsStrOption (long (dockerOptName dockerRunArgsArgName) <>
-                        hide <>
-                        value [] <>
-                        metavar "'ARG1 [ARG2 ...]'" <>
-                        help "Additional arguments to pass to 'docker run'")
+    <*> argsOption (long (dockerOptName dockerRunArgsArgName) <>
+                    hide <>
+                    value [] <>
+                    metavar "'ARG1 [ARG2 ...]'" <>
+                    help "Additional options to pass to 'docker run'")
     <*> many (option auto (long (dockerOptName dockerMountArgName) <>
                            hide <>
                            metavar "(PATH | HOST-PATH:CONTAINER-PATH)" <>
@@ -287,7 +286,6 @@ dockerOptsParser showOptions =
   where
     dockerOptName optName = dockerCmdName ++ "-" ++ T.unpack optName
     maybeStrOption = optional . option str
-    argsStrOption = option (fmap (either error id . parseArgs Escaping . T.pack) str)
     hide = if showOptions
               then idm
               else internal <> hidden
