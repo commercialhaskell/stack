@@ -12,6 +12,7 @@
 * GHC error messages: display file paths as absolute instead of relative for better editor integration
 * Add the `--copy-bins` option [#569](https://github.com/commercialhaskell/stack/issues/569)
 * Give warnings on unexpected config keys [#48](https://github.com/commercialhaskell/stack/issues/48)
+* Remove Docker `pass-host` option
 
 Bug fixes:
 
