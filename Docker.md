@@ -169,11 +169,6 @@ otherwise noted.
       # (default none, aside from the project directory which is always mounted)
       mount: ["/foo/bar","/baz:/tmp/quux"]
 
-      # If true, the container will be passed information so it can connect to the
-      # same Docker daemon that 'stack' is using.  This can be helpful if a process
-      # running in a container should be able to start other containers.
-      pass-host: false
-
       # Location of database used to track image usage, which `stack docker cleanup`
       # uses to determine which images should be kept.  On shared systems, it may
       # be useful to override this in the global configuration file so that
