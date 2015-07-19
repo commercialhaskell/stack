@@ -38,11 +38,11 @@ data ImageDockerOptsMonoid = ImageDockerOptsMonoid
     , imgDockerMonoidAdd :: !(Maybe (Map String FilePath))
     } deriving (Show)
 
-instance FromJSON ImageOptsMonoid where
-    parseJSON = withObject
+instance FromJSON (ImageOptsMonoid, [JSONWarning]) where
+    parseJSON = withObjectWarnings
             "ImageOptsMonoid"
             (\o ->
-                  do imgMonoidDocker <- o .:? imgDockerArgName
+                  do imgMonoidDocker <- jsonSubWarningsT (o ..:? imgDockerArgName)
                      return
                          ImageOptsMonoid
                          { ..
@@ -56,14 +56,14 @@ instance Monoid ImageOptsMonoid where
         { imgMonoidDocker = imgMonoidDocker l <|> imgMonoidDocker r
         }
 
-instance FromJSON ImageDockerOptsMonoid where
-    parseJSON = withObject
+instance FromJSON (ImageDockerOptsMonoid, [JSONWarning]) where
+    parseJSON = withObjectWarnings
             "ImageDockerOptsMonoid"
             (\o ->
-                  do imgDockerMonoidBase <- o .:? imgDockerBaseArgName
-                     imgDockerMonoidEntrypoints <- o .:?
+                  do imgDockerMonoidBase <- o ..:? imgDockerBaseArgName
+                     imgDockerMonoidEntrypoints <- o ..:?
                                                    imgDockerEntrypointsArgName
-                     imgDockerMonoidAdd <- o .:? imgDockerAddArgName
+                     imgDockerMonoidAdd <- o ..:? imgDockerAddArgName
                      return
                          ImageDockerOptsMonoid
                          { ..

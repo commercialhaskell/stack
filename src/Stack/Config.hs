@@ -418,10 +418,14 @@ getExtraConfigs stackRoot = liftIO $ do
         : maybe [] return (mstackGlobalConfig <|> defaultStackGlobalConfig)
 
 -- | Load and parse YAML from the given file.
-loadYaml :: (FromJSON a,MonadIO m) => Path Abs File -> m a
-loadYaml path =
-    liftIO $ Yaml.decodeFileEither (toFilePath path)
-         >>= either (throwM . ParseConfigFileException path) return
+loadYaml :: (FromJSON (a, [JSONWarning]), MonadIO m, MonadLogger m) => Path Abs File -> m a
+loadYaml path = do
+    (result,warnings) <-
+        liftIO $
+        Yaml.decodeFileEither (toFilePath path) >>=
+        either (throwM . ParseConfigFileException path) return
+    logJSONWarnings (toFilePath path) warnings
+    return result
 
 -- | Get the location of the project config file, if it exists.
 getProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)

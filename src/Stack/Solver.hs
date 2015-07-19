@@ -14,7 +14,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
-import           Data.Aeson                  (object, (.=), toJSON)
+import           Data.Aeson.Extended         (object, (.=), toJSON, logJSONWarnings)
 import qualified Data.ByteString             as S
 import qualified Data.ByteString.Char8       as S8
 import           Data.Either
@@ -181,7 +181,9 @@ solveExtraDeps modStackYaml = do
     when modStackYaml $ do
         let fp = toFilePath $ bcStackYaml bconfig
         obj <- liftIO (Yaml.decodeFileEither fp) >>= either throwM return
-        ProjectAndConfigMonoid project _ <- liftIO (Yaml.decodeFileEither fp) >>= either throwM return
+        (ProjectAndConfigMonoid project _, warnings) <-
+            liftIO (Yaml.decodeFileEither fp) >>= either throwM return
+        logJSONWarnings fp warnings
         let obj' =
                 HashMap.insert "extra-deps"
                     (toJSON $ map fromTuple $ Map.toList

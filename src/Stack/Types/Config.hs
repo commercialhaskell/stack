@@ -1,5 +1,6 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -15,8 +16,11 @@ import           Control.Monad (liftM, mzero)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
 import           Control.Monad.Logger (LogLevel(..))
-import           Data.Aeson.Extended (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, object
-                            ,(.=), (.:?), (.!=), (.:), Value (String, Object))
+import           Data.Aeson.Extended
+                 (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, object,
+                  (.=), (.:), (..:), (..:?), (..!=), Value(String),
+                  withObjectWarnings, WarningParser, Object, jsonSubWarnings, JSONWarning,
+                  jsonSubWarningsMT)
 import           Data.Binary (Binary)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
@@ -121,12 +125,12 @@ data PackageIndex = PackageIndex
     -- ^ Require that hashes and package size information be available for packages in this index
     }
     deriving Show
-instance FromJSON PackageIndex where
-    parseJSON = withObject "PackageIndex" $ \o -> do
-        name <- o .: "name"
-        prefix <- o .: "download-prefix"
-        mgit <- o .:? "git"
-        mhttp <- o .:? "http"
+instance FromJSON (PackageIndex, [JSONWarning]) where
+    parseJSON = withObjectWarnings "PackageIndex" $ \o -> do
+        name <- o ..: "name"
+        prefix <- o ..: "download-prefix"
+        mgit <- o ..:? "git"
+        mhttp <- o ..:? "http"
         loc <-
             case (mgit, mhttp) of
                 (Nothing, Nothing) -> fail $
@@ -135,8 +139,8 @@ instance FromJSON PackageIndex where
                 (Just git, Nothing) -> return $ ILGit git
                 (Nothing, Just http) -> return $ ILHttp http
                 (Just git, Just http) -> return $ ILGitHttp git http
-        gpgVerify <- o .:? "gpg-verify" .!= False
-        reqHashes <- o .:? "require-hashes" .!= False
+        gpgVerify <- o ..:? "gpg-verify" ..!= False
+        reqHashes <- o ..:? "require-hashes" ..!= False
         return PackageIndex
             { indexName = name
             , indexLocation = loc
@@ -293,20 +297,20 @@ instance ToJSON PackageEntry where
         , "location" .= peLocation pe
         , "subdirs" .= peSubdirs pe
         ]
-instance FromJSON PackageEntry where
+instance FromJSON (PackageEntry, [JSONWarning]) where
     parseJSON (String t) = do
         loc <- parseJSON $ String t
-        return PackageEntry
-            { peExtraDepMaybe = Nothing
-            , peValidWanted = Nothing
-            , peLocation = loc
-            , peSubdirs = []
-            }
-    parseJSON v = withObject "PackageEntry" (\o -> PackageEntry
-        <$> o .:? "extra-dep"
-        <*> o .:? "valid-wanted"
-        <*> o .: "location"
-        <*> o .:? "subdirs" .!= []) v
+        return (PackageEntry
+                { peExtraDepMaybe = Nothing
+                , peValidWanted = Nothing
+                , peLocation = loc
+                , peSubdirs = []
+                }, [])
+    parseJSON v = withObjectWarnings "PackageEntry" (\o -> PackageEntry
+        <$> o ..:? "extra-dep"
+        <*> o ..:? "valid-wanted"
+        <*> o ..: "location"
+        <*> o ..:? "subdirs" ..!= []) v
 
 data PackageLocation
     = PLFilePath FilePath
@@ -528,31 +532,35 @@ instance Monoid ConfigMonoid where
     , configMonoidImageOpts = configMonoidImageOpts l <> configMonoidImageOpts r
     }
 
-instance FromJSON ConfigMonoid where
-  parseJSON =
-    withObject "ConfigMonoid" $
-    \obj ->
-      do configMonoidDockerOpts <- obj .:? T.pack "docker" .!= mempty
-         configMonoidConnectionCount <- obj .:? "connection-count"
-         configMonoidHideTHLoading <- obj .:? "hide-th-loading"
-         configMonoidLatestSnapshotUrl <- obj .:? "latest-snapshot-url"
-         configMonoidPackageIndices <- obj .:? "package-indices"
-         configMonoidSystemGHC <- obj .:? "system-ghc"
-         configMonoidInstallGHC <- obj .:? "install-ghc"
-         configMonoidSkipGHCCheck <- obj .:? "skip-ghc-check"
-         configMonoidSkipMsys <- obj .:? "skip-msys"
-         configMonoidRequireStackVersion <- unVersionRangeJSON <$>
-                                            obj .:? "require-stack-version"
-                                                .!= VersionRangeJSON anyVersion
-         configMonoidOS <- obj .:? "os"
-         configMonoidArch <- obj .:? "arch"
-         configMonoidJobs <- obj .:? "jobs"
-         configMonoidExtraIncludeDirs <- obj .:? "extra-include-dirs" .!= Set.empty
-         configMonoidExtraLibDirs <- obj .:? "extra-lib-dirs" .!= Set.empty
-         configMonoidConcurrentTests <- obj .:? "concurrent-tests"
-         configMonoidLocalBinPath <- obj .:? "local-bin-path"
-         configMonoidImageOpts <- obj .:? T.pack "image" .!= mempty
-         return ConfigMonoid {..}
+instance FromJSON (ConfigMonoid, [JSONWarning]) where
+  parseJSON = withObjectWarnings "ConfigMonoid" parseConfigMonoidJSON
+
+-- | Parse a partial configuration.  Used both to parse both a standalone config
+-- file and a project file, so that a sub-parser is not required, which would interfere with
+-- warnings for missing fields.
+parseConfigMonoidJSON :: Object -> WarningParser ConfigMonoid
+parseConfigMonoidJSON obj = do
+    configMonoidDockerOpts <- jsonSubWarnings (obj ..:? "docker" ..!= mempty)
+    configMonoidConnectionCount <- obj ..:? "connection-count"
+    configMonoidHideTHLoading <- obj ..:? "hide-th-loading"
+    configMonoidLatestSnapshotUrl <- obj ..:? "latest-snapshot-url"
+    configMonoidPackageIndices <- jsonSubWarningsMT (obj ..:? "package-indices")
+    configMonoidSystemGHC <- obj ..:? "system-ghc"
+    configMonoidInstallGHC <- obj ..:? "install-ghc"
+    configMonoidSkipGHCCheck <- obj ..:? "skip-ghc-check"
+    configMonoidSkipMsys <- obj ..:? "skip-msys"
+    configMonoidRequireStackVersion <- unVersionRangeJSON <$>
+                                       obj ..:? "require-stack-version"
+                                           ..!= VersionRangeJSON anyVersion
+    configMonoidOS <- obj ..:? "os"
+    configMonoidArch <- obj ..:? "arch"
+    configMonoidJobs <- obj ..:? "jobs"
+    configMonoidExtraIncludeDirs <- obj ..:? "extra-include-dirs" ..!= Set.empty
+    configMonoidExtraLibDirs <- obj ..:? "extra-lib-dirs" ..!= Set.empty
+    configMonoidConcurrentTests <- obj ..:? "concurrent-tests"
+    configMonoidLocalBinPath <- obj ..:? "local-bin-path"
+    configMonoidImageOpts <- jsonSubWarnings (obj ..:? "image" ..!= mempty)
+    return ConfigMonoid {..}
 
 -- | Newtype for non-orphan FromJSON instance.
 newtype VersionRangeJSON = VersionRangeJSON { unVersionRangeJSON :: VersionRange }
@@ -778,18 +786,18 @@ getMinimalEnvOverride = do
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
 
-instance FromJSON ProjectAndConfigMonoid where
-    parseJSON = withObject "Project, ConfigMonoid" $ \o -> do
-        dirs <- o .:? "packages" .!= [packageEntryCurrDir]
-        extraDeps' <- o .:? "extra-deps" .!= []
+instance FromJSON (ProjectAndConfigMonoid, [JSONWarning]) where
+    parseJSON = withObjectWarnings "ProjectAndConfigMonoid" $ \o -> do
+        dirs <- jsonSubWarningsMT (o ..:? "packages") ..!= [packageEntryCurrDir]
+        extraDeps' <- o ..:? "extra-deps" ..!= []
         extraDeps <-
             case partitionEithers $ goDeps extraDeps' of
                 ([], x) -> return $ Map.fromList x
                 (errs, _) -> fail $ unlines errs
 
-        flags <- o .:? "flags" .!= mempty
-        resolver <- o .: "resolver"
-        config <- parseJSON $ Object o
+        flags <- o ..:? "flags" ..!= mempty
+        resolver <- o ..: "resolver"
+        config <- parseConfigMonoidJSON o
         let project = Project
                 { projectPackages = dirs
                 , projectExtraDeps = extraDeps

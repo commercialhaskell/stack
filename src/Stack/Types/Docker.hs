@@ -80,24 +80,24 @@ data DockerOptsMonoid = DockerOptsMonoid
   deriving (Show)
 
 -- | Decode uninterpreted docker options from JSON/YAML.
-instance FromJSON DockerOptsMonoid where
-  parseJSON = withObject "DockerOptsMonoid"
+instance FromJSON (DockerOptsMonoid, [JSONWarning]) where
+  parseJSON = withObjectWarnings "DockerOptsMonoid"
     (\o -> do dockerMonoidExists           <- pure (Just True)
-              dockerMonoidEnable           <- o .:? dockerEnableArgName
-              dockerMonoidRepoOrImage      <- ((Just . DockerMonoidImage) <$> o .: dockerImageArgName) <|>
-                                              ((Just . DockerMonoidRepo) <$> o .: dockerRepoArgName) <|>
+              dockerMonoidEnable           <- o ..:? dockerEnableArgName
+              dockerMonoidRepoOrImage      <- ((Just . DockerMonoidImage) <$> o ..: dockerImageArgName) <|>
+                                              ((Just . DockerMonoidRepo) <$> o ..: dockerRepoArgName) <|>
                                               pure Nothing
-              dockerMonoidRegistryLogin    <- o .:? dockerRegistryLoginArgName
-              dockerMonoidRegistryUsername <- o .:? dockerRegistryUsernameArgName
-              dockerMonoidRegistryPassword <- o .:? dockerRegistryPasswordArgName
-              dockerMonoidAutoPull         <- o .:? dockerAutoPullArgName
-              dockerMonoidDetach           <- o .:? dockerDetachArgName
-              dockerMonoidPersist          <- o .:? dockerPersistArgName
-              dockerMonoidContainerName    <- o .:? dockerContainerNameArgName
-              dockerMonoidRunArgs          <- o .:? dockerRunArgsArgName .!= []
-              dockerMonoidMount            <- o .:? dockerMountArgName .!= []
-              dockerMonoidPassHost         <- o .:? dockerPassHostArgName
-              dockerMonoidDatabasePath     <- o .:? dockerDatabasePathArgName
+              dockerMonoidRegistryLogin    <- o ..:? dockerRegistryLoginArgName
+              dockerMonoidRegistryUsername <- o ..:? dockerRegistryUsernameArgName
+              dockerMonoidRegistryPassword <- o ..:? dockerRegistryPasswordArgName
+              dockerMonoidAutoPull         <- o ..:? dockerAutoPullArgName
+              dockerMonoidDetach           <- o ..:? dockerDetachArgName
+              dockerMonoidPersist          <- o ..:? dockerPersistArgName
+              dockerMonoidContainerName    <- o ..:? dockerContainerNameArgName
+              dockerMonoidRunArgs          <- o ..:? dockerRunArgsArgName ..!= []
+              dockerMonoidMount            <- o ..:? dockerMountArgName ..!= []
+              dockerMonoidPassHost         <- o ..:? dockerPassHostArgName
+              dockerMonoidDatabasePath     <- o ..:? dockerDatabasePathArgName
               return DockerOptsMonoid{..})
 
 -- | Left-biased combine Docker options

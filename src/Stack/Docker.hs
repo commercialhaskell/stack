@@ -157,7 +157,7 @@ runContainerAndExit modConfig
      pwd <- getWorkingDir
      when (maybe False (isPrefixOf "tcp://") dockerHost &&
            maybe False (isInfixOf "boot2docker") dockerCertPath)
-          ($logWarn "WARNING: Using boot2docker is NOT supported, and not likely to perform well.")
+          ($logWarn "Warning: Using boot2docker is NOT supported, and not likely to perform well.")
      let image = dockerImage docker
      maybeImageInfo <- inspect envOverride image
      imageInfo <- case maybeImageInfo of
