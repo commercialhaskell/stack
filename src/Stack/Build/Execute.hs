@@ -602,7 +602,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
             let makeAbsolute = stripTHLoading -- If users want control, we should add a config option for this
 
             maybePrintBuildOutput stripTHLoading makeAbsolute LevelInfo mlogFile moutH
-            maybePrintBuildOutput stripTHLoading makeAbsolute LevelWarn mlogFile merrH
+            maybePrintBuildOutput False makeAbsolute LevelWarn mlogFile merrH
             ec <- liftIO $ waitForProcess ph
             case ec of
                 ExitSuccess -> return ()
