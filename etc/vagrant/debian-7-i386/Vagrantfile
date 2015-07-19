@@ -1,0 +1,23 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+Vagrant.configure(2) do |config|
+  config.vm.box = "puppetlabs/debian-7.8-32-nocm"
+  config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__exclude: [".stack_work/", "_release/"]
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "1024"
+  end
+  config.vm.provision "shell", run: "always", inline: <<-SHELL
+    set -xe
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y net-tools wget zlib1g-dev ruby-dev libgmp-dev lsb-release ca-certificates git
+    if ! which stack; then
+      curl -sSL $(curl -sSL https://api.github.com/repos/commercialhaskell/stack/releases/latest \
+               |grep '"browser_download_url": ".*/stack-[0-9\\.]\\+-i386-linux.gz"' \
+               |sed 's/.*"\\(.*\\)"$/\\1/') \
+        | gzip -dc \
+        >/usr/local/bin/stack
+      chmod a+x /usr/local/bin/stack
+    fi
+  SHELL
+end
