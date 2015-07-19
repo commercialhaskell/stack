@@ -6,7 +6,7 @@
 * Targets outside of root dir don't build [#366](https://github.com/commercialhaskell/stack/issues/366)
 * Upper limit on number of flag combinations to test [#543](https://github.com/commercialhaskell/stack/issues/543)
 * Fuzzy matching support to give better error messages for close version numbers [#504](https://github.com/commercialhaskell/stack/issues/504)
-* --local-bin-path global option. Use to change where binaries get placed on an `stack install` [#342](https://github.com/commercialhaskell/stack/issues/342)
+* `--local-bin-path` global option. Use to change where binaries get placed on a `--copy-bins` [#342](https://github.com/commercialhaskell/stack/issues/342)
 * Custom snapshots [#111](https://github.com/commercialhaskell/stack/issues/111)
 * --force-dirty flag: Force treating all local packages as having dirty files (useful for cases where stack can't detect a file change)
 * GHC error messages: display file paths as absolute instead of relative for better editor integration
