@@ -146,10 +146,9 @@ runContainerAndExit modConfig
      checkDockerVersion envOverride
      uidOut <- readProcessStdout Nothing envOverride "id" ["-u"]
      gidOut <- readProcessStdout Nothing envOverride "id" ["-g"]
-     (dockerHost,dockerCertPath,dockerTlsVerify) <-
-       liftIO ((,,) <$> lookupEnv "DOCKER_HOST"
-                    <*> lookupEnv "DOCKER_CERT_PATH"
-                    <*> lookupEnv "DOCKER_TLS_VERIFY")
+     (dockerHost,dockerCertPath) <-
+       liftIO ((,) <$> lookupEnv "DOCKER_HOST"
+                   <*> lookupEnv "DOCKER_CERT_PATH")
      isStdoutTerminal <- asks getTerminal
      (isStdinTerminal,isStderrTerminal) <-
        liftIO ((,) <$> hIsTerminalDevice stdin
@@ -227,19 +226,6 @@ runContainerAndExit modConfig
             then ["-e",sandboxIDEnvVar ++ "=" ++ sandboxID
                  ,"--entrypoint=/root/entrypoint.sh"]
             else []
-         ,case (dockerPassHost docker,dockerHost) of
-            (True,Just x@('u':'n':'i':'x':':':'/':'/':s)) -> ["-e","DOCKER_HOST=" ++ x
-                                                             ,"-v",s ++ ":" ++ s]
-            (True,Just x) -> ["-e","DOCKER_HOST=" ++ x]
-            (True,Nothing) -> ["-v","/var/run/docker.sock:/var/run/docker.sock"]
-            (False,_) -> []
-         ,case (dockerPassHost docker,dockerCertPath) of
-            (True,Just x) -> ["-e","DOCKER_CERT_PATH=" ++ x
-                             ,"-v",x ++ ":" ++ x]
-            _ -> []
-         ,case (dockerPassHost docker,dockerTlsVerify) of
-            (True,Just x )-> ["-e","DOCKER_TLS_VERIFY=" ++ x]
-            _ -> []
          ,concatMap sandboxSubdirArg sandboxSubdirs
          ,concatMap mountArg (dockerMount docker)
          ,case dockerContainerName docker of
@@ -648,7 +634,6 @@ dockerOptsFromMonoid mproject stackRoot DockerOptsMonoid{..} = DockerOpts
   ,dockerContainerName = emptyToNothing dockerMonoidContainerName
   ,dockerRunArgs = dockerMonoidRunArgs
   ,dockerMount = dockerMonoidMount
-  ,dockerPassHost = fromMaybe False dockerMonoidPassHost
   ,dockerDatabasePath =
      case dockerMonoidDatabasePath of
        Nothing -> stackRoot </> $(mkRelFile "docker.db")

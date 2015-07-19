@@ -36,8 +36,6 @@ data DockerOpts = DockerOpts
     -- ^ Arguments to pass directly to @docker run@.
   ,dockerMount :: ![Mount]
     -- ^ Volumes to mount in the container.
-  ,dockerPassHost :: !Bool
-    -- ^ Pass Docker daemon connection information into container.
   ,dockerDatabasePath :: !(Path Abs File)
     -- ^ Location of image usage database.
   }
@@ -72,8 +70,6 @@ data DockerOptsMonoid = DockerOptsMonoid
     -- ^ Arguments to pass directly to @docker run@
   ,dockerMonoidMount :: ![Mount]
     -- ^ Volumes to mount in the container
-  ,dockerMonoidPassHost :: !(Maybe Bool)
-    -- ^ Pass Docker daemon connection information into container.
   ,dockerMonoidDatabasePath :: !(Maybe String)
     -- ^ Location of image usage database.
   }
@@ -96,7 +92,6 @@ instance FromJSON (DockerOptsMonoid, [JSONWarning]) where
               dockerMonoidContainerName    <- o ..:? dockerContainerNameArgName
               dockerMonoidRunArgs          <- o ..:? dockerRunArgsArgName ..!= []
               dockerMonoidMount            <- o ..:? dockerMountArgName ..!= []
-              dockerMonoidPassHost         <- o ..:? dockerPassHostArgName
               dockerMonoidDatabasePath     <- o ..:? dockerDatabasePathArgName
               return DockerOptsMonoid{..})
 
@@ -115,7 +110,6 @@ instance Monoid DockerOptsMonoid where
     ,dockerMonoidContainerName    = Nothing
     ,dockerMonoidRunArgs          = []
     ,dockerMonoidMount            = []
-    ,dockerMonoidPassHost         = Nothing
     ,dockerMonoidDatabasePath     = Nothing
     }
   mappend l r = DockerOptsMonoid
@@ -131,7 +125,6 @@ instance Monoid DockerOptsMonoid where
     ,dockerMonoidContainerName    = dockerMonoidContainerName l <|> dockerMonoidContainerName r
     ,dockerMonoidRunArgs          = dockerMonoidRunArgs r <> dockerMonoidRunArgs l
     ,dockerMonoidMount            = dockerMonoidMount r <> dockerMonoidMount l
-    ,dockerMonoidPassHost         = dockerMonoidPassHost l <|> dockerMonoidPassHost r
     ,dockerMonoidDatabasePath     = dockerMonoidDatabasePath l <|> dockerMonoidDatabasePath r
     }
 
@@ -209,10 +202,6 @@ dockerContainerNameArgName = "container-name"
 -- | Docker persist argument name.
 dockerPersistArgName :: Text
 dockerPersistArgName = "persist"
-
--- | Docker pass host argument name.
-dockerPassHostArgName :: Text
-dockerPassHostArgName = "pass-host"
 
 -- | Docker database path argument name.
 dockerDatabasePathArgName :: Text

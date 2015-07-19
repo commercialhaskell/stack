@@ -280,9 +280,6 @@ dockerOptsParser showOptions =
                            metavar "(PATH | HOST-PATH:CONTAINER-PATH)" <>
                            help ("Mount volumes from host in container " ++
                                  "(may specify mutliple times)")))
-    <*> maybeBoolFlags (dockerOptName dockerPassHostArgName)
-                       "passing Docker daemon connection information into container"
-                       hide
     <*> maybeStrOption (long (dockerOptName dockerDatabasePathArgName) <>
                         hide <>
                         metavar "PATH" <>
