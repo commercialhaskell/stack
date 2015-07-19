@@ -290,7 +290,7 @@ executePlan menv bopts baseConfigOpts locals sourceMap plan = do
         unless (Map.null destToInstalled) $ $logInfo ""
         forM_ (Map.toList destToInstalled) $ \(dest, executables) -> do
             $logInfo $ T.concat
-                [ "Installed executables to "
+                [ "Copied executables to "
                 , T.pack dest
                 , ":"]
             forM_ executables $ \exe -> $logInfo $ T.append "- " exe

@@ -10,6 +10,7 @@
 * Custom snapshots [#111](https://github.com/commercialhaskell/stack/issues/111)
 * --force-dirty flag: Force treating all local packages as having dirty files (useful for cases where stack can't detect a file change)
 * GHC error messages: display file paths as absolute instead of relative for better editor integration
+* Add the `--copy-bins` option [#569](https://github.com/commercialhaskell/stack/issues/569)
 
 Bug fixes:
 

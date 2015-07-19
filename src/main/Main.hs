@@ -91,11 +91,15 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
-                        (buildOptsParser Build)
+                        (buildOptsParser Build False)
              addCommand "install"
-                        "Build executables and install to a user path"
+                        "Identical to 'build --copy-bins', not actually a managed installation tool!"
                         installCmd
-                        (buildOptsParser Build)
+                        (buildOptsParser Build True)
+             addCommand "uninstall"
+                        "DEPRECATED: This command performs no actions, and is present for documentation only"
+                        uninstallCmd
+                        (many $ strArgument $ metavar "IGNORED")
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
                         (\(bopts, topts) ->
@@ -103,15 +107,15 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                                              then bopts { boptsGhcOptions = "-fhpc" : boptsGhcOptions bopts}
                                              else bopts
                              in buildCmd (DoTests topts) bopts')
-                        ((,) <$> buildOptsParser Test <*> testOptsParser)
+                        ((,) <$> buildOptsParser Test False <*> testOptsParser)
              addCommand "bench"
                         "Build and benchmark the project(s) in this directory/configuration"
                         (\(bopts, beopts) -> buildCmd (DoBenchmarks beopts) bopts)
-                        ((,) <$> buildOptsParser Bench <*> benchOptsParser)
+                        ((,) <$> buildOptsParser Bench False <*> benchOptsParser)
              addCommand "haddock"
                         "Generate haddocks for the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
-                        (buildOptsParser Haddock)
+                        (buildOptsParser Haddock False)
              addCommand "new"
                         "Create a brand new project"
                         newCmd
@@ -487,22 +491,38 @@ cleanCmd :: () -> GlobalOpts -> IO ()
 cleanCmd () go = withBuildConfig go ThrowException clean
 
 -- | Helper for build and install commands
-buildCmdHelper :: NoBuildConfigStrategy -> FinalAction -> BuildOpts -> GlobalOpts -> IO ()
-buildCmdHelper strat finalAction opts go
+buildCmdHelper :: StackT EnvConfig IO () -- ^ do before build
+               -> NoBuildConfigStrategy -> FinalAction -> BuildOpts -> GlobalOpts -> IO ()
+buildCmdHelper beforeBuild strat finalAction opts go
     | boptsFileWatch opts = fileWatch inner
     | otherwise = inner $ const $ return ()
   where
-    inner setLocalFiles =
-        withBuildConfig go strat $
+    inner setLocalFiles = withBuildConfig go strat $ do
+        beforeBuild
         Stack.Build.build setLocalFiles opts { boptsFinalAction = finalAction }
 
 -- | Build the project.
 buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
-buildCmd = buildCmdHelper ThrowException
+buildCmd = buildCmdHelper (return ()) ThrowException
 
 -- | Install
 installCmd :: BuildOpts -> GlobalOpts -> IO ()
-installCmd opts = buildCmdHelper ExecStrategy DoNothing opts { boptsInstallExes = True }
+installCmd =
+    buildCmdHelper warning ExecStrategy DoNothing
+  where
+    warning = do
+        $logWarn "NOTE: stack is not a package manager"
+        $logWarn "The install command is only used to copy executables to a destination directory, not manage them"
+        $logWarn "You may want to use 'stack build --copy-bins' for clarity"
+
+copyCmd :: BuildOpts -> GlobalOpts -> IO ()
+copyCmd opts = buildCmdHelper (return ()) ExecStrategy DoNothing opts { boptsInstallExes = True }
+
+uninstallCmd :: [String] -> GlobalOpts -> IO ()
+uninstallCmd _ go = withConfig go $ do
+    $logError "stack does not manage installations in global locations"
+    $logError "The only global mutation stack performs is executable copying"
+    $logError "For the default executable destination, please run 'stack path --local-bin-path'"
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
