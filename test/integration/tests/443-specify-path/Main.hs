@@ -5,7 +5,7 @@ main :: IO ()
 main = do
   -- install in relative path
   createDirectory "bin"
-  stack ["-p", "./bin", "install" , "happy"]
+  stack ["--local-bin-path", "./bin", "install" , "happy"]
   doesExist "./bin/happy"
 
   -- Default install
@@ -16,10 +16,10 @@ main = do
   -- doesExist (defaultDir ++ "/bin/happy")
 
   -- install in current dir
-  stack ["-p", ".", "install", "happy" ]
+  stack ["--local-bin-path", ".", "install", "happy" ]
   doesExist "happy"
 
   -- install in absolute path
   tmpDirectory <- getTemporaryDirectory
-  stack ["-p", tmpDirectory, "install", "happy" ]
+  stack ["--local-bin-path", tmpDirectory, "install", "happy" ]
   doesExist "/tmp/happy"

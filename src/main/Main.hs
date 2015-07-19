@@ -100,9 +100,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                         "Build and test the project(s) in this directory/configuration"
                         (\(bopts, topts) ->
                              let bopts' = if toCoverage topts
-                                             then bopts { boptsExeProfile = True
-                                                        , boptsLibProfile = True
-                                                        , boptsGhcOptions = "-fhpc" : boptsGhcOptions bopts}
+                                             then bopts { boptsGhcOptions = "-fhpc" : boptsGhcOptions bopts}
                                              else bopts
                              in buildCmd (DoTests topts) bopts')
                         ((,) <$> buildOptsParser Test <*> testOptsParser)
@@ -127,7 +125,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                         solverCmd
                         solverOptsParser
              addCommand "setup"
-                        "Get the appropriate ghc for your project"
+                        "Get the appropriate GHC for your project"
                         setupCmd
                         setupParser
              addCommand "path"
@@ -307,7 +305,7 @@ pathCmd keys go =
                            null keys || elem key keys)
                      paths)
                 (\(_,key,path) ->
-                      $logInfo
+                      liftIO $ T.putStrLn
                           ((if length keys == 1
                                then ""
                                else key <> ": ") <>
@@ -406,7 +404,10 @@ data SetupCmdOpts = SetupCmdOpts
 
 setupParser :: Parser SetupCmdOpts
 setupParser = SetupCmdOpts
-    <$> (optional $ argument readVersion (metavar "VERSION"))
+    <$> (optional $ argument readVersion
+            (metavar "GHC_MAJOR_VERSION" <>
+             help ("Major version of GHC to install, e.g. 7.10. " ++
+                   "The default is to install the version implied by the resolver.")))
     <*> boolFlags False
             "reinstall"
             "Reinstall GHC, even if available (implies no-system-ghc)"
@@ -594,7 +595,13 @@ dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
 
 imgDockerCmd :: () -> GlobalOpts -> IO ()
 imgDockerCmd () go@GlobalOpts{..} = do
-    withBuildConfig go ExecStrategy Image.imageDocker
+    withBuildConfig
+        go
+        ExecStrategy
+        (do Stack.Build.build
+                (const (return ()))
+                defaultBuildOpts
+            Docker.preventInContainer Image.imageDocker)
 
 -- | Load the configuration with a manager. Convenience function used
 -- throughout this module.

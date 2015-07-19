@@ -90,6 +90,10 @@ data StackBuildException
         (Maybe (Path Abs File)) -- logfiles location
         S.ByteString     -- log contents
   | ExecutionFailure [SomeException]
+  | LocalPackageDoesn'tMatchTarget
+        PackageName
+        Version -- local version
+        Version -- version specified on command line
   deriving Typeable
 
 instance Show StackBuildException where
@@ -208,6 +212,15 @@ instance Show StackBuildException where
           dropQuotes = filter ('\"' /=)
           doubleIndent = indent . indent
     show (ExecutionFailure es) = intercalate "\n\n" $ map show es
+    show (LocalPackageDoesn'tMatchTarget name localV requestedV) = concat
+        [ "Version for local package "
+        , packageNameString name
+        , " is "
+        , versionString localV
+        , ", but you asked for "
+        , versionString requestedV
+        , " on the command line"
+        ]
 
 instance Exception StackBuildException
 
@@ -298,6 +311,8 @@ data BuildOpts =
             -- ^ Watch files for changes and automatically rebuild
             ,boptsKeepGoing :: !(Maybe Bool)
             -- ^ Keep building/running after failure
+            ,boptsForceDirty :: !Bool
+            -- ^ Force treating all local packages as having dirty files
             }
   deriving (Show)
 
@@ -318,6 +333,7 @@ defaultBuildOpts = BuildOpts
     , boptsOnlySnapshot = False
     , boptsFileWatch = False
     , boptsKeepGoing = Nothing
+    , boptsForceDirty = False
     }
 
 -- | Options for the 'FinalAction' 'DoTests'

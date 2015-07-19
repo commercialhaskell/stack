@@ -226,7 +226,7 @@ addHaddock (InstalledCache ref) =
         let gid = dpGhcPkgId dp
         h <- case Map.lookup gid m of
             Just installed -> return (installedCacheHaddock installed)
-            Nothing | null (dpLibraries dp) -> return True
+            Nothing | not (dpHasExposedModules dp) -> return True
             Nothing -> do
                 let loop [] = return False
                     loop (ifc:ifcs) = do
@@ -242,6 +242,7 @@ data DumpPackage profiling haddock = DumpPackage
     { dpGhcPkgId :: !GhcPkgId
     , dpLibDirs :: ![FilePath]
     , dpLibraries :: ![ByteString]
+    , dpHasExposedModules :: !Bool
     , dpDepends :: ![GhcPkgId]
     , dpHaddockInterfaces :: ![ByteString]
     , dpProfiling :: !profiling
@@ -312,6 +313,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
             let libDirKey = "library-dirs"
                 libDirs = parseM libDirKey
                 libraries = parseM "hs-libraries"
+                exposedModules = parseM "exposed-modules"
                 haddockInterfaces = parseM "haddock-interfaces"
             depends <- mapM parseDepend $ parseM "depends"
 
@@ -324,6 +326,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 { dpGhcPkgId = ghcPkgId
                 , dpLibDirs = libDirPaths
                 , dpLibraries = S8.words $ S8.unwords libraries
+                , dpHasExposedModules = not (null libraries || null exposedModules)
                 , dpDepends = catMaybes (depends :: [Maybe GhcPkgId])
                 , dpHaddockInterfaces = S8.words $ S8.unwords haddockInterfaces
                 , dpProfiling = ()

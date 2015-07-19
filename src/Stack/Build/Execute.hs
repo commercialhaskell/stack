@@ -18,8 +18,9 @@ import           Control.Concurrent.Lifted (fork)
 import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
+import           Control.Exception.Enclosed     (tryIO)
 import           Control.Exception.Lifted
-import           Control.Monad                  (liftM, when, unless, void, join)
+import           Control.Monad                  (liftM, when, unless, void, join, guard)
 import           Control.Monad.Catch            (MonadCatch, MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -27,6 +28,7 @@ import           Control.Monad.Reader           (MonadReader, asks)
 import           Control.Monad.Trans.Control    (liftBaseWith)
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                as S
+import           Data.ByteString                (ByteString)
 import qualified Data.ByteString.Char8          as S8
 import           Data.Conduit
 import qualified Data.Conduit.Binary            as CB
@@ -47,9 +49,10 @@ import           Data.Text                      (Text)
 import qualified Data.Text                      as T
 import qualified Data.Text.Encoding             as T
 import           Data.Text.Encoding             (encodeUtf8)
+import           Data.Word8                     (_colon)
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
-import           Language.Haskell.TH            (Loc(..))
+import           Language.Haskell.TH            as TH (location)
 import           Network.HTTP.Client.Conduit    (HasHttpManager)
 import           Path
 import           Path.IO
@@ -136,7 +139,7 @@ printPlan finalAction plan = do
                 [] -> $logInfo $ "Nothing to " <> finalLabel
                 xs -> do
                     $logInfo $ "Would " <> finalLabel <> ":"
-                    forM_ xs $ \(name, _) -> $logInfo $ T.pack $ packageNameString name
+                    forM_ xs $ \(name, _) -> $logInfo $ packageNameText name
 
     $logInfo ""
 
@@ -595,8 +598,11 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
             -- Use createProcess_ to avoid the log file being closed afterwards
             (Just inH, moutH, merrH, ph) <- liftIO $ createProcess_ "singleBuild" cp
             liftIO $ hClose inH
-            maybePrintBuildOutput stripTHLoading LevelInfo mlogFile moutH
-            maybePrintBuildOutput stripTHLoading LevelWarn mlogFile merrH
+
+            let makeAbsolute = stripTHLoading -- If users want control, we should add a config option for this
+
+            maybePrintBuildOutput stripTHLoading makeAbsolute LevelInfo mlogFile moutH
+            maybePrintBuildOutput stripTHLoading makeAbsolute LevelWarn mlogFile merrH
             ec <- liftIO $ waitForProcess ph
             case ec of
                 ExitSuccess -> return ()
@@ -615,12 +621,12 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
                         (fmap fst mlogFile)
                         bs
 
-    maybePrintBuildOutput stripTHLoading level mlogFile mh =
+    maybePrintBuildOutput stripTHLoading makeAbsolute level mlogFile mh =
         case mh of
             Just h ->
                 case mlogFile of
                   Just{} -> return ()
-                  Nothing -> printBuildOutput stripTHLoading level h
+                  Nothing -> printBuildOutput stripTHLoading makeAbsolute level h
             Nothing -> return ()
 
 singleBuild :: M env m
@@ -639,10 +645,11 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
 
     announce "build"
     config <- asks getConfig
+    extraOpts <- extraBuildOptions
     cabal (console && configHideTHLoading config) $
-        case taskType of
+        (case taskType of
             TTLocal lp -> "build" : map T.unpack (Set.toList $ lpComponents lp)
-            TTUpstream _ _ -> ["build"]
+            TTUpstream _ _ -> ["build"]) ++ extraOpts
 
     let doHaddock = shouldHaddockPackage eeBuildOpts eeWanted (packageName package) &&
                     -- Works around haddock failing on bytestring-builder since it has no modules
@@ -720,9 +727,9 @@ singleTest topts ac ee task =
             case taskType task of
                 TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
                 TTUpstream _ _ -> assert False $ return ()
-            hpcIndexDir <- toFilePath . (</> dotHpc) <$> hpcRelativeDir
+            extraOpts <- extraBuildOptions
             cabal (console && configHideTHLoading config) $
-                "build" : "--ghc-options" : ("-hpcdir " ++ hpcIndexDir) : components
+                "build" : (extraOpts ++ components)
             setTestBuilt pkgDir
 
         toRun <-
@@ -805,7 +812,7 @@ singleTest topts ac ee task =
                             [ "Test suite "
                             , testName
                             , " executable not found for "
-                            , T.pack $ packageNameString $ packageName package
+                            , packageNameText $ packageName package
                             ]
                         return $ Map.singleton testName Nothing
 
@@ -873,14 +880,14 @@ generateHpcReport pkgDir pkgName testName = do
             , T.pack (toFilePath tixFileAbs)
             , "."
             ]
-        else do
+        else (`onException` $logError ("Error occurred while producing coverage report for " <> whichTest)) $ do
             menv <- getMinimalEnvOverride
             $logInfo $ "Generating HTML coverage report for " <> whichTest
             _ <- readProcessStdout (Just hpcDir) menv "hpc"
-                ("markup" : toFilePath tixFile : args)
+                ("markup" : toFilePath tixFileAbs : args)
             output <- readProcessStdout (Just hpcDir) menv "hpc"
-                ("report" : toFilePath tixFile : args)
-            forM_ (S8.lines output) ($logInfo . T.decodeUtf8)
+                ("report" : toFilePath tixFileAbs : args)
+            forM_ (S8.lines output) ($logInfo . T.decodeUtf8 . stripCharacterReturn)
             $logInfo
                 ("The HTML coverage report for " <> whichTest <> " is available at " <>
                  T.pack (toFilePath (hpcDir </> $(mkRelFile "hpc_index.html"))))
@@ -909,7 +916,8 @@ singleBench beopts ac ee task =
                 TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
                 TTUpstream _ _ -> assert False $ return ()
             config <- asks getConfig
-            cabal (console && configHideTHLoading config) ["build"]
+            extraOpts <- extraBuildOptions
+            cabal (console && configHideTHLoading config) ("build" : extraOpts)
             setBenchBuilt pkgDir
         let args = maybe []
                          ((:[]) . ("--benchmark-options=" <>))
@@ -920,12 +928,17 @@ singleBench beopts ac ee task =
 -- | Grab all output from the given @Handle@ and print it to stdout, stripping
 -- Template Haskell "Loading package" lines. Does work in a separate thread.
 printBuildOutput :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
-                 => Bool -> LogLevel -> Handle -> m ()
-printBuildOutput excludeTHLoading level outH = void $ fork $
+                 => Bool -- ^ exclude TH loading?
+                 -> Bool -- ^ convert paths to absolute?
+                 -> LogLevel
+                 -> Handle -> m ()
+printBuildOutput excludeTHLoading makeAbsolute level outH = void $ fork $
          CB.sourceHandle outH
     $$ CB.lines
+    =$ CL.map stripCharacterReturn
     =$ CL.filter (not . isTHLoading)
-    =$ CL.mapM_ (monadLoggerLog (Loc "<unknown>" "<unknown>" "<unknown>" (0,0) (0,0)) "" level)
+    =$ CL.mapM toAbsolutePath
+    =$ CL.mapM_ (monadLoggerLog $(TH.location >>= liftLoc) "" level)
   where
     -- | Is this line a Template Haskell "Loading package" line
     -- ByteString
@@ -934,6 +947,38 @@ printBuildOutput excludeTHLoading level outH = void $ fork $
     isTHLoading bs =
         "Loading package " `S8.isPrefixOf` bs &&
         ("done." `S8.isSuffixOf` bs || "done.\r" `S8.isSuffixOf` bs)
+
+    -- | Convert GHC error lines with file paths to have absolute file paths
+    toAbsolutePath bs | not makeAbsolute = return bs
+    toAbsolutePath bs = do
+        let (x, y) = S.break (== _colon) bs
+        mabs <-
+            if isValidSuffix y
+                then do
+                    efp <- liftIO $ tryIO $ D.canonicalizePath $ S8.unpack x
+                    case efp of
+                        Left _ -> return Nothing
+                        Right fp -> return $ Just $ S8.pack fp
+                else return Nothing
+        case mabs of
+            Nothing -> return bs
+            Just fp -> return $ fp `S.append` y
+
+    -- | Match the line:column format at the end of lines
+    isValidSuffix bs0 = maybe False (const True) $ do
+        guard $ not $ S.null bs0
+        guard $ S.head bs0 == _colon
+        (_, bs1) <- S8.readInt $ S.drop 1 bs0
+
+        guard $ not $ S.null bs1
+        guard $ S.head bs1 == _colon
+        (_, bs2) <- S8.readInt $ S.drop 1 bs1
+
+        guard $ bs2 == ":"
+
+-- | Strip a @\r@ character from the byte vector. Used because Windows.
+stripCharacterReturn :: ByteString -> ByteString
+stripCharacterReturn = S8.filter (not . (=='\r'))
 
 taskLocation :: Task -> InstallLocation
 taskLocation task =
@@ -957,3 +1002,8 @@ getSetupHs dir = do
   where
     fp1 = dir </> $(mkRelFile "Setup.hs")
     fp2 = dir </> $(mkRelFile "Setup.lhs")
+
+extraBuildOptions :: M env m => m [String]
+extraBuildOptions = do
+    hpcIndexDir <- toFilePath . (</> dotHpc) <$> hpcRelativeDir
+    return ["--ghc-options", "-hpcdir " ++ hpcIndexDir]

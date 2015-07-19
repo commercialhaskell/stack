@@ -62,7 +62,7 @@ buildOptsParser cmd =
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> haddock <*> haddockDeps <*> finalAction <*> dryRun <*> ghcOpts <*>
             flags <*> installExes <*> preFetch <*> onlySnapshot <*>
-            fileWatch' <*> keepGoing
+            fileWatch' <*> keepGoing <*> forceDirty
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
         target =
@@ -129,6 +129,10 @@ buildOptsParser cmd =
             "keep-going"
             "continue running after a step fails (default: false for build, true for test/bench)"
             idm
+
+        forceDirty = flag False True
+            (long "force-dirty" <>
+             help "Force treating all local packages as having dirty files (useful for cases where stack can't detect a file change)")
 
 -- | Parser for package:[-]flag
 readFlag :: ReadM (Map (Maybe PackageName) (Map FlagName Bool))

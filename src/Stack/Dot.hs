@@ -13,7 +13,7 @@ import           Control.Applicative
 import           Control.Monad (void)
 import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger (MonadLogger, logInfo)
+import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader (MonadReader)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Data.Foldable as F
@@ -25,6 +25,7 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.IO as Text
 import qualified Data.Traversable as T
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Stack.Build (withLoadPackage)
@@ -51,8 +52,8 @@ dot :: (HasEnvConfig env
        ,HasHttpManager env
        ,MonadBaseControl IO m
        ,MonadCatch m
-       ,MonadIO m
        ,MonadLogger m
+       ,MonadIO m
        ,MonadReader env m
        )
     => DotOpts
@@ -146,26 +147,26 @@ localDependencies dotOpts locals = map (\lp -> (packageName (lpPackage lp), deps
         localNames = Set.fromList $ map (packageName . lpPackage) locals
 
 -- | Print a graphviz graph of the edges in the Map and highlight the given local packages
-printGraph :: (Applicative m, MonadLogger m)
+printGraph :: (Applicative m, MonadIO m)
            => DotOpts
            -> [LocalPackage]
            -> Map PackageName (Set PackageName)
            -> m ()
 printGraph dotOpts locals graph = do
-  $logInfo "strict digraph deps {"
+  liftIO $ Text.putStrLn "strict digraph deps {"
   printLocalNodes dotOpts filteredLocals
   printLeaves graph
   void (Map.traverseWithKey printEdges graph)
-  $logInfo "}"
+  liftIO $ Text.putStrLn "}"
   where filteredLocals = filter (\local ->
           show (packageName (lpPackage local)) `Set.notMember` dotPrune dotOpts) locals
 
 -- | Print the local nodes with a different style depending on options
-printLocalNodes :: (F.Foldable t, MonadLogger m)
+printLocalNodes :: (F.Foldable t, MonadIO m)
                 => DotOpts
                 -> t LocalPackage
                 -> m ()
-printLocalNodes dotOpts locals = $logInfo (Text.intercalate "\n" lpNodes)
+printLocalNodes dotOpts locals = liftIO $ Text.putStrLn (Text.intercalate "\n" lpNodes)
   where applyStyle :: Text -> Text
         applyStyle n = if dotIncludeExternal dotOpts
                          then n <> " [style=dashed];"
@@ -174,24 +175,24 @@ printLocalNodes dotOpts locals = $logInfo (Text.intercalate "\n" lpNodes)
         lpNodes = map (applyStyle . nodeName . packageName . lpPackage) (F.toList locals)
 
 -- | Print nodes without dependencies
-printLeaves :: (Applicative m, MonadLogger m) => Map PackageName (Set PackageName) -> m ()
+printLeaves :: (Applicative m, MonadIO m) => Map PackageName (Set PackageName) -> m ()
 printLeaves = F.traverse_ printLeaf . Map.keysSet . Map.filter Set.null
 
 -- | `printDedges p ps` prints an edge from p to every ps
-printEdges :: (Applicative m, MonadLogger m) => PackageName -> Set PackageName -> m ()
+printEdges :: (Applicative m, MonadIO m) => PackageName -> Set PackageName -> m ()
 printEdges package deps = F.for_ deps (printEdge package)
 
 -- | Print an edge between the two package names
-printEdge :: MonadLogger m => PackageName -> PackageName -> m ()
-printEdge from to = $logInfo (Text.concat [ nodeName from, " -> ", nodeName to, ";"])
+printEdge :: MonadIO m => PackageName -> PackageName -> m ()
+printEdge from to = liftIO $ Text.putStrLn (Text.concat [ nodeName from, " -> ", nodeName to, ";"])
 
 -- | Convert a package name to a graph node name.
 nodeName :: PackageName -> Text
 nodeName name = "\"" <> Text.pack (packageNameString name) <> "\""
 
 -- | Print a node with no dependencies
-printLeaf :: MonadLogger m => PackageName -> m ()
-printLeaf package = $logInfo . Text.concat $
+printLeaf :: MonadIO m => PackageName -> m ()
+printLeaf package = liftIO . Text.putStrLn . Text.concat $
   if isWiredIn package
     then ["{rank=max; ", nodeName package, " [shape=box]; };"]
     else ["{rank=max; ", nodeName package, "; };"]
