@@ -13,6 +13,7 @@
 Bug fixes:
 
 * Extensions from the `other-extensions` field no longer enabled by default [#449](https://github.com/commercialhaskell/stack/issues/449)
+* Fix: haddock forces rebuild of empty packages [#452](https://github.com/commercialhaskell/stack/issues/449)
 
 ## 0.1.2.0
 
