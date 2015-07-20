@@ -13,6 +13,7 @@
 * Add the `--copy-bins` option [#569](https://github.com/commercialhaskell/stack/issues/569)
 * Give warnings on unexpected config keys [#48](https://github.com/commercialhaskell/stack/issues/48)
 * Remove Docker `pass-host` option
+* Don't require cabal-install to upload [#313](https://github.com/commercialhaskell/stack/issues/313)
 
 Bug fixes:
 
