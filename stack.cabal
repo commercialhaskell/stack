@@ -160,7 +160,7 @@ library
                    , file-embed
                    , word8
                    , hastache
-                   , project-template
+                   , project-template >= 0.2
   if !os(windows)
     build-depends:   unix >= 2.7.0.1
   default-language:    Haskell2010
