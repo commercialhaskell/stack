@@ -182,10 +182,11 @@ sampleRun = do
   --let hiDir =
   --        -- $(mkAbsDir "/home/dan/dep-file-test/.stack-work/install/x86_64-linux/lts-2.13/7.8.4/lib/x86_64-linux-ghc-7.8.4/dep-file-test-0.1.0.0")
   --        $(mkAbsDir "/home/dan/dep-file-test/.stack-work/dist/x86_64-linux/Cabal-1.18.1.5/build/dep-file-test/dep-file-test-tmp")
+  sampleProjectRoot <- parseAbsDir "/home/dan/dep-file-test"
   let ctx = CompilationContext
           { ccPackageName = "dep-file-test"
           , ccPackageVersion = $(mkVersion "0.1.0.0")
-          , ccProjectRoot = $(mkAbsDir "/home/dan/dep-file-test")
+          , ccProjectRoot = sampleProjectRoot
           , ccGhcVersion = $(mkVersion "7.8.4")
           , ccArch = "x86_64-linux"
           , ccSnapshot = "lts-2.13"
