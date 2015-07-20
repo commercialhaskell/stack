@@ -793,16 +793,13 @@ getCabalFileName pkgDir = do
 
 -- | Path for the package's build log.
 buildLogPath :: (MonadReader env m, HasBuildConfig env, MonadThrow m)
-             => Package -> m (Path Abs File)
-buildLogPath package' = do
+             => Package -> Maybe String -> m (Path Abs File)
+buildLogPath package' msuffix = do
   env <- ask
   let stack = configProjectWorkDir env
-  fp <- parseRelFile $ concat
-    [ packageNameString $ packageName package'
-    , "-"
-    , versionString $ packageVersion package'
-    , ".log"
-    ]
+  fp <- parseRelFile $ concat $
+    (packageIdentifierString (packageIdentifier package')) :
+    (maybe id (\suffix -> ("-" :) . (suffix :)) msuffix) [".log"]
   return $ stack </> $(mkRelDir "logs") </> fp
 
 -- Internal helper to define resolveFileOrWarn and resolveDirOrWarn

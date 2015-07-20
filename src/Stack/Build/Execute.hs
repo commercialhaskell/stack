@@ -477,6 +477,7 @@ withSingleContext :: M env m
                   => ActionContext
                   -> ExecuteEnv
                   -> Task
+                  -> Maybe String
                   -> (  Package
                      -> Path Abs File
                      -> Path Abs Dir
@@ -486,7 +487,7 @@ withSingleContext :: M env m
                      -> Maybe (Path Abs File, Handle)
                      -> m a)
                   -> m a
-withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
+withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} msuffix inner0 =
     withPackage $ \package cabalfp pkgDir ->
     withLogFile package $ \mlogFile ->
     withCabal package pkgDir mlogFile $ \cabal ->
@@ -525,7 +526,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
     withLogFile package inner
         | console = inner Nothing
         | otherwise = do
-            logPath <- buildLogPath package -- TODO give a difference suffix for test, bench, etc?
+            logPath <- buildLogPath package msuffix
             createTree (parent logPath)
             let fp = toFilePath logPath
             bracket
@@ -634,7 +635,7 @@ singleBuild :: M env m
             -> Task
             -> m ()
 singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
-  withSingleContext ac ee task $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
+  withSingleContext ac ee task Nothing $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
     (cache, _neededConfig) <- ensureConfig pkgDir ee task (announce "configure") cabal cabalfp []
 
     markExeNotInstalled (taskLocation task) taskProvides
@@ -698,7 +699,7 @@ singleTest :: M env m
            -> Task
            -> m ()
 singleTest topts ac ee task =
-    withSingleContext ac ee task $ \package cabalfp pkgDir cabal announce console mlogFile -> do
+    withSingleContext ac ee task (Just "test") $ \package cabalfp pkgDir cabal announce console mlogFile -> do
         (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (test)") cabal cabalfp ["--enable-tests"]
         config <- asks getConfig
 
@@ -898,7 +899,7 @@ singleBench :: M env m
             -> Task
             -> m ()
 singleBench beopts ac ee task =
-    withSingleContext ac ee task $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
+    withSingleContext ac ee task (Just "bench") $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
         (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (benchmarks)") cabal cabalfp ["--enable-benchmarks"]
 
         benchBuilt <- checkBenchBuilt pkgDir
