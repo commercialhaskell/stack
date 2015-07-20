@@ -46,6 +46,7 @@ library
                      Stack.FileWatch
                      Stack.GhcPkg
                      Stack.Init
+                     Stack.Iface
                      Stack.New
                      Stack.Options
                      Stack.Package
