@@ -542,14 +542,13 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} inner0 =
             }
         exeName <- liftIO $ join $ findExecutable menv "runhaskell"
         distRelativeDir' <- distRelativeDir
-        msetuphs <-
+        setuphs <-
             -- Avoid broken Setup.hs files causing problems for simple build
             -- types, see:
             -- https://github.com/commercialhaskell/stack/issues/370
             if packageSimpleType package
-                then return Nothing
+                then return eeSetupHs
                 else liftIO $ getSetupHs pkgDir
-        let setuphs = fromMaybe eeSetupHs msetuphs
         inner $ \stripTHLoading args -> do
             let fullArgs =
                       ("-package=" ++
@@ -986,19 +985,19 @@ taskLocation task =
         TTLocal _ -> Local
         TTUpstream _ loc -> loc
 
--- | Ensure Setup.hs exists in the given directory. Returns an action
--- to remove it later.
+-- | Find the Setup.hs or Setup.lhs in the given directory. If none exists,
+-- throw an exception.
 getSetupHs :: Path Abs Dir -- ^ project directory
-           -> IO (Maybe (Path Abs File))
+           -> IO (Path Abs File)
 getSetupHs dir = do
     exists1 <- fileExists fp1
     if exists1
-        then return $ Just fp1
+        then return fp1
         else do
             exists2 <- fileExists fp2
             if exists2
-                then return $ Just fp2
-                else return Nothing
+                then return fp2
+                else throwM $ NoSetupHsFound dir
   where
     fp1 = dir </> $(mkRelFile "Setup.hs")
     fp2 = dir </> $(mkRelFile "Setup.lhs")

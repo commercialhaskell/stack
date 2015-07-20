@@ -94,6 +94,7 @@ data StackBuildException
         PackageName
         Version -- local version
         Version -- version specified on command line
+  | NoSetupHsFound (Path Abs Dir)
   deriving Typeable
 
 instance Show StackBuildException where
@@ -221,6 +222,8 @@ instance Show StackBuildException where
         , versionString requestedV
         , " on the command line"
         ]
+    show (NoSetupHsFound dir) =
+        "No Setup.hs or Setup.lhs file found in " ++ toFilePath dir
 
 instance Exception StackBuildException
 
