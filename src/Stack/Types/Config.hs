@@ -757,8 +757,8 @@ bindirSuffix :: Path Rel Dir
 bindirSuffix = $(mkRelDir "bin")
 
 -- | Suffix applied to an installation root to get the doc dir
-docdirSuffix :: Path Rel Dir
-docdirSuffix = $(mkRelDir "doc")
+docDirSuffix :: Path Rel Dir
+docDirSuffix = $(mkRelDir "doc")
 
 -- | Get the extra bin directories (for the PATH). Puts more local first
 --

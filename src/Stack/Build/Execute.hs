@@ -383,8 +383,10 @@ executePlan' plan ee@ExecuteEnv {..} = do
             then loop 0
             else return ()
     unless (null errs) $ throwM $ ExecutionFailure errs
-    when (boptsHaddock eeBuildOpts && not (null actions))
-        (generateHaddockIndex eeEnvOverride eeBaseConfigOpts eeLocals)
+    when (boptsHaddock eeBuildOpts) $ do
+        generateLocalHaddockIndex eeEnvOverride eeBaseConfigOpts eeLocals
+        generateDepsHaddockIndex eeEnvOverride eeBaseConfigOpts eeLocals
+        generateSnapHaddockIndex eeEnvOverride eeBaseConfigOpts eeGlobalDB
 
 toActions :: M env m
           => (m () -> IO ())

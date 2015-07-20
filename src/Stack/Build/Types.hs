@@ -508,8 +508,8 @@ configureOpts econfig bco deps wanted loc package = map T.pack $ concat
     toFilePathNoTrailingSlash = dropTrailingPathSeparator . toFilePath
     docDir =
         case pkgVerDir of
-            Nothing -> installRoot </> docdirSuffix
-            Just dir -> installRoot </> docdirSuffix </> dir
+            Nothing -> installRoot </> docDirSuffix
+            Just dir -> installRoot </> docDirSuffix </> dir
     installRoot =
         case loc of
             Snap -> bcoSnapInstallRoot bco

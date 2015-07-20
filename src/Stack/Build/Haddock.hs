@@ -8,11 +8,14 @@
 -- | Generate haddocks
 module Stack.Build.Haddock
     ( copyDepHaddocks
-    , generateHaddockIndex
+    , generateLocalHaddockIndex
+    , generateDepsHaddockIndex
+    , generateSnapHaddockIndex
     , shouldHaddockPackage
     , shouldHaddockDeps
     ) where
 
+import           Control.Exception              (tryJust)
 import           Control.Monad
 import           Control.Monad.Catch            (MonadCatch)
 import           Control.Monad.IO.Class
@@ -24,16 +27,19 @@ import           Data.List
 import           Data.Maybe
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
+import           Data.Text                      (Text)
 import qualified Data.Text                      as T
 import           Path
 import           Path.IO
 import           Prelude
+import           Safe                           (maximumMay)
 import           Stack.Build.Types
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.Types
 import           System.Directory               (getModificationTime)
 import qualified System.FilePath                as FP
+import           System.IO.Error                (isDoesNotExistError)
 import           System.Process.Read
 
 -- | Determine whether we should haddock for a package.
@@ -75,8 +81,8 @@ copyDepHaddocks envOverride bco pkgDbs pkgId extraDestDirs = do
             Just depOrigDir -> do
                 let extraDestDirs' =
                         -- Parent test ensures we don't try to copy docs to global locations
-                        if (bcoSnapInstallRoot bco) `isParentOf` pkgHtmlDir ||
-                           (bcoLocalInstallRoot bco) `isParentOf` pkgHtmlDir
+                        if bcoSnapInstallRoot bco `isParentOf` pkgHtmlDir ||
+                           bcoLocalInstallRoot bco `isParentOf` pkgHtmlDir
                             then Set.insert (parent pkgHtmlDir) extraDestDirs
                             else extraDestDirs
                 copyWhenNeeded extraDestDirs' depId depOrigDir
@@ -110,36 +116,119 @@ copyDepHaddocks envOverride bco pkgDbs pkgId extraDestDirs = do
         copyDirectoryRecursive depOrigDir depCopyDir
 
 -- | Generate Haddock index and contents for local packages.
-generateHaddockIndex :: (MonadIO m, MonadCatch m, MonadThrow m, MonadLogger m, MonadBaseControl IO m)
-                     => EnvOverride
-                     -> BaseConfigOpts
-                     -> [LocalPackage]
-                     -> m ()
-generateHaddockIndex envOverride bco locals = do
-    $logInfo ("Generating Haddock index in\n" <>
-              T.pack (toFilePath (haddockIndexFile docDir)))
-    interfaceArgs <- mapM (\LocalPackage {lpPackage = Package {..}} ->
-                              toInterfaceOpt (PackageIdentifier packageName packageVersion))
-                          locals
-    readProcessNull
-        (Just docDir)
+generateLocalHaddockIndex
+    :: (MonadIO m, MonadCatch m, MonadThrow m, MonadLogger m, MonadBaseControl IO m)
+    => EnvOverride -> BaseConfigOpts -> [LocalPackage] -> m ()
+generateLocalHaddockIndex envOverride bco locals = do
+    let packageIDs =
+            map
+                (\LocalPackage{lpPackage = Package{..}} ->
+                      PackageIdentifier packageName packageVersion)
+                locals
+    generateHaddockIndex
+        "local packages"
         envOverride
-        "haddock"
-        (["--gen-contents", "--gen-index"] ++ concat interfaceArgs)
-  where
-    docDir = bcoLocalInstallRoot bco </> docdirSuffix
-    toInterfaceOpt pid@(PackageIdentifier name _) = do
-        interfaceRelFile <- parseRelFile (packageIdentifierString pid FP.</>
-                                          packageNameString name FP.<.>
-                                          "haddock")
-        interfaceExists <- fileExists (docDir </> interfaceRelFile)
-        return $ if interfaceExists
-            then [ "-i"
-                 , concat
-                     [ packageIdentifierString pid
-                     , ","
-                     , toFilePath interfaceRelFile ] ]
-            else []
+        packageIDs
+        "."
+        (localDocDir bco)
 
+-- | Generate Haddock index and contents for local packages and their dependencies.
+generateDepsHaddockIndex
+    :: (MonadIO m, MonadCatch m, MonadThrow m, MonadLogger m, MonadBaseControl IO m)
+    => EnvOverride -> BaseConfigOpts -> [LocalPackage] -> m ()
+generateDepsHaddockIndex envOverride bco locals = do
+    depSets <-
+        mapM
+            (\LocalPackage{lpPackage = Package{..}} ->
+                  findTransitiveGhcPkgDepends
+                      envOverride
+                      [bcoSnapDB bco, bcoLocalDB bco]
+                      (PackageIdentifier packageName packageVersion))
+            locals
+    generateHaddockIndex
+        "local packages and dependencies"
+        envOverride
+        (Set.toList (Set.unions depSets))
+        ".."
+        (localDocDir bco </> $(mkRelDir "all"))
+
+-- | Generate Haddock index and contents for all snapshot packages.
+generateSnapHaddockIndex
+    :: (MonadIO m, MonadCatch m, MonadThrow m, MonadLogger m, MonadBaseControl IO m)
+    => EnvOverride -> BaseConfigOpts -> Path Abs Dir -> m ()
+generateSnapHaddockIndex envOverride bco globalDB = do
+    pkgIds <- listGhcPkgDbs envOverride [globalDB, bcoSnapDB bco]
+    generateHaddockIndex
+        "snapshot packages"
+        envOverride
+        pkgIds
+        "."
+        (snapDocDir bco)
+
+-- | Generate Haddock index and contents for specified packages.
+generateHaddockIndex
+    :: (MonadIO m, MonadCatch m, MonadThrow m, MonadLogger m, MonadBaseControl IO m)
+    => Text
+    -> EnvOverride
+    -> [PackageIdentifier]
+    -> FilePath
+    -> Path Abs Dir
+    -> m ()
+generateHaddockIndex descr envOverride packageIDs docRelDir destDir = do
+    createTree destDir
+    interfaceOpts <- liftIO $ fmap catMaybes (mapM toInterfaceOpt packageIDs)
+    case maximumMay (map snd interfaceOpts) of
+        Nothing -> return ()
+        Just maxInterfaceModTime -> do
+            eindexModTime <-
+                liftIO $
+                tryJust (guard . isDoesNotExistError) $
+                getModificationTime (toFilePath (haddockIndexFile destDir))
+            let needUpdate =
+                    case eindexModTime of
+                        Left _ -> True
+                        Right indexModTime ->
+                            indexModTime < maxInterfaceModTime
+            when
+                needUpdate $
+                do $logInfo
+                       ("Updating Haddock index for " <> descr <> " in\n" <>
+                        T.pack (toFilePath (haddockIndexFile destDir)))
+                   readProcessNull
+                       (Just destDir)
+                       envOverride
+                       "haddock"
+                       (["--gen-contents", "--gen-index"] ++ concatMap fst interfaceOpts)
+  where
+    toInterfaceOpt pid@(PackageIdentifier name _) = do
+        let interfaceRelFile =
+                docRelDir FP.</> packageIdentifierString pid FP.</>
+                packageNameString name FP.<.>
+                "haddock"
+            interfaceAbsFile = toFilePath destDir FP.</> interfaceRelFile
+        einterfaceModTime <-
+            tryJust (guard . isDoesNotExistError) $
+            getModificationTime interfaceAbsFile
+        return $
+            case einterfaceModTime of
+                Left _ -> Nothing
+                Right interfaceModTime ->
+                    Just
+                        ( [ "-i"
+                          , concat
+                                [ docRelDir FP.</> packageIdentifierString pid
+                                , ","
+                                , interfaceRelFile]]
+                        , interfaceModTime)
+
+-- | Path of haddock index file.
 haddockIndexFile :: Path Abs Dir -> Path Abs File
-haddockIndexFile docDir = docDir </> $(mkRelFile "index.html")
+haddockIndexFile destDir = destDir </> $(mkRelFile "index.html")
+
+-- | Path of local packages documentation directory.
+localDocDir :: BaseConfigOpts -> Path Abs Dir
+localDocDir bco = bcoLocalInstallRoot bco </> docDirSuffix
+
+-- | Path of snapshot packages documentation directory.
+snapDocDir :: BaseConfigOpts -> Path Abs Dir
+snapDocDir bco = bcoSnapInstallRoot bco </> docDirSuffix

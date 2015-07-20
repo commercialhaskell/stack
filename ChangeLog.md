@@ -14,6 +14,7 @@
 * Give warnings on unexpected config keys [#48](https://github.com/commercialhaskell/stack/issues/48)
 * Remove Docker `pass-host` option
 * Don't require cabal-install to upload [#313](https://github.com/commercialhaskell/stack/issues/313)
+* Generate indexes for all deps and all installed snapshot packages [#143](https://github.com/fpco/commercialhaskell/issues/143)
 
 Bug fixes:
 

@@ -16,7 +16,9 @@ module Stack.GhcPkg
   ,unregisterGhcPkgId
   ,getCabalPkgVer
   ,findGhcPkgHaddockHtml
-  ,findGhcPkgDepends)
+  ,findGhcPkgDepends
+  ,findTransitiveGhcPkgDepends
+  ,listGhcPkgDbs)
   where
 
 import           Control.Monad
@@ -28,6 +30,8 @@ import qualified Data.ByteString.Char8 as S8
 import           Data.Either
 import           Data.List
 import           Data.Maybe
+import           Data.Set (Set)
+import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -145,6 +149,27 @@ findGhcPkgHaddockHtml menv pkgDbs pkgId = do
             return (parseAbsDir path')
         _ -> return Nothing
 
+-- | Finds dependencies of package, and all their dependencies, etc.
+findTransitiveGhcPkgDepends
+    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+    => EnvOverride
+    -> [Path Abs Dir] -- ^ package databases
+    -> PackageIdentifier
+    -> m (Set PackageIdentifier)
+findTransitiveGhcPkgDepends menv pkgDbs pkgId0 =
+    go pkgId0 Set.empty
+  where
+    go pkgId res = do
+        deps <- findGhcPkgDepends menv pkgDbs pkgId
+        loop (map ghcPkgIdPackageIdentifier deps) res
+    loop [] res = return res
+    loop (dep:deps) res = do
+        if Set.member dep res
+            then loop deps res
+            else do
+                res' <- go dep (Set.insert dep res)
+                loop deps (Set.union res res')
+
 -- | Get the dependencies of the package.
 findGhcPkgDepends :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
                   => EnvOverride
@@ -182,3 +207,17 @@ getCabalPkgVer menv =
         maybe
             (throwM $ Couldn'tFindPkgId cabalPackageName)
             (return . packageIdentifierVersion . ghcPkgIdPackageIdentifier)
+
+listGhcPkgDbs
+    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+    => EnvOverride -> [Path Abs Dir] -> m [PackageIdentifier]
+listGhcPkgDbs menv pkgDbs = do
+    result <-
+        ghcPkg
+            menv
+            pkgDbs
+            ["list", "--simple-output"]
+    return $
+        case result of
+            Left{} -> []
+            Right lbs -> mapMaybe parsePackageIdentifier (S8.words lbs)
