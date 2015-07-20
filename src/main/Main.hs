@@ -13,7 +13,7 @@ import           Control.Exception
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (ask)
+import           Control.Monad.Reader (ask, asks)
 import           Data.Attoparsec.Args (withInterpreterArgs)
 import           Data.List
 import qualified Data.List as List
@@ -49,6 +49,7 @@ import           Stack.New
 import           Stack.Options
 import qualified Stack.PackageIndex
 import           Stack.Repl
+import           Stack.SDist (getSDistTarball)
 import           Stack.Setup
 import           Stack.Solver (solveExtraDeps)
 import           Stack.Types
@@ -56,7 +57,7 @@ import           Stack.Types.Internal
 import           Stack.Types.StackT
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
-import           System.Directory (canonicalizePath)
+import           System.Directory (canonicalizePath, doesFileExist, doesDirectoryExist)
 import           System.Environment (getArgs, getProgName)
 import           System.Exit
 import           System.FilePath (dropTrailingPathSeparator)
@@ -541,18 +542,36 @@ upgradeCmd fromGit go = withConfig go $
 
 -- | Upload to Hackage
 uploadCmd :: [String] -> GlobalOpts -> IO ()
+uploadCmd [] _ = error "To upload the current project, please run 'stack upload .'"
 uploadCmd args go = do
-    (manager,lc) <- loadConfigWithOpts go
-    let config = lcConfig lc
-    if null args
-        then error "To upload the current project, please run 'stack upload .'"
-        else liftIO $ do
-            uploader <- Upload.mkUploader
-                  config
-                $ Upload.setGetManager (return manager)
-                  Upload.defaultUploadSettings
-            mapM_ (Upload.upload uploader) args
-
+    let partitionM _ [] = return ([], [])
+        partitionM f (x:xs) = do
+            r <- f x
+            (as, bs) <- partitionM f xs
+            return $ if r then (x:as, bs) else (as, x:bs)
+    (files, nonFiles) <- partitionM doesFileExist args
+    (dirs, invalid) <- partitionM doesDirectoryExist nonFiles
+    when (not (null invalid)) $ error $
+        "'stack upload expects a list sdist tarballs or cabal directories.  Can't find " ++
+        show invalid
+    let getUploader :: (HasStackRoot config, HasPlatform config, HasConfig config) => StackT config IO Upload.Uploader
+        getUploader = do
+            config <- asks getConfig
+            manager <- asks envManager
+            let uploadSettings =
+                    Upload.setGetManager (return manager) $
+                    Upload.defaultUploadSettings
+            liftIO $ Upload.mkUploader config uploadSettings
+    if null dirs
+        then withConfig go $ do
+            uploader <- getUploader
+            liftIO $ forM_ files (Upload.upload uploader)
+        else withBuildConfig go ExecStrategy $ do
+            uploader <- getUploader
+            liftIO $ forM_ files (Upload.upload uploader)
+            forM_ dirs $ \dir -> do
+                (tarName, tarBytes) <- getSDistTarball dir
+                liftIO $ Upload.uploadBytes uploader tarName tarBytes
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()

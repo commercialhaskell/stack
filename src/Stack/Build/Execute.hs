@@ -9,7 +9,11 @@ module Stack.Build.Execute
     ( printPlan
     , preFetch
     , executePlan
-    -- TESTING
+    -- * Running Setup.hs
+    , ExecuteEnv
+    , withExecuteEnv
+    , withSingleContext
+    -- * Testing
     , compareTestsComponents
     ) where
 
@@ -194,16 +198,15 @@ data ExecuteEnv = ExecuteEnv
     , eeGlobalDB       :: !(Path Abs Dir)
     }
 
--- | Perform the actual plan
-executePlan :: M env m
-            => EnvOverride
-            -> BuildOpts
-            -> BaseConfigOpts
-            -> [LocalPackage]
-            -> SourceMap
-            -> Plan
-            -> m ()
-executePlan menv bopts baseConfigOpts locals sourceMap plan = do
+withExecuteEnv :: M env m
+               => EnvOverride
+               -> BuildOpts
+               -> BaseConfigOpts
+               -> [LocalPackage]
+               -> SourceMap
+               -> (ExecuteEnv -> m a)
+               -> m a
+withExecuteEnv menv bopts baseConfigOpts locals sourceMap inner = do
     withSystemTempDirectory stackProgName $ \tmpdir -> do
         tmpdir' <- parseAbsDir tmpdir
         configLock <- newMVar ()
@@ -213,7 +216,7 @@ executePlan menv bopts baseConfigOpts locals sourceMap plan = do
         liftIO $ writeFile (toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
         cabalPkgVer <- asks (envConfigCabalVersion . getEnvConfig)
         globalDB <- getGlobalDB menv
-        executePlan' plan ExecuteEnv
+        inner ExecuteEnv
             { eeEnvOverride = menv
             , eeBuildOpts = bopts
              -- Uncertain as to why we cannot run configures in parallel. This appears
@@ -233,6 +236,18 @@ executePlan menv bopts baseConfigOpts locals sourceMap plan = do
             , eeSourceMap = sourceMap
             , eeGlobalDB = globalDB
             }
+
+-- | Perform the actual plan
+executePlan :: M env m
+            => EnvOverride
+            -> BuildOpts
+            -> BaseConfigOpts
+            -> [LocalPackage]
+            -> SourceMap
+            -> Plan
+            -> m ()
+executePlan menv bopts baseConfigOpts locals sourceMap plan = do
+    withExecuteEnv menv bopts baseConfigOpts locals sourceMap (executePlan' plan)
 
     unless (Map.null $ planInstallExes plan) $ do
         snapBin <- (</> bindirSuffix) `liftM` installationRootDeps

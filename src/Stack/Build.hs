@@ -15,7 +15,8 @@
 module Stack.Build
   (build
   ,clean
-  ,withLoadPackage)
+  ,withLoadPackage
+  ,mkBaseConfigOpts)
   where
 
 import           Control.Monad

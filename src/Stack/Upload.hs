@@ -7,6 +7,7 @@ module Stack.Upload
       mkUploader
     , Uploader
     , upload
+    , uploadBytes
     , UploadSettings
     , defaultUploadSettings
     , setUploadUrl
@@ -44,6 +45,7 @@ import qualified Data.Text.IO                          as TIO
 import           Data.Typeable                         (Typeable)
 import           Network.HTTP.Client                   (BodyReader, Manager,
                                                         Response,
+                                                        RequestBody(RequestBodyLBS),
                                                         applyBasicAuth, brRead,
                                                         checkStatus, newManager,
                                                         parseUrl,
@@ -51,26 +53,16 @@ import           Network.HTTP.Client                   (BodyReader, Manager,
                                                         responseBody,
                                                         responseStatus,
                                                         withResponse)
-import           Network.HTTP.Client.MultipartFormData (formDataBody, partFile)
+import           Network.HTTP.Client.MultipartFormData (formDataBody, partFileRequestBody)
 import           Network.HTTP.Client.TLS               (tlsManagerSettings)
 import           Network.HTTP.Types                    (statusCode)
 import           Path                                  (toFilePath)
 import           Stack.Types
 import           System.Directory                      (createDirectoryIfMissing,
-                                                        doesDirectoryExist,
-                                                        doesFileExist,
-                                                        getDirectoryContents,
                                                         removeFile)
-import           System.Exit                           (ExitCode (ExitSuccess))
-import           System.FilePath                       (takeExtension, (</>))
-import           System.IO                             (hClose, hFlush,
-                                                        hGetEcho, hSetEcho,
+import           System.FilePath                       ((</>))
+import           System.IO                             (hFlush, hGetEcho, hSetEcho,
                                                         stdin, stdout)
-import           System.IO.Temp                        (withSystemTempDirectory)
-import           System.Process                        (StdStream (CreatePipe),
-                                                        createProcess, cwd,
-                                                        proc, std_in,
-                                                        waitForProcess)
 
 -- | Username and password to log into Hackage.
 --
@@ -202,14 +194,14 @@ mkUploader config us = do
             , checkStatus = \_ _ _ -> Nothing
             }
     return Uploader
-        { upload_ = \fp0 -> withTarball fp0 $ \fp -> do
-            let formData = [partFile "package" fp]
+        { upload_ = \tarName bytes -> do
+            let formData = [partFileRequestBody "package" tarName (RequestBodyLBS bytes)]
             req2 <- formDataBody formData req1
             let req3 = applyBasicAuth
                     (encodeUtf8 $ hcUsername creds)
                     (encodeUtf8 $ hcPassword creds)
                     req2
-            putStr $ "Uploading " ++ fp ++ "... "
+            putStr $ "Uploading " ++ tarName ++ "... "
             hFlush stdout
             withResponse req3 manager $ \res ->
                 case statusCode $ responseStatus res of
@@ -232,38 +224,8 @@ mkUploader config us = do
                     code -> do
                         putStrLn $ "unhandled status code: " ++ show code
                         printBody res
-                        error $ "Upload failed on " ++ fp
+                        error $ "Upload failed on " ++ tarName
         }
-
--- | Given either a file, return it. Given a directory, run @cabal sdist@ and
--- get the resulting tarball.
-withTarball :: FilePath -> (FilePath -> IO a) -> IO a
-withTarball fp0 inner = do
-    isFile <- doesFileExist fp0
-    if isFile then inner fp0 else withSystemTempDirectory "stackage-upload-tarball" $ \dir -> do
-        isDir <- doesDirectoryExist fp0
-        when (not isDir) $ error $ "Invalid argument: " ++ fp0
-
-        (Just h, Nothing, Nothing, ph) <-
-        -- The insanity: the Cabal library seems to sometimes generate tarballs
-        -- in the wrong format. For now, just falling back to cabal-install.
-        -- Sigh.
-
-            createProcess $ (proc "cabal"
-                    [ "sdist"
-                    , "--builddir=" ++ dir
-                    ])
-                { cwd = Just fp0
-                , std_in = CreatePipe
-                }
-        hClose h
-        ec <- waitForProcess ph
-        when (ec /= ExitSuccess) $
-            error $ "Could not create tarball for " ++ fp0
-        contents <- getDirectoryContents dir
-        case filter ((== ".gz") . takeExtension) contents of
-            [x] -> inner (dir </> x)
-            _ -> error $ "Unexpected directory contents after cabal sdist: " ++ show contents
 
 printBody :: Response BodyReader -> IO ()
 printBody res =
@@ -281,14 +243,21 @@ printBody res =
 --
 -- Since 0.1.0.0
 data Uploader = Uploader
-    { upload_ :: !(FilePath -> IO ())
+    { upload_ :: !(String -> L.ByteString -> IO ())
     }
 
 -- | Upload a single tarball with the given @Uploader@.
 --
 -- Since 0.1.0.0
 upload :: Uploader -> FilePath -> IO ()
-upload = upload_
+upload uploader fp = upload_ uploader fp =<< L.readFile fp
+
+-- | Upload a single tarball with the given @Uploader@.  Instead of
+-- sending a file like 'upload', this sends a lazy bytestring.
+--
+-- Since 0.1.2.1
+uploadBytes :: Uploader -> String -> L.ByteString -> IO ()
+uploadBytes = upload_
 
 -- | Settings for creating an @Uploader@.
 --

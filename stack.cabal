@@ -54,6 +54,7 @@ library
                      Stack.Repl
                      Stack.Ide
                      Stack.Image
+                     Stack.SDist
                      Stack.Setup
                      Stack.Solver
                      Stack.Types
