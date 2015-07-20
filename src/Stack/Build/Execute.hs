@@ -14,8 +14,8 @@ module Stack.Build.Execute
     ) where
 
 import           Control.Applicative            ((<$>), (<*>))
-import           Control.Concurrent.Lifted (fork)
 import           Control.Concurrent.Execute
+import           Control.Concurrent.Lifted      (fork)
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
 import           Control.Exception.Enclosed     (tryIO)
