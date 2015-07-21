@@ -432,7 +432,7 @@ fetchPackages' mdistDir toFetchAll = do
                 { drRequest = req
                 , drHashChecks = map toHashCheck $ maybeToList (tfSHA512 toFetch)
                 , drLengthCheck = fmap fromIntegral $ tfSize toFetch
-                , drRetries = drRetriesDefault
+                , drRetryPolicy = drRetryPolicyDefault
                 }
         let progressSink _ = do
                 liftIO $ runInBase $ $logInfo $ packageIdentifierText ident <> ": download"

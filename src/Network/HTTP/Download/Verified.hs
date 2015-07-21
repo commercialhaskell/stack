@@ -9,7 +9,7 @@
 module Network.HTTP.Download.Verified
   ( verifiedDownload
   , DownloadRequest(..)
-  , drRetriesDefault
+  , drRetryPolicyDefault
   , HashCheck(..)
   , CheckHexDigest(..)
   , LengthCheck
@@ -28,6 +28,7 @@ import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Monad.Reader
+import Control.Retry (recovering,limitRetries,RetryPolicy,constantDelay)
 import Control.Applicative
 import Crypto.Hash
 import Crypto.Hash.Conduit (sinkHash)
@@ -52,13 +53,13 @@ data DownloadRequest = DownloadRequest
     { drRequest :: Request
     , drHashChecks :: [HashCheck]
     , drLengthCheck :: Maybe LengthCheck
-    , drRetries :: Int
+    , drRetryPolicy :: RetryPolicy
     }
-  deriving Show
 
--- | Default to retrying thrice.
-drRetriesDefault :: Int
-drRetriesDefault = 3
+-- | Default to retrying thrice with a short constant delay.
+drRetryPolicyDefault :: RetryPolicy
+drRetryPolicyDefault = limitRetries 3 <> constantDelay onehundredMilliseconds
+  where onehundredMilliseconds = 100000
 
 data HashCheck = forall a. (Show a, HashAlgorithm a) => HashCheck
   { hashCheckAlgorithm :: a
@@ -91,8 +92,6 @@ data VerifiedDownloadException
           String -- algorithm
           CheckHexDigest -- expected
           String -- actual (shown)
-    | ZeroTries
-          Request
   deriving (Typeable)
 instance Show VerifiedDownloadException where
     show (WrongContentLength req expected actual) =
@@ -109,10 +108,6 @@ instance Show VerifiedDownloadException where
         "Download expectation failure: content hash (" ++ algo ++  ")\n"
         ++ "Expected: " ++ displayCheckHexDigest expected ++ "\n"
         ++ "Actual:   " ++ actual ++ "\n"
-        ++ "For: " ++ show (getUri req)
-    show (ZeroTries req) =
-        "Download expectation failure:\n"
-        ++ "Download was needed but <= 0 retries were requested.\n"
         ++ "For: " ++ show (getUri req)
 
 instance Exception VerifiedDownloadException
@@ -181,24 +176,6 @@ sinkHashUsing _ = sinkHash
 hashChecksToZipSink :: MonadThrow m => Request -> [HashCheck] -> ZipSink ByteString m ()
 hashChecksToZipSink req = traverse_ (ZipSink . sinkCheckHash req)
 
--- TODO(DanBurton): use Control.Retry instead.
--- Type inference drives the decision of which exceptions merit a retry.
-retry :: (MonadCatch m, Exception e)
-  => Int -- ^ The number of times to retry
-  -> m a -- ^ Action to retry
-  -> m (Either [e] a)
-retry n0 action =
-    go n0 []
-  where
-    go n es
-      | n <= 0 = return (Left es)
-      | otherwise = do
-          eRes <- try action
-          case eRes of
-            Left e -> go (n - 1) (e : es)
-            Right a -> return (Right a)
-
-
 -- | Copied and extended version of Network.HTTP.Download.download.
 --
 -- Has the following additional features:
@@ -223,15 +200,14 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
     liftIO $ whenM' getShouldDownload $ do
         createDirectoryIfMissing True dir
         withBinaryFile fptmp WriteMode $ \h -> do
-            eRes <- retry drRetries $
+            recovering drRetryPolicy [const $ Handler alwaysRetryHttp] $
                 flip runReaderT env $
                     withResponse req (go h)
-            case (eRes :: Either [HttpException] ()) of
-                Left [] -> throwM $ ZeroTries req
-                Left (e:_) -> throwM e -- just re-throw the latest HttpException
-                Right () -> return ()
         renameFile fptmp fp
   where
+    alwaysRetryHttp :: Monad m => HttpException -> m Bool
+    alwaysRetryHttp _ = return True
+
     whenM' mp m = do
         p <- mp
         if p then m >> return True else return False

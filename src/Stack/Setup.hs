@@ -49,7 +49,7 @@ import qualified Data.Yaml as Yaml
 import           Distribution.System (OS (..), Arch (..), Platform (..))
 import           Distribution.Text (simpleParse)
 import           Network.HTTP.Client.Conduit
-import           Network.HTTP.Download (verifiedDownload, DownloadRequest(..), drRetriesDefault)
+import           Network.HTTP.Download (verifiedDownload, DownloadRequest(..), drRetryPolicyDefault)
 import           Path
 import           Path.IO
 import           Prelude -- Fix AMP warning
@@ -720,7 +720,7 @@ chattyDownload label url path = do
             { drRequest = req
             , drHashChecks = []
             , drLengthCheck = Nothing
-            , drRetries = drRetriesDefault
+            , drRetryPolicy = drRetryPolicyDefault
             }
     runInBase <- liftBaseWith $ \run -> return (void . run)
     x <- verifiedDownload dReq path (chattyDownloadProgress runInBase)
