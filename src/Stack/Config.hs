@@ -279,7 +279,7 @@ loadBuildConfig menv mproject config stackRoot mresolver noConfigStrat = do
                 return $ mbpGhcVersion mbp
             ResolverGhc m -> return $ fromMajorVersion m
             ResolverCustom _name url -> do
-                mbp <- runReaderT (parseCustomMiniBuildPlan url) miniConfig
+                mbp <- runReaderT (parseCustomMiniBuildPlan stackYamlFP url) miniConfig
                 return $ mbpGhcVersion mbp
 
     let root = parent stackYamlFP

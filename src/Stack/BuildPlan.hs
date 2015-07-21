@@ -82,6 +82,7 @@ import           Stack.PackageIndex
 import           Stack.Types
 import           Stack.Types.StackT
 import           System.Directory (canonicalizePath)
+import qualified System.FilePath as FP
 
 data BuildPlanException
     = UnknownPackages
@@ -681,8 +682,9 @@ shadowMiniBuildPlan (MiniBuildPlan ghc pkgs0) shadowed =
                 Nothing -> assert False Right
 
 parseCustomMiniBuildPlan :: (MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m)
-                         => T.Text -> m MiniBuildPlan
-parseCustomMiniBuildPlan url0 = do
+                         => Path Abs File -- ^ stack.yaml file location
+                         -> T.Text -> m MiniBuildPlan
+parseCustomMiniBuildPlan stackYamlFP url0 = do
     yamlFP <- getYamlFP url0
 
     yamlBS <- liftIO $ S.readFile $ toFilePath yamlFP
@@ -721,8 +723,8 @@ parseCustomMiniBuildPlan url0 = do
         return cacheFP
 
     getYamlFPFromFile url = do
-        fp <- liftIO $ canonicalizePath $ T.unpack $ fromMaybe url $
-            T.stripPrefix "file://" url <|> T.stripPrefix "file:" url
+        fp <- liftIO $ canonicalizePath $ toFilePath (parent stackYamlFP) FP.</> T.unpack (fromMaybe url $
+            T.stripPrefix "file://" url <|> T.stripPrefix "file:" url)
         parseAbsFile fp
 
 data CustomSnapshot = CustomSnapshot

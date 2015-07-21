@@ -89,7 +89,9 @@ loadSourceMap bopts = do
             { mbpGhcVersion = fromMajorVersion ghc
             , mbpPackages = Map.empty
             }
-        ResolverCustom _ url -> parseCustomMiniBuildPlan url
+        ResolverCustom _ url -> do
+            stackYamlFP <- asks $ bcStackYaml . getBuildConfig
+            parseCustomMiniBuildPlan stackYamlFP url
 
     menv <- getMinimalEnvOverride
     caches <- getPackageCaches menv

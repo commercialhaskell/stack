@@ -147,7 +147,9 @@ solveExtraDeps modStackYaml = do
         case bcResolver bconfig of
             ResolverSnapshot snapName -> liftM mbpPackages $ loadMiniBuildPlan snapName
             ResolverGhc _ -> return Map.empty
-            ResolverCustom _ url -> liftM mbpPackages $ parseCustomMiniBuildPlan url
+            ResolverCustom _ url -> liftM mbpPackages $ parseCustomMiniBuildPlan
+                (bcStackYaml bconfig)
+                url
 
     let packages = Map.union
             (bcExtraDeps bconfig)
