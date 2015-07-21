@@ -71,7 +71,7 @@ buildOptsParser cmd defCopyBins =
           fmap (map T.pack)
                 (many (strArgument
                          (metavar "TARGET" <>
-                          help "If none specified, use all packages defined in current directory")))
+                          help "If none specified, use all packages")))
         libProfiling =
           boolFlags False
                     "library-profiling"
