@@ -194,10 +194,19 @@ data ExecOptsExtra
 data GlobalOpts = GlobalOpts
     { globalLogLevel     :: LogLevel -- ^ Log level
     , globalConfigMonoid :: ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
-    , globalResolver     :: Maybe Resolver -- ^ Resolver override
+    , globalResolver     :: Maybe AbstractResolver -- ^ Resolver override
     , globalTerminal     :: Bool -- ^ We're in a terminal?
     , globalStackYaml    :: Maybe FilePath -- ^ Override project stack.yaml
     } deriving (Show)
+
+-- | Either an actual resolver value, or an abstract description of one (e.g.,
+-- latest nightly).
+data AbstractResolver
+    = ARLatestNightly
+    | ARLatestLTS
+    | ARLatestLTSMajor !Int
+    | ARResolver !Resolver
+    deriving Show
 
 -- | Default logging level should be something useful but not crazy.
 defaultLogLevel :: LogLevel
@@ -251,7 +260,7 @@ instance HasEnvConfig EnvConfig where
 data LoadConfig m = LoadConfig
     { lcConfig          :: !Config
       -- ^ Top-level Stack configuration.
-    , lcLoadBuildConfig :: !(Maybe Resolver -> NoBuildConfigStrategy -> m BuildConfig)
+    , lcLoadBuildConfig :: !(Maybe AbstractResolver -> NoBuildConfigStrategy -> m BuildConfig)
         -- ^ Action to load the remaining 'BuildConfig'.
     , lcProjectRoot     :: !(Maybe (Path Abs Dir))
         -- ^ The project root directory, if in a project.

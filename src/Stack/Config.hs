@@ -34,7 +34,7 @@ import           Control.Monad
 import           Control.Monad.Catch (Handler(..), MonadCatch, MonadThrow, catches, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
-import           Control.Monad.Reader (MonadReader, ask, runReaderT)
+import           Control.Monad.Reader (MonadReader, ask, asks, runReaderT)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson.Extended
@@ -221,7 +221,7 @@ loadBuildConfig :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, H
                 -> Maybe (Project, Path Abs File, ConfigMonoid)
                 -> Config
                 -> Path Abs Dir
-                -> Maybe Resolver -- override resolver
+                -> Maybe AbstractResolver -- override resolver
                 -> NoBuildConfigStrategy
                 -> m BuildConfig
 loadBuildConfig menv mproject config stackRoot mresolver noConfigStrat = do
@@ -251,8 +251,14 @@ loadBuildConfig menv mproject config stackRoot mresolver noConfigStrat = do
                            Nothing ->
                                $logInfo ("Using resolver: " <> resolverName (projectResolver project) <>
                                          " from global config file: " <> T.pack dest')
-                           Just resolver ->
-                               $logInfo ("Using resolver: " <> resolverName resolver <>
+                           Just aresolver -> do
+                               let name =
+                                        case aresolver of
+                                            ARResolver resolver -> resolverName resolver
+                                            ARLatestNightly -> "nightly"
+                                            ARLatestLTS -> "lts"
+                                            ARLatestLTSMajor x -> T.pack $ "lts-" ++ show x
+                               $logInfo ("Using resolver: " <> name <>
                                          " specified on command line")
                    return (project, dest)
                else do
@@ -268,9 +274,15 @@ loadBuildConfig menv mproject config stackRoot mresolver noConfigStrat = do
                            }
                    liftIO $ Yaml.encodeFile dest' p
                    return (p, dest)
-    let project = project'
-            { projectResolver = fromMaybe (projectResolver project') mresolver
-            }
+    resolver <-
+        case mresolver of
+            Nothing -> return $ projectResolver project'
+            Just aresolver -> do
+                manager <- asks getHttpManager
+                runReaderT
+                    (makeConcreteResolver aresolver)
+                    (MiniConfig manager config)
+    let project = project' { projectResolver = resolver }
 
     ghcVersion <-
         case projectResolver project of

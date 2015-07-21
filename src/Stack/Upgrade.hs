@@ -29,7 +29,7 @@ import           System.Process.Run
 
 upgrade :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, HasTerminal env, HasLogLevel env, MonadBaseControl IO m)
         => Bool -- ^ use Git?
-        -> Maybe Resolver
+        -> Maybe AbstractResolver
         -> m ()
 upgrade fromGit mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> do
     menv <- getMinimalEnvOverride

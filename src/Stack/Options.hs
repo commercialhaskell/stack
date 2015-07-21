@@ -13,7 +13,7 @@ module Stack.Options
     ,initOptsParser
     ,newOptsParser
     ,logLevelOptsParser
-    ,resolverOptsParser
+    ,abstractResolverOptsParser
     ,solverOptsParser
     ,testOptsParser
     ) where
@@ -27,6 +27,7 @@ import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Set as Set
 import qualified Data.Text as T
+import           Data.Text.Read (decimal)
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Simple
@@ -410,7 +411,7 @@ globalOptsParser :: Bool -> Parser GlobalOpts
 globalOptsParser defaultTerminal =
     GlobalOpts <$> logLevelOptsParser <*>
     configOptsParser False <*>
-    optional resolverOptsParser <*>
+    optional abstractResolverOptsParser <*>
     flag
         defaultTerminal
         False
@@ -452,7 +453,7 @@ initOptsParser =
              help "Prefer Nightly snapshots over LTS snapshots") <|>
         pure PrefNone
 
-    resolver = option readResolver
+    resolver = option readAbstractResolver
         (long "resolver" <>
          metavar "RESOLVER" <>
          help "Use the given resolver, even if not all dependencies are met")
@@ -485,19 +486,25 @@ logLevelOptsParser =
             _ -> LevelOther (T.pack s)
 
 -- | Parser for the resolver
-resolverOptsParser :: Parser Resolver
-resolverOptsParser =
-    option readResolver
+abstractResolverOptsParser :: Parser AbstractResolver
+abstractResolverOptsParser =
+    option readAbstractResolver
         (long "resolver" <>
          metavar "RESOLVER" <>
          help "Override resolver in project file")
 
-readResolver :: ReadM Resolver
-readResolver = do
+readAbstractResolver :: ReadM AbstractResolver
+readAbstractResolver = do
     s <- readerAsk
-    case parseResolverText $ T.pack s of
-        Left e -> readerError $ show e
-        Right x -> return x
+    case s of
+        "nightly" -> return $ ARLatestNightly
+        "lts" -> return $ ARLatestLTS
+        'l':'t':'s':'-':x | Right (x', "") <- decimal $ T.pack x ->
+            return $ ARLatestLTSMajor x'
+        _ ->
+            case parseResolverText $ T.pack s of
+                Left e -> readerError $ show e
+                Right x -> return $ ARResolver x
 
 -- | Parser for @solverCmd@
 solverOptsParser :: Parser Bool

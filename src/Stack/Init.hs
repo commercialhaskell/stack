@@ -8,12 +8,13 @@ module Stack.Init
     , InitOpts (..)
     , SnapPref (..)
     , Method (..)
+    , makeConcreteResolver
     ) where
 
 import           Control.Exception               (assert)
 import           Control.Exception.Enclosed      (handleIO, catchAny)
 import           Control.Monad                   (liftM, when)
-import           Control.Monad.Catch             (MonadMask, throwM)
+import           Control.Monad.Catch             (MonadMask, throwM, MonadThrow)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader            (MonadReader)
@@ -142,7 +143,8 @@ getDefaultResolver cabalfps gpds initOpts =
                 Just (snap, flags) ->
                     return (ResolverSnapshot snap, flags, Map.empty)
                 Nothing -> throwM $ NoMatchingSnapshot names
-        MethodResolver resolver -> do
+        MethodResolver aresolver -> do
+            resolver <- makeConcreteResolver aresolver
             mpair <-
                 case resolver of
                     ResolverSnapshot name -> findBuildPlan gpds [name]
@@ -206,7 +208,7 @@ data InitOpts = InitOpts
 data SnapPref = PrefNone | PrefLTS | PrefNightly
 
 -- | Method of initializing
-data Method = MethodSnapshot SnapPref | MethodResolver Resolver | MethodSolver
+data Method = MethodSnapshot SnapPref | MethodResolver AbstractResolver | MethodSolver
 
 -- | Same semantics as @nub@, but more efficient by using the @Ord@ constraint.
 nubOrd :: Ord a => [a] -> [a]
@@ -217,3 +219,26 @@ nubOrd =
     go s (x:xs)
         | x `Set.member` s = go s xs
         | otherwise = x : go (Set.insert x s) xs
+
+-- | Turn an 'AbstractResolver' into a 'Resolver'.
+makeConcreteResolver :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadLogger m)
+                     => AbstractResolver
+                     -> m Resolver
+makeConcreteResolver (ARResolver r) = return r
+makeConcreteResolver ar = do
+    snapshots <- getSnapshots
+    r <-
+        case ar of
+            ARResolver r -> assert False $ return r
+            ARLatestNightly -> return $ ResolverSnapshot $ Nightly $ snapshotsNightly snapshots
+            ARLatestLTSMajor x ->
+                case IntMap.lookup x $ snapshotsLts snapshots of
+                    Nothing -> error $ "No LTS release found with major version " ++ show x
+                    Just y -> return $ ResolverSnapshot $ LTS x y
+            ARLatestLTS
+                | IntMap.null $ snapshotsLts snapshots -> error $ "No LTS releases found"
+                | otherwise ->
+                    let (x, y) = IntMap.findMax $ snapshotsLts snapshots
+                     in return $ ResolverSnapshot $ LTS x y
+    $logInfo $ "Selected resolver: " <> resolverName r
+    return r
