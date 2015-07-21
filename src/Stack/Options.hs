@@ -13,6 +13,7 @@ module Stack.Options
     ,initOptsParser
     ,newOptsParser
     ,logLevelOptsParser
+    ,ghciOptsParser
     ,abstractResolverOptsParser
     ,solverOptsParser
     ,testOptsParser
@@ -32,9 +33,11 @@ import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Simple
 import           Options.Applicative.Types (readerAsk)
+import           Stack.Config (packagesParser)
 import           Stack.Docker
 import qualified Stack.Docker as Docker
 import           Stack.Dot
+import           Stack.Ghci (GhciOpts(..))
 import           Stack.Init
 import           Stack.New
 import           Stack.Types
@@ -369,6 +372,27 @@ dotOptsParser = DotOpts
 
         splitNames :: String -> [String]
         splitNames = map (takeWhile (not . isSpace) . dropWhile isSpace) . splitOn ","
+
+ghciOptsParser :: Parser GhciOpts
+ghciOptsParser = GhciOpts
+             <$> fmap (map T.pack)
+                   (many (strArgument
+                            (metavar "TARGET" <>
+                             help ("If none specified, " <>
+                                   "use all packages defined in current directory"))))
+             <*> argsOption (long "ghc-options" <>
+                    metavar "OPTION" <>
+                    help "Additional options passed to GHCi" <>
+                    value [])
+             <*> strOption (long "with-ghc" <>
+                            metavar "GHC" <>
+                            help "Use this command for the GHC to run" <>
+                            value "ghc" <>
+                            showDefault)
+             <*> flag False True (long "no-load" <>
+                   help "Don't load modules on start-up")
+             <*> packagesParser
+
 
 -- | Parser for exec command
 execOptsParser :: Maybe String -- ^ command
