@@ -243,7 +243,7 @@ ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfi
 ensureGHC sopts = do
     when (getMajorVersion expected < MajorVersion 7 8) $ do
         $logWarn "stack will almost certainly fail with GHC below version 7.8"
-        $logWarn "Valliantly attempting to run anyway, but I know this is doomed"
+        $logWarn "Valiantly attempting to run anyway, but I know this is doomed"
         $logWarn "For more information, see: https://github.com/commercialhaskell/stack/issues/648"
         $logWarn ""
 
