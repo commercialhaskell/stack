@@ -131,7 +131,8 @@ createDockerImage :: M e m => FilePath -> m ()
 createDockerImage dir = do
     config <- asks getConfig
     bconfig <- asks getBuildConfig
-    case maybe Nothing imgDockerBase (imgDocker (configImage config)) of
+    let dockerConfig = imgDocker (configImage config)
+    case imgDockerBase =<< dockerConfig of
         Nothing -> throwM StackImageDockerBaseUnspecifiedException
         Just base -> do
             dirPath <- parseAbsDir dir
@@ -143,7 +144,11 @@ createDockerImage dir = do
                         (unlines ["FROM " ++ base, "ADD ./ /"])
                     callProcess
                         "docker"
-                        ["build", "-t", imageName bconfig, dir])
+                        ["build"
+                        ,"-t"
+                        ,fromMaybe (imageName bconfig)
+                                   (imgDockerImageName =<< dockerConfig)
+                        ,dir])
 
 -- | Extend the general purpose docker image with entrypoints (if
 -- specified).
@@ -151,10 +156,12 @@ extendDockerImageWithEntrypoint :: M e m => FilePath -> m ()
 extendDockerImageWithEntrypoint dir = do
     config <- asks getConfig
     bconfig <- asks getBuildConfig
+    let dockerConfig = imgDocker (configImage config)
+    let dockerImageName = fromMaybe (imageName bconfig) (imgDockerImageName =<< dockerConfig)
     let imgEntrypoints = maybe
                 Nothing
                 imgDockerEntrypoints
-                (imgDocker (configImage config))
+                dockerConfig
     case imgEntrypoints of
         Nothing -> return ()
         Just eps -> do
@@ -168,7 +175,7 @@ extendDockerImageWithEntrypoint dir = do
                                        (dirPath </>
                                         $(mkRelFile "Dockerfile")))
                                   (unlines
-                                       [ "FROM " ++ imageName bconfig
+                                       [ "FROM " ++ dockerImageName
                                        , "ENTRYPOINT [\"/usr/local/bin/" ++
                                          ep ++ "\"]"
                                        , "CMD []"])
@@ -176,7 +183,7 @@ extendDockerImageWithEntrypoint dir = do
                                   "docker"
                                   [ "build"
                                   , "-t"
-                                  , imageName bconfig ++ "-" ++ ep
+                                  , dockerImageName ++ "-" ++ ep
                                   , dir]))
 
 -- | The command name for dealing with images.
@@ -208,6 +215,7 @@ imgDockerOptsParser = ImageDockerOptsMonoid <$>
               metavar "NAME" <>
               help "Docker base image name")) <*>
     pure Nothing <*>
+    pure Nothing <*>
     pure Nothing
 
 -- | Convert image opts monoid to image options.
@@ -222,6 +230,7 @@ imgDockerOptsFromMonoid ImageDockerOptsMonoid{..} = ImageDockerOpts
     { imgDockerBase = emptyToNothing imgDockerMonoidBase
     , imgDockerEntrypoints = emptyToNothing imgDockerMonoidEntrypoints
     , imgDockerAdd = fromMaybe Map.empty imgDockerMonoidAdd
+    , imgDockerImageName = emptyToNothing imgDockerMonoidImageName
     }
     where emptyToNothing Nothing = Nothing
           emptyToNothing (Just s)
