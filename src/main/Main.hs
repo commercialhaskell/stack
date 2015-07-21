@@ -193,23 +193,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
              addCommand "ghci"
                         "Run ghci in the context of project(s)"
                         ghciCmd
-                        ((,,,,) <$>
-                         fmap (map T.pack)
-                              (many (strArgument
-                                       (metavar "TARGET" <>
-                                        help "If none specified, use all packages defined in current directory"))) <*>
-                         argsOption (long "ghc-options" <>
-                                      metavar "OPTION" <>
-                                      help "Additional options passed to GHCi" <>
-                                      value []) <*>
-                         strOption (long "with-ghc" <>
-                                    metavar "GHC" <>
-                                    help "Use this command for the GHC to run" <>
-                                    value "ghc" <>
-                                    showDefault) <*>
-                         flag False True (long "no-load" <>
-                                         help "Don't load modules on start-up") <*>
-                         packagesParser)
+                        ghciOptsParser
              addCommand "runghc"
                         "Run runghc"
                         execCmd
@@ -741,16 +725,16 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                exec eoEnvSettings eoCmd eoArgs
 
 -- | Run GHCi in the context of a project.
-ghciCmd :: ([Text], [String], FilePath, Bool, [String]) -> GlobalOpts -> IO ()
-ghciCmd (targets,args,path,noload,packages) go@GlobalOpts{..} = do
+ghciCmd :: GhciOpts -> GlobalOpts -> IO ()
+ghciCmd ghciOpts go@GlobalOpts{..} =
   withBuildConfigAndLock go $ \lk -> do
-    let packageTargets = concatMap words packages
+    let packageTargets = concatMap words (ghciAdditionalPackages ghciOpts)
     unless (null packageTargets) $
        Stack.Build.build (const $ return ()) (Just lk) defaultBuildOpts
            { boptsTargets = map T.pack packageTargets
            }
     liftIO $ unlockFile lk -- Don't hold the lock while in the GHCI.
-    ghci targets args path noload
+    ghci ghciOpts
 
 -- | Run ide-backend in the context of a project.
 ideCmd :: ([Text], [String]) -> GlobalOpts -> IO ()
