@@ -60,7 +60,7 @@ import           Path                                  (toFilePath)
 import           Stack.Types
 import           System.Directory                      (createDirectoryIfMissing,
                                                         removeFile)
-import           System.FilePath                       ((</>))
+import           System.FilePath                       ((</>), takeFileName)
 import           System.IO                             (hFlush, hGetEcho, hSetEcho,
                                                         stdin, stdout)
 
@@ -250,7 +250,7 @@ data Uploader = Uploader
 --
 -- Since 0.1.0.0
 upload :: Uploader -> FilePath -> IO ()
-upload uploader fp = upload_ uploader fp =<< L.readFile fp
+upload uploader fp = upload_ uploader (takeFileName fp) =<< L.readFile fp
 
 -- | Upload a single tarball with the given @Uploader@.  Instead of
 -- sending a file like 'upload', this sends a lazy bytestring.
