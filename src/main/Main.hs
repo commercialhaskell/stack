@@ -15,8 +15,10 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask, asks)
 import           Data.Attoparsec.Args (withInterpreterArgs)
+import qualified Data.ByteString.Lazy as L
 import           Data.List
 import qualified Data.List as List
+import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Set as Set
@@ -165,6 +167,10 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                         "Upload a package to Hackage"
                         uploadCmd
                         (many $ strArgument $ metavar "TARBALL/DIR")
+             addCommand "sdist"
+                        "Create source distribution tarballs"
+                        sdistCmd
+                        (many $ strArgument $ metavar "DIR")
              addCommand "dot"
                         "Visualize your project's dependency graph using Graphviz dot"
                         dotCmd
@@ -573,6 +579,20 @@ uploadCmd args go = do
                 pkgDir <- parseAbsDir =<< liftIO (canonicalizePath dir)
                 (tarName, tarBytes) <- getSDistTarball pkgDir
                 liftIO $ Upload.uploadBytes uploader tarName tarBytes
+
+sdistCmd :: [String] -> GlobalOpts -> IO ()
+sdistCmd dirs go =
+    withBuildConfig go ExecStrategy $ do
+        -- If no directories are specified, build all sdist tarballs.
+        dirs' <- if null dirs
+            then asks (Map.keys . bcPackages . getBuildConfig)
+            else mapM (parseAbsDir <=< liftIO . canonicalizePath) dirs
+        forM_ dirs' $ \dir -> do
+            (tarName, tarBytes) <- getSDistTarball dir
+            distDir <- distDirFromDir dir
+            tarPath <- fmap (distDir </>) $ parseRelFile tarName
+            liftIO $ L.writeFile (toFilePath tarPath) tarBytes
+            $logInfo $ "Wrote sdist tarball to " <> T.pack (toFilePath tarPath)
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
