@@ -154,7 +154,9 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
                  localDir <- liftIO (getAppUserDataDirectory "local") >>= parseAbsDir
                  return $ localDir </> $(mkRelDir "bin")
              Just userPath ->
-                 (liftIO $ canonicalizePath userPath >>= parseAbsDir)
+                 liftIO $ do
+                    createDirectoryIfMissing True userPath
+                    canonicalizePath userPath >>= parseAbsDir
                  `catches`
                  [Handler (\(_ :: IOException) -> throwM $ NoSuchDirectory userPath)
                  ,Handler (\(_ :: PathParseException) -> throwM $ NoSuchDirectory userPath)
