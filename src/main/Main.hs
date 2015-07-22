@@ -94,7 +94,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                         (buildCmd DoNothing)
                         (buildOptsParser Build False)
              addCommand "install"
-                        "Copy binaries to the target prefix location, presently hardcoded to ~/.local/bin. This is the only command that will mutate your system outside of this project directory"
+                        "Copy binaries to the target prefix location. The default is ~/.local/bin; you can change it with `--local-bin-path`. This is the only command that will mutate your system outside of this project directory"
                         installCmd
                         (buildOptsParser Build True)
              addCommand "uninstall"
