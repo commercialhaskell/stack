@@ -746,7 +746,7 @@ singleTest topts ac ee task =
                 TTUpstream _ _ -> assert False $ return ()
             extraOpts <- extraBuildOptions
             cabal (console && configHideTHLoading config) $
-                "build" : (extraOpts ++ components)
+                "build" : (components ++ extraOpts)
             setTestBuilt pkgDir
 
         toRun <-
