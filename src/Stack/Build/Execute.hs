@@ -458,7 +458,6 @@ ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal cabalfp extra = do
     mOldCabalMod <- tryGetCabalMod pkgDir
     newCabalMod <- liftIO (fmap modTime (D.getModificationTime (toFilePath cabalfp)))
 
-    hpcIndexDir <- toFilePath . (</> dotHpc) <$> hpcRelativeDir
     idMap <- liftIO $ readTVarIO eeGhcPkgIds
     let getMissing ident =
             case Map.lookup ident idMap of
@@ -467,8 +466,7 @@ ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal cabalfp extra = do
                 Just (Executable _) -> Nothing
         missing' = Set.fromList $ mapMaybe getMissing $ Set.toList missing
         TaskConfigOpts missing mkOpts = taskConfigOpts
-        configOpts = mkOpts missing' ++ extra ++
-            ["--ghc-options", "-hpcdir " <> T.pack hpcIndexDir]
+        configOpts = mkOpts missing' ++ extra
         allDeps = Set.union missing' taskPresent
         newConfigCache = ConfigCache
             { configCacheOpts = map encodeUtf8 configOpts
@@ -664,10 +662,11 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
 
     announce "build"
     config <- asks getConfig
+    extraOpts <- extraBuildOptions
     cabal (console && configHideTHLoading config) $
-        case taskType of
+        (case taskType of
             TTLocal lp -> "build" : map T.unpack (Set.toList $ lpComponents lp)
-            TTUpstream _ _ -> ["build"]
+            TTUpstream _ _ -> ["build"]) ++ extraOpts
 
     let doHaddock = shouldHaddockPackage eeBuildOpts eeWanted (packageName package) &&
                     -- Works around haddock failing on bytestring-builder since it has no modules
@@ -745,8 +744,9 @@ singleTest topts ac ee task =
             case taskType task of
                 TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
                 TTUpstream _ _ -> assert False $ return ()
+            extraOpts <- extraBuildOptions
             cabal (console && configHideTHLoading config) $
-                "build" : components
+                "build" : (extraOpts ++ components)
             setTestBuilt pkgDir
 
         toRun <-
@@ -933,7 +933,8 @@ singleBench beopts ac ee task =
                 TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
                 TTUpstream _ _ -> assert False $ return ()
             config <- asks getConfig
-            cabal (console && configHideTHLoading config) ["build"]
+            extraOpts <- extraBuildOptions
+            cabal (console && configHideTHLoading config) ("build" : extraOpts)
             setBenchBuilt pkgDir
         let args = maybe []
                          ((:[]) . ("--benchmark-options=" <>))
@@ -1018,3 +1019,8 @@ getSetupHs dir = do
   where
     fp1 = dir </> $(mkRelFile "Setup.hs")
     fp2 = dir </> $(mkRelFile "Setup.lhs")
+
+extraBuildOptions :: M env m => m [String]
+extraBuildOptions = do
+    hpcIndexDir <- toFilePath . (</> dotHpc) <$> hpcRelativeDir
+    return ["--ghc-options", "-hpcdir " ++ hpcIndexDir]
