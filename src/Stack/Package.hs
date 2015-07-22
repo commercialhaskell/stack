@@ -125,6 +125,7 @@ data Package =
           ,packageOpts :: !GetPackageOpts                 -- ^ Args to pass to GHC.
           ,packageHasExposedModules :: !Bool              -- ^ Does the package have exposed modules?
           ,packageSimpleType :: !Bool                     -- ^ Does the package of build-type: Simple
+          ,packageDefinedFlags :: !(Set FlagName)         -- ^ All flags defined in the .cabal file
           }
  deriving (Show,Typeable)
 
@@ -259,6 +260,7 @@ resolvePackage packageConfig gpkg = Package
         generatePkgDescOpts locals cabalfp pkg
     , packageHasExposedModules = maybe False (not . null . exposedModules) (library pkg)
     , packageSimpleType = buildType (packageDescription gpkg) == Just Simple
+    , packageDefinedFlags = S.fromList $ map (fromCabalFlagName . flagName) $ genPackageFlags gpkg
     }
 
   where

@@ -1,0 +1,4 @@
+resolver: ghc-7.8
+flags:
+    does-not-exist:
+        foo: false

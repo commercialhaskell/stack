@@ -14,6 +14,7 @@ module Stack.Build.Source
     ) where
 
 import           Control.Applicative ((<|>), (<$>), (<*>))
+import           Control.Arrow ((&&&))
 import           Control.Exception (catch)
 import           Control.Monad
 import           Control.Monad.Catch (MonadCatch)
@@ -246,6 +247,34 @@ loadLocals bopts latestVersion = do
 
     let known = Set.fromList $ map (packageName . lpPackage) lps
         unknown = Set.difference (Map.keysSet names) known
+
+        -- Check if flags specified in stack.yaml and the command line are
+        -- used, see https://github.com/commercialhaskell/stack/issues/617
+        flags = map (, FSCommandLine) [(k, v) | (Just k, v) <- Map.toList $ boptsFlags bopts]
+             ++ map (, FSStackYaml) (Map.toList $ bcFlags bconfig)
+
+        localNameMap = Map.fromList $ map (packageName . lpPackage &&& lpPackage) lps
+        checkFlagUsed ((name, userFlags), source) =
+            case Map.lookup name localNameMap of
+                -- Package is not available locally
+                Nothing ->
+                    case Map.lookup name $ bcExtraDeps bconfig of
+                        -- Also not in extra-deps, it's an error
+                        Nothing -> Just $ UFNoPackage source name
+                        -- We don't check for flag presence for extra deps
+                        Just _ -> Nothing
+                -- Package exists locally, let's check if the flags are defined
+                Just pkg ->
+                    let unused = Set.difference (Map.keysSet userFlags) (packageDefinedFlags pkg)
+                     in if Set.null unused
+                            -- All flags are defined, nothing to do
+                            then Nothing
+                            -- Error about the undefined flags
+                            else Just $ UFFlagsNotDefined source name unused
+
+        unusedFlags = mapMaybe checkFlagUsed flags
+
+    unless (null unusedFlags) $ throwM $ InvalidFlagSpecification $ Set.fromList unusedFlags
 
     return (lps, unknown, idents)
   where

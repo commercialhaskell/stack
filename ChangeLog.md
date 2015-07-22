@@ -16,6 +16,7 @@
 * Don't require cabal-install to upload [#313](https://github.com/commercialhaskell/stack/issues/313)
 * Generate indexes for all deps and all installed snapshot packages [#143](https://github.com/fpco/commercialhaskell/issues/143)
 * Provide `--resolver global` option [#645](https://github.com/commercialhaskell/stack/issues/645)
+* Make `stack build --flag` error when flag or package is unknown [#617](https://github.com/commercialhaskell/stack/issues/617)
 
 Bug fixes:
 

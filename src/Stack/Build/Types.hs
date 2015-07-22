@@ -11,6 +11,8 @@
 
 module Stack.Build.Types
     (StackBuildException(..)
+    ,FlagSource(..)
+    ,UnusedFlags(..)
     ,InstallLocation(..)
     ,ModTime
     ,modTime
@@ -95,7 +97,15 @@ data StackBuildException
         Version -- local version
         Version -- version specified on command line
   | NoSetupHsFound (Path Abs Dir)
+  | InvalidFlagSpecification (Set UnusedFlags)
   deriving Typeable
+
+data FlagSource = FSCommandLine | FSStackYaml
+    deriving (Show, Eq, Ord)
+
+data UnusedFlags = UFNoPackage FlagSource PackageName
+                 | UFFlagsNotDefined FlagSource PackageName (Set FlagName)
+    deriving (Show, Eq, Ord)
 
 instance Show StackBuildException where
     show (Couldn'tFindPkgId name) =
@@ -224,6 +234,29 @@ instance Show StackBuildException where
         ]
     show (NoSetupHsFound dir) =
         "No Setup.hs or Setup.lhs file found in " ++ toFilePath dir
+    show (InvalidFlagSpecification unused) = unlines
+        $ "Invalid flag specification:"
+        : map go (Set.toList unused)
+      where
+        goS :: FlagSource -> String
+        goS FSCommandLine = " (specified on command line)"
+        goS FSStackYaml = " (specified in stack.yaml)"
+
+        go :: UnusedFlags -> String
+        go (UFNoPackage src name) = concat
+            [ "- Package '"
+            , packageNameString name
+            , "' not found"
+            , goS src
+            ]
+        go (UFFlagsNotDefined src name flags) = concat
+            [ "- Package '"
+            , packageNameString name
+            , "' does not define the following flags"
+            , goS src
+            , ": "
+            , intercalate ", " $ map flagNameString $ Set.toList flags
+            ]
 
 instance Exception StackBuildException
 
