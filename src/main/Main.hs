@@ -549,8 +549,7 @@ uploadCmd args go = do
             r <- f x
             (as, bs) <- partitionM f xs
             return $ if r then (x:as, bs) else (as, x:bs)
-    absPaths <- mapM canonicalizePath args
-    (files, nonFiles) <- partitionM doesFileExist absPaths
+    (files, nonFiles) <- partitionM doesFileExist args
     (dirs, invalid) <- partitionM doesDirectoryExist nonFiles
     when (not (null invalid)) $ error $
         "stack upload expects a list sdist tarballs or cabal directories.  Can't find " ++
@@ -566,12 +565,13 @@ uploadCmd args go = do
     if null dirs
         then withConfig go $ do
             uploader <- getUploader
-            liftIO $ forM_ files (Upload.upload uploader)
+            liftIO $ forM_ files (canonicalizePath >=> Upload.upload uploader)
         else withBuildConfig go ExecStrategy $ do
             uploader <- getUploader
-            liftIO $ forM_ files (Upload.upload uploader)
+            liftIO $ forM_ files (canonicalizePath >=> Upload.upload uploader)
             forM_ dirs $ \dir -> do
-                (tarName, tarBytes) <- getSDistTarball =<< parseAbsDir dir
+                pkgDir <- parseAbsDir =<< liftIO (canonicalizePath dir)
+                (tarName, tarBytes) <- getSDistTarball pkgDir
                 liftIO $ Upload.uploadBytes uploader tarName tarBytes
 
 -- | Execute a command.
