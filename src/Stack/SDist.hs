@@ -27,7 +27,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
-import           Path.IO
 import           Stack.Build (mkBaseConfigOpts)
 import           Stack.Build.Execute
 import           Stack.Build.Source (loadSourceMap, localFlags)
@@ -47,13 +46,13 @@ type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig en
 -- While this yields a 'FilePath', the name of the tarball, this
 -- tarball is not written to the disk and instead yielded as a lazy
 -- bytestring.
-getSDistTarball :: M env m => FilePath -> m (FilePath, L.ByteString)
+getSDistTarball :: M env m => Path Abs Dir -> m (FilePath, L.ByteString)
 getSDistTarball pkgDir = do
-    pkgDir' <- parseRelAsAbsDir pkgDir
-    lp <- readLocalPackage pkgDir'
-    $logInfo $ "Getting file list for " <> T.pack pkgDir
+    let pkgFp = toFilePath pkgDir
+    lp <- readLocalPackage pkgDir
+    $logInfo $ "Getting file list for " <> T.pack pkgFp
     fileList <-  getSDistFileList lp
-    $logInfo $ "Building sdist tarball for " <> T.pack pkgDir
+    $logInfo $ "Building sdist tarball for " <> T.pack pkgFp
     files <- normalizeTarballPaths (lines fileList)
     liftIO $ do
         -- NOTE: Could make this use lazy I/O to only read files as needed
@@ -61,7 +60,7 @@ getSDistTarball pkgDir = do
         -- However, it seems less error prone and more predictable to read
         -- everything in at once, so that's what we're doing for now:
         let packWith f isDir fp =
-               f (pkgDir FP.</> fp)
+               f (pkgFp FP.</> fp)
                  (either error id (Tar.toTarPath isDir (pkgId FP.</> fp)))
             tarName = pkgId FP.<.> "tar.gz"
             pkgId = packageIdentifierString (packageIdentifier (lpPackage lp))

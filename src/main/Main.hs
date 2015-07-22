@@ -23,7 +23,7 @@ import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
-import           Data.Traversable
+import           Data.Traversable (sequenceA)
 import           Network.HTTP.Client
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
@@ -549,7 +549,8 @@ uploadCmd args go = do
             r <- f x
             (as, bs) <- partitionM f xs
             return $ if r then (x:as, bs) else (as, x:bs)
-    (files, nonFiles) <- partitionM doesFileExist args
+    absPaths <- mapM canonicalizePath args
+    (files, nonFiles) <- partitionM doesFileExist absPaths
     (dirs, invalid) <- partitionM doesDirectoryExist nonFiles
     when (not (null invalid)) $ error $
         "'stack upload expects a list sdist tarballs or cabal directories.  Can't find " ++
@@ -570,7 +571,7 @@ uploadCmd args go = do
             uploader <- getUploader
             liftIO $ forM_ files (Upload.upload uploader)
             forM_ dirs $ \dir -> do
-                (tarName, tarBytes) <- getSDistTarball dir
+                (tarName, tarBytes) <- getSDistTarball =<< parseAbsDir dir
                 liftIO $ Upload.uploadBytes uploader tarName tarBytes
 
 -- | Execute a command.
