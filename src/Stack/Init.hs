@@ -17,7 +17,7 @@ import           Control.Monad                   (liftM, when)
 import           Control.Monad.Catch             (MonadMask, throwM, MonadThrow)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader            (MonadReader)
+import           Control.Monad.Reader            (MonadReader, asks)
 import           Control.Monad.Trans.Control     (MonadBaseControl)
 import qualified Data.IntMap                     as IntMap
 import           Data.List                       (sort)
@@ -230,6 +230,13 @@ makeConcreteResolver ar = do
     r <-
         case ar of
             ARResolver r -> assert False $ return r
+            ARGlobal -> do
+                stackRoot <- asks $ configStackRoot . getConfig
+                let fp = implicitGlobalDir stackRoot </> stackDotYaml
+                (ProjectAndConfigMonoid project _, _warnings) <-
+                    liftIO (Yaml.decodeFileEither $ toFilePath fp)
+                    >>= either throwM return
+                return $ projectResolver project
             ARLatestNightly -> return $ ResolverSnapshot $ Nightly $ snapshotsNightly snapshots
             ARLatestLTSMajor x ->
                 case IntMap.lookup x $ snapshotsLts snapshots of

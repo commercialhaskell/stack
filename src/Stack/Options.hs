@@ -497,8 +497,9 @@ readAbstractResolver :: ReadM AbstractResolver
 readAbstractResolver = do
     s <- readerAsk
     case s of
-        "nightly" -> return $ ARLatestNightly
-        "lts" -> return $ ARLatestLTS
+        "global" -> return ARGlobal
+        "nightly" -> return ARLatestNightly
+        "lts" -> return ARLatestLTS
         'l':'t':'s':'-':x | Right (x', "") <- decimal $ T.pack x ->
             return $ ARLatestLTSMajor x'
         _ ->

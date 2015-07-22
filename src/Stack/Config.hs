@@ -258,6 +258,7 @@ loadBuildConfig menv mproject config stackRoot mresolver noConfigStrat = do
                                             ARLatestNightly -> "nightly"
                                             ARLatestLTS -> "lts"
                                             ARLatestLTSMajor x -> T.pack $ "lts-" ++ show x
+                                            ARGlobal -> "global"
                                $logInfo ("Using resolver: " <> name <>
                                          " specified on command line")
                    return (project, dest)

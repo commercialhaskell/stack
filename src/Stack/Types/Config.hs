@@ -4,6 +4,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- | The Config type.
@@ -206,6 +207,7 @@ data AbstractResolver
     | ARLatestLTS
     | ARLatestLTSMajor !Int
     | ARResolver !Resolver
+    | ARGlobal
     deriving Show
 
 -- | Default logging level should be something useful but not crazy.
@@ -795,7 +797,7 @@ getMinimalEnvOverride = do
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
 
-instance FromJSON (ProjectAndConfigMonoid, [JSONWarning]) where
+instance (warnings ~ [JSONWarning]) => FromJSON (ProjectAndConfigMonoid, warnings) where
     parseJSON = withObjectWarnings "ProjectAndConfigMonoid" $ \o -> do
         dirs <- jsonSubWarningsMT (o ..:? "packages") ..!= [packageEntryCurrDir]
         extraDeps' <- o ..:? "extra-deps" ..!= []
