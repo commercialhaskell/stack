@@ -108,14 +108,19 @@ ide targets useropts = do
                     else return Nothing
     localdb <- packageDatabaseLocal
     depsdb <- packageDatabaseDeps
+    bindirs <- extraBinDirs `ap` return True {- include local bin -}
     let pkgopts = concat (map _2 pkgs)
         srcfiles = concatMap (map toFilePath . _3) pkgs
         pkgdbs =
             ["--package-db=" <> toFilePath depsdb <> ":" <> toFilePath localdb]
+        paths =
+            ["--ide-backend-tools-path=" <> intercalate ":" (map toFilePath bindirs)
+            ]
     exec
         "stack-ide"
         (["--local-work-dir=" ++ toFilePath pwd] ++
          map ("--ghc-option=" ++) (filter (not . badForGhci) useropts) <>
+         paths <>
          pkgopts <>
          pkgdbs)
         (encode (initialRequest srcfiles))
