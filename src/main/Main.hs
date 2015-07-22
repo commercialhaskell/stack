@@ -542,7 +542,7 @@ upgradeCmd fromGit go = withConfig go $
 
 -- | Upload to Hackage
 uploadCmd :: [String] -> GlobalOpts -> IO ()
-uploadCmd [] _ = error "To upload the current project, please run 'stack upload .'"
+uploadCmd [] _ = error "To upload the current package, please run 'stack upload .'"
 uploadCmd args go = do
     let partitionM _ [] = return ([], [])
         partitionM f (x:xs) = do
@@ -553,7 +553,7 @@ uploadCmd args go = do
     (files, nonFiles) <- partitionM doesFileExist absPaths
     (dirs, invalid) <- partitionM doesDirectoryExist nonFiles
     when (not (null invalid)) $ error $
-        "'stack upload expects a list sdist tarballs or cabal directories.  Can't find " ++
+        "stack upload expects a list sdist tarballs or cabal directories.  Can't find " ++
         show invalid
     let getUploader :: (HasStackRoot config, HasPlatform config, HasConfig config) => StackT config IO Upload.Uploader
         getUploader = do
