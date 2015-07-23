@@ -66,7 +66,7 @@ dot dotOpts = do
     let pkgsToPrune = if dotIncludeBase dotOpts
                          then dotPrune dotOpts
                          else Set.insert "base" (dotPrune dotOpts)
-        localNames = Set.fromList (map (packageName . lpPackage) locals)
+        localNames = Set.fromList (map (packageName . lpPackageFinal) locals)
         prunedGraph = pruneGraph localNames pkgsToPrune resultGraph
     printGraph dotOpts locals prunedGraph
 
@@ -104,7 +104,7 @@ listDependencies :: (HasEnvConfig env
                  => m ()
 listDependencies = do
   (locals,_,_) <- loadLocals defaultBuildOpts Map.empty
-  let localNames = Set.fromList (map (packageNameString . packageName . lpPackage) locals)
+  let localNames = Set.fromList (map (packageNameString . packageName . lpPackageFinal) locals)
       dotOpts = DotOpts True True Nothing localNames
 
   resultGraph <- createDependencyGraph dotOpts locals
@@ -173,20 +173,20 @@ createDepLoader :: Applicative m
                 -> m (Set PackageName, Maybe Version)
 createDepLoader sourceMap loadPackageDeps pkgName =
   case Map.lookup pkgName sourceMap of
-    Just (PSLocal lp) -> pure ((packageAllDeps &&& (Just . packageVersion)) (lpPackage lp))
+    Just (PSLocal lp) -> pure ((packageAllDeps &&& (Just . packageVersion)) (lpPackageFinal lp))
     Just (PSUpstream version _ flags) -> loadPackageDeps pkgName version flags
     Nothing -> pure (Set.empty,Nothing)
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages
 localDependencies :: DotOpts -> [LocalPackage] -> [(PackageName,(Set PackageName,Maybe Version))]
 localDependencies dotOpts locals =
-    map (\lp -> (packageName (lpPackage lp), (deps lp,Just (lpVersion lp)))) locals
+    map (\lp -> (packageName (lpPackageFinal lp), (deps lp,Just (lpVersion lp)))) locals
   where deps lp = if dotIncludeExternal dotOpts
-                then Set.delete (lpName lp) (packageAllDeps (lpPackage lp))
-                else Set.intersection localNames (packageAllDeps (lpPackage lp))
-        lpName lp = packageName (lpPackage lp)
-        localNames = Set.fromList $ map (packageName . lpPackage) locals
-        lpVersion lp = packageVersion (lpPackage lp)
+                then Set.delete (lpName lp) (packageAllDeps (lpPackageFinal lp))
+                else Set.intersection localNames (packageAllDeps (lpPackageFinal lp))
+        lpName lp = packageName (lpPackageFinal lp)
+        localNames = Set.fromList $ map (packageName . lpPackageFinal) locals
+        lpVersion lp = packageVersion (lpPackageFinal lp)
 
 -- | Print a graphviz graph of the edges in the Map and highlight the given local packages
 printGraph :: (Applicative m, MonadIO m)
@@ -201,7 +201,7 @@ printGraph dotOpts locals graph = do
   void (Map.traverseWithKey printEdges (fst <$> graph))
   liftIO $ Text.putStrLn "}"
   where filteredLocals = filter (\local ->
-          show (packageName (lpPackage local)) `Set.notMember` dotPrune dotOpts) locals
+          show (packageName (lpPackageFinal local)) `Set.notMember` dotPrune dotOpts) locals
 
 -- | Print the local nodes with a different style depending on options
 printLocalNodes :: (F.Foldable t, MonadIO m)
@@ -214,7 +214,7 @@ printLocalNodes dotOpts locals = liftIO $ Text.putStrLn (Text.intercalate "\n" l
                          then n <> " [style=dashed];"
                          else n <> " [style=solid];"
         lpNodes :: [Text]
-        lpNodes = map (applyStyle . nodeName . packageName . lpPackage) (F.toList locals)
+        lpNodes = map (applyStyle . nodeName . packageName . lpPackageFinal) (F.toList locals)
 
 -- | Print nodes without dependencies
 printLeaves :: (Applicative m, MonadIO m)
