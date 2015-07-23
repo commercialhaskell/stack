@@ -562,7 +562,7 @@ installGHCPosix _ archiveFile archiveType destDir ident = do
     platform <- asks getPlatform
     menv0 <- getMinimalEnvOverride
     menv <- mkEnvOverride platform (removeHaskellEnvVars (unEnvOverride menv0))
-    $logInfo $ "menv = " <> T.pack (show (unEnvOverride menv))
+    $logDebug $ "menv = " <> T.pack (show (unEnvOverride menv))
     zipTool' <-
         case archiveType of
             TarXz -> return "xz"
