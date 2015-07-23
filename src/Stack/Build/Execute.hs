@@ -271,6 +271,8 @@ executePlan menv bopts baseConfigOpts locals sourceMap plan = do
 
         currExe <- liftIO getExecutablePath -- needed for windows, see below
 
+        -- FILELOCK: Here there is no phase distinction between snap/local so we
+        -- need to hold the write lock the whole time:
         installed <- forM (Map.toList $ planInstallExes plan) $ \(name, loc) -> do
             let bindir =
                     case loc of

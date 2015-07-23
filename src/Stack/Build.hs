@@ -57,6 +57,7 @@ build :: M env m
 build setLocalFiles bopts = do
     menv <- getMinimalEnvOverride
 
+    -- FILELOCK: a coarse-grained option would be to lock around this whole action:
     (mbp, locals, extraToBuild, sourceMap) <- loadSourceMap bopts
 
     -- Set local files, necessary for file watching
@@ -77,9 +78,11 @@ build setLocalFiles bopts = do
     plan <- withLoadPackage menv $ \loadPackage ->
         constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered loadPackage sourceMap installedMap
 
+    -- FILELOCK: does prefetch store in shared space?
     when (boptsPreFetch bopts) $
         preFetch plan
 
+    -- FILELOCK: here we could release the reader lock, and test if we need the writer lock.
     if boptsDryrun bopts
         then printPlan (boptsFinalAction bopts) plan
         else executePlan menv bopts baseConfigOpts locals sourceMap plan
