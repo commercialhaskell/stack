@@ -62,6 +62,7 @@ import qualified Stack.Upload as Upload
 import           System.Directory (canonicalizePath, doesFileExist, doesDirectoryExist)
 import           System.Environment (getArgs, getProgName)
 import           System.Exit
+import           System.FileLock (withFileLock, SharedExclusive(..))
 import           System.FilePath (dropTrailingPathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..))
 import           System.Process.Read
@@ -463,12 +464,30 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
               $logInfo "stack ghc, stack ghci, stack runghc, or stack exec"
               )
 
+-- | Enforce mutual exclusion of every action running via this function
+-- on this users account.  Currently, stack uses this to completely
+-- exclude concurrent execution of stack commands.  In the future,
+-- stack may refine this to a finer-grained locking approach.
+withUserFileLock :: Config
+                 -> IO a
+                 -> IO a
+withUserFileLock cfg act = do
+    lockfile <- parseRelFile "lockfile"
+    let pth = configStackRoot cfg </> lockfile
+    -- TODO: replace this with a polling/sleeping approach where we warn the user
+    -- if there may be a stale unreleased lock.  (Which should not normally be possible.)
+    -- Also, in general there should probably be a log message if stack is waiting on a lock.
+    withFileLock (toFilePath pth) Exclusive
+                 (\_lk -> act)
+
+
 withConfig :: GlobalOpts
            -> StackT Config IO ()
            -> IO ()
 withConfig go@GlobalOpts{..} inner = do
     (manager, lc) <- loadConfigWithOpts go
-    runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
+    withUserFileLock (lcConfig lc) $
+     runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
         Docker.reexecWithOptionalContainer (lcProjectRoot lc) $
             runStackT manager globalLogLevel (lcConfig lc) globalTerminal
                 inner
@@ -487,12 +506,13 @@ withBuildConfig go@GlobalOpts{..} strat inner = do
                 runStackT
                     manager globalLogLevel bconfig globalTerminal
                     setupEnv
-            runStackT
-                manager
-                globalLogLevel
-                envConfig
-                globalTerminal
-                inner
+            withUserFileLock (lcConfig lc) $
+             runStackT
+                 manager
+                 globalLogLevel
+                 envConfig
+                 globalTerminal
+                 inner
 
 cleanCmd :: () -> GlobalOpts -> IO ()
 cleanCmd () go = withBuildConfig go ThrowException clean
