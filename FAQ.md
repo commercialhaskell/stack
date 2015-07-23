@@ -253,7 +253,7 @@ A custom temporary directory can be forced:
 
 #### stack sometimes rebuilds based on flag changes when I wouldn't expect it to. How come?
 
-stack tries to give you reproducibility whenever possible. In some cases, this means that you get a recompile when one may not seem necessary. The most common exactly is running something like this in a multi-package project:
+stack tries to give you reproducibility whenever possible. In some cases, this means that you get a recompile when one may not seem necessary. The most common example is running something like this in a multi-package project:
 
     stack build --ghc-options -O0 && stack build --ghc-options -O0 one-of-the-packages
 
