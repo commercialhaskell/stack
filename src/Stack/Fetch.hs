@@ -468,7 +468,9 @@ fetchPackages' mdistDir toFetchAll = do
                                                             [] (const []) entries
                 Tar.unpack dest entries
                 -- Reset file permissions as they were in the tarball
-                mapM_ (\(fp', perm) -> setFileMode fp' perm) filePerms
+                mapM_ (\(fp', perm) -> setFileMode
+                    (FP.dropTrailingPathSeparator fp')
+                    perm) filePerms
 
                 case mdistDir of
                     Nothing -> return ()
