@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Stack.Dot (dot
+                 ,listDependencies
                  ,DotOpts(..)
                  ,resolveDependencies
                  ,printGraph
@@ -20,6 +21,7 @@ import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import           Data.Map (Map)
 import qualified Data.Map as Map
+import           Data.Maybe (isJust,fromJust)
 import           Data.Monoid ((<>))
 import           Data.Set (Set)
 import qualified Data.Set as Set
@@ -90,6 +92,28 @@ createDependencyGraph dotOpts locals = do
   where -- fmap a function over the result of a function with 3 arguments
         fmap3 :: Functor f => (d -> e) -> (a -> b -> c -> f d) -> a -> b -> c -> f e
         fmap3 f g a b c = f <$> g a b c
+
+listDependencies :: (HasEnvConfig env
+                    ,HasHttpManager env
+                    ,MonadBaseControl IO m
+                    ,MonadCatch m
+                    ,MonadLogger m
+                    ,MonadIO m
+                    ,MonadReader env m
+                    )
+                 => m ()
+listDependencies = do
+  (locals,_,_) <- loadLocals defaultBuildOpts Map.empty
+  let localNames = Set.fromList (map (packageNameString . packageName . lpPackage) locals)
+      dotOpts = DotOpts True True Nothing localNames
+
+  resultGraph <- createDependencyGraph dotOpts locals
+  void (Map.traverseWithKey go (fromJust <$> Map.filter isJust (snd <$> resultGraph)))
+    where go name v = liftIO (Text.putStrLn $
+                                Text.pack (packageNameString name) <>
+                                sep <>
+                                Text.pack (show v))
+          sep = "-"
 
 -- | `pruneGraph dontPrune toPrune graph` prunes all packages in
 -- `graph` with a name in `toPrune` and removes resulting orphans

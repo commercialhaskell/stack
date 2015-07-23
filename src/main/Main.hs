@@ -228,6 +228,10 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                         "Display TH dependencies"
                         ifaceCmd
                         (pure ())
+             addCommand "list-dependencies"
+                        "List the dependencies"
+                        listDependenciesCmd
+                        (pure ())
              addSubCommands
                Docker.dockerCmdName
                "Subcommands specific to Docker use"
@@ -702,7 +706,11 @@ solverCmd fixStackYaml go =
 
 -- | Visualize dependencies
 dotCmd :: DotOpts -> GlobalOpts -> IO ()
-dotCmd dotOpts go = withBuildConfig go (dot dotOpts)
+dotCmd dotOpts go = withBuildConfig go ThrowException (dot dotOpts)
 
 ifaceCmd :: () -> GlobalOpts -> IO ()
 ifaceCmd () go = withBuildConfig go iface
+
+-- | List the dependencies
+listDependenciesCmd :: () -> GlobalOpts -> IO ()
+listDependenciesCmd _ go = withBuildConfig go ThrowException listDependencies
