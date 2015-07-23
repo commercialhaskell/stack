@@ -24,6 +24,7 @@ module Stack.Fetch
 
 import qualified Codec.Archive.Tar              as Tar
 import qualified Codec.Archive.Tar.Check        as Tar
+import qualified Codec.Archive.Tar.Entry        as Tar
 import           Codec.Compression.GZip         (decompress)
 import           Control.Applicative
 import           Control.Concurrent.Async       (Concurrently (..))
@@ -52,7 +53,7 @@ import           Data.IORef                     (newIORef, readIORef,
 import           Data.List                      (intercalate, intersperse)
 import           Data.Map                       (Map)
 import qualified Data.Map                       as Map
-import           Data.Maybe                     (maybeToList)
+import           Data.Maybe                     (maybeToList, catMaybes)
 import           Data.Monoid                    ((<>))
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
@@ -76,6 +77,7 @@ import qualified System.FilePath                as FP
 import           System.IO                      (IOMode (ReadMode),
                                                  SeekMode (AbsoluteSeek), hSeek,
                                                  withBinaryFile)
+import           System.PosixCompat             (setFileMode)
 
 data FetchException
     = Couldn'tReadIndexTarball FilePath Tar.FormatError
@@ -456,7 +458,17 @@ fetchPackages' mdistDir toFetchAll = do
                     wrap :: Exception e => e -> FetchException
                     wrap = Couldn'tReadPackageTarball fp . toException
                     identStr = packageIdentifierString ident
+
+                    getPerms :: Tar.Entry -> (FilePath, Tar.Permissions)
+                    getPerms e = (dest FP.</> Tar.fromTarPath (Tar.entryTarPath e),
+                                  Tar.entryPermissions e)
+
+                    filePerms :: [(FilePath, Tar.Permissions)]
+                    filePerms = catMaybes $ Tar.foldEntries (\e -> (:) (Just $ getPerms e))
+                                                            [] (const []) entries
                 Tar.unpack dest entries
+                -- Reset file permissions as they were in the tarball
+                mapM_ (\(fp', perm) -> setFileMode fp' perm) filePerms
 
                 case mdistDir of
                     Nothing -> return ()
