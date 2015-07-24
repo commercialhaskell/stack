@@ -12,7 +12,7 @@ module Stack.Dot (dot
 import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Monad (void)
-import           Control.Monad.Catch (MonadCatch)
+import           Control.Monad.Catch (MonadCatch,MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader (MonadReader)
@@ -30,11 +30,13 @@ import qualified Data.Text.IO as Text
 import qualified Data.Traversable as T
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Stack.Build (withLoadPackage)
+import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
 import           Stack.Build.Source
 import           Stack.Build.Types
 import           Stack.Constants
 import           Stack.Package
 import           Stack.Types
+import           Stack.Types.Internal (HasLogLevel)
 
 -- | Options record for `stack dot`
 data DotOpts = DotOpts
@@ -51,10 +53,12 @@ data DotOpts = DotOpts
 -- | Visualize the project's dependencies as a graphviz graph
 dot :: (HasEnvConfig env
        ,HasHttpManager env
+       ,HasLogLevel env
        ,MonadBaseControl IO m
        ,MonadCatch m
        ,MonadLogger m
        ,MonadIO m
+       ,MonadMask m
        ,MonadReader env m
        )
     => DotOpts
@@ -71,10 +75,12 @@ dot dotOpts = do
 
 createDependencyGraph :: (HasEnvConfig env
                          ,HasHttpManager env
+                         ,HasLogLevel env
                          ,MonadLogger m
                          ,MonadBaseControl IO m
                          ,MonadCatch m
                          ,MonadIO m
+                         ,MonadMask m
                          ,MonadReader env m)
                       => DotOpts
                       -> [LocalPackage]
@@ -83,20 +89,35 @@ createDependencyGraph dotOpts locals = do
   (_,_,_,sourceMap) <- loadSourceMap defaultBuildOpts
   let graph = Map.fromList (localDependencies dotOpts locals)
   menv <- getMinimalEnvOverride
+  installedMap <- fmap thrd . fst <$> getInstalled menv
+                                                   (GetInstalledOpts False False)
+                                                   sourceMap
   withLoadPackage menv (\loader -> do
     let depLoader =
           createDepLoader sourceMap
+                          installedMap
                           (fmap3 (packageAllDeps &&& (Just . packageVersion)) loader)
     liftIO $ resolveDependencies (dotDependencyDepth dotOpts) graph depLoader)
   where -- fmap a function over the result of a function with 3 arguments
         fmap3 :: Functor f => (d -> e) -> (a -> b -> c -> f d) -> a -> b -> c -> f e
         fmap3 f g a b c = f <$> g a b c
 
+        thrd :: (a,b,c) -> c
+        thrd (_,_,x) = x
+
+libVersionFromInstalled :: Installed -> Maybe Version
+libVersionFromInstalled (Library ghcPkgId) =
+    case ghcPkgIdPackageIdentifier ghcPkgId of
+       PackageIdentifier _ v -> Just v
+libVersionFromInstalled (Executable _) = Nothing
+
 listDependencies :: (HasEnvConfig env
                     ,HasHttpManager env
+                    ,HasLogLevel env
                     ,MonadBaseControl IO m
                     ,MonadCatch m
                     ,MonadLogger m
+                    ,MonadMask m
                     ,MonadIO m
                     ,MonadReader env m
                     )
@@ -167,14 +188,16 @@ resolveDependencies limit graph loadPackageDeps = do
 -- | Given a SourceMap and a dependency loader, load the set of dependencies for a package
 createDepLoader :: Applicative m
                 => Map PackageName PackageSource
+                -> Map PackageName Installed
                 -> (PackageName -> Version -> Map FlagName Bool -> m (Set PackageName,Maybe Version))
                 -> PackageName
                 -> m (Set PackageName, Maybe Version)
-createDepLoader sourceMap loadPackageDeps pkgName =
+createDepLoader sourceMap installed loadPackageDeps pkgName =
   case Map.lookup pkgName sourceMap of
     Just (PSLocal lp) -> pure ((packageAllDeps &&& (Just . packageVersion)) (lpPackageFinal lp))
     Just (PSUpstream version _ flags) -> loadPackageDeps pkgName version flags
-    Nothing -> pure (Set.empty,Nothing)
+    Nothing -> pure (Set.empty, do m' <- T.traverse libVersionFromInstalled installed
+                                   Map.lookup pkgName m')
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages
 localDependencies :: DotOpts -> [LocalPackage] -> [(PackageName,(Set PackageName,Maybe Version))]
