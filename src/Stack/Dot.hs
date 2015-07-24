@@ -21,7 +21,6 @@ import qualified Data.Foldable as F
 import qualified Data.HashSet as HashSet
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (isJust,fromJust)
 import           Data.Monoid ((<>))
 import           Data.Set (Set)
 import qualified Data.Set as Set
@@ -101,19 +100,19 @@ listDependencies :: (HasEnvConfig env
                     ,MonadIO m
                     ,MonadReader env m
                     )
-                 => m ()
-listDependencies = do
+                 => Text
+                 -> m ()
+listDependencies sep = do
   (locals,_,_) <- loadLocals defaultBuildOpts Map.empty
   let localNames = Set.fromList (map (packageNameString . packageName . lpPackageFinal) locals)
       dotOpts = DotOpts True True Nothing localNames
 
   resultGraph <- createDependencyGraph dotOpts locals
-  void (Map.traverseWithKey go (fromJust <$> Map.filter isJust (snd <$> resultGraph)))
+  void (Map.traverseWithKey go (snd <$> resultGraph))
     where go name v = liftIO (Text.putStrLn $
                                 Text.pack (packageNameString name) <>
                                 sep <>
-                                Text.pack (show v))
-          sep = "-"
+                                maybe "<unknown>" (Text.pack . show) v)
 
 -- | `pruneGraph dontPrune toPrune graph` prunes all packages in
 -- `graph` with a name in `toPrune` and removes resulting orphans

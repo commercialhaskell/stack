@@ -231,7 +231,12 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
              addCommand "list-dependencies"
                         "List the dependencies"
                         listDependenciesCmd
-                        (pure ())
+                        (T.pack <$> strOption (long "separator" <>
+                                               metavar "SEP" <>
+                                               help ("Separator between package name " <>
+                                                     "and package version.") <>
+                                               value " " <>
+                                               showDefault))
              addSubCommands
                Docker.dockerCmdName
                "Subcommands specific to Docker use"
@@ -712,5 +717,6 @@ ifaceCmd :: () -> GlobalOpts -> IO ()
 ifaceCmd () go = withBuildConfig go iface
 
 -- | List the dependencies
-listDependenciesCmd :: () -> GlobalOpts -> IO ()
-listDependenciesCmd _ go = withBuildConfig go ThrowException listDependencies
+listDependenciesCmd :: Text -> GlobalOpts -> IO ()
+listDependenciesCmd sep go = withBuildConfig go ThrowException (listDependencies sep')
+  where sep' = T.replace "\\t" "\t" (T.replace "\\n" "\n" sep)
