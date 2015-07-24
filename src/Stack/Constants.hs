@@ -11,6 +11,7 @@ module Stack.Constants
     ,distDirFromDir
     ,distRelativeDir
     ,haskellModuleExts
+    ,imageStagingDir
     ,projectDockerSandboxDir
     ,rawGithubUrl
     ,stackDotYaml
@@ -234,6 +235,10 @@ rawGithubUrl org repo branch file = T.concat
 -- | Docker sandbox from project root.
 projectDockerSandboxDir :: Path Abs Dir -> Path Abs Dir
 projectDockerSandboxDir projectRoot = projectRoot </> workDirRel </> $(mkRelDir "docker/")
+
+-- | Image staging dir from project root.
+imageStagingDir :: Path Abs Dir -> Path Abs Dir
+imageStagingDir p = p </> workDirRel </> $(mkRelDir "image/")
 
 -- | Name of the 'stack' program.
 stackProgName :: String

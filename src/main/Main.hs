@@ -683,12 +683,14 @@ dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
 
 imgDockerCmd :: () -> GlobalOpts -> IO ()
 imgDockerCmd () go@GlobalOpts{..} = do
-    withBuildConfig
+    withBuildConfigExt
         go
+        Nothing
         (do Stack.Build.build
                 (const (return ()))
                 defaultBuildOpts
-            Docker.preventInContainer Image.imageDocker)
+            Image.stageContainerImageArtifacts)
+        (Just Image.createContainerImageFromStage)
 
 -- | Load the configuration with a manager. Convenience function used
 -- throughout this module.
