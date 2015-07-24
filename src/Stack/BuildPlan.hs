@@ -435,7 +435,6 @@ loadMiniBuildPlan
 loadMiniBuildPlan name = do
     path <- configMiniBuildPlanCache name
     let fp = toFilePath path
-    -- FILELOCK: this reads from shared space, and needs a reader lock:
     taggedDecodeOrLoad fp $ liftM buildPlanFixes $ do
         bp <- loadBuildPlan name
         toMiniBuildPlan
