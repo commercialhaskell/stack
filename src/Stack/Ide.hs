@@ -24,6 +24,7 @@ import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Set as S
 import           Data.Text (Text)
+import qualified Data.Text as T
 import           Path
 import           Path.IO
 import           Stack.Build.Source
@@ -37,7 +38,6 @@ import           System.Exit
 import           System.IO
 import qualified System.Process as P
 import           System.Process.Read
-import qualified Data.Text as T
 
 -- | Launch a GHCi IDE for the given local project targets with the
 -- given options and configure it with the load paths and extensions
@@ -126,8 +126,9 @@ ide targets useropts = do
             paths <>
             pkgopts <>
             pkgdbs
-    $logDebug $ "Running stack-ide " <> T.pack (unwords args)
-    exec "stack-ide" args (encode (initialRequest srcfiles))
+    let initialStdin = encode (initialRequest srcfiles)
+    $logDebug $ "Initial stack-ide request: " <> T.pack (show initialStdin)
+    exec "stack-ide" args initialStdin
   where
     wanted pwd cabalfp name = isInWantedList || targetsEmptyAndInDir
       where
