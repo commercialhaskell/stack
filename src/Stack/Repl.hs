@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 -- | Run a REPL configured with the user's project(s).
 
@@ -19,6 +20,7 @@ import           Data.Monoid
 import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Typeable
 import           Path
 import           Path.IO
 import           Stack.Build.Source
@@ -72,6 +74,10 @@ ghciSetup targets = do
                 if validWanted && wanted pwd cabalfp name
                     then return (Just (name, cabalfp))
                     else return Nothing
+    let findTarget x = find ((x==) . packageNameText . fst) locals
+        unmetTargets = filter (isNothing . findTarget) targets
+    when (not (null unmetTargets)) $
+        throwM (TargetsNotFound unmetTargets)
     forM locals $ \(name,cabalfp) -> do
         let config =
                 PackageConfig
@@ -97,3 +103,14 @@ ghciSetup targets = do
         targetsEmptyAndInDir = null targets || isParentOf (parent cabalfp) pwd
     badForGhci :: String -> Bool
     badForGhci x = isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky")
+
+data GhciSetupException =
+    TargetsNotFound [Text]
+    deriving Typeable
+
+instance Exception GhciSetupException
+instance Show GhciSetupException where
+    show (TargetsNotFound targets) = unlines
+        [ "Couldn't find targets: " ++ T.unpack (T.unwords targets)
+        , "(expecting package names)"
+        ]
