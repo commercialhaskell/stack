@@ -336,7 +336,7 @@ getSystemGHC menv = do
 data DownloadInfo = DownloadInfo
     { downloadInfoUrl :: Text
     , downloadInfoContentLength :: Int
-    , downloadInfoSha1 :: ByteString
+    , downloadInfoSha1 :: Maybe ByteString
     }
     deriving Show
 
@@ -350,11 +350,11 @@ parseDownloadInfoFromObject :: Yaml.Object -> Yaml.Parser DownloadInfo
 parseDownloadInfoFromObject o = do
     url           <- o .: "url"
     contentLength <- o .: "content-length"
-    sha1Text      <- o .: "sha1"
+    sha1TextMay   <- o .:? "sha1"
     return DownloadInfo
         { downloadInfoUrl = url
         , downloadInfoContentLength = contentLength
-        , downloadInfoSha1 = T.encodeUtf8 sha1Text
+        , downloadInfoSha1 = fmap T.encodeUtf8 sha1TextMay
         }
 
 instance FromJSON DownloadInfo where
@@ -753,11 +753,23 @@ chattyDownload label downloadInfo path = do
       , T.pack $ toFilePath path
       , " ..."
       ]
-
-    let sha1 = CheckHexDigestByteString (downloadInfoSha1 downloadInfo)
+    hashChecks <- case downloadInfoSha1 downloadInfo of
+        Just sha1ByteString -> do
+            let sha1 = CheckHexDigestByteString sha1ByteString
+            $logDebug $ T.concat
+                [ "Will check against sha1 hash: "
+                , T.decodeUtf8With T.lenientDecode sha1ByteString
+                ]
+            return [HashCheck SHA1 sha1]
+        Nothing -> do
+            $logWarn $ T.concat
+                [ "No sha1 found in metadata,"
+                , " download hash won't be checked."
+                ]
+            return []
     let dReq = DownloadRequest
             { drRequest = req
-            , drHashChecks = [HashCheck SHA1 sha1]
+            , drHashChecks = hashChecks
             , drLengthCheck = Just totalSize
             , drRetryPolicy = drRetryPolicyDefault
             }
