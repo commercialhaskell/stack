@@ -190,6 +190,7 @@ executable stack
                 , path
                 , process
                 , resourcet >= 1.1.4.1
+                , retry >= 0.6
                 , stack
                 , text >= 1.2.0.4
                 , either

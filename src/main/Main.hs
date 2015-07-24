@@ -14,13 +14,13 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask, asks)
+import           Control.Retry
 import           Data.Attoparsec.Args (withInterpreterArgs)
 import qualified Data.ByteString.Lazy as L
 import           Data.List
 import qualified Data.List as List
 import qualified Data.Map as Map
 import           Data.Maybe
-import           Data.Monoid
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -62,7 +62,7 @@ import qualified Stack.Upload as Upload
 import           System.Directory (canonicalizePath, doesFileExist, doesDirectoryExist)
 import           System.Environment (getArgs, getProgName)
 import           System.Exit
-import           System.FileLock (withFileLock, SharedExclusive(..))
+import           System.FileLock (tryLockFile, unlockFile, SharedExclusive(Exclusive))
 import           System.FilePath (dropTrailingPathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..))
 import           System.Process.Read
@@ -474,11 +474,18 @@ withUserFileLock :: Config
 withUserFileLock cfg act = do
     lockfile <- parseRelFile "lockfile"
     let pth = configStackRoot cfg </> lockfile
-    -- TODO: replace this with a polling/sleeping approach where we warn the user
-    -- if there may be a stale unreleased lock.  (Which should not normally be possible.)
-    -- Also, in general there should probably be a log message if stack is waiting on a lock.
-    withFileLock (toFilePath pth) Exclusive
-                 (\_lk -> act)
+        grab = tryLockFile (toFilePath pth) Exclusive
+
+    fstTry <- grab
+    lk <- case fstTry of
+            Nothing -> do putStrLn $ "Failed to grab lock ("++show pth++"); other stack instance running.  Waiting..."
+                          Just l <- retrying (capDelay (500*1000) (exponentialBackoff 1000))
+                                             (\_ x -> return (isNothing x))
+                                             grab
+                          putStrLn "Lock acquired, proceeding."
+                          return l
+            Just l -> return l
+    bracket (return lk) unlockFile (\_ -> act)
 
 
 withConfigAndLock :: GlobalOpts
