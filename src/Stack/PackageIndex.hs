@@ -27,6 +27,7 @@ import           Control.Exception (Exception)
 import           Control.Exception.Enclosed (tryIO)
 import           Control.Monad (unless, when, liftM, mzero)
 import           Control.Monad.Catch (MonadThrow, throwM, MonadCatch)
+import qualified Control.Monad.Catch as C
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger                  (MonadLogger, logDebug,
                                                         logInfo, logWarn)
@@ -99,18 +100,25 @@ instance BinarySchema PackageCacheMap where
     binarySchema _ = 1
 -- | Populate the package index caches and return them.
 populateCache
-    :: (MonadIO m, MonadThrow m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadIO m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
     => EnvOverride
     -> PackageIndex
     -> m (Map PackageIdentifier PackageCache)
 populateCache menv index = do
-    $logSticky "Populating index cache ..."
     requireIndex menv index
     -- This uses full on lazy I/O instead of ResourceT to provide some
     -- protections. Caveat emptor
     path <- configPackageIndex (indexName index)
-    lbs <- liftIO $ L.readFile $ Path.toFilePath path
-    pis <- loop 0 Map.empty (Tar.read lbs)
+    let loadPIS = do
+            $logSticky "Populating index cache ..."
+            lbs <- liftIO $ L.readFile $ Path.toFilePath path
+            loop 0 Map.empty (Tar.read lbs)
+    pis <- loadPIS `C.catch` \e -> do
+        $logWarn $ "Exception encountered when parsing index tarball: "
+                <> T.pack (show (e :: Tar.FormatError))
+        $logWarn "Automatically updating index and trying again"
+        updateIndex menv index
+        loadPIS
 
     when (indexRequireHashes index) $ forM_ (Map.toList pis) $ \(ident, pc) ->
         case pcDownload pc of
