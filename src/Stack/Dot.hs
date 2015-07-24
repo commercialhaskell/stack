@@ -125,11 +125,12 @@ listDependencies :: (HasEnvConfig env
                  -> m ()
 listDependencies sep = do
   (locals,_,_) <- loadLocals defaultBuildOpts Map.empty
-  let localNames = Set.fromList (map (packageNameString . packageName . lpPackageFinal) locals)
-      dotOpts = DotOpts True True Nothing localNames
+  let localNames = Set.fromList (map (packageName . lpPackageFinal) locals)
+      dotOpts = DotOpts True True Nothing Set.empty
 
   resultGraph <- createDependencyGraph dotOpts locals
-  void (Map.traverseWithKey go (snd <$> resultGraph))
+  let graphWithoutLocals = F.foldl' (flip Map.delete) resultGraph localNames
+  void (Map.traverseWithKey go (snd <$> graphWithoutLocals))
     where go name v = liftIO (Text.putStrLn $
                                 Text.pack (packageNameString name) <>
                                 sep <>
