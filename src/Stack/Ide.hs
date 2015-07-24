@@ -37,6 +37,7 @@ import           System.Exit
 import           System.IO
 import qualified System.Process as P
 import           System.Process.Read
+import qualified Data.Text as T
 
 -- | Launch a GHCi IDE for the given local project targets with the
 -- given options and configure it with the load paths and extensions
@@ -118,14 +119,15 @@ ide targets useropts = do
         paths =
             ["--ide-backend-tools-path=" <> intercalate ":" (map toFilePath bindirs) <> (maybe "" (':':) mpath)
             ]
-    exec
-        "stack-ide"
-        (["--local-work-dir=" ++ toFilePath pwd] ++
-         map ("--ghc-option=" ++) (filter (not . badForGhci) useropts) <>
-         paths <>
-         pkgopts <>
-         pkgdbs)
-        (encode (initialRequest srcfiles))
+        args =
+            ["--verbose"] <>
+            ["--local-work-dir=" ++ toFilePath pwd] <>
+            map ("--ghc-option=" ++) (filter (not . badForGhci) useropts) <>
+            paths <>
+            pkgopts <>
+            pkgdbs
+    $logDebug $ "Running stack-ide " <> T.pack (unwords args)
+    exec "stack-ide" args (encode (initialRequest srcfiles))
   where
     wanted pwd cabalfp name = isInWantedList || targetsEmptyAndInDir
       where
