@@ -299,7 +299,7 @@ pluginShouldHaveRun _plugin _globalOpts = do
 -- support others later).
 pathCmd :: [Text] -> GlobalOpts -> IO ()
 pathCmd keys go =
-    withBuildConfig
+    withBuildConfigAndLock
         go
         ExecStrategy
         (do env <- ask
@@ -481,10 +481,10 @@ withUserFileLock cfg act = do
                  (\_lk -> act)
 
 
-withConfig :: GlobalOpts
+withConfigAndLock :: GlobalOpts
            -> StackT Config IO ()
            -> IO ()
-withConfig go@GlobalOpts{..} inner = do
+withConfigAndLock go@GlobalOpts{..} inner = do
     (manager, lc) <- loadConfigWithOpts go
     withUserFileLock (lcConfig lc) $
      runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
@@ -492,11 +492,11 @@ withConfig go@GlobalOpts{..} inner = do
             runStackT manager globalLogLevel (lcConfig lc) globalTerminal
                 inner
 
-withBuildConfig :: GlobalOpts
+withBuildConfigAndLock :: GlobalOpts
                 -> NoBuildConfigStrategy
                 -> StackT EnvConfig IO ()
                 -> IO ()
-withBuildConfig go@GlobalOpts{..} strat inner = do
+withBuildConfigAndLock go@GlobalOpts{..} strat inner = do
     (manager, lc) <- loadConfigWithOpts go
     runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
         Docker.reexecWithOptionalContainer (lcProjectRoot lc) $ do
@@ -515,7 +515,7 @@ withBuildConfig go@GlobalOpts{..} strat inner = do
                  inner
 
 cleanCmd :: () -> GlobalOpts -> IO ()
-cleanCmd () go = withBuildConfig go ThrowException clean
+cleanCmd () go = withBuildConfigAndLock go ThrowException clean
 
 -- | Helper for build and install commands
 buildCmdHelper :: StackT EnvConfig IO () -- ^ do before build
@@ -524,7 +524,7 @@ buildCmdHelper beforeBuild strat finalAction opts go
     | boptsFileWatch opts = fileWatch inner
     | otherwise = inner $ const $ return ()
   where
-    inner setLocalFiles = withBuildConfig go strat $ do
+    inner setLocalFiles = withBuildConfigAndLock go strat $ do
         beforeBuild
         Stack.Build.build setLocalFiles opts { boptsFinalAction = finalAction }
 
@@ -546,24 +546,24 @@ copyCmd :: BuildOpts -> GlobalOpts -> IO ()
 copyCmd opts = buildCmdHelper (return ()) ExecStrategy DoNothing opts { boptsInstallExes = True }
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
-uninstallCmd _ go = withConfig go $ do
+uninstallCmd _ go = withConfigAndLock go $ do
     $logError "stack does not manage installations in global locations"
     $logError "The only global mutation stack performs is executable copying"
     $logError "For the default executable destination, please run 'stack path --local-bin-path'"
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
-unpackCmd names go = withConfig go $ do
+unpackCmd names go = withConfigAndLock go $ do
     menv <- getMinimalEnvOverride
     Stack.Fetch.unpackPackages menv "." names
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()
-updateCmd () go = withConfig go $
+updateCmd () go = withConfigAndLock go $
     getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
 
 upgradeCmd :: Bool -> GlobalOpts -> IO ()
-upgradeCmd fromGit go = withConfig go $
+upgradeCmd fromGit go = withConfigAndLock go $
     upgrade fromGit (globalResolver go)
 
 -- | Upload to Hackage
@@ -589,10 +589,10 @@ uploadCmd args go = do
                     Upload.defaultUploadSettings
             liftIO $ Upload.mkUploader config uploadSettings
     if null dirs
-        then withConfig go $ do
+        then withConfigAndLock go $ do
             uploader <- getUploader
             liftIO $ forM_ files (canonicalizePath >=> Upload.upload uploader)
-        else withBuildConfig go ExecStrategy $ do
+        else withBuildConfigAndLock go ExecStrategy $ do
             uploader <- getUploader
             liftIO $ forM_ files (canonicalizePath >=> Upload.upload uploader)
             forM_ dirs $ \dir -> do
@@ -602,7 +602,7 @@ uploadCmd args go = do
 
 sdistCmd :: [String] -> GlobalOpts -> IO ()
 sdistCmd dirs go =
-    withBuildConfig go ExecStrategy $ do
+    withBuildConfigAndLock go ExecStrategy $ do
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null dirs
             then asks (Map.keys . bcPackages . getBuildConfig)
@@ -627,7 +627,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
                         exec plainEnvSettings eoCmd eoArgs
         ExecOptsEmbellished {..} ->
-           withBuildConfig go ExecStrategy $ do
+           withBuildConfigAndLock go ExecStrategy $ do
                let targets = concatMap words eoPackages
                unless (null targets) $
                    Stack.Build.build (const $ return ()) defaultBuildOpts
@@ -638,7 +638,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
 -- | Run the REPL in the context of a project.
 replCmd :: ([Text], [String], FilePath, Bool, [String]) -> GlobalOpts -> IO ()
 replCmd (targets,args,path,noload,packages) go@GlobalOpts{..} = do
-  withBuildConfig go ExecStrategy $ do
+  withBuildConfigAndLock go ExecStrategy $ do
     let packageTargets = concatMap words packages
     unless (null packageTargets) $
        Stack.Build.build (const $ return ()) defaultBuildOpts
@@ -648,7 +648,7 @@ replCmd (targets,args,path,noload,packages) go@GlobalOpts{..} = do
 
 -- | Run ide-backend in the context of a project.
 ideCmd :: ([Text], [String]) -> GlobalOpts -> IO ()
-ideCmd (targets,args) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $ do
+ideCmd (targets,args) go@GlobalOpts{..} = withBuildConfigAndLock go ExecStrategy $ do
       ide targets args
 
 -- | Pull the current Docker image.
@@ -675,7 +675,7 @@ dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
 
 imgDockerCmd :: () -> GlobalOpts -> IO ()
 imgDockerCmd () go@GlobalOpts{..} = do
-    withBuildConfig
+    withBuildConfigAndLock
         go
         ExecStrategy
         (do Stack.Build.build
@@ -703,11 +703,11 @@ loadConfigWithOpts GlobalOpts{..} = do
 
 -- | Project initialization
 initCmd :: InitOpts -> GlobalOpts -> IO ()
-initCmd initOpts go = withConfig go $ initProject initOpts
+initCmd initOpts go = withConfigAndLock go $ initProject initOpts
 
 -- | Project creation
 newCmd :: NewOpts -> GlobalOpts -> IO ()
-newCmd newOpts go@GlobalOpts{..} = withConfig go $ do
+newCmd newOpts go@GlobalOpts{..} = withConfigAndLock go $ do
     newProject newOpts
     initProject (newOptsInitOpts newOpts)
 
@@ -716,8 +716,8 @@ solverCmd :: Bool -- ^ modify stack.yaml automatically?
           -> GlobalOpts
           -> IO ()
 solverCmd fixStackYaml go =
-    withBuildConfig go ThrowException (solveExtraDeps fixStackYaml)
+    withBuildConfigAndLock go ThrowException (solveExtraDeps fixStackYaml)
 
 -- | Visualize dependencies
 dotCmd :: DotOpts -> GlobalOpts -> IO ()
-dotCmd dotOpts go = withBuildConfig go ThrowException (dot dotOpts)
+dotCmd dotOpts go = withBuildConfigAndLock go ThrowException (dot dotOpts)
