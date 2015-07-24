@@ -53,7 +53,7 @@ spec = beforeAll setup $ afterAll teardown $ do
         -- github still depends on failure.
         writeFile "stack.yaml" "resolver: lts-2.9"
         LoadConfig{..} <- loadConfig' manager
-        bconfig <- loadBuildConfigRest manager (lcLoadBuildConfig Nothing ThrowException)
+        bconfig <- loadBuildConfigRest manager (lcLoadBuildConfig Nothing)
         runStackT manager logLevel bconfig False $ do
             menv <- getMinimalEnvOverride
             mbp <- loadMiniBuildPlan $ LTS 2 9

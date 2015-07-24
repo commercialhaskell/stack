@@ -300,7 +300,6 @@ pathCmd :: [Text] -> GlobalOpts -> IO ()
 pathCmd keys go =
     withBuildConfig
         go
-        ExecStrategy
         (do env <- ask
             let cfg = envConfig env
                 bc = envConfigBuildConfig cfg
@@ -441,7 +440,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                   case scoGhcVersion of
                       Just v -> return (v, Nothing)
                       Nothing -> do
-                          bc <- lcLoadBuildConfig lc globalResolver ExecStrategy
+                          bc <- lcLoadBuildConfig lc globalResolver
                           return (bcGhcVersionExpected bc, Just $ bcStackYaml bc)
               mpaths <- runStackT manager globalLogLevel (lcConfig lc) globalTerminal $ ensureGHC SetupOpts
                   { soptsInstallIfMissing = True
@@ -474,15 +473,14 @@ withConfig go@GlobalOpts{..} inner = do
                 inner
 
 withBuildConfig :: GlobalOpts
-                -> NoBuildConfigStrategy
                 -> StackT EnvConfig IO ()
                 -> IO ()
-withBuildConfig go@GlobalOpts{..} strat inner = do
+withBuildConfig go@GlobalOpts{..} inner = do
     (manager, lc) <- loadConfigWithOpts go
     runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
         Docker.reexecWithOptionalContainer (lcProjectRoot lc) $ do
             bconfig <- runStackLoggingT manager globalLogLevel globalTerminal $
-                lcLoadBuildConfig lc globalResolver strat
+                lcLoadBuildConfig lc globalResolver
             envConfig <-
                 runStackT
                     manager globalLogLevel bconfig globalTerminal
@@ -495,27 +493,27 @@ withBuildConfig go@GlobalOpts{..} strat inner = do
                 inner
 
 cleanCmd :: () -> GlobalOpts -> IO ()
-cleanCmd () go = withBuildConfig go ThrowException clean
+cleanCmd () go = withBuildConfig go clean
 
 -- | Helper for build and install commands
 buildCmdHelper :: StackT EnvConfig IO () -- ^ do before build
-               -> NoBuildConfigStrategy -> FinalAction -> BuildOpts -> GlobalOpts -> IO ()
-buildCmdHelper beforeBuild strat finalAction opts go
+               -> FinalAction -> BuildOpts -> GlobalOpts -> IO ()
+buildCmdHelper beforeBuild finalAction opts go
     | boptsFileWatch opts = fileWatch inner
     | otherwise = inner $ const $ return ()
   where
-    inner setLocalFiles = withBuildConfig go strat $ do
+    inner setLocalFiles = withBuildConfig go $ do
         beforeBuild
         Stack.Build.build setLocalFiles opts { boptsFinalAction = finalAction }
 
 -- | Build the project.
 buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
-buildCmd = buildCmdHelper (return ()) ThrowException
+buildCmd = buildCmdHelper (return ())
 
 -- | Install
 installCmd :: BuildOpts -> GlobalOpts -> IO ()
 installCmd =
-    buildCmdHelper warning ExecStrategy DoNothing
+    buildCmdHelper warning DoNothing
   where
     warning = do
         $logWarn "NOTE: stack is not a package manager"
@@ -523,7 +521,7 @@ installCmd =
         $logWarn "You may want to use 'stack build --copy-bins' for clarity"
 
 copyCmd :: BuildOpts -> GlobalOpts -> IO ()
-copyCmd opts = buildCmdHelper (return ()) ExecStrategy DoNothing opts { boptsInstallExes = True }
+copyCmd opts = buildCmdHelper (return ()) DoNothing opts { boptsInstallExes = True }
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
 uninstallCmd _ go = withConfig go $ do
@@ -572,7 +570,7 @@ uploadCmd args go = do
         then withConfig go $ do
             uploader <- getUploader
             liftIO $ forM_ files (canonicalizePath >=> Upload.upload uploader)
-        else withBuildConfig go ExecStrategy $ do
+        else withBuildConfig go $ do
             uploader <- getUploader
             liftIO $ forM_ files (canonicalizePath >=> Upload.upload uploader)
             forM_ dirs $ \dir -> do
@@ -582,7 +580,7 @@ uploadCmd args go = do
 
 sdistCmd :: [String] -> GlobalOpts -> IO ()
 sdistCmd dirs go =
-    withBuildConfig go ExecStrategy $ do
+    withBuildConfig go $ do
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null dirs
             then asks (Map.keys . bcPackages . getBuildConfig)
@@ -607,7 +605,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
                         exec plainEnvSettings eoCmd eoArgs
         ExecOptsEmbellished {..} ->
-           withBuildConfig go ExecStrategy $ do
+           withBuildConfig go $ do
                let targets = concatMap words eoPackages
                unless (null targets) $
                    Stack.Build.build (const $ return ()) defaultBuildOpts
@@ -618,7 +616,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
 -- | Run the REPL in the context of a project.
 replCmd :: ([Text], [String], FilePath, Bool, [String]) -> GlobalOpts -> IO ()
 replCmd (targets,args,path,noload,packages) go@GlobalOpts{..} = do
-  withBuildConfig go ExecStrategy $ do
+  withBuildConfig go $ do
     let packageTargets = concatMap words packages
     unless (null packageTargets) $
        Stack.Build.build (const $ return ()) defaultBuildOpts
@@ -628,7 +626,7 @@ replCmd (targets,args,path,noload,packages) go@GlobalOpts{..} = do
 
 -- | Run ide-backend in the context of a project.
 ideCmd :: ([Text], [String]) -> GlobalOpts -> IO ()
-ideCmd (targets,args) go@GlobalOpts{..} = withBuildConfig go ExecStrategy $ do
+ideCmd (targets,args) go@GlobalOpts{..} = withBuildConfig go $ do
       ide targets args
 
 -- | Pull the current Docker image.
@@ -657,7 +655,6 @@ imgDockerCmd :: () -> GlobalOpts -> IO ()
 imgDockerCmd () go@GlobalOpts{..} = do
     withBuildConfig
         go
-        ExecStrategy
         (do Stack.Build.build
                 (const (return ()))
                 defaultBuildOpts
@@ -696,8 +693,8 @@ solverCmd :: Bool -- ^ modify stack.yaml automatically?
           -> GlobalOpts
           -> IO ()
 solverCmd fixStackYaml go =
-    withBuildConfig go ThrowException (solveExtraDeps fixStackYaml)
+    withBuildConfig go (solveExtraDeps fixStackYaml)
 
 -- | Visualize dependencies
 dotCmd :: DotOpts -> GlobalOpts -> IO ()
-dotCmd dotOpts go = withBuildConfig go ThrowException (dot dotOpts)
+dotCmd dotOpts go = withBuildConfig go (dot dotOpts)

@@ -82,7 +82,7 @@ upgrade fromGit mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> d
             lc <- loadConfig
                 configMonoid
                 (Just $ dir </> $(mkRelFile "stack.yaml"))
-            lcLoadBuildConfig lc mresolver ThrowException
+            lcLoadBuildConfig lc mresolver
         envConfig1 <- runStackT manager logLevel bconfig terminal setupEnv
         runStackT manager logLevel envConfig1 terminal $ build (const $ return ()) defaultBuildOpts
             { boptsTargets = ["stack"]

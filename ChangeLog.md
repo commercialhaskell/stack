@@ -19,6 +19,7 @@
     * Also supports `--resolver nightly`, `--resolver lts`, and `--resolver lts-X`
 * Make `stack build --flag` error when flag or package is unknown [#617](https://github.com/commercialhaskell/stack/issues/617)
 * Preserve file permissions when unpacking sources [#666](https://github.com/commercialhaskell/stack/pull/666)
+* `stack build` etc work outside of a project
 
 Bug fixes:
 
