@@ -38,7 +38,7 @@ import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal (HasLogLevel)
 
--- | Options record for `stack dot`
+-- | Options record for @stack dot@
 data DotOpts = DotOpts
     { dotIncludeExternal :: Bool
     -- ^ Include external dependencies
@@ -73,6 +73,10 @@ dot dotOpts = do
         prunedGraph = pruneGraph localNames pkgsToPrune resultGraph
     printGraph dotOpts locals prunedGraph
 
+-- | Create the dependency graph, the result is a map from a package
+-- name to a tuple of dependencies and a version if available.  This
+-- function mainly gathers the required arguments for
+-- @resolveDependencies@.
 createDependencyGraph :: (HasEnvConfig env
                          ,HasHttpManager env
                          ,HasLogLevel env
@@ -82,8 +86,8 @@ createDependencyGraph :: (HasEnvConfig env
                          ,MonadIO m
                          ,MonadMask m
                          ,MonadReader env m)
-                      => DotOpts
-                      -> m (Map PackageName (Set PackageName, Maybe Version))
+                       => DotOpts
+                       -> m (Map PackageName (Set PackageName, Maybe Version))
 createDependencyGraph dotOpts = do
   (_,locals,_,sourceMap) <- loadSourceMap defaultBuildOpts
   let graph = Map.fromList (localDependencies dotOpts locals)
@@ -104,6 +108,7 @@ createDependencyGraph dotOpts = do
         thrd :: (a,b,c) -> c
         thrd (_,_,x) = x
 
+-- Given an 'Installed' try to get the 'Version'
 libVersionFromInstalled :: Installed -> Maybe Version
 libVersionFromInstalled (Library ghcPkgId) =
     case ghcPkgIdPackageIdentifier ghcPkgId of
@@ -120,8 +125,8 @@ listDependencies :: (HasEnvConfig env
                     ,MonadIO m
                     ,MonadReader env m
                     )
-                 => Text
-                 -> m ()
+                  => Text
+                  -> m ()
 listDependencies sep = do
   let dotOpts = DotOpts True True Nothing Set.empty
   resultGraph <- createDependencyGraph dotOpts
@@ -131,9 +136,9 @@ listDependencies sep = do
                                 sep <>
                                 maybe "<unknown>" (Text.pack . show) v)
 
--- | `pruneGraph dontPrune toPrune graph` prunes all packages in
--- `graph` with a name in `toPrune` and removes resulting orphans
--- unless they are in `dontPrune`
+-- | @pruneGraph dontPrune toPrune graph@ prunes all packages in
+-- @graph@ with a name in @toPrune@ and removes resulting orphans
+-- unless they are in @dontPrune@
 pruneGraph :: (F.Foldable f, F.Foldable g, Eq a)
            => f PackageName
            -> g String
@@ -240,7 +245,7 @@ printLeaves :: (Applicative m, MonadIO m)
             -> m ()
 printLeaves = F.traverse_ printLeaf . Map.keysSet . Map.filter Set.null . fmap fst
 
--- | `printDedges p ps` prints an edge from p to every ps
+-- | @printDedges p ps@ prints an edge from p to every ps
 printEdges :: (Applicative m, MonadIO m) => PackageName -> Set PackageName -> m ()
 printEdges package deps = F.for_ deps (printEdge package)
 
