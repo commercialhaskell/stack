@@ -65,7 +65,7 @@ dot :: (HasEnvConfig env
     -> m ()
 dot dotOpts = do
     (locals,_,_) <- loadLocals defaultBuildOpts Map.empty
-    resultGraph <- createDependencyGraph dotOpts locals
+    resultGraph <- createDependencyGraph dotOpts
     let pkgsToPrune = if dotIncludeBase dotOpts
                          then dotPrune dotOpts
                          else Set.insert "base" (dotPrune dotOpts)
@@ -83,10 +83,9 @@ createDependencyGraph :: (HasEnvConfig env
                          ,MonadMask m
                          ,MonadReader env m)
                       => DotOpts
-                      -> [LocalPackage]
                       -> m (Map PackageName (Set PackageName, Maybe Version))
-createDependencyGraph dotOpts locals = do
-  (_,_,_,sourceMap) <- loadSourceMap defaultBuildOpts
+createDependencyGraph dotOpts = do
+  (_,locals,_,sourceMap) <- loadSourceMap defaultBuildOpts
   let graph = Map.fromList (localDependencies dotOpts locals)
   menv <- getMinimalEnvOverride
   installedMap <- fmap thrd . fst <$> getInstalled menv
@@ -124,13 +123,9 @@ listDependencies :: (HasEnvConfig env
                  => Text
                  -> m ()
 listDependencies sep = do
-  (locals,_,_) <- loadLocals defaultBuildOpts Map.empty
-  let localNames = Set.fromList (map (packageName . lpPackageFinal) locals)
-      dotOpts = DotOpts True True Nothing Set.empty
-
-  resultGraph <- createDependencyGraph dotOpts locals
-  let graphWithoutLocals = F.foldl' (flip Map.delete) resultGraph localNames
-  void (Map.traverseWithKey go (snd <$> graphWithoutLocals))
+  let dotOpts = DotOpts True True Nothing Set.empty
+  resultGraph <- createDependencyGraph dotOpts
+  void (Map.traverseWithKey go (snd <$> resultGraph))
     where go name v = liftIO (Text.putStrLn $
                                 Text.pack (packageNameString name) <>
                                 sep <>
