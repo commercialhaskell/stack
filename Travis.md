@@ -53,31 +53,58 @@ addons:
 
 ### Multiple GHC - parametrised builds
 
-Travis apt plugin doesn't yet support installing apt package conditionally. (https://github.com/travis-ci/travis-ci/issues/4291). That for we need to install all GHC versions we would like to use:
+Travis apt plugin doesn't yet support installing apt packages dynamically (https://github.com/travis-ci/travis-ci/issues/4291). That for we need to write a bit repetetive `.travis.yml`.
 
 Also for different GHC versions, you probably want to use different `stack.yaml` files.
 
 ```yaml
-env:
-  - GHCVER=7.8.4 STACK_YAML=stack.yaml
-  - GHCVER=7.10.1 STACK_YAML=stack-7.10.yaml
-  - GHCVER=head STACK_YAML=stack-head.yaml
+# N.B. No top-level env: declaration!
+
+matrix:
+  include:
+  - env: GHCVER=7.8.4 STACK_YAML=stack.yaml
+    addons:
+      apt:
+        sources:
+        - hvr-ghc
+        packages:
+        - ghc-7.8.4
+  - env: GHCVER=7.10.1 STACK_YAML=stack-7.10.yaml
+    addons:
+      apt:
+        sources:
+        - hvr-ghc
+        packages:
+        - ghc-7.10.1
+  - env: GHCVER=head STACK_YAML=stack-head.yaml
+    addons:
+      apt:
+        sources:
+        - hvr-ghc
+        packages:
+        - ghc-head
+  allow_failures:
+    - env: GHCVER=head STACK_YAML=stack-head.yaml
 
 before_install:
   # ghc
   - export PATH=/opt/ghc/$GHCVER/bin:$PATH
-
-addons:
-  apt:
-    sources:
-    - hvr-ghc
-    packages:
-    - ghc-7.8.4
-    - ghc-7.10.1
-    - ghc-head
 ```
 
 Especially to use ghc `HEAD` you need to pass `--skip-ghc-check` option to stack.
+
+## Running tests
+
+After the environment setup, actual test running is simple:
+
+```yaml
+install:
+  - ./travis_long stack --no-terminal --skip-ghc-check setup
+  - ./travis_long stack --no-terminal --skip-ghc-check test --only-snapshot
+
+script:
+  - stack --no-terminal --skip-ghc-check test
+```
 
 ## Other details
 
