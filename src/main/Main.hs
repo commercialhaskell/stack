@@ -711,12 +711,12 @@ solverCmd fixStackYaml go =
 
 -- | Visualize dependencies
 dotCmd :: DotOpts -> GlobalOpts -> IO ()
-dotCmd dotOpts go = withBuildConfig go ThrowException (dot dotOpts)
+dotCmd dotOpts go = withBuildConfig go (dot dotOpts)
 
 ifaceCmd :: () -> GlobalOpts -> IO ()
 ifaceCmd () go = withBuildConfig go iface
 
 -- | List the dependencies
 listDependenciesCmd :: Text -> GlobalOpts -> IO ()
-listDependenciesCmd sep go = withBuildConfig go ThrowException (listDependencies sep')
+listDependenciesCmd sep go = withBuildConfig go (listDependencies sep')
   where sep' = T.replace "\\t" "\t" (T.replace "\\n" "\n" sep)
