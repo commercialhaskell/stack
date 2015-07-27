@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- TODO(DanBurton): remove the following once the module is done.
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-unused-imports #-}
@@ -19,12 +20,15 @@ import Path
 import Path.IO (fileExists)
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Maybe
 import Data.Monoid
 import Data.Foldable (foldMap)
 import Distribution.PackageDescription
+import Distribution.Package hiding (packageName, PackageName)
+import Distribution.Text (display)
 import qualified Distribution.ModuleName as ModuleName
 import System.Process (readProcess)
 import System.FilePath (dropExtension, addExtension)
@@ -35,12 +39,12 @@ import           Stack.Constants
 import           Stack.Package
 import           Stack.Types
 
---type M m env = (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasEnvConfig env)
+type M m env = (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasEnvConfig env)
 
 data TargetModules = TargetModules
     { targetIsExecutable   :: Bool
-      -- ^ Implies "Main" as a target module if True.
-      -- benchmark and test targets are also executable.
+    -- ^ Implies "Main" as a target module if True.
+    -- benchmark and test targets are also executable.
     , targetExposedModules :: [ModuleName]
     , targetOtherModules   :: [ModuleName]
     }
@@ -137,33 +141,35 @@ data CompilationContext = CompilationContext
     , ccPackageVersion :: Version
     , ccProjectRoot :: Path Abs Dir
     , ccGhcVersion :: Version
-    , ccArch :: String
+    , ccPlatform :: String
     , ccSnapshot :: String
     , ccCabalLibVersion :: Version
     }
 
+-- Find the directory where the .hi files are for the given target.
 targetHiDir :: MonadThrow m => CompilationContext -> Target -> m (Path Abs Dir)
 targetHiDir cc TargetLibrary = do
     let showGhcVer = versionString (ccGhcVersion cc)
-    let showArch = ccArch cc
+    let showPlat = ccPlatform cc
     let showPackageAndVersion = ccPackageName cc <> "-" <> versionString (ccPackageVersion cc)
 
-    arch <- parseRelDir (ccArch cc)
+    platform <- parseRelDir (ccPlatform cc)
     snapshot <- parseRelDir (ccSnapshot cc)
-    ghcVer <- parseRelDir showGhcVer
-    archGhc <- parseRelDir (showArch <> "-ghc-" <> showGhcVer)
-    packageAndVersion <- parseRelDir showPackageAndVersion
+    ghcVer   <- parseRelDir showGhcVer
+    platGhc  <- parseRelDir (showPlat <> "-ghc-" <> showGhcVer)
+    packageAndVersion
+             <- parseRelDir showPackageAndVersion
 
     return $ ccProjectRoot cc </> $(mkRelDir ".stack-work/install")
-        </> arch </> snapshot </> ghcVer
-        </> $(mkRelDir "lib") </> archGhc </> packageAndVersion
+        </> platform </> snapshot </> ghcVer
+        </> $(mkRelDir "lib") </> platGhc </> packageAndVersion
 targetHiDir cc (TargetExecutable exeName) = do
     let showCabalVersion = versionString (ccCabalLibVersion cc)
 
-    arch <- parseRelDir (ccArch cc)
+    arch         <- parseRelDir (ccPlatform cc)
     cabalWithVer <- parseRelDir ("Cabal-" <> showCabalVersion)
-    exe <- parseRelDir exeName
-    exeTmp <- parseRelDir (exeName <> "-tmp")
+    exe          <- parseRelDir exeName
+    exeTmp       <- parseRelDir (exeName <> "-tmp")
 
     return $ ccProjectRoot cc </> $(mkRelDir ".stack-work/dist")
         </> arch </> cabalWithVer
@@ -174,46 +180,111 @@ data Target
     | TargetExecutable String
   deriving (Eq, Ord, Show)
 
+
+-- Extract the contextual details needed to find the .hi files.
+makeCompilationContext :: EnvConfig -> LocalPackage -> CompilationContext
+makeCompilationContext EnvConfig{..} LocalPackage{..} = CompilationContext
+    { ccPackageName = show packageName
+    , ccPackageVersion = packageVersion
+    , ccProjectRoot = lpDir
+    , ccGhcVersion = envConfigGhcVersion
+    , ccPlatform = display configPlatform
+    , ccSnapshot = Text.unpack $ resolverName bcResolver
+    , ccCabalLibVersion = envConfigCabalVersion
+    }
+  where
+    BuildConfig{..} = envConfigBuildConfig
+    Config{..} = bcConfig
+    Package{..} = lpPackage
+
 sampleRun :: IO ()
 sampleRun = do
-  let showIface arg = do
-          str <- readProcess "ghc" ["--show-iface", toFilePath arg] ""
-          return $ S8.pack str
-  --let hiDir =
-  --        -- $(mkAbsDir "/home/dan/dep-file-test/.stack-work/install/x86_64-linux/lts-2.13/7.8.4/lib/x86_64-linux-ghc-7.8.4/dep-file-test-0.1.0.0")
-  --        $(mkAbsDir "/home/dan/dep-file-test/.stack-work/dist/x86_64-linux/Cabal-1.18.1.5/build/dep-file-test/dep-file-test-tmp")
-  sampleProjectRoot <- parseAbsDir "/home/dan/dep-file-test"
-  let ctx = CompilationContext
-          { ccPackageName = "dep-file-test"
-          , ccPackageVersion = $(mkVersion "0.1.0.0")
-          , ccProjectRoot = sampleProjectRoot
-          , ccGhcVersion = $(mkVersion "7.8.4")
-          , ccArch = "x86_64-linux"
-          , ccSnapshot = "lts-2.13"
-          , ccCabalLibVersion = $(mkVersion "1.18.1.5")
-          }
+    let showIface arg = do
+            str <- readProcess "ghc" ["--show-iface", toFilePath arg] ""
+            return $ S8.pack str
+    --let hiDir =
+    --        -- $(mkAbsDir "/home/dan/dep-file-test/.stack-work/install/x86_64-linux/lts-2.13/7.8.4/lib/x86_64-linux-ghc-7.8.4/dep-file-test-0.1.0.0")
+    --        $(mkAbsDir "/home/dan/dep-file-test/.stack-work/dist/x86_64-linux/Cabal-1.18.1.5/build/dep-file-test/dep-file-test-tmp")
+    sampleProjectRoot <- parseAbsDir "/home/dan/dep-file-test"
+    let ctx = CompilationContext
+            { ccPackageName = "dep-file-test"
+            , ccPackageVersion = $(mkVersion "0.1.0.0")
+            , ccProjectRoot = sampleProjectRoot
+            , ccGhcVersion = $(mkVersion "7.8.4")
+            , ccPlatform = "x86_64-linux"
+            , ccSnapshot = "lts-2.13"
+            , ccCabalLibVersion = $(mkVersion "1.18.1.5")
+            }
 
-  hiDir <- targetHiDir ctx (TargetExecutable "dep-file-test")
-  let targetModules = TargetModules
-          { targetIsExecutable   = True
-          , targetExposedModules = []
-          , targetOtherModules   = []
-          }
-  files <- detectFiles showIface hiDir targetModules
-  mapM_ print files
+    hiDir <- targetHiDir ctx (TargetExecutable "dep-file-test")
+    let tModules = TargetModules
+            { targetIsExecutable   = True
+            , targetExposedModules = []
+            , targetOtherModules   = []
+            }
+    files <- detectFiles showIface hiDir tModules
+    mapM_ print files
 
---iface :: M m env => m ()
---iface = do
---  let print' :: (Show a, MonadIO m) => a -> m ()
---      print' = liftIO . print
---  localInstallRoot <- installationRootLocal
---  print' localInstallRoot
+targets :: LocalPackage -> [Target]
+targets LocalPackage{..} =
+    if packageHasLibrary
+        then [TargetLibrary]
+        else []
+    <> map toTargetExe (Set.toList packageExes)
+    <> map toTargetExe (Set.toList packageTests)
+    <> map toTargetExe (Set.toList packageBenchmarks)
+  where
+    Package{..} = lpPackage
+    toTargetExe = TargetExecutable . Text.unpack
 
---  dist <- distRelativeDir
---  print' dist
 
---  (lps, _, _) <- loadLocals defaultBuildOpts Map.empty
---  forM_ lps $ \lp -> do
---    print' $ packageName $ lpPackage lp
+-- copied and adapted from Ide.hs line 68
+defaultPackageConfig :: EnvConfig -> PackageName -> PackageConfig
+defaultPackageConfig econfig name = PackageConfig
+    { packageConfigEnableTests = True
+    , packageConfigEnableBenchmarks = True
+    , packageConfigFlags = localFlags mempty bconfig name
+    , packageConfigGhcVersion = envConfigGhcVersion econfig
+    , packageConfigPlatform = configPlatform
+          (getConfig bconfig)
+    }
+  where
+    bconfig = envConfigBuildConfig econfig
 
---  return ()
+iface :: M m env => m ()
+iface = do
+    $logWarn "The iface command is experimental and will probably be removed"
+
+    -- TODO(DanBurton): call with menv.
+    -- TODO(DanBurton): consider caching the result of this call.
+    let showIface arg = do
+            str <- readProcess "ghc" ["--show-iface", toFilePath arg] ""
+            return $ S8.pack str
+
+    envConfig <- asks getEnvConfig
+    (lps, _, _) <- loadLocals defaultBuildOpts Map.empty
+    forM_ lps $ \lp -> do
+        let pName = packageName (lpPackage lp)
+        liftIO $ putStr "package: "
+        liftIO $ print pName
+
+        let ctx = makeCompilationContext envConfig lp
+        gpDesc <- readPackageUnresolved (lpCabalFile lp)
+
+        let pkgConfig = defaultPackageConfig envConfig pName
+        let pDesc = resolvePackageDescription pkgConfig gpDesc
+        let tModulesMap = targetModules pDesc
+
+        forM_ (targets lp) $ \target -> do
+            liftIO $ putStr "target: "
+            liftIO $ print target
+            hiDir <- targetHiDir ctx target
+            case Map.lookup target tModulesMap of
+                Just tModules -> do
+                    files <- liftIO $ detectFiles showIface hiDir tModules
+                    forM_ files $ \file -> liftIO $ do
+                        putStr "addDependentFile "
+                        print file
+                Nothing -> error $ "target discrepancy: " <> show target
+
+    return ()

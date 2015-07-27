@@ -45,6 +45,7 @@ import           Stack.Exec
 import           Stack.Fetch
 import           Stack.FileWatch
 import           Stack.Ide
+import           Stack.Iface (iface)
 import qualified Stack.Image as Image
 import           Stack.Init
 import           Stack.New
@@ -222,6 +223,10 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
              addCommand "clean"
                         "Clean the local packages"
                         cleanCmd
+                        (pure ())
+             addCommand "iface"
+                        "Display TH dependencies"
+                        ifaceCmd
                         (pure ())
              addSubCommands
                Docker.dockerCmdName
@@ -701,3 +706,6 @@ solverCmd fixStackYaml go =
 -- | Visualize dependencies
 dotCmd :: DotOpts -> GlobalOpts -> IO ()
 dotCmd dotOpts go = withBuildConfig go ThrowException (dot dotOpts)
+
+ifaceCmd :: () -> GlobalOpts -> IO ()
+ifaceCmd () go = withBuildConfig go ThrowException iface
