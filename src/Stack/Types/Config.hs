@@ -262,16 +262,11 @@ instance HasEnvConfig EnvConfig where
 data LoadConfig m = LoadConfig
     { lcConfig          :: !Config
       -- ^ Top-level Stack configuration.
-    , lcLoadBuildConfig :: !(Maybe AbstractResolver -> NoBuildConfigStrategy -> m BuildConfig)
+    , lcLoadBuildConfig :: !(Maybe AbstractResolver -> m BuildConfig)
         -- ^ Action to load the remaining 'BuildConfig'.
     , lcProjectRoot     :: !(Maybe (Path Abs Dir))
         -- ^ The project root directory, if in a project.
     }
-
-data NoBuildConfigStrategy
-    = ThrowException
-    | ExecStrategy
-    deriving (Show, Eq, Ord)
 
 data PackageEntry = PackageEntry
     { peExtraDepMaybe :: !(Maybe Bool)
