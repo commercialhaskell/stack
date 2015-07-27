@@ -1,5 +1,5 @@
 name:                stack
-version:             0.1.2.99
+version:             0.1.2.999
 synopsis:            The Haskell Tool Stack
 description:         Please see the README.md for usage information, and
                      the wiki on Github for more details.  Also, note that
@@ -190,7 +190,6 @@ executable stack
                 , path
                 , process
                 , resourcet >= 1.1.4.1
-                , retry >= 0.6
                 , stack
                 , text >= 1.2.0.4
                 , either
