@@ -705,4 +705,4 @@ dotCmd :: DotOpts -> GlobalOpts -> IO ()
 dotCmd dotOpts go = withBuildConfig go (dot dotOpts)
 
 ifaceCmd :: () -> GlobalOpts -> IO ()
-ifaceCmd () go = withBuildConfig go ThrowException iface
+ifaceCmd () go = withBuildConfig go iface
