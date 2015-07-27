@@ -702,12 +702,13 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
     liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides mpkgid'
 
     when (doHaddock && shouldHaddockDeps eeBuildOpts) $
-        copyDepHaddocks
-            eeEnvOverride
-            eeBaseConfigOpts
-            (pkgDbs ++ [eeGlobalDB])
-            (PackageIdentifier (packageName package) (packageVersion package))
-            Set.empty
+        withMVar eeInstallLock $ \() ->
+            copyDepHaddocks
+                eeEnvOverride
+                eeBaseConfigOpts
+                (pkgDbs ++ [eeGlobalDB])
+                (PackageIdentifier (packageName package) (packageVersion package))
+                Set.empty
 
 singleTest :: M env m
            => TestOpts

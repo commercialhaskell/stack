@@ -222,20 +222,14 @@ loadBuildConfig :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, H
                 -> Config
                 -> Path Abs Dir
                 -> Maybe AbstractResolver -- override resolver
-                -> NoBuildConfigStrategy
                 -> m BuildConfig
-loadBuildConfig menv mproject config stackRoot mresolver noConfigStrat = do
+loadBuildConfig menv mproject config stackRoot mresolver = do
     env <- ask
     let miniConfig = MiniConfig (getHttpManager env) config
     (project', stackYamlFP) <- case mproject of
       Just (project, fp, _) -> return (project, fp)
-      Nothing -> case noConfigStrat of
-        ThrowException -> do
-            currDir <- getWorkingDir
-            cabalFiles <- findCabalFiles True currDir
-            throwM $ NoProjectConfigFound currDir
-                $ Just $ if null cabalFiles then "new" else "init"
-        ExecStrategy -> do
+      Nothing -> do
+            $logInfo "Run from outside a project, using implicit global config"
             let dest :: Path Abs File
                 dest = destDir </> stackDotYaml
                 destDir = implicitGlobalDir stackRoot

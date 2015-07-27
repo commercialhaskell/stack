@@ -409,7 +409,11 @@ execOptsParser mcmd =
 -- | Parser for global command-line options.
 globalOptsParser :: Bool -> Parser GlobalOpts
 globalOptsParser defaultTerminal =
-    GlobalOpts <$> logLevelOptsParser <*>
+    GlobalOpts <$>
+    switch (long Docker.reExecArgName <>
+            hidden <>
+            internal) <*>
+    logLevelOptsParser <*>
     configOptsParser False <*>
     optional abstractResolverOptsParser <*>
     flag

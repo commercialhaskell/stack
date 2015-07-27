@@ -45,6 +45,7 @@ import           Stack.Exec
 import           Stack.Fetch
 import           Stack.FileWatch
 import           Stack.Ide
+import           Stack.Iface (iface)
 import qualified Stack.Image as Image
 import           Stack.Init
 import           Stack.New
@@ -224,6 +225,10 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                         "Clean the local packages"
                         cleanCmd
                         (pure ())
+             addCommand "iface"
+                        "Display TH dependencies"
+                        ifaceCmd
+                        (pure ())
              addSubCommands
                Docker.dockerCmdName
                "Subcommands specific to Docker use"
@@ -301,7 +306,6 @@ pathCmd :: [Text] -> GlobalOpts -> IO ()
 pathCmd keys go =
     withBuildConfigAndLock
         go
-        ExecStrategy
         (do env <- ask
             let cfg = envConfig env
                 bc = envConfigBuildConfig cfg
@@ -434,17 +438,19 @@ setupParser = SetupCmdOpts
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
-  runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
+  runStackTGlobal manager (lcConfig lc) go $
       Docker.reexecWithOptionalContainer
           (lcProjectRoot lc)
-          (runStackLoggingT manager globalLogLevel globalTerminal $ do
+          Nothing
+          (runStackLoggingTGlobal manager go $ do
               (ghc, mstack) <-
                   case scoGhcVersion of
                       Just v -> return (v, Nothing)
                       Nothing -> do
-                          bc <- lcLoadBuildConfig lc globalResolver ExecStrategy
+                          bc <- lcLoadBuildConfig lc globalResolver
                           return (bcGhcVersionExpected bc, Just $ bcStackYaml bc)
-              mpaths <- runStackT manager globalLogLevel (lcConfig lc) globalTerminal $ ensureGHC SetupOpts
+              mpaths <- runStackTGlobal manager (lcConfig lc) go $
+                  ensureGHC SetupOpts
                   { soptsInstallIfMissing = True
                   , soptsUseSystem =
                     (configSystemGHC $ lcConfig lc)
@@ -463,6 +469,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
               $logInfo "To use this GHC and packages outside of a project, consider using:"
               $logInfo "stack ghc, stack ghci, stack runghc, or stack exec"
               )
+          Nothing
 
 -- | Enforce mutual exclusion of every action running via this function
 -- on this users account.  Currently, stack uses this to completely
@@ -490,55 +497,74 @@ withConfigAndLock :: GlobalOpts
 withConfigAndLock go@GlobalOpts{..} inner = do
     (manager, lc) <- loadConfigWithOpts go
     withUserFileLock (lcConfig lc) $
-     runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-        Docker.reexecWithOptionalContainer (lcProjectRoot lc) $
-            runStackT manager globalLogLevel (lcConfig lc) globalTerminal
-                inner
+     runStackTGlobal manager (lcConfig lc) go $
+        Docker.reexecWithOptionalContainer (lcProjectRoot lc)
+            Nothing
+            (runStackTGlobal manager (lcConfig lc) go inner)
+            Nothing
 
 withBuildConfigAndLock :: GlobalOpts
-                -> NoBuildConfigStrategy
-                -> StackT EnvConfig IO ()
-                -> IO ()
-withBuildConfigAndLock go@GlobalOpts{..} strat inner = do
+                 -> StackT EnvConfig IO ()
+                 -> IO ()
+withBuildConfigAndLock go inner =
+    withBuildConfigExt go Nothing inner Nothing
+
+withBuildConfigExt
+    :: GlobalOpts
+    -> Maybe (StackT Config IO ())
+    -- ^ Action to perform after before build.  This will be run on the host
+    -- OS even if Docker is enabled for builds.  The build config is not
+    -- available in this action, since that would require build tools to be
+    -- installed on the host OS.
+    -> StackT EnvConfig IO ()
+    -- ^ Action that uses the build config.  If Docker is enabled for builds,
+    -- this will be run in a Docker container.
+    -> Maybe (StackT Config IO ())
+    -- ^ Action to perform after the build.  This will be run on the host
+    -- OS even if Docker is enabled for builds.  The build config is not
+    -- available in this action, since that would require build tools to be
+    -- installed on the host OS.
+    -> IO ()
+withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
     (manager, lc) <- loadConfigWithOpts go
-    runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-        Docker.reexecWithOptionalContainer (lcProjectRoot lc) $ do
-            bconfig <- runStackLoggingT manager globalLogLevel globalTerminal $
-                lcLoadBuildConfig lc globalResolver strat
+    let inner' = do
+            bconfig <- runStackLoggingTGlobal manager go $
+                lcLoadBuildConfig lc globalResolver
             envConfig <-
-                runStackT
-                    manager globalLogLevel bconfig globalTerminal
-                    setupEnv
-            withUserFileLock (lcConfig lc) $
-             runStackT
-                 manager
-                 globalLogLevel
-                 envConfig
-                 globalTerminal
-                 inner
+               runStackTGlobal
+                   manager bconfig go
+                   setupEnv
+            runStackTGlobal
+                manager
+                envConfig
+                go
+                inner
+    withUserFileLock (lcConfig lc) $
+     runStackTGlobal manager (lcConfig lc) go $
+        Docker.reexecWithOptionalContainer (lcProjectRoot lc) mbefore inner' mafter
 
 cleanCmd :: () -> GlobalOpts -> IO ()
-cleanCmd () go = withBuildConfigAndLock go ThrowException clean
+cleanCmd () go = withBuildConfigAndLock go clean
 
 -- | Helper for build and install commands
 buildCmdHelper :: StackT EnvConfig IO () -- ^ do before build
-               -> NoBuildConfigStrategy -> FinalAction -> BuildOpts -> GlobalOpts -> IO ()
-buildCmdHelper beforeBuild strat finalAction opts go
+               -> FinalAction -> BuildOpts -> GlobalOpts -> IO ()
+buildCmdHelper beforeBuild finalAction opts go
     | boptsFileWatch opts = fileWatch inner
     | otherwise = inner $ const $ return ()
   where
-    inner setLocalFiles = withBuildConfigAndLock go strat $ do
+    inner setLocalFiles = withBuildConfigAndLock go $ do
         beforeBuild
         Stack.Build.build setLocalFiles opts { boptsFinalAction = finalAction }
 
 -- | Build the project.
 buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
-buildCmd = buildCmdHelper (return ()) ThrowException
+buildCmd = buildCmdHelper (return ())
 
 -- | Install
 installCmd :: BuildOpts -> GlobalOpts -> IO ()
 installCmd =
-    buildCmdHelper warning ExecStrategy DoNothing
+    buildCmdHelper warning DoNothing
   where
     warning = do
         $logWarn "NOTE: stack is not a package manager"
@@ -546,7 +572,7 @@ installCmd =
         $logWarn "You may want to use 'stack build --copy-bins' for clarity"
 
 copyCmd :: BuildOpts -> GlobalOpts -> IO ()
-copyCmd opts = buildCmdHelper (return ()) ExecStrategy DoNothing opts { boptsInstallExes = True }
+copyCmd opts = buildCmdHelper (return ()) DoNothing opts { boptsInstallExes = True }
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
 uninstallCmd _ go = withConfigAndLock go $ do
@@ -595,7 +621,7 @@ uploadCmd args go = do
         then withConfigAndLock go $ do
             uploader <- getUploader
             liftIO $ forM_ files (canonicalizePath >=> Upload.upload uploader)
-        else withBuildConfigAndLock go ExecStrategy $ do
+        else withBuildConfigAndLock go $ do
             uploader <- getUploader
             liftIO $ forM_ files (canonicalizePath >=> Upload.upload uploader)
             forM_ dirs $ \dir -> do
@@ -605,7 +631,7 @@ uploadCmd args go = do
 
 sdistCmd :: [String] -> GlobalOpts -> IO ()
 sdistCmd dirs go =
-    withBuildConfigAndLock go ExecStrategy $ do
+    withBuildConfigAndLock go $ do
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null dirs
             then asks (Map.keys . bcPackages . getBuildConfig)
@@ -623,14 +649,16 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
     case eoExtra of
         ExecOptsPlain -> do
             (manager,lc) <- liftIO $ loadConfigWithOpts go
-            runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
+            runStackTGlobal manager (lcConfig lc) go $
                 Docker.execWithOptionalContainer
                     (lcProjectRoot lc)
-                    (return (eoCmd, eoArgs, id)) $
-                    runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
-                        exec plainEnvSettings eoCmd eoArgs
+                    (return (eoCmd, eoArgs, [], id))
+                    Nothing
+                    (runStackTGlobal manager (lcConfig lc) go $
+                        exec plainEnvSettings eoCmd eoArgs)
+                    Nothing
         ExecOptsEmbellished {..} ->
-           withBuildConfigAndLock go ExecStrategy $ do
+           withBuildConfigAndLock go $ do
                let targets = concatMap words eoPackages
                unless (null targets) $
                    Stack.Build.build (const $ return ()) defaultBuildOpts
@@ -641,7 +669,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
 -- | Run the REPL in the context of a project.
 replCmd :: ([Text], [String], FilePath, Bool, [String]) -> GlobalOpts -> IO ()
 replCmd (targets,args,path,noload,packages) go@GlobalOpts{..} = do
-  withBuildConfigAndLock go ExecStrategy $ do
+  withBuildConfigAndLock go $ do
     let packageTargets = concatMap words packages
     unless (null packageTargets) $
        Stack.Build.build (const $ return ()) defaultBuildOpts
@@ -651,28 +679,28 @@ replCmd (targets,args,path,noload,packages) go@GlobalOpts{..} = do
 
 -- | Run ide-backend in the context of a project.
 ideCmd :: ([Text], [String]) -> GlobalOpts -> IO ()
-ideCmd (targets,args) go@GlobalOpts{..} = withBuildConfigAndLock go ExecStrategy $ do
+ideCmd (targets,args) go@GlobalOpts{..} = withBuildConfigAndLock go $ do
       ide targets args
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
 dockerPullCmd _ go@GlobalOpts{..} = do
     (manager,lc) <- liftIO $ loadConfigWithOpts go
-    runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
+    runStackTGlobal manager (lcConfig lc) go $
         Docker.preventInContainer Docker.pull
 
 -- | Reset the Docker sandbox.
 dockerResetCmd :: Bool -> GlobalOpts -> IO ()
 dockerResetCmd keepHome go@GlobalOpts{..} = do
     (manager,lc) <- liftIO (loadConfigWithOpts go)
-    runStackLoggingT manager globalLogLevel globalTerminal$ Docker.preventInContainer $
-        Docker.reset (lcProjectRoot lc) keepHome
+    runStackLoggingTGlobal manager go $
+        Docker.preventInContainer $ Docker.reset (lcProjectRoot lc) keepHome
 
 -- | Cleanup Docker images and containers.
 dockerCleanupCmd :: Docker.CleanupOpts -> GlobalOpts -> IO ()
 dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
     (manager,lc) <- liftIO $ loadConfigWithOpts go
-    runStackT manager globalLogLevel (lcConfig lc) globalTerminal $
+    runStackTGlobal manager (lcConfig lc) go $
         Docker.preventInContainer $
             Docker.cleanup cleanupOpts
 
@@ -680,7 +708,6 @@ imgDockerCmd :: () -> GlobalOpts -> IO ()
 imgDockerCmd () go@GlobalOpts{..} = do
     withBuildConfigAndLock
         go
-        ExecStrategy
         (do Stack.Build.build
                 (const (return ()))
                 defaultBuildOpts
@@ -689,7 +716,7 @@ imgDockerCmd () go@GlobalOpts{..} = do
 -- | Load the configuration with a manager. Convenience function used
 -- throughout this module.
 loadConfigWithOpts :: GlobalOpts -> IO (Manager,LoadConfig (StackLoggingT IO))
-loadConfigWithOpts GlobalOpts{..} = do
+loadConfigWithOpts go@GlobalOpts{..} = do
     manager <- newTLSManager
     mstackYaml <-
         case globalStackYaml of
@@ -697,10 +724,9 @@ loadConfigWithOpts GlobalOpts{..} = do
             Just fp -> do
                 path <- canonicalizePath fp >>= parseAbsFile
                 return $ Just path
-    lc <- runStackLoggingT
+    lc <- runStackLoggingTGlobal
               manager
-              globalLogLevel
-              globalTerminal
+              go
               (loadConfig globalConfigMonoid mstackYaml)
     return (manager,lc)
 
@@ -719,8 +745,11 @@ solverCmd :: Bool -- ^ modify stack.yaml automatically?
           -> GlobalOpts
           -> IO ()
 solverCmd fixStackYaml go =
-    withBuildConfigAndLock go ThrowException (solveExtraDeps fixStackYaml)
+    withBuildConfigAndLock go (solveExtraDeps fixStackYaml)
 
 -- | Visualize dependencies
 dotCmd :: DotOpts -> GlobalOpts -> IO ()
-dotCmd dotOpts go = withBuildConfigAndLock go ThrowException (dot dotOpts)
+dotCmd dotOpts go = withBuildConfigAndLock go (dot dotOpts)
+
+ifaceCmd :: () -> GlobalOpts -> IO ()
+ifaceCmd () go = withBuildConfigAndLock go iface

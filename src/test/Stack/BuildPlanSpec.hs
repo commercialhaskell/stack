@@ -39,8 +39,8 @@ main = hspec spec
 spec :: Spec
 spec = beforeAll setup $ afterAll teardown $ do
     let logLevel = LevelDebug
-    let loadConfig' m = runStackLoggingT m logLevel False (loadConfig mempty Nothing)
-    let loadBuildConfigRest m = runStackLoggingT m logLevel False
+    let loadConfig' m = runStackLoggingT m logLevel False False (loadConfig mempty Nothing)
+    let loadBuildConfigRest m = runStackLoggingT m logLevel False False
     let inTempDir action = do
             currentDirectory <- getCurrentDirectory
             withSystemTempDirectory "Stack_BuildPlanSpec" $ \tempDir -> do
@@ -53,8 +53,8 @@ spec = beforeAll setup $ afterAll teardown $ do
         -- github still depends on failure.
         writeFile "stack.yaml" "resolver: lts-2.9"
         LoadConfig{..} <- loadConfig' manager
-        bconfig <- loadBuildConfigRest manager (lcLoadBuildConfig Nothing ThrowException)
-        runStackT manager logLevel bconfig False $ do
+        bconfig <- loadBuildConfigRest manager (lcLoadBuildConfig Nothing)
+        runStackT manager logLevel bconfig False False $ do
             menv <- getMinimalEnvOverride
             mbp <- loadMiniBuildPlan $ LTS 2 9
             eres <- try $ resolveBuildPlan

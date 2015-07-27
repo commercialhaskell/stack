@@ -11,11 +11,11 @@ module Stack.Docker
   ,dockerOptsFromMonoid
   ,dockerPullCmdName
   ,execWithOptionalContainer
-  ,execWithRequiredContainer
   ,preventInContainer
   ,pull
   ,reexecWithOptionalContainer
   ,reset
+  ,reExecArgName
   ) where
 
 import           Control.Applicative
@@ -45,11 +45,11 @@ import           Data.Typeable (Typeable)
 import           Path
 import           Path.IO (getWorkingDir,listDirectory,createTree,removeFile,removeTree,dirExists)
 import           Stack.Constants (projectDockerSandboxDir,stackProgName,stackDotYaml,stackRootEnvVar)
-import           Stack.Exec
 import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Docker.GlobalDB
 import           System.Environment (lookupEnv,getProgName,getArgs,getExecutablePath)
+import           System.Exit (exitSuccess, exitWith)
 import           System.FilePath (dropTrailingPathSeparator,takeBaseName)
 import           System.Info (arch,os)
 import           System.IO (stderr,stdin,stdout,hIsTerminalDevice)
@@ -63,53 +63,64 @@ import           Text.Printf (printf)
 reexecWithOptionalContainer
     :: M env m
     => Maybe (Path Abs Dir)
+    -> Maybe (m ())
     -> IO ()
+    -> Maybe (m ())
     -> m ()
 reexecWithOptionalContainer mprojectRoot =
   execWithOptionalContainer mprojectRoot getCmdArgs
   where
     getCmdArgs =
-      do args <- getArgs
+      do args <- (("--" ++ reExecArgName) :) <$> getArgs
          if arch == "x86_64" && os == "linux"
              then do exePath <- getExecutablePath
                      let mountPath = concat ["/opt/host/bin/",takeBaseName exePath]
                      return (mountPath
                             ,args
+                            ,[]
                             ,\c -> c{configDocker=(configDocker c)
                                                   {dockerMount=Mount exePath mountPath :
                                                                dockerMount (configDocker c)}})
              else do progName <- getProgName
-                     return (takeBaseName progName,args,id)
+                     return (takeBaseName progName,args,[],id)
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
 -- Docker container.  Otherwise, runs the inner action.
 execWithOptionalContainer
     :: M env m
     => Maybe (Path Abs Dir)
-    -> IO (FilePath,[String],Config -> Config)
+    -> IO (FilePath,[String],[(String,String)],Config -> Config)
+    -> Maybe (m ())
     -> IO ()
+    -> Maybe (m ())
     -> m ()
-execWithOptionalContainer mprojectRoot getCmdArgs inner =
+execWithOptionalContainer mprojectRoot getCmdArgs mbefore inner mafter =
   do config <- asks getConfig
      inContainer <- getInContainer
-     if inContainer || not (dockerEnable (configDocker config))
-        then liftIO inner
-        else do (cmd_,args,modConfig) <- liftIO getCmdArgs
-                runContainerAndExit modConfig mprojectRoot cmd_ args []
-
--- | If Docker is enabled, re-runs the OS command returned by the second argument in a
--- Docker container.  Otherwise, throws 'DockerMustBeEnabledException'.
-execWithRequiredContainer
-    :: M env m
-    => Maybe (Path Abs Dir)
-    -> IO (FilePath,[String],Config -> Config)
-    -> m ()
-execWithRequiredContainer mprojectRoot getCmdArgs =
-  do config <- asks getConfig
-     unless (dockerEnable (configDocker config))
-          (throwM DockerMustBeEnabledException)
-     (cmd_,args,modConfig) <- liftIO getCmdArgs
-     runContainerAndExit modConfig mprojectRoot cmd_ args []
+     isReExec <- asks getReExec
+     if | inContainer && not isReExec && (isJust mbefore || isJust mafter) ->
+            throwM OnlyOnHostException
+        | inContainer ->
+            liftIO (do inner
+                       exitSuccess)
+        | not (dockerEnable (configDocker config)) ->
+            do fromMaybeAction mbefore
+               liftIO inner
+               fromMaybeAction mafter
+               liftIO exitSuccess
+        | otherwise ->
+            do (cmd_,args,envVars,modConfig) <- liftIO getCmdArgs
+               runContainerAndExit
+                 modConfig
+                 mprojectRoot
+                 (fromMaybeAction mbefore)
+                 cmd_
+                 args
+                 envVars
+                 (fromMaybeAction mafter)
+  where
+    fromMaybeAction Nothing = return ()
+    fromMaybeAction (Just hook) = hook
 
 -- | Error if running in a container.
 preventInContainer :: (MonadIO m,MonadThrow m) => m () -> m ()
@@ -121,25 +132,25 @@ preventInContainer inner =
 
 -- | 'True' if we are currently running inside a Docker container.
 getInContainer :: (MonadIO m) => m Bool
-getInContainer =
-  do maybeEnvVar <- liftIO (lookupEnv inContainerEnvVar)
-     case maybeEnvVar of
-       Nothing -> return False
-       Just _ -> return True
+getInContainer = liftIO (isJust <$> lookupEnv inContainerEnvVar)
 
 -- | Run a command in a new Docker container, then exit the process.
 runContainerAndExit :: M env m
                     => (Config -> Config)
                     -> Maybe (Path Abs Dir)
+                    -> m ()
                     -> FilePath
                     -> [String]
                     -> [(String, String)]
                     -> m ()
+                    -> m ()
 runContainerAndExit modConfig
                     mprojectRoot
+                    before
                     cmnd
                     args
-                    envVars =
+                    envVars
+                    after =
   do config <- fmap modConfig (asks getConfig)
      let docker = configDocker config
      envOverride <- getEnvOverride (configPlatform config)
@@ -177,7 +188,7 @@ runContainerAndExit modConfig
              Just x -> (x,False)
              Nothing ->
                --EKB TODO: remove this and oldImage after lts-1.x images no longer in use
-               let sandboxName = maybe "default" id (lookupImageEnv "SANDBOX_NAME" imageEnvVars)
+               let sandboxName = fromMaybe "default" (lookupImageEnv "SANDBOX_NAME" imageEnvVars)
                    maybeImageCabalRemoteRepoName = lookupImageEnv "CABAL_REMOTE_REPO_NAME" imageEnvVars
                    maybeImageStackageSlug = lookupImageEnv "STACKAGE_SLUG" imageEnvVars
                    maybeImageStackageDate = lookupImageEnv "STACKAGE_DATE" imageEnvVars
@@ -203,8 +214,10 @@ runContainerAndExit modConfig
            mapM_ createTree
                  (concat [[sandboxHomeDir, sandboxSandboxDir, stackRoot] ++
                           sandboxSubdirs]))
-     exec
-       plainEnvSettings
+     before
+     e <- try $ callProcess
+       Nothing
+       envOverride
        "docker"
        (concat
          [["run"
@@ -222,6 +235,7 @@ runContainerAndExit modConfig
           ,"-v",toFPNoTrailingSep sandboxHomeDir ++ ":" ++ toFPNoTrailingSep sandboxRepoDir
           ,"-v",toFPNoTrailingSep stackRoot ++ ":" ++
                 toFPNoTrailingSep (sandboxRepoDir </> $(mkRelDir ("." ++ stackProgName ++ "/")))]
+         ,concatMap (\(k,v) -> ["-e", k ++ "=" ++ v]) envVars
          ,if oldImage
             then ["-e",sandboxIDEnvVar ++ "=" ++ sandboxID
                  ,"--entrypoint=/root/entrypoint.sh"]
@@ -238,10 +252,12 @@ runContainerAndExit modConfig
                          ,["-i" | isTerm]]
          ,dockerRunArgs docker
          ,[image]
-         ,map (\(k,v) -> k ++ "=" ++ v) envVars
          ,[cmnd]
          ,args])
-
+     case e of
+       Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
+       Right () -> do after
+                      liftIO exitSuccess
   where
     lookupImageEnv name vars =
       case lookup name vars of
@@ -514,7 +530,7 @@ pull =
      pullImage envOverride docker (dockerImage docker)
 
 -- | Pull Docker image from registry.
-pullImage :: (MonadLogger m,MonadIO m,MonadThrow m)
+pullImage :: (MonadLogger m,MonadIO m,MonadThrow m,MonadBaseControl IO m)
           => EnvOverride -> DockerOpts -> String -> m ()
 pullImage envOverride docker image =
   do $logInfo (concatT ["Pulling image from registry: '",image,"'"])
@@ -529,7 +545,7 @@ pullImage envOverride docker image =
                    ,maybe [] (\u -> ["--username=" ++ u]) (dockerRegistryUsername docker)
                    ,maybe [] (\p -> ["--password=" ++ p]) (dockerRegistryPassword docker)
                    ,[takeWhile (/= '/') image]]))
-     e <- liftIO (try (callProcess Nothing envOverride "docker" ["pull",image]))
+     e <- try (callProcess Nothing envOverride "docker" ["pull",image])
      case e of
        Left (ProcessExitedUnsuccessfully _ _) -> throwM (PullFailedException image)
        Right () -> return ()
@@ -676,6 +692,10 @@ dockerPullCmdName = "pull"
 -- | Command-line argument for @docker cleanup@.
 dockerCleanupCmdName :: String
 dockerCleanupCmdName = "cleanup"
+
+-- | Command-line option for @--internal-re-exec@.
+reExecArgName :: String
+reExecArgName = "--internal-re-exec"
 
 -- | Options for 'cleanup'.
 data CleanupOpts = CleanupOpts
@@ -846,4 +866,4 @@ instance Show StackDockerException where
     concat ["Invalid database path: ",show ex]
 
 type M env m = (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadCatch m
-               ,HasConfig env,HasTerminal env)
+               ,HasConfig env,HasTerminal env,HasReExec env)

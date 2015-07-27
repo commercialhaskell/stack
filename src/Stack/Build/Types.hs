@@ -209,7 +209,7 @@ instance Show StackBuildException where
      -- Supressing duplicate output
     show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bs) =
         let fullCmd = (dropQuotes (show execName) ++ " " ++ (unwords fullArgs))
-            logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ show fp) logFiles
+            logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ toFilePath fp) logFiles
         in "\n--  While building package " ++ dropQuotes (show taskProvides') ++ " using:\n" ++
            "      " ++ fullCmd ++ "\n" ++
            "    Process exited with code: " ++ show exitCode ++
