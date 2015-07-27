@@ -97,7 +97,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                         (buildCmd DoNothing)
                         (buildOptsParser Build False)
              addCommand "install"
-                        "Identical to 'build --copy-bins', not actually a managed installation tool!"
+                        "Copy binaries to the target prefix location. The default is ~/.local/bin; you can change it with `--local-bin-path`. This is the only command that will mutate your system outside of this project directory"
                         installCmd
                         (buildOptsParser Build True)
              addCommand "uninstall"
@@ -520,12 +520,7 @@ buildCmd = buildCmdHelper (return ()) ThrowException
 -- | Install
 installCmd :: BuildOpts -> GlobalOpts -> IO ()
 installCmd =
-    buildCmdHelper warning ExecStrategy DoNothing
-  where
-    warning = do
-        $logWarn "NOTE: stack is not a package manager"
-        $logWarn "The install command is only used to copy executables to a destination directory, not manage them"
-        $logWarn "You may want to use 'stack build --copy-bins' for clarity"
+    buildCmdHelper (return ()) ExecStrategy DoNothing
 
 copyCmd :: BuildOpts -> GlobalOpts -> IO ()
 copyCmd opts = buildCmdHelper (return ()) ExecStrategy DoNothing opts { boptsInstallExes = True }
