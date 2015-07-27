@@ -24,6 +24,7 @@ import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Set as S
 import           Data.Text (Text)
+import qualified Data.Text as T
 import           Path
 import           Path.IO
 import           Stack.Build.Source
@@ -32,6 +33,7 @@ import           Stack.Exec (defaultEnvSettings)
 import           Stack.Package
 import           Stack.Types
 import           System.Directory (doesFileExist)
+import           System.Environment (lookupEnv)
 import           System.Exit
 import           System.IO
 import qualified System.Process as P
@@ -108,22 +110,25 @@ ide targets useropts = do
                     else return Nothing
     localdb <- packageDatabaseLocal
     depsdb <- packageDatabaseDeps
+    mpath <- liftIO $ lookupEnv "PATH"
     bindirs <- extraBinDirs `ap` return True {- include local bin -}
     let pkgopts = concat (map _2 pkgs)
         srcfiles = concatMap (map toFilePath . _3) pkgs
         pkgdbs =
             ["--package-db=" <> toFilePath depsdb <> ":" <> toFilePath localdb]
         paths =
-            ["--ide-backend-tools-path=" <> intercalate ":" (map toFilePath bindirs)
+            ["--ide-backend-tools-path=" <> intercalate ":" (map toFilePath bindirs) <> (maybe "" (':':) mpath)
             ]
-    exec
-        "stack-ide"
-        (["--local-work-dir=" ++ toFilePath pwd] ++
-         map ("--ghc-option=" ++) (filter (not . badForGhci) useropts) <>
-         paths <>
-         pkgopts <>
-         pkgdbs)
-        (encode (initialRequest srcfiles))
+        args =
+            ["--verbose"] <>
+            ["--local-work-dir=" ++ toFilePath pwd] <>
+            map ("--ghc-option=" ++) (filter (not . badForGhci) useropts) <>
+            paths <>
+            pkgopts <>
+            pkgdbs
+    let initialStdin = encode (initialRequest srcfiles)
+    $logDebug $ "Initial stack-ide request: " <> T.pack (show initialStdin)
+    exec "stack-ide" args initialStdin
   where
     wanted pwd cabalfp name = isInWantedList || targetsEmptyAndInDir
       where
