@@ -485,7 +485,7 @@ withBuildConfig :: GlobalOpts
                 -> StackT EnvConfig IO ()
                 -> IO ()
 withBuildConfig go inner =
-    withBuildConfigExt go strat Nothing inner Nothing
+    withBuildConfigExt go Nothing inner Nothing
 
 withBuildConfigExt
     :: GlobalOpts
