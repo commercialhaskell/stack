@@ -8,6 +8,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | The monad used for the command-line executable @stack@.
@@ -16,7 +17,9 @@ module Stack.Types.StackT
   (StackT
   ,StackLoggingT
   ,runStackT
+  ,runStackTGlobal
   ,runStackLoggingT
+  ,runStackLoggingTGlobal
   ,newTLSManager
   ,logSticky
   ,logStickyDone)
@@ -45,6 +48,7 @@ import           Network.HTTP.Client.Conduit (HasHttpManager(..))
 import           Network.HTTP.Conduit
 import           Prelude -- Fix AMP warning
 import           Stack.Types.Internal
+import           Stack.Types.Config (GlobalOpts (..))
 import           System.IO
 import           System.Log.FastLogger
 
@@ -79,16 +83,22 @@ instance MonadTransControl (StackT config) where
 instance (MonadIO m) => MonadLogger (StackT config m) where
   monadLoggerLog = stickyLoggerFunc
 
+-- | Run a Stack action, using global options.
+runStackTGlobal :: (MonadIO m,MonadBaseControl IO m)
+                => Manager -> config -> GlobalOpts -> StackT config m a -> m a
+runStackTGlobal manager config GlobalOpts{..} m =
+    runStackT manager globalLogLevel config globalTerminal globalReExec m
+
 -- | Run a Stack action.
 runStackT :: (MonadIO m,MonadBaseControl IO m)
-          => Manager -> LogLevel -> config -> Bool -> StackT config m a -> m a
-runStackT manager logLevel config terminal m =
+          => Manager -> LogLevel -> config -> Bool -> Bool -> StackT config m a -> m a
+runStackT manager logLevel config terminal reExec m =
     withSticky
         terminal
         (\sticky ->
               runReaderT
                   (unStackT m)
-                  (Env config logLevel terminal manager sticky))
+                  (Env config logLevel terminal reExec manager sticky))
 
 --------------------------------------------------------------------------------
 -- Logging only StackLoggingT monad transformer
@@ -97,6 +107,7 @@ runStackT manager logLevel config terminal m =
 data LoggingEnv = LoggingEnv
     { lenvLogLevel :: !LogLevel
     , lenvTerminal :: !Bool
+    , lenvReExec :: !Bool
     , lenvManager :: !Manager
     , lenvSticky :: !Sticky
     }
@@ -135,10 +146,19 @@ instance HasHttpManager LoggingEnv where
 instance HasTerminal LoggingEnv where
     getTerminal = lenvTerminal
 
+instance HasReExec LoggingEnv where
+    getReExec = lenvReExec
+
+-- | Run the logging monad, using global options.
+runStackLoggingTGlobal :: MonadIO m
+                       => Manager -> GlobalOpts -> StackLoggingT m a -> m a
+runStackLoggingTGlobal manager GlobalOpts{..} m =
+    runStackLoggingT manager globalLogLevel globalTerminal globalReExec m
+
 -- | Run the logging monad.
 runStackLoggingT :: MonadIO m
-                 => Manager -> LogLevel -> Bool -> StackLoggingT m a -> m a
-runStackLoggingT manager logLevel terminal m =
+                 => Manager -> LogLevel -> Bool -> Bool -> StackLoggingT m a -> m a
+runStackLoggingT manager logLevel terminal reExec m =
     withSticky
         terminal
         (\sticky ->
@@ -149,6 +169,7 @@ runStackLoggingT manager logLevel terminal m =
                   , lenvManager = manager
                   , lenvSticky = sticky
                   , lenvTerminal = terminal
+                  , lenvReExec = reExec
                   })
 
 -- | Convenience for getting a 'Manager'

@@ -268,7 +268,11 @@ sinkProcessStderrStdout wd menv name args sinkStderr sinkStdout = do
 -- executable path.
 preProcess :: (MonadIO m) => Maybe (Path Abs Dir) -> EnvOverride -> String -> m FilePath
 preProcess wd menv name = do
-  name' <- liftIO $ liftM toFilePath $ join $ findExecutable menv name
+  exists <- liftIO $ doesFileExist name
+  name' <-
+    if exists
+       then return name
+       else liftIO $ liftM toFilePath $ join $ findExecutable menv name
   maybe (return ()) createTree wd
   return name'
 

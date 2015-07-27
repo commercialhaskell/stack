@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
@@ -10,6 +11,7 @@ import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
+import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.List
 import qualified Data.Map.Strict as M
 import           Data.Maybe
@@ -28,7 +30,7 @@ import           Stack.Types
 -- given options and configure it with the load paths and extensions
 -- of those targets.
 repl
-    :: (HasConfig r, HasBuildConfig r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m)
+    :: (HasConfig r, HasBuildConfig r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
     => [Text] -- ^ Targets.
     -> [String] -- ^ GHC options.
     -> FilePath

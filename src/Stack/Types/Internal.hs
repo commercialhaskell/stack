@@ -13,6 +13,7 @@ data Env config =
   Env {envConfig :: !config
       ,envLogLevel :: !LogLevel
       ,envTerminal :: !Bool
+      ,envReExec :: !Bool
       ,envManager :: !Manager
       ,envSticky :: !Sticky}
 
@@ -44,6 +45,12 @@ class HasTerminal r where
 
 instance HasTerminal (Env config) where
   getTerminal = envTerminal
+
+class HasReExec r where
+  getReExec :: r -> Bool
+
+instance HasReExec (Env config) where
+  getReExec = envReExec
 
 newtype Sticky = Sticky
     { unSticky :: Maybe (MVar (Maybe Text))
