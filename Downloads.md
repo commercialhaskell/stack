@@ -22,6 +22,8 @@ We generally test on the current version of OS X, but stack is known to work on 
 
 ## Ubuntu
 
+*note*: for 32-bit, use the [generic Linux option](#linux)
+
 1. Get the FP Complete key:
 
         wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
@@ -50,6 +52,8 @@ We generally test on the current version of OS X, but stack is known to work on 
 
 ## Debian
 
+*note*: for 32-bit, use the [generic Linux option](#linux)
+
 1. Get the FP Complete key:
 
         wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/debian/fpco.key | sudo apt-key add -
@@ -70,6 +74,8 @@ We generally test on the current version of OS X, but stack is known to work on 
 
 ## CentOS / Red Hat
 
+*note*: for 32-bit, use the [generic Linux option](#linux)
+
 1. Add the appropriate source repository:
 
     * CentOS 7 / RHEL 7 (x86_64)
@@ -83,6 +89,8 @@ We generally test on the current version of OS X, but stack is known to work on 
         sudo yum -y install stack
 
 ## Fedora
+
+*note*: for 32-bit, use the [generic Linux option](#linux)
 
 1. Add the appropriate source repository:
 
@@ -110,6 +118,8 @@ We generally test on the current version of OS X, but stack is known to work on 
 
 ## Arch Linux
 
+*note*: for 32-bit, use the [generic Linux option](#linux)
+
 stack can be found in the AUR:
   - [haskell-stack](https://aur.archlinux.org/packages/haskell-stack/) _latest stable version_
   - [haskell-stack-git](https://aur4.archlinux.org/packages/haskell-stack-git/) _git version_
@@ -119,6 +129,8 @@ In order to install stack from Hackage or from source, you will need the [libtin
 If you use the [ArchHaskell repository](https://wiki.archlinux.org/index.php/ArchHaskell), you can also get the `haskell-stack` package from there.
 
 ## NixOS
+
+*note*: for 32-bit, use the [generic Linux option](#linux)
 
 1. Clone the git repo:
 
@@ -136,7 +148,7 @@ If you use the [ArchHaskell repository](https://wiki.archlinux.org/index.php/Arc
 
 ## Linux
 
-(64-bit only)
+(64-bit and 32-bit options available)
 
 * Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest)
 * Extract the `stack` executable somewhere on your `$PATH`  (see [Path section below](#path))
