@@ -439,7 +439,8 @@ setupParser = SetupCmdOpts
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
-  runStackTGlobal manager (lcConfig lc) go $
+  withUserFileLock (lcConfig lc) $ \_ ->
+   runStackTGlobal manager (lcConfig lc) go $
       Docker.reexecWithOptionalContainer
           (lcProjectRoot lc)
           Nothing
@@ -687,21 +688,27 @@ ideCmd (targets,args) go@GlobalOpts{..} = withBuildConfigAndLock go $ \_ -> do
 dockerPullCmd :: () -> GlobalOpts -> IO ()
 dockerPullCmd _ go@GlobalOpts{..} = do
     (manager,lc) <- liftIO $ loadConfigWithOpts go
-    runStackTGlobal manager (lcConfig lc) go $
-        Docker.preventInContainer Docker.pull
+    -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
+    withUserFileLock (lcConfig lc) $ \_ ->
+     runStackTGlobal manager (lcConfig lc) go $
+       Docker.preventInContainer Docker.pull
 
 -- | Reset the Docker sandbox.
 dockerResetCmd :: Bool -> GlobalOpts -> IO ()
 dockerResetCmd keepHome go@GlobalOpts{..} = do
     (manager,lc) <- liftIO (loadConfigWithOpts go)
-    runStackLoggingTGlobal manager go $
+    -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
+    withUserFileLock (lcConfig lc) $ \_ ->
+     runStackLoggingTGlobal manager go $
         Docker.preventInContainer $ Docker.reset (lcProjectRoot lc) keepHome
 
 -- | Cleanup Docker images and containers.
 dockerCleanupCmd :: Docker.CleanupOpts -> GlobalOpts -> IO ()
 dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
     (manager,lc) <- liftIO $ loadConfigWithOpts go
-    runStackTGlobal manager (lcConfig lc) go $
+    -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
+    withUserFileLock (lcConfig lc) $ \_ ->
+     runStackTGlobal manager (lcConfig lc) go $
         Docker.preventInContainer $
             Docker.cleanup cleanupOpts
 
