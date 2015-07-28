@@ -650,33 +650,36 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
     case eoExtra of
         ExecOptsPlain -> do
             (manager,lc) <- liftIO $ loadConfigWithOpts go
-            withUserFileLock (lcConfig lc) $ \_lk ->
+            withUserFileLock (lcConfig lc) $ \lk ->
              runStackTGlobal manager (lcConfig lc) go $
                 Docker.execWithOptionalContainer
                     (lcProjectRoot lc)
                     (return (eoCmd, eoArgs, [], id))
                     Nothing
-                    (runStackTGlobal manager (lcConfig lc) go $
+                    (runStackTGlobal manager (lcConfig lc) go $ do
+                        liftIO $ unlockFile lk -- Unlock before transferring control away.
                         exec plainEnvSettings eoCmd eoArgs)
                     Nothing
         ExecOptsEmbellished {..} ->
-           withBuildConfigAndLock go $ \_ -> do
+           withBuildConfigAndLock go $ \lk -> do
                let targets = concatMap words eoPackages
                unless (null targets) $
                    Stack.Build.build (const $ return ()) defaultBuildOpts
                        { boptsTargets = map T.pack targets
                        }
+               liftIO $ unlockFile lk -- Unlock before transferring control away.
                exec eoEnvSettings eoCmd eoArgs
 
 -- | Run the REPL in the context of a project.
 replCmd :: ([Text], [String], FilePath, Bool, [String]) -> GlobalOpts -> IO ()
 replCmd (targets,args,path,noload,packages) go@GlobalOpts{..} = do
-  withBuildConfigAndLock go $ \_ -> do
+  withBuildConfigAndLock go $ \lk -> do
     let packageTargets = concatMap words packages
     unless (null packageTargets) $
        Stack.Build.build (const $ return ()) defaultBuildOpts
            { boptsTargets = map T.pack packageTargets
            }
+    liftIO $ unlockFile lk -- Don't hold the lock while in the REPL.
     repl targets args path noload
 
 -- | Run ide-backend in the context of a project.
