@@ -649,7 +649,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
     case eoExtra of
         ExecOptsPlain -> do
             (manager,lc) <- liftIO $ loadConfigWithOpts go
-            runStackTGlobal manager (lcConfig lc) go $
+            withUserFileLock (lcConfig lc) $ \_lk ->
+             runStackTGlobal manager (lcConfig lc) go $
                 Docker.execWithOptionalContainer
                     (lcProjectRoot lc)
                     (return (eoCmd, eoArgs, [], id))
