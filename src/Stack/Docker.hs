@@ -157,9 +157,11 @@ runContainerAndExit modConfig
      checkDockerVersion envOverride
      uidOut <- readProcessStdout Nothing envOverride "id" ["-u"]
      gidOut <- readProcessStdout Nothing envOverride "id" ["-g"]
-     (dockerHost,dockerCertPath) <-
-       liftIO ((,) <$> lookupEnv "DOCKER_HOST"
-                   <*> lookupEnv "DOCKER_CERT_PATH")
+     (dockerHost,dockerCertPath,bamboo,jenkins) <-
+       liftIO ((,,,) <$> lookupEnv "DOCKER_HOST"
+                     <*> lookupEnv "DOCKER_CERT_PATH"
+                     <*> lookupEnv "bamboo_buildKey"
+                     <*> lookupEnv "JENKINS_HOME")
      isStdoutTerminal <- asks getTerminal
      (isStdinTerminal,isStderrTerminal) <-
        liftIO ((,) <$> hIsTerminalDevice stdin
@@ -206,6 +208,7 @@ runContainerAndExit modConfig
          sandboxSubdirs = map (\d -> sandboxRepoDir </> d)
                               sandboxedHomeSubdirectories
          isTerm = isStdinTerminal && isStdoutTerminal && isStderrTerminal
+         keepStdinOpen = isTerm || (isNothing bamboo && isNothing jenkins)
      liftIO
        (do updateDockerImageLastUsed config
                                      (iiId imageInfo)
@@ -249,7 +252,7 @@ runContainerAndExit modConfig
              then ["-d"]
              else concat [["--rm" | not (dockerPersist docker)]
                          ,["-t" | isTerm]
-                         ,["-i" | isTerm]]
+                         ,["-i" | keepStdinOpen]]
          ,dockerRunArgs docker
          ,[image]
          ,[cmnd]
