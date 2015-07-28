@@ -703,7 +703,7 @@ dockerCleanupCmdName = "cleanup"
 
 -- | Command-line option for @--internal-re-exec@.
 reExecArgName :: String
-reExecArgName = "--internal-re-exec"
+reExecArgName = "internal-re-exec"
 
 -- | Options for 'cleanup'.
 data CleanupOpts = CleanupOpts
