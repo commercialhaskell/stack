@@ -185,20 +185,7 @@ runContainerAndExit modConfig
      let uid = dropWhileEnd isSpace (decodeUtf8 uidOut)
          gid = dropWhileEnd isSpace (decodeUtf8 gidOut)
          imageEnvVars = map (break (== '=')) (icEnv (iiConfig imageInfo))
-         (sandboxID,oldImage) =
-           case lookupImageEnv sandboxIDEnvVar imageEnvVars of
-             Just x -> (x,False)
-             Nothing ->
-               --EKB TODO: remove this and oldImage after lts-1.x images no longer in use
-               let sandboxName = fromMaybe "default" (lookupImageEnv "SANDBOX_NAME" imageEnvVars)
-                   maybeImageCabalRemoteRepoName = lookupImageEnv "CABAL_REMOTE_REPO_NAME" imageEnvVars
-                   maybeImageStackageSlug = lookupImageEnv "STACKAGE_SLUG" imageEnvVars
-                   maybeImageStackageDate = lookupImageEnv "STACKAGE_DATE" imageEnvVars
-               in (case (maybeImageStackageSlug,maybeImageStackageDate) of
-                     (Just stackageSlug,_) -> sandboxName ++ "_" ++ stackageSlug
-                     (_,Just stackageDate) -> sandboxName ++ "_" ++ stackageDate
-                     _ -> sandboxName ++ maybe "" ("_" ++) maybeImageCabalRemoteRepoName
-                  ,True)
+         sandboxID = fromMaybe "default" (lookupImageEnv sandboxIDEnvVar imageEnvVars)
      sandboxIDDir <- parseRelDir (sandboxID ++ "/")
      let stackRoot = configStackRoot config
          sandboxDir = projectDockerSandboxDir projectRoot
@@ -239,10 +226,6 @@ runContainerAndExit modConfig
           ,"-v",toFPNoTrailingSep stackRoot ++ ":" ++
                 toFPNoTrailingSep (sandboxRepoDir </> $(mkRelDir ("." ++ stackProgName ++ "/")))]
          ,concatMap (\(k,v) -> ["-e", k ++ "=" ++ v]) envVars
-         ,if oldImage
-            then ["-e",sandboxIDEnvVar ++ "=" ++ sandboxID
-                 ,"--entrypoint=/root/entrypoint.sh"]
-            else []
          ,concatMap sandboxSubdirArg sandboxSubdirs
          ,concatMap mountArg (dockerMount docker)
          ,case dockerContainerName docker of
