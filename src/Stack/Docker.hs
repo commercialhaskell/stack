@@ -33,6 +33,7 @@ import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Char (isSpace,toUpper,isAscii)
 import           Data.List (dropWhileEnd,find,intercalate,intersperse,isPrefixOf,isInfixOf,foldl',sortBy)
+import           Data.List.Extra (trim)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
@@ -57,6 +58,11 @@ import           System.Process.PagerEditor (editByteString)
 import           System.Process.Read
 import           System.Process.Run
 import           Text.Printf (printf)
+
+#ifndef mingw32_HOST_OS
+import           Control.Monad.Trans.Control (liftBaseWith)
+import           System.Posix.Signals
+#endif
 
 -- | If Docker is enabled, re-runs the currently running OS command in a Docker container.
 -- Otherwise, runs the inner action.
@@ -194,8 +200,12 @@ runContainerAndExit modConfig
          sandboxRepoDir = sandboxDir </> sandboxIDDir
          sandboxSubdirs = map (\d -> sandboxRepoDir </> d)
                               sandboxedHomeSubdirectories
-         isTerm = isStdinTerminal && isStdoutTerminal && isStderrTerminal
-         keepStdinOpen = isTerm || (isNothing bamboo && isNothing jenkins)
+         isTerm = not (dockerDetach docker) &&
+                  isStdinTerminal &&
+                  isStdoutTerminal &&
+                  isStderrTerminal
+         keepStdinOpen = not (dockerDetach docker) &&
+                         (isTerm || (isNothing bamboo && isNothing jenkins))
      liftIO
        (do updateDockerImageLastUsed config
                                      (iiId imageInfo)
@@ -204,13 +214,10 @@ runContainerAndExit modConfig
            mapM_ createTree
                  (concat [[sandboxHomeDir, sandboxSandboxDir, stackRoot] ++
                           sandboxSubdirs]))
-     before
-     e <- try $ callProcess
-       Nothing
+     containerID <- (trim . decodeUtf8) <$> readDockerProcess
        envOverride
-       "docker"
        (concat
-         [["run"
+         [["create"
           ,"--net=host"
           ,"-e",inContainerEnvVar ++ "=1"
           ,"-e",stackRootEnvVar ++ "=" ++ toFPNoTrailingSep stackRoot
@@ -231,15 +238,30 @@ runContainerAndExit modConfig
          ,case dockerContainerName docker of
             Just name -> ["--name=" ++ name]
             Nothing -> []
-         ,if dockerDetach docker
-             then ["-d"]
-             else concat [["--rm" | not (dockerPersist docker)]
-                         ,["-t" | isTerm]
-                         ,["-i" | keepStdinOpen]]
+         ,["-t" | isTerm]
+         ,["-i" | keepStdinOpen]
          ,dockerRunArgs docker
          ,[image]
          ,[cmnd]
          ,args])
+     before
+#ifndef mingw32_HOST_OS
+     runInBase <- liftBaseWith $ \run -> return (void . run)
+     forM_ [sigHUP,sigINT,sigQUIT,sigABRT,sigALRM,sigTERM] $ \sig -> do
+       let sigHandler = runInBase (readProcessNull Nothing envOverride "docker"
+                                     ["kill","--signal=" ++ show sig,containerID])
+       liftIO $ installHandler sig (Catch sigHandler) Nothing
+#endif
+     e <- try (callProcess
+                 Nothing
+                 envOverride
+                 "docker"
+                 (concat [["start"]
+                         ,["-a" | not (dockerDetach docker)]
+                         ,["-i" | keepStdinOpen]
+                         ,[containerID]]))
+     unless (dockerPersist docker || dockerDetach docker)
+            (readProcessNull Nothing envOverride "docker" ["rm",containerID])
      case e of
        Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
        Right () -> do after
