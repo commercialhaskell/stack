@@ -154,7 +154,8 @@ If you use the [ArchHaskell repository](https://wiki.archlinux.org/index.php/Arc
 * Extract the `stack` executable somewhere on your `$PATH`  (see [Path section below](#path))
 * Now you can run `stack` from the terminal.
 
-Tested on Fedora 20: make sure to install the following packages `sudo yum install perl make automake gcc gmp-devel`
+Tested on Fedora 20: make sure to install the following packages `sudo yum install perl make automake gcc gmp-devel`.
+For Gentoo users, make sure to have the `ncurses` package with `USE=tinfo` (without it, stack will not be able to install GHC).
 
 ## Path
 
