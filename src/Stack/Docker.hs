@@ -57,6 +57,7 @@ import           System.IO (stderr,stdin,stdout,hIsTerminalDevice)
 import           System.Process.PagerEditor (editByteString)
 import           System.Process.Read
 import           System.Process.Run
+import           System.Process (CreateProcess(delegate_ctlc))
 import           Text.Printf (printf)
 
 #ifndef mingw32_HOST_OS
@@ -247,12 +248,15 @@ runContainerAndExit modConfig
      before
 #ifndef mingw32_HOST_OS
      runInBase <- liftBaseWith $ \run -> return (void . run)
-     forM_ [sigHUP,sigINT,sigQUIT,sigABRT,sigALRM,sigTERM] $ \sig -> do
+     oldHandlers <- forM (concat [[(sigINT,sigTERM) | not keepStdinOpen]
+                                 ,[(sigTERM,sigTERM)]]) $ \(sigIn,sigOut) -> do
        let sigHandler = runInBase (readProcessNull Nothing envOverride "docker"
-                                     ["kill","--signal=" ++ show sig,containerID])
-       liftIO $ installHandler sig (Catch sigHandler) Nothing
+                                     ["kill","--signal=" ++ show sigOut,containerID])
+       oldHandler <- liftIO $ installHandler sigIn (Catch sigHandler) Nothing
+       return (sigIn, oldHandler)
 #endif
-     e <- try (callProcess
+     e <- try (callProcess'
+                 (if keepStdinOpen then id else (\cp -> cp { delegate_ctlc = False }))
                  Nothing
                  envOverride
                  "docker"
@@ -260,8 +264,12 @@ runContainerAndExit modConfig
                          ,["-a" | not (dockerDetach docker)]
                          ,["-i" | keepStdinOpen]
                          ,[containerID]]))
+#ifndef mingw32_HOST_OS
+     forM_ oldHandlers $ \(sig,oldHandler) ->
+       liftIO $ installHandler sig oldHandler Nothing
+#endif
      unless (dockerPersist docker || dockerDetach docker)
-            (readProcessNull Nothing envOverride "docker" ["rm",containerID])
+            (readProcessNull Nothing envOverride "docker" ["rm","-f",containerID])
      case e of
        Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
        Right () -> do after
