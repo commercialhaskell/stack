@@ -1,4 +1,4 @@
-## Unreleased
+## 0.1.2.2
 
 * Set the `HASKELL_DIST_DIR` environment variable [#524](https://github.com/commercialhaskell/stack/pull/524)
 * Track build status of tests and benchmarks [#525](https://github.com/commercialhaskell/stack/issues/525)
