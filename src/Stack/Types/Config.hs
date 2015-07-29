@@ -767,6 +767,10 @@ bindirSuffix = $(mkRelDir "bin")
 docDirSuffix :: Path Rel Dir
 docDirSuffix = $(mkRelDir "doc")
 
+-- | Suffix applied to an installation root to get the hpc dir
+hpcDirSuffix :: Path Rel Dir
+hpcDirSuffix = $(mkRelDir "hpc")
+
 -- | Get the extra bin directories (for the PATH). Puts more local first
 --
 -- Bool indicates whether or not to include the locals

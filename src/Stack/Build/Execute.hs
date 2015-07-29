@@ -882,8 +882,15 @@ compareTestsComponents comps tests2 =
 generateHpcReport :: M env m => Path Abs Dir -> Text -> Text -> Text -> m ()
 generateHpcReport pkgDir pkgName pkgId testName = do
     let whichTest = pkgName <> "'s test-suite \"" <> testName <> "\""
+    -- Compute destination directory.
+    installDir <- installationRootLocal
+    testNamePath <- parseRelDir (T.unpack testName)
+    pkgIdPath <- parseRelDir (T.unpack pkgId)
+    let destDir = installDir </> hpcDirSuffix </> pkgIdPath </> testNamePath
+    -- Directories for .mix files.
     hpcDir <- hpcDirFromDir pkgDir
     hpcRelDir <- (</> dotHpc) <$> hpcRelativeDir
+    -- Compute arguments used for both "hpc markup" and "hpc report".
     pkgDirs <- Map.keys . bcPackages <$> asks getBuildConfig
     let args =
             -- Use index files from all packages (allows cross-package
@@ -895,6 +902,7 @@ generateHpcReport pkgDir pkgName pkgId testName = do
             -- Restrict to just the current library code (see #634 -
             -- this will likely be customizable in the future)
             ,"--include", T.unpack (pkgId <> ":")]
+    -- If a .tix file exists, generate an HPC report for it.
     tixFile <- parseRelFile (T.unpack testName ++ ".tix")
     let tixFileAbs = hpcDir </> tixFile
     tixFileExists <- fileExists tixFileAbs
@@ -910,13 +918,13 @@ generateHpcReport pkgDir pkgName pkgId testName = do
             menv <- getMinimalEnvOverride
             $logInfo $ "Generating HTML coverage report for " <> whichTest
             _ <- readProcessStdout (Just hpcDir) menv "hpc"
-                ("markup" : toFilePath tixFileAbs : args)
+                ("markup" : toFilePath tixFileAbs : ("--destdir=" ++ toFilePath destDir) : args)
             output <- readProcessStdout (Just hpcDir) menv "hpc"
                 ("report" : toFilePath tixFileAbs : args)
             forM_ (S8.lines output) ($logInfo . T.decodeUtf8 . stripCharacterReturn)
             $logInfo
                 ("The HTML coverage report for " <> whichTest <> " is available at " <>
-                 T.pack (toFilePath (hpcDir </> $(mkRelFile "hpc_index.html"))))
+                 T.pack (toFilePath (destDir </> $(mkRelFile "hpc_index.html"))))
 
 singleBench :: M env m
             => BenchmarkOpts
