@@ -481,7 +481,7 @@ withUserFileLock :: Config
                  -> (FileLock -> IO a)
                  -> IO a
 withUserFileLock cfg act = do
-    lockfile <- parseRelFile "lockfile"
+    let lockfile = $(mkRelFile "lockfile")
     let pth = configStackRoot cfg </> lockfile
     fstTry <- tryLockFile (toFilePath pth) Exclusive
     case fstTry of
