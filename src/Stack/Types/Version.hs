@@ -24,7 +24,8 @@ module Stack.Types.Version
   ,fromCabalVersion
   ,mkVersion
   ,versionRangeText
-  ,withinRange)
+  ,withinRange
+  ,Stack.Types.Version.intersectVersionRanges)
   where
 
 import           Control.Applicative
@@ -201,3 +202,7 @@ versionRangeText = T.pack . render . disp
 -- | Check if a version is within a version range.
 withinRange :: Version -> Cabal.VersionRange -> Bool
 withinRange v r = toCabalVersion v `Cabal.withinRange` r
+
+-- | A modified intersection which also simplifies, for better display.
+intersectVersionRanges :: Cabal.VersionRange -> Cabal.VersionRange -> Cabal.VersionRange
+intersectVersionRanges x y = Cabal.simplifyVersionRange $ Cabal.intersectVersionRanges x y

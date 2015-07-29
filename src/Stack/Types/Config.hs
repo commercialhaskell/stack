@@ -39,7 +39,7 @@ import           Data.Typeable
 import           Data.Yaml (ParseException)
 import           Distribution.System (Platform)
 import qualified Distribution.Text
-import           Distribution.Version (anyVersion, intersectVersionRanges)
+import           Distribution.Version (anyVersion)
 import qualified Paths_stack as Meta
 import           Network.HTTP.Client (parseUrl)
 import           Path

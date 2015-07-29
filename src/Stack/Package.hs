@@ -65,7 +65,6 @@ import           Distribution.PackageDescription.Parse
 import           Distribution.Simple.Utils
 import           Distribution.System (OS (..), Arch, Platform (..))
 import           Distribution.Text (display)
-import           Distribution.Version (intersectVersionRanges)
 import           Path as FL
 import           Path.Find
 import           Path.IO
