@@ -4,10 +4,14 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TemplateHaskell       #-}
 -- | Generate HPC (Haskell Program Coverage) reports
-module Stack.Build.Coverage (generateHpcReport) where
+module Stack.Build.Coverage
+    ( generateHpcReport
+    , generateHpcMarkupIndex
+    ) where
 
 import           Control.Applicative            ((<$>))
 import           Control.Exception.Lifted
+import           Control.Monad                  (liftM)
 import           Control.Monad.Catch            (MonadCatch, MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -23,12 +27,16 @@ import           Data.Monoid                    ((<>))
 import           Data.Text                      (Text)
 import qualified Data.Text                      as T
 import qualified Data.Text.Encoding             as T
+import qualified Data.Text.IO                   as T
+import qualified Data.Text.Lazy                 as LT
+import           Data.Traversable               (forM)
 import           Path
 import           Path.IO
 import           Prelude                        hiding (FilePath, writeFile)
 import           Stack.Constants
 import           Stack.Types
 import           System.Process.Read
+import           Text.Hastache                  (htmlEscape)
 
 -- | Generates the HTML coverage report and shows a textual coverage
 -- summary.
@@ -81,3 +89,59 @@ generateHpcReport pkgDir pkgName pkgId testName = do
             $logInfo
                 ("The HTML coverage report for " <> whichTest <> " is available at " <>
                  T.pack (toFilePath (destDir </> $(mkRelFile "hpc_index.html"))))
+
+generateHpcMarkupIndex :: (MonadIO m,MonadReader env m,MonadLogger m,MonadCatch m,HasEnvConfig env)
+                       => m ()
+generateHpcMarkupIndex = do
+    installDir <- installationRootLocal
+    let markupDir = installDir </> hpcDirSuffix
+        outputFile = markupDir </> $(mkRelFile "index.html")
+    (dirs, _) <- listDirectory markupDir
+    rows <- liftM (catMaybes . concat) $ forM dirs $ \dir -> do
+        (subdirs, _) <- listDirectory dir
+        forM subdirs $ \subdir -> do
+            let indexPath = subdir </> $(mkRelFile "hpc_index.html")
+            exists <- fileExists indexPath
+            if not exists then return Nothing else do
+                relPath <- stripDir markupDir indexPath
+                let package = dirname dir
+                    testsuite = dirname subdir
+                return $ Just $ T.concat
+                  [ "<tr><td>"
+                  , pathToHtml package
+                  , "</td><td><a href=\""
+                  , pathToHtml relPath
+                  , "\">"
+                  , pathToHtml testsuite
+                  , "</a></td></tr>"
+                  ]
+    liftIO $ T.writeFile (toFilePath outputFile) $ T.concat $
+        [ "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\">"
+        -- Part of the css from HPC's output HTML
+        , "<style type=\"text/css\">"
+        , "table.dashboard { border-collapse: collapse; border: solid 1px black }"
+        , ".dashboard td { border: solid 1px black }"
+        , ".dashboard th { border: solid 1px black }"
+        , "</style>"
+        , "</head>"
+        , "<body>"
+        ] ++
+        (if null rows
+            then
+                [ "<b>No hpc_index.html files found in \""
+                , pathToHtml markupDir
+                , "\".</b>"
+                ]
+            else
+                [ "<table class=\"dashboard\" width=\"100%\" boder=\"1\"><tbody>"
+                , "<p><b>NOTE: This is merely a listing of the html files found in the coverage reports directory.  Some of these reports may be old.</b></p>"
+                , "<tr><th>Package</th><th>TestSuite</th></tr>"
+                ] ++
+                rows ++
+                ["</tbody></table>"]) ++
+        ["</body></html>"]
+    $logInfo $ "\nAn index of the generated HTML coverage reports is available at " <>
+        T.pack (toFilePath outputFile)
+
+pathToHtml :: Path b t -> Text
+pathToHtml = T.dropWhileEnd (=='/') . LT.toStrict . htmlEscape . LT.pack . toFilePath

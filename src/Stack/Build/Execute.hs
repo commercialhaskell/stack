@@ -387,6 +387,9 @@ executePlan' plan ee@ExecuteEnv {..} = do
         generateLocalHaddockIndex eeEnvOverride eeBaseConfigOpts eeLocals
         generateDepsHaddockIndex eeEnvOverride eeBaseConfigOpts eeLocals
         generateSnapHaddockIndex eeEnvOverride eeBaseConfigOpts eeGlobalDB
+    case boptsFinalAction eeBuildOpts of
+        DoTests topts | toCoverage topts -> generateHpcMarkupIndex
+        _ -> return ()
 
 toActions :: M env m
           => (m () -> IO ())
