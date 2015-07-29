@@ -4,7 +4,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TemplateHaskell       #-}
--- Perform a build
+-- | Perform a build
 module Stack.Build.Execute
     ( printPlan
     , preFetch
@@ -51,7 +51,6 @@ import qualified Data.Streaming.Process         as Process
 import           Data.Traversable               (forM)
 import           Data.Text                      (Text)
 import qualified Data.Text                      as T
-import qualified Data.Text.Encoding             as T
 import           Data.Text.Encoding             (encodeUtf8)
 import           Data.Word8                     (_colon)
 import           Distribution.System            (OS (Windows),
@@ -63,6 +62,7 @@ import           Path.IO
 import           Prelude                        hiding (FilePath, writeFile)
 import           Safe                           (lastMay)
 import           Stack.Build.Cache
+import           Stack.Build.Coverage
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
@@ -878,54 +878,6 @@ compareTestsComponents comps tests2 =
             ("test", y) -> Set.singleton $ T.drop 1 y
             _ -> Set.empty
 
--- | Generate the HTML report and show a textual coverage summary.
-generateHpcReport :: M env m => Path Abs Dir -> Text -> Text -> Text -> m ()
-generateHpcReport pkgDir pkgName pkgId testName = do
-    let whichTest = pkgName <> "'s test-suite \"" <> testName <> "\""
-    -- Compute destination directory.
-    installDir <- installationRootLocal
-    testNamePath <- parseRelDir (T.unpack testName)
-    pkgIdPath <- parseRelDir (T.unpack pkgId)
-    let destDir = installDir </> hpcDirSuffix </> pkgIdPath </> testNamePath
-    -- Directories for .mix files.
-    hpcDir <- hpcDirFromDir pkgDir
-    hpcRelDir <- (</> dotHpc) <$> hpcRelativeDir
-    -- Compute arguments used for both "hpc markup" and "hpc report".
-    pkgDirs <- Map.keys . bcPackages <$> asks getBuildConfig
-    let args =
-            -- Use index files from all packages (allows cross-package
-            -- coverage results).
-            concatMap (\x -> ["--srcdir", toFilePath x]) pkgDirs ++
-            -- Look for index files in the correct dir (relative to
-            -- each pkgdir).
-            ["--hpcdir", toFilePath hpcRelDir, "--reset-hpcdirs"
-            -- Restrict to just the current library code (see #634 -
-            -- this will likely be customizable in the future)
-            ,"--include", T.unpack (pkgId <> ":")]
-    -- If a .tix file exists, generate an HPC report for it.
-    tixFile <- parseRelFile (T.unpack testName ++ ".tix")
-    let tixFileAbs = hpcDir </> tixFile
-    tixFileExists <- fileExists tixFileAbs
-    if not tixFileExists
-        then $logError $ T.concat
-            [ "Didn't find .tix coverage file for "
-            , whichTest
-            , " - expected to find it at "
-            , T.pack (toFilePath tixFileAbs)
-            , "."
-            ]
-        else (`onException` $logError ("Error occurred while producing coverage report for " <> whichTest)) $ do
-            menv <- getMinimalEnvOverride
-            $logInfo $ "Generating HTML coverage report for " <> whichTest
-            _ <- readProcessStdout (Just hpcDir) menv "hpc"
-                ("markup" : toFilePath tixFileAbs : ("--destdir=" ++ toFilePath destDir) : args)
-            output <- readProcessStdout (Just hpcDir) menv "hpc"
-                ("report" : toFilePath tixFileAbs : args)
-            forM_ (S8.lines output) ($logInfo . T.decodeUtf8 . stripCharacterReturn)
-            $logInfo
-                ("The HTML coverage report for " <> whichTest <> " is available at " <>
-                 T.pack (toFilePath (destDir </> $(mkRelFile "hpc_index.html"))))
-
 singleBench :: M env m
             => BenchmarkOpts
             -> ActionContext
@@ -969,7 +921,7 @@ printBuildOutput :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
 printBuildOutput excludeTHLoading makeAbsolute level outH = void $ fork $
          CB.sourceHandle outH
     $$ CB.lines
-    =$ CL.map stripCharacterReturn
+    =$ CL.map stripCarriageReturn
     =$ CL.filter (not . isTHLoading)
     =$ CL.mapM toAbsolutePath
     =$ CL.mapM_ (monadLoggerLog $(TH.location >>= liftLoc) "" level)
@@ -1010,9 +962,9 @@ printBuildOutput excludeTHLoading makeAbsolute level outH = void $ fork $
 
         guard $ bs2 == ":"
 
--- | Strip a @\r@ character from the byte vector. Used because Windows.
-stripCharacterReturn :: ByteString -> ByteString
-stripCharacterReturn = S8.filter (not . (=='\r'))
+    -- | Strip @\r@ characters from the byte vector. Used because Windows.
+    stripCarriageReturn :: ByteString -> ByteString
+    stripCarriageReturn = S8.filter (not . (=='\r'))
 
 taskLocation :: Task -> InstallLocation
 taskLocation task =
