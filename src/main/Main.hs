@@ -483,14 +483,18 @@ withUserFileLock :: Config
 withUserFileLock cfg act = do
     let lockfile = $(mkRelFile "lockfile")
     let pth = configStackRoot cfg </> lockfile
-    fstTry <- tryLockFile (toFilePath pth) Exclusive
-    case fstTry of
-      Nothing -> do putStrLn $ "Failed to grab lock ("++show pth++"); other stack instance running.  Waiting..."
+    -- Just in case of asynchronous exceptions, we need to be careful
+    -- when using tryLockFile here:
+    bracket (tryLockFile (toFilePath pth) Exclusive)
+            (\fstTry -> maybe (return ()) unlockFile fstTry)
+            (\fstTry ->
+             case fstTry of
+               Just lk -> finally (act lk) (unlockFile lk)
+               Nothing ->
+                 do putStrLn $ "Failed to grab lock ("++show pth++"); other stack instance running.  Waiting..."
                     withFileLock (toFilePath pth) Exclusive $ \lk -> do
                       putStrLn "Lock acquired, proceeding."
-                      act lk
-      Just lk -> bracket (return lk) unlockFile act
-
+                      act lk)
 
 withConfigAndLock :: GlobalOpts
            -> StackT Config IO ()
