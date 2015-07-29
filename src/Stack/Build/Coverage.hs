@@ -12,7 +12,7 @@ module Stack.Build.Coverage
 import           Control.Applicative            ((<$>))
 import           Control.Exception.Lifted
 import           Control.Monad                  (liftM)
-import           Control.Monad.Catch            (MonadCatch, MonadMask)
+import           Control.Monad.Catch            (MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader           (MonadReader, asks)
