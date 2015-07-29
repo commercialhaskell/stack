@@ -36,6 +36,10 @@ enableDisableFlags defaultValue enabledValue disabledValue name helpSuffix mods 
 -- | Enable/disable flags for any type, without a default (to allow chaining @<|>@s)
 enableDisableFlagsNoDefault :: a -> a -> String -> String -> Mod FlagFields a -> Parser a
 enableDisableFlagsNoDefault enabledValue disabledValue name helpSuffix mods =
+  last <$> some (enableDisableFlagsNoDefault' enabledValue disabledValue name helpSuffix mods)
+
+enableDisableFlagsNoDefault' :: a -> a -> String -> String -> Mod FlagFields a -> Parser a
+enableDisableFlagsNoDefault' enabledValue disabledValue name helpSuffix mods =
   flag' enabledValue
         (long name <>
          help ("Enable " ++ helpSuffix) <>
