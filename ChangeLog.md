@@ -20,6 +20,7 @@
 * Make `stack build --flag` error when flag or package is unknown [#617](https://github.com/commercialhaskell/stack/issues/617)
 * Preserve file permissions when unpacking sources [#666](https://github.com/commercialhaskell/stack/pull/666)
 * `stack build` etc work outside of a project
+* `list-dependencies` command [#638](https://github.com/commercialhaskell/stack/issues/638)
 
 Bug fixes:
 
