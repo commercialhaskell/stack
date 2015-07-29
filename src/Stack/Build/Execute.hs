@@ -836,6 +836,7 @@ singleTest topts ac ee task =
 
             when needHpc $ forM_ (lastMay testsToRun) $ \testName -> do
                 let pkgName = packageNameText (packageName package)
+                    pkgId = packageIdentifierText (packageIdentifier package)
                 when (not $ null $ tail testsToRun) $ $logWarn $ T.concat
                     [ "Error: The --coverage flag does not yet support multiple test suites in a single cabal file. "
                     , "All of the tests have been run, however, the HPC report will only supply coverage info for "
@@ -844,7 +845,7 @@ singleTest topts ac ee task =
                     , testName
                     , "."
                     ]
-                generateHpcReport pkgDir pkgName testName
+                generateHpcReport pkgDir pkgName pkgId testName
 
             bs <- liftIO $
                 case mlogFile of
@@ -878,15 +879,22 @@ compareTestsComponents comps tests2 =
             _ -> Set.empty
 
 -- | Generate the HTML report and show a textual coverage summary.
-generateHpcReport :: M env m => Path Abs Dir -> Text -> Text -> m ()
-generateHpcReport pkgDir pkgName testName = do
+generateHpcReport :: M env m => Path Abs Dir -> Text -> Text -> Text -> m ()
+generateHpcReport pkgDir pkgName pkgId testName = do
     let whichTest = pkgName <> "'s test-suite \"" <> testName <> "\""
     hpcDir <- hpcDirFromDir pkgDir
     hpcRelDir <- (</> dotHpc) <$> hpcRelativeDir
     pkgDirs <- Map.keys . bcPackages <$> asks getBuildConfig
     let args =
+            -- Use index files from all packages (allows cross-package
+            -- coverage results).
             concatMap (\x -> ["--srcdir", toFilePath x]) pkgDirs ++
-            ["--hpcdir", toFilePath hpcRelDir, "--reset-hpcdirs"]
+            -- Look for index files in the correct dir (relative to
+            -- each pkgdir).
+            ["--hpcdir", toFilePath hpcRelDir, "--reset-hpcdirs"
+            -- Restrict to just the current library code (see #634 -
+            -- this will likely be customizable in the future)
+            ,"--include", T.unpack (pkgId <> ":")]
     tixFile <- parseRelFile (T.unpack testName ++ ".tix")
     let tixFileAbs = hpcDir </> tixFile
     tixFileExists <- fileExists tixFileAbs
