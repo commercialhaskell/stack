@@ -270,7 +270,7 @@ loadLocals bopts latestVersion = do
                             -- All flags are defined, nothing to do
                             then Nothing
                             -- Error about the undefined flags
-                            else Just $ UFFlagsNotDefined source name unused
+                            else Just $ UFFlagsNotDefined source pkg unused
 
         unusedFlags = mapMaybe checkFlagUsed flags
 
