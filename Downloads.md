@@ -150,7 +150,7 @@ If you use the [ArchHaskell repository](https://wiki.archlinux.org/index.php/Arc
 
 (64-bit and 32-bit options available)
 
-* Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest)
+* Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest).  Note: the `-gmp4` variants are for older distributions (such as CentOS 6.x) that only include libgmp4 (libgmp.so.3)
 * Extract the `stack` executable somewhere on your `$PATH`  (see [Path section below](#path))
 * Now you can run `stack` from the terminal.
 
