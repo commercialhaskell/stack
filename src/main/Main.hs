@@ -508,6 +508,15 @@ withConfigAndLock go@GlobalOpts{..} inner = do
             (runStackTGlobal manager (lcConfig lc) go inner)
             Nothing
 
+-- For now the non-locking version just unlocks immediately.
+-- That is, there's still a serialization point.
+withBuildConfig :: GlobalOpts
+               -> (StackT EnvConfig IO ())
+               -> IO ()
+withBuildConfig go inner =
+    withBuildConfigAndLock go (\lk -> do liftIO $ unlockFile lk
+                                         inner)
+
 withBuildConfigAndLock :: GlobalOpts
                  -> (FileLock -> StackT EnvConfig IO ())
                  -> IO ()
@@ -636,10 +645,7 @@ uploadCmd args go = do
 
 sdistCmd :: [String] -> GlobalOpts -> IO ()
 sdistCmd dirs go =
-    withBuildConfigAndLock go $ \lk -> do
-        liftIO $ unlockFile lk -- Unlock immediately to perform local actions.
-        -- TODO: if desired it would be possible to *never* lock for sdist, I think.
-
+    withBuildConfig go $ do -- No locking needed.
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null dirs
             then asks (Map.keys . bcPackages . getBuildConfig)
@@ -691,7 +697,8 @@ replCmd (targets,args,path,noload,packages) go@GlobalOpts{..} = do
 
 -- | Run ide-backend in the context of a project.
 ideCmd :: ([Text], [String]) -> GlobalOpts -> IO ()
-ideCmd (targets,args) go@GlobalOpts{..} = withBuildConfigAndLock go $ \_ -> do
+ideCmd (targets,args) go@GlobalOpts{..} =
+    withBuildConfig go $ -- No locking needed.
       ide targets args
 
 -- | Pull the current Docker image.
