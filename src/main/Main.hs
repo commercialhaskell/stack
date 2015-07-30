@@ -637,7 +637,7 @@ uploadCmd args go = do
 sdistCmd :: [String] -> GlobalOpts -> IO ()
 sdistCmd dirs go =
     withBuildConfigAndLock go $ \lk -> do
-        unlockFile lk -- Unlock immediately to perform local actions.
+        liftIO $ unlockFile lk -- Unlock immediately to perform local actions.
         -- TODO: if desired it would be possible to *never* lock for sdist, I think.
 
         -- If no directories are specified, build all sdist tarballs.
