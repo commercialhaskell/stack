@@ -229,6 +229,15 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                         "Display TH dependencies"
                         ifaceCmd
                         (pure ())
+             addCommand "list-dependencies"
+                        "List the dependencies"
+                        listDependenciesCmd
+                        (T.pack <$> strOption (long "separator" <>
+                                               metavar "SEP" <>
+                                               help ("Separator between package name " <>
+                                                     "and package version.") <>
+                                               value " " <>
+                                               showDefault))
              addSubCommands
                Docker.dockerCmdName
                "Subcommands specific to Docker use"
@@ -731,13 +740,15 @@ dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
 
 imgDockerCmd :: () -> GlobalOpts -> IO ()
 imgDockerCmd () go@GlobalOpts{..} = do
-    withBuildConfigAndLock
+    withBuildConfigExt
         go
+        Nothing
         (\_ ->
-          do Stack.Build.build
-                  (const (return ()))
-                  defaultBuildOpts
-             Docker.preventInContainer Image.imageDocker)
+         do Stack.Build.build
+                (const (return ()))
+                defaultBuildOpts
+            Image.stageContainerImageArtifacts)
+        (Just Image.createContainerImageFromStage)
 
 -- | Load the configuration with a manager. Convenience function used
 -- throughout this module.
@@ -779,3 +790,8 @@ dotCmd dotOpts go = withBuildConfigAndLock go (\_ -> dot dotOpts)
 
 ifaceCmd :: () -> GlobalOpts -> IO ()
 ifaceCmd () go = withBuildConfigAndLock go (\_ -> iface)
+
+-- | List the dependencies
+listDependenciesCmd :: Text -> GlobalOpts -> IO ()
+listDependenciesCmd sep go = withBuildConfig go (listDependencies sep')
+  where sep' = T.replace "\\t" "\t" (T.replace "\\n" "\n" sep)

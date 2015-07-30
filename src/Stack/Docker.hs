@@ -33,6 +33,7 @@ import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Char (isSpace,toUpper,isAscii)
 import           Data.List (dropWhileEnd,find,intercalate,intersperse,isPrefixOf,isInfixOf,foldl',sortBy)
+import           Data.List.Extra (trim)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
@@ -56,7 +57,13 @@ import           System.IO (stderr,stdin,stdout,hIsTerminalDevice)
 import           System.Process.PagerEditor (editByteString)
 import           System.Process.Read
 import           System.Process.Run
+import           System.Process (CreateProcess(delegate_ctlc))
 import           Text.Printf (printf)
+
+#ifndef mingw32_HOST_OS
+import           Control.Monad.Trans.Control (liftBaseWith)
+import           System.Posix.Signals
+#endif
 
 -- | If Docker is enabled, re-runs the currently running OS command in a Docker container.
 -- Otherwise, runs the inner action.
@@ -157,9 +164,11 @@ runContainerAndExit modConfig
      checkDockerVersion envOverride
      uidOut <- readProcessStdout Nothing envOverride "id" ["-u"]
      gidOut <- readProcessStdout Nothing envOverride "id" ["-g"]
-     (dockerHost,dockerCertPath) <-
-       liftIO ((,) <$> lookupEnv "DOCKER_HOST"
-                   <*> lookupEnv "DOCKER_CERT_PATH")
+     (dockerHost,dockerCertPath,bamboo,jenkins) <-
+       liftIO ((,,,) <$> lookupEnv "DOCKER_HOST"
+                     <*> lookupEnv "DOCKER_CERT_PATH"
+                     <*> lookupEnv "bamboo_buildKey"
+                     <*> lookupEnv "JENKINS_HOME")
      isStdoutTerminal <- asks getTerminal
      (isStdinTerminal,isStderrTerminal) <-
        liftIO ((,) <$> hIsTerminalDevice stdin
@@ -183,20 +192,7 @@ runContainerAndExit modConfig
      let uid = dropWhileEnd isSpace (decodeUtf8 uidOut)
          gid = dropWhileEnd isSpace (decodeUtf8 gidOut)
          imageEnvVars = map (break (== '=')) (icEnv (iiConfig imageInfo))
-         (sandboxID,oldImage) =
-           case lookupImageEnv sandboxIDEnvVar imageEnvVars of
-             Just x -> (x,False)
-             Nothing ->
-               --EKB TODO: remove this and oldImage after lts-1.x images no longer in use
-               let sandboxName = fromMaybe "default" (lookupImageEnv "SANDBOX_NAME" imageEnvVars)
-                   maybeImageCabalRemoteRepoName = lookupImageEnv "CABAL_REMOTE_REPO_NAME" imageEnvVars
-                   maybeImageStackageSlug = lookupImageEnv "STACKAGE_SLUG" imageEnvVars
-                   maybeImageStackageDate = lookupImageEnv "STACKAGE_DATE" imageEnvVars
-               in (case (maybeImageStackageSlug,maybeImageStackageDate) of
-                     (Just stackageSlug,_) -> sandboxName ++ "_" ++ stackageSlug
-                     (_,Just stackageDate) -> sandboxName ++ "_" ++ stackageDate
-                     _ -> sandboxName ++ maybe "" ("_" ++) maybeImageCabalRemoteRepoName
-                  ,True)
+         sandboxID = fromMaybe "default" (lookupImageEnv sandboxIDEnvVar imageEnvVars)
      sandboxIDDir <- parseRelDir (sandboxID ++ "/")
      let stackRoot = configStackRoot config
          sandboxDir = projectDockerSandboxDir projectRoot
@@ -205,7 +201,12 @@ runContainerAndExit modConfig
          sandboxRepoDir = sandboxDir </> sandboxIDDir
          sandboxSubdirs = map (\d -> sandboxRepoDir </> d)
                               sandboxedHomeSubdirectories
-         isTerm = isStdinTerminal && isStdoutTerminal && isStderrTerminal
+         isTerm = not (dockerDetach docker) &&
+                  isStdinTerminal &&
+                  isStdoutTerminal &&
+                  isStderrTerminal
+         keepStdinOpen = not (dockerDetach docker) &&
+                         (isTerm || (isNothing bamboo && isNothing jenkins))
      liftIO
        (do updateDockerImageLastUsed config
                                      (iiId imageInfo)
@@ -214,13 +215,10 @@ runContainerAndExit modConfig
            mapM_ createTree
                  (concat [[sandboxHomeDir, sandboxSandboxDir, stackRoot] ++
                           sandboxSubdirs]))
-     before
-     e <- try $ callProcess
-       Nothing
+     containerID <- (trim . decodeUtf8) <$> readDockerProcess
        envOverride
-       "docker"
        (concat
-         [["run"
+         [["create"
           ,"--net=host"
           ,"-e",inContainerEnvVar ++ "=1"
           ,"-e",stackRootEnvVar ++ "=" ++ toFPNoTrailingSep stackRoot
@@ -236,24 +234,42 @@ runContainerAndExit modConfig
           ,"-v",toFPNoTrailingSep stackRoot ++ ":" ++
                 toFPNoTrailingSep (sandboxRepoDir </> $(mkRelDir ("." ++ stackProgName ++ "/")))]
          ,concatMap (\(k,v) -> ["-e", k ++ "=" ++ v]) envVars
-         ,if oldImage
-            then ["-e",sandboxIDEnvVar ++ "=" ++ sandboxID
-                 ,"--entrypoint=/root/entrypoint.sh"]
-            else []
          ,concatMap sandboxSubdirArg sandboxSubdirs
          ,concatMap mountArg (dockerMount docker)
          ,case dockerContainerName docker of
             Just name -> ["--name=" ++ name]
             Nothing -> []
-         ,if dockerDetach docker
-             then ["-d"]
-             else concat [["--rm" | not (dockerPersist docker)]
-                         ,["-t" | isTerm]
-                         ,["-i" | isTerm]]
+         ,["-t" | isTerm]
+         ,["-i" | keepStdinOpen]
          ,dockerRunArgs docker
          ,[image]
          ,[cmnd]
          ,args])
+     before
+#ifndef mingw32_HOST_OS
+     runInBase <- liftBaseWith $ \run -> return (void . run)
+     oldHandlers <- forM (concat [[(sigINT,sigTERM) | not keepStdinOpen]
+                                 ,[(sigTERM,sigTERM)]]) $ \(sigIn,sigOut) -> do
+       let sigHandler = runInBase (readProcessNull Nothing envOverride "docker"
+                                     ["kill","--signal=" ++ show sigOut,containerID])
+       oldHandler <- liftIO $ installHandler sigIn (Catch sigHandler) Nothing
+       return (sigIn, oldHandler)
+#endif
+     e <- try (callProcess'
+                 (if keepStdinOpen then id else (\cp -> cp { delegate_ctlc = False }))
+                 Nothing
+                 envOverride
+                 "docker"
+                 (concat [["start"]
+                         ,["-a" | not (dockerDetach docker)]
+                         ,["-i" | keepStdinOpen]
+                         ,[containerID]]))
+#ifndef mingw32_HOST_OS
+     forM_ oldHandlers $ \(sig,oldHandler) ->
+       liftIO $ installHandler sig oldHandler Nothing
+#endif
+     unless (dockerPersist docker || dockerDetach docker)
+            (readProcessNull Nothing envOverride "docker" ["rm","-f",containerID])
      case e of
        Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
        Right () -> do after
@@ -695,7 +711,7 @@ dockerCleanupCmdName = "cleanup"
 
 -- | Command-line option for @--internal-re-exec@.
 reExecArgName :: String
-reExecArgName = "--internal-re-exec"
+reExecArgName = "internal-re-exec"
 
 -- | Options for 'cleanup'.
 data CleanupOpts = CleanupOpts

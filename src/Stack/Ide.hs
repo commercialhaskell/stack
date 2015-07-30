@@ -19,18 +19,16 @@ import qualified Data.ByteString.Char8 as S8
 import           Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as L
 import           Data.List
-import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Monoid
-import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Path
 import           Path.IO
-import           Stack.Build.Source
 import           Stack.Constants
 import           Stack.Exec (defaultEnvSettings)
 import           Stack.Package
+import           Stack.Repl (GhciPkgInfo(..), ghciSetup)
 import           Stack.Types
 import           System.Directory (doesFileExist)
 import           System.Environment (lookupEnv)
@@ -48,73 +46,30 @@ ide
     -> [String] -- ^ GHC options.
     -> m ()
 ide targets useropts = do
-    econfig <- asks getEnvConfig
-    bconfig <- asks getBuildConfig
+    pkgs <- ghciSetup targets
     pwd <- getWorkingDir
-    locals <-
-        liftM catMaybes $
-        forM (M.toList (bcPackages bconfig)) $
-        \(dir,validWanted) ->
-             do cabalfp <- getCabalFileName dir
-                name <- parsePackageNameFromFilePath cabalfp
-                if validWanted && wanted pwd cabalfp name
-                    then return (Just (name, cabalfp))
-                    else return Nothing
-    pkgs <-
-        liftM catMaybes $
-        forM (M.toList (bcPackages bconfig)) $
-        \(dir,validWanted) ->
-             do cabalfp <- getCabalFileName dir
-                name <- parsePackageNameFromFilePath cabalfp
-                let config =
-                        PackageConfig
-                        { packageConfigEnableTests = True
-                        , packageConfigEnableBenchmarks = True
-                        , packageConfigFlags = localFlags mempty bconfig name
-                        , packageConfigGhcVersion = envConfigGhcVersion econfig
-                        , packageConfigPlatform = configPlatform
-                              (getConfig bconfig)
-                        }
-                pkg <- readPackage config cabalfp
-                if validWanted && wanted pwd cabalfp name
-                    then do
-                        pkgOpts <-
-                            getPackageOpts
-                                (packageOpts pkg)
-                                (map fst locals)
-                                cabalfp
-                        srcfiles <-
-                            getPackageFiles (packageFiles pkg) Modules cabalfp
-                        dist <- distDirFromDir dir
-                        autogen <- return (autogenDir dist)
-                        paths_foo <-
-                            liftM
-                                (autogen </>)
-                                (parseRelFile
-                                     ("Paths_" ++
-                                      packageNameString name ++ ".hs"))
-                        paths_foo_exists <- fileExists paths_foo
-                        return
-                            (Just
-                                 ( packageName pkg
-                                 , ["--dist-dir=" <> toFilePath dist] ++
-                                   map
-                                       ("--ghc-option=" ++)
-                                       (filter (not . badForGhci) pkgOpts)
-                                 , mapMaybe
-                                       (stripDir pwd)
-                                       (S.toList srcfiles <>
-                                        if paths_foo_exists
-                                            then [paths_foo]
-                                            else [])))
-                    else return Nothing
+    (pkgopts, srcfiles)  <- liftM mconcat $ forM pkgs $ \pkg -> do
+        dist <- distDirFromDir (ghciPkgDir pkg)
+        autogen <- return (autogenDir dist)
+        paths_foo <-
+            liftM
+                (autogen </>)
+                (parseRelFile
+                     ("Paths_" ++
+                      packageNameString (ghciPkgName pkg) ++ ".hs"))
+        paths_foo_exists <- fileExists paths_foo
+        return ( ["--dist-dir=" <> toFilePath dist] ++
+                 map ("--ghc-option=" ++) (ghciPkgOpts pkg)
+               , mapMaybe (fmap toFilePath . stripDir pwd)
+                          (ghciPkgModules pkg <>
+                           if paths_foo_exists
+                               then [paths_foo]
+                               else []))
     localdb <- packageDatabaseLocal
     depsdb <- packageDatabaseDeps
     mpath <- liftIO $ lookupEnv "PATH"
     bindirs <- extraBinDirs `ap` return True {- include local bin -}
-    let pkgopts = concat (map _2 pkgs)
-        srcfiles = concatMap (map toFilePath . _3) pkgs
-        pkgdbs =
+    let pkgdbs =
             ["--package-db=" <> toFilePath depsdb <> ":" <> toFilePath localdb]
         paths =
             ["--ide-backend-tools-path=" <> intercalate ":" (map toFilePath bindirs) <> (maybe "" (':':) mpath)
@@ -122,23 +77,13 @@ ide targets useropts = do
         args =
             ["--verbose"] <>
             ["--local-work-dir=" ++ toFilePath pwd] <>
-            map ("--ghc-option=" ++) (filter (not . badForGhci) useropts) <>
+            map ("--ghc-option=" ++) useropts <>
             paths <>
             pkgopts <>
             pkgdbs
     let initialStdin = encode (initialRequest srcfiles)
     $logDebug $ "Initial stack-ide request: " <> T.pack (show initialStdin)
     exec "stack-ide" args initialStdin
-  where
-    wanted pwd cabalfp name = isInWantedList || targetsEmptyAndInDir
-      where
-        isInWantedList = elem (packageNameText name) targets
-        targetsEmptyAndInDir = null targets || isParentOf (parent cabalfp) pwd
-    badForGhci x =
-        isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky")
-    _1 (x,_,_) = x
-    _2 (_,x,_) = x
-    _3 (_,_,x) = x
 
 -- | Make the initial request.
 initialRequest :: [FilePath] -> Value

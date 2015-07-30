@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 -- | Run a REPL configured with the user's project(s).
 
@@ -19,6 +20,7 @@ import           Data.Monoid
 import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Typeable
 import           Path
 import           Path.IO
 import           Stack.Build.Source
@@ -37,6 +39,29 @@ repl
     -> Bool
     -> m ()
 repl targets useropts ghciPath noload = do
+    pkgs <- ghciSetup targets
+    let pkgopts = concatMap ghciPkgOpts pkgs
+        srcfiles
+          | noload = []
+          | otherwise = concatMap (map toFilePath . ghciPkgModules) pkgs
+    $logInfo
+        ("Configuring GHCi with the following packages: " <>
+         T.intercalate ", " (map packageNameText (map ghciPkgName pkgs)))
+    exec
+        defaultEnvSettings
+        ghciPath
+        ("--interactive" : pkgopts <> srcfiles <> useropts)
+
+data GhciPkgInfo = GhciPkgInfo
+  { ghciPkgName :: PackageName
+  , ghciPkgOpts :: [String]
+  , ghciPkgDir :: Path Abs Dir
+  , ghciPkgModules :: [Path Abs File]
+  }
+
+ghciSetup :: (HasConfig r, HasBuildConfig r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m)
+          => [Text] -> m [GhciPkgInfo]
+ghciSetup targets = do
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
     pwd <- getWorkingDir
@@ -49,40 +74,43 @@ repl targets useropts ghciPath noload = do
                 if validWanted && wanted pwd cabalfp name
                     then return (Just (name, cabalfp))
                     else return Nothing
-    pkgs <-
-        forM locals $
-        \(name,cabalfp) ->
-             do let config =
-                        PackageConfig
-                        { packageConfigEnableTests = True
-                        , packageConfigEnableBenchmarks = True
-                        , packageConfigFlags = localFlags mempty bconfig name
-                        , packageConfigGhcVersion = envConfigGhcVersion econfig
-                        , packageConfigPlatform = configPlatform
-                              (getConfig bconfig)
-                        }
-                pkg <- readPackage config cabalfp
-                pkgOpts <- getPackageOpts (packageOpts pkg) (map fst locals) cabalfp
-                srcfiles <- getPackageFiles (packageFiles pkg) Modules cabalfp
-                return (packageName pkg, pkgOpts, S.toList srcfiles)
-    let pkgopts = filter (not . badForGhci) (concat (map _2 pkgs))
-        srcfiles
-          | noload = []
-          | otherwise = concatMap (map toFilePath . _3) pkgs
-    $logInfo
-        ("Configuring GHCi with the following packages: " <>
-         T.intercalate ", " (map packageNameText (map _1 pkgs)))
-    exec
-        defaultEnvSettings
-        ghciPath
-        ("--interactive" : pkgopts <> srcfiles <> useropts)
+    let findTarget x = find ((x==) . packageNameText . fst) locals
+        unmetTargets = filter (isNothing . findTarget) targets
+    when (not (null unmetTargets)) $
+        throwM (TargetsNotFound unmetTargets)
+    forM locals $ \(name,cabalfp) -> do
+        let config =
+                PackageConfig
+                { packageConfigEnableTests = True
+                , packageConfigEnableBenchmarks = True
+                , packageConfigFlags = localFlags mempty bconfig name
+                , packageConfigGhcVersion = envConfigGhcVersion econfig
+                , packageConfigPlatform = configPlatform (getConfig bconfig)
+                }
+        pkg <- readPackage config cabalfp
+        pkgOpts <- getPackageOpts (packageOpts pkg) (map fst locals) cabalfp
+        srcfiles <- getPackageFiles (packageFiles pkg) Modules cabalfp
+        return GhciPkgInfo
+            { ghciPkgName = packageName pkg
+            , ghciPkgOpts = filter (not . badForGhci) pkgOpts
+            , ghciPkgDir = parent cabalfp
+            , ghciPkgModules = S.toList srcfiles
+            }
   where
     wanted pwd cabalfp name = isInWantedList || targetsEmptyAndInDir
       where
         isInWantedList = elem (packageNameText name) targets
         targetsEmptyAndInDir = null targets || isParentOf (parent cabalfp) pwd
-    badForGhci x =
-        isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky")
-    _1 (x,_,_) = x
-    _2 (_,x,_) = x
-    _3 (_,_,x) = x
+    badForGhci :: String -> Bool
+    badForGhci x = isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky")
+
+data GhciSetupException =
+    TargetsNotFound [Text]
+    deriving Typeable
+
+instance Exception GhciSetupException
+instance Show GhciSetupException where
+    show (TargetsNotFound targets) = unlines
+        [ "Couldn't find targets: " ++ T.unpack (T.unwords targets)
+        , "(expecting package names)"
+        ]

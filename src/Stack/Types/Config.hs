@@ -39,7 +39,7 @@ import           Data.Typeable
 import           Data.Yaml (ParseException)
 import           Distribution.System (Platform)
 import qualified Distribution.Text
-import           Distribution.Version (anyVersion, intersectVersionRanges)
+import           Distribution.Version (anyVersion)
 import qualified Paths_stack as Meta
 import           Network.HTTP.Client (parseUrl)
 import           Path
@@ -766,6 +766,10 @@ bindirSuffix = $(mkRelDir "bin")
 -- | Suffix applied to an installation root to get the doc dir
 docDirSuffix :: Path Rel Dir
 docDirSuffix = $(mkRelDir "doc")
+
+-- | Suffix applied to an installation root to get the hpc dir
+hpcDirSuffix :: Path Rel Dir
+hpcDirSuffix = $(mkRelDir "hpc")
 
 -- | Get the extra bin directories (for the PATH). Puts more local first
 --

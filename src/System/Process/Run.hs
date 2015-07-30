@@ -10,7 +10,8 @@
 
 module System.Process.Run
     (runIn
-    ,callProcess)
+    ,callProcess
+    ,callProcess')
     where
 
 import           Control.Exception.Lifted
@@ -59,16 +60,29 @@ runIn wd cmd menv args errMsg = do
 -- environment override, and throws ProcessExitedUnsuccessfully if the
 -- process exits unsuccessfully. Inherits stdout and stderr.
 callProcess :: (MonadIO m, MonadLogger m)
-             => Maybe (Path Abs Dir)
+            => Maybe (Path Abs Dir)
+            -> EnvOverride
+            -> String
+            -> [String]
+            -> m ()
+callProcess =
+    callProcess' id
+
+-- | Like as @System.Process.callProcess@, but takes an optional working directory and
+-- environment override, and throws ProcessExitedUnsuccessfully if the
+-- process exits unsuccessfully. Inherits stdout and stderr.
+callProcess' :: (MonadIO m, MonadLogger m)
+             => (CreateProcess -> CreateProcess)
+             -> Maybe (Path Abs Dir)
              -> EnvOverride
              -> String
              -> [String]
              -> m ()
-callProcess wd menv cmd0 args = do
+callProcess' modCP wd menv cmd0 args = do
     cmd <- preProcess wd menv cmd0
-    let c = (proc cmd args) { delegate_ctlc = True
-                            , cwd = fmap toFilePath wd
-                            , env = envHelper menv }
+    let c = modCP $ (proc cmd args) { delegate_ctlc = True
+                                    , cwd = fmap toFilePath wd
+                                    , env = envHelper menv }
         action (_, _, _, p) = do
             exit_code <- waitForProcess p
             case exit_code of

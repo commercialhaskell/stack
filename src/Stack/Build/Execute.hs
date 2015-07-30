@@ -4,7 +4,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TemplateHaskell       #-}
--- Perform a build
+-- | Perform a build
 module Stack.Build.Execute
     ( printPlan
     , preFetch
@@ -51,7 +51,6 @@ import qualified Data.Streaming.Process         as Process
 import           Data.Traversable               (forM)
 import           Data.Text                      (Text)
 import qualified Data.Text                      as T
-import qualified Data.Text.Encoding             as T
 import           Data.Text.Encoding             (encodeUtf8)
 import           Data.Word8                     (_colon)
 import           Distribution.System            (OS (Windows),
@@ -63,6 +62,7 @@ import           Path.IO
 import           Prelude                        hiding (FilePath, writeFile)
 import           Safe                           (lastMay)
 import           Stack.Build.Cache
+import           Stack.Build.Coverage
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
@@ -387,6 +387,9 @@ executePlan' plan ee@ExecuteEnv {..} = do
         generateLocalHaddockIndex eeEnvOverride eeBaseConfigOpts eeLocals
         generateDepsHaddockIndex eeEnvOverride eeBaseConfigOpts eeLocals
         generateSnapHaddockIndex eeEnvOverride eeBaseConfigOpts eeGlobalDB
+    case boptsFinalAction eeBuildOpts of
+        DoTests topts | toCoverage topts -> generateHpcMarkupIndex
+        _ -> return ()
 
 toActions :: M env m
           => (m () -> IO ())
@@ -836,6 +839,7 @@ singleTest topts ac ee task =
 
             when needHpc $ forM_ (lastMay testsToRun) $ \testName -> do
                 let pkgName = packageNameText (packageName package)
+                    pkgId = packageIdentifierText (packageIdentifier package)
                 when (not $ null $ tail testsToRun) $ $logWarn $ T.concat
                     [ "Error: The --coverage flag does not yet support multiple test suites in a single cabal file. "
                     , "All of the tests have been run, however, the HPC report will only supply coverage info for "
@@ -844,7 +848,7 @@ singleTest topts ac ee task =
                     , testName
                     , "."
                     ]
-                generateHpcReport pkgDir pkgName testName
+                generateHpcReport pkgDir pkgName pkgId testName
 
             bs <- liftIO $
                 case mlogFile of
@@ -876,39 +880,6 @@ compareTestsComponents comps tests2 =
             (y, "") -> assert (x == y) (Set.singleton x)
             ("test", y) -> Set.singleton $ T.drop 1 y
             _ -> Set.empty
-
--- | Generate the HTML report and show a textual coverage summary.
-generateHpcReport :: M env m => Path Abs Dir -> Text -> Text -> m ()
-generateHpcReport pkgDir pkgName testName = do
-    let whichTest = pkgName <> "'s test-suite \"" <> testName <> "\""
-    hpcDir <- hpcDirFromDir pkgDir
-    hpcRelDir <- (</> dotHpc) <$> hpcRelativeDir
-    pkgDirs <- Map.keys . bcPackages <$> asks getBuildConfig
-    let args =
-            concatMap (\x -> ["--srcdir", toFilePath x]) pkgDirs ++
-            ["--hpcdir", toFilePath hpcRelDir, "--reset-hpcdirs"]
-    tixFile <- parseRelFile (T.unpack testName ++ ".tix")
-    let tixFileAbs = hpcDir </> tixFile
-    tixFileExists <- fileExists tixFileAbs
-    if not tixFileExists
-        then $logError $ T.concat
-            [ "Didn't find .tix coverage file for "
-            , whichTest
-            , " - expected to find it at "
-            , T.pack (toFilePath tixFileAbs)
-            , "."
-            ]
-        else (`onException` $logError ("Error occurred while producing coverage report for " <> whichTest)) $ do
-            menv <- getMinimalEnvOverride
-            $logInfo $ "Generating HTML coverage report for " <> whichTest
-            _ <- readProcessStdout (Just hpcDir) menv "hpc"
-                ("markup" : toFilePath tixFileAbs : args)
-            output <- readProcessStdout (Just hpcDir) menv "hpc"
-                ("report" : toFilePath tixFileAbs : args)
-            forM_ (S8.lines output) ($logInfo . T.decodeUtf8 . stripCharacterReturn)
-            $logInfo
-                ("The HTML coverage report for " <> whichTest <> " is available at " <>
-                 T.pack (toFilePath (hpcDir </> $(mkRelFile "hpc_index.html"))))
 
 singleBench :: M env m
             => BenchmarkOpts
@@ -953,7 +924,7 @@ printBuildOutput :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
 printBuildOutput excludeTHLoading makeAbsolute level outH = void $ fork $
          CB.sourceHandle outH
     $$ CB.lines
-    =$ CL.map stripCharacterReturn
+    =$ CL.map stripCarriageReturn
     =$ CL.filter (not . isTHLoading)
     =$ CL.mapM toAbsolutePath
     =$ CL.mapM_ (monadLoggerLog $(TH.location >>= liftLoc) "" level)
@@ -994,9 +965,9 @@ printBuildOutput excludeTHLoading makeAbsolute level outH = void $ fork $
 
         guard $ bs2 == ":"
 
--- | Strip a @\r@ character from the byte vector. Used because Windows.
-stripCharacterReturn :: ByteString -> ByteString
-stripCharacterReturn = S8.filter (not . (=='\r'))
+    -- | Strip @\r@ characters from the byte vector. Used because Windows.
+    stripCarriageReturn :: ByteString -> ByteString
+    stripCarriageReturn = S8.filter (not . (=='\r'))
 
 taskLocation :: Task -> InstallLocation
 taskLocation task =

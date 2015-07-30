@@ -9,12 +9,13 @@
 
 -- | This module builds Docker (OpenContainer) images.
 module Stack.Image
-       (imageDocker, imgCmdName, imgDockerCmdName, imgOptsFromMonoid,
+       (stageContainerImageArtifacts, createContainerImageFromStage,
+        imgCmdName, imgDockerCmdName, imgOptsFromMonoid,
         imgDockerOptsFromMonoid, imgOptsParser, imgDockerOptsParser)
        where
 
 import           Control.Applicative
-import           Control.Exception.Lifted
+import           Control.Exception.Lifted hiding (finally)
 import           Control.Monad
 import           Control.Monad.Catch hiding (bracket)
 import           Control.Monad.IO.Class
@@ -25,154 +26,120 @@ import           Data.Char (toLower)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
 import           Data.Monoid
-import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Typeable
 import           Options.Applicative
 import           Path
 import           Path.IO
-import           Stack.Build.Source
-import           Stack.Package
+import           Stack.Constants
 import           Stack.Types
 import           Stack.Types.Internal
-import qualified System.Directory as SD
-import           System.IO.Temp
-import           System.FilePath (isPathSeparator)
+import           System.FilePath (dropTrailingPathSeparator)
 import           System.Process
 
-type M e m = (HasBuildConfig e, HasConfig e, HasEnvConfig e, HasTerminal e,
-              MonadBaseControl IO m, MonadCatch m, MonadIO m, MonadLogger m,
-              MonadReader e m)
+type Build e m = (HasBuildConfig e, HasConfig e, HasEnvConfig e, HasTerminal e, MonadBaseControl IO m, MonadCatch m, MonadIO m, MonadLogger m, MonadReader e m)
+
+type Assemble e m = (HasConfig e, HasTerminal e, MonadBaseControl IO m, MonadCatch m, MonadIO m, MonadLogger m, MonadMask m, MonadReader e m)
+
+-- | Stages the executables & additional content in a staging
+-- directory under '.stack-work'
+stageContainerImageArtifacts :: Build e m
+                             => m ()
+stageContainerImageArtifacts = do
+    imageDir <- imageStagingDir <$> getWorkingDir
+    createTree imageDir
+    stageExesInDir imageDir
+    syncAddContentToDir imageDir
 
 -- | Builds a Docker (OpenContainer) image extending the `base` image
--- specified in the project's stack.yaml.  The new image will contain
--- all the executables from the packages in the project as well as any
--- other specified files to `add`.  Then new image will be extended
--- with an ENTRYPOINT specified for each `entrypoint` listed in the
--- config file.
-imageDocker :: M e m => m ()
-imageDocker = do
-    tempDirFP <- liftIO SD.getTemporaryDirectory
-    bracket
-        (liftIO (createTempDirectory tempDirFP "stack-image-docker"))
-        (liftIO . SD.removeDirectoryRecursive)
-        (\dir ->
-              do stageExesInDir dir
-                 syncAddContentToDir dir
-                 createDockerImage dir
-                 extendDockerImageWithEntrypoint dir)
-
--- | Extract all the Package(s) from the stack.yaml config file &
--- project cabal files.
-projectPkgs :: M e m => m [Package]
-projectPkgs = do
-    econfig <- asks getEnvConfig
-    bconfig <- asks getBuildConfig
-    forM
-        (Map.toList
-             (bcPackages bconfig))
-        (\(dir,_wanted) ->
-              do cabalfp <- getCabalFileName dir
-                 name <- parsePackageNameFromFilePath cabalfp
-                 let cfg = PackageConfig
-                         { packageConfigEnableTests = True
-                         , packageConfigEnableBenchmarks = True
-                         , packageConfigFlags = localFlags mempty bconfig name
-                         , packageConfigGhcVersion = envConfigGhcVersion econfig
-                         , packageConfigPlatform = configPlatform
-                               (getConfig bconfig)
-                         }
-                 readPackage cfg cabalfp)
+-- specified in the project's stack.yaml.  Then new image will be
+-- extended with an ENTRYPOINT specified for each `entrypoint` listed
+-- in the config file.
+createContainerImageFromStage :: Assemble e m
+                              => m ()
+createContainerImageFromStage = do
+    imageDir <- imageStagingDir <$> getWorkingDir
+    createDockerImage imageDir
+    extendDockerImageWithEntrypoint imageDir
 
 -- | Stage all the Package executables in the usr/local/bin
 -- subdirectory of a temp directory.
-stageExesInDir :: M e m => FilePath -> m ()
+stageExesInDir :: Build e m => Path Abs Dir -> m ()
 stageExesInDir dir = do
-    srcBinPath <- (</> $(mkRelDir "bin")) <$> installationRootLocal
-    destBinPath <- (</> $(mkRelDir "usr/local/bin")) <$> parseAbsDir dir
+    srcBinPath <-
+        (</> $(mkRelDir "bin")) <$>
+        installationRootLocal
+    let destBinPath = dir </>
+            $(mkRelDir "usr/local/bin")
     createTree destBinPath
-    pkgs <- projectPkgs
-    forM_
-        (concatMap (Set.toList . packageExes) pkgs)
-        (\exe ->
-              do exePath <-
-                     parseRelFile
-                         (T.unpack exe)
-                 copyFile
-                     (srcBinPath </> exePath)
-                     (destBinPath </> exePath))
+    copyDirectoryRecursive srcBinPath destBinPath
 
 -- | Add any additional files into the temp directory, respecting the
 -- (Source, Destination) mapping.
-syncAddContentToDir :: M e m => FilePath -> m ()
+syncAddContentToDir :: Build e m => Path Abs Dir -> m ()
 syncAddContentToDir dir = do
     config <- asks getConfig
     bconfig <- asks getBuildConfig
-    dirPath <- parseAbsDir dir
     let imgAdd = maybe Map.empty imgDockerAdd (imgDocker (configImage config))
     forM_
         (Map.toList imgAdd)
         (\(source,dest) ->
               do sourcePath <- parseRelDir source
                  destPath <- parseAbsDir dest
-                 let destFullPath = dirPath </> dropRoot destPath
+                 let destFullPath = dir </> dropRoot destPath
                  createTree destFullPath
                  copyDirectoryRecursive
                      (bcRoot bconfig </> sourcePath)
                      destFullPath)
 
 -- | Derive an image name from the project directory.
-imageName :: BuildConfig -> String
-imageName = map toLower . filter (not . isPathSeparator) . toFilePath . dirname . bcRoot
+imageName :: Path Abs Dir -> String
+imageName = map toLower . dropTrailingPathSeparator . toFilePath . dirname
 
 -- | Create a general purpose docker image from the temporary
 -- directory of executables & static content.
-createDockerImage :: M e m => FilePath -> m ()
+createDockerImage :: Assemble e m => Path Abs Dir -> m ()
 createDockerImage dir = do
     config <- asks getConfig
-    bconfig <- asks getBuildConfig
     let dockerConfig = imgDocker (configImage config)
     case imgDockerBase =<< dockerConfig of
         Nothing -> throwM StackImageDockerBaseUnspecifiedException
         Just base -> do
-            dirPath <- parseAbsDir dir
             liftIO
                 (do writeFile
                         (toFilePath
-                             (dirPath </>
+                             (dir </>
                               $(mkRelFile "Dockerfile")))
                         (unlines ["FROM " ++ base, "ADD ./ /"])
                     callProcess
                         "docker"
-                        ["build"
-                        ,"-t"
-                        ,fromMaybe (imageName bconfig)
-                                   (imgDockerImageName =<< dockerConfig)
-                        ,dir])
+                        [ "build"
+                        , "-t"
+                        , fromMaybe
+                              (imageName (parent (parent dir)))
+                              (imgDockerImageName =<< dockerConfig)
+                        , toFilePath dir])
 
 -- | Extend the general purpose docker image with entrypoints (if
 -- specified).
-extendDockerImageWithEntrypoint :: M e m => FilePath -> m ()
+extendDockerImageWithEntrypoint :: Assemble e m => Path Abs Dir -> m ()
 extendDockerImageWithEntrypoint dir = do
     config <- asks getConfig
-    bconfig <- asks getBuildConfig
     let dockerConfig = imgDocker (configImage config)
-    let dockerImageName = fromMaybe (imageName bconfig) (imgDockerImageName =<< dockerConfig)
-    let imgEntrypoints = maybe
-                Nothing
-                imgDockerEntrypoints
-                dockerConfig
+    let dockerImageName = fromMaybe
+                (imageName (parent (parent dir)))
+                (imgDockerImageName =<< dockerConfig)
+    let imgEntrypoints = maybe Nothing imgDockerEntrypoints dockerConfig
     case imgEntrypoints of
         Nothing -> return ()
         Just eps -> do
-            dirPath <- parseAbsDir dir
             forM_
                 eps
                 (\ep ->
                       liftIO
                           (do writeFile
                                   (toFilePath
-                                       (dirPath </>
+                                       (dir </>
                                         $(mkRelFile "Dockerfile")))
                                   (unlines
                                        [ "FROM " ++ dockerImageName
@@ -184,7 +151,7 @@ extendDockerImageWithEntrypoint dir = do
                                   [ "build"
                                   , "-t"
                                   , dockerImageName ++ "-" ++ ep
-                                  , dir]))
+                                  , toFilePath dir]))
 
 -- | The command name for dealing with images.
 imgCmdName :: String
