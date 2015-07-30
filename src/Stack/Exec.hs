@@ -53,5 +53,5 @@ exec envSettings cmd0 args = do
         Right () -> exitSuccess
 #else
     cmd <- preProcess Nothing menv cmd0
-    liftIO $ executeFile cmd False args (envHelper menv)
+    liftIO $ executeFile cmd True args (envHelper menv)
 #endif
