@@ -8,6 +8,7 @@ Vagrant.configure(2) do |config|
   end
   config.vm.provision "shell", run: "always", inline: <<-SHELL
     set -xe
+    export PATH=/usr/local/bin:$PATH
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
     apt-get install -y net-tools wget zlib1g-dev ruby-dev libgmp-dev lsb-release ca-certificates
@@ -22,6 +23,12 @@ Vagrant.configure(2) do |config|
       echo "deb http://download.fpcomplete.com/debian/$(lsb_release -cs) stable main" >/etc/apt/sources.list.d/fpco.list
       apt-get update
       apt-get install -y stack
+    fi
+    if ! which cabal; then
+      pushd /vagrant
+      stack --install-ghc install cabal-install
+      cp `stack exec which cabal` /usr/local/bin/cabal
+      popd
     fi
     if ! [[ -f /usr/local/bin/docker ]]; then
       echo '#!/bin/sh' >/usr/local/bin/docker
