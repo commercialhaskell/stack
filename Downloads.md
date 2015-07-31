@@ -165,11 +165,8 @@ If you're curious about the choice of these paths, see [issue #153](https://gith
 
 ## Upgrade
 
-We're still [working out the best recommendation](https://github.com/commercialhaskell/stack/issues/237) for upgrades. Options for now are:
+There are essentially three different approaches to upgrade:
 
-* If you have a recent `stack` (post 0.1.0.0 release), you can try the experimental `stack upgrade` or `stack upgrade --git` command.
-* Clone the Git repository and run `stack install` inside of it
-* Anywhere after the 0.1.0.0 release: run `stack update && stack unpack stack`, change into the new directory, and run `stack install`. Note that you may need to run `stack setup`
-* Use your package manager when supported
-* Manually download new binaries from this page
-* In some cases, you'll be able to run `stack update && stack install stack:latest`, but this is not guaranteed to work (yet).
+* If you're using a package manager (e.g., the Ubuntu debs listed above) and are happy with sticking with the officially released binaries, simply follow your normal package manager strategies for upgrading (e.g. `apt-get update && apt-get upgrade`).
+* If you're not using a package manager but want to stick with the official binaries (such as on Windows or Mac), you'll need to manually follow the steps above to download the newest binaries from the release page and replace the old binary.
+* The `stack` tool itself ships with an `upgrade` command, which will build `stack` from source and install it to the default install path (see the previous section). You can use `stack upgrade` to get the latest official release, and `stack upgrade --git` to install from Git and leave on the bleeding edge. If you follow this, make sure that this directory is on your `PATH` and takes precedence over the system installed `stack`. For more information, see [this discussion](https://github.com/commercialhaskell/stack/issues/237#issuecomment-126793301).
