@@ -21,8 +21,9 @@ However, it supports two other location types: an HTTP URL referring to a tarbal
 packages:
 - some-directory
 - https://example.com/foo/bar/baz-0.0.2.tar.gz
-- git: git@github.com:commercialhaskell/stack
-  commit: 6a86ee32e5b869a877151f74064572225e1a0398
+- location:
+    git: git@github.com:commercialhaskell/stack
+    commit: 6a86ee32e5b869a877151f74064572225e1a0398
 ```
 
 Note: it is highly recommended that you only use SHA1 values for a Git commit. Other values may work, but they are not officially supported, and may result in unexpected behavior (namely, stack will not automatically pull to update to new versions).
