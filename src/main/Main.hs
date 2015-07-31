@@ -10,10 +10,12 @@
 module Main where
 
 import           Control.Exception
+import qualified Control.Exception.Lifted as EL
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask, asks)
+import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Attoparsec.Args (withInterpreterArgs)
 import qualified Data.ByteString.Lazy as L
 import           Data.List
@@ -63,7 +65,7 @@ import qualified Stack.Upload as Upload
 import           System.Directory (canonicalizePath, doesFileExist, doesDirectoryExist, createDirectoryIfMissing)
 import           System.Environment (getArgs, getProgName)
 import           System.Exit
-import           System.FileLock (withFileLock, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
+import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
 import           System.FilePath (dropTrailingPathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..))
 import           System.Process.Read
@@ -448,7 +450,7 @@ setupParser = SetupCmdOpts
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
-  withUserFileLock (lcConfig lc) $ \_ ->
+  withUserFileLock (configStackRoot $ lcConfig lc) $ \_ ->
    runStackTGlobal manager (lcConfig lc) go $
       Docker.reexecWithOptionalContainer
           (lcProjectRoot lc)
@@ -482,36 +484,43 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
               )
           Nothing
 
--- | Enforce mutual exclusion of every action running via this function
--- on this users account.  Currently, stack uses this to completely
--- exclude concurrent execution of stack commands.  In the future,
--- stack may refine this to a finer-grained locking approach.
-withUserFileLock :: Config
-                 -> (FileLock -> IO a)
-                 -> IO a
-withUserFileLock cfg act = do
+-- | Enforce mutual exclusion of every action running via this
+-- function, on this path, on this users account.
+--
+-- A lock file is created inside the given directory.  Currently,
+-- stack uses locks per-snapshot.  In the future, stack may refine
+-- this to an even more fine-grain locking approach.
+--
+withUserFileLock :: (MonadBaseControl IO m, MonadIO m)
+                 => Path Abs Dir
+                 -> (FileLock -> m a)
+                 -> m a
+withUserFileLock dir act = do
     let lockfile = $(mkRelFile "lockfile")
-    let pth = configStackRoot cfg </> lockfile
-    createDirectoryIfMissing True (toFilePath $ configStackRoot cfg)
+    let pth = dir </> lockfile
+    liftIO $ createDirectoryIfMissing True (toFilePath dir)
     -- Just in case of asynchronous exceptions, we need to be careful
     -- when using tryLockFile here:
-    bracket (tryLockFile (toFilePath pth) Exclusive)
-            (\fstTry -> maybe (return ()) unlockFile fstTry)
-            (\fstTry ->
-             case fstTry of
-               Just lk -> finally (act lk) (unlockFile lk)
-               Nothing ->
-                 do putStrLn $ "Failed to grab lock ("++show pth++"); other stack instance running.  Waiting..."
-                    withFileLock (toFilePath pth) Exclusive $ \lk -> do
-                      putStrLn "Lock acquired, proceeding."
-                      act lk)
+    EL.bracket (liftIO $ tryLockFile (toFilePath pth) Exclusive)
+               (\fstTry -> maybe (return ()) (liftIO . unlockFile) fstTry)
+               (\fstTry ->
+                case fstTry of
+                  Just lk -> EL.finally (act lk) (liftIO $ unlockFile lk)
+                  Nothing ->
+                    do liftIO $ putStrLn $ "Failed to grab lock ("++show pth++
+                                           "); other stack instance running.  Waiting..."
+                       EL.bracket (liftIO $ lockFile (toFilePath pth) Exclusive)
+                                  (liftIO . unlockFile)
+                                  (\lk -> do
+                                    liftIO $ putStrLn "Lock acquired, proceeding."
+                                    act lk))
 
 withConfigAndLock :: GlobalOpts
            -> StackT Config IO ()
            -> IO ()
 withConfigAndLock go@GlobalOpts{..} inner = do
     (manager, lc) <- loadConfigWithOpts go
-    withUserFileLock (lcConfig lc) $ \_lk ->
+    withUserFileLock (configStackRoot $ lcConfig lc) $ \_lk ->
      runStackTGlobal manager (lcConfig lc) go $
         Docker.reexecWithOptionalContainer (lcProjectRoot lc)
             Nothing
@@ -531,7 +540,16 @@ withBuildConfigAndLock :: GlobalOpts
                  -> (FileLock -> StackT EnvConfig IO ())
                  -> IO ()
 withBuildConfigAndLock go inner =
-    withBuildConfigExt go Nothing inner Nothing
+    withBuildConfigExt go Nothing
+      -- Locking policy:  This is only used for build commands, which
+      -- only need to lock the snapshot, not the global lock.  We
+      -- trade in the lock here.
+       (\lk -> do dir <- installationRootDeps
+                  -- A little bit of hand-over-hand locking:
+                  withUserFileLock dir $ \lk2 -> do
+                    liftIO $ unlockFile lk
+                    inner lk2)
+       Nothing
 
 withBuildConfigExt
     :: GlobalOpts
@@ -563,7 +581,7 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
                 envConfig
                 go
                 (inner lk)
-    withUserFileLock (lcConfig lc) $ \lk ->
+    withUserFileLock (configStackRoot $ lcConfig lc) $ \lk ->
      runStackTGlobal manager (lcConfig lc) go $
         Docker.reexecWithOptionalContainer (lcProjectRoot lc) mbefore (inner' lk) mafter
 
@@ -673,7 +691,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
     case eoExtra of
         ExecOptsPlain -> do
             (manager,lc) <- liftIO $ loadConfigWithOpts go
-            withUserFileLock (lcConfig lc) $ \lk ->
+            withUserFileLock (configStackRoot $ lcConfig lc) $ \lk ->
              runStackTGlobal manager (lcConfig lc) go $
                 Docker.execWithOptionalContainer
                     (lcProjectRoot lc)
@@ -716,7 +734,7 @@ dockerPullCmd :: () -> GlobalOpts -> IO ()
 dockerPullCmd _ go@GlobalOpts{..} = do
     (manager,lc) <- liftIO $ loadConfigWithOpts go
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock (lcConfig lc) $ \_ ->
+    withUserFileLock (configStackRoot $ lcConfig lc) $ \_ ->
      runStackTGlobal manager (lcConfig lc) go $
        Docker.preventInContainer Docker.pull
 
@@ -725,7 +743,7 @@ dockerResetCmd :: Bool -> GlobalOpts -> IO ()
 dockerResetCmd keepHome go@GlobalOpts{..} = do
     (manager,lc) <- liftIO (loadConfigWithOpts go)
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock (lcConfig lc) $ \_ ->
+    withUserFileLock (configStackRoot $ lcConfig lc) $ \_ ->
      runStackLoggingTGlobal manager go $
         Docker.preventInContainer $ Docker.reset (lcProjectRoot lc) keepHome
 
@@ -734,7 +752,7 @@ dockerCleanupCmd :: Docker.CleanupOpts -> GlobalOpts -> IO ()
 dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
     (manager,lc) <- liftIO $ loadConfigWithOpts go
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock (lcConfig lc) $ \_ ->
+    withUserFileLock (configStackRoot $ lcConfig lc) $ \_ ->
      runStackTGlobal manager (lcConfig lc) go $
         Docker.preventInContainer $
             Docker.cleanup cleanupOpts
