@@ -52,6 +52,8 @@ stack has support for packages that reside in remote git locations.
 Example:
 
 ```
+packages:
+- '.'
 - location:
     git: https://github.com/kolmodin/binary
     commit: 8debedd3fcb6525ac0d7de2dd49217dce2abc0d9
