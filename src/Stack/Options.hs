@@ -63,7 +63,8 @@ buildOptsParser :: Command
 buildOptsParser cmd defCopyBins =
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> haddock <*> haddockDeps <*> finalAction <*> dryRun <*> ghcOpts <*>
-            flags <*> copyBins <*> preFetch <*> onlySnapshot <*>
+            flags <*> copyBins <*> preFetch <*>
+            ((||) <$> onlySnapshot <*> onlyDependencies) <*>
             fileWatch' <*> keepGoing <*> forceDirty
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
@@ -127,6 +128,9 @@ buildOptsParser cmd defCopyBins =
         onlySnapshot = flag False True
             (long "only-snapshot" <>
              help "Only build packages for the snapshot database, not the local database")
+        onlyDependencies = flag False True
+            (long "only-dependencies" <>
+             help "Currently: a synonym for only-snapshot, see https://github.com/commercialhaskell/stack/issues/387")
 
         fileWatch' = flag False True
             (long "file-watch" <>
