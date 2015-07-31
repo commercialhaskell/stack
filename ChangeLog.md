@@ -21,6 +21,7 @@
 * Preserve file permissions when unpacking sources [#666](https://github.com/commercialhaskell/stack/pull/666)
 * `stack build` etc work outside of a project
 * `list-dependencies` command [#638](https://github.com/commercialhaskell/stack/issues/638)
+* `--upgrade-cabal` option to `stack setup` [#174](https://github.com/commercialhaskell/stack/issues/174)
 
 Bug fixes:
 

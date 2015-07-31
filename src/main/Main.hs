@@ -424,6 +424,7 @@ paths =
 data SetupCmdOpts = SetupCmdOpts
     { scoGhcVersion :: !(Maybe Version)
     , scoForceReinstall :: !Bool
+    , scoUpgradeCabal :: !Bool
     }
 
 setupParser :: Parser SetupCmdOpts
@@ -434,7 +435,11 @@ setupParser = SetupCmdOpts
                    "The default is to install the version implied by the resolver.")))
     <*> boolFlags False
             "reinstall"
-            "Reinstall GHC, even if available (implies no-system-ghc)"
+            "reinstalling GHC, even if available (implies no-system-ghc)"
+            idm
+    <*> boolFlags False
+            "upgrade-cabal"
+            "installing the newest version of the Cabal library globally"
             idm
   where
     readVersion = do
@@ -469,6 +474,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                   , soptsSanityCheck = True
                   , soptsSkipGhcCheck = False
                   , soptsSkipMsys = configSkipMsys $ lcConfig lc
+                  , soptsUpgradeCabal = scoUpgradeCabal
                   }
               case mpaths of
                   Nothing -> $logInfo "stack will use the GHC on your PATH"

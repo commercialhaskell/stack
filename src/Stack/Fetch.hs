@@ -180,7 +180,7 @@ data ResolvedPackage = ResolvedPackage
     }
 
 -- | Resolve a set of package names and identifiers into @FetchPackage@ values.
-resolvePackages :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadLogger m, MonadThrow m, MonadBaseControl IO m, MonadCatch m)
+resolvePackages :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
                 => EnvOverride
                 -> Set PackageIdentifier
                 -> Set PackageName

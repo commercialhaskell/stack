@@ -17,7 +17,7 @@ module Stack.Setup
 
 import           Control.Applicative
 import           Control.Exception.Enclosed (catchIO)
-import           Control.Monad (liftM, when, join, void)
+import           Control.Monad (liftM, when, join, void, unless)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger
@@ -58,6 +58,7 @@ import           Prelude -- Fix AMP warning
 import           Safe (headMay, readMay)
 import           Stack.Build.Types
 import           Stack.Constants (distRelativeDir)
+import           Stack.Fetch
 import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB)
 import           Stack.Solver (getGhcVersion)
 import           Stack.Types
@@ -69,6 +70,7 @@ import qualified System.FilePath as FP
 import           System.IO.Temp (withSystemTempDirectory)
 import           System.Process (rawSystem)
 import           System.Process.Read
+import           System.Process.Run (runIn)
 import           Text.Printf (printf)
 
 data SetupOpts = SetupOpts
@@ -84,6 +86,9 @@ data SetupOpts = SetupOpts
     -- ^ Don't check for a compatible GHC version/architecture
     , soptsSkipMsys :: !Bool
     -- ^ Do not use a custom msys installation on Windows
+    , soptsUpgradeCabal :: !Bool
+    -- ^ Upgrade the global Cabal library in the database to the newest
+    -- version. Only works reliably with a stack-managed installation.
     }
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
@@ -135,6 +140,7 @@ setupEnv = do
             , soptsSanityCheck = False
             , soptsSkipGhcCheck = configSkipGHCCheck $ bcConfig bconfig
             , soptsSkipMsys = configSkipMsys $ bcConfig bconfig
+            , soptsUpgradeCabal = False
             }
     mghcBin <- ensureGHC sopts
     menv0 <- getMinimalEnvOverride
@@ -301,22 +307,90 @@ ensureGHC sopts = do
             return $ Just $ map toFilePathNoTrailingSlash $ concat paths
         else return Nothing
 
-    when (soptsSanityCheck sopts) $ do
-        menv <-
-            case mpaths of
-                Nothing -> return menv0
-                Just paths -> do
-                    config <- asks getConfig
-                    let m0 = unEnvOverride menv0
-                        path0 = Map.lookup "PATH" m0
-                        path = augmentPath paths path0
-                        m = Map.insert "PATH" path m0
-                    mkEnvOverride (configPlatform config) (removeHaskellEnvVars m)
-        sanityCheck menv
+    menv <-
+        case mpaths of
+            Nothing -> return menv0
+            Just paths -> do
+                config <- asks getConfig
+                let m0 = unEnvOverride menv0
+                    path0 = Map.lookup "PATH" m0
+                    path = augmentPath paths path0
+                    m = Map.insert "PATH" path m0
+                mkEnvOverride (configPlatform config) (removeHaskellEnvVars m)
+
+    when (soptsUpgradeCabal sopts) $ do
+        unless needLocal $ do
+            $logWarn "Trying to upgrade Cabal library on a GHC not installed by stack."
+            $logWarn "This may fail, caveat emptor!"
+
+        upgradeCabal menv
+
+    when (soptsSanityCheck sopts) $ sanityCheck menv
 
     return mpaths
   where
     expected = soptsExpected sopts
+
+-- | Install the newest version of Cabal globally
+upgradeCabal :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m, MonadMask m)
+             => EnvOverride
+             -> m ()
+upgradeCabal menv = do
+    let name = $(mkPackageName "Cabal")
+    rmap <- resolvePackages menv Set.empty (Set.singleton name)
+    newest <-
+        case Map.keys rmap of
+            [] -> error "No Cabal library found in index, cannot upgrade"
+            [PackageIdentifier name' version]
+                | name == name' -> return version
+            x -> error $ "Unexpected results for resolvePackages: " ++ show x
+    installed <- getCabalPkgVer menv
+    if installed >= newest
+        then $logInfo $ T.concat
+            [ "Currently installed Cabal is "
+            , T.pack $ versionString installed
+            , ", newest is "
+            , T.pack $ versionString newest
+            , ". I'm not upgrading Cabal."
+            ]
+        else withSystemTempDirectory "stack-cabal-upgrade" $ \tmpdir -> do
+            $logInfo $ T.concat
+                [ "Installing Cabal-"
+                , T.pack $ versionString newest
+                , " to replace "
+                , T.pack $ versionString installed
+                ]
+            tmpdir' <- parseAbsDir tmpdir
+            let ident = PackageIdentifier name newest
+            m <- unpackPackageIdents menv tmpdir' Nothing (Set.singleton ident)
+
+            ghcPath <- join $ findExecutable menv "ghc"
+            newestDir <- parseRelDir $ versionString newest
+            let installRoot = toFilePath $ parent (parent ghcPath)
+                                       </> $(mkRelDir "new-cabal")
+                                       </> newestDir
+
+            dir <-
+                case Map.lookup ident m of
+                    Nothing -> error $ "upgradeCabal: Invariant violated, dir missing"
+                    Just dir -> return dir
+
+            runIn dir "ghc" menv ["Setup.hs"] Nothing
+            let setupExe = toFilePath $ dir </> $(mkRelFile "Setup")
+                dirArgument name' = concat
+                    [ "--"
+                    , name'
+                    , "dir="
+                    , installRoot FP.</> name'
+                    ]
+            runIn dir setupExe menv
+                ( "configure"
+                : map dirArgument (words "lib bin data doc")
+                )
+                Nothing
+            runIn dir setupExe menv ["build"] Nothing
+            runIn dir setupExe menv ["install"] Nothing
+            $logInfo "New Cabal library installed"
 
 -- | Get the major version of the system GHC, if available
 getSystemGHC :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m) => EnvOverride -> m (Maybe (Version, Arch))
