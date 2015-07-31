@@ -60,7 +60,7 @@ import           Stack.Types.Internal
 import           Stack.Types.StackT
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
-import           System.Directory (canonicalizePath, doesFileExist, doesDirectoryExist)
+import           System.Directory (canonicalizePath, doesFileExist, doesDirectoryExist, createDirectoryIfMissing)
 import           System.Environment (getArgs, getProgName)
 import           System.Exit
 import           System.FileLock (withFileLock, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
@@ -492,6 +492,7 @@ withUserFileLock :: Config
 withUserFileLock cfg act = do
     let lockfile = $(mkRelFile "lockfile")
     let pth = configStackRoot cfg </> lockfile
+    createDirectoryIfMissing True (toFilePath $ configStackRoot cfg)
     -- Just in case of asynchronous exceptions, we need to be careful
     -- when using tryLockFile here:
     bracket (tryLockFile (toFilePath pth) Exclusive)
