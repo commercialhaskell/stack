@@ -41,10 +41,7 @@ matrix:
 # Note: the distinction between `before_install` and `install` is not important.
 before_install:
  - export PATH=$HOME/.cabal/bin:/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
- - mkdir -p $HOME/.cabal
- - echo "remote-repo: hackage.haskell.org:http://hackage.fpcomplete.com/" > $HOME/.cabal/config
- - echo "remote-repo-cache: $HOME/.cabal/packages" >> $HOME/.cabal/config
- - echo "jobs: $ncpus" >> $HOME/.cabal/config
+ - ./.travis-setup.sh
 
 install:
  - cabal --version
