@@ -104,7 +104,7 @@ data FlagSource = FSCommandLine | FSStackYaml
     deriving (Show, Eq, Ord)
 
 data UnusedFlags = UFNoPackage FlagSource PackageName
-                 | UFFlagsNotDefined FlagSource PackageName (Set FlagName)
+                 | UFFlagsNotDefined FlagSource Package (Set FlagName)
     deriving (Show, Eq, Ord)
 
 instance Show StackBuildException where
@@ -238,25 +238,33 @@ instance Show StackBuildException where
         $ "Invalid flag specification:"
         : map go (Set.toList unused)
       where
-        goS :: FlagSource -> String
-        goS FSCommandLine = " (specified on command line)"
-        goS FSStackYaml = " (specified in stack.yaml)"
+        showFlagSrc :: FlagSource -> String
+        showFlagSrc FSCommandLine = " (specified on command line)"
+        showFlagSrc FSStackYaml = " (specified in stack.yaml)"
 
         go :: UnusedFlags -> String
         go (UFNoPackage src name) = concat
             [ "- Package '"
             , packageNameString name
             , "' not found"
-            , goS src
+            , showFlagSrc src
             ]
-        go (UFFlagsNotDefined src name flags) = concat
+        go (UFFlagsNotDefined src pkg flags) = concat
             [ "- Package '"
-            , packageNameString name
+            , name
             , "' does not define the following flags"
-            , goS src
-            , ": "
-            , intercalate ", " $ map flagNameString $ Set.toList flags
+            , showFlagSrc src
+            , ":\n"
+            , intercalate "\n"
+                          (map (\flag -> "  " ++ flagNameString flag)
+                               (Set.toList flags))
+            , "\n- Flags defined by package '" ++ name ++ "':\n"
+            , intercalate "\n"
+                          (map (\flag -> "  " ++ name ++ ":" ++ flagNameString flag)
+                               (Set.toList pkgFlags))
             ]
+          where name = packageNameString (packageName pkg)
+                pkgFlags = packageDefinedFlags pkg
 
 instance Exception StackBuildException
 
