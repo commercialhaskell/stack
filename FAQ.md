@@ -264,3 +264,7 @@ This may end up recompiling local dependencies of `one-of-the-packages` without 
 If you are using a powershell session, it is easy to automate even that step:
 
     $env:Path = ( stack setup | %{ $_ -replace '[^ ]+ ', ''} ), $env:Path -join ";"
+
+#### How does stack handle parallel builds? What exactly does it run in parallel?
+
+See [issue #644](https://github.com/commercialhaskell/stack/issues/644) for more details.
