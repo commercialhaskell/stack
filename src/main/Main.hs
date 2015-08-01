@@ -60,9 +60,10 @@ import           Stack.Types.Internal
 import           Stack.Types.StackT
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
-import           System.Directory (canonicalizePath, doesFileExist, doesDirectoryExist)
+import           System.Directory (canonicalizePath, doesFileExist, doesDirectoryExist, createDirectoryIfMissing)
 import           System.Environment (getArgs, getProgName)
 import           System.Exit
+import           System.FileLock (withFileLock, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
 import           System.FilePath (dropTrailingPathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..))
 import           System.Process.Read
@@ -312,9 +313,10 @@ pluginShouldHaveRun _plugin _globalOpts = do
 -- support others later).
 pathCmd :: [Text] -> GlobalOpts -> IO ()
 pathCmd keys go =
-    withBuildConfig
+    withBuildConfigAndLock
         go
-        (do env <- ask
+        (\_ ->
+         do env <- ask
             let cfg = envConfig env
                 bc = envConfigBuildConfig cfg
             menv <- getMinimalEnvOverride
@@ -451,7 +453,8 @@ setupParser = SetupCmdOpts
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
-  runStackTGlobal manager (lcConfig lc) go $
+  withUserFileLock (lcConfig lc) $ \_ ->
+   runStackTGlobal manager (lcConfig lc) go $
       Docker.reexecWithOptionalContainer
           (lcProjectRoot lc)
           Nothing
@@ -485,21 +488,55 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
               )
           Nothing
 
-withConfig :: GlobalOpts
+-- | Enforce mutual exclusion of every action running via this function
+-- on this users account.  Currently, stack uses this to completely
+-- exclude concurrent execution of stack commands.  In the future,
+-- stack may refine this to a finer-grained locking approach.
+withUserFileLock :: Config
+                 -> (FileLock -> IO a)
+                 -> IO a
+withUserFileLock cfg act = do
+    let lockfile = $(mkRelFile "lockfile")
+    let pth = configStackRoot cfg </> lockfile
+    createDirectoryIfMissing True (toFilePath $ configStackRoot cfg)
+    -- Just in case of asynchronous exceptions, we need to be careful
+    -- when using tryLockFile here:
+    bracket (tryLockFile (toFilePath pth) Exclusive)
+            (\fstTry -> maybe (return ()) unlockFile fstTry)
+            (\fstTry ->
+             case fstTry of
+               Just lk -> finally (act lk) (unlockFile lk)
+               Nothing ->
+                 do putStrLn $ "Failed to grab lock ("++show pth++"); other stack instance running.  Waiting..."
+                    withFileLock (toFilePath pth) Exclusive $ \lk -> do
+                      putStrLn "Lock acquired, proceeding."
+                      act lk)
+
+withConfigAndLock :: GlobalOpts
            -> StackT Config IO ()
            -> IO ()
-withConfig go@GlobalOpts{..} inner = do
+withConfigAndLock go@GlobalOpts{..} inner = do
     (manager, lc) <- loadConfigWithOpts go
-    runStackTGlobal manager (lcConfig lc) go $
+    withUserFileLock (lcConfig lc) $ \_lk ->
+     runStackTGlobal manager (lcConfig lc) go $
         Docker.reexecWithOptionalContainer (lcProjectRoot lc)
             Nothing
             (runStackTGlobal manager (lcConfig lc) go inner)
             Nothing
 
+-- For now the non-locking version just unlocks immediately.
+-- That is, there's still a serialization point.
 withBuildConfig :: GlobalOpts
-                -> StackT EnvConfig IO ()
-                -> IO ()
+               -> (StackT EnvConfig IO ())
+               -> IO ()
 withBuildConfig go inner =
+    withBuildConfigAndLock go (\lk -> do liftIO $ unlockFile lk
+                                         inner)
+
+withBuildConfigAndLock :: GlobalOpts
+                 -> (FileLock -> StackT EnvConfig IO ())
+                 -> IO ()
+withBuildConfigAndLock go inner =
     withBuildConfigExt go Nothing inner Nothing
 
 withBuildConfigExt
@@ -509,7 +546,7 @@ withBuildConfigExt
     -- OS even if Docker is enabled for builds.  The build config is not
     -- available in this action, since that would require build tools to be
     -- installed on the host OS.
-    -> StackT EnvConfig IO ()
+    -> (FileLock -> StackT EnvConfig IO ())
     -- ^ Action that uses the build config.  If Docker is enabled for builds,
     -- this will be run in a Docker container.
     -> Maybe (StackT Config IO ())
@@ -520,23 +557,24 @@ withBuildConfigExt
     -> IO ()
 withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
     (manager, lc) <- loadConfigWithOpts go
-    let inner' = do
+    let inner' lk = do
             bconfig <- runStackLoggingTGlobal manager go $
                 lcLoadBuildConfig lc globalResolver
             envConfig <-
-                runStackTGlobal
-                    manager bconfig go
-                    setupEnv
+               runStackTGlobal
+                   manager bconfig go
+                   setupEnv
             runStackTGlobal
                 manager
                 envConfig
                 go
-                inner
-    runStackTGlobal manager (lcConfig lc) go $
-        Docker.reexecWithOptionalContainer (lcProjectRoot lc) mbefore inner' mafter
+                (inner lk)
+    withUserFileLock (lcConfig lc) $ \lk ->
+     runStackTGlobal manager (lcConfig lc) go $
+        Docker.reexecWithOptionalContainer (lcProjectRoot lc) mbefore (inner' lk) mafter
 
 cleanCmd :: () -> GlobalOpts -> IO ()
-cleanCmd () go = withBuildConfig go clean
+cleanCmd () go = withBuildConfigAndLock go (\_ -> clean)
 
 -- | Helper for build and install commands
 buildCmdHelper :: StackT EnvConfig IO () -- ^ do before build
@@ -545,7 +583,7 @@ buildCmdHelper beforeBuild finalAction opts go
     | boptsFileWatch opts = fileWatch inner
     | otherwise = inner $ const $ return ()
   where
-    inner setLocalFiles = withBuildConfig go $ do
+    inner setLocalFiles = withBuildConfigAndLock go $ \_ -> do
         beforeBuild
         Stack.Build.build setLocalFiles opts { boptsFinalAction = finalAction }
 
@@ -567,24 +605,24 @@ copyCmd :: BuildOpts -> GlobalOpts -> IO ()
 copyCmd opts = buildCmdHelper (return ()) DoNothing opts { boptsInstallExes = True }
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
-uninstallCmd _ go = withConfig go $ do
+uninstallCmd _ go = withConfigAndLock go $ do
     $logError "stack does not manage installations in global locations"
     $logError "The only global mutation stack performs is executable copying"
     $logError "For the default executable destination, please run 'stack path --local-bin-path'"
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()
-unpackCmd names go = withConfig go $ do
+unpackCmd names go = withConfigAndLock go $ do
     menv <- getMinimalEnvOverride
     Stack.Fetch.unpackPackages menv "." names
 
 -- | Update the package index
 updateCmd :: () -> GlobalOpts -> IO ()
-updateCmd () go = withConfig go $
+updateCmd () go = withConfigAndLock go $
     getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
 
 upgradeCmd :: Bool -> GlobalOpts -> IO ()
-upgradeCmd fromGit go = withConfig go $
+upgradeCmd fromGit go = withConfigAndLock go $
     upgrade fromGit (globalResolver go)
 
 -- | Upload to Hackage
@@ -610,10 +648,10 @@ uploadCmd args go = do
                     Upload.defaultUploadSettings
             liftIO $ Upload.mkUploader config uploadSettings
     if null dirs
-        then withConfig go $ do
+        then withConfigAndLock go $ do
             uploader <- getUploader
             liftIO $ forM_ files (canonicalizePath >=> Upload.upload uploader)
-        else withBuildConfig go $ do
+        else withBuildConfigAndLock go $ \_ -> do
             uploader <- getUploader
             liftIO $ forM_ files (canonicalizePath >=> Upload.upload uploader)
             forM_ dirs $ \dir -> do
@@ -623,7 +661,7 @@ uploadCmd args go = do
 
 sdistCmd :: [String] -> GlobalOpts -> IO ()
 sdistCmd dirs go =
-    withBuildConfig go $ do
+    withBuildConfig go $ do -- No locking needed.
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null dirs
             then asks (Map.keys . bcPackages . getBuildConfig)
@@ -641,58 +679,69 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
     case eoExtra of
         ExecOptsPlain -> do
             (manager,lc) <- liftIO $ loadConfigWithOpts go
-            runStackTGlobal manager (lcConfig lc) go $
+            withUserFileLock (lcConfig lc) $ \lk ->
+             runStackTGlobal manager (lcConfig lc) go $
                 Docker.execWithOptionalContainer
                     (lcProjectRoot lc)
                     (return (eoCmd, eoArgs, [], id))
                     Nothing
-                    (runStackTGlobal manager (lcConfig lc) go $
+                    (runStackTGlobal manager (lcConfig lc) go $ do
+                        liftIO $ unlockFile lk -- Unlock before transferring control away.
                         exec plainEnvSettings eoCmd eoArgs)
                     Nothing
         ExecOptsEmbellished {..} ->
-           withBuildConfig go $ do
+           withBuildConfigAndLock go $ \lk -> do
                let targets = concatMap words eoPackages
                unless (null targets) $
                    Stack.Build.build (const $ return ()) defaultBuildOpts
                        { boptsTargets = map T.pack targets
                        }
+               liftIO $ unlockFile lk -- Unlock before transferring control away.
                exec eoEnvSettings eoCmd eoArgs
 
 -- | Run the REPL in the context of a project.
 replCmd :: ([Text], [String], FilePath, Bool, [String]) -> GlobalOpts -> IO ()
 replCmd (targets,args,path,noload,packages) go@GlobalOpts{..} = do
-  withBuildConfig go $ do
+  withBuildConfigAndLock go $ \lk -> do
     let packageTargets = concatMap words packages
     unless (null packageTargets) $
        Stack.Build.build (const $ return ()) defaultBuildOpts
            { boptsTargets = map T.pack packageTargets
            }
+    liftIO $ unlockFile lk -- Don't hold the lock while in the REPL.
     repl targets args path noload
 
 -- | Run ide-backend in the context of a project.
 ideCmd :: ([Text], [String]) -> GlobalOpts -> IO ()
-ideCmd (targets,args) go@GlobalOpts{..} = withBuildConfig go $ do
+ideCmd (targets,args) go@GlobalOpts{..} =
+    withBuildConfig go $ -- No locking needed.
       ide targets args
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
 dockerPullCmd _ go@GlobalOpts{..} = do
     (manager,lc) <- liftIO $ loadConfigWithOpts go
-    runStackTGlobal manager (lcConfig lc) go $
-        Docker.preventInContainer Docker.pull
+    -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
+    withUserFileLock (lcConfig lc) $ \_ ->
+     runStackTGlobal manager (lcConfig lc) go $
+       Docker.preventInContainer Docker.pull
 
 -- | Reset the Docker sandbox.
 dockerResetCmd :: Bool -> GlobalOpts -> IO ()
 dockerResetCmd keepHome go@GlobalOpts{..} = do
     (manager,lc) <- liftIO (loadConfigWithOpts go)
-    runStackLoggingTGlobal manager go $
+    -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
+    withUserFileLock (lcConfig lc) $ \_ ->
+     runStackLoggingTGlobal manager go $
         Docker.preventInContainer $ Docker.reset (lcProjectRoot lc) keepHome
 
 -- | Cleanup Docker images and containers.
 dockerCleanupCmd :: Docker.CleanupOpts -> GlobalOpts -> IO ()
 dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
     (manager,lc) <- liftIO $ loadConfigWithOpts go
-    runStackTGlobal manager (lcConfig lc) go $
+    -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
+    withUserFileLock (lcConfig lc) $ \_ ->
+     runStackTGlobal manager (lcConfig lc) go $
         Docker.preventInContainer $
             Docker.cleanup cleanupOpts
 
@@ -701,7 +750,8 @@ imgDockerCmd () go@GlobalOpts{..} = do
     withBuildConfigExt
         go
         Nothing
-        (do Stack.Build.build
+        (\_ ->
+         do Stack.Build.build
                 (const (return ()))
                 defaultBuildOpts
             Image.stageContainerImageArtifacts)
@@ -726,11 +776,11 @@ loadConfigWithOpts go@GlobalOpts{..} = do
 
 -- | Project initialization
 initCmd :: InitOpts -> GlobalOpts -> IO ()
-initCmd initOpts go = withConfig go $ initProject initOpts
+initCmd initOpts go = withConfigAndLock go $ initProject initOpts
 
 -- | Project creation
 newCmd :: NewOpts -> GlobalOpts -> IO ()
-newCmd newOpts go@GlobalOpts{..} = withConfig go $ do
+newCmd newOpts go@GlobalOpts{..} = withConfigAndLock go $ do
     newProject newOpts
     initProject (newOptsInitOpts newOpts)
 
@@ -739,14 +789,14 @@ solverCmd :: Bool -- ^ modify stack.yaml automatically?
           -> GlobalOpts
           -> IO ()
 solverCmd fixStackYaml go =
-    withBuildConfig go (solveExtraDeps fixStackYaml)
+    withBuildConfigAndLock go (\_ -> solveExtraDeps fixStackYaml)
 
 -- | Visualize dependencies
 dotCmd :: DotOpts -> GlobalOpts -> IO ()
-dotCmd dotOpts go = withBuildConfig go (dot dotOpts)
+dotCmd dotOpts go = withBuildConfigAndLock go (\_ -> dot dotOpts)
 
 ifaceCmd :: () -> GlobalOpts -> IO ()
-ifaceCmd () go = withBuildConfig go iface
+ifaceCmd () go = withBuildConfigAndLock go (\_ -> iface)
 
 -- | List the dependencies
 listDependenciesCmd :: Text -> GlobalOpts -> IO ()
