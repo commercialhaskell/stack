@@ -89,7 +89,8 @@ build setLocalFiles mbuildLk bopts = do
        -- NOTE: This policy is too conservative.  In the future we should be able to
        -- schedule unlocking as an Action that happens after all non-local actions are
        -- complete.
-      (Just lk,True) -> liftIO $ unlockFile lk
+      (Just lk,True) -> do $logDebug "All installs are local; releasing snapshot lock early."
+                           liftIO $ unlockFile lk
       _ -> return ()
 
     when (boptsPreFetch bopts) $
@@ -101,8 +102,13 @@ build setLocalFiles mbuildLk bopts = do
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
 
+-- | If all the tasks are local, they don't mutate anything outside of our local directory.
 allLocal :: Plan -> Bool
-allLocal _plan = False
+allLocal =
+    all (== Local) .
+    map taskLocation .
+    Map.elems .
+    planTasks
 
 -- | Get the @BaseConfigOpts@ necessary for constructing configure options
 mkBaseConfigOpts :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m)
