@@ -46,7 +46,7 @@ import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal
-import           System.FileLock (FileLock)
+import           System.FileLock (FileLock, unlockFile)
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
 
@@ -60,7 +60,7 @@ build :: M env m
       -> Maybe FileLock
       -> BuildOpts
       -> m ()
-build setLocalFiles _mbuildLk bopts = do
+build setLocalFiles mbuildLk bopts = do
     menv <- getMinimalEnvOverride
 
     (mbp, locals, extraToBuild, sourceMap) <- loadSourceMap bopts
@@ -83,6 +83,15 @@ build setLocalFiles _mbuildLk bopts = do
     plan <- withLoadPackage menv $ \loadPackage ->
         constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered loadPackage sourceMap installedMap
 
+    -- If our work to do is all local, let someone else have a turn with the snapshot.
+    -- They won't damage what's already in there.
+    case (mbuildLk, allLocal plan) of
+       -- NOTE: This policy is too conservative.  In the future we should be able to
+       -- schedule unlocking as an Action that happens after all non-local actions are
+       -- complete.
+      (Just lk,True) -> liftIO $ unlockFile lk
+      _ -> return ()
+
     when (boptsPreFetch bopts) $
         preFetch plan
 
@@ -91,6 +100,9 @@ build setLocalFiles _mbuildLk bopts = do
         else executePlan menv bopts baseConfigOpts locals sourceMap plan
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
+
+allLocal :: Plan -> Bool
+allLocal _plan = False
 
 -- | Get the @BaseConfigOpts@ necessary for constructing configure options
 mkBaseConfigOpts :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m)
