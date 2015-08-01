@@ -26,8 +26,8 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Resource
 import           Data.Function
-import           Data.Map.Strict (Map)
 import qualified Data.Map as Map
+import           Data.Map.Strict (Map)
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Network.HTTP.Client.Conduit (HasHttpManager)
@@ -46,15 +46,21 @@ import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal
+import           System.FileLock (FileLock)
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
 
--- | Build
+-- | Build.
+--
+--   If a buildLock is passed there is an important contract here.  That lock must
+--   protect the snapshot, and it must be safe to unlock it if there are no further
+--   modifications to the snapshot to be performed by this build.
 build :: M env m
       => (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
+      -> Maybe FileLock
       -> BuildOpts
       -> m ()
-build setLocalFiles bopts = do
+build setLocalFiles _mbuildLk bopts = do
     menv <- getMinimalEnvOverride
 
     (mbp, locals, extraToBuild, sourceMap) <- loadSourceMap bopts
