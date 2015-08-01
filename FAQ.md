@@ -124,6 +124,10 @@ It uses the first GHC that it finds on the `PATH`. If that GHC does not comply w
 
 See [this issue](https://github.com/commercialhaskell/stack/issues/420) for a detailed discussion.
 
+#### How do I upgrade to GHC 7.10.2 with stack?
+
+If you already have a prior version of GHC use `stack --resolver ghc-7.10 setup --reinstall`. If you don't have any GHC installed, you can skip the `--reinstall`. 
+
 #### How do I get extra build tools?
 
 stack will automatically install build tools required by your packages or their
