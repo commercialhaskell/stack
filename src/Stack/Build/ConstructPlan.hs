@@ -474,10 +474,3 @@ stripLocals plan = plan
             TTLocal _ -> False
             TTUpstream _ Local -> False
             TTUpstream _ Snap -> True
-
-taskLocation :: Task -> InstallLocation
-taskLocation =
-    go . taskType
-  where
-    go (TTLocal _) = Local
-    go (TTUpstream _ loc) = loc
