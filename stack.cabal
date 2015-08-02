@@ -174,7 +174,7 @@ library
 executable stack
   hs-source-dirs: src/main
   main-is:        Main.hs
-  ghc-options:    -Wall -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:    -Wall -threaded -rtsopts
   other-modules:     Plugins
                      Plugins.Commands
 
