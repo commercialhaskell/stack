@@ -205,18 +205,6 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                          flag False True (long "no-load" <>
                                          help "Don't load modules on start-up") <*>
                          packagesParser)
-             addCommand "ide"
-                        "Run ide-backend-client with the correct arguments"
-                        ideCmd
-                        ((,) <$>
-                         fmap (map T.pack)
-                              (many (strArgument
-                                       (metavar "TARGET" <>
-                                        help "If none specified, use all packages defined in current directory"))) <*>
-                         argsOption (long "ghc-options" <>
-                                     metavar "OPTION" <>
-                                     help "Additional options passed to GHCi" <>
-                                     value []))
              addCommand "runghc"
                         "Run runghc"
                         execCmd
@@ -238,6 +226,22 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                                                      "and package version.") <>
                                                value " " <>
                                                showDefault))
+             addSubCommands
+                 "ide"
+                 "IDE-specific commands"
+                 (addCommand
+                      "start"
+                      "Start the ide-backend service"
+                      ideCmd
+                      (((,) <$>
+                        fmap (map T.pack)
+                             (many (strArgument
+                                      (metavar "TARGET" <>
+                                       help "If none specified, use all packages defined in current directory"))) <*>
+                        argsOption (long "ghc-options" <>
+                                    metavar "OPTION" <>
+                                    help "Additional options passed to GHCi" <>
+                                    value []))))
              addSubCommands
                Docker.dockerCmdName
                "Subcommands specific to Docker use"
