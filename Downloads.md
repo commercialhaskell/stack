@@ -159,7 +159,11 @@ For Gentoo users, make sure to have the `ncurses` package with `USE=tinfo` (with
 
 ## Path
 
-You can install stack by copying it anywhere on your PATH environment variable, such as `/usr/local/bin`. However, it may be advantageous to place the stack executable in the same directory where stack itself will install executables, that way stack is able to upgrade itself. On Windows, that directory is `%APPDATA%\local\bin`, e.g. "c:\Users\Michael\AppData\Roaming\local\bin", and on other systems `$HOME/.local/bin`.
+You can install stack by copying it anywhere on your PATH environment variable. We recommend installing in the same directory where stack itself will install executables (that way stack is able to upgrade itself!). On Windows, that directory is `%APPDATA%\local\bin`, e.g. "c:\Users\Michael\AppData\Roaming\local\bin". For other systems, use `$HOME/.local/bin`.
+
+If you don't have that directory in your PATH, you may need to update your PATH (such as by editing .bashrc).
+
+NOTE: You may need to rename the file to just "stack" instead of the long name and edit the file to give it permission to be executable.
 
 If you're curious about the choice of these paths, see [issue #153](https://github.com/commercialhaskell/stack/issues/153)
 
