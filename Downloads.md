@@ -149,7 +149,9 @@ If you use the [ArchHaskell repository](https://wiki.archlinux.org/index.php/Arc
 (64-bit and 32-bit options available)
 
 * Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest).  Note: the `-gmp4` variants are for older distributions (such as CentOS 6.x) that only include libgmp4 (libgmp.so.3)
-* Extract the `stack` executable somewhere on your `$PATH`  (see [Path section below](#path))
+* Extract the "stack…" executable somewhere on your `$PATH`  (see [Path section below](#path))
+* Rename the long filename to just "stack"
+* Edit the file to give it permission to be executable (`chmod a+x /path/to/stack`).
 * Now you can run `stack` from the terminal.
 
 Tested on Fedora 20: make sure to install the following packages `sudo yum install perl make automake gcc gmp-devel`.
@@ -160,8 +162,6 @@ For Gentoo users, make sure to have the `ncurses` package with `USE=tinfo` (with
 You can install stack by copying it anywhere on your PATH environment variable. We recommend installing in the same directory where stack itself will install executables (that way stack is able to upgrade itself!). On Windows, that directory is `%APPDATA%\local\bin`, e.g. "c:\Users\Michael\AppData\Roaming\local\bin". For other systems, use `$HOME/.local/bin`.
 
 If you don't have that directory in your PATH, you may need to update your PATH (such as by editing .bashrc).
-
-NOTE: You may want to rename the file to just "stack" instead of the long name and edit the file to give it permission to be executable (`chmod a+x /path/to/stack`).
 
 If you're curious about the choice of these paths, see [issue #153](https://github.com/commercialhaskell/stack/issues/153)
 
