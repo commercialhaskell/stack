@@ -19,6 +19,7 @@ module Stack.Build.Types
     ,Installed(..)
     ,PackageInstallInfo(..)
     ,Task(..)
+    ,taskLocation
     ,LocalPackage(..)
     ,BaseConfigOpts(..)
     ,Plan(..)
@@ -485,6 +486,12 @@ instance Show TaskConfigOpts where
 data TaskType = TTLocal LocalPackage
               | TTUpstream Package InstallLocation
     deriving Show
+
+taskLocation :: Task -> InstallLocation
+taskLocation task =
+    case taskType task of
+        TTLocal _ -> Local
+        TTUpstream _ loc -> loc
 
 -- | A complete plan of what needs to be built and how to do it
 data Plan = Plan

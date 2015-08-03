@@ -969,12 +969,6 @@ printBuildOutput excludeTHLoading makeAbsolute level outH = void $ fork $
     stripCarriageReturn :: ByteString -> ByteString
     stripCarriageReturn = S8.filter (not . (=='\r'))
 
-taskLocation :: Task -> InstallLocation
-taskLocation task =
-    case taskType task of
-        TTLocal _ -> Local
-        TTUpstream _ loc -> loc
-
 -- | Find the Setup.hs or Setup.lhs in the given directory. If none exists,
 -- throw an exception.
 getSetupHs :: Path Abs Dir -- ^ project directory

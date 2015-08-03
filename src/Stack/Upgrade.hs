@@ -85,7 +85,8 @@ upgrade fromGit mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> d
                 (Just $ dir </> $(mkRelFile "stack.yaml"))
             lcLoadBuildConfig lc mresolver
         envConfig1 <- runStackT manager logLevel bconfig terminal reExec setupEnv
-        runStackT manager logLevel envConfig1 terminal reExec $ build (const $ return ()) defaultBuildOpts
+        runStackT manager logLevel envConfig1 terminal reExec $
+          build (const $ return ()) Nothing defaultBuildOpts
             { boptsTargets = ["stack"]
             , boptsInstallExes = True
             }

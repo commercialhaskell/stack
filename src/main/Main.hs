@@ -612,9 +612,9 @@ buildCmdHelper beforeBuild finalAction opts go
     | boptsFileWatch opts = fileWatch inner
     | otherwise = inner $ const $ return ()
   where
-    inner setLocalFiles = withBuildConfigAndLock go $ \_ -> do
+    inner setLocalFiles = withBuildConfigAndLock go $ \lk -> do
         beforeBuild
-        Stack.Build.build setLocalFiles opts { boptsFinalAction = finalAction }
+        Stack.Build.build setLocalFiles (Just lk) opts { boptsFinalAction = finalAction }
 
 -- | Build the project.
 buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
@@ -722,7 +722,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
            withBuildConfigAndLock go $ \lk -> do
                let targets = concatMap words eoPackages
                unless (null targets) $
-                   Stack.Build.build (const $ return ()) defaultBuildOpts
+                   Stack.Build.build (const $ return ()) (Just lk) defaultBuildOpts
                        { boptsTargets = map T.pack targets
                        }
                liftIO $ unlockFile lk -- Unlock before transferring control away.
@@ -734,7 +734,7 @@ replCmd (targets,args,path,noload,packages) go@GlobalOpts{..} = do
   withBuildConfigAndLock go $ \lk -> do
     let packageTargets = concatMap words packages
     unless (null packageTargets) $
-       Stack.Build.build (const $ return ()) defaultBuildOpts
+       Stack.Build.build (const $ return ()) (Just lk) defaultBuildOpts
            { boptsTargets = map T.pack packageTargets
            }
     liftIO $ unlockFile lk -- Don't hold the lock while in the REPL.
@@ -791,9 +791,10 @@ imgDockerCmd () go@GlobalOpts{..} = do
     withBuildConfigExt
         go
         Nothing
-        (\_ ->
+        (\lk ->
          do Stack.Build.build
                 (const (return ()))
+                (Just lk)
                 defaultBuildOpts
             Image.stageContainerImageArtifacts)
         (Just Image.createContainerImageFromStage)
