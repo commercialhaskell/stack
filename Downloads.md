@@ -16,9 +16,7 @@ NOTE: These executables have been built and tested on a Windows 8.1 64-bit machi
 
 We generally test on the current version of OS X, but stack is known to work on Mavericks as well, and may also work on older versions (YMMV).
 
-**Note**: due to [GHC bug 10322](https://ghc.haskell.org/trac/ghc/ticket/10322), building `stack` from source fails with GHC 7.10.1. This bug will be fixed in 7.10.2, but in the meantime, we recommend using GHC 7.8.4 on OS X.
-
-**Note**: If you see the message `bash: <PATH_TO_STACK>/stack: Permission denied` or `bash: stack: command not found`, set the executable bit: `chmod +x <PATH_TO_STACK>/stack`
+**Note**: due to [GHC bug 10322](https://ghc.haskell.org/trac/ghc/ticket/10322), building `stack` from source fails with GHC 7.10.1. This bug is fixed in GHC 7.10.2, and GHC 7.8.4 works as well.
 
 ## Ubuntu
 
@@ -163,7 +161,7 @@ You can install stack by copying it anywhere on your PATH environment variable. 
 
 If you don't have that directory in your PATH, you may need to update your PATH (such as by editing .bashrc).
 
-NOTE: You may need to rename the file to just "stack" instead of the long name and edit the file to give it permission to be executable.
+NOTE: You may want to rename the file to just "stack" instead of the long name and edit the file to give it permission to be executable (`chmod a+x /path/to/stack`).
 
 If you're curious about the choice of these paths, see [issue #153](https://github.com/commercialhaskell/stack/issues/153)
 
