@@ -84,13 +84,6 @@ docker reset` will reset that sandbox to its defaults.
 
 Note: this leaves of `~/.stack` (which is separately volume-mounted) alone.
 
-### exec - Runs a raw command in the Docker container
-
-In contrast to `stack exec`, `stack docker exec` will run a command directly,
-without passing it through `stack` in the container. This means the special
-environment to access packages and binaries built by stack is not set up first,
-but makes it usable with the "runtime" image variants (e.g. `fpco/stack-run`).
-
 Command-line options
 -------------------------------------------------------------------------------
 
