@@ -19,6 +19,7 @@ import qualified Data.ByteString.Lazy as L
 import           Data.List
 import qualified Data.List as List
 import qualified Data.Map as Map
+import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Set as Set
@@ -50,6 +51,7 @@ import qualified Stack.Image as Image
 import           Stack.Init
 import           Stack.New
 import           Stack.Options
+import           Stack.Package (getCabalFileName)
 import qualified Stack.PackageIndex
 import           Stack.Repl
 import           Stack.SDist (getSDistTarball)
@@ -229,19 +231,24 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
              addSubCommands
                  "ide"
                  "IDE-specific commands"
-                 (addCommand
-                      "start"
-                      "Start the ide-backend service"
-                      ideCmd
-                      (((,) <$>
-                        fmap (map T.pack)
-                             (many (strArgument
-                                      (metavar "TARGET" <>
-                                       help "If none specified, use all packages defined in current directory"))) <*>
-                        argsOption (long "ghc-options" <>
-                                    metavar "OPTION" <>
-                                    help "Additional options passed to GHCi" <>
-                                    value []))))
+                 (do addCommand
+                         "start"
+                         "Start the ide-backend service"
+                         ideCmd
+                         (((,) <$>
+                           fmap (map T.pack)
+                                (many (strArgument
+                                         (metavar "TARGET" <>
+                                          help "If none specified, use all packages defined in current directory"))) <*>
+                           argsOption (long "ghc-options" <>
+                                       metavar "OPTION" <>
+                                       help "Additional options passed to GHCi" <>
+                                       value [])))
+                     addCommand
+                         "packages"
+                         "List all available local loadable packages"
+                         packagesCmd
+                         (pure ()))
              addSubCommands
                Docker.dockerCmdName
                "Subcommands specific to Docker use"
@@ -720,6 +727,18 @@ ideCmd :: ([Text], [String]) -> GlobalOpts -> IO ()
 ideCmd (targets,args) go@GlobalOpts{..} =
     withBuildConfig go $ -- No locking needed.
       ide targets args
+
+-- | Run ide-backend in the context of a project.
+packagesCmd :: () -> GlobalOpts -> IO ()
+packagesCmd () go@GlobalOpts{..} =
+    withBuildConfig go $
+      do bconfig <- asks getBuildConfig
+         locals <-
+             forM (M.toList (bcPackages bconfig)) $
+             \(dir,_) ->
+                  do cabalfp <- getCabalFileName dir
+                     parsePackageNameFromFilePath cabalfp
+         forM_ locals (liftIO . putStrLn . packageNameString)
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
