@@ -18,6 +18,7 @@ import           Control.Monad.Reader (ask, asks)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Attoparsec.Args (withInterpreterArgs)
 import qualified Data.ByteString.Lazy as L
+import           Data.IORef
 import           Data.List
 import qualified Data.List as List
 import qualified Data.Map as Map
@@ -466,7 +467,7 @@ setupParser = SetupCmdOpts
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
-  withUserFileLock (configStackRoot $ lcConfig lc) $ \_ ->
+  withUserFileLock (configStackRoot $ lcConfig lc) $ \lk ->
    runStackTGlobal manager (lcConfig lc) go $
       Docker.reexecWithOptionalContainer
           (lcProjectRoot lc)
@@ -500,6 +501,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
               $logInfo "stack ghc, stack ghci, stack runghc, or stack exec"
               )
           Nothing
+          (Just $ liftIO$ unlockFile lk)
 
 -- | Enforce mutual exclusion of every action running via this
 -- function, on this path, on this users account.
@@ -537,12 +539,13 @@ withConfigAndLock :: GlobalOpts
            -> IO ()
 withConfigAndLock go@GlobalOpts{..} inner = do
     (manager, lc) <- loadConfigWithOpts go
-    withUserFileLock (configStackRoot $ lcConfig lc) $ \_lk ->
+    withUserFileLock (configStackRoot $ lcConfig lc) $ \lk ->
      runStackTGlobal manager (lcConfig lc) go $
         Docker.reexecWithOptionalContainer (lcProjectRoot lc)
             Nothing
             (runStackTGlobal manager (lcConfig lc) go inner)
             Nothing
+            (Just $ liftIO $ unlockFile lk)
 
 -- For now the non-locking version just unlocks immediately.
 -- That is, there's still a serialization point.
@@ -557,16 +560,7 @@ withBuildConfigAndLock :: GlobalOpts
                  -> (FileLock -> StackT EnvConfig IO ())
                  -> IO ()
 withBuildConfigAndLock go inner =
-    withBuildConfigExt go Nothing
-      -- Locking policy:  This is only used for build commands, which
-      -- only need to lock the snapshot, not the global lock.  We
-      -- trade in the lock here.
-       (\lk -> do dir <- installationRootDeps
-                  -- A little bit of hand-over-hand locking:
-                  withUserFileLock dir $ \lk2 -> do
-                    liftIO $ unlockFile lk
-                    inner lk2)
-       Nothing
+    withBuildConfigExt go Nothing inner Nothing
 
 withBuildConfigExt
     :: GlobalOpts
@@ -586,21 +580,39 @@ withBuildConfigExt
     -> IO ()
 withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
     (manager, lc) <- loadConfigWithOpts go
-    let inner' lk = do
-            bconfig <- runStackLoggingTGlobal manager go $
-                lcLoadBuildConfig lc globalResolver
-            envConfig <-
-               runStackTGlobal
-                   manager bconfig go
-                   setupEnv
-            runStackTGlobal
-                manager
-                envConfig
-                go
-                (inner lk)
-    withUserFileLock (configStackRoot $ lcConfig lc) $ \lk ->
-     runStackTGlobal manager (lcConfig lc) go $
-        Docker.reexecWithOptionalContainer (lcProjectRoot lc) mbefore (inner' lk) mafter
+
+    withUserFileLock (configStackRoot $ lcConfig lc) $ \lk0 -> do
+      -- A local bit of state for communication between callbacks:
+      curLk <- newIORef lk0
+      let inner' lk =
+            -- Locking policy:  This is only used for build commands, which
+            -- only need to lock the snapshot, not the global lock.  We
+            -- trade in the lock here.
+            do dir <- installationRootDeps
+               -- Hand-over-hand locking:
+               withUserFileLock dir $ \lk2 -> do
+                 liftIO $ writeIORef curLk lk2
+                 liftIO $ unlockFile lk
+                 inner lk2
+
+      let inner'' lk = do
+              bconfig <- runStackLoggingTGlobal manager go $
+                  lcLoadBuildConfig lc globalResolver
+              envConfig <-
+                 runStackTGlobal
+                     manager bconfig go
+                     setupEnv
+              runStackTGlobal
+                  manager
+                  envConfig
+                  go
+                  (inner' lk)
+
+      runStackTGlobal manager (lcConfig lc) go $
+         Docker.reexecWithOptionalContainer (lcProjectRoot lc) mbefore (inner'' lk0) mafter
+                                            (Just $ liftIO $
+                                             do lk' <- readIORef curLk
+                                                unlockFile lk')
 
 cleanCmd :: () -> GlobalOpts -> IO ()
 cleanCmd () go = withBuildConfigAndLock go (\_ -> clean)
@@ -713,11 +725,12 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                 Docker.execWithOptionalContainer
                     (lcProjectRoot lc)
                     (return (eoCmd, eoArgs, [], id))
-                    Nothing
+                    -- Unlock before transferring control away, whether using docker or not:
+                    (Just $ liftIO $ unlockFile lk)
                     (runStackTGlobal manager (lcConfig lc) go $ do
-                        liftIO $ unlockFile lk -- Unlock before transferring control away.
                         exec plainEnvSettings eoCmd eoArgs)
                     Nothing
+                    Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} ->
            withBuildConfigAndLock go $ \lk -> do
                let targets = concatMap words eoPackages

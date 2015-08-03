@@ -67,11 +67,17 @@ import           System.Posix.Signals
 
 -- | If Docker is enabled, re-runs the currently running OS command in a Docker container.
 -- Otherwise, runs the inner action.
+--
+-- This takes an optional release action which should be taken IFF control is
+-- transfering away from the current process to the intra-container one.  The main use
+-- for this is releasing a lock.  After launching reexecution, the host process becomes
+-- nothing but an manager for the call into docker and thus may not hold the lock.
 reexecWithOptionalContainer
     :: M env m
     => Maybe (Path Abs Dir)
     -> Maybe (m ())
     -> IO ()
+    -> Maybe (m ())
     -> Maybe (m ())
     -> m ()
 reexecWithOptionalContainer mprojectRoot =
@@ -93,6 +99,8 @@ reexecWithOptionalContainer mprojectRoot =
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
 -- Docker container.  Otherwise, runs the inner action.
+--
+-- This takes an optional release action just like `reexecWithOptionalContainer`.
 execWithOptionalContainer
     :: M env m
     => Maybe (Path Abs Dir)
@@ -100,8 +108,9 @@ execWithOptionalContainer
     -> Maybe (m ())
     -> IO ()
     -> Maybe (m ())
+    -> Maybe (m ())
     -> m ()
-execWithOptionalContainer mprojectRoot getCmdArgs mbefore inner mafter =
+execWithOptionalContainer mprojectRoot getCmdArgs mbefore inner mafter mrelease =
   do config <- asks getConfig
      inContainer <- getInContainer
      isReExec <- asks getReExec
@@ -117,6 +126,7 @@ execWithOptionalContainer mprojectRoot getCmdArgs mbefore inner mafter =
                liftIO exitSuccess
         | otherwise ->
             do (cmd_,args,envVars,modConfig) <- liftIO getCmdArgs
+               fromMaybeAction mrelease
                runContainerAndExit
                  modConfig
                  mprojectRoot
