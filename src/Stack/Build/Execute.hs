@@ -60,7 +60,6 @@ import           Network.HTTP.Client.Conduit    (HasHttpManager)
 import           Path
 import           Path.IO
 import           Prelude                        hiding (FilePath, writeFile)
-import           Safe                           (lastMay)
 import           Stack.Build.Cache
 import           Stack.Build.Coverage
 import           Stack.Build.Haddock
@@ -837,17 +836,9 @@ singleTest topts ac ee task =
                             ]
                         return $ Map.singleton testName Nothing
 
-            when needHpc $ forM_ (lastMay testsToRun) $ \testName -> do
+            when needHpc $ forM_ testsToRun $ \testName -> do
                 let pkgName = packageNameText (packageName package)
                     pkgId = packageIdentifierText (packageIdentifier package)
-                when (not $ null $ tail testsToRun) $ $logWarn $ T.concat
-                    [ "Error: The --coverage flag does not yet support multiple test suites in a single cabal file. "
-                    , "All of the tests have been run, however, the HPC report will only supply coverage info for "
-                    , pkgName
-                    , "'s last test, "
-                    , testName
-                    , "."
-                    ]
                 generateHpcReport pkgDir pkgName pkgId testName
 
             bs <- liftIO $
