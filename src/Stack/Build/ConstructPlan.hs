@@ -273,10 +273,29 @@ tellExecutablesUpstream name version loc flags = do
         tellExecutablesPackage loc p
 
 tellExecutablesPackage :: InstallLocation -> Package -> M ()
-tellExecutablesPackage loc p =
-    tell (Map.empty, m, Map.empty)
+tellExecutablesPackage loc p = do
+    cm <- asks combinedMap
+    -- Determine which components are enabled so we know which ones to copy
+    let myComps =
+            case Map.lookup (packageName p) cm of
+                Nothing -> assert False Set.empty
+                Just (PIOnlyInstalled _ _ _) -> Set.empty
+                Just (PIOnlySource ps) -> goSource ps
+                Just (PIBoth ps _) -> goSource ps
+
+        goSource (PSLocal lp) = lpComponents lp
+        goSource (PSUpstream _ _ _) = Set.empty
+
+    tell (Map.empty, m myComps, Map.empty)
   where
-    m = Map.fromList $ map (, loc) $ Set.toList $ packageExes p
+    m myComps = Map.fromList $ map (, loc) $ Set.toList
+              $ filterComps myComps $ packageExes p
+
+    filterComps myComps x
+        | Set.null myComps = x
+        | otherwise = Set.intersection x $ Set.map toExe myComps
+
+    toExe x = fromMaybe x $ T.stripPrefix "exe:" x
 
 -- TODO There are a lot of duplicated computations below. I've kept that for
 -- simplicity right now

@@ -27,6 +27,7 @@ Bug fixes:
 
 * Extensions from the `other-extensions` field no longer enabled by default [#449](https://github.com/commercialhaskell/stack/issues/449)
 * Fix: haddock forces rebuild of empty packages [#452](https://github.com/commercialhaskell/stack/issues/452)
+* Don't copy over executables excluded by component selection [#605](https://github.com/commercialhaskell/stack/issues/605)
 
 ## 0.1.2.0
 
