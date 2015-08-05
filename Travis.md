@@ -51,6 +51,19 @@ addons:
 
 *TODO* is the first option viable? Then we have to install dev dependencies.
 
+If you use one of the recent nightly snapshots which use GHC 7.10.2, you will
+need to make sure libgmp is available by adding
+
+```yaml
+addons:
+  apt:
+    packages:
+    - libgmp-dev
+```
+
+Otherwise the GHC post-install check fails.
+
+
 ### Multiple GHC - parametrised builds
 
 Travis apt plugin doesn't yet support installing apt packages dynamically (https://github.com/travis-ci/travis-ci/issues/4291). That for we need to write a bit repetetive `.travis.yml`.
