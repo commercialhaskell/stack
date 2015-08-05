@@ -142,6 +142,7 @@ solveExtraDeps :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadMask m, 
 solveExtraDeps modStackYaml = do
     $logInfo "This command is not guaranteed to give you a perfect build plan"
     $logInfo "It's possible that even with the changes generated below, you will still need to do some manual tweaking"
+    econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
     snapshot <-
         case bcResolver bconfig of
@@ -164,7 +165,7 @@ solveExtraDeps modStackYaml = do
             (Map.toList packages)
 
     (_ghc, extraDeps) <- cabalSolver
-        (Map.keys $ bcPackages bconfig)
+        (Map.keys $ envConfigPackages econfig)
         constraints
 
     let newDeps = extraDeps `Map.difference` packages

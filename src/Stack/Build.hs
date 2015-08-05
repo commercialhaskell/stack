@@ -157,7 +157,7 @@ withLoadPackage menv inner = do
 -- | Reset the build (remove Shake database and .gen files).
 clean :: (M env m) => m ()
 clean = do
-    bconfig <- asks getBuildConfig
+    econfig <- asks getEnvConfig
     forM_
-        (Map.keys (bcPackages bconfig))
+        (Map.keys (envConfigPackages econfig))
         (distDirFromDir >=> removeTreeIfExists)

@@ -23,6 +23,7 @@
 module Stack.Config
   (loadConfig
   ,packagesParser
+  ,resolvePackageEntry
   ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -207,23 +208,21 @@ loadConfig configArgs mstackYaml = do
             Just (_, _, projectConfig) -> configArgs : projectConfig : extraConfigs
     unless (fromCabalVersion Meta.version `withinRange` configRequireStackVersion config)
         (throwM (BadStackVersionException (configRequireStackVersion config)))
-    menv <- runReaderT getMinimalEnvOverride config
     return $ LoadConfig
         { lcConfig          = config
-        , lcLoadBuildConfig = loadBuildConfig menv mproject config stackRoot
+        , lcLoadBuildConfig = loadBuildConfig mproject config stackRoot
         , lcProjectRoot     = fmap (\(_, fp, _) -> parent fp) mproject
         }
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
 loadBuildConfig :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m, HasTerminal env)
-                => EnvOverride
-                -> Maybe (Project, Path Abs File, ConfigMonoid)
+                => Maybe (Project, Path Abs File, ConfigMonoid)
                 -> Config
                 -> Path Abs Dir
                 -> Maybe AbstractResolver -- override resolver
                 -> m BuildConfig
-loadBuildConfig menv mproject config stackRoot mresolver = do
+loadBuildConfig mproject config stackRoot mresolver = do
     env <- ask
     let miniConfig = MiniConfig (getHttpManager env) config
     (project', stackYamlFP) <- case mproject of
@@ -289,17 +288,13 @@ loadBuildConfig menv mproject config stackRoot mresolver = do
                 mbp <- runReaderT (parseCustomMiniBuildPlan stackYamlFP url) miniConfig
                 return $ mbpGhcVersion mbp
 
-    let root = parent stackYamlFP
-    packages' <- mapM (resolvePackageEntry menv root) (projectPackages project)
-    let packages = Map.fromList $ concat packages'
-
     return BuildConfig
         { bcConfig = config
         , bcResolver = projectResolver project
         , bcGhcVersionExpected = ghcVersion
-        , bcPackages = packages
+        , bcPackageEntries = projectPackages project
         , bcExtraDeps = projectExtraDeps project
-        , bcRoot = root
+        , bcRoot = parent stackYamlFP -- TODO remove this field, since it's redundant with bcStackYaml
         , bcStackYaml = stackYamlFP
         , bcFlags = projectFlags project
         }

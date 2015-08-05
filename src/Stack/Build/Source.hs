@@ -195,7 +195,7 @@ loadLocals bopts latestVersion = do
     -- Iterate over local packages declared in stack.yaml and turn them
     -- into LocalPackage structures. The targets affect whether these
     -- packages will be marked as wanted.
-    lps <- forM (Map.toList $ bcPackages bconfig) $ \(dir, validWanted) -> do
+    lps <- forM (Map.toList $ envConfigPackages econfig) $ \(dir, validWanted) -> do
         cabalfp <- getCabalFileName dir
         name <- parsePackageNameFromFilePath cabalfp
         let wanted = validWanted && isWanted' dir name

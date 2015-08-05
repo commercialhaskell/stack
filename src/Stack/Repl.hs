@@ -67,7 +67,7 @@ ghciSetup targets = do
     pwd <- getWorkingDir
     locals <-
         liftM catMaybes $
-        forM (M.toList (bcPackages bconfig)) $
+        forM (M.toList (envConfigPackages econfig)) $
         \(dir,validWanted) ->
              do cabalfp <- getCabalFileName dir
                 name <- parsePackageNameFromFilePath cabalfp

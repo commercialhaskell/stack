@@ -704,7 +704,7 @@ sdistCmd dirs go =
     withBuildConfig go $ do -- No locking needed.
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null dirs
-            then asks (Map.keys . bcPackages . getBuildConfig)
+            then asks (Map.keys . envConfigPackages . getEnvConfig)
             else mapM (parseAbsDir <=< liftIO . canonicalizePath) dirs
         forM_ dirs' $ \dir -> do
             (tarName, tarBytes) <- getSDistTarball dir
@@ -762,9 +762,9 @@ ideCmd (targets,args) go@GlobalOpts{..} =
 packagesCmd :: () -> GlobalOpts -> IO ()
 packagesCmd () go@GlobalOpts{..} =
     withBuildConfig go $
-      do bconfig <- asks getBuildConfig
+      do econfig <- asks getEnvConfig
          locals <-
-             forM (M.toList (bcPackages bconfig)) $
+             forM (M.toList (envConfigPackages econfig)) $
              \(dir,_) ->
                   do cabalfp <- getCabalFileName dir
                      parsePackageNameFromFilePath cabalfp

@@ -53,7 +53,7 @@ generateHpcReport pkgDir pkgName pkgId testName = do
     hpcDir <- hpcDirFromDir pkgDir
     hpcRelDir <- (</> dotHpc) <$> hpcRelativeDir
     -- Compute arguments used for both "hpc markup" and "hpc report".
-    pkgDirs <- Map.keys . bcPackages <$> asks getBuildConfig
+    pkgDirs <- Map.keys . envConfigPackages <$> asks getEnvConfig
     let args =
             -- Use index files from all packages (allows cross-package
             -- coverage results).

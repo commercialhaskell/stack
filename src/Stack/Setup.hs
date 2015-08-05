@@ -57,6 +57,7 @@ import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Safe (headMay, readMay)
 import           Stack.Build.Types
+import           Stack.Config (resolvePackageEntry)
 import           Stack.Constants (distRelativeDir)
 import           Stack.Fetch
 import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB)
@@ -160,10 +161,14 @@ setupEnv = do
     menv <- mkEnvOverride platform env
     ghcVer <- getGhcVersion menv
     cabalVer <- getCabalPkgVer menv
+    packages <- mapM
+        (resolvePackageEntry menv (bcRoot bconfig))
+        (bcPackageEntries bconfig)
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bconfig
             , envConfigCabalVersion = cabalVer
             , envConfigGhcVersion = ghcVer
+            , envConfigPackages = Map.fromList $ concat packages
             }
 
     -- extra installation bin directories
@@ -229,6 +234,7 @@ setupEnv = do
             }
         , envConfigCabalVersion = cabalVer
         , envConfigGhcVersion = ghcVer
+        , envConfigPackages = envConfigPackages envConfig0
         }
 
 -- | Augment the PATH environment variable with the given extra paths

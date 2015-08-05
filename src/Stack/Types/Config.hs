@@ -225,7 +225,7 @@ data BuildConfig = BuildConfig
       -- packages.
     , bcGhcVersionExpected :: !Version
       -- ^ Version of GHC we expected for this build
-    , bcPackages   :: !(Map (Path Abs Dir) Bool)
+    , bcPackageEntries :: ![PackageEntry]
       -- ^ Local packages identified by a path, Bool indicates whether it is
       -- a non-dependency (the opposite of 'peExtraDep')
     , bcExtraDeps  :: !(Map PackageName Version)
@@ -248,7 +248,8 @@ data BuildConfig = BuildConfig
 data EnvConfig = EnvConfig
     {envConfigBuildConfig :: !BuildConfig
     ,envConfigCabalVersion :: !Version
-    ,envConfigGhcVersion :: !Version}
+    ,envConfigGhcVersion :: !Version
+    ,envConfigPackages   :: !(Map (Path Abs Dir) Bool)}
 instance HasBuildConfig EnvConfig where
     getBuildConfig = envConfigBuildConfig
 instance HasConfig EnvConfig
