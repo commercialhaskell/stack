@@ -638,9 +638,8 @@ installCmd =
     buildCmdHelper warning DoNothing
   where
     warning = do
-        $logWarn "NOTE: stack is not a package manager"
-        $logWarn "The install command is only used to copy executables to a destination directory, not manage them"
-        $logWarn "You may want to use 'stack build --copy-bins' for clarity"
+        $logInfo "NOTE: the install command will copy executables to a destination directory"
+        $logInfo "It is functionally equivalent to the --copy-bins option"
 
 copyCmd :: BuildOpts -> GlobalOpts -> IO ()
 copyCmd opts = buildCmdHelper (return ()) DoNothing opts { boptsInstallExes = True }
