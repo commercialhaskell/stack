@@ -274,7 +274,14 @@ loadLocals bopts latestVersion = do
 
         unusedFlags = mapMaybe checkFlagUsed flags
 
+        unusedComponents = Set.difference (Map.keysSet names) known
+
     unless (null unusedFlags) $ throwM $ InvalidFlagSpecification $ Set.fromList unusedFlags
+    unless (Set.null unusedComponents) $ do
+        $logWarn "WARNING: You've specified components for non-local packages"
+        $logWarn "Components for the following packages will be ignored:"
+        forM_ (Set.toList unusedComponents) $ \x -> do
+            $logWarn $ "* " <> T.pack (packageNameString x)
 
     return (lps, unknown, idents)
   where
