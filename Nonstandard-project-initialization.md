@@ -38,7 +38,10 @@ Currently one needs to list all of your modules that interpret flags in the `oth
 
 # Selecting a Resolver
 
-`stack init` or `stack new` will try to default to the current Haskell LTS present on `https://www.stackage.org/snapshots`. Using an incorrect resolver can cause a build to fail if the version of GHC it requires is not present. In order to override the resolver entry at project initialization one can pass the `--resolver` option with the name of any snapshots on Stackage. Alternatively `--prefer-lts` and `--prefer-nightly` will choose a current lts or nightly versions accordingly. 
+`stack init` or `stack new` will try to default to the current Haskell LTS present on `https://www.stackage.org/snapshots` if no snapshot has been previously used locally, and to the latest LTS snapshot locally used for a build otherwise. Using an incorrect resolver can cause a build to fail if the version of GHC it requires is not present.
+
+In order to override the resolver entry at project initialization one can pass `--prefer-lts` or `--prefer-nightly`. These options will choose the latest LTS or nightly versions locally used.
+Alternatively the `--resolver` option can be used with the name of any snapshots on Stackage, or with `lts` or `nightly` to select the latest versions, disregarding previously used ones. This is not the default so as to avoid unnecessary recompilation time.
 
 :TODO: Document `--solver`
 
