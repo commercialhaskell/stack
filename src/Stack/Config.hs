@@ -294,7 +294,6 @@ loadBuildConfig mproject config stackRoot mresolver = do
         , bcGhcVersionExpected = ghcVersion
         , bcPackageEntries = projectPackages project
         , bcExtraDeps = projectExtraDeps project
-        , bcRoot = parent stackYamlFP -- TODO remove this field, since it's redundant with bcStackYaml
         , bcStackYaml = stackYamlFP
         , bcFlags = projectFlags project
         }

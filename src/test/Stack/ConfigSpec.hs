@@ -79,9 +79,9 @@ spec = beforeAll setup $ afterAll teardown $ do
       createDirectory childDir
       setCurrentDirectory childDir
       LoadConfig{..} <- loadConfig' manager
-      BuildConfig{..} <- loadBuildConfigRest manager
+      bc@BuildConfig{..} <- loadBuildConfigRest manager
                             (lcLoadBuildConfig Nothing)
-      bcRoot `shouldBe` parentDir
+      bcRoot bc `shouldBe` parentDir
 
     it "respects the STACK_YAML env variable" $ \T{..} -> inTempDir $ do
       withSystemTempDirectory "config-is-here" $ \dirFilePath -> do
@@ -92,7 +92,8 @@ spec = beforeAll setup $ afterAll teardown $ do
           LoadConfig{..} <- loadConfig' manager
           BuildConfig{..} <- loadBuildConfigRest manager
                                 (lcLoadBuildConfig Nothing)
-          bcRoot `shouldBe` dir
+          bcStackYaml `shouldBe` dir </> stackDotYaml
+          parent bcStackYaml `shouldBe` dir
 
     it "STACK_YAML can be relative" $ \T{..} -> inTempDir $ do
         parentDir <- getCurrentDirectory >>= parseAbsDir

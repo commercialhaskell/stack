@@ -233,8 +233,6 @@ data BuildConfig = BuildConfig
       --
       -- These dependencies will not be installed to a shared location, and
       -- will override packages provided by the resolver.
-    , bcRoot       :: !(Path Abs Dir)
-      -- ^ Directory containing the project's stack.yaml file
     , bcStackYaml  :: !(Path Abs File)
       -- ^ Location of the stack.yaml file.
       --
@@ -243,6 +241,10 @@ data BuildConfig = BuildConfig
     , bcFlags      :: !(Map PackageName (Map FlagName Bool))
       -- ^ Per-package flag overrides
     }
+
+-- | Directory containing the project's stack.yaml file
+bcRoot :: BuildConfig -> Path Abs Dir
+bcRoot = parent . bcStackYaml
 
 -- | Configuration after the environment has been setup.
 data EnvConfig = EnvConfig
