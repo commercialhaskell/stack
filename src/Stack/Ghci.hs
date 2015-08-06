@@ -74,35 +74,39 @@ ghciSetup targets = do
                 if validWanted && wanted pwd cabalfp name
                     then return (Just (name, cabalfp))
                     else return Nothing
-    let findTarget x = find ((x==) . packageNameText . fst) locals
+    let findTarget x = find ((x ==) . packageNameText . fst) locals
         unmetTargets = filter (isNothing . findTarget) targets
-    when (not (null unmetTargets)) $
-        throwM (TargetsNotFound unmetTargets)
-    forM locals $ \(name,cabalfp) -> do
-        let config =
-                PackageConfig
-                { packageConfigEnableTests = True
-                , packageConfigEnableBenchmarks = True
-                , packageConfigFlags = localFlags mempty bconfig name
-                , packageConfigGhcVersion = envConfigGhcVersion econfig
-                , packageConfigPlatform = configPlatform (getConfig bconfig)
-                }
-        pkg <- readPackage config cabalfp
-        pkgOpts <- getPackageOpts (packageOpts pkg) (map fst locals) cabalfp
-        srcfiles <- getPackageFiles (packageFiles pkg) Modules cabalfp
-        return GhciPkgInfo
-            { ghciPkgName = packageName pkg
-            , ghciPkgOpts = filter (not . badForGhci) pkgOpts
-            , ghciPkgDir = parent cabalfp
-            , ghciPkgModules = S.toList srcfiles
-            }
+    when (not (null unmetTargets)) $ throwM (TargetsNotFound unmetTargets)
+    forM locals $
+        \(name,cabalfp) ->
+             do let config =
+                        PackageConfig
+                        { packageConfigEnableTests = True
+                        , packageConfigEnableBenchmarks = True
+                        , packageConfigFlags = localFlags mempty bconfig name
+                        , packageConfigGhcVersion = envConfigGhcVersion econfig
+                        , packageConfigPlatform = configPlatform
+                              (getConfig bconfig)
+                        }
+                pkg <- readPackage config cabalfp
+                pkgOpts <-
+                    getPackageOpts (packageOpts pkg) (map fst locals) cabalfp
+                srcfiles <- getPackageFiles (packageFiles pkg) Modules cabalfp
+                return
+                    GhciPkgInfo
+                    { ghciPkgName = packageName pkg
+                    , ghciPkgOpts = filter (not . badForGhci) pkgOpts
+                    , ghciPkgDir = parent cabalfp
+                    , ghciPkgModules = S.toList srcfiles
+                    }
   where
     wanted pwd cabalfp name = isInWantedList || targetsEmptyAndInDir
       where
         isInWantedList = elem (packageNameText name) targets
         targetsEmptyAndInDir = null targets || isParentOf (parent cabalfp) pwd
     badForGhci :: String -> Bool
-    badForGhci x = isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky")
+    badForGhci x =
+        isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky")
 
 data GhciSetupException =
     TargetsNotFound [Text]
