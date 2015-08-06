@@ -110,7 +110,7 @@ printPlan :: M env m
           -> m ()
 printPlan finalAction plan = do
     case Map.toList $ planUnregisterLocal plan of
-        [] -> $logInfo "Nothing to unregister"
+        [] -> $logInfo "No packages would be unregistered."
         xs -> do
             $logInfo "Would unregister locally:"
             forM_ xs $ \(gid, reason) -> $logInfo $ T.concat
@@ -123,7 +123,7 @@ printPlan finalAction plan = do
     $logInfo ""
 
     case Map.elems $ planTasks plan of
-        [] -> $logInfo "Nothing to build"
+        [] -> $logInfo "Nothing to build."
         xs -> do
             $logInfo "Would build:"
             mapM_ ($logInfo . displayTask) xs
@@ -139,7 +139,7 @@ printPlan finalAction plan = do
             $logInfo ""
 
             case Map.toList $ planFinals plan of
-                [] -> $logInfo $ "Nothing to " <> finalLabel
+                [] -> $logInfo $ "Nothing to " <> finalLabel <> "."
                 xs -> do
                     $logInfo $ "Would " <> finalLabel <> ":"
                     forM_ xs $ \(name, _) -> $logInfo $ packageNameText name
@@ -147,7 +147,7 @@ printPlan finalAction plan = do
     $logInfo ""
 
     case Map.toList $ planInstallExes plan of
-        [] -> $logInfo "No executables to be installed"
+        [] -> $logInfo "No executables to be installed."
         xs -> do
             $logInfo "Would install executables:"
             forM_ xs $ \(name, loc) -> $logInfo $ T.concat
