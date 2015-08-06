@@ -56,7 +56,7 @@ import           Stack.New
 import           Stack.Options
 import           Stack.Package (getCabalFileName)
 import qualified Stack.PackageIndex
-import           Stack.Repl
+import           Stack.Ghci
 import           Stack.SDist (getSDistTarball)
 import           Stack.Setup
 import           Stack.Solver (solveExtraDeps)
@@ -192,7 +192,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter ->
                         (execOptsParser $ Just "ghc")
              addCommand "ghci"
                         "Run ghci in the context of project(s)"
-                        replCmd
+                        ghciCmd
                         ((,,,,) <$>
                          fmap (map T.pack)
                               (many (strArgument
@@ -740,17 +740,17 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                liftIO $ unlockFile lk -- Unlock before transferring control away.
                exec eoEnvSettings eoCmd eoArgs
 
--- | Run the REPL in the context of a project.
-replCmd :: ([Text], [String], FilePath, Bool, [String]) -> GlobalOpts -> IO ()
-replCmd (targets,args,path,noload,packages) go@GlobalOpts{..} = do
+-- | Run GHCi in the context of a project.
+ghciCmd :: ([Text], [String], FilePath, Bool, [String]) -> GlobalOpts -> IO ()
+ghciCmd (targets,args,path,noload,packages) go@GlobalOpts{..} = do
   withBuildConfigAndLock go $ \lk -> do
     let packageTargets = concatMap words packages
     unless (null packageTargets) $
        Stack.Build.build (const $ return ()) (Just lk) defaultBuildOpts
            { boptsTargets = map T.pack packageTargets
            }
-    liftIO $ unlockFile lk -- Don't hold the lock while in the REPL.
-    repl targets args path noload
+    liftIO $ unlockFile lk -- Don't hold the lock while in the GHCI.
+    ghci targets args path noload
 
 -- | Run ide-backend in the context of a project.
 ideCmd :: ([Text], [String]) -> GlobalOpts -> IO ()

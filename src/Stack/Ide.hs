@@ -28,7 +28,7 @@ import           Path.IO
 import           Stack.Constants
 import           Stack.Exec (defaultEnvSettings)
 import           Stack.Package
-import           Stack.Repl (GhciPkgInfo(..), ghciSetup)
+import           Stack.Ghci (GhciPkgInfo(..), ghciSetup)
 import           Stack.Types
 import           System.Directory (doesFileExist)
 import           System.Environment (lookupEnv)

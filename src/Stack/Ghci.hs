@@ -4,9 +4,9 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
--- | Run a REPL configured with the user's project(s).
+-- | Run a GHCi configured with the user's project(s).
 
-module Stack.Repl where
+module Stack.Ghci where
 
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -28,17 +28,17 @@ import           Stack.Exec
 import           Stack.Package
 import           Stack.Types
 
--- | Launch a GHCi REPL for the given local project targets with the
+-- | Launch a GHCi session for the given local project targets with the
 -- given options and configure it with the load paths and extensions
 -- of those targets.
-repl
+ghci
     :: (HasConfig r, HasBuildConfig r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
     => [Text] -- ^ Targets.
     -> [String] -- ^ GHC options.
     -> FilePath
     -> Bool
     -> m ()
-repl targets useropts ghciPath noload = do
+ghci targets useropts ghciPath noload = do
     pkgs <- ghciSetup targets
     let pkgopts = concatMap ghciPkgOpts pkgs
         srcfiles

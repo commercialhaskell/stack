@@ -52,7 +52,7 @@ library
                      Stack.Package
                      Stack.PackageDump
                      Stack.PackageIndex
-                     Stack.Repl
+                     Stack.Ghci
                      Stack.Ide
                      Stack.Image
                      Stack.SDist
