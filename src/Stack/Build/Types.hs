@@ -337,6 +337,8 @@ data BuildOpts =
             ,boptsLibProfile :: !Bool
             ,boptsExeProfile :: !Bool
             ,boptsEnableOptimizations :: !(Maybe Bool)
+            ,boptsEnableTests :: !Bool
+            ,boptsEnableBenchmarks :: !Bool
             ,boptsHaddock :: !Bool
             -- ^ Build haddocks?
             ,boptsHaddockDeps :: !(Maybe Bool)
@@ -379,6 +381,8 @@ defaultBuildOpts = BuildOpts
     , boptsFileWatch = False
     , boptsKeepGoing = Nothing
     , boptsForceDirty = False
+    , boptsEnableBenchmarks = False
+    , boptsEnableTests = False
     }
 
 -- | Options for the 'FinalAction' 'DoTests'

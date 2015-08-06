@@ -62,12 +62,14 @@ buildOptsParser :: Command
                 -> Parser BuildOpts
 buildOptsParser cmd defCopyBins =
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
-            optimize <*> haddock <*> haddockDeps <*> finalAction <*> dryRun <*> ghcOpts <*>
+            optimize <*> enableTests <*> enableBench <*> haddock <*> haddockDeps <*> finalAction <*> dryRun <*> ghcOpts <*>
             flags <*> copyBins <*> preFetch <*>
             ((||) <$> onlySnapshot <*> onlyDependencies) <*>
             fileWatch' <*> keepGoing <*> forceDirty
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
+        enableTests = pure False
+        enableBench = pure False
         target =
           fmap (map T.pack)
                 (many (strArgument
