@@ -200,20 +200,15 @@ loadLocals bopts latestVersion = do
         name <- parsePackageNameFromFilePath cabalfp
         let wanted = validWanted && isWanted' dir name
             config = PackageConfig
-                { packageConfigEnableTests = False
-                , packageConfigEnableBenchmarks = False
+                { packageConfigEnableTests = wanted && boptsEnableTests bopts
+                , packageConfigEnableBenchmarks = wanted && boptsEnableBenchmarks bopts
                 , packageConfigFlags = localFlags (boptsFlags bopts) bconfig name
                 , packageConfigGhcVersion = envConfigGhcVersion econfig
                 , packageConfigPlatform = configPlatform $ getConfig bconfig
                 }
             configFinal = config
-                { packageConfigEnableTests =
-                    case boptsFinalAction bopts of
-                        DoTests _ -> wanted
-                        _ -> False
-                , packageConfigEnableBenchmarks = wanted && case boptsFinalAction bopts of
-                                                              (DoBenchmarks _) -> True
-                                                              _ -> False
+                { packageConfigEnableTests = wanted && boptsEnableTests bopts
+                , packageConfigEnableBenchmarks = wanted && boptsEnableBenchmarks bopts
                 }
         pkg <- readPackage config cabalfp
         pkgFinal <- readPackage configFinal cabalfp

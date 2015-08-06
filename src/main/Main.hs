@@ -626,7 +626,19 @@ buildCmdHelper beforeBuild finalAction opts go
   where
     inner setLocalFiles = withBuildConfigAndLock go $ \lk -> do
         beforeBuild
-        Stack.Build.build setLocalFiles (Just lk) opts { boptsFinalAction = finalAction }
+        Stack.Build.build
+            setLocalFiles
+            (Just lk)
+            opts { boptsFinalAction = finalAction
+                 , boptsEnableTests =
+                       case finalAction of
+                         DoTests{} -> True
+                         _ -> False
+                 , boptsEnableBenchmarks =
+                       case finalAction of
+                         DoBenchmarks{} -> True
+                         _ -> False
+                 }
 
 -- | Build the project.
 buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
