@@ -688,21 +688,24 @@ resolveFilesAndDeps ty buildComponentDir dirs names0 exts = do
             thDeps =
                 case ty of
                     AllFiles ->
+                        -- The dependent file path is surrounded by quotes but is not escaped.
+                        -- It can be an absolute or relative path.
                         mapMaybe
-                            (fmap (dir </>) .
-                             parseRelFile .
-                             T.unpack .
-                             decodeUtf8 .
-                             C8.takeWhile (/= '"') .
-                             C8.dropWhile (== '"') . C8.dropWhile (/= '"')) $
+                            (parseAbsOrRelFile dir <=<
+                             (fmap T.unpack .
+                              (T.stripSuffix "\"" <=< T.stripPrefix "\"") .
+                              decodeUtf8 . C8.dropWhile (/= '"'))) $
                         filter ("addDependentFile \"" `C8.isPrefixOf`) dumpHI
                     Modules -> []
         --liftIO $ putStrLn $ "XXX dumpHI " ++ show dumpHIPath ++ "\n   XXX moduleDeps=" ++ show moduleDeps ++ "\n   XXX thDeps=" ++ show thDeps
-        return
-            (moduleDeps, thDeps)
+        return (moduleDeps, thDeps)
     getHIDir = do
         bld <- asks snd
         return $ maybe bld (bld </>) buildComponentDir
+    parseAbsOrRelFile dir fp =
+        case parseRelFile fp of
+            Just rel -> Just (dir </> rel)
+            Nothing -> parseAbsFile fp
 
 -- | Try to resolve the list of base names in the given directory by
 -- looking for unique instances of base names applied with the given
