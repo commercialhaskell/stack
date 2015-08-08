@@ -270,8 +270,9 @@ buildDir :: Path Abs Dir -> Path Abs Dir
 buildDir distDir = distDir </> $(mkRelDir "build")
 
 -- | Make the component-specific subdirectory of the build directory.
-getBuildComponentDir :: (MonadThrow m) => String -> m (Path Rel Dir)
-getBuildComponentDir name = parseRelDir (name FilePath.</> (name ++ "-tmp"))
+getBuildComponentDir :: Maybe String -> Maybe (Path Rel Dir)
+getBuildComponentDir Nothing = Nothing
+getBuildComponentDir (Just name) = parseRelDir (name FilePath.</> (name ++ "-tmp"))
 
 -- | Get all dependencies of the package (buildable targets only).
 packageDependencies :: PackageDescription -> Map PackageName VersionRange
@@ -411,11 +412,10 @@ benchmarkFiles :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs
 benchmarkFiles ty bench = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks (parent . fst)
-    let buildComponentDir = getBuildComponentDir (benchmarkName bench)
     exposed <-
         resolveFilesAndDeps
             ty
-            buildComponentDir
+            (Just $ benchmarkName bench)
             (dirs ++ [dir])
             (case benchmarkInterface bench of
                  BenchmarkExeV10 _ fp ->
@@ -423,7 +423,7 @@ benchmarkFiles ty bench = do
                  BenchmarkUnsupported _ ->
                      [])
             haskellModuleExts
-    bfiles <- buildFiles ty buildComponentDir dir build
+    bfiles <- buildFiles ty (Just $ benchmarkName bench) dir build
     case ty of
       AllFiles -> return (concat [bfiles,exposed])
       Modules -> return (concat [bfiles])
@@ -436,11 +436,10 @@ testFiles :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File
 testFiles ty test = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks (parent . fst)
-    let buildComponentDir = getBuildComponentDir (testName test)
     exposed <-
         resolveFilesAndDeps
             ty
-            buildComponentDir
+            (Just $ testName test)
             (dirs ++ [dir])
             (case testInterface test of
                  TestSuiteExeV10 _ fp ->
@@ -450,7 +449,7 @@ testFiles ty test = do
                  TestSuiteUnsupported _ ->
                      [])
             haskellModuleExts
-    bfiles <- buildFiles ty buildComponentDir dir build
+    bfiles <- buildFiles ty (Just $ testName test) dir build
     case ty of
       AllFiles -> return (concat [bfiles,exposed])
       Modules -> return (concat [bfiles])
@@ -463,15 +462,14 @@ executableFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs F
 executableFiles ty exe =
   do dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
      dir <- asks (parent . fst)
-     let buildComponentDir = getBuildComponentDir (exeName exe)
      exposed <-
        resolveFilesAndDeps
          ty
-         buildComponentDir
+         (Just $ exeName exe)
          (dirs ++ [dir])
          [Right (modulePath exe)]
          haskellModuleExts
-     bfiles <- buildFiles ty buildComponentDir dir build
+     bfiles <- buildFiles ty (Just $ exeName exe) dir build
      case ty of
        AllFiles -> return (concat [bfiles,exposed])
        Modules -> return (concat [bfiles])
@@ -497,13 +495,13 @@ libraryFiles ty lib =
 
 -- | Get all files in a build.
 buildFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m)
-           => CabalFileType -> Maybe (Path Rel Dir) -> Path Abs Dir -> BuildInfo -> m [Path Abs File]
-buildFiles ty buildComponentDir dir build = do
+           => CabalFileType -> Maybe (String) -> Path Abs Dir -> BuildInfo -> m [Path Abs File]
+buildFiles ty component dir build = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     other <-
         resolveFilesAndDeps
             ty
-            buildComponentDir
+            component
             (dirs ++ [dir])
             (map Left (otherModules build))
             haskellModuleExts
@@ -635,16 +633,27 @@ depRange = \(Dependency _ r) -> r
 resolveFilesAndDeps
     :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m)
     => CabalFileType
-    -> Maybe (Path Rel Dir) -- ^ Subdirectory of buildDir where Cabal/GHC writes artifacts
+    -> Maybe (String) -- ^ Package component name
     -> [Path Abs Dir] -- ^ Directories to look in.
     -> [Either ModuleName String] -- ^ Base names.
     -> [Text] -- ^ Extentions.
     -> m [Path Abs File]
-resolveFilesAndDeps ty buildComponentDir dirs names0 exts = do
-    (moduleFiles,thFiles) <- loop names0 S.empty
+resolveFilesAndDeps ty component dirs names0 exts = do
+    (moduleFiles,thFiles,_) <- loop names0 S.empty
+    -- cabalfp <- asks fst
+    -- forM_ (S.toList (foundModules `S.difference` (S.fromList (lefts names0)))) $
+    --     \unlistedModule ->
+    --          $(logWarn) $
+    --          T.pack $
+    --          "XXX Warning: module not listed in " ++
+    --          toFilePath (filename cabalfp) ++
+    --          (case component of
+    --               Nothing -> " for library"
+    --               Just c -> " for " ++ c) ++
+    --          " (add it to other-modules): " ++ display unlistedModule ++ "."
     return (S.toList moduleFiles ++ thFiles)
   where
-    loop [] _ = return (S.empty, [])
+    loop [] doneModules = return (S.empty, [], doneModules)
     loop names doneModules0 = do
         resolvedFiles <- resolveFiles dirs names exts
         pairs <- mapM getDependencies resolvedFiles
@@ -652,20 +661,21 @@ resolveFilesAndDeps ty buildComponentDir dirs names0 exts = do
             moduleDeps = S.unions (map fst pairs)
             thDepFiles = concatMap snd pairs
             modulesRemaining = S.difference moduleDeps doneModules'
-        (moduleDepFiles',thDepFiles') <-
+        (moduleDepFiles',thDepFiles',doneModules'') <-
             loop (map Left (S.toList modulesRemaining)) doneModules'
         return
             ( S.union (S.fromList resolvedFiles) moduleDepFiles'
-            , thDepFiles ++ thDepFiles')
+            , thDepFiles ++ thDepFiles'
+            , doneModules'')
     getDependencies resolvedFile = do
         dir <- asks (parent . fst)
-        hiDir <- getHIDir
+        dumpHIDir <- getDumpHIDir
         case stripDir dir resolvedFile of
             Nothing -> return (S.empty, [])
             Just fileRel -> do
                 let dumpHIPath =
                         FilePath.replaceExtension
-                            (toFilePath (hiDir </> fileRel))
+                            (toFilePath (dumpHIDir </> fileRel))
                             ".dump-hi"
                 dumpHIExists <- liftIO $ doesFileExist dumpHIPath
                 if dumpHIExists
@@ -698,10 +708,11 @@ resolveFilesAndDeps ty buildComponentDir dirs names0 exts = do
                         filter ("addDependentFile \"" `C8.isPrefixOf`) dumpHI
                     Modules -> []
         --liftIO $ putStrLn $ "XXX dumpHI " ++ show dumpHIPath ++ "\n   XXX moduleDeps=" ++ show moduleDeps ++ "\n   XXX thDeps=" ++ show thDeps
-        return (moduleDeps, thDeps)
-    getHIDir = do
+        return
+            (moduleDeps, thDeps)
+    getDumpHIDir = do
         bld <- asks snd
-        return $ maybe bld (bld </>) buildComponentDir
+        return $ maybe bld (bld </>) (getBuildComponentDir component)
     parseAbsOrRelFile dir fp =
         case parseRelFile fp of
             Just rel -> Just (dir </> rel)
