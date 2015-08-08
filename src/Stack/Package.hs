@@ -412,22 +412,26 @@ benchmarkFiles :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs
 benchmarkFiles ty bench = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks (parent . fst)
-    exposed <-
-        resolveFilesAndDeps
-            ty
-            (Just $ benchmarkName bench)
-            (dirs ++ [dir])
-            (case benchmarkInterface bench of
-                 BenchmarkExeV10 _ fp ->
-                     [Right fp]
-                 BenchmarkUnsupported _ ->
-                     [])
-            haskellModuleExts
-    bfiles <- buildFiles ty (Just $ benchmarkName bench) dir build
-    case ty of
-      AllFiles -> return (concat [bfiles,exposed])
-      Modules -> return (concat [bfiles])
+    rfiles <- resolveFilesAndDeps
+        ty
+        (Just $ benchmarkName bench)
+        (dirs ++ [dir])
+        names
+        haskellModuleExts
+    cfiles <- buildCSources ty build
+    return (rfiles ++ cfiles)
   where
+    names =
+        case ty of
+            AllFiles -> concat [bnames,exposed]
+            Modules -> concat [bnames]
+    exposed =
+        case benchmarkInterface bench of
+            BenchmarkExeV10 _ fp ->
+                [Right fp]
+            BenchmarkUnsupported _ ->
+                []
+    bnames = map Left (otherModules build)
     build = benchmarkBuildInfo bench
 
 -- | Get all files referenced by the test.
@@ -436,24 +440,28 @@ testFiles :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File
 testFiles ty test = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks (parent . fst)
-    exposed <-
-        resolveFilesAndDeps
-            ty
-            (Just $ testName test)
-            (dirs ++ [dir])
-            (case testInterface test of
-                 TestSuiteExeV10 _ fp ->
-                     [Right fp]
-                 TestSuiteLibV09 _ mn ->
-                     [Left mn]
-                 TestSuiteUnsupported _ ->
-                     [])
-            haskellModuleExts
-    bfiles <- buildFiles ty (Just $ testName test) dir build
-    case ty of
-      AllFiles -> return (concat [bfiles,exposed])
-      Modules -> return (concat [bfiles])
+    rfiles <- resolveFilesAndDeps
+        ty
+        (Just $ testName test)
+        (dirs ++ [dir])
+        names
+        haskellModuleExts
+    cfiles <- buildCSources ty build
+    return (rfiles ++ cfiles)
   where
+    names =
+        case ty of
+            AllFiles -> concat [bnames,exposed]
+            Modules -> concat [bnames]
+    exposed =
+        case testInterface test of
+            TestSuiteExeV10 _ fp ->
+                [Right fp]
+            TestSuiteLibV09 _ mn ->
+                [Left mn]
+            TestSuiteUnsupported _ ->
+                     []
+    bnames = map Left (otherModules build)
     build = testBuildInfo test
 
 -- | Get all files referenced by the executable.
@@ -462,18 +470,22 @@ executableFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs F
 executableFiles ty exe =
   do dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
      dir <- asks (parent . fst)
-     exposed <-
-       resolveFilesAndDeps
+     rfiles <- resolveFilesAndDeps
          ty
          (Just $ exeName exe)
          (dirs ++ [dir])
-         [Right (modulePath exe)]
+         names
          haskellModuleExts
-     bfiles <- buildFiles ty (Just $ exeName exe) dir build
-     case ty of
-       AllFiles -> return (concat [bfiles,exposed])
-       Modules -> return (concat [bfiles])
-  where build = buildInfo exe
+     cfiles <- buildCSources ty build
+     return (rfiles ++ cfiles)
+  where
+    names =
+        case ty of
+            AllFiles -> concat [bnames,exposed]
+            Modules -> concat [bnames]
+    bnames = map Left (otherModules build)
+    exposed = [Right (modulePath exe)]
+    build = buildInfo exe
 
 -- | Get all files referenced by the library.
 libraryFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m)
@@ -481,34 +493,28 @@ libraryFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File
 libraryFiles ty lib =
   do dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
      dir <- asks (parent . fst)
-     exposed <- resolveFilesAndDeps
-                  ty
-                  Nothing
-                  (dirs ++ [dir])
-                  (map Left (exposedModules lib))
-                  haskellModuleExts
-     bfiles <- buildFiles ty Nothing dir build
-     case ty of
-       AllFiles -> return (concat [bfiles,exposed])
-       Modules -> return (concat [bfiles,exposed])
-  where build = libBuildInfo lib
+     rfiles <- resolveFilesAndDeps
+         ty
+         Nothing
+         (dirs ++ [dir])
+         names
+         haskellModuleExts
+     cfiles <- buildCSources ty build
+     return (rfiles ++ cfiles)
+  where
+    names =
+        case ty of
+            AllFiles -> concat [bnames,exposed]
+            Modules -> concat [bnames,exposed]
+    exposed = map Left (exposedModules lib)
+    bnames = map Left (otherModules build)
+    build = libBuildInfo lib
 
--- | Get all files in a build.
-buildFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m)
-           => CabalFileType -> Maybe (String) -> Path Abs Dir -> BuildInfo -> m [Path Abs File]
-buildFiles ty component dir build = do
-    dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
-    other <-
-        resolveFilesAndDeps
-            ty
-            component
-            (dirs ++ [dir])
-            (map Left (otherModules build))
-            haskellModuleExts
-    cSources' <- mapMaybeM resolveFileOrWarn (cSources build)
-    case ty of
-        Modules -> return other
-        AllFiles -> return (other ++ cSources')
+-- | Get all C sources in a build.
+buildCSources :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m)
+           => CabalFileType -> BuildInfo -> m [Path Abs File]
+buildCSources Modules _ = return []
+buildCSources AllFiles build = mapMaybeM resolveFileOrWarn (cSources build)
 
 -- | Get all dependencies of a package, including library,
 -- executables, tests, benchmarks.
@@ -639,18 +645,24 @@ resolveFilesAndDeps
     -> [Text] -- ^ Extentions.
     -> m [Path Abs File]
 resolveFilesAndDeps ty component dirs names0 exts = do
-    (moduleFiles,thFiles,_) <- loop names0 S.empty
-    -- cabalfp <- asks fst
-    -- forM_ (S.toList (foundModules `S.difference` (S.fromList (lefts names0)))) $
-    --     \unlistedModule ->
-    --          $(logWarn) $
-    --          T.pack $
-    --          "XXX Warning: module not listed in " ++
-    --          toFilePath (filename cabalfp) ++
-    --          (case component of
-    --               Nothing -> " for library"
-    --               Just c -> " for " ++ c) ++
-    --          " (add it to other-modules): " ++ display unlistedModule ++ "."
+    (moduleFiles,thFiles,foundModules) <- loop names0 S.empty
+    cabalfp <- asks fst
+    let unlistedModules =
+            foundModules `S.difference` (S.fromList (lefts names0))
+    unless (S.null unlistedModules) $
+        $(logWarn) $
+        T.pack $
+        "Warning: " ++
+        (if S.size unlistedModules == 1
+             then "module"
+             else "modules") ++
+        " not listed in " ++
+        toFilePath (filename cabalfp) ++
+        (case component of
+             Nothing -> " for library"
+             Just c -> " for '" ++ c ++ "'") ++
+        " component (add to other-modules):\n    " ++
+        intercalate "\n    " (map display (S.toList unlistedModules))
     return (S.toList moduleFiles ++ thFiles)
   where
     loop [] doneModules = return (S.empty, [], doneModules)
@@ -707,7 +719,6 @@ resolveFilesAndDeps ty component dirs names0 exts = do
                               decodeUtf8 . C8.dropWhile (/= '"'))) $
                         filter ("addDependentFile \"" `C8.isPrefixOf`) dumpHI
                     Modules -> []
-        --liftIO $ putStrLn $ "XXX dumpHI " ++ show dumpHIPath ++ "\n   XXX moduleDeps=" ++ show moduleDeps ++ "\n   XXX thDeps=" ++ show thDeps
         return
             (moduleDeps, thDeps)
     getDumpHIDir = do
