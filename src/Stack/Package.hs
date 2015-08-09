@@ -44,6 +44,7 @@ import qualified Data.ByteString.Char8 as C8
 import           Data.Either
 import           Data.Function
 import           Data.List
+import           Data.List.Extra (nubOrd)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Maybe
@@ -193,7 +194,7 @@ generatePkgDescOpts sourceMap locals cabalfp pkg = do
                 then Just cabalmacros
                 else Nothing
     return
-        (nub
+        (nubOrd
              (["-hide-all-packages"] ++
               concatMap
                   (concatMap
@@ -215,7 +216,7 @@ generateBuildInfoOpts
     -> BuildInfo
     -> [String]
 generateBuildInfoOpts sourceMap mcabalmacros cabalDir distDir locals b =
-    nub (concat [ghcOpts b, extOpts b, srcOpts, includeOpts, macros, deps, extra b, extraDirs, fworks b])
+    nubOrd (concat [ghcOpts b, extOpts b, srcOpts, includeOpts, macros, deps, extra b, extraDirs, fworks b])
   where
     deps =
         concat
@@ -339,7 +340,7 @@ packageDescModulesAndFiles pkg = do
     docfiles <- liftM (mempty, ) (resolveGlobFiles (extraDocFiles pkg))
     return
         (second
-             nub
+             nubOrd
              (concat2
                   [ libfiles
                   , exefiles
@@ -351,6 +352,7 @@ packageDescModulesAndFiles pkg = do
   where
     concat2 :: Ord a => [(Set a, [b])] -> (Set a, [b])
     concat2 = (mconcat *** concat) . unzip
+
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
 resolveGlobFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m,MonadCatch m)
@@ -759,7 +761,7 @@ findCandidate dirs exts name = do
   where
     paths_pkg pkg = "Paths_" ++ packageNameString pkg
     makeNameCandidates =
-        liftM (nub . rights . concat) (mapM makeDirCandidates dirs)
+        liftM (nubOrd . rights . concat) (mapM makeDirCandidates dirs)
     makeDirCandidates
         :: Path Abs Dir
         -> IO [Either ResolveException (Path Abs File)]
