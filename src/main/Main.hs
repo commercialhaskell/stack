@@ -50,7 +50,6 @@ import           Stack.Exec
 import           Stack.Fetch
 import           Stack.FileWatch
 import           Stack.Ide
-import           Stack.Iface (iface)
 import qualified Stack.Image as Image
 import           Stack.Init
 import           Stack.New
@@ -269,10 +268,6 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> fixCodePage $ 
              addCommand "clean"
                         "Clean the local packages"
                         cleanCmd
-                        (pure ())
-             addCommand "iface"
-                        "Display TH dependencies"
-                        ifaceCmd
                         (pure ())
              addCommand "list-dependencies"
                         "List the dependencies"
@@ -900,9 +895,6 @@ solverCmd fixStackYaml go =
 -- | Visualize dependencies
 dotCmd :: DotOpts -> GlobalOpts -> IO ()
 dotCmd dotOpts go = withBuildConfigAndLock go (\_ -> dot dotOpts)
-
-ifaceCmd :: () -> GlobalOpts -> IO ()
-ifaceCmd () go = withBuildConfigAndLock go (\_ -> iface)
 
 -- | List the dependencies
 listDependenciesCmd :: Text -> GlobalOpts -> IO ()

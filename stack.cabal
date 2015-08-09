@@ -46,7 +46,6 @@ library
                      Stack.FileWatch
                      Stack.GhcPkg
                      Stack.Init
-                     Stack.Iface
                      Stack.New
                      Stack.Options
                      Stack.Package
@@ -179,6 +178,7 @@ executable stack
   ghc-options:    -Wall -threaded -rtsopts
   other-modules:     Plugins
                      Plugins.Commands
+                     Paths_stack
 
   build-depends:  base >=4.7 && < 5
                 , bytestring >= 0.10.4.0

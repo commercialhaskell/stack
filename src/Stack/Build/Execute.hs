@@ -985,4 +985,4 @@ getSetupHs dir = do
 extraBuildOptions :: M env m => m [String]
 extraBuildOptions = do
     hpcIndexDir <- toFilePath . (</> dotHpc) <$> hpcRelativeDir
-    return ["--ghc-options", "-hpcdir " ++ hpcIndexDir]
+    return ["--ghc-options", "-hpcdir " ++ hpcIndexDir ++ " -ddump-hi -ddump-to-file"]
