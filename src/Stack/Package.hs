@@ -33,6 +33,7 @@ module Stack.Package
   ,autogenDir)
   where
 
+import           Control.Arrow (second,(***))
 import           Control.Exception hiding (try,catch)
 import           Control.Monad
 import           Control.Monad.Catch
@@ -49,6 +50,7 @@ import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Maybe.Extra
 import           Data.Monoid
+import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -146,12 +148,17 @@ resolvePackage packageConfig gpkg = Package
     , packageDeps = deps
     , packageFiles = GetPackageFiles $ \ty cabalfp -> do
         distDir <- distDirFromDir (parent cabalfp)
-        files <- runReaderT (packageDescFiles ty pkg)
-                            (cabalfp, buildDir distDir)
+        (_,files) <- runReaderT (packageDescModulesAndFiles ty pkg)
+                                (cabalfp, buildDir distDir)
         return $ S.fromList $
           case ty of
              Modules -> files
              AllFiles -> cabalfp : files
+    , packageModules = GetPackageModules $ \ty cabalfp -> do
+        distDir <- distDirFromDir (parent cabalfp)
+        (modules,_) <- runReaderT (packageDescModulesAndFiles ty pkg)
+                                  (cabalfp, buildDir distDir)
+        return modules
     , packageTools = packageDescTools pkg
     , packageFlags = packageConfigFlags packageConfig
     , packageAllDeps = S.fromList (M.keys deps)
@@ -314,28 +321,35 @@ allBuildInfo' pkg_descr = [ bi | Just lib <- [library pkg_descr]
                               , benchmarkEnabled tst ]
 
 -- | Get all files referenced by the package.
-packageDescFiles
+packageDescModulesAndFiles
     :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m, MonadCatch m)
-    => CabalFileType -> PackageDescription -> m [Path Abs File]
-packageDescFiles ty pkg = do
+    => CabalFileType -> PackageDescription -> m (Set ModuleName,[Path Abs File])
+packageDescModulesAndFiles ty pkg = do
     libfiles <-
-        liftM concat (mapM (libraryFiles ty) (maybe [] return (library pkg)))
-    exefiles <- liftM concat (mapM (executableFiles ty) (executables pkg))
-    benchfiles <- liftM concat (mapM (benchmarkFiles ty) (benchmarks pkg))
-    testfiles <- liftM concat (mapM (testFiles ty) (testSuites pkg))
-    dfiles <- resolveGlobFiles (map (dataDir pkg FilePath.</>) (dataFiles pkg))
-    srcfiles <- resolveGlobFiles (extraSrcFiles pkg)
+        liftM concat2 (mapM (libraryFiles ty) (maybe [] return (library pkg)))
+    exefiles <- liftM concat2 (mapM (executableFiles ty) (executables pkg))
+    benchfiles <- liftM concat2 (mapM (benchmarkFiles ty) (benchmarks pkg))
+    testfiles <- liftM concat2 (mapM (testFiles ty) (testSuites pkg))
+    dfiles <-
+        liftM
+            (mempty, )
+            (resolveGlobFiles (map (dataDir pkg FilePath.</>) (dataFiles pkg)))
+    srcfiles <- liftM (mempty, ) (resolveGlobFiles (extraSrcFiles pkg))
     -- extraTmpFiles purposely not included here, as those are files generated
     -- by the build script. Another possible implementation: include them, but
     -- don't error out if not present
-    docfiles <- resolveGlobFiles (extraDocFiles pkg)
+    docfiles <- liftM (mempty, ) (resolveGlobFiles (extraDocFiles pkg))
     case ty of
         Modules ->
-            return (nub (concat [libfiles, exefiles, testfiles, benchfiles]))
+            return
+                (second
+                     nub
+                     (concat2 [libfiles, exefiles, testfiles, benchfiles]))
         AllFiles ->
             return
-                (nub
-                     (concat
+                (second
+                     nub
+                     (concat2
                           [ libfiles
                           , exefiles
                           , dfiles
@@ -343,6 +357,9 @@ packageDescFiles ty pkg = do
                           , docfiles
                           , benchfiles
                           , testfiles]))
+  where
+    concat2 :: Ord a => [(Set a, [b])] -> (Set a, [b])
+    concat2 = (mconcat *** concat) . unzip
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
 resolveGlobFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m,MonadCatch m)
@@ -408,18 +425,18 @@ matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
 
 -- | Get all files referenced by the benchmark.
 benchmarkFiles :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m)
-               => CabalFileType -> Benchmark -> m [Path Abs File]
+               => CabalFileType -> Benchmark -> m (Set ModuleName,[Path Abs File])
 benchmarkFiles ty bench = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks (parent . fst)
-    rfiles <- resolveFilesAndDeps
+    (rmodules,rfiles) <- resolveFilesAndDeps
         ty
         (Just $ benchmarkName bench)
         (dirs ++ [dir])
         names
         haskellModuleExts
     cfiles <- buildCSources ty build
-    return (rfiles ++ cfiles)
+    return (rmodules,rfiles ++ cfiles)
   where
     names =
         case ty of
@@ -436,18 +453,18 @@ benchmarkFiles ty bench = do
 
 -- | Get all files referenced by the test.
 testFiles :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m)
-          => CabalFileType -> TestSuite -> m [Path Abs File]
+          => CabalFileType -> TestSuite -> m (Set ModuleName,[Path Abs File])
 testFiles ty test = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks (parent . fst)
-    rfiles <- resolveFilesAndDeps
+    (modules,rfiles) <- resolveFilesAndDeps
         ty
         (Just $ testName test)
         (dirs ++ [dir])
         names
         haskellModuleExts
     cfiles <- buildCSources ty build
-    return (rfiles ++ cfiles)
+    return (modules,rfiles ++ cfiles)
   where
     names =
         case ty of
@@ -466,18 +483,18 @@ testFiles ty test = do
 
 -- | Get all files referenced by the executable.
 executableFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m)
-                => CabalFileType -> Executable -> m [Path Abs File]
+                => CabalFileType -> Executable -> m (Set ModuleName,[Path Abs File])
 executableFiles ty exe =
   do dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
      dir <- asks (parent . fst)
-     rfiles <- resolveFilesAndDeps
+     (modules,rfiles) <- resolveFilesAndDeps
          ty
          (Just $ exeName exe)
          (dirs ++ [dir])
          names
          haskellModuleExts
      cfiles <- buildCSources ty build
-     return (rfiles ++ cfiles)
+     return (modules,rfiles ++ cfiles)
   where
     names =
         case ty of
@@ -489,18 +506,18 @@ executableFiles ty exe =
 
 -- | Get all files referenced by the library.
 libraryFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m)
-             => CabalFileType -> Library -> m [Path Abs File]
+             => CabalFileType -> Library -> m (Set ModuleName,[Path Abs File])
 libraryFiles ty lib =
   do dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
      dir <- asks (parent . fst)
-     rfiles <- resolveFilesAndDeps
+     (modules,rfiles) <- resolveFilesAndDeps
          ty
          Nothing
          (dirs ++ [dir])
          names
          haskellModuleExts
      cfiles <- buildCSources ty build
-     return (rfiles ++ cfiles)
+     return (modules,rfiles ++ cfiles)
   where
     names =
         case ty of
@@ -643,7 +660,7 @@ resolveFilesAndDeps
     -> [Path Abs Dir] -- ^ Directories to look in.
     -> [Either ModuleName String] -- ^ Base names.
     -> [Text] -- ^ Extentions.
-    -> m [Path Abs File]
+    -> m (Set ModuleName,[Path Abs File])
 resolveFilesAndDeps ty component dirs names0 exts = do
     (moduleFiles,thFiles,foundModules) <- loop names0 S.empty
     cabalfp <- asks fst
@@ -663,7 +680,7 @@ resolveFilesAndDeps ty component dirs names0 exts = do
              Just c -> " for '" ++ c ++ "'") ++
         " component (add to other-modules):\n    " ++
         intercalate "\n    " (map display (S.toList unlistedModules))
-    return (S.toList moduleFiles ++ thFiles)
+    return (foundModules,S.toList moduleFiles ++ thFiles)
   where
     loop [] doneModules = return (S.empty, [], doneModules)
     loop names doneModules0 = do

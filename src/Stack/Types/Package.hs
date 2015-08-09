@@ -24,6 +24,7 @@ import           Data.Monoid
 import           Data.Set (Set)
 import           Data.Text (Text)
 import           Distribution.InstalledPackageInfo (PError)
+import           Distribution.ModuleName (ModuleName)
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
 import           Distribution.System (Platform (..))
 import           GHC.Generics
@@ -69,7 +70,8 @@ instance Show PackageException where
 data Package =
   Package {packageName :: !PackageName                    -- ^ Name of the package.
           ,packageVersion :: !Version                     -- ^ Version of the package
-          ,packageFiles :: !GetPackageFiles
+          ,packageFiles :: !GetPackageFiles               -- ^ Get all files of the package.
+          ,packageModules :: !GetPackageModules           -- ^ Get the modules of the package.
           ,packageDeps :: !(Map PackageName VersionRange) -- ^ Packages that the package depends on.
           ,packageTools :: ![Dependency]                  -- ^ A build tool name.
           ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
@@ -106,6 +108,16 @@ newtype GetPackageFiles = GetPackageFiles
                       -> m (Set (Path Abs File))
     }
 instance Show GetPackageFiles where
+    show _ = "<GetPackageFiles>"
+
+-- | Modules in the package.
+newtype GetPackageModules = GetPackageModules
+    { getPackageModules :: forall m env. (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadReader env m, HasPlatform env, HasEnvConfig env)
+                             => CabalFileType
+                             -> Path Abs File
+                             -> m (Set ModuleName)
+    }
+instance Show GetPackageModules where
     show _ = "<GetPackageFiles>"
 
 -- | Package build configuration
