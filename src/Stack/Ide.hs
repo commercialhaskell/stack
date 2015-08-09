@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -13,6 +14,7 @@ import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
+import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Aeson
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
@@ -23,12 +25,13 @@ import           Data.Maybe
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Network.HTTP.Client.Conduit
 import           Path
 import           Path.IO
 import           Stack.Constants
 import           Stack.Exec (defaultEnvSettings)
-import           Stack.Package
 import           Stack.Ghci (GhciPkgInfo(..), ghciSetup)
+import           Stack.Package
 import           Stack.Types
 import           System.Directory (doesFileExist)
 import           System.Environment (lookupEnv)
@@ -41,7 +44,7 @@ import           System.Process.Read
 -- given options and configure it with the load paths and extensions
 -- of those targets.
 ide
-    :: (HasConfig r, HasBuildConfig r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m)
+    :: (HasConfig r, HasBuildConfig r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m, HasHttpManager r)
     => [Text] -- ^ Targets.
     -> [String] -- ^ GHC options.
     -> m ()

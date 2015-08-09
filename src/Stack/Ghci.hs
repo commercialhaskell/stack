@@ -21,6 +21,7 @@ import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Typeable
+import           Network.HTTP.Client.Conduit
 import           Path
 import           Path.IO
 import           Stack.Build.Source
@@ -32,7 +33,7 @@ import           Stack.Types
 -- given options and configure it with the load paths and extensions
 -- of those targets.
 ghci
-    :: (HasConfig r, HasBuildConfig r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
+    :: (HasConfig r, HasBuildConfig r, HasHttpManager r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
     => [Text] -- ^ Targets.
     -> [String] -- ^ GHC options.
     -> FilePath
@@ -59,12 +60,14 @@ data GhciPkgInfo = GhciPkgInfo
   , ghciPkgModules :: [Path Abs File]
   }
 
-ghciSetup :: (HasConfig r, HasBuildConfig r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m)
-          => [Text] -> m [GhciPkgInfo]
+ghciSetup
+    :: (HasConfig r, HasHttpManager r, HasBuildConfig r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
+    => [Text] -> m [GhciPkgInfo]
 ghciSetup targets = do
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
     pwd <- getWorkingDir
+    (_,_,_,sourceMap) <- loadSourceMap defaultBuildOpts
     locals <-
         liftM catMaybes $
         forM (M.toList (envConfigPackages econfig)) $
@@ -90,7 +93,7 @@ ghciSetup targets = do
                         }
                 pkg <- readPackage config cabalfp
                 pkgOpts <-
-                    getPackageOpts (packageOpts pkg) (map fst locals) cabalfp
+                    getPackageOpts (packageOpts pkg) sourceMap (map fst locals) cabalfp
                 srcfiles <- getPackageFiles (packageFiles pkg) Modules cabalfp
                 return
                     GhciPkgInfo

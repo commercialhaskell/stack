@@ -89,7 +89,8 @@ data Package =
 -- Argument is the location of the .cabal file
 newtype GetPackageOpts = GetPackageOpts
     { getPackageOpts :: forall env m. (MonadIO m,HasEnvConfig env, HasPlatform env, MonadThrow m, MonadReader env m)
-                     => [PackageName]
+                     => SourceMap
+                     -> [PackageName]
                      -> Path Abs File
                      -> m [String]
     }
