@@ -207,6 +207,9 @@ executable stack
                 , transformers
                 , http-client
   default-language:    Haskell2010
+  if os(windows)
+    build-depends:   Win32
+    cpp-options:     -DWINDOWS
 
 test-suite stack-test
   type:           exitcode-stdio-1.0

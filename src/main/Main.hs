@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -73,10 +74,31 @@ import           System.FilePath (dropTrailingPathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..))
 import           System.Process.Read
 
+#if WINDOWS
+import System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
+import System.IO (hSetEncoding, utf8, hPutStrLn)
+#endif
+
 -- | Commandline dispatcher.
 main :: IO ()
-main = withInterpreterArgs stackProgName $ \args isInterpreter ->
-  do -- Line buffer the output by default, particularly for non-terminal runs.
+main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
+#if WINDOWS
+     -- Set the code page for this process to 65001 (UTF-8). See:
+     -- https://github.com/commercialhaskell/stack/issues/738
+     origCPI <- getConsoleCP
+     origCPO <- getConsoleOutputCP
+
+     when (origCPI /= 65001 || origCPO /= 65001) $ do
+         hPutStrLn stderr
+            "Setting codepage to UTF-8 (65001) to ensure correct output from GHC"
+         setConsoleCP 65001
+         setConsoleOutputCP 65001
+         hSetEncoding stdin  utf8
+         hSetEncoding stdout utf8
+         hSetEncoding stderr utf8
+#endif
+
+     -- Line buffer the output by default, particularly for non-terminal runs.
      -- See https://github.com/commercialhaskell/stack/pull/360
      hSetBuffering stdout LineBuffering
      hSetBuffering stdin  LineBuffering
