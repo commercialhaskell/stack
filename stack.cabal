@@ -71,6 +71,7 @@ library
                      Stack.Types.Version
                      Stack.Types.StackT
                      Stack.Types.Build
+                     Stack.Types.Package
                      Stack.Build
                      Stack.Build.Cache
                      Stack.Build.Coverage
