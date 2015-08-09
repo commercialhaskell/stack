@@ -25,6 +25,7 @@ import           Network.HTTP.Client.Conduit
 import           Path
 import           Path.IO
 import           Stack.Build.Source
+import           Stack.Constants
 import           Stack.Exec
 import           Stack.Package
 import           Stack.Types
@@ -41,17 +42,19 @@ ghci
     -> m ()
 ghci targets useropts ghciPath noload = do
     pkgs <- ghciSetup targets
+    config <- asks getBuildConfig
     let pkgopts = concatMap ghciPkgOpts pkgs
         srcfiles
           | noload = []
           | otherwise = concatMap (map toFilePath . ghciPkgModules) pkgs
+        odir = ["-odir=" <> toFilePath (objectInterfaceDir config)]
     $logInfo
         ("Configuring GHCi with the following packages: " <>
          T.intercalate ", " (map packageNameText (map ghciPkgName pkgs)))
     exec
         defaultEnvSettings
         ghciPath
-        ("--interactive" : pkgopts <> srcfiles <> useropts)
+        ("--interactive" : odir <> pkgopts <> srcfiles <> useropts)
 
 data GhciPkgInfo = GhciPkgInfo
   { ghciPkgName :: PackageName

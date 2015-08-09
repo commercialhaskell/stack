@@ -29,7 +29,8 @@ module Stack.Constants
     ,implicitGlobalDir
     ,hpcRelativeDir
     ,hpcDirFromDir
-    ,dotHpc)
+    ,dotHpc
+    ,objectInterfaceDir)
     where
 
 
@@ -109,6 +110,10 @@ defaultShakeThreads = 4
 -- | User documentation directory.
 userDocsDir :: Config -> Path Abs Dir
 userDocsDir config = configStackRoot config </> $(mkRelDir "doc/")
+
+-- | Output .o/.hi directory.
+objectInterfaceDir :: BuildConfig -> Path Abs Dir
+objectInterfaceDir bconfig = bcWorkDir bconfig </> $(mkRelDir "odir/")
 
 -- | The filename used for dirtiness check of source files.
 buildCacheFile :: (MonadThrow m, MonadReader env m, HasPlatform env,HasEnvConfig env)

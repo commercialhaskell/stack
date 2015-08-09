@@ -246,6 +246,10 @@ data BuildConfig = BuildConfig
 bcRoot :: BuildConfig -> Path Abs Dir
 bcRoot = parent . bcStackYaml
 
+-- | Directory containing the project's stack.yaml file
+bcWorkDir :: BuildConfig -> Path Abs Dir
+bcWorkDir = (</> workDirRel) . parent . bcStackYaml
+
 -- | Configuration after the environment has been setup.
 data EnvConfig = EnvConfig
     {envConfigBuildConfig :: !BuildConfig
