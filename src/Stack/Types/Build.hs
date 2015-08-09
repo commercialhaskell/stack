@@ -59,7 +59,6 @@ import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 import           Data.Time.Calendar
 import           Data.Time.Clock
-import           Data.Word (Word64)
 import           Distribution.System (Arch)
 import           Distribution.Text (display)
 import           GHC.Generics
@@ -411,35 +410,6 @@ newtype PkgDepsOracle =
     PkgDeps PackageName
     deriving (Show,Typeable,Eq,Hashable,Binary,NFData)
 
--- | A location to install a package into, either snapshot or local
-data InstallLocation = Snap | Local
-    deriving (Show, Eq)
-instance Monoid InstallLocation where
-    mempty = Snap
-    mappend Local _ = Local
-    mappend _ Local = Local
-    mappend Snap Snap = Snap
-
--- | Datatype which tells how which version of a package to install and where
--- to install it into
-class PackageInstallInfo a where
-    piiVersion :: a -> Version
-    piiLocation :: a -> InstallLocation
-
--- | Information on a locally available package of source code
-data LocalPackage = LocalPackage
-    { lpPackage        :: !Package         -- ^ The @Package@ info itself, after resolution with package flags, not including any final actions
-    , lpPackageFinal   :: !Package         -- ^ Same as lpPackage, but with any test suites or benchmarks enabled as necessary
-    , lpWanted         :: !Bool            -- ^ Is this package a \"wanted\" target based on command line input
-    , lpDir            :: !(Path Abs Dir)  -- ^ Directory of the package.
-    , lpCabalFile      :: !(Path Abs File) -- ^ The .cabal file
-    , lpDirtyFiles     :: !Bool            -- ^ are there files that have changed since the last build?
-    , lpNewBuildCache  :: !(Map FilePath FileCacheInfo) -- ^ current state of the files
-    , lpFiles          :: !(Set (Path Abs File)) -- ^ all files used by this package
-    , lpComponents     :: !(Set Text)      -- ^ components to build, passed directly to Setup.hs build
-    }
-    deriving Show
-
 -- | Stored on disk to know whether the flags have changed or any
 -- files have changed.
 data ConfigCache = ConfigCache
@@ -599,10 +569,6 @@ configureOpts econfig bco deps wanted loc package = map T.pack $ concat
 wantedLocalPackages :: [LocalPackage] -> Set PackageName
 wantedLocalPackages = Set.fromList . map (packageName . lpPackage) . filter lpWanted
 
--- | Used for storage and comparison.
-newtype ModTime = ModTime (Integer,Rational)
-  deriving (Ord,Show,Generic,Eq,NFData,Binary)
-
 -- | One-way conversion to serialized time.
 modTime :: UTCTime -> ModTime
 modTime x =
@@ -614,13 +580,3 @@ modTime x =
 
 data Installed = Library GhcPkgId | Executable PackageIdentifier
     deriving (Show, Eq, Ord)
-
-data FileCacheInfo = FileCacheInfo
-    { fciModTime :: !ModTime
-    , fciSize :: !Word64
-    , fciHash :: !S.ByteString
-    }
-    deriving (Generic, Show)
-instance Binary FileCacheInfo
-instance NFData FileCacheInfo where
-    rnf = genericRnf
