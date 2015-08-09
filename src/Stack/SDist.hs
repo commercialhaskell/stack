@@ -30,7 +30,7 @@ import           Path
 import           Stack.Build (mkBaseConfigOpts)
 import           Stack.Build.Execute
 import           Stack.Build.Source (loadSourceMap, localFlags)
-import           Stack.Build.Types
+import           Stack.Types.Build
 import           Stack.Constants
 import           Stack.Package
 import           Stack.Types

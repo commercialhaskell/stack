@@ -39,7 +39,7 @@ import           Data.Maybe (fromMaybe, mapMaybe)
 import           GHC.Generics (Generic)
 import           Path
 import           Path.IO
-import           Stack.Build.Types
+import           Stack.Types.Build
 import           Stack.Constants
 import           Stack.Types
 

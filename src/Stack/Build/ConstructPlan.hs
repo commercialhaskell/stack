@@ -38,7 +38,7 @@ import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
-import           Stack.Build.Types
+import           Stack.Types.Build
 import           Stack.BuildPlan
 
 import           Stack.Package

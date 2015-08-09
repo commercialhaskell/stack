@@ -16,7 +16,7 @@ import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager)
 import           Path
 import qualified Paths_stack as Paths
 import           Stack.Build
-import           Stack.Build.Types
+import           Stack.Types.Build
 import           Stack.Config
 import           Stack.Fetch
 import           Stack.PackageIndex

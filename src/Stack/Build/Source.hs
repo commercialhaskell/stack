@@ -46,7 +46,7 @@ import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Prelude
 import           Stack.Build.Cache
-import           Stack.Build.Types
+import           Stack.Types.Build
 import           Stack.BuildPlan (loadMiniBuildPlan, shadowMiniBuildPlan,
                                   parseCustomMiniBuildPlan)
 import           Stack.Constants (wiredInPackages)

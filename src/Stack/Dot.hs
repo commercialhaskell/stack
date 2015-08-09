@@ -32,10 +32,10 @@ import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Stack.Build (withLoadPackage)
 import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
 import           Stack.Build.Source
-import           Stack.Build.Types
 import           Stack.Constants
 import           Stack.Package
 import           Stack.Types
+import           Stack.Types.Build
 import           Stack.Types.Internal (HasLogLevel)
 
 -- | Options record for @stack dot@

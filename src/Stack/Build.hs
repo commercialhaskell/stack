@@ -39,7 +39,7 @@ import           Stack.Build.Execute
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
-import           Stack.Build.Types
+import           Stack.Types.Build
 import           Stack.Constants
 import           Stack.Fetch as Fetch
 import           Stack.GhcPkg

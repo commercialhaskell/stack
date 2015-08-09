@@ -32,7 +32,7 @@ import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Simple
 import           Options.Applicative.Types (readerAsk)
-import           Stack.Build.Types
+import           Stack.Types.Build
 import           Stack.Docker
 import qualified Stack.Docker as Docker
 import           Stack.Dot

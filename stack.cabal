@@ -70,6 +70,7 @@ library
                      Stack.Types.PackageName
                      Stack.Types.Version
                      Stack.Types.StackT
+                     Stack.Types.Build
                      Stack.Build
                      Stack.Build.Cache
                      Stack.Build.Coverage
@@ -78,7 +79,6 @@ library
                      Stack.Build.Haddock
                      Stack.Build.Installed
                      Stack.Build.Source
-                     Stack.Build.Types
                      Stack.Upgrade
                      Stack.Upload
                      System.Process.Read

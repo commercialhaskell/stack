@@ -38,7 +38,7 @@ import qualified Data.Text.Encoding as T
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
 import           Path.IO (dirExists, createTree)
 import           Prelude hiding (FilePath)
-import           Stack.Build.Types (StackBuildException (Couldn'tFindPkgId))
+import           Stack.Types.Build (StackBuildException (Couldn'tFindPkgId))
 import           Stack.Constants
 import           Stack.Types
 import           System.Directory (canonicalizePath, doesDirectoryExist)

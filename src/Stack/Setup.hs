@@ -56,7 +56,7 @@ import           Path
 import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Safe (headMay, readMay)
-import           Stack.Build.Types
+import           Stack.Types.Build
 import           Stack.Config (resolvePackageEntry)
 import           Stack.Constants (distRelativeDir)
 import           Stack.Fetch

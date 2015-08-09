@@ -33,7 +33,7 @@ import           Path
 import           Path.IO
 import           Prelude
 import           Safe                           (maximumMay)
-import           Stack.Build.Types
+import           Stack.Types.Build
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.Types

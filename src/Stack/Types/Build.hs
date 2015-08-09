@@ -7,9 +7,9 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ViewPatterns #-}
 
--- | All data types.
+-- | Build-specific types.
 
-module Stack.Build.Types
+module Stack.Types.Build
     (StackBuildException(..)
     ,FlagSource(..)
     ,UnusedFlags(..)

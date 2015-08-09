@@ -40,7 +40,7 @@ import qualified Paths_stack as Meta
 import           Plugins
 import           Prelude hiding (pi)
 import           Stack.Build
-import           Stack.Build.Types
+import           Stack.Types.Build
 import           Stack.Config
 import           Stack.Constants
 import qualified Stack.Docker as Docker

@@ -34,7 +34,7 @@ import System.Process (readProcess)
 import System.FilePath (dropExtension, addExtension)
 
 import           Stack.Build.Source
-import           Stack.Build.Types
+import           Stack.Types.Build
 import           Stack.Constants
 import           Stack.Package
 import           Stack.Types

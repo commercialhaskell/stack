@@ -32,7 +32,7 @@ import           Network.HTTP.Client.Conduit  (HasHttpManager)
 import           Path
 import           Prelude                      hiding (FilePath, writeFile)
 import           Stack.Build.Cache
-import           Stack.Build.Types
+import           Stack.Types.Build
 import           Stack.Constants
 import           Stack.GhcPkg
 import           Stack.PackageDump

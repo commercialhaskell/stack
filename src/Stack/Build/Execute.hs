@@ -65,7 +65,7 @@ import           Stack.Build.Coverage
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
-import           Stack.Build.Types
+import           Stack.Types.Build
 import           Stack.Fetch                    as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
