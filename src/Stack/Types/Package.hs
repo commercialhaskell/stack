@@ -21,7 +21,10 @@ import Distribution.Package hiding (Package,PackageName,packageName,packageVersi
 import Distribution.System (Platform (..))
 import Path as FL
 import Prelude hiding (FilePath)
-import Stack.Types
+import Stack.Types.PackageName
+import Stack.Types.Version
+import Stack.Types.FlagName
+import Stack.Types.Config
 
 -- | All exceptions thrown by the library.
 data PackageException

@@ -57,22 +57,6 @@ import           System.Directory
 import           System.IO (withBinaryFile, IOMode (ReadMode))
 import           System.IO.Error (isDoesNotExistError)
 
-type SourceMap = Map PackageName PackageSource
-
--- | Where the package's source is located: local directory or package index
-data PackageSource
-    = PSLocal LocalPackage
-    | PSUpstream Version InstallLocation (Map FlagName Bool)
-    -- ^ Upstream packages could be installed in either local or snapshot
-    -- databases; this is what 'InstallLocation' specifies.
-    deriving Show
-instance PackageInstallInfo PackageSource where
-    piiVersion (PSLocal lp) = packageVersion $ lpPackage lp
-    piiVersion (PSUpstream v _ _) = v
-
-    piiLocation (PSLocal _) = Local
-    piiLocation (PSUpstream _ loc _) = loc
-
 loadSourceMap :: (MonadIO m, MonadCatch m, MonadReader env m, HasBuildConfig env, MonadBaseControl IO m, HasHttpManager env, MonadLogger m, HasEnvConfig env)
               => BuildOpts
               -> m ( MiniBuildPlan

@@ -35,7 +35,6 @@ import           Stack.Build.Source
 import           Stack.Constants
 import           Stack.Package
 import           Stack.Types
-import           Stack.Types.Build
 import           Stack.Types.Internal (HasLogLevel)
 
 -- | Options record for @stack dot@

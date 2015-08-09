@@ -65,8 +65,13 @@ import           Distribution.Text (display)
 import           GHC.Generics
 import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, parseRelDir, (</>))
 import           Prelude
-import           Stack.Package
-import           Stack.Types
+import           Stack.Types.FlagName
+import           Stack.Types.GhcPkgId
+import           Stack.Types.Config
+import           Stack.Types.Package
+import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageName
+import           Stack.Types.Version
 import           System.Exit (ExitCode)
 import           System.FilePath (dropTrailingPathSeparator, pathSeparator)
 

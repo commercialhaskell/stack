@@ -68,7 +68,6 @@ import           Path.IO
 import           Prelude hiding (FilePath)
 import           Stack.Constants
 import           Stack.Types
-import           Stack.Types.Package
 import qualified Stack.Types.PackageIdentifier
 import           System.Directory (getDirectoryContents)
 import           System.FilePath (splitExtensions)
