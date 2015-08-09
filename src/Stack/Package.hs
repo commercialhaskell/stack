@@ -50,6 +50,7 @@ import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Maybe.Extra
 import           Data.Monoid
+import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -149,10 +150,10 @@ resolvePackage packageConfig gpkg = Package
         distDir <- distDirFromDir (parent cabalfp)
         files <- runReaderT (packageDescFiles ty pkg)
                             (cabalfp, buildDir distDir)
-        return $ S.fromList $
+        return $
           case ty of
              Modules -> files
-             AllFiles -> cabalfp : files
+             AllFiles -> S.insert cabalfp files
     , packageTools = packageDescTools pkg
     , packageFlags = packageConfigFlags packageConfig
     , packageAllDeps = S.fromList (M.keys deps)
@@ -317,13 +318,13 @@ allBuildInfo' pkg_descr = [ bi | Just lib <- [library pkg_descr]
 -- | Get all files referenced by the package.
 packageDescFiles
     :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m, MonadCatch m)
-    => CabalFileType -> PackageDescription -> m [Path Abs File]
+    => CabalFileType -> PackageDescription -> m (Set (Path Abs File))
 packageDescFiles ty pkg = do
     libfiles <-
-        liftM concat (mapM (libraryFiles ty) (maybe [] return (library pkg)))
-    exefiles <- liftM concat (mapM (executableFiles ty) (executables pkg))
-    benchfiles <- liftM concat (mapM (benchmarkFiles ty) (benchmarks pkg))
-    testfiles <- liftM concat (mapM (testFiles ty) (testSuites pkg))
+        liftM S.unions (mapM (libraryFiles ty) (maybe [] return (library pkg)))
+    exefiles <- liftM S.unions (mapM (executableFiles ty) (executables pkg))
+    benchfiles <- liftM S.unions (mapM (benchmarkFiles ty) (benchmarks pkg))
+    testfiles <- liftM S.unions (mapM (testFiles ty) (testSuites pkg))
     dfiles <- resolveGlobFiles (map (dataDir pkg FilePath.</>) (dataFiles pkg))
     srcfiles <- resolveGlobFiles (extraSrcFiles pkg)
     -- extraTmpFiles purposely not included here, as those are files generated
@@ -332,24 +333,23 @@ packageDescFiles ty pkg = do
     docfiles <- resolveGlobFiles (extraDocFiles pkg)
     case ty of
         Modules ->
-            return (nubOrd (concat [libfiles, exefiles, testfiles, benchfiles]))
+            return (S.unions [libfiles, exefiles, testfiles, benchfiles])
         AllFiles ->
             return
-                (nubOrd
-                     (concat
-                          [ libfiles
-                          , exefiles
-                          , dfiles
-                          , srcfiles
-                          , docfiles
-                          , benchfiles
-                          , testfiles]))
+                (S.unions
+                     [ libfiles
+                     , exefiles
+                     , dfiles
+                     , srcfiles
+                     , docfiles
+                     , benchfiles
+                     , testfiles])
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
 resolveGlobFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m,MonadCatch m)
-                 => [String] -> m [Path Abs File]
+                 => [String] -> m (Set (Path Abs File))
 resolveGlobFiles =
-    liftM (catMaybes . concat) .
+    liftM (S.fromList . catMaybes . concat) .
     mapM resolve
   where
     resolve name =
@@ -409,7 +409,7 @@ matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
 
 -- | Get all files referenced by the benchmark.
 benchmarkFiles :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m)
-               => CabalFileType -> Benchmark -> m [Path Abs File]
+               => CabalFileType -> Benchmark -> m (Set (Path Abs File))
 benchmarkFiles ty bench = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks (parent . fst)
@@ -420,7 +420,7 @@ benchmarkFiles ty bench = do
         names
         haskellModuleExts
     cfiles <- buildCSources ty build
-    return (rfiles ++ cfiles)
+    return (S.union rfiles cfiles)
   where
     names =
         case ty of
@@ -437,7 +437,7 @@ benchmarkFiles ty bench = do
 
 -- | Get all files referenced by the test.
 testFiles :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m)
-          => CabalFileType -> TestSuite -> m [Path Abs File]
+          => CabalFileType -> TestSuite -> m (Set (Path Abs File))
 testFiles ty test = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks (parent . fst)
@@ -448,7 +448,7 @@ testFiles ty test = do
         names
         haskellModuleExts
     cfiles <- buildCSources ty build
-    return (rfiles ++ cfiles)
+    return (S.union rfiles cfiles)
   where
     names =
         case ty of
@@ -467,7 +467,7 @@ testFiles ty test = do
 
 -- | Get all files referenced by the executable.
 executableFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m)
-                => CabalFileType -> Executable -> m [Path Abs File]
+                => CabalFileType -> Executable -> m (Set (Path Abs File))
 executableFiles ty exe =
   do dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
      dir <- asks (parent . fst)
@@ -478,7 +478,7 @@ executableFiles ty exe =
          names
          haskellModuleExts
      cfiles <- buildCSources ty build
-     return (rfiles ++ cfiles)
+     return (S.union rfiles cfiles)
   where
     names =
         case ty of
@@ -490,7 +490,7 @@ executableFiles ty exe =
 
 -- | Get all files referenced by the library.
 libraryFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m)
-             => CabalFileType -> Library -> m [Path Abs File]
+             => CabalFileType -> Library -> m (Set (Path Abs File))
 libraryFiles ty lib =
   do dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
      dir <- asks (parent . fst)
@@ -501,7 +501,7 @@ libraryFiles ty lib =
          names
          haskellModuleExts
      cfiles <- buildCSources ty build
-     return (rfiles ++ cfiles)
+     return (S.union rfiles cfiles)
   where
     names =
         case ty of
@@ -513,9 +513,11 @@ libraryFiles ty lib =
 
 -- | Get all C sources in a build.
 buildCSources :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m)
-           => CabalFileType -> BuildInfo -> m [Path Abs File]
-buildCSources Modules _ = return []
-buildCSources AllFiles build = mapMaybeM resolveFileOrWarn (cSources build)
+           => CabalFileType -> BuildInfo -> m (Set (Path Abs File))
+buildCSources Modules _ =
+    return S.empty
+buildCSources AllFiles build =
+    liftM S.fromList (mapMaybeM resolveFileOrWarn (cSources build))
 
 -- | Get all dependencies of a package, including library,
 -- executables, tests, benchmarks.
@@ -644,7 +646,7 @@ resolveFilesAndDeps
     -> [Path Abs Dir] -- ^ Directories to look in.
     -> [Either ModuleName String] -- ^ Base names.
     -> [Text] -- ^ Extentions.
-    -> m [Path Abs File]
+    -> m (Set (Path Abs File))
 resolveFilesAndDeps ty component dirs names0 exts = do
     (moduleFiles,thFiles,foundModules) <- loop names0 S.empty
     cabalfp <- asks fst
@@ -664,27 +666,27 @@ resolveFilesAndDeps ty component dirs names0 exts = do
              Just c -> " for '" ++ c ++ "'") ++
         " component (add to other-modules):\n    " ++
         intercalate "\n    " (map display (S.toList unlistedModules))
-    return (S.toList moduleFiles ++ thFiles)
+    return (S.union moduleFiles thFiles)
   where
-    loop [] doneModules = return (S.empty, [], doneModules)
+    loop [] doneModules = return (S.empty, S.empty, doneModules)
     loop names doneModules0 = do
         resolvedFiles <- resolveFiles dirs names exts
         pairs <- mapM getDependencies resolvedFiles
         let doneModules' = S.union doneModules0 (S.fromList (lefts names))
             moduleDeps = S.unions (map fst pairs)
-            thDepFiles = concatMap snd pairs
+            thDepFiles = S.unions (map snd pairs)
             modulesRemaining = S.difference moduleDeps doneModules'
         (moduleDepFiles',thDepFiles',doneModules'') <-
             loop (map Left (S.toList modulesRemaining)) doneModules'
         return
             ( S.union (S.fromList resolvedFiles) moduleDepFiles'
-            , thDepFiles ++ thDepFiles'
+            , S.union thDepFiles thDepFiles'
             , doneModules'')
     getDependencies resolvedFile = do
         dir <- asks (parent . fst)
         dumpHIDir <- getDumpHIDir
         case stripDir dir resolvedFile of
-            Nothing -> return (S.empty, [])
+            Nothing -> return (S.empty, S.empty)
             Just fileRel -> do
                 let dumpHIPath =
                         FilePath.replaceExtension
@@ -693,7 +695,7 @@ resolveFilesAndDeps ty component dirs names0 exts = do
                 dumpHIExists <- liftIO $ doesFileExist dumpHIPath
                 if dumpHIExists
                     then parseDumpHI dumpHIPath
-                    else return (S.empty, [])
+                    else return (S.empty, S.empty)
     parseDumpHI dumpHIPath = do
         dir <- asks (parent . fst)
         dumpHI <- liftIO $ fmap C8.lines (C8.readFile dumpHIPath)
@@ -713,6 +715,7 @@ resolveFilesAndDeps ty component dirs names0 exts = do
                     AllFiles ->
                         -- The dependent file path is surrounded by quotes but is not escaped.
                         -- It can be an absolute or relative path.
+                        S.fromList $
                         mapMaybe
                             (parseAbsOrRelFile dir <=<
                              (fmap T.unpack .
@@ -720,7 +723,7 @@ resolveFilesAndDeps ty component dirs names0 exts = do
 			      T.dropWhileEnd (== '\r') .
                               decodeUtf8 . C8.dropWhile (/= '"'))) $
                         filter ("addDependentFile \"" `C8.isPrefixOf`) dumpHI
-                    Modules -> []
+                    Modules -> S.empty
         return
             (moduleDeps, thDeps)
     getDumpHIDir = do
