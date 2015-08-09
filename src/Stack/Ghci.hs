@@ -3,6 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | Run a GHCi configured with the user's project(s).
 
@@ -28,29 +29,33 @@ import           Stack.Exec
 import           Stack.Package
 import           Stack.Types
 
+data GhciOpts = GhciOpts
+    {ghciTargets :: [Text]
+    ,ghciArgs :: [String]
+    ,ghciGhcCommand :: FilePath
+    ,ghciNoLoadModules :: Bool
+    ,ghciAdditionalPackages :: [String]
+    } deriving (Show,Eq)
+
 -- | Launch a GHCi session for the given local project targets with the
 -- given options and configure it with the load paths and extensions
 -- of those targets.
-ghci
-    :: (HasConfig r, HasBuildConfig r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
-    => [Text] -- ^ Targets.
-    -> [String] -- ^ GHC options.
-    -> FilePath
-    -> Bool
+ghci :: (HasConfig r, HasBuildConfig r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
+    => GhciOpts
     -> m ()
-ghci targets useropts ghciPath noload = do
-    pkgs <- ghciSetup targets
+ghci GhciOpts{..} = do
+    pkgs <- ghciSetup ghciTargets
     let pkgopts = concatMap ghciPkgOpts pkgs
         srcfiles
-          | noload = []
+          | ghciNoLoadModules = []
           | otherwise = concatMap (map toFilePath . ghciPkgModules) pkgs
     $logInfo
         ("Configuring GHCi with the following packages: " <>
-         T.intercalate ", " (map packageNameText (map ghciPkgName pkgs)))
+         T.intercalate ", " (map (packageNameText . ghciPkgName) pkgs))
     exec
         defaultEnvSettings
-        ghciPath
-        ("--interactive" : pkgopts <> srcfiles <> useropts)
+        ghciGhcCommand
+        ("--interactive" : pkgopts <> srcfiles <> ghciArgs)
 
 data GhciPkgInfo = GhciPkgInfo
   { ghciPkgName :: PackageName
