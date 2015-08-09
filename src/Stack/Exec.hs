@@ -13,6 +13,7 @@ import           Control.Monad.Logger
 import           Control.Monad.Catch hiding (try)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Stack.Types
+import           System.Process.Log
 
 #ifdef mingw32_HOST_OS
 import           Control.Exception.Lifted
@@ -46,6 +47,7 @@ exec :: (HasConfig r, MonadReader r m, MonadIO m, MonadLogger m, MonadThrow m, M
 exec envSettings cmd0 args = do
     config <- asks getConfig
     menv <- liftIO (configEnvOverride config envSettings)
+    $logProcessRun cmd0 args
 #ifdef mingw32_HOST_OS
     e <- try (callProcess Nothing menv cmd0 args)
     liftIO $ case e of

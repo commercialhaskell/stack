@@ -34,7 +34,6 @@ import           System.Directory            (copyFile,
                                               getTemporaryDirectory)
 import qualified System.FilePath             as FP
 import           System.IO.Temp
-import           System.Process (rawSystem)
 import           System.Process.Read
 
 cabalSolver :: (MonadIO m, MonadLogger m, MonadMask m, MonadBaseControl IO m, MonadReader env m, HasConfig env)
