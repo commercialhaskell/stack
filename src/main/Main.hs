@@ -79,25 +79,55 @@ import System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, get
 import System.IO (hSetEncoding, utf8, hPutStrLn)
 #endif
 
--- | Commandline dispatcher.
-main :: IO ()
-main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
+-- | Set the code page for this process as necessary. Only applies to Windows.
+-- See: https://github.com/commercialhaskell/stack/issues/738
+fixCodePage :: IO a -> IO a
 #if WINDOWS
-     -- Set the code page for this process to 65001 (UTF-8). See:
-     -- https://github.com/commercialhaskell/stack/issues/738
-     origCPI <- getConsoleCP
-     origCPO <- getConsoleOutputCP
+fixCodePage inner = do
+    origCPI <- getConsoleCP
+    origCPO <- getConsoleOutputCP
 
-     when (origCPI /= 65001 || origCPO /= 65001) $ do
-         hPutStrLn stderr
-            "Setting codepage to UTF-8 (65001) to ensure correct output from GHC"
-         setConsoleCP 65001
-         setConsoleOutputCP 65001
-         hSetEncoding stdin  utf8
-         hSetEncoding stdout utf8
-         hSetEncoding stderr utf8
+    let setInput = origCPI /= expected
+        setOutput = origCPO /= expected
+        fixInput
+            | setInput = bracket_
+                (do
+                    setConsoleCP expected
+                    hSetEncoding stdin utf8
+                    )
+                (setConsoleCP origCPI)
+            | otherwise = id
+        fixOutput
+            | setInput = bracket_
+                (do
+                    setConsoleOutputCP expected
+                    hSetEncoding stdout utf8
+                    hSetEncoding stderr utf8
+                    )
+                (setConsoleOutputCP origCPO)
+            | otherwise = id
+
+    case (setInput, setOutput) of
+        (False, False) -> return ()
+        (True, True) -> warn ""
+        (True, False) -> warn " input"
+        (False, True) -> warn " output"
+
+    fixInput $ fixOutput inner
+  where
+    expected = 65001 -- UTF-8
+    warn typ = hPutStrLn stderr $ concat
+        [ "Setting"
+        , typ
+        , " codepage to UTF-8 (65001) to ensure correct output from GHC"
+        ]
+#else
+fixCodePage = id
 #endif
 
+-- | Commandline dispatcher.
+main :: IO ()
+main = withInterpreterArgs stackProgName $ \args isInterpreter -> fixCodePage $ do
      -- Line buffer the output by default, particularly for non-terminal runs.
      -- See https://github.com/commercialhaskell/stack/pull/360
      hSetBuffering stdout LineBuffering
