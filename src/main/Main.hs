@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -73,10 +74,61 @@ import           System.FilePath (dropTrailingPathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..))
 import           System.Process.Read
 
+#if WINDOWS
+import System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
+import System.IO (hSetEncoding, utf8, hPutStrLn)
+#endif
+
+-- | Set the code page for this process as necessary. Only applies to Windows.
+-- See: https://github.com/commercialhaskell/stack/issues/738
+fixCodePage :: IO a -> IO a
+#if WINDOWS
+fixCodePage inner = do
+    origCPI <- getConsoleCP
+    origCPO <- getConsoleOutputCP
+
+    let setInput = origCPI /= expected
+        setOutput = origCPO /= expected
+        fixInput
+            | setInput = bracket_
+                (do
+                    setConsoleCP expected
+                    hSetEncoding stdin utf8
+                    )
+                (setConsoleCP origCPI)
+            | otherwise = id
+        fixOutput
+            | setInput = bracket_
+                (do
+                    setConsoleOutputCP expected
+                    hSetEncoding stdout utf8
+                    hSetEncoding stderr utf8
+                    )
+                (setConsoleOutputCP origCPO)
+            | otherwise = id
+
+    case (setInput, setOutput) of
+        (False, False) -> return ()
+        (True, True) -> warn ""
+        (True, False) -> warn " input"
+        (False, True) -> warn " output"
+
+    fixInput $ fixOutput inner
+  where
+    expected = 65001 -- UTF-8
+    warn typ = hPutStrLn stderr $ concat
+        [ "Setting"
+        , typ
+        , " codepage to UTF-8 (65001) to ensure correct output from GHC"
+        ]
+#else
+fixCodePage = id
+#endif
+
 -- | Commandline dispatcher.
 main :: IO ()
-main = withInterpreterArgs stackProgName $ \args isInterpreter ->
-  do -- Line buffer the output by default, particularly for non-terminal runs.
+main = withInterpreterArgs stackProgName $ \args isInterpreter -> fixCodePage $ do
+     -- Line buffer the output by default, particularly for non-terminal runs.
      -- See https://github.com/commercialhaskell/stack/pull/360
      hSetBuffering stdout LineBuffering
      hSetBuffering stdin  LineBuffering

@@ -602,7 +602,13 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} msuffix inne
                 cp = cp0
                     { cwd = Just $ toFilePath pkgDir
                     , Process.env = envHelper menv
-                    , std_in = CreatePipe
+                    -- Ideally we'd create a new pipe here and then close it
+                    -- below to avoid the child process from taking from our
+                    -- stdin. However, if we do this, the child process won't
+                    -- be able to get the codepage on Windows that we want.
+                    -- See:
+                    -- https://github.com/commercialhaskell/stack/issues/738
+                    -- , std_in = CreatePipe
                     , std_out =
                         case mlogFile of
                                 Nothing -> CreatePipe
@@ -615,8 +621,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} msuffix inne
             $logProcessRun (toFilePath exeName) fullArgs
 
             -- Use createProcess_ to avoid the log file being closed afterwards
-            (Just inH, moutH, merrH, ph) <- liftIO $ createProcess_ "singleBuild" cp
-            liftIO $ hClose inH
+            (Nothing, moutH, merrH, ph) <- liftIO $ createProcess_ "singleBuild" cp
 
             let makeAbsolute = stripTHLoading -- If users want control, we should add a config option for this
 
