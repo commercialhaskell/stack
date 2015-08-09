@@ -272,3 +272,22 @@ If you are using a powershell session, it is easy to automate even that step:
 #### How does stack handle parallel builds? What exactly does it run in parallel?
 
 See [issue #644](https://github.com/commercialhaskell/stack/issues/644) for more details.
+
+#### I get strange `ld` errors about recompiling with "-fPIC"
+
+Some users (myself included!) have come across a linker errors (example below) that seem to be dependent on the local environment, i.e. the package may compile on a different machine. There is no known workaround (if you come across one please include details), however the issue has been reported to be [non-deterministic]
+(https://github.com/commercialhaskell/stack/issues/614) in some cases. I've had success using the docker functionality to build the project on a machine that would not compile it otherwise.
+
+```
+tmp-0.1.0.0: build
+Building tmp-0.1.0.0...
+Preprocessing executable 'tmp' for tmp-0.1.0.0...
+Linking dist-stack/x86_64-linux/Cabal-1.22.2.0/build/tmp/tmp ...
+/usr/bin/ld: dist-stack/x86_64-linux/Cabal-1.22.2.0/build/tmp/tmp-tmp/Main.o: relocation R_X86_64_32S against `stg_bh_upd_frame_info' can not be used when making a shared object; recompile with -fPIC
+dist-stack/x86_64-linux/Cabal-1.22.2.0/build/tmp/tmp-tmp/Main.o: error adding symbols: Bad value
+collect2: error: ld returned 1 exit status
+
+--  While building package tmp-0.1.0.0 using:
+      /home/philip/.stack/programs/x86_64-linux/ghc-7.10.1/bin/runghc-7.10.1 -package=Cabal-1.22.2.0 -clear-package-db -global-package-db /home/philip/tmp/Setup.hs --builddir=dist-stack/x86_64-linux/Cabal-1.22.2.0/ build
+    Process exited with code: ExitFailure 1
+```
