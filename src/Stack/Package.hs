@@ -716,6 +716,7 @@ resolveFilesAndDeps ty component dirs names0 exts = do
                             (parseAbsOrRelFile dir <=<
                              (fmap T.unpack .
                               (T.stripSuffix "\"" <=< T.stripPrefix "\"") .
+			      T.dropWhileEnd (== '\r') .
                               decodeUtf8 . C8.dropWhile (/= '"'))) $
                         filter ("addDependentFile \"" `C8.isPrefixOf`) dumpHI
                     Modules -> []
