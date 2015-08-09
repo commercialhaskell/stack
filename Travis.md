@@ -134,3 +134,4 @@ install:
 - https://github.com/futurice/fum2github/blob/master/.travis.yml
 - https://github.com/haskell-distributed/cloud-haskell/blob/master/.travis.yml
 - https://github.com/simonmichael/hledger/blob/master/.travis.yml
+- https://github.com/fpco/wai-middleware-crowd/blob/master/.travis.yml
