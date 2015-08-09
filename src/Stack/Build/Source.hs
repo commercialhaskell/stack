@@ -204,7 +204,7 @@ loadLocals bopts latestVersion = do
         when (packageName pkg /= name) $ throwM
             $ MismatchedCabalName cabalfp (packageName pkg)
         mbuildCache <- tryGetBuildCache dir
-        files <- getPackageFiles (packageFiles pkg) AllFiles cabalfp
+        files <- getPackageFiles (packageFiles pkg) cabalfp
         (isDirty, newBuildCache) <- checkBuildCache
             (fromMaybe Map.empty mbuildCache)
             (map toFilePath $ Set.toList files)

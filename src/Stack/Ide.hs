@@ -23,8 +23,10 @@ import qualified Data.ByteString.Lazy as L
 import           Data.List
 import           Data.Maybe
 import           Data.Monoid
+import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Distribution.Text (display)
 import           Network.HTTP.Client.Conduit
 import           Path
 import           Path.IO
@@ -51,23 +53,28 @@ ide
 ide targets useropts = do
     pkgs <- ghciSetup targets
     pwd <- getWorkingDir
-    (pkgopts, srcfiles)  <- liftM mconcat $ forM pkgs $ \pkg -> do
-        dist <- distDirFromDir (ghciPkgDir pkg)
-        autogen <- return (autogenDir dist)
-        paths_foo <-
-            liftM
-                (autogen </>)
-                (parseRelFile
-                     ("Paths_" ++
-                      packageNameString (ghciPkgName pkg) ++ ".hs"))
-        paths_foo_exists <- fileExists paths_foo
-        return ( ["--dist-dir=" <> toFilePath dist] ++
-                 map ("--ghc-option=" ++) (ghciPkgOpts pkg)
-               , mapMaybe (fmap toFilePath . stripDir pwd)
-                          (ghciPkgModules pkg <>
-                           if paths_foo_exists
-                               then [paths_foo]
-                               else []))
+    (pkgopts,srcfiles) <-
+        liftM mconcat $
+        forM pkgs $
+        \pkg ->
+             do dist <- distDirFromDir (ghciPkgDir pkg)
+                autogen <- return (autogenDir dist)
+                paths_foo <-
+                    liftM
+                        (autogen </>)
+                        (parseRelFile
+                             ("Paths_" ++
+                              packageNameString (ghciPkgName pkg) ++ ".hs"))
+                paths_foo_exists <- fileExists paths_foo
+                return
+                    ( ["--dist-dir=" <> toFilePath dist] ++
+                      map ("--ghc-option=" ++) (ghciPkgOpts pkg)
+                    , (map display (S.toList (ghciPkgModules pkg)) <>
+                       (mapMaybe
+                            (fmap toFilePath . stripDir pwd)
+                            (if paths_foo_exists
+                                 then [paths_foo]
+                                 else []))))
     localdb <- packageDatabaseLocal
     depsdb <- packageDatabaseDeps
     mpath <- liftIO $ lookupEnv "PATH"
@@ -75,11 +82,11 @@ ide targets useropts = do
     let pkgdbs =
             ["--package-db=" <> toFilePath depsdb <> ":" <> toFilePath localdb]
         paths =
-            ["--ide-backend-tools-path=" <> intercalate ":" (map toFilePath bindirs) <> (maybe "" (':':) mpath)
-            ]
+            [ "--ide-backend-tools-path=" <>
+              intercalate ":" (map toFilePath bindirs) <>
+              (maybe "" (':' :) mpath)]
         args =
-            ["--verbose"] <>
-            ["--local-work-dir=" ++ toFilePath pwd] <>
+            ["--verbose"] <> ["--local-work-dir=" ++ toFilePath pwd] <>
             map ("--ghc-option=" ++) useropts <>
             paths <>
             pkgopts <>

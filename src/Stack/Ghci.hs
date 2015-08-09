@@ -17,10 +17,13 @@ import           Data.List
 import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Monoid
+import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Typeable
+import           Distribution.ModuleName (ModuleName)
+import           Distribution.Text (display)
 import           Network.HTTP.Client.Conduit
 import           Path
 import           Path.IO
@@ -46,7 +49,7 @@ ghci targets useropts ghciPath noload = do
     let pkgopts = concatMap ghciPkgOpts pkgs
         srcfiles
           | noload = []
-          | otherwise = concatMap (map toFilePath . ghciPkgModules) pkgs
+          | otherwise = concatMap (map display . S.toList . ghciPkgModules) pkgs
         odir = ["-odir=" <> toFilePath (objectInterfaceDir config)]
     $logInfo
         ("Configuring GHCi with the following packages: " <>
@@ -60,7 +63,7 @@ data GhciPkgInfo = GhciPkgInfo
   { ghciPkgName :: PackageName
   , ghciPkgOpts :: [String]
   , ghciPkgDir :: Path Abs Dir
-  , ghciPkgModules :: [Path Abs File]
+  , ghciPkgModules :: Set ModuleName
   }
 
 ghciSetup
@@ -97,13 +100,13 @@ ghciSetup targets = do
                 pkg <- readPackage config cabalfp
                 pkgOpts <-
                     getPackageOpts (packageOpts pkg) sourceMap (map fst locals) cabalfp
-                srcfiles <- getPackageFiles (packageFiles pkg) Modules cabalfp
+                modules <- getPackageModules (packageModules pkg) cabalfp
                 return
                     GhciPkgInfo
                     { ghciPkgName = packageName pkg
                     , ghciPkgOpts = filter (not . badForGhci) pkgOpts
                     , ghciPkgDir = parent cabalfp
-                    , ghciPkgModules = S.toList srcfiles
+                    , ghciPkgModules = modules
                     }
   where
     wanted pwd cabalfp name = isInWantedList || targetsEmptyAndInDir

@@ -103,8 +103,7 @@ instance Show GetPackageOpts where
 -- Argument is the location of the .cabal file
 newtype GetPackageFiles = GetPackageFiles
     { getPackageFiles :: forall m env. (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadReader env m, HasPlatform env, HasEnvConfig env)
-                      => CabalFileType
-                      -> Path Abs File
+                      => Path Abs File
                       -> m (Set (Path Abs File))
     }
 instance Show GetPackageFiles where
@@ -113,12 +112,11 @@ instance Show GetPackageFiles where
 -- | Modules in the package.
 newtype GetPackageModules = GetPackageModules
     { getPackageModules :: forall m env. (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadReader env m, HasPlatform env, HasEnvConfig env)
-                             => CabalFileType
-                             -> Path Abs File
+                             => Path Abs File
                              -> m (Set ModuleName)
     }
 instance Show GetPackageModules where
-    show _ = "<GetPackageFiles>"
+    show _ = "<GetPackageModules>"
 
 -- | Package build configuration
 data PackageConfig =
@@ -129,11 +127,6 @@ data PackageConfig =
                 ,packageConfigPlatform :: !Platform       -- ^ host platform
                 }
  deriving (Show,Typeable)
-
--- | Files to get for a cabal package.
-data CabalFileType
-    = AllFiles
-    | Modules
 
 -- | Compares the package name.
 instance Ord Package where
