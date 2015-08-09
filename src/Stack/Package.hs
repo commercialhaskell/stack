@@ -243,7 +243,8 @@ generateBuildInfoOpts sourceMap mcabalmacros cabalDir distDir locals b =
             (("-i" <>) . toFilePath)
             (cabalDir :
              map (cabalDir </>) (mapMaybe parseRelDir (hsSourceDirs b)) <>
-             [autogenDir distDir])
+             [autogenDir distDir,buildDir distDir]) ++
+        ["-stubdir=" ++ toFilePath (buildDir distDir)]
     includeOpts =
         [ "-I" <> toFilePath absDir
         | dir <- includeDirs b
