@@ -20,8 +20,8 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader            (MonadReader, asks)
 import           Control.Monad.Trans.Control     (MonadBaseControl)
 import qualified Data.IntMap                     as IntMap
-import           Data.List                       (isSuffixOf,sort)
-import           Data.List.Extra                 (nubOrd)
+import           Data.List                       (sort)
+import           Data.List                       (isSuffixOf)
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
 import           Data.Maybe                      (mapMaybe)
@@ -209,6 +209,16 @@ data SnapPref = PrefNone | PrefLTS | PrefNightly
 
 -- | Method of initializing
 data Method = MethodSnapshot SnapPref | MethodResolver AbstractResolver | MethodSolver
+
+-- | Same semantics as @nub@, but more efficient by using the @Ord@ constraint.
+nubOrd :: Ord a => [a] -> [a]
+nubOrd =
+    go Set.empty
+  where
+    go _ [] = []
+    go s (x:xs)
+        | x `Set.member` s = go s xs
+        | otherwise = x : go (Set.insert x s) xs
 
 -- | Turn an 'AbstractResolver' into a 'Resolver'.
 makeConcreteResolver :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadLogger m)

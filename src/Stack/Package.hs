@@ -44,7 +44,6 @@ import qualified Data.ByteString.Char8 as C8
 import           Data.Either
 import           Data.Function
 import           Data.List
-import           Data.List.Extra (nubOrd)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Maybe
@@ -190,7 +189,7 @@ generatePkgDescOpts sourceMap locals cabalfp pkg = do
                 then Just cabalmacros
                 else Nothing
     return
-        (nubOrd
+        (nub
              (["-hide-all-packages"] ++
               concatMap
                   (concatMap
@@ -212,7 +211,7 @@ generateBuildInfoOpts
     -> BuildInfo
     -> [String]
 generateBuildInfoOpts sourceMap mcabalmacros cabalDir distDir locals b =
-    nubOrd (concat [ghcOpts b, extOpts b, srcOpts, includeOpts, macros, deps, extra b, extraDirs, fworks b])
+    nub (concat [ghcOpts b, extOpts b, srcOpts, includeOpts, macros, deps, extra b, extraDirs, fworks b])
   where
     deps =
         concat
@@ -332,10 +331,10 @@ packageDescFiles ty pkg = do
     docfiles <- resolveGlobFiles (extraDocFiles pkg)
     case ty of
         Modules ->
-            return (nubOrd (concat [libfiles, exefiles, testfiles, benchfiles]))
+            return (nub (concat [libfiles, exefiles, testfiles, benchfiles]))
         AllFiles ->
             return
-                (nubOrd
+                (nub
                      (concat
                           [ libfiles
                           , exefiles
@@ -769,7 +768,7 @@ findCandidate dirs exts name = do
   where
     paths_pkg pkg = "Paths_" ++ packageNameString pkg
     makeNameCandidates =
-        liftM (nubOrd . rights . concat) (mapM makeDirCandidates dirs)
+        liftM (nub . rights . concat) (mapM makeDirCandidates dirs)
     makeDirCandidates
         :: Path Abs Dir
         -> IO [Either ResolveException (Path Abs File)]
