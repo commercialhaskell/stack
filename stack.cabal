@@ -79,6 +79,7 @@ library
                      Stack.Build.Haddock
                      Stack.Build.Installed
                      Stack.Build.Source
+                     Stack.Build.Target
                      Stack.Upgrade
                      Stack.Upload
                      System.Process.Read
@@ -219,6 +220,7 @@ test-suite stack-test
   other-modules:  Spec
                 , Stack.BuildPlanSpec
                 , Stack.Build.ExecuteSpec
+                , Stack.Build.TargetSpec
                 , Stack.ConfigSpec
                 , Stack.DotSpec
                 , Stack.PackageDumpSpec
