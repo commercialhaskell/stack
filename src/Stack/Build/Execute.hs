@@ -13,8 +13,6 @@ module Stack.Build.Execute
     , ExecuteEnv
     , withExecuteEnv
     , withSingleContext
-    -- * Testing
-    , compareTestsComponents
     ) where
 
 import           Control.Applicative            ((<$>), (<*>))
@@ -456,7 +454,7 @@ ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal cabalfp extra = do
             , configCacheDeps = allDeps
             , configCacheComponents =
                 case taskType of
-                    TTLocal lp -> Set.map encodeUtf8 $ lpComponents lp
+                    TTLocal lp -> Set.map renderComponent $ lpComponents lp
                     TTUpstream _ _ -> Set.empty
             , configCacheHaddock =
                 shouldHaddockPackage eeBuildOpts eeWanted (packageIdentifierName taskProvides)
@@ -653,7 +651,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
     extraOpts <- extraBuildOptions
     cabal (console && configHideTHLoading config) $
         (case taskType of
-            TTLocal lp -> "build" : map T.unpack (Set.toList $ lpComponents lp)
+            TTLocal lp -> "build" : "lib" : map (T.unpack . T.append "exe:")
+                                                (maybe [] Set.toList $ lpExeComponents lp)
             TTUpstream _ _ -> ["build"]) ++ extraOpts
 
     let doHaddock = shouldHaddockPackage eeBuildOpts eeWanted (packageName package) &&
@@ -703,11 +702,12 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
 
 singleTest :: M env m
            => TestOpts
+           -> LocalPackageTB
            -> ActionContext
            -> ExecuteEnv
            -> Task
            -> m ()
-singleTest topts ac ee task =
+singleTest topts lptb ac ee task =
     withSingleContext ac ee task (Just "test") $ \package cabalfp pkgDir cabal announce console mlogFile -> do
         (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (test)") cabal cabalfp ["--enable-tests"]
         config <- asks getConfig
@@ -722,11 +722,7 @@ singleTest topts ac ee task =
 
             needHpc = toCoverage topts
 
-            componentsRaw =
-                case taskType task of
-                    TTLocal lp -> Set.toList $ lpComponents lp
-                    TTUpstream _ _ -> assert False []
-            testsToRun = compareTestsComponents componentsRaw $ Set.toList $ packageTests package
+            testsToRun = Set.toList $ lptbTests lptb
             components = map (T.unpack . T.append "test:") testsToRun
 
         when needBuild $ do
@@ -844,22 +840,6 @@ singleTest topts ac ee task =
                 bs
 
             setTestSuccess pkgDir
-
--- | Determine the tests to be run based on the list of components.
-compareTestsComponents :: [Text] -- ^ components
-                       -> [Text] -- ^ all test names
-                       -> [Text] -- ^ tests to be run
-compareTestsComponents [] tests = tests -- no components -- all tests
-compareTestsComponents comps tests2 =
-    Set.toList $ Set.intersection tests1 $ Set.fromList tests2
-  where
-    tests1 = Set.unions $ map toSet comps
-
-    toSet x =
-        case T.break (== ':') x of
-            (y, "") -> assert (x == y) (Set.singleton x)
-            ("test", y) -> Set.singleton $ T.drop 1 y
-            _ -> Set.empty
 
 singleBench :: M env m
             => BenchmarkOpts

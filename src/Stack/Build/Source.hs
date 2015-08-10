@@ -10,12 +10,11 @@ module Stack.Build.Source
     , SourceMap
     , PackageSource (..)
     , localFlags
-    , loadLocals
     ) where
 
 import           Control.Applicative ((<|>), (<$>), (<*>))
 import           Control.Arrow ((&&&))
-import           Control.Exception (catch)
+import           Control.Exception (assert, catch)
 import           Control.Monad
 import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.IO.Class
@@ -106,19 +105,21 @@ loadSourceMap bopts = do
         (Map.keysSet $ Map.filter (== STUnknown) targets)
         latestVersion
 
-    _ <- error $ show (extraDeps0, targets)
-
-    (locals, extraNames, extraIdents) <- loadLocals bopts latestVersion -- FIXME remove
+    locals <- mapM (loadLocalPackage bopts targets) $ Map.toList rawLocals
 
     let
         -- loadLocals returns PackageName (foo) and PackageIdentifier (bar-1.2.3) targets separately;
         -- here we combine them into nonLocalTargets. This is one of the
         -- return values of this function.
         nonLocalTargets :: Set PackageName
-        nonLocalTargets = extraNames <> Set.map packageIdentifierName extraIdents
+        nonLocalTargets =
+            Map.keysSet $ Map.filter (not . isLocal) targets
+          where
+            isLocal (STLocal _) = True
+            isLocal STUnknown = False
+            isLocal STNonLocal = False
 
-    let shadowed = Set.fromList (map (packageName . lpPackage) locals)
-                <> Map.keysSet extraDeps0
+        shadowed = Map.keysSet rawLocals <> Map.keysSet extraDeps0
         (mbp, extraDeps1) = shadowMiniBuildPlan mbp0 shadowed
 
         -- Add the extra deps from the stack.yaml file to the deps grabbed from
@@ -141,19 +142,6 @@ loadSourceMap bopts = do
                 (PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi))
             ] `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
 
-    let unknown = Set.difference nonLocalTargets $ Map.keysSet sourceMap
-    unless (Set.null unknown) $ do
-        let toEither name =
-                case Map.lookup name latestVersion of
-                    Nothing -> Left name
-                    Just version -> Right (name, version)
-            eithers = map toEither $ Set.toList unknown
-            (unknown', notInIndex) = partitionEithers eithers
-        throwM $ UnknownTargets
-            (Set.fromList unknown')
-            (Map.fromList notInIndex)
-            (bcStackYaml bconfig)
-
     return (mbp, locals, nonLocalTargets, sourceMap)
 
 -- | Parse out the local package views for the current project
@@ -172,6 +160,7 @@ getLocalPackageViews = do
         let lpv = LocalPackageView
                 { lpvVersion = fromCabalVersion $ pkgVersion cabalID
                 , lpvRoot = dir
+                , lpvCabalFP = cabalfp
                 , lpvExtraDep = not validWanted
                 , lpvComponents = getNamedComponents gpkg
                 }
@@ -186,97 +175,79 @@ getLocalPackageViews = do
       where
         go wrapper f = map (wrapper . T.pack . fst) $ f gpkg
 
--- | 'loadLocals' combines two pieces of information:
---
--- 1. Targets, i.e. arguments passed to stack such as @foo@ and @bar@ in the @stack foo bar@ invocation
---
--- 2. Local packages listed in @stack.yaml@
---
--- It returns:
---
--- 1. For every local package, a 'LocalPackage' structure
---
--- 2. If a target does not correspond to a local package but is a valid
--- 'PackageName' or 'PackageIdentifier', it is returned as such.
---
--- NOTE: as the function is written right now, it may "drop" targets if
--- they correspond to existing directories not listed in stack.yaml. This
--- may be a bug.
-loadLocals :: forall m env .
-              (MonadReader env m, HasBuildConfig env, MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m,HasEnvConfig env)
-           => BuildOpts
-           -> Map PackageName Version
-           -> m ([LocalPackage], Set PackageName, Set PackageIdentifier)
-loadLocals bopts latestVersion = do
-    (isWanted', names, idents) <-
-        case boptsTargets bopts of
-            -- If there are no targets specified: build all locals
-            [] -> return (\_ _ -> True, Map.empty, Set.empty)
-            _targets -> do
-                targets' <- mapM parseTarget $ boptsTargets bopts
-                -- Group targets by their kind
-                (dirs, names, idents) <-
-                    case partitionEithers targets' of
-                        ([], targets'') -> return $ partitionTargetSpecs targets''
-                        (bad, _) -> throwM $ Couldn'tParseTargets bad
-                return (isWanted dirs names, names, idents)
-    let identsMap = Map.fromList $ map toTuple $ Set.toList idents
+splitComponents :: [NamedComponent]
+                -> (Set Text, Set Text, Set Text)
+splitComponents =
+    go id id id
+  where
+    go a b c [] = (Set.fromList $ a [], Set.fromList $ b [], Set.fromList $ c [])
+    go a b c (CLib:xs) = go a b c xs
+    go a b c (CExe x:xs) = go (a . (x:)) b c xs
+    go a b c (CTest x:xs) = go a (b . (x:)) c xs
+    go a b c (CBench x:xs) = go a b (c . (x:)) xs
 
-    econfig <- asks getEnvConfig
+-- | Upgrade the initial local package info to a full-blown @LocalPackage@
+-- based on the selected components
+loadLocalPackage
+    :: forall m env.
+       (MonadReader env m, HasEnvConfig env, MonadCatch m, MonadLogger m, MonadIO m)
+    => BuildOpts
+    -> Map PackageName SimpleTarget
+    -> (PackageName, (LocalPackageView, GenericPackageDescription))
+    -> m LocalPackage
+loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
     bconfig <- asks getBuildConfig
-    -- Iterate over local packages declared in stack.yaml and turn them
-    -- into LocalPackage structures. The targets affect whether these
-    -- packages will be marked as wanted.
-    lps <- forM (Map.toList $ envConfigPackages econfig) $ \(dir, validWanted) -> do
-        cabalfp <- getCabalFileName dir
-        name <- parsePackageNameFromFilePath cabalfp
-        let wanted = validWanted && isWanted' dir name
-            config = PackageConfig
-                { packageConfigEnableTests = False
-                , packageConfigEnableBenchmarks = False
-                , packageConfigFlags = localFlags (boptsFlags bopts) bconfig name
-                , packageConfigGhcVersion = envConfigGhcVersion econfig
-                , packageConfigPlatform = configPlatform $ getConfig bconfig
-                }
-            configFinal = config
-                { packageConfigEnableTests =
-                    error "FIXME packageConfigEnableTests"
-                , packageConfigEnableBenchmarks =
-                    error "FIXME packageConfigEnableBenchmarks"
-                }
-        pkg <- readPackage config cabalfp
-        pkgFinal <- readPackage configFinal cabalfp
-        when (packageName pkg /= name) $ throwM
-            $ MismatchedCabalName cabalfp (packageName pkg)
-        mbuildCache <- tryGetBuildCache dir
-        files <- getPackageFiles (packageFiles pkg) cabalfp
-        (isDirty, newBuildCache) <- checkBuildCache
-            (fromMaybe Map.empty mbuildCache)
-            (map toFilePath $ Set.toList files)
+    econfig <- asks getEnvConfig
 
-        case Map.lookup (packageName pkg) identsMap of
-            Just version | version /= packageVersion pkg ->
-                throwM $ LocalPackageDoesn'tMatchTarget
-                    (packageName pkg)
-                    (packageVersion pkg)
-                    version
-            _ -> return ()
-
-        return LocalPackage
-            { lpPackage = pkg
-            , lpPackageFinal = pkgFinal
-            , lpWanted = wanted
-            , lpFiles = files
-            , lpDirtyFiles = isDirty || boptsForceDirty bopts
-            , lpNewBuildCache = newBuildCache
-            , lpCabalFile = cabalfp
-            , lpDir = dir
-            , lpComponents = fromMaybe Set.empty $ Map.lookup name names
+    let mtarget = Map.lookup name targets
+        components =
+            case mtarget of
+                Just (STLocal comps) -> comps
+                Just STNonLocal -> assert False Set.empty
+                Just STUnknown -> assert False Set.empty
+                Nothing -> Set.empty
+        (exes, tests, benches) = splitComponents $ Set.toList components
+        config = PackageConfig
+            { packageConfigEnableTests = False
+            , packageConfigEnableBenchmarks = False
+            , packageConfigFlags = localFlags (boptsFlags bopts) bconfig name
+            , packageConfigGhcVersion = envConfigGhcVersion econfig
+            , packageConfigPlatform = configPlatform $ getConfig bconfig
             }
+        btconfig = config
+            { packageConfigEnableTests = not $ Set.null tests
+            , packageConfigEnableBenchmarks = not $ Set.null benches
+            }
+        pkg = resolvePackage config gpkg
+        btpkg
+            | Set.null tests && Set.null benches = Nothing
+            | otherwise = Just $ LocalPackageTB
+                { lptbPackage = resolvePackage btconfig gpkg
+                , lptbTests = tests
+                , lptbBenches = benches
+                }
+    mbuildCache <- tryGetBuildCache $ lpvRoot lpv
+    files <- getPackageFiles (packageFiles pkg) (lpvCabalFP lpv)
+    (isDirty, newBuildCache) <- checkBuildCache
+        (fromMaybe Map.empty mbuildCache)
+        (map toFilePath $ Set.toList files)
 
-    let known = Set.fromList $ map (packageName . lpPackage) lps
-        unknown = Set.difference (Map.keysSet names) known
+    return LocalPackage
+        { lpPackage = pkg
+        , lpExeComponents =
+            case mtarget of
+                Nothing -> Nothing
+                Just _ -> Just exes
+        , lpTestBench = btpkg
+        , lpFiles = files
+        , lpDirtyFiles = isDirty || boptsForceDirty bopts
+        , lpNewBuildCache = newBuildCache
+        , lpCabalFile = lpvCabalFP lpv
+        , lpDir = lpvRoot lpv
+        , lpComponents = components
+        }
 
+        {-
         -- Check if flags specified in stack.yaml and the command line are
         -- used, see https://github.com/commercialhaskell/stack/issues/617
         flags = map (, FSCommandLine) [(k, v) | (Just k, v) <- Map.toList $ boptsFlags bopts]
@@ -302,66 +273,7 @@ loadLocals bopts latestVersion = do
                             else Just $ UFFlagsNotDefined source pkg unused
 
         unusedFlags = mapMaybe checkFlagUsed flags
-
-        unusedComponents = Set.difference (Map.keysSet names) known
-
-    unless (null unusedFlags) $ throwM $ InvalidFlagSpecification $ Set.fromList unusedFlags
-    unless (Set.null unusedComponents) $ do
-        $logWarn "Warning: You've specified components for non-local packages"
-        $logWarn "Components for the following packages will be ignored:"
-        forM_ (Set.toList unusedComponents) $ \x -> do
-            $logWarn $ "* " <> T.pack (packageNameString x)
-
-    return (lps, unknown, idents)
-  where
-    -- Attempt to parse a TargetSpec based on its textual form and on
-    -- whether it is a name of an existing directory.
-    --
-    -- If a TargetSpec is not recognized, return it verbatim as Left.
-    parseTarget :: Text -> m (Either Text TargetSpec)
-    parseTarget t = do
-        let s = T.unpack t
-        isDir <- liftIO $ doesDirectoryExist s
-        if isDir
-            then liftM (Right . TSDir) $ liftIO (canonicalizePath s) >>= parseAbsDir
-            else return
-                    $ maybe (Left t) Right
-                    $ (flip TSName Set.empty <$> parsePackageNameFromString s)
-                  <|> (TSIdent <$> parsePackageIdentifierFromString s)
-                  <|> (do
-                        t' <- T.stripSuffix ":latest" t
-                        name <- parsePackageNameFromString $ T.unpack t'
-                        version <- Map.lookup name latestVersion
-                        Just $ TSIdent $ PackageIdentifier name version)
-                  <|> (do
-                        let (name', rest) = T.break (== ':') t
-                        component <- T.stripPrefix ":" rest
-                        name <- parsePackageNameFromString $ T.unpack name'
-                        Just $ TSName name $ Set.singleton component)
-    isWanted dirs names dir name =
-        name `Map.member` names ||
-        any (`isParentOf` dir) dirs ||
-        any (== dir) dirs
-
-data TargetSpec
-    = TSName PackageName (Set Text)
-    | TSIdent PackageIdentifier
-    | TSDir (Path Abs Dir)
-
-partitionTargetSpecs :: [TargetSpec] -> ([Path Abs Dir], Map PackageName (Set Text), Set PackageIdentifier)
-partitionTargetSpecs =
-    loop id Map.empty Set.empty
-  where
-    loop dirs names idents ts0 =
-        case ts0 of
-            [] -> (dirs [], names, idents)
-            TSName name comps:ts -> loop
-                dirs
-                (Map.insertWith Set.union name comps names)
-                idents
-                ts
-            TSIdent ident:ts -> loop dirs names (Set.insert ident idents) ts
-            TSDir dir:ts -> loop (dirs . (dir:)) names idents ts
+-}
 
 -- | All flags for a local package
 localFlags :: (Map (Maybe PackageName) (Map FlagName Bool))

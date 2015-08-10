@@ -194,6 +194,7 @@ mkUnregisterLocal tasks dirtyReason locallyRegistered =
         ident = ghcPkgIdPackageIdentifier gid
         name = packageIdentifierName ident
 
+{- FIXME
 addFinal :: LocalPackage -> M ()
 addFinal lp = do
     depsRes <- addPackageDeps package
@@ -220,6 +221,7 @@ addFinal lp = do
     tell (Map.singleton (packageName package) res, mempty, mempty)
   where
     package = lpPackageFinal lp
+-}
 
 addDep :: PackageName -> M (Either ConstructPlanException AddDepRes)
 addDep name = do
@@ -285,7 +287,7 @@ tellExecutablesPackage loc p = do
                 Just (PIOnlySource ps) -> goSource ps
                 Just (PIBoth ps _) -> goSource ps
 
-        goSource (PSLocal lp) = lpComponents lp
+        goSource (PSLocal lp) = fromMaybe Set.empty $ lpExeComponents lp
         goSource (PSUpstream _ _ _) = Set.empty
 
     tell (Map.empty, m myComps, Map.empty)
@@ -405,7 +407,7 @@ checkDirtiness ps installed package present wanted = do
             , configCacheDeps = present
             , configCacheComponents =
                 case ps of
-                    PSLocal lp -> Set.map encodeUtf8 $ lpComponents lp
+                    PSLocal lp -> Set.map renderComponent $ lpComponents lp
                     PSUpstream _ _ _ -> Set.empty
             , configCacheHaddock =
                 shouldHaddockPackage buildOpts wanted (packageName package) ||

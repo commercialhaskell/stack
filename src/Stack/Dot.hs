@@ -63,7 +63,7 @@ dot :: (HasEnvConfig env
     => DotOpts
     -> m ()
 dot dotOpts = do
-    (locals,_,_) <- loadLocals defaultBuildOpts Map.empty
+    (locals,_,_) <- error "FIXME loadLocals defaultBuildOpts Map.empty"
     resultGraph <- createDependencyGraph dotOpts
     let pkgsToPrune = if dotIncludeBase dotOpts
                          then dotPrune dotOpts

@@ -9,7 +9,6 @@
 module Stack.Build.Target
     ( -- * Types
       ComponentName
-    , NamedComponent (..)
     , UnresolvedComponent (..)
     , RawTarget (..)
     , LocalPackageView (..)
@@ -40,14 +39,6 @@ import           Stack.Types
 type ComponentName = Text
 
 newtype RawInput = RawInput { unRawInput :: Text }
-
--- | A single, fully resolved component of a package
-data NamedComponent
-    = CLib
-    | CExe !ComponentName
-    | CTest !ComponentName
-    | CBench !ComponentName
-    deriving (Show, Eq, Ord)
 
 -- | Either a fully resolved component, or a component name that could be
 -- either an executable, test, or benchmark
@@ -106,6 +97,7 @@ parseRawTarget t =
 data LocalPackageView = LocalPackageView
     { lpvVersion    :: !Version
     , lpvRoot       :: !(Path Abs Dir)
+    , lpvCabalFP    :: !(Path Abs File)
     , lpvComponents :: !(Set NamedComponent)
     , lpvExtraDep   :: !Bool
     }
@@ -304,7 +296,7 @@ parseTargets :: (MonadThrow m, MonadIO m)
 parseTargets includeTests includeBenches snap extras locals currDir textTargets' = do
     let textTargets =
             if null textTargets'
-                then map (T.pack . packageNameString) $ Map.keys locals
+                then map (T.pack . packageNameString) $ Map.keys $ Map.filter (not . lpvExtraDep) locals
                 else textTargets'
     erawTargets <- mapM (parseRawTargetDirs currDir locals) textTargets
 
