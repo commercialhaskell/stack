@@ -24,7 +24,7 @@ Downloads are available by operating system:
 * [OS X](https://github.com/commercialhaskell/stack/wiki/Downloads#os-x)
 * [Ubuntu](https://github.com/commercialhaskell/stack/wiki/Downloads#ubuntu)
 * [Debian](https://github.com/commercialhaskell/stack/wiki/Downloads#debian)
-* [CentOS / Red Hat](https://github.com/commercialhaskell/stack/wiki/Downloads#centos--red-hat)
+* [CentOS / Red Hat / Amazon Linux](https://github.com/commercialhaskell/stack/wiki/Downloads#centos--red-hat)
 * [Fedora](https://github.com/commercialhaskell/stack/wiki/Downloads#fedora)
 * [Arch Linux](https://github.com/commercialhaskell/stack/wiki/Downloads#arch-linux)
 * [Linux (general)](https://github.com/commercialhaskell/stack/wiki/Downloads#linux)
