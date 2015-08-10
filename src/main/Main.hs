@@ -179,9 +179,13 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> fixCodePage $ 
                         (buildCmd DoNothing)
                         (buildOptsParser Haddock False)
              addCommand "new"
-                        "Create a brand new project"
+                        "Create a new project from a template. Run `stack templates' to see available templates."
                         newCmd
                         newOptsParser
+             addCommand "templates"
+                        "List the templates available for `stack new'."
+                        templatesCmd
+                        (pure ())
              addCommand "init"
                         "Initialize a stack project based on one or more cabal packages"
                         initCmd
@@ -883,12 +887,16 @@ initCmd initOpts go =
     do pwd <- getWorkingDir
        initProject pwd initOpts
 
--- | Project creation
+-- | Create a project directory structure and initialize the stack config.
 newCmd :: (NewOpts,InitOpts) -> GlobalOpts -> IO ()
 newCmd (newOpts,initOpts) go@GlobalOpts{..} =
     withConfigAndLock go $
     do dir <- new newOpts
        initProject dir initOpts
+
+-- | List the available templates.
+templatesCmd :: () -> GlobalOpts -> IO ()
+templatesCmd _ go@GlobalOpts{..} = withConfigAndLock go listTemplates
 
 -- | Fix up extra-deps for a project
 solverCmd :: Bool -- ^ modify stack.yaml automatically?

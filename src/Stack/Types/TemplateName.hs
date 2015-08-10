@@ -17,6 +17,7 @@ import           Path.Internal
 
 -- | A template name of the format @foo.hsfiles@.
 data TemplateName = TemplateName !Text !(Path Rel File)
+  deriving (Ord,Eq,Show)
 
 -- | An argument which accepts a template name of the format
 -- @foo.hsfiles@ or @foo@, ultimately normalized to @foo.hsfiles@.
@@ -27,6 +28,7 @@ templateNameArgument =
         (do string <- O.str
             either O.readerError return (parseTemplateNameFromString string))
 
+-- | Parse a template name from a string.
 parseTemplateNameFromString :: String -> Either String TemplateName
 parseTemplateNameFromString fname =
     case T.stripSuffix ".hsfiles" (T.pack fname) of

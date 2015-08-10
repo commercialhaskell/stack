@@ -552,4 +552,5 @@ newOptsParser = (,) <$> newOpts <*> initOptsParser
         templateNameArgument
             (metavar "TEMPLATE_NAME" <>
              help "Name of a template, for example: foo or foo.hsfiles" <>
-             value defaultTemplateName)
+             value defaultTemplateName) <*
+        abortOption ShowHelpText (long "help" <> help "Show help text.")
