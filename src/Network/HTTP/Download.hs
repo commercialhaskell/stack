@@ -6,6 +6,7 @@ module Network.HTTP.Download
     , DownloadRequest(..)
     , drRetryPolicyDefault
     , HashCheck(..)
+    , DownloadException(..)
     , CheckHexDigest(..)
     , LengthCheck
     , VerifiedDownloadException(..)

@@ -1,157 +1,172 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
+
+-- | Create new a new project directory populated with a basic working
+-- project.
+
 module Stack.New
-    ( newProject
+    ( new
     , NewOpts(..)
+    , defaultTemplateName
+    , templateNameArgument
+    , TemplateName
     ) where
 
-import           Control.Monad          (filterM, forM_, unless)
-import           Control.Monad.Catch    (MonadCatch, catch)
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Control.Monad.Logger   (MonadLogger, logInfo, logDebug)
-import           Control.Monad.Reader   (MonadReader, asks)
-import           Control.Monad.Trans.Writer (execWriterT)
-import           Data.ByteString        (ByteString)
-import qualified Data.ByteString        as ByteString
-import qualified Data.ByteString.Lazy   as LByteString
-import           Data.Conduit           (($$), yield)
-import qualified Data.Map               as Map
-import           Data.Monoid            ((<>))
-import qualified Data.Text              as Text
-import qualified Data.Text.Encoding     as Text
-import qualified Data.Text.Lazy         as LText
-import           Network.HTTP.Client    (HttpException, getUri)
-import           Network.HTTP.Download  (parseUrl, redownload, HasHttpManager)
-import           Path                   (parseRelFile, mkRelDir, toFilePath, (</>))
-import           Path.IO                (fileExists)
-import           System.Directory       (createDirectoryIfMissing,
-                                         doesFileExist,
-                                         getCurrentDirectory)
-import           System.FilePath        (takeDirectory,
-                                         takeFileName,
-                                         dropTrailingPathSeparator)
+import           Control.Monad
+import           Control.Monad.Catch
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import           Control.Monad.Reader
+import           Control.Monad.Trans.Writer.Strict
+import qualified Data.ByteString.Lazy as LB
+import           Data.Conduit
+import           Data.Map.Strict (Map)
+import qualified Data.Map.Strict as M
+import           Data.Monoid
+import           Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified Data.Text.IO as T
+import qualified Data.Text.Lazy as LT
+import           Data.Typeable
+import           Network.HTTP.Client (Response(..))
+import           Network.HTTP.Download
+import           Network.HTTP.Types.Status
+import           Path
+import           Path.IO
+import           Stack.Constants
+import           Stack.Types
+import           Stack.Types.TemplateName
 import           Text.Hastache
 import           Text.Hastache.Context
-import           Text.ProjectTemplate   (unpackTemplate, receiveMem)
+import           Text.ProjectTemplate
 
-import           Stack.Init (InitOpts(forceOverwrite))
-import           Stack.Types.Config (HasStackRoot, getStackRoot)
+--------------------------------------------------------------------------------
+-- Main project creation
 
+-- | Options for creating a new project.
 data NewOpts = NewOpts
-    { newOptsTemplateRepository :: String
-    , newOptsTemplate :: Maybe Template
-    , newOptsTemplateArgs :: [String]
-    , newOptsInitOpts :: InitOpts
+    { newOptsProjectName  :: PackageName   -- ^ Name of the project to create.
+    , newOptsTemplate     :: TemplateName  -- ^ Name of the template to use.
     }
 
-type Template = String
-
-defaultTemplate :: Template
-defaultTemplate = "new-template"
-
--- Get the files associated with a given template as a single ByteString.
--- Templates are expected to be in "project-template" format.
-getFiles :: (MonadIO m, MonadLogger m, MonadCatch m, MonadReader env m, HasStackRoot env, HasHttpManager env)
-         => String -> Template -> m ByteString
-getFiles urlBase template = do
-    -- TODO(DanBurton): gracefully handle absence of trailing slash in urlBase.
-    -- TODO(DanBurton): gracefully handle urls with https:// already present.
-    let url = urlBase <> template <> ".hsfiles"
-    req <- parseUrl ("https://" <> url)
-
-    stackRoot <- asks getStackRoot
-    relFile <- parseRelFile url
-    let path = stackRoot </> $(mkRelDir "templates") </> relFile
-
-    let uriString = show $ getUri req
-    $logDebug "Attempting to redownload template"
-    downloaded <- redownload req path `catch` \(e :: HttpException) -> do
-        $logDebug $ "redownload failed for " <> Text.pack uriString
-        $logDebug $ "HttpException: " <> Text.pack (show e)
-        return False
-    exists <- fileExists path
-    unless exists $ error $ unlines
-        $ "Failed to download template:"
-        : uriString
-        : []
-    unless downloaded $ do
-        $logDebug "Using already-downloaded template."
-
-    liftIO $ ByteString.readFile (toFilePath path)
-
--- Detect default key:value pairs for mustache template.
-getDefaultArgs :: (MonadIO m, MonadLogger m) => m [(String, String)]
-getDefaultArgs = do
-    currentDirectory <- liftIO getCurrentDirectory
-    let name = takeFileName $ dropTrailingPathSeparator currentDirectory
-    return [("name", name)]
-
--- Take a list of strings of the form "key:val" and turn into a list of tuples.
-toArgs :: [String] -> [(String, String)]
-toArgs = map toArg
+-- | Create a new project with the given options.
+new
+    :: (HasConfig r, MonadReader r m, MonadLogger m, MonadCatch m, MonadThrow m, MonadIO m, HasHttpManager r)
+    => NewOpts -> m (Path Abs Dir)
+new opts = do
+    pwd <- getWorkingDir
+    relDir <- parseRelDir (packageNameString (newOptsProjectName opts))
+    absDir <- liftM (pwd </>) (return relDir)
+    exists <- dirExists absDir
+    if exists
+        then throwM (AlreadyExists absDir)
+        else do
+            logUsing relDir
+            templateText <- loadTemplate template
+            files <- applyTemplate project absDir templateText
+            writeTemplateFiles files
+            return absDir
   where
-    toArg s = case break (== ':') s of
-        (key, ':':val) -> (key, val)
-        _-> (s, "") -- TODO(DanBurton): Handle this error case better.
+    template = newOptsTemplate opts
+    project = newOptsProjectName opts
+    logUsing relDir =
+        $logInfo
+            ("Downloading template \"" <> templateName template <>
+             "\" to create project \"" <>
+             packageNameText project <>
+             "\" in " <>
+             T.pack (toFilePath relDir) <>
+             " ...")
 
-newProject :: (MonadIO m, MonadLogger m, MonadCatch m, MonadReader env m, HasStackRoot env, HasHttpManager env)
-           => NewOpts
-           -> m ()
-newProject newOpts = do
-    let NewOpts repo templateMay args0 initOpts = newOpts
+-- | Download and read in a template's text content.
+loadTemplate
+    :: (HasConfig r, HasHttpManager r, MonadReader r m, MonadIO m, MonadThrow m, MonadCatch m)
+    => TemplateName -> m Text
+loadTemplate name = do
+    req <-
+        parseUrl (defaultTemplateUrl <> "/" <> toFilePath (templatePath name))
+    config <- asks getConfig
+    let path = templatesDir config </> templatePath name
+    _ <- catch (redownload req path) (throwM . FailedToDownloadTemplate name)
+    exists <- fileExists path
+    if exists
+        then liftIO (T.readFile (toFilePath path))
+        else throwM (FailedToLoadTemplate name path)
 
-    $logDebug "Calculating template arguments"
-    defaultArgs <- getDefaultArgs
+-- | Apply and unpack a template into a directory.
+applyTemplate
+    :: (MonadIO m, MonadThrow m)
+    => PackageName -> Path Abs Dir -> Text -> m (Map (Path Abs File) LB.ByteString)
+applyTemplate project dir template = do
+    applied <-
+        hastacheStr defaultConfig template (mkStrContext contextFunction)
+    files :: Map FilePath LB.ByteString <-
+        execWriterT $
+        yield (T.encodeUtf8 (LT.toStrict applied)) $$
+        unpackTemplate receiveMem id
+    liftM
+        M.fromList
+        (mapM
+             (\(fp,bytes) ->
+                   do path <- parseRelFile fp
+                      return (dir </> path, bytes))
+             (M.toList files))
+  where contextFunction :: String -> MuType m
+        contextFunction "name" = MuVariable (packageNameString project)
+        contextFunction _      = MuNothing
 
-    -- TODO(DanBurton): Do this logic in the arg parser instead.
-    let (template, args1) = case templateMay of
-            Nothing -> (defaultTemplate, args0)
-            -- If the "template" arg has a colon, treat as arg instead.
-            Just template0 -> case break (== ':') template0 of
-               (_, []) -> (template0, args0)
-               (_key, _colonVal) -> (defaultTemplate, template0:args0)
+-- | Write files to the new project directory.
+writeTemplateFiles
+    :: MonadIO m
+    => Map (Path Abs File) LB.ByteString -> m ()
+writeTemplateFiles files = do
+    forM_
+        (M.toList files)
+        (\(fp,bytes) ->
+              do createTree (parent fp)
+                 liftIO (LB.writeFile (toFilePath fp) bytes))
 
-    -- Note: this map prefers user-specified args over defaultArgs.
-    let args = Map.union
-            (Map.fromList $ toArgs args1)
-            (Map.fromList defaultArgs)
+--------------------------------------------------------------------------------
+-- Defaults
 
-    $logDebug "Loading template files"
-    filesBS <- getFiles repo template
+-- | The default template name you can use if you don't have one.
+defaultTemplateName :: TemplateName
+defaultTemplateName = $(mkTemplateName "new-template")
 
-    let contextLookup key = case Map.lookup key args of
-            Just val -> MuVariable val
-            Nothing  -> MuNothing
+-- | Default web root URL to download from.
+defaultTemplateUrl :: String
+defaultTemplateUrl =
+    "https://raw.githubusercontent.com/commercialhaskell/stack-templates/master"
 
-    $logDebug "Rendering templates"
-    -- There is some unsafety in this regarding file names,
-    -- because interpolated file names could collide.
-    -- I believe the correct way to handle this is to tell template creators
-    -- to be careful to avoid this if they use mustache in file names.
-    -- ~ Dan Burton
-    filesLText <- hastacheStr
-        defaultConfig
-        (Text.decodeUtf8 filesBS)
-        (mkStrContext contextLookup)
-    let filesText = LText.toStrict filesLText
+--------------------------------------------------------------------------------
+-- Exceptions
 
-    files <- execWriterT
-         $ yield (Text.encodeUtf8 filesText)
-        $$ unpackTemplate receiveMem id
+-- | Exception that might occur when making a new project.
+data NewException
+    = FailedToLoadTemplate !TemplateName
+                           !(Path Abs File)
+    | FailedToDownloadTemplate !TemplateName
+                               !DownloadException
+    | AlreadyExists !(Path Abs Dir)
+    deriving (Typeable)
 
-    $logDebug "Checking presence of template files"
-    exist <- filterM (liftIO . doesFileExist) (Map.keys files)
-    unless (forceOverwrite initOpts || null exist) $
-       error $ unlines
-           $ "The following files already exist, refusing to overwrite (no --force):"
-           : map ("- " ++) exist
+instance Exception NewException
 
-    $logDebug "Writing template files"
-    $logInfo ""
-
-    forM_ (Map.toList files) $ \(fp, lbs) -> do
-        $logInfo $ Text.pack $ "Writing: " ++ fp
-        liftIO $ do
-            createDirectoryIfMissing True $ takeDirectory fp
-            LByteString.writeFile fp lbs
+instance Show NewException where
+    show (FailedToLoadTemplate name path) =
+        "Failed to load download template " <> T.unpack (templateName name) <>
+        " from " <>
+        toFilePath path
+    show (FailedToDownloadTemplate name (RedownloadFailed _ _ resp)) =
+        "Failed to download template " <> T.unpack (templateName name) <> ": " <>
+        case statusCode (responseStatus resp) of
+            404 -> "doesn't exist"
+            code -> "unknown reason, status code was: " <> show code
+    show (FailedToDownloadTemplate name _) =
+        "Failed to download template " <> T.unpack (templateName name) <>
+        ", reason unknown."
+    show (AlreadyExists path) =
+        "Directory " <> toFilePath path <> " already exists. Aborting."

@@ -30,7 +30,8 @@ module Stack.Constants
     ,hpcRelativeDir
     ,hpcDirFromDir
     ,dotHpc
-    ,objectInterfaceDir)
+    ,objectInterfaceDir
+    ,templatesDir)
     where
 
 
@@ -189,6 +190,10 @@ distDirFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env, HasEnvConfi
                -> m (Path Abs Dir)
 distDirFromDir fp =
     liftM (fp </>) distRelativeDir
+
+-- | Directory for project templates.
+templatesDir :: Config -> Path Abs Dir
+templatesDir config = configStackRoot config </> $(mkRelDir "templates")
 
 -- | Relative location of build artifacts.
 distRelativeDir :: (MonadThrow m, MonadReader env m, HasPlatform env, HasEnvConfig env)

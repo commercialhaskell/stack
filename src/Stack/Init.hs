@@ -60,10 +60,10 @@ ignoredDirs = Set.fromList
 
 -- | Generate stack.yaml
 initProject :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
-            => InitOpts
+            => Path Abs Dir
+            -> InitOpts
             -> m ()
-initProject initOpts = do
-    currDir <- getWorkingDir
+initProject currDir initOpts = do
     let dest = currDir </> stackDotYaml
         dest' = toFilePath dest
     exists <- fileExists dest

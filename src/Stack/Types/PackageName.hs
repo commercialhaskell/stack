@@ -20,7 +20,8 @@ module Stack.Types.PackageName
   ,fromCabalPackageName
   ,toCabalPackageName
   ,parsePackageNameFromFilePath
-  ,mkPackageName)
+  ,mkPackageName
+  ,packageNameArgument)
   where
 
 import           Control.Applicative
@@ -45,6 +46,7 @@ import           GHC.Generics
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
 import           Path
+import qualified Options.Applicative as O
 
 -- | A parse fail.
 data PackageNameParseFail
@@ -150,3 +152,17 @@ instance FromJSON a => FromJSON (Map PackageName a) where
         fmap Map.fromList $ mapM go $ Map.toList m
       where
         go (k, v) = fmap (, v) $ either (fail . show) return $ parsePackageNameFromString k
+
+-- | An argument which accepts a template name of the format
+-- @foo.hsfiles@.
+packageNameArgument :: O.Mod O.ArgumentFields PackageName
+                    -> O.Parser PackageName
+packageNameArgument =
+    O.argument
+        (do s <- O.str
+            either O.readerError return (p s))
+  where
+    p s =
+        case parsePackageNameFromString s of
+            Just x -> Right x
+            Nothing -> Left ("Expected valid package name, but got: " ++ s)

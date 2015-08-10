@@ -37,6 +37,7 @@ import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Simple
 import           Options.Applicative.Types (readerAsk)
 import           Path
+import           Path.IO
 import qualified Paths_stack as Meta
 import           Plugins
 import           Prelude hiding (pi)
@@ -877,13 +878,17 @@ loadConfigWithOpts go@GlobalOpts{..} = do
 
 -- | Project initialization
 initCmd :: InitOpts -> GlobalOpts -> IO ()
-initCmd initOpts go = withConfigAndLock go $ initProject initOpts
+initCmd initOpts go =
+    withConfigAndLock go $
+    do pwd <- getWorkingDir
+       initProject pwd initOpts
 
 -- | Project creation
-newCmd :: NewOpts -> GlobalOpts -> IO ()
-newCmd newOpts go@GlobalOpts{..} = withConfigAndLock go $ do
-    newProject newOpts
-    initProject (newOptsInitOpts newOpts)
+newCmd :: (NewOpts,InitOpts) -> GlobalOpts -> IO ()
+newCmd (newOpts,initOpts) go@GlobalOpts{..} =
+    withConfigAndLock go $
+    do dir <- new newOpts
+       initProject dir initOpts
 
 -- | Fix up extra-deps for a project
 solverCmd :: Bool -- ^ modify stack.yaml automatically?

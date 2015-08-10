@@ -67,6 +67,7 @@ library
                      Stack.Types.Image
                      Stack.Types.PackageIdentifier
                      Stack.Types.PackageName
+                     Stack.Types.TemplateName
                      Stack.Types.Version
                      Stack.Types.StackT
                      Stack.Types.Build
@@ -86,10 +87,10 @@ library
                      System.Process.Run
                      Network.HTTP.Download.Verified
                      Data.Attoparsec.Args
+                     Path.IO
   other-modules:     Network.HTTP.Download
                      Control.Concurrent.Execute
                      Path.Find
-                     Path.IO
                      System.Process.PagerEditor
                      Paths_stack
                      Data.Aeson.Extended
