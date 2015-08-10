@@ -151,11 +151,11 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> fixCodePage $ 
           globalOptsParser isTerminal)
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
-                        buildCmd
+                        (buildCmd Nothing)
                         (buildOptsParser Build)
              addCommand "install"
                         "Shortcut for 'build --copy-bins'"
-                        installCmd
+                        (buildCmd $ Just ("install", "copy-bins"))
                         (buildOptsParser Install)
              addCommand "uninstall"
                         "DEPRECATED: This command performs no actions, and is present for documentation only"
@@ -163,15 +163,15 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> fixCodePage $ 
                         (many $ strArgument $ metavar "IGNORED")
              addCommand "test"
                         "Shortcut for 'build --test'"
-                        buildCmd
+                        (buildCmd $ Just ("test", "test"))
                         (buildOptsParser Test)
              addCommand "bench"
                         "Shortcut for 'build --bench'"
-                        buildCmd
+                        (buildCmd $ Just ("bench", "bench"))
                         (buildOptsParser Bench)
              addCommand "haddock"
                         "Shortcut for 'build --haddock'"
-                        buildCmd
+                        (buildCmd $ Just ("haddock", "haddock"))
                         (buildOptsParser Haddock)
              addCommand "new"
                         "Create a brand new project"
@@ -661,28 +661,23 @@ cleanCmd :: () -> GlobalOpts -> IO ()
 cleanCmd () go = withBuildConfigAndLock go (\_ -> clean)
 
 -- | Helper for build and install commands
-buildCmdHelper :: StackT EnvConfig IO () -- ^ do before build
-               -> BuildOpts -> GlobalOpts -> IO ()
-buildCmdHelper beforeBuild opts go
+buildCmd :: Maybe (Text, Text) -- ^ option synonym
+         -> BuildOpts -> GlobalOpts -> IO ()
+buildCmd moptionSynonym opts go
     | boptsFileWatch opts = fileWatch inner
     | otherwise = inner $ const $ return ()
   where
     inner setLocalFiles = withBuildConfigAndLock go $ \lk -> do
-        beforeBuild
+        case moptionSynonym of
+            Nothing -> return ()
+            Just (cmd, opt) -> $logInfo $ T.concat
+                [ "NOTE: the "
+                , cmd
+                , " command is functionally equivalent to 'build --"
+                , opt
+                , "'"
+                ]
         Stack.Build.build setLocalFiles (Just lk) opts
-
--- | Build the project.
-buildCmd :: BuildOpts -> GlobalOpts -> IO ()
-buildCmd = buildCmdHelper (return ())
-
--- | Install
-installCmd :: BuildOpts -> GlobalOpts -> IO ()
-installCmd =
-    buildCmdHelper warning
-  where
-    warning = do
-        $logInfo "NOTE: the install command will copy executables to a destination directory"
-        $logInfo "It is functionally equivalent to the --copy-bins option"
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
 uninstallCmd _ go = withConfigAndLock go $ do
