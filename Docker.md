@@ -11,6 +11,11 @@ The primary purpose for using stack/docker this way is for teams to ensure all
 developers are building in an exactly consistent environment without team
 members needing to deal with Docker themselves.
 
+See the
+[how stack can use Docker under the hood](https://www.fpcomplete.com/blog/2015/08/stack-docker)
+blog post for more information about the motivation and implementation of stack's
+Docker support.
+
 Usage
 -------------------------------------------------------------------------------
 
