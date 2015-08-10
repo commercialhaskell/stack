@@ -29,7 +29,6 @@ module Stack.Config
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
-import           Control.Concurrent (getNumCapabilities)
 import           Control.Exception (IOException)
 import           Control.Monad
 import           Control.Monad.Catch (Handler(..), MonadCatch, MonadThrow, catches, throwM)
@@ -51,6 +50,7 @@ import qualified Data.Yaml as Yaml
 import           Distribution.System (OS (..), Platform (..), buildPlatform)
 import qualified Distribution.Text
 import           Distribution.Version (simplifyVersionRange)
+import           GHC.Conc (getNumProcessors)
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Manager, parseUrl)
 import           Network.HTTP.Download (download)
 import           Options.Applicative (Parser, strOption, long, help)
@@ -162,7 +162,7 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
                  ]
      configJobs <-
         case configMonoidJobs of
-            Nothing -> liftIO getNumCapabilities
+            Nothing -> liftIO getNumProcessors
             Just i -> return i
      let configConcurrentTests = fromMaybe True configMonoidConcurrentTests
 
