@@ -1,3 +1,7 @@
+## Unreleased changes
+
+* Detect unlisted modules and TemplateHaskell dependent files (#32, #105)
+
 ## 0.1.2.2
 
 * Set the `HASKELL_DIST_DIR` environment variable [#524](https://github.com/commercialhaskell/stack/pull/524)
