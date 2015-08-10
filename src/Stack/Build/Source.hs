@@ -30,7 +30,6 @@ import           Data.Conduit (($$), ZipSink (..))
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Either
-import qualified Data.Foldable as F
 import           Data.Function
 import qualified Data.HashSet as HashSet
 import           Data.List
@@ -85,7 +84,7 @@ loadSourceMap bopts = do
 
     rawLocals <- getLocalPackageViews
     workingDir <- getWorkingDir
-    targetsFIXME <-
+    (cliExtraDeps, targets) <-
         parseTargets
             (boptsTests bopts)
             (boptsBenchmarks bopts)
@@ -94,12 +93,22 @@ loadSourceMap bopts = do
             (fst <$> rawLocals)
             workingDir
             (boptsTargets bopts)
-    _ <- error $ show targetsFIXME
 
     menv <- getMinimalEnvOverride
     caches <- getPackageCaches menv
     let latestVersion = Map.fromListWith max $ map toTuple $ Map.keys caches
-    (locals, extraNames, extraIdents) <- loadLocals bopts latestVersion
+
+    -- Extend extra-deps to encompass targets requested on the command line
+    -- that are not in the snapshot.
+    extraDeps0 <- extendExtraDeps
+        (bcExtraDeps bconfig)
+        cliExtraDeps
+        (Map.keysSet $ Map.filter (== STUnknown) targets)
+        latestVersion
+
+    _ <- error $ show (extraDeps0, targets)
+
+    (locals, extraNames, extraIdents) <- loadLocals bopts latestVersion -- FIXME remove
 
     let
         -- loadLocals returns PackageName (foo) and PackageIdentifier (bar-1.2.3) targets separately;
@@ -107,15 +116,6 @@ loadSourceMap bopts = do
         -- return values of this function.
         nonLocalTargets :: Set PackageName
         nonLocalTargets = extraNames <> Set.map packageIdentifierName extraIdents
-
-        -- Extend extra-deps to encompass targets requested on the command line
-        -- that are not in the snapshot.
-        extraDeps0 = extendExtraDeps
-            (bcExtraDeps bconfig)
-            mbp0
-            latestVersion
-            extraNames
-            extraIdents
 
     let shadowed = Set.fromList (map (packageName . lpPackage) locals)
                 <> Map.keysSet extraDeps0
@@ -376,36 +376,34 @@ localFlags boptsflags bconfig name = Map.unions
 
 -- | Add in necessary packages to extra dependencies
 --
--- See https://github.com/commercialhaskell/stack/issues/272 for the requirements of this function
-extendExtraDeps :: Map PackageName Version -- ^ original extra deps
-                -> MiniBuildPlan
+-- Originally part of https://github.com/commercialhaskell/stack/issues/272,
+-- this was then superseded by
+-- https://github.com/commercialhaskell/stack/issues/651
+extendExtraDeps :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
+                => Map PackageName Version -- ^ original extra deps
+                -> Map PackageName Version -- ^ package identifiers from the command line
+                -> Set PackageName -- ^ all packages added on the command line
                 -> Map PackageName Version -- ^ latest versions in indices
-                -> Set PackageName -- ^ extra package names desired
-                -> Set PackageIdentifier -- ^ extra package identifiers desired
-                -> Map PackageName Version -- ^ new extradeps
-extendExtraDeps extraDeps0 mbp latestVersion extraNames extraIdents =
-    F.foldl' addIdent
-        (F.foldl' addName extraDeps0 extraNames)
-        extraIdents
+                -> m (Map PackageName Version) -- ^ new extradeps
+extendExtraDeps extraDeps0 cliExtraDeps unknowns latestVersion
+    | null errs = return $ Map.unions $ extraDeps1 : unknowns'
+    | otherwise = do
+        bconfig <- asks getBuildConfig
+        throwM $ UnknownTargets
+            (Set.fromList errs)
+            Map.empty -- TODO check the cliExtraDeps for presence in index
+            (bcStackYaml bconfig)
   where
-    snapshot = fmap mpiVersion $ mbpPackages mbp
+    extraDeps1 = Map.union extraDeps0 cliExtraDeps
 
-    addName m name =
-        case Map.lookup name m <|> Map.lookup name snapshot of
-            -- alright exists in snapshot or extra-deps
-            Just _ -> m
+    (errs, unknowns') = partitionEithers $ map addUnknown $ Set.toList unknowns
+    addUnknown pn =
+        case Map.lookup pn extraDeps1 of
+            Just _ -> Right Map.empty
             Nothing ->
-                case Map.lookup name latestVersion of
-                    -- use the latest version in the index
-                    Just v -> Map.insert name v m
-                    -- does not exist, will be reported as an error
-                    Nothing -> m
-
-    addIdent m (PackageIdentifier name version) =
-        case Map.lookup name snapshot of
-            -- the version matches what's in the snapshot, so just use the snapshot version
-            Just version' | version == version' -> m
-            _ -> Map.insert name version m
+                case Map.lookup pn latestVersion of
+                    Just v -> Right $ Map.singleton pn v
+                    Nothing -> Left pn
 
 -- | Compare the current filesystem state to the cached information, and
 -- determine (1) if the files are dirty, and (2) the new cache values.

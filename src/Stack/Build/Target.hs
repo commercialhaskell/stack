@@ -13,6 +13,7 @@ module Stack.Build.Target
     , UnresolvedComponent (..)
     , RawTarget (..)
     , LocalPackageView (..)
+    , SimpleTarget (..)
       -- * Parsers
     , parseRawTarget
     , parseTargets
@@ -137,9 +138,16 @@ parseRawTargetDirs root locals t =
             else Nothing
 
 data TargetType
-    = TTNonLocal
+    = TTUnknown
+    | TTNonLocal
     | TTLocalComp !NamedComponent
     | TTLocalAllComps !(Set NamedComponent)
+
+data SimpleTarget
+    = STUnknown
+    | STNonLocal
+    | STLocal !(Set NamedComponent)
+    deriving (Show, Eq, Ord)
 
 resolveIdents :: Map PackageName Version -- ^ snapshot
               -> Map PackageName Version -- ^ extra deps
@@ -239,8 +247,7 @@ resolveRawTarget snap extras locals (ri, rt) =
                     Nothing ->
                         case Map.lookup name snap of
                             Just _ -> Right (name, (ri, TTNonLocal))
-                            Nothing -> Left $ "Package not found in locals, extra deps, or snapshot: "
-                                `T.append` T.pack (packageNameString name)
+                            Nothing -> Right (name, (ri, TTUnknown))
 
 isCompNamed :: Text -> NamedComponent -> Bool
 isCompNamed _ CLib = False
@@ -251,22 +258,23 @@ isCompNamed t1 (CBench t2) = t1 == t2
 simplifyTargets :: Bool -- ^ include tests
                 -> Bool -- ^ include benchmarks
                 -> [(PackageName, (RawInput, TargetType))]
-                -> ([Text], Map PackageName (Maybe (Set NamedComponent)))
+                -> ([Text], Map PackageName SimpleTarget)
 simplifyTargets includeTests includeBenches =
     mconcat . map go . Map.toList . Map.fromListWith (++) . fmap (second return)
   where
     go :: (PackageName, [(RawInput, TargetType)])
-       -> ([Text], Map PackageName (Maybe (Set NamedComponent)))
+       -> ([Text], Map PackageName SimpleTarget)
     go (_, []) = error "Stack.Build.Target.simplifyTargets: the impossible happened"
     go (name, [(_, tt)]) = ([], Map.singleton name $
         case tt of
-            TTNonLocal -> Nothing
-            TTLocalComp comp -> Just $ Set.singleton comp
-            TTLocalAllComps comps -> Just $ Set.filter keepComp comps
+            TTUnknown -> STUnknown
+            TTNonLocal -> STNonLocal
+            TTLocalComp comp -> STLocal $ Set.singleton comp
+            TTLocalAllComps comps -> STLocal $ Set.filter keepComp comps
         )
     go (name, pairs) =
         case partitionEithers $ map (getLocalComp . snd) pairs of
-            ([], comps) -> ([], Map.singleton name $ Just $ Set.fromList comps)
+            ([], comps) -> ([], Map.singleton name $ STLocal $ Set.fromList comps)
             _ ->
                 let err = T.pack $ concat
                         [ "Overlapping targets provided for package "
@@ -292,7 +300,7 @@ parseTargets :: (MonadThrow m, MonadIO m)
              -> Map PackageName LocalPackageView
              -> Path Abs Dir -- ^ current directory
              -> [Text] -- ^ command line targets
-             -> m (Map PackageName Version, Map PackageName (Maybe (Set NamedComponent)))
+             -> m (Map PackageName Version, Map PackageName SimpleTarget)
 parseTargets includeTests includeBenches snap extras locals currDir textTargets' = do
     let textTargets =
             if null textTargets'
