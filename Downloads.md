@@ -70,7 +70,7 @@ We generally test on the current version of OS X, but stack is known to work on 
 
         sudo apt-get update && sudo apt-get install stack -y
 
-## CentOS / Red Hat
+## CentOS / Red Hat / Amazon Linux
 
 *note*: for 32-bit, use the [generic Linux option](#linux)
 
@@ -80,7 +80,7 @@ We generally test on the current version of OS X, but stack is known to work on 
 
             curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/centos/7/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 
-    Looking for CentOS 6 / RHEL 6?  See [#465](https://github.com/commercialhaskell/stack/issues/465#issuecomment-118844397).
+    Looking for CentOS 6 / RHEL 6/ Amazon Linux?  See [#465](https://github.com/commercialhaskell/stack/issues/465#issuecomment-118844397).
 
 2. Install:
 
