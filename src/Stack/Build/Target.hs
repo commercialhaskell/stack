@@ -106,6 +106,7 @@ data LocalPackageView = LocalPackageView
     { lpvVersion    :: !Version
     , lpvRoot       :: !(Path Abs Dir)
     , lpvComponents :: !(Set NamedComponent)
+    , lpvExtraDep   :: !Bool
     }
 
 -- | Same as @parseRawTarget@, but also takes directories into account.
@@ -131,7 +132,7 @@ parseRawTargetDirs root locals t =
     ri = RawInput t
 
     childOf dir (name, lpv) =
-        if dir == lpvRoot lpv || isParentOf dir (lpvRoot lpv)
+        if (dir == lpvRoot lpv || isParentOf dir (lpvRoot lpv)) && not (lpvExtraDep lpv)
             then Just name
             else Nothing
 
@@ -292,7 +293,11 @@ parseTargets :: (MonadThrow m, MonadIO m)
              -> Path Abs Dir -- ^ current directory
              -> [Text] -- ^ command line targets
              -> m (Map PackageName Version, Map PackageName (Maybe (Set NamedComponent)))
-parseTargets includeTests includeBenches snap extras locals currDir textTargets = do
+parseTargets includeTests includeBenches snap extras locals currDir textTargets' = do
+    let textTargets =
+            if null textTargets'
+                then map (T.pack . packageNameString) $ Map.keys locals
+                else textTargets'
     erawTargets <- mapM (parseRawTargetDirs currDir locals) textTargets
 
     let (errs1, rawTargets) = partitionEithers erawTargets
@@ -304,5 +309,9 @@ parseTargets includeTests includeBenches snap extras locals currDir textTargets 
         errs = concat [errs1, errs2, errs3, errs4]
 
     if null errs
-        then return (Map.unions newExtras, targets)
-        else throwM $ Couldn'tParseTargets errs
+        then if Map.null targets
+                 -- TODO perhaps check if we're using the implicit global and,
+                 -- if so, recommend running stack init/new?
+                 then throwM $ TargetParseException ["The specified targets matched no packages"]
+                 else return (Map.unions newExtras, targets)
+        else throwM $ TargetParseException errs

@@ -42,10 +42,15 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Distribution.Package (pkgName, pkgVersion)
+import           Distribution.PackageDescription (GenericPackageDescription, package, packageDescription)
+import qualified Distribution.PackageDescription as C
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
+import           Path.IO
 import           Prelude
 import           Stack.Build.Cache
+import           Stack.Build.Target
 import           Stack.Types.Build
 import           Stack.BuildPlan (loadMiniBuildPlan, shadowMiniBuildPlan,
                                   parseCustomMiniBuildPlan)
@@ -78,9 +83,22 @@ loadSourceMap bopts = do
             stackYamlFP <- asks $ bcStackYaml . getBuildConfig
             parseCustomMiniBuildPlan stackYamlFP url
 
+    rawLocals <- getLocalPackageViews
+    workingDir <- getWorkingDir
+    targetsFIXME <-
+        parseTargets
+            False -- include tests
+            False -- include benchmarks
+            (mpiVersion <$> mbpPackages mbp0)
+            (bcExtraDeps bconfig)
+            (fst <$> rawLocals)
+            workingDir
+            (boptsTargets bopts)
+    _ <- error $ show targetsFIXME
+
     menv <- getMinimalEnvOverride
     caches <- getPackageCaches menv
-    let latestVersion = Map.fromList $ map toTuple $ Map.keys caches
+    let latestVersion = Map.fromListWith max $ map toTuple $ Map.keys caches
     (locals, extraNames, extraIdents) <- loadLocals bopts latestVersion
 
     let
@@ -137,6 +155,36 @@ loadSourceMap bopts = do
             (bcStackYaml bconfig)
 
     return (mbp, locals, nonLocalTargets, sourceMap)
+
+-- | Parse out the local package views for the current project
+getLocalPackageViews :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env)
+                     => m (Map PackageName (LocalPackageView, GenericPackageDescription))
+getLocalPackageViews = do
+    econfig <- asks getEnvConfig
+    -- TODO ensure that there are no overlapping package names
+    liftM Map.fromList $ forM (Map.toList $ envConfigPackages econfig) $ \(dir, validWanted) -> do
+        cabalfp <- getCabalFileName dir
+        gpkg <- readPackageUnresolved cabalfp
+        let cabalID = package $ packageDescription gpkg
+        name <- parsePackageNameFromFilePath cabalfp
+        when (fromCabalPackageName (pkgName $ cabalID) /= name)
+            $ throwM $ MismatchedCabalName cabalfp name
+        let lpv = LocalPackageView
+                { lpvVersion = fromCabalVersion $ pkgVersion cabalID
+                , lpvRoot = dir
+                , lpvExtraDep = not validWanted
+                , lpvComponents = getNamedComponents gpkg
+                }
+        return (name, (lpv, gpkg))
+  where
+    getNamedComponents gpkg = Set.fromList $ concat
+        [ maybe [] (const [CLib]) (C.condLibrary gpkg)
+        , go CExe  C.condExecutables
+        , go CTest C.condTestSuites
+        , go CBench C.condBenchmarks
+        ]
+      where
+        go wrapper f = map (wrapper . T.pack . fst) $ f gpkg
 
 -- | 'loadLocals' combines two pieces of information:
 --

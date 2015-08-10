@@ -103,6 +103,7 @@ data StackBuildException
         Version -- version specified on command line
   | NoSetupHsFound (Path Abs Dir)
   | InvalidFlagSpecification (Set UnusedFlags)
+  | TargetParseException [Text]
   deriving Typeable
 
 data FlagSource = FSCommandLine | FSStackYaml
@@ -270,6 +271,10 @@ instance Show StackBuildException where
             ]
           where name = packageNameString (packageName pkg)
                 pkgFlags = packageDefinedFlags pkg
+    show (TargetParseException [err]) = "Error parsing targets: " ++ T.unpack err
+    show (TargetParseException errs) = unlines
+        $ "The following errors occurred while parsing the build targets:"
+        : map (("- " ++) . T.unpack) errs
 
 instance Exception StackBuildException
 
