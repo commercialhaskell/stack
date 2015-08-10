@@ -681,7 +681,10 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
                     packageHasExposedModules package
     when doHaddock $ do
         announce "haddock"
-        hscolourExists <- doesExecutableExist eeEnvOverride "hscolour"
+        hscolourExists <- doesExecutableExist eeEnvOverride "HsColour"
+        unless hscolourExists $ $logWarn
+            ("Warning: haddock not generating hyperlinked sources because 'HsColour' not\n" <>
+             "found on PATH (use 'stack build hscolour --copy-bins' to install).")
         cabal False (concat [["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
                             ,["--hyperlink-source" | hscolourExists]])
 
