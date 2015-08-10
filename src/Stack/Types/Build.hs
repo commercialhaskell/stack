@@ -25,7 +25,6 @@ module Stack.Types.Build
     ,Plan(..)
     ,TestOpts(..)
     ,BenchmarkOpts(..)
-    ,FinalAction(..)
     ,BuildOpts(..)
     ,defaultBuildOpts
     ,TaskType(..)
@@ -350,7 +349,6 @@ data BuildOpts =
             -- ^ Build haddocks?
             ,boptsHaddockDeps :: !(Maybe Bool)
             -- ^ Build haddocks for dependencies?
-            ,boptsFinalAction :: !FinalAction
             ,boptsDryrun :: !Bool
             ,boptsGhcOptions :: ![Text]
             ,boptsFlags :: !(Map (Maybe PackageName) (Map FlagName Bool))
@@ -367,6 +365,16 @@ data BuildOpts =
             -- ^ Keep building/running after failure
             ,boptsForceDirty :: !Bool
             -- ^ Force treating all local packages as having dirty files
+
+            ,boptsTests :: !Bool
+            -- ^ Turn on tests for local targets
+            ,boptsTestOpts :: !TestOpts
+            -- ^ Additional test arguments
+
+            ,boptsBenchmarks :: !Bool
+            -- ^ Turn on benchmarks for local targets
+            ,boptsBenchmarkOpts :: !BenchmarkOpts
+            -- ^ Additional test arguments
             }
   deriving (Show)
 
@@ -378,7 +386,6 @@ defaultBuildOpts = BuildOpts
     , boptsEnableOptimizations = Nothing
     , boptsHaddock = False
     , boptsHaddockDeps = Nothing
-    , boptsFinalAction = DoNothing
     , boptsDryrun = False
     , boptsGhcOptions = []
     , boptsFlags = Map.empty
@@ -388,6 +395,10 @@ defaultBuildOpts = BuildOpts
     , boptsFileWatch = False
     , boptsKeepGoing = Nothing
     , boptsForceDirty = False
+    , boptsTests = False
+    , boptsTestOpts = defaultTestOpts
+    , boptsBenchmarks = False
+    , boptsBenchmarkOpts = defaultBenchmarkOpts
     }
 
 -- | Options for the 'FinalAction' 'DoTests'
@@ -398,17 +409,23 @@ data TestOpts =
            ,toDisableRun :: !Bool -- ^ Disable running of tests
            } deriving (Eq,Show)
 
+defaultTestOpts :: TestOpts
+defaultTestOpts = TestOpts
+    { toRerunTests = True
+    , toAdditionalArgs = []
+    , toCoverage = False
+    , toDisableRun = False
+    }
+
 -- | Options for the 'FinalAction' 'DoBenchmarks'
 data BenchmarkOpts =
   BenchmarkOpts {beoAdditionalArgs :: !(Maybe String) -- ^ Arguments passed to the benchmark program
                 } deriving (Eq,Show)
 
--- | Run a Setup.hs action after building a package, before installing.
-data FinalAction
-  = DoTests TestOpts
-  | DoBenchmarks BenchmarkOpts
-  | DoNothing
-  deriving (Eq,Show)
+defaultBenchmarkOpts :: BenchmarkOpts
+defaultBenchmarkOpts = BenchmarkOpts
+    { beoAdditionalArgs = Nothing
+    }
 
 -- | Package dependency oracle.
 newtype PkgDepsOracle =

@@ -151,32 +151,28 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> fixCodePage $ 
           globalOptsParser isTerminal)
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
-                        (buildCmd DoNothing)
-                        (buildOptsParser Build False)
+                        buildCmd
+                        (buildOptsParser Build)
              addCommand "install"
-                        "Identical to 'build --copy-bins', not actually a managed installation tool!"
+                        "Shortcut for 'build --copy-bins'"
                         installCmd
-                        (buildOptsParser Build True)
+                        (buildOptsParser Install)
              addCommand "uninstall"
                         "DEPRECATED: This command performs no actions, and is present for documentation only"
                         uninstallCmd
                         (many $ strArgument $ metavar "IGNORED")
              addCommand "test"
-                        "Build and test the project(s) in this directory/configuration"
-                        (\(bopts, topts) ->
-                             let bopts' = if toCoverage topts
-                                             then bopts { boptsGhcOptions = "-fhpc" : boptsGhcOptions bopts}
-                                             else bopts
-                             in buildCmd (DoTests topts) bopts')
-                        ((,) <$> buildOptsParser Test False <*> testOptsParser)
+                        "Shortcut for 'build --test'"
+                        buildCmd
+                        (buildOptsParser Test)
              addCommand "bench"
-                        "Build and benchmark the project(s) in this directory/configuration"
-                        (\(bopts, beopts) -> buildCmd (DoBenchmarks beopts) bopts)
-                        ((,) <$> buildOptsParser Bench False <*> benchOptsParser)
+                        "Shortcut for 'build --bench'"
+                        buildCmd
+                        (buildOptsParser Bench)
              addCommand "haddock"
-                        "Generate haddocks for the project(s) in this directory/configuration"
-                        (buildCmd DoNothing)
-                        (buildOptsParser Haddock False)
+                        "Shortcut for 'build --haddock'"
+                        buildCmd
+                        (buildOptsParser Haddock)
              addCommand "new"
                         "Create a brand new project"
                         newCmd
@@ -666,30 +662,27 @@ cleanCmd () go = withBuildConfigAndLock go (\_ -> clean)
 
 -- | Helper for build and install commands
 buildCmdHelper :: StackT EnvConfig IO () -- ^ do before build
-               -> FinalAction -> BuildOpts -> GlobalOpts -> IO ()
-buildCmdHelper beforeBuild finalAction opts go
+               -> BuildOpts -> GlobalOpts -> IO ()
+buildCmdHelper beforeBuild opts go
     | boptsFileWatch opts = fileWatch inner
     | otherwise = inner $ const $ return ()
   where
     inner setLocalFiles = withBuildConfigAndLock go $ \lk -> do
         beforeBuild
-        Stack.Build.build setLocalFiles (Just lk) opts { boptsFinalAction = finalAction }
+        Stack.Build.build setLocalFiles (Just lk) opts
 
 -- | Build the project.
-buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
+buildCmd :: BuildOpts -> GlobalOpts -> IO ()
 buildCmd = buildCmdHelper (return ())
 
 -- | Install
 installCmd :: BuildOpts -> GlobalOpts -> IO ()
 installCmd =
-    buildCmdHelper warning DoNothing
+    buildCmdHelper warning
   where
     warning = do
         $logInfo "NOTE: the install command will copy executables to a destination directory"
         $logInfo "It is functionally equivalent to the --copy-bins option"
-
-copyCmd :: BuildOpts -> GlobalOpts -> IO ()
-copyCmd opts = buildCmdHelper (return ()) DoNothing opts { boptsInstallExes = True }
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
 uninstallCmd _ go = withConfigAndLock go $ do

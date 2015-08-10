@@ -121,10 +121,12 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
     let latest = Map.fromListWith max $ map toTuple $ Map.keys caches
 
     econfig <- asks getEnvConfig
-    let onWanted =
+    let onWanted = error "constructPlan.onWanted"
+        {-
             case boptsFinalAction $ bcoBuildOpts baseConfigOpts0 of
                 DoNothing -> void . addDep . packageName . lpPackage
                 _ -> addFinal
+                -}
     let inner = do
             mapM_ onWanted $ filter lpWanted locals
             mapM_ addDep $ Set.toList extraToBuild0

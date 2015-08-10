@@ -105,10 +105,9 @@ preFetch plan
                 (packageVersion package)
 
 printPlan :: M env m
-          => FinalAction
-          -> Plan
+          => Plan
           -> m ()
-printPlan finalAction plan = do
+printPlan plan = do
     case Map.toList $ planUnregisterLocal plan of
         [] -> $logInfo "No packages would be unregistered."
         xs -> do
@@ -127,22 +126,6 @@ printPlan finalAction plan = do
         xs -> do
             $logInfo "Would build:"
             mapM_ ($logInfo . displayTask) xs
-
-    let mfinalLabel =
-            case finalAction of
-                DoNothing -> Nothing
-                DoBenchmarks _ -> Just "benchmark"
-                DoTests _ -> Just "test"
-    case mfinalLabel of
-        Nothing -> return ()
-        Just finalLabel -> do
-            $logInfo ""
-
-            case Map.toList $ planFinals plan of
-                [] -> $logInfo $ "Nothing to " <> finalLabel <> "."
-                xs -> do
-                    $logInfo $ "Would " <> finalLabel <> ":"
-                    forM_ xs $ \(name, _) -> $logInfo $ packageNameText name
 
     $logInfo ""
 
@@ -356,14 +339,11 @@ executePlan' plan ee@ExecuteEnv {..} = do
     let keepGoing =
             case boptsKeepGoing eeBuildOpts of
                 Just kg -> kg
-                Nothing ->
-                    case boptsFinalAction eeBuildOpts of
-                        DoNothing -> False
-                        _ -> True
+                Nothing -> boptsTests eeBuildOpts || boptsBenchmarks eeBuildOpts
         concurrentFinal =
-            case boptsFinalAction eeBuildOpts of
-                DoTests _ -> concurrentTests
-                _ -> True
+            if boptsTests eeBuildOpts
+                then concurrentTests
+                else True
     terminal <- asks getTerminal
     errs <- liftIO $ runActions threads keepGoing concurrentFinal actions $ \doneVar -> do
         let total = length actions
@@ -386,9 +366,7 @@ executePlan' plan ee@ExecuteEnv {..} = do
         generateLocalHaddockIndex eeEnvOverride eeBaseConfigOpts eeLocals
         generateDepsHaddockIndex eeEnvOverride eeBaseConfigOpts eeLocals
         generateSnapHaddockIndex eeEnvOverride eeBaseConfigOpts eeGlobalDB
-    case boptsFinalAction eeBuildOpts of
-        DoTests topts | toCoverage topts -> generateHpcMarkupIndex
-        _ -> return ()
+    when (toCoverage $ boptsTestOpts eeBuildOpts) generateHpcMarkupIndex
 
 toActions :: M env m
           => (m () -> IO ())
@@ -396,6 +374,8 @@ toActions :: M env m
           -> (Maybe Task, Maybe Task) -- build and final
           -> [Action]
 toActions runInBase ee (mbuild, mfinal) =
+    error "toActions"
+    {-
     abuild ++ afinal
   where
     abuild =
@@ -441,6 +421,7 @@ toActions runInBase ee (mbuild, mfinal) =
         case taskType task of
             TTLocal lp -> not $ Set.null $ packageBenchmarks $ lpPackage lp
             _ -> assert False False
+    -}
 
 -- | Ensure that the configuration for the package matches what is given
 ensureConfig :: M env m

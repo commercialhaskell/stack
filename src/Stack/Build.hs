@@ -97,7 +97,7 @@ build setLocalFiles mbuildLk bopts = do
         preFetch plan
 
     if boptsDryrun bopts
-        then printPlan (boptsFinalAction bopts) plan
+        then printPlan plan
         else executePlan menv bopts baseConfigOpts locals sourceMap plan
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts

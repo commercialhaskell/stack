@@ -87,8 +87,8 @@ loadSourceMap bopts = do
     workingDir <- getWorkingDir
     targetsFIXME <-
         parseTargets
-            False -- include tests
-            False -- include benchmarks
+            (boptsTests bopts)
+            (boptsBenchmarks bopts)
             (mpiVersion <$> mbpPackages mbp0)
             (bcExtraDeps bconfig)
             (fst <$> rawLocals)
@@ -240,12 +240,9 @@ loadLocals bopts latestVersion = do
                 }
             configFinal = config
                 { packageConfigEnableTests =
-                    case boptsFinalAction bopts of
-                        DoTests _ -> wanted
-                        _ -> False
-                , packageConfigEnableBenchmarks = wanted && case boptsFinalAction bopts of
-                                                              (DoBenchmarks _) -> True
-                                                              _ -> False
+                    error "FIXME packageConfigEnableTests"
+                , packageConfigEnableBenchmarks =
+                    error "FIXME packageConfigEnableBenchmarks"
                 }
         pkg <- readPackage config cabalfp
         pkgFinal <- readPackage configFinal cabalfp
