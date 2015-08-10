@@ -50,7 +50,8 @@ ghci targets useropts ghciPath noload = do
         srcfiles
           | noload = []
           | otherwise = concatMap (map display . S.toList . ghciPkgModules) pkgs
-        odir = ["-odir=" <> toFilePath (objectInterfaceDir config)]
+        odir = ["-odir=" <> toFilePath (objectInterfaceDir config)
+               ,"-hidir=" <> toFilePath (objectInterfaceDir config)]
     $logInfo
         ("Configuring GHCi with the following packages: " <>
          T.intercalate ", " (map packageNameText (map ghciPkgName pkgs)))
