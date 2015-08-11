@@ -1,12 +1,6 @@
 ## Unreleased changes
 
-* Detect unlisted modules and TemplateHaskell dependent files (#32, #105)
-* Overhauled target parsing, added `--test` and `--bench` options [#651](https://github.com/commercialhaskell/stack/issues/651)
-    * For details, see [Build commands Wiki page](https://github.com/commercialhaskell/stack/wiki/Build-command)
-* `--exec` option [#651](https://github.com/commercialhaskell/stack/issues/651)
-* `--only-dependencies` implemented correctly [#387](https://github.com/commercialhaskell/stack/issues/387)
-
-## 0.1.2.2
+## 0.1.3.0
 
 * Set the `HASKELL_DIST_DIR` environment variable [#524](https://github.com/commercialhaskell/stack/pull/524)
 * Track build status of tests and benchmarks [#525](https://github.com/commercialhaskell/stack/issues/525)
@@ -30,6 +24,11 @@
 * `stack build` etc work outside of a project
 * `list-dependencies` command [#638](https://github.com/commercialhaskell/stack/issues/638)
 * `--upgrade-cabal` option to `stack setup` [#174](https://github.com/commercialhaskell/stack/issues/174)
+* Detect unlisted modules and TemplateHaskell dependent files (#32, #105)
+* Overhauled target parsing, added `--test` and `--bench` options [#651](https://github.com/commercialhaskell/stack/issues/651)
+    * For details, see [Build commands Wiki page](https://github.com/commercialhaskell/stack/wiki/Build-command)
+* `--exec` option [#651](https://github.com/commercialhaskell/stack/issues/651)
+* `--only-dependencies` implemented correctly [#387](https://github.com/commercialhaskell/stack/issues/387)
 
 Bug fixes:
 
