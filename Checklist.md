@@ -23,8 +23,8 @@ Release checklist after testing:
 * Run `scripts/release/release.hs release` on Linux (Debian 7 32-bit [Vagrantfile](https://github.com/commercialhaskell/stack/tree/master/etc/vagrant/debian-7-i386)/64-bit [Vagrantfile](https://github.com/commercialhaskell/stack/tree/master/etc/vagrant/debian-7-amd64)), Windows (`--arch=i386` and `--arch=x86_64`), and OS X.  This performs the following tasks automatically:
     * Binaries for Linux, Windows, and OS X uploaded to draft Github release.
 * Run `scripts/release/release.hs --binary-variant=gmp4 release` on CentOS 6 32-bit [Vagrantfile](https://github.com/commercialhaskell/stack/tree/master/etc/vagrant/centos-6-i386)/64-bit [Vagrantfile](centos-6-x86_64)).
-* Run `stack/release/release.hs ubuntu-upload debian-upload` in Linux (Ubuntu or Debian - [Vagrantfile](https://github.com/commercialhaskell/stack/tree/master/etc/vagrant/debian-7-amd64))
-* Run `stack/release/release.hs centos-upload fedora-upload` on Linux (CentOS or Fedora - [Vagrantfile](https://github.com/commercialhaskell/stack/tree/master/etc/vagrant/centos-7-x86_64))
+* Run `scripts/release/release.hs ubuntu-upload debian-upload` in Linux (Ubuntu or Debian - [Vagrantfile](https://github.com/commercialhaskell/stack/tree/master/etc/vagrant/debian-7-amd64))
+* Run `scripts/release/release.hs centos-upload fedora-upload` on Linux (CentOS or Fedora - [Vagrantfile](https://github.com/commercialhaskell/stack/tree/master/etc/vagrant/centos-7-x86_64))
 * Upload Arch Linux packages (manual process)
 
 After binaries uploaded:
