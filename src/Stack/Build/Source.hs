@@ -10,6 +10,8 @@ module Stack.Build.Source
     , SourceMap
     , PackageSource (..)
     , localFlags
+    , getLocalPackageViews
+    , loadLocalPackage
     ) where
 
 import           Control.Applicative ((<|>), (<$>), (<*>))
