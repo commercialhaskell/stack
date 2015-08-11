@@ -15,8 +15,8 @@ import           Control.Applicative ((<|>), (<$>), (<*>), pure)
 import           Control.Exception
 import           Control.Monad (liftM, mzero)
 import           Control.Monad.Catch (MonadThrow, throwM)
-import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
 import           Control.Monad.Logger (LogLevel(..))
+import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, object,
                   (.=), (.:), (..:), (..:?), (..!=), Value(String, Object),
@@ -29,9 +29,9 @@ import           Data.Either (partitionEithers)
 import           Data.Hashable (Hashable)
 import           Data.Map (Map)
 import qualified Data.Map as Map
+import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
-import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
@@ -40,9 +40,9 @@ import           Data.Yaml (ParseException)
 import           Distribution.System (Platform)
 import qualified Distribution.Text
 import           Distribution.Version (anyVersion)
-import qualified Paths_stack as Meta
 import           Network.HTTP.Client (parseUrl)
 import           Path
+import qualified Paths_stack as Meta
 import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
 import           Stack.Types.Docker
 import           Stack.Types.FlagName
@@ -111,6 +111,12 @@ data Config =
          ,configConcurrentTests     :: !Bool
          -- ^ Run test suites concurrently
          ,configImage               :: !ImageOpts
+         ,configAuthorEmail         :: !(Maybe Text)
+         -- ^ Email of the author using stack.
+         ,configAuthorName          :: !(Maybe Text)
+         -- ^ Name of the author using stack.
+         ,configScmInit             :: !(Maybe SCM)
+         -- ^ Initialize SCM (e.g. git) when creating new projects.
          }
 
 -- | Information on a single package index
@@ -500,6 +506,12 @@ data ConfigMonoid =
     -- ^ Used to override the binary installation dir
     ,configMonoidImageOpts           :: !ImageOptsMonoid
     -- ^ Image creation options.
+    ,configMonoidAuthorEmail         :: !(Maybe Text)
+    -- ^ Author's email address.
+    ,configMonoidAuthorName          :: !(Maybe Text)
+    -- ^ Author's name.
+    ,configMonoidScmInit             :: !(Maybe SCM)
+    -- ^ Initialize SCM (e.g. git init) when making new projects?
     }
   deriving Show
 
@@ -523,6 +535,9 @@ instance Monoid ConfigMonoid where
     , configMonoidConcurrentTests = Nothing
     , configMonoidLocalBinPath = Nothing
     , configMonoidImageOpts = mempty
+    , configMonoidAuthorEmail = mempty
+    , configMonoidAuthorName = mempty
+    , configMonoidScmInit = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -544,6 +559,9 @@ instance Monoid ConfigMonoid where
     , configMonoidConcurrentTests = configMonoidConcurrentTests l <|> configMonoidConcurrentTests r
     , configMonoidLocalBinPath = configMonoidLocalBinPath l <|> configMonoidLocalBinPath r
     , configMonoidImageOpts = configMonoidImageOpts l <> configMonoidImageOpts r
+    , configMonoidAuthorName = configMonoidAuthorName l <|> configMonoidAuthorName r
+    , configMonoidAuthorEmail = configMonoidAuthorEmail l <|> configMonoidAuthorEmail r
+    , configMonoidScmInit = configMonoidScmInit l <|> configMonoidScmInit r
     }
 
 instance FromJSON (ConfigMonoid, [JSONWarning]) where
@@ -574,6 +592,9 @@ parseConfigMonoidJSON obj = do
     configMonoidConcurrentTests <- obj ..:? "concurrent-tests"
     configMonoidLocalBinPath <- obj ..:? "local-bin-path"
     configMonoidImageOpts <- jsonSubWarnings (obj ..:? "image" ..!= mempty)
+    configMonoidAuthorName <- obj ..:? authorNameKey
+    configMonoidAuthorEmail <- obj ..:? authorEmailKey
+    configMonoidScmInit <- obj ..:? scmInitKey
     return ConfigMonoid {..}
 
 -- | Newtype for non-orphan FromJSON instance.
@@ -849,3 +870,29 @@ packageEntryCurrDir = PackageEntry
     , peLocation = PLFilePath "."
     , peSubdirs = []
     }
+
+-- | A software control system.
+data SCM = Git
+  deriving (Show)
+
+instance FromJSON SCM where
+    parseJSON v = do
+        s <- parseJSON v
+        case s of
+            "git" -> return Git
+            _ -> fail ("Unknown or unsupported SCM: " <> s)
+
+instance ToJSON SCM where
+    toJSON Git = toJSON ("git" :: Text)
+
+-- | Key used for the YAML file and templates.
+authorEmailKey :: Text
+authorEmailKey = "author-email"
+
+-- | Key used for the YAML file and templates.
+authorNameKey :: Text
+authorNameKey = "author-name"
+
+-- | Key used for the YAML file and templates.
+scmInitKey :: Text
+scmInitKey = "scm-init"

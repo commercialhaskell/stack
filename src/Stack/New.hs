@@ -48,6 +48,7 @@ import           Path.IO
 import           Stack.Constants
 import           Stack.Types
 import           Stack.Types.TemplateName
+import           System.Process.Run
 import           Text.Hastache
 import           Text.Hastache.Context
 import           Text.ProjectTemplate
@@ -77,6 +78,7 @@ new opts = do
             templateText <- loadTemplate template
             files <- applyTemplate project absDir templateText
             writeTemplateFiles files
+            runTemplateInits absDir
             return absDir
   where
     template = newOptsTemplate opts
@@ -107,11 +109,16 @@ loadTemplate name = do
 
 -- | Apply and unpack a template into a directory.
 applyTemplate
-    :: (MonadIO m, MonadThrow m)
+    :: (MonadIO m, MonadThrow m, MonadReader r m, HasConfig r, MonadLogger m)
     => PackageName -> Path Abs Dir -> Text -> m (Map (Path Abs File) LB.ByteString)
 applyTemplate project dir template = do
+    config <- asks getConfig
+    displayContext config
     applied <-
-        hastacheStr defaultConfig template (mkStrContext contextFunction)
+        hastacheStr
+            defaultConfig
+            template
+            (mkStrContext (contextFunction config))
     files :: Map FilePath LB.ByteString <-
         execWriterT $
         yield (T.encodeUtf8 (LT.toStrict applied)) $$
@@ -123,9 +130,31 @@ applyTemplate project dir template = do
                    do path <- parseRelFile fp
                       return (dir </> path, bytes))
              (M.toList files))
-  where contextFunction :: String -> MuType m
-        contextFunction "name" = MuVariable (packageNameString project)
-        contextFunction _      = MuNothing
+  where
+    context config =
+        [ ("name", packageNameText project)
+        , ( authorEmailKey
+          , fromMaybe defaultAuthorEmail (configAuthorEmail config))
+        , (authorNameKey, fromMaybe defaultAuthorName (configAuthorName config))]
+    contextFunction :: Config -> String -> MuType m
+    contextFunction config key =
+        case lookup (T.pack key) (context config) of
+            Nothing -> MuNothing
+            Just value -> MuVariable value
+
+-- | Display the context being used for the template.
+displayContext :: MonadLogger m => Config -> m ()
+displayContext config = do
+    $logInfo "Using the following authorship configuration:"
+    $logInfo
+        (authorEmailKey <> ": " <>
+         fromMaybe defaultAuthorEmail (configAuthorEmail config))
+    $logInfo
+        (authorNameKey <> ": " <>
+         fromMaybe defaultAuthorName (configAuthorName config))
+    $logInfo
+        ("Copy these to " <> T.pack (toFilePath (globalConfigPath config)) <>
+         " and edit to use different values.")
 
 -- | Write files to the new project directory.
 writeTemplateFiles
@@ -137,6 +166,21 @@ writeTemplateFiles files = do
         (\(fp,bytes) ->
               do createTree (parent fp)
                  liftIO (LB.writeFile (toFilePath fp) bytes))
+
+-- | Run any initialization functions, such as Git.
+runTemplateInits
+    :: (MonadIO m, MonadReader r m, HasConfig r, MonadLogger m, MonadCatch m)
+    => Path Abs Dir -> m ()
+runTemplateInits dir = do
+    menv <- getMinimalEnvOverride
+    config <- asks getConfig
+    case configScmInit config of
+        Nothing -> return ()
+        Just Git ->
+            do catch
+                   (callProcess (Just dir) menv "git" ["init"])
+                   (\(_ :: ProcessExitedUnsuccessfully) ->
+                         $logInfo "git init failed to run, ignoring ...")
 
 --------------------------------------------------------------------------------
 -- Getting templates list

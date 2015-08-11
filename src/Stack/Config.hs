@@ -166,6 +166,10 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
             Just i -> return i
      let configConcurrentTests = fromMaybe True configMonoidConcurrentTests
 
+     let configAuthorEmail = configMonoidAuthorEmail
+         configAuthorName = configMonoidAuthorName
+         configScmInit = configMonoidScmInit
+
      return Config {..}
 
 -- | Get the directory on Windows where we should install extra programs. For

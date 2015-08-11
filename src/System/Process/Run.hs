@@ -11,7 +11,8 @@
 module System.Process.Run
     (runIn
     ,callProcess
-    ,callProcess')
+    ,callProcess'
+    ,ProcessExitedUnsuccessfully)
     where
 
 import           Control.Exception.Lifted

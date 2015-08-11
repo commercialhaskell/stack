@@ -31,13 +31,17 @@ module Stack.Constants
     ,hpcDirFromDir
     ,dotHpc
     ,objectInterfaceDir
-    ,templatesDir)
+    ,templatesDir
+    ,defaultAuthorEmail
+    ,defaultAuthorName
+    ,globalConfigPath
+    ,authorEmailKey
+    ,authorNameKey
+    ,scmInitKey)
     where
-
 
 import           Control.Monad.Catch (MonadThrow)
 import           Control.Monad.Reader
-
 import           Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 import           Data.Text (Text)
@@ -295,3 +299,15 @@ implicitGlobalDir p =
 -- | Where .mix files go.
 dotHpc :: Path Rel Dir
 dotHpc = $(mkRelDir ".hpc")
+
+-- | Default author email.
+defaultAuthorEmail :: Text
+defaultAuthorEmail = "example@example.com"
+
+-- | Default author name.
+defaultAuthorName :: Text
+defaultAuthorName = "Example Author Name"
+
+-- | Global config path.
+globalConfigPath :: Config -> Path Abs File
+globalConfigPath = (</> $(mkRelFile "stack.yaml")) . configStackRoot
