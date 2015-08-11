@@ -358,6 +358,9 @@ executePlan' plan ee@ExecuteEnv {..} = do
                 Just kg -> kg
                 Nothing -> boptsTests eeBuildOpts || boptsBenchmarks eeBuildOpts
         concurrentFinal =
+            -- TODO it probably makes more sense to use a lock for test suites
+            -- and just have the execution blocked. Turning off all concurrency
+            -- on finals based on the --test option doesn't fit in well.
             if boptsTests eeBuildOpts
                 then concurrentTests
                 else True
