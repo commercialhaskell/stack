@@ -375,6 +375,8 @@ data BuildOpts =
             -- ^ Turn on benchmarks for local targets
             ,boptsBenchmarkOpts :: !BenchmarkOpts
             -- ^ Additional test arguments
+            ,boptsExec :: ![(String, [String])]
+            -- ^ Commands (with arguments) to run after a successful build
             }
   deriving (Show)
 
@@ -399,6 +401,7 @@ defaultBuildOpts = BuildOpts
     , boptsTestOpts = defaultTestOpts
     , boptsBenchmarks = False
     , boptsBenchmarkOpts = defaultBenchmarkOpts
+    , boptsExec = []
     }
 
 -- | Options for the 'FinalAction' 'DoTests'

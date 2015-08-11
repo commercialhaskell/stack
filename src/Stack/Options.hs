@@ -74,7 +74,8 @@ buildOptsParser cmd =
             ((||) <$> onlySnapshot <*> onlyDependencies) <*>
             fileWatch' <*> keepGoing <*> forceDirty <*>
             tests <*> testOptsParser <*>
-            benches <*> benchOptsParser
+            benches <*> benchOptsParser <*>
+            many exec
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
         target =
@@ -163,6 +164,11 @@ buildOptsParser cmd =
             "bench"
             "benchmarking the project(s) in this directory/configuration"
             idm
+
+        exec = cmdOption
+            ( long "exec" <>
+              metavar "CMD [ARGS]" <>
+              help "Command and arguments to run after a successful build" )
 
 -- | Parser for package:[-]flag
 readFlag :: ReadM (Map (Maybe PackageName) (Map FlagName Bool))

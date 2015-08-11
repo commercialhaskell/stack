@@ -5,6 +5,7 @@
 module Options.Applicative.Args
     (argsArgument
     ,argsOption
+    ,cmdOption
     ,parseArgsFromString)
     where
 
@@ -26,6 +27,16 @@ argsOption =
     O.option
         (do string <- O.str
             either O.readerError return (parseArgsFromString string))
+
+-- | An option which accepts a command and a list of arguments e.g. @--exec "echo hello world"@
+cmdOption :: O.Mod O.OptionFields (String, [String]) -> O.Parser (String, [String])
+cmdOption =
+    O.option
+        (do string <- O.str
+            xs <- either O.readerError return (parseArgsFromString string)
+            case xs of
+                [] -> O.readerError "Must provide a command"
+                x:xs' -> return (x, xs'))
 
 -- | Parse from a string.
 parseArgsFromString :: String -> Either String [String]

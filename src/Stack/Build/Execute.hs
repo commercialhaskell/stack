@@ -79,6 +79,7 @@ import           System.IO
 import           System.IO.Temp                 (withSystemTempDirectory)
 import           System.Process.Internals       (createProcess_)
 import           System.Process.Read
+import           System.Process.Run
 import           System.Process.Log             (showProcessArgDebug)
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
@@ -303,6 +304,10 @@ executePlan menv bopts baseConfigOpts locals sourceMap plan = do
                 , T.pack dest
                 , ":"]
             forM_ executables $ \exe -> $logInfo $ T.append "- " exe
+
+    forM_ (boptsExec bopts) $ \(cmd, args) -> do
+        $logProcessRun cmd args
+        callProcess Nothing menv cmd args
 
 -- | Windows can't write over the current executable. Instead, we rename the
 -- current executable to something else and then do the copy.
