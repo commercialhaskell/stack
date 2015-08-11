@@ -1,5 +1,6 @@
 __NOTE__ This page reflects the implementation of issue #651, which at the time
-of writing has not yet been merged to master (much less released).
+of writing has been merged to master, but not yet been included in an official
+release.
 
 ## Overview
 
