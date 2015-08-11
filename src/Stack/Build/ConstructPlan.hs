@@ -74,12 +74,20 @@ data AddDepRes
     | ADRFound InstallLocation Version Installed
     deriving Show
 
+data W = W
+    { wFinals :: !(Map PackageName (Either ConstructPlanException (Task, LocalPackageTB)))
+    , wInstall :: !(Map Text InstallLocation)
+    -- ^ executable to be installed, and location where the binary is placed
+    , wDirty :: !(Map PackageName Text)
+    -- ^ why a local package is considered dirty
+    }
+instance Monoid W where
+    mempty = W mempty mempty mempty
+    mappend (W a b c) (W w x y) = W (mappend a w) (mappend b x) (mappend c y)
+
 type M = RWST
     Ctx
-    ( Map PackageName (Either ConstructPlanException (Task, LocalPackageTB)) -- finals
-    , Map Text InstallLocation -- executable to be installed, and location where the binary is placed
-    , Map PackageName Text -- why a local package is considered dirty
-    )
+    W
     (Map PackageName (Either ConstructPlanException AddDepRes))
     IO
 
@@ -139,7 +147,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
     let inner = do
             mapM_ onWanted $ filter lpWanted locals
             mapM_ addDep $ Set.toList extraToBuild0
-    ((), m, (efinals, installExes, dirtyReason)) <- liftIO $ runRWST inner (ctx econfig latest) M.empty
+    ((), m, W efinals installExes dirtyReason) <- liftIO $ runRWST inner (ctx econfig latest) M.empty
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
         (errlibs, adrs) = partitionEithers $ map toEither $ M.toList m
@@ -226,7 +234,7 @@ addFinal lp lptb = do
                 , taskPresent = present
                 , taskType = TTLocal lp
                 }, lptb)
-    tell (Map.singleton (packageName package) res, mempty, mempty)
+    tell mempty { wFinals = Map.singleton (packageName package) res }
   where
     package = lptbPackage lptb
 
@@ -297,7 +305,7 @@ tellExecutablesPackage loc p = do
         goSource (PSLocal lp) = fromMaybe Set.empty $ lpExeComponents lp
         goSource (PSUpstream _ _ _) = Set.empty
 
-    tell (Map.empty, m myComps, Map.empty)
+    tell mempty { wInstall = m myComps }
   where
     m myComps = Map.fromList $ map (, loc) $ Set.toList
               $ filterComps myComps $ packageExes p
@@ -351,12 +359,12 @@ checkNeedInstall name ps installed wanted = assert (piiLocation ps == Local) $ d
         Right (missing, present, _loc)
             | Set.null missing -> checkDirtiness ps installed package present wanted
             | otherwise -> do
-                tell (Map.empty, Map.empty, Map.singleton name $
+                tell mempty { wDirty = Map.singleton name $
                     let t = T.intercalate ", " $ map (T.pack . packageNameString . packageIdentifierName) (Set.toList missing)
                      in T.append "missing dependencies: " $
                             if T.length t < 100
                                 then t
-                                else T.take 97 t <> "...")
+                                else T.take 97 t <> "..." }
                 return True
 
 addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Set GhcPkgId, InstallLocation))
@@ -431,7 +439,7 @@ checkDirtiness ps installed package present wanted = do
     case mreason of
         Nothing -> return False
         Just reason -> do
-            tell (Map.empty, Map.empty, Map.singleton (packageName package) reason)
+            tell mempty { wDirty = Map.singleton (packageName package) reason }
             return True
 
 describeConfigDiff :: ConfigCache -> ConfigCache -> Text
