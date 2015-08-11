@@ -15,7 +15,7 @@ module Stack.Build.Execute
     , withSingleContext
     ) where
 
-import           Control.Applicative            ((<$>), (<*>))
+import           Control.Applicative            ((<$>))
 import           Control.Concurrent.Execute
 import           Control.Concurrent.Lifted      (fork)
 import           Control.Concurrent.MVar.Lifted
@@ -854,7 +854,7 @@ singleBench :: M env m
             -> ExecuteEnv
             -> Task
             -> m ()
-singleBench beopts lptb ac ee task =
+singleBench beopts _lptb ac ee task =
     withSingleContext ac ee task (Just "bench") $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
         (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (benchmarks)") cabal cabalfp ["--enable-benchmarks"]
 

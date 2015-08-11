@@ -14,7 +14,7 @@ module Stack.Build.Source
     , loadLocalPackage
     ) where
 
-import           Control.Applicative ((<|>), (<$>), (<*>))
+import           Control.Applicative ((<$>), (<*>))
 import           Control.Arrow ((&&&))
 import           Control.Exception (assert, catch)
 import           Control.Monad
