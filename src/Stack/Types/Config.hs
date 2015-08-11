@@ -29,6 +29,9 @@ import           Data.Either (partitionEithers)
 import           Data.Hashable (Hashable)
 import           Data.Map (Map)
 import qualified Data.Map as Map
+
+import qualified Data.Map.Strict as M
+import           Data.Maybe
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
@@ -111,10 +114,8 @@ data Config =
          ,configConcurrentTests     :: !Bool
          -- ^ Run test suites concurrently
          ,configImage               :: !ImageOpts
-         ,configAuthorEmail         :: !(Maybe Text)
-         -- ^ Email of the author using stack.
-         ,configAuthorName          :: !(Maybe Text)
-         -- ^ Name of the author using stack.
+         ,configTemplateParams      :: !(Map Text Text)
+         -- ^ Parameters for templates.
          ,configScmInit             :: !(Maybe SCM)
          -- ^ Initialize SCM (e.g. git) when creating new projects.
          }
@@ -509,10 +510,8 @@ data ConfigMonoid =
     -- ^ Used to override the binary installation dir
     ,configMonoidImageOpts           :: !ImageOptsMonoid
     -- ^ Image creation options.
-    ,configMonoidAuthorEmail         :: !(Maybe Text)
-    -- ^ Author's email address.
-    ,configMonoidAuthorName          :: !(Maybe Text)
-    -- ^ Author's name.
+    ,configMonoidTemplateParameters  :: !(Map Text Text)
+    -- ^ Template parameters.
     ,configMonoidScmInit             :: !(Maybe SCM)
     -- ^ Initialize SCM (e.g. git init) when making new projects?
     }
@@ -538,8 +537,7 @@ instance Monoid ConfigMonoid where
     , configMonoidConcurrentTests = Nothing
     , configMonoidLocalBinPath = Nothing
     , configMonoidImageOpts = mempty
-    , configMonoidAuthorEmail = mempty
-    , configMonoidAuthorName = mempty
+    , configMonoidTemplateParameters = mempty
     , configMonoidScmInit = Nothing
     }
   mappend l r = ConfigMonoid
@@ -562,8 +560,7 @@ instance Monoid ConfigMonoid where
     , configMonoidConcurrentTests = configMonoidConcurrentTests l <|> configMonoidConcurrentTests r
     , configMonoidLocalBinPath = configMonoidLocalBinPath l <|> configMonoidLocalBinPath r
     , configMonoidImageOpts = configMonoidImageOpts l <> configMonoidImageOpts r
-    , configMonoidAuthorName = configMonoidAuthorName l <|> configMonoidAuthorName r
-    , configMonoidAuthorEmail = configMonoidAuthorEmail l <|> configMonoidAuthorEmail r
+    , configMonoidTemplateParameters = configMonoidTemplateParameters l <> configMonoidTemplateParameters r
     , configMonoidScmInit = configMonoidScmInit l <|> configMonoidScmInit r
     }
 
@@ -595,9 +592,14 @@ parseConfigMonoidJSON obj = do
     configMonoidConcurrentTests <- obj ..:? "concurrent-tests"
     configMonoidLocalBinPath <- obj ..:? "local-bin-path"
     configMonoidImageOpts <- jsonSubWarnings (obj ..:? "image" ..!= mempty)
-    configMonoidAuthorName <- obj ..:? authorNameKey
-    configMonoidAuthorEmail <- obj ..:? authorEmailKey
-    configMonoidScmInit <- obj ..:? scmInitKey
+    templates <- obj ..:? "templates"
+    (configMonoidScmInit,configMonoidTemplateParameters) <-
+      case templates of
+        Nothing -> return (Nothing,M.empty)
+        Just tobj -> do
+          scmInit <- tobj ..:? "scm-init"
+          params <- tobj ..:? "params"
+          return (scmInit,fromMaybe M.empty params)
     return ConfigMonoid {..}
 
 -- | Newtype for non-orphan FromJSON instance.
@@ -887,15 +889,3 @@ instance FromJSON SCM where
 
 instance ToJSON SCM where
     toJSON Git = toJSON ("git" :: Text)
-
--- | Key used for the YAML file and templates.
-authorEmailKey :: Text
-authorEmailKey = "author-email"
-
--- | Key used for the YAML file and templates.
-authorNameKey :: Text
-authorNameKey = "author-name"
-
--- | Key used for the YAML file and templates.
-scmInitKey :: Text
-scmInitKey = "scm-init"

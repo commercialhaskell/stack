@@ -28,6 +28,20 @@ templateNameArgument =
         (do string <- O.str
             either O.readerError return (parseTemplateNameFromString string))
 
+-- | An argument which accepts a @key:value@ pair for specifying parameters.
+templateParamArgument :: O.Mod O.OptionFields (Text,Text)
+                      -> O.Parser (Text,Text)
+templateParamArgument =
+    O.option
+        (do string <- O.str
+            either O.readerError return (parsePair string))
+  where
+    parsePair :: String -> Either String (Text, Text)
+    parsePair s =
+        case break (==':') s of
+            (key,':':value@(_:_)) -> Right (T.pack key, T.pack value)
+            _ -> Left ("Expected key:value format for argument: " <> s)
+
 -- | Parse a template name from a string.
 parseTemplateNameFromString :: String -> Either String TemplateName
 parseTemplateNameFromString fname =
@@ -40,7 +54,6 @@ parseTemplateNameFromString fname =
             Nothing -> Left expected
             Just fp -> return (TemplateName prefix fp)
     expected = "Expected a template filename like: foo or foo.hsfiles"
-
 
 -- | Make a template name.
 mkTemplateName :: String -> Q Exp

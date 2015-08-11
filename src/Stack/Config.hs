@@ -166,8 +166,7 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
             Just i -> return i
      let configConcurrentTests = fromMaybe True configMonoidConcurrentTests
 
-     let configAuthorEmail = configMonoidAuthorEmail
-         configAuthorName = configMonoidAuthorName
+     let configTemplateParams = configMonoidTemplateParameters
          configScmInit = configMonoidScmInit
 
      return Config {..}

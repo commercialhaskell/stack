@@ -24,6 +24,7 @@ import           Data.Char (isSpace, toLower)
 import           Data.List.Split (splitOn)
 import qualified Data.Map as Map
 import           Data.Map.Strict (Map)
+import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Set as Set
@@ -41,6 +42,7 @@ import           Stack.Ghci (GhciOpts(..))
 import           Stack.Init
 import           Stack.New
 import           Stack.Types
+import           Stack.Types.TemplateName
 
 -- | Command sum type for conditional arguments.
 data Command
@@ -603,5 +605,12 @@ newOptsParser = (,) <$> newOpts <*> initOptsParser
         templateNameArgument
             (metavar "TEMPLATE_NAME" <>
              help "Name of a template, for example: foo or foo.hsfiles" <>
-             value defaultTemplateName) <*
+             value defaultTemplateName) <*>
+        fmap
+            M.fromList
+            (many
+                 (templateParamArgument
+                      (short 'p' <> long "param" <> metavar "KEY:VALUE" <>
+                       help
+                           "Parameter for the template in the format key:value"))) <*
         abortOption ShowHelpText (long "help" <> help "Show help text.")

@@ -32,12 +32,8 @@ module Stack.Constants
     ,dotHpc
     ,objectInterfaceDir
     ,templatesDir
-    ,defaultAuthorEmail
-    ,defaultAuthorName
     ,globalConfigPath
-    ,authorEmailKey
-    ,authorNameKey
-    ,scmInitKey)
+    )
     where
 
 import           Control.Monad.Catch (MonadThrow)
@@ -299,14 +295,6 @@ implicitGlobalDir p =
 -- | Where .mix files go.
 dotHpc :: Path Rel Dir
 dotHpc = $(mkRelDir ".hpc")
-
--- | Default author email.
-defaultAuthorEmail :: Text
-defaultAuthorEmail = "example@example.com"
-
--- | Default author name.
-defaultAuthorName :: Text
-defaultAuthorName = "Example Author Name"
 
 -- | Global config path.
 globalConfigPath :: Config -> Path Abs File

@@ -58,8 +58,12 @@ import           Text.ProjectTemplate
 
 -- | Options for creating a new project.
 data NewOpts = NewOpts
-    { newOptsProjectName  :: PackageName   -- ^ Name of the project to create.
-    , newOptsTemplate     :: TemplateName  -- ^ Name of the template to use.
+    { newOptsProjectName  :: PackageName
+    -- ^ Name of the project to create.
+    , newOptsTemplate     :: TemplateName
+    -- ^ Name of the template to use.
+    , newOptsNonceParams  :: Map Text Text
+    -- ^ Nonce parameters specified just for this invocation.
     }
 
 -- | Create a new project with the given options.
@@ -76,7 +80,13 @@ new opts = do
         else do
             logUsing relDir
             templateText <- loadTemplate template
-            files <- applyTemplate project absDir templateText
+            files <-
+                applyTemplate
+                    project
+                    template
+                    (newOptsNonceParams opts)
+                    absDir
+                    templateText
             writeTemplateFiles files
             runTemplateInits absDir
             return absDir
@@ -110,15 +120,26 @@ loadTemplate name = do
 -- | Apply and unpack a template into a directory.
 applyTemplate
     :: (MonadIO m, MonadThrow m, MonadReader r m, HasConfig r, MonadLogger m)
-    => PackageName -> Path Abs Dir -> Text -> m (Map (Path Abs File) LB.ByteString)
-applyTemplate project dir template = do
+    => PackageName
+    -> TemplateName
+    -> Map Text Text
+    -> Path Abs Dir
+    -> Text
+    -> m (Map (Path Abs File) LB.ByteString)
+applyTemplate project template nonceParams dir templateText = do
     config <- asks getConfig
-    displayContext config
-    applied <-
-        hastacheStr
-            defaultConfig
-            template
-            (mkStrContext (contextFunction config))
+    let context = M.union (M.union nonceParams name) configParams
+          where
+            name = M.fromList [("name", packageNameText project)]
+            configParams = configTemplateParams config
+    (applied,missingKeys) <-
+        runWriterT
+            (hastacheStr
+                 defaultConfig
+                 templateText
+                 (mkStrContextM (contextFunction context)))
+    when (not (S.null missingKeys))
+         (throwM (MissingParameters project template config missingKeys))
     files :: Map FilePath LB.ByteString <-
         execWriterT $
         yield (T.encodeUtf8 (LT.toStrict applied)) $$
@@ -131,30 +152,20 @@ applyTemplate project dir template = do
                       return (dir </> path, bytes))
              (M.toList files))
   where
-    context config =
-        [ ("name", packageNameText project)
-        , ( authorEmailKey
-          , fromMaybe defaultAuthorEmail (configAuthorEmail config))
-        , (authorNameKey, fromMaybe defaultAuthorName (configAuthorName config))]
-    contextFunction :: Config -> String -> MuType m
-    contextFunction config key =
-        case lookup (T.pack key) (context config) of
-            Nothing -> MuNothing
-            Just value -> MuVariable value
-
--- | Display the context being used for the template.
-displayContext :: MonadLogger m => Config -> m ()
-displayContext config = do
-    $logInfo "Using the following authorship configuration:"
-    $logInfo
-        (authorEmailKey <> ": " <>
-         fromMaybe defaultAuthorEmail (configAuthorEmail config))
-    $logInfo
-        (authorNameKey <> ": " <>
-         fromMaybe defaultAuthorName (configAuthorName config))
-    $logInfo
-        ("Copy these to " <> T.pack (toFilePath (globalConfigPath config)) <>
-         " and edit to use different values.")
+    -- | Does a lookup in the context and returns a moustache value,
+    -- on the side, writes out a set of keys that were requested but
+    -- not found.
+    contextFunction
+        :: Monad m
+        => Map Text Text
+        -> String
+        -> WriterT (Set String) m (MuType (WriterT (Set String) m))
+    contextFunction context key = do
+        case M.lookup (T.pack key) context of
+            Nothing -> do
+                tell (S.singleton key)
+                return MuNothing
+            Just value -> return (MuVariable value)
 
 -- | Write files to the new project directory.
 writeTemplateFiles
@@ -260,6 +271,7 @@ data NewException
     | BadTemplatesResponse !Int
     | BadTemplatesJSON !String !LB.ByteString
     | AlreadyExists !(Path Abs Dir)
+    | MissingParameters !PackageName !TemplateName !Config !(Set String)
     deriving (Typeable)
 
 instance Exception NewException
@@ -289,3 +301,28 @@ instance Show NewException where
     show (BadTemplatesJSON err bytes) =
         "Github returned some JSON that couldn't be parsed: " <> err <> "\n\n" <>
         L8.unpack bytes
+    show (MissingParameters name template config missingKeys) =
+        intercalate
+            "\n"
+            [ "The following parameters were needed by the template but not provided: " <>
+              intercalate ", " (S.toList missingKeys)
+            , "You can provide them in " <>
+              toFilePath (globalConfigPath config) <>
+              ", like this:"
+            , "templates:"
+            , "  params:"
+            , intercalate
+                  "\n"
+                  (map
+                       (\key ->
+                             "    " <> key <> ": value")
+                       (S.toList missingKeys))
+            , "Or you can pass each one as parameters like this:"
+            , "stack new " <> packageNameString name <> " " <>
+              T.unpack (templateName template) <>
+              " " <>
+              unwords
+                  (map
+                       (\key ->
+                             "-p \"" <> key <> ":value\"")
+                       (S.toList missingKeys))]
