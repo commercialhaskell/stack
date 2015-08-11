@@ -257,12 +257,12 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
              addCommand "list-dependencies"
                         "List the dependencies"
                         listDependenciesCmd
-                        (T.pack <$> strOption (long "separator" <>
-                                               metavar "SEP" <>
-                                               help ("Separator between package name " <>
-                                                     "and package version.") <>
-                                               value " " <>
-                                               showDefault))
+                        (textOption (long "separator" <>
+                                     metavar "SEP" <>
+                                     help ("Separator between package name " <>
+                                           "and package version.") <>
+                                     value " " <>
+                                     showDefault))
              addSubCommands
                  "ide"
                  "IDE-specific commands"
@@ -270,15 +270,14 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                          "start"
                          "Start the ide-backend service"
                          ideCmd
-                         (((,) <$>
-                           fmap (map T.pack)
-                                (many (strArgument
-                                         (metavar "TARGET" <>
-                                          help "If none specified, use all packages defined in current directory"))) <*>
-                           argsOption (long "ghc-options" <>
-                                       metavar "OPTION" <>
-                                       help "Additional options passed to GHCi" <>
-                                       value [])))
+                         ((,) <$> many (textArgument
+                                          (metavar "TARGET" <>
+                                           help ("If none specified, use all " <>
+                                                 "packages defined in current directory")))
+                              <*> argsOption (long "ghc-options" <>
+                                              metavar "OPTION" <>
+                                              help "Additional options passed to GHCi" <>
+                                              value []))
                      addCommand
                          "packages"
                          "List all available local loadable packages"
