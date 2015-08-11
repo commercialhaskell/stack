@@ -380,10 +380,9 @@ ghciOptsParser = GhciOpts
                             (metavar "TARGET" <>
                              help ("If none specified, " <>
                                    "use all packages defined in current directory"))))
-             <*> argsOption (long "ghc-options" <>
+             <*> fmap concat (many (argsOption (long "ghc-options" <>
                     metavar "OPTION" <>
-                    help "Additional options passed to GHCi" <>
-                    value [])
+                    help "Additional options passed to GHCi")))
              <*> strOption (long "with-ghc" <>
                             metavar "GHC" <>
                             help "Use this command for the GHC to run" <>
