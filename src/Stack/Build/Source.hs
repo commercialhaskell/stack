@@ -108,6 +108,7 @@ loadSourceMap bopts = do
         latestVersion
 
     locals <- mapM (loadLocalPackage bopts targets) $ Map.toList rawLocals
+    checkFlagsUsed bopts locals
 
     let
         -- loadLocals returns PackageName (foo) and PackageIdentifier (bar-1.2.3) targets separately;
@@ -249,10 +250,18 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
         , lpComponents = components
         }
 
-        {-
+-- | Ensure that the flags specified in the stack.yaml file and on the command
+-- line are used.
+checkFlagsUsed :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
+               => BuildOpts
+               -> [LocalPackage]
+               -> m ()
+checkFlagsUsed bopts lps = do
+    bconfig <- asks getBuildConfig
+
         -- Check if flags specified in stack.yaml and the command line are
         -- used, see https://github.com/commercialhaskell/stack/issues/617
-        flags = map (, FSCommandLine) [(k, v) | (Just k, v) <- Map.toList $ boptsFlags bopts]
+    let flags = map (, FSCommandLine) [(k, v) | (Just k, v) <- Map.toList $ boptsFlags bopts]
              ++ map (, FSStackYaml) (Map.toList $ bcFlags bconfig)
 
         localNameMap = Map.fromList $ map (packageName . lpPackage &&& lpPackage) lps
@@ -275,7 +284,11 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
                             else Just $ UFFlagsNotDefined source pkg unused
 
         unusedFlags = mapMaybe checkFlagUsed flags
--}
+
+    unless (null unusedFlags)
+        $ throwM
+        $ InvalidFlagSpecification
+        $ Set.fromList unusedFlags
 
 -- | All flags for a local package
 localFlags :: (Map (Maybe PackageName) (Map FlagName Bool))
