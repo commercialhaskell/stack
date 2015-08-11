@@ -483,6 +483,14 @@ paths =
       , "local-install-root"
       , \pi ->
              T.pack (toFilePathNoTrailing (piLocalRoot pi)))
+    , ( "Snapshot documentation root"
+      , "snapshot-doc-root"
+      , \pi ->
+             T.pack (toFilePathNoTrailing (piSnapRoot pi </> docDirSuffix)))
+    , ( "Local project documentation root"
+      , "local-doc-root"
+      , \pi ->
+             T.pack (toFilePathNoTrailing (piLocalRoot pi </> docDirSuffix)))
     , ( "Dist work directory"
       , "dist-dir"
       , \pi ->
