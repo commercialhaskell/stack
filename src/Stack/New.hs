@@ -139,7 +139,7 @@ applyTemplate project template nonceParams dir templateText = do
                  templateText
                  (mkStrContextM (contextFunction context)))
     when (not (S.null missingKeys))
-         (throwM (MissingParameters project template config missingKeys))
+         ($logInfo (T.pack (show (MissingParameters project template config missingKeys))))
     files :: Map FilePath LB.ByteString <-
         execWriterT $
         yield (T.encodeUtf8 (LT.toStrict applied)) $$
