@@ -1,10 +1,12 @@
-## Unreleased changes
-
 ## 0.1.3.0
 
 Major changes:
 
-* Detect unlisted modules and TemplateHaskell dependent files (#32, #105)
+* Detect when a module is compiled but not listed in the cabal file ([#32](https://github.com/commercialhaskell/stack/issues/32))
+    * A warning is displayed for any modules that should be added to `other-modules` in the .cabal file
+    * These modules are taken into account when determining whether a package needs to be built
+* Respect TemplateHaskell addDependentFile dependency changes ([#105](https://github.com/commercialhaskell/stack/issues/105))
+    * TH dependent files are taken into account when determining whether a package needs to be built.
 * Overhauled target parsing, added `--test` and `--bench` options [#651](https://github.com/commercialhaskell/stack/issues/651)
     * For details, see [Build commands Wiki page](https://github.com/commercialhaskell/stack/wiki/Build-command)
 
