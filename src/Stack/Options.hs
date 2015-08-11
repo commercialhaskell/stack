@@ -71,7 +71,7 @@ buildOptsParser cmd =
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             optimize <*> haddock <*> haddockDeps <*> dryRun <*> ghcOpts <*>
             flags <*> copyBins <*> preFetch <*>
-            ((||) <$> onlySnapshot <*> onlyDependencies) <*>
+            buildSubset <*>
             fileWatch' <*> keepGoing <*> forceDirty <*>
             tests <*> testOptsParser <*>
             benches <*> benchOptsParser <*>
@@ -134,12 +134,15 @@ buildOptsParser cmd =
         preFetch = flag False True
             (long "prefetch" <>
              help "Fetch packages necessary for the build immediately, useful with --dry-run")
-        onlySnapshot = flag False True
-            (long "only-snapshot" <>
-             help "Only build packages for the snapshot database, not the local database")
-        onlyDependencies = flag False True
-            (long "only-dependencies" <>
-             help "Currently: a synonym for only-snapshot, see https://github.com/commercialhaskell/stack/issues/387")
+
+        buildSubset =
+            flag' BSOnlySnapshot
+                (long "only-snapshot" <>
+                 help "Only build packages for the snapshot database, not the local database")
+            <|> flag' BSOnlyDependencies
+                (long "only-dependencies" <>
+                 help "Only build packages that are dependencies of targets on the command line")
+            <|> pure BSAll
 
         fileWatch' = flag False True
             (long "file-watch" <>

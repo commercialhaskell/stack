@@ -80,10 +80,12 @@ data W = W
     -- ^ executable to be installed, and location where the binary is placed
     , wDirty :: !(Map PackageName Text)
     -- ^ why a local package is considered dirty
+    , wDeps :: !(Set PackageName)
+    -- ^ Packages which count as dependencies
     }
 instance Monoid W where
-    mempty = W mempty mempty mempty
-    mappend (W a b c) (W w x y) = W (mappend a w) (mappend b x) (mappend c y)
+    mempty = W mempty mempty mempty mempty
+    mappend (W a b c d) (W w x y z) = W (mappend a w) (mappend b x) (mappend c y) (mappend d z)
 
 type M = RWST
     Ctx
@@ -143,11 +145,11 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
             case lpTestBench lp of
                 Just tb -> addFinal lp tb
                 -- See comment above
-                Nothing -> void $ addDep $ packageName $ lpPackage lp
+                Nothing -> void $ addDep False $ packageName $ lpPackage lp
     let inner = do
             mapM_ onWanted $ filter lpWanted locals
-            mapM_ addDep $ Set.toList extraToBuild0
-    ((), m, W efinals installExes dirtyReason) <- liftIO $ runRWST inner (ctx econfig latest) M.empty
+            mapM_ (addDep False) $ Set.toList extraToBuild0
+    ((), m, W efinals installExes dirtyReason deps) <- liftIO $ runRWST inner (ctx econfig latest) M.empty
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
         (errlibs, adrs) = partitionEithers $ map toEither $ M.toList m
@@ -158,11 +160,12 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
             let toTask (_, ADRFound _ _ _) = Nothing
                 toTask (name, ADRToInstall task) = Just (name, task)
                 tasks = M.fromList $ mapMaybe toTask adrs
-                maybeStripLocals
-                    | boptsOnlySnapshot $ bcoBuildOpts baseConfigOpts0 =
-                        stripLocals
-                    | otherwise = id
-            return $ maybeStripLocals Plan
+                takeSubset =
+                    case boptsBuildSubset $ bcoBuildOpts baseConfigOpts0 of
+                        BSAll -> id
+                        BSOnlySnapshot -> stripLocals
+                        BSOnlyDependencies -> stripNonDeps deps
+            return $ takeSubset Plan
                 { planTasks = tasks
                 , planFinals = M.fromList finals
                 , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason locallyRegistered
@@ -213,7 +216,7 @@ mkUnregisterLocal tasks dirtyReason locallyRegistered =
 
 addFinal :: LocalPackage -> LocalPackageTB -> M ()
 addFinal lp lptb = do
-    depsRes <- addPackageDeps package
+    depsRes <- addPackageDeps False package
     res <- case depsRes of
         Left e -> return $ Left e
         Right (missing, present, _minLoc) -> do
@@ -238,27 +241,33 @@ addFinal lp lptb = do
   where
     package = lptbPackage lptb
 
-addDep :: PackageName -> M (Either ConstructPlanException AddDepRes)
-addDep name = do
+addDep :: Bool -- ^ is this being used by a dependency?
+       -> PackageName -> M (Either ConstructPlanException AddDepRes)
+addDep treatAsDep' name = do
+    ctx <- ask
+    let treatAsDep = treatAsDep' || name `Set.notMember` wanted ctx
+    when treatAsDep $ markAsDep name
     m <- get
     case Map.lookup name m of
         Just res -> return res
         Nothing -> do
-            res <- addDep' name
+            res <- addDep' treatAsDep name
             modify $ Map.insert name res
             return res
 
-addDep' :: PackageName -> M (Either ConstructPlanException AddDepRes)
-addDep' name = do
+addDep' :: Bool -- ^ is this being used by a dependency?
+        -> PackageName -> M (Either ConstructPlanException AddDepRes)
+addDep' treatAsDep name = do
     ctx <- ask
     if name `elem` callStack ctx
         then return $ Left $ DependencyCycleDetected $ name : callStack ctx
         else local
             (\ctx' -> ctx' { callStack = name : callStack ctx' }) $ do
-            (addDep'' name)
+            (addDep'' treatAsDep name)
 
-addDep'' :: PackageName -> M (Either ConstructPlanException AddDepRes)
-addDep'' name = do
+addDep'' :: Bool -- ^ is this being used by a dependency?
+         -> PackageName -> M (Either ConstructPlanException AddDepRes)
+addDep'' treatAsDep name = do
     ctx <- ask
     case Map.lookup name $ combinedMap ctx of
         -- TODO look up in the package index and see if there's a
@@ -269,12 +278,12 @@ addDep'' name = do
             return $ Right $ ADRFound loc version installed
         Just (PIOnlySource ps) -> do
             tellExecutables name ps
-            installPackage name ps
+            installPackage treatAsDep name ps
         Just (PIBoth ps installed) -> do
             tellExecutables name ps
-            needInstall <- checkNeedInstall name ps installed (wanted ctx)
+            needInstall <- checkNeedInstall treatAsDep name ps installed (wanted ctx)
             if needInstall
-                then installPackage name ps
+                then installPackage treatAsDep name ps
                 else return $ Right $ ADRFound (piiLocation ps) (piiVersion ps) installed
 
 tellExecutables :: PackageName -> PackageSource -> M () -- TODO merge this with addFinal above?
@@ -319,11 +328,12 @@ tellExecutablesPackage loc p = do
 -- TODO There are a lot of duplicated computations below. I've kept that for
 -- simplicity right now
 
-installPackage :: PackageName -> PackageSource -> M (Either ConstructPlanException AddDepRes)
-installPackage name ps = do
+installPackage :: Bool -- ^ is this being used by a dependency?
+               -> PackageName -> PackageSource -> M (Either ConstructPlanException AddDepRes)
+installPackage treatAsDep name ps = do
     ctx <- ask
     package <- psPackage name ps
-    depsRes <- addPackageDeps package
+    depsRes <- addPackageDeps treatAsDep package
     case depsRes of
         Left e -> return $ Left e
         Right (missing, present, minLoc) -> do
@@ -350,10 +360,11 @@ installPackage name ps = do
                         PSUpstream _ loc _ -> TTUpstream package $ loc <> minLoc
                 }
 
-checkNeedInstall :: PackageName -> PackageSource -> Installed -> Set PackageName -> M Bool
-checkNeedInstall name ps installed wanted = assert (piiLocation ps == Local) $ do
+checkNeedInstall :: Bool
+                 -> PackageName -> PackageSource -> Installed -> Set PackageName -> M Bool
+checkNeedInstall treatAsDep name ps installed wanted = assert (piiLocation ps == Local) $ do
     package <- psPackage name ps
-    depsRes <- addPackageDeps package
+    depsRes <- addPackageDeps treatAsDep package
     case depsRes of
         Left _e -> return True -- installPackage will find the error again
         Right (missing, present, _loc)
@@ -367,12 +378,13 @@ checkNeedInstall name ps installed wanted = assert (piiLocation ps == Local) $ d
                                 else T.take 97 t <> "..." }
                 return True
 
-addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Set GhcPkgId, InstallLocation))
-addPackageDeps package = do
+addPackageDeps :: Bool -- ^ is this being used by a dependency?
+               -> Package -> M (Either ConstructPlanException (Set PackageIdentifier, Set GhcPkgId, InstallLocation))
+addPackageDeps treatAsDep package = do
     ctx <- ask
     deps' <- packageDepsWithTools package
     deps <- forM (Map.toList deps') $ \(depname, range) -> do
-        eres <- addDep depname
+        eres <- addDep treatAsDep depname
         let mlatest = Map.lookup depname $ latestVersions ctx
         case eres of
             Left e ->
@@ -512,3 +524,15 @@ stripLocals plan = plan
             TTLocal _ -> False
             TTUpstream _ Local -> False
             TTUpstream _ Snap -> True
+
+stripNonDeps :: Set PackageName -> Plan -> Plan
+stripNonDeps deps plan = plan
+    { planTasks = Map.filter checkTask $ planTasks plan
+    , planFinals = Map.empty
+    , planInstallExes = Map.empty -- TODO maybe don't disable this?
+    }
+  where
+    checkTask task = packageIdentifierName (taskProvides task) `Set.member` deps
+
+markAsDep :: PackageName -> M ()
+markAsDep name = tell mempty { wDeps = Set.singleton name }

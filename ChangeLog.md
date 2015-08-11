@@ -3,6 +3,7 @@
 * Detect unlisted modules and TemplateHaskell dependent files (#32, #105)
 * Overhauled target parsing, added `--test` and `--bench` options [#651](https://github.com/commercialhaskell/stack/issues/651)
 * `--exec` option [#651](https://github.com/commercialhaskell/stack/issues/651)
+* `--only-dependencies` implemented correctly [#387](https://github.com/commercialhaskell/stack/issues/387)
 
 ## 0.1.2.2
 

@@ -26,6 +26,7 @@ module Stack.Types.Build
     ,TestOpts(..)
     ,BenchmarkOpts(..)
     ,BuildOpts(..)
+    ,BuildSubset(..)
     ,defaultBuildOpts
     ,TaskType(..)
     ,TaskConfigOpts(..)
@@ -339,6 +340,15 @@ instance Show ConstructPlanException where
 
 ----------------------------------------------
 
+-- | Which subset of packages to build
+data BuildSubset
+    = BSAll
+    | BSOnlySnapshot
+    -- ^ Only install packages in the snapshot database, skipping
+    -- packages intended for the local database.
+    | BSOnlyDependencies
+    deriving Show
+
 -- | Configuration for building.
 data BuildOpts =
   BuildOpts {boptsTargets :: ![Text]
@@ -356,9 +366,7 @@ data BuildOpts =
             -- ^ Install executables to user path after building?
             ,boptsPreFetch :: !Bool
             -- ^ Fetch all packages immediately
-            ,boptsOnlySnapshot :: !Bool
-            -- ^ Only install packages in the snapshot database, skipping
-            -- packages intended for the local database.
+            ,boptsBuildSubset :: !BuildSubset
             ,boptsFileWatch :: !Bool
             -- ^ Watch files for changes and automatically rebuild
             ,boptsKeepGoing :: !(Maybe Bool)
@@ -393,7 +401,7 @@ defaultBuildOpts = BuildOpts
     , boptsFlags = Map.empty
     , boptsInstallExes = False
     , boptsPreFetch = False
-    , boptsOnlySnapshot = False
+    , boptsBuildSubset = BSAll
     , boptsFileWatch = False
     , boptsKeepGoing = Nothing
     , boptsForceDirty = False
