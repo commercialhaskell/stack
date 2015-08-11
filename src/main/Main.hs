@@ -127,7 +127,7 @@ fixCodePage = id
 
 -- | Commandline dispatcher.
 main :: IO ()
-main = withInterpreterArgs stackProgName $ \args isInterpreter -> fixCodePage $ do
+main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
      -- Line buffer the output by default, particularly for non-terminal runs.
      -- See https://github.com/commercialhaskell/stack/pull/360
      hSetBuffering stdout LineBuffering
@@ -325,7 +325,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> fixCodePage $ 
          throwIO exitCode
        Right (global,run) -> do
          when (globalLogLevel global == LevelDebug) $ putStrLn versionString'
-         run global `catch` \e -> do
+         fixCodePage $ run global `catch` \e -> do
             -- This special handler stops "stack: " from being printed before the
             -- exception
             case fromException e of
