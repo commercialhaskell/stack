@@ -125,19 +125,21 @@ printPlan plan = do
             $logInfo "Would build:"
             mapM_ ($logInfo . displayTask) xs
 
-    $logInfo ""
-
     let hasTests = not . Set.null . lptbTests
         hasBenches = not . Set.null . lptbBenches
         tests = Map.elems $ fmap fst $ Map.filter (hasTests . snd) $ planFinals plan
         benches = Map.elems $ fmap fst $ Map.filter (hasBenches . snd) $ planFinals plan
 
     unless (null tests) $ do
+        $logInfo ""
         $logInfo "Would test:"
         mapM_ ($logInfo . displayTask) tests
     unless (null benches) $ do
+        $logInfo ""
         $logInfo "Would benchmark:"
         mapM_ ($logInfo . displayTask) benches
+
+    $logInfo ""
 
     case Map.toList $ planInstallExes plan of
         [] -> $logInfo "No executables to be installed."
@@ -343,7 +345,7 @@ executePlan' plan ee@ExecuteEnv {..} = do
             (fmap (\b -> (Just b, Nothing)))
             (fmap (\f -> (Nothing, Just f)))
             (planTasks plan)
-            (fmap fst $ planFinals plan) -- FIXME
+            (planFinals plan)
     threads <- asks $ configJobs . getConfig
     concurrentTests <- asks $ configConcurrentTests . getConfig
     let keepGoing =
@@ -381,11 +383,9 @@ executePlan' plan ee@ExecuteEnv {..} = do
 toActions :: M env m
           => (m () -> IO ())
           -> ExecuteEnv
-          -> (Maybe Task, Maybe Task) -- build and final
+          -> (Maybe Task, Maybe (Task, LocalPackageTB)) -- build and final
           -> [Action]
 toActions runInBase ee (mbuild, mfinal) =
-    error "toActions"
-    {-
     abuild ++ afinal
   where
     abuild =
@@ -400,38 +400,29 @@ toActions runInBase ee (mbuild, mfinal) =
                     }
                 ]
     afinal =
-        case (,) <$> mfinal <*> mfunc of
-            Just (task@Task {..}, (func, checkTask)) | checkTask task ->
+        case mfinal of
+            Nothing -> []
+            Just (task@Task {..}, lptb) ->
                 [ Action
                     { actionId = ActionId taskProvides ATFinal
                     , actionDeps = addBuild taskProvides $
                         (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
-                    , actionDo = \ac -> runInBase $ func ac ee task
+                    , actionDo = \ac -> runInBase $ do
+                        unless (Set.null $ lptbTests lptb) $ do
+                            singleTest topts lptb ac ee task
+                        unless (Set.null $ lptbBenches lptb) $ do
+                            singleBench beopts lptb ac ee task
                     }
                 ]
-            _ -> []
       where
         addBuild ident =
             case mbuild of
                 Nothing -> id
                 Just _ -> Set.insert $ ActionId ident ATBuild
 
-    mfunc =
-        case boptsFinalAction $ eeBuildOpts ee of
-            DoNothing -> Nothing
-            DoTests topts -> Just (singleTest topts, checkTest)
-            DoBenchmarks beopts -> Just (singleBench beopts, checkBench)
-
-    checkTest task =
-        case taskType task of
-            TTLocal lp -> not $ Set.null $ packageTests $ lpPackage lp
-            _ -> assert False False
-
-    checkBench task =
-        case taskType task of
-            TTLocal lp -> not $ Set.null $ packageBenchmarks $ lpPackage lp
-            _ -> assert False False
-    -}
+    bopts = eeBuildOpts ee
+    topts = boptsTestOpts bopts
+    beopts = boptsBenchmarkOpts bopts
 
 -- | Ensure that the configuration for the package matches what is given
 ensureConfig :: M env m
@@ -663,8 +654,11 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
     extraOpts <- extraBuildOptions
     cabal (console && configHideTHLoading config) $
         (case taskType of
-            TTLocal lp -> "build" : "lib" : map (T.unpack . T.append "exe:")
-                                                (maybe [] Set.toList $ lpExeComponents lp)
+            TTLocal lp -> "build"
+                        -- Cabal... There doesn't seem to be a way to call out the library component...
+                        -- : "lib"
+                        : map (T.unpack . T.append "exe:")
+                              (maybe [] Set.toList $ lpExeComponents lp)
             TTUpstream _ _ -> ["build"]) ++ extraOpts
 
     let doHaddock = shouldHaddockPackage eeBuildOpts eeWanted (packageName package) &&
@@ -855,11 +849,12 @@ singleTest topts lptb ac ee task =
 
 singleBench :: M env m
             => BenchmarkOpts
+            -> LocalPackageTB
             -> ActionContext
             -> ExecuteEnv
             -> Task
             -> m ()
-singleBench beopts ac ee task =
+singleBench beopts lptb ac ee task =
     withSingleContext ac ee task (Just "bench") $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
         (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (benchmarks)") cabal cabalfp ["--enable-benchmarks"]
 
