@@ -100,10 +100,6 @@ We generally test on the current version of OS X, but stack is known to work on 
 
             curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/21/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 
-    * Fedora 20 (x86_64)
-
-            curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/20/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
-
 2. Install:
 
     * Fedora 22+
