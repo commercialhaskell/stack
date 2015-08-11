@@ -296,6 +296,7 @@ loadBuildConfig mproject config stackRoot mresolver = do
         , bcExtraDeps = projectExtraDeps project
         , bcStackYaml = stackYamlFP
         , bcFlags = projectFlags project
+        , bcImplicitGlobal = isNothing mproject
         }
 
 -- | Resolve a PackageEntry into a list of paths, downloading and cloning as

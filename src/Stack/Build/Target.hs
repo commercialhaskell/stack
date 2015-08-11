@@ -285,7 +285,8 @@ simplifyTargets includeTests includeBenches =
     getLocalComp _ = Left ()
 
 parseTargets :: (MonadThrow m, MonadIO m)
-             => Bool -- ^ include tests
+             => Bool -- ^ using implicit global?
+             -> Bool -- ^ include tests
              -> Bool -- ^ include benchmarks
              -> Map PackageName Version -- ^ snapshot
              -> Map PackageName Version -- ^ extra deps
@@ -293,7 +294,7 @@ parseTargets :: (MonadThrow m, MonadIO m)
              -> Path Abs Dir -- ^ current directory
              -> [Text] -- ^ command line targets
              -> m (Map PackageName Version, Map PackageName SimpleTarget)
-parseTargets includeTests includeBenches snap extras locals currDir textTargets' = do
+parseTargets implicitGlobal includeTests includeBenches snap extras locals currDir textTargets' = do
     let textTargets =
             if null textTargets'
                 then map (T.pack . packageNameString) $ Map.keys $ Map.filter (not . lpvExtraDep) locals
@@ -310,8 +311,9 @@ parseTargets includeTests includeBenches snap extras locals currDir textTargets'
 
     if null errs
         then if Map.null targets
-                 -- TODO perhaps check if we're using the implicit global and,
-                 -- if so, recommend running stack init/new?
-                 then throwM $ TargetParseException ["The specified targets matched no packages"]
+                 then throwM $ TargetParseException
+                        $ if implicitGlobal
+                            then ["The specified targets matched no packages.\nPerhaps you need to run 'stack init'?"]
+                            else ["The specified targets matched no packages"]
                  else return (Map.unions newExtras, targets)
         else throwM $ TargetParseException errs

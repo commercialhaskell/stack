@@ -87,6 +87,7 @@ loadSourceMap bopts = do
     workingDir <- getWorkingDir
     (cliExtraDeps, targets) <-
         parseTargets
+            (bcImplicitGlobal bconfig)
             (boptsTests bopts)
             (boptsBenchmarks bopts)
             (mpiVersion <$> mbpPackages mbp0)
