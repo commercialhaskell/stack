@@ -83,10 +83,9 @@ buildOptsParser cmd =
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
         target =
-          fmap (map T.pack)
-                (many (strArgument
-                         (metavar "TARGET" <>
-                          help "If none specified, use all packages")))
+           many (textArgument
+                   (metavar "TARGET" <>
+                    help "If none specified, use all packages"))
         libProfiling =
           boolFlags False
                     "library-profiling"
@@ -122,18 +121,16 @@ buildOptsParser cmd =
               ( long "pedantic"
              <> help "Turn on -Wall and -Werror (note: option name may change in the future"
               )
-          <*> many (fmap T.pack
-                     (strOption (long "ghc-options" <>
-                                 metavar "OPTION" <>
-                                 help "Additional options passed to GHC")))
+          <*> many (textOption (long "ghc-options" <>
+                                metavar "OPTION" <>
+                                help "Additional options passed to GHC"))
 
-        flags =
-          fmap (Map.unionsWith Map.union) $ many
-            (option readFlag
-                ( long "flag"
-               <> metavar "PACKAGE:[-]FLAG"
-               <> help "Override flags set in stack.yaml (applies to local packages and extra-deps)"
-                ))
+        flags = Map.unionsWith Map.union <$> many
+                  (option readFlag
+                      (long "flag" <>
+                       metavar "PACKAGE:[-]FLAG" <>
+                       help ("Override flags set in stack.yaml " <>
+                             "(applies to local packages and extra-deps)")))
 
         preFetch = flag False True
             (long "prefetch" <>
@@ -241,16 +238,16 @@ configOptsParser docker =
            <> metavar "JOBS"
            <> help "Number of concurrent jobs to run"
             ))
-    <*> fmap (Set.fromList . map T.pack) (many $ strOption
+    <*> fmap Set.fromList (many (textOption
             ( long "extra-include-dirs"
            <> metavar "DIR"
            <> help "Extra directories to check for C header files"
-            ))
-    <*> fmap (Set.fromList . map T.pack) (many $ strOption
+            )))
+    <*> fmap Set.fromList (many (textOption
             ( long "extra-lib-dirs"
            <> metavar "DIR"
            <> help "Extra directories to check for libraries"
-            ))
+            )))
     <*> maybeBoolFlags
             "skip-ghc-check"
             "skipping the GHC version and architecture check"
@@ -405,14 +402,13 @@ dotOptsParser = DotOpts
 
 ghciOptsParser :: Parser GhciOpts
 ghciOptsParser = GhciOpts
-             <$> fmap (map T.pack)
-                   (many (strArgument
-                            (metavar "TARGET" <>
-                             help ("If none specified, " <>
-                                   "use all packages defined in current directory"))))
+             <$> many (textArgument
+                         (metavar "TARGET" <>
+                          help ("If none specified, " <>
+                                "use all packages defined in current directory")))
              <*> fmap concat (many (argsOption (long "ghc-options" <>
-                    metavar "OPTION" <>
-                    help "Additional options passed to GHCi")))
+                                       metavar "OPTION" <>
+                                       help "Additional options passed to GHCi")))
              <*> strOption (long "with-ghc" <>
                             metavar "GHC" <>
                             help "Use this command for the GHC to run" <>
@@ -478,10 +474,10 @@ globalOptsParser defaultTerminal =
         (long "no-terminal" <>
          help
              "Override terminal detection in the case of running in a false terminal") <*>
-    (optional (strOption
-        (long "stack-yaml" <>
-         metavar "STACK-YAML" <>
-         help "Override project stack.yaml file (overrides any STACK_YAML environment variable)")))
+    optional (strOption (long "stack-yaml" <>
+                         metavar "STACK-YAML" <>
+                         help ("Override project stack.yaml file " <>
+                               "(overrides any STACK_YAML environment variable)")))
 
 initOptsParser :: Parser InitOpts
 initOptsParser =

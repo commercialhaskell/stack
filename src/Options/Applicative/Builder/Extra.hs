@@ -7,13 +7,18 @@ module Options.Applicative.Builder.Extra
   ,enableDisableFlags
   ,enableDisableFlagsNoDefault
   ,extraHelpOption
-  ,execExtraHelp)
+  ,execExtraHelp
+  ,textOption
+  ,textArgument)
   where
 
 import Control.Monad (when)
 import Options.Applicative
+import Options.Applicative.Types (readerAsk)
 import System.Environment (withArgs)
 import System.FilePath (takeBaseName)
+import Data.Text (Text)
+import qualified Data.Text as T
 
 -- | Enable/disable flags for a @Bool@.
 boolFlags :: Bool -> String -> String -> Mod FlagFields Bool -> Parser Bool
@@ -71,7 +76,7 @@ extraHelpOption progName fakeName helpName =
 -- Since optparse-applicative doesn't allow an arbirary IO action for an 'abortOption', this
 -- was the best way I found that doesn't require manually formatting the help.
 execExtraHelp :: [String] -> String -> Parser a -> String -> IO ()
-execExtraHelp args helpOpt parser pd = do
+execExtraHelp args helpOpt parser pd =
     when (args == ["--" ++ helpOpt]) $
       withArgs ["--help"] $ do
         _ <- execParser (info (hiddenHelper <*>
@@ -81,3 +86,9 @@ execExtraHelp args helpOpt parser pd = do
                         (fullDesc <> progDesc pd))
         return ()
   where hiddenHelper = abortOption ShowHelpText (long "help" <> hidden <> internal)
+
+textOption :: Mod OptionFields Text -> Parser Text
+textOption = option (T.pack <$> readerAsk)
+
+textArgument :: Mod ArgumentFields Text -> Parser Text
+textArgument = argument (T.pack <$> readerAsk)
