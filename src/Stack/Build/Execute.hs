@@ -127,6 +127,18 @@ printPlan plan = do
 
     $logInfo ""
 
+    let hasTests = not . Set.null . lptbTests
+        hasBenches = not . Set.null . lptbBenches
+        tests = Map.elems $ fmap fst $ Map.filter (hasTests . snd) $ planFinals plan
+        benches = Map.elems $ fmap fst $ Map.filter (hasBenches . snd) $ planFinals plan
+
+    unless (null tests) $ do
+        $logInfo "Would test:"
+        mapM_ ($logInfo . displayTask) tests
+    unless (null benches) $ do
+        $logInfo "Would benchmark:"
+        mapM_ ($logInfo . displayTask) benches
+
     case Map.toList $ planInstallExes plan of
         [] -> $logInfo "No executables to be installed."
         xs -> do
@@ -331,7 +343,7 @@ executePlan' plan ee@ExecuteEnv {..} = do
             (fmap (\b -> (Just b, Nothing)))
             (fmap (\f -> (Nothing, Just f)))
             (planTasks plan)
-            (planFinals plan)
+            (fmap fst $ planFinals plan) -- FIXME
     threads <- asks $ configJobs . getConfig
     concurrentTests <- asks $ configConcurrentTests . getConfig
     let keepGoing =

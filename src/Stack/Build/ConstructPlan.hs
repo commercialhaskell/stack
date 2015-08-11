@@ -76,7 +76,7 @@ data AddDepRes
 
 type M = RWST
     Ctx
-    ( Map PackageName (Either ConstructPlanException Task) -- finals
+    ( Map PackageName (Either ConstructPlanException (Task, LocalPackageTB)) -- finals
     , Map Text InstallLocation -- executable to be installed, and location where the binary is placed
     , Map PackageName Text -- why a local package is considered dirty
     )
@@ -121,12 +121,13 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
     let latest = Map.fromListWith max $ map toTuple $ Map.keys caches
 
     econfig <- asks getEnvConfig
-    let onWanted = error "constructPlan.onWanted"
-        {-
-            case boptsFinalAction $ bcoBuildOpts baseConfigOpts0 of
-                DoNothing -> void . addDep . packageName . lpPackage
-                _ -> addFinal
-                -}
+    let onWanted lp = do
+            case lpExeComponents lp of
+                Nothing -> return ()
+                Just _ -> void $ addDep $ packageName $ lpPackage lp
+            case lpTestBench lp of
+                Nothing -> return ()
+                Just tb -> addFinal lp tb
     let inner = do
             mapM_ onWanted $ filter lpWanted locals
             mapM_ addDep $ Set.toList extraToBuild0
@@ -194,15 +195,14 @@ mkUnregisterLocal tasks dirtyReason locallyRegistered =
         ident = ghcPkgIdPackageIdentifier gid
         name = packageIdentifierName ident
 
-{- FIXME
-addFinal :: LocalPackage -> M ()
-addFinal lp = do
+addFinal :: LocalPackage -> LocalPackageTB -> M ()
+addFinal lp lptb = do
     depsRes <- addPackageDeps package
     res <- case depsRes of
         Left e -> return $ Left e
         Right (missing, present, _minLoc) -> do
             ctx <- ask
-            return $ Right Task
+            return $ Right (Task
                 { taskProvides = PackageIdentifier
                     (packageName package)
                     (packageVersion package)
@@ -217,11 +217,10 @@ addFinal lp = do
                             package
                 , taskPresent = present
                 , taskType = TTLocal lp
-                }
+                }, lptb)
     tell (Map.singleton (packageName package) res, mempty, mempty)
   where
-    package = lpPackageFinal lp
--}
+    package = lptbPackage lptb
 
 addDep :: PackageName -> M (Either ConstructPlanException AddDepRes)
 addDep name = do

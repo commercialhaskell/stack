@@ -493,7 +493,7 @@ taskLocation task =
 -- | A complete plan of what needs to be built and how to do it
 data Plan = Plan
     { planTasks :: !(Map PackageName Task)
-    , planFinals :: !(Map PackageName Task)
+    , planFinals :: !(Map PackageName (Task, LocalPackageTB))
     -- ^ Final actions to be taken (test, benchmark, etc)
     , planUnregisterLocal :: !(Map GhcPkgId Text)
     -- ^ Text is reason we're unregistering, for display only
