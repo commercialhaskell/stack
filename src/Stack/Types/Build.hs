@@ -25,8 +25,8 @@ module Stack.Types.Build
     ,Plan(..)
     ,TestOpts(..)
     ,BenchmarkOpts(..)
-    ,FinalAction(..)
     ,BuildOpts(..)
+    ,BuildSubset(..)
     ,defaultBuildOpts
     ,TaskType(..)
     ,TaskConfigOpts(..)
@@ -103,6 +103,7 @@ data StackBuildException
         Version -- version specified on command line
   | NoSetupHsFound (Path Abs Dir)
   | InvalidFlagSpecification (Set UnusedFlags)
+  | TargetParseException [Text]
   deriving Typeable
 
 data FlagSource = FSCommandLine | FSStackYaml
@@ -270,6 +271,10 @@ instance Show StackBuildException where
             ]
           where name = packageNameString (packageName pkg)
                 pkgFlags = packageDefinedFlags pkg
+    show (TargetParseException [err]) = "Error parsing targets: " ++ T.unpack err
+    show (TargetParseException errs) = unlines
+        $ "The following errors occurred while parsing the build targets:"
+        : map (("- " ++) . T.unpack) errs
 
 instance Exception StackBuildException
 
@@ -335,6 +340,15 @@ instance Show ConstructPlanException where
 
 ----------------------------------------------
 
+-- | Which subset of packages to build
+data BuildSubset
+    = BSAll
+    | BSOnlySnapshot
+    -- ^ Only install packages in the snapshot database, skipping
+    -- packages intended for the local database.
+    | BSOnlyDependencies
+    deriving Show
+
 -- | Configuration for building.
 data BuildOpts =
   BuildOpts {boptsTargets :: ![Text]
@@ -345,7 +359,6 @@ data BuildOpts =
             -- ^ Build haddocks?
             ,boptsHaddockDeps :: !(Maybe Bool)
             -- ^ Build haddocks for dependencies?
-            ,boptsFinalAction :: !FinalAction
             ,boptsDryrun :: !Bool
             ,boptsGhcOptions :: ![Text]
             ,boptsFlags :: !(Map (Maybe PackageName) (Map FlagName Bool))
@@ -353,15 +366,25 @@ data BuildOpts =
             -- ^ Install executables to user path after building?
             ,boptsPreFetch :: !Bool
             -- ^ Fetch all packages immediately
-            ,boptsOnlySnapshot :: !Bool
-            -- ^ Only install packages in the snapshot database, skipping
-            -- packages intended for the local database.
+            ,boptsBuildSubset :: !BuildSubset
             ,boptsFileWatch :: !Bool
             -- ^ Watch files for changes and automatically rebuild
             ,boptsKeepGoing :: !(Maybe Bool)
             -- ^ Keep building/running after failure
             ,boptsForceDirty :: !Bool
             -- ^ Force treating all local packages as having dirty files
+
+            ,boptsTests :: !Bool
+            -- ^ Turn on tests for local targets
+            ,boptsTestOpts :: !TestOpts
+            -- ^ Additional test arguments
+
+            ,boptsBenchmarks :: !Bool
+            -- ^ Turn on benchmarks for local targets
+            ,boptsBenchmarkOpts :: !BenchmarkOpts
+            -- ^ Additional test arguments
+            ,boptsExec :: ![(String, [String])]
+            -- ^ Commands (with arguments) to run after a successful build
             }
   deriving (Show)
 
@@ -373,16 +396,20 @@ defaultBuildOpts = BuildOpts
     , boptsEnableOptimizations = Nothing
     , boptsHaddock = False
     , boptsHaddockDeps = Nothing
-    , boptsFinalAction = DoNothing
     , boptsDryrun = False
     , boptsGhcOptions = []
     , boptsFlags = Map.empty
     , boptsInstallExes = False
     , boptsPreFetch = False
-    , boptsOnlySnapshot = False
+    , boptsBuildSubset = BSAll
     , boptsFileWatch = False
     , boptsKeepGoing = Nothing
     , boptsForceDirty = False
+    , boptsTests = False
+    , boptsTestOpts = defaultTestOpts
+    , boptsBenchmarks = False
+    , boptsBenchmarkOpts = defaultBenchmarkOpts
+    , boptsExec = []
     }
 
 -- | Options for the 'FinalAction' 'DoTests'
@@ -393,17 +420,23 @@ data TestOpts =
            ,toDisableRun :: !Bool -- ^ Disable running of tests
            } deriving (Eq,Show)
 
+defaultTestOpts :: TestOpts
+defaultTestOpts = TestOpts
+    { toRerunTests = True
+    , toAdditionalArgs = []
+    , toCoverage = False
+    , toDisableRun = False
+    }
+
 -- | Options for the 'FinalAction' 'DoBenchmarks'
 data BenchmarkOpts =
   BenchmarkOpts {beoAdditionalArgs :: !(Maybe String) -- ^ Arguments passed to the benchmark program
                 } deriving (Eq,Show)
 
--- | Run a Setup.hs action after building a package, before installing.
-data FinalAction
-  = DoTests TestOpts
-  | DoBenchmarks BenchmarkOpts
-  | DoNothing
-  deriving (Eq,Show)
+defaultBenchmarkOpts :: BenchmarkOpts
+defaultBenchmarkOpts = BenchmarkOpts
+    { beoAdditionalArgs = Nothing
+    }
 
 -- | Package dependency oracle.
 newtype PkgDepsOracle =
@@ -471,7 +504,7 @@ taskLocation task =
 -- | A complete plan of what needs to be built and how to do it
 data Plan = Plan
     { planTasks :: !(Map PackageName Task)
-    , planFinals :: !(Map PackageName Task)
+    , planFinals :: !(Map PackageName (Task, LocalPackageTB))
     -- ^ Final actions to be taken (test, benchmark, etc)
     , planUnregisterLocal :: !(Map GhcPkgId Text)
     -- ^ Text is reason we're unregistering, for display only

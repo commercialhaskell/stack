@@ -1,6 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 -- |
 
@@ -23,6 +24,7 @@ import           Data.Maybe
 import           Data.Monoid
 import           Data.Set (Set)
 import           Data.Text (Text)
+import           Data.Text.Encoding (encodeUtf8)
 import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
@@ -159,19 +161,51 @@ class PackageInstallInfo a where
     piiVersion :: a -> Version
     piiLocation :: a -> InstallLocation
 
+-- | Second-stage build information: tests and benchmarks
+data LocalPackageTB = LocalPackageTB
+    { lptbPackage :: !Package
+    -- ^ Package resolved with dependencies for tests and benchmarks, depending
+    -- on which components are active
+    , lptbTests   :: !(Set Text)
+    -- ^ Test components
+    , lptbBenches :: !(Set Text)
+    -- ^ Benchmark components
+    }
+    deriving Show
+
 -- | Information on a locally available package of source code
 data LocalPackage = LocalPackage
-    { lpPackage        :: !Package         -- ^ The @Package@ info itself, after resolution with package flags, not including any final actions
-    , lpPackageFinal   :: !Package         -- ^ Same as lpPackage, but with any test suites or benchmarks enabled as necessary
-    , lpWanted         :: !Bool            -- ^ Is this package a \"wanted\" target based on command line input
+    { lpPackage        :: !Package         -- ^ The @Package@ info itself, after resolution with package flags, not including any tests or benchmarks
+    , lpExeComponents  :: !(Maybe (Set Text)) -- ^ Executable components to build, Nothing if not a target
+
+    , lpTestBench      :: !(Maybe LocalPackageTB)
+
     , lpDir            :: !(Path Abs Dir)  -- ^ Directory of the package.
     , lpCabalFile      :: !(Path Abs File) -- ^ The .cabal file
     , lpDirtyFiles     :: !Bool            -- ^ are there files that have changed since the last build?
     , lpNewBuildCache  :: !(Map FilePath FileCacheInfo) -- ^ current state of the files
     , lpFiles          :: !(Set (Path Abs File)) -- ^ all files used by this package
-    , lpComponents     :: !(Set Text)      -- ^ components to build, passed directly to Setup.hs build
+    , lpComponents     :: !(Set NamedComponent)
     }
     deriving Show
+
+-- | Is the given local a target
+lpWanted :: LocalPackage -> Bool
+lpWanted lp = isJust (lpExeComponents lp) || isJust (lpTestBench lp)
+
+-- | A single, fully resolved component of a package
+data NamedComponent
+    = CLib
+    | CExe !Text
+    | CTest !Text
+    | CBench !Text
+    deriving (Show, Eq, Ord)
+
+renderComponent :: NamedComponent -> S.ByteString
+renderComponent CLib = "lib"
+renderComponent (CExe x) = "exe:" <> encodeUtf8 x
+renderComponent (CTest x) = "test:" <> encodeUtf8 x
+renderComponent (CBench x) = "bench:" <> encodeUtf8 x
 
 -- | A location to install a package into, either snapshot or local
 data InstallLocation = Snap | Local

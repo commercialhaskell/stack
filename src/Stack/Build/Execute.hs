@@ -13,11 +13,9 @@ module Stack.Build.Execute
     , ExecuteEnv
     , withExecuteEnv
     , withSingleContext
-    -- * Testing
-    , compareTestsComponents
     ) where
 
-import           Control.Applicative            ((<$>), (<*>))
+import           Control.Applicative            ((<$>))
 import           Control.Concurrent.Execute
 import           Control.Concurrent.Lifted      (fork)
 import           Control.Concurrent.MVar.Lifted
@@ -81,6 +79,7 @@ import           System.IO
 import           System.IO.Temp                 (withSystemTempDirectory)
 import           System.Process.Internals       (createProcess_)
 import           System.Process.Read
+import           System.Process.Run
 import           System.Process.Log             (showProcessArgDebug)
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
@@ -105,10 +104,9 @@ preFetch plan
                 (packageVersion package)
 
 printPlan :: M env m
-          => FinalAction
-          -> Plan
+          => Plan
           -> m ()
-printPlan finalAction plan = do
+printPlan plan = do
     case Map.toList $ planUnregisterLocal plan of
         [] -> $logInfo "No packages would be unregistered."
         xs -> do
@@ -128,21 +126,19 @@ printPlan finalAction plan = do
             $logInfo "Would build:"
             mapM_ ($logInfo . displayTask) xs
 
-    let mfinalLabel =
-            case finalAction of
-                DoNothing -> Nothing
-                DoBenchmarks _ -> Just "benchmark"
-                DoTests _ -> Just "test"
-    case mfinalLabel of
-        Nothing -> return ()
-        Just finalLabel -> do
-            $logInfo ""
+    let hasTests = not . Set.null . lptbTests
+        hasBenches = not . Set.null . lptbBenches
+        tests = Map.elems $ fmap fst $ Map.filter (hasTests . snd) $ planFinals plan
+        benches = Map.elems $ fmap fst $ Map.filter (hasBenches . snd) $ planFinals plan
 
-            case Map.toList $ planFinals plan of
-                [] -> $logInfo $ "Nothing to " <> finalLabel <> "."
-                xs -> do
-                    $logInfo $ "Would " <> finalLabel <> ":"
-                    forM_ xs $ \(name, _) -> $logInfo $ packageNameText name
+    unless (null tests) $ do
+        $logInfo ""
+        $logInfo "Would test:"
+        mapM_ ($logInfo . displayTask) tests
+    unless (null benches) $ do
+        $logInfo ""
+        $logInfo "Would benchmark:"
+        mapM_ ($logInfo . displayTask) benches
 
     $logInfo ""
 
@@ -309,6 +305,10 @@ executePlan menv bopts baseConfigOpts locals sourceMap plan = do
                 , ":"]
             forM_ executables $ \exe -> $logInfo $ T.append "- " exe
 
+    forM_ (boptsExec bopts) $ \(cmd, args) -> do
+        $logProcessRun cmd args
+        callProcess Nothing menv cmd args
+
 -- | Windows can't write over the current executable. Instead, we rename the
 -- current executable to something else and then do the copy.
 windowsRenameCopy :: FilePath -> FilePath -> IO ()
@@ -356,14 +356,14 @@ executePlan' plan ee@ExecuteEnv {..} = do
     let keepGoing =
             case boptsKeepGoing eeBuildOpts of
                 Just kg -> kg
-                Nothing ->
-                    case boptsFinalAction eeBuildOpts of
-                        DoNothing -> False
-                        _ -> True
+                Nothing -> boptsTests eeBuildOpts || boptsBenchmarks eeBuildOpts
         concurrentFinal =
-            case boptsFinalAction eeBuildOpts of
-                DoTests _ -> concurrentTests
-                _ -> True
+            -- TODO it probably makes more sense to use a lock for test suites
+            -- and just have the execution blocked. Turning off all concurrency
+            -- on finals based on the --test option doesn't fit in well.
+            if boptsTests eeBuildOpts
+                then concurrentTests
+                else True
     terminal <- asks getTerminal
     errs <- liftIO $ runActions threads keepGoing concurrentFinal actions $ \doneVar -> do
         let total = length actions
@@ -386,14 +386,12 @@ executePlan' plan ee@ExecuteEnv {..} = do
         generateLocalHaddockIndex eeEnvOverride eeBaseConfigOpts eeLocals
         generateDepsHaddockIndex eeEnvOverride eeBaseConfigOpts eeLocals
         generateSnapHaddockIndex eeEnvOverride eeBaseConfigOpts eeGlobalDB
-    case boptsFinalAction eeBuildOpts of
-        DoTests topts | toCoverage topts -> generateHpcMarkupIndex
-        _ -> return ()
+    when (toCoverage $ boptsTestOpts eeBuildOpts) generateHpcMarkupIndex
 
 toActions :: M env m
           => (m () -> IO ())
           -> ExecuteEnv
-          -> (Maybe Task, Maybe Task) -- build and final
+          -> (Maybe Task, Maybe (Task, LocalPackageTB)) -- build and final
           -> [Action]
 toActions runInBase ee (mbuild, mfinal) =
     abuild ++ afinal
@@ -410,37 +408,29 @@ toActions runInBase ee (mbuild, mfinal) =
                     }
                 ]
     afinal =
-        case (,) <$> mfinal <*> mfunc of
-            Just (task@Task {..}, (func, checkTask)) | checkTask task ->
+        case mfinal of
+            Nothing -> []
+            Just (task@Task {..}, lptb) ->
                 [ Action
                     { actionId = ActionId taskProvides ATFinal
                     , actionDeps = addBuild taskProvides $
                         (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
-                    , actionDo = \ac -> runInBase $ func ac ee task
+                    , actionDo = \ac -> runInBase $ do
+                        unless (Set.null $ lptbTests lptb) $ do
+                            singleTest topts lptb ac ee task
+                        unless (Set.null $ lptbBenches lptb) $ do
+                            singleBench beopts lptb ac ee task
                     }
                 ]
-            _ -> []
       where
         addBuild ident =
             case mbuild of
                 Nothing -> id
                 Just _ -> Set.insert $ ActionId ident ATBuild
 
-    mfunc =
-        case boptsFinalAction $ eeBuildOpts ee of
-            DoNothing -> Nothing
-            DoTests topts -> Just (singleTest topts, checkTest)
-            DoBenchmarks beopts -> Just (singleBench beopts, checkBench)
-
-    checkTest task =
-        case taskType task of
-            TTLocal lp -> not $ Set.null $ packageTests $ lpPackage lp
-            _ -> assert False False
-
-    checkBench task =
-        case taskType task of
-            TTLocal lp -> not $ Set.null $ packageBenchmarks $ lpPackage lp
-            _ -> assert False False
+    bopts = eeBuildOpts ee
+    topts = boptsTestOpts bopts
+    beopts = boptsBenchmarkOpts bopts
 
 -- | Ensure that the configuration for the package matches what is given
 ensureConfig :: M env m
@@ -475,7 +465,7 @@ ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal cabalfp extra = do
             , configCacheDeps = allDeps
             , configCacheComponents =
                 case taskType of
-                    TTLocal lp -> Set.map encodeUtf8 $ lpComponents lp
+                    TTLocal lp -> Set.map renderComponent $ lpComponents lp
                     TTUpstream _ _ -> Set.empty
             , configCacheHaddock =
                 shouldHaddockPackage eeBuildOpts eeWanted (packageIdentifierName taskProvides)
@@ -672,7 +662,11 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
     extraOpts <- extraBuildOptions
     cabal (console && configHideTHLoading config) $
         (case taskType of
-            TTLocal lp -> "build" : map T.unpack (Set.toList $ lpComponents lp)
+            TTLocal lp -> "build"
+                        -- Cabal... There doesn't seem to be a way to call out the library component...
+                        -- : "lib"
+                        : map (T.unpack . T.append "exe:")
+                              (maybe [] Set.toList $ lpExeComponents lp)
             TTUpstream _ _ -> ["build"]) ++ extraOpts
 
     let doHaddock = shouldHaddockPackage eeBuildOpts eeWanted (packageName package) &&
@@ -722,11 +716,12 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
 
 singleTest :: M env m
            => TestOpts
+           -> LocalPackageTB
            -> ActionContext
            -> ExecuteEnv
            -> Task
            -> m ()
-singleTest topts ac ee task =
+singleTest topts lptb ac ee task =
     withSingleContext ac ee task (Just "test") $ \package cabalfp pkgDir cabal announce console mlogFile -> do
         (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (test)") cabal cabalfp ["--enable-tests"]
         config <- asks getConfig
@@ -741,11 +736,7 @@ singleTest topts ac ee task =
 
             needHpc = toCoverage topts
 
-            componentsRaw =
-                case taskType task of
-                    TTLocal lp -> Set.toList $ lpComponents lp
-                    TTUpstream _ _ -> assert False []
-            testsToRun = compareTestsComponents componentsRaw $ Set.toList $ packageTests package
+            testsToRun = Set.toList $ lptbTests lptb
             components = map (T.unpack . T.append "test:") testsToRun
 
         when needBuild $ do
@@ -864,29 +855,14 @@ singleTest topts ac ee task =
 
             setTestSuccess pkgDir
 
--- | Determine the tests to be run based on the list of components.
-compareTestsComponents :: [Text] -- ^ components
-                       -> [Text] -- ^ all test names
-                       -> [Text] -- ^ tests to be run
-compareTestsComponents [] tests = tests -- no components -- all tests
-compareTestsComponents comps tests2 =
-    Set.toList $ Set.intersection tests1 $ Set.fromList tests2
-  where
-    tests1 = Set.unions $ map toSet comps
-
-    toSet x =
-        case T.break (== ':') x of
-            (y, "") -> assert (x == y) (Set.singleton x)
-            ("test", y) -> Set.singleton $ T.drop 1 y
-            _ -> Set.empty
-
 singleBench :: M env m
             => BenchmarkOpts
+            -> LocalPackageTB
             -> ActionContext
             -> ExecuteEnv
             -> Task
             -> m ()
-singleBench beopts ac ee task =
+singleBench beopts _lptb ac ee task =
     withSingleContext ac ee task (Just "bench") $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
         (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (benchmarks)") cabal cabalfp ["--enable-benchmarks"]
 

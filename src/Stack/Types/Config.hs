@@ -246,6 +246,9 @@ data BuildConfig = BuildConfig
       -- different from bcRoot </> "stack.yaml"
     , bcFlags      :: !(Map PackageName (Map FlagName Bool))
       -- ^ Per-package flag overrides
+    , bcImplicitGlobal :: !Bool
+      -- ^ Are we loading from the implicit global stack.yaml? This is useful
+      -- for providing better error messages.
     }
 
 -- | Directory containing the project's stack.yaml file

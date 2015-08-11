@@ -89,12 +89,12 @@ readLocalPackage pkgDir = do
     package <- readPackage config cabalfp
     return LocalPackage
         { lpPackage = package
-        , lpWanted = False -- HACK: makes it so that sdist output goes to a log instead of a file.
+        , lpExeComponents = Nothing -- HACK: makes it so that sdist output goes to a log instead of a file.
         , lpDir = pkgDir
         , lpCabalFile = cabalfp
         -- NOTE: these aren't the 'correct values, but aren't used in
         -- the usage of this function in this module.
-        , lpPackageFinal = package
+        , lpTestBench = Nothing
         , lpDirtyFiles = True
         , lpNewBuildCache = Map.empty
         , lpFiles = Set.empty

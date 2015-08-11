@@ -48,6 +48,7 @@ data Command
     | Test
     | Haddock
     | Bench
+    | Install
     deriving (Eq)
 
 -- | Parser for bench arguments.
@@ -58,16 +59,25 @@ benchOptsParser = BenchmarkOpts
                                  help ("Forward BENCH_ARGS to the benchmark suite. " <>
                                        "Supports templates from `cabal bench`")))
 
+addCoverageFlags :: BuildOpts -> BuildOpts
+addCoverageFlags bopts
+    | toCoverage $ boptsTestOpts bopts
+        = bopts { boptsGhcOptions = "-fhpc" : boptsGhcOptions bopts }
+    | otherwise = bopts
+
 -- | Parser for build arguments.
 buildOptsParser :: Command
-                -> Bool -- ^ default copy-bins value
                 -> Parser BuildOpts
-buildOptsParser cmd defCopyBins =
+buildOptsParser cmd =
+            fmap addCoverageFlags $
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
-            optimize <*> haddock <*> haddockDeps <*> finalAction <*> dryRun <*> ghcOpts <*>
+            optimize <*> haddock <*> haddockDeps <*> dryRun <*> ghcOpts <*>
             flags <*> copyBins <*> preFetch <*>
-            ((||) <$> onlySnapshot <*> onlyDependencies) <*>
-            fileWatch' <*> keepGoing <*> forceDirty
+            buildSubset <*>
+            fileWatch' <*> keepGoing <*> forceDirty <*>
+            tests <*> testOptsParser <*>
+            benches <*> benchOptsParser <*>
+            many exec
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
         target =
@@ -88,7 +98,7 @@ buildOptsParser cmd defCopyBins =
         haddock =
           boolFlags (cmd == Haddock)
                     "haddock"
-                    "building Haddocks"
+                    "generating Haddocks the project(s) in this directory/configuration"
                     idm
         haddockDeps =
           if cmd == Haddock
@@ -97,9 +107,8 @@ buildOptsParser cmd defCopyBins =
                             "building Haddocks for dependencies"
                             idm
              else pure Nothing
-        finalAction = pure DoNothing
 
-        copyBins = boolFlags defCopyBins
+        copyBins = boolFlags (cmd == Install)
             "copy-bins"
             "copying binaries to the local-bin-path (see 'stack path')"
             idm
@@ -127,12 +136,15 @@ buildOptsParser cmd defCopyBins =
         preFetch = flag False True
             (long "prefetch" <>
              help "Fetch packages necessary for the build immediately, useful with --dry-run")
-        onlySnapshot = flag False True
-            (long "only-snapshot" <>
-             help "Only build packages for the snapshot database, not the local database")
-        onlyDependencies = flag False True
-            (long "only-dependencies" <>
-             help "Currently: a synonym for only-snapshot, see https://github.com/commercialhaskell/stack/issues/387")
+
+        buildSubset =
+            flag' BSOnlySnapshot
+                (long "only-snapshot" <>
+                 help "Only build packages for the snapshot database, not the local database")
+            <|> flag' BSOnlyDependencies
+                (long "only-dependencies" <>
+                 help "Only build packages that are dependencies of targets on the command line")
+            <|> pure BSAll
 
         fileWatch' = flag False True
             (long "file-watch" <>
@@ -146,6 +158,22 @@ buildOptsParser cmd defCopyBins =
         forceDirty = flag False True
             (long "force-dirty" <>
              help "Force treating all local packages as having dirty files (useful for cases where stack can't detect a file change)")
+
+
+        tests = boolFlags (cmd == Test)
+            "test"
+            "testing the project(s) in this directory/configuration"
+            idm
+
+        benches = boolFlags (cmd == Bench)
+            "bench"
+            "benchmarking the project(s) in this directory/configuration"
+            idm
+
+        exec = cmdOption
+            ( long "exec" <>
+              metavar "CMD [ARGS]" <>
+              help "Command and arguments to run after a successful build" )
 
 -- | Parser for package:[-]flag
 readFlag :: ReadM (Map (Maybe PackageName) (Map FlagName Bool))

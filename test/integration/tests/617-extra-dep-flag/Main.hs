@@ -1,4 +1,4 @@
 import StackTest
 
 main :: IO ()
-main = stack ["build"]
+main = stack ["build", "acme-dont-1.1"]
