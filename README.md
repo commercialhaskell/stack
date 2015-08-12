@@ -29,6 +29,8 @@ Downloads are available by operating system:
 * [Arch Linux](https://github.com/commercialhaskell/stack/wiki/Downloads#arch-linux)
 * [Linux (general)](https://github.com/commercialhaskell/stack/wiki/Downloads#linux)
 
+[How to upgrade](https://github.com/commercialhaskell/stack/wiki/Downloads#upgrade).
+
 #### How to use
 
 Go into a Haskell project directory and run `stack build`. If everything is
