@@ -31,6 +31,8 @@ Downloads are available by operating system:
 
 [Upgrade instructions](https://github.com/commercialhaskell/stack/wiki/Downloads#upgrade)
 
+Note: if you are using cabal-install to install stack, you may need to pass a constraint to work around a [Cabal bug](https://github.com/haskell/cabal/issues/2759): `cabal install --constraint 'mono-traversable >= 0.9' stack`.
+
 #### How to use
 
 Go into a Haskell project directory and run `stack build`. If everything is
