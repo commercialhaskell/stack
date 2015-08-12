@@ -12,6 +12,7 @@ module Stack.Build.Source
     , localFlags
     , getLocalPackageViews
     , loadLocalPackage
+    , parseTargetsFromBuildOpts
     ) where
 
 import           Control.Applicative ((<$>), (<*>))
@@ -36,6 +37,7 @@ import qualified Data.HashSet as HashSet
 import           Data.List
 import qualified Data.Map as Map
 import           Data.Map.Strict (Map)
+import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Monoid ((<>), Any (..), mconcat, mempty)
 import           Data.Set (Set)
@@ -51,13 +53,13 @@ import           Path.IO
 import           Prelude
 import           Stack.Build.Cache
 import           Stack.Build.Target
-import           Stack.Types.Build
 import           Stack.BuildPlan (loadMiniBuildPlan, shadowMiniBuildPlan,
                                   parseCustomMiniBuildPlan)
 import           Stack.Constants (wiredInPackages)
 import           Stack.Package
 import           Stack.PackageIndex
 import           Stack.Types
+
 import           System.Directory
 import           System.IO (withBinaryFile, IOMode (ReadMode))
 import           System.IO.Error (isDoesNotExistError)
@@ -71,28 +73,8 @@ loadSourceMap :: (MonadIO m, MonadCatch m, MonadReader env m, HasBuildConfig env
                    )
 loadSourceMap bopts = do
     bconfig <- asks getBuildConfig
-    mbp0 <- case bcResolver bconfig of
-        ResolverSnapshot snapName -> do
-            $logDebug $ "Checking resolver: " <> renderSnapName snapName
-            loadMiniBuildPlan snapName
-        ResolverGhc ghc -> return MiniBuildPlan
-            { mbpGhcVersion = fromMajorVersion ghc
-            , mbpPackages = Map.empty
-            }
-        ResolverCustom _ url -> do
-            stackYamlFP <- asks $ bcStackYaml . getBuildConfig
-            parseCustomMiniBuildPlan stackYamlFP url
-
     rawLocals <- getLocalPackageViews
-    workingDir <- getWorkingDir
-    (cliExtraDeps, targets) <-
-        parseTargets
-            (bcImplicitGlobal bconfig)
-            (mpiVersion <$> mbpPackages mbp0)
-            (bcExtraDeps bconfig)
-            (fst <$> rawLocals)
-            workingDir
-            (boptsTargets bopts)
+    (mbp0, cliExtraDeps, targets) <- parseTargetsFromBuildOpts bopts
 
     menv <- getMinimalEnvOverride
     caches <- getPackageCaches menv
@@ -146,6 +128,39 @@ loadSourceMap bopts = do
             ] `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
 
     return (mbp, locals, nonLocalTargets, sourceMap)
+
+-- | Use the build options and environment to parse targets.
+parseTargetsFromBuildOpts
+    :: (MonadIO m, MonadCatch m, MonadReader env m, HasBuildConfig env, MonadBaseControl IO m, HasHttpManager env, MonadLogger m, HasEnvConfig env)
+    => BuildOpts
+    -> m (MiniBuildPlan, M.Map PackageName Version, M.Map PackageName SimpleTarget)
+parseTargetsFromBuildOpts bopts = do
+    bconfig <- asks getBuildConfig
+    mbp0 <-
+        case bcResolver bconfig of
+            ResolverSnapshot snapName -> do
+                $logDebug $ "Checking resolver: " <> renderSnapName snapName
+                loadMiniBuildPlan snapName
+            ResolverGhc ghc ->
+                return
+                    MiniBuildPlan
+                    { mbpGhcVersion = fromMajorVersion ghc
+                    , mbpPackages = Map.empty
+                    }
+            ResolverCustom _ url -> do
+                stackYamlFP <- asks $ bcStackYaml . getBuildConfig
+                parseCustomMiniBuildPlan stackYamlFP url
+    rawLocals <- getLocalPackageViews
+    workingDir <- getWorkingDir
+    (cliExtraDeps, targets) <-
+        parseTargets
+            (bcImplicitGlobal bconfig)
+            (mpiVersion <$> mbpPackages mbp0)
+            (bcExtraDeps bconfig)
+            (fst <$> rawLocals)
+            workingDir
+            (boptsTargets bopts)
+    return (mbp0, cliExtraDeps, targets)
 
 -- | Parse out the local package views for the current project
 getLocalPackageViews :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env)
