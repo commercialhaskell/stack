@@ -26,7 +26,6 @@ import           Data.Monoid
 import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Distribution.Text (display)
 import           Network.HTTP.Client.Conduit
 import           Path
 import           Path.IO
@@ -69,12 +68,12 @@ ide targets useropts = do
                 return
                     ( ["--dist-dir=" <> toFilePath dist] ++
                       map ("--ghc-option=" ++) (ghciPkgOpts pkg)
-                    , (map display (S.toList (ghciPkgModules pkg)) <>
-                       (mapMaybe
-                            (fmap toFilePath . stripDir pwd)
-                            (if paths_foo_exists
-                                 then [paths_foo]
-                                 else []))))
+                    , mapMaybe
+                          (fmap toFilePath . stripDir pwd)
+                          (S.toList (ghciPkgFiles pkg) <>
+                           if paths_foo_exists
+                               then [paths_foo]
+                               else []))
     localdb <- packageDatabaseLocal
     depsdb <- packageDatabaseDeps
     mpath <- liftIO $ lookupEnv "PATH"

@@ -146,15 +146,16 @@ resolvePackage packageConfig gpkg = Package
     { packageName = name
     , packageVersion = fromCabalVersion (pkgVersion pkgId)
     , packageDeps = deps
-    , packageFiles = GetPackageFiles $ \cabalfp -> do
+    , packageFiles = GetPackageFiles $ \typ cabalfp -> do
         distDir <- distDirFromDir (parent cabalfp)
-        (_,files) <- runReaderT (packageDescModulesAndFiles pkg)
+        (_,files) <- runReaderT (packageDescModulesAndFiles typ pkg)
                                 (cabalfp, buildDir distDir)
-        return $ S.insert cabalfp files
-
+        return $ case typ of
+                   AllFiles -> S.insert cabalfp files
+                   Modules -> files
     , packageModules = GetPackageModules $ \cabalfp -> do
         distDir <- distDirFromDir (parent cabalfp)
-        (modules,_) <- runReaderT (packageDescModulesAndFiles pkg)
+        (modules,_) <- runReaderT (packageDescModulesAndFiles AllFiles pkg)
                                   (cabalfp, buildDir distDir)
         return modules
     , packageTools = packageDescTools pkg
@@ -322,8 +323,8 @@ allBuildInfo' pkg_descr = [ bi | Just lib <- [library pkg_descr]
 -- | Get all files referenced by the package.
 packageDescModulesAndFiles
     :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m, MonadCatch m)
-    => PackageDescription -> m (Set ModuleName,Set (Path Abs File))
-packageDescModulesAndFiles pkg = do
+    => CabalFileType -> PackageDescription -> m (Set ModuleName,Set (Path Abs File))
+packageDescModulesAndFiles typ pkg = do
     libfiles <-
         liftM concat2 (mapM libraryFiles (maybe [] return (library pkg)))
     exefiles <- liftM concat2 (mapM executableFiles (executables pkg))
@@ -340,13 +341,19 @@ packageDescModulesAndFiles pkg = do
     docfiles <- liftM (mempty, ) (resolveGlobFiles (extraDocFiles pkg))
     return
         (concat2
-             [ libfiles
-             , exefiles
-             , dfiles
-             , srcfiles
-             , docfiles
-             , benchfiles
-             , testfiles])
+             (case typ of
+                AllFiles -> [ libfiles
+                            , exefiles
+                            , dfiles
+                            , srcfiles
+                            , docfiles
+                            , benchfiles
+                            , testfiles]
+                Modules -> [ libfiles
+                           , exefiles
+                           , srcfiles
+                           , benchfiles
+                           , testfiles]))
   where
     concat2 :: (Ord a,Ord b) => [(Set a, Set b)] -> (Set a, Set b)
     concat2 = (mconcat *** mconcat) . unzip

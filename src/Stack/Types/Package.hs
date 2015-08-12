@@ -101,11 +101,17 @@ newtype GetPackageOpts = GetPackageOpts
 instance Show GetPackageOpts where
     show _ = "<GetPackageOpts>"
 
+-- | Files to get for a cabal package.
+data CabalFileType
+    = AllFiles
+    | Modules
+
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the .cabal file
 newtype GetPackageFiles = GetPackageFiles
     { getPackageFiles :: forall m env. (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadReader env m, HasPlatform env, HasEnvConfig env)
-                      => Path Abs File
+                      => CabalFileType
+                      -> Path Abs File
                       -> m (Set (Path Abs File))
     }
 instance Show GetPackageFiles where

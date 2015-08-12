@@ -70,6 +70,7 @@ data GhciPkgInfo = GhciPkgInfo
   , ghciPkgOpts :: [String]
   , ghciPkgDir :: Path Abs Dir
   , ghciPkgModules :: Set ModuleName
+  , ghciPkgFiles :: Set (Path Abs File)
   }
 
 ghciSetup
@@ -107,12 +108,14 @@ ghciSetup targets = do
                 pkgOpts <-
                     getPackageOpts (packageOpts pkg) sourceMap (map fst locals) cabalfp
                 modules <- getPackageModules (packageModules pkg) cabalfp
+                moduleFiles <- getPackageFiles (packageFiles pkg) Modules cabalfp
                 return
                     GhciPkgInfo
                     { ghciPkgName = packageName pkg
                     , ghciPkgOpts = filter (not . badForGhci) pkgOpts
                     , ghciPkgDir = parent cabalfp
                     , ghciPkgModules = modules
+                    , ghciPkgFiles = moduleFiles
                     }
   where
     wanted pwd cabalfp name = isInWantedList || targetsEmptyAndInDir
