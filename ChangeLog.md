@@ -1,3 +1,9 @@
+## 0.1.3.1
+
+Bug fixes:
+
+* Ignore disabled executables [#763](https://github.com/commercialhaskell/stack/issues/763)
+
 ## 0.1.3.0
 
 Major changes:
