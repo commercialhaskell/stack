@@ -29,8 +29,8 @@ Release checklist after testing:
 
 After binaries uploaded:
 
+* Push signed Git tag (matching Github release tag name).
 * Publish Github release.
-* Sign Git tag.
 * Upload package to Hackage.
 * Announce to haskell-cafe, commercialhaskell, and haskell-stack mailing lists.
 
