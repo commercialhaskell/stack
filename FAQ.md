@@ -4,8 +4,7 @@ helpful and concise as possible.
 
 #### Where is stack installed and will it interfere with `ghc` (etc) I already have installed?
 
-Stack is installed under your `.stack` directory in your home directory. It
-should not affect your existing installation at all.
+Stack itself is installed in normal system locations based on the mechanism you used (see the [[Downloads]] page). The libraries that Stack installs go under your `.stack` directory in your home directory. It should not affect any existing Haskell tools at all.
 
 #### What is the relationship between stack and cabal?
 
