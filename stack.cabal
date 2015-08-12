@@ -188,6 +188,7 @@ executable stack
                 , exceptions
                 , filepath
                 , filelock >= 0.1.0.1
+                , gitrev >= 1.1
                 , http-conduit >= 2.1.5
                 , lifted-base
                 , monad-control

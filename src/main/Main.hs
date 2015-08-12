@@ -31,6 +31,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Data.Traversable (sequenceA)
+import           Development.GitRev (gitCommitCount)
 import           Network.HTTP.Client
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
@@ -142,7 +143,12 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                    dockerHelpOptName
                    (dockerOptsParser True)
                    ("Only showing --" ++ Docker.dockerCmdName ++ "* options.")
-     let versionString' = $(simpleVersion Meta.version)
+     let versionString' = concat
+            [ $(simpleVersion Meta.version)
+            , " ("
+            , $gitCommitCount
+            , " commits)"
+            ]
      eGlobalRun <- try $
        simpleOptions
          versionString'
