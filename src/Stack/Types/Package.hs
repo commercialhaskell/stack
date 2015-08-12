@@ -96,7 +96,7 @@ newtype GetPackageOpts = GetPackageOpts
                      => SourceMap
                      -> [PackageName]
                      -> Path Abs File
-                     -> m [String]
+                     -> m (Map NamedComponent [String],[String])
     }
 instance Show GetPackageOpts where
     show _ = "<GetPackageOpts>"
@@ -110,9 +110,9 @@ data CabalFileType
 -- Argument is the location of the .cabal file
 newtype GetPackageFiles = GetPackageFiles
     { getPackageFiles :: forall m env. (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadReader env m, HasPlatform env, HasEnvConfig env)
-                      => CabalFileType
-                      -> Path Abs File
-                      -> m (Set (Path Abs File))
+                      => Path Abs File
+                      -> m (Map NamedComponent (Set (Path Abs File))
+                           ,Set (Path Abs File))
     }
 instance Show GetPackageFiles where
     show _ = "<GetPackageFiles>"
@@ -121,7 +121,7 @@ instance Show GetPackageFiles where
 newtype GetPackageModules = GetPackageModules
     { getPackageModules :: forall m env. (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadReader env m, HasPlatform env, HasEnvConfig env)
                              => Path Abs File
-                             -> m (Set ModuleName)
+                             -> m (Map NamedComponent (Set ModuleName))
     }
 instance Show GetPackageModules where
     show _ = "<GetPackageModules>"

@@ -32,7 +32,6 @@ module Stack.Package
   ,autogenDir)
   where
 
-import           Control.Arrow ((***))
 import           Control.Exception hiding (try,catch)
 import           Control.Monad
 import           Control.Monad.Catch
@@ -146,17 +145,17 @@ resolvePackage packageConfig gpkg = Package
     { packageName = name
     , packageVersion = fromCabalVersion (pkgVersion pkgId)
     , packageDeps = deps
-    , packageFiles = GetPackageFiles $ \typ cabalfp -> do
+    , packageFiles = GetPackageFiles $ \cabalfp -> do
         distDir <- distDirFromDir (parent cabalfp)
-        (_,files) <- runReaderT (packageDescModulesAndFiles typ pkg)
-                                (cabalfp, buildDir distDir)
-        return $ case typ of
-                   AllFiles -> S.insert cabalfp files
-                   Modules -> files
+        (_,components,extra) <-
+            runReaderT (packageDescModulesAndFiles pkg)
+                       (cabalfp, buildDir distDir)
+        return (components,S.singleton cabalfp <> extra)
     , packageModules = GetPackageModules $ \cabalfp -> do
         distDir <- distDirFromDir (parent cabalfp)
-        (modules,_) <- runReaderT (packageDescModulesAndFiles AllFiles pkg)
-                                  (cabalfp, buildDir distDir)
+        (modules,_,_) <-
+            runReaderT (packageDescModulesAndFiles pkg)
+                       (cabalfp, buildDir distDir)
         return modules
     , packageTools = packageDescTools pkg
     , packageFlags = packageConfigFlags packageConfig
@@ -178,14 +177,16 @@ resolvePackage packageConfig gpkg = Package
     pkg = resolvePackageDescription packageConfig gpkg
     deps = M.filterWithKey (const . (/= name)) (packageDependencies pkg)
 
--- | Generate GHC options for the package.
+-- | Generate GHC options for the package's components, and a list of
+-- options which apply generally to the package, not one specific
+-- component.
 generatePkgDescOpts
     :: (HasEnvConfig env, HasPlatform env, MonadThrow m, MonadReader env m, MonadIO m)
     => SourceMap
     -> [PackageName]
     -> Path Abs File
     -> PackageDescription
-    -> m [String]
+    -> m (Map NamedComponent [String],[String])
 generatePkgDescOpts sourceMap locals cabalfp pkg = do
     distDir <- distDirFromDir cabalDir
     let cabalmacros = autogenDir distDir </> $(mkRelFile "cabal_macros.h")
@@ -194,16 +195,36 @@ generatePkgDescOpts sourceMap locals cabalfp pkg = do
             if exists
                 then Just cabalmacros
                 else Nothing
+    let generate =
+            generateBuildInfoOpts
+                sourceMap
+                mcabalmacros
+                cabalDir
+                distDir
+                locals
     return
-        (nubOrd
-             (["-hide-all-packages"] ++
-              concatMap
-                  (concatMap
-                       (generateBuildInfoOpts sourceMap mcabalmacros cabalDir distDir locals))
-                  [ maybe [] (return . libBuildInfo) (library pkg)
-                  , map buildInfo (executables pkg)
-                  , map benchmarkBuildInfo (benchmarks pkg)
-                  , map testBuildInfo (testSuites pkg)]))
+        ( M.fromList
+              (concat
+                   [ maybe
+                         []
+                         (return . (CLib, ) . generate . libBuildInfo)
+                         (library pkg)
+                   , map
+                         (\exe ->
+                               ( CExe (T.pack (exeName exe))
+                               , generate (buildInfo exe)))
+                         (executables pkg)
+                   , map
+                         (\bench ->
+                               ( CBench (T.pack (benchmarkName bench))
+                               , generate (benchmarkBuildInfo bench)))
+                         (benchmarks pkg)
+                   , map
+                         (\test ->
+                               ( CBench (T.pack (testName test))
+                               , generate (testBuildInfo test)))
+                         (testSuites pkg)])
+        , ["-hide-all-packages"])
   where
     cabalDir = parent cabalfp
 
@@ -323,40 +344,48 @@ allBuildInfo' pkg_descr = [ bi | Just lib <- [library pkg_descr]
 -- | Get all files referenced by the package.
 packageDescModulesAndFiles
     :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m, MonadCatch m)
-    => CabalFileType -> PackageDescription -> m (Set ModuleName,Set (Path Abs File))
-packageDescModulesAndFiles typ pkg = do
-    libfiles <-
-        liftM concat2 (mapM libraryFiles (maybe [] return (library pkg)))
-    exefiles <- liftM concat2 (mapM executableFiles (executables pkg))
-    benchfiles <- liftM concat2 (mapM benchmarkFiles (benchmarks pkg))
-    testfiles <- liftM concat2 (mapM testFiles (testSuites pkg))
-    dfiles <-
+    => PackageDescription
+    -> m (Map NamedComponent (Set ModuleName), Map NamedComponent (Set (Path Abs File)), (Set (Path Abs File)))
+packageDescModulesAndFiles pkg = do
+    (libraryMods,libFiles) <-
+        maybe
+            (return (M.empty, M.empty))
+            (asModuleAndFileMap libComponent libraryFiles)
+            (library pkg)
+    (executableMods,exeFiles) <-
         liftM
-            (mempty, )
-            (resolveGlobFiles (map (dataDir pkg FilePath.</>) (dataFiles pkg)))
-    srcfiles <- liftM (mempty, ) (resolveGlobFiles (extraSrcFiles pkg))
-    -- extraTmpFiles purposely not included here, as those are files generated
-    -- by the build script. Another possible implementation: include them, but
-    -- don't error out if not present
-    docfiles <- liftM (mempty, ) (resolveGlobFiles (extraDocFiles pkg))
-    return
-        (concat2
-             (case typ of
-                AllFiles -> [ libfiles
-                            , exefiles
-                            , dfiles
-                            , srcfiles
-                            , docfiles
-                            , benchfiles
-                            , testfiles]
-                Modules -> [ libfiles
-                           , exefiles
-                           , srcfiles
-                           , benchfiles
-                           , testfiles]))
+            foldPairs
+            (mapM
+                 (asModuleAndFileMap exeComponent executableFiles)
+                 (executables pkg))
+    (testMods,testFps) <-
+        liftM
+            foldPairs
+            (mapM (asModuleAndFileMap testComponent testFiles) (testSuites pkg))
+    (benchModules,benchFiles) <-
+        liftM
+            foldPairs
+            (mapM
+                 (asModuleAndFileMap benchComponent benchmarkFiles)
+                 (benchmarks pkg))
+    dfiles <-
+        resolveGlobFiles (map (dataDir pkg FilePath.</>) (dataFiles pkg))
+    let modules = libraryMods <> executableMods <> testMods <> benchModules
+        files = libFiles <> exeFiles <> testFps <> benchFiles
+    return (modules, files, dfiles)
   where
-    concat2 :: (Ord a,Ord b) => [(Set a, Set b)] -> (Set a, Set b)
-    concat2 = (mconcat *** mconcat) . unzip
+    libComponent = const CLib
+    exeComponent = CExe . T.pack . exeName
+    testComponent = CTest . T.pack . testName
+    benchComponent = CBench . T.pack . benchmarkName
+    asModuleAndFileMap label f lib = do
+        (a,b) <- f lib
+        return (M.singleton (label lib) a, M.singleton (label lib) b)
+    foldPairs =
+        foldl'
+            (\(a,b) (x,y) ->
+                  (a <> x, b <> y))
+            (M.empty, M.empty)
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
 resolveGlobFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m,MonadCatch m)
