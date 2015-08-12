@@ -129,16 +129,11 @@ parseRawTargetDirs root locals t =
             then Just name
             else Nothing
 
-data TargetType
-    = TTUnknown
-    | TTNonLocal
-    | TTLocalComp !NamedComponent
-    | TTLocalAllComps !(Set NamedComponent)
-
 data SimpleTarget
     = STUnknown
     | STNonLocal
-    | STLocal !(Set NamedComponent)
+    | STLocalComps !(Set NamedComponent)
+    | STLocalAll
     deriving (Show, Eq, Ord)
 
 resolveIdents :: Map PackageName Version -- ^ snapshot
@@ -180,7 +175,7 @@ resolveRawTarget :: Map PackageName Version -- ^ snapshot
                  -> Map PackageName Version -- ^ extra deps
                  -> Map PackageName LocalPackageView
                  -> (RawInput, RawTarget NoIdents)
-                 -> Either Text (PackageName, (RawInput, TargetType))
+                 -> Either Text (PackageName, (RawInput, SimpleTarget))
 resolveRawTarget snap extras locals (ri, rt) =
     go rt
   where
@@ -191,7 +186,7 @@ resolveRawTarget snap extras locals (ri, rt) =
                 case ucomp of
                     ResolvedComponent comp
                         | comp `Set.member` lpvComponents lpv ->
-                            Right (name, (ri, TTLocalComp comp))
+                            Right (name, (ri, STLocalComps $ Set.singleton comp))
                         | otherwise -> Left $ T.pack $ concat
                             [ "Component "
                             , show comp
@@ -206,7 +201,7 @@ resolveRawTarget snap extras locals (ri, rt) =
                                 , " does not exist in package "
                                 , T.pack $ packageNameString name
                                 ]
-                            [x] -> Right (name, (ri, TTLocalComp x))
+                            [x] -> Right (name, (ri, STLocalComps $ Set.singleton x))
                             matches -> Left $ T.concat
                                 [ "Ambiguous component name "
                                 , comp
@@ -222,7 +217,7 @@ resolveRawTarget snap extras locals (ri, rt) =
          in case filter (isCompNamed cname . snd) allPairs of
                 [] -> Left $ "Could not find a component named " `T.append` cname
                 [(name, comp)] ->
-                    Right (name, (ri, TTLocalComp comp))
+                    Right (name, (ri, STLocalComps $ Set.singleton comp))
                 matches -> Left $ T.concat
                     [ "Ambiugous component name "
                     , cname
@@ -232,14 +227,14 @@ resolveRawTarget snap extras locals (ri, rt) =
 
     go (RTPackage name) =
         case Map.lookup name locals of
-            Just lpv -> Right (name, (ri, TTLocalAllComps $ lpvComponents lpv))
+            Just _lpv -> Right (name, (ri, STLocalAll))
             Nothing ->
                 case Map.lookup name extras of
-                    Just _ -> Right (name, (ri, TTNonLocal))
+                    Just _ -> Right (name, (ri, STNonLocal))
                     Nothing ->
                         case Map.lookup name snap of
-                            Just _ -> Right (name, (ri, TTNonLocal))
-                            Nothing -> Right (name, (ri, TTUnknown))
+                            Just _ -> Right (name, (ri, STNonLocal))
+                            Nothing -> Right (name, (ri, STUnknown))
 
 isCompNamed :: Text -> NamedComponent -> Bool
 isCompNamed _ CLib = False
@@ -247,26 +242,18 @@ isCompNamed t1 (CExe t2) = t1 == t2
 isCompNamed t1 (CTest t2) = t1 == t2
 isCompNamed t1 (CBench t2) = t1 == t2
 
-simplifyTargets :: Bool -- ^ include tests
-                -> Bool -- ^ include benchmarks
-                -> [(PackageName, (RawInput, TargetType))]
+simplifyTargets :: [(PackageName, (RawInput, SimpleTarget))]
                 -> ([Text], Map PackageName SimpleTarget)
-simplifyTargets includeTests includeBenches =
+simplifyTargets =
     mconcat . map go . Map.toList . Map.fromListWith (++) . fmap (second return)
   where
-    go :: (PackageName, [(RawInput, TargetType)])
+    go :: (PackageName, [(RawInput, SimpleTarget)])
        -> ([Text], Map PackageName SimpleTarget)
     go (_, []) = error "Stack.Build.Target.simplifyTargets: the impossible happened"
-    go (name, [(_, tt)]) = ([], Map.singleton name $
-        case tt of
-            TTUnknown -> STUnknown
-            TTNonLocal -> STNonLocal
-            TTLocalComp comp -> STLocal $ Set.singleton comp
-            TTLocalAllComps comps -> STLocal $ Set.filter keepComp comps
-        )
+    go (name, [(_, st)]) = ([], Map.singleton name st)
     go (name, pairs) =
         case partitionEithers $ map (getLocalComp . snd) pairs of
-            ([], comps) -> ([], Map.singleton name $ STLocal $ Set.fromList comps)
+            ([], comps) -> ([], Map.singleton name $ STLocalComps $ Set.unions comps)
             _ ->
                 let err = T.pack $ concat
                         [ "Overlapping targets provided for package "
@@ -276,25 +263,18 @@ simplifyTargets includeTests includeBenches =
                         ]
                  in ([err], Map.empty)
 
-    keepComp CLib = True
-    keepComp (CExe _) = True
-    keepComp (CTest _) = includeTests
-    keepComp (CBench _) = includeBenches
-
-    getLocalComp (TTLocalComp comp) = Right comp
+    getLocalComp (STLocalComps comps) = Right comps
     getLocalComp _ = Left ()
 
 parseTargets :: (MonadThrow m, MonadIO m)
              => Bool -- ^ using implicit global?
-             -> Bool -- ^ include tests
-             -> Bool -- ^ include benchmarks
              -> Map PackageName Version -- ^ snapshot
              -> Map PackageName Version -- ^ extra deps
              -> Map PackageName LocalPackageView
              -> Path Abs Dir -- ^ current directory
              -> [Text] -- ^ command line targets
              -> m (Map PackageName Version, Map PackageName SimpleTarget)
-parseTargets implicitGlobal includeTests includeBenches snap extras locals currDir textTargets' = do
+parseTargets implicitGlobal snap extras locals currDir textTargets' = do
     let textTargets =
             if null textTargets'
                 then map (T.pack . packageNameString) $ Map.keys $ Map.filter (not . lpvExtraDep) locals
@@ -306,7 +286,7 @@ parseTargets implicitGlobal includeTests includeBenches snap extras locals currD
             map (resolveIdents snap extras locals) $ concat rawTargets
         (errs3, targetTypes) = partitionEithers $
             map (resolveRawTarget snap extras locals) rawTargets'
-        (errs4, targets) = simplifyTargets includeTests includeBenches targetTypes
+        (errs4, targets) = simplifyTargets targetTypes
         errs = concat [errs1, errs2, errs3, errs4]
 
     if null errs

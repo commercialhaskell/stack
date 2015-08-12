@@ -1,5 +1,5 @@
 name:                stack
-version:             0.1.3.0
+version:             0.1.3.1
 synopsis:            The Haskell Tool Stack
 description:         Please see the README.md for usage information, and
                      the wiki on Github for more details.  Also, note that

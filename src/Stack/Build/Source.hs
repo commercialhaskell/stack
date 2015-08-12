@@ -37,7 +37,7 @@ import           Data.List
 import qualified Data.Map as Map
 import           Data.Map.Strict (Map)
 import           Data.Maybe
-import           Data.Monoid ((<>), Any (..), mconcat)
+import           Data.Monoid ((<>), Any (..), mconcat, mempty)
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
@@ -88,8 +88,6 @@ loadSourceMap bopts = do
     (cliExtraDeps, targets) <-
         parseTargets
             (bcImplicitGlobal bconfig)
-            (boptsTests bopts)
-            (boptsBenchmarks bopts)
             (mpiVersion <$> mbpPackages mbp0)
             (bcExtraDeps bconfig)
             (fst <$> rawLocals)
@@ -119,7 +117,8 @@ loadSourceMap bopts = do
         nonLocalTargets =
             Map.keysSet $ Map.filter (not . isLocal) targets
           where
-            isLocal (STLocal _) = True
+            isLocal (STLocalComps _) = True
+            isLocal STLocalAll = True
             isLocal STUnknown = False
             isLocal STNonLocal = False
 
@@ -203,26 +202,36 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
     bconfig <- asks getBuildConfig
     econfig <- asks getEnvConfig
 
-    let mtarget = Map.lookup name targets
-        components =
-            case mtarget of
-                Just (STLocal comps) -> comps
-                Just STNonLocal -> assert False Set.empty
-                Just STUnknown -> assert False Set.empty
-                Nothing -> Set.empty
-        (exes, tests, benches) = splitComponents $ Set.toList components
-        config = PackageConfig
+    let config = PackageConfig
             { packageConfigEnableTests = False
             , packageConfigEnableBenchmarks = False
             , packageConfigFlags = localFlags (boptsFlags bopts) bconfig name
             , packageConfigGhcVersion = envConfigGhcVersion econfig
             , packageConfigPlatform = configPlatform $ getConfig bconfig
             }
+        pkg = resolvePackage config gpkg
+
+        mtarget = Map.lookup name targets
+        (exes, tests, benches) =
+            case mtarget of
+                Just (STLocalComps comps) -> splitComponents $ Set.toList comps
+                Just STLocalAll ->
+                    ( packageExes pkg
+                    , if boptsTests bopts
+                        then packageTests pkg
+                        else Set.empty
+                    , if boptsBenchmarks bopts
+                        then packageBenchmarks pkg
+                        else Set.empty
+                    )
+                Just STNonLocal -> assert False mempty
+                Just STUnknown -> assert False mempty
+                Nothing -> mempty
+
         btconfig = config
             { packageConfigEnableTests = not $ Set.null tests
             , packageConfigEnableBenchmarks = not $ Set.null benches
             }
-        pkg = resolvePackage config gpkg
         btpkg
             | Set.null tests && Set.null benches = Nothing
             | otherwise = Just $ LocalPackageTB
@@ -248,7 +257,11 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
         , lpNewBuildCache = newBuildCache
         , lpCabalFile = lpvCabalFP lpv
         , lpDir = lpvRoot lpv
-        , lpComponents = components
+        , lpComponents = Set.unions
+            [ Set.map CExe exes
+            , Set.map CTest tests
+            , Set.map CBench benches
+            ]
         }
 
 -- | Ensure that the flags specified in the stack.yaml file and on the command
