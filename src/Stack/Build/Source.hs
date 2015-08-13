@@ -143,10 +143,13 @@ parseTargetsFromBuildOpts needTargets bopts = do
             ResolverSnapshot snapName -> do
                 $logDebug $ "Checking resolver: " <> renderSnapName snapName
                 loadMiniBuildPlan snapName
-            ResolverGhc ghc ->
-                return
-                    MiniBuildPlan
-                    { mbpGhcVersion = fromMajorVersion ghc
+            ResolverCompiler _ -> do
+                -- We ignore the resolver version, as it might be
+                -- GhcMajorVersion, and we want the exact version
+                -- we're using.
+                version <- asks (envConfigGhcVersion . getEnvConfig)
+                return MiniBuildPlan
+                    { mbpGhcVersion = version
                     , mbpPackages = Map.empty
                     }
             ResolverCustom _ url -> do

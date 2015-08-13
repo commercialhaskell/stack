@@ -66,6 +66,7 @@ import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, parseRelDir, 
 import           Prelude
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
+import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
@@ -78,8 +79,12 @@ import           System.FilePath (dropTrailingPathSeparator, pathSeparator)
 -- Exceptions
 data StackBuildException
   = Couldn'tFindPkgId PackageName
-  | GHCVersionMismatch (Maybe (Version, Arch)) (Version, Arch) (Maybe (Path Abs File))
-                       Text -- recommended resolution
+  | GHCVersionMismatch
+        (Maybe (Version, Arch))
+        (CompilerVersion, Arch)
+        VersionCheck
+        (Maybe (Path Abs File))
+        Text -- recommended resolution
   -- ^ Path to the stack.yaml file
   | Couldn'tParseTargets [Text]
   | UnknownTargets
@@ -120,18 +125,22 @@ instance Show StackBuildException where
                ", the package id couldn't be found " <> "(via ghc-pkg describe " <>
                packageNameString name <> "). This shouldn't happen, " <>
                "please report as a bug")
-    show (GHCVersionMismatch mactual (expected, earch) mstack resolution) = concat
+    show (GHCVersionMismatch mactual (expected, earch) check mstack resolution) = concat
                 [ case mactual of
-                    Nothing -> "No GHC found, expected version "
+                    Nothing -> "No GHC found, expected "
                     Just (actual, arch) -> concat
                         [ "GHC version mismatched, found "
                         , versionString actual
                         , " ("
                         , display arch
                         , ")"
-                        , ", but expected version "
+                        , ", but expected "
                         ]
-                , versionString expected
+                , case check of
+                    MatchMinor -> "minor version match with "
+                    MatchExact -> "exact version "
+                    NewerMinor -> "minor version match or newer with "
+                , T.unpack (compilerVersionName expected)
                 , " ("
                 , display earch
                 , ") (based on "

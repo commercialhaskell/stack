@@ -137,6 +137,8 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
 
          configImage = Image.imgOptsFromMonoid configMonoidImageOpts
 
+         configCompilerCheck = fromMaybe MatchMinor configMonoidCompilerCheck
+
      origEnv <- getEnvOverride configPlatform
      let configEnvOverride _ = return origEnv
 
@@ -281,20 +283,20 @@ loadBuildConfig mproject config stackRoot mresolver = do
                     (MiniConfig manager config)
     let project = project' { projectResolver = resolver }
 
-    ghcVersion <-
+    wantedCompiler <-
         case projectResolver project of
             ResolverSnapshot snapName -> do
                 mbp <- runReaderT (loadMiniBuildPlan snapName) miniConfig
-                return $ mbpGhcVersion mbp
-            ResolverGhc m -> return $ fromMajorVersion m
+                return $ GhcVersion $ mbpGhcVersion mbp
             ResolverCustom _name url -> do
                 mbp <- runReaderT (parseCustomMiniBuildPlan stackYamlFP url) miniConfig
-                return $ mbpGhcVersion mbp
+                return $ GhcVersion $ mbpGhcVersion mbp
+            ResolverCompiler wantedCompiler -> return wantedCompiler
 
     return BuildConfig
         { bcConfig = config
         , bcResolver = projectResolver project
-        , bcGhcVersionExpected = ghcVersion
+        , bcWantedCompiler = wantedCompiler
         , bcPackageEntries = projectPackages project
         , bcExtraDeps = projectExtraDeps project
         , bcStackYaml = stackYamlFP

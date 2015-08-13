@@ -40,14 +40,14 @@ cabalSolver :: (MonadIO m, MonadLogger m, MonadMask m, MonadBaseControl IO m, Mo
             => [Path Abs Dir] -- ^ cabal files
             -> Map PackageName Version -- ^ constraints
             -> [String] -- ^ additional arguments
-            -> m (MajorVersion, Map PackageName (Version, Map FlagName Bool))
+            -> m (Version, Map PackageName (Version, Map FlagName Bool))
 cabalSolver cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-solver" $ \dir -> do
     configLines <- getCabalConfig dir constraints
     let configFile = dir FP.</> "cabal.config"
     liftIO $ S.writeFile configFile $ encodeUtf8 $ T.unlines configLines
 
     menv <- getMinimalEnvOverride
-    ghcMajorVersion <- getGhcMajorVersion menv
+    ghcVersion <- getGhcVersion menv
 
     -- Run from a temporary directory to avoid cabal getting confused by any
     -- sandbox files, see:
@@ -78,7 +78,7 @@ cabalSolver cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-solv
            $ decodeUtf8 bs
         (errs, pairs) = partitionEithers $ map parseLine ls
     if null errs
-        then return (ghcMajorVersion, Map.fromList pairs)
+        then return (ghcVersion, Map.fromList pairs)
         else error $ "Could not parse cabal-install output: " ++ show errs
   where
     parseLine t0 = maybe (Left t0) Right $ do
@@ -107,12 +107,6 @@ getGhcVersion menv = do
     parseVersion $ S8.takeWhile isValid bs
   where
     isValid c = c == '.' || ('0' <= c && c <= '9')
-
-getGhcMajorVersion :: (MonadLogger m, MonadCatch m, MonadBaseControl IO m, MonadIO m)
-                   => EnvOverride -> m MajorVersion
-getGhcMajorVersion menv = do
-    version <- getGhcVersion menv
-    return $ getMajorVersion version
 
 getCabalConfig :: (MonadReader env m, HasConfig env, MonadIO m, MonadThrow m)
                => FilePath -- ^ temp dir
@@ -156,7 +150,7 @@ solveExtraDeps modStackYaml = do
     snapshot <-
         case bcResolver bconfig of
             ResolverSnapshot snapName -> liftM mbpPackages $ loadMiniBuildPlan snapName
-            ResolverGhc _ -> return Map.empty
+            ResolverCompiler _ -> return Map.empty
             ResolverCustom _ url -> liftM mbpPackages $ parseCustomMiniBuildPlan
                 (bcStackYaml bconfig)
                 url

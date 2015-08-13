@@ -11,10 +11,7 @@
 module Stack.Types.Version
   (Version
   ,Cabal.VersionRange -- TODO in the future should have a newtype wrapper
-  ,MajorVersion (..)
-  ,getMajorVersion
-  ,fromMajorVersion
-  ,parseMajorVersionFromString
+  ,VersionCheck(..)
   ,versionParser
   ,parseVersion
   ,parseVersionFromString
@@ -25,7 +22,9 @@ module Stack.Types.Version
   ,mkVersion
   ,versionRangeText
   ,withinRange
-  ,Stack.Types.Version.intersectVersionRanges)
+  ,Stack.Types.Version.intersectVersionRanges
+  ,toMajorVersion
+  ,checkVersion)
   where
 
 import           Control.Applicative
@@ -58,63 +57,16 @@ import           Text.PrettyPrint (render)
 -- | A parse fail.
 data VersionParseFail =
   VersionParseFail ByteString
-  | NotAMajorVersion Version
   deriving (Typeable)
 instance Exception VersionParseFail
 instance Show VersionParseFail where
     show (VersionParseFail bs) = "Invalid version: " ++ show bs
-    show (NotAMajorVersion v) = concat
-        [ "Not a major version: "
-        , versionString v
-        , ", expecting exactly two numbers (e.g. 7.10)"
-        ]
 
 -- | A package version.
 newtype Version =
   Version {unVersion :: Vector Word}
   deriving (Eq,Ord,Typeable,Data,Generic,Binary,NFData)
 
--- | The first two components of a version.
-data MajorVersion = MajorVersion !Word !Word
-    deriving (Typeable, Eq, Ord)
-instance Show MajorVersion where
-    show (MajorVersion x y) = concat [show x, ".", show y]
-instance ToJSON MajorVersion where
-    toJSON = toJSON . fromMajorVersion
-
--- | Parse major version from @String@
-parseMajorVersionFromString :: MonadThrow m => String -> m MajorVersion
-parseMajorVersionFromString s = do
-    Version v <- parseVersionFromString s
-    if V.length v == 2
-        then return $ getMajorVersion (Version v)
-        else throwM $ NotAMajorVersion (Version v)
-
-instance FromJSON MajorVersion where
-    parseJSON = withText "MajorVersion"
-              $ either (fail . show) return
-              . parseMajorVersionFromString
-              . T.unpack
-instance FromJSON a => FromJSON (Map MajorVersion a) where
-    parseJSON val = do
-        m <- parseJSON val
-        fmap Map.fromList $ mapM go $ Map.toList m
-      where
-        go (k, v) = do
-            k' <- either (fail . show) return $ parseMajorVersionFromString k
-            return (k', v)
-
--- | Returns the first two components, defaulting to 0 if not present
-getMajorVersion :: Version -> MajorVersion
-getMajorVersion (Version v) =
-    case V.length v of
-        0 -> MajorVersion 0 0
-        1 -> MajorVersion (V.head v) 0
-        _ -> MajorVersion (V.head v) (v V.! 1)
-
--- | Convert a two-component version into a @Version@
-fromMajorVersion :: MajorVersion -> Version
-fromMajorVersion (MajorVersion x y) = Version $ V.fromList [x, y]
 
 instance Hashable Version where
   hashWithSalt i = hashWithSalt i . V.toList . unVersion
@@ -140,6 +92,14 @@ instance FromJSON Version where
          Nothing ->
            fail ("Couldn't parse package version: " ++ s)
          Just ver -> return ver
+instance FromJSON a => FromJSON (Map Version a) where
+    parseJSON val = do
+        m <- parseJSON val
+        fmap Map.fromList $ mapM go $ Map.toList m
+      where
+        go (k, v) = do
+            k' <- either (fail . show) return $ parseVersionFromString k
+            return (k', v)
 
 -- | Attoparsec parser for a package version from bytestring.
 versionParser :: Parser Version
@@ -206,3 +166,44 @@ withinRange v r = toCabalVersion v `Cabal.withinRange` r
 -- | A modified intersection which also simplifies, for better display.
 intersectVersionRanges :: Cabal.VersionRange -> Cabal.VersionRange -> Cabal.VersionRange
 intersectVersionRanges x y = Cabal.simplifyVersionRange $ Cabal.intersectVersionRanges x y
+
+-- | Returns the first two components, defaulting to 0 if not present
+toMajorVersion :: Version -> Version
+toMajorVersion  (Version v) =
+    case V.length v of
+        0 -> Version (V.fromList [0,        0])
+        1 -> Version (V.fromList [V.head v, 0])
+        _ -> Version (V.fromList [V.head v, v V.! 1])
+
+data VersionCheck
+    = MatchMinor
+    | MatchExact
+    | NewerMinor
+    deriving (Show, Eq, Ord)
+instance ToJSON VersionCheck where
+    toJSON MatchMinor = String "match-minor"
+    toJSON MatchExact = String "match-exact"
+    toJSON NewerMinor = String "newer-minor"
+instance FromJSON VersionCheck where
+    parseJSON = withText expected $ \t ->
+        case t of
+            "match-minor" -> return MatchMinor
+            "match-exact" -> return MatchExact
+            "newer-minor" -> return NewerMinor
+            _ -> fail ("Expected " ++ expected ++ ", but got " ++ show t)
+      where
+        expected = "VersionCheck value (match-minor, match-exact, or newer-minor)"
+
+checkVersion :: VersionCheck -> Version -> Version -> Bool
+checkVersion check (Version wanted) (Version actual) =
+    case check of
+        MatchMinor -> V.and (V.take 3 matching)
+        MatchExact -> V.length wanted == V.length actual && V.and matching
+        NewerMinor -> V.and (V.take 2 matching) && newerMinor
+  where
+    matching = V.zipWith (==) wanted actual
+    newerMinor =
+        case (wanted V.!? 2, actual V.!? 2) of
+            (Nothing, _) -> True
+            (Just _, Nothing) -> False
+            (Just w, Just a) -> a >= w

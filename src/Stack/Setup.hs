@@ -8,6 +8,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TupleSections #-}
 
 module Stack.Setup
   ( setupEnv
@@ -33,12 +34,14 @@ import           Data.Conduit (Conduit, ($$), (=$), await, yield, awaitForever)
 import           Data.Conduit.Lift (evalStateC)
 import qualified Data.Conduit.List as CL
 import           Data.Either
+import           Data.Foldable (forM_)
 import           Data.IORef
-import           Data.List (intercalate)
+import           Data.List (intercalate, sortBy, maximumBy)
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (mapMaybe, catMaybes, fromMaybe)
+import           Data.Maybe
 import           Data.Monoid
+import           Data.Ord (comparing)
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
@@ -77,7 +80,8 @@ import           Text.Printf (printf)
 data SetupOpts = SetupOpts
     { soptsInstallIfMissing :: !Bool
     , soptsUseSystem :: !Bool
-    , soptsExpected :: !Version
+    , soptsWantedCompiler :: !CompilerVersion
+    , soptsCompilerCheck :: !VersionCheck
     , soptsStackYaml :: !(Maybe (Path Abs File))
     -- ^ If we got the desired GHC version from that file
     , soptsForceReinstall :: !Bool
@@ -96,7 +100,7 @@ data SetupOpts = SetupOpts
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
                     | MissingDependencies [String]
-                    | UnknownGHCVersion Text Version (Set MajorVersion)
+                    | UnknownGHCVersion Text CompilerVersion (Set Version)
                     | UnknownOSKey Text
                     | GHCSanityCheckCompileFailed ReadProcessException (Path Abs File)
     deriving Typeable
@@ -110,9 +114,9 @@ instance Show SetupException where
     show (MissingDependencies tools) =
         "The following executables are missing and must be installed: " ++
         intercalate ", " tools
-    show (UnknownGHCVersion oskey version known) = concat
+    show (UnknownGHCVersion oskey wanted known) = concat
         [ "No information found for GHC version "
-        , versionString version
+        , T.unpack (compilerVersionName wanted)
         , ".\nSupported GHC major versions for OS key '" ++ T.unpack oskey ++ "': "
         , intercalate ", " (map show $ Set.toList known)
         ]
@@ -138,7 +142,8 @@ setupEnv mResolveMissingGHC = do
         sopts = SetupOpts
             { soptsInstallIfMissing = configInstallGHC $ bcConfig bconfig
             , soptsUseSystem = configSystemGHC $ bcConfig bconfig
-            , soptsExpected = bcGhcVersionExpected bconfig
+            , soptsWantedCompiler = bcWantedCompiler bconfig
+            , soptsCompilerCheck = configCompilerCheck $ bcConfig bconfig
             , soptsStackYaml = Just $ bcStackYaml bconfig
             , soptsForceReinstall = False
             , soptsSanityCheck = False
@@ -259,11 +264,13 @@ ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfi
           => SetupOpts
           -> m (Maybe [FilePath])
 ensureGHC sopts = do
-    when (getMajorVersion expected < MajorVersion 7 8) $ do
-        $logWarn "stack will almost certainly fail with GHC below version 7.8"
-        $logWarn "Valiantly attempting to run anyway, but I know this is doomed"
-        $logWarn "For more information, see: https://github.com/commercialhaskell/stack/issues/648"
-        $logWarn ""
+    case soptsWantedCompiler sopts of
+        GhcVersion v | v < $(mkVersion "7.8") -> do
+            $logWarn "stack will almost certainly fail with GHC below version 7.8"
+            $logWarn "Valiantly attempting to run anyway, but I know this is doomed"
+            $logWarn "For more information, see: https://github.com/commercialhaskell/stack/issues/648"
+            $logWarn ""
+        _ -> return ()
 
     -- Check the available GHCs
     menv0 <- getMinimalEnvOverride
@@ -279,26 +286,13 @@ ensureGHC sopts = do
             Nothing -> True
             Just _ | soptsSkipGhcCheck sopts -> False
             Just (system, arch) ->
-                -- we allow a newer version of GHC within the same major series
-                getMajorVersion system /= getMajorVersion expected ||
-                expected > system ||
+                not (isWanted system) ||
                 arch /= expectedArch
+        isWanted = isWantedCompiler (soptsCompilerCheck sopts) (soptsWantedCompiler sopts) . GhcVersion
 
     -- If we need to install a GHC, try to do so
     mpaths <- if needLocal
         then do
-            config <- asks getConfig
-            let tools =
-                    case configPlatform config of
-                        Platform _ os | isWindows os ->
-                              ($(mkPackageName "ghc"), Just expected)
-                            : (if soptsSkipMsys sopts
-                                then []
-                                else [($(mkPackageName "git"), Nothing)])
-                        _ ->
-                            [ ($(mkPackageName "ghc"), Just expected)
-                            ]
-
             -- Avoid having to load it twice
             siRef <- liftIO $ newIORef Nothing
             manager <- asks getHttpManager
@@ -311,9 +305,44 @@ ensureGHC sopts = do
                             writeIORef siRef $ Just si
                             return si
 
+            config <- asks getConfig
             installed <- runReaderT listInstalled config
-            idents <- mapM (ensureTool menv0 sopts installed getSetupInfo' msystem) tools
-            paths <- runReaderT (mapM binDirs $ catMaybes idents) config
+
+            -- Install GHC
+            ghcIdent <- case getInstalledTool installed $(mkPackageName "ghc") isWanted of
+                Just ident -> return ident
+                Nothing
+                    | soptsInstallIfMissing sopts -> do
+                        si <- getSetupInfo'
+                        downloadAndInstallGHC menv0 si (soptsWantedCompiler sopts) (soptsCompilerCheck sopts)
+                    | otherwise -> do
+                        Platform arch _ <- asks getPlatform
+                        throwM $ GHCVersionMismatch
+                            msystem
+                            (soptsWantedCompiler sopts, arch)
+                            (soptsCompilerCheck sopts)
+                            (soptsStackYaml sopts)
+                            (fromMaybe
+                                "Try running stack setup to locally install the correct GHC"
+                                $ soptsResolveMissingGHC sopts)
+
+            -- Install git on windows, if necessary
+            mgitIdent <- case configPlatform config of
+                Platform _ os | isWindows os && not (soptsSkipMsys sopts) ->
+                    case getInstalledTool installed $(mkPackageName "git") (const True) of
+                        Just ident -> return (Just ident)
+                        Nothing
+                            | soptsInstallIfMissing sopts -> do
+                                si <- getSetupInfo'
+                                let VersionedDownloadInfo version info = siPortableGit si
+                                Just <$> downloadAndInstallTool si info $(mkPackageName "git") version installGitWindows
+                            | otherwise -> do
+                                $logWarn "Continuing despite missing tool: git"
+                                return Nothing
+                _ -> return Nothing
+
+            let idents = catMaybes [Just ghcIdent, mgitIdent]
+            paths <- runReaderT (mapM binDirs idents) config
             return $ Just $ map toFilePathNoTrailingSlash $ concat paths
         else return Nothing
 
@@ -338,8 +367,6 @@ ensureGHC sopts = do
     when (soptsSanityCheck sopts) $ sanityCheck menv
 
     return mpaths
-  where
-    expected = soptsExpected sopts
 
 -- | Install the newest version of Cabal globally
 upgradeCabal :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m, MonadMask m)
@@ -456,7 +483,7 @@ data SetupInfo = SetupInfo
     { siSevenzExe :: DownloadInfo
     , siSevenzDll :: DownloadInfo
     , siPortableGit :: VersionedDownloadInfo
-    , siGHCs :: Map Text (Map MajorVersion VersionedDownloadInfo)
+    , siGHCs :: Map Text (Map Version DownloadInfo)
     }
     deriving Show
 instance FromJSON SetupInfo where
@@ -474,7 +501,7 @@ getSetupInfo manager = do
     let bs = S8.concat bss
     either throwM return $ Yaml.decodeEither' bs
   where
-    req = "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/stack-setup.yaml"
+    req = "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/stack-setup-2.yaml"
 
 markInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
               => PackageIdentifier -- ^ e.g., ghc-7.8.4, git-2.4.0.1
@@ -535,77 +562,62 @@ binDirs ident = do
             $logWarn $ "binDirs: unexpected OS/tool combo: " <> T.pack (show (x, tool))
             return []
 
-ensureTool :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
-           => EnvOverride
-           -> SetupOpts
-           -> [PackageIdentifier] -- ^ already installed
-           -> m SetupInfo
-           -> Maybe (Version, Arch) -- ^ installed GHC
-           -> (PackageName, Maybe Version)
-           -> m (Maybe PackageIdentifier)
-ensureTool menv sopts installed getSetupInfo' msystem (name, mversion)
-    | not $ null available = return $ Just $ PackageIdentifier name $ maximum available
-    | not $ soptsInstallIfMissing sopts =
-        if name == $(mkPackageName "ghc")
-            then do
-                Platform arch _ <- asks getPlatform
-                throwM $ GHCVersionMismatch msystem (soptsExpected sopts, arch) (soptsStackYaml sopts)
-                    (fromMaybe
-                        "Try running stack setup to locally install the correct GHC"
-                        $ soptsResolveMissingGHC sopts)
-            else do
-                $logWarn $ "Continuing despite missing tool: " <> T.pack (packageNameString name)
-                return Nothing
-    | otherwise = do
-        si <- getSetupInfo'
-        (VersionedDownloadInfo version downloadInfo, installer) <-
-            case packageNameString name of
-                "git" -> do
-                    let pair = siPortableGit si
-                    return (pair, installGitWindows)
-                "ghc" -> do
-                    osKey <- getOSKey menv
-                    pairs <-
-                        case Map.lookup osKey $ siGHCs si of
-                            Nothing -> throwM $ UnknownOSKey osKey
-                            Just pairs -> return pairs
-                    version <-
-                        case mversion of
-                            Nothing -> error "invariant violated: ghc must have a version"
-                            Just version -> return version
-                    pair <-
-                        case Map.lookup (getMajorVersion version) pairs of
-                            Nothing -> throwM $ UnknownGHCVersion osKey version (Map.keysSet pairs)
-                            Just pair -> return pair
-                    platform <- asks $ configPlatform . getConfig
-                    let installer =
-                            case platform of
-                                Platform _ os | isWindows os -> installGHCWindows
-                                _ -> installGHCPosix
-                    return (pair, installer)
-                x -> error $ "Invariant violated: ensureTool on " ++ x
-        let ident = PackageIdentifier name version
-
-        (file, at) <- downloadFromInfo downloadInfo ident
-        dir <- installDir ident
-        unmarkInstalled ident
-        installer si file at dir ident
-
-        markInstalled ident
-        return $ Just ident
+getInstalledTool :: [PackageIdentifier] -- ^ already installed
+                 -> PackageName         -- ^ package to find
+                 -> (Version -> Bool)   -- ^ which versions are acceptable
+                 -> Maybe PackageIdentifier
+getInstalledTool installed name goodVersion =
+    if null available
+        then Nothing
+        else Just $ maximumBy (comparing packageIdentifierVersion) available
   where
-    available
-        | soptsForceReinstall sopts = []
-        | otherwise = filter goodVersion
-                    $ map packageIdentifierVersion
-                    $ filter (\pi' -> packageIdentifierName pi' == name) installed
+    available = filter goodPackage installed
+    goodPackage pi' =
+        packageIdentifierName pi' == name &&
+        goodVersion (packageIdentifierVersion pi')
 
-    goodVersion =
-        case mversion of
-            Nothing -> const True
-            Just expected -> \actual ->
-                getMajorVersion expected == getMajorVersion actual &&
-                actual >= expected
+downloadAndInstallTool :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+                       => SetupInfo
+                       -> DownloadInfo
+                       -> PackageName
+                       -> Version
+                       -> (SetupInfo -> Path Abs File -> ArchiveType -> Path Abs Dir -> PackageIdentifier -> m ())
+                       -> m PackageIdentifier
+downloadAndInstallTool si downloadInfo name version installer = do
+    let ident = PackageIdentifier name version
+    (file, at) <- downloadFromInfo downloadInfo ident
+    dir <- installDir ident
+    unmarkInstalled ident
+    installer si file at dir ident
+    markInstalled ident
+    return ident
+
+downloadAndInstallGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+           => EnvOverride
+           -> SetupInfo
+           -> CompilerVersion
+           -> VersionCheck
+           -> m PackageIdentifier
+downloadAndInstallGHC menv si wanted versionCheck = do
+    osKey <- getOSKey menv
+    pairs <-
+        case Map.lookup osKey $ siGHCs si of
+            Nothing -> throwM $ UnknownOSKey osKey
+            Just pairs -> return pairs
+    let mpair =
+            listToMaybe $
+            sortBy (flip (comparing fst)) $
+            filter (\(v, _) -> isWantedCompiler versionCheck wanted (GhcVersion v)) (Map.toList pairs)
+    (selectedVersion, downloadInfo) <-
+        case mpair of
+            Just pair -> return pair
+            Nothing -> throwM $ UnknownGHCVersion osKey wanted (Map.keysSet pairs)
+    platform <- asks $ configPlatform . getConfig
+    let installer =
+            case platform of
+                Platform _ os | isWindows os -> installGHCWindows
+                _ -> installGHCPosix
+    downloadAndInstallTool si downloadInfo $(mkPackageName "ghc") selectedVersion installer
 
 getOSKey :: (MonadReader env m, MonadThrow m, HasConfig env, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
          => EnvOverride -> m Text

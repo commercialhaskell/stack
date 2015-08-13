@@ -483,7 +483,7 @@ paths =
   where toFilePathNoTrailing = dropTrailingPathSeparator . toFilePath
 
 data SetupCmdOpts = SetupCmdOpts
-    { scoGhcVersion :: !(Maybe Version)
+    { scoCompilerVersion :: !(Maybe CompilerVersion)
     , scoForceReinstall :: !Bool
     , scoUpgradeCabal :: !Bool
     }
@@ -492,7 +492,7 @@ setupParser :: Parser SetupCmdOpts
 setupParser = SetupCmdOpts
     <$> (optional $ argument readVersion
             (metavar "GHC_MAJOR_VERSION" <>
-             help ("Major version of GHC to install, e.g. 7.10. " ++
+             help ("Version of GHC to install, e.g. 7.10.2. " ++
                    "The default is to install the version implied by the resolver.")))
     <*> boolFlags False
             "reinstall"
@@ -505,7 +505,7 @@ setupParser = SetupCmdOpts
   where
     readVersion = do
         s <- readerAsk
-        case parseVersionFromString s of
+        case parseCompilerVersion ("ghc-" <> T.pack s) of
             Nothing -> readerError $ "Invalid version: " ++ s
             Just x -> return x
 
@@ -518,19 +518,23 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
           (lcProjectRoot lc)
           Nothing
           (runStackLoggingTGlobal manager go $ do
-              (ghc, mstack) <-
-                  case scoGhcVersion of
-                      Just v -> return (v, Nothing)
+              (wantedCompiler, compilerCheck, mstack) <-
+                  case scoCompilerVersion of
+                      Just v -> return (v, MatchMinor, Nothing)
                       Nothing -> do
                           bc <- lcLoadBuildConfig lc globalResolver
-                          return (bcGhcVersionExpected bc, Just $ bcStackYaml bc)
+                          return ( bcWantedCompiler bc
+                                 , configCompilerCheck (lcConfig lc)
+                                 , Just $ bcStackYaml bc
+                                 )
               mpaths <- runStackTGlobal manager (lcConfig lc) go $
                   ensureGHC SetupOpts
                   { soptsInstallIfMissing = True
                   , soptsUseSystem =
                     (configSystemGHC $ lcConfig lc)
                     && not scoForceReinstall
-                  , soptsExpected = ghc
+                  , soptsWantedCompiler = wantedCompiler
+                  , soptsCompilerCheck = compilerCheck
                   , soptsStackYaml = mstack
                   , soptsForceReinstall = scoForceReinstall
                   , soptsSanityCheck = True

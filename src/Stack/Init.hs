@@ -148,7 +148,7 @@ getDefaultResolver cabalfps gpds initOpts =
             mpair <-
                 case resolver of
                     ResolverSnapshot name -> findBuildPlan gpds [name]
-                    ResolverGhc _ -> return Nothing
+                    ResolverCompiler _ -> return Nothing
                     ResolverCustom _ _ -> return Nothing
             case mpair of
                 Just (snap, flags) ->
@@ -157,7 +157,7 @@ getDefaultResolver cabalfps gpds initOpts =
         MethodSolver -> do
             (ghcVersion, extraDeps) <- cabalSolver (map parent cabalfps) Map.empty []
             return
-                ( ResolverGhc ghcVersion
+                ( ResolverCompiler (GhcVersion ghcVersion)
                 , Map.filter (not . Map.null) $ fmap snd extraDeps
                 , fmap fst extraDeps
                 )

@@ -47,6 +47,7 @@ import           Network.HTTP.Client (parseUrl)
 import           Path
 import qualified Paths_stack as Meta
 import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
+import           Stack.Types.Compiler
 import           Stack.Types.Docker
 import           Stack.Types.FlagName
 import           Stack.Types.Image
@@ -99,6 +100,8 @@ data Config =
          -- ^ Don't bother checking the GHC version or architecture.
          ,configSkipMsys            :: !Bool
          -- ^ On Windows: don't use a locally installed MSYS
+         ,configCompilerCheck       :: !VersionCheck
+         -- ^ Specifies which versions of the compiler are acceptable.
          ,configLocalBin            :: !(Path Abs Dir)
          -- ^ Directory we should install executables into
          ,configRequireStackVersion :: !VersionRange
@@ -230,8 +233,8 @@ data BuildConfig = BuildConfig
     , bcResolver   :: !Resolver
       -- ^ How we resolve which dependencies to install given a set of
       -- packages.
-    , bcGhcVersionExpected :: !Version
-      -- ^ Version of GHC we expected for this build
+    , bcWantedCompiler :: !CompilerVersion
+      -- ^ Compiler version wanted for this build
     , bcPackageEntries :: ![PackageEntry]
       -- ^ Local packages identified by a path, Bool indicates whether it is
       -- a non-dependency (the opposite of 'peExtraDep')
@@ -389,9 +392,9 @@ data Resolver
   -- ^ Use an official snapshot from the Stackage project, either an LTS
   -- Haskell or Stackage Nightly
 
-  | ResolverGhc {-# UNPACK #-} !MajorVersion
-  -- ^ Require a specific GHC major version, but otherwise provide no build
-  -- plan. Intended for use cases where end user wishes to specify all upstream
+  | ResolverCompiler !CompilerVersion
+  -- ^ Require a specific compiler version, but otherwise provide no build plan.
+  -- Intended for use cases where end user wishes to specify all upstream
   -- dependencies manually, such as using a dependency solver.
 
   | ResolverCustom !Text !Text
@@ -400,12 +403,11 @@ data Resolver
   deriving (Show)
 
 instance ToJSON Resolver where
-    toJSON (ResolverSnapshot name) = toJSON $ renderSnapName name
-    toJSON (ResolverGhc (MajorVersion x y)) = toJSON $ T.pack $ concat ["ghc-", show x, ".", show y]
     toJSON (ResolverCustom name location) = object
         [ "name" .= name
         , "location" .= location
         ]
+    toJSON x = toJSON $ resolverName x
 instance FromJSON Resolver where
     -- Strange structuring is to give consistent error messages
     parseJSON v@(Object _) = withObject "Resolver" (\o -> ResolverCustom
@@ -420,16 +422,14 @@ instance FromJSON Resolver where
 -- directory names
 resolverName :: Resolver -> Text
 resolverName (ResolverSnapshot name) = renderSnapName name
-resolverName (ResolverGhc (MajorVersion x y)) = T.pack $ concat ["ghc-", show x, ".", show y]
+resolverName (ResolverCompiler v) = compilerVersionName v
 resolverName (ResolverCustom name _) = "custom-" <> name
 
 -- | Try to parse a @Resolver@ from a @Text@. Won't work for complex resolvers (like custom).
 parseResolverText :: MonadThrow m => Text -> m Resolver
 parseResolverText t
     | Right x <- parseSnapName t = return $ ResolverSnapshot x
-    | Just t' <- T.stripPrefix "ghc-" t
-    , Just v <- parseMajorVersionFromString $ T.unpack t'
-        = return $ ResolverGhc v
+    | Just v <- parseCompilerVersion t = return $ ResolverCompiler v
     | otherwise = throwM $ ParseResolverException t
 
 -- | Class for environment values which have access to the stack root
@@ -492,6 +492,8 @@ data ConfigMonoid =
     -- ^ See: 'configSkipGHCCheck'
     ,configMonoidSkipMsys            :: !(Maybe Bool)
     -- ^ See: 'configSkipMsys'
+    ,configMonoidCompilerCheck       :: !(Maybe VersionCheck)
+    -- ^ See: 'configCompilerCheck'
     ,configMonoidRequireStackVersion :: !VersionRange
     -- ^ See: 'configRequireStackVersion'
     ,configMonoidOS                  :: !(Maybe String)
@@ -539,6 +541,7 @@ instance Monoid ConfigMonoid where
     , configMonoidImageOpts = mempty
     , configMonoidTemplateParameters = mempty
     , configMonoidScmInit = Nothing
+    , configMonoidCompilerCheck = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -562,6 +565,7 @@ instance Monoid ConfigMonoid where
     , configMonoidImageOpts = configMonoidImageOpts l <> configMonoidImageOpts r
     , configMonoidTemplateParameters = configMonoidTemplateParameters l <> configMonoidTemplateParameters r
     , configMonoidScmInit = configMonoidScmInit l <|> configMonoidScmInit r
+    , configMonoidCompilerCheck = configMonoidCompilerCheck l <|> configMonoidCompilerCheck r
     }
 
 instance FromJSON (ConfigMonoid, [JSONWarning]) where
@@ -600,6 +604,7 @@ parseConfigMonoidJSON obj = do
           scmInit <- tobj ..:? "scm-init"
           params <- tobj ..:? "params"
           return (scmInit,fromMaybe M.empty params)
+    configMonoidCompilerCheck <- obj ..:? "compiler-check"
     return ConfigMonoid {..}
 
 -- | Newtype for non-orphan FromJSON instance.
@@ -632,7 +637,7 @@ instance Show ConfigException where
     show (ParseResolverException t) = concat
         [ "Invalid resolver value: "
         , T.unpack t
-        , ". Possible valid values include lts-2.12, nightly-YYYY-MM-DD, and ghc-7.10. "
+        , ". Possible valid values include lts-2.12, nightly-YYYY-MM-DD, and ghc-7.10.2. "
         , "See https://www.stackage.org/snapshots for a complete list."
         ]
     show (NoProjectConfigFound dir mcmd) = concat
