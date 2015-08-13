@@ -268,7 +268,7 @@ If you are using a powershell session, it is easy to automate even that step:
 
     $env:Path = ( stack setup | %{ $_ -replace '[^ ]+ ', ''} ), $env:Path -join ";"
 
-#### How do I reset / remove Stack to do a fresh build?
+#### How do I reset / remove Stack (such as to to do a completely fresh build)?
 
 The first thing to remove is project-specific `.stack-work` directory within the project's directory. Next, remove `~/.stack` directory overall. You may have errors if you remove the latter but leave the former. Removing Stack itself will relate to how it was installed, and if you used GHC installed outside of Stack, that would need to be removed separately.
 
