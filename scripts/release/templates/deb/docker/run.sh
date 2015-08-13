@@ -7,8 +7,8 @@ stack --install-ghc build
 # PKG
 mkdir -p /fpm/usr/bin
 strip -p --strip-unneeded --remove-section=.comment -o /fpm/usr/bin/stack $(stack path --local-install-root)/bin/stack
-mkdir -p /fpm/usr/share/man/man1
-gzip -c < man/man1/stack.1 >/fpm/usr/share/man/man1/stack.1.gz
+#mkdir -p /fpm/usr/share/man/man1
+#gzip -c < man/man1/stack.1 >/fpm/usr/share/man/man1/stack.1.gz
 mkdir -p /fpm/etc/bash_completion.d
 /fpm/usr/bin/stack --bash-completion-script /usr/bin/stack >/fpm/etc/bash_completion.d/stack
 fpm \
