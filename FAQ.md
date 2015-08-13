@@ -4,7 +4,7 @@ helpful and concise as possible.
 
 #### Where is stack installed and will it interfere with `ghc` (etc) I already have installed?
 
-Stack itself is installed in normal system locations based on the mechanism you used (see the [[Downloads]] page). The libraries that Stack installs go under your `.stack` directory in your home directory. It should not affect any existing Haskell tools at all.
+Stack itself is installed in normal system locations based on the mechanism you used (see the [[Downloads]] page). Stack installs the Stackage libraries in `~/.stack` and any project libraries or extra dependencies in a `.stack-work` directory within each project's directory. None of this should not affect any existing Haskell tools at all.
 
 #### What is the relationship between stack and cabal?
 
@@ -267,6 +267,10 @@ This may end up recompiling local dependencies of `one-of-the-packages` without 
 If you are using a powershell session, it is easy to automate even that step:
 
     $env:Path = ( stack setup | %{ $_ -replace '[^ ]+ ', ''} ), $env:Path -join ";"
+
+#### How do I reset / remove Stack to do a fresh build?
+
+The first thing to remove is project-specific `.stack-work` directory within the project's directory. Next, remove `~/.stack` directory overall. You may have errors if you remove the latter but leave the former. Removing Stack itself will relate to how it was installed, and if you used GHC installed outside of Stack, that would need to be removed separately.
 
 #### How does stack handle parallel builds? What exactly does it run in parallel?
 
