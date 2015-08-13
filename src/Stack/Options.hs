@@ -143,6 +143,9 @@ buildOptsParser cmd =
             <|> flag' BSOnlyDependencies
                 (long "only-dependencies" <>
                  help "Only build packages that are dependencies of targets on the command line")
+            <|> flag' BSOnlyDependencies
+                (long "dependencies-only" <>
+                 help "A synonym for --only-dependencies")
             <|> pure BSAll
 
         fileWatch' = flag False True
