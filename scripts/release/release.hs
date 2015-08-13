@@ -97,7 +97,7 @@ options =
 		Just arch -> Right $ \g -> g{gArch = arch})
 	    "ARCHITECTURE")
         "Architecture to build (e.g. 'i386' or 'x86_64')."
-    , Option "" [binarySuffixOptName]
+    , Option "" [binaryVariantOptName]
         (ReqArg (\v -> Right $ \g -> g{gBinarySuffix = v}) "SUFFIX")
         "Extra suffix to add to binary executable archive filename." ]
 
@@ -152,9 +152,9 @@ rules global@Global{..} args = do
         liftIO $ renameFile instExeFile tmpExeFile
         actionFinally
             (do opt <- addPath [installBinDir] []
-                () <- cmd opt stackProgName (stackArgs global) "build"
-                () <- cmd opt stackProgName (stackArgs global) "clean"
                 () <- cmd opt stackProgName (stackArgs global) "build --pedantic"
+                () <- cmd opt stackProgName (stackArgs global) "clean"
+                () <- cmd opt stackProgName (stackArgs global) "build"
                 () <- cmd opt stackProgName (stackArgs global) "test --flag stack:integration-tests"
                 return ())
             (renameFile tmpExeFile instExeFile)
@@ -496,9 +496,9 @@ allowDirtyOptName = "allow-dirty"
 archOptName :: String
 archOptName = "arch"
 
--- | @--binary-suffix@ command-line option name.
-binarySuffixOptName :: String
-binarySuffixOptName = "binary-suffix"
+-- | @--binary-variant@ command-line option name.
+binaryVariantOptName :: String
+binaryVariantOptName = "binary-variant"
 
 -- | Arguments to pass to all 'stack' invocations.
 stackArgs :: Global -> [String]
