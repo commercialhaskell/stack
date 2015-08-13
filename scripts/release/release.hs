@@ -325,8 +325,7 @@ rules global@Global{..} args = do
             [ ("7", "7")
             , ("6", "6") ]
         | distro == fedoraDistro =
-            [ ("20", "20")
-            , ("21", "21")
+            [ ("21", "21")
             , ("22", "22") ]
         | otherwise = error ("distroVersions: unknown distro: " ++ distro)
 
