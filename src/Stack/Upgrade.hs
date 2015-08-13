@@ -84,7 +84,8 @@ upgrade fromGit mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> d
                 configMonoid
                 (Just $ dir </> $(mkRelFile "stack.yaml"))
             lcLoadBuildConfig lc mresolver
-        envConfig1 <- runStackT manager logLevel bconfig terminal reExec setupEnv
+        envConfig1 <- runStackT manager logLevel bconfig terminal reExec $ setupEnv $ Just
+            "Try rerunning with --install-ghc to install the appropriate GHC"
         runStackT manager logLevel envConfig1 terminal reExec $
           build (const $ return ()) Nothing defaultBuildOpts
             { boptsTargets = ["stack"]

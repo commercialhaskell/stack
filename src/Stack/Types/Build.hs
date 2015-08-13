@@ -79,6 +79,7 @@ import           System.FilePath (dropTrailingPathSeparator, pathSeparator)
 data StackBuildException
   = Couldn'tFindPkgId PackageName
   | GHCVersionMismatch (Maybe (Version, Arch)) (Version, Arch) (Maybe (Path Abs File))
+                       Text -- recommended resolution
   -- ^ Path to the stack.yaml file
   | Couldn'tParseTargets [Text]
   | UnknownTargets
@@ -119,7 +120,7 @@ instance Show StackBuildException where
                ", the package id couldn't be found " <> "(via ghc-pkg describe " <>
                packageNameString name <> "). This shouldn't happen, " <>
                "please report as a bug")
-    show (GHCVersionMismatch mactual (expected, earch) mstack) = concat
+    show (GHCVersionMismatch mactual (expected, earch) mstack resolution) = concat
                 [ case mactual of
                     Nothing -> "No GHC found, expected version "
                     Just (actual, arch) -> concat
@@ -137,7 +138,8 @@ instance Show StackBuildException where
                 , case mstack of
                     Nothing -> "command line arguments"
                     Just stack -> "resolver setting in " ++ toFilePath stack
-                , "). Try running stack setup"
+                , "). "
+                , T.unpack resolution
                 ]
     show (Couldn'tParseTargets targets) = unlines
                 $ "The following targets could not be parsed as package names or directories:"

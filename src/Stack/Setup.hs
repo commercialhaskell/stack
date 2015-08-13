@@ -90,6 +90,8 @@ data SetupOpts = SetupOpts
     , soptsUpgradeCabal :: !Bool
     -- ^ Upgrade the global Cabal library in the database to the newest
     -- version. Only works reliably with a stack-managed installation.
+    , soptsResolveMissingGHC :: !(Maybe Text)
+    -- ^ Message shown to user for how to resolve the missing GHC
     }
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
@@ -128,8 +130,9 @@ instance Show SetupException where
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasBuildConfig env, HasHttpManager env, MonadBaseControl IO m)
-         => m EnvConfig
-setupEnv = do
+         => Maybe Text -- ^ Message to give user when necessary GHC is not available
+         -> m EnvConfig
+setupEnv mResolveMissingGHC = do
     bconfig <- asks getBuildConfig
     let platform = getPlatform bconfig
         sopts = SetupOpts
@@ -142,6 +145,7 @@ setupEnv = do
             , soptsSkipGhcCheck = configSkipGHCCheck $ bcConfig bconfig
             , soptsSkipMsys = configSkipMsys $ bcConfig bconfig
             , soptsUpgradeCabal = False
+            , soptsResolveMissingGHC = mResolveMissingGHC
             }
     mghcBin <- ensureGHC sopts
     menv0 <- getMinimalEnvOverride
@@ -546,6 +550,9 @@ ensureTool menv sopts installed getSetupInfo' msystem (name, mversion)
             then do
                 Platform arch _ <- asks getPlatform
                 throwM $ GHCVersionMismatch msystem (soptsExpected sopts, arch) (soptsStackYaml sopts)
+                    (fromMaybe
+                        "Try running stack setup to locally install the correct GHC"
+                        $ soptsResolveMissingGHC sopts)
             else do
                 $logWarn $ "Continuing despite missing tool: " <> T.pack (packageNameString name)
                 return Nothing

@@ -537,6 +537,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                   , soptsSkipGhcCheck = False
                   , soptsSkipMsys = configSkipMsys $ lcConfig lc
                   , soptsUpgradeCabal = scoUpgradeCabal
+                  , soptsResolveMissingGHC = Nothing
                   }
               case mpaths of
                   Nothing -> $logInfo "stack will use the GHC on your PATH"
@@ -646,7 +647,7 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
               envConfig <-
                  runStackTGlobal
                      manager bconfig go
-                     setupEnv
+                     (setupEnv Nothing)
               runStackTGlobal
                   manager
                   envConfig
