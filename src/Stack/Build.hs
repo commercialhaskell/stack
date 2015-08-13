@@ -39,7 +39,7 @@ import           Stack.Build.Execute
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
-import           Stack.Types.Build
+import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
@@ -63,7 +63,7 @@ build :: M env m
 build setLocalFiles mbuildLk bopts = do
     menv <- getMinimalEnvOverride
 
-    (mbp, locals, extraToBuild, sourceMap) <- loadSourceMap bopts
+    (mbp, locals, extraToBuild, sourceMap) <- loadSourceMap NeedTargets bopts
 
     -- Set local files, necessary for file watching
     stackYaml <- asks $ bcStackYaml . getBuildConfig

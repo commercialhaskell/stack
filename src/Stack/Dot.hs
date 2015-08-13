@@ -32,6 +32,7 @@ import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Stack.Build (withLoadPackage)
 import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
 import           Stack.Build.Source
+import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Package
 import           Stack.Types
@@ -87,7 +88,7 @@ createDependencyGraph :: (HasEnvConfig env
                        => DotOpts
                        -> m (Map PackageName (Set PackageName, Maybe Version))
 createDependencyGraph dotOpts = do
-  (_,locals,_,sourceMap) <- loadSourceMap defaultBuildOpts
+  (_,locals,_,sourceMap) <- loadSourceMap NeedTargets defaultBuildOpts
   let graph = Map.fromList (localDependencies dotOpts locals)
   menv <- getMinimalEnvOverride
   installedMap <- fmap thrd . fst <$> getInstalled menv

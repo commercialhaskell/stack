@@ -86,11 +86,12 @@ ghciSetup
 ghciSetup stringTargets = do
     (_,_,targets) <-
         parseTargetsFromBuildOpts
+            AllowNoTargets
             defaultBuildOpts
             { boptsTargets = stringTargets
             }
     econfig <- asks getEnvConfig
-    (_,_,_,sourceMap) <- loadSourceMap defaultBuildOpts
+    (_,_,_,sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOpts
     locals <-
         liftM catMaybes $
         forM (M.toList (envConfigPackages econfig)) $

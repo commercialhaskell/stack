@@ -13,6 +13,7 @@ module Stack.Build.Target
     , RawTarget (..)
     , LocalPackageView (..)
     , SimpleTarget (..)
+    , NeedTargets (..)
       -- * Parsers
     , parseRawTarget
     , parseTargets
@@ -266,15 +267,21 @@ simplifyTargets =
     getLocalComp (STLocalComps comps) = Right comps
     getLocalComp _ = Left ()
 
+-- | Need targets, e.g. `stack build` or allow none?
+data NeedTargets
+    = NeedTargets
+    | AllowNoTargets
+
 parseTargets :: (MonadThrow m, MonadIO m)
-             => Bool -- ^ using implicit global?
+             => NeedTargets -- ^ need at least one target
+             -> Bool -- ^ using implicit global?
              -> Map PackageName Version -- ^ snapshot
              -> Map PackageName Version -- ^ extra deps
              -> Map PackageName LocalPackageView
              -> Path Abs Dir -- ^ current directory
              -> [Text] -- ^ command line targets
              -> m (Map PackageName Version, Map PackageName SimpleTarget)
-parseTargets implicitGlobal snap extras locals currDir textTargets' = do
+parseTargets needTargets implicitGlobal snap extras locals currDir textTargets' = do
     let textTargets =
             if null textTargets'
                 then map (T.pack . packageNameString) $ Map.keys $ Map.filter (not . lpvExtraDep) locals
@@ -291,9 +298,13 @@ parseTargets implicitGlobal snap extras locals currDir textTargets' = do
 
     if null errs
         then if Map.null targets
-                 then throwM $ TargetParseException
-                        $ if implicitGlobal
-                            then ["The specified targets matched no packages.\nPerhaps you need to run 'stack init'?"]
-                            else ["The specified targets matched no packages"]
+                 then case needTargets of
+                        AllowNoTargets ->
+                            return (Map.empty, Map.empty)
+                        NeedTargets ->
+                            throwM $ TargetParseException
+                              $ if implicitGlobal
+                                  then ["The specified targets matched no packages.\nPerhaps you need to run 'stack init'?"]
+                                  else ["The specified targets matched no packages"]
                  else return (Map.unions newExtras, targets)
         else throwM $ TargetParseException errs

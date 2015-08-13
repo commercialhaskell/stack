@@ -65,16 +65,17 @@ import           System.IO (withBinaryFile, IOMode (ReadMode))
 import           System.IO.Error (isDoesNotExistError)
 
 loadSourceMap :: (MonadIO m, MonadCatch m, MonadReader env m, HasBuildConfig env, MonadBaseControl IO m, HasHttpManager env, MonadLogger m, HasEnvConfig env)
-              => BuildOpts
+              => NeedTargets
+              -> BuildOpts
               -> m ( MiniBuildPlan
                    , [LocalPackage]
                    , Set PackageName -- non-local targets
                    , SourceMap
                    )
-loadSourceMap bopts = do
+loadSourceMap needTargets bopts = do
     bconfig <- asks getBuildConfig
     rawLocals <- getLocalPackageViews
-    (mbp0, cliExtraDeps, targets) <- parseTargetsFromBuildOpts bopts
+    (mbp0, cliExtraDeps, targets) <- parseTargetsFromBuildOpts needTargets bopts
 
     menv <- getMinimalEnvOverride
     caches <- getPackageCaches menv
@@ -132,9 +133,10 @@ loadSourceMap bopts = do
 -- | Use the build options and environment to parse targets.
 parseTargetsFromBuildOpts
     :: (MonadIO m, MonadCatch m, MonadReader env m, HasBuildConfig env, MonadBaseControl IO m, HasHttpManager env, MonadLogger m, HasEnvConfig env)
-    => BuildOpts
+    => NeedTargets
+    -> BuildOpts
     -> m (MiniBuildPlan, M.Map PackageName Version, M.Map PackageName SimpleTarget)
-parseTargetsFromBuildOpts bopts = do
+parseTargetsFromBuildOpts needTargets bopts = do
     bconfig <- asks getBuildConfig
     mbp0 <-
         case bcResolver bconfig of
@@ -154,6 +156,7 @@ parseTargetsFromBuildOpts bopts = do
     workingDir <- getWorkingDir
     (cliExtraDeps, targets) <-
         parseTargets
+            needTargets
             (bcImplicitGlobal bconfig)
             (mpiVersion <$> mbpPackages mbp0)
             (bcExtraDeps bconfig)
