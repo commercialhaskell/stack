@@ -102,7 +102,6 @@ figureOutMainFile mainIsTargets targets0 packages = do
         candidate:_ -> do
             let border = $logWarn "* * * * * * * *"
             border
-            $logInfo ("Targets: " <> T.pack (show targets))
             $logWarn ("The main module to load is ambiguous. Candidates are: ")
             forM_ (map renderCandidate candidates) $logWarn
             $logWarn
