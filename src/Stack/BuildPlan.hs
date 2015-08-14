@@ -735,7 +735,8 @@ data CustomSnapshot = CustomSnapshot
 instance FromJSON CustomSnapshot where
     parseJSON = withObject "CustomSnapshot" $ \o -> CustomSnapshot
         <$> ((o .: "compiler") >>= (\t -> maybe (fail $ "Invalid compiler: " ++ T.unpack t) return $ do
-                GhcVersion v <- parseCompilerVersion t
-                return v))
+                cv <- parseCompilerVersion t
+                case cv of
+                    GhcVersion v -> return v))
         <*> o .: "packages"
         <*> o .:? "flags" .!= Map.empty
