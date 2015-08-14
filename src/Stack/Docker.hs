@@ -31,7 +31,7 @@ import           Data.Aeson.Extended (FromJSON(..),(.:),(.:?),(.!=),eitherDecode
 import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import           Data.Char (isSpace,toUpper,isAscii)
+import           Data.Char (isSpace,toUpper,isAscii,isDigit)
 import           Data.List (dropWhileEnd,find,intercalate,intersperse,isPrefixOf,isInfixOf,foldl',sortBy)
 import           Data.List.Extra (trim)
 import           Data.Map.Strict (Map)
@@ -586,7 +586,7 @@ checkDockerVersion envOverride =
      dockerVersionOut <- readDockerProcess envOverride ["--version"]
      case words (decodeUtf8 dockerVersionOut) of
        (_:_:v:_) ->
-         case parseVersionFromString (dropWhileEnd (== ',') v) of
+         case parseVersionFromString (dropWhileEnd (not . isDigit) v) of
            Just v'
              | v' < minimumDockerVersion ->
                throwM (DockerTooOldException minimumDockerVersion v')
