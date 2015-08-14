@@ -28,12 +28,14 @@ import           Distribution.Text (display)
 import           Network.HTTP.Client.Conduit
 import           Path
 import           Prelude
+import           Stack.Build
 import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Exec
 import           Stack.Package
 import           Stack.Types
+import           Stack.Types.Internal
 
 -- | Command-line options for GHC.
 data GhciOpts = GhciOpts
@@ -56,9 +58,9 @@ data GhciPkgInfo = GhciPkgInfo
 -- | Launch a GHCi session for the given local project targets with the
 -- given options and configure it with the load paths and extensions
 -- of those targets.
-ghci :: (HasConfig r, HasBuildConfig r, HasHttpManager r,  HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
-    => GhciOpts
-    -> m ()
+ghci
+    :: (HasConfig r, HasBuildConfig r, HasHttpManager r, MonadMask m, HasLogLevel r, HasTerminal r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
+    => GhciOpts -> m ()
 ghci GhciOpts{..} = do
     pkgs <- ghciSetup ghciTargets
     bconfig <- asks getBuildConfig
@@ -81,17 +83,13 @@ ghci GhciOpts{..} = do
 -- | Create a list of infos for each target containing necessary
 -- information to load that package/components.
 ghciSetup
-    :: (HasConfig r, HasHttpManager r, HasBuildConfig r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
+    :: (HasConfig r, HasHttpManager r, HasBuildConfig r, MonadMask m, HasTerminal r, HasLogLevel r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
     => [Text] -> m [GhciPkgInfo]
 ghciSetup stringTargets = do
-    (_,_,targets) <-
-        parseTargetsFromBuildOpts
-            AllowNoTargets
-            defaultBuildOpts
-            { boptsTargets = stringTargets
-            }
+    (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets defaultBuildOpts
+    let bopts = makeBuildOpts targets
     econfig <- asks getEnvConfig
-    (_,_,_,sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOpts
+    (_,_,_,sourceMap) <- loadSourceMap AllowNoTargets bopts
     locals <-
         liftM catMaybes $
         forM (M.toList (envConfigPackages econfig)) $
@@ -104,9 +102,41 @@ ghciSetup stringTargets = do
                                  return (Just (name, (cabalfp, simpleTargets)))
                              Nothing -> return Nothing
                     else return Nothing
-    forM locals $
+    infos <-
+        forM locals $
         \(name,(cabalfp,components)) ->
              makeGhciPkgInfo sourceMap (map fst locals) name cabalfp components
+    build (const (return ())) Nothing bopts
+    return infos
+  where
+    makeBuildOpts targets =
+        base
+        { boptsTargets = stringTargets
+        , boptsTests = any (hasLocalComp isCTest) elems
+        , boptsBenchmarks = any (hasLocalComp isCBench) elems
+        , boptsTestOpts = (boptsTestOpts base)
+          { toDisableRun = True
+          }
+        , boptsBenchmarkOpts = (boptsBenchmarkOpts base)
+          { beoDisableRun = True
+          }
+        }
+      where
+        base = defaultBuildOpts
+        elems = M.elems targets
+        hasLocalComp p t =
+            case t of
+                STLocalComps s -> any p (S.toList s)
+                STLocalAll -> True
+                _ -> False
+        isCTest nc =
+            case nc of
+                CTest{} -> True
+                _ -> False
+        isCBench nc =
+            case nc of
+                CBench{} -> True
+                _ -> False
 
 -- | Make information necessary to load the given package in GHCi.
 makeGhciPkgInfo

@@ -34,6 +34,7 @@ import           Stack.Exec (defaultEnvSettings)
 import           Stack.Ghci (GhciPkgInfo(..), ghciSetup)
 import           Stack.Package
 import           Stack.Types
+import           Stack.Types.Internal
 import           System.Directory (doesFileExist)
 import           System.Environment (lookupEnv)
 import           System.Exit
@@ -45,7 +46,7 @@ import           System.Process.Read
 -- given options and configure it with the load paths and extensions
 -- of those targets.
 ide
-    :: (HasConfig r, HasBuildConfig r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m, HasHttpManager r)
+    :: (HasConfig r, HasBuildConfig r, HasTerminal r, HasLogLevel r, MonadMask m, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m, HasHttpManager r)
     => [Text] -- ^ Targets.
     -> [String] -- ^ GHC options.
     -> m ()
