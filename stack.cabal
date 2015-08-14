@@ -257,7 +257,7 @@ test-suite stack-test
 test-suite stack-integration-test
   type:           exitcode-stdio-1.0
   hs-source-dirs: test/integration
-  main-is:        Spec.hs
+  main-is:        IntegrationSpec.hs
   ghc-options:    -Wall -threaded -rtsopts -with-rtsopts=-N
 
   if flag(integration-tests)
