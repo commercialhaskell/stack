@@ -9,7 +9,6 @@ module Stack.Dot (dot
                  ,pruneGraph
                  ) where
 
-import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Monad (liftM, void)
 import           Control.Monad.Catch (MonadCatch,MonadMask)

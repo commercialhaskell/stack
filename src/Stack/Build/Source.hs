@@ -15,7 +15,7 @@ module Stack.Build.Source
     , parseTargetsFromBuildOpts
     ) where
 
-import           Control.Applicative ((<$>), (<*>))
+
 import           Control.Arrow ((&&&))
 import           Control.Exception (assert, catch)
 import           Control.Monad

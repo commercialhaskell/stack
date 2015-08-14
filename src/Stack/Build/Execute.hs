@@ -15,7 +15,7 @@ module Stack.Build.Execute
     , withSingleContext
     ) where
 
-import           Control.Applicative            ((<$>))
+
 import           Control.Concurrent.Execute
 import           Control.Concurrent.Lifted      (fork)
 import           Control.Concurrent.MVar.Lifted
@@ -77,7 +77,7 @@ import           System.Exit                    (ExitCode (ExitSuccess))
 import qualified System.FilePath                as FP
 import           System.IO
 import           System.IO.Temp                 (withSystemTempDirectory)
-import           System.Process.Internals       (createProcess_)
+
 import           System.Process.Read
 import           System.Process.Run
 import           System.Process.Log             (showProcessArgDebug)
