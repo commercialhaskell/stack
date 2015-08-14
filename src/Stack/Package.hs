@@ -141,36 +141,51 @@ readPackageDir packageConfig dir = do
 resolvePackage :: PackageConfig
                -> GenericPackageDescription
                -> Package
-resolvePackage packageConfig gpkg = Package
+resolvePackage packageConfig gpkg =
+    Package
     { packageName = name
     , packageVersion = fromCabalVersion (pkgVersion pkgId)
     , packageDeps = deps
-    , packageFiles = GetPackageFiles $ \cabalfp -> do
-        distDir <- distDirFromDir (parent cabalfp)
-        (_,components,extra) <-
-            runReaderT (packageDescModulesAndFiles pkg)
-                       (cabalfp, buildDir distDir)
-        return (components,S.singleton cabalfp <> extra)
-    , packageModules = GetPackageModules $ \cabalfp -> do
-        distDir <- distDirFromDir (parent cabalfp)
-        (modules,_,_) <-
-            runReaderT (packageDescModulesAndFiles pkg)
-                       (cabalfp, buildDir distDir)
-        return modules
+    , packageFiles = GetPackageFiles $
+      \cabalfp ->
+           do distDir <- distDirFromDir (parent cabalfp)
+              (_,files,mains,extra) <-
+                  runReaderT
+                      (packageDescModulesAndFiles pkg)
+                      (cabalfp, buildDir distDir)
+              return (files, mains, S.singleton cabalfp <> extra)
+    , packageModules = GetPackageModules $
+      \cabalfp ->
+           do distDir <- distDirFromDir (parent cabalfp)
+              (modules,_,_,_) <-
+                  runReaderT
+                      (packageDescModulesAndFiles pkg)
+                      (cabalfp, buildDir distDir)
+              return modules
     , packageTools = packageDescTools pkg
     , packageFlags = packageConfigFlags packageConfig
     , packageAllDeps = S.fromList (M.keys deps)
     , packageHasLibrary = maybe False (buildable . libBuildInfo) (library pkg)
-    , packageTests = S.fromList $ [ T.pack (testName t) | t <- testSuites pkg, buildable (testBuildInfo t)]
-    , packageBenchmarks = S.fromList $ [ T.pack (benchmarkName b) | b <- benchmarks pkg, buildable (benchmarkBuildInfo b)]
-    , packageExes = S.fromList $ [ T.pack (exeName b) | b <- executables pkg, buildable (buildInfo b)]
-    , packageOpts = GetPackageOpts $ \sourceMap locals cabalfp ->
-        generatePkgDescOpts sourceMap locals cabalfp pkg
-    , packageHasExposedModules = maybe False (not . null . exposedModules) (library pkg)
+    , packageTests = S.fromList $
+      [T.pack (testName t) | t <- testSuites pkg
+                           , buildable (testBuildInfo t)]
+    , packageBenchmarks = S.fromList $
+      [T.pack (benchmarkName b) | b <- benchmarks pkg
+                                , buildable (benchmarkBuildInfo b)]
+    , packageExes = S.fromList $
+      [T.pack (exeName b) | b <- executables pkg
+                          , buildable (buildInfo b)]
+    , packageOpts = GetPackageOpts $
+      \sourceMap locals cabalfp ->
+           generatePkgDescOpts sourceMap locals cabalfp pkg
+    , packageHasExposedModules = maybe
+          False
+          (not . null . exposedModules)
+          (library pkg)
     , packageSimpleType = buildType (packageDescription gpkg) == Just Simple
-    , packageDefinedFlags = S.fromList $ map (fromCabalFlagName . flagName) $ genPackageFlags gpkg
+    , packageDefinedFlags = S.fromList $
+      map (fromCabalFlagName . flagName) $ genPackageFlags gpkg
     }
-
   where
     pkgId = package (packageDescription gpkg)
     name = fromCabalPackageName (pkgName pkgId)
@@ -345,47 +360,50 @@ allBuildInfo' pkg_descr = [ bi | Just lib <- [library pkg_descr]
 packageDescModulesAndFiles
     :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m, MonadCatch m)
     => PackageDescription
-    -> m (Map NamedComponent (Set ModuleName), Map NamedComponent (Set (Path Abs File)), (Set (Path Abs File)))
+    -> m (Map NamedComponent (Set ModuleName), Map NamedComponent (Set (Path Abs File)), Map NamedComponent (Set MainIs), Set (Path Abs File))
 packageDescModulesAndFiles pkg = do
-    (libraryMods,libFiles) <-
+    (libraryMods,libFiles,_) <-
         maybe
-            (return (M.empty, M.empty))
+            (return (M.empty, M.empty, M.empty))
             (asModuleAndFileMap libComponent libraryFiles)
             (library pkg)
-    (executableMods,exeFiles) <-
+    (executableMods,exeFiles,exeMainIs) <-
         liftM
-            foldPairs
+            foldTriples
             (mapM
                  (asModuleAndFileMap exeComponent executableFiles)
                  (executables pkg))
-    (testMods,testFps) <-
+    (testMods,testFps,testMainIs) <-
         liftM
-            foldPairs
+            foldTriples
             (mapM (asModuleAndFileMap testComponent testFiles) (testSuites pkg))
-    (benchModules,benchFiles) <-
+    (benchModules,benchFiles,benchMainIs) <-
         liftM
-            foldPairs
+            foldTriples
             (mapM
                  (asModuleAndFileMap benchComponent benchmarkFiles)
                  (benchmarks pkg))
-    dfiles <-
-        resolveGlobFiles (map (dataDir pkg FilePath.</>) (dataFiles pkg))
+    dfiles <- resolveGlobFiles (map (dataDir pkg FilePath.</>) (dataFiles pkg))
     let modules = libraryMods <> executableMods <> testMods <> benchModules
         files = libFiles <> exeFiles <> testFps <> benchFiles
-    return (modules, files, dfiles)
+        mains = exeMainIs <> benchMainIs <> testMainIs
+    return (modules, files, mains, dfiles)
   where
     libComponent = const CLib
     exeComponent = CExe . T.pack . exeName
     testComponent = CTest . T.pack . testName
     benchComponent = CBench . T.pack . benchmarkName
     asModuleAndFileMap label f lib = do
-        (a,b) <- f lib
-        return (M.singleton (label lib) a, M.singleton (label lib) b)
-    foldPairs =
+        (a,b,c) <- f lib
+        return
+            ( M.singleton (label lib) a
+            , M.singleton (label lib) b
+            , M.singleton (label lib) c)
+    foldTriples =
         foldl'
-            (\(a,b) (x,y) ->
-                  (a <> x, b <> y))
-            (M.empty, M.empty)
+            (\(a,b,c) (x,y,z) ->
+                  (a <> x, b <> y, c <> z))
+            (M.empty, M.empty, M.empty)
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
 resolveGlobFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m,MonadCatch m)
@@ -451,79 +469,73 @@ matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
 
 -- | Get all files referenced by the benchmark.
 benchmarkFiles :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m)
-               => Benchmark -> m (Set ModuleName,Set (Path Abs File))
+               => Benchmark -> m (Set ModuleName,Set (Path Abs File),Set MainIs)
 benchmarkFiles bench = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks (parent . fst)
-    (rmodules,rfiles) <- resolveFilesAndDeps
-        (Just $ benchmarkName bench)
-        (dirs ++ [dir])
-        names
-        haskellModuleExts
+    (rmodules,rfiles) <-
+        resolveFilesAndDeps
+            (Just $ benchmarkName bench)
+            (dirs ++ [dir])
+            bnames
+            haskellModuleExts
+    mainFiles <- resolveFiles (dirs ++ [dir]) exposed haskellModuleExts
     cfiles <- buildCSources build
-    return (rmodules,rfiles <> cfiles)
+    return (rmodules, rfiles <> cfiles, S.map MainIs (S.fromList mainFiles))
   where
-    names =
-        concat [bnames,exposed]
     exposed =
         case benchmarkInterface bench of
-            BenchmarkExeV10 _ fp ->
-                [Right fp]
-            BenchmarkUnsupported _ ->
-                []
+            BenchmarkExeV10 _ fp -> [Right fp]
+            BenchmarkUnsupported _ -> []
     bnames = map Left (otherModules build)
     build = benchmarkBuildInfo bench
 
 -- | Get all files referenced by the test.
 testFiles :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m)
-          => TestSuite -> m (Set ModuleName,Set (Path Abs File))
+          => TestSuite -> m (Set ModuleName,Set (Path Abs File),Set MainIs)
 testFiles test = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
     dir <- asks (parent . fst)
-    (modules,rfiles) <- resolveFilesAndDeps
-        (Just $ testName test)
-        (dirs ++ [dir])
-        names
-        haskellModuleExts
+    (modules,rfiles) <-
+        resolveFilesAndDeps
+            (Just $ testName test)
+            (dirs ++ [dir])
+            bnames
+            haskellModuleExts
+    mainFiles <- resolveFiles (dirs ++ [dir]) exposed haskellModuleExts
     cfiles <- buildCSources build
-    return (modules,rfiles <> cfiles)
+    return (modules, rfiles <> cfiles, S.map MainIs (S.fromList mainFiles))
   where
-    names =
-        concat [bnames,exposed]
     exposed =
         case testInterface test of
-            TestSuiteExeV10 _ fp ->
-                [Right fp]
-            TestSuiteLibV09 _ mn ->
-                [Left mn]
-            TestSuiteUnsupported _ ->
-                     []
+            TestSuiteExeV10 _ fp -> [Right fp]
+            TestSuiteLibV09 _ mn -> [Left mn]
+            TestSuiteUnsupported _ -> []
     bnames = map Left (otherModules build)
     build = testBuildInfo test
 
 -- | Get all files referenced by the executable.
 executableFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m)
-                => Executable -> m (Set ModuleName,Set (Path Abs File))
-executableFiles exe =
-  do dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
-     dir <- asks (parent . fst)
-     (modules,rfiles) <- resolveFilesAndDeps
-         (Just $ exeName exe)
-         (dirs ++ [dir])
-         names
-         haskellModuleExts
-     cfiles <- buildCSources build
-     return (modules,rfiles <> cfiles)
+                => Executable -> m (Set ModuleName,Set (Path Abs File),Set MainIs)
+executableFiles exe = do
+    dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
+    dir <- asks (parent . fst)
+    (modules,rfiles) <-
+        resolveFilesAndDeps
+            (Just $ exeName exe)
+            (dirs ++ [dir])
+            (map Left (otherModules build))
+            haskellModuleExts
+    mainFiles <-
+        resolveFiles (dirs ++ [dir]) [Right (modulePath exe)] haskellModuleExts
+    cfiles <- buildCSources build
+    return (modules, rfiles <> cfiles, S.map MainIs (S.fromList mainFiles))
   where
-    names =
-        concat [bnames,exposed]
-    bnames = map Left (otherModules build)
-    exposed = [Right (modulePath exe)]
     build = buildInfo exe
 
 -- | Get all files referenced by the library.
 libraryFiles :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m)
-             => Library -> m (Set ModuleName,Set (Path Abs File))
+             => Library -> m (Set ModuleName,Set (Path Abs File), Set MainIs)
 libraryFiles lib =
   do dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
      dir <- asks (parent . fst)
@@ -533,7 +545,7 @@ libraryFiles lib =
          names
          haskellModuleExts
      cfiles <- buildCSources build
-     return (modules,rfiles <> cfiles)
+     return (modules,rfiles <> cfiles, mempty)
   where
     names =
         concat [bnames,exposed]

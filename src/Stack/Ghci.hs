@@ -53,6 +53,7 @@ data GhciPkgInfo = GhciPkgInfo
   , ghciPkgDir :: Path Abs Dir
   , ghciPkgModules :: Set ModuleName
   , ghciPkgFiles :: Set (Path Abs File)
+  , ghciPkgMainIs :: Set (Path Abs File)
   }
 
 -- | Launch a GHCi session for the given local project targets with the
@@ -116,6 +117,7 @@ ghciSetup stringTargets = do
         , boptsBenchmarks = any (hasLocalComp isCBench) elems
         , boptsTestOpts = (boptsTestOpts base)
           { toDisableRun = True
+          , toRerunTests = False
           }
         , boptsBenchmarkOpts = (boptsBenchmarkOpts base)
           { beoDisableRun = True
@@ -160,13 +162,9 @@ makeGhciPkgInfo sourceMap locals name cabalfp components = do
             }
     pkg <- readPackage config cabalfp
     (componentsOpts,generalOpts) <-
-        getPackageOpts
-            (packageOpts pkg)
-            sourceMap
-            locals
-            cabalfp
+        getPackageOpts (packageOpts pkg) sourceMap locals cabalfp
     componentsModules <- getPackageModules (packageModules pkg) cabalfp
-    (componentModFiles,generalFiles) <-
+    (componentModFiles,mainIsFiles,generalFiles) <-
         getPackageFiles (packageFiles pkg) cabalfp
     let filterWithinWantedComponents m =
             M.elems
@@ -188,7 +186,11 @@ makeGhciPkgInfo sourceMap locals name cabalfp components = do
               (filterWithinWantedComponents componentsModules)
         , ghciPkgFiles = generalFiles <>
           mconcat (filterWithinWantedComponents componentModFiles)
+        , ghciPkgMainIs = S.map
+              mainIsFile
+              (mconcat (filterWithinWantedComponents mainIsFiles))
         }
-  where badForGhci :: String -> Bool
-        badForGhci x =
-            isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky")
+  where
+    badForGhci :: String -> Bool
+    badForGhci x =
+        isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky")

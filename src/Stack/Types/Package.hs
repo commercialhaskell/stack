@@ -112,10 +112,17 @@ newtype GetPackageFiles = GetPackageFiles
     { getPackageFiles :: forall m env. (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadReader env m, HasPlatform env, HasEnvConfig env)
                       => Path Abs File
                       -> m (Map NamedComponent (Set (Path Abs File))
+                           ,Map NamedComponent (Set MainIs)
                            ,Set (Path Abs File))
     }
 instance Show GetPackageFiles where
     show _ = "<GetPackageFiles>"
+
+-- | A file specified as @main-is@ in a .cabal file.
+newtype MainIs = MainIs
+    { mainIsFile :: Path Abs File
+    }
+  deriving (Ord,Eq)
 
 -- | Modules in the package.
 newtype GetPackageModules = GetPackageModules

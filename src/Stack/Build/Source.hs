@@ -261,8 +261,11 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
                 , lptbBenches = benches
                 }
     mbuildCache <- tryGetBuildCache $ lpvRoot lpv
-    (componentFiles,extraFiles) <- getPackageFiles (packageFiles pkg) (lpvCabalFP lpv)
-    let files = mconcat (M.elems componentFiles) <> extraFiles
+    (componentFiles,mainFiles,extraFiles) <- getPackageFiles (packageFiles pkg) (lpvCabalFP lpv)
+    let files =
+            mconcat (M.elems componentFiles) <>
+            Set.map mainIsFile (mconcat (M.elems mainFiles)) <>
+            extraFiles
     (isDirty, newBuildCache) <- checkBuildCache
         (fromMaybe Map.empty mbuildCache)
         (map toFilePath $ Set.toList files)
