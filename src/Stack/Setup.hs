@@ -34,9 +34,9 @@ import           Data.Conduit (Conduit, ($$), (=$), await, yield, awaitForever)
 import           Data.Conduit.Lift (evalStateC)
 import qualified Data.Conduit.List as CL
 import           Data.Either
-import           Data.Foldable (forM_)
+import           Data.Foldable
 import           Data.IORef
-import           Data.List (intercalate, sortBy, maximumBy)
+import           Data.List hiding (concat, elem, maximumBy)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe
@@ -57,7 +57,7 @@ import           Network.HTTP.Client.Conduit
 import           Network.HTTP.Download.Verified
 import           Path
 import           Path.IO
-import           Prelude -- Fix AMP warning
+import           Prelude hiding (concat, elem) -- Fix AMP warning
 import           Safe (headMay, readMay)
 import           Stack.Types.Build
 import           Stack.Config (resolvePackageEntry)

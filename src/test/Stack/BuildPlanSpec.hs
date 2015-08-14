@@ -12,6 +12,7 @@ import Data.Monoid
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Network.HTTP.Conduit (Manager)
+import Prelude -- Fix redundant import warnings
 import System.Directory
 import System.IO.Temp
 import System.Environment

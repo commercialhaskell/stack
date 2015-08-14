@@ -26,13 +26,14 @@ import Data.Aeson as Export hiding ((.:), (.:?))
 import qualified Data.Aeson as A
 import Data.Aeson.Types hiding ((.:), (.:?))
 import qualified Data.HashMap.Strict as HashMap
-import Data.Monoid (Monoid (..), (<>))
+import Data.Monoid
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Text (unpack, Text)
 import qualified Data.Text as T
-import Data.Traversable (Traversable)
+import Data.Traversable
 import qualified Data.Traversable as Traversable
+import Prelude -- Fix redundant import warnings
 
 -- | Extends @.:@ warning to include field name.
 (.:) :: FromJSON a => Object -> Text -> Parser a

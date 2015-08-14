@@ -45,6 +45,7 @@ import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZon
 import           Data.Typeable (Typeable)
 import           Path
 import           Path.IO (getWorkingDir,listDirectory,createTree,removeFile,removeTree,dirExists)
+import           Prelude -- Fix redundant import warnings
 import           Stack.Constants (projectDockerSandboxDir,stackProgName,stackDotYaml,stackRootEnvVar)
 import           Stack.Types
 import           Stack.Types.Internal

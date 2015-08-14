@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -16,6 +17,7 @@ module Stack.Build.Execute
     ) where
 
 
+import           Control.Applicative
 import           Control.Concurrent.Execute
 import           Control.Concurrent.Lifted      (fork)
 import           Control.Concurrent.MVar.Lifted
@@ -81,6 +83,10 @@ import           System.IO.Temp                 (withSystemTempDirectory)
 import           System.Process.Read
 import           System.Process.Run
 import           System.Process.Log             (showProcessArgDebug)
+
+#if !MIN_VERSION_process(1,2,1)
+import           System.Process.Internals       (createProcess_)
+#endif
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
 

@@ -27,7 +27,7 @@ module Stack.Upload
     , fromMemory
     ) where
 
-import           Control.Applicative                   ((<$>), (<*>))
+import           Control.Applicative
 import           Control.Exception                     (bracket)
 import qualified Control.Exception                     as E
 import           Control.Monad                         (when)
@@ -57,6 +57,7 @@ import           Network.HTTP.Client.MultipartFormData (formDataBody, partFileRe
 import           Network.HTTP.Client.TLS               (tlsManagerSettings)
 import           Network.HTTP.Types                    (statusCode)
 import           Path                                  (toFilePath)
+import           Prelude -- Fix redundant import warnings
 import           Stack.Types
 import           System.Directory                      (createDirectoryIfMissing,
                                                         removeFile)

@@ -10,7 +10,7 @@ module Stack.SDist
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
-import           Control.Applicative ((<$>))
+import           Control.Applicative
 import           Control.Concurrent.Execute (ActionContext(..))
 import           Control.Monad (when)
 import           Control.Monad.Catch (MonadCatch, MonadMask)
@@ -27,6 +27,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
+import           Prelude -- Fix redundant import warnings
 import           Stack.Build (mkBaseConfigOpts)
 import           Stack.Build.Execute
 import           Stack.Build.Source (loadSourceMap, localFlags)

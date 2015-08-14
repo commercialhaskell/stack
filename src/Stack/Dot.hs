@@ -9,6 +9,7 @@ module Stack.Dot (dot
                  ,pruneGraph
                  ) where
 
+import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Monad (liftM, void)
 import           Control.Monad.Catch (MonadCatch,MonadMask)
@@ -28,6 +29,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Traversable as T
 import           Network.HTTP.Client.Conduit (HasHttpManager)
+import           Prelude -- Fix redundant import warnings
 import           Stack.Build (withLoadPackage)
 import           Stack.Build.Installed (getInstalled, GetInstalledOpts(..))
 import           Stack.Build.Source

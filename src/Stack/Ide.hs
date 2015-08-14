@@ -51,7 +51,7 @@ ide
     -> [String] -- ^ GHC options.
     -> m ()
 ide targets useropts = do
-    (realTargets,_,pkgs) <- ghciSetup Nothing targets
+    (_realTargets,_,pkgs) <- ghciSetup Nothing targets
     pwd <- getWorkingDir
     (pkgopts,srcfiles) <-
         liftM mconcat $

@@ -9,7 +9,7 @@ module Stack.Build.Coverage
     , generateHpcMarkupIndex
     ) where
 
-
+import           Control.Applicative
 import           Control.Exception.Lifted
 import           Control.Monad                  (liftM)
 import           Control.Monad.Catch            (MonadCatch)

@@ -11,7 +11,7 @@
 
 module Stack.Types.Config where
 
-import           Control.Applicative ((<|>), (<$>), (<*>), pure)
+import           Control.Applicative
 import           Control.Exception
 import           Control.Monad (liftM, mzero)
 import           Control.Monad.Catch (MonadThrow, throwM)

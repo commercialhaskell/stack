@@ -130,7 +130,7 @@ library
                    , hashable >= 1.2.3.2
                    , http-client >= 0.4.9
                    , http-client-tls >= 0.2.2
-                   , http-conduit
+                   , http-conduit >= 2.1.7
                    , http-types >= 0.8.6
                    , lifted-base
                    , monad-control

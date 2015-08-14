@@ -9,6 +9,7 @@ import Data.Aeson.Extended
 import Data.Monoid
 import Data.Map (Map)
 import Data.Text (Text)
+import Prelude -- Fix redundant import warnings
 
 -- | Image options. Currently only Docker image options.
 data ImageOpts = ImageOpts

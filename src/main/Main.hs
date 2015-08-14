@@ -12,7 +12,7 @@ module Main where
 
 import           Control.Exception
 import qualified Control.Exception.Lifted as EL
-import           Control.Monad
+import           Control.Monad hiding (mapM, forM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask, asks)
@@ -30,7 +30,7 @@ import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
-import           Data.Traversable (sequenceA)
+import           Data.Traversable
 import           Development.GitRev (gitCommitCount)
 import           Network.HTTP.Client
 import           Options.Applicative.Args
@@ -41,7 +41,7 @@ import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Plugins
-import           Prelude hiding (pi)
+import           Prelude hiding (pi, mapM)
 import           Stack.Build
 import           Stack.Types.Build
 import           Stack.Config

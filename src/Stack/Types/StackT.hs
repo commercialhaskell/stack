@@ -174,7 +174,7 @@ runStackLoggingT manager logLevel terminal reExec m =
 
 -- | Convenience for getting a 'Manager'
 newTLSManager :: MonadIO m => m Manager
-newTLSManager = liftIO $ newManager conduitManagerSettings
+newTLSManager = liftIO $ newManager tlsManagerSettings
 
 --------------------------------------------------------------------------------
 -- Logging functionality

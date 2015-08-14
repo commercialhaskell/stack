@@ -11,6 +11,7 @@ import Data.Monoid
 import Network.HTTP.Conduit (Manager)
 import Path
 --import System.FilePath
+import Prelude -- Fix redundant import warnings
 import System.Directory
 import System.IO.Temp
 import System.Environment

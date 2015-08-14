@@ -16,6 +16,7 @@ module Stack.Build.Source
     ) where
 
 
+import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Exception (assert, catch)
 import           Control.Monad
@@ -39,7 +40,7 @@ import qualified Data.Map as Map
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Maybe
-import           Data.Monoid ((<>), Any (..), mconcat, mempty)
+import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)

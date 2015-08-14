@@ -51,7 +51,7 @@ import           Data.List (intercalate)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (fromMaybe, mapMaybe)
-import           Data.Monoid ((<>), Monoid (..))
+import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as T

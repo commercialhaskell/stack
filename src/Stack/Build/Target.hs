@@ -27,13 +27,14 @@ import           Data.Either            (partitionEithers)
 import           Data.Map               (Map)
 import qualified Data.Map               as Map
 import           Data.Maybe             (mapMaybe)
-import           Data.Monoid            (mconcat)
+import           Data.Monoid
 import           Data.Set               (Set)
 import qualified Data.Set               as Set
 import           Data.Text              (Text)
 import qualified Data.Text              as T
 import           Path
 import           Path.IO
+import           Prelude -- Fix redundant import warnings
 import           Stack.Types
 
 -- | The name of a component, which applies to executables, test suites, and benchmarks
@@ -54,7 +55,7 @@ data RawTarget (a :: RawTargetType) where
     RTPackageComponent :: !PackageName -> !UnresolvedComponent -> RawTarget a
     RTComponent :: !ComponentName -> RawTarget a
     RTPackage :: !PackageName -> RawTarget a
-    RTPackageIdentifier :: !PackageIdentifier -> RawTarget HasIdents
+    RTPackageIdentifier :: !PackageIdentifier -> RawTarget 'HasIdents
 
 deriving instance Show (RawTarget a)
 deriving instance Eq (RawTarget a)
@@ -64,7 +65,7 @@ data RawTargetType = HasIdents | NoIdents
 
 -- | If this function returns @Nothing@, the input should be treated as a
 -- directory.
-parseRawTarget :: Text -> Maybe (RawTarget HasIdents)
+parseRawTarget :: Text -> Maybe (RawTarget 'HasIdents)
 parseRawTarget t =
         (RTPackageIdentifier <$> parsePackageIdentifierFromString s)
     <|> (RTPackage <$> parsePackageNameFromString s)
@@ -108,7 +109,7 @@ parseRawTargetDirs :: (MonadIO m, MonadThrow m)
                    => Path Abs Dir -- ^ current directory
                    -> Map PackageName LocalPackageView
                    -> Text
-                   -> m (Either Text [(RawInput, RawTarget HasIdents)])
+                   -> m (Either Text [(RawInput, RawTarget 'HasIdents)])
 parseRawTargetDirs root locals t =
     case parseRawTarget t of
         Just rt -> return $ Right [(ri, rt)]
@@ -140,8 +141,8 @@ data SimpleTarget
 resolveIdents :: Map PackageName Version -- ^ snapshot
               -> Map PackageName Version -- ^ extra deps
               -> Map PackageName LocalPackageView
-              -> (RawInput, RawTarget HasIdents)
-              -> Either Text ((RawInput, RawTarget NoIdents), Map PackageName Version)
+              -> (RawInput, RawTarget 'HasIdents)
+              -> Either Text ((RawInput, RawTarget 'NoIdents), Map PackageName Version)
 resolveIdents _ _ _ (ri, RTPackageComponent x y) = Right ((ri, RTPackageComponent x y), Map.empty)
 resolveIdents _ _ _ (ri, RTComponent x) = Right ((ri, RTComponent x), Map.empty)
 resolveIdents _ _ _ (ri, RTPackage x) = Right $ ((ri, RTPackage x), Map.empty)
@@ -175,7 +176,7 @@ resolveIdents snap extras locals (ri, RTPackageIdentifier (PackageIdentifier nam
 resolveRawTarget :: Map PackageName Version -- ^ snapshot
                  -> Map PackageName Version -- ^ extra deps
                  -> Map PackageName LocalPackageView
-                 -> (RawInput, RawTarget NoIdents)
+                 -> (RawInput, RawTarget 'NoIdents)
                  -> Either Text (PackageName, (RawInput, SimpleTarget))
 resolveRawTarget snap extras locals (ri, rt) =
     go rt
