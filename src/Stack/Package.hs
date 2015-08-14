@@ -67,7 +67,7 @@ import           Distribution.Text (display, simpleParse)
 import           Path as FL
 import           Path.Find
 import           Path.IO
-import           Prelude hiding (FilePath)
+import           Prelude
 import           Safe (headDef, tailSafe)
 import           Stack.Constants
 import           Stack.Types
@@ -676,9 +676,31 @@ resolveFilesAndDeps
     -> m (Set ModuleName,Set (Path Abs File))
 resolveFilesAndDeps component dirs names0 exts = do
     (moduleFiles,thFiles,foundModules) <- loop names0 S.empty
+    warnUnlisted component (lefts names0) foundModules
+    return (foundModules, moduleFiles <> S.fromList thFiles)
+  where
+    loop [] doneModules = return (S.empty, [], doneModules)
+    loop names doneModules0 = do
+        resolvedFiles <- resolveFiles dirs names exts
+        pairs <- mapM (getDependencies component) resolvedFiles
+        let doneModules' = S.union doneModules0 (S.fromList (lefts names))
+            moduleDeps = S.unions (map fst pairs)
+            thDepFiles = concatMap snd pairs
+            modulesRemaining = S.difference moduleDeps doneModules'
+        (moduleDepFiles',thDepFiles',doneModules'') <-
+            loop (map Left (S.toList modulesRemaining)) doneModules'
+        return
+            ( S.union (S.fromList resolvedFiles) moduleDepFiles'
+            , thDepFiles ++ thDepFiles'
+            , doneModules'')
+
+-- | Warn about modules which are used but not listed in the cabal
+-- file.
+warnUnlisted
+    :: (MonadLogger m, MonadReader (Path Abs File, void) m)
+    => Maybe String -> [ModuleName] -> Set ModuleName -> m ()
+warnUnlisted component names0 foundModules = do
     cabalfp <- asks fst
-    let unlistedModules =
-            foundModules `S.difference` (S.fromList (lefts names0))
     unless (S.null unlistedModules) $
         $(logWarn) $
         T.pack $
@@ -693,65 +715,59 @@ resolveFilesAndDeps component dirs names0 exts = do
              Just c -> " for '" ++ c ++ "'") ++
         " component (add to other-modules):\n    " ++
         intercalate "\n    " (map display (S.toList unlistedModules))
-    return (foundModules,moduleFiles <> S.fromList thFiles)
   where
-    loop [] doneModules = return (S.empty, [], doneModules)
-    loop names doneModules0 = do
-        resolvedFiles <- resolveFiles dirs names exts
-        pairs <- mapM getDependencies resolvedFiles
-        let doneModules' = S.union doneModules0 (S.fromList (lefts names))
-            moduleDeps = S.unions (map fst pairs)
-            thDepFiles = concatMap snd pairs
-            modulesRemaining = S.difference moduleDeps doneModules'
-        (moduleDepFiles',thDepFiles',doneModules'') <-
-            loop (map Left (S.toList modulesRemaining)) doneModules'
-        return
-            ( S.union (S.fromList resolvedFiles) moduleDepFiles'
-            , thDepFiles ++ thDepFiles'
-            , doneModules'')
-    getDependencies resolvedFile = do
-        dir <- asks (parent . fst)
-        dumpHIDir <- getDumpHIDir
-        case stripDir dir resolvedFile of
-            Nothing -> return (S.empty, [])
-            Just fileRel -> do
-                let dumpHIPath =
-                        FilePath.replaceExtension
-                            (toFilePath (dumpHIDir </> fileRel))
-                            ".dump-hi"
-                dumpHIExists <- liftIO $ doesFileExist dumpHIPath
-                if dumpHIExists
-                    then parseDumpHI dumpHIPath
-                    else return (S.empty, [])
-    parseDumpHI dumpHIPath = do
-        dir <- asks (parent . fst)
-        dumpHI <- liftIO $ fmap C8.lines (C8.readFile dumpHIPath)
-        let startModuleDeps =
-                dropWhile
-                    (not . ("module dependencies:" `C8.isPrefixOf`))
-                    dumpHI
-            moduleDeps =
-                S.fromList $
-                mapMaybe (simpleParse . T.unpack . decodeUtf8) $
-                C8.words $
-                C8.concat $
-                C8.dropWhile (/= ' ') (headDef "" startModuleDeps) :
-                takeWhile (" " `C8.isPrefixOf`) (tailSafe startModuleDeps)
-            thDeps =
-               -- The dependent file path is surrounded by quotes but is not escaped.
-               -- It can be an absolute or relative path.
-               mapMaybe
-                   (parseAbsOrRelFile dir <=<
-                    (fmap T.unpack .
-                     (T.stripSuffix "\"" <=< T.stripPrefix "\"") .
-                     T.dropWhileEnd (== '\r') .
-                     decodeUtf8 . C8.dropWhile (/= '"'))) $
-               filter ("addDependentFile \"" `C8.isPrefixOf`) dumpHI
-        return
-            (moduleDeps, thDeps)
-    getDumpHIDir = do
-        bld <- asks snd
-        return $ maybe bld (bld </>) (getBuildComponentDir component)
+    unlistedModules =
+        foundModules `S.difference` (S.fromList names0)
+
+-- | Get the dependencies of a Haskell module file.
+getDependencies
+    :: (MonadReader (Path Abs File, Path Abs Dir) m, MonadIO m)
+    => Maybe String -> Path Abs File -> m (Set ModuleName, [Path Abs File])
+getDependencies component resolvedFile = do
+    dir <- asks (parent . fst)
+    dumpHIDir <- getDumpHIDir
+    case stripDir dir resolvedFile of
+        Nothing -> return (S.empty, [])
+        Just fileRel -> do
+            let dumpHIPath =
+                    FilePath.replaceExtension
+                        (toFilePath (dumpHIDir </> fileRel))
+                        ".dump-hi"
+            dumpHIExists <- liftIO $ doesFileExist dumpHIPath
+            if dumpHIExists
+                then parseDumpHI dumpHIPath
+                else return (S.empty, [])
+  where getDumpHIDir = do
+            bld <- asks snd
+            return $ maybe bld (bld </>) (getBuildComponentDir component)
+
+-- | Parse a .dump-hi file into a set of modules and files.
+parseDumpHI
+    :: (MonadReader (Path Abs File, void) m, MonadIO m)
+    => FilePath -> m (Set ModuleName, [Path Abs File])
+parseDumpHI dumpHIPath = do
+    dir <- asks (parent . fst)
+    dumpHI <- liftIO $ fmap C8.lines (C8.readFile dumpHIPath)
+    let startModuleDeps =
+            dropWhile (not . ("module dependencies:" `C8.isPrefixOf`)) dumpHI
+        moduleDeps =
+            S.fromList $
+            mapMaybe (simpleParse . T.unpack . decodeUtf8) $
+            C8.words $
+            C8.concat $
+            C8.dropWhile (/= ' ') (headDef "" startModuleDeps) :
+            takeWhile (" " `C8.isPrefixOf`) (tailSafe startModuleDeps)
+        thDeps =
+            -- The dependent file path is surrounded by quotes but is not escaped.
+            -- It can be an absolute or relative path.
+            mapMaybe
+                (parseAbsOrRelFile dir <=<
+                 (fmap T.unpack .
+                  (T.stripSuffix "\"" <=< T.stripPrefix "\"") .
+                  T.dropWhileEnd (== '\r') . decodeUtf8 . C8.dropWhile (/= '"'))) $
+            filter ("addDependentFile \"" `C8.isPrefixOf`) dumpHI
+    return (moduleDeps, thDeps)
+  where
     parseAbsOrRelFile dir fp =
         case parseRelFile fp of
             Just rel -> Just (dir </> rel)
