@@ -88,7 +88,7 @@ createDependencyGraph :: (HasEnvConfig env
                        => DotOpts
                        -> m (Map PackageName (Set PackageName, Maybe Version))
 createDependencyGraph dotOpts = do
-  (_,locals,_,sourceMap) <- loadSourceMap NeedTargets defaultBuildOpts
+  (_,_,locals,_,sourceMap) <- loadSourceMap NeedTargets defaultBuildOpts
   let graph = Map.fromList (localDependencies dotOpts locals)
   menv <- getMinimalEnvOverride
   installedMap <- fmap thrd . fst <$> getInstalled menv

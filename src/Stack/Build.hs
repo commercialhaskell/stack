@@ -63,7 +63,7 @@ build :: M env m
 build setLocalFiles mbuildLk bopts = do
     menv <- getMinimalEnvOverride
 
-    (mbp, locals, extraToBuild, sourceMap) <- loadSourceMap NeedTargets bopts
+    (_, mbp, locals, extraToBuild, sourceMap) <- loadSourceMap NeedTargets bopts
 
     -- Set local files, necessary for file watching
     stackYaml <- asks $ bcStackYaml . getBuildConfig

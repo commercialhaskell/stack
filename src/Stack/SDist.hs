@@ -107,7 +107,7 @@ getSDistFileList lp =
         menv <- getMinimalEnvOverride
         let bopts = defaultBuildOpts
         baseConfigOpts <- mkBaseConfigOpts bopts
-        (_mbp, locals, _extraToBuild, sourceMap) <- loadSourceMap NeedTargets bopts
+        (_, _mbp, locals, _extraToBuild, sourceMap) <- loadSourceMap NeedTargets bopts
         withExecuteEnv menv bopts baseConfigOpts locals sourceMap $ \ee -> do
             withSingleContext ac ee task (Just "sdist") $ \_package _cabalfp _pkgDir cabal _announce _console _mlogFile -> do
                 let outFile = tmpdir FP.</> "source-files-list"

@@ -67,7 +67,8 @@ import           System.IO.Error (isDoesNotExistError)
 loadSourceMap :: (MonadIO m, MonadCatch m, MonadReader env m, HasBuildConfig env, MonadBaseControl IO m, HasHttpManager env, MonadLogger m, HasEnvConfig env)
               => NeedTargets
               -> BuildOpts
-              -> m ( MiniBuildPlan
+              -> m ( Map PackageName SimpleTarget
+                   , MiniBuildPlan
                    , [LocalPackage]
                    , Set PackageName -- non-local targets
                    , SourceMap
@@ -128,7 +129,7 @@ loadSourceMap needTargets bopts = do
                 (PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi))
             ] `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
 
-    return (mbp, locals, nonLocalTargets, sourceMap)
+    return (targets, mbp, locals, nonLocalTargets, sourceMap)
 
 -- | Use the build options and environment to parse targets.
 parseTargetsFromBuildOpts

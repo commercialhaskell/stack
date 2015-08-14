@@ -424,7 +424,13 @@ ghciOptsParser = GhciOpts
              <*> flag False True (long "no-load" <>
                    help "Don't load modules on start-up")
              <*> packagesParser
-
+             <*> optional
+                     (textOption
+                           (long "main-is" <>
+                            metavar "TARGET" <>
+                            help "Specify which target should contain the main \
+                                 \module to load, such as for an executable for \
+                                 \test suite or benchmark."))
 
 -- | Parser for exec command
 execOptsParser :: Maybe String -- ^ command
