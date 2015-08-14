@@ -224,10 +224,16 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
              addCommand "upgrade"
                         "Upgrade to the latest stack (experimental)"
                         upgradeCmd
-                        (switch
-                            ( long "git"
-                           <> help "Clone from Git instead of downloading from Hackage (more dangerous)"
-                            ))
+                        ((,) <$> (switch
+                                  ( long "git"
+                                 <> help "Clone from Git instead of downloading from Hackage (more dangerous)"
+                                  ))
+                             <*> (strOption
+                                  ( long "git-repo"
+                                 <> help "Clone from specified git repository"
+                                 <> value "https://github.com/commercialhaskell/stack"
+                                 <> showDefault
+                                  )))
              addCommand "upload"
                         "Upload a package to Hackage"
                         uploadCmd
@@ -703,9 +709,9 @@ updateCmd :: () -> GlobalOpts -> IO ()
 updateCmd () go = withConfigAndLock go $
     getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
 
-upgradeCmd :: Bool -> GlobalOpts -> IO ()
-upgradeCmd fromGit go = withConfigAndLock go $
-    upgrade fromGit (globalResolver go)
+upgradeCmd :: (Bool, String) -> GlobalOpts -> IO ()
+upgradeCmd (fromGit, repo) go = withConfigAndLock go $
+    upgrade (if fromGit then Just repo else Nothing) (globalResolver go)
 
 -- | Upload to Hackage
 uploadCmd :: [String] -> GlobalOpts -> IO ()

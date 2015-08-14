@@ -28,49 +28,48 @@ import           System.IO.Temp              (withSystemTempDirectory)
 import           System.Process.Run
 
 upgrade :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, HasTerminal env, HasReExec env, HasLogLevel env, MonadBaseControl IO m)
-        => Bool -- ^ use Git?
+        => Maybe String -- ^ git repository to use
         -> Maybe AbstractResolver
         -> m ()
-upgrade fromGit mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> do
+upgrade gitRepo mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> do
     menv <- getMinimalEnvOverride
     tmp <- parseAbsDir tmp'
-    mdir <-
-        if fromGit
-            then do
-                $logInfo "Cloning stack"
-                runIn tmp "git" menv
-                    [ "clone"
-                    , "https://github.com/commercialhaskell/stack" -- TODO allow to be configured
-                    , "stack"
-                    , "--depth"
-                    , "1"
-                    ]
-                    Nothing
-                return $ Just $ tmp </> $(mkRelDir "stack")
-            else do
-                updateAllIndices menv
-                caches <- getPackageCaches menv
-                let latest = Map.fromListWith max
-                           $ map toTuple
-                           $ Map.keys
+    mdir <- case gitRepo of
+      Just repo -> do
+        $logInfo "Cloning stack"
+        runIn tmp "git" menv
+            [ "clone"
+            , repo
+            , "stack"
+            , "--depth"
+            , "1"
+            ]
+            Nothing
+        return $ Just $ tmp </> $(mkRelDir "stack")
+      Nothing -> do
+        updateAllIndices menv
+        caches <- getPackageCaches menv
+        let latest = Map.fromListWith max
+                   $ map toTuple
+                   $ Map.keys
 
-                           -- Mistaken upload to Hackage, just ignore it
-                           $ Map.delete (PackageIdentifier
-                                $(mkPackageName "stack")
-                                $(mkVersion "9.9.9"))
+                   -- Mistaken upload to Hackage, just ignore it
+                   $ Map.delete (PackageIdentifier
+                        $(mkPackageName "stack")
+                        $(mkVersion "9.9.9"))
 
-                             caches
-                case Map.lookup $(mkPackageName "stack") latest of
-                    Nothing -> error "No stack found in package indices"
-                    Just version | version <= fromCabalVersion Paths.version -> do
-                        $logInfo "Already at latest version, no upgrade required"
-                        return Nothing
-                    Just version -> do
-                        let ident = PackageIdentifier $(mkPackageName "stack") version
-                        paths <- unpackPackageIdents menv tmp Nothing $ Set.singleton ident
-                        case Map.lookup ident paths of
-                            Nothing -> error "Stack.Upgrade.upgrade: invariant violated, unpacked directory not found"
-                            Just path -> return $ Just path
+                     caches
+        case Map.lookup $(mkPackageName "stack") latest of
+            Nothing -> error "No stack found in package indices"
+            Just version | version <= fromCabalVersion Paths.version -> do
+                $logInfo "Already at latest version, no upgrade required"
+                return Nothing
+            Just version -> do
+                let ident = PackageIdentifier $(mkPackageName "stack") version
+                paths <- unpackPackageIdents menv tmp Nothing $ Set.singleton ident
+                case Map.lookup ident paths of
+                    Nothing -> error "Stack.Upgrade.upgrade: invariant violated, unpacked directory not found"
+                    Just path -> return $ Just path
 
     manager <- asks getHttpManager
     logLevel <- asks getLogLevel
