@@ -442,11 +442,13 @@ defaultTestOpts = TestOpts
 -- | Options for the 'FinalAction' 'DoBenchmarks'
 data BenchmarkOpts =
   BenchmarkOpts {beoAdditionalArgs :: !(Maybe String) -- ^ Arguments passed to the benchmark program
+                ,beoDisableRun :: !Bool -- ^ Disable running of benchmarks
                 } deriving (Eq,Show)
 
 defaultBenchmarkOpts :: BenchmarkOpts
 defaultBenchmarkOpts = BenchmarkOpts
     { beoAdditionalArgs = Nothing
+    , beoDisableRun = False
     }
 
 -- | Package dependency oracle.

@@ -886,8 +886,18 @@ singleBench beopts _lptb ac ee task =
         let args = maybe []
                          ((:[]) . ("--benchmark-options=" <>))
                          (beoAdditionalArgs beopts)
-        announce "benchmarks"
-        cabal False ("bench" : args)
+
+        toRun <-
+            if beoDisableRun beopts
+              then do
+                  announce "Benchmark running disabled by --no-run-benchmarks flag."
+                  return False
+              else do
+                  return True
+
+        when toRun $ do
+          announce "benchmarks"
+          cabal False ("bench" : args)
 
 -- | Grab all output from the given @Handle@ and print it to stdout, stripping
 -- Template Haskell "Loading package" lines. Does work in a separate thread.
