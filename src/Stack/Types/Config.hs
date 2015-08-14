@@ -272,7 +272,7 @@ bcWorkDir = (</> workDirRel) . parent . bcStackYaml
 data EnvConfig = EnvConfig
     {envConfigBuildConfig :: !BuildConfig
     ,envConfigCabalVersion :: !Version
-    ,envConfigGhcVersion :: !Version
+    ,envConfigCompilerVersion :: !CompilerVersion
     ,envConfigPackages   :: !(Map (Path Abs Dir) Bool)}
 instance HasBuildConfig EnvConfig where
     getBuildConfig = envConfigBuildConfig
@@ -790,20 +790,23 @@ installationRootDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m
 installationRootDeps = do
     snapshots <- snapshotsDir
     bc <- asks getBuildConfig
-    ec <- asks getEnvConfig
     name <- parseRelDir $ T.unpack $ resolverName $ bcResolver bc
-    ghc <- parseRelDir $ versionString $ envConfigGhcVersion ec
+    ghc <- compilerVersionDir
     return $ snapshots </> name </> ghc
 
 -- | Installation root for locals
 installationRootLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
 installationRootLocal = do
     bc <- asks getBuildConfig
-    ec <- asks getEnvConfig
     name <- parseRelDir $ T.unpack $ resolverName $ bcResolver bc
-    ghc <- parseRelDir $ versionString $ envConfigGhcVersion ec
+    ghc <- compilerVersionDir
     platform <- platformRelDir
     return $ configProjectWorkDir bc </> $(mkRelDir "install") </> platform </> name </> ghc
+
+compilerVersionDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Rel Dir)
+compilerVersionDir = do
+    GhcVersion version <- asks (envConfigCompilerVersion . getEnvConfig)
+    parseRelDir (versionString version)
 
 -- | Package database for installing dependencies into
 packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)

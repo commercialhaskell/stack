@@ -171,7 +171,7 @@ setupEnv mResolveMissingGHC = do
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bconfig
             , envConfigCabalVersion = cabalVer
-            , envConfigGhcVersion = ghcVer
+            , envConfigCompilerVersion = GhcVersion ghcVer
             , envConfigPackages = Map.fromList $ concat packages
             }
 
@@ -237,7 +237,7 @@ setupEnv mResolveMissingGHC = do
             { bcConfig = (bcConfig bconfig) { configEnvOverride = getEnvOverride' }
             }
         , envConfigCabalVersion = cabalVer
-        , envConfigGhcVersion = ghcVer
+        , envConfigCompilerVersion = GhcVersion ghcVer
         , envConfigPackages = envConfigPackages envConfig0
         }
 

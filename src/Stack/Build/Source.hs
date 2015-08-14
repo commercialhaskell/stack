@@ -149,9 +149,9 @@ parseTargetsFromBuildOpts needTargets bopts = do
                 -- We ignore the resolver version, as it might be
                 -- GhcMajorVersion, and we want the exact version
                 -- we're using.
-                version <- asks (envConfigGhcVersion . getEnvConfig)
+                version <- asks (envConfigCompilerVersion . getEnvConfig)
                 return MiniBuildPlan
-                    { mbpGhcVersion = version
+                    { mbpCompilerVersion = version
                     , mbpPackages = Map.empty
                     }
             ResolverCustom _ url -> do
@@ -229,7 +229,7 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
             { packageConfigEnableTests = False
             , packageConfigEnableBenchmarks = False
             , packageConfigFlags = localFlags (boptsFlags bopts) bconfig name
-            , packageConfigGhcVersion = envConfigGhcVersion econfig
+            , packageConfigCompilerVersion = envConfigCompilerVersion econfig
             , packageConfigPlatform = configPlatform $ getConfig bconfig
             }
         pkg = resolvePackage config gpkg

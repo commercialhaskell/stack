@@ -580,7 +580,7 @@ resolvePackageDescription packageConfig (GenericPackageDescription desc defaultF
                   (flagMap defaultFlags)
 
         rc = mkResolveConditions
-                (packageConfigGhcVersion packageConfig)
+                (packageConfigCompilerVersion packageConfig)
                 (packageConfigPlatform packageConfig)
                 flags
 
@@ -610,19 +610,19 @@ flagMap = M.fromList . map pair
 
 data ResolveConditions = ResolveConditions
     { rcFlags :: Map FlagName Bool
-    , rcGhcVersion :: Version
+    , rcCompilerVersion :: CompilerVersion
     , rcOS :: OS
     , rcArch :: Arch
     }
 
 -- | Generic a @ResolveConditions@ using sensible defaults.
-mkResolveConditions :: Version -- ^ GHC version
+mkResolveConditions :: CompilerVersion -- ^ Compiler version
                     -> Platform -- ^ installation target platform
                     -> Map FlagName Bool -- ^ enabled flags
                     -> ResolveConditions
-mkResolveConditions ghcVersion (Platform arch os) flags = ResolveConditions
+mkResolveConditions compilerVersion (Platform arch os) flags = ResolveConditions
     { rcFlags = flags
-    , rcGhcVersion = ghcVersion
+    , rcCompilerVersion = compilerVersion
     , rcOS = if isWindows os then Windows else os
     , rcArch = arch
     }
@@ -664,7 +664,9 @@ resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
                                 False
                     Impl flavor range ->
                         flavor == GHC &&
-                        withinRange (rcGhcVersion rc) range
+                        withinRange v range
+                      where
+                        GhcVersion v = rcCompilerVersion rc
 
 -- | Get the name of a dependency.
 depName :: Dependency -> PackageName

@@ -98,7 +98,7 @@ spec = beforeAll setup $ afterAll teardown $ do
             attoparsec = go "attoparsec" "text"
             aeson = go "aeson" "text attoparsec"
             mkMBP pkgs = MiniBuildPlan
-                { mbpGhcVersion = version
+                { mbpCompilerVersion = version
                 , mbpPackages = Map.fromList pkgs
                 }
             mbpAll = mkMBP [resourcet, conduit, conduitExtra, text, attoparsec, aeson]

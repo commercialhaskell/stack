@@ -150,7 +150,7 @@ withLoadPackage menv inner = do
         { packageConfigEnableTests = False
         , packageConfigEnableBenchmarks = False
         , packageConfigFlags = flags
-        , packageConfigGhcVersion = envConfigGhcVersion econfig
+        , packageConfigCompilerVersion = envConfigCompilerVersion econfig
         , packageConfigPlatform = configPlatform (getConfig econfig)
         }
 

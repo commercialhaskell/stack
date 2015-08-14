@@ -293,10 +293,10 @@ loadBuildConfig mproject config stackRoot mresolver = do
         case projectResolver project of
             ResolverSnapshot snapName -> do
                 mbp <- runReaderT (loadMiniBuildPlan snapName) miniConfig
-                return $ GhcVersion $ mbpGhcVersion mbp
+                return $ mbpCompilerVersion mbp
             ResolverCustom _name url -> do
                 mbp <- runReaderT (parseCustomMiniBuildPlan stackYamlFP url) miniConfig
-                return $ GhcVersion $ mbpGhcVersion mbp
+                return $ mbpCompilerVersion mbp
             ResolverCompiler wantedCompiler -> return wantedCompiler
 
     return BuildConfig
