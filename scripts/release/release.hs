@@ -205,7 +205,7 @@ rules global@Global{..} args = do
         distroVersionDir (anyDistroVersion' distro0) </> distroPackageFileName distro0 <.> uploadExt %> \out -> do
             let dv@DistroVersion{..} = distroVersionFromPath out
             need [dropExtension out]
-            uploadPackage (distroPackageExt dvDistro) dv (dropExtension out)
+            uploadPackage dvDistro dv (dropExtension out)
             copyFileChanged (dropExtension out) out
 
         distroVersionDir (anyDistroVersion' distro0) </> distroPackageFileName distro0 %> \out -> do
@@ -242,14 +242,14 @@ rules global@Global{..} args = do
 
     distroVersionDockerDir anyDistroVersion </> "Dockerfile" %> \out -> do
         let DistroVersion{..} = distroVersionFromPath out
-        template <- readTemplate (distroPackageExt dvDistro </> "docker/Dockerfile")
+        template <- readTemplate (distroTemplateDir dvDistro </> "docker/Dockerfile")
         writeFileChanged out $
             replace "<<DISTRO-VERSION>>" dvVersion $
             replace "<<DISTRO>>" dvDistro template
 
     distroVersionDockerDir anyDistroVersion </> "run.sh" %> \out -> do
         let DistroVersion{..} = distroVersionFromPath out
-        writeFileChanged out =<< readTemplate (distroPackageExt dvDistro </> "docker/run.sh")
+        writeFileChanged out =<< readTemplate (distroTemplateDir dvDistro </> "docker/run.sh")
 
   where
     distroVersionFromPath path =
@@ -288,11 +288,15 @@ rules global@Global{..} args = do
             concat [stackProgName, "_", distroPackageVersionStr distro, "_amd64"] <.> debExt
         | distroPackageExt distro == rpmExt =
             concat [stackProgName, "-", distroPackageVersionStr distro] <.> "x86_64" <.> rpmExt
-        | otherwise = error ("distroPackageFileName: unknown extension: " ++ distroPackageExt distro)
+        | distro == archDistro =
+            concat [stackProgName, "_", distroPackageVersionStr distro, "-", "x86_64"] <.> tarGzExt
+        | otherwise = error ("distroPackageFileName: unknown distro: " ++ distro)
     imageIDFileName = "image-id"
 
     zipExt = "zip"
+    tarGzExt = tarExt <.> gzExt
     gzExt = "gz"
+    tarExt = "tar"
     ascExt = "asc"
     uploadExt = "upload"
     debExt = "deb"
@@ -305,11 +309,19 @@ rules global@Global{..} args = do
             concat [stackVersionStr global, "-", show gGitRevCount, "-", gGitSha]
         | distroPackageExt distro == rpmExt =
             concat [stackVersionStr global, "_", show gGitRevCount, "_", gGitSha]
-        | otherwise = error ("distroPackageVersionStr: unknown extension: " ++ distroPackageExt distro)
+        | distro == archDistro =
+            stackVersionStr global
+        | otherwise = error ("distroPackageVersionStr: unknown distro: " ++ distro)
+
+    distroTemplateDir distro
+        | distroPackageExt distro `elem` [debExt, rpmExt] = distroPackageExt distro
+        | distro == archDistro = "arch"
+        | otherwise = error ("distroTemplateDir: unknown distro: " ++ distro)
 
     distroPackageExt distro
         | distro `elem` [ubuntuDistro, debianDistro] = debExt
         | distro `elem` [centosDistro, fedoraDistro] = rpmExt
+        | distro == archDistro = tarGzExt
         | otherwise = error ("distroPackageExt: unknown distro: " ++ distro)
 
     distroVersions distro
@@ -327,6 +339,8 @@ rules global@Global{..} args = do
         | distro == fedoraDistro =
             [ ("21", "21")
             , ("22", "22") ]
+        | distro == archDistro =
+            [ ("current", "current") ]
         | otherwise = error ("distroVersions: unknown distro: " ++ distro)
 
     distroVersionCodeName DistroVersion{..} =
@@ -338,23 +352,25 @@ rules global@Global{..} args = do
         [ ubuntuDistro
         , debianDistro
         , centosDistro
-        , fedoraDistro ]
+        , fedoraDistro
+        , archDistro ]
     ubuntuDistro = "ubuntu"
     debianDistro = "debian"
     centosDistro = "centos"
     fedoraDistro = "fedora"
+    archDistro = "arch"
 
     anyDistroVersion = DistroVersion "*" "*"
     anyDistroVersion' distro = DistroVersion distro "*"
 
     uploadPackage :: String -> DistroVersion -> FilePath -> Action ()
-    uploadPackage ext dv@DistroVersion{..} pkgFile
-        | ext == debExt =
+    uploadPackage distro dv@DistroVersion{..} pkgFile
+        | distroPackageExt distro == debExt =
             cmd "deb-s3 upload -b download.fpcomplete.com --preserve-versions"
                 [ "--sign=" ++ gGpgKey
                 , "--prefix=" ++ dvDistro ++ "/" ++ distroVersionCodeName dv
                 , pkgFile ]
-        | ext == rpmExt = do
+        | distroPackageExt distro == rpmExt = do
             let rpmmacrosFile = gHomeDir </> ".rpmmacros"
             rpmmacrosExists <- liftIO $ System.Directory.doesFileExist rpmmacrosFile
             when rpmmacrosExists $
@@ -367,7 +383,12 @@ rules global@Global{..} args = do
                         [ "--repopath=" ++ dvDistro ++ "/" ++ dvVersion
                         , pkgFile ])
                 (liftIO $ removeFile rpmmacrosFile)
-        | otherwise = error ("uploadPackage: unknown extension: " ++ ext)
+        | distro == archDistro = do
+            () <- cmd "aws s3 cp"
+                [ pkgFile
+                , "s3://download.fpcomplete.com/archlinux/" ++ takeFileName pkgFile ]
+            putNormal "WARNING: Arch package uploaded, but updating AUR is a manual step."
+        | otherwise = error ("uploadPackage: unknown distro: " ++ distro)
 
 
 -- | Upload file to Github release.
