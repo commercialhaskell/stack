@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- | IO actions that might be put in a package at some point.
 
@@ -30,7 +31,9 @@ module Path.IO
   ,copyFileIfExists
   ,copyDirectoryRecursive
   ,createTree
-  ,dropRoot)
+  ,dropRoot
+  ,parseCollapsedAbsFile
+  ,parseCollapsedAbsDir)
   where
 
 import           Control.Exception hiding (catch)
@@ -122,6 +125,44 @@ resolveDirMaybe = resolveCheckParse D.doesDirectoryExist parseAbsDir
 resolveFileMaybe :: (MonadIO m,MonadThrow m)
                  => Path Abs Dir -> FilePath -> m (Maybe (Path Abs File))
 resolveFileMaybe = resolveCheckParse D.doesFileExist parseAbsFile
+
+-- | Collapse intermediate "." and ".." directories from path, then parse
+-- it with 'parseAbsFile'.
+-- (probably should be moved to the Path module)
+parseCollapsedAbsFile :: MonadThrow m => FilePath -> m (Path Abs File)
+parseCollapsedAbsFile = parseAbsFile . collapseFilePath
+
+-- | Collapse intermediate "." and ".." directories from path, then parse
+-- it with 'parseAbsDir'.
+-- (probably should be moved to the Path module)
+parseCollapsedAbsDir :: MonadThrow m => FilePath -> m (Path Abs Dir)
+parseCollapsedAbsDir = parseAbsDir . collapseFilePath
+
+-- | Collapse intermediate "." and ".." directories from a path.
+--
+-- > collapseFilePath "./foo" == "foo"
+-- > collapseFilePath "/bar/../baz" == "/baz"
+-- > collapseFilePath "/../baz" == "/../baz"
+-- > collapseFilePath "parent/foo/baz/../bar" ==  "parent/foo/bar"
+-- > collapseFilePath "parent/foo/baz/../../bar" ==  "parent/bar"
+-- > collapseFilePath "parent/foo/.." ==  "parent"
+-- > collapseFilePath "/parent/foo/../../bar" ==  "/bar"
+--
+-- (borrowed from @Text.Pandoc.Shared@)
+collapseFilePath :: FilePath -> FilePath
+collapseFilePath = FP.joinPath . reverse . foldl go [] . FP.splitDirectories
+  where
+    go rs "." = rs
+    go r@(p:rs) ".." = case p of
+                            ".." -> ("..":r)
+                            (checkPathSeperator -> Just True) -> ("..":r)
+                            _ -> rs
+    go _ (checkPathSeperator -> Just True) = [[FP.pathSeparator]]
+    go rs x = x:rs
+    isSingleton [] = Nothing
+    isSingleton [x] = Just x
+    isSingleton _ = Nothing
+    checkPathSeperator = fmap FP.isPathSeparator . isSingleton
 
 -- | List objects in a directory, excluding "@.@" and "@..@".  Entries are not sorted.
 listDirectory :: (MonadIO m,MonadThrow m) => Path Abs Dir -> m ([Path Abs Dir],[Path Abs File])

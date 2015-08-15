@@ -66,3 +66,8 @@ doesFileOrDirExist fp = do
             if isDir
                 then return (Right ("Directory exists: " ++ fp))
                 else return (Left ())
+
+copy :: FilePath -> FilePath -> IO ()
+copy src dest = do
+    putStrLn ("Copy " ++ show src ++ " to " ++ show dest)
+    System.Directory.copyFile src dest

@@ -837,15 +837,22 @@ findCandidate dirs exts name = do
         -> IO [Either ResolveException (Path Abs File)]
     makeDirCandidates dir =
         case name of
-            Right fp -> liftM return (try (resolveFile dir fp))
+            Right fp -> liftM return (try (resolveFile' dir fp))
             Left mn ->
                 mapM
                     (\ext ->
                           try
-                              (resolveFile
+                              (resolveFile'
                                    dir
                                    (Cabal.toFilePath mn ++ "." ++ ext)))
                     (map T.unpack exts)
+    resolveFile' :: (MonadIO m, MonadThrow m) => Path Abs Dir -> FilePath.FilePath -> m (Path Abs File)
+    resolveFile' x y = do
+        p <- parseCollapsedAbsFile (toFilePath x FilePath.</> y)
+        exists <- fileExists p
+        if exists
+            then return p
+            else throwM $ ResolveFileFailed x y (toFilePath p)
 
 -- | Warn the user that multiple candidates are available for an
 -- entry, but that we picked one anyway and continued.
