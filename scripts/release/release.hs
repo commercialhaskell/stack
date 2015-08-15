@@ -387,7 +387,7 @@ rules global@Global{..} args = do
             () <- cmd "aws s3 cp"
                 [ pkgFile
                 , "s3://download.fpcomplete.com/archlinux/" ++ takeFileName pkgFile ]
-            putNormal "WARNING: Arch package uploaded, but updating AUR is a manual step."
+            putNormal "WARNING: Arch package uploaded, but applying the AUR patch is a manual step."
         | otherwise = error ("uploadPackage: unknown distro: " ++ distro)
 
 
