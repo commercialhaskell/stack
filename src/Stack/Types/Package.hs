@@ -73,7 +73,6 @@ data Package =
   Package {packageName :: !PackageName                    -- ^ Name of the package.
           ,packageVersion :: !Version                     -- ^ Version of the package
           ,packageFiles :: !GetPackageFiles               -- ^ Get all files of the package.
-          ,packageModules :: !GetPackageModules           -- ^ Get the modules of the package.
           ,packageDeps :: !(Map PackageName VersionRange) -- ^ Packages that the package depends on.
           ,packageTools :: ![Dependency]                  -- ^ A build tool name.
           ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
@@ -111,7 +110,8 @@ data CabalFileType
 newtype GetPackageFiles = GetPackageFiles
     { getPackageFiles :: forall m env. (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadReader env m, HasPlatform env, HasEnvConfig env)
                       => Path Abs File
-                      -> m (Map NamedComponent (Set (Path Abs File))
+                      -> m (Map NamedComponent (Set ModuleName)
+                           ,Map NamedComponent (Set (Path Abs File))
                            ,Map NamedComponent (Set (Path Abs File))
                            ,Map NamedComponent (Set MainIs)
                            ,Set (Path Abs File))
@@ -124,15 +124,6 @@ newtype MainIs = MainIs
     { mainIsFile :: Path Abs File
     }
   deriving (Ord,Eq)
-
--- | Modules in the package.
-newtype GetPackageModules = GetPackageModules
-    { getPackageModules :: forall m env. (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadReader env m, HasPlatform env, HasEnvConfig env)
-                             => Path Abs File
-                             -> m (Map NamedComponent (Set ModuleName))
-    }
-instance Show GetPackageModules where
-    show _ = "<GetPackageModules>"
 
 -- | Package build configuration
 data PackageConfig =

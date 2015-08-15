@@ -149,19 +149,16 @@ resolvePackage packageConfig gpkg =
     , packageFiles = GetPackageFiles $
       \cabalfp ->
            do distDir <- distDirFromDir (parent cabalfp)
-              (_,moduleFiles,files,mains,extra) <-
+              (modules,moduleFiles,files,mains,extra) <-
                   runReaderT
                       (packageDescModulesAndFiles pkg)
                       (cabalfp, buildDir distDir)
-              return (moduleFiles, files, mains, S.singleton cabalfp <> extra)
-    , packageModules = GetPackageModules $
-      \cabalfp ->
-           do distDir <- distDirFromDir (parent cabalfp)
-              (modules,_,_,_,_) <-
-                  runReaderT
-                      (packageDescModulesAndFiles pkg)
-                      (cabalfp, buildDir distDir)
-              return modules
+              return
+                  ( modules
+                  , moduleFiles
+                  , files
+                  , mains
+                  , S.singleton cabalfp <> extra)
     , packageTools = packageDescTools pkg
     , packageFlags = packageConfigFlags packageConfig
     , packageAllDeps = S.fromList (M.keys deps)
