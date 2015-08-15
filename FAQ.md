@@ -132,6 +132,8 @@ If you already have a prior version of GHC use `stack --resolver ghc-7.10 setup 
 stack will automatically install build tools required by your packages or their
 dependencies, in particular alex and happy.
 
+__NOTE__: This works when using lts or nightly resolvers, not with ghc or custom resolvers. You can manually install build tools by running, e.g., `stack build alex happy`.
+
 #### How does stack choose which snapshot to use when creating a new config file?
 
 It checks the two most recent LTS Haskell major versions and the most recent
