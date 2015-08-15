@@ -54,7 +54,7 @@ data GhciPkgInfo = GhciPkgInfo
   , ghciPkgOpts :: [String]
   , ghciPkgDir :: Path Abs Dir
   , ghciPkgModules :: Set ModuleName
-  , ghciPkgFiles :: Set (Path Abs File)
+  , ghciPkgModFiles :: Set (Path Abs File) -- ^ Module file paths.
   , ghciPkgMainIs :: Map NamedComponent (Set (Path Abs File))
   }
 
@@ -243,7 +243,7 @@ makeGhciPkgInfo sourceMap locals name cabalfp components = do
     (componentsOpts,generalOpts) <-
         getPackageOpts (packageOpts pkg) sourceMap locals cabalfp
     componentsModules <- getPackageModules (packageModules pkg) cabalfp
-    (componentModFiles,mainIsFiles,_) <-
+    (componentModFiles,_,mainIsFiles,_) <-
         getPackageFiles (packageFiles pkg) cabalfp
     let filterWithinWantedComponents m =
             M.elems
@@ -263,8 +263,8 @@ makeGhciPkgInfo sourceMap locals name cabalfp components = do
         , ghciPkgDir = parent cabalfp
         , ghciPkgModules = mconcat
               (filterWithinWantedComponents componentsModules)
-        , ghciPkgFiles =
-          mconcat (filterWithinWantedComponents componentModFiles)
+        , ghciPkgModFiles = mconcat
+              (filterWithinWantedComponents componentModFiles)
         , ghciPkgMainIs = M.map (S.map mainIsFile) mainIsFiles
         }
   where

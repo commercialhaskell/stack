@@ -112,6 +112,7 @@ newtype GetPackageFiles = GetPackageFiles
     { getPackageFiles :: forall m env. (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadReader env m, HasPlatform env, HasEnvConfig env)
                       => Path Abs File
                       -> m (Map NamedComponent (Set (Path Abs File))
+                           ,Map NamedComponent (Set (Path Abs File))
                            ,Map NamedComponent (Set MainIs)
                            ,Set (Path Abs File))
     }

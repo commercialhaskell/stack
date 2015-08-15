@@ -71,7 +71,7 @@ ide targets useropts = do
                       map ("--ghc-option=" ++) (ghciPkgOpts pkg)
                     , mapMaybe
                           (fmap toFilePath . stripDir pwd)
-                          (S.toList (ghciPkgFiles pkg) <>
+                          (S.toList (ghciPkgModFiles pkg) <>
                            if paths_foo_exists
                                then [paths_foo]
                                else []))
