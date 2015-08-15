@@ -21,6 +21,7 @@ import           Data.Text.Encoding.Error     (lenientDecode)
 import qualified Data.Text.Lazy               as TL
 import qualified Data.Text.Lazy.Encoding      as TL
 import           Data.Typeable
+import           Prelude -- Fix redundant import warnings
 import           System.Directory
 import           System.Environment
 import           System.Exit
