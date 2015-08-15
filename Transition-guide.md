@@ -47,3 +47,14 @@ stack can handle that workflow. There's a [Reddit answer](http://www.reddit.com/
 * stack has explicit dependency solving
 * When we want to kick off solving, run `stack init --solver --force`
 * No dependency solving will occur until you next run that command
+
+## When should I use install
+
+The `install` command- unlike cabal- is only used for copying executables to a generally available directory. Download, building, and registering dependencies is handled via the `build` command for you automatically. The idea is to be as declarative as possible: state your package dependencies in your .cabal file and stack.yaml as appropriate, and they'll be built for you as needed.
+
+## How do I force stack to use GHC-X.Y
+
+Your stack.yaml specifies a *resolver* value, that states how dependencies are resolved and which version of the compiler to use. When generating with `stack init`, it will generally prefer an LTS Haskell release when possible (though you can control this with command line parameters). Each LTS Haskell and Stackage Nightly comes with a specific GHC version. In order to switch to a different GHC, you generally want to:
+
+1. Modify the resolver value to an appropriate value for the GHC version you want (e.g., move from `lts-2.22` to `lts-3.0` to move from GHC 7.8.4 to GHC 7.10.2)
+2. Run `stack setup` to download/locally install the necessary GHC version
