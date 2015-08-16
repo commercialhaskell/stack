@@ -490,7 +490,11 @@ globalOptsParser defaultTerminal =
     optional (strOption (long "stack-yaml" <>
                          metavar "STACK-YAML" <>
                          help ("Override project stack.yaml file " <>
-                               "(overrides any STACK_YAML environment variable)")))
+                               "(overrides any STACK_YAML environment variable)"))) <*>
+    boolFlags True
+        "modify-code-page"
+        "setting the codepage to support UTF-8 (Windows only)"
+        idm
 
 initOptsParser :: Parser InitOpts
 initOptsParser =

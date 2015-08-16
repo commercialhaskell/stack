@@ -13,6 +13,7 @@ module Main where
 import           Control.Exception
 import qualified Control.Exception.Lifted as EL
 import           Control.Monad hiding (mapM, forM)
+import qualified Control.Monad.Catch as Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask, asks)
@@ -77,35 +78,35 @@ import           System.Process.Read
 
 #if WINDOWS
 import System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
-import System.IO (hSetEncoding, utf8, hPutStrLn)
+import System.IO (hSetEncoding, utf8)
 #endif
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738
-fixCodePage :: IO a -> IO a
+fixCodePage :: (MonadIO m, Catch.MonadMask m, MonadLogger m) => m a -> m a
 #if WINDOWS
 fixCodePage inner = do
-    origCPI <- getConsoleCP
-    origCPO <- getConsoleOutputCP
+    origCPI <- liftIO getConsoleCP
+    origCPO <- liftIO getConsoleOutputCP
 
     let setInput = origCPI /= expected
         setOutput = origCPO /= expected
         fixInput
-            | setInput = bracket_
-                (do
+            | setInput = Catch.bracket_
+                (liftIO $ do
                     setConsoleCP expected
                     hSetEncoding stdin utf8
                     )
-                (setConsoleCP origCPI)
+                (liftIO $ setConsoleCP origCPI)
             | otherwise = id
         fixOutput
-            | setInput = bracket_
-                (do
+            | setInput = Catch.bracket_
+                (liftIO $ do
                     setConsoleOutputCP expected
                     hSetEncoding stdout utf8
                     hSetEncoding stderr utf8
                     )
-                (setConsoleOutputCP origCPO)
+                (liftIO $ setConsoleOutputCP origCPO)
             | otherwise = id
 
     case (setInput, setOutput) of
@@ -117,7 +118,7 @@ fixCodePage inner = do
     fixInput $ fixOutput inner
   where
     expected = 65001 -- UTF-8
-    warn typ = hPutStrLn stderr $ concat
+    warn typ = $logInfo $ T.concat
         [ "Setting"
         , typ
         , " codepage to UTF-8 (65001) to ensure correct output from GHC"
@@ -332,7 +333,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
          throwIO exitCode
        Right (global,run) -> do
          when (globalLogLevel global == LevelDebug) $ putStrLn versionString'
-         fixCodePage $ run global `catch` \e -> do
+         run global `catch` \e -> do
             -- This special handler stops "stack: " from being printed before the
             -- exception
             case fromException e of
@@ -690,7 +691,11 @@ buildCmd moptionSynonym opts go
                 , opt
                 , "'"
                 ]
-        Stack.Build.build setLocalFiles (Just lk) opts
+        fixCodePage' $ Stack.Build.build setLocalFiles (Just lk) opts
+
+    fixCodePage'
+        | globalModifyCodePage go = fixCodePage
+        | otherwise = id
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
 uninstallCmd _ go = withConfigAndLock go $ do
