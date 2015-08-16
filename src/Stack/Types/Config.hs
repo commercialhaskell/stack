@@ -13,7 +13,7 @@ module Stack.Types.Config where
 
 import           Control.Applicative
 import           Control.Exception
-import           Control.Monad (liftM, mzero)
+import           Control.Monad (liftM, mzero, forM)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Logger (LogLevel(..))
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
@@ -522,6 +522,8 @@ data ConfigMonoid =
     -- ^ Initialize SCM (e.g. git init) when making new projects?
     ,configMonoidGhcOptions          :: !(Map (Maybe PackageName) [Text])
     -- ^ See 'configGhcOptions'
+    ,configMonoidExtraPath           :: ![Path Abs Dir]
+    -- ^ Additional paths to search for executables in
     }
   deriving Show
 
@@ -549,6 +551,7 @@ instance Monoid ConfigMonoid where
     , configMonoidScmInit = Nothing
     , configMonoidCompilerCheck = Nothing
     , configMonoidGhcOptions = mempty
+    , configMonoidExtraPath = []
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -574,6 +577,7 @@ instance Monoid ConfigMonoid where
     , configMonoidScmInit = configMonoidScmInit l <|> configMonoidScmInit r
     , configMonoidCompilerCheck = configMonoidCompilerCheck l <|> configMonoidCompilerCheck r
     , configMonoidGhcOptions = Map.unionWith (++) (configMonoidGhcOptions l) (configMonoidGhcOptions r)
+    , configMonoidExtraPath = configMonoidExtraPath l ++ configMonoidExtraPath r
     }
 
 instance FromJSON (ConfigMonoid, [JSONWarning]) where
@@ -619,6 +623,10 @@ parseConfigMonoidJSON obj = do
         case mghcoptions of
             Nothing -> return mempty
             Just m -> fmap Map.fromList $ mapM handleGhcOptions $ Map.toList m
+
+    extraPath <- obj ..:? "extra-path" ..!= []
+    configMonoidExtraPath <- forM extraPath $
+        either (fail . show) return . parseAbsDir . T.unpack
 
     return ConfigMonoid {..}
   where

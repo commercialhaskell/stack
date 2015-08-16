@@ -7,6 +7,7 @@ Major changes:
 Other enhancements:
 
 * Added the `ghc-options` field to stack.yaml [#796](https://github.com/commercialhaskell/stack/issues/796)
+* Added the `extra-path` field to stack.yaml
 
 Bug fixes:
 

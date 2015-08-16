@@ -29,6 +29,7 @@ module Stack.Config
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
+import           Control.Arrow ((***))
 import           Control.Exception (IOException)
 import           Control.Monad
 import           Control.Monad.Catch (Handler(..), MonadCatch, MonadThrow, catches, throwM)
@@ -67,7 +68,7 @@ import           Stack.Types.Internal
 import           System.Directory (getAppUserDataDirectory, createDirectoryIfMissing, canonicalizePath)
 import           System.Environment
 import           System.IO
-import           System.Process.Read (getEnvOverride, EnvOverride, unEnvOverride, readInNull)
+import           System.Process.Read
 
 -- | Get the latest snapshot resolver available.
 getLatestResolver
@@ -139,7 +140,11 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
 
          configCompilerCheck = fromMaybe MatchMinor configMonoidCompilerCheck
 
-     origEnv <- getEnvOverride configPlatform
+     rawEnv <- liftIO getEnvironment
+     origEnv <- mkEnvOverride configPlatform
+              $ augmentPathMap (map toFilePath configMonoidExtraPath)
+              $ Map.fromList
+              $ map (T.pack *** T.pack) rawEnv
      let configEnvOverride _ = return origEnv
 
      platform <- runReaderT platformRelDir configPlatform

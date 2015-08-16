@@ -27,6 +27,8 @@ module System.Process.Read
   ,readInNull
   ,logProcessRun
   ,ReadProcessException (..)
+  ,augmentPath
+  ,augmentPathMap
   )
   where
 
@@ -49,7 +51,7 @@ import           Data.Foldable (forM_)
 import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (isJust)
+import           Data.Maybe (fromMaybe, isJust)
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -327,3 +329,23 @@ getEnvOverride platform =
     getEnvironment >>=
           mkEnvOverride platform
         . Map.fromList . map (T.pack *** T.pack)
+
+-- | Augment the PATH environment variable with the given extra paths
+augmentPath :: [FilePath] -> Maybe Text -> Text
+augmentPath dirs mpath =
+    T.intercalate (T.singleton FP.searchPathSeparator)
+    $ map (stripTrailingSlashT . T.pack) dirs
+   ++ maybe [] return mpath
+
+stripTrailingSlashT :: Text -> Text
+stripTrailingSlashT t = fromMaybe t $ T.stripSuffix
+        (T.singleton FP.pathSeparator)
+        t
+
+-- | Apply 'augmentPath' on the PATH value in the given Map.
+augmentPathMap :: [FilePath] -> Map Text Text -> Map Text Text
+augmentPathMap paths origEnv =
+    Map.insert "PATH" path origEnv
+  where
+    mpath = Map.lookup "PATH" origEnv
+    path = augmentPath paths mpath

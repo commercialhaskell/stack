@@ -152,20 +152,15 @@ setupEnv mResolveMissingGHC = do
             , soptsUpgradeCabal = False
             , soptsResolveMissingGHC = mResolveMissingGHC
             }
+
     mghcBin <- ensureGHC sopts
-    menv0 <- getMinimalEnvOverride
 
     -- Modify the initial environment to include the GHC path, if a local GHC
     -- is being used
-    let env = removeHaskellEnvVars $ case mghcBin of
-            Nothing -> unEnvOverride menv0
-            Just ghcBin ->
-                let x = unEnvOverride menv0
-                    mpath = Map.lookup "PATH" x
-                    path = T.intercalate (T.singleton searchPathSeparator)
-                        $ map (stripTrailingSlashT . T.pack) ghcBin
-                       ++ maybe [] return mpath
-                 in Map.insert "PATH" path x
+    menv0 <- getMinimalEnvOverride
+    let env = removeHaskellEnvVars
+            $ augmentPathMap (fromMaybe [] mghcBin)
+            $ unEnvOverride menv0
 
     menv <- mkEnvOverride platform env
     ghcVer <- getGhcVersion menv
@@ -245,19 +240,6 @@ setupEnv mResolveMissingGHC = do
         , envConfigGhcVersion = ghcVer
         , envConfigPackages = envConfigPackages envConfig0
         }
-
--- | Augment the PATH environment variable with the given extra paths
-augmentPath :: [FilePath] -> Maybe Text -> Text
-augmentPath dirs mpath =
-    T.pack $ intercalate [searchPathSeparator]
-        (map stripTrailingSlashS dirs ++ maybe [] (return . T.unpack) mpath)
-  where
-    stripTrailingSlashS = T.unpack . stripTrailingSlashT . T.pack
-
-stripTrailingSlashT :: Text -> Text
-stripTrailingSlashT t = fromMaybe t $ T.stripSuffix
-        (T.singleton FP.pathSeparator)
-        t
 
 -- | Ensure GHC is installed and provide the PATHs to add if necessary
 ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
