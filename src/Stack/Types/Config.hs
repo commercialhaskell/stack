@@ -213,6 +213,7 @@ data GlobalOpts = GlobalOpts
     , globalResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
     , globalTerminal     :: !Bool -- ^ We're in a terminal?
     , globalStackYaml    :: !(Maybe FilePath) -- ^ Override project stack.yaml
+    , globalModifyCodePage :: !Bool -- ^ Force the code page to UTF-8 on Windows
     } deriving (Show)
 
 -- | Either an actual resolver value, or an abstract description of one (e.g.,
