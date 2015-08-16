@@ -30,7 +30,7 @@ This will create a new project called first-project- in the first-project direct
 * first-project.cabal
 * stack.yaml
 
-We'll describe their significance and the distinction between the two next. But for now, we just want to play around. From inside the first-project directory, run `stack build`. It may tell you that you need to run `stack setup`. That's fine, it just means that stack couldn't find the required GHC version on your system, and therefore it will download and install it into a local directory for your (you can use `stack path` for more information about paths stack uses).
+We'll describe their significance and the distinction between the two next. But for now, we just want to play around. From inside the first-project directory, run `stack build`. It may tell you that you need to run `stack setup`. Running `stack setup` is a safe operation, which will download and install GHC into a local directory which only stack will use. (For more information on exact paths used by stack, run `stack path`.)
 
 You can also use `stack test` to build and run your test suite. But now, let's make things a bit more interesting, and perform an HTTP request from inside our application. Replace the `src/Lib.hs` file's contents with the following code (if you're brand new to Haskell, don't worry about the exact meaning of this yet):
 
