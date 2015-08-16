@@ -190,3 +190,11 @@ extra-include-dirs:
 extra-lib-dirs:
 - /opt/foo/lib
 ```
+
+### compiler-check
+
+Specifies how the compiler version in the resolver is matched against concrete versions. Valid values:
+
+* `match-minor`: make sure that the first three components match, but allow patch-level differences. For example< 7.8.4.1 and 7.8.4.2 would both match 7.8.4. This is useful to allow for custom patch levels of a compiler. This is the default
+* `match-exact`: the entire version number must match precisely
+* `newer-minor`: the third component can be increased, e.g. if your resolver is `ghc-7.10.1`, then 7.10.2 will also be allowed. This was the default up through stack 0.1.3
