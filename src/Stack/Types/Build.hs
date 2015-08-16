@@ -565,9 +565,7 @@ configureOpts econfig bco deps wanted loc package = map T.pack $ concat
                        flagNameString name)
                     (Map.toList (packageFlags package))
     -- FIXME Chris: where does this come from now? , ["--ghc-options=-O2" | gconfigOptimize gconfig]
-    , if wanted
-        then concatMap (\x -> ["--ghc-options", T.unpack x]) (boptsGhcOptions bopts)
-        else []
+    , concatMap (\x -> ["--ghc-options", T.unpack x]) allGhcOptions
     , map (("--extra-include-dirs=" ++) . T.unpack) (Set.toList (configExtraIncludeDirs config))
     , map (("--extra-lib-dirs=" ++) . T.unpack) (Set.toList (configExtraLibDirs config))
     ]
@@ -610,6 +608,15 @@ configureOpts econfig bco deps wanted loc package = map T.pack $ concat
         ]
       where
         PackageIdentifier name version = ghcPkgIdPackageIdentifier gid
+
+    ghcOptionsMap = configGhcOptions $ getConfig econfig
+    allGhcOptions = concat
+        [ fromMaybe [] $ Map.lookup Nothing ghcOptionsMap
+        , fromMaybe [] $ Map.lookup (Just $ packageName package) ghcOptionsMap
+        , if wanted
+            then boptsGhcOptions bopts
+            else []
+        ]
 
 -- | Get set of wanted package names from locals.
 wantedLocalPackages :: [LocalPackage] -> Set PackageName

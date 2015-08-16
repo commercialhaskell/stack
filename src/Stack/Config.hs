@@ -170,6 +170,7 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
 
      let configTemplateParams = configMonoidTemplateParameters
          configScmInit = configMonoidScmInit
+         configGhcOptions = configMonoidGhcOptions
 
      return Config {..}
 

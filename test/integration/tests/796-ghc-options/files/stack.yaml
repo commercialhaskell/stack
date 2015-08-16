@@ -1,0 +1,5 @@
+resolver: ghc-7
+ghc-options:
+    "*": -DFOO
+    ghc-options: -DBAR
+    text: -DBAZ

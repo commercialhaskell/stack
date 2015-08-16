@@ -22,6 +22,7 @@ import           Data.Aeson.Extended
                   (.=), (.:), (..:), (..:?), (..!=), Value(String, Object),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings, JSONWarning,
                   jsonSubWarningsMT)
+import           Data.Attoparsec.Args
 import           Data.Binary (Binary)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
@@ -121,6 +122,9 @@ data Config =
          -- ^ Parameters for templates.
          ,configScmInit             :: !(Maybe SCM)
          -- ^ Initialize SCM (e.g. git) when creating new projects.
+         ,configGhcOptions          :: !(Map (Maybe PackageName) [Text])
+         -- ^ Additional GHC options to apply to either all packages (Nothing)
+         -- or a specific package (Just).
          }
 
 -- | Information on a single package index
@@ -516,6 +520,8 @@ data ConfigMonoid =
     -- ^ Template parameters.
     ,configMonoidScmInit             :: !(Maybe SCM)
     -- ^ Initialize SCM (e.g. git init) when making new projects?
+    ,configMonoidGhcOptions          :: !(Map (Maybe PackageName) [Text])
+    -- ^ See 'configGhcOptions'
     }
   deriving Show
 
@@ -542,6 +548,7 @@ instance Monoid ConfigMonoid where
     , configMonoidTemplateParameters = mempty
     , configMonoidScmInit = Nothing
     , configMonoidCompilerCheck = Nothing
+    , configMonoidGhcOptions = mempty
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -566,6 +573,7 @@ instance Monoid ConfigMonoid where
     , configMonoidTemplateParameters = configMonoidTemplateParameters l <> configMonoidTemplateParameters r
     , configMonoidScmInit = configMonoidScmInit l <|> configMonoidScmInit r
     , configMonoidCompilerCheck = configMonoidCompilerCheck l <|> configMonoidCompilerCheck r
+    , configMonoidGhcOptions = Map.unionWith (++) (configMonoidGhcOptions l) (configMonoidGhcOptions r)
     }
 
 instance FromJSON (ConfigMonoid, [JSONWarning]) where
@@ -605,7 +613,27 @@ parseConfigMonoidJSON obj = do
           params <- tobj ..:? "params"
           return (scmInit,fromMaybe M.empty params)
     configMonoidCompilerCheck <- obj ..:? "compiler-check"
+
+    mghcoptions <- obj ..:? "ghc-options"
+    configMonoidGhcOptions <-
+        case mghcoptions of
+            Nothing -> return mempty
+            Just m -> fmap Map.fromList $ mapM handleGhcOptions $ Map.toList m
+
     return ConfigMonoid {..}
+  where
+    handleGhcOptions :: Monad m => (Text, Text) -> m (Maybe PackageName, [Text])
+    handleGhcOptions (name', vals') = do
+        name <-
+            if name' == "*"
+                then return Nothing
+                else case parsePackageNameFromString $ T.unpack name' of
+                        Left e -> fail $ show e
+                        Right x -> return $ Just x
+
+        case parseArgs Escaping vals' of
+            Left e -> fail e
+            Right vals -> return (name, map T.pack vals)
 
 -- | Newtype for non-orphan FromJSON instance.
 newtype VersionRangeJSON = VersionRangeJSON { unVersionRangeJSON :: VersionRange }
