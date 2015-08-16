@@ -193,8 +193,28 @@ extra-lib-dirs:
 
 ### compiler-check
 
+(Since 0.1.4)
+
 Specifies how the compiler version in the resolver is matched against concrete versions. Valid values:
 
 * `match-minor`: make sure that the first three components match, but allow patch-level differences. For example< 7.8.4.1 and 7.8.4.2 would both match 7.8.4. This is useful to allow for custom patch levels of a compiler. This is the default
 * `match-exact`: the entire version number must match precisely
 * `newer-minor`: the third component can be increased, e.g. if your resolver is `ghc-7.10.1`, then 7.10.2 will also be allowed. This was the default up through stack 0.1.3
+
+### ghc-options
+
+(Since 0.1.4)
+
+Allows specifying per-package and global GHC options:
+
+```yaml
+ghc-options:
+    # All packages
+    "*": -Wall
+    some-package: -DSOME_CPP_FLAG
+```
+
+Caveat emptor: setting options like this will affect your snapshot packages,
+which can lead to unpredictable behavior versus official Stackage snapshots.
+This is in contrast to the `ghc-options` command line flag, which will only
+affect targets.
