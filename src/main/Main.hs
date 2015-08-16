@@ -256,7 +256,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                         execCmd
                         (execOptsParser $ Just "ghc")
              addCommand "ghci"
-                        "Run ghci in the context of project(s)"
+                        "Run ghci in the context of project(s) (experimental)"
                         ghciCmd
                         ghciOptsParser
              addCommand "runghc"
