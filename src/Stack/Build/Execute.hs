@@ -209,10 +209,10 @@ getSetupExe :: M env m
             -> Path Abs Dir -- ^ temporary directory
             -> m (Maybe (Path Abs File))
 getSetupExe setupHs tmpdir = do
+    wc <- getWhichCompiler
     econfig <- asks getEnvConfig
     let config = getConfig econfig
-
-    let filenameS = concat
+        baseNameS = concat
             [ "setup-Simple-Cabal-"
             , versionString $ envConfigCabalVersion econfig
             , "-"
@@ -220,45 +220,54 @@ getSetupExe setupHs tmpdir = do
             , "-"
             , T.unpack $ compilerVersionName
                        $ envConfigCompilerVersion econfig
-            , case configPlatform config of
+            ]
+        exeNameS = baseNameS ++
+            case configPlatform config of
                 Platform _ Windows -> ".exe"
                 _ -> ""
-            ]
-    filenameP <- parseRelFile filenameS
-    let setupDir =
+        outputNameS =
+            case wc of
+                Ghc -> exeNameS
+                Ghcjs -> baseNameS ++ ".jsexe"
+        jsExeNameS =
+            baseNameS ++ ".jsexe"
+        setupDir =
             configStackRoot config </>
             $(mkRelDir "setup-exe-cache")
-        setupExe = setupDir </> filenameP
 
-    exists <- liftIO $ D.doesFileExist $ toFilePath setupExe
+    exePath <- fmap (setupDir </>) $ parseRelFile exeNameS
+    jsExePath <- fmap (setupDir </>) $ parseRelDir jsExeNameS
+
+    exists <- liftIO $ D.doesFileExist $ toFilePath exePath
 
     if exists
-        then return $ Just setupExe
+        then return $ Just exePath
         else do
-            tmpfilename <- parseRelFile $ "tmp-" ++ filenameS
-            let tmpSetupExe = setupDir </> tmpfilename
+            tmpExePath <- fmap (setupDir </>) $ parseRelFile $ "tmp-" ++ exeNameS
+            tmpOutputPath <- fmap (setupDir </>) $ parseRelFile $ "tmp-" ++ outputNameS
+            tmpJsExePath <- fmap (setupDir </>) $ parseRelDir $ "tmp-" ++ jsExeNameS
+
             liftIO $ D.createDirectoryIfMissing True $ toFilePath setupDir
 
             menv <- getMinimalEnvOverride
-            case envConfigCompilerVersion econfig of
-                GhcVersion _ -> do
-                    runIn tmpdir "ghc" menv
-                        [ "-clear-package-db"
-                        , "-global-package-db"
-                        , "-hide-all-packages"
-                        , "-package"
-                        , "base"
-                        , "-package"
-                        , "Cabal-" ++ versionString (envConfigCabalVersion econfig)
-                        , toFilePath setupHs
-                        , "-o"
-                        , toFilePath tmpSetupExe
-                        ]
-                        Nothing
-                    renameFile tmpSetupExe setupExe
-                    return $ Just setupExe
-                -- FIXME Sloan: need to add GHCJS caching
-                GhcjsVersion _ _ -> return Nothing
+            wc <- getWhichCompiler
+            let args =
+                    [ "-clear-package-db"
+                    , "-global-package-db"
+                    , "-hide-all-packages"
+                    , "-package"
+                    , "base"
+                    , "-package"
+                    , "Cabal-" ++ versionString (envConfigCabalVersion econfig)
+                    , toFilePath setupHs
+                    , "-o"
+                    , toFilePath tmpOutputPath
+                    ] ++
+                    ["-build-runner" | wc == Ghcjs]
+            runIn tmpdir (compilerExeName wc) menv args Nothing
+            when (wc == Ghcjs) $ renameDir tmpJsExePath jsExePath
+            renameFile tmpExePath exePath
+            return $ Just exePath
 
 withExecuteEnv :: M env m
                => EnvOverride
