@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -92,7 +93,7 @@ loadSourceMap needTargets bopts = do
         latestVersion
 
     locals <- mapM (loadLocalPackage bopts targets) $ Map.toList rawLocals
-    checkFlagsUsed bopts locals
+    checkFlagsUsed bopts locals extraDeps0 (mbpPackages mbp0)
 
     let
         -- loadLocals returns PackageName (foo) and PackageIdentifier (bar-1.2.3) targets separately;
@@ -159,16 +160,47 @@ parseTargetsFromBuildOpts needTargets bopts = do
                 parseCustomMiniBuildPlan stackYamlFP url
     rawLocals <- getLocalPackageViews
     workingDir <- getWorkingDir
+
+    let snapshot = mpiVersion <$> mbpPackages mbp0
+    flagExtraDeps <- convertSnapshotToExtra
+        snapshot
+        (bcExtraDeps bconfig)
+        (catMaybes $ Map.keys $ boptsFlags bopts)
+
     (cliExtraDeps, targets) <-
         parseTargets
             needTargets
             (bcImplicitGlobal bconfig)
-            (mpiVersion <$> mbpPackages mbp0)
-            (bcExtraDeps bconfig)
+            snapshot
+            (flagExtraDeps <> bcExtraDeps bconfig)
             (fst <$> rawLocals)
             workingDir
             (boptsTargets bopts)
-    return (mbp0, cliExtraDeps, targets)
+    return (mbp0, cliExtraDeps <> flagExtraDeps, targets)
+
+-- | For every package in the snapshot which is referenced by a flag, give the
+-- user a warning and then add it to extra-deps.
+convertSnapshotToExtra
+    :: MonadLogger m
+    => Map PackageName Version -- ^ snapshot
+    -> Map PackageName Version -- ^ extra-deps
+    -> [PackageName] -- ^ packages referenced by a flag
+    -> m (Map PackageName Version)
+convertSnapshotToExtra snapshot extra0 flags0 =
+    go Map.empty flags0
+  where
+    go !extra [] = return extra
+    go extra (flag:flags)
+        | Just _ <- Map.lookup flag extra0 = go extra flags
+        | otherwise = case Map.lookup flag snapshot of
+            Nothing -> go extra flags
+            Just version -> do
+                $logWarn $ T.concat
+                    [ "- Implicitly adding "
+                    , T.pack $ packageNameString flag
+                    , " to extra-deps based on command line flag"
+                    ]
+                go (Map.insert flag version extra) flags
 
 -- | Parse out the local package views for the current project
 getLocalPackageViews :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env)
@@ -297,8 +329,10 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
 checkFlagsUsed :: (MonadThrow m, MonadReader env m, HasBuildConfig env)
                => BuildOpts
                -> [LocalPackage]
+               -> Map PackageName extraDeps -- ^ extra deps
+               -> Map PackageName snapshot -- ^ snapshot, for error messages
                -> m ()
-checkFlagsUsed bopts lps = do
+checkFlagsUsed bopts lps extraDeps snapshot = do
     bconfig <- asks getBuildConfig
 
         -- Check if flags specified in stack.yaml and the command line are
@@ -311,9 +345,12 @@ checkFlagsUsed bopts lps = do
             case Map.lookup name localNameMap of
                 -- Package is not available locally
                 Nothing ->
-                    case Map.lookup name $ bcExtraDeps bconfig of
+                    case Map.lookup name extraDeps of
                         -- Also not in extra-deps, it's an error
-                        Nothing -> Just $ UFNoPackage source name
+                        Nothing ->
+                            case Map.lookup name snapshot of
+                                Nothing -> Just $ UFNoPackage source name
+                                Just _ -> Just $ UFSnapshot name
                         -- We don't check for flag presence for extra deps
                         Just _ -> Nothing
                 -- Package exists locally, let's check if the flags are defined

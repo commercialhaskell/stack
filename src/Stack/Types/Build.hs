@@ -117,6 +117,7 @@ data FlagSource = FSCommandLine | FSStackYaml
 
 data UnusedFlags = UFNoPackage FlagSource PackageName
                  | UFFlagsNotDefined FlagSource Package (Set FlagName)
+                 | UFSnapshot PackageName
     deriving (Show, Eq, Ord)
 
 instance Show StackBuildException where
@@ -282,6 +283,11 @@ instance Show StackBuildException where
             ]
           where name = packageNameString (packageName pkg)
                 pkgFlags = packageDefinedFlags pkg
+        go (UFSnapshot name) = concat
+            [ "- Attempted to set flag on snapshot package "
+            , packageNameString name
+            , ", please add to extra-deps"
+            ]
     show (TargetParseException [err]) = "Error parsing targets: " ++ T.unpack err
     show (TargetParseException errs) = unlines
         $ "The following errors occurred while parsing the build targets:"
