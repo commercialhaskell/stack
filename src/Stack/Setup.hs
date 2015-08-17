@@ -379,10 +379,7 @@ upgradeCabal menv wc = do
             let ident = PackageIdentifier name newest
             m <- unpackPackageIdents menv tmpdir' Nothing (Set.singleton ident)
 
-            let compilerName = case wc of
-                    Ghc -> "ghc"
-                    Ghcjs -> "ghcjs"
-            compilerPath <- join $ findExecutable menv compilerName
+            compilerPath <- join $ findExecutable menv (compilerExeName wc)
             newestDir <- parseRelDir $ versionString newest
             let installRoot = toFilePath $ parent (parent compilerPath)
                                        </> $(mkRelDir "new-cabal")
@@ -393,7 +390,7 @@ upgradeCabal menv wc = do
                     Nothing -> error $ "upgradeCabal: Invariant violated, dir missing"
                     Just dir -> return dir
 
-            runIn dir compilerName menv ["Setup.hs"] Nothing
+            runIn dir (compilerExeName wc) menv ["Setup.hs"] Nothing
             let setupExe = toFilePath $ dir </> $(mkRelFile "Setup")
                 dirArgument name' = concat
                     [ "--"

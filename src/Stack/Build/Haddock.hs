@@ -203,12 +203,9 @@ generateHaddockIndex descr envOverride wc packageIDs docRelDir destDir = do
                    readProcessNull
                        (Just destDir)
                        envOverride
-                       exeName
+                       (compilerExeName wc)
                        (["--gen-contents", "--gen-index"] ++ concatMap fst interfaceOpts)
   where
-    exeName = case wc of
-        Ghc -> "haddock"
-        Ghcjs -> "haddock-ghcjs"
     toInterfaceOpt pid@(PackageIdentifier name _) = do
         let interfaceRelFile =
                 docRelDir FP.</> packageIdentifierString pid FP.</>
