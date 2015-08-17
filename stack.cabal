@@ -98,8 +98,9 @@ library
                      Data.Aeson.Extended
                      Data.Attoparsec.Combinators
                      Data.Binary.VersionTagged
-                     Data.Set.Monad
+                     Data.IORef.RunOnce
                      Data.Maybe.Extra
+                     Data.Set.Monad
   build-depends:     Cabal >= 1.18.1.5
                    , aeson >= 0.8.0.2
                    , async >= 2.0.2

@@ -17,7 +17,7 @@ module Stack.Setup
   ) where
 
 import           Control.Applicative
-import           Control.Exception.Enclosed (catchIO)
+import           Control.Exception.Enclosed (catchIO, tryAny)
 import           Control.Monad (liftM, when, join, void, unless)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class (MonadIO, liftIO)
@@ -36,6 +36,7 @@ import qualified Data.Conduit.List as CL
 import           Data.Either
 import           Data.Foldable
 import           Data.IORef
+import           Data.IORef.RunOnce (runOnce)
 import           Data.List hiding (concat, elem, maximumBy)
 import           Data.Map (Map)
 import qualified Data.Map as Map
@@ -51,7 +52,8 @@ import qualified Data.Text.Encoding.Error as T
 import           Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
 import           Data.Typeable (Typeable)
 import qualified Data.Yaml as Yaml
-import           Distribution.System (OS (..), Arch (..), Platform (..))
+import           Distribution.System (OS, Arch (..), Platform (..))
+import qualified Distribution.System as Cabal
 import           Distribution.Text (simpleParse)
 import           Network.HTTP.Client.Conduit
 import           Network.HTTP.Download.Verified
@@ -64,7 +66,7 @@ import           Stack.Config (resolvePackageEntry)
 import           Stack.Constants (distRelativeDir)
 import           Stack.Fetch
 import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB)
-import           Stack.Solver (getGhcVersion)
+import           Stack.Solver (getCompilerVersion)
 import           Stack.Types
 import           Stack.Types.StackT
 import           System.Environment (getExecutablePath)
@@ -100,7 +102,7 @@ data SetupOpts = SetupOpts
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
                     | MissingDependencies [String]
-                    | UnknownGHCVersion Text CompilerVersion (Set Version)
+                    | UnknownCompilerVersion Text CompilerVersion (Set Version)
                     | UnknownOSKey Text
                     | GHCSanityCheckCompileFailed ReadProcessException (Path Abs File)
     deriving Typeable
@@ -114,10 +116,10 @@ instance Show SetupException where
     show (MissingDependencies tools) =
         "The following executables are missing and must be installed: " ++
         intercalate ", " tools
-    show (UnknownGHCVersion oskey wanted known) = concat
-        [ "No information found for GHC version "
+    show (UnknownCompilerVersion oskey wanted known) = concat
+        [ "No information found for "
         , T.unpack (compilerVersionName wanted)
-        , ".\nSupported GHC major versions for OS key '" ++ T.unpack oskey ++ "': "
+        , ".\nSupported versions for OS key '" ++ T.unpack oskey ++ "': "
         , intercalate ", " (map show $ Set.toList known)
         ]
     show (UnknownOSKey oskey) =
@@ -139,6 +141,7 @@ setupEnv :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasBuildC
 setupEnv mResolveMissingGHC = do
     bconfig <- asks getBuildConfig
     let platform = getPlatform bconfig
+        wc = whichCompiler (bcWantedCompiler bconfig)
         sopts = SetupOpts
             { soptsInstallIfMissing = configInstallGHC $ bcConfig bconfig
             , soptsUseSystem = configSystemGHC $ bcConfig bconfig
@@ -163,15 +166,15 @@ setupEnv mResolveMissingGHC = do
             $ unEnvOverride menv0
 
     menv <- mkEnvOverride platform env
-    ghcVer <- getGhcVersion menv
-    cabalVer <- getCabalPkgVer menv
+    compilerVer <- getCompilerVersion menv wc
+    cabalVer <- getCabalPkgVer menv wc
     packages <- mapM
         (resolvePackageEntry menv (bcRoot bconfig))
         (bcPackageEntries bconfig)
     let envConfig0 = EnvConfig
             { envConfigBuildConfig = bconfig
             , envConfigCabalVersion = cabalVer
-            , envConfigCompilerVersion = GhcVersion ghcVer
+            , envConfigCompilerVersion = compilerVer
             , envConfigPackages = Map.fromList $ concat packages
             }
 
@@ -183,10 +186,10 @@ setupEnv mResolveMissingGHC = do
         localsPath = augmentPath (mkDirs' True) mpath
 
     deps <- runReaderT packageDatabaseDeps envConfig0
-    createDatabase menv deps
+    createDatabase menv wc deps
     localdb <- runReaderT packageDatabaseLocal envConfig0
-    createDatabase menv localdb
-    globalDB <- getGlobalDB menv
+    createDatabase menv wc localdb
+    globalDB <- getGlobalDB menv wc
     let mkGPP locals = T.pack $ intercalate [searchPathSeparator] $ concat
             [ [toFilePathNoTrailingSlash localdb | locals]
             , [toFilePathNoTrailingSlash deps]
@@ -237,7 +240,7 @@ setupEnv mResolveMissingGHC = do
             { bcConfig = (bcConfig bconfig) { configEnvOverride = getEnvOverride' }
             }
         , envConfigCabalVersion = cabalVer
-        , envConfigCompilerVersion = GhcVersion ghcVer
+        , envConfigCompilerVersion = compilerVer
         , envConfigPackages = envConfigPackages envConfig0
         }
 
@@ -246,20 +249,22 @@ ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfi
           => SetupOpts
           -> m (Maybe [FilePath])
 ensureGHC sopts = do
-    case soptsWantedCompiler sopts of
-        GhcVersion v | v < $(mkVersion "7.8") -> do
-            $logWarn "stack will almost certainly fail with GHC below version 7.8"
-            $logWarn "Valiantly attempting to run anyway, but I know this is doomed"
-            $logWarn "For more information, see: https://github.com/commercialhaskell/stack/issues/648"
-            $logWarn ""
-        _ -> return ()
+    let wc = whichCompiler (soptsWantedCompiler sopts)
+        ghcVersion = case soptsWantedCompiler sopts of
+            GhcVersion v -> v
+            GhcjsVersion _ v -> v
+    when (ghcVersion < $(mkVersion "7.8")) $ do
+        $logWarn "stack will almost certainly fail with GHC below version 7.8"
+        $logWarn "Valiantly attempting to run anyway, but I know this is doomed"
+        $logWarn "For more information, see: https://github.com/commercialhaskell/stack/issues/648"
+        $logWarn ""
 
     -- Check the available GHCs
     menv0 <- getMinimalEnvOverride
 
     msystem <-
         if soptsUseSystem sopts
-            then getSystemGHC menv0
+            then getSystemCompiler menv0 wc
             else return Nothing
 
     Platform expectedArch _ <- asks getPlatform
@@ -270,28 +275,18 @@ ensureGHC sopts = do
             Just (system, arch) ->
                 not (isWanted system) ||
                 arch /= expectedArch
-        isWanted = isWantedCompiler (soptsCompilerCheck sopts) (soptsWantedCompiler sopts) . GhcVersion
+        isWanted = isWantedCompiler (soptsCompilerCheck sopts) (soptsWantedCompiler sopts)
 
     -- If we need to install a GHC, try to do so
     mpaths <- if needLocal
         then do
-            -- Avoid having to load it twice
-            siRef <- liftIO $ newIORef Nothing
-            manager <- asks getHttpManager
-            let getSetupInfo' = liftIO $ do
-                    msi <- readIORef siRef
-                    case msi of
-                        Just si -> return si
-                        Nothing -> do
-                            si <- getSetupInfo manager
-                            writeIORef siRef $ Just si
-                            return si
+            getSetupInfo' <- runOnce (getSetupInfo =<< asks getHttpManager)
 
             config <- asks getConfig
             installed <- runReaderT listInstalled config
 
             -- Install GHC
-            ghcIdent <- case getInstalledTool installed $(mkPackageName "ghc") isWanted of
+            ghcIdent <- case getInstalledTool installed $(mkPackageName "ghc") (isWanted . GhcVersion) of
                 Just ident -> return ident
                 Nothing
                     | soptsInstallIfMissing sopts -> do
@@ -299,7 +294,7 @@ ensureGHC sopts = do
                         downloadAndInstallGHC menv0 si (soptsWantedCompiler sopts) (soptsCompilerCheck sopts)
                     | otherwise -> do
                         Platform arch _ <- asks getPlatform
-                        throwM $ GHCVersionMismatch
+                        throwM $ CompilerVersionMismatch
                             msystem
                             (soptsWantedCompiler sopts, arch)
                             (soptsCompilerCheck sopts)
@@ -344,7 +339,7 @@ ensureGHC sopts = do
             $logWarn "Trying to upgrade Cabal library on a GHC not installed by stack."
             $logWarn "This may fail, caveat emptor!"
 
-        upgradeCabal menv
+        upgradeCabal menv wc
 
     when (soptsSanityCheck sopts) $ sanityCheck menv
 
@@ -353,8 +348,9 @@ ensureGHC sopts = do
 -- | Install the newest version of Cabal globally
 upgradeCabal :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m, MonadMask m)
              => EnvOverride
+             -> WhichCompiler
              -> m ()
-upgradeCabal menv = do
+upgradeCabal menv wc = do
     let name = $(mkPackageName "Cabal")
     rmap <- resolvePackages menv Set.empty (Set.singleton name)
     newest <-
@@ -363,7 +359,7 @@ upgradeCabal menv = do
             [PackageIdentifier name' version]
                 | name == name' -> return version
             x -> error $ "Unexpected results for resolvePackages: " ++ show x
-    installed <- getCabalPkgVer menv
+    installed <- getCabalPkgVer menv wc
     if installed >= newest
         then $logInfo $ T.concat
             [ "Currently installed Cabal is "
@@ -383,9 +379,12 @@ upgradeCabal menv = do
             let ident = PackageIdentifier name newest
             m <- unpackPackageIdents menv tmpdir' Nothing (Set.singleton ident)
 
-            ghcPath <- join $ findExecutable menv "ghc"
+            let compilerName = case wc of
+                    Ghc -> "ghc"
+                    Ghcjs -> "ghcjs"
+            compilerPath <- join $ findExecutable menv compilerName
             newestDir <- parseRelDir $ versionString newest
-            let installRoot = toFilePath $ parent (parent ghcPath)
+            let installRoot = toFilePath $ parent (parent compilerPath)
                                        </> $(mkRelDir "new-cabal")
                                        </> newestDir
 
@@ -394,7 +393,7 @@ upgradeCabal menv = do
                     Nothing -> error $ "upgradeCabal: Invariant violated, dir missing"
                     Just dir -> return dir
 
-            runIn dir "ghc" menv ["Setup.hs"] Nothing
+            runIn dir compilerName menv ["Setup.hs"] Nothing
             let setupExe = toFilePath $ dir </> $(mkRelFile "Setup")
                 dirArgument name' = concat
                     [ "--"
@@ -411,19 +410,30 @@ upgradeCabal menv = do
             runIn dir setupExe menv ["install"] Nothing
             $logInfo "New Cabal library installed"
 
--- | Get the major version of the system GHC, if available
-getSystemGHC :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m) => EnvOverride -> m (Maybe (Version, Arch))
-getSystemGHC menv = do
-    exists <- doesExecutableExist menv "ghc"
+-- | Get the version of the system compiler, if available
+getSystemCompiler :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m) => EnvOverride -> WhichCompiler -> m (Maybe (CompilerVersion, Arch))
+getSystemCompiler menv wc = do
+    let exeName = case wc of
+            Ghc -> "ghc"
+            Ghcjs -> "ghcjs"
+    exists <- doesExecutableExist menv exeName
     if exists
         then do
-            eres <- tryProcessStdout Nothing menv "ghc" ["--info"]
-            return $ do
-                Right bs <- Just eres
-                pairs <- readMay $ S8.unpack bs :: Maybe [(String, String)]
-                version <- lookup "Project version" pairs >>= parseVersionFromString
-                arch <- lookup "Target platform" pairs >>= simpleParse . takeWhile (/= '-')
-                Just (version, arch)
+            eres <- tryProcessStdout Nothing menv exeName ["--info"]
+            let minfo = do
+                    Right bs <- Just eres
+                    pairs <- readMay $ S8.unpack bs :: Maybe [(String, String)]
+                    version <- lookup "Project version" pairs >>= parseVersionFromString
+                    arch <- lookup "Target platform" pairs >>= simpleParse . takeWhile (/= '-')
+                    return (version, arch)
+            case (wc, minfo) of
+                (Ghc, Just (version, arch)) -> return (Just (GhcVersion version, arch))
+                (Ghcjs, Just (_, arch)) -> do
+                    eversion <- tryAny $ getCompilerVersion menv Ghcjs
+                    case eversion of
+                        Left _ -> return Nothing
+                        Right version -> return (Just (version, arch))
+                (_, Nothing) -> return Nothing
         else return Nothing
 
 data DownloadInfo = DownloadInfo
@@ -593,7 +603,7 @@ downloadAndInstallGHC menv si wanted versionCheck = do
     (selectedVersion, downloadInfo) <-
         case mpair of
             Just pair -> return pair
-            Nothing -> throwM $ UnknownGHCVersion osKey wanted (Map.keysSet pairs)
+            Nothing -> throwM $ UnknownCompilerVersion osKey wanted (Map.keysSet pairs)
     platform <- asks $ configPlatform . getConfig
     let installer =
             case platform of
@@ -606,19 +616,19 @@ getOSKey :: (MonadReader env m, MonadThrow m, HasConfig env, MonadLogger m, Mona
 getOSKey menv = do
     platform <- asks $ configPlatform . getConfig
     case platform of
-        Platform I386 Linux -> ("linux32" <>) <$> getLinuxSuffix
-        Platform X86_64 Linux -> ("linux64" <>) <$> getLinuxSuffix
-        Platform I386 OSX -> return "macosx"
-        Platform X86_64 OSX -> return "macosx"
-        Platform I386 FreeBSD -> return "freebsd32"
-        Platform X86_64 FreeBSD -> return "freebsd64"
-        Platform I386 OpenBSD -> return "openbsd32"
-        Platform X86_64 OpenBSD -> return "openbsd64"
-        Platform I386 Windows -> return "windows32"
-        Platform X86_64 Windows -> return "windows64"
+        Platform I386   Cabal.Linux -> ("linux32" <>) <$> getLinuxSuffix
+        Platform X86_64 Cabal.Linux -> ("linux64" <>) <$> getLinuxSuffix
+        Platform I386   Cabal.OSX -> return "macosx"
+        Platform X86_64 Cabal.OSX -> return "macosx"
+        Platform I386   Cabal.FreeBSD -> return "freebsd32"
+        Platform X86_64 Cabal.FreeBSD -> return "freebsd64"
+        Platform I386   Cabal.OpenBSD -> return "openbsd32"
+        Platform X86_64 Cabal.OpenBSD -> return "openbsd64"
+        Platform I386   Cabal.Windows -> return "windows32"
+        Platform X86_64 Cabal.Windows -> return "windows64"
 
-        Platform I386 (OtherOS "windowsintegersimple") -> return "windowsintegersimple32"
-        Platform X86_64 (OtherOS "windowsintegersimple") -> return "windowsintegersimple64"
+        Platform I386   (Cabal.OtherOS "windowsintegersimple") -> return "windowsintegersimple32"
+        Platform X86_64 (Cabal.OtherOS "windowsintegersimple") -> return "windowsintegersimple64"
 
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
   where

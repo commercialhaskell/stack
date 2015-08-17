@@ -674,7 +674,7 @@ instance Show ConfigException where
     show (ParseResolverException t) = concat
         [ "Invalid resolver value: "
         , T.unpack t
-        , ". Possible valid values include lts-2.12, nightly-YYYY-MM-DD, and ghc-7.10.2. "
+        , ". Possible valid values include lts-2.12, nightly-YYYY-MM-DD, ghc-7.10.2, and ghcjs-0.1.0-ghc-7.10.2. "
         , "See https://www.stackage.org/snapshots for a complete list."
         ]
     show (NoProjectConfigFound dir mcmd) = concat
@@ -805,8 +805,10 @@ installationRootLocal = do
 
 compilerVersionDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Rel Dir)
 compilerVersionDir = do
-    GhcVersion version <- asks (envConfigCompilerVersion . getEnvConfig)
-    parseRelDir (versionString version)
+    compilerVersion <- asks (envConfigCompilerVersion . getEnvConfig)
+    parseRelDir $ case compilerVersion of
+        GhcVersion version -> versionString version
+        GhcjsVersion {} -> T.unpack (compilerVersionName compilerVersion)
 
 -- | Package database for installing dependencies into
 packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
@@ -871,6 +873,9 @@ getMinimalEnvOverride = do
                     , esIncludeGhcPackagePath = False
                     , esStackExe = False
                     }
+
+getWhichCompiler :: (MonadReader env m, HasEnvConfig env) => m WhichCompiler
+getWhichCompiler = asks (whichCompiler . envConfigCompilerVersion . getEnvConfig)
 
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid

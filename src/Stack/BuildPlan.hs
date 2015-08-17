@@ -638,8 +638,8 @@ displayDepErrors errs =
 shadowMiniBuildPlan :: MiniBuildPlan
                     -> Set PackageName
                     -> (MiniBuildPlan, Map PackageName MiniPackageInfo)
-shadowMiniBuildPlan (MiniBuildPlan ghc pkgs0) shadowed =
-    (MiniBuildPlan ghc $ Map.fromList met, Map.fromList unmet)
+shadowMiniBuildPlan (MiniBuildPlan cv pkgs0) shadowed =
+    (MiniBuildPlan cv $ Map.fromList met, Map.fromList unmet)
   where
     pkgs1 = Map.difference pkgs0 $ Map.fromSet (\_ -> ()) shadowed
 

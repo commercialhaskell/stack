@@ -8,6 +8,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE CPP #-}
 
 -- | Dealing with Cabal.
 
@@ -655,18 +656,24 @@ resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
                     OS os -> os == rcOS rc
                     Arch arch -> arch == rcArch rc
                     Flag flag ->
-                        case M.lookup (fromCabalFlagName flag) (rcFlags rc) of
-                            Just x -> x
-                            Nothing ->
-                                -- NOTE: This should never happen, as all flags
-                                -- which are used must be declared. Defaulting
-                                -- to False
-                                False
+                      case M.lookup (fromCabalFlagName flag) (rcFlags rc) of
+                        Just x -> x
+                        Nothing ->
+                          -- NOTE: This should never happen, as all flags
+                          -- which are used must be declared. Defaulting
+                          -- to False
+                          False
                     Impl flavor range ->
-                        flavor == GHC &&
-                        withinRange v range
-                      where
-                        GhcVersion v = rcCompilerVersion rc
+                      case (flavor, rcCompilerVersion rc) of
+                        (GHC, GhcVersion vghc) -> vghc `withinRange` range
+                        (GHC, GhcjsVersion _ vghc) -> vghc `withinRange` range
+#if MIN_VERSION_Cabal(1, 22, 0)
+                        (GHCJS, GhcjsVersion vghcjs _) ->
+#else
+                        (OtherCompiler "ghcjs", GhcjsVersion vghcjs _) ->
+#endif
+                          vghcjs `withinRange` range
+                        _ -> False
 
 -- | Get the name of a dependency.
 depName :: Dependency -> PackageName
@@ -874,9 +881,9 @@ logPossibilities dirs mn = do
                  T.pack (display mn) <>
                  "\", but did find: " <>
                  T.intercalate ", " (map (T.pack . toFilePath) possibilities) <>
-                 ". If you are using a custom preprocessor for this module \
-                 \with its own file extension, consider adding the file(s) \
-                 \to your .cabal under extra-source-files.")
+                 ". If you are using a custom preprocessor for this module " <>
+                 "with its own file extension, consider adding the file(s) " <>
+                 "to your .cabal under extra-source-files.")
   where
     makePossibilities name =
         mapM

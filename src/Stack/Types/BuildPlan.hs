@@ -219,9 +219,11 @@ data SystemInfo = SystemInfo
     }
     deriving (Show, Eq, Ord)
 instance ToJSON SystemInfo where
-    toJSON SystemInfo {..} = object
-        [ "compiler-version" .= siCompilerVersion
-        , "os" .= display siOS
+    toJSON SystemInfo {..} = object $
+        (case siCompilerVersion of
+            GhcVersion version -> "ghc-version" .= version
+            _ -> "compiler-version" .= siCompilerVersion) :
+        [ "os" .= display siOS
         , "arch" .= display siArch
         , "core-packages" .= siCorePackages
         , "core-executables" .= siCoreExecutables
@@ -229,7 +231,14 @@ instance ToJSON SystemInfo where
 instance FromJSON SystemInfo where
     parseJSON = withObject "SystemInfo" $ \o -> do
         let helper name = (o .: name) >>= either (fail . show) return . simpleParse
-        siCompilerVersion <- o .: "compiler-version"
+        ghcVersion <- o .:? "ghc-version"
+        compilerVersion <- o .:? "compiler-version"
+        siCompilerVersion <-
+            case (ghcVersion, compilerVersion) of
+                (Just _, Just _) -> fail "can't have both compiler-version and ghc-version fields"
+                (Just ghc, _) -> return (GhcVersion ghc)
+                (_, Just compiler) -> return compiler
+                _ -> fail "expected field \"ghc-version\" or \"compiler-version\" not present"
         siOS <- helper "os"
         siArch <- helper "arch"
         siCorePackages <- o .: "core-packages"

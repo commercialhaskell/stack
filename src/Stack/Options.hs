@@ -416,11 +416,10 @@ ghciOptsParser = GhciOpts
              <*> fmap concat (many (argsOption (long "ghc-options" <>
                                        metavar "OPTION" <>
                                        help "Additional options passed to GHCi")))
-             <*> strOption (long "with-ghc" <>
-                            metavar "GHC" <>
-                            help "Use this command for the GHC to run" <>
-                            value "ghc" <>
-                            showDefault)
+             <*> optional
+                     (strOption (long "with-ghc" <>
+                                 metavar "GHC" <>
+                                 help "Use this command for the GHC to run"))
              <*> flag False True (long "no-load" <>
                    help "Don't load modules on start-up")
              <*> packagesParser

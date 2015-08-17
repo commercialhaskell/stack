@@ -18,7 +18,8 @@ module Stack.GhcPkg
   ,findGhcPkgHaddockHtml
   ,findGhcPkgDepends
   ,findTransitiveGhcPkgDepends
-  ,listGhcPkgDbs)
+  ,listGhcPkgDbs
+  ,ghcPkgExeName)
   where
 
 import           Control.Monad
@@ -45,11 +46,11 @@ import           System.Process.Read
 
 -- | Get the global package database
 getGlobalDB :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
-            => EnvOverride -> m (Path Abs Dir)
-getGlobalDB menv = do
+            => EnvOverride -> WhichCompiler -> m (Path Abs Dir)
+getGlobalDB menv wc = do
     -- This seems like a strange way to get the global package database
     -- location, but I don't know of a better one
-    bs <- ghcPkg menv [] ["list", "--global"] >>= either throwM return
+    bs <- ghcPkg menv wc [] ["list", "--global"] >>= either throwM return
     let fp = S8.unpack $ stripTrailingColon $ firstLine bs
     liftIO (canonicalizePath fp) >>= parseAbsDir
   where
@@ -62,33 +63,39 @@ getGlobalDB menv = do
 -- | Run the ghc-pkg executable
 ghcPkg :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
        => EnvOverride
+       -> WhichCompiler
        -> [Path Abs Dir]
        -> [String]
        -> m (Either ReadProcessException S8.ByteString)
-ghcPkg menv pkgDbs args = do
+ghcPkg menv wc pkgDbs args = do
     eres <- go
     r <- case eres of
             Left _ -> do
-                mapM_ (createDatabase menv) pkgDbs
+                mapM_ (createDatabase menv wc) pkgDbs
                 go
             Right _ -> return eres
     return r
   where
-    go = tryProcessStdout Nothing menv "ghc-pkg" args'
+    go = tryProcessStdout Nothing menv (ghcPkgExeName wc) args'
     args' = packageDbFlags pkgDbs ++ args
 
 -- | Create a package database in the given directory, if it doesn't exist.
 createDatabase :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
-               => EnvOverride -> Path Abs Dir -> m ()
-createDatabase menv db = do
+               => EnvOverride -> WhichCompiler -> Path Abs Dir -> m ()
+createDatabase menv wc db = do
     exists <- dirExists db
     unless exists $ do
         -- Creating the parent doesn't seem necessary, as ghc-pkg
         -- seems to be sufficiently smart. But I don't feel like
         -- finding out it isn't the hard way
         createTree (parent db)
-        _ <- tryProcessStdout Nothing menv "ghc-pkg" ["init", toFilePath db]
+        _ <- tryProcessStdout Nothing menv (ghcPkgExeName wc) ["init", toFilePath db]
         return ()
+
+-- | Get the name to use for "ghc-pkg", given the compiler version.
+ghcPkgExeName :: WhichCompiler -> String
+ghcPkgExeName Ghc = "ghc-pkg"
+ghcPkgExeName Ghcjs = "ghcjs-pkg"
 
 -- | Get the necessary ghc-pkg flags for setting up the given package database
 packageDbFlags :: [Path Abs Dir] -> [String]
@@ -100,14 +107,16 @@ packageDbFlags pkgDbs =
 findGhcPkgField
     :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
     => EnvOverride
+    -> WhichCompiler
     -> [Path Abs Dir] -- ^ package databases
     -> Text
     -> Text
     -> m (Maybe Text)
-findGhcPkgField menv pkgDbs name field = do
+findGhcPkgField menv wc pkgDbs name field = do
     result <-
         ghcPkg
             menv
+            wc
             pkgDbs
             ["field", "--simple-output", T.unpack name, T.unpack field]
     return $
@@ -121,11 +130,12 @@ findGhcPkgField menv pkgDbs name field = do
 -- | Get the id of the package e.g. @foo-0.0.0-9c293923c0685761dcff6f8c3ad8f8ec@.
 findGhcPkgId :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
              => EnvOverride
+             -> WhichCompiler
              -> [Path Abs Dir] -- ^ package databases
              -> PackageName
              -> m (Maybe GhcPkgId)
-findGhcPkgId menv pkgDbs name = do
-    mpid <- findGhcPkgField menv pkgDbs (packageNameText name) "id"
+findGhcPkgId menv wc pkgDbs name = do
+    mpid <- findGhcPkgField menv wc pkgDbs (packageNameText name) "id"
     case mpid of
         Just !pid -> return (parseGhcPkgId (T.encodeUtf8 pid))
         _ -> return Nothing
@@ -133,11 +143,12 @@ findGhcPkgId menv pkgDbs name = do
 -- | Get the Haddock HTML documentation path of the package.
 findGhcPkgHaddockHtml :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
                       => EnvOverride
+                      -> WhichCompiler
                       -> [Path Abs Dir] -- ^ package databases
                       -> PackageIdentifier
                       -> m (Maybe (Path Abs Dir))
-findGhcPkgHaddockHtml menv pkgDbs pkgId = do
-    mpath <- findGhcPkgField menv pkgDbs (packageIdentifierText pkgId) "haddock-html"
+findGhcPkgHaddockHtml menv wc pkgDbs pkgId = do
+    mpath <- findGhcPkgField menv wc pkgDbs (packageIdentifierText pkgId) "haddock-html"
     case mpath of
         Just !path0 -> do
             let path = T.unpack path0
@@ -152,14 +163,15 @@ findGhcPkgHaddockHtml menv pkgDbs pkgId = do
 findTransitiveGhcPkgDepends
     :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
     => EnvOverride
+    -> WhichCompiler
     -> [Path Abs Dir] -- ^ package databases
     -> PackageIdentifier
     -> m (Set PackageIdentifier)
-findTransitiveGhcPkgDepends menv pkgDbs pkgId0 =
+findTransitiveGhcPkgDepends menv wc pkgDbs pkgId0 =
     go pkgId0 Set.empty
   where
     go pkgId res = do
-        deps <- findGhcPkgDepends menv pkgDbs pkgId
+        deps <- findGhcPkgDepends menv wc pkgDbs pkgId
         loop (map ghcPkgIdPackageIdentifier deps) res
     loop [] res = return res
     loop (dep:deps) res = do
@@ -172,22 +184,24 @@ findTransitiveGhcPkgDepends menv pkgDbs pkgId0 =
 -- | Get the dependencies of the package.
 findGhcPkgDepends :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
                   => EnvOverride
+                  -> WhichCompiler
                   -> [Path Abs Dir] -- ^ package databases
                   -> PackageIdentifier
                   -> m [GhcPkgId]
-findGhcPkgDepends menv pkgDbs pkgId = do
-    mdeps <- findGhcPkgField menv pkgDbs (packageIdentifierText pkgId) "depends"
+findGhcPkgDepends menv wc pkgDbs pkgId = do
+    mdeps <- findGhcPkgField menv wc pkgDbs (packageIdentifierText pkgId) "depends"
     case mdeps of
         Just !deps -> return (mapMaybe (parseGhcPkgId . T.encodeUtf8) (T.words deps))
         _ -> return []
 
 unregisterGhcPkgId :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadBaseControl IO m)
                     => EnvOverride
+                    -> WhichCompiler
                     -> Path Abs Dir -- ^ package database
                     -> GhcPkgId
                     -> m ()
-unregisterGhcPkgId menv pkgDb gid = do
-    eres <- ghcPkg menv [pkgDb] args
+unregisterGhcPkgId menv wc pkgDb gid = do
+    eres <- ghcPkg menv wc [pkgDb] args
     case eres of
         Left e -> $logWarn $ T.pack $ show e
         Right _ -> return ()
@@ -197,10 +211,11 @@ unregisterGhcPkgId menv pkgDb gid = do
 
 -- | Get the version of Cabal from the global package database.
 getCabalPkgVer :: (MonadThrow m, MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
-               => EnvOverride -> m Version
-getCabalPkgVer menv =
+               => EnvOverride -> WhichCompiler -> m Version
+getCabalPkgVer menv wc =
     findGhcPkgId
         menv
+        wc
         [] -- global DB
         cabalPackageName >>=
         maybe
@@ -209,11 +224,12 @@ getCabalPkgVer menv =
 
 listGhcPkgDbs
     :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
-    => EnvOverride -> [Path Abs Dir] -> m [PackageIdentifier]
-listGhcPkgDbs menv pkgDbs = do
+    => EnvOverride -> WhichCompiler -> [Path Abs Dir] -> m [PackageIdentifier]
+listGhcPkgDbs menv wc pkgDbs = do
     result <-
         ghcPkg
             menv
+            wc
             pkgDbs
             ["list", "--simple-output"]
     return $

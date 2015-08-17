@@ -79,8 +79,8 @@ import           System.FilePath (dropTrailingPathSeparator, pathSeparator)
 -- Exceptions
 data StackBuildException
   = Couldn'tFindPkgId PackageName
-  | GHCVersionMismatch
-        (Maybe (Version, Arch))
+  | CompilerVersionMismatch
+        (Maybe (CompilerVersion, Arch))
         (CompilerVersion, Arch)
         VersionCheck
         (Maybe (Path Abs File))
@@ -125,12 +125,12 @@ instance Show StackBuildException where
                ", the package id couldn't be found " <> "(via ghc-pkg describe " <>
                packageNameString name <> "). This shouldn't happen, " <>
                "please report as a bug")
-    show (GHCVersionMismatch mactual (expected, earch) check mstack resolution) = concat
+    show (CompilerVersionMismatch mactual (expected, earch) check mstack resolution) = concat
                 [ case mactual of
-                    Nothing -> "No GHC found, expected "
+                    Nothing -> "No compiler found, expected "
                     Just (actual, arch) -> concat
-                        [ "GHC version mismatched, found "
-                        , versionString actual
+                        [ "Compiler version mismatched, found "
+                        , T.unpack (compilerVersionName actual)
                         , " ("
                         , display arch
                         , ")"
@@ -568,6 +568,9 @@ configureOpts econfig bco deps wanted loc package = map T.pack $ concat
     , concatMap (\x -> ["--ghc-options", T.unpack x]) allGhcOptions
     , map (("--extra-include-dirs=" ++) . T.unpack) (Set.toList (configExtraIncludeDirs config))
     , map (("--extra-lib-dirs=" ++) . T.unpack) (Set.toList (configExtraLibDirs config))
+    , if whichCompiler (envConfigCompilerVersion econfig) == Ghcjs
+        then ["--ghcjs"]
+        else []
     ]
   where
     config = getConfig econfig
