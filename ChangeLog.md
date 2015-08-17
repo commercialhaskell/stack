@@ -11,6 +11,7 @@ Other enhancements:
 * Added the `extra-path` field to stack.yaml
 * Code page changes on Windows only apply to the build command (and its synonyms), and can be controlled via a command line flag (still defaults to on) [#757](https://github.com/commercialhaskell/stack/issues/757)
 * Implicitly add packages to extra-deps when a flag for them is set [#807](https://github.com/commercialhaskell/stack/issues/807)
+* Use a precompiled Setup.hs for simple build types [#801](https://github.com/commercialhaskell/stack/issues/801)
 
 Bug fixes:
 
@@ -63,7 +64,7 @@ Bug fixes:
 * Fix: stack fails on Windows with git package in stack.yaml and no git binary on path [#712](https://github.com/commercialhaskell/stack/issues/712)
 * Fixed GHCi issue: Specifying explicit package versions (#678)
 * Fixed GHCi issue: Specifying -odir and -hidir as .stack-work/odir (#529)
-* Fixed GHCi issue: Specifying A instead of A.ext for modules (#498) 
+* Fixed GHCi issue: Specifying A instead of A.ext for modules (#498)
 
 ## 0.1.2.0
 

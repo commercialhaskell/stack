@@ -78,15 +78,12 @@ ghci GhciOpts{..} = do
         odir =
             [ "-odir=" <> toFilePath (objectInterfaceDir bconfig)
             , "-hidir=" <> toFilePath (objectInterfaceDir bconfig)]
-        defaultCommand = case wc of
-            Ghc -> "ghc"
-            Ghcjs -> "ghcjs"
     $logInfo
         ("Configuring GHCi with the following packages: " <>
          T.intercalate ", " (map (packageNameText . ghciPkgName) pkgs))
     exec
         defaultEnvSettings
-        (fromMaybe defaultCommand ghciGhcCommand)
+        (fromMaybe (compilerExeName wc) ghciGhcCommand)
         ("--interactive" : odir <> pkgopts <> srcfiles <> ghciArgs)
 
 -- | Figure out the main-is file to load based on the targets. Sometimes there

@@ -55,6 +55,7 @@ import           Data.Text.Encoding             (encodeUtf8)
 import           Data.Word8                     (_colon)
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
+import qualified Distribution.Text
 import           Language.Haskell.TH            as TH (location)
 import           Network.HTTP.Client.Conduit    (HasHttpManager)
 import           Path
@@ -191,6 +192,9 @@ data ExecuteEnv = ExecuteEnv
     , eeGhcPkgIds      :: !(TVar (Map PackageIdentifier Installed))
     , eeTempDir        :: !(Path Abs Dir)
     , eeSetupHs        :: !(Path Abs File)
+    -- ^ Temporary Setup.hs for simple builds
+    , eeSetupExe       :: !(Maybe (Path Abs File))
+    -- ^ Compiled version of eeSetupHs
     , eeCabalPkgVer    :: !Version
     , eeTotalWanted    :: !Int
     , eeWanted         :: !(Set PackageName)
@@ -198,6 +202,72 @@ data ExecuteEnv = ExecuteEnv
     , eeSourceMap      :: !SourceMap
     , eeGlobalDB       :: !(Path Abs Dir)
     }
+
+-- | Get a compiled Setup exe
+getSetupExe :: M env m
+            => Path Abs File -- ^ Setup.hs input file
+            -> Path Abs Dir -- ^ temporary directory
+            -> m (Maybe (Path Abs File))
+getSetupExe setupHs tmpdir = do
+    wc <- getWhichCompiler
+    econfig <- asks getEnvConfig
+    let config = getConfig econfig
+        baseNameS = concat
+            [ "setup-Simple-Cabal-"
+            , versionString $ envConfigCabalVersion econfig
+            , "-"
+            , Distribution.Text.display $ configPlatform config
+            , "-"
+            , T.unpack $ compilerVersionName
+                       $ envConfigCompilerVersion econfig
+            ]
+        exeNameS = baseNameS ++
+            case configPlatform config of
+                Platform _ Windows -> ".exe"
+                _ -> ""
+        outputNameS =
+            case wc of
+                Ghc -> exeNameS
+                Ghcjs -> baseNameS ++ ".jsexe"
+        jsExeNameS =
+            baseNameS ++ ".jsexe"
+        setupDir =
+            configStackRoot config </>
+            $(mkRelDir "setup-exe-cache")
+
+    exePath <- fmap (setupDir </>) $ parseRelFile exeNameS
+    jsExePath <- fmap (setupDir </>) $ parseRelDir jsExeNameS
+
+    exists <- liftIO $ D.doesFileExist $ toFilePath exePath
+
+    if exists
+        then return $ Just exePath
+        else do
+            tmpExePath <- fmap (setupDir </>) $ parseRelFile $ "tmp-" ++ exeNameS
+            tmpOutputPath <- fmap (setupDir </>) $ parseRelFile $ "tmp-" ++ outputNameS
+            tmpJsExePath <- fmap (setupDir </>) $ parseRelDir $ "tmp-" ++ jsExeNameS
+
+            liftIO $ D.createDirectoryIfMissing True $ toFilePath setupDir
+
+            menv <- getMinimalEnvOverride
+            wc <- getWhichCompiler
+            let args =
+                    [ "-clear-package-db"
+                    , "-global-package-db"
+                    , "-hide-all-packages"
+                    , "-package"
+                    , "base"
+                    , "-package"
+                    , "Cabal-" ++ versionString (envConfigCabalVersion econfig)
+                    , toFilePath setupHs
+                    , "-o"
+                    , toFilePath tmpOutputPath
+                    ] ++
+                    ["-build-runner" | wc == Ghcjs]
+            runIn tmpdir (compilerExeName wc) menv args Nothing
+            when (wc == Ghcjs) $ renameDir tmpJsExePath jsExePath
+            renameFile tmpExePath exePath
+            return $ Just exePath
 
 withExecuteEnv :: M env m
                => EnvOverride
@@ -215,6 +285,7 @@ withExecuteEnv menv bopts baseConfigOpts locals sourceMap inner = do
         idMap <- liftIO $ newTVarIO Map.empty
         let setupHs = tmpdir' </> $(mkRelFile "Setup.hs")
         liftIO $ writeFile (toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
+        setupExe <- getSetupExe setupHs tmpdir'
         cabalPkgVer <- asks (envConfigCabalVersion . getEnvConfig)
         globalDB <- getGlobalDB menv =<< getWhichCompiler
         inner ExecuteEnv
@@ -230,6 +301,7 @@ withExecuteEnv menv bopts baseConfigOpts locals sourceMap inner = do
             , eeGhcPkgIds = idMap
             , eeTempDir = tmpdir'
             , eeSetupHs = setupHs
+            , eeSetupExe = setupExe
             , eeCabalPkgVer = cabalPkgVer
             , eeTotalWanted = length $ filter lpWanted locals
             , eeWanted = wantedLocalPackages locals
@@ -560,13 +632,13 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} msuffix inne
         getRunhaskellPath <- runOnce $ liftIO $ join $ findExecutable menv "runhaskell"
         getGhcjsPath <- runOnce $ liftIO $ join $ findExecutable menv "ghcjs"
         distRelativeDir' <- distRelativeDir
-        setuphs <-
+        esetupexehs <-
             -- Avoid broken Setup.hs files causing problems for simple build
             -- types, see:
             -- https://github.com/commercialhaskell/stack/issues/370
-            if packageSimpleType package
-                then return eeSetupHs
-                else liftIO $ getSetupHs pkgDir
+            case (packageSimpleType package, eeSetupExe) of
+                (True, Just setupExe) -> return $ Left setupExe
+                _ -> liftIO $ fmap Right $ getSetupHs pkgDir
         inner $ \stripTHLoading args -> do
             let packageArgs =
                       ("-package=" ++
@@ -643,12 +715,13 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} msuffix inne
                         }
 
             wc <- getWhichCompiler
-            (exeName, fullArgs) <- case wc of
-                Ghc -> do
+            (exeName, fullArgs) <- case (esetupexehs, wc) of
+                (Left setupExe, _) -> return (setupExe, setupArgs)
+                (Right setuphs, Ghc) -> do
                     exeName <- getRunhaskellPath
                     let fullArgs = packageArgs ++ (toFilePath setuphs : setupArgs)
                     return (exeName, fullArgs)
-                Ghcjs -> do
+                (Right setuphs, Ghcjs) -> do
                     distDir <- distDirFromDir pkgDir
                     let setupDir = distDir </> $(mkRelDir "setup")
                         outputFile = setupDir </> $(mkRelFile "setup")
