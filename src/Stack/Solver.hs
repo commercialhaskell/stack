@@ -8,7 +8,7 @@ module Stack.Solver
     , solveExtraDeps
     ) where
 
-import           Control.Applicative ((<$>), (<*>))
+import           Control.Applicative
 import           Control.Exception.Enclosed  (tryIO)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
