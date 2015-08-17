@@ -73,8 +73,8 @@ ghci GhciOpts{..} = do
         srcfiles
           | ghciNoLoadModules = []
           | otherwise =
-              nub (concatMap (map display . S.toList . ghciPkgModules) pkgs <>
-                   maybe [] (return . toFilePath) mainFile)
+              nub (maybe [] (return . toFilePath) mainFile <>
+                   concatMap (map display . S.toList . ghciPkgModules) pkgs)
         odir =
             [ "-odir=" <> toFilePath (objectInterfaceDir bconfig)
             , "-hidir=" <> toFilePath (objectInterfaceDir bconfig)]
