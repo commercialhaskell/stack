@@ -8,6 +8,7 @@ module Stack.Solver
     , solveExtraDeps
     ) where
 
+import           Control.Applicative ((<$>), (<*>))
 import           Control.Exception.Enclosed  (tryIO)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -27,6 +28,7 @@ import           Data.Text.Encoding          (decodeUtf8, encodeUtf8)
 import qualified Data.Yaml                   as Yaml
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
+import           Prelude
 import           Stack.BuildPlan
 import           Stack.Types
 import           System.Directory            (copyFile,
