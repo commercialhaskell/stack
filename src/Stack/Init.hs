@@ -155,9 +155,9 @@ getDefaultResolver cabalfps gpds initOpts =
                     return (ResolverSnapshot snap, flags, Map.empty)
                 Nothing -> return (resolver, Map.empty, Map.empty)
         MethodSolver -> do
-            (ghcVersion, extraDeps) <- cabalSolver (map parent cabalfps) Map.empty []
+            (compilerVersion, extraDeps) <- cabalSolver Ghc (map parent cabalfps) Map.empty []
             return
-                ( ResolverCompiler (GhcVersion ghcVersion)
+                ( ResolverCompiler compilerVersion
                 , Map.filter (not . Map.null) $ fmap snd extraDeps
                 , fmap fst extraDeps
                 )

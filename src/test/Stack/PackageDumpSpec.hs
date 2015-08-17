@@ -149,7 +149,7 @@ spec = do
         menv' <- getEnvOverride buildPlatform
         menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
         icache <- newInstalledCache
-        ghcPkgDump menv Nothing
+        ghcPkgDump menv Ghc Nothing
             $  conduitDumpPackage
             =$ addProfiling icache
             =$ addHaddock icache
@@ -159,7 +159,7 @@ spec = do
         menv' <- getEnvOverride buildPlatform
         menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
         icache <- newInstalledCache
-        m <- runNoLoggingT $ ghcPkgDump menv Nothing
+        m <- runNoLoggingT $ ghcPkgDump menv Ghc Nothing
             $  conduitDumpPackage
             =$ addProfiling icache
             =$ addHaddock icache

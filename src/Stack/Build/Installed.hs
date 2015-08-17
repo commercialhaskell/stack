@@ -124,7 +124,8 @@ loadDatabase :: (M env m, PackageInstallInfo pii)
              -> [LoadHelper] -- ^ from parent databases
              -> m ([LoadHelper], Set GhcPkgId)
 loadDatabase menv opts mcache sourceMap mdb lhs0 = do
-    (lhs1, gids) <- ghcPkgDump menv (fmap snd mdb)
+    wc <- getWhichCompiler
+    (lhs1, gids) <- ghcPkgDump menv wc (fmap snd mdb)
                   $ conduitDumpPackage =$ sink
     let lhs = pruneDeps
             (packageIdentifierName . ghcPkgIdPackageIdentifier)

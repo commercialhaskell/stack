@@ -16,7 +16,6 @@ module Stack.Build.Execute
     , withSingleContext
     ) where
 
-
 import           Control.Applicative
 import           Control.Concurrent.Execute
 import           Control.Concurrent.Lifted      (fork)
@@ -39,6 +38,7 @@ import qualified Data.Conduit.Binary            as CB
 import qualified Data.Conduit.List              as CL
 import           Data.Foldable                  (forM_)
 import           Data.Function
+import           Data.IORef.RunOnce             (runOnce)
 import           Data.List
 import           Data.Map.Strict                (Map)
 import qualified Data.Map.Strict                as Map
@@ -216,7 +216,7 @@ withExecuteEnv menv bopts baseConfigOpts locals sourceMap inner = do
         let setupHs = tmpdir' </> $(mkRelFile "Setup.hs")
         liftIO $ writeFile (toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
         cabalPkgVer <- asks (envConfigCabalVersion . getEnvConfig)
-        globalDB <- getGlobalDB menv
+        globalDB <- getGlobalDB menv =<< getWhichCompiler
         inner ExecuteEnv
             { eeEnvOverride = menv
             , eeBuildOpts = bopts
@@ -332,6 +332,7 @@ executePlan' :: M env m
              -> ExecuteEnv
              -> m ()
 executePlan' plan ee@ExecuteEnv {..} = do
+    wc <- getWhichCompiler
     case Map.toList $ planUnregisterLocal plan of
         [] -> return ()
         ids -> do
@@ -343,7 +344,7 @@ executePlan' plan ee@ExecuteEnv {..} = do
                     , reason
                     , ")"
                     ]
-                unregisterGhcPkgId eeEnvOverride localDB id'
+                unregisterGhcPkgId eeEnvOverride wc localDB id'
 
     -- Yes, we're explicitly discarding result values, which in general would
     -- be bad. monad-unlift does this all properly at the type system level,
@@ -389,9 +390,9 @@ executePlan' plan ee@ExecuteEnv {..} = do
             else return ()
     unless (null errs) $ throwM $ ExecutionFailure errs
     when (boptsHaddock eeBuildOpts) $ do
-        generateLocalHaddockIndex eeEnvOverride eeBaseConfigOpts eeLocals
-        generateDepsHaddockIndex eeEnvOverride eeBaseConfigOpts eeLocals
-        generateSnapHaddockIndex eeEnvOverride eeBaseConfigOpts eeGlobalDB
+        generateLocalHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeLocals
+        generateDepsHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeLocals
+        generateSnapHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeGlobalDB
     when (toCoverage $ boptsTestOpts eeBuildOpts) generateHpcMarkupIndex
 
 toActions :: M env m
@@ -556,7 +557,8 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} msuffix inne
             , esIncludeGhcPackagePath = False
             , esStackExe = False
             }
-        exeName <- liftIO $ join $ findExecutable menv "runhaskell"
+        getRunhaskellPath <- runOnce $ liftIO $ join $ findExecutable menv "runhaskell"
+        getGhcjsPath <- runOnce $ liftIO $ join $ findExecutable menv "ghcjs"
         distRelativeDir' <- distRelativeDir
         setuphs <-
             -- Avoid broken Setup.hs files causing problems for simple build
@@ -566,7 +568,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} msuffix inne
                 then return eeSetupHs
                 else liftIO $ getSetupHs pkgDir
         inner $ \stripTHLoading args -> do
-            let fullArgs =
+            let packageArgs =
                       ("-package=" ++
                        packageIdentifierString
                            (PackageIdentifier cabalPackageName
@@ -589,57 +591,81 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} msuffix inne
                     -- -hide-all-packages and explicitly list which packages
                     -- can be used by Setup.hs, and have that based on the
                     -- dependencies of the package itself.
-                    : ("-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts))
+                    : ["-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts)]
+                setupArgs = ("--builddir=" ++ toFilePath distRelativeDir') : args
+                runExe exeName fullArgs = do
+                    $logProcessRun (toFilePath exeName) fullArgs
 
-                    : toFilePath setuphs
-                    : ("--builddir=" ++ toFilePath distRelativeDir')
-                    : args
-                cp0 = proc (toFilePath exeName) fullArgs
-                cp = cp0
-                    { cwd = Just $ toFilePath pkgDir
-                    , Process.env = envHelper menv
-                    -- Ideally we'd create a new pipe here and then close it
-                    -- below to avoid the child process from taking from our
-                    -- stdin. However, if we do this, the child process won't
-                    -- be able to get the codepage on Windows that we want.
-                    -- See:
-                    -- https://github.com/commercialhaskell/stack/issues/738
-                    -- , std_in = CreatePipe
-                    , std_out =
-                        case mlogFile of
+                    -- Use createProcess_ to avoid the log file being closed afterwards
+                    (Nothing, moutH, merrH, ph) <- liftIO $ createProcess_ "singleBuild" cp
+
+                    let makeAbsolute = stripTHLoading -- If users want control, we should add a config option for this
+
+                    maybePrintBuildOutput stripTHLoading makeAbsolute LevelInfo mlogFile moutH
+                    maybePrintBuildOutput False makeAbsolute LevelWarn mlogFile merrH
+                    ec <- liftIO $ waitForProcess ph
+                    case ec of
+                        ExitSuccess -> return ()
+                        _ -> do
+                            bs <- liftIO $
+                                case mlogFile of
+                                    Nothing -> return ""
+                                    Just (logFile, h) -> do
+                                        hClose h
+                                        S.readFile $ toFilePath logFile
+                            throwM $ CabalExitedUnsuccessfully
+                                ec
+                                taskProvides
+                                exeName
+                                fullArgs
+                                (fmap fst mlogFile)
+                                bs
+                  where
+                    cp0 = proc (toFilePath exeName) fullArgs
+                    cp = cp0
+                        { cwd = Just $ toFilePath pkgDir
+                        , Process.env = envHelper menv
+                        -- Ideally we'd create a new pipe here and then close it
+                        -- below to avoid the child process from taking from our
+                        -- stdin. However, if we do this, the child process won't
+                        -- be able to get the codepage on Windows that we want.
+                        -- See:
+                        -- https://github.com/commercialhaskell/stack/issues/738
+                        -- , std_in = CreatePipe
+                        , std_out =
+                            case mlogFile of
+                                    Nothing -> CreatePipe
+                                    Just (_, h) -> UseHandle h
+                        , std_err =
+                            case mlogFile of
                                 Nothing -> CreatePipe
                                 Just (_, h) -> UseHandle h
-                    , std_err =
-                        case mlogFile of
-                            Nothing -> CreatePipe
-                            Just (_, h) -> UseHandle h
-                    }
-            $logProcessRun (toFilePath exeName) fullArgs
+                        }
 
-            -- Use createProcess_ to avoid the log file being closed afterwards
-            (Nothing, moutH, merrH, ph) <- liftIO $ createProcess_ "singleBuild" cp
-
-            let makeAbsolute = stripTHLoading -- If users want control, we should add a config option for this
-
-            maybePrintBuildOutput stripTHLoading makeAbsolute LevelInfo mlogFile moutH
-            maybePrintBuildOutput False makeAbsolute LevelWarn mlogFile merrH
-            ec <- liftIO $ waitForProcess ph
-            case ec of
-                ExitSuccess -> return ()
-                _ -> do
-                    bs <- liftIO $
-                        case mlogFile of
-                            Nothing -> return ""
-                            Just (logFile, h) -> do
-                                hClose h
-                                S.readFile $ toFilePath logFile
-                    throwM $ CabalExitedUnsuccessfully
-                        ec
-                        taskProvides
-                        exeName
-                        fullArgs
-                        (fmap fst mlogFile)
-                        bs
+            wc <- getWhichCompiler
+            (exeName, fullArgs) <- case wc of
+                Ghc -> do
+                    exeName <- getRunhaskellPath
+                    let fullArgs = packageArgs ++ (toFilePath setuphs : setupArgs)
+                    return (exeName, fullArgs)
+                Ghcjs -> do
+                    distDir <- distDirFromDir pkgDir
+                    let setupDir = distDir </> $(mkRelDir "setup")
+                        outputFile = setupDir </> $(mkRelFile "setup")
+                    createTree setupDir
+                    ghcjsPath <- getGhcjsPath
+                    runExe ghcjsPath $
+                        [ "--make"
+                        , "-odir", toFilePath setupDir
+                        , "-hidir", toFilePath setupDir
+                        , "-i", "-i."
+                        ] ++ packageArgs ++
+                        [ toFilePath setuphs
+                        , "-o", toFilePath outputFile
+                        , "-build-runner"
+                        ]
+                    return (outputFile, setupArgs)
+            runExe exeName fullArgs
 
     maybePrintBuildOutput stripTHLoading makeAbsolute level mlogFile mh =
         case mh of
@@ -657,6 +683,7 @@ singleBuild :: M env m
 singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
   withSingleContext ac ee task Nothing $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
     (cache, _neededConfig) <- ensureConfig pkgDir ee task (announce "configure") cabal cabalfp []
+    wc <- getWhichCompiler
 
     markExeNotInstalled (taskLocation task) taskProvides
     case taskType of
@@ -686,7 +713,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
             ("Warning: haddock not generating hyperlinked sources because 'HsColour' not\n" <>
              "found on PATH (use 'stack build hscolour --copy-bins' to install).")
         cabal False (concat [["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
-                            ,["--hyperlink-source" | hscolourExists]])
+                            ,["--hyperlink-source" | hscolourExists]
+                            ,["--ghcjs" | wc == Ghcjs]])
 
     withMVar eeInstallLock $ \() -> do
         announce "install"
@@ -699,7 +727,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
                     [ bcoSnapDB eeBaseConfigOpts
                     , bcoLocalDB eeBaseConfigOpts
                     ]
-    mpkgid <- findGhcPkgId eeEnvOverride pkgDbs (packageName package)
+    mpkgid <- findGhcPkgId eeEnvOverride wc pkgDbs (packageName package)
     mpkgid' <- case (packageHasLibrary package, mpkgid) of
         (False, _) -> assert (isNothing mpkgid) $ do
             markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
@@ -715,6 +743,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
         withMVar eeInstallLock $ \() ->
             copyDepHaddocks
                 eeEnvOverride
+                wc
                 eeBaseConfigOpts
                 (pkgDbs ++ [eeGlobalDB])
                 (PackageIdentifier (packageName package) (packageVersion package))

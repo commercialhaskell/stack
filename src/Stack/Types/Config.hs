@@ -272,7 +272,7 @@ bcWorkDir = (</> workDirRel) . parent . bcStackYaml
 data EnvConfig = EnvConfig
     {envConfigBuildConfig :: !BuildConfig
     ,envConfigCabalVersion :: !Version
-    ,envConfigGhcVersion :: !Version
+    ,envConfigCompilerVersion :: !CompilerVersion
     ,envConfigPackages   :: !(Map (Path Abs Dir) Bool)}
 instance HasBuildConfig EnvConfig where
     getBuildConfig = envConfigBuildConfig
@@ -674,7 +674,7 @@ instance Show ConfigException where
     show (ParseResolverException t) = concat
         [ "Invalid resolver value: "
         , T.unpack t
-        , ". Possible valid values include lts-2.12, nightly-YYYY-MM-DD, and ghc-7.10.2. "
+        , ". Possible valid values include lts-2.12, nightly-YYYY-MM-DD, ghc-7.10.2, and ghcjs-0.1.0-ghc-7.10.2. "
         , "See https://www.stackage.org/snapshots for a complete list."
         ]
     show (NoProjectConfigFound dir mcmd) = concat
@@ -790,20 +790,25 @@ installationRootDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m
 installationRootDeps = do
     snapshots <- snapshotsDir
     bc <- asks getBuildConfig
-    ec <- asks getEnvConfig
     name <- parseRelDir $ T.unpack $ resolverName $ bcResolver bc
-    ghc <- parseRelDir $ versionString $ envConfigGhcVersion ec
+    ghc <- compilerVersionDir
     return $ snapshots </> name </> ghc
 
 -- | Installation root for locals
 installationRootLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
 installationRootLocal = do
     bc <- asks getBuildConfig
-    ec <- asks getEnvConfig
     name <- parseRelDir $ T.unpack $ resolverName $ bcResolver bc
-    ghc <- parseRelDir $ versionString $ envConfigGhcVersion ec
+    ghc <- compilerVersionDir
     platform <- platformRelDir
     return $ configProjectWorkDir bc </> $(mkRelDir "install") </> platform </> name </> ghc
+
+compilerVersionDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Rel Dir)
+compilerVersionDir = do
+    compilerVersion <- asks (envConfigCompilerVersion . getEnvConfig)
+    parseRelDir $ case compilerVersion of
+        GhcVersion version -> versionString version
+        GhcjsVersion {} -> T.unpack (compilerVersionName compilerVersion)
 
 -- | Package database for installing dependencies into
 packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
@@ -868,6 +873,9 @@ getMinimalEnvOverride = do
                     , esIncludeGhcPackagePath = False
                     , esStackExe = False
                     }
+
+getWhichCompiler :: (MonadReader env m, HasEnvConfig env) => m WhichCompiler
+getWhichCompiler = asks (whichCompiler . envConfigCompilerVersion . getEnvConfig)
 
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid

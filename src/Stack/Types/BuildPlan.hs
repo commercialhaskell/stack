@@ -57,6 +57,7 @@ import qualified Distribution.Version            as C
 import           GHC.Generics                    (Generic)
 import           Prelude -- Fix AMP warning
 import           Safe (readMay)
+import           Stack.Types.Compiler
 import           Stack.Types.FlagName
 import           Stack.Types.PackageName
 import           Stack.Types.Version
@@ -210,7 +211,7 @@ instance FromJSON TestState where
                $ map (\x -> (testStateToText x, x)) [minBound..maxBound]
 
 data SystemInfo = SystemInfo
-    { siGhcVersion      :: Version
+    { siCompilerVersion :: CompilerVersion
     , siOS              :: OS
     , siArch            :: Arch
     , siCorePackages    :: Map PackageName Version
@@ -218,9 +219,11 @@ data SystemInfo = SystemInfo
     }
     deriving (Show, Eq, Ord)
 instance ToJSON SystemInfo where
-    toJSON SystemInfo {..} = object
-        [ "ghc-version" .= siGhcVersion
-        , "os" .= display siOS
+    toJSON SystemInfo {..} = object $
+        (case siCompilerVersion of
+            GhcVersion version -> "ghc-version" .= version
+            _ -> "compiler-version" .= siCompilerVersion) :
+        [ "os" .= display siOS
         , "arch" .= display siArch
         , "core-packages" .= siCorePackages
         , "core-executables" .= siCoreExecutables
@@ -228,7 +231,14 @@ instance ToJSON SystemInfo where
 instance FromJSON SystemInfo where
     parseJSON = withObject "SystemInfo" $ \o -> do
         let helper name = (o .: name) >>= either (fail . show) return . simpleParse
-        siGhcVersion <- o .: "ghc-version"
+        ghcVersion <- o .:? "ghc-version"
+        compilerVersion <- o .:? "compiler-version"
+        siCompilerVersion <-
+            case (ghcVersion, compilerVersion) of
+                (Just _, Just _) -> fail "can't have both compiler-version and ghc-version fields"
+                (Just ghc, _) -> return (GhcVersion ghc)
+                (_, Just compiler) -> return compiler
+                _ -> fail "expected field \"ghc-version\" or \"compiler-version\" not present"
         siOS <- helper "os"
         siArch <- helper "arch"
         siCorePackages <- o .: "core-packages"
@@ -360,7 +370,7 @@ instance FromJSON a => FromJSON (Map ExeName a) where
 
 -- | A simplified version of the 'BuildPlan' + cabal file.
 data MiniBuildPlan = MiniBuildPlan
-    { mbpGhcVersion :: !Version
+    { mbpCompilerVersion :: !CompilerVersion
     , mbpPackages :: !(Map PackageName MiniPackageInfo)
     }
     deriving (Generic, Show, Eq)
@@ -369,7 +379,7 @@ instance NFData MiniBuildPlan where
     rnf = genericRnf
 instance BinarySchema MiniBuildPlan where
     -- Don't forget to update this if you change the datatype in any way!
-    binarySchema _ = 1
+    binarySchema _ = 2
 
 -- | Information on a single package for the 'MiniBuildPlan'.
 data MiniPackageInfo = MiniPackageInfo

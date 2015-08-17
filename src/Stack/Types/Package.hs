@@ -32,6 +32,7 @@ import           Distribution.System (Platform (..))
 import           GHC.Generics
 import           Path as FL
 import           Prelude
+import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
 import           Stack.Types.PackageName
@@ -127,11 +128,11 @@ newtype MainIs = MainIs
 
 -- | Package build configuration
 data PackageConfig =
-  PackageConfig {packageConfigEnableTests :: !Bool        -- ^ Are tests enabled?
-                ,packageConfigEnableBenchmarks :: !Bool   -- ^ Are benchmarks enabled?
-                ,packageConfigFlags :: !(Map FlagName Bool)   -- ^ Package config flags.
-                ,packageConfigGhcVersion :: !Version      -- ^ GHC version
-                ,packageConfigPlatform :: !Platform       -- ^ host platform
+  PackageConfig {packageConfigEnableTests :: !Bool                -- ^ Are tests enabled?
+                ,packageConfigEnableBenchmarks :: !Bool           -- ^ Are benchmarks enabled?
+                ,packageConfigFlags :: !(Map FlagName Bool)       -- ^ Package config flags.
+                ,packageConfigCompilerVersion :: !CompilerVersion -- ^ GHC version
+                ,packageConfigPlatform :: !Platform               -- ^ host platform
                 }
  deriving (Show,Typeable)
 

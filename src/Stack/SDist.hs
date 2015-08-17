@@ -84,7 +84,7 @@ readLocalPackage pkgDir = do
             { packageConfigEnableTests = False
             , packageConfigEnableBenchmarks = False
             , packageConfigFlags = localFlags Map.empty bconfig name
-            , packageConfigGhcVersion = envConfigGhcVersion econfig
+            , packageConfigCompilerVersion = envConfigCompilerVersion econfig
             , packageConfigPlatform = configPlatform $ getConfig bconfig
             }
     package <- readPackage config cabalfp

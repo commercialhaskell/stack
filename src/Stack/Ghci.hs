@@ -42,7 +42,7 @@ import           Stack.Types.Internal
 data GhciOpts = GhciOpts
     {ghciTargets            :: ![Text]
     ,ghciArgs               :: ![String]
-    ,ghciGhcCommand         :: !FilePath
+    ,ghciGhcCommand         :: !(Maybe FilePath)
     ,ghciNoLoadModules      :: !Bool
     ,ghciAdditionalPackages :: ![String]
     ,ghciMainIs             :: !(Maybe Text)
@@ -68,6 +68,7 @@ ghci GhciOpts{..} = do
     (targets,mainIsTargets,pkgs) <- ghciSetup ghciMainIs ghciTargets
     bconfig <- asks getBuildConfig
     mainFile <- figureOutMainFile mainIsTargets targets pkgs
+    wc <- getWhichCompiler
     let pkgopts = concatMap ghciPkgOpts pkgs
         srcfiles
           | ghciNoLoadModules = []
@@ -77,12 +78,15 @@ ghci GhciOpts{..} = do
         odir =
             [ "-odir=" <> toFilePath (objectInterfaceDir bconfig)
             , "-hidir=" <> toFilePath (objectInterfaceDir bconfig)]
+        defaultCommand = case wc of
+            Ghc -> "ghc"
+            Ghcjs -> "ghcjs"
     $logInfo
         ("Configuring GHCi with the following packages: " <>
          T.intercalate ", " (map (packageNameText . ghciPkgName) pkgs))
     exec
         defaultEnvSettings
-        ghciGhcCommand
+        (fromMaybe defaultCommand ghciGhcCommand)
         ("--interactive" : odir <> pkgopts <> srcfiles <> ghciArgs)
 
 -- | Figure out the main-is file to load based on the targets. Sometimes there
@@ -236,7 +240,7 @@ makeGhciPkgInfo sourceMap locals name cabalfp components = do
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True
             , packageConfigFlags = localFlags mempty bconfig name
-            , packageConfigGhcVersion = envConfigGhcVersion econfig
+            , packageConfigCompilerVersion = envConfigCompilerVersion econfig
             , packageConfigPlatform = configPlatform (getConfig bconfig)
             }
     pkg <- readPackage config cabalfp

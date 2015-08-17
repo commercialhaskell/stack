@@ -208,11 +208,11 @@ data ResolveState = ResolveState
     }
 
 toMiniBuildPlan :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadCatch m)
-                => Version -- ^ GHC version
+                => CompilerVersion -- ^ Compiler version
                 -> Map PackageName Version -- ^ cores
                 -> Map PackageName (Version, Map FlagName Bool) -- ^ non-core packages
                 -> m MiniBuildPlan
-toMiniBuildPlan ghcVersion corePackages packages = do
+toMiniBuildPlan compilerVersion corePackages packages = do
     $logInfo "Caching build plan"
 
     -- Determine the dependencies of all of the packages in the build plan. We
@@ -220,13 +220,13 @@ toMiniBuildPlan ghcVersion corePackages packages = do
     -- package index. For those, we allow missing packages to exist, and then
     -- remove those from the list of dependencies, since there's no way we'll
     -- ever reinstall them anyway.
-    (cores, missingCores) <- addDeps True ghcVersion
+    (cores, missingCores) <- addDeps True compilerVersion
         $ fmap (, Map.empty) corePackages
 
-    (extras, missing) <- addDeps False ghcVersion packages
+    (extras, missing) <- addDeps False compilerVersion packages
 
     assert (Set.null missing) $ return MiniBuildPlan
-        { mbpGhcVersion = ghcVersion
+        { mbpCompilerVersion = compilerVersion
         , mbpPackages = Map.unions
             [ fmap (removeMissingDeps (Map.keysSet cores)) cores
             , extras
@@ -250,10 +250,10 @@ toMiniBuildPlan ghcVersion corePackages packages = do
 -- | Add in the resolved dependencies from the package index
 addDeps :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, MonadThrow m, HasConfig env, MonadBaseControl IO m, MonadCatch m)
         => Bool -- ^ allow missing
-        -> Version -- ^ GHC version
+        -> CompilerVersion -- ^ Compiler version
         -> Map PackageName (Version, Map FlagName Bool)
         -> m (Map PackageName MiniPackageInfo, Set PackageIdentifier)
-addDeps allowMissing ghcVersion toCalc = do
+addDeps allowMissing compilerVersion toCalc = do
     menv <- getMinimalEnvOverride
     platform <- asks $ configPlatform . getConfig
     (resolvedMap, missingIdents) <-
@@ -280,7 +280,7 @@ addDeps allowMissing ghcVersion toCalc = do
                     { packageConfigEnableTests = False
                     , packageConfigEnableBenchmarks = False
                     , packageConfigFlags = flags
-                    , packageConfigGhcVersion = ghcVersion
+                    , packageConfigCompilerVersion = compilerVersion
                     , packageConfigPlatform = platform
                     }
                 name = packageIdentifierName ident
@@ -438,7 +438,7 @@ loadMiniBuildPlan name = do
     taggedDecodeOrLoad fp $ liftM buildPlanFixes $ do
         bp <- loadBuildPlan name
         toMiniBuildPlan
-            (siGhcVersion $ bpSystemInfo bp)
+            (siCompilerVersion $ bpSystemInfo bp)
             (siCorePackages $ bpSystemInfo bp)
             (fmap goPP $ bpPackages bp)
   where
@@ -526,11 +526,11 @@ checkBuildPlan locals mbp gpd = do
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True
             , packageConfigFlags = flags
-            , packageConfigGhcVersion = ghcVersion
+            , packageConfigCompilerVersion = compilerVersion
             , packageConfigPlatform = platform
             }
 
-    ghcVersion = mbpGhcVersion mbp
+    compilerVersion = mbpCompilerVersion mbp
 
     flagName' = fromCabalFlagName . flagName
 
@@ -638,8 +638,8 @@ displayDepErrors errs =
 shadowMiniBuildPlan :: MiniBuildPlan
                     -> Set PackageName
                     -> (MiniBuildPlan, Map PackageName MiniPackageInfo)
-shadowMiniBuildPlan (MiniBuildPlan ghc pkgs0) shadowed =
-    (MiniBuildPlan ghc $ Map.fromList met, Map.fromList unmet)
+shadowMiniBuildPlan (MiniBuildPlan cv pkgs0) shadowed =
+    (MiniBuildPlan cv $ Map.fromList met, Map.fromList unmet)
   where
     pkgs1 = Map.difference pkgs0 $ Map.fromSet (\_ -> ()) shadowed
 
@@ -699,7 +699,7 @@ parseCustomMiniBuildPlan stackYamlFP url0 = do
             addFlags (PackageIdentifier name ver) =
                 (name, (ver, fromMaybe Map.empty $ Map.lookup name $ csFlags cs))
         toMiniBuildPlan
-            (csGhcVersion cs)
+            (csCompilerVersion cs)
             Map.empty
             (Map.fromList $ map addFlags $ Set.toList $ csPackages cs)
   where
@@ -728,15 +728,15 @@ parseCustomMiniBuildPlan stackYamlFP url0 = do
         parseAbsFile fp
 
 data CustomSnapshot = CustomSnapshot
-    { csGhcVersion :: !Version
+    { csCompilerVersion :: !CompilerVersion
     , csPackages :: !(Set PackageIdentifier)
     , csFlags :: !(Map PackageName (Map FlagName Bool))
     }
 instance FromJSON CustomSnapshot where
     parseJSON = withObject "CustomSnapshot" $ \o -> CustomSnapshot
-        <$> ((o .: "compiler") >>= (\t -> maybe (fail $ "Invalid compiler: " ++ T.unpack t) return $ do
-                cv <- parseCompilerVersion t
-                case cv of
-                    GhcVersion v -> return v))
+        <$> ((o .: "compiler") >>= \t ->
+                case parseCompilerVersion t of
+                    Nothing -> fail $ "Invalid compiler: " ++ T.unpack t
+                    Just compilerVersion -> return compilerVersion)
         <*> o .: "packages"
         <*> o .:? "flags" .!= Map.empty
