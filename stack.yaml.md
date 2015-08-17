@@ -161,7 +161,7 @@ which means stack will prompt you to run `stack setup` as needed.
 
 ### skip-ghc-check
 
-Should we confirm that your system GHC version (on the PATH) matches what your project expects? Default is true.
+Should we skip the check to confirm that your system GHC version (on the PATH) matches what your project expects? Default is false.
 
 ### require-stack-version
 
