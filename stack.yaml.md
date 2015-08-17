@@ -70,10 +70,12 @@ Specifies how dependencies are resolved. There are currently three options:
 
 * LTS Haskell snapshot, e.g. `resolver: lts-2.14`
 * Stackage Nightly snapshot, e.g. `resolver: nightly-2015-06-16`
-* No snapshot, just use packages shipped with GHC, e.g. `resolver: ghc-7.10`
+* No snapshot, just use packages shipped with GHC, e.g. `resolver: ghc-7.10.2`
 
-It's important to point out that each resolver identifies a GHC major version,
-and stack will require that that version of GHC is used for building your code.
+It's important to point out that each resolver identifies a compiler version
+(usually GHC), and stack will require that that version is used for building
+your code.  There is also a resolver for GHCJS, which looks like `resolver:
+ghcjs-0.1.0_ghc-7.10.2`.
 
 ### flags
 
