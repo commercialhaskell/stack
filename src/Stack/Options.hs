@@ -319,7 +319,12 @@ dockerOptsParser showOptions =
                            hide <>
                            metavar "(PATH | HOST-PATH:CONTAINER-PATH)" <>
                            help ("Mount volumes from host in container " ++
-                                 "(may specify mutliple times)")))
+                                 "(may specify multiple times)")))
+    <*> many (option str (long (dockerOptName dockerEnvArgName) <>
+                                hide <>
+                                metavar "NAME=VALUE" <>
+                                help ("Set environment variable in container " ++
+                                      "(may specify multiple times)")))
     <*> maybeStrOption (long (dockerOptName dockerDatabasePathArgName) <>
                         hide <>
                         metavar "PATH" <>

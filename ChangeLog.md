@@ -1,3 +1,7 @@
+## Unreleased changes
+
+* Added the `--docker-env` argument, to set environment variables in Docker container.
+
 ## 0.1.3.1
 
 Major changes:
