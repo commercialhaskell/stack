@@ -316,10 +316,11 @@ executePlan :: M env m
             -> BaseConfigOpts
             -> [LocalPackage]
             -> SourceMap
+            -> InstalledMap
             -> Plan
             -> m ()
-executePlan menv bopts baseConfigOpts locals sourceMap plan = do
-    withExecuteEnv menv bopts baseConfigOpts locals sourceMap (executePlan' plan)
+executePlan menv bopts baseConfigOpts locals sourceMap installedMap plan = do
+    withExecuteEnv menv bopts baseConfigOpts locals sourceMap (executePlan' installedMap plan)
 
     unless (Map.null $ planInstallExes plan) $ do
         snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
@@ -399,10 +400,11 @@ windowsRenameCopy src dest = do
 
 -- | Perform the actual plan (internal)
 executePlan' :: M env m
-             => Plan
+             => InstalledMap
+             -> Plan
              -> ExecuteEnv
              -> m ()
-executePlan' plan ee@ExecuteEnv {..} = do
+executePlan' installedMap plan ee@ExecuteEnv {..} = do
     wc <- getWhichCompiler
     case Map.toList $ planUnregisterLocal plan of
         [] -> return ()
@@ -423,7 +425,7 @@ executePlan' plan ee@ExecuteEnv {..} = do
     -- stack always using transformer stacks that are safe for this use case.
     runInBase <- liftBaseWith $ \run -> return (void . run)
 
-    let actions = concatMap (toActions runInBase ee) $ Map.elems $ Map.mergeWithKey
+    let actions = concatMap (toActions installedMap' runInBase ee) $ Map.elems $ Map.mergeWithKey
             (\_ b f -> Just (Just b, Just f))
             (fmap (\b -> (Just b, Nothing)))
             (fmap (\f -> (Nothing, Just f)))
@@ -465,13 +467,20 @@ executePlan' plan ee@ExecuteEnv {..} = do
         generateDepsHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeLocals
         generateSnapHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeGlobalDB
     when (toCoverage $ boptsTestOpts eeBuildOpts) generateHpcMarkupIndex
+  where
+    installedMap' = Map.difference installedMap
+                  $ Map.fromList
+                  $ map (\gid -> (packageIdentifierName $ ghcPkgIdPackageIdentifier gid, ()))
+                  $ Map.keys
+                  $ planUnregisterLocal plan
 
 toActions :: M env m
-          => (m () -> IO ())
+          => InstalledMap
+          -> (m () -> IO ())
           -> ExecuteEnv
           -> (Maybe Task, Maybe (Task, LocalPackageTB)) -- build and final
           -> [Action]
-toActions runInBase ee (mbuild, mfinal) =
+toActions installedMap runInBase ee (mbuild, mfinal) =
     abuild ++ afinal
   where
     abuild =
@@ -482,7 +491,7 @@ toActions runInBase ee (mbuild, mfinal) =
                     { actionId = ActionId taskProvides ATBuild
                     , actionDeps =
                         (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
-                    , actionDo = \ac -> runInBase $ singleBuild ac ee task
+                    , actionDo = \ac -> runInBase $ singleBuild ac ee task installedMap
                     }
                 ]
     afinal =
@@ -495,9 +504,9 @@ toActions runInBase ee (mbuild, mfinal) =
                         (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
                     , actionDo = \ac -> runInBase $ do
                         unless (Set.null $ lptbTests lptb) $ do
-                            singleTest topts lptb ac ee task
+                            singleTest topts lptb ac ee task installedMap
                         unless (Set.null $ lptbBenches lptb) $ do
-                            singleBench beopts lptb ac ee task
+                            singleBench beopts lptb ac ee task installedMap
                     }
                 ]
       where
@@ -751,10 +760,22 @@ singleBuild :: M env m
             => ActionContext
             -> ExecuteEnv
             -> Task
+            -> InstalledMap
             -> m ()
-singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
+singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap =
   withSingleContext ac ee task Nothing $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
-    (cache, _neededConfig) <- ensureConfig pkgDir ee task (announce "configure") cabal cabalfp []
+    (cache, _neededConfig) <- ensureConfig pkgDir ee task (announce "configure") cabal cabalfp $
+        -- We enable tests if the test suite dependencies are already
+        -- installed, so that we avoid unnecessary recompilation based on
+        -- cabal_macros.h changes when switching between 'stack build' and
+        -- 'stack test'. See:
+        -- https://github.com/commercialhaskell/stack/issues/805
+        case taskType of
+            TTLocal lp -> concat
+                [ ["--enable-tests" | depsPresent installedMap $ lpTestDeps lp]
+                , ["--enable-benchmarks" | depsPresent installedMap $ lpBenchDeps lp]
+                ]
+            _ -> []
     wc <- getWhichCompiler
 
     markExeNotInstalled (taskLocation task) taskProvides
@@ -826,16 +847,32 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
                 (PackageIdentifier (packageName package) (packageVersion package))
                 Set.empty
 
+-- | Determine if all of the dependencies given are installed
+depsPresent :: InstalledMap -> Map PackageName VersionRange -> Bool
+depsPresent installedMap deps = all
+    (\(name, range) ->
+        case Map.lookup name installedMap of
+            Just (version, _, _) -> version `withinRange` range
+            Nothing -> False)
+    (Map.toList deps)
+
 singleTest :: M env m
            => TestOpts
            -> LocalPackageTB
            -> ActionContext
            -> ExecuteEnv
            -> Task
+           -> InstalledMap
            -> m ()
-singleTest topts lptb ac ee task =
+singleTest topts lptb ac ee task installedMap =
     withSingleContext ac ee task (Just "test") $ \package cabalfp pkgDir cabal announce console mlogFile -> do
-        (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (test)") cabal cabalfp ["--enable-tests"]
+        (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (test)") cabal cabalfp $
+            case taskType task of
+                TTLocal lp -> concat
+                    [ ["--enable-tests"]
+                    , ["--enable-benchmarks" | depsPresent installedMap $ lpBenchDeps lp]
+                    ]
+                _ -> []
         config <- asks getConfig
 
         testBuilt <- checkTestBuilt pkgDir
@@ -973,10 +1010,17 @@ singleBench :: M env m
             -> ActionContext
             -> ExecuteEnv
             -> Task
+            -> InstalledMap
             -> m ()
-singleBench beopts _lptb ac ee task =
+singleBench beopts _lptb ac ee task installedMap =
     withSingleContext ac ee task (Just "bench") $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
-        (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (benchmarks)") cabal cabalfp ["--enable-benchmarks"]
+        (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (benchmarks)") cabal cabalfp $
+            case taskType task of
+                TTLocal lp -> concat
+                    [ ["--enable-tests" | depsPresent installedMap $ lpTestDeps lp]
+                    , ["--enable-benchmarks"]
+                    ]
+                _ -> []
 
         benchBuilt <- checkBenchBuilt pkgDir
 

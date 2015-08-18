@@ -476,6 +476,8 @@ describeConfigDiff old new
         , "--package-db="
         , "--libdir="
         , "--bindir="
+        , "--enable-tests"
+        , "--enable-benchmarks"
         ]
 
     userOpts = filter (not . isStackOpt)

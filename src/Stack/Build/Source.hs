@@ -302,6 +302,15 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
             { packageConfigEnableTests = not $ Set.null tests
             , packageConfigEnableBenchmarks = not $ Set.null benches
             }
+        testconfig = config
+            { packageConfigEnableTests = True
+            , packageConfigEnableBenchmarks = False
+            }
+        benchconfig = config
+            { packageConfigEnableTests = False
+            , packageConfigEnableBenchmarks = True
+            }
+
         btpkg
             | Set.null tests && Set.null benches = Nothing
             | otherwise = Just $ LocalPackageTB
@@ -309,6 +318,8 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
                 , lptbTests = tests
                 , lptbBenches = benches
                 }
+        testpkg = resolvePackage testconfig gpkg
+        benchpkg = resolvePackage benchconfig gpkg
     mbuildCache <- tryGetBuildCache $ lpvRoot lpv
     (_,modFiles,otherFiles,mainFiles,extraFiles) <- getPackageFiles (packageFiles pkg) (lpvCabalFP lpv)
     let files =
@@ -322,6 +333,8 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
 
     return LocalPackage
         { lpPackage = pkg
+        , lpTestDeps = packageDeps $ testpkg
+        , lpBenchDeps = packageDeps $ benchpkg
         , lpExeComponents =
             case mtarget of
                 Nothing -> Nothing

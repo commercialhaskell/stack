@@ -182,6 +182,10 @@ data LocalPackageTB = LocalPackageTB
 -- | Information on a locally available package of source code
 data LocalPackage = LocalPackage
     { lpPackage        :: !Package         -- ^ The @Package@ info itself, after resolution with package flags, not including any tests or benchmarks
+    , lpTestDeps       :: !(Map PackageName VersionRange)
+    -- ^ Used for determining if we can use --enable-tests in a normal build
+    , lpBenchDeps      :: !(Map PackageName VersionRange)
+    -- ^ Used for determining if we can use --enable-benchmarks in a normal build
     , lpExeComponents  :: !(Maybe (Set Text)) -- ^ Executable components to build, Nothing if not a target
 
     , lpTestBench      :: !(Maybe LocalPackageTB)
