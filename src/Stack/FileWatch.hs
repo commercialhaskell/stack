@@ -84,7 +84,11 @@ fileWatch inner = withManager $ \manager -> do
                     "watched" -> do
                         watch <- readTVarIO watchVar
                         mapM_ (putStrLn . toFilePath) (Map.keys watch)
-                    _ -> putStrLn $ "Unknown command: " ++ show line
+                    _ -> putStrLn $ concat
+                        [ "Unknown command: "
+                        , show line
+                        , ". Try 'help'"
+                        ]
 
                 watchInput
 
