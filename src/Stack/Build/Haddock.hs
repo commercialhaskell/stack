@@ -203,7 +203,7 @@ generateHaddockIndex descr envOverride wc packageIDs docRelDir destDir = do
                    readProcessNull
                        (Just destDir)
                        envOverride
-                       (compilerExeName wc)
+                       (haddockExeName wc)
                        (["--gen-contents", "--gen-index"] ++ concatMap fst interfaceOpts)
   where
     toInterfaceOpt pid@(PackageIdentifier name _) = do

@@ -75,3 +75,7 @@ isWantedCompiler _ _ _ = False
 compilerExeName :: WhichCompiler -> String
 compilerExeName Ghc = "ghc"
 compilerExeName Ghcjs = "ghcjs"
+
+haddockExeName :: WhichCompiler -> String
+haddockExeName Ghc = "haddock"
+haddockExeName Ghcjs = "haddock-ghcjs"
