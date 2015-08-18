@@ -4,5 +4,6 @@ Primary documents:
 2. [[New to Haskell]]: people new to Haskell trying to understand how the various pieces fit together should read this after following the README
 3. [[Transition guide]]: existing Haskellers looking to start with stack and will be confused by things being missing, e.g. "How do I do sandboxing?"
 4. [[Architecture]]: for people curious about the internals, wanting to use stack in unusual ways, or wanting to get involved deeply in the codebase
+5. [[stack.yaml]]: Reference documentation for writing `stack.yaml` files.
 
 There's also the [[FAQ]] which will likely have something for everyone, and the [[Downloads]] page (which is linked from the README).
