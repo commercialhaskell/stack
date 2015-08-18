@@ -1,6 +1,6 @@
 This page is intended to fully document all configuration options available in the stack.yaml file. Note that this page is likely to be both *incomplete* and sometimes *inaccurate*. If you see such cases, please update the page, and if you're not sure how, open an issue labeled "question".
 
-The stack.yaml configuration options break down into project specific and non-project specific options. The latter can be specified in your global config (/etc/stack/config) and user config (~/.stack/global/stack.yaml), as well as in the project config. The former must be in the project config.
+The stack.yaml configuration options break down into project specific and non-project specific options. The latter can be specified in your global config (`/etc/stack/config`) and user config (`~/.stack/global/stack.yaml`), as well as in the project config. The former must be in the project config.
 
 ## Project config
 
@@ -111,19 +111,19 @@ See [Docker configuration](Docker#configuration).
 
 Integer indicating how many simultaneous downloads are allowed to happen
 
-Default: 8
+Default: `8`
 
 ### hide-th-loading
 
 Strip out the "Loading ..." lines from GHC build output, produced when using Template Haskell
 
-Default: true
+Default: `true`
 
 ### latest-snapshot-url
 
 URL providing a JSON with information on the latest LTS and Nightly snapshots, used for automatic project configuration.
 
-Default: https://www.stackage.org/download/snapshots.json
+Default: `https://www.stackage.org/download/snapshots.json`
 
 ### package-indices
 
@@ -149,7 +149,7 @@ other projects by installing into your shared snapshot database.
 
 Enables or disables using the GHC available on the PATH. Useful to disable if
 you want to force stack to use its own installed GHC (via `stack setup`), in
-cases where your system GHC my be incomplete for some reason. Default is true.
+cases where your system GHC my be incomplete for some reason. Default is `true`.
 
 ```yaml
 # Turn off system GHC
@@ -158,12 +158,12 @@ system-ghc: false
 
 ### install-ghc
 
-Whether or not to automatically install GHC when necessary. Default is false,
+Whether or not to automatically install GHC when necessary. Default is `false`,
 which means stack will prompt you to run `stack setup` as needed.
 
 ### skip-ghc-check
 
-Should we skip the check to confirm that your system GHC version (on the PATH) matches what your project expects? Default is false.
+Should we skip the check to confirm that your system GHC version (on the PATH) matches what your project expects? Default is `false`.
 
 ### require-stack-version
 
@@ -171,7 +171,7 @@ Require a version of stack within the specified range
 ([cabal-style](https://www.haskell.org/cabal/users-guide/developing-packages.html#build-information))
 to be used for this project. Example: `require-stack-version: "== 0.1.*"`
 
-Default: "-any"
+Default: `"-any"`
 
 ### arch/os
 
