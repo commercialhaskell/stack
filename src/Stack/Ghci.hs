@@ -156,7 +156,7 @@ ghciSetup
     -> [Text]
     -> m (Map PackageName SimpleTarget, Maybe (Map PackageName SimpleTarget), [GhciPkgInfo])
 ghciSetup mainIs stringTargets = do
-    (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets defaultBuildOpts
+    (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets defaultBuildOpts {boptsTargets=stringTargets}
     mainIsTargets <-
         case mainIs of
             Nothing -> return Nothing
