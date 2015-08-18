@@ -164,8 +164,19 @@ otherwise noted.
       # Directories from the host to volume-mount into the container.  If it
       # contains a `:`, the part before the `:` is the directory on the host and
       # the part after the `:` is where it should be mounted in the container.
-      # (default none, aside from the project directory which is always mounted)
-      mount: ["/foo/bar","/baz:/tmp/quux"]
+      # (default none, aside from the project and stack root directories which are
+      # always mounted)
+      mount:
+        - "/foo/bar"
+        - "/baz:/tmp/quux"
+
+      # Environment variables to set in the container.  Environment variables
+      # are not automatically inherited from the host, so if you need any specific
+      # variables, use the '--docker-env` command-line argument version of this to
+      # pass them in.  (default none)
+      env:
+        - "FOO=BAR"
+        - "BAR=BAZ QUUX"
 
       # Location of database used to track image usage, which `stack docker cleanup`
       # uses to determine which images should be kept.  On shared systems, it may
