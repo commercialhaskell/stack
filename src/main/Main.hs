@@ -691,11 +691,15 @@ buildCmd moptionSynonym opts go
                 , opt
                 , "'"
                 ]
-        fixCodePage' $ Stack.Build.build setLocalFiles (Just lk) opts
+        globalFixCodePage go $ Stack.Build.build setLocalFiles (Just lk) opts
 
-    fixCodePage'
-        | globalModifyCodePage go = fixCodePage
-        | otherwise = id
+globalFixCodePage :: (Catch.MonadMask m, MonadIO m, MonadLogger m)
+                  => GlobalOpts
+                  -> m a
+                  -> m a
+globalFixCodePage go
+    | globalModifyCodePage go = fixCodePage
+    | otherwise = id
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
 uninstallCmd _ go = withConfigAndLock go $ do
@@ -715,7 +719,7 @@ updateCmd () go = withConfigAndLock go $
     getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
 
 upgradeCmd :: (Bool, String) -> GlobalOpts -> IO ()
-upgradeCmd (fromGit, repo) go = withConfigAndLock go $
+upgradeCmd (fromGit, repo) go = withConfigAndLock go $ globalFixCodePage go $
     upgrade (if fromGit then Just repo else Nothing) (globalResolver go)
 
 -- | Upload to Hackage
@@ -786,7 +790,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
         ExecOptsEmbellished {..} ->
            withBuildConfigAndLock go $ \lk -> do
                let targets = concatMap words eoPackages
-               unless (null targets) $
+               unless (null targets) $ globalFixCodePage go $
                    Stack.Build.build (const $ return ()) (Just lk) defaultBuildOpts
                        { boptsTargets = map T.pack targets
                        }
@@ -798,7 +802,7 @@ ghciCmd :: GhciOpts -> GlobalOpts -> IO ()
 ghciCmd ghciOpts go@GlobalOpts{..} =
   withBuildConfigAndLock go $ \lk -> do
     let packageTargets = concatMap words (ghciAdditionalPackages ghciOpts)
-    unless (null packageTargets) $
+    unless (null packageTargets) $ globalFixCodePage go $
        Stack.Build.build (const $ return ()) (Just lk) defaultBuildOpts
            { boptsTargets = map T.pack packageTargets
            }
