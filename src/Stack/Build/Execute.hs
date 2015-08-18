@@ -768,10 +768,16 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
     extraOpts <- extraBuildOptions
     cabal (console && configHideTHLoading config) $
         (case taskType of
-            TTLocal lp -> "build"
-                        : ("lib:" ++ packageNameString (packageName package))
-                        : map (T.unpack . T.append "exe:")
-                              (maybe [] Set.toList $ lpExeComponents lp)
+            TTLocal lp -> concat
+                [ ["build"]
+                , ["lib:" ++ packageNameString (packageName package)
+                  -- TODO: get this information from target parsing instead,
+                  -- which will allow users to turn off library building if
+                  -- desired
+                  | packageHasLibrary package]
+                , map (T.unpack . T.append "exe:")
+                      (maybe [] Set.toList $ lpExeComponents lp)
+                ]
             TTUpstream _ _ -> ["build"]) ++ extraOpts
 
     let doHaddock = shouldHaddockPackage eeBuildOpts eeWanted (packageName package) &&
