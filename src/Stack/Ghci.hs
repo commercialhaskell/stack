@@ -192,7 +192,7 @@ ghciSetup mainIs stringTargets = do
         forM locals $
         \(name,(cabalfp,components)) ->
              makeGhciPkgInfo sourceMap (map fst locals) name cabalfp components
-    unless (null realTargets) (build (const (return ())) Nothing bopts)
+    unless (M.null realTargets) (build (const (return ())) Nothing bopts)
     return (realTargets, mainIsTargets, infos)
   where
     makeBuildOpts targets =
