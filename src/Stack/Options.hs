@@ -207,13 +207,14 @@ readFlag = do
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser docker =
-    (\opts systemGHC installGHC arch os jobs includes libs skipGHCCheck skipMsys localBin -> mempty
+    (\opts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin -> mempty
         { configMonoidDockerOpts = opts
         , configMonoidSystemGHC = systemGHC
         , configMonoidInstallGHC = installGHC
         , configMonoidSkipGHCCheck = skipGHCCheck
         , configMonoidArch = arch
         , configMonoidOS = os
+        , configMonoidGHCVariant = ghcVariant
         , configMonoidJobs = jobs
         , configMonoidExtraIncludeDirs = includes
         , configMonoidExtraLibDirs = libs
@@ -238,6 +239,11 @@ configOptsParser docker =
             ( long "os"
            <> metavar "OS"
            <> help "Operating system, e.g. linux, windows"
+            ))
+    <*> optional (strOption
+            ( long "ghc-variant"
+           <> metavar "VARIANT"
+           <> help "Specialized GHC variant, e.g. integersimple"
             ))
     <*> optional (option auto
             ( long "jobs"

@@ -60,7 +60,7 @@ import           Network.HTTP.Download.Verified
 import           Path
 import           Path.IO
 import           Prelude hiding (concat, elem) -- Fix AMP warning
-import           Safe (headMay, readMay)
+import           Safe (readMay)
 import           Stack.Types.Build
 import           Stack.Config (resolvePackageEntry)
 import           Stack.Constants (distRelativeDir)
@@ -100,7 +100,7 @@ data SetupOpts = SetupOpts
     -- ^ Message shown to user for how to resolve the missing GHC
     }
     deriving Show
-data SetupException = UnsupportedSetupCombo OS Arch
+data SetupException = UnsupportedSetupCombo OS Arch GHCVariant
                     | MissingDependencies [String]
                     | UnknownCompilerVersion Text CompilerVersion (Set Version)
                     | UnknownOSKey Text
@@ -108,9 +108,11 @@ data SetupException = UnsupportedSetupCombo OS Arch
     deriving Typeable
 instance Exception SetupException
 instance Show SetupException where
-    show (UnsupportedSetupCombo os arch) = concat
+    show (UnsupportedSetupCombo os arch ghcVariant) = concat
         [ "I don't know how to install GHC for "
-        , show (os, arch)
+        , case ghcVariant of
+              StandardGHC -> show (os, arch)
+              _ -> show (os, arch, ghcVariant)
         , ", please install manually"
         ]
     show (MissingDependencies tools) =
@@ -291,7 +293,7 @@ ensureGHC sopts = do
                 Nothing
                     | soptsInstallIfMissing sopts -> do
                         si <- getSetupInfo'
-                        downloadAndInstallGHC menv0 si (soptsWantedCompiler sopts) (soptsCompilerCheck sopts)
+                        downloadAndInstallGHC si (soptsWantedCompiler sopts) (soptsCompilerCheck sopts)
                     | otherwise -> do
                         Platform arch _ <- asks getPlatform
                         throwM $ CompilerVersionMismatch
@@ -305,7 +307,7 @@ ensureGHC sopts = do
 
             -- Install git on windows, if necessary
             mgitIdent <- case configPlatform config of
-                Platform _ os | isWindows os && not (soptsSkipMsys sopts) ->
+                Platform _ Cabal.Windows | not (soptsSkipMsys sopts) ->
                     case getInstalledTool installed $(mkPackageName "git") (const True) of
                         Just ident -> return (Just ident)
                         Nothing
@@ -536,11 +538,11 @@ binDirs ident = do
     config <- asks getConfig
     dir <- installDir ident
     case (configPlatform config, packageNameString $ packageIdentifierName ident) of
-        (Platform _ (isWindows -> True), "ghc") -> return
+        (Platform _ Cabal.Windows, "ghc") -> return
             [ dir </> $(mkRelDir "bin")
             , dir </> $(mkRelDir "mingw") </> $(mkRelDir "bin")
             ]
-        (Platform _ (isWindows -> True), "git") -> return
+        (Platform _ Cabal.Windows, "git") -> return
             [ dir </> $(mkRelDir "cmd")
             , dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
             ]
@@ -582,13 +584,12 @@ downloadAndInstallTool si downloadInfo name version installer = do
     return ident
 
 downloadAndInstallGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
-           => EnvOverride
-           -> SetupInfo
+           => SetupInfo
            -> CompilerVersion
            -> VersionCheck
            -> m PackageIdentifier
-downloadAndInstallGHC menv si wanted versionCheck = do
-    osKey <- getOSKey menv
+downloadAndInstallGHC si wanted versionCheck = do
+    osKey <- getOSKey
     pairs <-
         case Map.lookup osKey $ siGHCs si of
             Nothing -> throwM $ UnknownOSKey osKey
@@ -604,39 +605,32 @@ downloadAndInstallGHC menv si wanted versionCheck = do
     platform <- asks $ configPlatform . getConfig
     let installer =
             case platform of
-                Platform _ os | isWindows os -> installGHCWindows
+                Platform _ Cabal.Windows -> installGHCWindows
                 _ -> installGHCPosix
     downloadAndInstallTool si downloadInfo $(mkPackageName "ghc") selectedVersion installer
 
 getOSKey :: (MonadReader env m, MonadThrow m, HasConfig env, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
-         => EnvOverride -> m Text
-getOSKey menv = do
-    platform <- asks $ configPlatform . getConfig
-    case platform of
-        Platform I386   Cabal.Linux -> ("linux32" <>) <$> getLinuxSuffix
-        Platform X86_64 Cabal.Linux -> ("linux64" <>) <$> getLinuxSuffix
-        Platform I386   Cabal.OSX -> return "macosx"
-        Platform X86_64 Cabal.OSX -> return "macosx"
-        Platform I386   Cabal.FreeBSD -> return "freebsd32"
-        Platform X86_64 Cabal.FreeBSD -> return "freebsd64"
-        Platform I386   Cabal.OpenBSD -> return "openbsd32"
-        Platform X86_64 Cabal.OpenBSD -> return "openbsd64"
-        Platform I386   Cabal.Windows -> return "windows32"
-        Platform X86_64 Cabal.Windows -> return "windows64"
+         => m Text
+getOSKey = do
+    platform <- asks getPlatform
+    ghcVariant <- asks getGHCVariant
+    case (platform, ghcVariant) of
+        (Platform I386   Cabal.Linux,   Gmp4) -> return "linux32-gmp4"
+        (Platform X86_64 Cabal.Linux,   Gmp4) -> return "linux64-gmp4"
+        (Platform I386   Cabal.Linux,   StandardGHC) -> return "linux32"
+        (Platform X86_64 Cabal.Linux,   StandardGHC) -> return "linux64"
+        (Platform I386   Cabal.OSX,     StandardGHC) -> return "macosx"
+        (Platform X86_64 Cabal.OSX,     StandardGHC) -> return "macosx"
+        (Platform I386   Cabal.FreeBSD, StandardGHC) -> return "freebsd32"
+        (Platform X86_64 Cabal.FreeBSD, StandardGHC) -> return "freebsd64"
+        (Platform I386   Cabal.OpenBSD, StandardGHC) -> return "openbsd32"
+        (Platform X86_64 Cabal.OpenBSD, StandardGHC) -> return "openbsd64"
+        (Platform I386   Cabal.Windows, IntegerSimple) -> return "windowsintegersimple32"
+        (Platform X86_64 Cabal.Windows, IntegerSimple) -> return "windowsintegersimple64"
+        (Platform I386   Cabal.Windows, StandardGHC) -> return "windows32"
+        (Platform X86_64 Cabal.Windows, StandardGHC) -> return "windows64"
 
-        Platform I386   (Cabal.OtherOS "windowsintegersimple") -> return "windowsintegersimple32"
-        Platform X86_64 (Cabal.OtherOS "windowsintegersimple") -> return "windowsintegersimple64"
-
-        Platform arch os -> throwM $ UnsupportedSetupCombo os arch
-  where
-    getLinuxSuffix = do
-        executablePath <- liftIO getExecutablePath
-        elddOut <- tryProcessStdout Nothing menv "ldd" [executablePath]
-        return $ case elddOut of
-            Left _ -> ""
-            Right lddOut -> if hasLineWithFirstWord "libgmp.so.3" lddOut then "-gmp4" else ""
-    hasLineWithFirstWord w =
-      elem (Just w) . map (headMay . T.words) . T.lines . T.decodeUtf8With T.lenientDecode
+        (Platform arch os, _) -> throwM $ UnsupportedSetupCombo os arch ghcVariant
 
 downloadFromInfo :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
              => DownloadInfo

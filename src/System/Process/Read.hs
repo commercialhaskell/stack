@@ -59,7 +59,7 @@ import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Data.Text.Lazy.Encoding as LT
 import qualified Data.Text.Lazy as LT
 import           Data.Typeable (Typeable)
-import           Distribution.System (OS (Windows, OtherOS), Platform (Platform))
+import           Distribution.System (OS (Windows), Platform (Platform))
 import           Path (Path, Abs, Dir, toFilePath, File, parseAbsFile)
 import           Path.IO (createTree)
 import           Prelude -- Fix AMP warning
@@ -111,7 +111,6 @@ mkEnvOverride platform tm' = do
     isWindows =
         case platform of
             Platform _ Windows -> True
-            Platform _ (OtherOS "windowsintegersimple") -> True
             _ -> False
 
 -- | Helper conversion function

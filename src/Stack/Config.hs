@@ -46,7 +46,8 @@ import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import           Data.Text.Encoding (encodeUtf8, decodeUtf8, decodeUtf8With)
+import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Data.Yaml as Yaml
 import           Distribution.System (OS (..), Platform (..), buildPlatform)
 import qualified Distribution.Text
@@ -58,6 +59,7 @@ import           Options.Applicative (Parser, strOption, long, help)
 import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
+import           Safe (headMay)
 import           Stack.BuildPlan
 import           Stack.Constants
 import qualified Stack.Docker as Docker
@@ -89,9 +91,16 @@ getLatestResolver = do
 defaultStackGlobalConfig :: Maybe (Path Abs File)
 defaultStackGlobalConfig = parseAbsFile "/etc/stack/config"
 
+-- | Used to get the @dist@ directory before the full Config is available.
+data PlatformGHCVariant = PlatformGHCVariant Platform GHCVariant
+instance HasPlatform PlatformGHCVariant where
+    getPlatform (PlatformGHCVariant platform _) = platform
+instance HasGHCVariant PlatformGHCVariant where
+    getGHCVariant (PlatformGHCVariant _ ghcVariant) = ghcVariant
+
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid
-    :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env)
+    :: (MonadBaseControl IO m, MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env)
     => Path Abs Dir -- ^ stack root, e.g. ~/.stack
     -> Maybe Project
     -> ConfigMonoid
@@ -147,7 +156,11 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
               $ map (T.pack *** T.pack) rawEnv
      let configEnvOverride _ = return origEnv
 
-     platform <- runReaderT platformRelDir configPlatform
+     configGHCVariant <- case parseGHCVariant <$> configMonoidGHCVariant of
+         Just ghcVariant -> return ghcVariant
+         Nothing -> getDefaultGHCVariant origEnv os
+
+     platform <- runReaderT platformRelDir (PlatformGHCVariant configPlatform configGHCVariant)
 
      configLocalPrograms <-
         case configPlatform of
@@ -179,6 +192,26 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
 
      return Config {..}
 
+-- | Get the default 'GHCVariant'.  On older Linux systems with libgmp4, returns 'Gmp4'.
+getDefaultGHCVariant
+    :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m)
+    => EnvOverride -> OS -> m GHCVariant
+getDefaultGHCVariant menv Linux = do
+    executablePath <- liftIO getExecutablePath
+    elddOut <- tryProcessStdout Nothing menv "ldd" [executablePath]
+    return $
+        case elddOut of
+            Left _ -> StandardGHC
+            Right lddOut ->
+                if hasLineWithFirstWord "libgmp.so.3" lddOut
+                    then Gmp4
+                    else StandardGHC
+  where
+    hasLineWithFirstWord w =
+        elem (Just w) .
+        map (headMay . T.words) . T.lines . decodeUtf8With lenientDecode
+getDefaultGHCVariant _ _ = return StandardGHC
+
 -- | Get the directory on Windows where we should install extra programs. For
 -- more information, see discussion at:
 -- https://github.com/fpco/minghc/issues/43#issuecomment-99737383
@@ -200,6 +233,7 @@ instance HasStackRoot MiniConfig
 instance HasHttpManager MiniConfig where
     getHttpManager (MiniConfig man _) = man
 instance HasPlatform MiniConfig
+instance HasGHCVariant MiniConfig
 
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.
