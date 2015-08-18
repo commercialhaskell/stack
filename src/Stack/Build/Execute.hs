@@ -769,8 +769,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} =
     cabal (console && configHideTHLoading config) $
         (case taskType of
             TTLocal lp -> "build"
-                        -- Cabal... There doesn't seem to be a way to call out the library component...
-                        -- : "lib"
+                        : ("lib:" ++ packageNameString (packageName package))
                         : map (T.unpack . T.append "exe:")
                               (maybe [] Set.toList $ lpExeComponents lp)
             TTUpstream _ _ -> ["build"]) ++ extraOpts
