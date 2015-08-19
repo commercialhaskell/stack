@@ -247,6 +247,7 @@ runContainerAndExit modConfig
          ,concatMap (\(k,v) -> ["-e", k ++ "=" ++ v]) envVars
          ,concatMap sandboxSubdirArg sandboxSubdirs
          ,concatMap mountArg (dockerMount docker)
+         ,concatMap (\nv -> ["-e", nv]) (dockerEnv docker)
          ,case dockerContainerName docker of
             Just name -> ["--name=" ++ name]
             Nothing -> []
@@ -677,6 +678,7 @@ dockerOptsFromMonoid mproject stackRoot DockerOptsMonoid{..} = DockerOpts
   ,dockerContainerName = emptyToNothing dockerMonoidContainerName
   ,dockerRunArgs = dockerMonoidRunArgs
   ,dockerMount = dockerMonoidMount
+  ,dockerEnv = dockerMonoidEnv
   ,dockerDatabasePath =
      case dockerMonoidDatabasePath of
        Nothing -> stackRoot </> $(mkRelFile "docker.db")

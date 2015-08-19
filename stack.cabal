@@ -186,6 +186,7 @@ executable stack
 
   build-depends:  base >=4.7 && < 5
                 , bytestring >= 0.10.4.0
+                , Cabal
                 , containers
                 , exceptions
                 , filepath

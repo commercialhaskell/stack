@@ -250,7 +250,6 @@ getSetupExe setupHs tmpdir = do
             liftIO $ D.createDirectoryIfMissing True $ toFilePath setupDir
 
             menv <- getMinimalEnvOverride
-            wc <- getWhichCompiler
             let args =
                     [ "-clear-package-db"
                     , "-global-package-db"

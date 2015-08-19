@@ -32,6 +32,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Data.Traversable
+import           Distribution.System (buildArch)
 import           Development.GitRev (gitCommitCount)
 import           Network.HTTP.Client
 import           Options.Applicative.Args
@@ -149,6 +150,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
               -- Leave out number of commits for --depth=1 clone
               -- See https://github.com/commercialhaskell/stack/issues/792
             , [" (" ++ $gitCommitCount ++ " commits)" | $gitCommitCount /= ("1"::String)]
+            , [" ", show buildArch]
             ]
      eGlobalRun <- try $
        simpleOptions
