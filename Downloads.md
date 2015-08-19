@@ -124,17 +124,15 @@ If you use the [ArchHaskell repository](https://wiki.archlinux.org/index.php/Arc
 
 ## NixOS
 
-*note*: for 32-bit, use the [generic Linux option](#linux)
-
 1. Clone the git repo:
 
          git clone https://github.com/commercialhaskell/stack.git
 
 2. Create a `shell.nix` file:
 
-         cabal2nix --shell ./. --no-check > shell.nix
+         cabal2nix --shell ./. --no-check --no-haddock > shell.nix
 
-   Note that the tests fail on NixOS, so disable them with `--no-check`.
+   Note that the tests fail on NixOS, so disable them with `--no-check`. Also, haddock currently doesn't work for stack, so `--no-haddock` disables it.
 
 3. Install stack to your user profile:
 
