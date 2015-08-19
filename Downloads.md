@@ -112,7 +112,7 @@ We generally test on the current version of OS X, but stack is known to work on 
 
 ## Arch Linux
 
-*note*: for 32-bit, use the [generic Linux option](#linux)
+*note*: for 32-bit, use the [generic Linux option](#linux). (You will need to ensure libtinfo is installed, see below.)
 
 stack can be found in the AUR:
   - [haskell-stack](https://aur.archlinux.org/packages/haskell-stack/) _latest stable version_
