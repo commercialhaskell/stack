@@ -124,6 +124,12 @@ If you use the [ArchHaskell repository](https://wiki.archlinux.org/index.php/Arc
 
 ## NixOS
 
+Users who follow the `nixos-unstable` channel or the Nixpkgs `master` branch can install the latest `stack` release into their profile by running:
+
+         nix-env -f "<nixpkgs>" -iA haskellPackages.stack
+
+Alternatively, the package can be built from source as follows.
+
 1. Clone the git repo:
 
          git clone https://github.com/commercialhaskell/stack.git
