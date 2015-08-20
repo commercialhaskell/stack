@@ -74,7 +74,7 @@ import           System.Environment (getArgs, getProgName)
 import           System.Exit
 import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
 import           System.FilePath (dropTrailingPathSeparator)
-import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..))
+import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn)
 import           System.Process.Read
 
 #if WINDOWS
@@ -325,7 +325,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
      case eGlobalRun of
        Left (exitCode :: ExitCode) -> do
          when isInterpreter $
-           putStrLn $ concat
+           hPutStrLn stderr $ concat
              [ "\nIf you are trying to use "
              , stackProgName
              , " as a script interpreter, a\n'-- "
@@ -334,7 +334,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
              , "\nSee https://github.com/commercialhaskell/stack/wiki/Script-interpreter" ]
          throwIO exitCode
        Right (global,run) -> do
-         when (globalLogLevel global == LevelDebug) $ putStrLn versionString'
+         when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
          run global `catch` \e -> do
             -- This special handler stops "stack: " from being printed before the
             -- exception
@@ -585,12 +585,12 @@ withUserFileLock dir act = do
                 case fstTry of
                   Just lk -> EL.finally (act lk) (liftIO $ unlockFile lk)
                   Nothing ->
-                    do liftIO $ putStrLn $ "Failed to grab lock ("++show pth++
+                    do liftIO $ hPutStrLn stderr $ "Failed to grab lock ("++show pth++
                                            "); other stack instance running.  Waiting..."
                        EL.bracket (liftIO $ lockFile (toFilePath pth) Exclusive)
                                   (liftIO . unlockFile)
                                   (\lk -> do
-                                    liftIO $ putStrLn "Lock acquired, proceeding."
+                                    liftIO $ hPutStrLn stderr "Lock acquired, proceeding."
                                     act lk))
 
 withConfigAndLock :: GlobalOpts
