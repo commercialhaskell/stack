@@ -95,6 +95,8 @@ readLocalPackage pkgDir = do
         , lpCabalFile = cabalfp
         -- NOTE: these aren't the 'correct values, but aren't used in
         -- the usage of this function in this module.
+        , lpTestDeps = Map.empty
+        , lpBenchDeps = Map.empty
         , lpTestBench = Nothing
         , lpDirtyFiles = True
         , lpNewBuildCache = Map.empty

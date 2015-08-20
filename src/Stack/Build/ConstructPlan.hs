@@ -132,20 +132,13 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
 
     econfig <- asks getEnvConfig
     let onWanted lp = do
-            {-
-             - Arguably this is the right thing to do. However, forcing the
-             - library to rebuild causes the cabal_macros.h file to change,
-             - which makes GHC rebuild everything...
-
             case lpExeComponents lp of
                 Nothing -> return ()
-                Just _ -> void $ addDep $ packageName $ lpPackage lp
-            -}
+                Just _ -> void $ addDep False $ packageName $ lpPackage lp
 
             case lpTestBench lp of
                 Just tb -> addFinal lp tb
-                -- See comment above
-                Nothing -> void $ addDep False $ packageName $ lpPackage lp
+                Nothing -> return ()
     let inner = do
             mapM_ onWanted $ filter lpWanted locals
             mapM_ (addDep False) $ Set.toList extraToBuild0
@@ -476,6 +469,8 @@ describeConfigDiff old new
         , "--package-db="
         , "--libdir="
         , "--bindir="
+        , "--enable-tests"
+        , "--enable-benchmarks"
         ]
 
     userOpts = filter (not . isStackOpt)
