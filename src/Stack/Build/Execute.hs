@@ -383,9 +383,15 @@ executePlan menv bopts baseConfigOpts locals sourceMap installedMap plan = do
                 , ":"]
             forM_ executables $ \exe -> $logInfo $ T.append "- " exe
 
+    config <- asks getConfig
+    menv' <- liftIO $ configEnvOverride config EnvSettings
+                    { esIncludeLocals = True
+                    , esIncludeGhcPackagePath = True
+                    , esStackExe = True
+                    }
     forM_ (boptsExec bopts) $ \(cmd, args) -> do
         $logProcessRun cmd args
-        callProcess Nothing menv cmd args
+        callProcess Nothing menv' cmd args
 
 -- | Windows can't write over the current executable. Instead, we rename the
 -- current executable to something else and then do the copy.
