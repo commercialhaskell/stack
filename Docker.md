@@ -4,7 +4,7 @@ Using Docker with Stack
 `stack` has support for automatically performing builds inside a Docker
 container, using volume mounts and user ID switching to make it mostly seamless.
 FP Complete provides images for use with stack that include GHC, tools, and
-optionally have all of the Stackage LTS packages pre-intalled in in the global
+optionally have all of the Stackage LTS packages pre-installed in in the global
 package database.
 
 The primary purpose for using stack/docker this way is for teams to ensure all
