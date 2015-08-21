@@ -78,7 +78,7 @@ import           System.Process.Read
 
 #ifdef WINDOWS
 import System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
-import System.IO (hSetEncoding, utf8)
+import System.IO (utf8)
 #endif
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
