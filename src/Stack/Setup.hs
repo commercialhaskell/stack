@@ -216,6 +216,10 @@ setupEnv mResolveMissingGHC = do
                                 then Map.insert "STACK_EXE" (T.pack executablePath)
                                 else id)
 
+                        $ (if esLocaleUtf8 es
+                                then Map.insert "LC_ALL" "C.UTF-8"
+                                else id)
+
                         -- For reasoning and duplication, see: https://github.com/fpco/stack/issues/70
                         $ Map.insert "HASKELL_PACKAGE_SANDBOX" (T.pack $ toFilePathNoTrailingSlash deps)
                         $ Map.insert "HASKELL_PACKAGE_SANDBOXES"

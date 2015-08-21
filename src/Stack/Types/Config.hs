@@ -190,6 +190,8 @@ data EnvSettings = EnvSettings
     -- ^ include the GHC_PACKAGE_PATH variable
     , esStackExe :: !Bool
     -- ^ set the STACK_EXE variable to the current executable name
+    , esLocaleUtf8 :: !Bool
+    -- ^ set the locale to C.UTF-8
     }
     deriving (Show, Eq, Ord)
 
@@ -872,6 +874,7 @@ getMinimalEnvOverride = do
                     { esIncludeLocals = False
                     , esIncludeGhcPackagePath = False
                     , esStackExe = False
+                    , esLocaleUtf8 = False
                     }
 
 getWhichCompiler :: (MonadReader env m, HasEnvConfig env) => m WhichCompiler

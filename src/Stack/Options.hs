@@ -465,6 +465,7 @@ execOptsParser mcmd =
                 "stack-exe"
                 "setting the STACK_EXE environment variable to the path for the stack executable"
                 idm
+        <*> pure False
 
     eoPackagesParser :: Parser [String]
     eoPackagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))

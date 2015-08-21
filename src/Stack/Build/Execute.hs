@@ -388,6 +388,7 @@ executePlan menv bopts baseConfigOpts locals sourceMap installedMap plan = do
                     { esIncludeLocals = True
                     , esIncludeGhcPackagePath = True
                     , esStackExe = True
+                    , esLocaleUtf8 = False
                     }
     forM_ (boptsExec bopts) $ \(cmd, args) -> do
         $logProcessRun cmd args
@@ -642,6 +643,7 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} msuffix inne
             { esIncludeLocals = taskLocation task == Local
             , esIncludeGhcPackagePath = False
             , esStackExe = False
+            , esLocaleUtf8 = True
             }
         getRunhaskellPath <- runOnce $ liftIO $ join $ findExecutable menv "runhaskell"
         getGhcjsPath <- runOnce $ liftIO $ join $ findExecutable menv "ghcjs"
@@ -941,6 +943,7 @@ singleTest topts lptb ac ee task installedMap =
                     { esIncludeLocals = taskLocation task == Local
                     , esIncludeGhcPackagePath = True
                     , esStackExe = True
+                    , esLocaleUtf8 = False
                     }
                 if exists
                     then do

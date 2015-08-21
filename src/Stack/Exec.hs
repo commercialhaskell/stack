@@ -31,6 +31,7 @@ defaultEnvSettings = EnvSettings
     { esIncludeLocals = True
     , esIncludeGhcPackagePath = True
     , esStackExe = True
+    , esLocaleUtf8 = False
     }
 
 -- | Environment settings which do not embellish the environment
@@ -39,6 +40,7 @@ plainEnvSettings = EnvSettings
     { esIncludeLocals = False
     , esIncludeGhcPackagePath = False
     , esStackExe = False
+    , esLocaleUtf8 = False
     }
 
 -- | Execute a process within the Stack configured environment.
