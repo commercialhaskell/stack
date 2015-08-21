@@ -76,7 +76,7 @@ import           System.FilePath (dropTrailingPathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, Handle, hGetEncoding, hSetEncoding)
 import           System.Process.Read
 
-#if WINDOWS
+#ifdef WINDOWS
 import System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
 import System.IO (hSetEncoding, utf8)
 #endif
@@ -84,7 +84,7 @@ import System.IO (hSetEncoding, utf8)
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738
 fixCodePage :: (MonadIO m, Catch.MonadMask m, MonadLogger m) => m a -> m a
-#if WINDOWS
+#ifdef WINDOWS
 fixCodePage inner = do
     origCPI <- liftIO getConsoleCP
     origCPO <- liftIO getConsoleOutputCP
