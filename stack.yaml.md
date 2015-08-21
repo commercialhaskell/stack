@@ -219,4 +219,4 @@ ghc-options:
 Caveat emptor: setting options like this will affect your snapshot packages,
 which can lead to unpredictable behavior versus official Stackage snapshots.
 This is in contrast to the `ghc-options` command line flag, which will only
-affect targets.
+affect local targets.
