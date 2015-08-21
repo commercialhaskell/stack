@@ -863,11 +863,12 @@ imgDockerCmd () go@GlobalOpts{..} = do
         go
         Nothing
         (\lk ->
-         do Stack.Build.build
-                (const (return ()))
-                (Just lk)
-                defaultBuildOpts
-            Image.stageContainerImageArtifacts)
+              do globalFixCodePage go $
+                     Stack.Build.build
+                         (const (return ()))
+                         (Just lk)
+                         defaultBuildOpts
+                 Image.stageContainerImageArtifacts)
         (Just Image.createContainerImageFromStage)
 
 -- | Load the configuration with a manager. Convenience function used
