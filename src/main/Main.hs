@@ -22,7 +22,6 @@ import           Data.Attoparsec.Args (withInterpreterArgs)
 import qualified Data.ByteString.Lazy as L
 import           Data.IORef
 import           Data.List
-import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
 import           Data.Maybe
@@ -42,7 +41,6 @@ import           Options.Applicative.Types (readerAsk)
 import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
-import           Plugins
 import           Prelude hiding (pi, mapM)
 import           Stack.Build
 import           Stack.Types.Build
@@ -70,7 +68,7 @@ import           Stack.Types.StackT
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import           System.Directory (canonicalizePath, doesFileExist, doesDirectoryExist, createDirectoryIfMissing)
-import           System.Environment (getArgs, getProgName)
+import           System.Environment (getProgName)
 import           System.Exit
 import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
 import           System.FilePath (dropTrailingPathSeparator)
@@ -136,9 +134,6 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
      hSetBuffering stdout LineBuffering
      hSetBuffering stdin  LineBuffering
      hSetBuffering stderr NoBuffering
-     when False $ do -- https://github.com/commercialhaskell/stack/issues/322
-       plugins <- findPlugins (T.pack stackProgName)
-       tryRunPlugin plugins
      progName <- getProgName
      isTerminal <- hIsTerminalDevice stdout
      execExtraHelp args
@@ -321,7 +316,6 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                 "Build a Docker image for the project"
                 imgDockerCmd
                 (pure ())))
-             -- commandsFromPlugins plugins pluginShouldHaveRun) https://github.com/commercialhaskell/stack/issues/322
      case eGlobalRun of
        Left (exitCode :: ExitCode) -> do
          when isInterpreter $
@@ -345,29 +339,6 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                     exitFailure
   where
     dockerHelpOptName = Docker.dockerCmdName ++ "-help"
-
--- Try to run a plugin
-tryRunPlugin :: Plugins -> IO ()
-tryRunPlugin plugins = do
-  args <- getArgs
-  case dropWhile (List.isPrefixOf "-") args of
-    ((T.pack -> name):args')
-      | isJust (lookupPlugin plugins name) -> do
-          callPlugin plugins name args' `catch` onPluginErr
-          exitSuccess
-    _ -> return ()
--- TODO(danburton): use logger
-onPluginErr :: PluginException -> IO ()
-onPluginErr (PluginNotFound _ name) = do
-  T.hPutStr stderr $ "Stack plugin not found: " <> name
-  exitFailure
-onPluginErr (PluginExitFailure _ i) = do
-  exitWith (ExitFailure i)
-
--- TODO(danburton): improve this, although it should never happen
-pluginShouldHaveRun :: Plugin -> GlobalOpts -> IO ()
-pluginShouldHaveRun _plugin _globalOpts = do
-  fail "Plugin should have run"
 
 -- | Print out useful path information in a human-readable format (and
 -- support others later).
