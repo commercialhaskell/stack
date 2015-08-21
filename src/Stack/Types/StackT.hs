@@ -245,13 +245,13 @@ loggerFunc loc _src level msg =
   do maxLogLevel <- asks getLogLevel
      when (level >= maxLogLevel)
           (liftIO (do out <- getOutput maxLogLevel
-                      S8.hPutStrLn outputChannel (S8.pack out)))
+                      T.hPutStrLn outputChannel out))
   where outputChannel = stderr
         getOutput maxLogLevel =
           do date <- getDate
              l <- getLevel
              lc <- getLoc
-             return (date ++ l ++ S8.unpack (fromLogStr (toLogStr msg)) ++ lc)
+             return (T.pack date <> T.pack l <> T.decodeUtf8 (fromLogStr (toLogStr msg)) <> T.pack lc)
           where getDate
                   | maxLogLevel <= LevelDebug =
                     do now <- getCurrentTime

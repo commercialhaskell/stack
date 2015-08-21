@@ -33,6 +33,7 @@ import qualified Data.Text.IO as T
 import           Data.Traversable
 import           Distribution.System (buildArch)
 import           Development.GitRev (gitCommitCount)
+import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Network.HTTP.Client
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
@@ -72,7 +73,7 @@ import           System.Environment (getProgName)
 import           System.Exit
 import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
 import           System.FilePath (dropTrailingPathSeparator)
-import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn)
+import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, Handle, hGetEncoding, hSetEncoding)
 import           System.Process.Read
 
 #if WINDOWS
@@ -126,6 +127,18 @@ fixCodePage inner = do
 fixCodePage = id
 #endif
 
+-- | Change the character encoding of the given Handle to transliterate
+-- on unsupported characters instead of throwing an exception
+hSetTranslit :: Handle -> IO ()
+hSetTranslit h = do
+    menc <- hGetEncoding h
+    case fmap textEncodingName menc of
+        Just name
+          | '/' `notElem` name -> do
+              enc' <- mkTextEncoding $ name ++ "//TRANSLIT"
+              hSetEncoding h enc'
+        _ -> return ()
+
 -- | Commandline dispatcher.
 main :: IO ()
 main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
@@ -134,6 +147,8 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
      hSetBuffering stdout LineBuffering
      hSetBuffering stdin  LineBuffering
      hSetBuffering stderr NoBuffering
+     hSetTranslit stdout
+     hSetTranslit stderr
      progName <- getProgName
      isTerminal <- hIsTerminalDevice stdout
      execExtraHelp args

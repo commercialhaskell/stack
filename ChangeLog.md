@@ -2,6 +2,7 @@
 
 * Added the `--docker-env` argument, to set environment variables in Docker container.
 * Set `LC_ALL` to UTF-8 encoding for builds to avoid "commitBuffer: invalid argument" errors from GHC [#793](https://github.com/commercialhaskell/stack/issues/793)
+* Enable translitation for encoding on stdout and stderr [#824](https://github.com/commercialhaskell/stack/issues/824)
 
 ## 0.1.3.1
 
