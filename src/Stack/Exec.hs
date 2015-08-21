@@ -15,7 +15,7 @@ import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Stack.Types
 import           System.Process.Log
 
-#ifdef mingw32_HOST_OS
+#ifdef WINDOWS
 import           Control.Exception.Lifted
 import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import           System.Exit
@@ -48,7 +48,7 @@ exec envSettings cmd0 args = do
     config <- asks getConfig
     menv <- liftIO (configEnvOverride config envSettings)
     $logProcessRun cmd0 args
-#ifdef mingw32_HOST_OS
+#ifdef WINDOWS
     e <- try (callProcess Nothing menv cmd0 args)
     liftIO $ case e of
         Left (ProcessExitedUnsuccessfully _ ec) -> exitWith ec

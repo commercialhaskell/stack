@@ -61,7 +61,7 @@ import           System.Process.Run
 import           System.Process (CreateProcess(delegate_ctlc))
 import           Text.Printf (printf)
 
-#ifndef mingw32_HOST_OS
+#ifndef WINDOWS
 import           Control.Monad.Trans.Control (liftBaseWith)
 import           System.Posix.Signals
 #endif
@@ -258,7 +258,7 @@ runContainerAndExit modConfig
          ,[cmnd]
          ,args])
      before
-#ifndef mingw32_HOST_OS
+#ifndef WINDOWS
      runInBase <- liftBaseWith $ \run -> return (void . run)
      oldHandlers <- forM (concat [[(sigINT,sigTERM) | not keepStdinOpen]
                                  ,[(sigTERM,sigTERM)]]) $ \(sigIn,sigOut) -> do
@@ -276,7 +276,7 @@ runContainerAndExit modConfig
                          ,["-a" | not (dockerDetach docker)]
                          ,["-i" | keepStdinOpen]
                          ,[containerID]]))
-#ifndef mingw32_HOST_OS
+#ifndef WINDOWS
      forM_ oldHandlers $ \(sig,oldHandler) ->
        liftIO $ installHandler sig oldHandler Nothing
 #endif
