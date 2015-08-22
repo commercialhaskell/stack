@@ -4,7 +4,7 @@ helpful and concise as possible.
 
 #### Where is stack installed and will it interfere with `ghc` (etc) I already have installed?
 
-Stack itself is installed in normal system locations based on the mechanism you used (see the [[Downloads]] page). Stack installs the Stackage libraries in `~/.stack` and any project libraries or extra dependencies in a `.stack-work` directory within each project's directory. None of this should not affect any existing Haskell tools at all.
+Stack itself is installed in normal system locations based on the mechanism you used (see the [[Downloads]] page). Stack installs the Stackage libraries in `~/.stack` and any project libraries or extra dependencies in a `.stack-work` directory within each project's directory. None of this should affect any existing Haskell tools at all.
 
 #### What is the relationship between stack and cabal?
 
