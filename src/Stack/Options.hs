@@ -243,7 +243,7 @@ configOptsParser docker =
     <*> optional (strOption
             ( long "ghc-variant"
            <> metavar "VARIANT"
-           <> help "Specialized GHC variant, e.g. integersimple"
+           <> help "Specialized GHC variant, e.g. integersimple (implies --no-system-ghc)"
             ))
     <*> optional (option auto
             ( long "jobs"

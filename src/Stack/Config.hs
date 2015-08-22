@@ -126,7 +126,9 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
                 }]
             configMonoidPackageIndices
 
-         configSystemGHC = fromMaybe True configMonoidSystemGHC
+         configGHCVariant0 = fmap parseGHCVariant configMonoidGHCVariant
+
+         configSystemGHC = fromMaybe (isNothing configGHCVariant0) configMonoidSystemGHC
          configInstallGHC = fromMaybe False configMonoidInstallGHC
          configSkipGHCCheck = fromMaybe False configMonoidSkipGHCCheck
          configSkipMsys = fromMaybe False configMonoidSkipMsys
@@ -142,8 +144,6 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
          os = fromMaybe defOS
             $ configMonoidOS >>= Distribution.Text.simpleParse
          configPlatform = Platform arch os
-
-         configGHCVariant0 = fmap parseGHCVariant configMonoidGHCVariant
 
          configRequireStackVersion = simplifyVersionRange configMonoidRequireStackVersion
 
