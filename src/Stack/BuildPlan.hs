@@ -429,7 +429,7 @@ instance FromJSON Snapshots where
 
 -- | Load up a 'MiniBuildPlan', preferably from cache
 loadMiniBuildPlan
-    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m, MonadCatch m)
     => SnapName
     -> m MiniBuildPlan
 loadMiniBuildPlan name = do
@@ -587,7 +587,7 @@ instance Monoid DepError where
 
 -- | Find a snapshot and set of flags that is compatible with the given
 -- 'GenericPackageDescription'. Returns 'Nothing' if no such snapshot is found.
-findBuildPlan :: (MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m)
+findBuildPlan :: (MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m)
               => [GenericPackageDescription]
               -> [SnapName]
               -> m (Maybe (SnapName, Map PackageName (Map FlagName Bool)))

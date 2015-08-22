@@ -65,8 +65,6 @@ data Config =
          ,configDocker              :: !DockerOpts
          ,configEnvOverride         :: !(EnvSettings -> IO EnvOverride)
          -- ^ Environment variables to be passed to external tools
-         ,configLocalPrograms       :: !(Path Abs Dir)
-         -- ^ Path containing local installations (mainly GHC)
          ,configConnectionCount     :: !Int
          -- ^ How many concurrent connections are allowed when downloading
          ,configHideTHLoading       :: !Bool
@@ -74,8 +72,10 @@ data Config =
          -- console
          ,configPlatform            :: !Platform
          -- ^ The platform we're building for, used in many directory names
-         ,configGHCVariant          :: !GHCVariant
-         -- ^ The variant of GHC we're using
+         ,configGHCVariant0         :: !(Maybe GHCVariant)
+         -- ^ The variant of GHC requested by the user.
+         -- In most cases, use 'BuildConfig' or 'MiniConfig's version instead,
+         -- which will have an auto-detected default.
          ,configLatestSnapshotUrl   :: !Text
          -- ^ URL for a JSON file containing information on the latest
          -- snapshots available.
@@ -263,6 +263,10 @@ data BuildConfig = BuildConfig
     , bcImplicitGlobal :: !Bool
       -- ^ Are we loading from the implicit global stack.yaml? This is useful
       -- for providing better error messages.
+    , bcGHCVariant :: !GHCVariant
+      -- ^ The variant of GHC used to select a GHC bindist.
+    , bcLocalPrograms :: !(Path Abs Dir)
+      -- ^ Path containing local installations (mainly GHC)
     }
 
 -- | Directory containing the project's stack.yaml file
@@ -284,8 +288,9 @@ instance HasBuildConfig EnvConfig where
 instance HasConfig EnvConfig
 instance HasPlatform EnvConfig
 instance HasGHCVariant EnvConfig
+instance HasLocalPrograms EnvConfig
 instance HasStackRoot EnvConfig
-class HasBuildConfig r => HasEnvConfig r where
+class (HasBuildConfig r, HasGHCVariant r) => HasEnvConfig r where
     getEnvConfig :: r -> EnvConfig
 instance HasEnvConfig EnvConfig where
     getEnvConfig = id
@@ -462,21 +467,27 @@ instance HasPlatform Platform where
 -- | Class for environment values which have a GHCVariant
 class HasGHCVariant env where
     getGHCVariant :: env -> GHCVariant
-    default getGHCVariant :: HasConfig env => env -> GHCVariant
-    getGHCVariant = configGHCVariant . getConfig
+    default getGHCVariant :: HasBuildConfig env => env -> GHCVariant
+    getGHCVariant = bcGHCVariant . getBuildConfig
     {-# INLINE getGHCVariant #-}
 instance HasGHCVariant GHCVariant where
     getGHCVariant = id
 
+-- | Class for environment values which have a local programs path.
+class HasLocalPrograms env where
+    getLocalPrograms :: env -> Path Abs Dir
+    default getLocalPrograms :: HasBuildConfig env => env -> Path Abs Dir
+    getLocalPrograms = bcLocalPrograms . getBuildConfig
+    {-# INLINE getLocalPrograms #-}
+
 -- | Class for environment values that can provide a 'Config'.
-class (HasStackRoot env, HasPlatform env, HasGHCVariant env) => HasConfig env where
+class (HasStackRoot env, HasPlatform env) => HasConfig env where
     getConfig :: env -> Config
     default getConfig :: HasBuildConfig env => env -> Config
     getConfig = bcConfig . getBuildConfig
     {-# INLINE getConfig #-}
 instance HasStackRoot Config
 instance HasPlatform Config
-instance HasGHCVariant Config
 instance HasConfig Config where
     getConfig = id
     {-# INLINE getConfig #-}
@@ -487,6 +498,7 @@ class HasConfig env => HasBuildConfig env where
 instance HasStackRoot BuildConfig
 instance HasPlatform BuildConfig
 instance HasGHCVariant BuildConfig
+instance HasLocalPrograms BuildConfig
 instance HasConfig BuildConfig
 instance HasBuildConfig BuildConfig where
     getBuildConfig = id
@@ -811,7 +823,7 @@ configLocalUnpackDir :: (MonadReader env m, HasBuildConfig env) => m (Path Abs D
 configLocalUnpackDir = liftM (</> $(mkRelDir "unpacked")) configProjectWorkDir
 
 -- | Directory containing snapshots
-snapshotsDir :: (MonadReader env m, HasConfig env, MonadThrow m) => m (Path Abs Dir)
+snapshotsDir :: (MonadReader env m, HasConfig env, HasGHCVariant env, MonadThrow m) => m (Path Abs Dir)
 snapshotsDir = do
     config <- asks getConfig
     platform <- platformRelDir
@@ -861,7 +873,7 @@ flagCacheLocal = do
     return $ root </> $(mkRelDir "flag-cache")
 
 -- | Where to store mini build plan caches
-configMiniBuildPlanCache :: (MonadThrow m, MonadReader env m, HasConfig env)
+configMiniBuildPlanCache :: (MonadThrow m, MonadReader env m, HasConfig env, HasGHCVariant env)
                          => SnapName
                          -> m (Path Abs File)
 configMiniBuildPlanCache name = do

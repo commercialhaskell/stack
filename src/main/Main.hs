@@ -16,7 +16,7 @@ import           Control.Monad hiding (mapM, forM)
 import qualified Control.Monad.Catch as Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (ask, asks)
+import           Control.Monad.Reader (ask, asks, runReaderT)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Attoparsec.Args (withInterpreterArgs)
 import qualified Data.ByteString.Lazy as L
@@ -432,7 +432,7 @@ paths =
     , ( "Installed GHCs (unpacked and archives)"
       , "ghc-paths"
       , \pi ->
-             T.pack (toFilePathNoTrailing (configLocalPrograms (bcConfig (piBuildConfig pi)))))
+             T.pack (toFilePathNoTrailing (bcLocalPrograms (piBuildConfig pi))))
     , ( "Local bin path where stack installs executables"
       , "local-bin-path"
       , \pi ->
@@ -522,7 +522,8 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                                  , configCompilerCheck (lcConfig lc)
                                  , Just $ bcStackYaml bc
                                  )
-              mpaths <- runStackTGlobal manager (lcConfig lc) go $
+              miniConfig <- loadMiniConfig (lcConfig lc)
+              mpaths <- runStackTGlobal manager miniConfig go $
                   ensureGHC SetupOpts
                   { soptsInstallIfMissing = True
                   , soptsUseSystem =
@@ -879,14 +880,18 @@ initCmd :: InitOpts -> GlobalOpts -> IO ()
 initCmd initOpts go =
     withConfigAndLock go $
     do pwd <- getWorkingDir
-       initProject pwd initOpts
+       config <- asks getConfig
+       miniConfig <- loadMiniConfig config
+       runReaderT (initProject pwd initOpts) miniConfig
 
 -- | Create a project directory structure and initialize the stack config.
 newCmd :: (NewOpts,InitOpts) -> GlobalOpts -> IO ()
 newCmd (newOpts,initOpts) go@GlobalOpts{..} =
     withConfigAndLock go $
     do dir <- new newOpts
-       initProject dir initOpts
+       config <- asks getConfig
+       miniConfig <- loadMiniConfig config
+       runReaderT (initProject dir initOpts) miniConfig
 
 -- | List the available templates.
 templatesCmd :: () -> GlobalOpts -> IO ()

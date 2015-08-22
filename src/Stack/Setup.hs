@@ -137,7 +137,7 @@ instance Show SetupException where
         ]
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
-setupEnv :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasBuildConfig env, HasHttpManager env, MonadBaseControl IO m)
+setupEnv :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasBuildConfig env, HasHttpManager env, HasGHCVariant env, HasLocalPrograms env, MonadBaseControl IO m)
          => Maybe Text -- ^ Message to give user when necessary GHC is not available
          -> m EnvConfig
 setupEnv mResolveMissingGHC = do
@@ -251,7 +251,7 @@ setupEnv mResolveMissingGHC = do
         }
 
 -- | Ensure GHC is installed and provide the PATHs to add if necessary
-ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, HasPlatform env, HasGHCVariant env, HasLocalPrograms env, MonadBaseControl IO m)
           => SetupOpts
           -> m (Maybe [FilePath])
 ensureGHC sopts = do
@@ -288,8 +288,7 @@ ensureGHC sopts = do
         then do
             getSetupInfo' <- runOnce (getSetupInfo =<< asks getHttpManager)
 
-            config <- asks getConfig
-            installed <- runReaderT listInstalled config
+            installed <- listInstalled
 
             -- Install GHC
             ghcIdent <- case getInstalledTool installed $(mkPackageName "ghc") (isWanted . GhcVersion) of
@@ -310,7 +309,8 @@ ensureGHC sopts = do
                                 $ soptsResolveMissingGHC sopts)
 
             -- Install git on windows, if necessary
-            mgitIdent <- case configPlatform config of
+            platform <- asks getPlatform
+            mgitIdent <- case platform of
                 Platform _ Cabal.Windows | not (soptsSkipMsys sopts) ->
                     case getInstalledTool installed $(mkPackageName "git") (const True) of
                         Just ident -> return (Just ident)
@@ -325,7 +325,7 @@ ensureGHC sopts = do
                 _ -> return Nothing
 
             let idents = catMaybes [Just ghcIdent, mgitIdent]
-            paths <- runReaderT (mapM binDirs idents) config
+            paths <- mapM binDirs idents
             return $ Just $ map toFilePathNoTrailingSlash $ concat paths
         else return Nothing
 
@@ -498,26 +498,26 @@ getSetupInfo manager = do
   where
     req = "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/stack-setup-2.yaml"
 
-markInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
+markInstalled :: (MonadIO m, MonadReader env m, HasLocalPrograms env, MonadThrow m)
               => PackageIdentifier -- ^ e.g., ghc-7.8.4, git-2.4.0.1
               -> m ()
 markInstalled ident = do
-    dir <- asks $ configLocalPrograms . getConfig
+    dir <- asks getLocalPrograms
     fpRel <- parseRelFile $ packageIdentifierString ident ++ ".installed"
     liftIO $ writeFile (toFilePath $ dir </> fpRel) "installed"
 
-unmarkInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
+unmarkInstalled :: (MonadIO m, MonadReader env m, HasLocalPrograms env, MonadThrow m)
                 => PackageIdentifier
                 -> m ()
 unmarkInstalled ident = do
-    dir <- asks $ configLocalPrograms . getConfig
+    dir <- asks getLocalPrograms
     fpRel <- parseRelFile $ packageIdentifierString ident ++ ".installed"
     removeFileIfExists $ dir </> fpRel
 
-listInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
+listInstalled :: (MonadIO m, MonadReader env m, HasLocalPrograms env, MonadThrow m)
               => m [PackageIdentifier]
 listInstalled = do
-    dir <- asks $ configLocalPrograms . getConfig
+    dir <- asks getLocalPrograms
     createTree dir
     (_, files) <- listDirectory dir
     return $ mapMaybe toIdent files
@@ -526,22 +526,22 @@ listInstalled = do
         x <- T.stripSuffix ".installed" $ T.pack $ toFilePath $ filename fp
         parsePackageIdentifierFromString $ T.unpack x
 
-installDir :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
+installDir :: (MonadReader env m, HasLocalPrograms env, MonadThrow m, MonadLogger m)
            => PackageIdentifier
            -> m (Path Abs Dir)
 installDir ident = do
-    config <- asks getConfig
+    localPrograms <- asks getLocalPrograms
     reldir <- parseRelDir $ packageIdentifierString ident
-    return $ configLocalPrograms config </> reldir
+    return $ localPrograms </> reldir
 
 -- | Binary directories for the given installed package
-binDirs :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
+binDirs :: (MonadReader env m, HasPlatform env, HasLocalPrograms env, MonadThrow m, MonadLogger m)
         => PackageIdentifier
         -> m [Path Abs Dir]
 binDirs ident = do
-    config <- asks getConfig
+    platform <- asks getPlatform
     dir <- installDir ident
-    case (configPlatform config, packageNameString $ packageIdentifierName ident) of
+    case (platform, packageNameString $ packageIdentifierName ident) of
         (Platform _ Cabal.Windows, "ghc") -> return
             [ dir </> $(mkRelDir "bin")
             , dir </> $(mkRelDir "mingw") </> $(mkRelDir "bin")
@@ -571,7 +571,7 @@ getInstalledTool installed name goodVersion =
         packageIdentifierName pi' == name &&
         goodVersion (packageIdentifierVersion pi')
 
-downloadAndInstallTool :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+downloadAndInstallTool :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasLocalPrograms env, HasHttpManager env, MonadBaseControl IO m)
                        => SetupInfo
                        -> DownloadInfo
                        -> PackageName
@@ -587,7 +587,7 @@ downloadAndInstallTool si downloadInfo name version installer = do
     markInstalled ident
     return ident
 
-downloadAndInstallGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+downloadAndInstallGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasPlatform env, HasGHCVariant env, HasLocalPrograms env, HasHttpManager env, MonadBaseControl IO m)
            => SetupInfo
            -> CompilerVersion
            -> VersionCheck
@@ -606,14 +606,14 @@ downloadAndInstallGHC si wanted versionCheck = do
         case mpair of
             Just pair -> return pair
             Nothing -> throwM $ UnknownCompilerVersion osKey wanted (Map.keysSet pairs)
-    platform <- asks $ configPlatform . getConfig
+    platform <- asks getPlatform
     let installer =
             case platform of
                 Platform _ Cabal.Windows -> installGHCWindows
                 _ -> installGHCPosix
     downloadAndInstallTool si downloadInfo $(mkPackageName "ghc") selectedVersion installer
 
-getOSKey :: (MonadReader env m, MonadThrow m, HasConfig env, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
+getOSKey :: (MonadReader env m, MonadThrow m, HasPlatform env, HasGHCVariant env, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
          => m Text
 getOSKey = do
     platform <- asks getPlatform
@@ -636,12 +636,12 @@ getOSKey = do
 
         (Platform arch os, _) -> throwM $ UnsupportedSetupCombo os arch ghcVariant
 
-downloadFromInfo :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+downloadFromInfo :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasLocalPrograms env, HasHttpManager env, MonadBaseControl IO m)
              => DownloadInfo
              -> PackageIdentifier
              -> m (Path Abs File, ArchiveType)
 downloadFromInfo downloadInfo ident = do
-    config <- asks getConfig
+    localPrograms <- asks getLocalPrograms
     at <-
         case extension of
             ".tar.xz" -> return TarXz
@@ -649,7 +649,7 @@ downloadFromInfo downloadInfo ident = do
             ".7z.exe" -> return SevenZ
             _ -> error $ "Unknown extension: " ++ extension
     relfile <- parseRelFile $ packageIdentifierString ident ++ extension
-    let path = configLocalPrograms config </> relfile
+    let path = localPrograms </> relfile
     chattyDownload (packageIdentifierText ident) downloadInfo path
     return (path, at)
   where
@@ -746,7 +746,7 @@ instance Alternative CheckDependency where
             Left _ -> y menv
             Right x' -> return $ Right x'
 
-installGHCWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+installGHCWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasHttpManager env, HasLocalPrograms env, MonadBaseControl IO m)
                   => SetupInfo
                   -> Path Abs File
                   -> ArchiveType
@@ -764,8 +764,7 @@ installGHCWindows si archiveFile archiveType destDir _ = do
             Nothing -> error $ "Invalid GHC filename: " ++ show archiveFile
             Just x -> parseAbsFile $ T.unpack x
 
-    config <- asks getConfig
-    run7z <- setup7z si config
+    run7z <- setup7z si
 
     run7z (parent archiveFile) archiveFile
     run7z (parent archiveFile) tarFile
@@ -779,7 +778,7 @@ installGHCWindows si archiveFile archiveType destDir _ = do
 
     $logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
 
-installGitWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+installGitWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasHttpManager env, HasLocalPrograms env, MonadBaseControl IO m)
                   => SetupInfo
                   -> Path Abs File
                   -> ArchiveType
@@ -791,18 +790,19 @@ installGitWindows si archiveFile archiveType destDir _ = do
         SevenZ -> return ()
         _ -> error $ "Git on Windows must be a 7z archive"
 
-    config <- asks getConfig
-    run7z <- setup7z si config
+    run7z <- setup7z si
     run7z destDir archiveFile
 
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
 -- Returned function takes an unpack directory and archive.
-setup7z :: (MonadReader env m, HasHttpManager env, MonadThrow m, MonadIO m, MonadIO n, MonadLogger m, MonadBaseControl IO m)
+setup7z :: (MonadReader env m, HasHttpManager env, HasLocalPrograms env, MonadThrow m, MonadIO m, MonadIO n, MonadLogger m, MonadBaseControl IO m)
         => SetupInfo
-        -> Config
         -> m (Path Abs Dir -> Path Abs File -> n ())
-setup7z si config = do
+setup7z si = do
+    dir <- asks getLocalPrograms
+    let exe = dir </> $(mkRelFile "7z.exe")
+        dll = dir </> $(mkRelFile "7z.dll")
     chattyDownload "7z.dll" (siSevenzDll si) dll
     chattyDownload "7z.exe" (siSevenzExe si) exe
     return $ \outdir archive -> liftIO $ do
@@ -814,10 +814,6 @@ setup7z si config = do
             ]
         when (ec /= ExitSuccess)
             $ error $ "Problem while decompressing " ++ toFilePath archive
-  where
-    dir = configLocalPrograms config </> $(mkRelDir "7z")
-    exe = dir </> $(mkRelFile "7z.exe")
-    dll = dir </> $(mkRelFile "7z.dll")
 
 chattyDownload :: (MonadReader env m, HasHttpManager env, MonadIO m, MonadLogger m, MonadThrow m, MonadBaseControl IO m)
                => Text          -- ^ label
