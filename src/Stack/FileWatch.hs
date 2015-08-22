@@ -19,6 +19,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.String (fromString)
 import Data.Traversable (forM)
+import Ignore
 import Path
 import System.FSNotify
 import System.IO (stderr)
@@ -32,11 +33,20 @@ printExceptionStderr e =
 --
 -- The action provided takes a callback that is used to set the files to be
 -- watched. When any of those files are changed, we rerun the action again.
-fileWatch :: ((Set (Path Abs File) -> IO ()) -> IO ())
+fileWatch :: IO (Path Abs Dir)
+          -> ((Set (Path Abs File) -> IO ()) -> IO ())
           -> IO ()
-fileWatch inner = withManager $ \manager -> do
+fileWatch getProjectRoot inner = withManager $ \manager -> do
     dirtyVar <- newTVarIO True
     watchVar <- newTVarIO Map.empty
+    projRoot <- getProjectRoot
+    mChecker <- findIgnoreFiles [VCSGit, VCSMercurial, VCSDarcs] projRoot >>= buildChecker
+    (FileIgnoredChecker isFileIgnored) <-
+        case mChecker of
+          Left err ->
+              do putStrLn $ "Failed to parse VCS's ignore file: " ++ err
+                 return $ FileIgnoredChecker (const False)
+          Right chk -> return chk
 
     let onChange = atomically $ writeTVar dirtyVar True
 
@@ -67,7 +77,7 @@ fileWatch inner = withManager $ \manager -> do
                 return Nothing
             startListening = Map.mapWithKey $ \dir () -> do
                 let dir' = fromString $ toFilePath dir
-                listen <- watchDir manager dir' (const True) (const onChange)
+                listen <- watchDir manager dir' (not . isFileIgnored . eventPath) (const onChange)
                 return $ Just listen
 
     let watchInput = do
