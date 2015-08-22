@@ -325,7 +325,12 @@ dockerOptsParser showOptions =
                            hide <>
                            metavar "(PATH | HOST-PATH:CONTAINER-PATH)" <>
                            help ("Mount volumes from host in container " ++
-                                 "(may specify mutliple times)")))
+                                 "(may specify multiple times)")))
+    <*> many (option str (long (dockerOptName dockerEnvArgName) <>
+                                hide <>
+                                metavar "NAME=VALUE" <>
+                                help ("Set environment variable in container " ++
+                                      "(may specify multiple times)")))
     <*> maybeStrOption (long (dockerOptName dockerDatabasePathArgName) <>
                         hide <>
                         metavar "PATH" <>
@@ -466,6 +471,7 @@ execOptsParser mcmd =
                 "stack-exe"
                 "setting the STACK_EXE environment variable to the path for the stack executable"
                 idm
+        <*> pure False
 
     eoPackagesParser :: Parser [String]
     eoPackagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))

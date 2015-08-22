@@ -119,7 +119,22 @@ loadSourceMap needTargets bopts = do
 
         -- Overwrite any flag settings with those from the config file
         extraDeps3 = Map.mapWithKey
-            (\n (v, f) -> PSUpstream v Local $ fromMaybe f $ Map.lookup n $ bcFlags bconfig)
+            (\n (v, f) -> PSUpstream v Local $
+                case ( Map.lookup (Just n) $ boptsFlags bopts
+                     , Map.lookup Nothing $ boptsFlags bopts
+                     , Map.lookup n $ bcFlags bconfig
+                     ) of
+                    -- Didn't have any flag overrides, fall back to the flags
+                    -- defined in the snapshot.
+                    (Nothing, Nothing, Nothing) -> f
+                    -- Either command line flag for this package, general
+                    -- command line flag, or flag in stack.yaml is defined.
+                    -- Take all of those and ignore the snapshot flags.
+                    (x, y, z) -> Map.unions
+                        [ fromMaybe Map.empty x
+                        , fromMaybe Map.empty y
+                        , fromMaybe Map.empty z
+                        ])
             extraDeps2
 
     let sourceMap = Map.unions
@@ -287,6 +302,15 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
             { packageConfigEnableTests = not $ Set.null tests
             , packageConfigEnableBenchmarks = not $ Set.null benches
             }
+        testconfig = config
+            { packageConfigEnableTests = True
+            , packageConfigEnableBenchmarks = False
+            }
+        benchconfig = config
+            { packageConfigEnableTests = False
+            , packageConfigEnableBenchmarks = True
+            }
+
         btpkg
             | Set.null tests && Set.null benches = Nothing
             | otherwise = Just $ LocalPackageTB
@@ -294,6 +318,8 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
                 , lptbTests = tests
                 , lptbBenches = benches
                 }
+        testpkg = resolvePackage testconfig gpkg
+        benchpkg = resolvePackage benchconfig gpkg
     mbuildCache <- tryGetBuildCache $ lpvRoot lpv
     (_,modFiles,otherFiles,mainFiles,extraFiles) <- getPackageFiles (packageFiles pkg) (lpvCabalFP lpv)
     let files =
@@ -307,6 +333,8 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
 
     return LocalPackage
         { lpPackage = pkg
+        , lpTestDeps = packageDeps $ testpkg
+        , lpBenchDeps = packageDeps $ benchpkg
         , lpExeComponents =
             case mtarget of
                 Nothing -> Nothing

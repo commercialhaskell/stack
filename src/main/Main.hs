@@ -22,7 +22,6 @@ import           Data.Attoparsec.Args (withInterpreterArgs)
 import qualified Data.ByteString.Lazy as L
 import           Data.IORef
 import           Data.List
-import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
 import           Data.Maybe
@@ -32,7 +31,9 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Data.Traversable
+import           Distribution.System (buildArch)
 import           Development.GitRev (gitCommitCount)
+import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Network.HTTP.Client
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
@@ -41,7 +42,6 @@ import           Options.Applicative.Types (readerAsk)
 import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
-import           Plugins
 import           Prelude hiding (pi, mapM)
 import           Stack.Build
 import           Stack.Types.Build
@@ -69,22 +69,22 @@ import           Stack.Types.StackT
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import           System.Directory (canonicalizePath, doesFileExist, doesDirectoryExist, createDirectoryIfMissing)
-import           System.Environment (getArgs, getProgName)
+import           System.Environment (getProgName)
 import           System.Exit
 import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
 import           System.FilePath (dropTrailingPathSeparator)
-import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..))
+import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, Handle, hGetEncoding, hSetEncoding)
 import           System.Process.Read
 
-#if WINDOWS
+#ifdef WINDOWS
 import System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
-import System.IO (hSetEncoding, utf8)
+import System.IO (utf8)
 #endif
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738
 fixCodePage :: (MonadIO m, Catch.MonadMask m, MonadLogger m) => m a -> m a
-#if WINDOWS
+#ifdef WINDOWS
 fixCodePage inner = do
     origCPI <- liftIO getConsoleCP
     origCPO <- liftIO getConsoleOutputCP
@@ -127,6 +127,18 @@ fixCodePage inner = do
 fixCodePage = id
 #endif
 
+-- | Change the character encoding of the given Handle to transliterate
+-- on unsupported characters instead of throwing an exception
+hSetTranslit :: Handle -> IO ()
+hSetTranslit h = do
+    menc <- hGetEncoding h
+    case fmap textEncodingName menc of
+        Just name
+          | '/' `notElem` name -> do
+              enc' <- mkTextEncoding $ name ++ "//TRANSLIT"
+              hSetEncoding h enc'
+        _ -> return ()
+
 -- | Commandline dispatcher.
 main :: IO ()
 main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
@@ -135,9 +147,8 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
      hSetBuffering stdout LineBuffering
      hSetBuffering stdin  LineBuffering
      hSetBuffering stderr NoBuffering
-     when False $ do -- https://github.com/commercialhaskell/stack/issues/322
-       plugins <- findPlugins (T.pack stackProgName)
-       tryRunPlugin plugins
+     hSetTranslit stdout
+     hSetTranslit stderr
      progName <- getProgName
      isTerminal <- hIsTerminalDevice stdout
      execExtraHelp args
@@ -149,6 +160,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
               -- Leave out number of commits for --depth=1 clone
               -- See https://github.com/commercialhaskell/stack/issues/792
             , [" (" ++ $gitCommitCount ++ " commits)" | $gitCommitCount /= ("1"::String)]
+            , [" ", show buildArch]
             ]
      eGlobalRun <- try $
        simpleOptions
@@ -319,11 +331,10 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                 "Build a Docker image for the project"
                 imgDockerCmd
                 (pure ())))
-             -- commandsFromPlugins plugins pluginShouldHaveRun) https://github.com/commercialhaskell/stack/issues/322
      case eGlobalRun of
        Left (exitCode :: ExitCode) -> do
          when isInterpreter $
-           putStrLn $ concat
+           hPutStrLn stderr $ concat
              [ "\nIf you are trying to use "
              , stackProgName
              , " as a script interpreter, a\n'-- "
@@ -332,7 +343,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
              , "\nSee https://github.com/commercialhaskell/stack/wiki/Script-interpreter" ]
          throwIO exitCode
        Right (global,run) -> do
-         when (globalLogLevel global == LevelDebug) $ putStrLn versionString'
+         when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
          run global `catch` \e -> do
             -- This special handler stops "stack: " from being printed before the
             -- exception
@@ -343,29 +354,6 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                     exitFailure
   where
     dockerHelpOptName = Docker.dockerCmdName ++ "-help"
-
--- Try to run a plugin
-tryRunPlugin :: Plugins -> IO ()
-tryRunPlugin plugins = do
-  args <- getArgs
-  case dropWhile (List.isPrefixOf "-") args of
-    ((T.pack -> name):args')
-      | isJust (lookupPlugin plugins name) -> do
-          callPlugin plugins name args' `catch` onPluginErr
-          exitSuccess
-    _ -> return ()
--- TODO(danburton): use logger
-onPluginErr :: PluginException -> IO ()
-onPluginErr (PluginNotFound _ name) = do
-  T.hPutStr stderr $ "Stack plugin not found: " <> name
-  exitFailure
-onPluginErr (PluginExitFailure _ i) = do
-  exitWith (ExitFailure i)
-
--- TODO(danburton): improve this, although it should never happen
-pluginShouldHaveRun :: Plugin -> GlobalOpts -> IO ()
-pluginShouldHaveRun _plugin _globalOpts = do
-  fail "Plugin should have run"
 
 -- | Print out useful path information in a human-readable format (and
 -- support others later).
@@ -583,12 +571,12 @@ withUserFileLock dir act = do
                 case fstTry of
                   Just lk -> EL.finally (act lk) (liftIO $ unlockFile lk)
                   Nothing ->
-                    do liftIO $ putStrLn $ "Failed to grab lock ("++show pth++
+                    do liftIO $ hPutStrLn stderr $ "Failed to grab lock ("++show pth++
                                            "); other stack instance running.  Waiting..."
                        EL.bracket (liftIO $ lockFile (toFilePath pth) Exclusive)
                                   (liftIO . unlockFile)
                                   (\lk -> do
-                                    liftIO $ putStrLn "Lock acquired, proceeding."
+                                    liftIO $ hPutStrLn stderr "Lock acquired, proceeding."
                                     act lk))
 
 withConfigAndLock :: GlobalOpts
@@ -861,11 +849,12 @@ imgDockerCmd () go@GlobalOpts{..} = do
         go
         Nothing
         (\lk ->
-         do Stack.Build.build
-                (const (return ()))
-                (Just lk)
-                defaultBuildOpts
-            Image.stageContainerImageArtifacts)
+              do globalFixCodePage go $
+                     Stack.Build.build
+                         (const (return ()))
+                         (Just lk)
+                         defaultBuildOpts
+                 Image.stageContainerImageArtifacts)
         (Just Image.createContainerImageFromStage)
 
 -- | Load the configuration with a manager. Convenience function used

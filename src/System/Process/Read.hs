@@ -61,7 +61,7 @@ import qualified Data.Text.Lazy as LT
 import           Data.Typeable (Typeable)
 import           Distribution.System (OS (Windows), Platform (Platform))
 import           Path (Path, Abs, Dir, toFilePath, File, parseAbsFile)
-import           Path.IO (createTree)
+import           Path.IO (createTree, parseRelAsAbsFile)
 import           Prelude -- Fix AMP warning
 import           System.Directory (doesFileExist, getCurrentDirectory)
 import           System.Environment (getEnvironment)
@@ -181,6 +181,7 @@ data ReadProcessException
     = ReadProcessException CreateProcess ExitCode L.ByteString L.ByteString
     | NoPathFound
     | ExecutableNotFound String [FilePath]
+    | ExecutableNotFoundAt FilePath
     deriving Typeable
 instance Show ReadProcessException where
     show (ReadProcessException cp ec out err) = concat
@@ -206,6 +207,8 @@ instance Show ReadProcessException where
         , " not found on path: "
         , show path
         ]
+    show (ExecutableNotFoundAt name) =
+        "Did not find executable at specified path: " ++ name
 instance Exception ReadProcessException
 
 -- | Consume the stdout of a process feeding strict 'S.ByteString's to a consumer.
@@ -269,11 +272,7 @@ sinkProcessStderrStdout wd menv name args sinkStderr sinkStdout = do
 -- executable path.
 preProcess :: (MonadIO m) => Maybe (Path Abs Dir) -> EnvOverride -> String -> m FilePath
 preProcess wd menv name = do
-  exists <- liftIO $ doesFileExist name
-  name' <-
-    if exists
-       then return name
-       else liftIO $ liftM toFilePath $ join $ findExecutable menv name
+  name' <- liftIO $ liftM toFilePath $ join $ findExecutable menv name
   maybe (return ()) createTree wd
   return name'
 
@@ -294,6 +293,13 @@ makeAbsolute = fmap FP.normalise . absolutize
 
 -- | Find the complete path for the executable
 findExecutable :: (MonadIO m, MonadThrow n) => EnvOverride -> String -> m (n (Path Abs File))
+findExecutable _ name | any FP.isPathSeparator name = do
+    exists <- liftIO $ doesFileExist name
+    if exists
+        then do
+            path <- liftIO $ parseRelAsAbsFile name
+            return $ return path
+        else return $ throwM $ ExecutableNotFoundAt name
 findExecutable eo name = liftIO $ do
     m <- readIORef $ eoExeCache eo
     epath <- case Map.lookup name m of

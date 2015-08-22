@@ -96,9 +96,17 @@ fileWatch inner = withManager $ \manager -> do
         atomically $ do
             dirty <- readTVar dirtyVar
             check dirty
-            writeTVar dirtyVar False
 
         eres <- tryAny $ inner setWatched
+
+        -- Clear dirtiness flag after the build to avoid an infinite
+        -- loop caused by the build itself triggering dirtiness. This
+        -- could be viewed as a bug, since files changed during the
+        -- build will not trigger an extra rebuild, but overall seems
+        -- like better behavior. See
+        -- https://github.com/commercialhaskell/stack/issues/822
+        atomically $ writeTVar dirtyVar False
+
         case eres of
             Left e -> printExceptionStderr e
             Right () -> putStrLn "Success! Waiting for next file change."

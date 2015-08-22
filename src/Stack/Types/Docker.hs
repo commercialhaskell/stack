@@ -36,6 +36,8 @@ data DockerOpts = DockerOpts
     -- ^ Arguments to pass directly to @docker run@.
   ,dockerMount :: ![Mount]
     -- ^ Volumes to mount in the container.
+  ,dockerEnv :: ![String]
+    -- ^ Environment variables to set in the container.
   ,dockerDatabasePath :: !(Path Abs File)
     -- ^ Location of image usage database.
   }
@@ -70,6 +72,8 @@ data DockerOptsMonoid = DockerOptsMonoid
     -- ^ Arguments to pass directly to @docker run@
   ,dockerMonoidMount :: ![Mount]
     -- ^ Volumes to mount in the container
+  ,dockerMonoidEnv :: ![String]
+    -- ^ Environment variables to set in the container
   ,dockerMonoidDatabasePath :: !(Maybe String)
     -- ^ Location of image usage database.
   }
@@ -92,6 +96,7 @@ instance FromJSON (DockerOptsMonoid, [JSONWarning]) where
               dockerMonoidContainerName    <- o ..:? dockerContainerNameArgName
               dockerMonoidRunArgs          <- o ..:? dockerRunArgsArgName ..!= []
               dockerMonoidMount            <- o ..:? dockerMountArgName ..!= []
+              dockerMonoidEnv              <- o ..:? dockerEnvArgName ..!= []
               dockerMonoidDatabasePath     <- o ..:? dockerDatabasePathArgName
               return DockerOptsMonoid{..})
 
@@ -110,6 +115,7 @@ instance Monoid DockerOptsMonoid where
     ,dockerMonoidContainerName    = Nothing
     ,dockerMonoidRunArgs          = []
     ,dockerMonoidMount            = []
+    ,dockerMonoidEnv              = []
     ,dockerMonoidDatabasePath     = Nothing
     }
   mappend l r = DockerOptsMonoid
@@ -125,6 +131,7 @@ instance Monoid DockerOptsMonoid where
     ,dockerMonoidContainerName    = dockerMonoidContainerName l <|> dockerMonoidContainerName r
     ,dockerMonoidRunArgs          = dockerMonoidRunArgs r <> dockerMonoidRunArgs l
     ,dockerMonoidMount            = dockerMonoidMount r <> dockerMonoidMount l
+    ,dockerMonoidEnv              = dockerMonoidEnv r <> dockerMonoidEnv l
     ,dockerMonoidDatabasePath     = dockerMonoidDatabasePath l <|> dockerMonoidDatabasePath r
     }
 
@@ -194,6 +201,10 @@ dockerRunArgsArgName = "run-args"
 -- | Docker mount argument name.
 dockerMountArgName :: Text
 dockerMountArgName = "mount"
+
+-- | Docker environment variable argument name.
+dockerEnvArgName :: Text
+dockerEnvArgName = "env"
 
 -- | Docker container name argument name.
 dockerContainerNameArgName :: Text

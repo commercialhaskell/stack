@@ -133,20 +133,13 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
 
     econfig <- asks getEnvConfig
     let onWanted lp = do
-            {-
-             - Arguably this is the right thing to do. However, forcing the
-             - library to rebuild causes the cabal_macros.h file to change,
-             - which makes GHC rebuild everything...
-
             case lpExeComponents lp of
                 Nothing -> return ()
-                Just _ -> void $ addDep $ packageName $ lpPackage lp
-            -}
+                Just _ -> void $ addDep False $ packageName $ lpPackage lp
 
             case lpTestBench lp of
                 Just tb -> addFinal lp tb
-                -- See comment above
-                Nothing -> void $ addDep False $ packageName $ lpPackage lp
+                Nothing -> return ()
     let inner = do
             mapM_ onWanted $ filter lpWanted locals
             mapM_ (addDep False) $ Set.toList extraToBuild0
@@ -446,7 +439,7 @@ checkDirtiness ps installed package present wanted = do
             case moldOpts of
                 Nothing -> Just "old configure information not found"
                 Just oldOpts
-                    | oldOpts /= wantConfigCache -> Just $ describeConfigDiff oldOpts wantConfigCache
+                    | Just reason <- describeConfigDiff oldOpts wantConfigCache -> Just reason
                     | psDirty ps -> Just "local file changes"
                     | otherwise -> Nothing
     case mreason of
@@ -455,19 +448,20 @@ checkDirtiness ps installed package present wanted = do
             tell mempty { wDirty = Map.singleton (packageName package) reason }
             return True
 
-describeConfigDiff :: ConfigCache -> ConfigCache -> Text
+describeConfigDiff :: ConfigCache -> ConfigCache -> Maybe Text
 describeConfigDiff old new
-    | configCacheDeps old /= configCacheDeps new = "dependencies changed"
-    | configCacheComponents old /= configCacheComponents new = "components changed"
-    | configCacheHaddock old && not (configCacheHaddock new) = "no longer building haddocks"
-    | not (configCacheHaddock old) && configCacheHaddock new = "building haddocks"
-    | oldOpts /= newOpts = T.pack $ concat
+    | configCacheDeps old /= configCacheDeps new = Just "dependencies changed"
+    | not $ Set.null newComponents =
+        Just $ "components added: " `T.append` T.intercalate ", "
+            (map (decodeUtf8With lenientDecode) (Set.toList newComponents))
+    | not (configCacheHaddock old) && configCacheHaddock new = Just "rebuilding with haddocks"
+    | oldOpts /= newOpts = Just $ T.pack $ concat
         [ "flags changed from "
         , show oldOpts
         , " to "
         , show newOpts
         ]
-    | otherwise = "unknown config cache difference"
+    | otherwise = Nothing
   where
     -- options set by stack
     isStackOpt t = any (`T.isPrefixOf` t)
@@ -476,6 +470,8 @@ describeConfigDiff old new
         , "--package-db="
         , "--libdir="
         , "--bindir="
+        , "--enable-tests"
+        , "--enable-benchmarks"
         ]
 
     userOpts = filter (not . isStackOpt)
@@ -487,6 +483,8 @@ describeConfigDiff old new
     removeMatching (x:xs) (y:ys)
         | x == y = removeMatching xs ys
     removeMatching xs ys = (xs, ys)
+
+    newComponents = configCacheComponents new `Set.difference` configCacheComponents old
 
 psDirty :: PackageSource -> Bool
 psDirty (PSLocal lp) = lpDirtyFiles lp
