@@ -116,9 +116,9 @@ We generally test on the current version of OS X, but stack is known to work on 
 
 stack can be found in the AUR:
   - [haskell-stack](https://aur.archlinux.org/packages/haskell-stack/) _latest stable version_
-  - [haskell-stack-git](https://aur4.archlinux.org/packages/haskell-stack-git/) _git version_
+  - [haskell-stack-git](https://aur.archlinux.org/packages/haskell-stack-git/) _git version_
 
-In order to install stack from Hackage or from source, you will need the [libtinfo](https://aur4.archlinux.org/packages/libtinfo/) Arch Linux package installed.  If this package is not installed, stack will not be able to install GHC.  
+In order to install stack from Hackage or from source, you will need the [libtinfo](https://aur.archlinux.org/packages/libtinfo/) Arch Linux package installed.  If this package is not installed, stack will not be able to install GHC.  
 
 If you use the [ArchHaskell repository](https://wiki.archlinux.org/index.php/ArchHaskell), you can also get the `haskell-stack` package from there.
 
