@@ -6,6 +6,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE TupleSections #-}
@@ -450,7 +451,7 @@ data VersionedDownloadInfo = VersionedDownloadInfo
 instance FromJSON VersionedDownloadInfo where
     parseJSON = withObject "VersionedDownloadInfo" $ \o -> do
         version <- o .: "version"
-        downloadInfo <- parseDownloadInfoFromObject o
+        downloadInfo <- unWarningParser (parseDownloadInfoFromObject o)
         return VersionedDownloadInfo
             { vdiVersion = version
             , vdiDownloadInfo = downloadInfo

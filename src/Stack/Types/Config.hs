@@ -5,6 +5,7 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -18,12 +19,11 @@ import           Control.Monad (liftM, mzero, forM)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Logger (LogLevel(..))
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
-import           Data.Aeson.Types (Parser)
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, object,
-                  (.=), (.:), (.:?), (..:), (..:?), (..!=), Value(String, Object),
+                  (.=), (.:), (..:), (..:?), (..!=), Value(String, Object),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings, JSONWarning,
-                  jsonSubWarningsMT)
+                  jsonSubWarningsMT, jsonSubWarningsT, unWarningParser)
 import           Data.Attoparsec.Args
 import           Data.Binary (Binary)
 import           Data.ByteString (ByteString)
@@ -425,13 +425,13 @@ instance ToJSON Resolver where
         , "location" .= location
         ]
     toJSON x = toJSON $ resolverName x
-instance FromJSON Resolver where
+instance FromJSON (Resolver,[JSONWarning]) where
     -- Strange structuring is to give consistent error messages
-    parseJSON v@(Object _) = withObject "Resolver" (\o -> ResolverCustom
-        <$> o .: "name"
-        <*> o .: "location") v
+    parseJSON v@(Object _) = withObjectWarnings "Resolver" (\o -> ResolverCustom
+        <$> o ..: "name"
+        <*> o ..: "location") v
 
-    parseJSON (String t) = either (fail . show) return (parseResolverText t)
+    parseJSON (String t) = either (fail . show) return ((,[]) <$> parseResolverText t)
 
     parseJSON _ = fail $ "Invalid Resolver, must be Object or String"
 
@@ -637,7 +637,7 @@ parseConfigMonoidJSON obj = do
                                            ..!= VersionRangeJSON anyVersion
     configMonoidOS <- obj ..:? "os"
     configMonoidArch <- obj ..:? "arch"
-    configMonoidGHCVariant <- obj ..:? "ghc-variant"
+    configMonoidGHCVariant <- jsonSubWarningsT (obj ..:? "ghc-variant")
     configMonoidJobs <- obj ..:? "jobs"
     configMonoidExtraIncludeDirs <- obj ..:? "extra-include-dirs" ..!= Set.empty
     configMonoidExtraLibDirs <- obj ..:? "extra-lib-dirs" ..!= Set.empty
@@ -945,7 +945,7 @@ instance (warnings ~ [JSONWarning]) => FromJSON (ProjectAndConfigMonoid, warning
                 (errs, _) -> fail $ unlines errs
 
         flags <- o ..:? "flags" ..!= mempty
-        resolver <- o ..: "resolver"
+        resolver <- jsonSubWarnings (o ..: "resolver")
         config <- parseConfigMonoidJSON o
         let project = Project
                 { projectPackages = dirs
@@ -1003,15 +1003,19 @@ data GHCVariant
     | GHCCustom String DownloadInfo -- ^ Other bindists.
     deriving (Show)
 
-instance FromJSON GHCVariant where
+instance FromJSON (GHCVariant, [JSONWarning]) where
     -- Strange structuring is to give consistent error messages
-    parseJSON v@(Object _) = withObject "GHCVariant" (\o -> do
-        name <- o .: "name"
-        downloadInfo <- parseDownloadInfoFromObject o
-        return (GHCCustom name downloadInfo)
-        ) v
-    parseJSON (String t) = either (fail . show) return (parseGHCVariant (T.unpack t))
-    parseJSON _ = fail $ "Invalid Resolver, must be Object or String"
+    parseJSON v@(Object _) =
+        withObjectWarnings
+            "GHCVariant"
+            (\o ->
+                  do name <- o ..: "name"
+                     downloadInfo <- parseDownloadInfoFromObject o
+                     return (GHCCustom name downloadInfo))
+            v
+    parseJSON (String t) =
+        either (fail . show) return ((,[]) <$> parseGHCVariant (T.unpack t))
+    parseJSON _ = fail "Invalid Resolver, must be Object or String"
 
 -- | Render a GHC variant to a String.
 ghcVariantName :: GHCVariant -> String
@@ -1025,7 +1029,10 @@ parseGHCVariant :: (MonadThrow m) => String -> m GHCVariant
 parseGHCVariant s =
     case break (== ':') s of
         (name,':':location) ->
-            return (GHCCustom name (DownloadInfo (T.pack location) Nothing Nothing))
+            return
+                (GHCCustom
+                     name
+                     (DownloadInfo (T.pack location) Nothing Nothing))
         _
           | s == "standard" -> return GHCStandard
           | s == "gmp4" -> return GHCGMP4
@@ -1039,15 +1046,18 @@ data DownloadInfo = DownloadInfo
     , downloadInfoSha1 :: Maybe ByteString
     } deriving (Show)
 
+instance FromJSON (DownloadInfo, [JSONWarning]) where
+    parseJSON = withObjectWarnings "DownloadInfo" parseDownloadInfoFromObject
+
 instance FromJSON DownloadInfo where
-    parseJSON = withObject "DownloadInfo" parseDownloadInfoFromObject
+    parseJSON = withObject "DownloadInfo" (unWarningParser . parseDownloadInfoFromObject)
 
 -- | Parse JSON in existing object for 'DownloadInfo'
-parseDownloadInfoFromObject :: Object -> Parser DownloadInfo
+parseDownloadInfoFromObject :: Object -> WarningParser DownloadInfo
 parseDownloadInfoFromObject o = do
-    url <- o .: "url"
-    contentLength <- o .:? "content-length"
-    sha1TextMay <- o .:? "sha1"
+    url <- o ..: "url"
+    contentLength <- o ..:? "content-length"
+    sha1TextMay <- o ..:? "sha1"
     return
         DownloadInfo
         { downloadInfoUrl = url

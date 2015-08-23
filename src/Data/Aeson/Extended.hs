@@ -10,13 +10,14 @@ module Data.Aeson.Extended (
   , WarningParser
   , JSONWarning (..)
   , withObjectWarnings
-  , (..:)
-  , (..:?)
-  , (..!=)
   , jsonSubWarnings
   , jsonSubWarningsT
   , jsonSubWarningsMT
   , logJSONWarnings
+  , unWarningParser
+  , (..:)
+  , (..:?)
+  , (..!=)
   ) where
 
 import Control.Monad.Logger (MonadLogger, logWarn)
@@ -69,7 +70,7 @@ wp ..!= d =
 tellField :: Text -> WarningParser ()
 tellField key = tell (mempty { wpmExpectedFields = Set.singleton key})
 
--- | 'MonadParser' version of 'withObject'.
+-- | 'WarningParser' version of 'withObject'.
 withObjectWarnings :: String
                    -> (Object -> WarningParser a)
                    -> Value
@@ -89,6 +90,12 @@ withObjectWarnings expected f =
                   case unrecognizedFields of
                       [] -> []
                       _ -> [JSONUnrecognizedFields expected unrecognizedFields])
+
+-- | Convert a 'WarningParser' to a 'Parser'.
+unWarningParser :: WarningParser a -> Parser a
+unWarningParser wp = do
+    (a,_) <- runWriterT wp
+    return a
 
 -- | Log JSON warnings.
 logJSONWarnings
@@ -128,7 +135,7 @@ jsonSubWarningsMT f = do
 -- | JSON parser that warns about unexpected fields in objects.
 type WarningParser a = WriterT WarningParserMonoid Parser a
 
--- | Monoid used by 'MonadParser' to track expected fields and warnings.
+-- | Monoid used by 'WarningParser' to track expected fields and warnings.
 data WarningParserMonoid = WarningParserMonoid
     { wpmExpectedFields :: !(Set Text)
     , wpmWarnings :: [JSONWarning]
