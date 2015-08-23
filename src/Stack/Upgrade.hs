@@ -12,6 +12,7 @@ import           Control.Monad.Trans.Control
 import           Data.Foldable               (forM_)
 import qualified Data.Map                    as Map
 import           Data.Monoid                 ((<>))
+import qualified Data.Monoid
 import qualified Data.Set                    as Set
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager)
 import           Path
@@ -81,7 +82,7 @@ upgrade gitRepo mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> d
     forM_ mdir $ \dir -> liftIO $ do
         bconfig <- runStackLoggingT manager logLevel terminal reExec $ do
             lc <- loadConfig
-                (configMonoid <> mempty
+                (configMonoid <> Data.Monoid.mempty
                     { configMonoidInstallGHC = Just True
                     })
                 (Just $ dir </> $(mkRelFile "stack.yaml"))
