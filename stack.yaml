@@ -1,6 +1,9 @@
 resolver: lts-3.0
 extra-deps:
-- ignore-0.1.0.0
+- ignore-0.1.1.0
+flags:
+  ignore:
+    without-pcre: true
 image:
   container:
     base: "fpco/ubuntu-with-libgmp:14.04"
