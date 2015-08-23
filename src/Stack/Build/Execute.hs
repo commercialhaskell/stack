@@ -784,76 +784,78 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 , ["--enable-benchmarks" | depsPresent installedMap $ lpBenchDeps lp]
                 ]
             _ -> []
-    wc <- getWhichCompiler
 
-    markExeNotInstalled (taskLocation task) taskProvides
-    case taskType of
-        TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
-        TTUpstream _ _ -> return ()
+    unless (boptsOnlyConfigure eeBuildOpts) $ do
+        wc <- getWhichCompiler
 
-    announce "build"
-    config <- asks getConfig
-    extraOpts <- extraBuildOptions
-    cabal (console && configHideTHLoading config) $
-        (case taskType of
-            TTLocal lp -> concat
-                [ ["build"]
-                , ["lib:" ++ packageNameString (packageName package)
-                  -- TODO: get this information from target parsing instead,
-                  -- which will allow users to turn off library building if
-                  -- desired
-                  | packageHasLibrary package]
-                , map (T.unpack . T.append "exe:")
-                      (maybe [] Set.toList $ lpExeComponents lp)
-                ]
-            TTUpstream _ _ -> ["build"]) ++ extraOpts
+        markExeNotInstalled (taskLocation task) taskProvides
+        case taskType of
+            TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
+            TTUpstream _ _ -> return ()
 
-    let doHaddock = shouldHaddockPackage eeBuildOpts eeWanted (packageName package) &&
-                    -- Works around haddock failing on bytestring-builder since it has no modules
-                    -- when bytestring is new enough.
-                    packageHasExposedModules package
-    when doHaddock $ do
-        announce "haddock"
-        hscolourExists <- doesExecutableExist eeEnvOverride "HsColour"
-        unless hscolourExists $ $logWarn
-            ("Warning: haddock not generating hyperlinked sources because 'HsColour' not\n" <>
-             "found on PATH (use 'stack build hscolour --copy-bins' to install).")
-        cabal False (concat [["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
-                            ,["--hyperlink-source" | hscolourExists]
-                            ,["--ghcjs" | wc == Ghcjs]])
-
-    withMVar eeInstallLock $ \() -> do
-        announce "install"
-        cabal False ["install"]
-
-    let pkgDbs =
-            case taskLocation task of
-                Snap -> [bcoSnapDB eeBaseConfigOpts]
-                Local ->
-                    [ bcoSnapDB eeBaseConfigOpts
-                    , bcoLocalDB eeBaseConfigOpts
+        announce "build"
+        config <- asks getConfig
+        extraOpts <- extraBuildOptions
+        cabal (console && configHideTHLoading config) $
+            (case taskType of
+                TTLocal lp -> concat
+                    [ ["build"]
+                    , ["lib:" ++ packageNameString (packageName package)
+                      -- TODO: get this information from target parsing instead,
+                      -- which will allow users to turn off library building if
+                      -- desired
+                      | packageHasLibrary package]
+                    , map (T.unpack . T.append "exe:")
+                          (maybe [] Set.toList $ lpExeComponents lp)
                     ]
-    mpkgid <- findGhcPkgId eeEnvOverride wc pkgDbs (packageName package)
-    mpkgid' <- case (packageHasLibrary package, mpkgid) of
-        (False, _) -> assert (isNothing mpkgid) $ do
-            markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
-            return $ Executable $ PackageIdentifier
-                (packageName package)
-                (packageVersion package)
-        (True, Nothing) -> throwM $ Couldn'tFindPkgId $ packageName package
-        (True, Just pkgid) -> return $ Library pkgid
-    writeFlagCache mpkgid' cache
-    liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides mpkgid'
+                TTUpstream _ _ -> ["build"]) ++ extraOpts
 
-    when (doHaddock && shouldHaddockDeps eeBuildOpts) $
-        withMVar eeInstallLock $ \() ->
-            copyDepHaddocks
-                eeEnvOverride
-                wc
-                eeBaseConfigOpts
-                (pkgDbs ++ [eeGlobalDB])
-                (PackageIdentifier (packageName package) (packageVersion package))
-                Set.empty
+        let doHaddock = shouldHaddockPackage eeBuildOpts eeWanted (packageName package) &&
+                        -- Works around haddock failing on bytestring-builder since it has no modules
+                        -- when bytestring is new enough.
+                        packageHasExposedModules package
+        when doHaddock $ do
+            announce "haddock"
+            hscolourExists <- doesExecutableExist eeEnvOverride "HsColour"
+            unless hscolourExists $ $logWarn
+                ("Warning: haddock not generating hyperlinked sources because 'HsColour' not\n" <>
+                 "found on PATH (use 'stack build hscolour --copy-bins' to install).")
+            cabal False (concat [["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
+                                ,["--hyperlink-source" | hscolourExists]
+                                ,["--ghcjs" | wc == Ghcjs]])
+
+        withMVar eeInstallLock $ \() -> do
+            announce "install"
+            cabal False ["install"]
+
+        let pkgDbs =
+                case taskLocation task of
+                    Snap -> [bcoSnapDB eeBaseConfigOpts]
+                    Local ->
+                        [ bcoSnapDB eeBaseConfigOpts
+                        , bcoLocalDB eeBaseConfigOpts
+                        ]
+        mpkgid <- findGhcPkgId eeEnvOverride wc pkgDbs (packageName package)
+        mpkgid' <- case (packageHasLibrary package, mpkgid) of
+            (False, _) -> assert (isNothing mpkgid) $ do
+                markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
+                return $ Executable $ PackageIdentifier
+                    (packageName package)
+                    (packageVersion package)
+            (True, Nothing) -> throwM $ Couldn'tFindPkgId $ packageName package
+            (True, Just pkgid) -> return $ Library pkgid
+        writeFlagCache mpkgid' cache
+        liftIO $ atomically $ modifyTVar eeGhcPkgIds $ Map.insert taskProvides mpkgid'
+
+        when (doHaddock && shouldHaddockDeps eeBuildOpts) $
+            withMVar eeInstallLock $ \() ->
+                copyDepHaddocks
+                    eeEnvOverride
+                    wc
+                    eeBaseConfigOpts
+                    (pkgDbs ++ [eeGlobalDB])
+                    (PackageIdentifier (packageName package) (packageVersion package))
+                    Set.empty
 
 -- | Determine if all of the dependencies given are installed
 depsPresent :: InstalledMap -> Map PackageName VersionRange -> Bool

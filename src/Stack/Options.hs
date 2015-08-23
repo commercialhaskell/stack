@@ -83,7 +83,7 @@ buildOptsParser cmd =
             fileWatch' <*> keepGoing <*> forceDirty <*>
             tests <*> testOptsParser <*>
             benches <*> benchOptsParser <*>
-            many exec
+            many exec <*> onlyConfigure
   where optimize =
           maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
         target =
@@ -180,6 +180,10 @@ buildOptsParser cmd =
             ( long "exec" <>
               metavar "CMD [ARGS]" <>
               help "Command and arguments to run after a successful build" )
+
+        onlyConfigure = flag False True
+            (long "only-configure" <>
+             help "Only perform the configure step, not any builds. Intended for tool usage, may break when used on multiple packages at once!")
 
 -- | Parser for package:[-]flag
 readFlag :: ReadM (Map (Maybe PackageName) (Map FlagName Bool))

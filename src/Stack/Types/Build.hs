@@ -402,6 +402,8 @@ data BuildOpts =
             -- ^ Additional test arguments
             ,boptsExec :: ![(String, [String])]
             -- ^ Commands (with arguments) to run after a successful build
+            ,boptsOnlyConfigure :: !Bool
+            -- ^ Only perform the configure step when building
             }
   deriving (Show)
 
@@ -427,6 +429,7 @@ defaultBuildOpts = BuildOpts
     , boptsBenchmarks = False
     , boptsBenchmarkOpts = defaultBenchmarkOpts
     , boptsExec = []
+    , boptsOnlyConfigure = False
     }
 
 -- | Options for the 'FinalAction' 'DoTests'
