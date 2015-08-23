@@ -154,7 +154,7 @@ buildOptsParser cmd =
 
         fileWatch' = flag False True
             (long "file-watch" <>
-             help "Watch for changes in local files and automatically rebuild")
+             help "Watch for changes in local files and automatically rebuild. Ignores files in VCS boring/ignore file")
 
         keepGoing = maybeBoolFlags
             "keep-going"

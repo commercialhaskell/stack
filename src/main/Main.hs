@@ -666,7 +666,14 @@ cleanCmd () go = withBuildConfigAndLock go (\_ -> clean)
 buildCmd :: Maybe (Text, Text) -- ^ option synonym
          -> BuildOpts -> GlobalOpts -> IO ()
 buildCmd moptionSynonym opts go
-    | boptsFileWatch opts = fileWatch inner
+    | boptsFileWatch opts =
+        let getProjectRoot =
+                do (manager, lc) <- loadConfigWithOpts go
+                   bconfig <-
+                       runStackLoggingTGlobal manager go $
+                       lcLoadBuildConfig lc (globalResolver go)
+                   return (bcRoot bconfig)
+        in fileWatch getProjectRoot inner
     | otherwise = inner $ const $ return ()
   where
     inner setLocalFiles = withBuildConfigAndLock go $ \lk -> do
