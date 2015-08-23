@@ -78,7 +78,6 @@ import           System.Process.Read
 
 #ifdef WINDOWS
 import System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
-import System.IO (utf8)
 #endif
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
@@ -94,18 +93,13 @@ fixCodePage inner = do
         fixInput
             | setInput = Catch.bracket_
                 (liftIO $ do
-                    setConsoleCP expected
-                    hSetEncoding stdin utf8
-                    )
+                    setConsoleCP expected)
                 (liftIO $ setConsoleCP origCPI)
             | otherwise = id
         fixOutput
             | setInput = Catch.bracket_
                 (liftIO $ do
-                    setConsoleOutputCP expected
-                    hSetEncoding stdout utf8
-                    hSetEncoding stderr utf8
-                    )
+                    setConsoleOutputCP expected)
                 (liftIO $ setConsoleOutputCP origCPO)
             | otherwise = id
 
