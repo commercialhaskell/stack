@@ -41,8 +41,10 @@ import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import qualified Data.Text.Encoding.Error as T
 import qualified Data.Text.IO as T
 import           Data.Time
+import           GHC.Foreign (withCString, peekCString)
 import           Language.Haskell.TH
 import           Network.HTTP.Client.Conduit (HasHttpManager(..))
 import           Network.HTTP.Conduit
@@ -92,13 +94,24 @@ runStackTGlobal manager config GlobalOpts{..} m =
 -- | Run a Stack action.
 runStackT :: (MonadIO m,MonadBaseControl IO m)
           => Manager -> LogLevel -> config -> Bool -> Bool -> StackT config m a -> m a
-runStackT manager logLevel config terminal reExec m =
+runStackT manager logLevel config terminal reExec m = do
+    canUseUnicode <- liftIO getCanUseUnicode
     withSticky
         terminal
         (\sticky ->
               runReaderT
                   (unStackT m)
-                  (Env config logLevel terminal reExec manager sticky))
+                  (Env config logLevel terminal reExec manager sticky canUseUnicode))
+
+-- | Taken from GHC: determine if we should use Unicode syntax
+getCanUseUnicode :: IO Bool
+getCanUseUnicode = do
+    let enc = localeEncoding
+        str = "\x2018\x2019"
+        test = withCString enc str $ \cstr -> do
+            str' <- peekCString enc cstr
+            return (str == str')
+    test `catchIOError` \_ -> return False
 
 --------------------------------------------------------------------------------
 -- Logging only StackLoggingT monad transformer
@@ -110,6 +123,7 @@ data LoggingEnv = LoggingEnv
     , lenvReExec :: !Bool
     , lenvManager :: !Manager
     , lenvSticky :: !Sticky
+    , lenvSupportsUnicode :: !Bool
     }
 
 -- | The monad used for logging in the executable @stack@ before
@@ -149,6 +163,9 @@ instance HasTerminal LoggingEnv where
 instance HasReExec LoggingEnv where
     getReExec = lenvReExec
 
+instance HasSupportsUnicode LoggingEnv where
+    getSupportsUnicode = lenvSupportsUnicode
+
 -- | Run the logging monad, using global options.
 runStackLoggingTGlobal :: MonadIO m
                        => Manager -> GlobalOpts -> StackLoggingT m a -> m a
@@ -158,7 +175,8 @@ runStackLoggingTGlobal manager GlobalOpts{..} m =
 -- | Run the logging monad.
 runStackLoggingT :: MonadIO m
                  => Manager -> LogLevel -> Bool -> Bool -> StackLoggingT m a -> m a
-runStackLoggingT manager logLevel terminal reExec m =
+runStackLoggingT manager logLevel terminal reExec m = do
+    canUseUnicode <- liftIO getCanUseUnicode
     withSticky
         terminal
         (\sticky ->
@@ -170,6 +188,7 @@ runStackLoggingT manager logLevel terminal reExec m =
                   , lenvSticky = sticky
                   , lenvTerminal = terminal
                   , lenvReExec = reExec
+                  , lenvSupportsUnicode = canUseUnicode
                   })
 
 -- | Convenience for getting a 'Manager'
@@ -178,7 +197,7 @@ newTLSManager = liftIO $ newManager tlsManagerSettings
 
 --------------------------------------------------------------------------------
 -- Logging functionality
-stickyLoggerFunc :: (HasSticky r, HasLogLevel r, ToLogStr msg, MonadReader r (t m), MonadTrans t, MonadIO (t m))
+stickyLoggerFunc :: (HasSticky r, HasLogLevel r, HasSupportsUnicode r, ToLogStr msg, MonadReader r (t m), MonadTrans t, MonadIO (t m))
                  => Loc -> LogSource -> LogLevel -> msg -> t m ()
 stickyLoggerFunc loc src level msg = do
     Sticky mref <- asks getSticky
@@ -206,24 +225,27 @@ stickyLoggerFunc loc src level msg = do
                               repeating ' ' <>
                               repeating backSpaceChar))
             maxLogLevel <- asks getLogLevel
+
+            -- Convert some GHC-generated Unicode characters as necessary
+            supportsUnicode <- asks getSupportsUnicode
+            let msgText
+                    | supportsUnicode = msgTextRaw
+                    | otherwise = T.map replaceUnicode msgTextRaw
+
             newState <-
                 case level of
                     LevelOther "sticky-done" -> do
                         clear
-                        let text =
-                                T.decodeUtf8 msgBytes
-                        liftIO (T.putStrLn text)
+                        liftIO (T.putStrLn msgText)
                         return Nothing
                     LevelOther "sticky" -> do
                         clear
-                        let text =
-                                T.decodeUtf8 msgBytes
-                        liftIO (T.putStr text)
-                        return (Just text)
+                        liftIO (T.putStr msgText)
+                        return (Just msgText)
                     _
                       | level >= maxLogLevel -> do
                           clear
-                          loggerFunc loc src level msg
+                          loggerFunc loc src level $ toLogStr msgText
                           case sticky of
                               Nothing ->
                                   return Nothing
@@ -234,9 +256,14 @@ stickyLoggerFunc loc src level msg = do
                           return sticky
             liftIO (putMVar ref newState)
   where
-    msgBytes =
-        fromLogStr
-            (toLogStr msg)
+    msgTextRaw = T.decodeUtf8With T.lenientDecode msgBytes
+    msgBytes = fromLogStr (toLogStr msg)
+
+-- | Replace Unicode characters with non-Unicode equivalents
+replaceUnicode :: Char -> Char
+replaceUnicode '\x2018' = '`'
+replaceUnicode '\x2019' = '\''
+replaceUnicode c = c
 
 -- | Logging function takes the log level into account.
 loggerFunc :: (MonadIO m,ToLogStr msg,MonadReader r m,HasLogLevel r)
