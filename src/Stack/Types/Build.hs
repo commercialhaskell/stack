@@ -226,7 +226,7 @@ instance Show StackBuildException where
                 go _ = Map.empty
      -- Supressing duplicate output
     show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bs) =
-        let fullCmd = (dropQuotes (show execName) ++ " " ++ (unwords fullArgs))
+        let fullCmd = (dropQuotes (toFilePath execName) ++ " " ++ (unwords fullArgs))
             logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ toFilePath fp) logFiles
         in "\n--  While building package " ++ dropQuotes (show taskProvides') ++ " using:\n" ++
            "      " ++ fullCmd ++ "\n" ++
