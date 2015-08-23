@@ -27,7 +27,6 @@ import           Control.Monad.State (get, put, modify)
 import           Control.Monad.Trans.Control
 import           Crypto.Hash (SHA1(SHA1))
 import           Data.Aeson.Extended
-import           Data.ByteString (ByteString)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import           Data.Conduit (Conduit, ($$), (=$), await, yield, awaitForever)
@@ -105,13 +104,14 @@ data SetupException = UnsupportedSetupCombo OS Arch GHCVariant
                     | UnknownCompilerVersion Text CompilerVersion (Set Version)
                     | UnknownOSKey Text
                     | GHCSanityCheckCompileFailed ReadProcessException (Path Abs File)
+                    | WantedMustBeGHC
     deriving Typeable
 instance Exception SetupException
 instance Show SetupException where
     show (UnsupportedSetupCombo os arch ghcVariant) = concat
         [ "I don't know how to install GHC for "
         , case ghcVariant of
-              StandardGHC -> show (os, arch)
+              GHCStandard -> show (os, arch)
               _ -> show (os, arch, ghcVariant)
         , ", please install manually"
         ]
@@ -135,6 +135,8 @@ instance Show SetupException where
         , "for more information. Exception was:\n"
         , show e
         ]
+    show (WantedMustBeGHC) =
+        "The wanted compiler must be GHC"
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasBuildConfig env, HasHttpManager env, HasGHCVariant env, HasLocalPrograms env, MonadBaseControl IO m)
@@ -439,32 +441,12 @@ getSystemCompiler menv wc = do
                 (_, Nothing) -> return Nothing
         else return Nothing
 
-data DownloadInfo = DownloadInfo
-    { downloadInfoUrl :: Text
-    , downloadInfoContentLength :: Int
-    , downloadInfoSha1 :: Maybe ByteString
-    }
-    deriving Show
-
 data VersionedDownloadInfo = VersionedDownloadInfo
     { vdiVersion :: Version
     , vdiDownloadInfo :: DownloadInfo
     }
     deriving Show
 
-parseDownloadInfoFromObject :: Yaml.Object -> Yaml.Parser DownloadInfo
-parseDownloadInfoFromObject o = do
-    url           <- o .: "url"
-    contentLength <- o .: "content-length"
-    sha1TextMay   <- o .:? "sha1"
-    return DownloadInfo
-        { downloadInfoUrl = url
-        , downloadInfoContentLength = contentLength
-        , downloadInfoSha1 = fmap T.encodeUtf8 sha1TextMay
-        }
-
-instance FromJSON DownloadInfo where
-    parseJSON = withObject "DownloadInfo" parseDownloadInfoFromObject
 instance FromJSON VersionedDownloadInfo where
     parseJSON = withObject "VersionedDownloadInfo" $ \o -> do
         version <- o .: "version"
@@ -593,19 +575,25 @@ downloadAndInstallGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env
            -> VersionCheck
            -> m PackageIdentifier
 downloadAndInstallGHC si wanted versionCheck = do
-    osKey <- getOSKey
-    pairs <-
-        case Map.lookup osKey $ siGHCs si of
-            Nothing -> throwM $ UnknownOSKey osKey
-            Just pairs -> return pairs
-    let mpair =
-            listToMaybe $
-            sortBy (flip (comparing fst)) $
-            filter (\(v, _) -> isWantedCompiler versionCheck wanted (GhcVersion v)) (Map.toList pairs)
-    (selectedVersion, downloadInfo) <-
-        case mpair of
-            Just pair -> return pair
-            Nothing -> throwM $ UnknownCompilerVersion osKey wanted (Map.keysSet pairs)
+    ghcVariant <- asks getGHCVariant
+    (selectedVersion, downloadInfo) <- case ghcVariant of
+        GHCCustom _ downloadInfo -> do
+            case wanted of
+              GhcVersion version -> return (version, downloadInfo)
+              _ -> throwM WantedMustBeGHC
+        _ -> do
+            osKey <- getOSKey
+            pairs <-
+                case Map.lookup osKey $ siGHCs si of
+                    Nothing -> throwM $ UnknownOSKey osKey
+                    Just pairs -> return pairs
+            let mpair =
+                    listToMaybe $
+                    sortBy (flip (comparing fst)) $
+                    filter (\(v, _) -> isWantedCompiler versionCheck wanted (GhcVersion v)) (Map.toList pairs)
+            case mpair of
+                Just pair -> return pair
+                Nothing -> throwM $ UnknownCompilerVersion osKey wanted (Map.keysSet pairs)
     platform <- asks getPlatform
     let installer =
             case platform of
@@ -619,20 +607,20 @@ getOSKey = do
     platform <- asks getPlatform
     ghcVariant <- asks getGHCVariant
     case (platform, ghcVariant) of
-        (Platform I386   Cabal.Linux,   Gmp4) -> return "linux32-gmp4"
-        (Platform X86_64 Cabal.Linux,   Gmp4) -> return "linux64-gmp4"
-        (Platform I386   Cabal.Linux,   StandardGHC) -> return "linux32"
-        (Platform X86_64 Cabal.Linux,   StandardGHC) -> return "linux64"
-        (Platform I386   Cabal.OSX,     StandardGHC) -> return "macosx"
-        (Platform X86_64 Cabal.OSX,     StandardGHC) -> return "macosx"
-        (Platform I386   Cabal.FreeBSD, StandardGHC) -> return "freebsd32"
-        (Platform X86_64 Cabal.FreeBSD, StandardGHC) -> return "freebsd64"
-        (Platform I386   Cabal.OpenBSD, StandardGHC) -> return "openbsd32"
-        (Platform X86_64 Cabal.OpenBSD, StandardGHC) -> return "openbsd64"
-        (Platform I386   Cabal.Windows, IntegerSimple) -> return "windowsintegersimple32"
-        (Platform X86_64 Cabal.Windows, IntegerSimple) -> return "windowsintegersimple64"
-        (Platform I386   Cabal.Windows, StandardGHC) -> return "windows32"
-        (Platform X86_64 Cabal.Windows, StandardGHC) -> return "windows64"
+        (Platform I386   Cabal.Linux,   GHCGMP4) -> return "linux32-gmp4"
+        (Platform X86_64 Cabal.Linux,   GHCGMP4) -> return "linux64-gmp4"
+        (Platform I386   Cabal.Linux,   GHCStandard) -> return "linux32"
+        (Platform X86_64 Cabal.Linux,   GHCStandard) -> return "linux64"
+        (Platform I386   Cabal.OSX,     GHCStandard) -> return "macosx"
+        (Platform X86_64 Cabal.OSX,     GHCStandard) -> return "macosx"
+        (Platform I386   Cabal.FreeBSD, GHCStandard) -> return "freebsd32"
+        (Platform X86_64 Cabal.FreeBSD, GHCStandard) -> return "freebsd64"
+        (Platform I386   Cabal.OpenBSD, GHCStandard) -> return "openbsd32"
+        (Platform X86_64 Cabal.OpenBSD, GHCStandard) -> return "openbsd64"
+        (Platform I386   Cabal.Windows, GHCIntegerSimple) -> return "windowsintegersimple32"
+        (Platform X86_64 Cabal.Windows, GHCIntegerSimple) -> return "windowsintegersimple64"
+        (Platform I386   Cabal.Windows, GHCStandard) -> return "windows32"
+        (Platform X86_64 Cabal.Windows, GHCStandard) -> return "windows64"
 
         (Platform arch os, _) -> throwM $ UnsupportedSetupCombo os arch ghcVariant
 
@@ -852,7 +840,7 @@ chattyDownload label downloadInfo path = do
     let dReq = DownloadRequest
             { drRequest = req
             , drHashChecks = hashChecks
-            , drLengthCheck = Just totalSize
+            , drLengthCheck = mtotalSize
             , drRetryPolicy = drRetryPolicyDefault
             }
     runInBase <- liftBaseWith $ \run -> return (void . run)
@@ -861,7 +849,7 @@ chattyDownload label downloadInfo path = do
         then $logStickyDone ("Downloaded " <> label <> ".")
         else $logStickyDone "Already downloaded."
   where
-    totalSize = downloadInfoContentLength downloadInfo
+    mtotalSize = downloadInfoContentLength downloadInfo
     chattyDownloadProgress runInBase _ = do
         _ <- liftIO $ runInBase $ $logSticky $
           label <> ": download has begun"
@@ -873,21 +861,15 @@ chattyDownload label downloadInfo path = do
             modify (+ size)
             totalSoFar <- get
             liftIO $ runInBase $ $logSticky $ T.pack $
-                chattyProgressWithTotal totalSoFar totalSize
+                case mtotalSize of
+                    Nothing -> chattyProgressNoTotal totalSoFar
+                    Just 0 -> chattyProgressNoTotal totalSoFar
+                    Just totalSize -> chattyProgressWithTotal totalSoFar totalSize
 
-        -- Note(DanBurton): Total size is now always known in this file.
-        -- However, printing in the case where it isn't known may still be
-        -- useful in other parts of the codebase.
-        -- So I'm just commenting out the code rather than deleting it.
-
-        --      case mcontentLength of
-        --        Nothing -> chattyProgressNoTotal totalSoFar
-        --        Just 0 -> chattyProgressNoTotal totalSoFar
-        --        Just total -> chattyProgressWithTotal totalSoFar total
-        ---- Example: ghc: 42.13 KiB downloaded...
-        --chattyProgressNoTotal totalSoFar =
-        --    printf ("%s: " <> bytesfmt "%7.2f" totalSoFar <> " downloaded...")
-        --           (T.unpack label)
+        -- Example: ghc: 42.13 KiB downloaded...
+        chattyProgressNoTotal totalSoFar =
+            printf ("%s: " <> bytesfmt "%7.2f" totalSoFar <> " downloaded...")
+                   (T.unpack label)
 
         -- Example: ghc: 50.00 MiB / 100.00 MiB (50.00%) downloaded...
         chattyProgressWithTotal totalSoFar total =

@@ -240,11 +240,7 @@ configOptsParser docker =
            <> metavar "OS"
            <> help "Operating system, e.g. linux, windows"
             ))
-    <*> optional (strOption
-            ( long "ghc-variant"
-           <> metavar "VARIANT"
-           <> help "Specialized GHC variant, e.g. integersimple (implies --no-system-ghc)"
-            ))
+    <*> optional ghcVariantParser
     <*> optional (option auto
             ( long "jobs"
            <> short 'j'
@@ -590,6 +586,21 @@ readAbstractResolver = do
             case parseResolverText $ T.pack s of
                 Left e -> readerError $ show e
                 Right x -> return $ ARResolver x
+
+-- | GHC variant parser
+ghcVariantParser :: Parser GHCVariant
+ghcVariantParser =
+    option
+        readGHCVariant
+        (long "ghc-variant" <> metavar "VARIANT" <>
+         help
+             "Specialized GHC variant, e.g. integersimple (implies --no-system-ghc)")
+  where
+    readGHCVariant = do
+        s <- readerAsk
+        case parseGHCVariant s of
+            Left e -> readerError (show e)
+            Right v -> return v
 
 -- | Parser for @solverCmd@
 solverOptsParser :: Parser Bool

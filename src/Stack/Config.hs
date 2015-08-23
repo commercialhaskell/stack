@@ -126,7 +126,7 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
                 }]
             configMonoidPackageIndices
 
-         configGHCVariant0 = fmap parseGHCVariant configMonoidGHCVariant
+         configGHCVariant0 = configMonoidGHCVariant
 
          configSystemGHC = fromMaybe (isNothing configGHCVariant0) configMonoidSystemGHC
          configInstallGHC = fromMaybe False configMonoidInstallGHC
@@ -183,7 +183,7 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
 
      return Config {..}
 
--- | Get the default 'GHCVariant'.  On older Linux systems with libgmp4, returns 'Gmp4'.
+-- | Get the default 'GHCVariant'.  On older Linux systems with libgmp4, returns 'GHCGMP4'.
 getDefaultGHCVariant
     :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m)
     => EnvOverride -> Platform -> m GHCVariant
@@ -192,16 +192,16 @@ getDefaultGHCVariant menv (Platform _ Linux) = do
     elddOut <- tryProcessStdout Nothing menv "ldd" [executablePath]
     return $
         case elddOut of
-            Left _ -> StandardGHC
+            Left _ -> GHCStandard
             Right lddOut ->
                 if hasLineWithFirstWord "libgmp.so.3" lddOut
-                    then Gmp4
-                    else StandardGHC
+                    then GHCGMP4
+                    else GHCStandard
   where
     hasLineWithFirstWord w =
         elem (Just w) .
         map (headMay . T.words) . T.lines . decodeUtf8With lenientDecode
-getDefaultGHCVariant _ _ = return StandardGHC
+getDefaultGHCVariant _ _ = return GHCStandard
 
 -- | Get the directory on Windows where we should install extra programs. For
 -- more information, see discussion at:

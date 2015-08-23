@@ -18,9 +18,10 @@ import           Control.Monad (liftM, mzero, forM)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Logger (LogLevel(..))
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
+import           Data.Aeson.Types (Parser)
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, object,
-                  (.=), (.:), (..:), (..:?), (..!=), Value(String, Object),
+                  (.=), (.:), (.:?), (..:), (..:?), (..!=), Value(String, Object),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings, JSONWarning,
                   jsonSubWarningsMT)
 import           Data.Attoparsec.Args
@@ -534,7 +535,7 @@ data ConfigMonoid =
     -- ^ Used for overriding the platform
     ,configMonoidArch                :: !(Maybe String)
     -- ^ Used for overriding the platform
-    ,configMonoidGHCVariant          :: !(Maybe String)
+    ,configMonoidGHCVariant          :: !(Maybe GHCVariant)
     -- ^ Used for overriding the GHC variant
     ,configMonoidJobs                :: !(Maybe Int)
     -- ^ See: 'configJobs'
@@ -696,6 +697,7 @@ data ConfigException
   | BadStackVersionException VersionRange
   | NoMatchingSnapshot [SnapName]
   | NoSuchDirectory FilePath
+  | ParseGHCVariantException String
   deriving Typeable
 instance Show ConfigException where
     show (ParseConfigFileException configFile exception) = concat
@@ -748,6 +750,10 @@ instance Show ConfigException where
     show (NoSuchDirectory dir) = concat
         ["No directory could be located matching the supplied path: "
         ,dir
+        ]
+    show (ParseGHCVariantException v) = concat
+        [ "Invalid ghc-variant value: "
+        , v
         ]
 instance Exception ConfigException
 
@@ -811,8 +817,8 @@ platformRelDir = do
         concat
             [ Distribution.Text.display platform
             , case ghcVariant of
-                  StandardGHC -> ""
-                  _ -> "-" ++ renderGHCVariant ghcVariant]
+                  GHCStandard -> ""
+                  _ -> "-" ++ ghcVariantName ghcVariant]
 
 -- | Path to .shake files.
 configShakeFilesDir :: (MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
@@ -991,23 +997,60 @@ instance ToJSON SCM where
 
 -- | Specialized bariant of GHC (e.g. libgmp4 or integer-simple)
 data GHCVariant
-    = StandardGHC -- ^ Standard bindist
-    | Gmp4 -- ^ Bindist that supports libgmp4 (centos66)
-    | IntegerSimple -- ^ Bindist that uses integer-simple
-    | OtherGHC String -- ^ Other bindists.
-    deriving (Eq,Ord,Show)
+    = GHCStandard -- ^ Standard bindist
+    | GHCGMP4 -- ^ Bindist that supports libgmp4 (centos66)
+    | GHCIntegerSimple -- ^ Bindist that uses integer-simple
+    | GHCCustom String DownloadInfo -- ^ Other bindists.
+    deriving (Show)
+
+instance FromJSON GHCVariant where
+    -- Strange structuring is to give consistent error messages
+    parseJSON v@(Object _) = withObject "GHCVariant" (\o -> do
+        name <- o .: "name"
+        downloadInfo <- parseDownloadInfoFromObject o
+        return (GHCCustom name downloadInfo)
+        ) v
+    parseJSON (String t) = either (fail . show) return (parseGHCVariant (T.unpack t))
+    parseJSON _ = fail $ "Invalid Resolver, must be Object or String"
 
 -- | Render a GHC variant to a String.
-renderGHCVariant :: GHCVariant -> String
-renderGHCVariant StandardGHC = "standard"
-renderGHCVariant Gmp4 = "gmp4"
-renderGHCVariant IntegerSimple = "integersimple"
-renderGHCVariant (OtherGHC other) = other
+ghcVariantName :: GHCVariant -> String
+ghcVariantName GHCStandard = "standard"
+ghcVariantName GHCGMP4 = "gmp4"
+ghcVariantName GHCIntegerSimple = "integersimple"
+ghcVariantName (GHCCustom name _) = "custom-" ++ name
 
 -- | Parse GHC variant from a String.
-parseGHCVariant :: String -> GHCVariant
+parseGHCVariant :: (MonadThrow m) => String -> m GHCVariant
 parseGHCVariant s =
-    if |  s == "standard" -> StandardGHC
-       |  s == "gmp4" -> Gmp4
-       |  s == "integersimple" -> IntegerSimple
-       |  otherwise -> OtherGHC s
+    case break (== ':') s of
+        (name,':':location) ->
+            return (GHCCustom name (DownloadInfo (T.pack location) Nothing Nothing))
+        _
+          | s == "standard" -> return GHCStandard
+          | s == "gmp4" -> return GHCGMP4
+          | s == "integersimple" -> return GHCIntegerSimple
+          | otherwise -> throwM $ ParseGHCVariantException s
+
+-- | Information for a file to download.
+data DownloadInfo = DownloadInfo
+    { downloadInfoUrl :: Text
+    , downloadInfoContentLength :: Maybe Int
+    , downloadInfoSha1 :: Maybe ByteString
+    } deriving (Show)
+
+instance FromJSON DownloadInfo where
+    parseJSON = withObject "DownloadInfo" parseDownloadInfoFromObject
+
+-- | Parse JSON in existing object for 'DownloadInfo'
+parseDownloadInfoFromObject :: Object -> Parser DownloadInfo
+parseDownloadInfoFromObject o = do
+    url <- o .: "url"
+    contentLength <- o .:? "content-length"
+    sha1TextMay <- o .:? "sha1"
+    return
+        DownloadInfo
+        { downloadInfoUrl = url
+        , downloadInfoContentLength = contentLength
+        , downloadInfoSha1 = fmap encodeUtf8 sha1TextMay
+        }
