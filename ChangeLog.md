@@ -10,6 +10,7 @@ Other enhancements:
 * Added the `--docker-env` argument, to set environment variables in Docker container.
 * Set `LC_ALL` to UTF-8 encoding for builds to avoid "commitBuffer: invalid argument" errors from GHC [#793](https://github.com/commercialhaskell/stack/issues/793)
 * Enable translitation for encoding on stdout and stderr [#824](https://github.com/commercialhaskell/stack/issues/824)
+* By default, `stack upgrade` automatically installs GHC as necessary [#797](https://github.com/commercialhaskell/stack/issues/797)
 
 * Added the `ghc-options` field to stack.yaml [#796](https://github.com/commercialhaskell/stack/issues/796)
 * Added the `extra-path` field to stack.yaml
