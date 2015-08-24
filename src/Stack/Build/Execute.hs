@@ -18,7 +18,7 @@ module Stack.Build.Execute
 
 import           Control.Applicative
 import           Control.Concurrent.Execute
-import           Control.Concurrent.Lifted      (fork)
+import           Control.Concurrent.Async       (withAsync, wait)
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
 import           Control.Exception.Enclosed     (tryIO)
@@ -498,7 +498,7 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
                     { actionId = ActionId taskProvides ATBuild
                     , actionDeps =
                         (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
-                    , actionDo = \ac -> runInBase $ singleBuild ac ee task installedMap
+                    , actionDo = \ac -> runInBase $ singleBuild runInBase ac ee task installedMap
                     }
                 ]
     afinal =
@@ -511,9 +511,9 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
                         (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
                     , actionDo = \ac -> runInBase $ do
                         unless (Set.null $ lptbTests lptb) $ do
-                            singleTest topts lptb ac ee task installedMap
+                            singleTest runInBase topts lptb ac ee task installedMap
                         unless (Set.null $ lptbBenches lptb) $ do
-                            singleBench beopts lptb ac ee task installedMap
+                            singleBench runInBase beopts lptb ac ee task installedMap
                     }
                 ]
       where
@@ -577,7 +577,8 @@ ensureConfig pkgDir ExecuteEnv {..} Task {..} announce cabal cabalfp extra = do
     return (newConfigCache, needConfig)
 
 withSingleContext :: M env m
-                  => ActionContext
+                  => (m () -> IO ())
+                  -> ActionContext
                   -> ExecuteEnv
                   -> Task
                   -> Maybe String
@@ -590,7 +591,7 @@ withSingleContext :: M env m
                      -> Maybe (Path Abs File, Handle)
                      -> m a)
                   -> m a
-withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} msuffix inner0 =
+withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} msuffix inner0 =
     withPackage $ \package cabalfp pkgDir ->
     withLogFile package $ \mlogFile ->
     withCabal package pkgDir mlogFile $ \cabal ->
@@ -689,9 +690,14 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} msuffix inne
 
                     let makeAbsolute = stripTHLoading -- If users want control, we should add a config option for this
 
-                    maybePrintBuildOutput stripTHLoading makeAbsolute LevelInfo mlogFile moutH
-                    maybePrintBuildOutput False makeAbsolute LevelWarn mlogFile merrH
-                    ec <- liftIO $ waitForProcess ph
+                    ec <-
+                        liftIO $
+                        withAsync (runInBase $ maybePrintBuildOutput stripTHLoading makeAbsolute LevelInfo mlogFile moutH) $ \outThreadID ->
+                        withAsync (runInBase $ maybePrintBuildOutput False makeAbsolute LevelWarn mlogFile merrH) $ \errThreadID -> do
+                            ec <- waitForProcess ph
+                            wait errThreadID
+                            wait outThreadID
+                            return ec
                     case ec of
                         ExitSuccess -> return ()
                         _ -> do
@@ -765,13 +771,14 @@ withSingleContext ActionContext {..} ExecuteEnv {..} task@Task {..} msuffix inne
             Nothing -> return ()
 
 singleBuild :: M env m
-            => ActionContext
+            => (m () -> IO ())
+            -> ActionContext
             -> ExecuteEnv
             -> Task
             -> InstalledMap
             -> m ()
-singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap =
-  withSingleContext ac ee task Nothing $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
+singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap =
+  withSingleContext runInBase ac ee task Nothing $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
     (cache, _neededConfig) <- ensureConfig pkgDir ee task (announce "configure") cabal cabalfp $
         -- We enable tests if the test suite dependencies are already
         -- installed, so that we avoid unnecessary recompilation based on
@@ -867,15 +874,16 @@ depsPresent installedMap deps = all
     (Map.toList deps)
 
 singleTest :: M env m
-           => TestOpts
+           => (m () -> IO ())
+           -> TestOpts
            -> LocalPackageTB
            -> ActionContext
            -> ExecuteEnv
            -> Task
            -> InstalledMap
            -> m ()
-singleTest topts lptb ac ee task installedMap =
-    withSingleContext ac ee task (Just "test") $ \package cabalfp pkgDir cabal announce console mlogFile -> do
+singleTest runInBase topts lptb ac ee task installedMap =
+    withSingleContext runInBase ac ee task (Just "test") $ \package cabalfp pkgDir cabal announce console mlogFile -> do
         (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (test)") cabal cabalfp $
             case taskType task of
                 TTLocal lp -> concat
@@ -1016,15 +1024,16 @@ singleTest topts lptb ac ee task installedMap =
             setTestSuccess pkgDir
 
 singleBench :: M env m
-            => BenchmarkOpts
+            => (m () -> IO ())
+            -> BenchmarkOpts
             -> LocalPackageTB
             -> ActionContext
             -> ExecuteEnv
             -> Task
             -> InstalledMap
             -> m ()
-singleBench beopts _lptb ac ee task installedMap =
-    withSingleContext ac ee task (Just "bench") $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
+singleBench runInBase beopts _lptb ac ee task installedMap =
+    withSingleContext runInBase ac ee task (Just "bench") $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
         (_cache, neededConfig) <- ensureConfig pkgDir ee task (announce "configure (benchmarks)") cabal cabalfp $
             case taskType task of
                 TTLocal lp -> concat
@@ -1073,7 +1082,7 @@ printBuildOutput :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
                  -> Bool -- ^ convert paths to absolute?
                  -> LogLevel
                  -> Handle -> m ()
-printBuildOutput excludeTHLoading makeAbsolute level outH = void $ fork $
+printBuildOutput excludeTHLoading makeAbsolute level outH = void $
          CB.sourceHandle outH
     $$ CB.lines
     =$ CL.map stripCarriageReturn
