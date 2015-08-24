@@ -335,14 +335,21 @@ instance Show ConstructPlanException where
         , ": needed ("
         , display range
         , ")"
-        , case mlatest of
-            Nothing -> ""
-            Just latest -> ", latest is " ++ versionString latest
-        , ", but "
-        , case badDep of
-            NotInBuildPlan -> "not present in build plan"
-            Couldn'tResolveItsDependencies -> "couldn't resolve its dependencies"
-            DependencyMismatch version -> versionString version ++ " found"
+        , ", "
+        , let latestStr =
+                case mlatest of
+                    Nothing -> ""
+                    Just latest -> " (latest is " ++ versionString latest ++ ")"
+           in case badDep of
+                NotInBuildPlan -> "not present in build plan" ++ latestStr
+                Couldn'tResolveItsDependencies -> "couldn't resolve its dependencies"
+                DependencyMismatch version ->
+                    case mlatest of
+                        Just latest
+                            | latest == version ->
+                                versionString version ++
+                                " found (latest version available)"
+                        _ -> versionString version ++ " found" ++ latestStr
         ]
          {- TODO Perhaps change the showDep function to look more like this:
           dropQuotes = filter ((/=) '\"')
