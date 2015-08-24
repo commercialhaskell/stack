@@ -140,7 +140,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
      -- See https://github.com/commercialhaskell/stack/pull/360
      hSetBuffering stdout LineBuffering
      hSetBuffering stdin  LineBuffering
-     hSetBuffering stderr NoBuffering
+     hSetBuffering stderr LineBuffering
      hSetTranslit stdout
      hSetTranslit stderr
      progName <- getProgName
