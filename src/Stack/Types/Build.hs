@@ -110,6 +110,7 @@ data StackBuildException
   | NoSetupHsFound (Path Abs Dir)
   | InvalidFlagSpecification (Set UnusedFlags)
   | TargetParseException [Text]
+  | DuplicateLocalPackageNames [(PackageName, [Path Abs Dir])]
   deriving Typeable
 
 data FlagSource = FSCommandLine | FSStackYaml
@@ -292,6 +293,16 @@ instance Show StackBuildException where
     show (TargetParseException errs) = unlines
         $ "The following errors occurred while parsing the build targets:"
         : map (("- " ++) . T.unpack) errs
+
+    show (DuplicateLocalPackageNames pairs) = concat
+        $ "The same package name is used in multiple local packages\n"
+        : map go pairs
+      where
+        go (name, dirs) = unlines
+            $ ""
+            : (packageNameString name ++ " used in:")
+            : map goDir dirs
+        goDir dir = "- " ++ toFilePath dir
 
 instance Exception StackBuildException
 

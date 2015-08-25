@@ -222,8 +222,7 @@ getLocalPackageViews :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfi
                      => m (Map PackageName (LocalPackageView, GenericPackageDescription))
 getLocalPackageViews = do
     econfig <- asks getEnvConfig
-    -- TODO ensure that there are no overlapping package names
-    liftM Map.fromList $ forM (Map.toList $ envConfigPackages econfig) $ \(dir, validWanted) -> do
+    locals <- forM (Map.toList $ envConfigPackages econfig) $ \(dir, validWanted) -> do
         cabalfp <- getCabalFileName dir
         gpkg <- readPackageUnresolved cabalfp
         let cabalID = package $ packageDescription gpkg
@@ -238,6 +237,8 @@ getLocalPackageViews = do
                 , lpvComponents = getNamedComponents gpkg
                 }
         return (name, (lpv, gpkg))
+    checkDuplicateNames locals
+    return $ Map.fromList locals
   where
     getNamedComponents gpkg = Set.fromList $ concat
         [ maybe [] (const [CLib]) (C.condLibrary gpkg)
@@ -247,6 +248,18 @@ getLocalPackageViews = do
         ]
       where
         go wrapper f = map (wrapper . T.pack . fst) $ f gpkg
+
+-- | Check if there are any duplicate package names and, if so, throw an
+-- exception.
+checkDuplicateNames :: MonadThrow m => [(PackageName, (LocalPackageView, gpd))] -> m ()
+checkDuplicateNames locals =
+    case filter hasMultiples $ Map.toList $ Map.fromListWith (++) $ map toPair locals of
+        [] -> return ()
+        x -> throwM $ DuplicateLocalPackageNames x
+  where
+    toPair (pn, (lpv, _)) = (pn, [lpvRoot lpv])
+    hasMultiples (_, _:_:_) = True
+    hasMultiples _ = False
 
 splitComponents :: [NamedComponent]
                 -> (Set Text, Set Text, Set Text)

@@ -18,6 +18,7 @@ Other enhancements:
 * Use a precompiled Setup.hs for simple build types [#801](https://github.com/commercialhaskell/stack/issues/801)
 * Set --enable-tests and --enable-benchmarks optimistically [#805](https://github.com/commercialhaskell/stack/issues/805)
 * `--only-configure` option added [#820](https://github.com/commercialhaskell/stack/issues/820)
+* Check for duplicate local package names
 
 Bug fixes:
 
