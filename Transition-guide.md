@@ -38,7 +38,7 @@ should do so via `stack ghc` or `stack exec`.
 The [[Architecture]] page goes into much more detail on this.
 
 ### running an executable.
-There is no `stack run` that does what `cabal run` does, but `stack build && stack exec foo` accomplishes the same thing.
+There is no `stack run` that does what `cabal run` does, but `stack build && stack exec foo` (or `stack build && stack runghc app/Main.hs`) accomplishes the same thing.
 
 ### I prefer dependency solving to curation
 
