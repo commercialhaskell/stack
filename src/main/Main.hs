@@ -165,11 +165,11 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
           globalOptsParser isTerminal)
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
-                        (buildCmd Nothing)
+                        buildCmd
                         (buildOptsParser Build)
              addCommand "install"
                         "Shortcut for 'build --copy-bins'"
-                        (buildCmd $ Just ("install", "copy-bins"))
+                        buildCmd
                         (buildOptsParser Install)
              addCommand "uninstall"
                         "DEPRECATED: This command performs no actions, and is present for documentation only"
@@ -177,15 +177,15 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                         (many $ strArgument $ metavar "IGNORED")
              addCommand "test"
                         "Shortcut for 'build --test'"
-                        (buildCmd $ Just ("test", "test"))
+                        buildCmd
                         (buildOptsParser Test)
              addCommand "bench"
                         "Shortcut for 'build --bench'"
-                        (buildCmd $ Just ("bench", "bench"))
+                        buildCmd
                         (buildOptsParser Bench)
              addCommand "haddock"
                         "Shortcut for 'build --haddock'"
-                        (buildCmd $ Just ("haddock", "haddock"))
+                        buildCmd
                         (buildOptsParser Haddock)
              addCommand "new"
                         "Create a new project from a template. Run `stack templates' to see available templates."
@@ -657,9 +657,8 @@ cleanCmd :: () -> GlobalOpts -> IO ()
 cleanCmd () go = withBuildConfigAndLock go (\_ -> clean)
 
 -- | Helper for build and install commands
-buildCmd :: Maybe (Text, Text) -- ^ option synonym
-         -> BuildOpts -> GlobalOpts -> IO ()
-buildCmd moptionSynonym opts go
+buildCmd :: BuildOpts -> GlobalOpts -> IO ()
+buildCmd opts go
     | boptsFileWatch opts =
         let getProjectRoot =
                 do (manager, lc) <- loadConfigWithOpts go
@@ -670,16 +669,7 @@ buildCmd moptionSynonym opts go
         in fileWatch getProjectRoot inner
     | otherwise = inner $ const $ return ()
   where
-    inner setLocalFiles = withBuildConfigAndLock go $ \lk -> do
-        case moptionSynonym of
-            Nothing -> return ()
-            Just (cmd, opt) -> $logInfo $ T.concat
-                [ "NOTE: the "
-                , cmd
-                , " command is functionally equivalent to 'build --"
-                , opt
-                , "'"
-                ]
+    inner setLocalFiles = withBuildConfigAndLock go $ \lk ->
         globalFixCodePage go $ Stack.Build.build setLocalFiles (Just lk) opts
 
 globalFixCodePage :: (Catch.MonadMask m, MonadIO m, MonadLogger m)

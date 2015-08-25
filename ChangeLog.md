@@ -19,6 +19,7 @@ Other enhancements:
 * Set --enable-tests and --enable-benchmarks optimistically [#805](https://github.com/commercialhaskell/stack/issues/805)
 * `--only-configure` option added [#820](https://github.com/commercialhaskell/stack/issues/820)
 * Check for duplicate local package names
+* Stop nagging people that call `stack test` [#845](https://github.com/commercialhaskell/stack/issues/845)
 
 Bug fixes:
 
