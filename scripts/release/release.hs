@@ -418,6 +418,7 @@ uploadToGithubRelease global@Global{..} file = do
             (error ("Could not find Github release with tag '" ++ tag ++ "'.\n" ++
                     "Use --" ++ githubReleaseTagOptName ++ " option to specify a different tag."))
             (find (\r -> relTagName r == tag) releases)
+    getGithubReleases :: Action [GithubRelease]
     getGithubReleases = do
         resp <- liftIO $ callGithubApi global
             [] Nothing "https://api.github.com/repos/commercialhaskell/stack/releases"
