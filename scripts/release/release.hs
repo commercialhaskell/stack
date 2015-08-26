@@ -65,7 +65,7 @@ main =
             -- Need to get paths after options since the '--arch' argument can effect them.
             localInstallRoot' <- getStackPath global0 "local-install-root"
             projectRoot' <- getStackPath global0 "project-root"
-	    let global = global0
+            let global = global0
                     { gLocalInstallRoot = localInstallRoot'
                     , gProjectRoot = projectRoot' }
             return $ Just $ rules global args
@@ -92,10 +92,10 @@ options =
         "Github release tag to upload to."
     , Option "" [archOptName]
         (ReqArg
-	    (\v -> case simpleParse v of
-	        Nothing -> Left $ "Unknown architecture in --arch option: " ++ v
-		Just arch -> Right $ \g -> g{gArch = arch})
-	    "ARCHITECTURE")
+            (\v -> case simpleParse v of
+                Nothing -> Left $ "Unknown architecture in --arch option: " ++ v
+                Just arch -> Right $ \g -> g{gArch = arch})
+            "ARCHITECTURE")
         "Architecture to build (e.g. 'i386' or 'x86_64')."
     , Option "" [binaryVariantOptName]
         (ReqArg (\v -> Right $ \g -> g{gBinarySuffix = v}) "SUFFIX")
@@ -467,10 +467,10 @@ binaryName global@Global{..} =
     concat
         [ stackProgName
         , "-"
-	, stackVersionStr global
-	, "-"
-	, platformName global
-	, if null gBinarySuffix then "" else "-" ++ gBinarySuffix ]
+        , stackVersionStr global
+        , "-"
+        , platformName global
+        , if null gBinarySuffix then "" else "-" ++ gBinarySuffix ]
 
 -- | String representation of stack package version.
 stackVersionStr :: Global -> String
