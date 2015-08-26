@@ -6,6 +6,7 @@
 import Control.Applicative
 import Control.Exception
 import Control.Monad
+import Control.Monad.Trans.Resource (runResourceT)
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy.Char8 as L8
 import Data.List
@@ -448,7 +449,8 @@ callGithubApi Global{..} headers mpostFile url = do
             return $ req1
                 { method = S8.pack "POST"
                 , requestBody = RequestBodyLBS lbs }
-    withManager $ \manager -> do
+    manager <- newManager tlsManagerSettings
+    runResourceT $ do
         res <- http req manager
         responseBody res $$+- CC.sinkLazy
 
