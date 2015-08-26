@@ -37,6 +37,7 @@ import Network.HTTP.Conduit
 import Network.HTTP.Types
 import Network.Mime
 import System.Environment.Executable
+import Prelude -- Silence AMP warning
 
 -- | Entrypoint.
 main :: IO ()
