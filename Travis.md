@@ -135,3 +135,4 @@ install:
 - https://github.com/haskell-distributed/cloud-haskell/blob/master/.travis.yml
 - https://github.com/simonmichael/hledger/blob/master/.travis.yml
 - https://github.com/fpco/wai-middleware-crowd/blob/master/.travis.yml
+- https://github.com/commercialhaskell/all-cabal-hashes-tool/blob/master/.travis.yml
