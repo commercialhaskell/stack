@@ -62,6 +62,8 @@ cabalSolver wc cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-s
 
     let args = ("--config-file=" ++ configFile)
              : "install"
+             : "--enable-tests"
+             : "--enable-benchmarks"
              : "-v"
              : "--dry-run"
              : "--only-dependencies"
