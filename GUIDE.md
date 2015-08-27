@@ -16,7 +16,7 @@ your toolchain (including GHC- the Glasgow Haskell Compiler- and- for Windows
 users- MSYS), building and registering libraries, building build tool
 dependencies, and much more. While stack can use existing tools on your system,
 stack has the capability to be your one-stop shop for all Haskell tooling you
-need. This guide will follows that approach.
+need. This guide will follow that approach.
 
 What makes stack special? It's primary design point is __reproducible builds__.
 The goal is that if you run `stack build` today, you'll get the same result
