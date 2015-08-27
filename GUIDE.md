@@ -578,8 +578,224 @@ page](https://github.com/commercialhaskell/stack/wiki/stack.yaml#resolver).
 
 ## Existing projects
 
-* stack init --solver
-* stack solver
+Alright, enough playing around with simple projects. Let's take an open source
+package and try to build it. We'll be ambitious and use
+[yackage](https://www.stackage.org/package/yackage), a local package server
+using [Yesod](http://www.yesodweb.com/). To get the code, we'll use the `stack
+unpack` command:
+
+```
+michael@d30748af6d3d:~$ stack unpack yackage-0.8.0
+yackage-0.8.0: download
+Unpacked yackage-0.8.0 to /home/michael/yackage-0.8.0/
+michael@d30748af6d3d:~$ cd yackage-0.8.0/
+```
+
+This new directory does not have a stack.yaml file, so we need to make one
+first. We could do it by hand, but let's be lazy instead with the `stack init`
+command:
+
+```
+michael@d30748af6d3d:~/yackage-0.8.0$ stack init
+Writing default config file to: /home/michael/yackage-0.8.0/stack.yaml
+Basing on cabal files:
+- /home/michael/yackage-0.8.0/yackage.cabal
+
+Checking against build plan lts-3.2
+Selected resolver: lts-3.2
+Wrote project config to: /home/michael/yackage-0.8.0/stack.yaml
+michael@d30748af6d3d:~/yackage-0.8.0$ cat stack.yaml
+flags:
+  yackage:
+    upload: true
+packages:
+- '.'
+extra-deps: []
+resolver: lts-3.2
+```
+
+stack init does quite a few things for you behind the scenes:
+
+* Creates a list of snapshots that would be good candidates. The basic algorithm here is: prefer snapshots you've already built some packages for (to increase sharing of binary package databases, as we'll discuss later), prefer recent snapshots, and prefer LTS. These preferences can be tweaked with command line flags, see `stack init --help`.
+* Finds all of the .cabal files in your current directory and subdirectories (unless you use `--ignore-subdirs`) and determines the packages and versions they require
+* Finds a combination of snapshot and package flags that allows everything to compile
+
+Assuming it finds a match, it will write your stack.yaml file, and everything
+will be good. Given that LTS Haskell and Stackage Nightly have ~1400 of the
+most common Haskell packages, this will often be enough. However, let's
+simulate a failure by adding acme-missiles to our build-depends and re-initing:
+
+```
+michael@d30748af6d3d:~/yackage-0.8.0$ stack init --force
+Writing default config file to: /home/michael/yackage-0.8.0/stack.yaml
+Basing on cabal files:
+- /home/michael/yackage-0.8.0/yackage.cabal
+
+Checking against build plan lts-3.2
+
+* Build plan did not match your requirements:
+    acme-missiles not found
+    - yackage requires -any
+
+Checking against build plan lts-3.1
+
+* Build plan did not match your requirements:
+    acme-missiles not found
+    - yackage requires -any
+
+
+Checking against build plan nightly-2015-08-26
+
+* Build plan did not match your requirements:
+    acme-missiles not found
+    - yackage requires -any
+
+
+Checking against build plan lts-2.22
+
+* Build plan did not match your requirements:
+    acme-missiles not found
+    - yackage requires -any
+
+    warp version 3.0.13.1 found
+    - yackage requires >=3.1
+
+
+There was no snapshot found that matched the package bounds in your .cabal files.
+Please choose one of the following commands to get started.
+
+    stack init --resolver lts-3.2
+    stack init --resolver lts-3.1
+    stack init --resolver nightly-2015-08-26
+    stack init --resolver lts-2.22
+
+You'll then need to add some extra-deps. See:
+
+    https://github.com/commercialhaskell/stack/wiki/stack.yaml#extra-deps
+
+You can also try falling back to a dependency solver with:
+
+    stack init --solver
+```
+
+stack has tested four different snapshots, and in every case discovered that
+acme-missiles is not available. Also, when testing lts-2.22, it found that the
+warp version provided was too old for yackage. The question is: what do we do
+next?
+
+The recommended approach is: pick a resolver, and fix the problem. Again,
+following the advice mentioned above, default to LTS if you don't have a
+preference. In this case, the newest LTS listed is lts-3.2. Let's pick that.
+stack has told us the correct command to do this. We'll just remove our old
+stack.yaml first and then run it:
+
+```
+michael@d30748af6d3d:~/yackage-0.8.0$ rm stack.yaml
+michael@d30748af6d3d:~/yackage-0.8.0$ stack init --resolver lts-3.2
+Writing default config file to: /home/michael/yackage-0.8.0/stack.yaml
+Basing on cabal files:
+- /home/michael/yackage-0.8.0/yackage.cabal
+
+Checking against build plan lts-3.2
+
+* Build plan did not match your requirements:
+    acme-missiles not found
+    - yackage requires -any
+
+
+Selected resolver: lts-3.2
+Wrote project config to: /home/michael/yackage-0.8.0/stack.yaml
+```
+
+As you may guess, `stack build` will now fail due to the missing acme-missiles.
+Toward the end of the error message, it says the familiar:
+
+```
+Recommended action: try adding the following to your extra-deps in /home/michael/yackage-0.8.0/stack.yaml
+- acme-missiles-0.3
+```
+
+If you're following along at home, try making the necessary stack.yaml
+modification to get things building.
+
+### Alternative solution: dependency solving
+
+There's another solution to the problem you may consider. At the very end of
+the previous error message, it said:
+
+```
+You may also want to try the 'stack solver' command
+```
+
+This approach uses a full blown dependency solver to look at all upstream package versions available and compare them to your snapshot selection and version ranges in your .cabal file. In order to use this feature, you'll need the cabal executable available. Let's build that with:
+
+```
+michael@d30748af6d3d:~/yackage-0.8.0$ stack build cabal-install
+random-1.1: download
+mtl-2.2.1: download
+network-2.6.2.1: download
+old-locale-1.0.0.7: download
+random-1.1: configure
+random-1.1: build
+# ...
+cabal-install-1.22.6.0: download
+cabal-install-1.22.6.0: configure
+cabal-install-1.22.6.0: build
+cabal-install-1.22.6.0: install
+Completed all 10 actions.
+```
+
+Now we can use `stack solver`:
+
+```
+michael@d30748af6d3d:~/yackage-0.8.0$ stack solver
+This command is not guaranteed to give you a perfect build plan
+It's possible that even with the changes generated below, you will still need to do some manual tweaking
+Asking cabal to calculate a build plan, please wait
+extra-deps:
+- acme-missiles-0.3
+```
+
+And if we're exceptionally lazy, we can ask stack to modify our stack.yaml file
+for us:
+
+```
+michael@d30748af6d3d:~/yackage-0.8.0$ stack solver --modify-stack-yaml
+This command is not guaranteed to give you a perfect build plan
+It's possible that even with the changes generated below, you will still need to do some manual tweaking
+Asking cabal to calculate a build plan, please wait
+extra-deps:
+- acme-missiles-0.3
+Updated /home/michael/yackage-0.8.0/stack.yaml
+```
+
+With that change, `stack build` will now run.
+
+NOTE: You should probably back up your stack.yaml before doing this, such as
+commiting to Git/Mercurial/Darcs.
+
+There's one final approach to mention: skipping the snapshot entirely and just
+using dependency solving. You can do this with the `--solver` flag to `init`.
+This is not a commonly used workflow with stack, as you end up with a large
+number of extra-deps, and no guarantee that the packages will compile together.
+For those interested, however, the option is available. You need to make sure
+you have both the ghc and cabal commands on your PATH. An easy way to do this
+is to use the `stack exec` command:
+
+```
+michael@d30748af6d3d:~/yackage-0.8.0$ stack exec --no-ghc-package-path -- stack init --solver --force
+Writing default config file to: /home/michael/yackage-0.8.0/stack.yaml
+Basing on cabal files:
+- /home/michael/yackage-0.8.0/yackage.cabal
+
+Asking cabal to calculate a build plan, please wait
+Selected resolver: ghc-7.10
+Wrote project config to: /home/michael/yackage-0.8.0/stack.yaml
+```
+
+The --no-ghc-package-path flag is described below, and is only needed due to a
+[bug](https://github.com/commercialhaskell/stack/issues/860) in the currently
+released stack. That bug is fixed in 0.1.4 and forward.
 
 ## Different databases
 
@@ -608,6 +824,8 @@ page](https://github.com/commercialhaskell/stack/wiki/stack.yaml#resolver).
 * How to completely remove traces of stack
 
 ## exec
+
+* --no-ghc-package-path
 
 ## repl
 
