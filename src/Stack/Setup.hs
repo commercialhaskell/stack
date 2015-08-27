@@ -610,6 +610,8 @@ downloadAndInstallGHC menv si wanted versionCheck = do
             case platform of
                 Platform _ os | isWindows os -> installGHCWindows
                 _ -> installGHCPosix
+    $logInfo "Preparing to install GHC to an isolated location."
+    $logInfo "This will not interfere with any system-level installation."
     downloadAndInstallTool si downloadInfo $(mkPackageName "ghc") selectedVersion installer
 
 getOSKey :: (MonadReader env m, MonadThrow m, HasConfig env, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
