@@ -34,7 +34,7 @@ import           Data.Conduit (Conduit, ($$), (=$), await, yield, awaitForever)
 import           Data.Conduit.Lift (evalStateC)
 import qualified Data.Conduit.List as CL
 import           Data.Either
-import           Data.Foldable
+import           Data.Foldable hiding (concatMap, or)
 import           Data.IORef
 import           Data.IORef.RunOnce (runOnce)
 import           Data.List hiding (concat, elem, maximumBy)
