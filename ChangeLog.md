@@ -23,6 +23,8 @@ Other enhancements:
 
 Bug fixes:
 
+* `stack init --solver` fails if `GHC_PACKAGE_PATH` is present [#860](https://github.com/commercialhaskell/stack/issues/860)
+
 ## 0.1.3.1
 
 Bug fixes:

@@ -75,7 +75,10 @@ cabalSolver wc cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-s
 
     $logInfo "Asking cabal to calculate a build plan, please wait"
 
-    bs <- readProcessStdout (Just tmpdir) menv "cabal" args
+    platform <- asks getPlatform
+    menv' <- mkEnvOverride platform
+           $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv
+    bs <- readProcessStdout (Just tmpdir) menv' "cabal" args
     let ls = drop 1
            $ dropWhile (not . T.isPrefixOf "In order, ")
            $ T.lines
