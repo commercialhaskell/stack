@@ -1,4 +1,4 @@
-stack is a cross-platform programm for developing Haskell projects. This guide
+stack is a cross-platform program for developing Haskell projects. This guide
 is intended to step a new stack user through all of the typical stack
 workflows. This guide will not teach you Haskell, but will also not be looking
 at much code. This guide will not presume prior experience with the Haskell
@@ -116,7 +116,7 @@ No GHC found, expected version 7.10.2 (x86_64) (based on resolver setting in /ho
 Try running stack setup
 ```
 
-That was a bit anticlimatic. The problem is that stack needs GHC in order to
+That was a bit anticlimactic. The problem is that stack needs GHC in order to
 build your project, but we don't have one on our system yet. Instead of
 automatically assuming you want it to download and install GHC for you, stack
 asks you to do this as a separate command: `setup`. Our message here lets us
@@ -203,7 +203,7 @@ helloworld-0.1.0.0: test (suite: helloworld-test)
 Test suite not yet implemented
 ```
 
-In the next three subsections, we'll disect a few details of this helloworld
+In the next three subsections, we'll dissect a few details of this helloworld
 example.
 
 ### Files in helloworld
@@ -772,7 +772,7 @@ Updated /home/michael/yackage-0.8.0/stack.yaml
 With that change, `stack build` will now run.
 
 NOTE: You should probably back up your stack.yaml before doing this, such as
-commiting to Git/Mercurial/Darcs.
+committing to Git/Mercurial/Darcs.
 
 There's one final approach to mention: skipping the snapshot entirely and just
 using dependency solving. You can do this with the `--solver` flag to `init`.
