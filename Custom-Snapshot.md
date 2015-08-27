@@ -14,6 +14,20 @@ that you're able to create a file specifying all the packages you
 want, include those extra dependencies, and make stack use it as
 if it came from Stackage.
 
+## Format
+
+```
+compiler: ghc-7.10.2
+
+flags:
+  aeson:
+    old-locale: false
+
+packages:
+  - aeson-diff-0.1.1.2
+```
+
+
 ## Creating a new snapshot
 
 Note: start by just adding custom dependencies to extra-deps.
