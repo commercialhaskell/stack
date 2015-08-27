@@ -203,6 +203,9 @@ helloworld-0.1.0.0: test (suite: helloworld-test)
 Test suite not yet implemented
 ```
 
+In the next three subsections, we'll disect a few details of this helloworld
+example.
+
 ### Files in helloworld
 
 Before moving on with understanding stack a bit better, let's understand our project just a bit better.
@@ -271,26 +274,312 @@ modify a .cabal file. The definitive reference on the .cabal file format is
 [available on
 haskell.org](https://www.haskell.org/cabal/users-guide/developing-packages.html).
 
-## The setup command
+### The setup command
 
-* stack setup (nothing happens)
+As we saw above, the `setup` command installed GHC for us. Just for kicks,
+let's run `setup` a second time:
 
-## The build command
+```
+michael@d30748af6d3d:~/helloworld$ stack setup
+stack will use a locally installed GHC
+For more information on paths, see 'stack path' and 'stack exec env'
+To use this GHC and packages outside of a project, consider using:
+stack ghc, stack ghci, stack runghc, or stack exec
+```
+
+Thankfully, the command is smart enough to know not to perform an installation
+twice. setup will take advantage of either the first GHC it finds on your PATH,
+or a locally installed version. As the command output above indicates, you can
+use `stack path` for quite a bit of path information (which we'll play with
+more later). For now, we'll just look at where GHC is installed:
+
+```
+michael@d30748af6d3d:~/helloworld$ stack exec which ghc
+/home/michael/.stack/programs/x86_64-linux/ghc-7.10.2/bin/ghc
+```
+
+As you can see from that path, the installation is placed such that it will not
+interfere with any other GHC installation, either system-wide, or even
+different GHC versions installed by stack.
+
+### The build command
+
+The build command is the heart and soul of stack. It is the engine that powers
+building your code, testing it, getting dependencies, and more. Quite a bit of
+the remainder of this guide will cover fun things you can do with build to get
+more advanced behavior, such as building test and Haddocks at the same time, or
+constantly rebuilding blocking on file changes.
+
+But on a philosophical note: running the build command twice with the same
+options and arguments should generally be a no-op (besides things like
+rerunning test suites), and should in general produce a reproducible result
+between different runs.
+
+OK, enough talking about this simple example. Let's start making it a bit more
+complicated!
 
 ## Adding dependencies
 
-* To cabal file
-* Outside of package set
+Let's say we decide to modify our helloworld source a bit to use a new library,
+perhaps the ubiquitous text package. For example:
+
+```haskell
+{-# LANGUAGE OverloadedStrings #-}
+module Lib
+    ( someFunc
+    ) where
+
+import qualified Data.Text.IO as T
+
+someFunc :: IO ()
+someFunc = T.putStrLn "someFunc"
+```
+
+When we try to build this, things don't go as expected:
+
+```haskell
+michael@d30748af6d3d:~/helloworld$ stack build
+helloworld-0.1.0.0-c91e853ce4bfbf6d394f54b135573db8: unregistering (local file changes)
+helloworld-0.1.0.0: configure
+Configuring helloworld-0.1.0.0...
+helloworld-0.1.0.0: build
+Preprocessing library helloworld-0.1.0.0...
+
+/home/michael/helloworld/src/Lib.hs:6:18:
+    Could not find module `Data.Text.IO'
+    Use -v to see a list of the files searched for.
+
+--  While building package helloworld-0.1.0.0 using:
+      /home/michael/.stack/programs/x86_64-linux/ghc-7.10.2/bin/runhaskell -package=Cabal-1.22.4.0 -clear-package-db -global-package-db -package-db=/home/michael/.stack/snapshots/x86_64-linux/lts-3.2/7.10.2/pkgdb/ /tmp/stack5846/Setup.hs --builddir=.stack-work/dist/x86_64-linux/Cabal-1.22.4.0/ build exe:helloworld-exe --ghc-options -hpcdir .stack-work/dist/x86_64-linux/Cabal-1.22.4.0/hpc/.hpc/ -ddump-hi -ddump-to-file
+    Process exited with code: ExitFailure 1
+```
+
+Notice that it says "Could not find module." This means that the package
+containing the module in question is not available. In order to tell stack that
+you want to use text, you need to add it to your .cabal file. This can be done
+in your build-depends section, and looks like this:
+
+```cabal
+library
+  hs-source-dirs:      src
+  exposed-modules:     Lib
+  build-depends:       base >= 4.7 && < 5
+                       -- This next line is the new one
+                     , text
+  default-language:    Haskell2010
+```
+
+Now if we rerun `stack build`, we get a very different result:
+
+```
+michael@d30748af6d3d:~/helloworld$ stack build
+text-1.2.1.3: download
+text-1.2.1.3: configure
+text-1.2.1.3: build
+text-1.2.1.3: install
+helloworld-0.1.0.0: configure
+Configuring helloworld-0.1.0.0...
+helloworld-0.1.0.0: build
+Preprocessing library helloworld-0.1.0.0...
+[1 of 1] Compiling Lib              ( src/Lib.hs, .stack-work/dist/x86_64-linux/Cabal-1.22.4.0/build/Lib.o )
+In-place registering helloworld-0.1.0.0...
+Preprocessing executable 'helloworld-exe' for helloworld-0.1.0.0...
+[1 of 1] Compiling Main             ( app/Main.hs, .stack-work/dist/x86_64-linux/Cabal-1.22.4.0/build/helloworld-exe/helloworld-exe-tmp/Main.o ) [Lib changed]
+Linking .stack-work/dist/x86_64-linux/Cabal-1.22.4.0/build/helloworld-exe/helloworld-exe ...
+helloworld-0.1.0.0: install
+Installing library in
+/home/michael/helloworld/.stack-work/install/x86_64-linux/lts-3.2/7.10.2/lib/x86_64-linux-ghc-7.10.2/helloworld-0.1.0.0-HI1deOtDlWiAIDtsSJiOtw
+Installing executable(s) in
+/home/michael/helloworld/.stack-work/install/x86_64-linux/lts-3.2/7.10.2/bin
+Registering helloworld-0.1.0.0...
+Completed all 2 actions.
+```
+
+### extra-deps
+
+Let's try a more off-the-beaten-track package: the joke
+[acme-missiles](http://www.stackage.org/package/acme-missiles) package. Our
+source code is simple:
+
+```haskell
+module Lib
+    ( someFunc
+    ) where
+
+import Acme.Missiles
+
+someFunc :: IO ()
+someFunc = launchMissiles
+```
+
+As expected, `stack build` will fail because the module is not available. But
+if we add acme-missiles to the .cabal file, we get a new error message:
+
+```
+michael@d30748af6d3d:~/helloworld$ stack build
+While constructing the BuildPlan the following exceptions were encountered:
+
+--  While attempting to add dependency,
+    Could not find package acme-missiles in known packages
+
+--  Failure when adding dependencies:
+      acme-missiles: needed (-any), latest is 0.3, but not present in build plan
+    needed for package: helloworld-0.1.0.0
+
+Recommended action: try adding the following to your extra-deps in /home/michael/helloworld/stack.yaml
+- acme-missiles-0.3
+
+You may also want to try the 'stack solver' command
+```
+
+Notice that it says acme-missiles is "not present in build plan." This is the
+next major topic to understand when using stack.
 
 ## Curated package sets
 
-* stackage.org
-    * Resolver names
-    * Hoogle
+Remember up above when `stack new` selected the lts-3.2 resolver for us? That's
+what's defining our build plan, and available packages. When we tried using the
+text package, it just worked, because it was part of the lts-3.2 *package set*.
+acme-missiles, on the other hand, is not part of that package set, and
+therefore building failed.
+
+The first thing you're probably wondering is: how do I fix this? To do so,
+we'll use another one of the fields in stack.yaml- `extra-deps`- which is used
+to define extra dependencies not present in your resolver. With that change,
+our stack.yaml looks like:
+
+```yaml
+flags: {}
+packages:
+- '.'
+extra-deps:
+- acme-missiles-0.3 # Here it is
+resolver: lts-3.2
+```
+
+And as expected, `stack build` succeeds.
+
+With that out of the way, let's dig a little bit more into these package sets, also known as *snapshots*. We mentioned lts-3.2, and you can get quite a bit of information about it at [https://www.stackage.org/lts-3.2](https://www.stackage.org/lts-3.2):
+
+* The appropriate resolver value (`resolver: lts-3.2`, as we used above)
+* The GHC version used
+* A full list of all packages available in this snapshot
+* The ability to perform a Hoogle search on the packages in this snapshot
+* A [list of all modules](https://www.stackage.org/lts-3.2/docs) in a snapshot, which an be useful when trying to determine which package to add to your .cabal file
+
+You can also see a [list of all available
+snapshots](https://www.stackage.org/snapshots). You'll notice two flavors: LTS
+(standing for Long Term Support) and Nightly. You can read more about them on
+the [LTS Haskell Github page](https://github.com/fpco/lts-haskell#readme). If
+you're not sure what to go with, start with LTS Haskell. That's what stack will
+lean towards by default as well.
 
 ## Resolvers and changing your compiler version
 
+Now that we know a bit more about package sets, let's try putting that
+knowledge to work. Instead of lts-3.2, let's change our stack.yaml file to use
+[nightly-2015-08-26](https://www.stackage.org/nightly-2015-08-26). Rerunning
+`stack build` will produce:
+
+```
+michael@d30748af6d3d:~/helloworld$ stack build
+Downloaded nightly-2015-08-26 build plan.
+Caching build plan
+stm-2.4.4: configure
+stm-2.4.4: build
+stm-2.4.4: install
+acme-missiles-0.3: configure
+acme-missiles-0.3: build
+acme-missiles-0.3: install
+helloworld-0.1.0.0: configure
+Configuring helloworld-0.1.0.0...
+helloworld-0.1.0.0: build
+Preprocessing library helloworld-0.1.0.0...
+In-place registering helloworld-0.1.0.0...
+Preprocessing executable 'helloworld-exe' for helloworld-0.1.0.0...
+Linking .stack-work/dist/x86_64-linux/Cabal-1.22.4.0/build/helloworld-exe/helloworld-exe ...
+helloworld-0.1.0.0: install
+Installing library in
+/home/michael/helloworld/.stack-work/install/x86_64-linux/nightly-2015-08-26/7.10.2/lib/x86_64-linux-ghc-7.10.2/helloworld-0.1.0.0-6cKaFKQBPsi7wB4XdqRv8w
+Installing executable(s) in
+/home/michael/helloworld/.stack-work/install/x86_64-linux/nightly-2015-08-26/7.10.2/bin
+Registering helloworld-0.1.0.0...
+Completed all 3 actions.
+```
+
+We can also change resolvers on the command line, which can be useful in a
+Continuous Integration (CI) setting, like on Travis. For example:
+
+```
+michael@d30748af6d3d:~/helloworld$ stack --resolver lts-3.1 build
+Downloaded lts-3.1 build plan.
+Caching build plan
+stm-2.4.4: configure
+# Rest is the same, no point copying it
+```
+
+When passed on the command line, you also get some additional "short-cut" versions of resolvers: `--resolver nightly` will use the newest Nightly resolver available, `--resolver lts` will use the newest LTS, and `--resolver lts-2` will use the newest LTS in the 2.X series. The reason these are only available on the command line and not in your stack.yaml file is that using them:
+
+1. Will slow your build down, since stack needs to download information on the
+   latest available LTS each time it builds
+2. Produces unreliable results, since a build run today may proceed differently
+   tomorrow because of changes outside of your control.
+
+### Changing GHC versions
+
+Finally, let's try using an older LTS snapshot. We'll use the newest 2.X
+snapshot:
+
+```
+michael@d30748af6d3d:~/helloworld$ stack --resolver lts-2 build
+Selected resolver: lts-2.22
+Downloaded lts-2.22 build plan.
+Caching build plan
+No GHC found, expected version 7.8.4 (x86_64) (based on resolver setting in /home/michael/helloworld/stack.yaml). Try running stack setup
+```
+
+This fails, because GHC 7.8.4 (which lts-2.22 uses) is not available on our
+system. The first lesson is: when you want to change your GHC version, modify
+the resolver value. Now the question is: how do we get the right GHC version?
+One answer is to use `stack setup` like we did above, this time with the
+`--resolver lts-2` option. However, there's another way worth mentioning: the
+`--install-ghc` flag.
+
+```
+michael@d30748af6d3d:~/helloworld$ stack --resolver lts-2 --install-ghc build
+Selected resolver: lts-2.22
+Downloaded ghc-7.8.4.
+Installed GHC.
+stm-2.4.4: configure
+# Mostly same as before, nothing interesting to see
+```
+
+What's nice about `--install-ghc` is that:
+
+1. You don't need to have an extra step in your build script
+2. It only requires downloading the information on latest snapshots once
+
+As mentioned above, the default behavior of stack is to *not* install new
+versions of GHC automatically, to avoid surprising users with large
+downloads/installs. This flag simply changes that default behavior.
+
+### Other resolver values
+
+We've mentioned `nightly-YYYY-MM-DD` and `lts-X.Y` values for the resolver.
+There are actually other options available, and the list will grow over time.
+At the time of writing:
+
+* `ghc-X.Y.Z`, for requiring a specific GHC version but no additional packages
+* Experimental GHCJS support
+* Experimental custom snapshot support
+
+The most up-to-date information can always be found on the [stack.yaml wiki
+page](https://github.com/commercialhaskell/stack/wiki/stack.yaml#resolver).
+
 ## Existing projects
+
+* stack init --solver
+* stack solver
 
 ## Different databases
 
