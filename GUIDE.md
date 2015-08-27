@@ -290,6 +290,8 @@ haskell.org](https://www.haskell.org/cabal/users-guide/developing-packages.html)
 
 ## Resolvers and changing your compiler version
 
+## Existing projects
+
 ## Different databases
 
 ## The build synonyms
@@ -321,6 +323,8 @@ haskell.org](https://www.haskell.org/cabal/users-guide/developing-packages.html)
 ## repl
 
 ## ghc/runghc
+
+## Implicit global
 
 ## IDE
 
