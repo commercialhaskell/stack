@@ -40,6 +40,7 @@ import Data.Foldable (traverse_,for_)
 import Data.Monoid
 import Data.String
 import Data.Typeable (Typeable)
+import GHC.IO.Exception (IOException(..),IOErrorType(..))
 import Network.HTTP.Client.Conduit
 import Network.HTTP.Types.Header (hContentLength, hContentMD5)
 import Path
@@ -200,13 +201,22 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
     liftIO $ whenM' getShouldDownload $ do
         createDirectoryIfMissing True dir
         withBinaryFile fptmp WriteMode $ \h -> do
-            recovering drRetryPolicy [const $ Handler alwaysRetryHttp] $
+            recovering drRetryPolicy handlers $
                 flip runReaderT env $
                     withResponse req (go h)
         renameFile fptmp fp
   where
+    handlers = [const $ Handler alwaysRetryHttp,const $ Handler retrySomeIO]
+
     alwaysRetryHttp :: Monad m => HttpException -> m Bool
     alwaysRetryHttp _ = return True
+
+    retrySomeIO :: Monad m => IOException -> m Bool
+    retrySomeIO e = return $ case ioe_type e of
+                               -- hGetBuf: resource vanished (Connection reset by peer)
+                               ResourceVanished -> True
+                               -- conservatively exclude all others
+                               _ -> False
 
     whenM' mp m = do
         p <- mp
