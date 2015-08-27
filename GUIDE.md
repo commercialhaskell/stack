@@ -13,7 +13,7 @@ packaging system or other build tools.
 
 stack is a modern build tool for Haskell code. It handles the management of
 your toolchain (including GHC- the Glasgow Haskell Compiler- and- for Windows
-users- MSYS), building and registry libraries, building build tool
+users- MSYS), building and registering libraries, building build tool
 dependencies, and much more. While stack can use existing tools on your system,
 stack has the capability to be your one-stop shop for all Haskell tooling you
 need. This guide will follows that approach.
