@@ -400,6 +400,11 @@ Registering helloworld-0.1.0.0...
 Completed all 2 actions.
 ```
 
+What this output means is: the text package was downloaded, configured, built,
+and locally installed. Once that was done, we moved on to building our local
+package (helloworld). Notice that at no point do you need to ask stack to build
+dependencies for you: it does so automatically.
+
 ### extra-deps
 
 Let's try a more off-the-beaten-track package: the joke
