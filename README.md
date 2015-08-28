@@ -56,10 +56,11 @@ to do is `stack install <package-name>`.
 
 Run `stack` for a complete list of commands.
 
-#### Architecture
+#### Complete guide to stack
 
-A full description of the architecture
-[is available here](https://github.com/commercialhaskell/stack/wiki/Architecture).
+This repository also contains [a complete guide to using
+stack](https://github.com/commercialhaskell/stack/blob/master/GUIDE.md),
+covering all of the most common use cases.
 
 #### Questions, Feedback, Discussion
 
