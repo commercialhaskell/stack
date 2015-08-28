@@ -1,8 +1,3 @@
-__NOTE__: This document is a work in progress, and is being shared to get
-feedback. Please do *not* rely on this document as being perfect, and if you
-see something that can be improved, either send a pull request or send a note
-to Michael Snoyman (who's currently authoring it).
-
 stack is a cross-platform program for developing Haskell projects. This guide
 is intended to step a new stack user through all of the typical stack
 workflows. This guide will not teach you Haskell, but will also not be looking
