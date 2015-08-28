@@ -72,7 +72,7 @@ import           System.Directory (canonicalizePath, doesFileExist, doesDirector
 import           System.Environment (getProgName)
 import           System.Exit
 import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
-import           System.FilePath (dropTrailingPathSeparator)
+import           System.FilePath (dropTrailingPathSeparator, searchPathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, Handle, hGetEncoding, hSetEncoding)
 import           System.Process.Read
 
@@ -422,7 +422,7 @@ paths =
     , ( "PATH environment variable"
       , "bin-path"
       , \pi ->
-             T.pack (intercalate ":" (eoPath (piEnvOverride pi))))
+             T.pack (intercalate [searchPathSeparator] (eoPath (piEnvOverride pi))))
     , ( "Installed GHCs (unpacked and archives)"
       , "ghc-paths"
       , \pi ->
