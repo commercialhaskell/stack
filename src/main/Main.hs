@@ -31,6 +31,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Data.Traversable
+import           Data.Version (showVersion)
 import           Distribution.System (buildArch)
 import           Development.GitRev (gitCommitCount)
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
@@ -156,12 +157,20 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
             , [" (" ++ $gitCommitCount ++ " commits)" | $gitCommitCount /= ("1"::String)]
             , [" ", show buildArch]
             ]
+
+     let numericVersion :: Parser (a -> a)
+         numericVersion =
+          infoOption
+            (showVersion Meta.version)
+            (long "numeric-version" <>
+             help "Show only version number")
+
      eGlobalRun <- try $
        simpleOptions
          versionString'
          "stack - The Haskell Tool Stack"
          ""
-         (extraHelpOption progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
+         (numericVersion <*> extraHelpOption progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
           globalOptsParser isTerminal)
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
