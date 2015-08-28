@@ -746,6 +746,7 @@ sdistCmd dirs go =
             (tarName, tarBytes) <- getSDistTarball dir
             distDir <- distDirFromDir dir
             tarPath <- fmap (distDir </>) $ parseRelFile tarName
+            liftIO $ createTree $ parent tarPath
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
             $logInfo $ "Wrote sdist tarball to " <> T.pack (toFilePath tarPath)
 
