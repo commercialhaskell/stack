@@ -809,6 +809,89 @@ released stack. That bug is fixed in 0.1.4 and forward.
 
 ## Different databases
 
+Time to take a short break from hands-on examples and discuss a little
+architecture. stack has the concept of multiple *databases*. A database
+consists of a GHC package database (which contains the compiled version of a
+library), executables, and a few other things as well. Just to give you an
+idea:
+
+```
+michael@d30748af6d3d:~/helloworld$ ls .stack-work/install/x86_64-linux/lts-3.2/7.10.2/
+bin  doc  flag-cache  lib  pkgdb
+```
+
+Databases in stack are *layered*. For example, the database listing I just gave
+is what we call a *local* database. This is layered on top of a *snapshot*
+database, which contains the libraries and executables specified in the
+snapshot itself. Finally, GHC itself ships with a number of libraries and
+executables, which forms the *global* database. Just to give a quick idea of
+this, we can look at the output of the `ghc-pkg list` command in our helloworld
+project:
+
+```
+/home/michael/.stack/programs/x86_64-linux/ghc-7.10.2/lib/ghc-7.10.2/package.conf.d
+   Cabal-1.22.4.0
+   array-0.5.1.0
+   base-4.8.1.0
+   bin-package-db-0.0.0.0
+   binary-0.7.5.0
+   bytestring-0.10.6.0
+   containers-0.5.6.2
+   deepseq-1.4.1.1
+   directory-1.2.2.0
+   filepath-1.4.0.0
+   ghc-7.10.2
+   ghc-prim-0.4.0.0
+   haskeline-0.7.2.1
+   hoopl-3.10.0.2
+   hpc-0.6.0.2
+   integer-gmp-1.0.0.0
+   pretty-1.1.2.0
+   process-1.2.3.0
+   rts-1.0
+   template-haskell-2.10.0.0
+   terminfo-0.4.0.1
+   time-1.5.0.1
+   transformers-0.4.2.0
+   unix-2.7.1.0
+   xhtml-3000.2.1
+/home/michael/.stack/snapshots/x86_64-linux/nightly-2015-08-26/7.10.2/pkgdb
+   stm-2.4.4
+/home/michael/helloworld/.stack-work/install/x86_64-linux/nightly-2015-08-26/7.10.2/pkgdb
+   acme-missiles-0.3
+   helloworld-0.1.0.0
+```
+
+Notice that acme-missiles ends up in the *local* database. Anything which is
+not installed from a snapshot ends up in the local database. This includes:
+your own code, extra-deps, and in some cases even snapshot packages, if you
+modify them in some way. The reason we have this structure is that:
+
+* it lets multiple projects reuse the same binary builds of many snapshot packages,
+* but doesn't allow different projects to "contaminate" each other by putting non-standard content into the shared snapshot database
+
+Typically, the process by which a snapshot package is marked as modified is
+referred to as "promoting to an extra-dep," meaning we treat it just like a
+package in the extra-deps section. This happens for a variety of reasons,
+including:
+
+* changing the version of the snapshot package
+* changing build flags
+* one of the packages that the package depends on has been promoted to an extra-dep
+
+And as you probably guessed: there are multiple snapshot databases available, e.g.:
+
+```
+michael@d30748af6d3d:~/helloworld$ ls ~/.stack/snapshots/x86_64-linux/
+lts-2.22  lts-3.1  lts-3.2  nightly-2015-08-26
+```
+
+These databases don't get layered on top of each other, but are each used separately.
+
+In reality, you'll rarely- if ever- interact directly with these databases, but
+it's good to have a basic understanding of how they work so you can understand
+why rebuilding may occur at different points.
+
 ## The build synonyms
 
 * build, test, bench, haddock, and install
