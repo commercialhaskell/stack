@@ -68,7 +68,7 @@ it's a good idea- though not required- to set your PATH environment variable to
 include `$HOME/.local/bin`:
 
 ```
-michael@d30748af6d3d:~$ echo 'export HOME=$HOME/.local/bin:$PATH' >> ~/.bashrc
+michael@d30748af6d3d:~$ echo 'export PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc
 ```
 
 ## Hello World
