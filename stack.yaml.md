@@ -9,6 +9,8 @@ and [non-project specific](#non-project-config) options in:
 - `/etc/stack/config` -- for system global non-project options
 -  `~/.stack/stack.yaml` -- for user non-project options
 
+*Note:* When stack is invoked outside a stack project it will source project specific options from `~/.stack/global/stack.yaml`.
+
 ## Project config
 
 Project specific options are only valid in the `stack.yaml` file local to a project, not in the user or global config files.
