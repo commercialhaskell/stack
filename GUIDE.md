@@ -13,11 +13,13 @@ dependencies, and much more. While stack can use existing tools on your system,
 stack has the capability to be your one-stop shop for all Haskell tooling you
 need. This guide will follow that approach.
 
-What makes stack special? Its primary design point is __reproducible builds__.
-The goal is that if you run `stack build` today, you'll get the same result
-running `stack build` tomorrow. There are some exceptions to that rule (changes
-in your operating system configuration, for example), but overall it follows
-this design philosophy closely.
+What makes stack special? Its primary design point is __reproducible
+builds__.  The goal is that if you run `stack build` today, you'll get
+the same result running `stack build` tomorrow. There are some
+exceptions to that rule (changes in your operating system
+configuration, for example), but overall it follows this design
+philosophy closely. stack makes use of curated package sets, called
+__snapshots__, in order to make this a simple process.
 
 stack has also been designed from the ground up to be user friendly, with an
 intuitive, discoverable command line interface. For many users, simply
@@ -25,11 +27,17 @@ downloading stack and reading `stack --help` will be enough to get up and
 running. This guide is intended to provide a gradual learning process for users
 who prefer that learning style.
 
-Finally, stack is __isolated__: it will not make changes outside of specific
-stack directories (described below). Do not be worried if you see comments like
-"Installing GHC": stack will not tamper with your system packages at all.
-Additionally, stack packages will not interfere with packages installed by
-other build tools like cabal.
+Finally, stack is __isolated__: it will not make changes outside of
+specific stack directories. The stack root directory (default
+`~/.stack`) is the location where stack stores isolated copies of
+programs and curated package sets. Do not be worried if you see
+comments like "Installing GHC": stack will install programs in its
+root directory, and it will not tamper with your system version of GHC
+at all. Additionally, packages installed with stack will not interfere
+with packages installed by other build tools, like `cabal`. Packages
+belonging to a snapshot are installed in the stack root directory, and
+packages specific to a project are installed in a project local
+`./.stack-work` directory.
 
 _NOTE_ In this guide, I'll be running commands on a Linux system (Ubuntu 14.04,
 64-bit) and sharing output from there. Output on other systems- or with

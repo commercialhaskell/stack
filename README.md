@@ -48,9 +48,10 @@ You may be prompted to run some of the following along the way:
 * `stack init` to create a stack configuration file for an existing project.
   stack will figure out what Stackage release (LTS or nightly) is appropriate
   for the dependencies.
-* `stack setup` to download and install the correct GHC version in an isolated
-  location that won't interfere with any system-level installations. (For
-  information on installation paths, please use the `stack path` command.)
+* `stack setup` to download and install the correct GHC version in an
+  isolated location (default `~/.stack`) that won't interfere with any
+  system-level installations. (For information on installation paths,
+  please use the `stack path` command.)
 
 If you just want to install an executable using stack, then all you have
 to do is `stack install <package-name>`.
