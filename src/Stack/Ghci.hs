@@ -207,6 +207,7 @@ ghciSetup mainIs stringTargets = do
         , boptsBenchmarkOpts = (boptsBenchmarkOpts base)
           { beoDisableRun = True
           }
+        , boptsBuildSubset = BSOnlyDependencies
         }
       where
         base = defaultBuildOpts
