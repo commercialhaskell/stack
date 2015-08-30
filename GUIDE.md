@@ -13,7 +13,7 @@ dependencies, and much more. While stack can use existing tools on your system,
 stack has the capability to be your one-stop shop for all Haskell tooling you
 need. This guide will follow that approach.
 
-What makes stack special? It's primary design point is __reproducible builds__.
+What makes stack special? Its primary design point is __reproducible builds__.
 The goal is that if you run `stack build` today, you'll get the same result
 running `stack build` tomorrow. There are some exceptions to that rule (changes
 in your operating system configuration, for example), but overall it follows
