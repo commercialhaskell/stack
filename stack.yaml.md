@@ -1,8 +1,17 @@
 This page is intended to fully document all configuration options available in the stack.yaml file. Note that this page is likely to be both *incomplete* and sometimes *inaccurate*. If you see such cases, please update the page, and if you're not sure how, open an issue labeled "question".
 
-The stack.yaml configuration options break down into project specific and non-project specific options. The latter can be specified in your global config (`/etc/stack/config`) and user config (`~/.stack/stack.yaml`), as well as in the project config. The former must be in the project config.
+The stack.yaml configuration options break down into [project specific](#project-config) options in: 
+
+- `<project dir>/stack.yml`
+
+and [non-project specific](#non-project-config) options in:
+
+- `/etc/stack/config` -- for system global non-project options
+-  `~/.stack/stack.yaml` -- for user non-project options
 
 ## Project config
+
+Project specific options are only valid in the `stack.yaml` file local to a project, not in the user or global config files.
 
 ### packages
 
@@ -103,6 +112,8 @@ image:
 
 ## Non-project config
 
+Non-project config options may go in the global config (`/etc/stack/config`) or the user config (`~/.stack/stack.yaml`).
+
 ### docker
 
 See [Docker configuration](Docker#configuration).
@@ -124,6 +135,12 @@ Default: `true`
 URL providing a JSON with information on the latest LTS and Nightly snapshots, used for automatic project configuration.
 
 Default: `https://www.stackage.org/download/snapshots.json`
+
+### local-bin-path
+
+Target directory for `stack install` and `stack build --copy-bins`.
+
+Default: `~/.local/bin`
 
 ### package-indices
 
