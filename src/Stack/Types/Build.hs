@@ -35,7 +35,9 @@ module Stack.Types.Build
     ,configureOpts
     ,BadDependency(..)
     ,wantedLocalPackages
-    ,FileCacheInfo (..))
+    ,FileCacheInfo (..)
+    ,ConfigureOpts (..)
+    ,PrecompiledCache (..))
     where
 
 import           Control.DeepSeq
@@ -486,7 +488,7 @@ newtype PkgDepsOracle =
 -- | Stored on disk to know whether the flags have changed or any
 -- files have changed.
 data ConfigCache = ConfigCache
-    { configCacheOpts :: ![S.ByteString]
+    { configCacheOpts :: !ConfigureOpts
       -- ^ All options used for this package.
     , configCacheDeps :: !(Set GhcPkgId)
       -- ^ The GhcPkgIds of all of the dependencies. Since Cabal doesn't take
@@ -518,7 +520,7 @@ data Task = Task
 data TaskConfigOpts = TaskConfigOpts
     { tcoMissing :: !(Set PackageIdentifier)
       -- ^ Dependencies for which we don't yet have an GhcPkgId
-    , tcoOpts    :: !(Set GhcPkgId -> [Text])
+    , tcoOpts    :: !(Set GhcPkgId -> ConfigureOpts)
       -- ^ Produce the list of options given the missing @GhcPkgId@s
     }
 instance Show TaskConfigOpts where
@@ -569,13 +571,21 @@ configureOpts :: EnvConfig
               -> Bool -- ^ wanted?
               -> InstallLocation
               -> Package
-              -> [Text]
-configureOpts econfig bco deps wanted loc package = map T.pack $ concat
+              -> ConfigureOpts
+configureOpts econfig bco deps wanted loc package = ConfigureOpts
+    { coDirs = configureOptsDirs bco loc package
+    , coNoDirs = configureOptsNoDir econfig bco deps wanted package
+    }
+
+configureOptsDirs :: BaseConfigOpts
+                  -> InstallLocation
+                  -> Package
+                  -> [String]
+configureOptsDirs bco loc package = concat
     [ ["--user", "--package-db=clear", "--package-db=global"]
     , map (("--package-db=" ++) . toFilePath) $ case loc of
         Snap -> [bcoSnapDB bco]
         Local -> [bcoSnapDB bco, bcoLocalDB bco]
-    , depOptions
     , [ "--libdir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "lib"))
       , "--bindir=" ++ toFilePathNoTrailingSlash (installRoot </> bindirSuffix)
       , "--datadir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "share"))
@@ -584,6 +594,31 @@ configureOpts econfig bco deps wanted loc package = map T.pack $ concat
       , "--docdir=" ++ toFilePathNoTrailingSlash docDir
       , "--htmldir=" ++ toFilePathNoTrailingSlash docDir
       , "--haddockdir=" ++ toFilePathNoTrailingSlash docDir]
+    ]
+  where
+    toFilePathNoTrailingSlash = dropTrailingPathSeparator . toFilePath
+    installRoot =
+        case loc of
+            Snap -> bcoSnapInstallRoot bco
+            Local -> bcoLocalInstallRoot bco
+    docDir =
+        case pkgVerDir of
+            Nothing -> installRoot </> docDirSuffix
+            Just dir -> installRoot </> docDirSuffix </> dir
+    pkgVerDir =
+        parseRelDir (packageIdentifierString (PackageIdentifier (packageName package)
+                                                                (packageVersion package)) ++
+                     [pathSeparator])
+
+-- | Same as 'configureOpts', but does not include directory path options
+configureOptsNoDir :: EnvConfig
+                   -> BaseConfigOpts
+                   -> Set GhcPkgId -- ^ dependencies
+                   -> Bool -- ^ wanted?
+                   -> Package
+                   -> [String]
+configureOptsNoDir econfig bco deps wanted package = concat
+    [ depOptions
     , ["--enable-library-profiling" | boptsLibProfile bopts || boptsExeProfile bopts]
     , ["--enable-executable-profiling" | boptsExeProfile bopts]
     , map (\(name,enabled) ->
@@ -604,19 +639,6 @@ configureOpts econfig bco deps wanted loc package = map T.pack $ concat
   where
     config = getConfig econfig
     bopts = bcoBuildOpts bco
-    toFilePathNoTrailingSlash = dropTrailingPathSeparator . toFilePath
-    docDir =
-        case pkgVerDir of
-            Nothing -> installRoot </> docDirSuffix
-            Just dir -> installRoot </> docDirSuffix </> dir
-    installRoot =
-        case loc of
-            Snap -> bcoSnapInstallRoot bco
-            Local -> bcoLocalInstallRoot bco
-    pkgVerDir =
-        parseRelDir (packageIdentifierString (PackageIdentifier (packageName package)
-                                                                (packageVersion package)) ++
-                     [pathSeparator])
 
     depOptions = map toDepOption $ Set.toList deps
       where
@@ -665,3 +687,30 @@ modTime x =
 
 data Installed = Library GhcPkgId | Executable PackageIdentifier
     deriving (Show, Eq, Ord)
+
+-- | Configure options to be sent to Setup.hs configure
+data ConfigureOpts = ConfigureOpts
+    { coDirs :: ![String]
+    -- ^ Options related to various paths. We separate these out since they do
+    -- not have an impact on the contents of the compiled binary for checking
+    -- if we can use an existing precompiled cache.
+    , coNoDirs :: ![String]
+    }
+    deriving (Show, Eq, Generic)
+instance Binary ConfigureOpts
+instance NFData ConfigureOpts where
+    rnf = genericRnf
+
+-- | Information on a compiled package: the library conf file (if relevant),
+-- and all of the executable paths.
+data PrecompiledCache = PrecompiledCache
+    -- Use FilePath instead of Path Abs File for Binary instances
+    { pcLibrary :: !(Maybe FilePath)
+    -- ^ .conf file inside the package database
+    , pcExes :: ![FilePath]
+    -- ^ Full paths to executables
+    }
+    deriving (Show, Eq, Generic)
+instance Binary PrecompiledCache
+instance NFData PrecompiledCache where
+    rnf = genericRnf

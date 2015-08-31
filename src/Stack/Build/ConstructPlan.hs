@@ -28,7 +28,7 @@ import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8, decodeUtf8With)
+import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 import           Distribution.Package (Dependency (..))
 import           Distribution.Version         (anyVersion)
@@ -423,7 +423,7 @@ checkDirtiness ps installed package present wanted = do
             package
         buildOpts = bcoBuildOpts (baseConfigOpts ctx)
         wantConfigCache = ConfigCache
-            { configCacheOpts = map encodeUtf8 configOpts
+            { configCacheOpts = configOpts
             , configCacheDeps = present
             , configCacheComponents =
                 case ps of
@@ -474,7 +474,8 @@ describeConfigDiff old new
         ]
 
     userOpts = filter (not . isStackOpt)
-             . map (decodeUtf8With lenientDecode)
+             . map T.pack
+             . (\(ConfigureOpts x y) -> x ++ y)
              . configCacheOpts
 
     (oldOpts, newOpts) = removeMatching (userOpts old) (userOpts new)
