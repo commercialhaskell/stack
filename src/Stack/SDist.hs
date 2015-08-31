@@ -126,7 +126,7 @@ getSDistFileList lp =
         , taskType = TTLocal lp
         , taskConfigOpts = TaskConfigOpts
             { tcoMissing = Set.empty
-            , tcoOpts = \_ -> []
+            , tcoOpts = \_ -> ConfigureOpts [] []
             }
         , taskPresent = Set.empty
         }
