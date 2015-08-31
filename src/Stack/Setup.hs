@@ -171,7 +171,7 @@ setupEnv mResolveMissingGHC = do
     -- is being used
     menv0 <- getMinimalEnvOverride
     let env = removeHaskellEnvVars
-            $ augmentPathMap (fromMaybe [] mghcBin)
+            $ augmentPathMap (maybe [] edBins mghcBin)
             $ unEnvOverride menv0
 
     menv <- mkEnvOverride platform env
@@ -252,17 +252,42 @@ setupEnv mResolveMissingGHC = do
 
     return EnvConfig
         { envConfigBuildConfig = bconfig
-            { bcConfig = (bcConfig bconfig) { configEnvOverride = getEnvOverride' }
+            { bcConfig = maybe id addIncludeLib mghcBin
+                          (bcConfig bconfig)
+                { configEnvOverride = getEnvOverride' }
             }
         , envConfigCabalVersion = cabalVer
         , envConfigCompilerVersion = compilerVer
         , envConfigPackages = envConfigPackages envConfig0
         }
 
+-- | Add the include and lib paths to the given Config
+addIncludeLib :: ExtraDirs -> Config -> Config
+addIncludeLib (ExtraDirs _bins includes libs) config = config
+    { configExtraIncludeDirs = Set.union
+        (configExtraIncludeDirs config)
+        (Set.fromList $ map T.pack includes)
+    , configExtraLibDirs = Set.union
+        (configExtraLibDirs config)
+        (Set.fromList $ map T.pack libs)
+    }
+
+data ExtraDirs = ExtraDirs
+    { edBins :: ![FilePath]
+    , edInclude :: ![FilePath]
+    , edLib :: ![FilePath]
+    }
+instance Monoid ExtraDirs where
+    mempty = ExtraDirs [] [] []
+    mappend (ExtraDirs a b c) (ExtraDirs x y z) = ExtraDirs
+        (a ++ x)
+        (b ++ y)
+        (c ++ z)
+
 -- | Ensure GHC is installed and provide the PATHs to add if necessary
 ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
           => SetupOpts
-          -> m (Maybe [FilePath])
+          -> m (Maybe ExtraDirs)
 ensureGHC sopts = do
     let wc = whichCompiler (soptsWantedCompiler sopts)
         ghcVersion = case soptsWantedCompiler sopts of
@@ -338,18 +363,18 @@ ensureGHC sopts = do
                 _ -> return Nothing
 
             let idents = catMaybes [Just ghcIdent, mmsys2Ident]
-            paths <- runReaderT (mapM binDirs idents) config
-            return $ Just $ map toFilePathNoTrailingSlash $ concat paths
+            paths <- runReaderT (mapM extraDirs idents) config
+            return $ Just $ mconcat paths
         else return Nothing
 
     menv <-
         case mpaths of
             Nothing -> return menv0
-            Just paths -> do
+            Just ed -> do
                 config <- asks getConfig
                 let m0 = unEnvOverride menv0
                     path0 = Map.lookup "PATH" m0
-                    path = augmentPath paths path0
+                    path = augmentPath (edBins ed) path0
                     m = Map.insert "PATH" path m0
                 mkEnvOverride (configPlatform config) (removeHaskellEnvVars m)
 
@@ -550,26 +575,42 @@ installDir ident = do
     return $ configLocalPrograms config </> reldir
 
 -- | Binary directories for the given installed package
-binDirs :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
-        => PackageIdentifier
-        -> m [Path Abs Dir]
-binDirs ident = do
+extraDirs :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
+          => PackageIdentifier
+          -> m ExtraDirs
+extraDirs ident = do
     config <- asks getConfig
     dir <- installDir ident
     case (configPlatform config, packageNameString $ packageIdentifierName ident) of
-        (Platform _ (isWindows -> True), "ghc") -> return
-            [ dir </> $(mkRelDir "bin")
-            , dir </> $(mkRelDir "mingw") </> $(mkRelDir "bin")
-            ]
-        (Platform _ (isWindows -> True), "msys2") -> return
-            [ dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
-            ]
-        (_, "ghc") -> return
-            [ dir </> $(mkRelDir "bin")
-            ]
+        (Platform _ (isWindows -> True), "ghc") -> return mempty
+            { edBins = goList
+                [ dir </> $(mkRelDir "bin")
+                , dir </> $(mkRelDir "mingw") </> $(mkRelDir "bin")
+                ]
+            }
+        (Platform _ (isWindows -> True), "msys2") -> return mempty
+            { edBins = goList
+                [ dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
+                ]
+            , edInclude = goList
+                [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "include")
+                , dir </> $(mkRelDir "mingw32") </> $(mkRelDir "include")
+                ]
+            , edLib = goList
+                [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "lib")
+                , dir </> $(mkRelDir "mingw32") </> $(mkRelDir "lib")
+                ]
+            }
+        (_, "ghc") -> return mempty
+            { edBins = goList
+                [ dir </> $(mkRelDir "bin")
+                ]
+            }
         (Platform _ x, tool) -> do
             $logWarn $ "binDirs: unexpected OS/tool combo: " <> T.pack (show (x, tool))
-            return []
+            return mempty
+  where
+    goList = map toFilePathNoTrailingSlash
 
 getInstalledTool :: [PackageIdentifier] -- ^ already installed
                  -> PackageName         -- ^ package to find
