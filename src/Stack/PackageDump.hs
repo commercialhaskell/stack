@@ -101,7 +101,7 @@ newInstalledCache = liftIO $ InstalledCache <$> newIORef (InstalledCacheInner Ma
 
 -- | Load a @InstalledCache@ from disk, swallowing any errors and returning an
 -- empty cache.
-loadInstalledCache :: MonadIO m => Path Abs File -> m InstalledCache
+loadInstalledCache :: (MonadLogger m, MonadIO m) => Path Abs File -> m InstalledCache
 loadInstalledCache path = do
     m <- taggedDecodeOrLoad (toFilePath path) (return $ InstalledCacheInner Map.empty)
     liftIO $ fmap InstalledCache $ newIORef m

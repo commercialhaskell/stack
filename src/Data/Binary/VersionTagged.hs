@@ -2,6 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 -- | Tag a Binary instance with the stack version number to ensure we're
 -- reading a compatible format.
 module Data.Binary.VersionTagged
@@ -19,6 +20,7 @@ import Control.DeepSeq.Generics (NFData (..), genericRnf)
 import Control.Exception (Exception)
 import Control.Monad.Catch (MonadThrow (..))
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.Logger
 import Data.Binary (Binary (..), encodeFile, decodeFileOrFail, putWord8, getWord8)
 import Data.Binary.Get (ByteOffset)
 import Data.Typeable (Typeable)
@@ -29,6 +31,7 @@ import qualified Data.ByteString as S
 import Data.ByteString (ByteString)
 import Control.Monad (forM_, when)
 import Data.Proxy
+import qualified Data.Text as T
 
 magic :: ByteString
 magic = "stack"
@@ -66,18 +69,22 @@ taggedEncodeFile fp x = liftIO $ do
 -- | Read from the given file. If the read fails, run the given action and
 -- write that back to the file. Always starts the file off with the version
 -- tag.
-taggedDecodeOrLoad :: (BinarySchema a, MonadIO m)
+taggedDecodeOrLoad :: (BinarySchema a, MonadIO m, MonadLogger m)
                    => FilePath
                    -> m a
                    -> m a
 taggedDecodeOrLoad fp mx = do
+    $logDebug $ T.pack $ "Trying to decode " ++ fp
     eres <- decodeFileOrFailDeep fp
     case eres of
         Left _ -> do
+            $logDebug $ T.pack $ "Failure decoding " ++ fp
             x <- mx
             taggedEncodeFile fp x
             return x
-        Right (WithTag x) -> return x
+        Right (WithTag x) -> do
+            $logDebug $ T.pack $ "Success decoding " ++ fp
+            return x
 
 -- | Ensure that there are no lurking exceptions deep inside the parsed
 -- value... because that happens unfortunately. See
