@@ -9,7 +9,7 @@ Stack itself is installed in normal system locations based on the mechanism you 
 #### What is the relationship between stack and cabal?
 
 * Cabal-the-library is used by stack to build your Haskell code.
-* cabal-install (the executable) is not used at all by stack.
+* cabal-install (the executable) is used by stack for its dependency solver functionality.
 * A .cabal file is provided for each package, and defines all package-level metadata just like it does in the cabal-install world: modules, executables, test suites, etc. No change at all on this front.
 * A stack.yaml file references 1 or more packages, and provides information on where dependencies come from.
 * `stack build` currently initializes a stack.yaml from the existing .cabal file. Project initialization is something that is still being discussed and there may be more options here for new projects in the future (see issue [253](https://github.com/commercialhaskell/stack/issues/253))
