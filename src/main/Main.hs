@@ -484,12 +484,13 @@ data SetupCmdOpts = SetupCmdOpts
     { scoCompilerVersion :: !(Maybe CompilerVersion)
     , scoForceReinstall :: !Bool
     , scoUpgradeCabal :: !Bool
+    , scoStackSetupYaml :: !String
     }
 
 setupParser :: Parser SetupCmdOpts
 setupParser = SetupCmdOpts
     <$> (optional $ argument readVersion
-            (metavar "GHC_MAJOR_VERSION" <>
+            (metavar "GHC_VERSION" <>
              help ("Version of GHC to install, e.g. 7.10.2. " ++
                    "The default is to install the version implied by the resolver.")))
     <*> boolFlags False
@@ -500,6 +501,12 @@ setupParser = SetupCmdOpts
             "upgrade-cabal"
             "installing the newest version of the Cabal library globally"
             idm
+    <*> strOption
+            ( long "stack-setup-yaml"
+           <> help "Location of the stack-setup.yaml file"
+           <> value defaultStackSetupYaml
+           <> showDefault
+            )
   where
     readVersion = do
         s <- readerAsk
@@ -540,6 +547,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                   , soptsSkipMsys = configSkipMsys $ lcConfig lc
                   , soptsUpgradeCabal = scoUpgradeCabal
                   , soptsResolveMissingGHC = Nothing
+                  , soptsStackSetupYaml = scoStackSetupYaml
                   }
               case mpaths of
                   Nothing -> $logInfo "stack will use the GHC on your PATH"

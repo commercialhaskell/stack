@@ -14,6 +14,7 @@ module Stack.Setup
   ( setupEnv
   , ensureGHC
   , SetupOpts (..)
+  , defaultStackSetupYaml
   ) where
 
 import           Control.Applicative
@@ -79,6 +80,11 @@ import           System.Process.Read
 import           System.Process.Run (runIn)
 import           Text.Printf (printf)
 
+-- | Default location of the stack-setup.yaml file
+defaultStackSetupYaml :: String
+defaultStackSetupYaml =
+    "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/stack-setup-2.yaml"
+
 data SetupOpts = SetupOpts
     { soptsInstallIfMissing :: !Bool
     , soptsUseSystem :: !Bool
@@ -98,6 +104,7 @@ data SetupOpts = SetupOpts
     -- version. Only works reliably with a stack-managed installation.
     , soptsResolveMissingGHC :: !(Maybe Text)
     -- ^ Message shown to user for how to resolve the missing GHC
+    , soptsStackSetupYaml :: !String
     }
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
@@ -154,6 +161,7 @@ setupEnv mResolveMissingGHC = do
             , soptsSkipMsys = configSkipMsys $ bcConfig bconfig
             , soptsUpgradeCabal = False
             , soptsResolveMissingGHC = mResolveMissingGHC
+            , soptsStackSetupYaml = defaultStackSetupYaml
             }
 
     mghcBin <- ensureGHC sopts
@@ -286,7 +294,7 @@ ensureGHC sopts = do
     -- If we need to install a GHC, try to do so
     mpaths <- if needLocal
         then do
-            getSetupInfo' <- runOnce (getSetupInfo =<< asks getHttpManager)
+            getSetupInfo' <- runOnce (getSetupInfo sopts =<< asks getHttpManager)
 
             config <- asks getConfig
             installed <- runReaderT listInstalled config
@@ -489,14 +497,16 @@ instance FromJSON SetupInfo where
         <*> o .: "ghc"
 
 -- | Download the most recent SetupInfo
-getSetupInfo :: (MonadIO m, MonadThrow m) => Manager -> m SetupInfo
-getSetupInfo manager = do
-    bss <- liftIO $ flip runReaderT manager
-         $ withResponse req $ \res -> responseBody res $$ CL.consume
-    let bs = S8.concat bss
+getSetupInfo :: (MonadIO m, MonadThrow m) => SetupOpts -> Manager -> m SetupInfo
+getSetupInfo sopts manager = do
+    bs <-
+        case parseUrl $ soptsStackSetupYaml sopts of
+            Just req -> do
+                bss <- liftIO $ flip runReaderT manager
+                     $ withResponse req $ \res -> responseBody res $$ CL.consume
+                return $ S8.concat bss
+            Nothing -> liftIO $ S.readFile $ soptsStackSetupYaml sopts
     either throwM return $ Yaml.decodeEither' bs
-  where
-    req = "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/stack-setup-2.yaml"
 
 markInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
               => PackageIdentifier -- ^ e.g., ghc-7.8.4, git-2.4.0.1
