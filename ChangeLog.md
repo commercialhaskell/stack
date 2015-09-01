@@ -29,6 +29,7 @@ Bug fixes:
 * `stack solver` and `stack init --solver` check for test suite and benchmark dependencies [#862](https://github.com/commercialhaskell/stack/issues/862)
 * More intelligent logic for setting UTF-8 locale environment variables [#856](https://github.com/commercialhaskell/stack/issues/856)
 * Create missing directories for `stack sdist`
+* Deprecate unused `--optimizations` flag
 
 ## 0.1.3.1
 
