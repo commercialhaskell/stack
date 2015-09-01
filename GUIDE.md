@@ -21,11 +21,17 @@ configuration, for example), but overall it follows this design
 philosophy closely. stack makes use of curated package sets, called
 __snapshots__, in order to make this a simple process.
 
-stack has also been designed from the ground up to be user friendly, with an
-intuitive, discoverable command line interface. For many users, simply
-downloading stack and reading `stack --help` will be enough to get up and
-running. This guide is intended to provide a gradual learning process for users
-who prefer that learning style.
+stack has also been designed from the ground up to be user friendly,
+with an intuitive, discoverable command line interface. For many
+users, simply downloading stack and reading `stack --help` will be
+enough to get up and running. This guide is intended to provide a
+gradual learning process for users who prefer that learning
+style.
+
+The blueprint which stack uses to build your project is a `stack.yaml`
+file in the root directory of your project. This file contains a
+reference, called a __resolver__, to the snapshot which your package
+will be built against.
 
 Finally, stack is __isolated__: it will not make changes outside of
 specific stack directories. The stack root directory (default
@@ -44,7 +50,7 @@ _NOTE_ In this guide, I'll be running commands on a Linux system (Ubuntu 14.04,
 different versions of stack- will be slightly different. But all commands work
 in a cross platform way, unless explicitly stated otherwise.
 
-## Downloading
+## Downloading and Installation
 
 There's [a wiki page dedicated to downloading
 stack](https://github.com/commercialhaskell/stack/wiki/Downloads) which has the
@@ -79,11 +85,18 @@ include `$HOME/.local/bin`:
 michael@d30748af6d3d:~$ echo 'export PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc
 ```
 
-## Hello World
+## Hello World Example
 
-Now that we've got stack, it's time to put it to work. We'll start off with the
-`stack new` command to create a new *project*. We'll call our project
-`helloworld`, and we'll use the `new-template` project template:
+Now that we've got stack, it's time to put it to work. We're going to create
+a new project fromm a template, and walk through some of the most common
+stack commands that you will need on a frequent basis.
+
+
+### stack new
+
+We'll start off with the `stack new` command to create a new
+*project*. We'll call our project `helloworld`, and we'll use the
+`new-template` project template:
 
 ```
 michael@d30748af6d3d:~$ stack new helloworld new-template
@@ -113,23 +126,16 @@ Checking against build plan lts-3.2
 Selected resolver: lts-3.2
 Wrote project config to: /home/michael/helloworld/stack.yaml
 ```
+Great, we now have a project in the `helloworld` directory.
 
-Great, we now have a project in the `helloworld` directory. Let's go in there
-and have some fun, using the most important stack command: `build`.
+### stack setup
 
-```
-michael@d30748af6d3d:~$ cd helloworld/
-michael@d30748af6d3d:~/helloworld$ stack build
-No GHC found, expected version 7.10.2 (x86_64) (based on resolver setting in /home/michael/helloworld/stack.yaml).
-Try running stack setup
-```
+Instead of automatically assuming you want it to download and install
+GHC for you, stack asks you to do this as a separate command:
+`setup`. If we don't run `stack setup` now, later we will see a
+message that lets us know we are missing the right GHC version.
 
-That was a bit anticlimactic. The problem is that stack needs GHC in order to
-build your project, but we don't have one on our system yet. Instead of
-automatically assuming you want it to download and install GHC for you, stack
-asks you to do this as a separate command: `setup`. Our message here lets us
-know that `stack setup` will need to install GHC version 7.10.2. Let's try that
-out:
+Let's try running stack setup:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack setup
@@ -145,11 +151,27 @@ It doesn't come through in the output here, but you'll get intermediate
 download percentage statistics while the download is occurring. This command
 may take some time, depending on download speeds.
 
-__NOTE__: GHC gets installed to a stack-specific directory, so calling `ghc` on the
-command line won't work. See the `stack exec`, `stack ghc`, and `stack runghc`
-commands below for more information.
+__NOTE__: GHC will be installed to your global stack root directory, so
+calling `ghc` on the command line won't work. See the `stack exec`,
+`stack ghc`, and `stack runghc` commands below for more information.
 
-But now that we've got GHC available, stack can build our project:
+### stack build
+
+Let's go back to our project and have some fun, using the most
+important stack command: `stack build`. If you forgot to run `stack
+setup` in the previous step you would be dissapoinnted to see:
+
+```
+michael@d30748af6d3d:~$ cd helloworld/
+michael@d30748af6d3d:~/helloworld$ stack build
+No GHC found, expected version 7.10.2 (x86_64) (based on resolver setting in /home/michael/helloworld/stack.yaml).
+Try running stack setup
+```
+
+which would be a bit anticlimactic. The problem is that stack needs
+GHC in order to build your project, but we did't download and unpack
+the right version on our system yet. Assuming that we have run `stack
+setup` and GHC is available, you should see stack build our project:
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack build
@@ -170,15 +192,26 @@ Installing executable(s) in
 Registering helloworld-0.1.0.0...
 ```
 
-If you look closely at the output, you can see that it built both a library
-called "helloworld" and an executable called "helloworld-exe". We'll explain in
-the next section where this information is defined. For now, though, let's just
-run our executable (which just outputs the string "someFunc"):
+### stack exec
+
+If you look closely at the output of the previous command, you can see
+that it built both a library called "helloworld" and an executable
+called "helloworld-exe". We'll explain in the next section how stack
+works in more detail, but for now just notice that the executables are
+installed in our project's `./stack-work` directory. Let's run our
+executable (which just outputs the string "someFunc"):
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack exec helloworld-exe
 someFunc
 ```
+
+`stack exec` works this magic by providing the same reproducible
+environment that was used to build your project to the command that
+you are running. This was how it knew where to find `helloworld-exe`
+even though it is hidden in the `./stack-work` directory.
+
+### stack test
 
 And finally, like all good software, helloworld actually has a test suite.
 Let's run it with `stack test`:
@@ -211,7 +244,9 @@ helloworld-0.1.0.0: test (suite: helloworld-test)
 Test suite not yet implemented
 ```
 
-In the next three subsections, we'll dissect a few details of this helloworld
+## Inner Workings of stack
+
+In this subsection, we'll dissect in more detail the helloworld
 example.
 
 ### Files in helloworld
