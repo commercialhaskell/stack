@@ -30,6 +30,7 @@ Bug fixes:
 * More intelligent logic for setting UTF-8 locale environment variables [#856](https://github.com/commercialhaskell/stack/issues/856)
 * Create missing directories for `stack sdist`
 * Don't ignore .cabal files with extra periods [#895](https://github.com/commercialhaskell/stack/issues/895)
+* Deprecate unused `--optimizations` flag
 
 ## 0.1.3.1
 

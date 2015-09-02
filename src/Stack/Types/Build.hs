@@ -392,7 +392,6 @@ data BuildOpts =
   BuildOpts {boptsTargets :: ![Text]
             ,boptsLibProfile :: !Bool
             ,boptsExeProfile :: !Bool
-            ,boptsEnableOptimizations :: !(Maybe Bool)
             ,boptsHaddock :: !Bool
             -- ^ Build haddocks?
             ,boptsHaddockDeps :: !(Maybe Bool)
@@ -433,7 +432,6 @@ defaultBuildOpts = BuildOpts
     { boptsTargets = []
     , boptsLibProfile = False
     , boptsExeProfile = False
-    , boptsEnableOptimizations = Nothing
     , boptsHaddock = False
     , boptsHaddockDeps = Nothing
     , boptsDryrun = False
@@ -642,7 +640,6 @@ configureOptsNoDir econfig bco deps wanted package = concat
                            else "-") <>
                        flagNameString name)
                     (Map.toList (packageFlags package))
-    -- FIXME Chris: where does this come from now? , ["--ghc-options=-O2" | gconfigOptimize gconfig]
     , concatMap (\x -> ["--ghc-options", T.unpack x]) allGhcOptions
     , map (("--extra-include-dirs=" ++) . T.unpack) (Set.toList (configExtraIncludeDirs config))
     , map (("--extra-lib-dirs=" ++) . T.unpack) (Set.toList (configExtraLibDirs config))
