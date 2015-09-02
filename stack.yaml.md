@@ -2,12 +2,13 @@ This page is intended to fully document all configuration options available in t
 
 The stack.yaml configuration options break down into [project specific](#project-config) options in: 
 
-- `<project dir>/stack.yml`
+- `<project dir>/stack.yaml`
 
 and [non-project specific](#non-project-config) options in:
 
 - `/etc/stack/config` -- for system global non-project options
 -  `~/.stack/stack.yaml` -- for user non-project options
+- The project file itself may also contain non-project specific options
 
 *Note:* When stack is invoked outside a stack project it will source project specific options from `~/.stack/global/stack.yaml`.
 
