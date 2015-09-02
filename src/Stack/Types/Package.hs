@@ -249,6 +249,9 @@ instance Monoid InstallLocation where
     mappend _ Local = Local
     mappend Snap Snap = Snap
 
+data InstalledPackageLocation = InstalledTo InstallLocation | ExtraGlobal
+    deriving (Show, Eq)
+
 data FileCacheInfo = FileCacheInfo
     { fciModTime :: !ModTime
     , fciSize :: !Word64

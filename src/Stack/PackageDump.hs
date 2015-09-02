@@ -42,7 +42,6 @@ import           Data.Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Either (partitionEithers)
-import qualified Data.Foldable as F
 import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as Map
@@ -81,18 +80,20 @@ ghcPkgDump
     :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
     => EnvOverride
     -> WhichCompiler
-    -> Maybe (Path Abs Dir) -- ^ if Nothing, use global
+    -> [Path Abs Dir] -- ^ if empty, use global
     -> Sink ByteString IO a
     -> m a
-ghcPkgDump menv wc mpkgDb sink = do
-    F.mapM_ (createDatabase menv wc) mpkgDb -- TODO maybe use some retry logic instead?
+ghcPkgDump menv wc mpkgDbs sink = do
+    case reverse mpkgDbs of
+        (pkgDb:_) -> (createDatabase menv wc) pkgDb -- TODO maybe use some retry logic instead?
+        _ -> return ()
     a <- sinkProcessStdout Nothing menv (ghcPkgExeName wc) args sink
     return a
   where
     args = concat
-        [ case mpkgDb of
-            Nothing -> ["--global", "--no-user-package-db"]
-            Just pkgdb -> ["--user", "--no-user-package-db", "--package-db", toFilePath pkgdb]
+        [ case mpkgDbs of
+            [] -> ["--global", "--no-user-package-db"]
+            _ -> ["--user", "--no-user-package-db"] ++ concatMap (\pkgDb -> ["--package-db", toFilePath pkgDb]) mpkgDbs
         , ["dump", "--expand-pkgroot"]
         ]
 

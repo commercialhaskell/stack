@@ -80,7 +80,6 @@ loadSourceMap needTargets bopts = do
     bconfig <- asks getBuildConfig
     rawLocals <- getLocalPackageViews
     (mbp0, cliExtraDeps, targets) <- parseTargetsFromBuildOpts needTargets bopts
-
     menv <- getMinimalEnvOverride
     caches <- getPackageCaches menv
     let latestVersion = Map.fromListWith max $ map toTuple $ Map.keys caches
@@ -183,16 +182,18 @@ parseTargetsFromBuildOpts needTargets bopts = do
         (bcExtraDeps bconfig)
         (catMaybes $ Map.keys $ boptsFlags bopts)
 
-    (cliExtraDeps, targets) <-
+    let extraDeps' = flagExtraDeps <> bcExtraDeps bconfig
+
+    (_cliExtraDeps, targets) <-
         parseTargets
             needTargets
             (bcImplicitGlobal bconfig)
             snapshot
-            (flagExtraDeps <> bcExtraDeps bconfig)
+            extraDeps'
             (fst <$> rawLocals)
             workingDir
             (boptsTargets bopts)
-    return (mbp0, cliExtraDeps <> flagExtraDeps, targets)
+    return (mbp0, extraDeps', targets)
 
 -- | For every package in the snapshot which is referenced by a flag, give the
 -- user a warning and then add it to extra-deps.

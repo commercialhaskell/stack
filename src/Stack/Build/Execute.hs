@@ -716,13 +716,16 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                  $ Set.toList
                                  $ addGlobalPackages deps eeGlobalPackages
                             in
-                              "-clear-package-db"
-                            : "-global-package-db"
-                            : ("-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts))
-                            : ("-package-db=" ++ toFilePath (bcoLocalDB eeBaseConfigOpts))
-                            : "-hide-all-packages"
-                            : cabalPackageArg
-                            : map ("-package-id=" ++) depsMinusCabal
+                                ( "-clear-package-db"
+                                : "-global-package-db"
+                                : map (("-package-db=" ++) . toFilePath) (bcoExtraDBs eeBaseConfigOpts)
+                                ) ++
+                                ( ("-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts))
+                                : ("-package-db=" ++ toFilePath (bcoLocalDB eeBaseConfigOpts))
+                                : "-hide-all-packages"
+                                : cabalPackageArg
+                                : map ("-package-id=" ++) depsMinusCabal
+                                )
                         -- This branch is debatable. It adds access to the
                         -- snapshot package database for Cabal. There are two
                         -- possible objections:
