@@ -226,9 +226,8 @@ getLocalPackageViews = do
         cabalfp <- getCabalFileName dir
         gpkg <- readPackageUnresolved cabalfp
         let cabalID = package $ packageDescription gpkg
-        name <- parsePackageNameFromFilePath cabalfp
-        when (fromCabalPackageName (pkgName $ cabalID) /= name)
-            $ throwM $ MismatchedCabalName cabalfp name
+            name = fromCabalPackageName $ pkgName $ cabalID
+        checkCabalFileName name cabalfp
         let lpv = LocalPackageView
                 { lpvVersion = fromCabalVersion $ pkgVersion cabalID
                 , lpvRoot = dir

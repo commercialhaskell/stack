@@ -63,10 +63,13 @@ instance Show PackageException where
         ": " ++
         intercalate ", " (map (toFilePath . filename) files)
     show (MismatchedCabalName fp name) = concat
-        [ "cabal file "
+        [ "cabal file path "
         , toFilePath fp
-        , " has a mismatched package name: "
+        , " does not match the package name it defines.\n"
+        , "Please rename the file to: "
         , packageNameString name
+        , ".cabal\n"
+        , "For more information, see: https://github.com/commercialhaskell/stack/issues/317"
         ]
 
 -- | Some package info.
