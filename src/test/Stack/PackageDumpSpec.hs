@@ -66,6 +66,7 @@ spec = do
                $$ conduitDumpPackage
                =$ CL.consume
             ghcPkgId <- parseGhcPkgId "haskell2010-1.1.2.0-05c8dd51009e08c6371c82972d40f55a"
+            packageIdent <- parsePackageIdentifier "haskell2010-1.1.2.0"
             depends <- mapM parseGhcPkgId
                 [ "array-0.5.0.0-470385a50d2b78598af85cfe9d988e1b"
                 , "base-4.7.0.2-bfd89587617e381ae01b8dd7b6c7f1c1"
@@ -73,6 +74,7 @@ spec = do
                 ]
             haskell2010 `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
+                , dpPackageIdent = packageIdent
                 , dpLibDirs = ["/opt/ghc/7.8.4/lib/ghc-7.8.4/haskell2010-1.1.2.0"]
                 , dpDepends = depends
                 , dpLibraries = ["HShaskell2010-1.1.2.0"]
@@ -88,6 +90,7 @@ spec = do
                $$ conduitDumpPackage
                =$ CL.consume
             ghcPkgId <- parseGhcPkgId "ghc-7.10.1-325809317787a897b7a97d646ceaa3a3"
+            pkgIdent <- parsePackageIdentifier "ghc-7.10.1"
             depends <- mapM parseGhcPkgId
                 [ "array-0.5.1.0-e29cdbe82692341ebb7ce6e2798294f9"
                 , "base-4.8.0.0-1b689eb8d72c4d4cc88f445839c1f01a"
@@ -106,6 +109,7 @@ spec = do
                 ]
             haskell2010 `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
+                , dpPackageIdent = pkgIdent
                 , dpLibDirs = ["/opt/ghc/7.10.1/lib/ghc-7.10.1/ghc_EMlWrQ42XY0BNVbSrKixqY"]
                 , dpHaddockInterfaces = ["/opt/ghc/7.10.1/share/doc/ghc/html/libraries/ghc-7.10.1/ghc.haddock"]
                 , dpDepends = depends
@@ -120,6 +124,7 @@ spec = do
                $$ conduitDumpPackage
                =$ CL.consume
             ghcPkgId <- parseGhcPkgId "hmatrix-0.16.1.5-12d5d21f26aa98774cdd8edbc343fbfe"
+            pkgId <- parsePackageIdentifier "hmatrix-0.16.1.5"
             depends <- mapM parseGhcPkgId
                 [ "array-0.5.0.0-470385a50d2b78598af85cfe9d988e1b"
                 , "base-4.7.0.2-918c7ac27f65a87103264a9f51652d63"
@@ -132,6 +137,7 @@ spec = do
                 , "vector-0.10.12.3-f4222db607fd5fdd7545d3e82419b307"]
             hmatrix `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
+                , dpPackageIdent = pkgId
                 , dpLibDirs =
                       [ "/Users/alexbiehl/.stack/snapshots/x86_64-osx/lts-2.13/7.8.4/lib/x86_64-osx-ghc-7.8.4/hmatrix-0.16.1.5"
                       , "/opt/local/lib/"

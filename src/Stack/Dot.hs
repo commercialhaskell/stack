@@ -110,9 +110,7 @@ createDependencyGraph dotOpts = do
 
 -- Given an 'Installed' try to get the 'Version'
 libVersionFromInstalled :: Installed -> Maybe Version
-libVersionFromInstalled (Library ghcPkgId) =
-    case ghcPkgIdPackageIdentifier ghcPkgId of
-       PackageIdentifier _ v -> Just v
+libVersionFromInstalled (Library (PackageIdentifier _ v) _) = Just v
 libVersionFromInstalled (Executable _) = Nothing
 
 listDependencies :: (HasEnvConfig env

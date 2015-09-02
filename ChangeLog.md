@@ -1,3 +1,13 @@
+## Unreleased changes
+
+Major changes:
+
+Other enhancements:
+
+* Adapt to upcoming Cabal installed package identifier format change [#851](https://github.com/commercialhaskell/stack/issues/851)
+
+Bug fixes:
+
 ## 0.1.4.0
 
 Major changes:
