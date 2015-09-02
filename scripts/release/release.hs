@@ -1,5 +1,5 @@
 #!/usr/bin/env stack
--- stack --install-ghc runghc --package=shake --package=extra --package=zip-archive --package=mime-types --package=http-types --package=http-conduit --package=text --package=conduit-combinators --package=conduit --package=case-insensitive --package=aeson --package=zlib --package executable-path --package tar
+-- stack --install-ghc runghc --package=shake --package=extra --package=zip-archive --package=mime-types --package=http-types --package=http-conduit --package=text --package=conduit-combinators --package=conduit --package=case-insensitive --package=aeson --package=zlib --package tar
 {-# OPTIONS_GHC -Wall -Werror #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -37,7 +37,6 @@ import Development.Shake.FilePath
 import Network.HTTP.Conduit
 import Network.HTTP.Types
 import Network.Mime
-import System.Environment.Executable
 import Prelude -- Silence AMP warning
 
 -- | Entrypoint.
@@ -55,8 +54,10 @@ main =
             gGitRevCount <- length . lines <$> readProcess "git" ["rev-list", "HEAD"] ""
             gGitSha <- trim <$> readProcess "git" ["rev-parse", "HEAD"] ""
             gHomeDir <- getHomeDirectory
-            RunGHC gScriptPath <- getScriptPath
-            let gGpgKey = "9BEFB442"
+            let -- @gScriptPath@ was retrived using the @executable-path@ package, but it
+                -- has trouble with GHC 7.10.2 on OS X
+                gScriptPath = "scripts/release/release.hs"
+                gGpgKey = "9BEFB442"
                 gAllowDirty = False
                 gGithubReleaseTag = Nothing
                 Platform arch _ = buildPlatform
