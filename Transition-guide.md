@@ -1,3 +1,7 @@
+This page has mostly been superseded by [the stack
+guide](https://github.com/commercialhaskell/stack/blob/master/GUIDE.md). We may
+remove this content in the future, but it is kept for now.
+
 The [[FAQ]] may be helpful for general questions. This is intended to help people familiar with using other Haskell build tools- like cabal-install, hsenv, etc- with getting started with stack. The goal of stack is to be easy to use, so hopefully there won't be any gotchas. In our experience so far, most of the confusion comes from things you don't need to do in stack. For example:
 
 * There's no need for explicit sandboxing, all builds in stack are isolated automatically

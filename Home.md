@@ -1,9 +1,8 @@
 New users:
 
 * [README](../#readme): Get up-and-running with stack quickly. Requires no prior Haskell tooling experience
+* [In-depth stack guide](https://github.com/commercialhaskell/stack/blob/master/GUIDE.md): Full tutorial covering all major stack features
 * [Getting started with stack tutorial](http://seanhess.github.io/2015/08/04/practical-haskell-getting-started.html)
-* [[New to Haskell]] wiki page: people new to Haskell trying to understand how the various pieces fit together should read this after following the README
-* [[Transition guide]] wiki page: existing Haskellers looking to start with stack and will be confused by things being missing, e.g. "How do I do sandboxing?"
 
 More detailed documents:
 

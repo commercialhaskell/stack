@@ -1,3 +1,7 @@
+This page has mostly been superseded by [the stack
+guide](https://github.com/commercialhaskell/stack/blob/master/GUIDE.md). We may
+remove this content in the future, but it is kept for now.
+
 ## Terminology
 
 Since you'll see a bunch of terms floating around, let's try to define them:

@@ -1,3 +1,7 @@
+This page has mostly been superseded by [the stack
+guide](https://github.com/commercialhaskell/stack/blob/master/GUIDE.md#ghcrunghc). We may
+remove this content in the future, but it is kept for now.
+
 You can use stack as a script interpreter.  Here is an example that uses the [turtle](http://www.stackage.org/package/turtle) package:
 
 ```haskell
