@@ -120,7 +120,7 @@ constructPlan :: forall env m.
               -> BaseConfigOpts
               -> [LocalPackage]
               -> Set PackageName -- ^ additional packages that must be built
-              -> Set GhcPkgId -- ^ locally registered
+              -> Map GhcPkgId PackageIdentifier -- ^ locally registered
               -> (PackageName -> Version -> Map FlagName Bool -> IO Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
@@ -192,19 +192,20 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
 -- already registered local packages
 mkUnregisterLocal :: Map PackageName Task
                   -> Map PackageName Text
-                  -> Set GhcPkgId
-                  -> Map GhcPkgId Text
+                  -> Map GhcPkgId PackageIdentifier
+                  -> Map GhcPkgId (PackageIdentifier, Text)
 mkUnregisterLocal tasks dirtyReason locallyRegistered =
-    Map.unions $ map toUnregisterMap $ Set.toList locallyRegistered
+    Map.unions $ map toUnregisterMap $ Map.toList locallyRegistered
   where
-    toUnregisterMap gid =
+    toUnregisterMap (gid, ident) =
         case M.lookup name tasks of
             Nothing -> Map.empty
             Just _ -> Map.singleton gid
-                    $ fromMaybe "likely unregistering due to a version change"
-                    $ Map.lookup name dirtyReason
+                ( ident
+                , fromMaybe "likely unregistering due to a version change"
+                  $ Map.lookup name dirtyReason
+                )
       where
-        ident = ghcPkgIdPackageIdentifier gid
         name = packageIdentifierName ident
 
 addFinal :: LocalPackage -> LocalPackageTB -> M ()
@@ -219,7 +220,7 @@ addFinal lp lptb = do
                     (packageName package)
                     (packageVersion package)
                 , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
-                    let allDeps = Set.union present missing'
+                    let allDeps = Map.union present missing'
                      in configureOpts
                             (getEnvConfig ctx)
                             (baseConfigOpts ctx)
@@ -335,7 +336,7 @@ installPackage treatAsDep name ps = do
                     (packageName package)
                     (packageVersion package)
                 , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
-                    let allDeps = Set.union present missing'
+                    let allDeps = Map.union present missing'
                         destLoc = piiLocation ps <> minLoc
                      in configureOpts
                             (getEnvConfig ctx)
@@ -372,7 +373,7 @@ checkNeedInstall treatAsDep name ps installed wanted = assert (piiLocation ps ==
                 return True
 
 addPackageDeps :: Bool -- ^ is this being used by a dependency?
-               -> Package -> M (Either ConstructPlanException (Set PackageIdentifier, Set GhcPkgId, InstallLocation))
+               -> Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, InstallLocation))
 addPackageDeps treatAsDep package = do
     ctx <- ask
     deps' <- packageDepsWithTools package
@@ -389,11 +390,11 @@ addPackageDeps treatAsDep package = do
             Right adr | not $ adrVersion adr `withinRange` range ->
                 return $ Left (depname, (range, mlatest, DependencyMismatch $ adrVersion adr))
             Right (ADRToInstall task) -> return $ Right
-                (Set.singleton $ taskProvides task, Set.empty, taskLocation task)
+                (Set.singleton $ taskProvides task, Map.empty, taskLocation task)
             Right (ADRFound loc _ (Executable _)) -> return $ Right
-                (Set.empty, Set.empty, loc)
-            Right (ADRFound loc _ (Library gid)) -> return $ Right
-                (Set.empty, Set.singleton gid, loc)
+                (Set.empty, Map.empty, loc)
+            Right (ADRFound loc _ (Library ident gid)) -> return $ Right
+                (Set.empty, Map.singleton ident gid, loc)
     case partitionEithers deps of
         ([], pairs) -> return $ Right $ mconcat pairs
         (errs, _) -> return $ Left $ DependencyPlanFailures
@@ -408,7 +409,7 @@ addPackageDeps treatAsDep package = do
 checkDirtiness :: PackageSource
                -> Installed
                -> Package
-               -> Set GhcPkgId
+               -> Map PackageIdentifier GhcPkgId
                -> Set PackageName
                -> M Bool
 checkDirtiness ps installed package present wanted = do
@@ -424,7 +425,7 @@ checkDirtiness ps installed package present wanted = do
         buildOpts = bcoBuildOpts (baseConfigOpts ctx)
         wantConfigCache = ConfigCache
             { configCacheOpts = configOpts
-            , configCacheDeps = present
+            , configCacheDeps = Set.fromList $ Map.elems present
             , configCacheComponents =
                 case ps of
                     PSLocal lp -> Set.map renderComponent $ lpComponents lp

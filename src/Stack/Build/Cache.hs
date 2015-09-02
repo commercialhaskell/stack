@@ -173,7 +173,7 @@ flagCacheFile :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
 flagCacheFile installed = do
     rel <- parseRelFile $
         case installed of
-            Library gid -> ghcPkgIdString gid
+            Library _ gid -> ghcPkgIdString gid
             Executable ident -> packageIdentifierString ident
     dir <- flagCacheLocal
     return $ dir </> rel
