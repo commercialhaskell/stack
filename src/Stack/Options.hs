@@ -445,18 +445,19 @@ execOptsParser :: Maybe String -- ^ command
                -> Parser ExecOpts
 execOptsParser mcmd =
     ExecOpts
-        <$> maybe eoCmdParser pure mcmd
+        <$> pure mcmd
         <*> eoArgsParser
         <*> (eoPlainParser <|>
              ExecOptsEmbellished
                 <$> eoEnvSettingsParser
                 <*> eoPackagesParser)
   where
-    eoCmdParser :: Parser String
-    eoCmdParser = strArgument (metavar "CMD")
-
     eoArgsParser :: Parser [String]
-    eoArgsParser = many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)"))
+    eoArgsParser = many (strArgument (metavar meta))
+      where
+        meta =
+            (maybe ("CMD ") (const "") mcmd) ++
+            "-- ARGS (e.g. stack ghc -- X.hs -o x)"
 
     eoEnvSettingsParser :: Parser EnvSettings
     eoEnvSettingsParser = EnvSettings
