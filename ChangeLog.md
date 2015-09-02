@@ -2,6 +2,16 @@
 
 Major changes:
 
+Other enhancements:
+
+* Adapt to upcoming Cabal installed package identifier format change [#851](https://github.com/commercialhaskell/stack/issues/851)
+
+Bug fixes:
+
+## 0.1.4.0
+
+Major changes:
+
 * You now have more control over how GHC versions are matched, e.g. "use exactly this version," "use the specified minor version, but allow patches," or "use the given minor version or any later minor in the given major release." The default has switched from allowing newer later minor versions to a specific minor version allowing patches. For more information, see [#736](https://github.com/commercialhaskell/stack/issues/736) and [#784](https://github.com/commercialhaskell/stack/pull/784).
 * Support added for compiling with GHCJS
 * stack can now reuse prebuilt binaries between snapshots. That means that, if you build package foo in LTS-3.1, that binary version can be reused in LTS-3.2, assuming it uses the same dependencies and flags. [#878](https://github.com/commercialhaskell/stack/issues/878)
@@ -9,7 +19,7 @@ Major changes:
 Other enhancements:
 
 * Added the `--docker-env` argument, to set environment variables in Docker container.
-* Set `LC_ALL` to UTF-8 encoding for builds to avoid "commitBuffer: invalid argument" errors from GHC [#793](https://github.com/commercialhaskell/stack/issues/793)
+* Set locale environment variables to UTF-8 encoding for builds to avoid "commitBuffer: invalid argument" errors from GHC [#793](https://github.com/commercialhaskell/stack/issues/793)
 * Enable translitation for encoding on stdout and stderr [#824](https://github.com/commercialhaskell/stack/issues/824)
 * By default, `stack upgrade` automatically installs GHC as necessary [#797](https://github.com/commercialhaskell/stack/issues/797)
 * Added the `ghc-options` field to stack.yaml [#796](https://github.com/commercialhaskell/stack/issues/796)
@@ -22,7 +32,7 @@ Other enhancements:
 * Check for duplicate local package names
 * Stop nagging people that call `stack test` [#845](https://github.com/commercialhaskell/stack/issues/845)
 * `--file-watch` will ignore files that are in your VCS boring/ignore files [#703](https://github.com/commercialhaskell/stack/issues/703)
-* Adapt to upcoming Cabal installed package identifier format change [#851](https://github.com/commercialhaskell/stack/issues/851)
+* Add `--numeric-version` option
 
 Bug fixes:
 
@@ -31,6 +41,8 @@ Bug fixes:
 * More intelligent logic for setting UTF-8 locale environment variables [#856](https://github.com/commercialhaskell/stack/issues/856)
 * Create missing directories for `stack sdist`
 * Don't ignore .cabal files with extra periods [#895](https://github.com/commercialhaskell/stack/issues/895)
+* Deprecate unused `--optimizations` flag
+* Truncated output on slow terminals [#413](https://github.com/commercialhaskell/stack/issues/413)
 
 ## 0.1.3.1
 

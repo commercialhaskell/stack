@@ -1,5 +1,5 @@
 #!/usr/bin/env stack
--- stack --install-ghc runghc --package=shake --package=extra --package=zip-archive --package=mime-types --package=http-types --package=http-conduit --package=text --package=conduit-combinators --package=conduit --package=case-insensitive --package=aeson --package=zlib --package executable-path
+-- stack --install-ghc runghc --package=shake --package=extra --package=zip-archive --package=mime-types --package=http-types --package=http-conduit --package=text --package=conduit-combinators --package=conduit --package=case-insensitive --package=aeson --package=zlib --package tar
 {-# OPTIONS_GHC -Wall -Werror #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -23,6 +23,7 @@ import System.Directory
 import System.IO.Error
 import System.Process
 
+import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Zip as Zip
 import qualified Codec.Compression.GZip as GZip
 import Data.Aeson
@@ -36,7 +37,6 @@ import Development.Shake.FilePath
 import Network.HTTP.Conduit
 import Network.HTTP.Types
 import Network.Mime
-import System.Environment.Executable
 import Prelude -- Silence AMP warning
 
 -- | Entrypoint.
@@ -54,8 +54,10 @@ main =
             gGitRevCount <- length . lines <$> readProcess "git" ["rev-list", "HEAD"] ""
             gGitSha <- trim <$> readProcess "git" ["rev-parse", "HEAD"] ""
             gHomeDir <- getHomeDirectory
-            RunGHC gScriptPath <- getScriptPath
-            let gGpgKey = "9BEFB442"
+            let -- @gScriptPath@ was retrived using the @executable-path@ package, but it
+                -- has trouble with GHC 7.10.2 on OS X
+                gScriptPath = "scripts/release/release.hs"
+                gGpgKey = "9BEFB442"
                 gAllowDirty = False
                 gGithubReleaseTag = Nothing
                 Platform arch _ = buildPlatform
@@ -171,12 +173,12 @@ rules global@Global{..} args = do
                 archive = Zip.addEntryToArchive entry' Zip.emptyArchive
             L8.writeFile out (Zip.fromArchive archive)
 
-    releaseDir </> binaryExeGzFileName %> \out -> do
+    releaseDir </> binaryExeTarGzFileName %> \out -> do
         need [releaseDir </> binaryExeFileName]
-        putNormal $ "gzip " ++ (releaseDir </> binaryExeFileName)
+        putNormal $ "tar gzip " ++ (releaseDir </> binaryExeFileName)
         liftIO $ do
-            fc <- L8.readFile (releaseDir </> binaryExeFileName)
-            L8.writeFile out $ GZip.compress fc
+            content <- Tar.pack releaseDir [binaryExeFileName]
+            L8.writeFile out $ GZip.compress $ Tar.write content
 
     releaseDir </> binaryExeFileName %> \out -> do
         need [installBinDir </> stackOrigExeFileName]
@@ -280,11 +282,11 @@ rules global@Global{..} args = do
     binaryExeCompressedFileName =
         case platformOS of
             Windows -> binaryExeZipFileName
-            _ -> binaryExeGzFileName
-    binaryExeZipFileName = binaryExeFileNameNoExt <.> zipExt
-    binaryExeGzFileName = binaryExeFileName <.> gzExt
+            _ -> binaryExeTarGzFileName
+    binaryExeZipFileName = binaryName global <.> zipExt
+    binaryExeTarGzFileName = binaryName global <.> tarGzExt
     binaryExeFileName = binaryExeFileNameNoExt <.> exe
-    binaryExeFileNameNoExt = binaryName global
+    binaryExeFileNameNoExt = stackOrigExeFileName
     distroPackageFileName distro
         | distroPackageExt distro == debExt =
             concat [stackProgName, "_", distroPackageVersionStr distro, "_amd64"] <.> debExt
