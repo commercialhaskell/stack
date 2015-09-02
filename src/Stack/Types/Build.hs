@@ -526,7 +526,7 @@ data Task = Task
     { taskProvides        :: !PackageIdentifier        -- ^ the package/version to be built
     , taskType            :: !TaskType                 -- ^ the task type, telling us how to build this
     , taskConfigOpts      :: !TaskConfigOpts
-    , taskPresent         :: !(Set GhcPkgId)           -- ^ GhcPkgIds of already-installed dependencies
+    , taskPresent         :: !(Map PackageIdentifier GhcPkgId)           -- ^ GhcPkgIds of already-installed dependencies
     }
     deriving Show
 
@@ -534,7 +534,7 @@ data Task = Task
 data TaskConfigOpts = TaskConfigOpts
     { tcoMissing :: !(Set PackageIdentifier)
       -- ^ Dependencies for which we don't yet have an GhcPkgId
-    , tcoOpts    :: !(Set GhcPkgId -> ConfigureOpts)
+    , tcoOpts    :: !(Map PackageIdentifier GhcPkgId -> ConfigureOpts)
       -- ^ Produce the list of options given the missing @GhcPkgId@s
     }
 instance Show TaskConfigOpts where
@@ -542,7 +542,7 @@ instance Show TaskConfigOpts where
         [ "Missing: "
         , show missing
         , ". Without those: "
-        , show $ f Set.empty
+        , show $ f Map.empty
         ]
 
 -- | The type of a task, either building local code or something from the
@@ -562,7 +562,7 @@ data Plan = Plan
     { planTasks :: !(Map PackageName Task)
     , planFinals :: !(Map PackageName (Task, LocalPackageTB))
     -- ^ Final actions to be taken (test, benchmark, etc)
-    , planUnregisterLocal :: !(Map GhcPkgId Text)
+    , planUnregisterLocal :: !(Map GhcPkgId (PackageIdentifier, Text))
     -- ^ Text is reason we're unregistering, for display only
     , planInstallExes :: !(Map Text InstallLocation)
     -- ^ Executables that should be installed after successful building
@@ -581,7 +581,7 @@ data BaseConfigOpts = BaseConfigOpts
 -- | Render a @BaseConfigOpts@ to an actual list of options
 configureOpts :: EnvConfig
               -> BaseConfigOpts
-              -> Set GhcPkgId -- ^ dependencies
+              -> Map PackageIdentifier GhcPkgId -- ^ dependencies
               -> Bool -- ^ wanted?
               -> InstallLocation
               -> Package
@@ -627,7 +627,7 @@ configureOptsDirs bco loc package = concat
 -- | Same as 'configureOpts', but does not include directory path options
 configureOptsNoDir :: EnvConfig
                    -> BaseConfigOpts
-                   -> Set GhcPkgId -- ^ dependencies
+                   -> Map PackageIdentifier GhcPkgId -- ^ dependencies
                    -> Bool -- ^ wanted?
                    -> Package
                    -> [String]
@@ -654,28 +654,28 @@ configureOptsNoDir econfig bco deps wanted package = concat
     config = getConfig econfig
     bopts = bcoBuildOpts bco
 
-    depOptions = map toDepOption $ Set.toList deps
+    depOptions = map (uncurry toDepOption) $ Map.toList deps
       where
         toDepOption =
             if envConfigCabalVersion econfig >= $(mkVersion "1.22")
                 then toDepOption1_22
                 else toDepOption1_18
 
-    toDepOption1_22 gid = concat
+    toDepOption1_22 ident gid = concat
         [ "--dependency="
-        , packageNameString $ packageIdentifierName $ ghcPkgIdPackageIdentifier gid
+        , packageNameString $ packageIdentifierName ident
         , "="
         , ghcPkgIdString gid
         ]
 
-    toDepOption1_18 gid = concat
+    toDepOption1_18 ident _gid = concat
         [ "--constraint="
         , packageNameString name
         , "=="
         , versionString version
         ]
       where
-        PackageIdentifier name version = ghcPkgIdPackageIdentifier gid
+        PackageIdentifier name version = ident
 
     ghcOptionsMap = configGhcOptions $ getConfig econfig
     allGhcOptions = concat
@@ -699,7 +699,7 @@ modTime x =
         , toRational
               (utctDayTime x))
 
-data Installed = Library GhcPkgId | Executable PackageIdentifier
+data Installed = Library PackageIdentifier GhcPkgId | Executable PackageIdentifier
     deriving (Show, Eq, Ord)
 
 -- | Configure options to be sent to Setup.hs configure

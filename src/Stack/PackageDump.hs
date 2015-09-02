@@ -25,6 +25,7 @@ module Stack.PackageDump
     ) where
 
 import           Control.Applicative
+import           Control.Arrow ((&&&))
 import           Control.Exception.Enclosed (tryIO)
 import           Control.Monad (when, liftM)
 import           Control.Monad.Catch
@@ -64,12 +65,13 @@ newtype InstalledCacheInner = InstalledCacheInner (Map GhcPkgId InstalledCacheEn
     deriving (Binary, NFData)
 instance BinarySchema InstalledCacheInner where
     -- Don't forget to update this if you change the datatype in any way!
-    binarySchema _ = 1
+    binarySchema _ = 2
 
 -- | Cached information on whether a package has profiling libraries and haddocks.
 data InstalledCacheEntry = InstalledCacheEntry
     { installedCacheProfiling :: !Bool
-    , installedCacheHaddock :: !Bool }
+    , installedCacheHaddock :: !Bool
+    , installedCacheIdent :: !PackageIdentifier }
     deriving (Eq, Generic)
 instance Binary InstalledCacheEntry
 instance NFData InstalledCacheEntry where
@@ -162,23 +164,21 @@ sinkMatching :: Monad m
                          m
                          (Map PackageName (DumpPackage Bool Bool))
 sinkMatching reqProfiling reqHaddock allowed = do
-    dps <- CL.filter (\dp -> isAllowed (dpGhcPkgId dp) &&
+    dps <- CL.filter (\dp -> isAllowed (dpPackageIdent dp) &&
                              (not reqProfiling || dpProfiling dp) &&
                              (not reqHaddock || dpHaddock dp))
        =$= CL.consume
-    return $ pruneDeps
-        (packageIdentifierName . ghcPkgIdPackageIdentifier)
+    return $ Map.fromList $ map (packageIdentifierName . dpPackageIdent &&& id) $ Map.elems $ pruneDeps
+        id
         dpGhcPkgId
         dpDepends
         const -- Could consider a better comparison in the future
         dps
   where
-    isAllowed gid =
+    isAllowed (PackageIdentifier name version) =
         case Map.lookup name allowed of
             Just version' | version /= version' -> False
             _ -> True
-      where
-        PackageIdentifier name version = ghcPkgIdPackageIdentifier gid
 
 -- | Add profiling information to the stream of @DumpPackage@s
 addProfiling :: MonadIO m
@@ -241,6 +241,7 @@ addHaddock (InstalledCache ref) =
 -- | Dump information for a single package
 data DumpPackage profiling haddock = DumpPackage
     { dpGhcPkgId :: !GhcPkgId
+    , dpPackageIdent :: !PackageIdentifier
     , dpLibDirs :: ![FilePath]
     , dpLibraries :: ![ByteString]
     , dpHasExposedModules :: !Bool
@@ -253,7 +254,6 @@ data DumpPackage profiling haddock = DumpPackage
 
 data PackageDumpException
     = MissingSingleField ByteString (Map ByteString [Line])
-    | MismatchedId PackageName Version GhcPkgId
     | Couldn'tParseField ByteString [Line]
     deriving Typeable
 instance Exception PackageDumpException
@@ -266,9 +266,6 @@ instance Show PackageDumpException where
             ]
         , map (\(k, v) -> "    " ++ show (k, v)) (Map.toList values)
         ]
-    show (MismatchedId name version gid) =
-        "Invalid id/name/version in ghc-pkg dump output: " ++
-        show (name, version, gid)
     show (Couldn'tParseField name ls) =
         "Couldn't parse the field " ++ show name ++ " from lines: " ++ show ls
 
@@ -307,8 +304,6 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
             name <- parseS "name" >>= parsePackageName
             version <- parseS "version" >>= parseVersion
             ghcPkgId <- parseS "id" >>= parseGhcPkgId
-            when (PackageIdentifier name version /= ghcPkgIdPackageIdentifier ghcPkgId)
-                $ throwM $ MismatchedId name version ghcPkgId
 
             -- if a package has no modules, these won't exist
             let libDirKey = "library-dirs"
@@ -325,6 +320,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
 
             return $ Just DumpPackage
                 { dpGhcPkgId = ghcPkgId
+                , dpPackageIdent = PackageIdentifier name version
                 , dpLibDirs = libDirPaths
                 , dpLibraries = S8.words $ S8.unwords libraries
                 , dpHasExposedModules = not (null libraries || null exposedModules)

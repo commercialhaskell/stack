@@ -11,6 +11,7 @@ module Stack.Build.Installed
     ) where
 
 import           Control.Applicative
+import           Control.Arrow                ((&&&))
 import           Control.Monad
 import           Control.Monad.Catch          (MonadCatch, MonadMask)
 import           Control.Monad.IO.Class
@@ -26,8 +27,6 @@ import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import qualified Data.Map.Strict              as Map
 import           Data.Maybe
-import           Data.Set                     (Set)
-import qualified Data.Set                     as Set
 import           Network.HTTP.Client.Conduit  (HasHttpManager)
 import           Path
 import           Prelude                      hiding (FilePath, writeFile)
@@ -63,7 +62,7 @@ getInstalled :: (M env m, PackageInstallInfo pii)
              => EnvOverride
              -> GetInstalledOpts
              -> Map PackageName pii -- ^ does not contain any installed information
-             -> m (InstalledMap, Set GhcPkgId)
+             -> m (InstalledMap, Map GhcPkgId PackageIdentifier)
 getInstalled menv opts sourceMap = do
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
@@ -122,18 +121,18 @@ loadDatabase :: (M env m, PackageInstallInfo pii)
              -> Map PackageName pii -- ^ to determine which installed things we should include
              -> Maybe (InstallLocation, Path Abs Dir) -- ^ package database, Nothing for global
              -> [LoadHelper] -- ^ from parent databases
-             -> m ([LoadHelper], Set GhcPkgId)
+             -> m ([LoadHelper], Map GhcPkgId PackageIdentifier)
 loadDatabase menv opts mcache sourceMap mdb lhs0 = do
     wc <- getWhichCompiler
     (lhs1, gids) <- ghcPkgDump menv wc (fmap snd mdb)
                   $ conduitDumpPackage =$ sink
     let lhs = pruneDeps
-            (packageIdentifierName . ghcPkgIdPackageIdentifier)
+            id
             lhId
             lhDeps
             const
             (lhs0 ++ lhs1)
-    return (map (\lh -> lh { lhDeps = [] }) $ Map.elems lhs, Set.fromList gids)
+    return (map (\lh -> lh { lhDeps = [] }) $ Map.elems lhs, Map.fromList gids)
   where
     conduitProfilingCache =
         case mcache of
@@ -151,7 +150,7 @@ loadDatabase menv opts mcache sourceMap mdb lhs0 = do
           =$ conduitHaddockCache
           =$ CL.mapMaybe (isAllowed opts mcache sourceMap (fmap fst mdb))
           =$ CL.consume
-    sinkGIDs = CL.map dpGhcPkgId =$ CL.consume
+    sinkGIDs = CL.map (dpGhcPkgId &&& dpPackageIdent) =$ CL.consume
     sink = getZipSink $ (,)
         <$> ZipSink sinkDP
         <*> ZipSink sinkGIDs
@@ -183,7 +182,7 @@ isAllowed opts mcache sourceMap mloc dp
             if name `HashSet.member` wiredInPackages
                 then []
                 else dpDepends dp
-        , lhPair = (name, (version, fromMaybe Snap mloc, Library gid))
+        , lhPair = (name, (version, fromMaybe Snap mloc, Library ident gid))
         }
     | otherwise = Nothing
   where
@@ -209,4 +208,4 @@ isAllowed opts mcache sourceMap mloc dp
     checkLocation Local = mloc == Just Local
 
     gid = dpGhcPkgId dp
-    PackageIdentifier name version = ghcPkgIdPackageIdentifier gid
+    ident@(PackageIdentifier name version) = dpPackageIdent dp

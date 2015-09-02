@@ -22,6 +22,7 @@ Other enhancements:
 * Check for duplicate local package names
 * Stop nagging people that call `stack test` [#845](https://github.com/commercialhaskell/stack/issues/845)
 * `--file-watch` will ignore files that are in your VCS boring/ignore files [#703](https://github.com/commercialhaskell/stack/issues/703)
+* Adapt to upcoming Cabal installed package identifier format change [#851](https://github.com/commercialhaskell/stack/issues/851)
 
 Bug fixes:
 
