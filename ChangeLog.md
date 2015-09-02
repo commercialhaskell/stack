@@ -31,6 +31,7 @@ Bug fixes:
 * Create missing directories for `stack sdist`
 * Don't ignore .cabal files with extra periods [#895](https://github.com/commercialhaskell/stack/issues/895)
 * Deprecate unused `--optimizations` flag
+* Hacky workaround for optparse-applicative issue with `stack exec --help` [#806](https://github.com/commercialhaskell/stack/issues/806)
 
 ## 0.1.3.1
 

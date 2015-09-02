@@ -761,7 +761,12 @@ sdistCmd dirs go =
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
-execCmd ExecOpts {..} go@GlobalOpts{..} =
+execCmd ExecOpts {..} go@GlobalOpts{..} = do
+    (cmd, args) <-
+        case (eoCmd, eoArgs) of
+            (Just cmd, args) -> return (cmd, args)
+            (Nothing, cmd:args) -> return (cmd, args)
+            (Nothing, []) -> error "You must provide a command to exec, e.g. 'stack exec echo Hello World'"
     case eoExtra of
         ExecOptsPlain -> do
             (manager,lc) <- liftIO $ loadConfigWithOpts go
@@ -769,11 +774,11 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
              runStackTGlobal manager (lcConfig lc) go $
                 Docker.execWithOptionalContainer
                     (lcProjectRoot lc)
-                    (return (eoCmd, eoArgs, [], id))
+                    (return (cmd, args, [], id))
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ liftIO $ unlockFile lk)
                     (runStackTGlobal manager (lcConfig lc) go $ do
-                        exec plainEnvSettings eoCmd eoArgs)
+                        exec plainEnvSettings cmd args)
                     Nothing
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} ->
@@ -784,7 +789,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                        { boptsTargets = map T.pack targets
                        }
                liftIO $ unlockFile lk -- Unlock before transferring control away.
-               exec eoEnvSettings eoCmd eoArgs
+               exec eoEnvSettings cmd args
 
 -- | Run GHCi in the context of a project.
 ghciCmd :: GhciOpts -> GlobalOpts -> IO ()
