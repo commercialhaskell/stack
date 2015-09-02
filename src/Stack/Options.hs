@@ -77,7 +77,7 @@ buildOptsParser :: Command
 buildOptsParser cmd =
             fmap addCoverageFlags $
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
-            optimize <*> haddock <*> haddockDeps <*> dryRun <*> ghcOpts <*>
+            (optimize *> haddock) <*> haddockDeps <*> dryRun <*> ghcOpts <*>
             flags <*> copyBins <*> preFetch <*>
             buildSubset <*>
             fileWatch' <*> keepGoing <*> forceDirty <*>
@@ -85,7 +85,7 @@ buildOptsParser cmd =
             benches <*> benchOptsParser <*>
             many exec <*> onlyConfigure
   where optimize =
-          maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
+          maybeBoolFlags "optimizations" "DEPRECATED: This flag is no longer used, and has no effect. Please use --ghc-options=-O?" idm
         target =
            many (textArgument
                    (metavar "TARGET" <>

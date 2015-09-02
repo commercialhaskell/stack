@@ -21,7 +21,7 @@ import           Control.Concurrent.Execute
 import           Control.Concurrent.Async       (withAsync, wait)
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
-import           Control.Exception.Enclosed     (tryIO)
+import           Control.Exception.Enclosed     (catchIO, tryIO)
 import           Control.Exception.Lifted
 import           Control.Monad                  (liftM, when, unless, void, join, guard)
 import           Control.Monad.Catch            (MonadCatch, MonadMask)
@@ -80,6 +80,7 @@ import qualified System.FilePath                as FP
 import           System.IO
 import           System.IO.Temp                 (withSystemTempDirectory)
 
+import           System.PosixCompat.Files       (createLink)
 import           System.Process.Read
 import           System.Process.Run
 import           System.Process.Log             (showProcessArgDebug)
@@ -113,12 +114,12 @@ printPlan :: M env m
           => Plan
           -> m ()
 printPlan plan = do
-    case Map.toList $ planUnregisterLocal plan of
+    case Map.elems $ planUnregisterLocal plan of
         [] -> $logInfo "No packages would be unregistered."
         xs -> do
             $logInfo "Would unregister locally:"
-            forM_ xs $ \(gid, reason) -> $logInfo $ T.concat
-                [ T.pack $ ghcPkgIdString gid
+            forM_ xs $ \(ident, reason) -> $logInfo $ T.concat
+                [ T.pack $ packageIdentifierString ident
                 , " ("
                 , reason
                 , ")"
@@ -416,9 +417,9 @@ executePlan' installedMap plan ee@ExecuteEnv {..} = do
         [] -> return ()
         ids -> do
             localDB <- packageDatabaseLocal
-            forM_ ids $ \(id', reason) -> do
+            forM_ ids $ \(id', (ident, reason)) -> do
                 $logInfo $ T.concat
-                    [ T.pack $ ghcPkgIdString id'
+                    [ T.pack $ packageIdentifierString ident
                     , ": unregistering ("
                     , reason
                     , ")"
@@ -476,8 +477,8 @@ executePlan' installedMap plan ee@ExecuteEnv {..} = do
   where
     installedMap' = Map.difference installedMap
                   $ Map.fromList
-                  $ map (\gid -> (packageIdentifierName $ ghcPkgIdPackageIdentifier gid, ()))
-                  $ Map.keys
+                  $ map (\(ident, _) -> (packageIdentifierName ident, ()))
+                  $ Map.elems
                   $ planUnregisterLocal plan
 
 toActions :: M env m
@@ -534,12 +535,12 @@ getConfigCache ExecuteEnv {..} Task {..} extra = do
     let getMissing ident =
             case Map.lookup ident idMap of
                 Nothing -> error "singleBuild: invariant violated, missing package ID missing"
-                Just (Library x) -> Just x
+                Just (Library ident' x) -> assert (ident == ident') $ Just (ident, x)
                 Just (Executable _) -> Nothing
-        missing' = Set.fromList $ mapMaybe getMissing $ Set.toList missing
+        missing' = Map.fromList $ mapMaybe getMissing $ Set.toList missing
         TaskConfigOpts missing mkOpts = taskConfigOpts
         opts = mkOpts missing'
-        allDeps = Set.union missing' taskPresent
+        allDeps = Set.fromList $ Map.elems missing' ++ Map.elems taskPresent
     return ConfigCache
         { configCacheOpts = opts
             { coNoDirs = coNoDirs opts ++ map T.unpack extra
@@ -840,14 +841,18 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         announceTask task "copying precompiled package"
         forM_ mlib $ \libpath -> do
             menv <- getMinimalEnvOverride
-            readProcessNull Nothing menv "ghc-pkg"
-                [ "register"
-                , "--no-user-package-db"
-                , "--package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts)
-                , "--force"
-                , libpath
-                ]
-        liftIO $ forM_ exes $ \exe -> D.copyFile exe bindir -- FIXME use hard links on Unix
+            withMVar eeInstallLock $ \() ->
+                readProcessNull Nothing menv "ghc-pkg"
+                    [ "register"
+                    , "--no-user-package-db"
+                    , "--package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts)
+                    , "--force"
+                    , libpath
+                    ]
+        liftIO $ forM_ exes $ \exe -> do
+            D.createDirectoryIfMissing True bindir
+            let dst = bindir FP.</> FP.takeFileName exe
+            createLink exe dst `catchIO` \_ -> D.copyFile exe bindir
 
         -- Find the package in the database
         wc <- getWhichCompiler
@@ -857,7 +862,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         return $ Just $
             case mpkgid of
                 Nothing -> Executable taskProvides
-                Just pkgid -> Library pkgid
+                Just pkgid -> Library taskProvides pkgid
       where
         bindir = toFilePath $ bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
@@ -916,14 +921,13 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                         , bcoLocalDB eeBaseConfigOpts
                         ]
         mpkgid <- findGhcPkgId eeEnvOverride wc pkgDbs (packageName package)
+        let ident = PackageIdentifier (packageName package) (packageVersion package)
         mpkgid' <- case (packageHasLibrary package, mpkgid) of
             (False, _) -> assert (isNothing mpkgid) $ do
                 markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
-                return $ Executable $ PackageIdentifier
-                    (packageName package)
-                    (packageVersion package)
+                return $ Executable ident
             (True, Nothing) -> throwM $ Couldn'tFindPkgId $ packageName package
-            (True, Just pkgid) -> return $ Library pkgid
+            (True, Just pkgid) -> return $ Library ident pkgid
 
         when (doHaddock package && shouldHaddockDeps eeBuildOpts) $
             withMVar eeInstallLock $ \() ->

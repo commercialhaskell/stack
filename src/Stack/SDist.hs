@@ -128,7 +128,7 @@ getSDistFileList lp =
             { tcoMissing = Set.empty
             , tcoOpts = \_ -> ConfigureOpts [] []
             }
-        , taskPresent = Set.empty
+        , taskPresent = Map.empty
         }
 
 normalizeTarballPaths :: M env m => [FilePath] -> m [FilePath]

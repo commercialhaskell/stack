@@ -67,19 +67,18 @@ copyDepHaddocks :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadB
                 -> Set (Path Abs Dir)
                 -> m ()
 copyDepHaddocks envOverride wc bco pkgDbs pkgId extraDestDirs = do
-    mpkgHtmlDir <- findGhcPkgHaddockHtml envOverride wc pkgDbs pkgId
+    mpkgHtmlDir <- findGhcPkgHaddockHtml envOverride wc pkgDbs $ packageIdentifierString pkgId
     case mpkgHtmlDir of
         Nothing -> return ()
-        Just pkgHtmlDir -> do
-            depGhcIds <- findGhcPkgDepends envOverride wc pkgDbs pkgId
-            forM_ (map ghcPkgIdPackageIdentifier depGhcIds) $
-                copyDepWhenNeeded pkgHtmlDir
+        Just (_pkgId, pkgHtmlDir) -> do
+            depGhcIds <- findGhcPkgDepends envOverride wc pkgDbs $ packageIdentifierString pkgId
+            forM_ depGhcIds $ copyDepWhenNeeded pkgHtmlDir
   where
-    copyDepWhenNeeded pkgHtmlDir depId = do
-        mDepOrigDir <- findGhcPkgHaddockHtml envOverride wc pkgDbs depId
+    copyDepWhenNeeded pkgHtmlDir depGhcId = do
+        mDepOrigDir <- findGhcPkgHaddockHtml envOverride wc pkgDbs $ ghcPkgIdString depGhcId
         case mDepOrigDir of
             Nothing -> return ()
-            Just depOrigDir -> do
+            Just (depId, depOrigDir) -> do
                 let extraDestDirs' =
                         -- Parent test ensures we don't try to copy docs to global locations
                         if bcoSnapInstallRoot bco `isParentOf` pkgHtmlDir ||

@@ -8,24 +8,22 @@ module Stack.Types.GhcPkgId
   (GhcPkgId
   ,ghcPkgIdParser
   ,parseGhcPkgId
-  ,ghcPkgIdString
-  ,ghcPkgIdPackageIdentifier)
+  ,ghcPkgIdString)
   where
 
 import           Control.Applicative
 import           Control.Monad.Catch
 import           Data.Aeson.Extended
-import           Data.Attoparsec.ByteString.Char8
+import           Data.Attoparsec.ByteString.Char8 as A8
+import           Data.Binary (getWord8, putWord8)
 import           Data.Binary.VersionTagged
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as S8
-import           Data.Char (isLetter)
 import           Data.Data
 import           Data.Hashable
 import           Data.Text.Encoding (encodeUtf8)
 import           GHC.Generics
 import           Prelude -- Fix AMP warning
-import           Stack.Types.PackageIdentifier
 
 -- | A parse fail.
 data GhcPkgIdParseFail
@@ -36,13 +34,24 @@ instance Show GhcPkgIdParseFail where
 instance Exception GhcPkgIdParseFail
 
 -- | A ghc-pkg package identifier.
-data GhcPkgId =
-  GhcPkgId !PackageIdentifier
-           !ByteString
+newtype GhcPkgId = GhcPkgId ByteString
   deriving (Eq,Ord,Data,Typeable,Generic)
 
 instance Hashable GhcPkgId
-instance Binary GhcPkgId
+instance Binary GhcPkgId where
+    put (GhcPkgId x) = do
+        -- magic string
+        putWord8 1
+        putWord8 3
+        putWord8 4
+        putWord8 7
+        put x
+    get = do
+        1 <- getWord8
+        3 <- getWord8
+        4 <- getWord8
+        7 <- getWord8
+        fmap GhcPkgId get
 instance NFData GhcPkgId where
     rnf = genericRnf
 
@@ -69,18 +78,16 @@ parseGhcPkgId x = go x
 -- | A parser for a package-version-hash pair.
 ghcPkgIdParser :: Parser GhcPkgId
 ghcPkgIdParser =
-  do ident <- packageIdentifierParser
-     _ <- char8 '-'
-     h <- many1 (satisfy isAlphaNum)
-     let !bytes = S8.pack h
-     return (GhcPkgId ident bytes)
-  where isAlphaNum c = isLetter c || isDigit c
+    fmap GhcPkgId (A8.takeWhile isValid)
+  where
+    isValid c =
+        ('A' <= c && c <= 'Z') ||
+        ('a' <= c && c <= 'z') ||
+        ('0' <= c && c <= '9') ||
+        c == '.' ||
+        c == '-' ||
+        c == '_'
 
 -- | Get a string representation of GHC package id.
 ghcPkgIdString :: GhcPkgId -> String
-ghcPkgIdString (GhcPkgId ident x) =
-  packageIdentifierString ident ++ "-" ++ S8.unpack x
-
--- | Get the package identifier of the GHC package id.
-ghcPkgIdPackageIdentifier :: GhcPkgId -> PackageIdentifier
-ghcPkgIdPackageIdentifier (GhcPkgId ident _) = ident
+ghcPkgIdString (GhcPkgId x) = S8.unpack x
