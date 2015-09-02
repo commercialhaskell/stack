@@ -1,4 +1,4 @@
-## Unreleased changes
+## 0.1.4.0
 
 Major changes:
 
@@ -9,7 +9,7 @@ Major changes:
 Other enhancements:
 
 * Added the `--docker-env` argument, to set environment variables in Docker container.
-* Set `LC_ALL` to UTF-8 encoding for builds to avoid "commitBuffer: invalid argument" errors from GHC [#793](https://github.com/commercialhaskell/stack/issues/793)
+* Set locale environment variables to UTF-8 encoding for builds to avoid "commitBuffer: invalid argument" errors from GHC [#793](https://github.com/commercialhaskell/stack/issues/793)
 * Enable translitation for encoding on stdout and stderr [#824](https://github.com/commercialhaskell/stack/issues/824)
 * By default, `stack upgrade` automatically installs GHC as necessary [#797](https://github.com/commercialhaskell/stack/issues/797)
 * Added the `ghc-options` field to stack.yaml [#796](https://github.com/commercialhaskell/stack/issues/796)
@@ -22,6 +22,7 @@ Other enhancements:
 * Check for duplicate local package names
 * Stop nagging people that call `stack test` [#845](https://github.com/commercialhaskell/stack/issues/845)
 * `--file-watch` will ignore files that are in your VCS boring/ignore files [#703](https://github.com/commercialhaskell/stack/issues/703)
+* Add `--numeric-version` option
 
 Bug fixes:
 
@@ -31,6 +32,7 @@ Bug fixes:
 * Create missing directories for `stack sdist`
 * Don't ignore .cabal files with extra periods [#895](https://github.com/commercialhaskell/stack/issues/895)
 * Deprecate unused `--optimizations` flag
+* Truncated output on slow terminals [#413](https://github.com/commercialhaskell/stack/issues/413)
 
 ## 0.1.3.1
 
