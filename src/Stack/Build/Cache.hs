@@ -39,7 +39,7 @@ import qualified Crypto.Hash.SHA256 as SHA256
 import qualified Data.Binary as Binary
 import           Data.Binary.VersionTagged
 import qualified Data.ByteString.Char8 as S8
-import qualified Data.ByteString.Base64 as B64
+import qualified Data.ByteString.Base16 as B16
 import           Data.Map (Map)
 import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Set (Set)
@@ -306,7 +306,7 @@ precompiledCacheFile pkgident copts = do
 
     -- We only pay attention to non-directory options. We don't want to avoid a
     -- cache hit just because it was installed in a different directory.
-    copts' <- parseRelFile $ S8.unpack $ B64.encode $ SHA256.hashlazy $ Binary.encode $ coNoDirs copts
+    copts' <- parseRelFile $ S8.unpack $ B16.encode $ SHA256.hashlazy $ Binary.encode $ coNoDirs copts
 
     return $ getStackRoot ec
          </> $(mkRelDir "precompiled")

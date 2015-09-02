@@ -43,6 +43,7 @@ module Stack.Types.Build
 import           Control.DeepSeq
 import           Control.Exception
 
+import           Data.Binary (getWord8, putWord8, gput, gget)
 import           Data.Binary.VersionTagged
 import qualified Data.ByteString as S
 import           Data.Char (isSpace)
@@ -503,7 +504,20 @@ data ConfigCache = ConfigCache
       -- ^ Are haddocks to be built?
     }
     deriving (Generic,Eq,Show)
-instance Binary ConfigCache
+instance Binary ConfigCache where
+    put x = do
+        -- magic string
+        putWord8 1
+        putWord8 3
+        putWord8 4
+        putWord8 8
+        gput $ from x
+    get = do
+        1 <- getWord8
+        3 <- getWord8
+        4 <- getWord8
+        8 <- getWord8
+        fmap to gget
 instance NFData ConfigCache where
     rnf = genericRnf
 

@@ -21,7 +21,7 @@ import           Control.Concurrent.Execute
 import           Control.Concurrent.Async       (withAsync, wait)
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
-import           Control.Exception.Enclosed     (tryIO)
+import           Control.Exception.Enclosed     (catchIO, tryIO)
 import           Control.Exception.Lifted
 import           Control.Monad                  (liftM, when, unless, void, join, guard)
 import           Control.Monad.Catch            (MonadCatch, MonadMask)
@@ -80,6 +80,7 @@ import qualified System.FilePath                as FP
 import           System.IO
 import           System.IO.Temp                 (withSystemTempDirectory)
 
+import           System.PosixCompat.Files       (createLink)
 import           System.Process.Read
 import           System.Process.Run
 import           System.Process.Log             (showProcessArgDebug)
@@ -840,14 +841,18 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         announceTask task "copying precompiled package"
         forM_ mlib $ \libpath -> do
             menv <- getMinimalEnvOverride
-            readProcessNull Nothing menv "ghc-pkg"
-                [ "register"
-                , "--no-user-package-db"
-                , "--package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts)
-                , "--force"
-                , libpath
-                ]
-        liftIO $ forM_ exes $ \exe -> D.copyFile exe bindir -- FIXME use hard links on Unix
+            withMVar eeInstallLock $ \() ->
+                readProcessNull Nothing menv "ghc-pkg"
+                    [ "register"
+                    , "--no-user-package-db"
+                    , "--package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts)
+                    , "--force"
+                    , libpath
+                    ]
+        liftIO $ forM_ exes $ \exe -> do
+            D.createDirectoryIfMissing True bindir
+            let dst = bindir FP.</> FP.takeFileName exe
+            createLink exe dst `catchIO` \_ -> D.copyFile exe bindir
 
         -- Find the package in the database
         wc <- getWhichCompiler

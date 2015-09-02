@@ -30,7 +30,8 @@ module Stack.Package
   ,packageToolDependencies
   ,packageDependencies
   ,packageIdentifier
-  ,autogenDir)
+  ,autogenDir
+  ,checkCabalFileName)
   where
 
 import           Control.Exception hiding (try,catch)
@@ -133,10 +134,19 @@ readPackageDir :: (MonadLogger m, MonadIO m, MonadThrow m, MonadCatch m)
 readPackageDir packageConfig dir = do
     cabalfp <- getCabalFileName dir
     pkg <- readPackage packageConfig cabalfp
-    name <- parsePackageNameFromFilePath cabalfp
-    when (packageName pkg /= name)
-        $ throwM $ MismatchedCabalName cabalfp name
+    checkCabalFileName (packageName pkg) cabalfp
+
     return (cabalfp, pkg)
+
+-- | Check if the given name in the @Package@ matches the name of the .cabal file
+checkCabalFileName :: MonadThrow m => PackageName -> Path Abs File -> m ()
+checkCabalFileName name cabalfp = do
+    -- Previously, we just use parsePackageNameFromFilePath. However, that can
+    -- lead to confusing error messages. See:
+    -- https://github.com/commercialhaskell/stack/issues/895
+    let expected = packageNameString name ++ ".cabal"
+    when (expected /= toFilePath (filename cabalfp))
+        $ throwM $ MismatchedCabalName cabalfp name
 
 -- | Resolve a parsed cabal file into a 'Package'.
 resolvePackage :: PackageConfig
@@ -922,7 +932,7 @@ getCabalFileName pkgDir = do
         [] -> throwM $ PackageNoCabalFileFound pkgDir
         [x] -> return x
         _:_ -> throwM $ PackageMultipleCabalFilesFound pkgDir files
-  where hasExtension fp x = FilePath.takeExtensions fp == "." ++ x
+  where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
 
 -- | Path for the package's build log.
 buildLogPath :: (MonadReader env m, HasBuildConfig env, MonadThrow m)
