@@ -2,9 +2,12 @@
 
 Major changes:
 
+* On Windows, we now use a full MSYS2 installation in place of the previous PortableGit. This gives you access to the pacman package manager for more easily installing libraries.
+
 Other enhancements:
 
 * Adapt to upcoming Cabal installed package identifier format change [#851](https://github.com/commercialhaskell/stack/issues/851)
+* `stack setup` takes a `--stack-setup-yaml` argument
 
 Bug fixes:
 
