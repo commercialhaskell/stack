@@ -24,6 +24,7 @@ module Stack.GhcPkg
   ,ghcPkgExeName)
   where
 
+import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class

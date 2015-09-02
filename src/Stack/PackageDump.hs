@@ -27,7 +27,7 @@ module Stack.PackageDump
 import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Exception.Enclosed (tryIO)
-import           Control.Monad (when, liftM)
+import           Control.Monad (liftM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
