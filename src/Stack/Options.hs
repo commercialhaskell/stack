@@ -77,7 +77,7 @@ buildOptsParser :: Command
 buildOptsParser cmd =
             fmap addCoverageFlags $
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
-            optimize <*> haddock <*> haddockDeps <*> dryRun <*> ghcOpts <*>
+            (optimize *> haddock) <*> haddockDeps <*> dryRun <*> ghcOpts <*>
             flags <*> copyBins <*> preFetch <*>
             buildSubset <*>
             fileWatch' <*> keepGoing <*> forceDirty <*>
@@ -85,7 +85,7 @@ buildOptsParser cmd =
             benches <*> benchOptsParser <*>
             many exec <*> onlyConfigure
   where optimize =
-          maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
+          maybeBoolFlags "optimizations" "DEPRECATED: This flag is no longer used, and has no effect. Please use --ghc-options=-O?" idm
         target =
            many (textArgument
                    (metavar "TARGET" <>
@@ -445,18 +445,19 @@ execOptsParser :: Maybe String -- ^ command
                -> Parser ExecOpts
 execOptsParser mcmd =
     ExecOpts
-        <$> maybe eoCmdParser pure mcmd
+        <$> pure mcmd
         <*> eoArgsParser
         <*> (eoPlainParser <|>
              ExecOptsEmbellished
                 <$> eoEnvSettingsParser
                 <*> eoPackagesParser)
   where
-    eoCmdParser :: Parser String
-    eoCmdParser = strArgument (metavar "CMD")
-
     eoArgsParser :: Parser [String]
-    eoArgsParser = many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)"))
+    eoArgsParser = many (strArgument (metavar meta))
+      where
+        meta =
+            (maybe ("CMD ") (const "") mcmd) ++
+            "-- ARGS (e.g. stack ghc -- X.hs -o x)"
 
     eoEnvSettingsParser :: Parser EnvSettings
     eoEnvSettingsParser = EnvSettings

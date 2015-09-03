@@ -70,6 +70,7 @@ import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB)
 import           Stack.Solver (getCompilerVersion)
 import           Stack.Types
 import           Stack.Types.StackT
+import qualified System.Directory as D
 import           System.Environment (getExecutablePath)
 import           System.Exit (ExitCode (ExitSuccess))
 import           System.FilePath (searchPathSeparator)
@@ -170,7 +171,7 @@ setupEnv mResolveMissingGHC = do
     -- is being used
     menv0 <- getMinimalEnvOverride
     let env = removeHaskellEnvVars
-            $ augmentPathMap (fromMaybe [] mghcBin)
+            $ augmentPathMap (maybe [] edBins mghcBin)
             $ unEnvOverride menv0
 
     menv <- mkEnvOverride platform env
@@ -251,17 +252,42 @@ setupEnv mResolveMissingGHC = do
 
     return EnvConfig
         { envConfigBuildConfig = bconfig
-            { bcConfig = (bcConfig bconfig) { configEnvOverride = getEnvOverride' }
+            { bcConfig = maybe id addIncludeLib mghcBin
+                          (bcConfig bconfig)
+                { configEnvOverride = getEnvOverride' }
             }
         , envConfigCabalVersion = cabalVer
         , envConfigCompilerVersion = compilerVer
         , envConfigPackages = envConfigPackages envConfig0
         }
 
+-- | Add the include and lib paths to the given Config
+addIncludeLib :: ExtraDirs -> Config -> Config
+addIncludeLib (ExtraDirs _bins includes libs) config = config
+    { configExtraIncludeDirs = Set.union
+        (configExtraIncludeDirs config)
+        (Set.fromList $ map T.pack includes)
+    , configExtraLibDirs = Set.union
+        (configExtraLibDirs config)
+        (Set.fromList $ map T.pack libs)
+    }
+
+data ExtraDirs = ExtraDirs
+    { edBins :: ![FilePath]
+    , edInclude :: ![FilePath]
+    , edLib :: ![FilePath]
+    }
+instance Monoid ExtraDirs where
+    mempty = ExtraDirs [] [] []
+    mappend (ExtraDirs a b c) (ExtraDirs x y z) = ExtraDirs
+        (a ++ x)
+        (b ++ y)
+        (c ++ z)
+
 -- | Ensure GHC is installed and provide the PATHs to add if necessary
 ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
           => SetupOpts
-          -> m (Maybe [FilePath])
+          -> m (Maybe ExtraDirs)
 ensureGHC sopts = do
     let wc = whichCompiler (soptsWantedCompiler sopts)
         ghcVersion = case soptsWantedCompiler sopts of
@@ -317,34 +343,38 @@ ensureGHC sopts = do
                                 "Try running stack setup to locally install the correct GHC"
                                 $ soptsResolveMissingGHC sopts)
 
-            -- Install git on windows, if necessary
-            mgitIdent <- case configPlatform config of
+            -- Install msys2 on windows, if necessary
+            mmsys2Ident <- case configPlatform config of
                 Platform _ os | isWindows os && not (soptsSkipMsys sopts) ->
-                    case getInstalledTool installed $(mkPackageName "git") (const True) of
+                    case getInstalledTool installed $(mkPackageName "msys2") (const True) of
                         Just ident -> return (Just ident)
                         Nothing
                             | soptsInstallIfMissing sopts -> do
                                 si <- getSetupInfo'
-                                let VersionedDownloadInfo version info = siPortableGit si
-                                Just <$> downloadAndInstallTool si info $(mkPackageName "git") version installGitWindows
+                                osKey <- getOSKey menv0
+                                VersionedDownloadInfo version info <-
+                                    case Map.lookup osKey $ siMsys2 si of
+                                        Just x -> return x
+                                        Nothing -> error $ "MSYS2 not found for " ++ T.unpack osKey
+                                Just <$> downloadAndInstallTool si info $(mkPackageName "msys2") version (installMsys2Windows osKey)
                             | otherwise -> do
-                                $logWarn "Continuing despite missing tool: git"
+                                $logWarn "Continuing despite missing tool: msys2"
                                 return Nothing
                 _ -> return Nothing
 
-            let idents = catMaybes [Just ghcIdent, mgitIdent]
-            paths <- runReaderT (mapM binDirs idents) config
-            return $ Just $ map toFilePathNoTrailingSlash $ concat paths
+            let idents = catMaybes [Just ghcIdent, mmsys2Ident]
+            paths <- runReaderT (mapM extraDirs idents) config
+            return $ Just $ mconcat paths
         else return Nothing
 
     menv <-
         case mpaths of
             Nothing -> return menv0
-            Just paths -> do
+            Just ed -> do
                 config <- asks getConfig
                 let m0 = unEnvOverride menv0
                     path0 = Map.lookup "PATH" m0
-                    path = augmentPath paths path0
+                    path = augmentPath (edBins ed) path0
                     m = Map.insert "PATH" path m0
                 mkEnvOverride (configPlatform config) (removeHaskellEnvVars m)
 
@@ -485,7 +515,7 @@ instance FromJSON VersionedDownloadInfo where
 data SetupInfo = SetupInfo
     { siSevenzExe :: DownloadInfo
     , siSevenzDll :: DownloadInfo
-    , siPortableGit :: VersionedDownloadInfo
+    , siMsys2 :: Map Text VersionedDownloadInfo
     , siGHCs :: Map Text (Map Version DownloadInfo)
     }
     deriving Show
@@ -493,7 +523,7 @@ instance FromJSON SetupInfo where
     parseJSON = withObject "SetupInfo" $ \o -> SetupInfo
         <$> o .: "sevenzexe-info"
         <*> o .: "sevenzdll-info"
-        <*> o .: "portable-git"
+        <*> o .: "msys2"
         <*> o .: "ghc"
 
 -- | Download the most recent SetupInfo
@@ -509,7 +539,7 @@ getSetupInfo sopts manager = do
     either throwM return $ Yaml.decodeEither' bs
 
 markInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
-              => PackageIdentifier -- ^ e.g., ghc-7.8.4, git-2.4.0.1
+              => PackageIdentifier -- ^ e.g., ghc-7.8.4, msys2-20150512
               -> m ()
 markInstalled ident = do
     dir <- asks $ configLocalPrograms . getConfig
@@ -545,27 +575,42 @@ installDir ident = do
     return $ configLocalPrograms config </> reldir
 
 -- | Binary directories for the given installed package
-binDirs :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
-        => PackageIdentifier
-        -> m [Path Abs Dir]
-binDirs ident = do
+extraDirs :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
+          => PackageIdentifier
+          -> m ExtraDirs
+extraDirs ident = do
     config <- asks getConfig
     dir <- installDir ident
     case (configPlatform config, packageNameString $ packageIdentifierName ident) of
-        (Platform _ (isWindows -> True), "ghc") -> return
-            [ dir </> $(mkRelDir "bin")
-            , dir </> $(mkRelDir "mingw") </> $(mkRelDir "bin")
-            ]
-        (Platform _ (isWindows -> True), "git") -> return
-            [ dir </> $(mkRelDir "cmd")
-            , dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
-            ]
-        (_, "ghc") -> return
-            [ dir </> $(mkRelDir "bin")
-            ]
+        (Platform _ (isWindows -> True), "ghc") -> return mempty
+            { edBins = goList
+                [ dir </> $(mkRelDir "bin")
+                , dir </> $(mkRelDir "mingw") </> $(mkRelDir "bin")
+                ]
+            }
+        (Platform _ (isWindows -> True), "msys2") -> return mempty
+            { edBins = goList
+                [ dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
+                ]
+            , edInclude = goList
+                [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "include")
+                , dir </> $(mkRelDir "mingw32") </> $(mkRelDir "include")
+                ]
+            , edLib = goList
+                [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "lib")
+                , dir </> $(mkRelDir "mingw32") </> $(mkRelDir "lib")
+                ]
+            }
+        (_, "ghc") -> return mempty
+            { edBins = goList
+                [ dir </> $(mkRelDir "bin")
+                ]
+            }
         (Platform _ x, tool) -> do
             $logWarn $ "binDirs: unexpected OS/tool combo: " <> T.pack (show (x, tool))
-            return []
+            return mempty
+  where
+    goList = map toFilePathNoTrailingSlash
 
 getInstalledTool :: [PackageIdentifier] -- ^ already installed
                  -> PackageName         -- ^ package to find
@@ -799,21 +844,65 @@ installGHCWindows si archiveFile archiveType destDir _ = do
 
     $logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
 
-installGitWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
-                  => SetupInfo
+installMsys2Windows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+                  => Text -- ^ OS Key
+                  -> SetupInfo
                   -> Path Abs File
                   -> ArchiveType
                   -> Path Abs Dir
                   -> PackageIdentifier
                   -> m ()
-installGitWindows si archiveFile archiveType destDir _ = do
-    case archiveType of
-        SevenZ -> return ()
-        _ -> error $ "Git on Windows must be a 7z archive"
+installMsys2Windows osKey si archiveFile archiveType destDir _ = do
+    suffix <-
+        case archiveType of
+            TarXz -> return ".xz"
+            TarBz2 -> return ".bz2"
+            _ -> error $ "MSYS2 must be a .tar.xz archive"
+    tarFile <-
+        case T.stripSuffix suffix $ T.pack $ toFilePath archiveFile of
+            Nothing -> error $ "Invalid MSYS2 filename: " ++ show archiveFile
+            Just x -> parseAbsFile $ T.unpack x
 
     config <- asks getConfig
     run7z <- setup7z si config
-    run7z destDir archiveFile
+
+    exists <- liftIO $ D.doesDirectoryExist $ toFilePath destDir
+    when exists $ liftIO (D.removeDirectoryRecursive $ toFilePath destDir) `catchIO` \e -> do
+        $logError $ T.pack $
+            "Could not delete existing msys directory: " ++
+            toFilePath destDir
+        throwM e
+
+    run7z (parent archiveFile) archiveFile
+    run7z (parent archiveFile) tarFile
+    removeFile tarFile `catchIO` \e ->
+        $logWarn (T.concat
+            [ "Exception when removing "
+            , T.pack $ toFilePath tarFile
+            , ": "
+            , T.pack $ show e
+            ])
+
+    msys <- parseRelDir $ "msys" ++ T.unpack (fromMaybe "32" $ T.stripPrefix "windows" osKey)
+    liftIO $ D.renameDirectory
+        (toFilePath $ parent archiveFile </> msys)
+        (toFilePath destDir)
+
+    platform <- asks getPlatform
+    menv0 <- getMinimalEnvOverride
+    let oldEnv = unEnvOverride menv0
+        newEnv = augmentPathMap
+            [toFilePath $ destDir </> $(mkRelDir "usr") </> $(mkRelDir "bin")]
+            oldEnv
+    menv <- mkEnvOverride platform newEnv
+
+    -- I couldn't find this officially documented anywhere, but you need to run
+    -- the shell once in order to initialize some pacman stuff. Once that run
+    -- happens, you can just run commands as usual.
+    runIn destDir "sh" menv ["--login", "-c", "true"] Nothing
+
+    -- Install git. We could install other useful things in the future too.
+    runIn destDir "pacman" menv ["-Sy", "--noconfirm", "git"] Nothing
 
 -- | Download 7z as necessary, and get a function for unpacking things.
 --

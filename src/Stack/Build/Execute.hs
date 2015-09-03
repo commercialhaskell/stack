@@ -114,12 +114,12 @@ printPlan :: M env m
           => Plan
           -> m ()
 printPlan plan = do
-    case Map.toList $ planUnregisterLocal plan of
+    case Map.elems $ planUnregisterLocal plan of
         [] -> $logInfo "No packages would be unregistered."
         xs -> do
             $logInfo "Would unregister locally:"
-            forM_ xs $ \(gid, reason) -> $logInfo $ T.concat
-                [ T.pack $ ghcPkgIdString gid
+            forM_ xs $ \(ident, reason) -> $logInfo $ T.concat
+                [ T.pack $ packageIdentifierString ident
                 , " ("
                 , reason
                 , ")"
@@ -413,18 +413,19 @@ executePlan' :: M env m
              -> m ()
 executePlan' installedMap plan ee@ExecuteEnv {..} = do
     wc <- getWhichCompiler
+    cv <- asks $ envConfigCompilerVersion . getEnvConfig
     case Map.toList $ planUnregisterLocal plan of
         [] -> return ()
         ids -> do
             localDB <- packageDatabaseLocal
-            forM_ ids $ \(id', reason) -> do
+            forM_ ids $ \(id', (ident, reason)) -> do
                 $logInfo $ T.concat
-                    [ T.pack $ ghcPkgIdString id'
+                    [ T.pack $ packageIdentifierString ident
                     , ": unregistering ("
                     , reason
                     , ")"
                     ]
-                unregisterGhcPkgId eeEnvOverride wc localDB id'
+                unregisterGhcPkgId eeEnvOverride wc cv localDB id' ident
 
     -- Yes, we're explicitly discarding result values, which in general would
     -- be bad. monad-unlift does this all properly at the type system level,
@@ -477,8 +478,8 @@ executePlan' installedMap plan ee@ExecuteEnv {..} = do
   where
     installedMap' = Map.difference installedMap
                   $ Map.fromList
-                  $ map (\gid -> (packageIdentifierName $ ghcPkgIdPackageIdentifier gid, ()))
-                  $ Map.keys
+                  $ map (\(ident, _) -> (packageIdentifierName ident, ()))
+                  $ Map.elems
                   $ planUnregisterLocal plan
 
 toActions :: M env m
@@ -535,12 +536,12 @@ getConfigCache ExecuteEnv {..} Task {..} extra = do
     let getMissing ident =
             case Map.lookup ident idMap of
                 Nothing -> error "singleBuild: invariant violated, missing package ID missing"
-                Just (Library x) -> Just x
+                Just (Library ident' x) -> assert (ident == ident') $ Just (ident, x)
                 Just (Executable _) -> Nothing
-        missing' = Set.fromList $ mapMaybe getMissing $ Set.toList missing
+        missing' = Map.fromList $ mapMaybe getMissing $ Set.toList missing
         TaskConfigOpts missing mkOpts = taskConfigOpts
         opts = mkOpts missing'
-        allDeps = Set.union missing' taskPresent
+        allDeps = Set.fromList $ Map.elems missing' ++ Map.elems taskPresent
     return ConfigCache
         { configCacheOpts = opts
             { coNoDirs = coNoDirs opts ++ map T.unpack extra
@@ -862,7 +863,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         return $ Just $
             case mpkgid of
                 Nothing -> Executable taskProvides
-                Just pkgid -> Library pkgid
+                Just pkgid -> Library taskProvides pkgid
       where
         bindir = toFilePath $ bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
@@ -921,14 +922,13 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                         , bcoLocalDB eeBaseConfigOpts
                         ]
         mpkgid <- findGhcPkgId eeEnvOverride wc pkgDbs (packageName package)
+        let ident = PackageIdentifier (packageName package) (packageVersion package)
         mpkgid' <- case (packageHasLibrary package, mpkgid) of
             (False, _) -> assert (isNothing mpkgid) $ do
                 markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
-                return $ Executable $ PackageIdentifier
-                    (packageName package)
-                    (packageVersion package)
+                return $ Executable ident
             (True, Nothing) -> throwM $ Couldn'tFindPkgId $ packageName package
-            (True, Just pkgid) -> return $ Library pkgid
+            (True, Just pkgid) -> return $ Library ident pkgid
 
         when (doHaddock package && shouldHaddockDeps eeBuildOpts) $
             withMVar eeInstallLock $ \() ->

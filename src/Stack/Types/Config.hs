@@ -196,7 +196,10 @@ data EnvSettings = EnvSettings
     deriving (Show, Eq, Ord)
 
 data ExecOpts = ExecOpts
-    { eoCmd :: !String
+    { eoCmd :: !(Maybe String)
+    -- ^ Usage of @Maybe@ here is nothing more than a hack, to avoid some weird
+    -- bug in optparse-applicative. See:
+    -- https://github.com/commercialhaskell/stack/issues/806
     , eoArgs :: ![String]
     , eoExtra :: !ExecOptsExtra
     }

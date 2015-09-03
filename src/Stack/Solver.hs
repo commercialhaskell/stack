@@ -200,7 +200,8 @@ solveExtraDeps modStackYaml = do
                         else ["flags" .= newFlags])
             mapM_ $logInfo $ T.lines $ decodeUtf8 $ Yaml.encode o
 
-    when modStackYaml $ do
+    if modStackYaml
+      then do
         let fp = toFilePath $ bcStackYaml bconfig
         obj <- liftIO (Yaml.decodeFileEither fp) >>= either throwM return
         (ProjectAndConfigMonoid project _, warnings) <-
@@ -215,3 +216,6 @@ solveExtraDeps modStackYaml = do
                 obj
         liftIO $ Yaml.encodeFile fp obj'
         $logInfo $ T.pack $ "Updated " ++ fp
+      else do
+        $logInfo ""
+        $logInfo "To automatically modify your stack.yaml file, rerun with '--modify-stack-yaml'"
