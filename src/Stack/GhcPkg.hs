@@ -230,17 +230,23 @@ findGhcPkgDepends menv wc pkgDbs pkgId = do
 unregisterGhcPkgId :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadBaseControl IO m)
                     => EnvOverride
                     -> WhichCompiler
+                    -> CompilerVersion
                     -> Path Abs Dir -- ^ package database
                     -> GhcPkgId
+                    -> PackageIdentifier
                     -> m ()
-unregisterGhcPkgId menv wc pkgDb gid = do
+unregisterGhcPkgId menv wc cv pkgDb gid ident = do
     eres <- ghcPkg menv wc [pkgDb] args
     case eres of
         Left e -> $logWarn $ T.pack $ show e
         Right _ -> return ()
   where
     -- TODO ideally we'd tell ghc-pkg a GhcPkgId instead
-    args = ["unregister", "--user", "--force", ghcPkgIdString gid]
+    args = "unregister" : "--user" : "--force" :
+        (case cv of
+            GhcVersion v | v < $(mkVersion "7.9") ->
+                [packageIdentifierString ident]
+            _ -> ["--ipid", ghcPkgIdString gid])
 
 -- | Get the version of Cabal from the global package database.
 getCabalPkgVer :: (MonadThrow m, MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)

@@ -413,6 +413,7 @@ executePlan' :: M env m
              -> m ()
 executePlan' installedMap plan ee@ExecuteEnv {..} = do
     wc <- getWhichCompiler
+    cv <- asks $ envConfigCompilerVersion . getEnvConfig
     case Map.toList $ planUnregisterLocal plan of
         [] -> return ()
         ids -> do
@@ -424,7 +425,7 @@ executePlan' installedMap plan ee@ExecuteEnv {..} = do
                     , reason
                     , ")"
                     ]
-                unregisterGhcPkgId eeEnvOverride wc localDB id'
+                unregisterGhcPkgId eeEnvOverride wc cv localDB id' ident
 
     -- Yes, we're explicitly discarding result values, which in general would
     -- be bad. monad-unlift does this all properly at the type system level,
