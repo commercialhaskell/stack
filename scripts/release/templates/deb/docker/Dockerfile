@@ -3,8 +3,7 @@ FROM <<DISTRO>>:<<DISTRO-VERSION>>
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update
 RUN apt-get install -y net-tools wget zlib1g-dev lsb-release locales wget ca-certificates libgmp-dev
-ENV LANG en_US.UTF-8
-RUN locale-gen $LANG
+ENV LANG C.UTF-8
 
 # STACK
 RUN wget -q -O- http://download.fpcomplete.com/ubuntu/fpco.key | apt-key add -
