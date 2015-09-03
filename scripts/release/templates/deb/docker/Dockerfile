@@ -14,7 +14,7 @@ RUN apt-get install -y stack
 # RUBY & FPM
 RUN apt-get install -y ruby-dev libffi-dev make build-essential
 RUN apt-get install -y rubygems || true
-RUN gem install fpm
+RUN gem install fpm --version '< 1.4.0'
 
 # RUN ENVIRONMENT
 COPY run.sh /run.sh
