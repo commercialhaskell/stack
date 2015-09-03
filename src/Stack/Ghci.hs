@@ -249,7 +249,7 @@ makeGhciPkgInfo sourceMap locals name cabalfp components = do
     pkg <- readPackage config cabalfp
     (componentsOpts,generalOpts) <-
         getPackageOpts (packageOpts pkg) sourceMap locals cabalfp
-    (componentsModules,componentModFiles,_,mainIsFiles,_) <-
+    (componentsModules,componentFiles,_) <-
         getPackageFiles (packageFiles pkg) cabalfp
     let filterWithinWantedComponents m =
             M.elems
@@ -270,10 +270,12 @@ makeGhciPkgInfo sourceMap locals name cabalfp components = do
         , ghciPkgModules = mconcat
               (filterWithinWantedComponents componentsModules)
         , ghciPkgModFiles = mconcat
-              (filterWithinWantedComponents componentModFiles)
-        , ghciPkgMainIs = M.map (S.map mainIsFile) mainIsFiles
+              (filterWithinWantedComponents
+                   (M.map (setMapMaybe dotCabalModulePath) componentFiles))
+        , ghciPkgMainIs = M.map (setMapMaybe dotCabalMainPath) componentFiles
         }
   where
     badForGhci :: String -> Bool
     badForGhci x =
         isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky")
+    setMapMaybe f = S.fromList . mapMaybe f . S.toList
