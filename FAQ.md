@@ -227,7 +227,7 @@ script:
 
 If you wish to use stack as part of a larger matrix, à la [hvr/multi-ghc-travis](https://github.com/hvr/multi-ghc-travis), then you need to do a bit more work. Take a look at [tebello-thejane/bitx-haskell/.travis.yml](https://github.com/tebello-thejane/bitx-haskell/blob/master/.travis.yml), and note the extensive use of `if` statements to select between building with Cabal and stack.
 
-Also, note that `stack setup` has been known to take longer than 20 minutes when cloning the Hackage package index on Travis. Spawning a simple minute counter while using stack is a cheap trick to ensure that the Travis build does not time out due to lack of output for longer than 10 minutes (and that the stack output is instantaneous, unlike using `travis_wait`). See [tebello-thejane/bitx-haskell/.travis/stack-build.sh](https://github.com/tebello-thejane/bitx-haskell/blob/master/.travis/stack-build.sh) as an example of how to accomplish this.
+Also, note that some `stack` commands have been known to take longer than 20 minutes when on Travis, thus causing Travis to kill the build. A cheap trick is to cause `stack` to display verbose output (with the `-v` option), which causes it to display more often and thus Travis is less likely to kill it due to lack of perceived activity.
 
 #### What is licensing restrictions on Windows?
 
