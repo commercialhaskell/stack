@@ -115,11 +115,19 @@ newtype GetPackageFiles = GetPackageFiles
     { getPackageFiles :: forall m env. (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadReader env m, HasPlatform env, HasEnvConfig env)
                       => Path Abs File
                       -> m (Map NamedComponent (Set ModuleName)
-                           ,Map NamedComponent (Set DotCabalPath)
+                           ,Map NamedComponent (Set (Path Abs File))
+                           ,Map NamedComponent (Set (Path Abs File))
+                           ,Map NamedComponent (Set MainIs)
                            ,Set (Path Abs File))
     }
 instance Show GetPackageFiles where
     show _ = "<GetPackageFiles>"
+
+-- | A file specified as @main-is@ in a .cabal file.
+newtype MainIs = MainIs
+    { mainIsFile :: Path Abs File
+    }
+  deriving (Ord,Eq)
 
 -- | Package build configuration
 data PackageConfig =
@@ -234,52 +242,3 @@ instance NFData FileCacheInfo where
 -- | Used for storage and comparison.
 newtype ModTime = ModTime (Integer,Rational)
   deriving (Ord,Show,Generic,Eq,NFData,Binary)
-
--- | A descriptor from a .cabal file indicating one of the following:
---
--- exposed-modules: Foo
--- other-modules: Foo
--- or
--- main-is: Foo.hs
---
-data DotCabalDescriptor
-    = DotCabalModule !ModuleName
-    | DotCabalMain !FilePath
-    | DotCabalFile !FilePath
-    deriving (Eq,Ord)
-
--- | Maybe get the module name from the .cabal descriptor.
-dotCabalModule :: DotCabalDescriptor -> Maybe ModuleName
-dotCabalModule (DotCabalModule m) = Just m
-dotCabalModule _ = Nothing
-
--- | Maybe get the main name from the .cabal descriptor.
-dotCabalMain :: DotCabalDescriptor -> Maybe FilePath
-dotCabalMain (DotCabalMain m) = Just m
-dotCabalMain _ = Nothing
-
--- | A path resolved from the .cabal file, which is either main-is or
--- an exposed/internal/referenced module.
-data DotCabalPath
-    = DotCabalModulePath !(Path Abs File)
-    | DotCabalMainPath !(Path Abs File)
-    | DotCabalFilePath !(Path Abs File)
-    deriving (Eq,Ord)
-
--- | Get the module path.
-dotCabalModulePath :: DotCabalPath -> Maybe (Path Abs File)
-dotCabalModulePath (DotCabalModulePath fp) = Just fp
-dotCabalModulePath _ = Nothing
-
--- | Get the main path.
-dotCabalMainPath :: DotCabalPath -> Maybe (Path Abs File)
-dotCabalMainPath (DotCabalMainPath fp) = Just fp
-dotCabalMainPath _ = Nothing
-
--- | Get the path.
-dotCabalGetPath :: DotCabalPath -> Path Abs File
-dotCabalGetPath dcp =
-    case dcp of
-        DotCabalModulePath fp -> fp
-        DotCabalMainPath fp -> fp
-        DotCabalFilePath fp -> fp
