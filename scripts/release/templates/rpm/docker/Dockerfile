@@ -7,7 +7,7 @@ RUN yum -y install perl make automake gcc gmp-devel zlib-devel rpm-build tar whi
 # RUBY & FPM
 RUN yum -y install ruby-devel
 RUN bash -c 'if [[ "<<DISTRO>>" == "centos" && "<<DISTRO-VERSION>>" < "7" ]]; then yum -y install rubygems; fi'
-RUN gem install fpm
+RUN gem install fpm --version '< 1.4.0'
 
 # STACK
 RUN curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/<<DISTRO>>/<<DISTRO-VERSION>>/fpco.repo >/etc/yum.repos.d/fpco.repo
