@@ -14,6 +14,10 @@ Bug fixes:
 
 * Hacky workaround for optparse-applicative issue with `stack exec --help` [#806](https://github.com/commercialhaskell/stack/issues/806)
 
+## 0.1.4.1
+
+Fix stack's own Haddocks.  No changes to functionality (only comments updated).
+
 ## 0.1.4.0
 
 Major changes:
