@@ -148,10 +148,8 @@ Alternatively, the package can be built from source as follows.
 
 (64-bit and 32-bit options available)
 
-* Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest).  Note: the `-gmp4` variants are for older distributions (such as CentOS 6.x) that only include libgmp4 (libgmp.so.3)
-* Extract the "stack…" executable somewhere on your `$PATH`  (see [Path section below](#path))
-* Rename the long filename to just "stack"
-* Edit the file to give it permission to be executable (`chmod a+x /path/to/stack`).
+* Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest).  Note: the `-gmp4` variants are for older distributions (such as CentOS 6.x) that only include libgmp4 (libgmp.so.3).
+* The download is compressed. Extract the compressed file somewhere on your PATH  (see [PATH section below](#path)).
 * Now you can run `stack` from the terminal.
 
 Tested on Fedora 20: make sure to install the following packages `sudo yum install perl make automake gcc gmp-devel`.
