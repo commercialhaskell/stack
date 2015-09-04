@@ -30,8 +30,8 @@ data WhichCompiler
 data CompilerVersion
     = GhcVersion {-# UNPACK #-} !Version
     | GhcjsVersion
-        {-# UNPACK #-} !Version -- ^ GHCJS version
-        {-# UNPACK #-} !Version -- ^ GHC version
+        {-# UNPACK #-} !Version -- GHCJS version
+        {-# UNPACK #-} !Version -- GHC version
     deriving (Generic, Show, Eq, Ord)
 instance Binary CompilerVersion
 instance NFData CompilerVersion where
