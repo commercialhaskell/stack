@@ -106,13 +106,10 @@ buildOptsParser cmd =
                     "generating Haddocks the project(s) in this directory/configuration"
                     idm
         haddockDeps =
-          if cmd == Haddock
-             then maybeBoolFlags
-                            "haddock-deps"
-                            "building Haddocks for dependencies"
-                            idm
-             else pure Nothing
-
+             maybeBoolFlags
+                       "haddock-deps"
+                       "building Haddocks for dependencies"
+                       idm
         copyBins = boolFlags (cmd == Install)
             "copy-bins"
             "copying binaries to the local-bin-path (see 'stack path')"
