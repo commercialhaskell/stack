@@ -1,3 +1,7 @@
+## 0.1.4.1
+
+Fix stack's own Haddocks.  No changes to functionality (only comments updated).
+
 ## 0.1.4.0
 
 Major changes:
