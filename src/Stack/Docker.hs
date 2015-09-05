@@ -570,7 +570,7 @@ pullImage envOverride docker image =
                 "docker"
                 (concat
                    [["login"]
-                   ,maybe [] (\u -> ["--username=" ++ u]) (dockerRegistryUsername docker)
+                   ,maybe [] (\n -> ["--username=" ++ n]) (dockerRegistryUsername docker)
                    ,maybe [] (\p -> ["--password=" ++ p]) (dockerRegistryPassword docker)
                    ,[takeWhile (/= '/') image]]))
      e <- try (callProcess Nothing envOverride "docker" ["pull",image])
