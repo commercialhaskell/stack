@@ -154,7 +154,8 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
             [ [$(simpleVersion Meta.version)]
               -- Leave out number of commits for --depth=1 clone
               -- See https://github.com/commercialhaskell/stack/issues/792
-            , [" (" ++ $gitCommitCount ++ " commits)" | $gitCommitCount /= ("1"::String)]
+            , [" (" ++ $gitCommitCount ++ " commits)" | $gitCommitCount /= ("1"::String) &&
+                                                        $gitCommitCount /= ("UNKNOWN" :: String)]
             , [" ", show buildArch]
             ]
 
