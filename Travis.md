@@ -23,7 +23,7 @@ before_install:
   # stack
   - mkdir -p ~/.local/bin
   - export PATH=~/.local/bin:$PATH
-  - travis_retry (cd ~/.local/bin && rm -f stack && curl -L https://github.com/commercialhaskell/stack/releases/download/v0.1.4.0/stack-0.1.4.0-x86_64-linux.tar.gz | tar xzf -)
+  - travis_retry curl -L https://github.com/commercialhaskell/stack/releases/download/v0.1.4.0/stack-0.1.4.0-x86_64-linux.tar.gz | tar xz -C ~/.local/bin
 ```
 
 *TODO*: https://github.com/travis-ci/travis-ci/issues/4169 is not yet resolved. Otherwise it will be possible to use [apt plugin](http://docs.travis-ci.com/user/apt/).
