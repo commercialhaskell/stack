@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 module Stack.Upgrade (upgrade) where
 
+import           Control.Monad               (when)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -14,6 +15,7 @@ import qualified Data.Map                    as Map
 import           Data.Monoid                 ((<>))
 import qualified Data.Monoid
 import qualified Data.Set                    as Set
+import           Development.GitRev          (gitHash)
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager)
 import           Path
 import qualified Paths_stack as Paths
@@ -27,6 +29,7 @@ import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Types.StackT
 import           System.IO.Temp              (withSystemTempDirectory)
+import           System.Process              (readProcess)
 import           System.Process.Run
 
 upgrade :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, HasTerminal env, HasReExec env, HasLogLevel env, MonadBaseControl IO m)
@@ -38,6 +41,9 @@ upgrade gitRepo mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> d
     tmp <- parseAbsDir tmp'
     mdir <- case gitRepo of
       Just repo -> do
+        remote <- liftIO $ readProcess "git" ["ls-remote", repo, "master"] []
+        let latestCommit = head . words $ remote
+        when (latestCommit == $(gitHash)) $ error "Already up-to-date, no upgrade required"
         $logInfo "Cloning stack"
         runIn tmp "git" menv
             [ "clone"
