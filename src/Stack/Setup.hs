@@ -763,7 +763,7 @@ installGHCPosix _ archiveFile archiveType destDir ident = do
         root <- parseAbsDir root'
         dir <- liftM (root Path.</>) $ parseRelDir $ packageIdentifierString ident
 
-        $logSticky $ "Unpacking GHC ..."
+        $logSticky $ T.concat ["Unpacking GHC into ", (T.pack . toFilePath $ root), " ..."]
         $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
         readInNull root tarTool menv ["xf", toFilePath archiveFile] Nothing
 
