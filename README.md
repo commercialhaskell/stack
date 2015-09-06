@@ -58,7 +58,7 @@ to do is `stack install <package-name>`.
 
 Run `stack` for a complete list of commands.
 
-## How to contribute
+#### How to contribute
 
 This assumes that you have already installed a version of stack, and have `git` installed.
 
