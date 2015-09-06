@@ -58,6 +58,25 @@ to do is `stack install <package-name>`.
 
 Run `stack` for a complete list of commands.
 
+#### How to contribute
+
+This assumes that you have already installed a version of stack, and have `git` installed.
+
+1. Clone `stack` from git with
+   `git clone https://github.com/commercialhaskell/stack.git`.
+2. Enter into the stack folder with `cd stack`.
+3. Build `stack` using a pre-existing `stack` install with
+   `stack setup && stack build`.
+4. Once `stack` finishes building, check the stack version with 
+   `stack --version`. Make sure the version is the latest.
+5. Look for issues tagged with [`newcomer` and `awaiting-pr` labels](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3Anewcomer+label%3Aawaiting-pr)
+
+Build from source as a one-liner:
+
+```bash
+git clone https://github.com/commercialhaskell/stack.git && cd stack && stack setup && stack build
+```
+
 #### Complete guide to stack
 
 This repository also contains [a complete guide to using
