@@ -88,7 +88,7 @@ michael@d30748af6d3d:~$ echo 'export PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc
 ## Hello World Example
 
 Now that we've got stack, it's time to put it to work. We're going to create
-a new project fromm a template, and walk through some of the most common
+a new project from a template, and walk through some of the most common
 stack commands that you will need on a frequent basis.
 
 
