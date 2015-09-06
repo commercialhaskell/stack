@@ -555,10 +555,6 @@ getConfigCache ExecuteEnv {..} Task {..} extra = do
             shouldHaddockPackage eeBuildOpts eeWanted (packageIdentifierName taskProvides)
         }
 
--- | Like `configCacheDeps`, but throws away the package id hash.
-configCacheDeps' :: ConfigCache -> Set PackageIdentifier
-configCacheDeps' = Set.map ghcPkgIdPackageIdentifier . configCacheDeps
-
 -- | Ensure that the configuration for the package matches what is given
 ensureConfig :: M env m
              => ConfigCache -- ^ newConfigCache
@@ -600,7 +596,10 @@ withSingleContext :: M env m
                   -> ActionContext
                   -> ExecuteEnv
                   -> Task
-                  -> Set PackageIdentifier
+                  -> Maybe (Set GhcPkgId)
+                  -- ^ All dependencies' package ids to provide to Setup.hs. If
+                  -- Nothing, just provide global and snapshot package
+                  -- databases.
                   -> Maybe String
                   -> (  Package
                      -> Path Abs File
@@ -611,7 +610,7 @@ withSingleContext :: M env m
                      -> Maybe (Path Abs File, Handle)
                      -> m a)
                   -> m a
-withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} deps msuffix inner0 =
+withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} mdeps msuffix inner0 =
     withPackage $ \package cabalfp pkgDir ->
     withLogFile package $ \mlogFile ->
     withCabal package pkgDir mlogFile $ \cabal ->
@@ -673,17 +672,46 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} de
                 (True, Just setupExe) -> return $ Left setupExe
                 _ -> liftIO $ fmap Right $ getSetupHs pkgDir
         inner $ \stripTHLoading args -> do
-            let packageArgs =
-                      "-clear-package-db"
-                    : "-global-package-db"
-                    : ("-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts))
-                    : ("-package-db=" ++ toFilePath (bcoLocalDB eeBaseConfigOpts))
-                    : "-hide-all-packages"
-                    : ("-package=" ++
-                       packageIdentifierString
-                           (PackageIdentifier cabalPackageName
-                                              eeCabalPkgVer))
-                    : Set.toList (Set.map (("-package=" ++) . packageIdentifierString) deps)
+            let cabalPackageArg =
+                    "-package=" ++ packageIdentifierString
+                                       (PackageIdentifier cabalPackageName
+                                                          eeCabalPkgVer)
+                packageArgs =
+                    case mdeps of
+                        Just deps ->
+                            -- Stack always builds with the global Cabal for various
+                            -- reproducibility issues.
+                            let depsMinusCabal = filter (not . isPrefixOf "Cabal-")
+                                                 . map ghcPkgIdString
+                                                 . Set.toList
+                                                 $ deps
+                            in
+                              "-clear-package-db"
+                            : "-global-package-db"
+                            : ("-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts))
+                            : ("-package-db=" ++ toFilePath (bcoLocalDB eeBaseConfigOpts))
+                            : "-hide-all-packages"
+                            : cabalPackageArg
+                            : map ("-package-id=" ++) depsMinusCabal
+                        -- This branch is debatable. It adds access to the
+                        -- snapshot package database for Cabal. There are two
+                        -- possible objections:
+                        --
+                        -- 1. This doesn't isolate the build enough; arbitrary
+                        -- other packages available could cause the build to
+                        -- succeed or fail.
+                        --
+                        -- 2. This doesn't provide enough packages: we should also
+                        -- include the local database when building local packages.
+                        --
+                        -- Currently, this branch is only taken via `stack sdist`.
+                        Nothing ->
+                            [ cabalPackageArg
+                            , "-clear-package-db"
+                            , "-global-package-db"
+                            , "-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts)
+                            ]
+
                 setupArgs = ("--builddir=" ++ toFilePath distRelativeDir') : args
                 runExe exeName fullArgs = do
                     $logProcessRun (toFilePath exeName) fullArgs
@@ -859,7 +887,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
       where
         bindir = toFilePath $ bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
-    realConfigAndBuild cache = withSingleContext runInBase ac ee task (configCacheDeps' cache) Nothing
+    realConfigAndBuild cache = withSingleContext runInBase ac ee task (Just $ configCacheDeps cache) Nothing
         $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
             _neededConfig <- ensureConfig cache pkgDir ee (announce "configure") cabal cabalfp
 
@@ -964,7 +992,7 @@ singleTest runInBase topts lptb ac ee task installedMap = do
                 , ["--enable-benchmarks" | depsPresent installedMap $ lpBenchDeps lp]
                 ]
             _ -> []
-    withSingleContext runInBase ac ee task (configCacheDeps' cache) (Just "test") $ \package cabalfp pkgDir cabal announce console mlogFile -> do
+    withSingleContext runInBase ac ee task (Just $ configCacheDeps cache) (Just "test") $ \package cabalfp pkgDir cabal announce console mlogFile -> do
         neededConfig <- ensureConfig cache pkgDir ee (announce "configure (test)") cabal cabalfp
         config <- asks getConfig
 
@@ -1115,7 +1143,7 @@ singleBench runInBase beopts _lptb ac ee task installedMap = do
                 , ["--enable-benchmarks"]
                 ]
             _ -> []
-    withSingleContext runInBase ac ee task (configCacheDeps' cache) (Just "bench") $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
+    withSingleContext runInBase ac ee task (Just $ configCacheDeps cache) (Just "bench") $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
         neededConfig <- ensureConfig cache pkgDir ee (announce "configure (benchmarks)") cabal cabalfp
 
         benchBuilt <- checkBenchBuilt pkgDir

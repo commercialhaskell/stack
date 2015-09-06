@@ -114,16 +114,15 @@ getSDistFileList lp =
         (_, _mbp, locals, _extraToBuild, sourceMap) <- loadSourceMap NeedTargets bopts
         runInBase <- liftBaseWith $ \run -> return (void . run)
         withExecuteEnv menv bopts baseConfigOpts locals sourceMap $ \ee -> do
-            withSingleContext runInBase ac ee task deps (Just "sdist") $ \_package _cabalfp _pkgDir cabal _announce _console _mlogFile -> do
+            withSingleContext runInBase ac ee task Nothing (Just "sdist") $ \_package _cabalfp _pkgDir cabal _announce _console _mlogFile -> do
                 let outFile = tmpdir FP.</> "source-files-list"
                 cabal False ["sdist", "--list-sources", outFile]
                 liftIO (readFile outFile)
   where
     package = lpPackage lp
     ac = ActionContext Set.empty
-    ident = PackageIdentifier (packageName package) (packageVersion package)
     task = Task
-        { taskProvides = ident
+        { taskProvides = PackageIdentifier (packageName package) (packageVersion package)
         , taskType = TTLocal lp
         , taskConfigOpts = TaskConfigOpts
             { tcoMissing = Set.empty
@@ -131,7 +130,6 @@ getSDistFileList lp =
             }
         , taskPresent = Map.empty
         }
-    deps = Set.singleton ident
 
 normalizeTarballPaths :: M env m => [FilePath] -> m [FilePath]
 normalizeTarballPaths fps = do
