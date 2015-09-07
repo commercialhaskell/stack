@@ -1,6 +1,6 @@
 ## Shell Autocompletion:
 
-The following adds support for shell tab completion for standard Stack arguments, although completion for filenames and executables etc. within stack is still lacking (see [issue 82](https://github.com/commercialhaskell/stack/issues/832)
+The following adds support for shell tab completion for standard Stack arguments, although completion for filenames and executables etc. within stack is still lacking (see [issue 82](https://github.com/commercialhaskell/stack/issues/832)).
 
 ### for bash users
 
