@@ -98,7 +98,7 @@ buildOptsParser cmd =
         exeProfiling =
           boolFlags False
                     "executable-profiling"
-                    "library profiling for TARGETs and all its dependencies"
+                    "executable profiling for TARGETs and all its dependencies"
                     idm
         haddock =
           boolFlags (cmd == Haddock)
