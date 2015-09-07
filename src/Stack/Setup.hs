@@ -220,7 +220,9 @@ setupEnv mResolveMissingGHC = do
                     eo <- mkEnvOverride platform
                         $ Map.insert "PATH" (if esIncludeLocals es then localsPath else depsPath)
                         $ (if esIncludeGhcPackagePath es
-                                then Map.insert "GHC_PACKAGE_PATH" (mkGPP (esIncludeLocals es))
+                                then Map.insert
+                                       (case wc of { Ghc -> "GHC_PACKAGE_PATH"; Ghcjs -> "GHCJS_PACKAGE_PATH" })
+                                       (mkGPP (esIncludeLocals es))
                                 else id)
 
                         $ (if esStackExe es
@@ -1084,6 +1086,7 @@ toFilePathNoTrailingSlash = FP.dropTrailingPathSeparator . toFilePath
 -- Remove potentially confusing environment variables
 removeHaskellEnvVars :: Map Text Text -> Map Text Text
 removeHaskellEnvVars =
+    Map.delete "GHCJS_PACKAGE_PATH" .
     Map.delete "GHC_PACKAGE_PATH" .
     Map.delete "HASKELL_PACKAGE_SANDBOX" .
     Map.delete "HASKELL_PACKAGE_SANDBOXES" .
