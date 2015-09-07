@@ -23,7 +23,7 @@ import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
 import           Control.Exception.Enclosed     (catchIO, tryIO)
 import           Control.Exception.Lifted
-import           Control.Monad                  (liftM, when, unless, void, join, guard)
+import           Control.Monad                  (liftM, when, unless, void, join, guard, filterM, (<=<))
 import           Control.Monad.Catch            (MonadCatch, MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -328,8 +328,9 @@ executePlan menv bopts baseConfigOpts locals sourceMap installedMap plan = do
         destDir <- asks $ configLocalBin . getConfig
         createTree destDir
 
-        let destDir' = toFilePath destDir
-        when (not $ any (FP.equalFilePath destDir') (envSearchPath menv)) $
+        destDir' <- liftIO . D.canonicalizePath . toFilePath $ destDir
+        isInPATH <- liftIO . fmap (any (FP.equalFilePath destDir')) . (mapM D.canonicalizePath <=< filterM D.doesDirectoryExist) $ (envSearchPath menv)
+        when (not isInPATH) $
             $logWarn $ T.concat
                 [ "Installation path "
                 , T.pack destDir'
