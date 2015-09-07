@@ -4,7 +4,6 @@
 {-# LANGUAGE TemplateHaskell       #-}
 module Stack.Upgrade (upgrade) where
 
-import           Control.Monad               (when)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -43,17 +42,19 @@ upgrade gitRepo mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> d
       Just repo -> do
         remote <- liftIO $ readProcess "git" ["ls-remote", repo, "master"] []
         let latestCommit = head . words $ remote
-        when (latestCommit == $(gitHash)) $ error "Already up-to-date, no upgrade required"
-        $logInfo "Cloning stack"
-        runIn tmp "git" menv
-            [ "clone"
-            , repo
-            , "stack"
-            , "--depth"
-            , "1"
-            ]
-            Nothing
-        return $ Just $ tmp </> $(mkRelDir "stack")
+        if (latestCommit == $gitHash) then do
+          $logInfo "Already up-to-date, no upgrade required"
+          return Nothing
+        else do $logInfo "Cloning stack"
+                runIn tmp "git" menv
+                    [ "clone"
+                    , repo
+                    , "stack"
+                    , "--depth"
+                    , "1"
+                    ]
+                    Nothing
+                return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
         updateAllIndices menv
         caches <- getPackageCaches menv
