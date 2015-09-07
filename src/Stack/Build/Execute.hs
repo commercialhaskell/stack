@@ -118,11 +118,15 @@ printPlan plan = do
         [] -> $logInfo "No packages would be unregistered."
         xs -> do
             $logInfo "Would unregister locally:"
-            forM_ xs $ \(ident, reason) -> $logInfo $ T.concat
+            forM_ xs $ \(ident, mreason) -> $logInfo $ T.concat
                 [ T.pack $ packageIdentifierString ident
-                , " ("
-                , reason
-                , ")"
+                , case mreason of
+                    Nothing -> ""
+                    Just reason -> T.concat
+                        [ " ("
+                        , reason
+                        , ")"
+                        ]
                 ]
 
     $logInfo ""
@@ -418,12 +422,17 @@ executePlan' installedMap plan ee@ExecuteEnv {..} = do
         [] -> return ()
         ids -> do
             localDB <- packageDatabaseLocal
-            forM_ ids $ \(id', (ident, reason)) -> do
+            forM_ ids $ \(id', (ident, mreason)) -> do
                 $logInfo $ T.concat
                     [ T.pack $ packageIdentifierString ident
-                    , ": unregistering ("
-                    , reason
-                    , ")"
+                    , ": unregistering"
+                    , case mreason of
+                        Nothing -> ""
+                        Just reason -> T.concat
+                            [ " ("
+                            , reason
+                            , ")"
+                            ]
                     ]
                 unregisterGhcPkgId eeEnvOverride wc cv localDB id' ident
 
