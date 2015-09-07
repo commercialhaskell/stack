@@ -883,7 +883,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         liftIO $ forM_ exes $ \exe -> do
             D.createDirectoryIfMissing True bindir
             let dst = bindir FP.</> FP.takeFileName exe
-            createLink exe dst `catchIO` \_ -> D.copyFile exe bindir
+            createLink exe dst `catchIO` \_ -> D.copyFile exe dst
 
         -- Find the package in the database
         wc <- getWhichCompiler
