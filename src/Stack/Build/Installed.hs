@@ -62,7 +62,10 @@ getInstalled :: (M env m, PackageInstallInfo pii)
              => EnvOverride
              -> GetInstalledOpts
              -> Map PackageName pii -- ^ does not contain any installed information
-             -> m (InstalledMap, Map GhcPkgId PackageIdentifier)
+             -> m ( InstalledMap
+                  , Map GhcPkgId PackageIdentifier -- globally installed
+                  , Map GhcPkgId PackageIdentifier -- locally installed
+                  )
 getInstalled menv opts sourceMap = do
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
@@ -75,11 +78,12 @@ getInstalled menv opts sourceMap = do
             else return Nothing
 
     let loadDatabase' = loadDatabase menv opts mcache sourceMap
-    (installedLibs', localInstalled) <-
-        loadDatabase' Nothing [] >>=
-        loadDatabase' (Just (Snap, snapDBPath)) . fst >>=
-        loadDatabase' (Just (Local, localDBPath)) . fst
-    let installedLibs = M.fromList $ map lhPair installedLibs'
+    (installedLibs0, globalInstalled) <- loadDatabase' Nothing []
+    (installedLibs1, _snapInstalled) <-
+        loadDatabase' (Just (Snap, snapDBPath)) installedLibs0
+    (installedLibs2, localInstalled) <-
+        loadDatabase' (Just (Local, localDBPath)) installedLibs1
+    let installedLibs = M.fromList $ map lhPair installedLibs2
 
     case mcache of
         Nothing -> return ()
@@ -107,7 +111,7 @@ getInstalled menv opts sourceMap = do
             , installedLibs
             ]
 
-    return (installedMap, localInstalled)
+    return (installedMap, globalInstalled, localInstalled)
 
 -- | Outputs both the modified InstalledMap and the Set of all installed packages in this database
 --

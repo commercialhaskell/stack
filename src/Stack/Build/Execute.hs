@@ -205,6 +205,7 @@ data ExecuteEnv = ExecuteEnv
     , eeLocals         :: ![LocalPackage]
     , eeSourceMap      :: !SourceMap
     , eeGlobalDB       :: !(Path Abs Dir)
+    , eeGlobalPackages :: !(Set GhcPkgId)
     }
 
 -- | Get a compiled Setup exe
@@ -277,10 +278,11 @@ withExecuteEnv :: M env m
                -> BuildOpts
                -> BaseConfigOpts
                -> [LocalPackage]
+               -> Set GhcPkgId -- ^ global packages
                -> SourceMap
                -> (ExecuteEnv -> m a)
                -> m a
-withExecuteEnv menv bopts baseConfigOpts locals sourceMap inner = do
+withExecuteEnv menv bopts baseConfigOpts locals globals sourceMap inner = do
     withSystemTempDirectory stackProgName $ \tmpdir -> do
         tmpdir' <- parseAbsDir tmpdir
         configLock <- newMVar ()
@@ -311,6 +313,7 @@ withExecuteEnv menv bopts baseConfigOpts locals sourceMap inner = do
             , eeLocals = locals
             , eeSourceMap = sourceMap
             , eeGlobalDB = globalDB
+            , eeGlobalPackages = globals
             }
 
 -- | Perform the actual plan
@@ -319,12 +322,13 @@ executePlan :: M env m
             -> BuildOpts
             -> BaseConfigOpts
             -> [LocalPackage]
+            -> Set GhcPkgId -- ^ globals
             -> SourceMap
             -> InstalledMap
             -> Plan
             -> m ()
-executePlan menv bopts baseConfigOpts locals sourceMap installedMap plan = do
-    withExecuteEnv menv bopts baseConfigOpts locals sourceMap (executePlan' installedMap plan)
+executePlan menv bopts baseConfigOpts locals globals sourceMap installedMap plan = do
+    withExecuteEnv menv bopts baseConfigOpts locals globals sourceMap (executePlan' installedMap plan)
 
     unless (Map.null $ planInstallExes plan) $ do
         snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
@@ -694,7 +698,10 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             let depsMinusCabal = filter (not . isPrefixOf "Cabal-")
                                                  . map ghcPkgIdString
                                                  . Set.toList
-                                                 $ deps
+                                                 $ Set.union deps eeGlobalPackages
+                                    -- We also provide all global packages to
+                                    -- the Setup.hs file, see:
+                                    -- https://github.com/commercialhaskell/stack/issues/941
                             in
                               "-clear-package-db"
                             : "-global-package-db"

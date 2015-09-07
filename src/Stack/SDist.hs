@@ -113,7 +113,9 @@ getSDistFileList lp =
         baseConfigOpts <- mkBaseConfigOpts bopts
         (_, _mbp, locals, _extraToBuild, sourceMap) <- loadSourceMap NeedTargets bopts
         runInBase <- liftBaseWith $ \run -> return (void . run)
-        withExecuteEnv menv bopts baseConfigOpts locals sourceMap $ \ee -> do
+        withExecuteEnv menv bopts baseConfigOpts locals
+            Set.empty -- provide empty list of globals. This is a hack around custom Setup.hs files
+            sourceMap $ \ee -> do
             withSingleContext runInBase ac ee task Nothing (Just "sdist") $ \_package _cabalfp _pkgDir cabal _announce _console _mlogFile -> do
                 let outFile = tmpdir FP.</> "source-files-list"
                 cabal False ["sdist", "--list-sources", outFile]
