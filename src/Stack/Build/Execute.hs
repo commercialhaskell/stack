@@ -925,8 +925,13 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                       -- which will allow users to turn off library building if
                       -- desired
                       | packageHasLibrary package]
-                    , map (T.unpack . T.append "exe:")
-                          (maybe [] Set.toList $ lpExeComponents lp)
+                    , map (T.unpack . T.append "exe:") $ Set.toList $
+                        case lpExeComponents lp of
+                            Just exes -> exes
+                            -- Build all executables in the event that no
+                            -- specific list is provided (as happens with
+                            -- extra-deps).
+                            Nothing -> packageExes package
                     ]
                 TTUpstream _ _ -> ["build"]) ++ extraOpts
 

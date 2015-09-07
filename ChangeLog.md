@@ -13,6 +13,7 @@ Other enhancements:
 Bug fixes:
 
 * Hacky workaround for optparse-applicative issue with `stack exec --help` [#806](https://github.com/commercialhaskell/stack/issues/806)
+* Build executables for local extra deps [#920](https://github.com/commercialhaskell/stack/issues/920)
 
 ## 0.1.4.1
 
