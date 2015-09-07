@@ -57,6 +57,8 @@ data GetInstalledOpts = GetInstalledOpts
       -- ^ Require haddocks?
     }
 
+type IsExposed = Bool
+
 -- | Returns the new InstalledMap and all of the locally registered packages.
 getInstalled :: (M env m, PackageInstallInfo pii)
              => EnvOverride
@@ -111,7 +113,10 @@ getInstalled menv opts sourceMap = do
             , installedLibs
             ]
 
-    return (installedMap, globalInstalled, localInstalled)
+    return ( installedMap
+           , Map.map fst $ Map.filter snd globalInstalled
+           , Map.map fst localInstalled
+           )
 
 -- | Outputs both the modified InstalledMap and the Set of all installed packages in this database
 --
@@ -125,7 +130,7 @@ loadDatabase :: (M env m, PackageInstallInfo pii)
              -> Map PackageName pii -- ^ to determine which installed things we should include
              -> Maybe (InstallLocation, Path Abs Dir) -- ^ package database, Nothing for global
              -> [LoadHelper] -- ^ from parent databases
-             -> m ([LoadHelper], Map GhcPkgId PackageIdentifier)
+             -> m ([LoadHelper], Map GhcPkgId (PackageIdentifier, IsExposed))
 loadDatabase menv opts mcache sourceMap mdb lhs0 = do
     wc <- getWhichCompiler
     (lhs1, gids) <- ghcPkgDump menv wc (fmap snd mdb)
@@ -154,7 +159,7 @@ loadDatabase menv opts mcache sourceMap mdb lhs0 = do
           =$ conduitHaddockCache
           =$ CL.mapMaybe (isAllowed opts mcache sourceMap (fmap fst mdb))
           =$ CL.consume
-    sinkGIDs = CL.map (dpGhcPkgId &&& dpPackageIdent) =$ CL.consume
+    sinkGIDs = CL.map (dpGhcPkgId &&& (dpPackageIdent &&& dpIsExposed)) =$ CL.consume
     sink = getZipSink $ (,)
         <$> ZipSink sinkDP
         <*> ZipSink sinkGIDs
