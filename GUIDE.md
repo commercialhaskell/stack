@@ -9,7 +9,7 @@ with the Haskell packaging system or other build tools.
 stack handles the management of your toolchain (including GHC — the Glasgow
 Haskell Compiler — and, for Windows users, MSYS), building and registering
 libraries, building build tool dependencies, and more. While it can use existing
-tools on your system, stack's has the capacity to be your one-stop shop for all
+tools on your system, stack has the capacity to be your one-stop shop for all
 Haskell tooling you need. This guide will follow that stack-centric approach.
 
 ### What makes stack special?
@@ -242,7 +242,7 @@ In this subsection, we'll dissect the helloworld example in more detail.
 
 ### Files in helloworld
 
-Before moving studying stack more, let's understand our project a bit better.
+Before studying stack more, let's understand our project a bit better.
 
 ```
 michael@d30748af6d3d:~/helloworld$ find * -type f
@@ -281,13 +281,13 @@ extra-deps: []
 resolver: lts-3.2
 ```
 
-As is obvious if you're familiar with YAML, the `flags` and `extra-deps` keys
-have empty values. We'll see more interesting usages for these fields later.
-Let's focus on the other two fields. `packages` tells stack which local packages
-to build. In our simple example, we have only a single package in our project,
-located in the same directory, so `'.'` suffices. However, stack has powerful
-support for multi-package projects, which we'll elaborate on as this guide
-progresses.
+If you're familiar with YAML, you may recognize that the `flags` and
+`extra-deps` keys have empty values. We'll see more interesting usages for these
+fields later.  Let's focus on the other two fields. `packages` tells stack which
+local packages to build. In our simple example, we have only a single package in
+our project, located in the same directory, so `'.'` suffices. However, stack
+has powerful support for multi-package projects, which we'll elaborate on as
+this guide progresses.
 
 The final field is resolver. This tells stack *how* to build your package:
 which GHC version to use, versions of package dependencies, and so on. Our
@@ -581,10 +581,11 @@ No GHC found, expected version 7.8.4 (x86_64) (based on resolver setting in /hom
 ```
 
 This fails, because GHC 7.8.4 (which lts-2.22 uses) is not available on our
-system. This shows us that we can change GHC version by modifying the resolver
-value. So, how do we now get the right GHC version?  One answer is to use `stack
-setup` like we did above, this time with the `--resolver lts-2` option. However,
-there's another method worth mentioning: the `--install-ghc` flag.
+system. So, we see that different LTS versions (2 vs 3 in this case) use
+different GHC versions. Now, how do we get the right GHC version after changing
+the LTS version?  One answer is to use `stack setup` like we did above, this
+time with the `--resolver lts-2` option. However, there's another method worth
+mentioning: the `--install-ghc` flag.
 
 ```
 michael@d30748af6d3d:~/helloworld$ stack --resolver lts-2 --install-ghc build
@@ -1344,9 +1345,9 @@ with:
 
     stack exec ghci
 
-But that won't loading up locally written modules for access. For that, use the
-`stack ghci` command. To then load modules from your project, use the `:m` (for
-"module" command followed by the module name.
+But that won't load up locally written modules for access. For that, use the
+`stack ghci` command. To then load modules from your project, use the `:m`
+command (for "module") followed by the module name.
 
 ## ghc/runghc
 
@@ -1601,7 +1602,7 @@ built packages, meaning that subsequent builds will be much faster.
 
 Two notes for future improvement:
 
-* One Travis whitelists the stack .deb files, we'll be able to simply include
+* Once Travis whitelists the stack .deb files, we'll be able to simply include
   stack in the `addons` section, and automatically use the newest version of
   stack, avoiding that complicated `before_install` section
 * Starting with stack-0.1.4.0, there are improvements to the test command, so
