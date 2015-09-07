@@ -1572,41 +1572,56 @@ Travis](https://github.com/commercialhaskell/stack/wiki/Travis). However, for
 most people, the following example will be sufficient to get started:
 
 ```yaml
+# Use new container infrastructure to enable caching
 sudo: false
+
+# Choose a lightweight base image; we provide our own build tools.
 language: c
 
+# GHC depends on GMP. You can add other dependencies here as well.
 addons:
   apt:
     packages:
     - libgmp-dev
 
+# The different configurations we want to test. You could also do things like
+# change flags or use --stack-yaml to point to a different file.
+env:
+- ARGS=""
+- ARGS="--resolver lts-2"
+- ARGS="--resolver lts-3"
+- ARGS="--resolver lts"
+- ARGS="--resolver nightly"
+
 before_install:
-# stack
+# Download and unpack the stack executable
 - mkdir -p ~/.local/bin
 - export PATH=$HOME/.local/bin:$PATH
-- travis_retry curl -L https://github.com/commercialhaskell/stack/releases/download/v0.1.3.1/stack-0.1.3.1-x86_64-linux.gz | gunzip > ~/.local/bin/stack
-- chmod a+x ~/.local/bin/stack
+- travis_retry curl -L https://github.com/commercialhaskell/stack/releases/download/v0.1.4.0/stack-0.1.4.0-x86_64-linux.tar.gz | tar xz -C ~/.local/bin
 
-script:
-- stack --no-terminal setup
-- stack --no-terminal build
-- stack --no-terminal test
+# This line does all of the work: installs GHC if necessary, build the library,
+# executables, and test suites, and runs the test suites. --no-terminal works
+# around some quirks in Travis's terminal implementation.
+script: stack $ARGS --no-terminal --install-ghc test --haddock
 
+# Caching so the next build will be fast too.
 cache:
   directories:
   - $HOME/.stack
 ```
 
-Not only will this build and test your project, but it will cache your snapshot
-built packages, meaning that subsequent builds will be much faster.
+Not only will this build and test your project against multiple GHC versions
+and snapshots, but it will cache your snapshot built packages, meaning that
+subsequent builds will be much faster.
 
-Two notes for future improvement:
-
-* Once Travis whitelists the stack .deb files, we'll be able to simply include
-  stack in the `addons` section, and automatically use the newest version of
-  stack, avoiding that complicated `before_install` section
-* Starting with stack-0.1.4.0, there are improvements to the test command, so
-  that the entire script section can be `stack --no-terminal --install-ghc test`
+Once Travis whitelists the stack .deb files, we'll be able to simply include
+stack in the `addons` section, and automatically use the newest version of
+stack, avoiding that complicated `before_install` section This is being
+tracked in the
+[apt-source-whitelist](https://github.com/travis-ci/apt-source-whitelist/pull/7)
+and
+[apt-package-whitelist](https://github.com/travis-ci/apt-package-whitelist/issues/379)
+issue trackers.
 
 In case you're wondering: we need `--no-terminal` because stack does some fancy
 sticky display on smart terminals to give nicer status and progress messages,
