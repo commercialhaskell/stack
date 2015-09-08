@@ -17,6 +17,7 @@ Bug fixes:
 * Hacky workaround for optparse-applicative issue with `stack exec --help` [#806](https://github.com/commercialhaskell/stack/issues/806)
 * Build executables for local extra deps [#920](https://github.com/commercialhaskell/stack/issues/920)
 * copyFile can't handle directories [#942](https://github.com/commercialhaskell/stack/pull/942)
+* Support for spaces in Haddock interface files [fpco/minghc#85](https://github.com/fpco/minghc/issues/85)
 
 ## 0.1.4.1
 
