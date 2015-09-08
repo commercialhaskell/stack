@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
+{-# LANGUAGE ConstraintKinds       #-}
 -- | Cache information about previous builds
 module Stack.Build.Cache
     ( tryGetBuildCache
