@@ -57,15 +57,13 @@ data GetInstalledOpts = GetInstalledOpts
       -- ^ Require haddocks?
     }
 
-type IsExposed = Bool
-
 -- | Returns the new InstalledMap and all of the locally registered packages.
 getInstalled :: (M env m, PackageInstallInfo pii)
              => EnvOverride
              -> GetInstalledOpts
              -> Map PackageName pii -- ^ does not contain any installed information
              -> m ( InstalledMap
-                  , Map GhcPkgId PackageIdentifier -- globally installed
+                  , [DumpPackage () ()] -- globally installed
                   , Map GhcPkgId PackageIdentifier -- locally installed
                   )
 getInstalled menv opts sourceMap = do
@@ -114,8 +112,8 @@ getInstalled menv opts sourceMap = do
             ]
 
     return ( installedMap
-           , Map.map fst $ Map.filter snd globalInstalled
-           , Map.map fst localInstalled
+           , globalInstalled
+           , Map.fromList $ map (dpGhcPkgId &&& dpPackageIdent) localInstalled
            )
 
 -- | Outputs both the modified InstalledMap and the Set of all installed packages in this database
@@ -130,10 +128,10 @@ loadDatabase :: (M env m, PackageInstallInfo pii)
              -> Map PackageName pii -- ^ to determine which installed things we should include
              -> Maybe (InstallLocation, Path Abs Dir) -- ^ package database, Nothing for global
              -> [LoadHelper] -- ^ from parent databases
-             -> m ([LoadHelper], Map GhcPkgId (PackageIdentifier, IsExposed))
+             -> m ([LoadHelper], [DumpPackage () ()])
 loadDatabase menv opts mcache sourceMap mdb lhs0 = do
     wc <- getWhichCompiler
-    (lhs1, gids) <- ghcPkgDump menv wc (fmap snd mdb)
+    (lhs1, dps) <- ghcPkgDump menv wc (fmap snd mdb)
                   $ conduitDumpPackage =$ sink
     let lhs = pruneDeps
             id
@@ -141,7 +139,7 @@ loadDatabase menv opts mcache sourceMap mdb lhs0 = do
             lhDeps
             const
             (lhs0 ++ lhs1)
-    return (map (\lh -> lh { lhDeps = [] }) $ Map.elems lhs, Map.fromList gids)
+    return (map (\lh -> lh { lhDeps = [] }) $ Map.elems lhs, dps)
   where
     conduitProfilingCache =
         case mcache of
@@ -159,10 +157,9 @@ loadDatabase menv opts mcache sourceMap mdb lhs0 = do
           =$ conduitHaddockCache
           =$ CL.mapMaybe (isAllowed opts mcache sourceMap (fmap fst mdb))
           =$ CL.consume
-    sinkGIDs = CL.map (dpGhcPkgId &&& (dpPackageIdent &&& dpIsExposed)) =$ CL.consume
     sink = getZipSink $ (,)
         <$> ZipSink sinkDP
-        <*> ZipSink sinkGIDs
+        <*> ZipSink CL.consume
 
 -- | Check if a can be included in the set of installed packages or not, based
 -- on the package selections made by the user. This does not perform any

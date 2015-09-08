@@ -17,6 +17,7 @@ module Stack.Build.Execute
     ) where
 
 import           Control.Applicative
+import           Control.Arrow ((&&&))
 import           Control.Concurrent.Execute
 import           Control.Concurrent.Async       (withAsync, wait)
 import           Control.Concurrent.MVar.Lifted
@@ -69,6 +70,7 @@ import           Stack.Types.Build
 import           Stack.Fetch                    as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
+import           Stack.PackageDump
 import           Stack.Constants
 import           Stack.Types
 import           Stack.Types.StackT
@@ -205,7 +207,7 @@ data ExecuteEnv = ExecuteEnv
     , eeLocals         :: ![LocalPackage]
     , eeSourceMap      :: !SourceMap
     , eeGlobalDB       :: !(Path Abs Dir)
-    , eeGlobalPackages :: !(Map PackageIdentifier GhcPkgId)
+    , eeGlobalPackages :: ![DumpPackage () ()]
     }
 
 -- | Get a compiled Setup exe
@@ -278,7 +280,7 @@ withExecuteEnv :: M env m
                -> BuildOpts
                -> BaseConfigOpts
                -> [LocalPackage]
-               -> Map PackageIdentifier GhcPkgId -- ^ global packages
+               -> [DumpPackage () ()] -- ^ global packages
                -> SourceMap
                -> (ExecuteEnv -> m a)
                -> m a
@@ -322,7 +324,7 @@ executePlan :: M env m
             -> BuildOpts
             -> BaseConfigOpts
             -> [LocalPackage]
-            -> Map PackageIdentifier GhcPkgId -- ^ globals
+            -> [DumpPackage () ()] -- ^ globals
             -> SourceMap
             -> InstalledMap
             -> Plan
@@ -701,19 +703,10 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         Just deps ->
                             -- Stack always builds with the global Cabal for various
                             -- reproducibility issues.
-                            let depsMinusCabal = filter (not . isPrefixOf "Cabal-")
-                                                 . map ghcPkgIdString
-                                                 . Map.elems
-                                                 . uniqueByName
-                                                 $ Map.union deps eeGlobalPackages
-                                    -- We also provide all global packages to
-                                    -- the Setup.hs file, see:
-                                    -- https://github.com/commercialhaskell/stack/issues/941
-
-                                -- We only want a single installation of each package name
-                                uniqueByName = Map.mapKeysWith
-                                    const
-                                    packageIdentifierName
+                            let depsMinusCabal
+                                 = map ghcPkgIdString
+                                 $ Set.toList
+                                 $ addGlobalPackages deps eeGlobalPackages
                             in
                               "-clear-package-db"
                             : "-global-package-db"
@@ -1289,3 +1282,71 @@ extraBuildOptions :: M env m => m [String]
 extraBuildOptions = do
     hpcIndexDir <- toFilePath . (</> dotHpc) <$> hpcRelativeDir
     return ["--ghc-options", "-hpcdir " ++ hpcIndexDir ++ " -ddump-hi -ddump-to-file"]
+
+-- | Take the given list of package dependencies and the contents of the global
+-- package database, and construct a set of installed package IDs that:
+--
+-- * Excludes the Cabal library (it's added later)
+--
+-- * Includes all packages depended on by this package
+--
+-- * Includes all global packages, unless: (1) it's hidden, (2) it's shadowed
+--   by a depended-on package, or (3) one of its dependencies is not met.
+--
+-- See:
+--
+-- * https://github.com/commercialhaskell/stack/issues/941
+--
+-- * https://github.com/commercialhaskell/stack/issues/944
+--
+-- * https://github.com/commercialhaskell/stack/issues/949
+addGlobalPackages :: Map PackageIdentifier GhcPkgId -- ^ dependencies of the package
+                  -> [DumpPackage () ()] -- ^ global packages
+                  -> Set GhcPkgId
+addGlobalPackages deps globals0 =
+    res
+  where
+    -- Initial set of packages: the installed IDs of all dependencies
+    res0 = Map.elems $ Map.filterWithKey (\ident _ -> not $ isCabal ident) deps
+
+    -- First check on globals: it's not shadowed by a dep, it's not Cabal, and
+    -- it's exposed
+    goodGlobal1 dp = not (isDep dp)
+                  && not (isCabal $ dpPackageIdent dp)
+                  && dpIsExposed dp
+    globals1 = filter goodGlobal1 globals0
+
+    -- Create a Map of unique package names in the global database
+    globals2 = Map.fromListWith chooseBest
+             $ map (packageIdentifierName . dpPackageIdent &&& id) globals1
+
+    -- Final result: add in globals that have their dependencies met
+    res = loop id (Map.elems globals2) $ Set.fromList res0
+
+    ----------------------------------
+    -- Some auxiliary helper functions
+    ----------------------------------
+
+    -- Is the given package identifier for any version of Cabal
+    isCabal (PackageIdentifier name _) = name == $(mkPackageName "Cabal")
+
+    -- Is the given package name provided by the package dependencies?
+    isDep dp = packageIdentifierName (dpPackageIdent dp) `Set.member` depNames
+    depNames = Set.map packageIdentifierName $ Map.keysSet deps
+
+    -- Choose the best of two competing global packages (the newest version)
+    chooseBest dp1 dp2
+        | getVer dp1 < getVer dp2 = dp2
+        | otherwise               = dp1
+      where
+        getVer = packageIdentifierVersion . dpPackageIdent
+
+    -- Are all dependencies of the given package met by the given Set of
+    -- installed packages
+    depsMet dp gids = all (`Set.member` gids) (dpDepends dp)
+
+    -- Find all globals that have all of their dependencies met
+    loop _ [] gids = gids
+    loop front (dp:dps) gids
+        | depsMet dp gids = loop id (front dps) (Set.insert (dpGhcPkgId dp) gids)
+        | otherwise = loop (front . (dp:)) dps gids
