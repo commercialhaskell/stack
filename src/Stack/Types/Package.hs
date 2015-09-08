@@ -229,8 +229,7 @@ data FileCacheInfo = FileCacheInfo
     deriving (Generic, Show)
 instance Binary FileCacheInfo
 instance HasStructuralInfo FileCacheInfo
-instance NFData FileCacheInfo where
-    rnf = genericRnf
+instance NFData FileCacheInfo
 
 -- | Used for storage and comparison.
 newtype ModTime = ModTime (Integer,Rational)

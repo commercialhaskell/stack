@@ -74,8 +74,7 @@ data InstalledCacheEntry = InstalledCacheEntry
     deriving (Eq, Generic)
 instance Binary InstalledCacheEntry
 instance HasStructuralInfo InstalledCacheEntry
-instance NFData InstalledCacheEntry where
-    rnf = genericRnf
+instance NFData InstalledCacheEntry
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump
