@@ -424,6 +424,8 @@ data BuildOpts =
             -- ^ Commands (with arguments) to run after a successful build
             ,boptsOnlyConfigure :: !Bool
             -- ^ Only perform the configure step when building
+            ,boptsReconfigure :: !Bool
+            -- ^ Perform the configure step even if already configured
             }
   deriving (Show)
 
@@ -449,6 +451,7 @@ defaultBuildOpts = BuildOpts
     , boptsBenchmarkOpts = defaultBenchmarkOpts
     , boptsExec = []
     , boptsOnlyConfigure = False
+    , boptsReconfigure = False
     }
 
 -- | Options for the 'FinalAction' 'DoTests'

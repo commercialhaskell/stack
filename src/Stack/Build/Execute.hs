@@ -579,16 +579,20 @@ ensureConfig :: M env m
              -> Path Abs File -- ^ .cabal file
              -> m Bool
 ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp = do
-    -- Determine the old and new configuration in the local directory, to
-    -- determine if we need to reconfigure.
-    mOldConfigCache <- tryGetConfigCache pkgDir
-
-    mOldCabalMod <- tryGetCabalMod pkgDir
     newCabalMod <- liftIO (fmap modTime (D.getModificationTime (toFilePath cabalfp)))
+    needConfig <-
+        if boptsReconfigure eeBuildOpts
+            then return True
+            else do
+                -- Determine the old and new configuration in the local directory, to
+                -- determine if we need to reconfigure.
+                mOldConfigCache <- tryGetConfigCache pkgDir
 
-    let needConfig = mOldConfigCache /= Just newConfigCache
-                  || mOldCabalMod /= Just newCabalMod
-        ConfigureOpts dirs nodirs = configCacheOpts newConfigCache
+                mOldCabalMod <- tryGetCabalMod pkgDir
+
+                return $ mOldConfigCache /= Just newConfigCache
+                      || mOldCabalMod /= Just newCabalMod
+    let ConfigureOpts dirs nodirs = configCacheOpts newConfigCache
     when needConfig $ withMVar eeConfigureLock $ \_ -> do
         deleteCaches pkgDir
         announce

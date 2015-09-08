@@ -83,7 +83,7 @@ buildOptsParser cmd =
             fileWatch' <*> keepGoing <*> forceDirty <*>
             tests <*> testOptsParser <*>
             benches <*> benchOptsParser <*>
-            many exec <*> onlyConfigure
+            many exec <*> onlyConfigure <*> reconfigure
   where optimize =
           maybeBoolFlags "optimizations" "DEPRECATED: This flag is no longer used, and has no effect. Please use --ghc-options=-O?" idm
         target =
@@ -181,6 +181,10 @@ buildOptsParser cmd =
         onlyConfigure = flag False True
             (long "only-configure" <>
              help "Only perform the configure step, not any builds. Intended for tool usage, may break when used on multiple packages at once!")
+
+        reconfigure = flag False True
+            (long "reconfigure" <>
+             help "Perform the configure step even if unnecessary. Useful in some corner cases with custom Setup.hs files")
 
 -- | Parser for package:[-]flag
 readFlag :: ReadM (Map (Maybe PackageName) (Map FlagName Bool))

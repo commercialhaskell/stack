@@ -10,6 +10,7 @@ Other enhancements:
 * `stack setup` takes a `--stack-setup-yaml` argument
 * `--file-watch` is more discerning about which files to rebuild for [#912](https://github.com/commercialhaskell/stack/issues/912)
 * `stack path` now supports `--global-pkg-db` and `--ghc-package-path`
+* `--reconfigure` flag [#914](https://github.com/commercialhaskell/stack/issues/914) [#946](https://github.com/commercialhaskell/stack/issues/946)
 
 Bug fixes:
 
