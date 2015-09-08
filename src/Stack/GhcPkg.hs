@@ -21,7 +21,8 @@ module Stack.GhcPkg
   ,findGhcPkgDepends
   ,findTransitiveGhcPkgDepends
   ,listGhcPkgDbs
-  ,ghcPkgExeName)
+  ,ghcPkgExeName
+  ,mkGhcPackagePath)
   where
 
 import           Control.Applicative
@@ -46,6 +47,7 @@ import           Prelude hiding (FilePath)
 import           Stack.Constants
 import           Stack.Types
 import           System.Directory (canonicalizePath, doesDirectoryExist)
+import           System.FilePath (FilePath, searchPathSeparator, dropTrailingPathSeparator)
 import           System.Process.Read
 
 -- | Get the global package database
@@ -273,3 +275,16 @@ listGhcPkgDbs menv wc pkgDbs = do
         case result of
             Left{} -> []
             Right lbs -> mapMaybe parsePackageIdentifier (S8.words lbs)
+
+-- | Get the value for GHC_PACKAGE_PATH
+mkGhcPackagePath :: Bool -> Path Abs Dir -> Path Abs Dir -> Path Abs Dir -> Text
+mkGhcPackagePath locals localdb deps globaldb =
+  T.pack $ intercalate [searchPathSeparator] $ concat
+    [ [toFilePathNoTrailingSlash localdb | locals]
+    , [toFilePathNoTrailingSlash deps]
+    , [toFilePathNoTrailingSlash globaldb]
+    ]
+
+-- TODO: dedupe with copy in Stack.Setup
+toFilePathNoTrailingSlash :: Path loc Dir -> FilePath
+toFilePathNoTrailingSlash = dropTrailingPathSeparator . toFilePath
