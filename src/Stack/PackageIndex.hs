@@ -88,16 +88,18 @@ data PackageCache = PackageCache
     -- ^ size in bytes of the .cabal file
     , pcDownload :: !(Maybe PackageDownload)
     }
-    deriving Generic
+    deriving (Generic)
+
 instance Binary.Binary PackageCache
 instance NFData PackageCache where
     rnf = genericRnf
+instance HasStructuralInfo PackageCache
 
 newtype PackageCacheMap = PackageCacheMap (Map PackageIdentifier PackageCache)
-    deriving (Binary.Binary, NFData)
-instance BinarySchema PackageCacheMap where
-    -- Don't forget to update this if you change the datatype in any way!
-    binarySchema _ = 1
+    deriving (Generic, Binary, NFData)
+instance HasStructuralInfo PackageCacheMap
+instance HasSemanticVersion PackageCacheMap
+
 -- | Populate the package index caches and return them.
 populateCache
     :: (MonadIO m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
@@ -363,6 +365,7 @@ data PackageDownload = PackageDownload
     }
     deriving (Show, Generic)
 instance Binary.Binary PackageDownload
+instance HasStructuralInfo PackageDownload
 instance NFData PackageDownload where
     rnf = genericRnf
 instance FromJSON PackageDownload where

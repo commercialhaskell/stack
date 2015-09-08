@@ -31,7 +31,7 @@ import           Control.Monad.Catch
 import           Data.Aeson.Extended
 import           Data.Attoparsec.ByteString.Char8
 import           Data.Attoparsec.Combinators
-import           Data.Binary (Binary)
+import           Data.Binary.VersionTagged (Binary, HasStructuralInfo)
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Char (isLetter)
@@ -72,6 +72,8 @@ instance Lift PackageName where
 
 instance Show PackageName where
   show (PackageName n) = S8.unpack n
+
+instance HasStructuralInfo PackageName
 
 instance ToJSON PackageName where
     toJSON = toJSON . packageNameText

@@ -54,6 +54,7 @@ instance Binary GhcPkgId where
         fmap GhcPkgId get
 instance NFData GhcPkgId where
     rnf = genericRnf
+instance HasStructuralInfo GhcPkgId
 
 instance Show GhcPkgId where
   show = show . ghcPkgIdString

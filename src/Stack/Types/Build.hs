@@ -522,6 +522,9 @@ instance Binary ConfigCache where
 instance NFData ConfigCache where
     rnf = genericRnf
 
+instance HasStructuralInfo ConfigCache
+instance HasSemanticVersion ConfigCache
+
 -- | A task to perform when building
 data Task = Task
     { taskProvides        :: !PackageIdentifier        -- ^ the package/version to be built
@@ -712,6 +715,7 @@ data ConfigureOpts = ConfigureOpts
     }
     deriving (Show, Eq, Generic)
 instance Binary ConfigureOpts
+instance HasStructuralInfo ConfigureOpts
 instance NFData ConfigureOpts where
     rnf = genericRnf
 
@@ -726,5 +730,7 @@ data PrecompiledCache = PrecompiledCache
     }
     deriving (Show, Eq, Generic)
 instance Binary PrecompiledCache
+instance HasSemanticVersion PrecompiledCache
+instance HasStructuralInfo PrecompiledCache
 instance NFData PrecompiledCache where
     rnf = genericRnf

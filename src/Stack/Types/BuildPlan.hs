@@ -250,8 +250,8 @@ newtype Maintainer = Maintainer { unMaintainer :: Text }
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: ByteString }
-    deriving (Show, Eq, Ord, Hashable, IsString, Generic, NFData)
-instance Binary ExeName
+    deriving (Show, Eq, Ord, Hashable, IsString, Generic, Binary, NFData)
+instance HasStructuralInfo ExeName
 instance ToJSON ExeName where
     toJSON = toJSON . S8.unpack . unExeName
 instance FromJSON ExeName where
@@ -377,9 +377,8 @@ data MiniBuildPlan = MiniBuildPlan
 instance Binary MiniBuildPlan
 instance NFData MiniBuildPlan where
     rnf = genericRnf
-instance BinarySchema MiniBuildPlan where
-    -- Don't forget to update this if you change the datatype in any way!
-    binarySchema _ = 2
+instance HasStructuralInfo MiniBuildPlan
+instance HasSemanticVersion MiniBuildPlan
 
 -- | Information on a single package for the 'MiniBuildPlan'.
 data MiniPackageInfo = MiniPackageInfo
@@ -398,6 +397,7 @@ data MiniPackageInfo = MiniPackageInfo
     }
     deriving (Generic, Show, Eq)
 instance Binary MiniPackageInfo
+instance HasStructuralInfo MiniPackageInfo
 instance NFData MiniPackageInfo where
     rnf = genericRnf
 

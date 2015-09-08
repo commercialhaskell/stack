@@ -62,10 +62,9 @@ import           System.Process.Read
 -- | Cached information on whether package have profiling libraries and haddocks.
 newtype InstalledCache = InstalledCache (IORef InstalledCacheInner)
 newtype InstalledCacheInner = InstalledCacheInner (Map GhcPkgId InstalledCacheEntry)
-    deriving (Binary, NFData)
-instance BinarySchema InstalledCacheInner where
-    -- Don't forget to update this if you change the datatype in any way!
-    binarySchema _ = 2
+    deriving (Binary, NFData, Generic)
+instance HasStructuralInfo InstalledCacheInner
+instance HasSemanticVersion InstalledCacheInner
 
 -- | Cached information on whether a package has profiling libraries and haddocks.
 data InstalledCacheEntry = InstalledCacheEntry
@@ -74,6 +73,7 @@ data InstalledCacheEntry = InstalledCacheEntry
     , installedCacheIdent :: !PackageIdentifier }
     deriving (Eq, Generic)
 instance Binary InstalledCacheEntry
+instance HasStructuralInfo InstalledCacheEntry
 instance NFData InstalledCacheEntry where
     rnf = genericRnf
 

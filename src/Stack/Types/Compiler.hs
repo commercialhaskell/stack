@@ -7,7 +7,7 @@ module Stack.Types.Compiler where
 import           Control.DeepSeq
 import           Control.DeepSeq.Generics (genericRnf)
 import           Data.Aeson
-import           Data.Binary (Binary)
+import           Data.Binary.VersionTagged (Binary, HasStructuralInfo)
 import           Data.Monoid ((<>))
 import qualified Data.Text as T
 import           GHC.Generics (Generic)
@@ -34,6 +34,7 @@ data CompilerVersion
         {-# UNPACK #-} !Version -- GHC version
     deriving (Generic, Show, Eq, Ord)
 instance Binary CompilerVersion
+instance HasStructuralInfo CompilerVersion
 instance NFData CompilerVersion where
     rnf = genericRnf
 instance ToJSON CompilerVersion where
