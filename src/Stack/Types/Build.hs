@@ -75,7 +75,7 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
-import           System.Exit (ExitCode)
+import           System.Exit (ExitCode (ExitFailure))
 import           System.FilePath (dropTrailingPathSeparator, pathSeparator)
 
 ----------------------------------------------
@@ -235,6 +235,9 @@ instance Show StackBuildException where
         in "\n--  While building package " ++ dropQuotes (show taskProvides') ++ " using:\n" ++
            "      " ++ fullCmd ++ "\n" ++
            "    Process exited with code: " ++ show exitCode ++
+           (if exitCode == ExitFailure (-9)
+                then " (THIS MAY INDICATE OUT OF MEMORY)"
+                else "") ++
            logLocations ++
            (if S.null bs
                 then ""
