@@ -99,7 +99,7 @@ build setLocalFiles mbuildLk bopts = do
     if boptsDryrun bopts
         then printPlan plan
         else executePlan menv bopts baseConfigOpts locals
-                         (Map.keysSet globallyRegistered)
+                         (Map.fromList $ map (\(x, y) -> (y, x)) $ Map.toList globallyRegistered)
                          sourceMap
                          installedMap
                          plan

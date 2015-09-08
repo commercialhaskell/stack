@@ -205,7 +205,7 @@ data ExecuteEnv = ExecuteEnv
     , eeLocals         :: ![LocalPackage]
     , eeSourceMap      :: !SourceMap
     , eeGlobalDB       :: !(Path Abs Dir)
-    , eeGlobalPackages :: !(Set GhcPkgId)
+    , eeGlobalPackages :: !(Map PackageIdentifier GhcPkgId)
     }
 
 -- | Get a compiled Setup exe
@@ -278,7 +278,7 @@ withExecuteEnv :: M env m
                -> BuildOpts
                -> BaseConfigOpts
                -> [LocalPackage]
-               -> Set GhcPkgId -- ^ global packages
+               -> Map PackageIdentifier GhcPkgId -- ^ global packages
                -> SourceMap
                -> (ExecuteEnv -> m a)
                -> m a
@@ -322,7 +322,7 @@ executePlan :: M env m
             -> BuildOpts
             -> BaseConfigOpts
             -> [LocalPackage]
-            -> Set GhcPkgId -- ^ globals
+            -> Map PackageIdentifier GhcPkgId -- ^ globals
             -> SourceMap
             -> InstalledMap
             -> Plan
@@ -544,7 +544,7 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
 -- | Generate the ConfigCache
 getConfigCache :: MonadIO m
                => ExecuteEnv -> Task -> [Text]
-               -> m ConfigCache
+               -> m (Map PackageIdentifier GhcPkgId, ConfigCache)
 getConfigCache ExecuteEnv {..} Task {..} extra = do
     idMap <- liftIO $ readTVarIO eeGhcPkgIds
     let getMissing ident =
@@ -556,18 +556,20 @@ getConfigCache ExecuteEnv {..} Task {..} extra = do
         TaskConfigOpts missing mkOpts = taskConfigOpts
         opts = mkOpts missing'
         allDeps = Set.fromList $ Map.elems missing' ++ Map.elems taskPresent
-    return ConfigCache
-        { configCacheOpts = opts
-            { coNoDirs = coNoDirs opts ++ map T.unpack extra
+        cache = ConfigCache
+            { configCacheOpts = opts
+                { coNoDirs = coNoDirs opts ++ map T.unpack extra
+                }
+            , configCacheDeps = allDeps
+            , configCacheComponents =
+                case taskType of
+                    TTLocal lp -> Set.map renderComponent $ lpComponents lp
+                    TTUpstream _ _ -> Set.empty
+            , configCacheHaddock =
+                shouldHaddockPackage eeBuildOpts eeWanted (packageIdentifierName taskProvides)
             }
-        , configCacheDeps = allDeps
-        , configCacheComponents =
-            case taskType of
-                TTLocal lp -> Set.map renderComponent $ lpComponents lp
-                TTUpstream _ _ -> Set.empty
-        , configCacheHaddock =
-            shouldHaddockPackage eeBuildOpts eeWanted (packageIdentifierName taskProvides)
-        }
+        allDepsMap = Map.union missing' taskPresent
+    return (allDepsMap, cache)
 
 -- | Ensure that the configuration for the package matches what is given
 ensureConfig :: M env m
@@ -614,7 +616,7 @@ withSingleContext :: M env m
                   -> ActionContext
                   -> ExecuteEnv
                   -> Task
-                  -> Maybe (Set GhcPkgId)
+                  -> Maybe (Map PackageIdentifier GhcPkgId)
                   -- ^ All dependencies' package ids to provide to Setup.hs. If
                   -- Nothing, just provide global and snapshot package
                   -- databases.
@@ -701,11 +703,17 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             -- reproducibility issues.
                             let depsMinusCabal = filter (not . isPrefixOf "Cabal-")
                                                  . map ghcPkgIdString
-                                                 . Set.toList
-                                                 $ Set.union deps eeGlobalPackages
+                                                 . Map.elems
+                                                 . uniqueByName
+                                                 $ Map.union deps eeGlobalPackages
                                     -- We also provide all global packages to
                                     -- the Setup.hs file, see:
                                     -- https://github.com/commercialhaskell/stack/issues/941
+
+                                -- We only want a single installation of each package name
+                                uniqueByName = Map.mapKeysWith
+                                    const
+                                    packageIdentifierName
                             in
                               "-clear-package-db"
                             : "-global-package-db"
@@ -830,12 +838,12 @@ singleBuild :: M env m
             -> InstalledMap
             -> m ()
 singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap = do
-    cache <- getCache
+    (allDepsMap, cache) <- getCache
     mprecompiled <- getPrecompiled cache
     minstalled <-
         case mprecompiled of
             Just precompiled -> copyPreCompiled precompiled
-            Nothing -> realConfigAndBuild cache
+            Nothing -> realConfigAndBuild cache allDepsMap
     case minstalled of
         Nothing -> return ()
         Just installed -> do
@@ -908,7 +916,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
       where
         bindir = toFilePath $ bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
-    realConfigAndBuild cache = withSingleContext runInBase ac ee task (Just $ configCacheDeps cache) Nothing
+    realConfigAndBuild cache allDepsMap = withSingleContext runInBase ac ee task (Just allDepsMap) Nothing
         $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
             _neededConfig <- ensureConfig cache pkgDir ee (announce "configure") cabal cabalfp
 
@@ -1011,14 +1019,14 @@ singleTest :: M env m
            -> InstalledMap
            -> m ()
 singleTest runInBase topts lptb ac ee task installedMap = do
-    cache <- getConfigCache ee task $
+    (allDepsMap, cache) <- getConfigCache ee task $
         case taskType task of
             TTLocal lp -> concat
                 [ ["--enable-tests"]
                 , ["--enable-benchmarks" | depsPresent installedMap $ lpBenchDeps lp]
                 ]
             _ -> []
-    withSingleContext runInBase ac ee task (Just $ configCacheDeps cache) (Just "test") $ \package cabalfp pkgDir cabal announce console mlogFile -> do
+    withSingleContext runInBase ac ee task (Just allDepsMap) (Just "test") $ \package cabalfp pkgDir cabal announce console mlogFile -> do
         neededConfig <- ensureConfig cache pkgDir ee (announce "configure (test)") cabal cabalfp
         config <- asks getConfig
 
@@ -1162,14 +1170,14 @@ singleBench :: M env m
             -> InstalledMap
             -> m ()
 singleBench runInBase beopts _lptb ac ee task installedMap = do
-    cache <- getConfigCache ee task $
+    (allDepsMap, cache) <- getConfigCache ee task $
         case taskType task of
             TTLocal lp -> concat
                 [ ["--enable-tests" | depsPresent installedMap $ lpTestDeps lp]
                 , ["--enable-benchmarks"]
                 ]
             _ -> []
-    withSingleContext runInBase ac ee task (Just $ configCacheDeps cache) (Just "bench") $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
+    withSingleContext runInBase ac ee task (Just allDepsMap) (Just "bench") $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
         neededConfig <- ensureConfig cache pkgDir ee (announce "configure (benchmarks)") cabal cabalfp
 
         benchBuilt <- checkBenchBuilt pkgDir
