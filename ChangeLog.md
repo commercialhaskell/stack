@@ -9,6 +9,7 @@ Other enhancements:
 * Adapt to upcoming Cabal installed package identifier format change [#851](https://github.com/commercialhaskell/stack/issues/851)
 * `stack setup` takes a `--stack-setup-yaml` argument
 * `--file-watch` is more discerning about which files to rebuild for [#912](https://github.com/commercialhaskell/stack/issues/912)
+* `stack path` now supports `--global-pkg-db` and `--ghc-package-path`
 
 Bug fixes:
 
