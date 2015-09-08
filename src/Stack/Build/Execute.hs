@@ -1346,7 +1346,13 @@ addGlobalPackages deps globals0 =
     depsMet dp gids = all (`Set.member` gids) (dpDepends dp)
 
     -- Find all globals that have all of their dependencies met
-    loop _ [] gids = gids
     loop front (dp:dps) gids
+        -- This package has its deps met. Add it to the list of dependencies
+        -- and then traverse the list from the beginning (this package may have
+        -- been a dependency of an earlier one).
         | depsMet dp gids = loop id (front dps) (Set.insert (dpGhcPkgId dp) gids)
+        -- Deps are not met, keep going
         | otherwise = loop (front . (dp:)) dps gids
+    -- None of the packages we checked can be added, therefore drop them all
+    -- and return our results
+    loop _ [] gids = gids
