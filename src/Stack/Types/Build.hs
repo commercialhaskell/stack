@@ -152,7 +152,7 @@ instance Show StackBuildException where
                 , case mstack of
                     Nothing -> "command line arguments"
                     Just stack -> "resolver setting in " ++ toFilePath stack
-                , "). "
+                , ").\n"
                 , T.unpack resolution
                 ]
     show (Couldn'tParseTargets targets) = unlines
@@ -424,6 +424,8 @@ data BuildOpts =
             -- ^ Commands (with arguments) to run after a successful build
             ,boptsOnlyConfigure :: !Bool
             -- ^ Only perform the configure step when building
+            ,boptsReconfigure :: !Bool
+            -- ^ Perform the configure step even if already configured
             }
   deriving (Show)
 
@@ -449,6 +451,7 @@ defaultBuildOpts = BuildOpts
     , boptsBenchmarkOpts = defaultBenchmarkOpts
     , boptsExec = []
     , boptsOnlyConfigure = False
+    , boptsReconfigure = False
     }
 
 -- | Options for the 'FinalAction' 'DoTests'
@@ -560,7 +563,7 @@ data Plan = Plan
     { planTasks :: !(Map PackageName Task)
     , planFinals :: !(Map PackageName (Task, LocalPackageTB))
     -- ^ Final actions to be taken (test, benchmark, etc)
-    , planUnregisterLocal :: !(Map GhcPkgId (PackageIdentifier, Text))
+    , planUnregisterLocal :: !(Map GhcPkgId (PackageIdentifier, Maybe Text))
     -- ^ Text is reason we're unregistering, for display only
     , planInstallExes :: !(Map Text InstallLocation)
     -- ^ Executables that should be installed after successful building

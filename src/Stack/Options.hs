@@ -83,7 +83,7 @@ buildOptsParser cmd =
             fileWatch' <*> keepGoing <*> forceDirty <*>
             tests <*> testOptsParser <*>
             benches <*> benchOptsParser <*>
-            many exec <*> onlyConfigure
+            many exec <*> onlyConfigure <*> reconfigure
   where optimize =
           maybeBoolFlags "optimizations" "DEPRECATED: This flag is no longer used, and has no effect. Please use --ghc-options=-O?" idm
         target =
@@ -98,7 +98,7 @@ buildOptsParser cmd =
         exeProfiling =
           boolFlags False
                     "executable-profiling"
-                    "library profiling for TARGETs and all its dependencies"
+                    "executable profiling for TARGETs and all its dependencies"
                     idm
         haddock =
           boolFlags (cmd == Haddock)
@@ -106,13 +106,10 @@ buildOptsParser cmd =
                     "generating Haddocks the project(s) in this directory/configuration"
                     idm
         haddockDeps =
-          if cmd == Haddock
-             then maybeBoolFlags
-                            "haddock-deps"
-                            "building Haddocks for dependencies"
-                            idm
-             else pure Nothing
-
+             maybeBoolFlags
+                       "haddock-deps"
+                       "building Haddocks for dependencies"
+                       idm
         copyBins = boolFlags (cmd == Install)
             "copy-bins"
             "copying binaries to the local-bin-path (see 'stack path')"
@@ -184,6 +181,10 @@ buildOptsParser cmd =
         onlyConfigure = flag False True
             (long "only-configure" <>
              help "Only perform the configure step, not any builds. Intended for tool usage, may break when used on multiple packages at once!")
+
+        reconfigure = flag False True
+            (long "reconfigure" <>
+             help "Perform the configure step even if unnecessary. Useful in some corner cases with custom Setup.hs files")
 
 -- | Parser for package:[-]flag
 readFlag :: ReadM (Map (Maybe PackageName) (Map FlagName Bool))

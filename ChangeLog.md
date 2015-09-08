@@ -8,10 +8,19 @@ Other enhancements:
 
 * Adapt to upcoming Cabal installed package identifier format change [#851](https://github.com/commercialhaskell/stack/issues/851)
 * `stack setup` takes a `--stack-setup-yaml` argument
+* `--file-watch` is more discerning about which files to rebuild for [#912](https://github.com/commercialhaskell/stack/issues/912)
+* `stack path` now supports `--global-pkg-db` and `--ghc-package-path`
+* `--reconfigure` flag [#914](https://github.com/commercialhaskell/stack/issues/914) [#946](https://github.com/commercialhaskell/stack/issues/946)
 
 Bug fixes:
 
 * Hacky workaround for optparse-applicative issue with `stack exec --help` [#806](https://github.com/commercialhaskell/stack/issues/806)
+* Build executables for local extra deps [#920](https://github.com/commercialhaskell/stack/issues/920)
+* copyFile can't handle directories [#942](https://github.com/commercialhaskell/stack/pull/942)
+
+## 0.1.4.1
+
+Fix stack's own Haddocks.  No changes to functionality (only comments updated).
 
 ## 0.1.4.0
 

@@ -72,7 +72,7 @@ build setLocalFiles mbuildLk bopts = do
            $ Set.unions
            $ map lpFiles locals
 
-    (installedMap, locallyRegistered) <-
+    (installedMap, globallyRegistered, locallyRegistered) <-
         getInstalled menv
                      GetInstalledOpts
                          { getInstalledProfiling = profiling
@@ -98,7 +98,11 @@ build setLocalFiles mbuildLk bopts = do
 
     if boptsDryrun bopts
         then printPlan plan
-        else executePlan menv bopts baseConfigOpts locals sourceMap installedMap plan
+        else executePlan menv bopts baseConfigOpts locals
+                         (Map.keysSet globallyRegistered)
+                         sourceMap
+                         installedMap
+                         plan
   where
     profiling = boptsLibProfile bopts || boptsExeProfile bopts
 

@@ -61,6 +61,7 @@ import           Stack.Options
 import           Stack.Package (getCabalFileName)
 import qualified Stack.PackageIndex
 import           Stack.Ghci
+import           Stack.GhcPkg (getGlobalDB, mkGhcPackagePath)
 import           Stack.SDist (getSDistTarball)
 import           Stack.Setup
 import           Stack.Solver (solveExtraDeps)
@@ -154,7 +155,8 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
             [ [$(simpleVersion Meta.version)]
               -- Leave out number of commits for --depth=1 clone
               -- See https://github.com/commercialhaskell/stack/issues/792
-            , [" (" ++ $gitCommitCount ++ " commits)" | $gitCommitCount /= ("1"::String)]
+            , [" (" ++ $gitCommitCount ++ " commits)" | $gitCommitCount /= ("1"::String) &&
+                                                        $gitCommitCount /= ("UNKNOWN" :: String)]
             , [" ", show buildArch]
             ]
 
@@ -371,6 +373,7 @@ pathCmd keys go =
             menv <- getMinimalEnvOverride
             snap <- packageDatabaseDeps
             local <- packageDatabaseLocal
+            global <- getGlobalDB menv =<< getWhichCompiler
             snaproot <- installationRootDeps
             localroot <- installationRootLocal
             distDir <- distRelativeDir
@@ -390,6 +393,7 @@ pathCmd keys go =
                                     menv
                                     snap
                                     local
+                                    global
                                     snaproot
                                     localroot
                                     distDir))))
@@ -400,6 +404,7 @@ data PathInfo = PathInfo
     ,piEnvOverride :: EnvOverride
     ,piSnapDb :: Path Abs Dir
     ,piLocalDb :: Path Abs Dir
+    ,piGlobalDb :: Path Abs Dir
     ,piSnapRoot :: Path Abs Dir
     ,piLocalRoot :: Path Abs Dir
     ,piDistDir :: Path Rel Dir
@@ -458,6 +463,13 @@ paths =
       , "local-pkg-db"
       , \pi ->
              T.pack (toFilePathNoTrailing (piLocalDb pi)))
+    , ( "Global package database"
+      , "global-pkg-db"
+      , \pi ->
+             T.pack (toFilePathNoTrailing (piGlobalDb pi)))
+    , ( "GHC_PACKAGE_PATH environment variable"
+      , "ghc-package-path"
+      , \pi -> mkGhcPackagePath True (piLocalDb pi) (piSnapDb pi) (piGlobalDb pi))
     , ( "Snapshot installation root"
       , "snapshot-install-root"
       , \pi ->

@@ -249,6 +249,7 @@ data DumpPackage profiling haddock = DumpPackage
     , dpHaddockInterfaces :: ![ByteString]
     , dpProfiling :: !profiling
     , dpHaddock :: !haddock
+    , dpIsExposed :: !Bool
     }
     deriving (Show, Eq, Ord)
 
@@ -311,6 +312,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 libraries = parseM "hs-libraries"
                 exposedModules = parseM "exposed-modules"
                 haddockInterfaces = parseM "haddock-interfaces"
+                exposed = parseM "exposed"
             depends <- mapM parseDepend $ parseM "depends"
 
             libDirPaths <-
@@ -328,6 +330,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 , dpHaddockInterfaces = S8.words $ S8.unwords haddockInterfaces
                 , dpProfiling = ()
                 , dpHaddock = ()
+                , dpIsExposed = exposed == ["True"]
                 }
 
 stripPrefixBS :: ByteString -> ByteString -> Maybe ByteString

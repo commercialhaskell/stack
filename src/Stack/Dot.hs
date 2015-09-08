@@ -92,7 +92,7 @@ createDependencyGraph dotOpts = do
   (_,_,locals,_,sourceMap) <- loadSourceMap NeedTargets defaultBuildOpts
   let graph = Map.fromList (localDependencies dotOpts locals)
   menv <- getMinimalEnvOverride
-  installedMap <- fmap thrd . fst <$> getInstalled menv
+  installedMap <- fmap thrd . fst3 <$> getInstalled menv
                                                    (GetInstalledOpts False False)
                                                    sourceMap
   withLoadPackage menv (\loader -> do
@@ -107,6 +107,9 @@ createDependencyGraph dotOpts = do
 
         thrd :: (a,b,c) -> c
         thrd (_,_,x) = x
+
+        fst3 :: (a,b,c) -> a
+        fst3 (x,_,_) = x
 
 -- Given an 'Installed' try to get the 'Version'
 libVersionFromInstalled :: Installed -> Maybe Version
