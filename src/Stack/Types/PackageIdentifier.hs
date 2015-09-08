@@ -25,7 +25,7 @@ import           Control.Exception (Exception)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Data.Aeson.Extended
 import           Data.Attoparsec.ByteString.Char8
-import           Data.Binary (Binary)
+import           Data.Binary.VersionTagged (Binary, HasStructuralInfo)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Data
@@ -58,6 +58,7 @@ instance NFData PackageIdentifier where
 
 instance Hashable PackageIdentifier
 instance Binary PackageIdentifier
+instance HasStructuralInfo PackageIdentifier
 
 instance Show PackageIdentifier where
   show = show . packageIdentifierString

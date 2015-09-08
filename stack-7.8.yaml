@@ -9,4 +9,5 @@ extra-deps:
 - http-client-0.4.19
 - http-conduit-2.1.8
 - ignore-0.1.1.0
+- binary-tagged-0.1.1.0
 - fsnotify-0.2.1

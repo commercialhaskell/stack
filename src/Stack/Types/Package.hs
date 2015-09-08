@@ -228,12 +228,16 @@ data FileCacheInfo = FileCacheInfo
     }
     deriving (Generic, Show)
 instance Binary FileCacheInfo
+instance HasStructuralInfo FileCacheInfo
 instance NFData FileCacheInfo where
     rnf = genericRnf
 
 -- | Used for storage and comparison.
 newtype ModTime = ModTime (Integer,Rational)
   deriving (Ord,Show,Generic,Eq,NFData,Binary)
+
+instance HasStructuralInfo ModTime
+instance HasSemanticVersion ModTime
 
 -- | A descriptor from a .cabal file indicating one of the following:
 --

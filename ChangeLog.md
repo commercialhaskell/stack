@@ -11,6 +11,7 @@ Other enhancements:
 * `--file-watch` is more discerning about which files to rebuild for [#912](https://github.com/commercialhaskell/stack/issues/912)
 * `stack path` now supports `--global-pkg-db` and `--ghc-package-path`
 * `--reconfigure` flag [#914](https://github.com/commercialhaskell/stack/issues/914) [#946](https://github.com/commercialhaskell/stack/issues/946)
+* Cached data is written with a checksum of its structure [#889](https://github.com/commercialhaskell/stack/issues/889)
 
 Bug fixes:
 
