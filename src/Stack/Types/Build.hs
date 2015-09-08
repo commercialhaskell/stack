@@ -152,7 +152,7 @@ instance Show StackBuildException where
                 , case mstack of
                     Nothing -> "command line arguments"
                     Just stack -> "resolver setting in " ++ toFilePath stack
-                , "). "
+                , ").\n"
                 , T.unpack resolution
                 ]
     show (Couldn'tParseTargets targets) = unlines
