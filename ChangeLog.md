@@ -12,6 +12,7 @@ Other enhancements:
 * `stack path` now supports `--global-pkg-db` and `--ghc-package-path`
 * `--reconfigure` flag [#914](https://github.com/commercialhaskell/stack/issues/914) [#946](https://github.com/commercialhaskell/stack/issues/946)
 * Cached data is written with a checksum of its structure [#889](https://github.com/commercialhaskell/stack/issues/889)
+* Fully removed `--optimizations` flag
 
 Bug fixes:
 
