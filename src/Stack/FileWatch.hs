@@ -55,7 +55,6 @@ fileWatch getProjectRoot inner = withManager $ \manager -> do
 
         setWatched :: Set (Path Abs File) -> IO ()
         setWatched files = do
-            print files
             atomically $ writeTVar allFiles $ Set.map toFilePath files
             watch0 <- readTVarIO watchVar
             let actions = Map.mergeWithKey
