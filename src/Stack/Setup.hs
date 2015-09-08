@@ -66,7 +66,7 @@ import           Stack.Types.Build
 import           Stack.Config (resolvePackageEntry)
 import           Stack.Constants (distRelativeDir)
 import           Stack.Fetch
-import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB)
+import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath)
 import           Stack.Solver (getCompilerVersion)
 import           Stack.Types
 import           Stack.Types.StackT
@@ -198,12 +198,8 @@ setupEnv mResolveMissingGHC = do
     createDatabase menv wc deps
     localdb <- runReaderT packageDatabaseLocal envConfig0
     createDatabase menv wc localdb
-    globalDB <- getGlobalDB menv wc
-    let mkGPP locals = T.pack $ intercalate [searchPathSeparator] $ concat
-            [ [toFilePathNoTrailingSlash localdb | locals]
-            , [toFilePathNoTrailingSlash deps]
-            , [toFilePathNoTrailingSlash globalDB]
-            ]
+    globaldb <- getGlobalDB menv wc
+    let mkGPP locals = mkGhcPackagePath locals localdb deps globaldb
 
     distDir <- runReaderT distRelativeDir envConfig0
 
