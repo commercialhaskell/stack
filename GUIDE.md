@@ -1498,6 +1498,15 @@ Now the differences:
       its databases. In other words: when you use stack, there's __no need for
       sandboxes__, everything is (essentially) sandboxed by default.
 
+__Other tools for comparison (including active and historical)__
+* [cabal-dev](https://hackage.haskell.org/package/cabal-dev) (deprecated in favor of cabal-install)
+* [cabal-meta](https://hackage.haskell.org/package/cabal-meta)
+* [cabal-src](https://hackage.haskell.org/package/cabal-src)
+* [stackage-cli](https://hackage.haskell.org/package/stackage-cli) (deprecated in favor of stack)
+
+## Roadmap
+There has been some mention of a possible [future merger of stack and Halcyon](https://groups.google.com/forum/#!msg/commercialhaskell/Uc8RsQq6Yv0/IT2FZw4aDmsJ).
+
 ## More resources
 
 There are lots of resources available for learning more about stack:
