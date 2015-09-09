@@ -95,11 +95,13 @@ data Package =
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the .cabal file
 newtype GetPackageOpts = GetPackageOpts
-    { getPackageOpts :: forall env m. (MonadIO m,HasEnvConfig env, HasPlatform env, MonadThrow m, MonadReader env m)
+    { getPackageOpts :: forall env m. (MonadIO m,HasEnvConfig env, HasPlatform env, MonadThrow m, MonadReader env m, MonadLogger m, MonadCatch m)
                      => SourceMap
                      -> [PackageName]
                      -> Path Abs File
-                     -> m (Map NamedComponent [String],[String])
+                     -> m (Map NamedComponent (Set ModuleName)
+                          ,Map NamedComponent (Set DotCabalPath)
+                          ,Map NamedComponent [String],[String])
     }
 instance Show GetPackageOpts where
     show _ = "<GetPackageOpts>"
@@ -250,7 +252,8 @@ data DotCabalDescriptor
     = DotCabalModule !ModuleName
     | DotCabalMain !FilePath
     | DotCabalFile !FilePath
-    deriving (Eq,Ord)
+    | DotCabalCFile !FilePath
+    deriving (Eq,Ord,Show)
 
 -- | Maybe get the module name from the .cabal descriptor.
 dotCabalModule :: DotCabalDescriptor -> Maybe ModuleName
@@ -268,7 +271,8 @@ data DotCabalPath
     = DotCabalModulePath !(Path Abs File)
     | DotCabalMainPath !(Path Abs File)
     | DotCabalFilePath !(Path Abs File)
-    deriving (Eq,Ord)
+    | DotCabalCFilePath !(Path Abs File)
+    deriving (Eq,Ord,Show)
 
 -- | Get the module path.
 dotCabalModulePath :: DotCabalPath -> Maybe (Path Abs File)
@@ -280,6 +284,11 @@ dotCabalMainPath :: DotCabalPath -> Maybe (Path Abs File)
 dotCabalMainPath (DotCabalMainPath fp) = Just fp
 dotCabalMainPath _ = Nothing
 
+-- | Get the c file path.
+dotCabalCFilePath :: DotCabalPath -> Maybe (Path Abs File)
+dotCabalCFilePath (DotCabalCFilePath fp) = Just fp
+dotCabalCFilePath _ = Nothing
+
 -- | Get the path.
 dotCabalGetPath :: DotCabalPath -> Path Abs File
 dotCabalGetPath dcp =
@@ -287,3 +296,4 @@ dotCabalGetPath dcp =
         DotCabalModulePath fp -> fp
         DotCabalMainPath fp -> fp
         DotCabalFilePath fp -> fp
+        DotCabalCFilePath fp -> fp
