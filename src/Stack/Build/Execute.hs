@@ -328,8 +328,9 @@ executePlan menv bopts baseConfigOpts locals sourceMap installedMap plan = do
         destDir <- asks $ configLocalBin . getConfig
         createTree destDir
 
-        let destDir' = toFilePath destDir
-        when (not $ any (FP.equalFilePath destDir') (envSearchPath menv)) $
+        destDir' <- liftIO $ D.canonicalizePath (toFilePath destDir)
+        envSearchPaths <- liftIO $ mapM D.canonicalizePath (envSearchPath menv)
+        when (not $ any (FP.equalFilePath destDir') envSearchPaths) $
             $logWarn $ T.concat
                 [ "Installation path "
                 , T.pack destDir'
