@@ -75,7 +75,7 @@ import           Stack.Constants
 import           Stack.Types
 import qualified Stack.Types.PackageIdentifier
 import           System.Directory (doesFileExist, getDirectoryContents)
-import           System.FilePath (splitExtensions)
+import           System.FilePath (splitExtensions, replaceExtension)
 import qualified System.FilePath as FilePath
 import           System.IO.Error
 
@@ -157,14 +157,7 @@ resolvePackage packageConfig gpkg =
     { packageName = name
     , packageVersion = fromCabalVersion (pkgVersion pkgId)
     , packageDeps = deps
-    , packageFiles = GetPackageFiles $
-      \cabalfp ->
-           do distDir <- distDirFromDir (parent cabalfp)
-              (componentModules,componentFiles,cabalFiles) <-
-                  runReaderT
-                      (packageDescModulesAndFiles pkg)
-                      (cabalfp, buildDir distDir)
-              return ( componentModules, componentFiles, cabalFiles)
+    , packageFiles = pkgFiles
     , packageTools = packageDescTools pkg
     , packageFlags = packageConfigFlags packageConfig
     , packageAllDeps = S.fromList (M.keys deps)
@@ -180,7 +173,10 @@ resolvePackage packageConfig gpkg =
                           , buildable (buildInfo b)]
     , packageOpts = GetPackageOpts $
       \sourceMap locals cabalfp ->
-           generatePkgDescOpts sourceMap locals cabalfp pkg
+           do (componentsModules,componentFiles,_) <- getPackageFiles pkgFiles cabalfp
+              (componentsOpts,generalOpts) <-
+                  generatePkgDescOpts sourceMap locals cabalfp pkg componentFiles
+              return (componentsModules,componentFiles,componentsOpts,generalOpts)
     , packageHasExposedModules = maybe
           False
           (not . null . exposedModules)
@@ -190,6 +186,14 @@ resolvePackage packageConfig gpkg =
       map (fromCabalFlagName . flagName) $ genPackageFlags gpkg
     }
   where
+    pkgFiles = GetPackageFiles $
+        \cabalfp ->
+             do distDir <- distDirFromDir (parent cabalfp)
+                (componentModules,componentFiles,cabalFiles) <-
+                    runReaderT
+                        (packageDescModulesAndFiles pkg)
+                        (cabalfp, buildDir distDir)
+                return ( componentModules, componentFiles, cabalFiles)
     pkgId = package (packageDescription gpkg)
     name = fromCabalPackageName (pkgName pkgId)
     pkg = resolvePackageDescription packageConfig gpkg
@@ -204,8 +208,9 @@ generatePkgDescOpts
     -> [PackageName]
     -> Path Abs File
     -> PackageDescription
+    -> Map NamedComponent (Set DotCabalPath)
     -> m (Map NamedComponent [String],[String])
-generatePkgDescOpts sourceMap locals cabalfp pkg = do
+generatePkgDescOpts sourceMap locals cabalfp pkg componentPaths = do
     distDir <- distDirFromDir cabalDir
     let cabalmacros = autogenDir distDir </> $(mkRelFile "cabal_macros.h")
     exists <- fileExists cabalmacros
@@ -213,34 +218,41 @@ generatePkgDescOpts sourceMap locals cabalfp pkg = do
             if exists
                 then Just cabalmacros
                 else Nothing
-    let generate =
-            generateBuildInfoOpts
-                sourceMap
-                mcabalmacros
-                cabalDir
-                distDir
-                locals
+    let generate namedComponent binfo =
+            ( namedComponent
+            , generateBuildInfoOpts
+                  sourceMap
+                  mcabalmacros
+                  cabalDir
+                  distDir
+                  locals
+                  binfo
+                  (fromMaybe mempty (M.lookup namedComponent componentPaths))
+                  namedComponent)
     return
         ( M.fromList
               (concat
                    [ maybe
                          []
-                         (return . (CLib, ) . generate . libBuildInfo)
+                         (return . generate CLib . libBuildInfo)
                          (library pkg)
                    , map
                          (\exe ->
-                               ( CExe (T.pack (exeName exe))
-                               , generate (buildInfo exe)))
+                               (generate
+                                    (CExe (T.pack (exeName exe)))
+                                    (buildInfo exe)))
                          (executables pkg)
                    , map
                          (\bench ->
-                               ( CBench (T.pack (benchmarkName bench))
-                               , generate (benchmarkBuildInfo bench)))
+                               (generate
+                                    (CBench (T.pack (benchmarkName bench)))
+                                    (benchmarkBuildInfo bench)))
                          (benchmarks pkg)
                    , map
                          (\test ->
-                               ( CBench (T.pack (testName test))
-                               , generate (testBuildInfo test)))
+                               (generate
+                                    (CBench (T.pack (testName test)))
+                                    (testBuildInfo test)))
                          (testSuites pkg)])
         , ["-hide-all-packages"])
   where
@@ -254,10 +266,17 @@ generateBuildInfoOpts
     -> Path Abs Dir
     -> [PackageName]
     -> BuildInfo
+    -> Set DotCabalPath
+    -> NamedComponent
     -> [String]
-generateBuildInfoOpts sourceMap mcabalmacros cabalDir distDir locals b =
-    nubOrd (concat [ghcOpts b, extOpts b, srcOpts, includeOpts, macros, deps, extra b, extraDirs, fworks b])
+generateBuildInfoOpts sourceMap mcabalmacros cabalDir distDir locals b dotCabalPaths componentName =
+    nubOrd (concat [ghcOpts b, extOpts b, srcOpts, includeOpts, macros, deps, extra b, extraDirs, fworks b, cObjectFiles])
   where
+    cObjectFiles =
+        mapMaybe (fmap toFilePath .
+                  makeObjectFilePathFromC cabalDir componentName distDir)
+                 cfiles
+    cfiles = mapMaybe dotCabalCFilePath (S.toList dotCabalPaths)
     deps =
         concat
             [ ["-package=" <> display name <>
@@ -306,6 +325,56 @@ generateBuildInfoOpts sourceMap mcabalmacros cabalDir distDir locals b =
           (Nothing, Nothing ) -> []
         ]
     fworks = map (\fwk -> "-framework=" <> fwk) . frameworks
+
+-- | Make the .o path from the .c file path for a component. Example:
+--
+-- @
+-- executable FOO
+--   c-sources:        cbits/text_search.c
+-- @
+--
+-- Produces
+--
+-- <dist-dir>/build/FOO-tmp/cbits/text_search.o
+--
+-- Example:
+--
+-- λ> makeObjectFilePathFromC
+--     $(mkAbsDir "/Users/chris/Repos/hoogle")
+--     CLib
+--     $(mkAbsDir "/Users/chris/Repos/hoogle/.stack-work/Cabal-x.x.x/dist")
+--     $(mkAbsFile "/Users/chris/Repos/hoogle/cbits/text_search.c")
+-- Just "/Users/chris/Repos/hoogle/.stack-work/Cabal-x.x.x/dist/build/cbits/text_search.o"
+-- λ> makeObjectFilePathFromC
+--     $(mkAbsDir "/Users/chris/Repos/hoogle")
+--     (CExe "hoogle")
+--     $(mkAbsDir "/Users/chris/Repos/hoogle/.stack-work/Cabal-x.x.x/dist")
+--     $(mkAbsFile "/Users/chris/Repos/hoogle/cbits/text_search.c")
+-- Just "/Users/chris/Repos/hoogle/.stack-work/Cabal-x.x.x/dist/build/hoogle-tmp/cbits/text_search.o"
+-- λ>
+makeObjectFilePathFromC
+    :: MonadThrow m
+    => Path Abs Dir          -- ^ The cabal directory.
+    -> NamedComponent        -- ^ The name of the component.
+    -> Path Abs Dir          -- ^ Dist directory.
+    -> Path Abs File         -- ^ The path to the .c file.
+    -> m (Path Abs File) -- ^ The path to the .o file for the component.
+makeObjectFilePathFromC cabalDir namedComponent distDir cFilePath = do
+    relCFilePath <- stripDir cabalDir cFilePath
+    relOFilePath <-
+        parseRelFile (replaceExtension (toFilePath relCFilePath) "o")
+    addComponentPrefix <- fromComponentName
+    return (addComponentPrefix (buildDir distDir) </> relOFilePath)
+  where
+    fromComponentName =
+        case namedComponent of
+            CLib -> return id
+            CExe name -> makeTmp name
+            CTest name -> makeTmp name
+            CBench name -> makeTmp name
+    makeTmp name = do
+        prefix <- parseRelDir (T.unpack name <> "-tmp")
+        return (</> prefix)
 
 -- | Make the autogen dir.
 autogenDir :: Path Abs Dir -> Path Abs Dir
@@ -556,7 +625,7 @@ buildCSources :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs Fil
            => BuildInfo -> m (Set DotCabalPath)
 buildCSources build =
     liftM
-        (S.map DotCabalFilePath . S.fromList)
+        (S.map DotCabalCFilePath . S.fromList)
         (mapMaybeM resolveFileOrWarn (cSources build))
 
 -- | Get all dependencies of a package, including library,
@@ -753,6 +822,7 @@ getDependencies component dotCabalPath =
         DotCabalModulePath resolvedFile -> readResolvedHi resolvedFile
         DotCabalMainPath resolvedFile -> readResolvedHi resolvedFile
         DotCabalFilePath{} -> return (S.empty, [])
+        DotCabalCFilePath{} -> return (S.empty, [])
   where
     readResolvedHi resolvedFile = do
         dumpHIDir <- getDumpHIDir
@@ -845,6 +915,7 @@ findCandidate dirs exts name = do
             DotCabalModule{} -> DotCabalModulePath
             DotCabalMain{} -> DotCabalMainPath
             DotCabalFile{} -> DotCabalFilePath
+            DotCabalCFile{} -> DotCabalCFilePath
     paths_pkg pkg = "Paths_" ++ packageNameString pkg
     makeNameCandidates =
         liftM (nubOrd . rights . concat) (mapM makeDirCandidates dirs)
@@ -854,6 +925,7 @@ findCandidate dirs exts name = do
         case name of
             DotCabalMain fp -> liftM return (try (resolveFile' dir fp))
             DotCabalFile fp -> liftM return (try (resolveFile' dir fp))
+            DotCabalCFile fp -> liftM return (try (resolveFile' dir fp))
             DotCabalModule mn ->
                 mapM
                     (\ext ->
@@ -888,6 +960,7 @@ warnMultiple name candidate rest =
   where showName (DotCabalModule name') = T.pack (display name')
         showName (DotCabalMain fp) = T.pack fp
         showName (DotCabalFile fp) = T.pack fp
+        showName (DotCabalCFile fp) = T.pack fp
 
 -- | Log that we couldn't find a candidate, but there are
 -- possibilities for custom preprocessor extensions.
