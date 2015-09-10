@@ -629,8 +629,16 @@ buildOtherSources build =
                        (mapMaybeM resolveFileOrWarn (cSources build))
        jsources <- liftM
                        (S.map DotCabalFilePath . S.fromList)
-                       (mapMaybeM resolveFileOrWarn (jsSources build))
+                       (mapMaybeM resolveFileOrWarn (targetJsSources build))
        return (csources <> jsources)
+
+-- | Get the target's JS sources.
+targetJsSources :: BuildInfo -> [FilePath]
+#if MIN_VERSION_Cabal(1, 22, 0)
+targetJsSources = jsSources
+#else
+targetJsSources = const []
+#endif
 
 -- | Get all dependencies of a package, including library,
 -- executables, tests, benchmarks.
