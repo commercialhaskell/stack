@@ -88,7 +88,8 @@ readLocalPackage pkgDir = do
             , packageConfigCompilerVersion = envConfigCompilerVersion econfig
             , packageConfigPlatform = configPlatform $ getConfig bconfig
             }
-    package <- readPackage config cabalfp
+    (warnings,package) <- readPackage config cabalfp
+    mapM_ (printCabalFileWarning cabalfp) warnings
     return LocalPackage
         { lpPackage = package
         , lpExeComponents = Nothing -- HACK: makes it so that sdist output goes to a log instead of a file.

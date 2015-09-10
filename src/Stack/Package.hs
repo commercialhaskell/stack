@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -31,7 +32,8 @@ module Stack.Package
   ,packageDependencies
   ,packageIdentifier
   ,autogenDir
-  ,checkCabalFileName)
+  ,checkCabalFileName
+  ,printCabalFileWarning)
   where
 
 import           Control.Exception hiding (try,catch)
@@ -63,6 +65,7 @@ import qualified Distribution.ModuleName as Cabal
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
 import           Distribution.PackageDescription hiding (FlagName)
 import           Distribution.PackageDescription.Parse
+import           Distribution.ParseUtils
 import           Distribution.Simple.Utils
 import           Distribution.System (OS (..), Arch, Platform (..))
 import           Distribution.Text (display, simpleParse)
@@ -88,7 +91,7 @@ packageIdentifier pkg =
 -- | Read the raw, unresolved package information.
 readPackageUnresolved :: (MonadIO m, MonadThrow m)
                       => Path Abs File
-                      -> m GenericPackageDescription
+                      -> m ([PWarning],GenericPackageDescription)
 readPackageUnresolved cabalfp =
   liftIO (BS.readFile (FL.toFilePath cabalfp))
   >>= readPackageUnresolvedBS (Just cabalfp)
@@ -97,12 +100,12 @@ readPackageUnresolved cabalfp =
 readPackageUnresolvedBS :: (MonadThrow m)
                         => Maybe (Path Abs File)
                         -> BS.ByteString
-                        -> m GenericPackageDescription
+                        -> m ([PWarning],GenericPackageDescription)
 readPackageUnresolvedBS mcabalfp bs =
     case parsePackageDescription chars of
        ParseFailed per ->
          throwM (PackageInvalidCabalFile mcabalfp per)
-       ParseOk _ gpkg -> return gpkg
+       ParseOk warnings gpkg -> return (warnings,gpkg)
   where
     chars = T.unpack (dropBOM (decodeUtf8With lenientDecode bs))
 
@@ -113,30 +116,49 @@ readPackageUnresolvedBS mcabalfp bs =
 readPackage :: (MonadLogger m, MonadIO m, MonadThrow m, MonadCatch m)
             => PackageConfig
             -> Path Abs File
-            -> m Package
+            -> m ([PWarning],Package)
 readPackage packageConfig cabalfp =
-  resolvePackage packageConfig `liftM` readPackageUnresolved cabalfp
+  do (warnings,gpkg) <- readPackageUnresolved cabalfp
+     return (warnings,resolvePackage packageConfig gpkg)
 
 -- | Reads and exposes the package information, from a ByteString
 readPackageBS :: (MonadThrow m)
               => PackageConfig
               -> BS.ByteString
-              -> m Package
+              -> m ([PWarning],Package)
 readPackageBS packageConfig bs =
-  resolvePackage packageConfig `liftM` readPackageUnresolvedBS Nothing bs
+  do (warnings,gpkg) <- readPackageUnresolvedBS Nothing bs
+     return (warnings,resolvePackage packageConfig gpkg)
 
 -- | Convenience wrapper around @readPackage@ that first finds the cabal file
 -- in the given directory.
 readPackageDir :: (MonadLogger m, MonadIO m, MonadThrow m, MonadCatch m)
                => PackageConfig
                -> Path Abs Dir
-               -> m (Path Abs File, Package)
+               -> m (Path Abs File, [PWarning], Package)
 readPackageDir packageConfig dir = do
     cabalfp <- getCabalFileName dir
-    pkg <- readPackage packageConfig cabalfp
+    (warnings,pkg) <- readPackage packageConfig cabalfp
     checkCabalFileName (packageName pkg) cabalfp
+    return (cabalfp, warnings, pkg)
 
-    return (cabalfp, pkg)
+-- | Print cabal file warnings.
+printCabalFileWarning
+    :: (MonadLogger m)
+    => Path Abs File -> PWarning -> m ()
+printCabalFileWarning cabalfp =
+    \case
+        (PWarning x) ->
+            $logWarn
+                ("Cabal file warning in " <> T.pack (toFilePath cabalfp) <>
+                 ": " <>
+                 T.pack x)
+        (UTFWarning line msg) ->
+            $logWarn
+                ("Cabal file warning in " <> T.pack (toFilePath cabalfp) <> ":" <>
+                 T.pack (show line) <>
+                 ": " <>
+                 T.pack msg)
 
 -- | Check if the given name in the @Package@ matches the name of the .cabal file
 checkCabalFileName :: MonadThrow m => PackageName -> Path Abs File -> m ()
