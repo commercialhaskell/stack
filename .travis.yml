@@ -36,7 +36,6 @@ env:
 matrix:
   allow_failures:
   - env: CABALVER=head GHCVER=head
-  - env: CABALVER=1.22 GHCVER=7.10.2
 
 # Note: the distinction between `before_install` and `install` is not important.
 before_install:
@@ -47,7 +46,7 @@ install:
  - cabal --version
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
  - travis_retry cabal update
- - cabal install --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls --ghc-options="-O0 -Werror"
+ - cabal install --only-dependencies --constraint="ignore +without-pcre" --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0
 
 script:
  - if [ -f configure.ac ]; then autoreconf -i; fi
@@ -69,4 +68,3 @@ script:
 # `cabal install --force-reinstalls dist/*-*.tar.gz`
  - SRC_TGZ=$(cabal info . | awk '{print $2;exit}').tar.gz &&
    (cd dist && cabal install --force-reinstalls "$SRC_TGZ")
-

@@ -77,15 +77,15 @@ buildOptsParser :: Command
 buildOptsParser cmd =
             fmap addCoverageFlags $
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
-            optimize <*> haddock <*> haddockDeps <*> dryRun <*> ghcOpts <*>
+            (optimize *> haddock) <*> haddockDeps <*> dryRun <*> ghcOpts <*>
             flags <*> copyBins <*> preFetch <*>
             buildSubset <*>
             fileWatch' <*> keepGoing <*> forceDirty <*>
             tests <*> testOptsParser <*>
             benches <*> benchOptsParser <*>
-            many exec
+            many exec <*> onlyConfigure
   where optimize =
-          maybeBoolFlags "optimizations" "optimizations for TARGETs and all its dependencies" idm
+          maybeBoolFlags "optimizations" "DEPRECATED: This flag is no longer used, and has no effect. Please use --ghc-options=-O?" idm
         target =
            many (textArgument
                    (metavar "TARGET" <>
@@ -106,13 +106,10 @@ buildOptsParser cmd =
                     "generating Haddocks the project(s) in this directory/configuration"
                     idm
         haddockDeps =
-          if cmd == Haddock
-             then maybeBoolFlags
-                            "haddock-deps"
-                            "building Haddocks for dependencies"
-                            idm
-             else pure Nothing
-
+             maybeBoolFlags
+                       "haddock-deps"
+                       "building Haddocks for dependencies"
+                       idm
         copyBins = boolFlags (cmd == Install)
             "copy-bins"
             "copying binaries to the local-bin-path (see 'stack path')"
@@ -154,7 +151,7 @@ buildOptsParser cmd =
 
         fileWatch' = flag False True
             (long "file-watch" <>
-             help "Watch for changes in local files and automatically rebuild")
+             help "Watch for changes in local files and automatically rebuild. Ignores files in VCS boring/ignore file")
 
         keepGoing = maybeBoolFlags
             "keep-going"
@@ -180,6 +177,10 @@ buildOptsParser cmd =
             ( long "exec" <>
               metavar "CMD [ARGS]" <>
               help "Command and arguments to run after a successful build" )
+
+        onlyConfigure = flag False True
+            (long "only-configure" <>
+             help "Only perform the configure step, not any builds. Intended for tool usage, may break when used on multiple packages at once!")
 
 -- | Parser for package:[-]flag
 readFlag :: ReadM (Map (Maybe PackageName) (Map FlagName Bool))
@@ -443,18 +444,19 @@ execOptsParser :: Maybe String -- ^ command
                -> Parser ExecOpts
 execOptsParser mcmd =
     ExecOpts
-        <$> maybe eoCmdParser pure mcmd
+        <$> pure mcmd
         <*> eoArgsParser
         <*> (eoPlainParser <|>
              ExecOptsEmbellished
                 <$> eoEnvSettingsParser
                 <*> eoPackagesParser)
   where
-    eoCmdParser :: Parser String
-    eoCmdParser = strArgument (metavar "CMD")
-
     eoArgsParser :: Parser [String]
-    eoArgsParser = many (strArgument (metavar "-- ARGS (e.g. stack ghc -- X.hs -o x)"))
+    eoArgsParser = many (strArgument (metavar meta))
+      where
+        meta =
+            (maybe ("CMD ") (const "") mcmd) ++
+            "-- ARGS (e.g. stack ghc -- X.hs -o x)"
 
     eoEnvSettingsParser :: Parser EnvSettings
     eoEnvSettingsParser = EnvSettings

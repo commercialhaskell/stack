@@ -1,7 +1,7 @@
 FROM dock0/arch
 
 # Update system and install packages from main repos
-RUN pacman -Syu --noconfirm git binutils fakeroot pkgbuild-introspection make sudo && \
+RUN pacman -Syu --noconfirm git binutils fakeroot pkgbuild-introspection make sudo gcc && \
     useradd -m -g users aurbuilder
 
 # Install libtinfo from AUR

@@ -26,6 +26,8 @@ module Stack.Build.Cache
     , setBenchBuilt
     , unsetBenchBuilt
     , checkBenchBuilt
+    , writePrecompiledCache
+    , readPrecompiledCache
     ) where
 
 import           Control.Exception.Enclosed (handleIO)
@@ -33,9 +35,17 @@ import           Control.Monad.Catch (MonadThrow)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader
+import qualified Crypto.Hash.SHA256 as SHA256
+import qualified Data.Binary as Binary
 import           Data.Binary.VersionTagged
+import qualified Data.ByteString.Char8 as S8
+import qualified Data.ByteString.Base16 as B16
 import           Data.Map (Map)
 import           Data.Maybe (fromMaybe, mapMaybe)
+import           Data.Set (Set)
+import qualified Data.Set as Set
+import           Data.Text (Text)
+import qualified Data.Text as T
 import           GHC.Generics (Generic)
 import           Path
 import           Path.IO
@@ -163,7 +173,7 @@ flagCacheFile :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
 flagCacheFile installed = do
     rel <- parseRelFile $
         case installed of
-            Library gid -> ghcPkgIdString gid
+            Library _ gid -> ghcPkgIdString gid
             Executable ident -> packageIdentifierString ident
     dir <- flagCacheLocal
     return $ dir </> rel
@@ -271,3 +281,71 @@ checkBenchBuilt dir =
     liftM
         (fromMaybe False)
         (tryGetCache benchBuiltFile dir)
+
+--------------------------------------
+-- Precompiled Cache
+--
+-- Idea is simple: cache information about packages built in other snapshots,
+-- and then for identical matches (same flags, config options, dependencies)
+-- just copy over the executables and reregister the libraries.
+--------------------------------------
+
+-- | The file containing information on the given package/configuration
+-- combination. The filename contains a hash of the non-directory configure
+-- options for quick lookup if there's a match.
+precompiledCacheFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
+                     => PackageIdentifier
+                     -> ConfigureOpts
+                     -> m (Path Abs File)
+precompiledCacheFile pkgident copts = do
+    ec <- asks getEnvConfig
+
+    compiler <- parseRelDir $ T.unpack $ compilerVersionName $ envConfigCompilerVersion ec
+    cabal <- parseRelDir $ versionString $ envConfigCabalVersion ec
+    pkg <- parseRelDir $ packageIdentifierString pkgident
+
+    -- We only pay attention to non-directory options. We don't want to avoid a
+    -- cache hit just because it was installed in a different directory.
+    copts' <- parseRelFile $ S8.unpack $ B16.encode $ SHA256.hashlazy $ Binary.encode $ coNoDirs copts
+
+    return $ getStackRoot ec
+         </> $(mkRelDir "precompiled")
+         </> compiler
+         </> cabal
+         </> pkg
+         </> copts'
+
+-- | Write out information about a newly built package
+writePrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadIO m)
+                      => BaseConfigOpts
+                      -> PackageIdentifier
+                      -> ConfigureOpts
+                      -> Maybe GhcPkgId -- ^ library
+                      -> Set Text -- ^ executables
+                      -> m ()
+writePrecompiledCache baseConfigOpts pkgident copts mghcPkgId exes = do
+    file <- precompiledCacheFile pkgident copts
+    createTree $ parent file
+    mlibpath <-
+        case mghcPkgId of
+            Nothing -> return Nothing
+            Just ipid -> liftM Just $ do
+                ipid' <- parseRelFile $ ghcPkgIdString ipid ++ ".conf"
+                return $ toFilePath $ bcoSnapDB baseConfigOpts </> ipid'
+    exes' <- forM (Set.toList exes) $ \exe -> do
+        name <- parseRelFile $ T.unpack exe
+        return $ toFilePath $ bcoSnapInstallRoot baseConfigOpts </> bindirSuffix </> name
+    liftIO $ encodeFile (toFilePath file) PrecompiledCache
+        { pcLibrary = mlibpath
+        , pcExes = exes'
+        }
+
+-- | Check the cache for a precompiled package matching the given
+-- configuration.
+readPrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadIO m)
+                     => PackageIdentifier -- ^ target package
+                     -> ConfigureOpts
+                     -> m (Maybe PrecompiledCache)
+readPrecompiledCache pkgident copts = do
+    file <- precompiledCacheFile pkgident copts
+    decodeFileOrFailDeep $ toFilePath file

@@ -12,11 +12,12 @@ import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Concurrent.Execute (ActionContext(..))
-import           Control.Monad (when)
+import           Control.Monad (when, void)
 import           Control.Monad.Catch (MonadCatch, MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
+import           Control.Monad.Trans.Control (liftBaseWith)
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Lazy as L
 import           Data.Either (partitionEithers)
@@ -111,8 +112,9 @@ getSDistFileList lp =
         let bopts = defaultBuildOpts
         baseConfigOpts <- mkBaseConfigOpts bopts
         (_, _mbp, locals, _extraToBuild, sourceMap) <- loadSourceMap NeedTargets bopts
+        runInBase <- liftBaseWith $ \run -> return (void . run)
         withExecuteEnv menv bopts baseConfigOpts locals sourceMap $ \ee -> do
-            withSingleContext ac ee task (Just "sdist") $ \_package _cabalfp _pkgDir cabal _announce _console _mlogFile -> do
+            withSingleContext runInBase ac ee task (Just "sdist") $ \_package _cabalfp _pkgDir cabal _announce _console _mlogFile -> do
                 let outFile = tmpdir FP.</> "source-files-list"
                 cabal False ["sdist", "--list-sources", outFile]
                 liftIO (readFile outFile)
@@ -124,9 +126,9 @@ getSDistFileList lp =
         , taskType = TTLocal lp
         , taskConfigOpts = TaskConfigOpts
             { tcoMissing = Set.empty
-            , tcoOpts = \_ -> []
+            , tcoOpts = \_ -> ConfigureOpts [] []
             }
-        , taskPresent = Set.empty
+        , taskPresent = Map.empty
         }
 
 normalizeTarballPaths :: M env m => [FilePath] -> m [FilePath]

@@ -35,12 +35,15 @@ module Stack.Types.Build
     ,configureOpts
     ,BadDependency(..)
     ,wantedLocalPackages
-    ,FileCacheInfo (..))
+    ,FileCacheInfo (..)
+    ,ConfigureOpts (..)
+    ,PrecompiledCache (..))
     where
 
 import           Control.DeepSeq
 import           Control.Exception
 
+import           Data.Binary (getWord8, putWord8, gput, gget)
 import           Data.Binary.VersionTagged
 import qualified Data.ByteString as S
 import           Data.Char (isSpace)
@@ -110,6 +113,7 @@ data StackBuildException
   | NoSetupHsFound (Path Abs Dir)
   | InvalidFlagSpecification (Set UnusedFlags)
   | TargetParseException [Text]
+  | DuplicateLocalPackageNames [(PackageName, [Path Abs Dir])]
   deriving Typeable
 
 data FlagSource = FSCommandLine | FSStackYaml
@@ -226,7 +230,7 @@ instance Show StackBuildException where
                 go _ = Map.empty
      -- Supressing duplicate output
     show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bs) =
-        let fullCmd = (dropQuotes (show execName) ++ " " ++ (unwords fullArgs))
+        let fullCmd = (dropQuotes (toFilePath execName) ++ " " ++ (unwords fullArgs))
             logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ toFilePath fp) logFiles
         in "\n--  While building package " ++ dropQuotes (show taskProvides') ++ " using:\n" ++
            "      " ++ fullCmd ++ "\n" ++
@@ -293,6 +297,16 @@ instance Show StackBuildException where
         $ "The following errors occurred while parsing the build targets:"
         : map (("- " ++) . T.unpack) errs
 
+    show (DuplicateLocalPackageNames pairs) = concat
+        $ "The same package name is used in multiple local packages\n"
+        : map go pairs
+      where
+        go (name, dirs) = unlines
+            $ ""
+            : (packageNameString name ++ " used in:")
+            : map goDir dirs
+        goDir dir = "- " ++ toFilePath dir
+
 instance Exception StackBuildException
 
 data ConstructPlanException
@@ -335,14 +349,21 @@ instance Show ConstructPlanException where
         , ": needed ("
         , display range
         , ")"
-        , case mlatest of
-            Nothing -> ""
-            Just latest -> ", latest is " ++ versionString latest
-        , ", but "
-        , case badDep of
-            NotInBuildPlan -> "not present in build plan"
-            Couldn'tResolveItsDependencies -> "couldn't resolve its dependencies"
-            DependencyMismatch version -> versionString version ++ " found"
+        , ", "
+        , let latestStr =
+                case mlatest of
+                    Nothing -> ""
+                    Just latest -> " (latest is " ++ versionString latest ++ ")"
+           in case badDep of
+                NotInBuildPlan -> "not present in build plan" ++ latestStr
+                Couldn'tResolveItsDependencies -> "couldn't resolve its dependencies"
+                DependencyMismatch version ->
+                    case mlatest of
+                        Just latest
+                            | latest == version ->
+                                versionString version ++
+                                " found (latest version available)"
+                        _ -> versionString version ++ " found" ++ latestStr
         ]
          {- TODO Perhaps change the showDep function to look more like this:
           dropQuotes = filter ((/=) '\"')
@@ -371,7 +392,6 @@ data BuildOpts =
   BuildOpts {boptsTargets :: ![Text]
             ,boptsLibProfile :: !Bool
             ,boptsExeProfile :: !Bool
-            ,boptsEnableOptimizations :: !(Maybe Bool)
             ,boptsHaddock :: !Bool
             -- ^ Build haddocks?
             ,boptsHaddockDeps :: !(Maybe Bool)
@@ -402,6 +422,8 @@ data BuildOpts =
             -- ^ Additional test arguments
             ,boptsExec :: ![(String, [String])]
             -- ^ Commands (with arguments) to run after a successful build
+            ,boptsOnlyConfigure :: !Bool
+            -- ^ Only perform the configure step when building
             }
   deriving (Show)
 
@@ -410,7 +432,6 @@ defaultBuildOpts = BuildOpts
     { boptsTargets = []
     , boptsLibProfile = False
     , boptsExeProfile = False
-    , boptsEnableOptimizations = Nothing
     , boptsHaddock = False
     , boptsHaddockDeps = Nothing
     , boptsDryrun = False
@@ -427,6 +448,7 @@ defaultBuildOpts = BuildOpts
     , boptsBenchmarks = False
     , boptsBenchmarkOpts = defaultBenchmarkOpts
     , boptsExec = []
+    , boptsOnlyConfigure = False
     }
 
 -- | Options for the 'FinalAction' 'DoTests'
@@ -465,7 +487,7 @@ newtype PkgDepsOracle =
 -- | Stored on disk to know whether the flags have changed or any
 -- files have changed.
 data ConfigCache = ConfigCache
-    { configCacheOpts :: ![S.ByteString]
+    { configCacheOpts :: !ConfigureOpts
       -- ^ All options used for this package.
     , configCacheDeps :: !(Set GhcPkgId)
       -- ^ The GhcPkgIds of all of the dependencies. Since Cabal doesn't take
@@ -480,7 +502,20 @@ data ConfigCache = ConfigCache
       -- ^ Are haddocks to be built?
     }
     deriving (Generic,Eq,Show)
-instance Binary ConfigCache
+instance Binary ConfigCache where
+    put x = do
+        -- magic string
+        putWord8 1
+        putWord8 3
+        putWord8 4
+        putWord8 8
+        gput $ from x
+    get = do
+        1 <- getWord8
+        3 <- getWord8
+        4 <- getWord8
+        8 <- getWord8
+        fmap to gget
 instance NFData ConfigCache where
     rnf = genericRnf
 
@@ -489,7 +524,7 @@ data Task = Task
     { taskProvides        :: !PackageIdentifier        -- ^ the package/version to be built
     , taskType            :: !TaskType                 -- ^ the task type, telling us how to build this
     , taskConfigOpts      :: !TaskConfigOpts
-    , taskPresent         :: !(Set GhcPkgId)           -- ^ GhcPkgIds of already-installed dependencies
+    , taskPresent         :: !(Map PackageIdentifier GhcPkgId)           -- ^ GhcPkgIds of already-installed dependencies
     }
     deriving Show
 
@@ -497,7 +532,7 @@ data Task = Task
 data TaskConfigOpts = TaskConfigOpts
     { tcoMissing :: !(Set PackageIdentifier)
       -- ^ Dependencies for which we don't yet have an GhcPkgId
-    , tcoOpts    :: !(Set GhcPkgId -> [Text])
+    , tcoOpts    :: !(Map PackageIdentifier GhcPkgId -> ConfigureOpts)
       -- ^ Produce the list of options given the missing @GhcPkgId@s
     }
 instance Show TaskConfigOpts where
@@ -505,7 +540,7 @@ instance Show TaskConfigOpts where
         [ "Missing: "
         , show missing
         , ". Without those: "
-        , show $ f Set.empty
+        , show $ f Map.empty
         ]
 
 -- | The type of a task, either building local code or something from the
@@ -525,7 +560,7 @@ data Plan = Plan
     { planTasks :: !(Map PackageName Task)
     , planFinals :: !(Map PackageName (Task, LocalPackageTB))
     -- ^ Final actions to be taken (test, benchmark, etc)
-    , planUnregisterLocal :: !(Map GhcPkgId Text)
+    , planUnregisterLocal :: !(Map GhcPkgId (PackageIdentifier, Text))
     -- ^ Text is reason we're unregistering, for display only
     , planInstallExes :: !(Map Text InstallLocation)
     -- ^ Executables that should be installed after successful building
@@ -544,23 +579,58 @@ data BaseConfigOpts = BaseConfigOpts
 -- | Render a @BaseConfigOpts@ to an actual list of options
 configureOpts :: EnvConfig
               -> BaseConfigOpts
-              -> Set GhcPkgId -- ^ dependencies
+              -> Map PackageIdentifier GhcPkgId -- ^ dependencies
               -> Bool -- ^ wanted?
               -> InstallLocation
               -> Package
-              -> [Text]
-configureOpts econfig bco deps wanted loc package = map T.pack $ concat
+              -> ConfigureOpts
+configureOpts econfig bco deps wanted loc package = ConfigureOpts
+    { coDirs = configureOptsDirs bco loc package
+    , coNoDirs = configureOptsNoDir econfig bco deps wanted package
+    }
+
+configureOptsDirs :: BaseConfigOpts
+                  -> InstallLocation
+                  -> Package
+                  -> [String]
+configureOptsDirs bco loc package = concat
     [ ["--user", "--package-db=clear", "--package-db=global"]
     , map (("--package-db=" ++) . toFilePath) $ case loc of
         Snap -> [bcoSnapDB bco]
         Local -> [bcoSnapDB bco, bcoLocalDB bco]
-    , depOptions
     , [ "--libdir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "lib"))
       , "--bindir=" ++ toFilePathNoTrailingSlash (installRoot </> bindirSuffix)
       , "--datadir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "share"))
+      , "--libexecdir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "libexec"))
+      , "--sysconfdir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "etc"))
       , "--docdir=" ++ toFilePathNoTrailingSlash docDir
       , "--htmldir=" ++ toFilePathNoTrailingSlash docDir
       , "--haddockdir=" ++ toFilePathNoTrailingSlash docDir]
+    ]
+  where
+    toFilePathNoTrailingSlash = dropTrailingPathSeparator . toFilePath
+    installRoot =
+        case loc of
+            Snap -> bcoSnapInstallRoot bco
+            Local -> bcoLocalInstallRoot bco
+    docDir =
+        case pkgVerDir of
+            Nothing -> installRoot </> docDirSuffix
+            Just dir -> installRoot </> docDirSuffix </> dir
+    pkgVerDir =
+        parseRelDir (packageIdentifierString (PackageIdentifier (packageName package)
+                                                                (packageVersion package)) ++
+                     [pathSeparator])
+
+-- | Same as 'configureOpts', but does not include directory path options
+configureOptsNoDir :: EnvConfig
+                   -> BaseConfigOpts
+                   -> Map PackageIdentifier GhcPkgId -- ^ dependencies
+                   -> Bool -- ^ wanted?
+                   -> Package
+                   -> [String]
+configureOptsNoDir econfig bco deps wanted package = concat
+    [ depOptions
     , ["--enable-library-profiling" | boptsLibProfile bopts || boptsExeProfile bopts]
     , ["--enable-executable-profiling" | boptsExeProfile bopts]
     , map (\(name,enabled) ->
@@ -570,7 +640,6 @@ configureOpts econfig bco deps wanted loc package = map T.pack $ concat
                            else "-") <>
                        flagNameString name)
                     (Map.toList (packageFlags package))
-    -- FIXME Chris: where does this come from now? , ["--ghc-options=-O2" | gconfigOptimize gconfig]
     , concatMap (\x -> ["--ghc-options", T.unpack x]) allGhcOptions
     , map (("--extra-include-dirs=" ++) . T.unpack) (Set.toList (configExtraIncludeDirs config))
     , map (("--extra-lib-dirs=" ++) . T.unpack) (Set.toList (configExtraLibDirs config))
@@ -581,42 +650,29 @@ configureOpts econfig bco deps wanted loc package = map T.pack $ concat
   where
     config = getConfig econfig
     bopts = bcoBuildOpts bco
-    toFilePathNoTrailingSlash = dropTrailingPathSeparator . toFilePath
-    docDir =
-        case pkgVerDir of
-            Nothing -> installRoot </> docDirSuffix
-            Just dir -> installRoot </> docDirSuffix </> dir
-    installRoot =
-        case loc of
-            Snap -> bcoSnapInstallRoot bco
-            Local -> bcoLocalInstallRoot bco
-    pkgVerDir =
-        parseRelDir (packageIdentifierString (PackageIdentifier (packageName package)
-                                                                (packageVersion package)) ++
-                     [pathSeparator])
 
-    depOptions = map toDepOption $ Set.toList deps
+    depOptions = map (uncurry toDepOption) $ Map.toList deps
       where
         toDepOption =
             if envConfigCabalVersion econfig >= $(mkVersion "1.22")
                 then toDepOption1_22
                 else toDepOption1_18
 
-    toDepOption1_22 gid = concat
+    toDepOption1_22 ident gid = concat
         [ "--dependency="
-        , packageNameString $ packageIdentifierName $ ghcPkgIdPackageIdentifier gid
+        , packageNameString $ packageIdentifierName ident
         , "="
         , ghcPkgIdString gid
         ]
 
-    toDepOption1_18 gid = concat
+    toDepOption1_18 ident _gid = concat
         [ "--constraint="
         , packageNameString name
         , "=="
         , versionString version
         ]
       where
-        PackageIdentifier name version = ghcPkgIdPackageIdentifier gid
+        PackageIdentifier name version = ident
 
     ghcOptionsMap = configGhcOptions $ getConfig econfig
     allGhcOptions = concat
@@ -640,5 +696,32 @@ modTime x =
         , toRational
               (utctDayTime x))
 
-data Installed = Library GhcPkgId | Executable PackageIdentifier
+data Installed = Library PackageIdentifier GhcPkgId | Executable PackageIdentifier
     deriving (Show, Eq, Ord)
+
+-- | Configure options to be sent to Setup.hs configure
+data ConfigureOpts = ConfigureOpts
+    { coDirs :: ![String]
+    -- ^ Options related to various paths. We separate these out since they do
+    -- not have an impact on the contents of the compiled binary for checking
+    -- if we can use an existing precompiled cache.
+    , coNoDirs :: ![String]
+    }
+    deriving (Show, Eq, Generic)
+instance Binary ConfigureOpts
+instance NFData ConfigureOpts where
+    rnf = genericRnf
+
+-- | Information on a compiled package: the library conf file (if relevant),
+-- and all of the executable paths.
+data PrecompiledCache = PrecompiledCache
+    -- Use FilePath instead of Path Abs File for Binary instances
+    { pcLibrary :: !(Maybe FilePath)
+    -- ^ .conf file inside the package database
+    , pcExes :: ![FilePath]
+    -- ^ Full paths to executables
+    }
+    deriving (Show, Eq, Generic)
+instance Binary PrecompiledCache
+instance NFData PrecompiledCache where
+    rnf = genericRnf

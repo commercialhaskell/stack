@@ -10,7 +10,7 @@ projects. It is aimed at Haskellers both new and experienced.
 
 It features:
 
-* Installing GHC automatically.
+* Installing GHC automatically, in an isolated location.
 * Installing packages needed for your project.
 * Building your project.
 * Testing your project.
@@ -48,18 +48,21 @@ You may be prompted to run some of the following along the way:
 * `stack init` to create a stack configuration file for an existing project.
   stack will figure out what Stackage release (LTS or nightly) is appropriate
   for the dependencies.
-* `stack setup` to download and install the correct GHC version. (For
-  information on installation paths, please use the `stack path` command.)
+* `stack setup` to download and install the correct GHC version in an
+  isolated location (default `~/.stack`) that won't interfere with any
+  system-level installations. (For information on installation paths,
+  please use the `stack path` command.)
 
 If you just want to install an executable using stack, then all you have
 to do is `stack install <package-name>`.
 
 Run `stack` for a complete list of commands.
 
-#### Architecture
+#### Complete guide to stack
 
-A full description of the architecture
-[is available here](https://github.com/commercialhaskell/stack/wiki/Architecture).
+This repository also contains [a complete guide to using
+stack](https://github.com/commercialhaskell/stack/blob/master/GUIDE.md),
+covering all of the most common use cases.
 
 #### Questions, Feedback, Discussion
 

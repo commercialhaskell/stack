@@ -15,7 +15,8 @@ data Env config =
       ,envTerminal :: !Bool
       ,envReExec :: !Bool
       ,envManager :: !Manager
-      ,envSticky :: !Sticky}
+      ,envSticky :: !Sticky
+      ,envSupportsUnicode :: !Bool}
 
 instance HasStackRoot config => HasStackRoot (Env config) where
     getStackRoot = getStackRoot . envConfig
@@ -55,6 +56,12 @@ class HasReExec r where
 
 instance HasReExec (Env config) where
   getReExec = envReExec
+
+class HasSupportsUnicode r where
+  getSupportsUnicode :: r -> Bool
+
+instance HasSupportsUnicode (Env config) where
+  getSupportsUnicode = envSupportsUnicode
 
 newtype Sticky = Sticky
     { unSticky :: Maybe (MVar (Maybe Text))

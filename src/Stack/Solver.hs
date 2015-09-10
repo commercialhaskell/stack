@@ -62,6 +62,8 @@ cabalSolver wc cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-s
 
     let args = ("--config-file=" ++ configFile)
              : "install"
+             : "--enable-tests"
+             : "--enable-benchmarks"
              : "-v"
              : "--dry-run"
              : "--only-dependencies"
@@ -75,7 +77,10 @@ cabalSolver wc cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-s
 
     $logInfo "Asking cabal to calculate a build plan, please wait"
 
-    bs <- readProcessStdout (Just tmpdir) menv "cabal" args
+    platform <- asks getPlatform
+    menv' <- mkEnvOverride platform
+           $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv
+    bs <- readProcessStdout (Just tmpdir) menv' "cabal" args
     let ls = drop 1
            $ dropWhile (not . T.isPrefixOf "In order, ")
            $ T.lines
@@ -195,7 +200,8 @@ solveExtraDeps modStackYaml = do
                         else ["flags" .= newFlags])
             mapM_ $logInfo $ T.lines $ decodeUtf8 $ Yaml.encode o
 
-    when modStackYaml $ do
+    if modStackYaml
+      then do
         let fp = toFilePath $ bcStackYaml bconfig
         obj <- liftIO (Yaml.decodeFileEither fp) >>= either throwM return
         (ProjectAndConfigMonoid project _, warnings) <-
@@ -210,3 +216,6 @@ solveExtraDeps modStackYaml = do
                 obj
         liftIO $ Yaml.encodeFile fp obj'
         $logInfo $ T.pack $ "Updated " ++ fp
+      else do
+        $logInfo ""
+        $logInfo "To automatically modify your stack.yaml file, rerun with '--modify-stack-yaml'"

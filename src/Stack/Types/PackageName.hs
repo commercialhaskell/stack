@@ -52,11 +52,13 @@ import qualified Options.Applicative as O
 data PackageNameParseFail
   = PackageNameParseFail ByteString
   | CabalFileNameParseFail FilePath
+  | CabalFileNameInvalidPackageName FilePath
   deriving (Typeable)
 instance Exception PackageNameParseFail
 instance Show PackageNameParseFail where
     show (PackageNameParseFail bs) = "Invalid package name: " ++ show bs
-    show (CabalFileNameParseFail fp) = "Invalid file path for cabal file: " ++ fp
+    show (CabalFileNameParseFail fp) = "Invalid file path for cabal file, must have a .cabal extension: " ++ fp
+    show (CabalFileNameInvalidPackageName fp) = "cabal file names must use valid package names followed by a .cabal extension, the following is invalid: " ++ fp
 
 -- | A package name.
 newtype PackageName =
@@ -138,8 +140,11 @@ toCabalPackageName (PackageName name) =
 
 -- | Parse a package name from a file path.
 parsePackageNameFromFilePath :: MonadThrow m => Path a File -> m PackageName
-parsePackageNameFromFilePath fp =
-  clean (toFilePath (filename fp)) >>= parsePackageNameFromString
+parsePackageNameFromFilePath fp = do
+    base <- clean $ toFilePath $ filename fp
+    case parsePackageNameFromString base of
+        Nothing -> throwM $ CabalFileNameInvalidPackageName $ toFilePath fp
+        Just x -> return x
   where clean = liftM reverse . strip . reverse
         strip ('l':'a':'b':'a':'c':'.':xs) = return xs
         strip _ = throwM (CabalFileNameParseFail (toFilePath fp))

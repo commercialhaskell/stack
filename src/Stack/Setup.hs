@@ -15,6 +15,7 @@ module Stack.Setup
   ( setupEnv
   , ensureGHC
   , SetupOpts (..)
+  , defaultStackSetupYaml
   ) where
 
 import           Control.Applicative
@@ -34,7 +35,7 @@ import           Data.Conduit (Conduit, ($$), (=$), await, yield, awaitForever)
 import           Data.Conduit.Lift (evalStateC)
 import qualified Data.Conduit.List as CL
 import           Data.Either
-import           Data.Foldable
+import           Data.Foldable hiding (concatMap, or)
 import           Data.IORef
 import           Data.IORef.RunOnce (runOnce)
 import           Data.List hiding (concat, elem, maximumBy)
@@ -69,6 +70,7 @@ import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB)
 import           Stack.Solver (getCompilerVersion)
 import           Stack.Types
 import           Stack.Types.StackT
+import qualified System.Directory as D
 import           System.Environment (getExecutablePath)
 import           System.Exit (ExitCode (ExitSuccess))
 import           System.FilePath (searchPathSeparator)
@@ -78,6 +80,11 @@ import           System.Process (rawSystem)
 import           System.Process.Read
 import           System.Process.Run (runIn)
 import           Text.Printf (printf)
+
+-- | Default location of the stack-setup.yaml file
+defaultStackSetupYaml :: String
+defaultStackSetupYaml =
+    "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/stack-setup-2.yaml"
 
 data SetupOpts = SetupOpts
     { soptsInstallIfMissing :: !Bool
@@ -98,6 +105,7 @@ data SetupOpts = SetupOpts
     -- version. Only works reliably with a stack-managed installation.
     , soptsResolveMissingGHC :: !(Maybe Text)
     -- ^ Message shown to user for how to resolve the missing GHC
+    , soptsStackSetupYaml :: !String
     }
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch GHCVariant
@@ -159,6 +167,7 @@ setupEnv mResolveMissingGHC = do
             , soptsSkipMsys = configSkipMsys $ bcConfig bconfig
             , soptsUpgradeCabal = False
             , soptsResolveMissingGHC = mResolveMissingGHC
+            , soptsStackSetupYaml = defaultStackSetupYaml
             }
 
     mghcBin <- ensureGHC sopts
@@ -167,7 +176,7 @@ setupEnv mResolveMissingGHC = do
     -- is being used
     menv0 <- getMinimalEnvOverride
     let env = removeHaskellEnvVars
-            $ augmentPathMap (fromMaybe [] mghcBin)
+            $ augmentPathMap (maybe [] edBins mghcBin)
             $ unEnvOverride menv0
 
     menv <- mkEnvOverride platform env
@@ -205,6 +214,8 @@ setupEnv mResolveMissingGHC = do
 
     executablePath <- liftIO getExecutablePath
 
+    utf8EnvVars <- getUtf8LocaleVars menv
+
     envRef <- liftIO $ newIORef Map.empty
     let getEnvOverride' es = do
             m <- readIORef envRef
@@ -222,7 +233,7 @@ setupEnv mResolveMissingGHC = do
                                 else id)
 
                         $ (if esLocaleUtf8 es
-                                then Map.insert "LC_ALL" "C.UTF-8"
+                                then Map.union utf8EnvVars
                                 else id)
 
                         -- For reasoning and duplication, see: https://github.com/fpco/stack/issues/70
@@ -246,17 +257,42 @@ setupEnv mResolveMissingGHC = do
 
     return EnvConfig
         { envConfigBuildConfig = bconfig
-            { bcConfig = (bcConfig bconfig) { configEnvOverride = getEnvOverride' }
+            { bcConfig = maybe id addIncludeLib mghcBin
+                          (bcConfig bconfig)
+                { configEnvOverride = getEnvOverride' }
             }
         , envConfigCabalVersion = cabalVer
         , envConfigCompilerVersion = compilerVer
         , envConfigPackages = envConfigPackages envConfig0
         }
 
+-- | Add the include and lib paths to the given Config
+addIncludeLib :: ExtraDirs -> Config -> Config
+addIncludeLib (ExtraDirs _bins includes libs) config = config
+    { configExtraIncludeDirs = Set.union
+        (configExtraIncludeDirs config)
+        (Set.fromList $ map T.pack includes)
+    , configExtraLibDirs = Set.union
+        (configExtraLibDirs config)
+        (Set.fromList $ map T.pack libs)
+    }
+
+data ExtraDirs = ExtraDirs
+    { edBins :: ![FilePath]
+    , edInclude :: ![FilePath]
+    , edLib :: ![FilePath]
+    }
+instance Monoid ExtraDirs where
+    mempty = ExtraDirs [] [] []
+    mappend (ExtraDirs a b c) (ExtraDirs x y z) = ExtraDirs
+        (a ++ x)
+        (b ++ y)
+        (c ++ z)
+
 -- | Ensure GHC is installed and provide the PATHs to add if necessary
 ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, HasPlatform env, HasGHCVariant env, HasLocalPrograms env, MonadBaseControl IO m)
           => SetupOpts
-          -> m (Maybe [FilePath])
+          -> m (Maybe ExtraDirs)
 ensureGHC sopts = do
     let wc = whichCompiler (soptsWantedCompiler sopts)
         ghcVersion = case soptsWantedCompiler sopts of
@@ -289,7 +325,7 @@ ensureGHC sopts = do
     -- If we need to install a GHC, try to do so
     mpaths <- if needLocal
         then do
-            getSetupInfo' <- runOnce (getSetupInfo =<< asks getHttpManager)
+            getSetupInfo' <- runOnce (getSetupInfo sopts =<< asks getHttpManager)
 
             installed <- listInstalled
 
@@ -311,35 +347,39 @@ ensureGHC sopts = do
                                 "Try running stack setup to locally install the correct GHC"
                                 $ soptsResolveMissingGHC sopts)
 
-            -- Install git on windows, if necessary
+            -- Install msys2 on windows, if necessary
             platform <- asks getPlatform
-            mgitIdent <- case platform of
+            mmsys2Ident <- case platform of
                 Platform _ Cabal.Windows | not (soptsSkipMsys sopts) ->
-                    case getInstalledTool installed $(mkPackageName "git") (const True) of
+                    case getInstalledTool installed $(mkPackageName "msys2") (const True) of
                         Just ident -> return (Just ident)
                         Nothing
                             | soptsInstallIfMissing sopts -> do
                                 si <- getSetupInfo'
-                                let VersionedDownloadInfo version info = siPortableGit si
-                                Just <$> downloadAndInstallTool si info $(mkPackageName "git") version installGitWindows
+                                osKey <- getOSKey
+                                VersionedDownloadInfo version info <-
+                                    case Map.lookup osKey $ siMsys2 si of
+                                        Just x -> return x
+                                        Nothing -> error $ "MSYS2 not found for " ++ T.unpack osKey
+                                Just <$> downloadAndInstallTool si info $(mkPackageName "msys2") version (installMsys2Windows osKey)
                             | otherwise -> do
-                                $logWarn "Continuing despite missing tool: git"
+                                $logWarn "Continuing despite missing tool: msys2"
                                 return Nothing
                 _ -> return Nothing
 
-            let idents = catMaybes [Just ghcIdent, mgitIdent]
-            paths <- mapM binDirs idents
-            return $ Just $ map toFilePathNoTrailingSlash $ concat paths
+            let idents = catMaybes [Just ghcIdent, mmsys2Ident]
+            paths <- mapM extraDirs idents
+            return $ Just $ mconcat paths
         else return Nothing
 
     menv <-
         case mpaths of
             Nothing -> return menv0
-            Just paths -> do
+            Just ed -> do
                 config <- asks getConfig
                 let m0 = unEnvOverride menv0
                     path0 = Map.lookup "PATH" m0
-                    path = augmentPath paths path0
+                    path = augmentPath (edBins ed) path0
                     m = Map.insert "PATH" path m0
                 mkEnvOverride (configPlatform config) (removeHaskellEnvVars m)
 
@@ -460,7 +500,7 @@ instance FromJSON VersionedDownloadInfo where
 data SetupInfo = SetupInfo
     { siSevenzExe :: DownloadInfo
     , siSevenzDll :: DownloadInfo
-    , siPortableGit :: VersionedDownloadInfo
+    , siMsys2 :: Map Text VersionedDownloadInfo
     , siGHCs :: Map Text (Map Version DownloadInfo)
     }
     deriving Show
@@ -468,21 +508,23 @@ instance FromJSON SetupInfo where
     parseJSON = withObject "SetupInfo" $ \o -> SetupInfo
         <$> o .: "sevenzexe-info"
         <*> o .: "sevenzdll-info"
-        <*> o .: "portable-git"
+        <*> o .: "msys2"
         <*> o .: "ghc"
 
 -- | Download the most recent SetupInfo
-getSetupInfo :: (MonadIO m, MonadThrow m) => Manager -> m SetupInfo
-getSetupInfo manager = do
-    bss <- liftIO $ flip runReaderT manager
-         $ withResponse req $ \res -> responseBody res $$ CL.consume
-    let bs = S8.concat bss
+getSetupInfo :: (MonadIO m, MonadThrow m) => SetupOpts -> Manager -> m SetupInfo
+getSetupInfo sopts manager = do
+    bs <-
+        case parseUrl $ soptsStackSetupYaml sopts of
+            Just req -> do
+                bss <- liftIO $ flip runReaderT manager
+                     $ withResponse req $ \res -> responseBody res $$ CL.consume
+                return $ S8.concat bss
+            Nothing -> liftIO $ S.readFile $ soptsStackSetupYaml sopts
     either throwM return $ Yaml.decodeEither' bs
-  where
-    req = "https://raw.githubusercontent.com/fpco/stackage-content/master/stack/stack-setup-2.yaml"
 
 markInstalled :: (MonadIO m, MonadReader env m, HasLocalPrograms env, MonadThrow m)
-              => PackageIdentifier -- ^ e.g., ghc-7.8.4, git-2.4.0.1
+              => PackageIdentifier -- ^ e.g., ghc-7.8.4, msys2-20150512
               -> m ()
 markInstalled ident = do
     dir <- asks getLocalPrograms
@@ -518,27 +560,42 @@ installDir ident = do
     return $ localPrograms </> reldir
 
 -- | Binary directories for the given installed package
-binDirs :: (MonadReader env m, HasPlatform env, HasLocalPrograms env, MonadThrow m, MonadLogger m)
-        => PackageIdentifier
-        -> m [Path Abs Dir]
-binDirs ident = do
+extraDirs :: (MonadReader env m, HasPlatform env, HasLocalPrograms env, MonadThrow m, MonadLogger m)
+          => PackageIdentifier
+          -> m ExtraDirs
+extraDirs ident = do
     platform <- asks getPlatform
     dir <- installDir ident
     case (platform, packageNameString $ packageIdentifierName ident) of
-        (Platform _ Cabal.Windows, "ghc") -> return
-            [ dir </> $(mkRelDir "bin")
-            , dir </> $(mkRelDir "mingw") </> $(mkRelDir "bin")
-            ]
-        (Platform _ Cabal.Windows, "git") -> return
-            [ dir </> $(mkRelDir "cmd")
-            , dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
-            ]
-        (_, "ghc") -> return
-            [ dir </> $(mkRelDir "bin")
-            ]
+        (Platform _ Cabal.Windows, "ghc") -> return mempty
+            { edBins = goList
+                [ dir </> $(mkRelDir "bin")
+                , dir </> $(mkRelDir "mingw") </> $(mkRelDir "bin")
+                ]
+            }
+        (Platform _ Cabal.Windows, "msys2") -> return mempty
+            { edBins = goList
+                [ dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
+                ]
+            , edInclude = goList
+                [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "include")
+                , dir </> $(mkRelDir "mingw32") </> $(mkRelDir "include")
+                ]
+            , edLib = goList
+                [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "lib")
+                , dir </> $(mkRelDir "mingw32") </> $(mkRelDir "lib")
+                ]
+            }
+        (_, "ghc") -> return mempty
+            { edBins = goList
+                [ dir </> $(mkRelDir "bin")
+                ]
+            }
         (Platform _ x, tool) -> do
             $logWarn $ "binDirs: unexpected OS/tool combo: " <> T.pack (show (x, tool))
-            return []
+            return mempty
+  where
+    goList = map toFilePathNoTrailingSlash
 
 getInstalledTool :: [PackageIdentifier] -- ^ already installed
                  -> PackageName         -- ^ package to find
@@ -600,6 +657,8 @@ downloadAndInstallGHC si wanted versionCheck = do
             case platform of
                 Platform _ Cabal.Windows -> installGHCWindows
                 _ -> installGHCPosix
+    $logInfo "Preparing to install GHC to an isolated location."
+    $logInfo "This will not interfere with any system-level installation."
     downloadAndInstallTool si downloadInfo $(mkPackageName "ghc") selectedVersion installer
 
 getOSKey :: (MonadReader env m, MonadThrow m, HasPlatform env, HasGHCVariant env, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
@@ -767,20 +826,64 @@ installGHCWindows si archiveFile archiveType destDir _ = do
 
     $logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
 
-installGitWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasHttpManager env, HasLocalPrograms env, MonadBaseControl IO m)
-                  => SetupInfo
+installMsys2Windows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, HasLocalPrograms env, HasPlatform env, MonadBaseControl IO m)
+                  => Text -- ^ OS Key
+                  -> SetupInfo
                   -> Path Abs File
                   -> ArchiveType
                   -> Path Abs Dir
                   -> PackageIdentifier
                   -> m ()
-installGitWindows si archiveFile archiveType destDir _ = do
-    case archiveType of
-        SevenZ -> return ()
-        _ -> error $ "Git on Windows must be a 7z archive"
+installMsys2Windows osKey si archiveFile archiveType destDir _ = do
+    suffix <-
+        case archiveType of
+            TarXz -> return ".xz"
+            TarBz2 -> return ".bz2"
+            _ -> error $ "MSYS2 must be a .tar.xz archive"
+    tarFile <-
+        case T.stripSuffix suffix $ T.pack $ toFilePath archiveFile of
+            Nothing -> error $ "Invalid MSYS2 filename: " ++ show archiveFile
+            Just x -> parseAbsFile $ T.unpack x
 
     run7z <- setup7z si
-    run7z destDir archiveFile
+
+    exists <- liftIO $ D.doesDirectoryExist $ toFilePath destDir
+    when exists $ liftIO (D.removeDirectoryRecursive $ toFilePath destDir) `catchIO` \e -> do
+        $logError $ T.pack $
+            "Could not delete existing msys directory: " ++
+            toFilePath destDir
+        throwM e
+
+    run7z (parent archiveFile) archiveFile
+    run7z (parent archiveFile) tarFile
+    removeFile tarFile `catchIO` \e ->
+        $logWarn (T.concat
+            [ "Exception when removing "
+            , T.pack $ toFilePath tarFile
+            , ": "
+            , T.pack $ show e
+            ])
+
+    msys <- parseRelDir $ "msys" ++ T.unpack (fromMaybe "32" $ T.stripPrefix "windows" osKey)
+    liftIO $ D.renameDirectory
+        (toFilePath $ parent archiveFile </> msys)
+        (toFilePath destDir)
+
+    platform <- asks getPlatform
+    menv0 <- getMinimalEnvOverride
+    let oldEnv = unEnvOverride menv0
+        newEnv = augmentPathMap
+            [toFilePath $ destDir </> $(mkRelDir "usr") </> $(mkRelDir "bin")]
+            oldEnv
+    menv <- mkEnvOverride platform newEnv
+
+    -- I couldn't find this officially documented anywhere, but you need to run
+    -- the shell once in order to initialize some pacman stuff. Once that run
+    -- happens, you can just run commands as usual.
+    runIn destDir "sh" menv ["--login", "-c", "true"] Nothing
+
+    -- Install git. We could install other useful things in the future too.
+    runIn destDir "pacman" menv ["-Sy", "--noconfirm", "git"] Nothing
 
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
@@ -958,3 +1061,137 @@ removeHaskellEnvVars =
     Map.delete "HASKELL_PACKAGE_SANDBOX" .
     Map.delete "HASKELL_PACKAGE_SANDBOXES" .
     Map.delete "HASKELL_DIST_DIR"
+
+-- | Get map of environment variables to set to change the locale's encoding to UTF-8
+getUtf8LocaleVars
+    :: forall m env.
+       (MonadReader env m, HasPlatform env, MonadLogger m, MonadCatch m, MonadBaseControl IO m, MonadIO m)
+    => EnvOverride -> m (Map Text Text)
+getUtf8LocaleVars menv = do
+    Platform _ os <- asks getPlatform
+    if os == Cabal.Windows
+        then
+             -- On Windows, locale is controlled by the code page, so we don't set any environment
+             -- variables.
+             return
+                 Map.empty
+        else do
+            let checkedVars = map checkVar (Map.toList $ eoTextMap menv)
+                -- List of environment variables that will need to be updated to set UTF-8 (because
+                -- they currently do not specify UTF-8).
+                needChangeVars = concatMap fst checkedVars
+                -- Set of locale-related environment variables that have already have a value.
+                existingVarNames = Set.unions (map snd checkedVars)
+                -- True if a locale is already specified by one of the "global" locale variables.
+                hasAnyExisting =
+                    or $
+                    map
+                        (`Set.member` existingVarNames)
+                        ["LANG", "LANGUAGE", "LC_ALL"]
+            if null needChangeVars && hasAnyExisting
+                then
+                     -- If no variables need changes and at least one "global" variable is set, no
+                     -- changes to environment need to be made.
+                     return
+                         Map.empty
+                else do
+                    -- Get a list of known locales by running @locale -a@.
+                    elocales <- tryProcessStdout Nothing menv "locale" ["-a"]
+                    let
+                        -- Filter the list to only include locales with UTF-8 encoding.
+                        utf8Locales =
+                            case elocales of
+                                Left _ -> []
+                                Right locales ->
+                                    filter
+                                        isUtf8Locale
+                                        (T.lines $
+                                         T.decodeUtf8With
+                                             T.lenientDecode
+                                             locales)
+                        mfallback = getFallbackLocale utf8Locales
+                    when
+                        (isNothing mfallback)
+                        ($logWarn
+                             "Warning: unable to set locale to UTF-8 encoding; GHC may fail with 'invalid character'")
+                    let
+                        -- Get the new values of variables to adjust.
+                        changes =
+                            Map.unions $
+                            map
+                                (adjustedVarValue utf8Locales mfallback)
+                                needChangeVars
+                        -- Get the values of variables to add.
+                        adds
+                          | hasAnyExisting =
+                              -- If we already have a "global" variable, then nothing needs
+                              -- to be added.
+                              Map.empty
+                          | otherwise =
+                              -- If we don't already have a "global" variable, then set LANG to the
+                              -- fallback.
+                              case mfallback of
+                                  Nothing -> Map.empty
+                                  Just fallback ->
+                                      Map.singleton "LANG" fallback
+                    return (Map.union changes adds)
+  where
+    -- Determines whether an environment variable is locale-related and, if so, whether it needs to
+    -- be adjusted.
+    checkVar
+        :: (Text, Text) -> ([Text], Set Text)
+    checkVar (k,v) =
+        if k `elem` ["LANG", "LANGUAGE"] || "LC_" `T.isPrefixOf` k
+            then if isUtf8Locale v
+                     then ([], Set.singleton k)
+                     else ([k], Set.singleton k)
+            else ([], Set.empty)
+    -- Adjusted value of an existing locale variable.  Looks for valid UTF-8 encodings with
+    -- same language /and/ territory, then with same language, and finally the first UTF-8 locale
+    -- returned by @locale -a@.
+    adjustedVarValue
+        :: [Text] -> Maybe Text -> Text -> Map Text Text
+    adjustedVarValue utf8Locales mfallback k =
+        case Map.lookup k (eoTextMap menv) of
+            Nothing -> Map.empty
+            Just v ->
+                case concatMap
+                         (matchingLocales utf8Locales)
+                         [ T.takeWhile (/= '.') v <> "."
+                         , T.takeWhile (/= '_') v <> "_"] of
+                    (v':_) -> Map.singleton k v'
+                    [] ->
+                        case mfallback of
+                            Just fallback -> Map.singleton k fallback
+                            Nothing -> Map.empty
+    -- Determine the fallback locale, by looking for any UTF-8 locale prefixed with the list in
+    -- @fallbackPrefixes@, and if not found, picking the first UTF-8 encoding returned by @locale
+    -- -a@.
+    getFallbackLocale
+        :: [Text] -> Maybe Text
+    getFallbackLocale utf8Locales = do
+        case concatMap (matchingLocales utf8Locales) fallbackPrefixes of
+            (v:_) -> Just v
+            [] ->
+                case utf8Locales of
+                    [] -> Nothing
+                    (v:_) -> Just v
+    -- Filter the list of locales for any with the given prefixes (case-insitive).
+    matchingLocales
+        :: [Text] -> Text -> [Text]
+    matchingLocales utf8Locales prefix =
+        filter
+            (\v ->
+                  (T.toLower prefix) `T.isPrefixOf` T.toLower v)
+            utf8Locales
+    -- Does the locale have one of the encodings in @utf8Suffixes@ (case-insensitive)?
+    isUtf8Locale locale =
+        or $
+        map
+            (\v ->
+                  T.toLower v `T.isSuffixOf` T.toLower locale)
+            utf8Suffixes
+    -- Prefixes of fallback locales (case-insensitive)
+    fallbackPrefixes = ["C.", "en_US.", "en_"]
+    -- Suffixes of UTF-8 locales (case-insensitive)
+    utf8Suffixes = [".UTF-8", ".utf8"]

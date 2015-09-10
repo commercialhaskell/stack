@@ -1,11 +1,12 @@
 #!/usr/bin/env stack
--- stack --install-ghc runghc --package=shake --package=extra --package=zip-archive --package=mime-types --package=http-types --package=http-conduit --package=text --package=conduit-combinators --package=conduit --package=case-insensitive --package=aeson --package=zlib --package executable-path
+-- stack --install-ghc runghc --package=shake --package=extra --package=zip-archive --package=mime-types --package=http-types --package=http-conduit --package=text --package=conduit-combinators --package=conduit --package=case-insensitive --package=aeson --package=zlib --package tar
 {-# OPTIONS_GHC -Wall -Werror #-}
 {-# LANGUAGE RecordWildCards #-}
 
 import Control.Applicative
 import Control.Exception
 import Control.Monad
+import Control.Monad.Trans.Resource (runResourceT)
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy.Char8 as L8
 import Data.List
@@ -22,6 +23,7 @@ import System.Directory
 import System.IO.Error
 import System.Process
 
+import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Zip as Zip
 import qualified Codec.Compression.GZip as GZip
 import Data.Aeson
@@ -35,7 +37,7 @@ import Development.Shake.FilePath
 import Network.HTTP.Conduit
 import Network.HTTP.Types
 import Network.Mime
-import System.Environment.Executable
+import Prelude -- Silence AMP warning
 
 -- | Entrypoint.
 main :: IO ()
@@ -52,8 +54,10 @@ main =
             gGitRevCount <- length . lines <$> readProcess "git" ["rev-list", "HEAD"] ""
             gGitSha <- trim <$> readProcess "git" ["rev-parse", "HEAD"] ""
             gHomeDir <- getHomeDirectory
-            RunGHC gScriptPath <- getScriptPath
-            let gGpgKey = "9BEFB442"
+            let -- @gScriptPath@ was retrived using the @executable-path@ package, but it
+                -- has trouble with GHC 7.10.2 on OS X
+                gScriptPath = "scripts/release/release.hs"
+                gGpgKey = "9BEFB442"
                 gAllowDirty = False
                 gGithubReleaseTag = Nothing
                 Platform arch _ = buildPlatform
@@ -65,7 +69,7 @@ main =
             -- Need to get paths after options since the '--arch' argument can effect them.
             localInstallRoot' <- getStackPath global0 "local-install-root"
             projectRoot' <- getStackPath global0 "project-root"
-	    let global = global0
+            let global = global0
                     { gLocalInstallRoot = localInstallRoot'
                     , gProjectRoot = projectRoot' }
             return $ Just $ rules global args
@@ -92,10 +96,10 @@ options =
         "Github release tag to upload to."
     , Option "" [archOptName]
         (ReqArg
-	    (\v -> case simpleParse v of
-	        Nothing -> Left $ "Unknown architecture in --arch option: " ++ v
-		Just arch -> Right $ \g -> g{gArch = arch})
-	    "ARCHITECTURE")
+            (\v -> case simpleParse v of
+                Nothing -> Left $ "Unknown architecture in --arch option: " ++ v
+                Just arch -> Right $ \g -> g{gArch = arch})
+            "ARCHITECTURE")
         "Architecture to build (e.g. 'i386' or 'x86_64')."
     , Option "" [binaryVariantOptName]
         (ReqArg (\v -> Right $ \g -> g{gBinarySuffix = v}) "SUFFIX")
@@ -152,7 +156,7 @@ rules global@Global{..} args = do
         liftIO $ renameFile instExeFile tmpExeFile
         actionFinally
             (do opt <- addPath [installBinDir] []
-                () <- cmd opt stackProgName (stackArgs global) "build --pedantic"
+                () <- cmd opt stackProgName (stackArgs global) "build --pedantic --haddock --no-haddock-deps"
                 () <- cmd opt stackProgName (stackArgs global) "clean"
                 () <- cmd opt stackProgName (stackArgs global) "build"
                 () <- cmd opt stackProgName (stackArgs global) "test --flag stack:integration-tests"
@@ -169,12 +173,12 @@ rules global@Global{..} args = do
                 archive = Zip.addEntryToArchive entry' Zip.emptyArchive
             L8.writeFile out (Zip.fromArchive archive)
 
-    releaseDir </> binaryExeGzFileName %> \out -> do
+    releaseDir </> binaryExeTarGzFileName %> \out -> do
         need [releaseDir </> binaryExeFileName]
-        putNormal $ "gzip " ++ (releaseDir </> binaryExeFileName)
+        putNormal $ "tar gzip " ++ (releaseDir </> binaryExeFileName)
         liftIO $ do
-            fc <- L8.readFile (releaseDir </> binaryExeFileName)
-            L8.writeFile out $ GZip.compress fc
+            content <- Tar.pack releaseDir [binaryExeFileName]
+            L8.writeFile out $ GZip.compress $ Tar.write content
 
     releaseDir </> binaryExeFileName %> \out -> do
         need [installBinDir </> stackOrigExeFileName]
@@ -278,11 +282,11 @@ rules global@Global{..} args = do
     binaryExeCompressedFileName =
         case platformOS of
             Windows -> binaryExeZipFileName
-            _ -> binaryExeGzFileName
-    binaryExeZipFileName = binaryExeFileNameNoExt <.> zipExt
-    binaryExeGzFileName = binaryExeFileName <.> gzExt
+            _ -> binaryExeTarGzFileName
+    binaryExeZipFileName = binaryName global <.> zipExt
+    binaryExeTarGzFileName = binaryName global <.> tarGzExt
     binaryExeFileName = binaryExeFileNameNoExt <.> exe
-    binaryExeFileNameNoExt = binaryName global
+    binaryExeFileNameNoExt = stackOrigExeFileName
     distroPackageFileName distro
         | distroPackageExt distro == debExt =
             concat [stackProgName, "_", distroPackageVersionStr distro, "_amd64"] <.> debExt
@@ -416,6 +420,7 @@ uploadToGithubRelease global@Global{..} file = do
             (error ("Could not find Github release with tag '" ++ tag ++ "'.\n" ++
                     "Use --" ++ githubReleaseTagOptName ++ " option to specify a different tag."))
             (find (\r -> relTagName r == tag) releases)
+    getGithubReleases :: Action [GithubRelease]
     getGithubReleases = do
         resp <- liftIO $ callGithubApi global
             [] Nothing "https://api.github.com/repos/commercialhaskell/stack/releases"
@@ -448,7 +453,8 @@ callGithubApi Global{..} headers mpostFile url = do
             return $ req1
                 { method = S8.pack "POST"
                 , requestBody = RequestBodyLBS lbs }
-    withManager $ \manager -> do
+    manager <- newManager tlsManagerSettings
+    runResourceT $ do
         res <- http req manager
         responseBody res $$+- CC.sinkLazy
 
@@ -467,10 +473,10 @@ binaryName global@Global{..} =
     concat
         [ stackProgName
         , "-"
-	, stackVersionStr global
-	, "-"
-	, platformName global
-	, if null gBinarySuffix then "" else "-" ++ gBinarySuffix ]
+        , stackVersionStr global
+        , "-"
+        , platformName global
+        , if null gBinarySuffix then "" else "-" ++ gBinarySuffix ]
 
 -- | String representation of stack package version.
 stackVersionStr :: Global -> String

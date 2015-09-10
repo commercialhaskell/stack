@@ -31,6 +31,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Data.Traversable
+import           Data.Version (showVersion)
 import           Distribution.System (buildArch)
 import           Development.GitRev (gitCommitCount)
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
@@ -72,13 +73,12 @@ import           System.Directory (canonicalizePath, doesFileExist, doesDirector
 import           System.Environment (getProgName)
 import           System.Exit
 import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
-import           System.FilePath (dropTrailingPathSeparator)
+import           System.FilePath (dropTrailingPathSeparator, searchPathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, Handle, hGetEncoding, hSetEncoding)
 import           System.Process.Read
 
 #ifdef WINDOWS
 import System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
-import System.IO (utf8)
 #endif
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
@@ -94,18 +94,13 @@ fixCodePage inner = do
         fixInput
             | setInput = Catch.bracket_
                 (liftIO $ do
-                    setConsoleCP expected
-                    hSetEncoding stdin utf8
-                    )
+                    setConsoleCP expected)
                 (liftIO $ setConsoleCP origCPI)
             | otherwise = id
         fixOutput
             | setInput = Catch.bracket_
                 (liftIO $ do
-                    setConsoleOutputCP expected
-                    hSetEncoding stdout utf8
-                    hSetEncoding stderr utf8
-                    )
+                    setConsoleOutputCP expected)
                 (liftIO $ setConsoleOutputCP origCPO)
             | otherwise = id
 
@@ -146,7 +141,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
      -- See https://github.com/commercialhaskell/stack/pull/360
      hSetBuffering stdout LineBuffering
      hSetBuffering stdin  LineBuffering
-     hSetBuffering stderr NoBuffering
+     hSetBuffering stderr LineBuffering
      hSetTranslit stdout
      hSetTranslit stderr
      progName <- getProgName
@@ -159,23 +154,32 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
             [ [$(simpleVersion Meta.version)]
               -- Leave out number of commits for --depth=1 clone
               -- See https://github.com/commercialhaskell/stack/issues/792
-            , [" (" ++ $gitCommitCount ++ " commits)" | $gitCommitCount /= ("1"::String)]
+            , [" (" ++ $gitCommitCount ++ " commits)" | $gitCommitCount /= ("1"::String) &&
+                                                        $gitCommitCount /= ("UNKNOWN" :: String)]
             , [" ", show buildArch]
             ]
+
+     let numericVersion :: Parser (a -> a)
+         numericVersion =
+          infoOption
+            (showVersion Meta.version)
+            (long "numeric-version" <>
+             help "Show only version number")
+
      eGlobalRun <- try $
        simpleOptions
          versionString'
          "stack - The Haskell Tool Stack"
          ""
-         (extraHelpOption progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
+         (numericVersion <*> extraHelpOption progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
           globalOptsParser isTerminal)
          (do addCommand "build"
                         "Build the project(s) in this directory/configuration"
-                        (buildCmd Nothing)
+                        buildCmd
                         (buildOptsParser Build)
              addCommand "install"
                         "Shortcut for 'build --copy-bins'"
-                        (buildCmd $ Just ("install", "copy-bins"))
+                        buildCmd
                         (buildOptsParser Install)
              addCommand "uninstall"
                         "DEPRECATED: This command performs no actions, and is present for documentation only"
@@ -183,15 +187,15 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                         (many $ strArgument $ metavar "IGNORED")
              addCommand "test"
                         "Shortcut for 'build --test'"
-                        (buildCmd $ Just ("test", "test"))
+                        buildCmd
                         (buildOptsParser Test)
              addCommand "bench"
                         "Shortcut for 'build --bench'"
-                        (buildCmd $ Just ("bench", "bench"))
+                        buildCmd
                         (buildOptsParser Bench)
              addCommand "haddock"
                         "Shortcut for 'build --haddock'"
-                        (buildCmd $ Just ("haddock", "haddock"))
+                        buildCmd
                         (buildOptsParser Haddock)
              addCommand "new"
                         "Create a new project from a template. Run `stack templates' to see available templates."
@@ -428,7 +432,7 @@ paths =
     , ( "PATH environment variable"
       , "bin-path"
       , \pi ->
-             T.pack (intercalate ":" (eoPath (piEnvOverride pi))))
+             T.pack (intercalate [searchPathSeparator] (eoPath (piEnvOverride pi))))
     , ( "Installed GHCs (unpacked and archives)"
       , "ghc-paths"
       , \pi ->
@@ -481,12 +485,13 @@ data SetupCmdOpts = SetupCmdOpts
     { scoCompilerVersion :: !(Maybe CompilerVersion)
     , scoForceReinstall :: !Bool
     , scoUpgradeCabal :: !Bool
+    , scoStackSetupYaml :: !String
     }
 
 setupParser :: Parser SetupCmdOpts
 setupParser = SetupCmdOpts
     <$> (optional $ argument readVersion
-            (metavar "GHC_MAJOR_VERSION" <>
+            (metavar "GHC_VERSION" <>
              help ("Version of GHC to install, e.g. 7.10.2. " ++
                    "The default is to install the version implied by the resolver.")))
     <*> boolFlags False
@@ -497,6 +502,12 @@ setupParser = SetupCmdOpts
             "upgrade-cabal"
             "installing the newest version of the Cabal library globally"
             idm
+    <*> strOption
+            ( long "stack-setup-yaml"
+           <> help "Location of the stack-setup.yaml file"
+           <> value defaultStackSetupYaml
+           <> showDefault
+            )
   where
     readVersion = do
         s <- readerAsk
@@ -538,6 +549,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                   , soptsSkipMsys = configSkipMsys $ lcConfig lc
                   , soptsUpgradeCabal = scoUpgradeCabal
                   , soptsResolveMissingGHC = Nothing
+                  , soptsStackSetupYaml = scoStackSetupYaml
                   }
               case mpaths of
                   Nothing -> $logInfo "stack will use the GHC on your PATH"
@@ -664,22 +676,19 @@ cleanCmd :: () -> GlobalOpts -> IO ()
 cleanCmd () go = withBuildConfigAndLock go (\_ -> clean)
 
 -- | Helper for build and install commands
-buildCmd :: Maybe (Text, Text) -- ^ option synonym
-         -> BuildOpts -> GlobalOpts -> IO ()
-buildCmd moptionSynonym opts go
-    | boptsFileWatch opts = fileWatch inner
+buildCmd :: BuildOpts -> GlobalOpts -> IO ()
+buildCmd opts go
+    | boptsFileWatch opts =
+        let getProjectRoot =
+                do (manager, lc) <- loadConfigWithOpts go
+                   bconfig <-
+                       runStackLoggingTGlobal manager go $
+                       lcLoadBuildConfig lc (globalResolver go)
+                   return (bcRoot bconfig)
+        in fileWatch getProjectRoot inner
     | otherwise = inner $ const $ return ()
   where
-    inner setLocalFiles = withBuildConfigAndLock go $ \lk -> do
-        case moptionSynonym of
-            Nothing -> return ()
-            Just (cmd, opt) -> $logInfo $ T.concat
-                [ "NOTE: the "
-                , cmd
-                , " command is functionally equivalent to 'build --"
-                , opt
-                , "'"
-                ]
+    inner setLocalFiles = withBuildConfigAndLock go $ \lk ->
         globalFixCodePage go $ Stack.Build.build setLocalFiles (Just lk) opts
 
 globalFixCodePage :: (Catch.MonadMask m, MonadIO m, MonadLogger m)
@@ -756,12 +765,18 @@ sdistCmd dirs go =
             (tarName, tarBytes) <- getSDistTarball dir
             distDir <- distDirFromDir dir
             tarPath <- fmap (distDir </>) $ parseRelFile tarName
+            liftIO $ createTree $ parent tarPath
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
             $logInfo $ "Wrote sdist tarball to " <> T.pack (toFilePath tarPath)
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
-execCmd ExecOpts {..} go@GlobalOpts{..} =
+execCmd ExecOpts {..} go@GlobalOpts{..} = do
+    (cmd, args) <-
+        case (eoCmd, eoArgs) of
+            (Just cmd, args) -> return (cmd, args)
+            (Nothing, cmd:args) -> return (cmd, args)
+            (Nothing, []) -> error "You must provide a command to exec, e.g. 'stack exec echo Hello World'"
     case eoExtra of
         ExecOptsPlain -> do
             (manager,lc) <- liftIO $ loadConfigWithOpts go
@@ -769,11 +784,11 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
              runStackTGlobal manager (lcConfig lc) go $
                 Docker.execWithOptionalContainer
                     (lcProjectRoot lc)
-                    (return (eoCmd, eoArgs, [], id))
+                    (return (cmd, args, [], id))
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ liftIO $ unlockFile lk)
                     (runStackTGlobal manager (lcConfig lc) go $ do
-                        exec plainEnvSettings eoCmd eoArgs)
+                        exec plainEnvSettings cmd args)
                     Nothing
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} ->
@@ -784,7 +799,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                        { boptsTargets = map T.pack targets
                        }
                liftIO $ unlockFile lk -- Unlock before transferring control away.
-               exec eoEnvSettings eoCmd eoArgs
+               exec eoEnvSettings cmd args
 
 -- | Run GHCi in the context of a project.
 ghciCmd :: GhciOpts -> GlobalOpts -> IO ()

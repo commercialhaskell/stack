@@ -1,24 +1,60 @@
 ## Unreleased changes
 
-* Added the `--docker-env` argument, to set environment variables in Docker container.
-* Set `LC_ALL` to UTF-8 encoding for builds to avoid "commitBuffer: invalid argument" errors from GHC [#793](https://github.com/commercialhaskell/stack/issues/793)
-* Enable translitation for encoding on stdout and stderr [#824](https://github.com/commercialhaskell/stack/issues/824)
+Major changes:
 
-## 0.1.3.1
+* On Windows, we now use a full MSYS2 installation in place of the previous PortableGit. This gives you access to the pacman package manager for more easily installing libraries.
+
+Other enhancements:
+
+* Adapt to upcoming Cabal installed package identifier format change [#851](https://github.com/commercialhaskell/stack/issues/851)
+* `stack setup` takes a `--stack-setup-yaml` argument
+* `--file-watch` is more discerning about which files to rebuild for [#912](https://github.com/commercialhaskell/stack/issues/912)
+
+Bug fixes:
+
+* Hacky workaround for optparse-applicative issue with `stack exec --help` [#806](https://github.com/commercialhaskell/stack/issues/806)
+
+## 0.1.4.1
+
+Fix stack's own Haddocks.  No changes to functionality (only comments updated).
+
+## 0.1.4.0
 
 Major changes:
 
 * You now have more control over how GHC versions are matched, e.g. "use exactly this version," "use the specified minor version, but allow patches," or "use the given minor version or any later minor in the given major release." The default has switched from allowing newer later minor versions to a specific minor version allowing patches. For more information, see [#736](https://github.com/commercialhaskell/stack/issues/736) and [#784](https://github.com/commercialhaskell/stack/pull/784).
 * Support added for compiling with GHCJS
+* stack can now reuse prebuilt binaries between snapshots. That means that, if you build package foo in LTS-3.1, that binary version can be reused in LTS-3.2, assuming it uses the same dependencies and flags. [#878](https://github.com/commercialhaskell/stack/issues/878)
 
 Other enhancements:
 
+* Added the `--docker-env` argument, to set environment variables in Docker container.
+* Set locale environment variables to UTF-8 encoding for builds to avoid "commitBuffer: invalid argument" errors from GHC [#793](https://github.com/commercialhaskell/stack/issues/793)
+* Enable translitation for encoding on stdout and stderr [#824](https://github.com/commercialhaskell/stack/issues/824)
+* By default, `stack upgrade` automatically installs GHC as necessary [#797](https://github.com/commercialhaskell/stack/issues/797)
 * Added the `ghc-options` field to stack.yaml [#796](https://github.com/commercialhaskell/stack/issues/796)
 * Added the `extra-path` field to stack.yaml
 * Code page changes on Windows only apply to the build command (and its synonyms), and can be controlled via a command line flag (still defaults to on) [#757](https://github.com/commercialhaskell/stack/issues/757)
 * Implicitly add packages to extra-deps when a flag for them is set [#807](https://github.com/commercialhaskell/stack/issues/807)
 * Use a precompiled Setup.hs for simple build types [#801](https://github.com/commercialhaskell/stack/issues/801)
 * Set --enable-tests and --enable-benchmarks optimistically [#805](https://github.com/commercialhaskell/stack/issues/805)
+* `--only-configure` option added [#820](https://github.com/commercialhaskell/stack/issues/820)
+* Check for duplicate local package names
+* Stop nagging people that call `stack test` [#845](https://github.com/commercialhaskell/stack/issues/845)
+* `--file-watch` will ignore files that are in your VCS boring/ignore files [#703](https://github.com/commercialhaskell/stack/issues/703)
+* Add `--numeric-version` option
+
+Bug fixes:
+
+* `stack init --solver` fails if `GHC_PACKAGE_PATH` is present [#860](https://github.com/commercialhaskell/stack/issues/860)
+* `stack solver` and `stack init --solver` check for test suite and benchmark dependencies [#862](https://github.com/commercialhaskell/stack/issues/862)
+* More intelligent logic for setting UTF-8 locale environment variables [#856](https://github.com/commercialhaskell/stack/issues/856)
+* Create missing directories for `stack sdist`
+* Don't ignore .cabal files with extra periods [#895](https://github.com/commercialhaskell/stack/issues/895)
+* Deprecate unused `--optimizations` flag
+* Truncated output on slow terminals [#413](https://github.com/commercialhaskell/stack/issues/413)
+
+## 0.1.3.1
 
 Bug fixes:
 
