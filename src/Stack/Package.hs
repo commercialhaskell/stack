@@ -545,7 +545,7 @@ benchmarkFiles bench = do
             (dirs ++ [dir])
             (bnames <> exposed)
             haskellModuleExts
-    cfiles <- buildCSources build
+    cfiles <- buildOtherSources build
     return (modules, files <> cfiles)
   where
     exposed =
@@ -569,7 +569,7 @@ testFiles test = do
             (dirs ++ [dir])
             (bnames <> exposed)
             haskellModuleExts
-    cfiles <- buildCSources build
+    cfiles <- buildOtherSources build
     return (modules, files <> cfiles)
   where
     exposed =
@@ -595,7 +595,7 @@ executableFiles exe = do
             (map DotCabalModule (otherModules build) ++
              [DotCabalMain (modulePath exe)])
             haskellModuleExts
-    cfiles <- buildCSources build
+    cfiles <- buildOtherSources build
     return (modules, files <> cfiles)
   where
     build = buildInfo exe
@@ -612,7 +612,7 @@ libraryFiles lib = do
             (dirs ++ [dir])
             (names <> exposed)
             haskellModuleExts
-    cfiles <- buildCSources build
+    cfiles <- buildOtherSources build
     return (modules, files <> cfiles)
   where
     names = concat [bnames, exposed]
@@ -620,13 +620,17 @@ libraryFiles lib = do
     bnames = map DotCabalModule (otherModules build)
     build = libBuildInfo lib
 
--- | Get all C sources in a build.
-buildCSources :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m)
+-- | Get all C sources and extra source files in a build.
+buildOtherSources :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m)
            => BuildInfo -> m (Set DotCabalPath)
-buildCSources build =
-    liftM
-        (S.map DotCabalCFilePath . S.fromList)
-        (mapMaybeM resolveFileOrWarn (cSources build))
+buildOtherSources build =
+    do csources <- liftM
+                       (S.map DotCabalCFilePath . S.fromList)
+                       (mapMaybeM resolveFileOrWarn (cSources build))
+       jsources <- liftM
+                       (S.map DotCabalFilePath . S.fromList)
+                       (mapMaybeM resolveFileOrWarn (jsSources build))
+       return (csources <> jsources)
 
 -- | Get all dependencies of a package, including library,
 -- executables, tests, benchmarks.
