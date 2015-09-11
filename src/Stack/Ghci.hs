@@ -42,6 +42,7 @@ import           Stack.Types.Internal
 data GhciOpts = GhciOpts
     {ghciTargets            :: ![Text]
     ,ghciArgs               :: ![String]
+    ,ghciBuildGhcArgs       :: ![Text]
     ,ghciGhcCommand         :: !(Maybe FilePath)
     ,ghciNoLoadModules      :: !Bool
     ,ghciAdditionalPackages :: ![String]
@@ -65,7 +66,7 @@ ghci
     :: (HasConfig r, HasBuildConfig r, HasHttpManager r, MonadMask m, HasLogLevel r, HasTerminal r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
     => GhciOpts -> m ()
 ghci GhciOpts{..} = do
-    (targets,mainIsTargets,pkgs) <- ghciSetup ghciMainIs ghciTargets
+    (targets,mainIsTargets,pkgs) <- ghciSetup ghciMainIs ghciTargets ghciBuildGhcArgs
     bconfig <- asks getBuildConfig
     mainFile <- figureOutMainFile mainIsTargets targets pkgs
     wc <- getWhichCompiler
@@ -154,13 +155,15 @@ ghciSetup
     :: (HasConfig r, HasHttpManager r, HasBuildConfig r, MonadMask m, HasTerminal r, HasLogLevel r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
     => Maybe Text
     -> [Text]
+    -> [Text]
     -> m (Map PackageName SimpleTarget, Maybe (Map PackageName SimpleTarget), [GhciPkgInfo])
-ghciSetup mainIs stringTargets = do
+ghciSetup mainIs stringTargets buildGhcOpts = do
     (_,_,targets) <-
         parseTargetsFromBuildOpts
             AllowNoTargets
             defaultBuildOpts
             { boptsTargets = stringTargets
+            , boptsGhcOptions = buildGhcOpts
             }
     mainIsTargets <-
         case mainIs of
@@ -208,6 +211,7 @@ ghciSetup mainIs stringTargets = do
           { beoDisableRun = True
           }
         , boptsBuildSubset = BSOnlyDependencies
+        , boptsGhcOptions = buildGhcOpts
         }
       where
         base = defaultBuildOpts

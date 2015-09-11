@@ -424,6 +424,9 @@ ghciOptsParser = GhciOpts
              <*> fmap concat (many (argsOption (long "ghc-options" <>
                                        metavar "OPTION" <>
                                        help "Additional options passed to GHCi")))
+             <*> many (textOption (long "build-ghc-options" <>
+                                   metavar "OPTION" <>
+                                   help "Additional options passed to GHC"))
              <*> optional
                      (strOption (long "with-ghc" <>
                                  metavar "GHC" <>
