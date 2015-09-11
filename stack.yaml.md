@@ -78,16 +78,16 @@ extra-deps:
 
 ### resolver
 
-Specifies how dependencies are resolved. There are currently three options:
+Specifies how dependencies are resolved. There are currently four resolver types:
 
-* LTS Haskell snapshot, e.g. `resolver: lts-2.14`
+* LTS Haskell snapshots, e.g. `resolver: lts-2.14`
 * Stackage Nightly snapshot, e.g. `resolver: nightly-2015-06-16`
-* No snapshot, just use packages shipped with GHC, e.g. `resolver: ghc-7.10.2`
+* No snapshot, just use packages shipped with the compiler
+    * For GHC this looks like `resolver: ghc-7.10.2`
+    * For GHCJS this looks like `resolver: ghcjs-0.1.0_ghc-7.10.2`.
+* [Custom snapshot](/commercialhaskell/stack/wiki/Custom-Snapshot)
 
-It's important to point out that each resolver identifies a compiler version
-(usually GHC), and stack will require that that version is used for building
-your code.  There is also a resolver for GHCJS, which looks like `resolver:
-ghcjs-0.1.0_ghc-7.10.2`.
+Each of these resolvers will also determine what constraints are placed on the compiler version. See the [compiler-check](#compiler-check) option for some additional control over compiler version.
 
 ### flags
 
