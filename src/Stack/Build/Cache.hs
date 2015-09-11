@@ -99,8 +99,7 @@ data BuildCache = BuildCache
 instance Binary BuildCache
 instance HasStructuralInfo BuildCache
 instance HasSemanticVersion BuildCache
-instance NFData BuildCache where
-    rnf = genericRnf
+instance NFData BuildCache
 
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)

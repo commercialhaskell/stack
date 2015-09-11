@@ -522,9 +522,7 @@ instance Binary ConfigCache where
         4 <- getWord8
         8 <- getWord8
         fmap to gget
-instance NFData ConfigCache where
-    rnf = genericRnf
-
+instance NFData ConfigCache
 instance HasStructuralInfo ConfigCache
 instance HasSemanticVersion ConfigCache
 
@@ -719,8 +717,7 @@ data ConfigureOpts = ConfigureOpts
     deriving (Show, Eq, Generic)
 instance Binary ConfigureOpts
 instance HasStructuralInfo ConfigureOpts
-instance NFData ConfigureOpts where
-    rnf = genericRnf
+instance NFData ConfigureOpts
 
 -- | Information on a compiled package: the library conf file (if relevant),
 -- and all of the executable paths.
@@ -735,5 +732,4 @@ data PrecompiledCache = PrecompiledCache
 instance Binary PrecompiledCache
 instance HasSemanticVersion PrecompiledCache
 instance HasStructuralInfo PrecompiledCache
-instance NFData PrecompiledCache where
-    rnf = genericRnf
+instance NFData PrecompiledCache

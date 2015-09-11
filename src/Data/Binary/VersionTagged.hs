@@ -14,10 +14,9 @@ module Data.Binary.VersionTagged
     , HasSemanticVersion
     , decodeFileOrFailDeep
     , NFData (..)
-    , genericRnf
     ) where
 
-import Control.DeepSeq.Generics (NFData (..), genericRnf)
+import Control.DeepSeq (NFData (..))
 import Control.Exception (Exception)
 import Control.Monad.Catch (MonadThrow (..))
 import Control.Monad.IO.Class (MonadIO, liftIO)
