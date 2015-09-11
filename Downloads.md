@@ -7,7 +7,7 @@ Binaries are signed with this [[Signing key]].
 * Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest). Note: while generally i386/32-bit GHC is better tested on Windows, there are reports that recent versions of Windows only work with the 64-bit version of stack (see [issue #393](https://github.com/commercialhaskell/stack/issues/393)).
 * Unpack the `stack.exe` to somewhere on your `%PATH%` (see [Path section below](#path)) and you can then run `stack` on the commandline.
 
-NOTE: These executables have been built and tested on a Windows 8.1 64-bit machine. They should run on older Windows installs as well, but have not been tested. If you do test, please edit and update this page to indicate as such.
+NOTE: These executables have been built and tested on a Windows 7, 8.1, and 10 64-bit machines. They should run on older Windows installs as well, but have not been tested. If you do test, please edit and update this page to indicate as such.
 
 ## OS X
 
