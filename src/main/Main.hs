@@ -308,9 +308,14 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                                                metavar "OPTION" <>
                                                help "Additional options passed to GHCi" <>
                                                value [])
-                               <*> many (textOption (long "build-ghc-options" <>
-                                                     metavar "OPTION" <>
-                                                     help "Additional options passed to GHC")))
+                               <*> ((++)
+                                      <$> flag [] ["-Wall", "-Werror"]
+                                          ( long "pedantic"
+                                         <> help "Turn on -Wall and -Werror (note: option name may change in the future"
+                                          )
+                                      <*> many (textOption (long "ghc-options" <>
+                                                            metavar "OPTION" <>
+                                                            help "Additional options passed to GHC"))))
                      addCommand
                          "packages"
                          "List all available local loadable packages"
