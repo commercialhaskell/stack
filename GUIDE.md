@@ -1500,12 +1500,9 @@ Now the differences:
 
 __Other tools for comparison (including active and historical)__
 * [cabal-dev](https://hackage.haskell.org/package/cabal-dev) (deprecated in favor of cabal-install)
-* [cabal-meta](https://hackage.haskell.org/package/cabal-meta)
-* [cabal-src](https://hackage.haskell.org/package/cabal-src)
-* [stackage-cli](https://hackage.haskell.org/package/stackage-cli) (deprecated in favor of stack)
-
-## Roadmap
-There has been some mention of a possible [future merger of stack and Halcyon](https://groups.google.com/forum/#!msg/commercialhaskell/Uc8RsQq6Yv0/IT2FZw4aDmsJ).
+* [cabal-meta](https://hackage.haskell.org/package/cabal-meta) inspired a lot of the multi-package functionality of stack. If you're still using cabal-install, cabal-meta is relevant. For stack work, the feature set is fully subsumed by stack.
+* [cabal-src](https://hackage.haskell.org/package/cabal-src) is mostly irrelevant in the presence of both stack and cabal sandboxes, both of which make it easier to add additional package sources easily. The mega-sdist executable that ships with cabal-src is, however, still relevant. Its functionality may some day be folded into stack
+* [stackage-cli](https://hackage.haskell.org/package/stackage-cli) was an initial attempt to make cabal-install work more easily with curated snapshots, but due to a slight impedance mismatch between cabal.config constraints and snapshots, it did not work as well as hoped. It is deprecated in favor of stack.
 
 ## More resources
 
