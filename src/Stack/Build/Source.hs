@@ -218,13 +218,14 @@ convertSnapshotToExtra snapshot extra0 flags0 =
                 go (Map.insert flag version extra) flags
 
 -- | Parse out the local package views for the current project
-getLocalPackageViews :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env)
+getLocalPackageViews :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env, MonadLogger m)
                      => m (Map PackageName (LocalPackageView, GenericPackageDescription))
 getLocalPackageViews = do
     econfig <- asks getEnvConfig
     locals <- forM (Map.toList $ envConfigPackages econfig) $ \(dir, validWanted) -> do
         cabalfp <- getCabalFileName dir
-        gpkg <- readPackageUnresolved cabalfp
+        (warnings,gpkg) <- readPackageUnresolved cabalfp
+        mapM_ (printCabalFileWarning cabalfp) warnings
         let cabalID = package $ packageDescription gpkg
             name = fromCabalPackageName $ pkgName $ cabalID
         checkCabalFileName name cabalfp

@@ -146,7 +146,12 @@ withLoadPackage menv inner = do
     withCabalLoader menv $ \cabalLoader ->
         inner $ \name version flags -> do
             bs <- cabalLoader $ PackageIdentifier name version -- TODO automatically update index the first time this fails
-            readPackageBS (depPackageConfig econfig flags) bs
+
+            -- Intentionally ignore warnings, as it's not really
+            -- appropriate to print a bunch of warnings out while
+            -- resolving the package index.
+            (_warnings,pkg) <- readPackageBS (depPackageConfig econfig flags) bs
+            return pkg
   where
     -- | Package config to be used for dependencies
     depPackageConfig :: EnvConfig -> Map FlagName Bool -> PackageConfig

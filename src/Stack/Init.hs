@@ -79,7 +79,8 @@ initProject currDir initOpts = do
     $logInfo ""
 
     when (null cabalfps) $ error "In order to init, you should have an existing .cabal file. Please try \"stack new\" instead"
-    gpds <- mapM readPackageUnresolved cabalfps
+    (warnings,gpds) <- fmap unzip (mapM readPackageUnresolved cabalfps)
+    sequence_ (zipWith (mapM_ . printCabalFileWarning) cabalfps warnings)
 
     (r, flags, extraDeps) <- getDefaultResolver cabalfps gpds initOpts
     let p = Project

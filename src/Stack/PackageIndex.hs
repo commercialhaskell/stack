@@ -90,9 +90,8 @@ data PackageCache = PackageCache
     }
     deriving (Generic)
 
-instance Binary.Binary PackageCache
-instance NFData PackageCache where
-    rnf = genericRnf
+instance Binary PackageCache
+instance NFData PackageCache
 instance HasStructuralInfo PackageCache
 
 newtype PackageCacheMap = PackageCacheMap (Map PackageIdentifier PackageCache)
@@ -366,8 +365,7 @@ data PackageDownload = PackageDownload
     deriving (Show, Generic)
 instance Binary.Binary PackageDownload
 instance HasStructuralInfo PackageDownload
-instance NFData PackageDownload where
-    rnf = genericRnf
+instance NFData PackageDownload
 instance FromJSON PackageDownload where
     parseJSON = withObject "Package" $ \o -> do
         hashes <- o .: "package-hashes"

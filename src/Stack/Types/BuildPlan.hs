@@ -375,8 +375,7 @@ data MiniBuildPlan = MiniBuildPlan
     }
     deriving (Generic, Show, Eq)
 instance Binary MiniBuildPlan
-instance NFData MiniBuildPlan where
-    rnf = genericRnf
+instance NFData MiniBuildPlan
 instance HasStructuralInfo MiniBuildPlan
 instance HasSemanticVersion MiniBuildPlan
 
@@ -398,8 +397,7 @@ data MiniPackageInfo = MiniPackageInfo
     deriving (Generic, Show, Eq)
 instance Binary MiniPackageInfo
 instance HasStructuralInfo MiniPackageInfo
-instance NFData MiniPackageInfo where
-    rnf = genericRnf
+instance NFData MiniPackageInfo
 
 
 isWindows :: OS -> Bool
