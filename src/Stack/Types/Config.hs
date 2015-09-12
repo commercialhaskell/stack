@@ -28,6 +28,7 @@ import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
 import           Data.Hashable (Hashable)
+import qualified Data.HashMap.Strict as HM
 import           Data.Map (Map)
 import qualified Data.Map as Map
 
@@ -362,16 +363,18 @@ instance ToJSON PackageLocation where
     toJSON (PLHttpTarball t) = toJSON t
     toJSON (PLGit x y) = toJSON $ T.unwords ["git", x, y]
 instance FromJSON PackageLocation where
-    parseJSON v = git v <|> withText "PackageLocation" (\t -> http t <|> file t) v
+    parseJSON v = withText "PackageLocation" (\t -> http t <|> file t) v <|> git v
       where
         file t = pure $ PLFilePath $ T.unpack t
         http t =
             case parseUrl $ T.unpack t of
                 Left _ -> mzero
                 Right _ -> return $ PLHttpTarball t
-        git = withObject "PackageGitLocation" $ \o -> PLGit
-            <$> o .: "git"
-            <*> o .: "commit"
+        git = withObject "PackageGitLocation" $ \o ->
+            case filter (`notElem` ["git", "commit"]) (HM.keys o) of
+                [] -> PLGit <$> o .: "git" <*> o .: "commit"
+                keys -> fail (T.unpack ("Invalid fields for git location: "
+                    <> T.intercalate ", " keys))
 
 -- | A project is a collection of packages. We can have multiple stack.yaml
 -- files, but only one of them may contain project information.
