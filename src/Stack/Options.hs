@@ -83,7 +83,8 @@ buildOptsParser cmd =
             fileWatch' <*> keepGoing <*> forceDirty <*>
             tests <*> testOptsParser <*>
             benches <*> benchOptsParser <*>
-            many exec <*> onlyConfigure <*> reconfigure
+            many exec <*> onlyConfigure <*> reconfigure <*>
+            cabalVerbose
   where target =
            many (textArgument
                    (metavar "TARGET" <>
@@ -183,6 +184,10 @@ buildOptsParser cmd =
         reconfigure = flag False True
             (long "reconfigure" <>
              help "Perform the configure step even if unnecessary. Useful in some corner cases with custom Setup.hs files")
+
+        cabalVerbose = flag False True
+            (long "cabal-verbose" <>
+             help "Ask Cabal to be verbose in its output")
 
 -- | Parser for package:[-]flag
 readFlag :: ReadM (Map (Maybe PackageName) (Map FlagName Bool))

@@ -429,6 +429,8 @@ data BuildOpts =
             -- ^ Only perform the configure step when building
             ,boptsReconfigure :: !Bool
             -- ^ Perform the configure step even if already configured
+            ,boptsCabalVerbose :: !Bool
+            -- ^ Ask Cabal to be verbose in its builds
             }
   deriving (Show)
 
@@ -455,6 +457,7 @@ defaultBuildOpts = BuildOpts
     , boptsExec = []
     , boptsOnlyConfigure = False
     , boptsReconfigure = False
+    , boptsCabalVerbose = False
     }
 
 -- | Options for the 'FinalAction' 'DoTests'

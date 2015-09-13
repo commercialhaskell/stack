@@ -813,7 +813,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         , "-build-runner"
                         ]
                     return (outputFile, setupArgs)
-            runExe exeName fullArgs
+            runExe exeName $ (if boptsCabalVerbose eeBuildOpts then ("--verbose":) else id) fullArgs
 
     maybePrintBuildOutput stripTHLoading makeAbsolute level mlogFile mh =
         case mh of
