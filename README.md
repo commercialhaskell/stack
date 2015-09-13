@@ -80,7 +80,7 @@ git clone https://github.com/commercialhaskell/stack.git && cd stack && stack se
 #### Complete guide to stack
 
 This repository also contains [a complete guide to using
-stack](https://github.com/commercialhaskell/stack/blob/master/GUIDE.md),
+stack](https://github.com/commercialhaskell/stack/blob/master/doc/GUIDE.md),
 covering all of the most common use cases.
 
 #### Questions, Feedback, Discussion
