@@ -2,6 +2,7 @@
 {-# LANGUAGE TupleSections #-}
 module Stack.FileWatch
     ( fileWatch
+    , fileWatchPoll
     , printExceptionStderr
     ) where
 
@@ -29,14 +30,25 @@ printExceptionStderr :: Exception e => e -> IO ()
 printExceptionStderr e =
     L.hPut stderr $ toLazyByteString $ fromShow e <> copyByteString "\n"
 
+fileWatch :: IO (Path Abs Dir)
+          -> ((Set (Path Abs File) -> IO ()) -> IO ())
+          -> IO ()
+fileWatch = fileWatchConf defaultConfig
+
+fileWatchPoll :: IO (Path Abs Dir)
+               -> ((Set (Path Abs File) -> IO ()) -> IO ())
+               -> IO ()
+fileWatchPoll = fileWatchConf $ defaultConfig { confUsePolling = True }
+
 -- | Run an action, watching for file changes
 --
 -- The action provided takes a callback that is used to set the files to be
 -- watched. When any of those files are changed, we rerun the action again.
-fileWatch :: IO (Path Abs Dir)
-          -> ((Set (Path Abs File) -> IO ()) -> IO ())
-          -> IO ()
-fileWatch getProjectRoot inner = withManager $ \manager -> do
+fileWatchConf :: WatchConfig
+              -> IO (Path Abs Dir)
+              -> ((Set (Path Abs File) -> IO ()) -> IO ())
+              -> IO ()
+fileWatchConf cfg getProjectRoot inner = withManagerConf cfg $ \manager -> do
     allFiles <- newTVarIO Set.empty
     dirtyVar <- newTVarIO True
     watchVar <- newTVarIO Map.empty

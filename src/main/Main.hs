@@ -688,18 +688,18 @@ cleanCmd () go = withBuildConfigAndLock go (\_ -> clean)
 -- | Helper for build and install commands
 buildCmd :: BuildOpts -> GlobalOpts -> IO ()
 buildCmd opts go
-    | boptsFileWatch opts =
-        let getProjectRoot =
-                do (manager, lc) <- loadConfigWithOpts go
-                   bconfig <-
-                       runStackLoggingTGlobal manager go $
-                       lcLoadBuildConfig lc (globalResolver go)
-                   return (bcRoot bconfig)
-        in fileWatch getProjectRoot inner
+    | boptsFileWatchPoll opts = fileWatchPoll getProjectRoot inner
+    | boptsFileWatch opts = fileWatch getProjectRoot inner
     | otherwise = inner $ const $ return ()
   where
     inner setLocalFiles = withBuildConfigAndLock go $ \lk ->
         globalFixCodePage go $ Stack.Build.build setLocalFiles (Just lk) opts
+    getProjectRoot = do
+        (manager, lc) <- loadConfigWithOpts go
+        bconfig <-
+            runStackLoggingTGlobal manager go $
+            lcLoadBuildConfig lc (globalResolver go)
+        return (bcRoot bconfig)
 
 globalFixCodePage :: (Catch.MonadMask m, MonadIO m, MonadLogger m)
                   => GlobalOpts

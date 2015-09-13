@@ -408,6 +408,7 @@ data BuildOpts =
             -- ^ Fetch all packages immediately
             ,boptsBuildSubset :: !BuildSubset
             ,boptsFileWatch :: !Bool
+            ,boptsFileWatchPoll :: !Bool
             -- ^ Watch files for changes and automatically rebuild
             ,boptsKeepGoing :: !(Maybe Bool)
             -- ^ Keep building/running after failure
@@ -448,6 +449,7 @@ defaultBuildOpts = BuildOpts
     , boptsPreFetch = False
     , boptsBuildSubset = BSAll
     , boptsFileWatch = False
+    , boptsFileWatchPoll = False
     , boptsKeepGoing = Nothing
     , boptsForceDirty = False
     , boptsTests = False

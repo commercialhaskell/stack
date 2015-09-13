@@ -80,7 +80,7 @@ buildOptsParser cmd =
             haddock <*> haddockDeps <*> dryRun <*> ghcOpts <*>
             flags <*> copyBins <*> preFetch <*>
             buildSubset <*>
-            fileWatch' <*> keepGoing <*> forceDirty <*>
+            fileWatch' <*> fileWatchPoll' <*> keepGoing <*> forceDirty <*>
             tests <*> testOptsParser <*>
             benches <*> benchOptsParser <*>
             many exec <*> onlyConfigure <*> reconfigure <*>
@@ -151,6 +151,10 @@ buildOptsParser cmd =
         fileWatch' = flag False True
             (long "file-watch" <>
              help "Watch for changes in local files and automatically rebuild. Ignores files in VCS boring/ignore file")
+
+        fileWatchPoll' = flag False True
+            (long "file-watch-poll" <>
+             help "Same as --file-watch, except polling files for changes instead of listening for events")
 
         keepGoing = maybeBoolFlags
             "keep-going"
