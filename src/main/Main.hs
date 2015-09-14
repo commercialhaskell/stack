@@ -687,10 +687,11 @@ cleanCmd () go = withBuildConfigAndLock go (\_ -> clean)
 
 -- | Helper for build and install commands
 buildCmd :: BuildOpts -> GlobalOpts -> IO ()
-buildCmd opts go
-    | boptsFileWatchPoll opts = fileWatchPoll getProjectRoot inner
-    | boptsFileWatch opts = fileWatch getProjectRoot inner
-    | otherwise = inner $ const $ return ()
+buildCmd opts go =
+  case boptsFileWatch opts of
+    FileWatchPoll -> fileWatchPoll getProjectRoot inner
+    FileWatch -> fileWatch getProjectRoot inner
+    NoFileWatch -> inner $ const $ return ()
   where
     inner setLocalFiles = withBuildConfigAndLock go $ \lk ->
         globalFixCodePage go $ Stack.Build.build setLocalFiles (Just lk) opts

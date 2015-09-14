@@ -25,6 +25,7 @@ module Stack.Types.Build
     ,Plan(..)
     ,TestOpts(..)
     ,BenchmarkOpts(..)
+    ,FileWatchOpts(..)
     ,BuildOpts(..)
     ,BuildSubset(..)
     ,defaultBuildOpts
@@ -407,8 +408,7 @@ data BuildOpts =
             ,boptsPreFetch :: !Bool
             -- ^ Fetch all packages immediately
             ,boptsBuildSubset :: !BuildSubset
-            ,boptsFileWatch :: !Bool
-            ,boptsFileWatchPoll :: !Bool
+            ,boptsFileWatch :: !FileWatchOpts
             -- ^ Watch files for changes and automatically rebuild
             ,boptsKeepGoing :: !(Maybe Bool)
             -- ^ Keep building/running after failure
@@ -448,8 +448,7 @@ defaultBuildOpts = BuildOpts
     , boptsInstallExes = False
     , boptsPreFetch = False
     , boptsBuildSubset = BSAll
-    , boptsFileWatch = False
-    , boptsFileWatchPoll = False
+    , boptsFileWatch = NoFileWatch
     , boptsKeepGoing = Nothing
     , boptsForceDirty = False
     , boptsTests = False
@@ -489,6 +488,12 @@ defaultBenchmarkOpts = BenchmarkOpts
     { beoAdditionalArgs = Nothing
     , beoDisableRun = False
     }
+
+data FileWatchOpts
+  = NoFileWatch
+  | FileWatch
+  | FileWatchPoll
+  deriving (Show,Eq)
 
 -- | Package dependency oracle.
 newtype PkgDepsOracle =
