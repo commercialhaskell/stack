@@ -18,15 +18,15 @@ When reporting a bug, please write in the following format:
 > **Actual:**
 
 > _What actually happened._
-> 
+>
 > Here is the `stack ---version` output:
-> 
+>
 > ```
 > $ stack --version
 > Version 0.0.2, Git revision 6a86ee32e5b869a877151f74064572225e1a0398
 > ```
 > Here is the command I ran **with `--verbose`**:
-> 
+>
 > ```
 > $ stack <your command here> <args> --verbose
 > <output>
@@ -43,3 +43,19 @@ The more detailed your report, the faster it can be resolved and will ensure it 
 If you would like to help with documentation, please note that for most cases the Wiki has been deprecated in favor of markdown files placed in a new `/doc` subdirectory of the repository itself. Please submit a [pull request](https://help.github.com/articles/using-pull-requests/) with your changes/additions.
 
 If your changes move or rename files, or subsume Wiki content, please continue to leave a file/page in the old location temporarily, in addition to the new location. This will allow users time to update any shared links to the old location. Please also update any links in other files, or on the Wiki, to point to the new file location.
+
+
+## Code
+
+If you would like to contribute code to fix a bug, add a new feature, or
+otherwise improve `stack`, pull requests are most welcome. It's a good idea to
+[submit an issue](https://github.com/commercialhaskell/stack/issues/new) to
+discuss the change before plowing into writing code.
+
+If you'd like to help out but aren't sure what to work on, look for issues with
+the
+[awaiting pr](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3A%22awaiting+pr%22)
+label. Issues that are suitable for newcomers to the codebase have the
+[newcomer](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3A%22awaiting+pr%22+label%3Anewcomer)
+label. Best to post a comment to the issue before you start work, in case anyone
+has already started.
