@@ -78,13 +78,10 @@ buildOptsParser cmd =
             fmap addCoverageFlags $
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             haddock <*> haddockDeps <*> dryRun <*> ghcOpts <*>
-            flags <*> copyBins <*> preFetch <*>
-            buildSubset <*>
-            fileWatch' <*> keepGoing <*> forceDirty <*>
-            tests <*> testOptsParser <*>
-            benches <*> benchOptsParser <*>
-            many exec <*> onlyConfigure <*> reconfigure <*>
-            cabalVerbose
+            flags <*> copyBins <*> preFetch <*> buildSubset <*>
+            fileWatch' <*> keepGoing <*> forceDirty <*> tests <*>
+            testOptsParser <*> benches <*> benchOptsParser <*>
+            many exec <*> onlyConfigure <*> reconfigure <*> cabalVerbose
   where target =
            many (textArgument
                    (metavar "TARGET" <>
@@ -148,9 +145,14 @@ buildOptsParser cmd =
                  help "A synonym for --only-dependencies")
             <|> pure BSAll
 
-        fileWatch' = flag False True
-            (long "file-watch" <>
-             help "Watch for changes in local files and automatically rebuild. Ignores files in VCS boring/ignore file")
+        fileWatch' =
+            flag' FileWatch
+                (long "file-watch" <>
+                 help "Watch for changes in local files and automatically rebuild. Ignores files in VCS boring/ignore file")
+            <|> flag' FileWatchPoll
+                (long "file-watch-poll" <>
+                 help "Like --file-watch, but polling the filesystem instead of using events")
+            <|> pure NoFileWatch
 
         keepGoing = maybeBoolFlags
             "keep-going"
@@ -160,7 +162,6 @@ buildOptsParser cmd =
         forceDirty = flag False True
             (long "force-dirty" <>
              help "Force treating all local packages as having dirty files (useful for cases where stack can't detect a file change)")
-
 
         tests = boolFlags (cmd == Test)
             "test"
