@@ -66,7 +66,7 @@ import           Stack.Types.Build
 import           Stack.Config (resolvePackageEntry)
 import           Stack.Constants (distRelativeDir)
 import           Stack.Fetch
-import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB)
+import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath)
 import           Stack.Solver (getCompilerVersion)
 import           Stack.Types
 import           Stack.Types.StackT
@@ -203,12 +203,8 @@ setupEnv mResolveMissingGHC = do
     createDatabase menv wc deps
     localdb <- runReaderT packageDatabaseLocal envConfig0
     createDatabase menv wc localdb
-    globalDB <- getGlobalDB menv wc
-    let mkGPP locals = T.pack $ intercalate [searchPathSeparator] $ concat
-            [ [toFilePathNoTrailingSlash localdb | locals]
-            , [toFilePathNoTrailingSlash deps]
-            , [toFilePathNoTrailingSlash globalDB]
-            ]
+    globaldb <- getGlobalDB menv wc
+    let mkGPP locals = mkGhcPackagePath locals localdb deps globaldb
 
     distDir <- runReaderT distRelativeDir envConfig0
 
@@ -225,7 +221,9 @@ setupEnv mResolveMissingGHC = do
                     eo <- mkEnvOverride platform
                         $ Map.insert "PATH" (if esIncludeLocals es then localsPath else depsPath)
                         $ (if esIncludeGhcPackagePath es
-                                then Map.insert "GHC_PACKAGE_PATH" (mkGPP (esIncludeLocals es))
+                                then Map.insert
+                                       (case wc of { Ghc -> "GHC_PACKAGE_PATH"; Ghcjs -> "GHCJS_PACKAGE_PATH" })
+                                       (mkGPP (esIncludeLocals es))
                                 else id)
 
                         $ (if esStackExe es
@@ -344,7 +342,7 @@ ensureGHC sopts = do
                             (soptsCompilerCheck sopts)
                             (soptsStackYaml sopts)
                             (fromMaybe
-                                "Try running stack setup to locally install the correct GHC"
+                                "Try running \"stack setup\" to locally install the correct GHC"
                                 $ soptsResolveMissingGHC sopts)
 
             -- Install msys2 on windows, if necessary
@@ -746,7 +744,7 @@ installGHCPosix _ archiveFile archiveType destDir ident = do
         root <- parseAbsDir root'
         dir <- liftM (root Path.</>) $ parseRelDir $ packageIdentifierString ident
 
-        $logSticky $ "Unpacking GHC ..."
+        $logSticky $ T.concat ["Unpacking GHC into ", (T.pack . toFilePath $ root), " ..."]
         $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
         readInNull root tarTool menv ["xf", toFilePath archiveFile] Nothing
 
@@ -1057,6 +1055,7 @@ toFilePathNoTrailingSlash = FP.dropTrailingPathSeparator . toFilePath
 -- Remove potentially confusing environment variables
 removeHaskellEnvVars :: Map Text Text -> Map Text Text
 removeHaskellEnvVars =
+    Map.delete "GHCJS_PACKAGE_PATH" .
     Map.delete "GHC_PACKAGE_PATH" .
     Map.delete "HASKELL_PACKAGE_SANDBOX" .
     Map.delete "HASKELL_PACKAGE_SANDBOXES" .

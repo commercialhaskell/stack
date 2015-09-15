@@ -25,6 +25,7 @@ module Stack.Types.Build
     ,Plan(..)
     ,TestOpts(..)
     ,BenchmarkOpts(..)
+    ,FileWatchOpts(..)
     ,BuildOpts(..)
     ,BuildSubset(..)
     ,defaultBuildOpts
@@ -75,7 +76,7 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
-import           System.Exit (ExitCode)
+import           System.Exit (ExitCode (ExitFailure))
 import           System.FilePath (dropTrailingPathSeparator, pathSeparator)
 
 ----------------------------------------------
@@ -152,7 +153,7 @@ instance Show StackBuildException where
                 , case mstack of
                     Nothing -> "command line arguments"
                     Just stack -> "resolver setting in " ++ toFilePath stack
-                , "). "
+                , ").\n"
                 , T.unpack resolution
                 ]
     show (Couldn'tParseTargets targets) = unlines
@@ -235,6 +236,9 @@ instance Show StackBuildException where
         in "\n--  While building package " ++ dropQuotes (show taskProvides') ++ " using:\n" ++
            "      " ++ fullCmd ++ "\n" ++
            "    Process exited with code: " ++ show exitCode ++
+           (if exitCode == ExitFailure (-9)
+                then " (THIS MAY INDICATE OUT OF MEMORY)"
+                else "") ++
            logLocations ++
            (if S.null bs
                 then ""
@@ -404,7 +408,7 @@ data BuildOpts =
             ,boptsPreFetch :: !Bool
             -- ^ Fetch all packages immediately
             ,boptsBuildSubset :: !BuildSubset
-            ,boptsFileWatch :: !Bool
+            ,boptsFileWatch :: !FileWatchOpts
             -- ^ Watch files for changes and automatically rebuild
             ,boptsKeepGoing :: !(Maybe Bool)
             -- ^ Keep building/running after failure
@@ -424,6 +428,10 @@ data BuildOpts =
             -- ^ Commands (with arguments) to run after a successful build
             ,boptsOnlyConfigure :: !Bool
             -- ^ Only perform the configure step when building
+            ,boptsReconfigure :: !Bool
+            -- ^ Perform the configure step even if already configured
+            ,boptsCabalVerbose :: !Bool
+            -- ^ Ask Cabal to be verbose in its builds
             }
   deriving (Show)
 
@@ -440,7 +448,7 @@ defaultBuildOpts = BuildOpts
     , boptsInstallExes = False
     , boptsPreFetch = False
     , boptsBuildSubset = BSAll
-    , boptsFileWatch = False
+    , boptsFileWatch = NoFileWatch
     , boptsKeepGoing = Nothing
     , boptsForceDirty = False
     , boptsTests = False
@@ -449,6 +457,8 @@ defaultBuildOpts = BuildOpts
     , boptsBenchmarkOpts = defaultBenchmarkOpts
     , boptsExec = []
     , boptsOnlyConfigure = False
+    , boptsReconfigure = False
+    , boptsCabalVerbose = False
     }
 
 -- | Options for the 'FinalAction' 'DoTests'
@@ -478,6 +488,12 @@ defaultBenchmarkOpts = BenchmarkOpts
     { beoAdditionalArgs = Nothing
     , beoDisableRun = False
     }
+
+data FileWatchOpts
+  = NoFileWatch
+  | FileWatch
+  | FileWatchPoll
+  deriving (Show,Eq)
 
 -- | Package dependency oracle.
 newtype PkgDepsOracle =
@@ -516,8 +532,9 @@ instance Binary ConfigCache where
         4 <- getWord8
         8 <- getWord8
         fmap to gget
-instance NFData ConfigCache where
-    rnf = genericRnf
+instance NFData ConfigCache
+instance HasStructuralInfo ConfigCache
+instance HasSemanticVersion ConfigCache
 
 -- | A task to perform when building
 data Task = Task
@@ -560,7 +577,7 @@ data Plan = Plan
     { planTasks :: !(Map PackageName Task)
     , planFinals :: !(Map PackageName (Task, LocalPackageTB))
     -- ^ Final actions to be taken (test, benchmark, etc)
-    , planUnregisterLocal :: !(Map GhcPkgId (PackageIdentifier, Text))
+    , planUnregisterLocal :: !(Map GhcPkgId (PackageIdentifier, Maybe Text))
     -- ^ Text is reason we're unregistering, for display only
     , planInstallExes :: !(Map Text InstallLocation)
     -- ^ Executables that should be installed after successful building
@@ -709,8 +726,8 @@ data ConfigureOpts = ConfigureOpts
     }
     deriving (Show, Eq, Generic)
 instance Binary ConfigureOpts
-instance NFData ConfigureOpts where
-    rnf = genericRnf
+instance HasStructuralInfo ConfigureOpts
+instance NFData ConfigureOpts
 
 -- | Information on a compiled package: the library conf file (if relevant),
 -- and all of the executable paths.
@@ -723,5 +740,6 @@ data PrecompiledCache = PrecompiledCache
     }
     deriving (Show, Eq, Generic)
 instance Binary PrecompiledCache
-instance NFData PrecompiledCache where
-    rnf = genericRnf
+instance HasSemanticVersion PrecompiledCache
+instance HasStructuralInfo PrecompiledCache
+instance NFData PrecompiledCache

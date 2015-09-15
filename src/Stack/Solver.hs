@@ -79,6 +79,7 @@ cabalSolver wc cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-s
 
     platform <- asks getPlatform
     menv' <- mkEnvOverride platform
+           $ Map.delete "GHCJS_PACKAGE_PATH"
            $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv
     bs <- readProcessStdout (Just tmpdir) menv' "cabal" args
     let ls = drop 1

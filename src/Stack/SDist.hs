@@ -88,7 +88,8 @@ readLocalPackage pkgDir = do
             , packageConfigCompilerVersion = envConfigCompilerVersion econfig
             , packageConfigPlatform = configPlatform $ getConfig bconfig
             }
-    package <- readPackage config cabalfp
+    (warnings,package) <- readPackage config cabalfp
+    mapM_ (printCabalFileWarning cabalfp) warnings
     return LocalPackage
         { lpPackage = package
         , lpExeComponents = Nothing -- HACK: makes it so that sdist output goes to a log instead of a file.
@@ -113,8 +114,10 @@ getSDistFileList lp =
         baseConfigOpts <- mkBaseConfigOpts bopts
         (_, _mbp, locals, _extraToBuild, sourceMap) <- loadSourceMap NeedTargets bopts
         runInBase <- liftBaseWith $ \run -> return (void . run)
-        withExecuteEnv menv bopts baseConfigOpts locals sourceMap $ \ee -> do
-            withSingleContext runInBase ac ee task (Just "sdist") $ \_package _cabalfp _pkgDir cabal _announce _console _mlogFile -> do
+        withExecuteEnv menv bopts baseConfigOpts locals
+            [] -- provide empty list of globals. This is a hack around custom Setup.hs files
+            sourceMap $ \ee -> do
+            withSingleContext runInBase ac ee task Nothing (Just "sdist") $ \_package _cabalfp _pkgDir cabal _announce _console _mlogFile -> do
                 let outFile = tmpdir FP.</> "source-files-list"
                 cabal False ["sdist", "--list-sources", outFile]
                 liftIO (readFile outFile)

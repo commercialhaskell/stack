@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
+{-# LANGUAGE ConstraintKinds       #-}
 -- | Cache information about previous builds
 module Stack.Build.Cache
     ( tryGetBuildCache
@@ -36,7 +37,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader
 import qualified Crypto.Hash.SHA256 as SHA256
-import qualified Data.Binary as Binary
+import qualified Data.Binary as Binary (encode)
 import           Data.Binary.VersionTagged
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Base16 as B16
@@ -96,8 +97,9 @@ data BuildCache = BuildCache
     }
     deriving (Generic)
 instance Binary BuildCache
-instance NFData BuildCache where
-    rnf = genericRnf
+instance HasStructuralInfo BuildCache
+instance HasSemanticVersion BuildCache
+instance NFData BuildCache
 
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
@@ -115,7 +117,7 @@ tryGetCabalMod :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, Mo
 tryGetCabalMod = tryGetCache configCabalMod
 
 -- | Try to load a cache.
-tryGetCache :: (MonadIO m, Binary a, NFData a)
+tryGetCache :: (MonadIO m, BinarySchema a)
             => (Path Abs Dir -> m (Path Abs File))
             -> Path Abs Dir
             -> m (Maybe a)
@@ -158,14 +160,14 @@ deleteCaches dir = do
     removeFileIfExists cfp
 
 -- | Write to a cache.
-writeCache :: (Binary a, MonadIO m)
+writeCache :: (BinarySchema a, MonadIO m)
            => Path Abs Dir
            -> (Path Abs Dir -> m (Path Abs File))
            -> a
            -> m ()
 writeCache dir get' content = do
     fp <- get' dir
-    liftIO $ encodeFile (toFilePath fp) content
+    taggedEncodeFile (toFilePath fp) content
 
 flagCacheFile :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
               => Installed
@@ -193,7 +195,7 @@ writeFlagCache gid cache = do
     file <- flagCacheFile gid
     liftIO $ do
         createTree (parent file)
-        encodeFile (toFilePath file) cache
+        taggedEncodeFile (toFilePath file) cache
 
 -- | Mark a test suite as having succeeded
 setTestSuccess :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
@@ -335,7 +337,7 @@ writePrecompiledCache baseConfigOpts pkgident copts mghcPkgId exes = do
     exes' <- forM (Set.toList exes) $ \exe -> do
         name <- parseRelFile $ T.unpack exe
         return $ toFilePath $ bcoSnapInstallRoot baseConfigOpts </> bindirSuffix </> name
-    liftIO $ encodeFile (toFilePath file) PrecompiledCache
+    liftIO $ taggedEncodeFile (toFilePath file) PrecompiledCache
         { pcLibrary = mlibpath
         , pcExes = exes'
         }

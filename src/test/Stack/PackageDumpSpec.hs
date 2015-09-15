@@ -82,6 +82,7 @@ spec = do
                 , dpHaddockInterfaces = ["/opt/ghc/7.8.4/share/doc/ghc/html/libraries/haskell2010-1.1.2.0/haskell2010.haddock"]
                 , dpProfiling = ()
                 , dpHaddock = ()
+                , dpIsExposed = False
                 }
 
         it "ghc 7.10" $ do
@@ -117,6 +118,7 @@ spec = do
                 , dpHasExposedModules = True
                 , dpProfiling = ()
                 , dpHaddock = ()
+                , dpIsExposed = False
                 }
         it "ghc 7.8.4 (osx)" $ do
             hmatrix:_ <- runResourceT
@@ -149,6 +151,7 @@ spec = do
                 , dpHasExposedModules = True
                 , dpProfiling = ()
                 , dpHaddock = ()
+                , dpIsExposed = True
                 }
 
     it "ghcPkgDump + addProfiling + addHaddock" $ (id :: IO () -> IO ()) $ runNoLoggingT $ do

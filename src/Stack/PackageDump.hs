@@ -62,10 +62,9 @@ import           System.Process.Read
 -- | Cached information on whether package have profiling libraries and haddocks.
 newtype InstalledCache = InstalledCache (IORef InstalledCacheInner)
 newtype InstalledCacheInner = InstalledCacheInner (Map GhcPkgId InstalledCacheEntry)
-    deriving (Binary, NFData)
-instance BinarySchema InstalledCacheInner where
-    -- Don't forget to update this if you change the datatype in any way!
-    binarySchema _ = 2
+    deriving (Binary, NFData, Generic)
+instance HasStructuralInfo InstalledCacheInner
+instance HasSemanticVersion InstalledCacheInner
 
 -- | Cached information on whether a package has profiling libraries and haddocks.
 data InstalledCacheEntry = InstalledCacheEntry
@@ -74,8 +73,8 @@ data InstalledCacheEntry = InstalledCacheEntry
     , installedCacheIdent :: !PackageIdentifier }
     deriving (Eq, Generic)
 instance Binary InstalledCacheEntry
-instance NFData InstalledCacheEntry where
-    rnf = genericRnf
+instance HasStructuralInfo InstalledCacheEntry
+instance NFData InstalledCacheEntry
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump
@@ -231,7 +230,7 @@ addHaddock (InstalledCache ref) =
             Nothing -> do
                 let loop [] = return False
                     loop (ifc:ifcs) = do
-                        exists <- doesFileExist (S8.unpack ifc)
+                        exists <- doesFileExist ifc
                         if exists
                             then return True
                             else loop ifcs
@@ -246,9 +245,10 @@ data DumpPackage profiling haddock = DumpPackage
     , dpLibraries :: ![ByteString]
     , dpHasExposedModules :: !Bool
     , dpDepends :: ![GhcPkgId]
-    , dpHaddockInterfaces :: ![ByteString]
+    , dpHaddockInterfaces :: ![FilePath]
     , dpProfiling :: !profiling
     , dpHaddock :: !haddock
+    , dpIsExposed :: !Bool
     }
     deriving (Show, Eq, Ord)
 
@@ -307,16 +307,19 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
 
             -- if a package has no modules, these won't exist
             let libDirKey = "library-dirs"
-                libDirs = parseM libDirKey
                 libraries = parseM "hs-libraries"
                 exposedModules = parseM "exposed-modules"
-                haddockInterfaces = parseM "haddock-interfaces"
+                exposed = parseM "exposed"
             depends <- mapM parseDepend $ parseM "depends"
 
-            libDirPaths <-
-                case mapM (P.parseOnly (argsParser NoEscaping) . T.decodeUtf8) libDirs of
-                    Left{} -> throwM (Couldn'tParseField libDirKey libDirs)
-                    Right dirs -> return (concat dirs)
+            let parseQuoted key =
+                    case mapM (P.parseOnly (argsParser NoEscaping) . T.decodeUtf8) val of
+                        Left{} -> throwM (Couldn'tParseField key val)
+                        Right dirs -> return (concat dirs)
+                  where
+                    val = parseM key
+            libDirPaths <- parseQuoted libDirKey
+            haddockInterfaces <- parseQuoted "haddock-interfaces"
 
             return $ Just DumpPackage
                 { dpGhcPkgId = ghcPkgId
@@ -325,9 +328,10 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 , dpLibraries = S8.words $ S8.unwords libraries
                 , dpHasExposedModules = not (null libraries || null exposedModules)
                 , dpDepends = catMaybes (depends :: [Maybe GhcPkgId])
-                , dpHaddockInterfaces = S8.words $ S8.unwords haddockInterfaces
+                , dpHaddockInterfaces = haddockInterfaces
                 , dpProfiling = ()
                 , dpHaddock = ()
+                , dpIsExposed = exposed == ["True"]
                 }
 
 stripPrefixBS :: ByteString -> ByteString -> Maybe ByteString

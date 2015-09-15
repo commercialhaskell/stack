@@ -246,11 +246,10 @@ makeGhciPkgInfo sourceMap locals name cabalfp components = do
             , packageConfigCompilerVersion = envConfigCompilerVersion econfig
             , packageConfigPlatform = configPlatform (getConfig bconfig)
             }
-    pkg <- readPackage config cabalfp
-    (componentsOpts,generalOpts) <-
+    (warnings,pkg) <- readPackage config cabalfp
+    mapM_ (printCabalFileWarning cabalfp) warnings
+    (componentsModules,componentFiles,componentsOpts,generalOpts) <-
         getPackageOpts (packageOpts pkg) sourceMap locals cabalfp
-    (componentsModules,componentFiles,_) <-
-        getPackageFiles (packageFiles pkg) cabalfp
     let filterWithinWantedComponents m =
             M.elems
                 (M.filterWithKey

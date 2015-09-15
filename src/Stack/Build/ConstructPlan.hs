@@ -195,7 +195,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
 mkUnregisterLocal :: Map PackageName Task
                   -> Map PackageName Text
                   -> Map GhcPkgId PackageIdentifier
-                  -> Map GhcPkgId (PackageIdentifier, Text)
+                  -> Map GhcPkgId (PackageIdentifier, Maybe Text)
 mkUnregisterLocal tasks dirtyReason locallyRegistered =
     Map.unions $ map toUnregisterMap $ Map.toList locallyRegistered
   where
@@ -204,8 +204,7 @@ mkUnregisterLocal tasks dirtyReason locallyRegistered =
             Nothing -> Map.empty
             Just _ -> Map.singleton gid
                 ( ident
-                , fromMaybe "likely unregistering due to a version change"
-                  $ Map.lookup name dirtyReason
+                , Map.lookup name dirtyReason
                 )
       where
         name = packageIdentifierName ident

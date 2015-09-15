@@ -276,7 +276,6 @@ rules global@Global{..} args = do
     distroVersionDockerDir dv = distroVersionDir dv </> "docker"
     distroVersionDir DistroVersion{..} = releaseDir </> dvDistro </> dvVersion
 
-    stackOrigExeFileName = stackProgName <.> exe
     binaryFileNames = [binaryExeCompressedFileName, binaryExeCompressedAscFileName]
     binaryExeCompressedAscFileName = binaryExeCompressedFileName <.> ascExt
     binaryExeCompressedFileName =
@@ -285,8 +284,8 @@ rules global@Global{..} args = do
             _ -> binaryExeTarGzFileName
     binaryExeZipFileName = binaryName global <.> zipExt
     binaryExeTarGzFileName = binaryName global <.> tarGzExt
-    binaryExeFileName = binaryExeFileNameNoExt <.> exe
-    binaryExeFileNameNoExt = stackOrigExeFileName
+    binaryExeFileName = stackOrigExeFileName
+    stackOrigExeFileName = stackProgName <.> exe
     distroPackageFileName distro
         | distroPackageExt distro == debExt =
             concat [stackProgName, "_", distroPackageVersionStr distro, "_amd64"] <.> debExt

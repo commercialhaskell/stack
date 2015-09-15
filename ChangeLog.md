@@ -9,10 +9,19 @@ Other enhancements:
 * Adapt to upcoming Cabal installed package identifier format change [#851](https://github.com/commercialhaskell/stack/issues/851)
 * `stack setup` takes a `--stack-setup-yaml` argument
 * `--file-watch` is more discerning about which files to rebuild for [#912](https://github.com/commercialhaskell/stack/issues/912)
+* `stack path` now supports `--global-pkg-db` and `--ghc-package-path`
+* `--reconfigure` flag [#914](https://github.com/commercialhaskell/stack/issues/914) [#946](https://github.com/commercialhaskell/stack/issues/946)
+* Cached data is written with a checksum of its structure [#889](https://github.com/commercialhaskell/stack/issues/889)
+* Fully removed `--optimizations` flag
+* Added `--cabal-verbose` flag
+* Added `--file-watch-poll` flag for polling instead of using filesystem events (useful for running tests in a Docker container while modifying code in the host environment. When code is injected into the container via a volume, the container won't propagate filesystem events).
 
 Bug fixes:
 
 * Hacky workaround for optparse-applicative issue with `stack exec --help` [#806](https://github.com/commercialhaskell/stack/issues/806)
+* Build executables for local extra deps [#920](https://github.com/commercialhaskell/stack/issues/920)
+* copyFile can't handle directories [#942](https://github.com/commercialhaskell/stack/pull/942)
+* Support for spaces in Haddock interface files [fpco/minghc#85](https://github.com/fpco/minghc/issues/85)
 
 ## 0.1.4.1
 

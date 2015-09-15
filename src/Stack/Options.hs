@@ -77,16 +77,12 @@ buildOptsParser :: Command
 buildOptsParser cmd =
             fmap addCoverageFlags $
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
-            (optimize *> haddock) <*> haddockDeps <*> dryRun <*> ghcOpts <*>
-            flags <*> copyBins <*> preFetch <*>
-            buildSubset <*>
-            fileWatch' <*> keepGoing <*> forceDirty <*>
-            tests <*> testOptsParser <*>
-            benches <*> benchOptsParser <*>
-            many exec <*> onlyConfigure
-  where optimize =
-          maybeBoolFlags "optimizations" "DEPRECATED: This flag is no longer used, and has no effect. Please use --ghc-options=-O?" idm
-        target =
+            haddock <*> haddockDeps <*> dryRun <*> ghcOpts <*>
+            flags <*> copyBins <*> preFetch <*> buildSubset <*>
+            fileWatch' <*> keepGoing <*> forceDirty <*> tests <*>
+            testOptsParser <*> benches <*> benchOptsParser <*>
+            many exec <*> onlyConfigure <*> reconfigure <*> cabalVerbose
+  where target =
            many (textArgument
                    (metavar "TARGET" <>
                     help "If none specified, use all packages"))
@@ -98,7 +94,7 @@ buildOptsParser cmd =
         exeProfiling =
           boolFlags False
                     "executable-profiling"
-                    "library profiling for TARGETs and all its dependencies"
+                    "executable profiling for TARGETs and all its dependencies"
                     idm
         haddock =
           boolFlags (cmd == Haddock)
@@ -149,9 +145,14 @@ buildOptsParser cmd =
                  help "A synonym for --only-dependencies")
             <|> pure BSAll
 
-        fileWatch' = flag False True
-            (long "file-watch" <>
-             help "Watch for changes in local files and automatically rebuild. Ignores files in VCS boring/ignore file")
+        fileWatch' =
+            flag' FileWatch
+                (long "file-watch" <>
+                 help "Watch for changes in local files and automatically rebuild. Ignores files in VCS boring/ignore file")
+            <|> flag' FileWatchPoll
+                (long "file-watch-poll" <>
+                 help "Like --file-watch, but polling the filesystem instead of using events")
+            <|> pure NoFileWatch
 
         keepGoing = maybeBoolFlags
             "keep-going"
@@ -161,7 +162,6 @@ buildOptsParser cmd =
         forceDirty = flag False True
             (long "force-dirty" <>
              help "Force treating all local packages as having dirty files (useful for cases where stack can't detect a file change)")
-
 
         tests = boolFlags (cmd == Test)
             "test"
@@ -181,6 +181,14 @@ buildOptsParser cmd =
         onlyConfigure = flag False True
             (long "only-configure" <>
              help "Only perform the configure step, not any builds. Intended for tool usage, may break when used on multiple packages at once!")
+
+        reconfigure = flag False True
+            (long "reconfigure" <>
+             help "Perform the configure step even if unnecessary. Useful in some corner cases with custom Setup.hs files")
+
+        cabalVerbose = flag False True
+            (long "cabal-verbose" <>
+             help "Ask Cabal to be verbose in its output")
 
 -- | Parser for package:[-]flag
 readFlag :: ReadM (Map (Maybe PackageName) (Map FlagName Bool))

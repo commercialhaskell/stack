@@ -62,7 +62,10 @@ getInstalled :: (M env m, PackageInstallInfo pii)
              => EnvOverride
              -> GetInstalledOpts
              -> Map PackageName pii -- ^ does not contain any installed information
-             -> m (InstalledMap, Map GhcPkgId PackageIdentifier)
+             -> m ( InstalledMap
+                  , [DumpPackage () ()] -- globally installed
+                  , Map GhcPkgId PackageIdentifier -- locally installed
+                  )
 getInstalled menv opts sourceMap = do
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
@@ -75,11 +78,12 @@ getInstalled menv opts sourceMap = do
             else return Nothing
 
     let loadDatabase' = loadDatabase menv opts mcache sourceMap
-    (installedLibs', localInstalled) <-
-        loadDatabase' Nothing [] >>=
-        loadDatabase' (Just (Snap, snapDBPath)) . fst >>=
-        loadDatabase' (Just (Local, localDBPath)) . fst
-    let installedLibs = M.fromList $ map lhPair installedLibs'
+    (installedLibs0, globalInstalled) <- loadDatabase' Nothing []
+    (installedLibs1, _snapInstalled) <-
+        loadDatabase' (Just (Snap, snapDBPath)) installedLibs0
+    (installedLibs2, localInstalled) <-
+        loadDatabase' (Just (Local, localDBPath)) installedLibs1
+    let installedLibs = M.fromList $ map lhPair installedLibs2
 
     case mcache of
         Nothing -> return ()
@@ -107,7 +111,10 @@ getInstalled menv opts sourceMap = do
             , installedLibs
             ]
 
-    return (installedMap, localInstalled)
+    return ( installedMap
+           , globalInstalled
+           , Map.fromList $ map (dpGhcPkgId &&& dpPackageIdent) localInstalled
+           )
 
 -- | Outputs both the modified InstalledMap and the Set of all installed packages in this database
 --
@@ -121,10 +128,10 @@ loadDatabase :: (M env m, PackageInstallInfo pii)
              -> Map PackageName pii -- ^ to determine which installed things we should include
              -> Maybe (InstallLocation, Path Abs Dir) -- ^ package database, Nothing for global
              -> [LoadHelper] -- ^ from parent databases
-             -> m ([LoadHelper], Map GhcPkgId PackageIdentifier)
+             -> m ([LoadHelper], [DumpPackage () ()])
 loadDatabase menv opts mcache sourceMap mdb lhs0 = do
     wc <- getWhichCompiler
-    (lhs1, gids) <- ghcPkgDump menv wc (fmap snd mdb)
+    (lhs1, dps) <- ghcPkgDump menv wc (fmap snd mdb)
                   $ conduitDumpPackage =$ sink
     let lhs = pruneDeps
             id
@@ -132,7 +139,7 @@ loadDatabase menv opts mcache sourceMap mdb lhs0 = do
             lhDeps
             const
             (lhs0 ++ lhs1)
-    return (map (\lh -> lh { lhDeps = [] }) $ Map.elems lhs, Map.fromList gids)
+    return (map (\lh -> lh { lhDeps = [] }) $ Map.elems lhs, dps)
   where
     conduitProfilingCache =
         case mcache of
@@ -150,10 +157,9 @@ loadDatabase menv opts mcache sourceMap mdb lhs0 = do
           =$ conduitHaddockCache
           =$ CL.mapMaybe (isAllowed opts mcache sourceMap (fmap fst mdb))
           =$ CL.consume
-    sinkGIDs = CL.map (dpGhcPkgId &&& dpPackageIdent) =$ CL.consume
     sink = getZipSink $ (,)
         <$> ZipSink sinkDP
-        <*> ZipSink sinkGIDs
+        <*> ZipSink CL.consume
 
 -- | Check if a can be included in the set of installed packages or not, based
 -- on the package selections made by the user. This does not perform any

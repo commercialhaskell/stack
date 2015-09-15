@@ -61,6 +61,7 @@ import           Stack.Options
 import           Stack.Package (getCabalFileName)
 import qualified Stack.PackageIndex
 import           Stack.Ghci
+import           Stack.GhcPkg (getGlobalDB, mkGhcPackagePath)
 import           Stack.SDist (getSDistTarball)
 import           Stack.Setup
 import           Stack.Solver (solveExtraDeps)
@@ -372,6 +373,7 @@ pathCmd keys go =
             menv <- getMinimalEnvOverride
             snap <- packageDatabaseDeps
             local <- packageDatabaseLocal
+            global <- getGlobalDB menv =<< getWhichCompiler
             snaproot <- installationRootDeps
             localroot <- installationRootLocal
             distDir <- distRelativeDir
@@ -391,6 +393,7 @@ pathCmd keys go =
                                     menv
                                     snap
                                     local
+                                    global
                                     snaproot
                                     localroot
                                     distDir))))
@@ -401,6 +404,7 @@ data PathInfo = PathInfo
     ,piEnvOverride :: EnvOverride
     ,piSnapDb :: Path Abs Dir
     ,piLocalDb :: Path Abs Dir
+    ,piGlobalDb :: Path Abs Dir
     ,piSnapRoot :: Path Abs Dir
     ,piLocalRoot :: Path Abs Dir
     ,piDistDir :: Path Rel Dir
@@ -459,6 +463,13 @@ paths =
       , "local-pkg-db"
       , \pi ->
              T.pack (toFilePathNoTrailing (piLocalDb pi)))
+    , ( "Global package database"
+      , "global-pkg-db"
+      , \pi ->
+             T.pack (toFilePathNoTrailing (piGlobalDb pi)))
+    , ( "GHC_PACKAGE_PATH environment variable"
+      , "ghc-package-path"
+      , \pi -> mkGhcPackagePath True (piLocalDb pi) (piSnapDb pi) (piGlobalDb pi))
     , ( "Snapshot installation root"
       , "snapshot-install-root"
       , \pi ->
@@ -677,19 +688,20 @@ cleanCmd () go = withBuildConfigAndLock go (\_ -> clean)
 
 -- | Helper for build and install commands
 buildCmd :: BuildOpts -> GlobalOpts -> IO ()
-buildCmd opts go
-    | boptsFileWatch opts =
-        let getProjectRoot =
-                do (manager, lc) <- loadConfigWithOpts go
-                   bconfig <-
-                       runStackLoggingTGlobal manager go $
-                       lcLoadBuildConfig lc (globalResolver go)
-                   return (bcRoot bconfig)
-        in fileWatch getProjectRoot inner
-    | otherwise = inner $ const $ return ()
+buildCmd opts go =
+  case boptsFileWatch opts of
+    FileWatchPoll -> fileWatchPoll getProjectRoot inner
+    FileWatch -> fileWatch getProjectRoot inner
+    NoFileWatch -> inner $ const $ return ()
   where
     inner setLocalFiles = withBuildConfigAndLock go $ \lk ->
         globalFixCodePage go $ Stack.Build.build setLocalFiles (Just lk) opts
+    getProjectRoot = do
+        (manager, lc) <- loadConfigWithOpts go
+        bconfig <-
+            runStackLoggingTGlobal manager go $
+            lcLoadBuildConfig lc (globalResolver go)
+        return (bcRoot bconfig)
 
 globalFixCodePage :: (Catch.MonadMask m, MonadIO m, MonadLogger m)
                   => GlobalOpts

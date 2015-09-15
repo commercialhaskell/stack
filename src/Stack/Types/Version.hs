@@ -32,7 +32,7 @@ import           Control.DeepSeq
 import           Control.Monad.Catch
 import           Data.Aeson.Extended
 import           Data.Attoparsec.ByteString.Char8
-import           Data.Binary (Binary)
+import           Data.Binary.VersionTagged (Binary, HasStructuralInfo)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Data
@@ -66,7 +66,7 @@ instance Show VersionParseFail where
 newtype Version =
   Version {unVersion :: Vector Word}
   deriving (Eq,Ord,Typeable,Data,Generic,Binary,NFData)
-
+instance HasStructuralInfo Version
 
 instance Hashable Version where
   hashWithSalt i = hashWithSalt i . V.toList . unVersion

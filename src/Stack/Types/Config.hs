@@ -8,6 +8,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | The Config type.
 
@@ -21,7 +22,7 @@ import           Control.Monad.Logger (LogLevel(..))
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
 import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, object,
-                  (.=), (.:), (..:), (..:?), (..!=), Value(String, Object),
+                  (.=), (..:), (..:?), (..!=), Value(String, Object),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings, JSONWarning,
                   jsonSubWarningsMT, jsonSubWarningsT, unWarningParser)
 import           Data.Attoparsec.Args
@@ -346,7 +347,7 @@ instance ToJSON PackageEntry where
         ]
 instance FromJSON (PackageEntry, [JSONWarning]) where
     parseJSON (String t) = do
-        loc <- parseJSON $ String t
+        (loc, _::[JSONWarning]) <- parseJSON $ String t
         return (PackageEntry
                 { peExtraDepMaybe = Nothing
                 , peValidWanted = Nothing
@@ -356,7 +357,7 @@ instance FromJSON (PackageEntry, [JSONWarning]) where
     parseJSON v = withObjectWarnings "PackageEntry" (\o -> PackageEntry
         <$> o ..:? "extra-dep"
         <*> o ..:? "valid-wanted"
-        <*> o ..: "location"
+        <*> jsonSubWarnings (o ..: "location")
         <*> o ..:? "subdirs" ..!= []) v
 
 data PackageLocation
@@ -371,17 +372,17 @@ instance ToJSON PackageLocation where
     toJSON (PLFilePath fp) = toJSON fp
     toJSON (PLHttpTarball t) = toJSON t
     toJSON (PLGit x y) = toJSON $ T.unwords ["git", x, y]
-instance FromJSON PackageLocation where
-    parseJSON v = git v <|> withText "PackageLocation" (\t -> http t <|> file t) v
+instance FromJSON (PackageLocation, [JSONWarning]) where
+    parseJSON v = git v <|> ((,[]) <$> withText "PackageLocation" (\t -> http t <|> file t) v)
       where
         file t = pure $ PLFilePath $ T.unpack t
         http t =
             case parseUrl $ T.unpack t of
                 Left _ -> mzero
                 Right _ -> return $ PLHttpTarball t
-        git = withObject "PackageGitLocation" $ \o -> PLGit
-            <$> o .: "git"
-            <*> o .: "commit"
+        git = withObjectWarnings "PackageGitLocation" $ \o -> PLGit
+            <$> o ..: "git"
+            <*> o ..: "commit"
 
 -- | A project is a collection of packages. We can have multiple stack.yaml
 -- files, but only one of them may contain project information.
@@ -713,7 +714,7 @@ instance Show ConfigException where
     show (ParseResolverException t) = concat
         [ "Invalid resolver value: "
         , T.unpack t
-        , ". Possible valid values include lts-2.12, nightly-YYYY-MM-DD, ghc-7.10.2, and ghcjs-0.1.0-ghc-7.10.2. "
+        , ". Possible valid values include lts-2.12, nightly-YYYY-MM-DD, ghc-7.10.2, and ghcjs-0.1.0_ghc-7.10.2. "
         , "See https://www.stackage.org/snapshots for a complete list."
         ]
     show (NoProjectConfigFound dir mcmd) = concat
