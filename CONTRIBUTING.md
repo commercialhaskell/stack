@@ -1,3 +1,5 @@
+## Bug Reports
+
 When reporting a bug, please write in the following format:
 
 > [Any general summary/comments if desired]
@@ -35,3 +37,9 @@ With `--verbose` mode we can see what the tool is doing and when. Without this o
 Include any `.yaml` configuration if relevant.
 
 The more detailed your report, the faster it can be resolved and will ensure it is resolved in the right way. Once your bug has been resolved, the responsible will tag the issue as _Needs confirmation_ and assign the issue back to you. Once you have tested and confirmed that the issue is resolved, close the issue. If you are not a member of the project, you will be asked for confirmation and we will close it.
+
+
+## Documentation
+If you would like to help with documentation, please note that for most cases the Wiki has been deprecated in favor of markdown files placed in a new `/doc` subdirectory of the repository itself. Please submit a [pull request](https://help.github.com/articles/using-pull-requests/) with your changes/additions.
+
+If your changes move or rename files, or subsume Wiki content, please continue to leave a file/page in the old location temporarily, in addition to the new location. This will allow users time to update any shared links to the old location. Please also update any links in other files, or on the Wiki, to point to the new file location.
