@@ -109,7 +109,6 @@ data Ctx = Ctx
 instance HasStackRoot Ctx
 instance HasPlatform Ctx
 instance HasGHCVariant Ctx
-instance HasLocalPrograms Ctx
 instance HasConfig Ctx
 instance HasBuildConfig Ctx where
     getBuildConfig = getBuildConfig . getEnvConfig

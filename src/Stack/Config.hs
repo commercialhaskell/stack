@@ -93,16 +93,9 @@ getLatestResolver = do
 defaultStackGlobalConfig :: Maybe (Path Abs File)
 defaultStackGlobalConfig = parseAbsFile "/etc/stack/config"
 
--- | Used to get the @dist@ directory before the full Config is available.
-data PlatformGHCVariant = PlatformGHCVariant Platform GHCVariant
-instance HasPlatform PlatformGHCVariant where
-    getPlatform (PlatformGHCVariant platform _) = platform
-instance HasGHCVariant PlatformGHCVariant where
-    getGHCVariant (PlatformGHCVariant _ ghcVariant) = ghcVariant
-
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid
-    :: (MonadBaseControl IO m, MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env)
+    :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env)
     => Path Abs Dir -- ^ stack root, e.g. ~/.stack
     -> Maybe Project
     -> ConfigMonoid
@@ -160,6 +153,17 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
               $ map (T.pack *** T.pack) rawEnv
      let configEnvOverride _ = return origEnv
 
+     platformOnlyDir <- runReaderT platformOnlyRelDir configPlatform
+     configLocalPrograms <-
+         case configPlatform of
+             Platform _ Windows -> do
+                 progsDir <- getWindowsProgsDir configStackRoot origEnv
+                 return $ progsDir </> $(mkRelDir stackProgName) </> platformOnlyDir
+             _ ->
+                 return $
+                 configStackRoot </> $(mkRelDir "programs") </>
+                 platformOnlyDir
+
      configLocalBin <-
          case configMonoidLocalBinPath of
              Nothing -> do
@@ -180,6 +184,7 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
      let configTemplateParams = configMonoidTemplateParameters
          configScmInit = configMonoidScmInit
          configGhcOptions = configMonoidGhcOptions
+         configSetupInfoLocations = configMonoidSetupInfoLocations
 
      return Config {..}
 
@@ -218,17 +223,15 @@ getWindowsProgsDir stackRoot m =
         Nothing -> return $ stackRoot </> $(mkRelDir "Programs")
 
 -- | An environment with a subset of BuildConfig used for setup.
-data MiniConfig = MiniConfig Manager GHCVariant (Path Abs Dir) Config
+data MiniConfig = MiniConfig Manager GHCVariant Config
 instance HasConfig MiniConfig where
-    getConfig (MiniConfig _ _ _ c) = c
+    getConfig (MiniConfig _ _ c) = c
 instance HasStackRoot MiniConfig
 instance HasHttpManager MiniConfig where
-    getHttpManager (MiniConfig man _ _ _) = man
+    getHttpManager (MiniConfig man _ _) = man
 instance HasPlatform MiniConfig
 instance HasGHCVariant MiniConfig where
-    getGHCVariant (MiniConfig _ v _ _) = v
-instance HasLocalPrograms MiniConfig where
-    getLocalPrograms (MiniConfig _ _ v _) = v
+    getGHCVariant (MiniConfig _ v _) = v
 
 -- | Load the 'MiniConfig'.
 loadMiniConfig
@@ -241,20 +244,7 @@ loadMiniConfig config = do
         case configGHCVariant0 config of
             Just ghcVariant -> return ghcVariant
             Nothing -> getDefaultGHCVariant menv (configPlatform config)
-    platformDir <-
-        runReaderT
-            platformRelDir
-            (PlatformGHCVariant (configPlatform config) ghcVariant)
-    localPrograms <-
-        case configPlatform config of
-            Platform _ Windows -> do
-                progsDir <- getWindowsProgsDir (configStackRoot config) menv
-                return $ progsDir </> $(mkRelDir stackProgName) </> platformDir
-            _ ->
-                return $
-                (configStackRoot config) </> $(mkRelDir "programs") </>
-                platformDir
-    return (MiniConfig manager ghcVariant localPrograms config)
+    return (MiniConfig manager ghcVariant config)
 
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.
@@ -362,7 +352,6 @@ loadBuildConfig mproject config stackRoot mresolver = do
         , bcFlags = projectFlags project
         , bcImplicitGlobal = isNothing mproject
         , bcGHCVariant = getGHCVariant miniConfig
-        , bcLocalPrograms = getLocalPrograms miniConfig
         }
 
 -- | Resolve a PackageEntry into a list of paths, downloading and cloning as

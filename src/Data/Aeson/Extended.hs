@@ -12,8 +12,9 @@ module Data.Aeson.Extended (
   , withObjectWarnings
   , jsonSubWarnings
   , jsonSubWarningsT
-  , jsonSubWarningsMT
+  , jsonSubWarningsTT
   , logJSONWarnings
+  , tellJSONField
   , unWarningParser
   , (..:)
   , (..:?)
@@ -50,13 +51,13 @@ import Prelude -- Fix redundant import warnings
 (..:)
     :: FromJSON a
     => Object -> Text -> WarningParser a
-o ..: k = tellField k >> lift (o .: k)
+o ..: k = tellJSONField k >> lift (o .: k)
 
 -- | 'WarningParser' version of @.:?@.
 (..:?)
     :: FromJSON a
     => Object -> Text -> WarningParser (Maybe a)
-o ..:? k = tellField k >> lift (o .:? k)
+o ..:? k = tellJSONField k >> lift (o .:? k)
 
 -- | 'WarningParser' version of @.!=@.
 (..!=) :: WarningParser (Maybe a) -> a -> WarningParser a
@@ -66,9 +67,9 @@ wp ..!= d =
          do a <- fmap snd p
             fmap (, a) (fmap fst p .!= d)
 
--- | Tell warning parser about about an expected field.
-tellField :: Text -> WarningParser ()
-tellField key = tell (mempty { wpmExpectedFields = Set.singleton key})
+-- | Tell warning parser about about an expected field, so it doesn't warn about it.
+tellJSONField :: Text -> WarningParser ()
+tellJSONField key = tell (mempty { wpmExpectedFields = Set.singleton key})
 
 -- | 'WarningParser' version of 'withObject'.
 withObjectWarnings :: String
@@ -122,15 +123,12 @@ jsonSubWarningsT f =
     Traversable.mapM (jsonSubWarnings . return) =<< f
 
 -- | Handle warnings in a @Maybe Traversable@ of sub-objects.
-jsonSubWarningsMT
-    :: (Traversable t)
-    => WarningParser (Maybe (t (a, [JSONWarning])))
-    -> WarningParser (Maybe (t a))
-jsonSubWarningsMT f = do
-    ml <- f
-    case ml of
-        Nothing -> return Nothing
-        Just l -> fmap Just (jsonSubWarningsT (return l))
+jsonSubWarningsTT
+    :: (Traversable t, Traversable u)
+    => WarningParser (u (t (a, [JSONWarning])))
+    -> WarningParser (u (t a))
+jsonSubWarningsTT f =
+    Traversable.mapM (jsonSubWarningsT . return) =<< f
 
 -- | JSON parser that warns about unexpected fields in objects.
 type WarningParser a = WriterT WarningParserMonoid Parser a

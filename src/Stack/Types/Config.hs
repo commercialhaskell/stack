@@ -21,15 +21,16 @@ import           Control.Monad.Catch (MonadThrow, throwM)
 import           Control.Monad.Logger (LogLevel(..))
 import           Control.Monad.Reader (MonadReader, ask, asks, MonadIO, liftIO)
 import           Data.Aeson.Extended
-                 (ToJSON, toJSON, FromJSON, parseJSON, withText, withObject, object,
+                 (ToJSON, toJSON, FromJSON, parseJSON, withText, object,
                   (.=), (..:), (..:?), (..!=), Value(String, Object),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings, JSONWarning,
-                  jsonSubWarningsMT, jsonSubWarningsT, unWarningParser)
+                  jsonSubWarningsT, jsonSubWarningsTT, tellJSONField)
 import           Data.Attoparsec.Args
 import           Data.Binary (Binary)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
+import           Data.List (stripPrefix)
 import           Data.Hashable (Hashable)
 import           Data.Map (Map)
 import qualified Data.Map as Map
@@ -67,6 +68,8 @@ data Config =
          ,configDocker              :: !DockerOpts
          ,configEnvOverride         :: !(EnvSettings -> IO EnvOverride)
          -- ^ Environment variables to be passed to external tools
+         ,configLocalPrograms       :: !(Path Abs Dir)
+         -- ^ Path containing local installations (mainly GHC)
          ,configConnectionCount     :: !Int
          -- ^ How many concurrent connections are allowed when downloading
          ,configHideTHLoading       :: !Bool
@@ -130,6 +133,8 @@ data Config =
          ,configGhcOptions          :: !(Map (Maybe PackageName) [Text])
          -- ^ Additional GHC options to apply to either all packages (Nothing)
          -- or a specific package (Just).
+         ,configSetupInfoLocations  :: ![SetupInfoLocation]
+         -- ^ Additional SetupInfo (inline or remote) to use to find tools.
          }
 
 -- | Information on a single package index
@@ -270,8 +275,6 @@ data BuildConfig = BuildConfig
       -- for providing better error messages.
     , bcGHCVariant :: !GHCVariant
       -- ^ The variant of GHC used to select a GHC bindist.
-    , bcLocalPrograms :: !(Path Abs Dir)
-      -- ^ Path containing local installations (mainly GHC)
     }
 
 -- | Directory containing the project's stack.yaml file
@@ -293,7 +296,6 @@ instance HasBuildConfig EnvConfig where
 instance HasConfig EnvConfig
 instance HasPlatform EnvConfig
 instance HasGHCVariant EnvConfig
-instance HasLocalPrograms EnvConfig
 instance HasStackRoot EnvConfig
 class (HasBuildConfig r, HasGHCVariant r) => HasEnvConfig r where
     getEnvConfig :: r -> EnvConfig
@@ -373,7 +375,7 @@ instance ToJSON PackageLocation where
     toJSON (PLHttpTarball t) = toJSON t
     toJSON (PLGit x y) = toJSON $ T.unwords ["git", x, y]
 instance FromJSON (PackageLocation, [JSONWarning]) where
-    parseJSON v = git v <|> ((,[]) <$> withText "PackageLocation" (\t -> http t <|> file t) v)
+    parseJSON v = ((,[]) <$> withText "PackageLocation" (\t -> http t <|> file t) v) <|> git v
       where
         file t = pure $ PLFilePath $ T.unpack t
         http t =
@@ -478,13 +480,6 @@ class HasGHCVariant env where
 instance HasGHCVariant GHCVariant where
     getGHCVariant = id
 
--- | Class for environment values which have a local programs path.
-class HasLocalPrograms env where
-    getLocalPrograms :: env -> Path Abs Dir
-    default getLocalPrograms :: HasBuildConfig env => env -> Path Abs Dir
-    getLocalPrograms = bcLocalPrograms . getBuildConfig
-    {-# INLINE getLocalPrograms #-}
-
 -- | Class for environment values that can provide a 'Config'.
 class (HasStackRoot env, HasPlatform env) => HasConfig env where
     getConfig :: env -> Config
@@ -503,7 +498,6 @@ class HasConfig env => HasBuildConfig env where
 instance HasStackRoot BuildConfig
 instance HasPlatform BuildConfig
 instance HasGHCVariant BuildConfig
-instance HasLocalPrograms BuildConfig
 instance HasConfig BuildConfig
 instance HasBuildConfig BuildConfig where
     getBuildConfig = id
@@ -561,6 +555,8 @@ data ConfigMonoid =
     -- ^ See 'configGhcOptions'
     ,configMonoidExtraPath           :: ![Path Abs Dir]
     -- ^ Additional paths to search for executables in
+    ,configMonoidSetupInfoLocations  :: ![SetupInfoLocation]
+    -- ^ Additional setup info (inline or remote) to use for installing tools
     }
   deriving Show
 
@@ -590,6 +586,7 @@ instance Monoid ConfigMonoid where
     , configMonoidCompilerCheck = Nothing
     , configMonoidGhcOptions = mempty
     , configMonoidExtraPath = []
+    , configMonoidSetupInfoLocations = mempty
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -617,6 +614,7 @@ instance Monoid ConfigMonoid where
     , configMonoidCompilerCheck = configMonoidCompilerCheck l <|> configMonoidCompilerCheck r
     , configMonoidGhcOptions = Map.unionWith (++) (configMonoidGhcOptions l) (configMonoidGhcOptions r)
     , configMonoidExtraPath = configMonoidExtraPath l ++ configMonoidExtraPath r
+    , configMonoidSetupInfoLocations = configMonoidSetupInfoLocations l ++ configMonoidSetupInfoLocations r
     }
 
 instance FromJSON (ConfigMonoid, [JSONWarning]) where
@@ -631,7 +629,7 @@ parseConfigMonoidJSON obj = do
     configMonoidConnectionCount <- obj ..:? "connection-count"
     configMonoidHideTHLoading <- obj ..:? "hide-th-loading"
     configMonoidLatestSnapshotUrl <- obj ..:? "latest-snapshot-url"
-    configMonoidPackageIndices <- jsonSubWarningsMT (obj ..:? "package-indices")
+    configMonoidPackageIndices <- jsonSubWarningsTT (obj ..:? "package-indices")
     configMonoidSystemGHC <- obj ..:? "system-ghc"
     configMonoidInstallGHC <- obj ..:? "install-ghc"
     configMonoidSkipGHCCheck <- obj ..:? "skip-ghc-check"
@@ -641,7 +639,7 @@ parseConfigMonoidJSON obj = do
                                            ..!= VersionRangeJSON anyVersion
     configMonoidOS <- obj ..:? "os"
     configMonoidArch <- obj ..:? "arch"
-    configMonoidGHCVariant <- jsonSubWarningsT (obj ..:? "ghc-variant")
+    configMonoidGHCVariant <- obj ..:? "ghc-variant"
     configMonoidJobs <- obj ..:? "jobs"
     configMonoidExtraIncludeDirs <- obj ..:? "extra-include-dirs" ..!= Set.empty
     configMonoidExtraLibDirs <- obj ..:? "extra-lib-dirs" ..!= Set.empty
@@ -667,6 +665,9 @@ parseConfigMonoidJSON obj = do
     extraPath <- obj ..:? "extra-path" ..!= []
     configMonoidExtraPath <- forM extraPath $
         either (fail . show) return . parseAbsDir . T.unpack
+
+    configMonoidSetupInfoLocations <-
+        maybeToList <$> jsonSubWarningsT (obj ..:? "setup-info")
 
     return ConfigMonoid {..}
   where
@@ -811,18 +812,21 @@ configInstalledCache :: (HasBuildConfig env, MonadReader env m) => m (Path Abs F
 configInstalledCache = liftM (</> $(mkRelFile "installed-cache.bin")) configProjectWorkDir
 
 -- | Relative directory for the platform identifier
-platformRelDir
+platformOnlyRelDir
+    :: (MonadReader env m, HasPlatform env, MonadThrow m)
+    => m (Path Rel Dir)
+platformOnlyRelDir = do
+    platform <- asks getPlatform
+    parseRelDir (Distribution.Text.display platform)
+
+-- | Relative directory for the platform identifier
+platformVariantRelDir
     :: (MonadReader env m, HasPlatform env, HasGHCVariant env, MonadThrow m)
     => m (Path Rel Dir)
-platformRelDir = do
+platformVariantRelDir = do
     platform <- asks getPlatform
     ghcVariant <- asks getGHCVariant
-    parseRelDir $
-        concat
-            [ Distribution.Text.display platform
-            , case ghcVariant of
-                  GHCStandard -> ""
-                  _ -> "-" ++ ghcVariantName ghcVariant]
+    parseRelDir (Distribution.Text.display platform <> ghcVariantSuffix ghcVariant)
 
 -- | Path to .shake files.
 configShakeFilesDir :: (MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
@@ -836,7 +840,7 @@ configLocalUnpackDir = liftM (</> $(mkRelDir "unpacked")) configProjectWorkDir
 snapshotsDir :: (MonadReader env m, HasConfig env, HasGHCVariant env, MonadThrow m) => m (Path Abs Dir)
 snapshotsDir = do
     config <- asks getConfig
-    platform <- platformRelDir
+    platform <- platformVariantRelDir
     return $ configStackRoot config </> $(mkRelDir "snapshots") </> platform
 
 -- | Installation root for dependencies
@@ -854,7 +858,7 @@ installationRootLocal = do
     bc <- asks getBuildConfig
     name <- parseRelDir $ T.unpack $ resolverName $ bcResolver bc
     ghc <- compilerVersionDir
-    platform <- platformRelDir
+    platform <- platformVariantRelDir
     return $ configProjectWorkDir bc </> $(mkRelDir "install") </> platform </> name </> ghc
 
 compilerVersionDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Rel Dir)
@@ -888,7 +892,7 @@ configMiniBuildPlanCache :: (MonadThrow m, MonadReader env m, HasConfig env, Has
                          -> m (Path Abs File)
 configMiniBuildPlanCache name = do
     root <- asks getStackRoot
-    platform <- platformRelDir
+    platform <- platformVariantRelDir
     file <- parseRelFile $ T.unpack (renderSnapName name) ++ ".cache"
     -- Yes, cached plans differ based on platform
     return (root </> $(mkRelDir "build-plan-cache") </> platform </> file)
@@ -941,7 +945,7 @@ data ProjectAndConfigMonoid
 
 instance (warnings ~ [JSONWarning]) => FromJSON (ProjectAndConfigMonoid, warnings) where
     parseJSON = withObjectWarnings "ProjectAndConfigMonoid" $ \o -> do
-        dirs <- jsonSubWarningsMT (o ..:? "packages") ..!= [packageEntryCurrDir]
+        dirs <- jsonSubWarningsTT (o ..:? "packages") ..!= [packageEntryCurrDir]
         extraDeps' <- o ..:? "extra-deps" ..!= []
         extraDeps <-
             case partitionEithers $ goDeps extraDeps' of
@@ -1004,44 +1008,39 @@ data GHCVariant
     = GHCStandard -- ^ Standard bindist
     | GHCGMP4 -- ^ Bindist that supports libgmp4 (centos66)
     | GHCIntegerSimple -- ^ Bindist that uses integer-simple
-    | GHCCustom String DownloadInfo -- ^ Other bindists.
+    | GHCCustom String -- ^ Other bindists
     deriving (Show)
 
-instance FromJSON (GHCVariant, [JSONWarning]) where
+instance FromJSON GHCVariant where
     -- Strange structuring is to give consistent error messages
-    parseJSON v@(Object _) =
-        withObjectWarnings
+    parseJSON =
+        withText
             "GHCVariant"
-            (\o ->
-                  do name <- o ..: "name"
-                     downloadInfo <- parseDownloadInfoFromObject o
-                     return (GHCCustom name downloadInfo))
-            v
-    parseJSON (String t) =
-        either (fail . show) return ((,[]) <$> parseGHCVariant (T.unpack t))
-    parseJSON _ = fail "Invalid Resolver, must be Object or String"
+            (either (fail . show) return . parseGHCVariant . T.unpack)
 
 -- | Render a GHC variant to a String.
 ghcVariantName :: GHCVariant -> String
 ghcVariantName GHCStandard = "standard"
 ghcVariantName GHCGMP4 = "gmp4"
 ghcVariantName GHCIntegerSimple = "integersimple"
-ghcVariantName (GHCCustom name _) = "custom-" ++ name
+ghcVariantName (GHCCustom name) = "custom-" ++ name
+
+-- | Render a GHC variant to a String suffix.
+ghcVariantSuffix :: GHCVariant -> String
+ghcVariantSuffix GHCStandard = ""
+ghcVariantSuffix v = "-" ++ ghcVariantName v
 
 -- | Parse GHC variant from a String.
 parseGHCVariant :: (MonadThrow m) => String -> m GHCVariant
 parseGHCVariant s =
-    case break (== ':') s of
-        (name,':':location) ->
-            return
-                (GHCCustom
-                     name
-                     (DownloadInfo (T.pack location) Nothing Nothing))
-        _
+    case stripPrefix "custom-" s of
+        Just name -> return (GHCCustom name)
+        Nothing
+          | s == "" -> return GHCStandard
           | s == "standard" -> return GHCStandard
           | s == "gmp4" -> return GHCGMP4
           | s == "integersimple" -> return GHCIntegerSimple
-          | otherwise -> throwM $ ParseGHCVariantException s
+          | otherwise -> return (GHCCustom s)
 
 -- | Information for a file to download.
 data DownloadInfo = DownloadInfo
@@ -1053,18 +1052,81 @@ data DownloadInfo = DownloadInfo
 instance FromJSON (DownloadInfo, [JSONWarning]) where
     parseJSON = withObjectWarnings "DownloadInfo" parseDownloadInfoFromObject
 
-instance FromJSON DownloadInfo where
-    parseJSON = withObject "DownloadInfo" (unWarningParser . parseDownloadInfoFromObject)
-
 -- | Parse JSON in existing object for 'DownloadInfo'
 parseDownloadInfoFromObject :: Object -> WarningParser DownloadInfo
 parseDownloadInfoFromObject o = do
     url <- o ..: "url"
     contentLength <- o ..:? "content-length"
     sha1TextMay <- o ..:? "sha1"
+    -- Don't warn about 'version' field that is sometimes included
+    tellJSONField "version"
     return
         DownloadInfo
         { downloadInfoUrl = url
         , downloadInfoContentLength = contentLength
         , downloadInfoSha1 = fmap encodeUtf8 sha1TextMay
         }
+
+data VersionedDownloadInfo = VersionedDownloadInfo
+    { vdiVersion :: Version
+    , vdiDownloadInfo :: DownloadInfo
+    }
+    deriving Show
+
+instance FromJSON (VersionedDownloadInfo, [JSONWarning]) where
+    parseJSON = withObjectWarnings "VersionedDownloadInfo" $ \o -> do
+        version <- o ..: "version"
+        downloadInfo <- parseDownloadInfoFromObject o
+        return VersionedDownloadInfo
+            { vdiVersion = version
+            , vdiDownloadInfo = downloadInfo
+            }
+
+data SetupInfo = SetupInfo
+    { siSevenzExe :: Maybe DownloadInfo
+    , siSevenzDll :: Maybe DownloadInfo
+    , siMsys2 :: Map Text VersionedDownloadInfo
+    , siGHCs :: Map Text (Map Version DownloadInfo)
+    }
+    deriving Show
+
+instance FromJSON (SetupInfo, [JSONWarning]) where
+    parseJSON = withObjectWarnings "SetupInfo" $ \o -> do
+        siSevenzExe <- jsonSubWarningsT (o ..:? "sevenzexe-info")
+        siSevenzDll <- jsonSubWarningsT (o ..:? "sevenzdll-info")
+        siMsys2 <- jsonSubWarningsT (o ..:? "msys2" ..!= mempty)
+        siGHCs <- jsonSubWarningsTT (o ..:? "ghc" ..!= mempty)
+        -- Don't warn about 'portable-git' that is no-longer used
+        tellJSONField "portable-git"
+        return SetupInfo {..}
+
+instance Monoid SetupInfo where
+    mempty =
+        SetupInfo
+        { siSevenzExe = Nothing
+        , siSevenzDll = Nothing
+        , siMsys2 = Map.empty
+        , siGHCs = Map.empty
+        }
+    mappend l r =
+        SetupInfo
+        { siSevenzExe = siSevenzExe l <|> siSevenzExe r
+        , siSevenzDll = siSevenzDll l <|> siSevenzDll r
+        , siMsys2 = siMsys2 l <> siMsys2 r
+        , siGHCs = siGHCs l <> siGHCs r }
+
+-- | Remote or inline 'SetupInfo'
+data SetupInfoLocation
+    = SetupInfoFileOrURL String
+    | SetupInfoInline SetupInfo
+    deriving (Show)
+
+instance FromJSON (SetupInfoLocation, [JSONWarning]) where
+    parseJSON v =
+        ((, []) <$>
+         withText "SetupInfoFileOrURL" (pure . SetupInfoFileOrURL . T.unpack) v) <|>
+        inline
+      where
+        inline = do
+            (si,w) <- parseJSON v
+            return (SetupInfoInline si, w)

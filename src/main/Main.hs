@@ -440,7 +440,7 @@ paths =
     , ( "Installed GHCs (unpacked and archives)"
       , "ghc-paths"
       , \pi ->
-             T.pack (toFilePathNoTrailing (bcLocalPrograms (piBuildConfig pi))))
+             T.pack (toFilePathNoTrailing (configLocalPrograms (bcConfig (piBuildConfig pi)))))
     , ( "Local bin path where stack installs executables"
       , "local-bin-path"
       , \pi ->
@@ -497,6 +497,7 @@ data SetupCmdOpts = SetupCmdOpts
     , scoForceReinstall :: !Bool
     , scoUpgradeCabal :: !Bool
     , scoStackSetupYaml :: !String
+    , scoGHCBindistURL :: !(Maybe String)
     }
 
 setupParser :: Parser SetupCmdOpts
@@ -515,10 +516,15 @@ setupParser = SetupCmdOpts
             idm
     <*> strOption
             ( long "stack-setup-yaml"
-           <> help "Location of the stack-setup.yaml file"
+           <> help "Location of the main stack-setup.yaml file"
            <> value defaultStackSetupYaml
            <> showDefault
             )
+    <*> (optional $ strOption
+            (long "ghc-bindist"
+           <> metavar "URL"
+           <> help "Alternate GHC binary distribution (requires custom --ghc-variant)"
+            ))
   where
     readVersion = do
         s <- readerAsk
@@ -561,6 +567,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                   , soptsUpgradeCabal = scoUpgradeCabal
                   , soptsResolveMissingGHC = Nothing
                   , soptsStackSetupYaml = scoStackSetupYaml
+                  , soptsGHCBindistURL = scoGHCBindistURL
                   }
               case mpaths of
                   Nothing -> $logInfo "stack will use the GHC on your PATH"
