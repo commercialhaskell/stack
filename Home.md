@@ -1,3 +1,5 @@
+### Please note, this Wiki is deprecated, please submit any further changes via pull requests to documentation under /doc in the main repository.
+
 New users:
 
 * [README](../#readme): Get up-and-running with stack quickly. Requires no prior Haskell tooling experience
