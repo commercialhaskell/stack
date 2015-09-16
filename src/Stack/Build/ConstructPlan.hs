@@ -161,7 +161,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
             return $ takeSubset Plan
                 { planTasks = tasks
                 , planFinals = M.fromList finals
-                , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason locallyRegistered
+                , planUnregisterLocal = mkUnregisterLocal tasks dirtyReason locallyRegistered sourceMap
                 , planInstallExes =
                     if boptsInstallExes $ bcoBuildOpts baseConfigOpts0
                         then installExes
@@ -193,13 +193,20 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
 mkUnregisterLocal :: Map PackageName Task
                   -> Map PackageName Text
                   -> Map GhcPkgId PackageIdentifier
+                  -> SourceMap
                   -> Map GhcPkgId (PackageIdentifier, Maybe Text)
-mkUnregisterLocal tasks dirtyReason locallyRegistered =
+mkUnregisterLocal tasks dirtyReason locallyRegistered sourceMap =
     Map.unions $ map toUnregisterMap $ Map.toList locallyRegistered
   where
     toUnregisterMap (gid, ident) =
         case M.lookup name tasks of
-            Nothing -> Map.empty
+            Nothing ->
+                case M.lookup name sourceMap of
+                    Just (PSUpstream _ Snap _) -> Map.singleton gid
+                        ( ident
+                        , Just "Switching to snapshot installed package"
+                        )
+                    _ -> Map.empty
             Just _ -> Map.singleton gid
                 ( ident
                 , Map.lookup name dirtyReason

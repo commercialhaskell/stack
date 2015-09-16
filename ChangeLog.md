@@ -22,6 +22,7 @@ Bug fixes:
 * Build executables for local extra deps [#920](https://github.com/commercialhaskell/stack/issues/920)
 * copyFile can't handle directories [#942](https://github.com/commercialhaskell/stack/pull/942)
 * Support for spaces in Haddock interface files [fpco/minghc#85](https://github.com/fpco/minghc/issues/85)
+* Temporarily building against a "shadowing" local package? [#992](https://github.com/commercialhaskell/stack/issues/992)
 
 ## 0.1.4.1
 
