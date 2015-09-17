@@ -338,7 +338,8 @@ ensureGHC sopts = do
                             (soptsCompilerCheck sopts)
                             (soptsStackYaml sopts)
                             (fromMaybe
-                                "Try running \"stack setup\" to locally install the correct GHC"
+                                ("Try running \"stack setup\" to install the correct GHC into "
+                                <> T.pack (toFilePath (configLocalPrograms config)))
                                 $ soptsResolveMissingGHC sopts)
 
             -- Install msys2 on windows, if necessary

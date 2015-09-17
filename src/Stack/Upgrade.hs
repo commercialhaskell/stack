@@ -14,6 +14,7 @@ import qualified Data.Map                    as Map
 import           Data.Monoid                 ((<>))
 import qualified Data.Monoid
 import qualified Data.Set                    as Set
+import qualified Data.Text as T
 import           Development.GitRev          (gitHash)
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager)
 import           Path
@@ -84,18 +85,19 @@ upgrade gitRepo mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> d
     logLevel <- asks getLogLevel
     terminal <- asks getTerminal
     reExec <- asks getReExec
-    configMonoid <- asks $ configConfigMonoid . getConfig
+    config <- asks getConfig
 
     forM_ mdir $ \dir -> liftIO $ do
         bconfig <- runStackLoggingT manager logLevel terminal reExec $ do
             lc <- loadConfig
-                (configMonoid <> Data.Monoid.mempty
+                (configConfigMonoid config <> Data.Monoid.mempty
                     { configMonoidInstallGHC = Just True
                     })
                 (Just $ dir </> $(mkRelFile "stack.yaml"))
             lcLoadBuildConfig lc mresolver
-        envConfig1 <- runStackT manager logLevel bconfig terminal reExec $ setupEnv $ Just
-            "Try rerunning with --install-ghc to install the appropriate GHC"
+        envConfig1 <- runStackT manager logLevel bconfig terminal reExec $ setupEnv $ Just $
+            "Try rerunning with --install-ghc to install the correct GHC into " <>
+            T.pack (toFilePath (configLocalPrograms config))
         runStackT manager logLevel envConfig1 terminal reExec $
           build (const $ return ()) Nothing defaultBuildOpts
             { boptsTargets = ["stack"]
