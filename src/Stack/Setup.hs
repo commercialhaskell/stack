@@ -433,7 +433,11 @@ upgradeCabal menv wc = do
                     Just dir -> return dir
 
             runIn dir (compilerExeName wc) menv ["Setup.hs"] Nothing
-            let setupExe = toFilePath $ dir </> $(mkRelFile "Setup")
+            platform <- asks getPlatform
+            let setupExe = toFilePath $ dir </>
+                  (case platform of
+                     Platform _ os | isWindows os -> $(mkRelFile "Setup.exe")
+                     _ -> $(mkRelFile "Setup"))
                 dirArgument name' = concat
                     [ "--"
                     , name'

@@ -23,6 +23,7 @@ Bug fixes:
 * copyFile can't handle directories [#942](https://github.com/commercialhaskell/stack/pull/942)
 * Support for spaces in Haddock interface files [fpco/minghc#85](https://github.com/fpco/minghc/issues/85)
 * Temporarily building against a "shadowing" local package? [#992](https://github.com/commercialhaskell/stack/issues/992)
+* Fix Setup.exe name for --upgrade-cabal on Windows [#1002](https://github.com/commercialhaskell/stack/issues/1002)
 
 ## 0.1.4.1
 
