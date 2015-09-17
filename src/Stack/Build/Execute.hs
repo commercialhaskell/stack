@@ -927,7 +927,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
         () <- announce "build"
         config <- asks getConfig
-        extraOpts <- extraBuildOptions
+        extraOpts <- extraBuildOptions eeBuildOpts
         cabal (console && configHideTHLoading config) $
             (case taskType of
                 TTLocal lp -> concat
@@ -1043,7 +1043,7 @@ singleTest runInBase topts lptb ac ee task installedMap = do
             case taskType task of
                 TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
                 TTUpstream _ _ -> assert False $ return ()
-            extraOpts <- extraBuildOptions
+            extraOpts <- extraBuildOptions (eeBuildOpts ee)
             cabal (console && configHideTHLoading config) $
                 "build" : (components ++ extraOpts)
             setTestBuilt pkgDir
@@ -1187,7 +1187,7 @@ singleBench runInBase beopts _lptb ac ee task installedMap = do
                 TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
                 TTUpstream _ _ -> assert False $ return ()
             config <- asks getConfig
-            extraOpts <- extraBuildOptions
+            extraOpts <- extraBuildOptions (eeBuildOpts ee)
             cabal (console && configHideTHLoading config) ("build" : extraOpts)
             setBenchBuilt pkgDir
         let args = maybe []
@@ -1278,10 +1278,17 @@ getSetupHs dir = do
     fp1 = dir </> $(mkRelFile "Setup.hs")
     fp2 = dir </> $(mkRelFile "Setup.lhs")
 
-extraBuildOptions :: M env m => m [String]
-extraBuildOptions = do
-    hpcIndexDir <- toFilePath . (</> dotHpc) <$> hpcRelativeDir
-    return ["--ghc-options", "-hpcdir " ++ hpcIndexDir ++ " -ddump-hi -ddump-to-file"]
+-- Do not pass `-hpcdir` as GHC option if the coverage is not enabled.
+-- This helps running stack-compiled programs with dynamic interpreters like `hint`.
+-- Cfr: https://github.com/commercialhaskell/stack/issues/997
+extraBuildOptions :: M env m => BuildOpts -> m [String]
+extraBuildOptions bopts = do
+    let ddumpOpts = " -ddump-hi -ddump-to-file"
+    case toCoverage (boptsTestOpts bopts) of
+      True -> do
+        hpcIndexDir <- toFilePath . (</> dotHpc) <$> hpcRelativeDir
+        return ["--ghc-options", "-hpcdir " ++ hpcIndexDir ++ ddumpOpts]
+      False -> return ["--ghc-options", ddumpOpts]
 
 -- | Take the given list of package dependencies and the contents of the global
 -- package database, and construct a set of installed package IDs that:
