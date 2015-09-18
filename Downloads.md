@@ -90,7 +90,7 @@ We generally test on the current version of OS X, but stack is known to work on 
 
 ## Fedora
 
-*note*: for 32-bit, use the [generic Linux option](#linux)
+*note*: for 32-bit, you can use the [petersen/stack Copr repo](https://copr.fedoraproject.org/coprs/petersen/stack/) which can be enabled with `dnf copr enable petersen/stack`.
 
 1. Add the appropriate source repository:
 
