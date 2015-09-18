@@ -341,6 +341,7 @@ ensureGHC sopts = do
 
             -- Install GHC
             ghcVariant <- asks getGHCVariant
+            config <- asks getConfig
             ghcPkgName <- parsePackageNameFromString ("ghc" ++ ghcVariantSuffix ghcVariant)
             ghcIdent <- case getInstalledTool installed ghcPkgName (isWanted . GhcVersion) of
                 Just ident -> return ident
@@ -353,10 +354,9 @@ ensureGHC sopts = do
                             (soptsCompilerCheck sopts)
                             (soptsGHCBindistURL sopts)
                     | otherwise -> do
-                        Platform arch _ <- asks getPlatform
                         throwM $ CompilerVersionMismatch
                             msystem
-                            (soptsWantedCompiler sopts, arch)
+                            (soptsWantedCompiler sopts, expectedArch)
                             ghcVariant
                             (soptsCompilerCheck sopts)
                             (soptsStackYaml sopts)
@@ -461,7 +461,7 @@ upgradeCabal menv wc = do
             platform <- asks getPlatform
             let setupExe = toFilePath $ dir </>
                   (case platform of
-                     Platform _ os | isWindows os -> $(mkRelFile "Setup.exe")
+                     Platform _ Cabal.Windows -> $(mkRelFile "Setup.exe")
                      _ -> $(mkRelFile "Setup"))
                 dirArgument name' = concat
                     [ "--"
