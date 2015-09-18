@@ -26,6 +26,7 @@ Release checklist after testing:
 * Run `scripts/release/release.hs ubuntu-upload debian-upload` in Linux (Ubuntu or Debian - [Vagrantfile](https://github.com/commercialhaskell/stack/tree/master/etc/vagrant/debian-7-amd64))
 * Run `scripts/release/release.hs centos-upload fedora-upload` on Linux (CentOS or Fedora - [Vagrantfile](https://github.com/commercialhaskell/stack/tree/master/etc/vagrant/centos-7-x86_64))
 * Upload Arch Linux packages (manual process)
+* Build new MinGHC distribution (See https://github.com/fpco/minghc/commit/51490f398e6722672364548a3855a0bfcba48ffe)
 
 After binaries uploaded:
 
