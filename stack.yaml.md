@@ -1,6 +1,6 @@
 This page is intended to fully document all configuration options available in the stack.yaml file. Note that this page is likely to be both *incomplete* and sometimes *inaccurate*. If you see such cases, please update the page, and if you're not sure how, open an issue labeled "question".
 
-The stack.yaml configuration options break down into [project specific](#project-config) options in: 
+The stack.yaml configuration options break down into [project specific](#project-config) options in:
 
 - `<project dir>/stack.yaml`
 
@@ -240,3 +240,34 @@ Caveat emptor: setting options like this will affect your snapshot packages,
 which can lead to unpredictable behavior versus official Stackage snapshots.
 This is in contrast to the `ghc-options` command line flag, which will only
 affect local targets.
+
+### ghc-variant
+
+(Since 0.1.5)
+
+Specify a variant binary distribution of GHC to use.  Known values:
+
+* `standard`: This is the default, uses the standard GHC binary distribution
+* `gmp4`: Use the "centos6" GHC bindist, for Linux systems with libgmp4 (aka
+  `libgmp.so.3`), such as CentOS 6. This variant will be used automatically on such systems; you should not need to specify it in the configuration
+* `integersimple`: Use a GHC bindist that uses
+  [integer-simple instead of GMP](https://ghc.haskell.org/trac/ghc/wiki/ReplacingGMPNotes)
+* any other value: Use a custom GHC bindist. You should specify
+  [setup-info](#setup-info) so `stack setup` knows where to download it, or
+  pass the `stack setup --ghc-bindist` argument on the command-line
+
+### setup-info
+
+(Since 0.1.5)
+
+Allows overriding from where tools like GHC and msys2 (on Windows) are
+downloaded. Most useful for specifying locations of custom GHC binary
+distributions (for use with the [ghc-variant](#ghc-variant) option):
+
+```yaml
+setup-info:
+  ghc:
+    windows32-custom-foo:
+      7.10.2:
+        url: "https://example.com/ghc-7.10.2-i386-unknown-mingw32-foo.tar.xz"
+```
