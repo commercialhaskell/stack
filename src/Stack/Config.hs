@@ -21,7 +21,9 @@
 -- probably default to behaving like cabal, possibly with spitting out
 -- a warning that "you should run `stk init` to make things better".
 module Stack.Config
-  (loadConfig
+  (MiniConfig
+  ,loadConfig
+  ,loadMiniConfig
   ,packagesParser
   ,resolvePackageEntry
   ) where
@@ -35,7 +37,7 @@ import           Control.Monad
 import           Control.Monad.Catch (Handler(..), MonadCatch, MonadThrow, catches, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
-import           Control.Monad.Reader (MonadReader, ask, asks, runReaderT)
+import           Control.Monad.Reader (MonadReader, ask, runReaderT)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson.Extended
@@ -46,7 +48,8 @@ import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import           Data.Text.Encoding (encodeUtf8, decodeUtf8, decodeUtf8With)
+import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Data.Yaml as Yaml
 import           Distribution.System (OS (..), Platform (..), buildPlatform)
 import qualified Distribution.Text
@@ -58,6 +61,7 @@ import           Options.Applicative (Parser, strOption, long, help)
 import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
+import           Safe (headMay)
 import           Stack.BuildPlan
 import           Stack.Constants
 import qualified Stack.Docker as Docker
@@ -115,7 +119,9 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
                 }]
             configMonoidPackageIndices
 
-         configSystemGHC = fromMaybe True configMonoidSystemGHC
+         configGHCVariant0 = configMonoidGHCVariant
+
+         configSystemGHC = fromMaybe (isNothing configGHCVariant0) configMonoidSystemGHC
          configInstallGHC = fromMaybe False configMonoidInstallGHC
          configSkipGHCCheck = fromMaybe False configMonoidSkipGHCCheck
          configSkipMsys = fromMaybe False configMonoidSkipMsys
@@ -147,14 +153,16 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
               $ map (T.pack *** T.pack) rawEnv
      let configEnvOverride _ = return origEnv
 
-     platform <- runReaderT platformRelDir configPlatform
-
+     platformOnlyDir <- runReaderT platformOnlyRelDir configPlatform
      configLocalPrograms <-
-        case configPlatform of
-            Platform _ Windows -> do
-                progsDir <- getWindowsProgsDir configStackRoot origEnv
-                return $ progsDir </> $(mkRelDir stackProgName) </> platform
-            _ -> return $ configStackRoot </> $(mkRelDir "programs") </> platform
+         case configPlatform of
+             Platform _ Windows -> do
+                 progsDir <- getWindowsProgsDir configStackRoot origEnv
+                 return $ progsDir </> $(mkRelDir stackProgName) </> platformOnlyDir
+             _ ->
+                 return $
+                 configStackRoot </> $(mkRelDir "programs") </>
+                 platformOnlyDir
 
      configLocalBin <-
          case configMonoidLocalBinPath of
@@ -176,8 +184,29 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
      let configTemplateParams = configMonoidTemplateParameters
          configScmInit = configMonoidScmInit
          configGhcOptions = configMonoidGhcOptions
+         configSetupInfoLocations = configMonoidSetupInfoLocations
 
      return Config {..}
+
+-- | Get the default 'GHCVariant'.  On older Linux systems with libgmp4, returns 'GHCGMP4'.
+getDefaultGHCVariant
+    :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m)
+    => EnvOverride -> Platform -> m GHCVariant
+getDefaultGHCVariant menv (Platform _ Linux) = do
+    executablePath <- liftIO getExecutablePath
+    elddOut <- tryProcessStdout Nothing menv "ldd" [executablePath]
+    return $
+        case elddOut of
+            Left _ -> GHCStandard
+            Right lddOut ->
+                if hasLineWithFirstWord "libgmp.so.3" lddOut
+                    then GHCGMP4
+                    else GHCStandard
+  where
+    hasLineWithFirstWord w =
+        elem (Just w) .
+        map (headMay . T.words) . T.lines . decodeUtf8With lenientDecode
+getDefaultGHCVariant _ _ = return GHCStandard
 
 -- | Get the directory on Windows where we should install extra programs. For
 -- more information, see discussion at:
@@ -193,13 +222,29 @@ getWindowsProgsDir stackRoot m =
             return $ lad </> $(mkRelDir "Programs")
         Nothing -> return $ stackRoot </> $(mkRelDir "Programs")
 
-data MiniConfig = MiniConfig Manager Config
+-- | An environment with a subset of BuildConfig used for setup.
+data MiniConfig = MiniConfig Manager GHCVariant Config
 instance HasConfig MiniConfig where
-    getConfig (MiniConfig _ c) = c
+    getConfig (MiniConfig _ _ c) = c
 instance HasStackRoot MiniConfig
 instance HasHttpManager MiniConfig where
-    getHttpManager (MiniConfig man _) = man
+    getHttpManager (MiniConfig man _ _) = man
 instance HasPlatform MiniConfig
+instance HasGHCVariant MiniConfig where
+    getGHCVariant (MiniConfig _ v _) = v
+
+-- | Load the 'MiniConfig'.
+loadMiniConfig
+    :: (MonadIO m, HasHttpManager a, MonadReader a m, MonadBaseControl IO m, MonadCatch m, MonadLogger m)
+    => Config -> m MiniConfig
+loadMiniConfig config = do
+    menv <- liftIO $ (configEnvOverride config) minimalEnvSettings
+    manager <- getHttpManager <$> ask
+    ghcVariant <-
+        case configGHCVariant0 config of
+            Just ghcVariant -> return ghcVariant
+            Nothing -> getDefaultGHCVariant menv (configPlatform config)
+    return (MiniConfig manager ghcVariant config)
 
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.
@@ -235,7 +280,8 @@ loadBuildConfig :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, H
                 -> m BuildConfig
 loadBuildConfig mproject config stackRoot mresolver = do
     env <- ask
-    let miniConfig = MiniConfig (getHttpManager env) config
+    miniConfig <- loadMiniConfig config
+
     (project', stackYamlFP) <- case mproject of
       Just (project, fp, _) -> return (project, fp)
       Nothing -> do
@@ -283,10 +329,7 @@ loadBuildConfig mproject config stackRoot mresolver = do
         case mresolver of
             Nothing -> return $ projectResolver project'
             Just aresolver -> do
-                manager <- asks getHttpManager
-                runReaderT
-                    (makeConcreteResolver aresolver)
-                    (MiniConfig manager config)
+                runReaderT (makeConcreteResolver aresolver) miniConfig
     let project = project' { projectResolver = resolver }
 
     wantedCompiler <-
@@ -308,6 +351,7 @@ loadBuildConfig mproject config stackRoot mresolver = do
         , bcStackYaml = stackYamlFP
         , bcFlags = projectFlags project
         , bcImplicitGlobal = isNothing mproject
+        , bcGHCVariant = getGHCVariant miniConfig
         }
 
 -- | Resolve a PackageEntry into a list of paths, downloading and cloning as

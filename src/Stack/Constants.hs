@@ -200,7 +200,7 @@ distRelativeDir :: (MonadThrow m, MonadReader env m, HasPlatform env, HasEnvConf
                 => m (Path Rel Dir)
 distRelativeDir = do
     cabalPkgVer <- asks (envConfigCabalVersion . getEnvConfig)
-    platform <- platformRelDir
+    platform <- platformVariantRelDir
     cabal <-
         parseRelDir $
         packageIdentifierString

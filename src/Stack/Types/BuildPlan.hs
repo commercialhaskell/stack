@@ -22,7 +22,6 @@ module Stack.Types.BuildPlan
     , MiniPackageInfo (..)
     , renderSnapName
     , parseSnapName
-    , isWindows
     ) where
 
 import           Control.Applicative
@@ -398,9 +397,3 @@ data MiniPackageInfo = MiniPackageInfo
 instance Binary MiniPackageInfo
 instance HasStructuralInfo MiniPackageInfo
 instance NFData MiniPackageInfo
-
-
-isWindows :: OS -> Bool
-isWindows Windows = True
-isWindows (OtherOS "windowsintegersimple") = True
-isWindows _ = False

@@ -3,6 +3,14 @@
 Major changes:
 
 * On Windows, we now use a full MSYS2 installation in place of the previous PortableGit. This gives you access to the pacman package manager for more easily installing libraries.
+* Support for custom GHC binary distributions [#530](https://github.com/commercialhaskell/stack/issues/530)
+    * `ghc-variant` option in stack.yaml to specify the variant (also
+      `--ghc-variant` command-line option)
+    * `setup-info` in stack.yaml, to specify where to download custom binary
+      distributions (also `--ghc-bindist` command-line option)
+    * Note: On systems with libgmp4 (aka `libgmp.so.3`), such as CentOS 6, you
+      may need to re-run `stack setup` due to the centos6 GHC bindist being
+      treated like a variant
 
 Other enhancements:
 

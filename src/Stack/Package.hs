@@ -727,7 +727,7 @@ mkResolveConditions :: CompilerVersion -- ^ Compiler version
 mkResolveConditions compilerVersion (Platform arch os) flags = ResolveConditions
     { rcFlags = flags
     , rcCompilerVersion = compilerVersion
-    , rcOS = if isWindows os then Windows else os
+    , rcOS = os
     , rcArch = arch
     }
 

@@ -59,7 +59,7 @@ ignoredDirs = Set.fromList
     ]
 
 -- | Generate stack.yaml
-initProject :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
+initProject :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, HasGHCVariant env, MonadLogger m, MonadBaseControl IO m)
             => Path Abs Dir
             -> InitOpts
             -> m ()
@@ -126,7 +126,7 @@ getSnapshots' =
         return Nothing
 
 -- | Get the default resolver value
-getDefaultResolver :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
+getDefaultResolver :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, HasGHCVariant env, MonadLogger m, MonadBaseControl IO m)
                    => [Path Abs File] -- ^ cabal files
                    -> [C.GenericPackageDescription] -- ^ cabal descriptions
                    -> InitOpts
@@ -163,7 +163,7 @@ getDefaultResolver cabalfps gpds initOpts =
                 , fmap fst extraDeps
                 )
 
-getRecommendedSnapshots :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
+getRecommendedSnapshots :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, HasGHCVariant env, MonadLogger m, MonadBaseControl IO m)
                         => Snapshots
                         -> SnapPref
                         -> m [SnapName]

@@ -216,13 +216,14 @@ readFlag = do
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser docker =
-    (\opts systemGHC installGHC arch os jobs includes libs skipGHCCheck skipMsys localBin -> mempty
+    (\opts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin -> mempty
         { configMonoidDockerOpts = opts
         , configMonoidSystemGHC = systemGHC
         , configMonoidInstallGHC = installGHC
         , configMonoidSkipGHCCheck = skipGHCCheck
         , configMonoidArch = arch
         , configMonoidOS = os
+        , configMonoidGHCVariant = ghcVariant
         , configMonoidJobs = jobs
         , configMonoidExtraIncludeDirs = includes
         , configMonoidExtraLibDirs = libs
@@ -248,6 +249,7 @@ configOptsParser docker =
            <> metavar "OS"
            <> help "Operating system, e.g. linux, windows"
             ))
+    <*> optional ghcVariantParser
     <*> optional (option auto
             ( long "jobs"
            <> short 'j'
@@ -594,6 +596,21 @@ readAbstractResolver = do
             case parseResolverText $ T.pack s of
                 Left e -> readerError $ show e
                 Right x -> return $ ARResolver x
+
+-- | GHC variant parser
+ghcVariantParser :: Parser GHCVariant
+ghcVariantParser =
+    option
+        readGHCVariant
+        (long "ghc-variant" <> metavar "VARIANT" <>
+         help
+             "Specialized GHC variant, e.g. integersimple (implies --no-system-ghc)")
+  where
+    readGHCVariant = do
+        s <- readerAsk
+        case parseGHCVariant s of
+            Left e -> readerError (show e)
+            Right v -> return v
 
 -- | Parser for @solverCmd@
 solverOptsParser :: Parser Bool

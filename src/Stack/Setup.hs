@@ -6,6 +6,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE TupleSections #-}
@@ -28,7 +29,6 @@ import           Control.Monad.State (get, put, modify)
 import           Control.Monad.Trans.Control
 import           Crypto.Hash (SHA1(SHA1))
 import           Data.Aeson.Extended
-import           Data.ByteString (ByteString)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import           Data.Conduit (Conduit, ($$), (=$), await, yield, awaitForever)
@@ -61,7 +61,7 @@ import           Network.HTTP.Download.Verified
 import           Path
 import           Path.IO
 import           Prelude hiding (concat, elem) -- Fix AMP warning
-import           Safe (headMay, readMay)
+import           Safe (readMay)
 import           Stack.Types.Build
 import           Stack.Config (resolvePackageEntry)
 import           Stack.Constants (distRelativeDir)
@@ -79,6 +79,7 @@ import           System.IO.Temp (withSystemTempDirectory)
 import           System.Process (rawSystem)
 import           System.Process.Read
 import           System.Process.Run (runIn)
+import           System.IO.Temp (withTempDirectory)
 import           Text.Printf (printf)
 
 -- | Default location of the stack-setup.yaml file
@@ -106,6 +107,9 @@ data SetupOpts = SetupOpts
     , soptsResolveMissingGHC :: !(Maybe Text)
     -- ^ Message shown to user for how to resolve the missing GHC
     , soptsStackSetupYaml :: !String
+    -- ^ Location of the main stack-setup.yaml file
+    , soptsGHCBindistURL :: !(Maybe String)
+    -- ^ Alternate GHC binary distribution (requires custom GHCVariant)
     }
     deriving Show
 data SetupException = UnsupportedSetupCombo OS Arch
@@ -113,6 +117,10 @@ data SetupException = UnsupportedSetupCombo OS Arch
                     | UnknownCompilerVersion Text CompilerVersion (Set Version)
                     | UnknownOSKey Text
                     | GHCSanityCheckCompileFailed ReadProcessException (Path Abs File)
+                    | WantedMustBeGHC
+                    | RequireCustomGHCVariant
+                    | ProblemWhileDecompressing (Path Abs File)
+                    | SetupInfoMissingSevenz
     deriving Typeable
 instance Exception SetupException
 instance Show SetupException where
@@ -141,9 +149,17 @@ instance Show SetupException where
         , "for more information. Exception was:\n"
         , show e
         ]
+    show WantedMustBeGHC =
+        "The wanted compiler must be GHC"
+    show RequireCustomGHCVariant =
+        "A custom --ghc-variant must be specified to use --ghc-bindist"
+    show (ProblemWhileDecompressing archive) =
+        "Problem while decompressing " ++ toFilePath archive
+    show SetupInfoMissingSevenz =
+        "SetupInfo missing Sevenz EXE/DLL"
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
-setupEnv :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasBuildConfig env, HasHttpManager env, MonadBaseControl IO m)
+setupEnv :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasBuildConfig env, HasHttpManager env, HasGHCVariant env, MonadBaseControl IO m)
          => Maybe Text -- ^ Message to give user when necessary GHC is not available
          -> m EnvConfig
 setupEnv mResolveMissingGHC = do
@@ -163,6 +179,7 @@ setupEnv mResolveMissingGHC = do
             , soptsUpgradeCabal = False
             , soptsResolveMissingGHC = mResolveMissingGHC
             , soptsStackSetupYaml = defaultStackSetupYaml
+            , soptsGHCBindistURL = Nothing
             }
 
     mghcBin <- ensureGHC sopts
@@ -283,7 +300,7 @@ instance Monoid ExtraDirs where
         (c ++ z)
 
 -- | Ensure GHC is installed and provide the PATHs to add if necessary
-ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, HasGHCVariant env, MonadBaseControl IO m)
           => SetupOpts
           -> m (Maybe ExtraDirs)
 ensureGHC sopts = do
@@ -320,21 +337,27 @@ ensureGHC sopts = do
         then do
             getSetupInfo' <- runOnce (getSetupInfo sopts =<< asks getHttpManager)
 
-            config <- asks getConfig
-            installed <- runReaderT listInstalled config
+            installed <- listInstalled
 
             -- Install GHC
-            ghcIdent <- case getInstalledTool installed $(mkPackageName "ghc") (isWanted . GhcVersion) of
+            ghcVariant <- asks getGHCVariant
+            ghcPkgName <- parsePackageNameFromString ("ghc" ++ ghcVariantSuffix ghcVariant)
+            ghcIdent <- case getInstalledTool installed ghcPkgName (isWanted . GhcVersion) of
                 Just ident -> return ident
                 Nothing
                     | soptsInstallIfMissing sopts -> do
                         si <- getSetupInfo'
-                        downloadAndInstallGHC menv0 si (soptsWantedCompiler sopts) (soptsCompilerCheck sopts)
+                        downloadAndInstallGHC
+                            si
+                            (soptsWantedCompiler sopts)
+                            (soptsCompilerCheck sopts)
+                            (soptsGHCBindistURL sopts)
                     | otherwise -> do
                         Platform arch _ <- asks getPlatform
                         throwM $ CompilerVersionMismatch
                             msystem
                             (soptsWantedCompiler sopts, arch)
+                            ghcVariant
                             (soptsCompilerCheck sopts)
                             (soptsStackYaml sopts)
                             (fromMaybe
@@ -343,14 +366,15 @@ ensureGHC sopts = do
                                 $ soptsResolveMissingGHC sopts)
 
             -- Install msys2 on windows, if necessary
-            mmsys2Ident <- case configPlatform config of
-                Platform _ os | isWindows os && not (soptsSkipMsys sopts) ->
+            platform <- asks getPlatform
+            mmsys2Ident <- case platform of
+                Platform _ Cabal.Windows | not (soptsSkipMsys sopts) ->
                     case getInstalledTool installed $(mkPackageName "msys2") (const True) of
                         Just ident -> return (Just ident)
                         Nothing
                             | soptsInstallIfMissing sopts -> do
                                 si <- getSetupInfo'
-                                osKey <- getOSKey menv0
+                                osKey <- getOSKey
                                 VersionedDownloadInfo version info <-
                                     case Map.lookup osKey $ siMsys2 si of
                                         Just x -> return x
@@ -362,7 +386,7 @@ ensureGHC sopts = do
                 _ -> return Nothing
 
             let idents = catMaybes [Just ghcIdent, mmsys2Ident]
-            paths <- runReaderT (mapM extraDirs idents) config
+            paths <- mapM extraDirs idents
             return $ Just $ mconcat paths
         else return Nothing
 
@@ -480,66 +504,36 @@ getSystemCompiler menv wc = do
                 (_, Nothing) -> return Nothing
         else return Nothing
 
-data DownloadInfo = DownloadInfo
-    { downloadInfoUrl :: Text
-    , downloadInfoContentLength :: Int
-    , downloadInfoSha1 :: Maybe ByteString
-    }
-    deriving Show
-
-data VersionedDownloadInfo = VersionedDownloadInfo
-    { vdiVersion :: Version
-    , vdiDownloadInfo :: DownloadInfo
-    }
-    deriving Show
-
-parseDownloadInfoFromObject :: Yaml.Object -> Yaml.Parser DownloadInfo
-parseDownloadInfoFromObject o = do
-    url           <- o .: "url"
-    contentLength <- o .: "content-length"
-    sha1TextMay   <- o .:? "sha1"
-    return DownloadInfo
-        { downloadInfoUrl = url
-        , downloadInfoContentLength = contentLength
-        , downloadInfoSha1 = fmap T.encodeUtf8 sha1TextMay
-        }
-
-instance FromJSON DownloadInfo where
-    parseJSON = withObject "DownloadInfo" parseDownloadInfoFromObject
-instance FromJSON VersionedDownloadInfo where
-    parseJSON = withObject "VersionedDownloadInfo" $ \o -> do
-        version <- o .: "version"
-        downloadInfo <- parseDownloadInfoFromObject o
-        return VersionedDownloadInfo
-            { vdiVersion = version
-            , vdiDownloadInfo = downloadInfo
-            }
-
-data SetupInfo = SetupInfo
-    { siSevenzExe :: DownloadInfo
-    , siSevenzDll :: DownloadInfo
-    , siMsys2 :: Map Text VersionedDownloadInfo
-    , siGHCs :: Map Text (Map Version DownloadInfo)
-    }
-    deriving Show
-instance FromJSON SetupInfo where
-    parseJSON = withObject "SetupInfo" $ \o -> SetupInfo
-        <$> o .: "sevenzexe-info"
-        <*> o .: "sevenzdll-info"
-        <*> o .: "msys2"
-        <*> o .: "ghc"
-
 -- | Download the most recent SetupInfo
-getSetupInfo :: (MonadIO m, MonadThrow m) => SetupOpts -> Manager -> m SetupInfo
+getSetupInfo
+    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasConfig env)
+    => SetupOpts -> Manager -> m SetupInfo
 getSetupInfo sopts manager = do
-    bs <-
-        case parseUrl $ soptsStackSetupYaml sopts of
-            Just req -> do
-                bss <- liftIO $ flip runReaderT manager
-                     $ withResponse req $ \res -> responseBody res $$ CL.consume
-                return $ S8.concat bss
-            Nothing -> liftIO $ S.readFile $ soptsStackSetupYaml sopts
-    either throwM return $ Yaml.decodeEither' bs
+    config <- asks getConfig
+    setupInfos <-
+        mapM
+            loadSetupInfo
+            (SetupInfoFileOrURL (soptsStackSetupYaml sopts) :
+             configSetupInfoLocations config)
+    return
+        (mconcat setupInfos)
+  where
+    loadSetupInfo (SetupInfoInline si) = return si
+    loadSetupInfo (SetupInfoFileOrURL urlOrFile) = do
+        bs <-
+            case parseUrl urlOrFile of
+                Just req -> do
+                    bss <-
+                        liftIO $
+                        flip runReaderT manager $
+                        withResponse req $
+                        \res ->
+                             responseBody res $$ CL.consume
+                    return $ S8.concat bss
+                Nothing -> liftIO $ S.readFile urlOrFile
+        (si,warnings) <- either throwM return (Yaml.decodeEither' bs)
+        logJSONWarnings urlOrFile warnings
+        return si
 
 markInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
               => PackageIdentifier -- ^ e.g., ghc-7.8.4, msys2-20150512
@@ -582,16 +576,16 @@ extraDirs :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
           => PackageIdentifier
           -> m ExtraDirs
 extraDirs ident = do
-    config <- asks getConfig
+    platform <- asks getPlatform
     dir <- installDir ident
-    case (configPlatform config, packageNameString $ packageIdentifierName ident) of
-        (Platform _ (isWindows -> True), "ghc") -> return mempty
+    case (platform, packageNameString $ packageIdentifierName ident) of
+        (Platform _ Cabal.Windows, isGHC -> True) -> return mempty
             { edBins = goList
                 [ dir </> $(mkRelDir "bin")
                 , dir </> $(mkRelDir "mingw") </> $(mkRelDir "bin")
                 ]
             }
-        (Platform _ (isWindows -> True), "msys2") -> return mempty
+        (Platform _ Cabal.Windows, "msys2") -> return mempty
             { edBins = goList
                 [ dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
                 ]
@@ -604,7 +598,7 @@ extraDirs ident = do
                 , dir </> $(mkRelDir "mingw32") </> $(mkRelDir "lib")
                 ]
             }
-        (_, "ghc") -> return mempty
+        (_, isGHC -> True) -> return mempty
             { edBins = goList
                 [ dir </> $(mkRelDir "bin")
                 ]
@@ -614,6 +608,7 @@ extraDirs ident = do
             return mempty
   where
     goList = map toFilePathNoTrailingSlash
+    isGHC n = "ghc" == n || "ghc-" `isPrefixOf` n
 
 getInstalledTool :: [PackageIdentifier] -- ^ already installed
                  -> PackageName         -- ^ package to find
@@ -645,64 +640,75 @@ downloadAndInstallTool si downloadInfo name version installer = do
     markInstalled ident
     return ident
 
-downloadAndInstallGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
-           => EnvOverride
-           -> SetupInfo
+downloadAndInstallGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasGHCVariant env, HasHttpManager env, MonadBaseControl IO m)
+           => SetupInfo
            -> CompilerVersion
            -> VersionCheck
+           -> (Maybe String)
            -> m PackageIdentifier
-downloadAndInstallGHC menv si wanted versionCheck = do
-    osKey <- getOSKey menv
-    pairs <-
-        case Map.lookup osKey $ siGHCs si of
-            Nothing -> throwM $ UnknownOSKey osKey
-            Just pairs -> return pairs
-    let mpair =
-            listToMaybe $
-            sortBy (flip (comparing fst)) $
-            filter (\(v, _) -> isWantedCompiler versionCheck wanted (GhcVersion v)) (Map.toList pairs)
-    (selectedVersion, downloadInfo) <-
-        case mpair of
-            Just pair -> return pair
-            Nothing -> throwM $ UnknownCompilerVersion osKey wanted (Map.keysSet pairs)
-    platform <- asks $ configPlatform . getConfig
+downloadAndInstallGHC si wanted versionCheck mbindistURL = do
+    ghcVariant <- asks getGHCVariant
+    (selectedVersion, downloadInfo) <- case mbindistURL of
+        Just bindistURL -> do
+            case ghcVariant of
+                GHCCustom _ -> return ()
+                _ -> throwM RequireCustomGHCVariant
+            case wanted of
+                GhcVersion version ->
+                    return (version, DownloadInfo (T.pack bindistURL) Nothing Nothing)
+                _ ->
+                    throwM WantedMustBeGHC
+        _ -> do
+            ghcKey <- getGhcKey
+            pairs <-
+                case Map.lookup ghcKey $ siGHCs si of
+                    Nothing -> throwM $ UnknownOSKey ghcKey
+                    Just pairs -> return pairs
+            let mpair =
+                    listToMaybe $
+                    sortBy (flip (comparing fst)) $
+                    filter (\(v, _) -> isWantedCompiler versionCheck wanted (GhcVersion v)) (Map.toList pairs)
+            case mpair of
+                Just pair -> return pair
+                Nothing -> throwM $ UnknownCompilerVersion ghcKey wanted (Map.keysSet pairs)
+    platform <- asks getPlatform
     let installer =
             case platform of
-                Platform _ os | isWindows os -> installGHCWindows
+                Platform _ Cabal.Windows -> installGHCWindows
                 _ -> installGHCPosix
-    $logInfo "Preparing to install GHC to an isolated location."
+    $logInfo $
+        "Preparing to install GHC" <>
+        (case ghcVariant of
+            GHCStandard -> ""
+            v -> " (" <> T.pack (ghcVariantName v) <> ")") <>
+        " to an isolated location."
     $logInfo "This will not interfere with any system-level installation."
-    downloadAndInstallTool si downloadInfo $(mkPackageName "ghc") selectedVersion installer
+    ghcPkgName <- parsePackageNameFromString ("ghc" ++ ghcVariantSuffix ghcVariant)
+    downloadAndInstallTool si downloadInfo ghcPkgName selectedVersion installer
 
-getOSKey :: (MonadReader env m, MonadThrow m, HasConfig env, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
-         => EnvOverride -> m Text
-getOSKey menv = do
-    platform <- asks $ configPlatform . getConfig
+getGhcKey :: (MonadReader env m, MonadThrow m, HasPlatform env, HasGHCVariant env, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
+         => m Text
+getGhcKey = do
+    ghcVariant <- asks getGHCVariant
+    osKey <- getOSKey
+    return $ osKey <> T.pack (ghcVariantSuffix ghcVariant)
+
+getOSKey :: (MonadReader env m, MonadThrow m, HasPlatform env, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
+         => m Text
+getOSKey = do
+    platform <- asks getPlatform
     case platform of
-        Platform I386   Cabal.Linux -> ("linux32" <>) <$> getLinuxSuffix
-        Platform X86_64 Cabal.Linux -> ("linux64" <>) <$> getLinuxSuffix
-        Platform I386   Cabal.OSX -> return "macosx"
-        Platform X86_64 Cabal.OSX -> return "macosx"
+        Platform I386   Cabal.Linux   -> return "linux32"
+        Platform X86_64 Cabal.Linux   -> return "linux64"
+        Platform I386   Cabal.OSX     -> return "macosx"
+        Platform X86_64 Cabal.OSX     -> return "macosx"
         Platform I386   Cabal.FreeBSD -> return "freebsd32"
         Platform X86_64 Cabal.FreeBSD -> return "freebsd64"
         Platform I386   Cabal.OpenBSD -> return "openbsd32"
         Platform X86_64 Cabal.OpenBSD -> return "openbsd64"
         Platform I386   Cabal.Windows -> return "windows32"
         Platform X86_64 Cabal.Windows -> return "windows64"
-
-        Platform I386   (Cabal.OtherOS "windowsintegersimple") -> return "windowsintegersimple32"
-        Platform X86_64 (Cabal.OtherOS "windowsintegersimple") -> return "windowsintegersimple64"
-
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
-  where
-    getLinuxSuffix = do
-        executablePath <- liftIO getExecutablePath
-        elddOut <- tryProcessStdout Nothing menv "ldd" [executablePath]
-        return $ case elddOut of
-            Left _ -> ""
-            Right lddOut -> if hasLineWithFirstWord "libgmp.so.3" lddOut then "-gmp4" else ""
-    hasLineWithFirstWord w =
-      elem (Just w) . map (headMay . T.words) . T.lines . T.decodeUtf8With T.lenientDecode
 
 downloadFromInfo :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
              => DownloadInfo
@@ -764,7 +770,10 @@ installGHCPosix _ archiveFile archiveType destDir ident = do
 
     withSystemTempDirectory "stack-setup" $ \root' -> do
         root <- parseAbsDir root'
-        dir <- liftM (root Path.</>) $ parseRelDir $ packageIdentifierString ident
+        dir <-
+            liftM (root Path.</>) $
+            parseRelDir $
+            "ghc-" ++ versionString (packageIdentifierVersion ident)
 
         $logSticky $ T.concat ["Unpacking GHC into ", (T.pack . toFilePath $ root), " ..."]
         $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
@@ -821,7 +830,7 @@ installGHCWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, 
                   -> Path Abs Dir
                   -> PackageIdentifier
                   -> m ()
-installGHCWindows si archiveFile archiveType destDir _ = do
+installGHCWindows si archiveFile archiveType destDir ident = do
     suffix <-
         case archiveType of
             TarXz -> return ".xz"
@@ -832,18 +841,22 @@ installGHCWindows si archiveFile archiveType destDir _ = do
             Nothing -> error $ "Invalid GHC filename: " ++ show archiveFile
             Just x -> parseAbsFile $ T.unpack x
 
-    config <- asks getConfig
-    run7z <- setup7z si config
+    run7z <- setup7z si
 
-    run7z (parent archiveFile) archiveFile
-    run7z (parent archiveFile) tarFile
-    removeFile tarFile `catchIO` \e ->
-        $logWarn (T.concat
-            [ "Exception when removing "
-            , T.pack $ toFilePath tarFile
-            , ": "
-            , T.pack $ show e
-            ])
+    withTempDirectory (toFilePath $ parent destDir)
+                      ((FP.dropTrailingPathSeparator $ toFilePath $ dirname destDir) ++ "-tmp") $ \tmpDir0 -> do
+        tmpDir <- parseAbsDir tmpDir0
+        run7z (parent archiveFile) archiveFile
+        run7z tmpDir tarFile
+        removeFile tarFile `catchIO` \e ->
+            $logWarn (T.concat
+                [ "Exception when removing "
+                , T.pack $ toFilePath tarFile
+                , ": "
+                , T.pack $ show e
+                ])
+        tarComponent <- parseRelDir $ "ghc-" ++ versionString (packageIdentifierVersion ident)
+        renameDir (tmpDir </> tarComponent) destDir
 
     $logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
 
@@ -866,8 +879,7 @@ installMsys2Windows osKey si archiveFile archiveType destDir _ = do
             Nothing -> error $ "Invalid MSYS2 filename: " ++ show archiveFile
             Just x -> parseAbsFile $ T.unpack x
 
-    config <- asks getConfig
-    run7z <- setup7z si config
+    run7z <- setup7z si
 
     exists <- liftIO $ D.doesDirectoryExist $ toFilePath destDir
     when exists $ liftIO (D.removeDirectoryRecursive $ toFilePath destDir) `catchIO` \e -> do
@@ -910,26 +922,27 @@ installMsys2Windows osKey si archiveFile archiveType destDir _ = do
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
 -- Returned function takes an unpack directory and archive.
-setup7z :: (MonadReader env m, HasHttpManager env, MonadThrow m, MonadIO m, MonadIO n, MonadLogger m, MonadBaseControl IO m)
+setup7z :: (MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadIO m, MonadIO n, MonadLogger m, MonadBaseControl IO m)
         => SetupInfo
-        -> Config
         -> m (Path Abs Dir -> Path Abs File -> n ())
-setup7z si config = do
-    chattyDownload "7z.dll" (siSevenzDll si) dll
-    chattyDownload "7z.exe" (siSevenzExe si) exe
-    return $ \outdir archive -> liftIO $ do
-        ec <- rawSystem (toFilePath exe)
-            [ "x"
-            , "-o" ++ toFilePath outdir
-            , "-y"
-            , toFilePath archive
-            ]
-        when (ec /= ExitSuccess)
-            $ error $ "Problem while decompressing " ++ toFilePath archive
-  where
-    dir = configLocalPrograms config </> $(mkRelDir "7z")
-    exe = dir </> $(mkRelFile "7z.exe")
-    dll = dir </> $(mkRelFile "7z.dll")
+setup7z si = do
+    dir <- asks $ configLocalPrograms . getConfig
+    let exe = dir </> $(mkRelFile "7z.exe")
+        dll = dir </> $(mkRelFile "7z.dll")
+    case (siSevenzDll si, siSevenzExe si) of
+        (Just sevenzDll, Just sevenzExe) -> do
+            chattyDownload "7z.dll" sevenzDll dll
+            chattyDownload "7z.exe" sevenzExe exe
+            return $ \outdir archive -> liftIO $ do
+                ec <- rawSystem (toFilePath exe)
+                    [ "x"
+                    , "-o" ++ toFilePath outdir
+                    , "-y"
+                    , toFilePath archive
+                    ]
+                when (ec /= ExitSuccess)
+                    $ throwM (ProblemWhileDecompressing archive)
+        _ -> throwM SetupInfoMissingSevenz
 
 chattyDownload :: (MonadReader env m, HasHttpManager env, MonadIO m, MonadLogger m, MonadThrow m, MonadBaseControl IO m)
                => Text          -- ^ label
@@ -968,7 +981,7 @@ chattyDownload label downloadInfo path = do
     let dReq = DownloadRequest
             { drRequest = req
             , drHashChecks = hashChecks
-            , drLengthCheck = Just totalSize
+            , drLengthCheck = mtotalSize
             , drRetryPolicy = drRetryPolicyDefault
             }
     runInBase <- liftBaseWith $ \run -> return (void . run)
@@ -977,7 +990,7 @@ chattyDownload label downloadInfo path = do
         then $logStickyDone ("Downloaded " <> label <> ".")
         else $logStickyDone "Already downloaded."
   where
-    totalSize = downloadInfoContentLength downloadInfo
+    mtotalSize = downloadInfoContentLength downloadInfo
     chattyDownloadProgress runInBase _ = do
         _ <- liftIO $ runInBase $ $logSticky $
           label <> ": download has begun"
@@ -989,21 +1002,15 @@ chattyDownload label downloadInfo path = do
             modify (+ size)
             totalSoFar <- get
             liftIO $ runInBase $ $logSticky $ T.pack $
-                chattyProgressWithTotal totalSoFar totalSize
+                case mtotalSize of
+                    Nothing -> chattyProgressNoTotal totalSoFar
+                    Just 0 -> chattyProgressNoTotal totalSoFar
+                    Just totalSize -> chattyProgressWithTotal totalSoFar totalSize
 
-        -- Note(DanBurton): Total size is now always known in this file.
-        -- However, printing in the case where it isn't known may still be
-        -- useful in other parts of the codebase.
-        -- So I'm just commenting out the code rather than deleting it.
-
-        --      case mcontentLength of
-        --        Nothing -> chattyProgressNoTotal totalSoFar
-        --        Just 0 -> chattyProgressNoTotal totalSoFar
-        --        Just total -> chattyProgressWithTotal totalSoFar total
-        ---- Example: ghc: 42.13 KiB downloaded...
-        --chattyProgressNoTotal totalSoFar =
-        --    printf ("%s: " <> bytesfmt "%7.2f" totalSoFar <> " downloaded...")
-        --           (T.unpack label)
+        -- Example: ghc: 42.13 KiB downloaded...
+        chattyProgressNoTotal totalSoFar =
+            printf ("%s: " <> bytesfmt "%7.2f" totalSoFar <> " downloaded...")
+                   (T.unpack label)
 
         -- Example: ghc: 50.00 MiB / 100.00 MiB (50.00%) downloaded...
         chattyProgressWithTotal totalSoFar total =
@@ -1100,7 +1107,7 @@ getUtf8LocaleVars
     => EnvOverride -> m (Map Text Text)
 getUtf8LocaleVars menv = do
     Platform _ os <- asks getPlatform
-    if isWindows os
+    if os == Cabal.Windows
         then
              -- On Windows, locale is controlled by the code page, so we don't set any environment
              -- variables.
