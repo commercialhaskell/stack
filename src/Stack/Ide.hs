@@ -7,7 +7,9 @@
 
 -- | Run a IDE configured with the user's project(s).
 
-module Stack.Ide (ide) where
+module Stack.Ide
+    (ide, getPackageOptsAndTargetFiles)
+    where
 
 import           Control.Concurrent
 import           Control.Monad.Catch
@@ -54,27 +56,7 @@ ide targets useropts = do
     (_realTargets,_,pkgs) <- ghciSetup Nothing targets
     pwd <- getWorkingDir
     (pkgopts,srcfiles) <-
-        liftM mconcat $
-        forM pkgs $
-        \pkg ->
-             do dist <- distDirFromDir (ghciPkgDir pkg)
-                autogen <- return (autogenDir dist)
-                paths_foo <-
-                    liftM
-                        (autogen </>)
-                        (parseRelFile
-                             ("Paths_" ++
-                              packageNameString (ghciPkgName pkg) ++ ".hs"))
-                paths_foo_exists <- fileExists paths_foo
-                return
-                    ( ["--dist-dir=" <> toFilePath dist] ++
-                      map ("--ghc-option=" ++) (ghciPkgOpts pkg)
-                    , mapMaybe
-                          (fmap toFilePath . stripDir pwd)
-                          (S.toList (ghciPkgModFiles pkg) <>
-                           if paths_foo_exists
-                               then [paths_foo]
-                               else []))
+        liftM mconcat $ forM pkgs $ getPackageOptsAndTargetFiles pwd
     localdb <- packageDatabaseLocal
     depsdb <- packageDatabaseDeps
     mpath <- liftIO $ lookupEnv "PATH"
@@ -91,24 +73,30 @@ ide targets useropts = do
             paths <>
             pkgopts <>
             pkgdbs
-    let initialStdin = encode (initialRequest srcfiles)
-    $logDebug $ "Initial stack-ide request: " <> T.pack (show initialStdin)
-    exec "stack-ide" args initialStdin
+    exec "stack-ide" args ""
 
--- | Make the initial request.
-initialRequest :: [FilePath] -> Value
-initialRequest srcfiles =
-    object
-        [ "tag" .= "RequestUpdateSession"
-        , "contents" .=
-            [ object
-                [ "tag" .= "RequestUpdateTargets"
-                , "contents" .= object
-                    [ "tag" .= "TargetsInclude"
-                    , "contents" .= srcfiles ]
-                ]
-            ]
-        ]
+-- | Get options and target files for the given package info.
+getPackageOptsAndTargetFiles
+    :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env)
+    => Path Abs Dir -> GhciPkgInfo -> m ([FilePath], [FilePath])
+getPackageOptsAndTargetFiles pwd pkg = do
+    dist <- distDirFromDir (ghciPkgDir pkg)
+    autogen <- return (autogenDir dist)
+    paths_foo <-
+        liftM
+            (autogen </>)
+            (parseRelFile
+                 ("Paths_" ++ packageNameString (ghciPkgName pkg) ++ ".hs"))
+    paths_foo_exists <- fileExists paths_foo
+    return
+        ( ["--dist-dir=" <> toFilePath dist] ++
+          map ("--ghc-option=" ++) (ghciPkgOpts pkg)
+        , mapMaybe
+              (fmap toFilePath . stripDir pwd)
+              (S.toList (ghciPkgCFiles pkg) <> S.toList (ghciPkgModFiles pkg) <>
+               if paths_foo_exists
+                   then [paths_foo]
+                   else []))
 
 -- | Execute a process within the Stack configured environment.
 exec :: (HasConfig r, MonadReader r m, MonadIO m, MonadLogger m, MonadThrow m)
