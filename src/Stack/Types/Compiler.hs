@@ -36,7 +36,7 @@ instance Binary CompilerVersion
 instance HasStructuralInfo CompilerVersion
 instance NFData CompilerVersion
 instance ToJSON CompilerVersion where
-    toJSON = toJSON . compilerVersionName
+    toJSON = toJSON . compilerVersionText
 instance FromJSON CompilerVersion where
     parseJSON (String t) = maybe (fail "Failed to parse compiler version") return (parseCompilerVersion t)
     parseJSON _ = fail "Invalid CompilerVersion, must be String"
@@ -54,11 +54,14 @@ parseCompilerVersion t
     | otherwise
         = Nothing
 
-compilerVersionName :: CompilerVersion -> T.Text
-compilerVersionName (GhcVersion vghc) =
+compilerVersionText :: CompilerVersion -> T.Text
+compilerVersionText (GhcVersion vghc) =
     "ghc-" <> versionText vghc
-compilerVersionName (GhcjsVersion vghcjs vghc) =
+compilerVersionText (GhcjsVersion vghcjs vghc) =
     "ghcjs-" <> versionText vghcjs <> "_ghc-" <> versionText vghc
+
+compilerVersionString :: CompilerVersion -> String
+compilerVersionString = T.unpack . compilerVersionText
 
 whichCompiler :: CompilerVersion -> WhichCompiler
 whichCompiler GhcVersion {} = Ghc

@@ -448,7 +448,7 @@ instance FromJSON (Resolver,[JSONWarning]) where
 -- directory names
 resolverName :: Resolver -> Text
 resolverName (ResolverSnapshot name) = renderSnapName name
-resolverName (ResolverCompiler v) = compilerVersionName v
+resolverName (ResolverCompiler v) = compilerVersionText v
 resolverName (ResolverCustom name _) = "custom-" <> name
 
 -- | Try to parse a @Resolver@ from a @Text@. Won't work for complex resolvers (like custom).
@@ -875,7 +875,7 @@ compilerVersionDir = do
     compilerVersion <- asks (envConfigCompilerVersion . getEnvConfig)
     parseRelDir $ case compilerVersion of
         GhcVersion version -> versionString version
-        GhcjsVersion {} -> T.unpack (compilerVersionName compilerVersion)
+        GhcjsVersion {} -> compilerVersionString compilerVersion
 
 -- | Package database for installing dependencies into
 packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)

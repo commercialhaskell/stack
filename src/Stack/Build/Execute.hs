@@ -226,8 +226,7 @@ getSetupExe setupHs tmpdir = do
             , "-"
             , Distribution.Text.display $ configPlatform config
             , "-"
-            , T.unpack $ compilerVersionName
-                       $ envConfigCompilerVersion econfig
+            , compilerVersionString $ envConfigCompilerVersion econfig
             ]
         exeNameS = baseNameS ++
             case configPlatform config of

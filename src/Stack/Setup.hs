@@ -134,7 +134,7 @@ instance Show SetupException where
         intercalate ", " tools
     show (UnknownCompilerVersion oskey wanted known) = concat
         [ "No information found for "
-        , T.unpack (compilerVersionName wanted)
+        , compilerVersionString wanted
         , ".\nSupported versions for OS key '" ++ T.unpack oskey ++ "': "
         , intercalate ", " (map show $ Set.toList known)
         ]
