@@ -11,6 +11,7 @@
 
 module Stack.GhcPkg
   (findGhcPkgId
+  ,findGhcPkgKey
   ,getGlobalDB
   ,EnvOverride
   ,envHelper
@@ -145,6 +146,18 @@ findGhcPkgId menv wc pkgDbs name = do
     case mpid of
         Just !pid -> return (parseGhcPkgId (T.encodeUtf8 pid))
         _ -> return Nothing
+
+-- | Get the package key e.g. @foo_9bTCpMF7G4UFWJJvtDrIdB@.
+--
+-- NOTE: GHC > 7.10 only! Will always yield 'Nothing' otherwise.
+findGhcPkgKey :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+             => EnvOverride
+             -> WhichCompiler
+             -> [Path Abs Dir] -- ^ package databases
+             -> PackageName
+             -> m (Maybe Text)
+findGhcPkgKey menv wc pkgDbs name =
+    findGhcPkgField menv wc pkgDbs (packageNameString name) "key"
 
 -- | Get the version of the package
 findGhcPkgVersion :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)

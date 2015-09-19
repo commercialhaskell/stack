@@ -34,6 +34,7 @@ import           Path
 import           Path.IO
 import           Prelude                        hiding (FilePath, writeFile)
 import           Stack.Constants
+import           Stack.Package
 import           Stack.Types
 import           System.Process.Read
 import           Text.Hastache                  (htmlEscape)
@@ -41,54 +42,69 @@ import           Text.Hastache                  (htmlEscape)
 -- | Generates the HTML coverage report and shows a textual coverage
 -- summary.
 generateHpcReport :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
-                  => Path Abs Dir -> Text -> Text -> Text -> m ()
-generateHpcReport pkgDir pkgName pkgId testName = do
-    let whichTest = pkgName <> "'s test-suite \"" <> testName <> "\""
-    -- Compute destination directory.
-    installDir <- installationRootLocal
-    testNamePath <- parseRelDir (T.unpack testName)
-    pkgIdPath <- parseRelDir (T.unpack pkgId)
-    let destDir = installDir </> hpcDirSuffix </> pkgIdPath </> testNamePath
-    -- Directories for .mix files.
-    hpcDir <- hpcDirFromDir pkgDir
-    hpcRelDir <- (</> dotHpc) <$> hpcRelativeDir
-    -- Compute arguments used for both "hpc markup" and "hpc report".
-    pkgDirs <- Map.keys . envConfigPackages <$> asks getEnvConfig
-    let args =
-            -- Use index files from all packages (allows cross-package
-            -- coverage results).
-            concatMap (\x -> ["--srcdir", toFilePath x]) pkgDirs ++
-            -- Look for index files in the correct dir (relative to
-            -- each pkgdir).
-            ["--hpcdir", toFilePath hpcRelDir, "--reset-hpcdirs"
-            -- Restrict to just the current library code (see #634 -
-            -- this will likely be customizable in the future)
-            ,"--include", T.unpack (pkgId <> ":")]
-    -- If a .tix file exists, generate an HPC report for it.
-    tixFile <- parseRelFile (T.unpack testName ++ ".tix")
-    let tixFileAbs = hpcDir </> tixFile
-    tixFileExists <- fileExists tixFileAbs
-    if not tixFileExists
-        then $logError $ T.concat
-            [ "Didn't find .tix coverage file for "
-            , whichTest
-            , " - expected to find it at "
-            , T.pack (toFilePath tixFileAbs)
-            , "."
-            ]
-        else (`onException` $logError ("Error occurred while producing coverage report for " <> whichTest)) $ do
-            menv <- getMinimalEnvOverride
-            $logInfo $ "Generating HTML coverage report for " <> whichTest
-            _ <- readProcessStdout (Just hpcDir) menv "hpc"
-                ("markup" : toFilePath tixFileAbs : ("--destdir=" ++ toFilePath destDir) : args)
-            output <- readProcessStdout (Just hpcDir) menv "hpc"
-                ("report" : toFilePath tixFileAbs : args)
-            -- Print output, stripping @\r@ characters because
-            -- Windows.
-            forM_ (S8.lines output) ($logInfo . T.decodeUtf8 . S8.filter (not . (=='\r')))
-            $logInfo
-                ("The HTML coverage report for " <> whichTest <> " is available at " <>
-                 T.pack (toFilePath (destDir </> $(mkRelFile "hpc_index.html"))))
+                  => Path Abs Dir -> Package -> [Text] -> (PackageName -> m (Maybe Text)) -> m ()
+generateHpcReport pkgDir package tests getGhcPkgKey = do
+    -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a
+    -- ghc package key. See
+    -- https://github.com/commercialhaskell/stack/issues/785
+    let pkgName = packageNameText (packageName package)
+        pkgId = packageIdentifierString (packageIdentifier package)
+    compilerVersion <- asks (envConfigCompilerVersion . getEnvConfig)
+    includeName <-
+        if getGhcVersion compilerVersion < $(mkVersion "7.10")
+            then return pkgId
+            else do
+                mghcPkgKey <- getGhcPkgKey (packageName package)
+                case mghcPkgKey of
+                    Nothing -> fail $ "Before computing test coverage report, failed to find GHC package key for " ++ T.unpack pkgName
+                    Just ghcPkgKey -> return $ T.unpack ghcPkgKey
+    forM_ tests $ \testName -> do
+        let whichTest = pkgName <> "'s test-suite \"" <> testName <> "\""
+        -- Compute destination directory.
+        installDir <- installationRootLocal
+        testNamePath <- parseRelDir (T.unpack testName)
+        pkgIdPath <- parseRelDir pkgId
+        let destDir = installDir </> hpcDirSuffix </> pkgIdPath </> testNamePath
+        -- Directories for .mix files.
+        hpcDir <- hpcDirFromDir pkgDir
+        hpcRelDir <- (</> dotHpc) <$> hpcRelativeDir
+        -- Compute arguments used for both "hpc markup" and "hpc report".
+        pkgDirs <- Map.keys . envConfigPackages <$> asks getEnvConfig
+        let args =
+                -- Use index files from all packages (allows cross-package
+                -- coverage results).
+                concatMap (\x -> ["--srcdir", toFilePath x]) pkgDirs ++
+                -- Look for index files in the correct dir (relative to
+                -- each pkgdir).
+                ["--hpcdir", toFilePath hpcRelDir, "--reset-hpcdirs"
+                -- Restrict to just the current library code (see #634 -
+                -- this will likely be customizable in the future)
+                ,"--include", includeName ++ ":"]
+        -- If a .tix file exists, generate an HPC report for it.
+        tixFile <- parseRelFile (T.unpack testName ++ ".tix")
+        let tixFileAbs = hpcDir </> tixFile
+        tixFileExists <- fileExists tixFileAbs
+        if not tixFileExists
+            then $logError $ T.concat
+                [ "Didn't find .tix coverage file for "
+                , whichTest
+                , " - expected to find it at "
+                , T.pack (toFilePath tixFileAbs)
+                , "."
+                ]
+            else (`onException` $logError ("Error occurred while producing coverage report for " <> whichTest)) $ do
+                menv <- getMinimalEnvOverride
+                $logInfo $ "Generating HTML coverage report for " <> whichTest
+                _ <- readProcessStdout (Just hpcDir) menv "hpc"
+                    ("markup" : toFilePath tixFileAbs : ("--destdir=" ++ toFilePath destDir) : args)
+                output <- readProcessStdout (Just hpcDir) menv "hpc"
+                    ("report" : toFilePath tixFileAbs : args)
+                -- Print output, stripping @\r@ characters because
+                -- Windows.
+                forM_ (S8.lines output) ($logInfo . T.decodeUtf8 . S8.filter (not . (=='\r')))
+                $logInfo
+                    ("The HTML coverage report for " <> whichTest <> " is available at " <>
+                     T.pack (toFilePath (destDir </> $(mkRelFile "hpc_index.html"))))
 
 generateHpcMarkupIndex :: (MonadIO m,MonadReader env m,MonadLogger m,MonadCatch m,HasEnvConfig env)
                        => m ()
