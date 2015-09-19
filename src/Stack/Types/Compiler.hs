@@ -71,6 +71,10 @@ isWantedCompiler check (GhcjsVersion wanted wantedGhc) (GhcjsVersion actual actu
     checkVersion check wanted actual && checkVersion check wantedGhc actualGhc
 isWantedCompiler _ _ _ = False
 
+getGhcVersion :: CompilerVersion -> Version
+getGhcVersion (GhcVersion v) = v
+getGhcVersion (GhcjsVersion _ v) = v
+
 compilerExeName :: WhichCompiler -> String
 compilerExeName Ghc = "ghc"
 compilerExeName Ghcjs = "ghcjs"

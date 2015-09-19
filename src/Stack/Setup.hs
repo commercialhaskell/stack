@@ -305,10 +305,7 @@ ensureGHC :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfi
           -> m (Maybe ExtraDirs)
 ensureGHC sopts = do
     let wc = whichCompiler (soptsWantedCompiler sopts)
-        ghcVersion = case soptsWantedCompiler sopts of
-            GhcVersion v -> v
-            GhcjsVersion _ v -> v
-    when (ghcVersion < $(mkVersion "7.8")) $ do
+    when (getGhcVersion (soptsWantedCompiler sopts) < $(mkVersion "7.8")) $ do
         $logWarn "stack will almost certainly fail with GHC below version 7.8"
         $logWarn "Valiantly attempting to run anyway, but I know this is doomed"
         $logWarn "For more information, see: https://github.com/commercialhaskell/stack/issues/648"
