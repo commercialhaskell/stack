@@ -357,7 +357,7 @@ generateBuildInfoOpts sourceMap mcabalmacros cabalDir distDir locals b dotCabalP
 --
 -- Produces
 --
--- <dist-dir>/build/FOO-tmp/cbits/text_search.o
+-- <dist-dir>/build/FOO/FOO-tmp/cbits/text_search.o
 --
 -- Example:
 --
@@ -372,7 +372,7 @@ generateBuildInfoOpts sourceMap mcabalmacros cabalDir distDir locals b dotCabalP
 --     (CExe "hoogle")
 --     $(mkAbsDir "/Users/chris/Repos/hoogle/.stack-work/Cabal-x.x.x/dist")
 --     $(mkAbsFile "/Users/chris/Repos/hoogle/cbits/text_search.c")
--- Just "/Users/chris/Repos/hoogle/.stack-work/Cabal-x.x.x/dist/build/hoogle-tmp/cbits/text_search.o"
+-- Just "/Users/chris/Repos/hoogle/.stack-work/Cabal-x.x.x/dist/build/hoogle/hoogle-tmp/cbits/text_search.o"
 -- λ>
 makeObjectFilePathFromC
     :: MonadThrow m
@@ -395,7 +395,7 @@ makeObjectFilePathFromC cabalDir namedComponent distDir cFilePath = do
             CTest name -> makeTmp name
             CBench name -> makeTmp name
     makeTmp name = do
-        prefix <- parseRelDir (T.unpack name <> "-tmp")
+        prefix <- parseRelDir (T.unpack name <> "/" <> T.unpack name <> "-tmp")
         return (</> prefix)
 
 -- | Make the autogen dir.
