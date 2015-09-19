@@ -11,6 +11,7 @@ Major changes:
     * Note: On systems with libgmp4 (aka `libgmp.so.3`), such as CentOS 6, you
       may need to re-run `stack setup` due to the centos6 GHC bindist being
       treated like a variant
+* A new `--pvp-bounds` flag to the sdist and upload commands allows automatic adding of PVP upper and/or lower bounds to your dependencies
 
 Other enhancements:
 

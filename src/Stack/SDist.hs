@@ -1,7 +1,9 @@
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE ViewPatterns          #-}
 -- Create a source distribution tarball
 module Stack.SDist
     ( getSDistTarball
@@ -13,19 +15,28 @@ import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Concurrent.Execute (ActionContext(..))
 import           Control.Monad (when, void)
-import           Control.Monad.Catch (MonadCatch, MonadMask)
+import           Control.Monad.Catch (MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Control (liftBaseWith)
 import           Control.Monad.Trans.Resource
+import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
+import           Data.Data (Data, Typeable, cast, gmapT)
 import           Data.Either (partitionEithers)
 import           Data.List
 import qualified Data.Map.Strict as Map
+import           Data.Maybe (fromMaybe)
 import           Data.Monoid ((<>))
 import qualified Data.Set as Set
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TLE
+import           Distribution.Package (Dependency (..))
+import           Distribution.PackageDescription.PrettyPrint (showGenericPackageDescription)
+import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion)
+import           Distribution.Version.Extra
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Prelude -- Fix redundant import warnings
@@ -40,7 +51,7 @@ import           Stack.Types.Internal
 import qualified System.FilePath as FP
 import           System.IO.Temp (withSystemTempDirectory)
 
-type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
+type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
 
 -- | Given the path to a local package, creates its source
 -- distribution tarball.
@@ -48,27 +59,81 @@ type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig en
 -- While this yields a 'FilePath', the name of the tarball, this
 -- tarball is not written to the disk and instead yielded as a lazy
 -- bytestring.
-getSDistTarball :: M env m => Path Abs Dir -> m (FilePath, L.ByteString)
-getSDistTarball pkgDir = do
-    let pkgFp = toFilePath pkgDir
+getSDistTarball :: M env m
+                => Maybe PvpBounds -- ^ override Config value
+                -> Path Abs Dir
+                -> m (FilePath, L.ByteString)
+getSDistTarball mpvpBounds pkgDir = do
+    config <- asks getConfig
+    let pvpBounds = fromMaybe (configPvpBounds config) mpvpBounds
+        tweakCabal = pvpBounds /= PvpBoundsNone
+        pkgFp = toFilePath pkgDir
     lp <- readLocalPackage pkgDir
     $logInfo $ "Getting file list for " <> T.pack pkgFp
-    fileList <-  getSDistFileList lp
+    (fileList, cabalfp) <-  getSDistFileList lp
     $logInfo $ "Building sdist tarball for " <> T.pack pkgFp
     files <- normalizeTarballPaths (lines fileList)
-    liftIO $ do
-        -- NOTE: Could make this use lazy I/O to only read files as needed
-        -- for upload (both GZip.compress and Tar.write are lazy).
-        -- However, it seems less error prone and more predictable to read
-        -- everything in at once, so that's what we're doing for now:
-        let packWith f isDir fp =
-               f (pkgFp FP.</> fp)
-                 (either error id (Tar.toTarPath isDir (pkgId FP.</> fp)))
-            tarName = pkgId FP.<.> "tar.gz"
-            pkgId = packageIdentifierString (packageIdentifier (lpPackage lp))
-        dirEntries <- mapM (packWith Tar.packDirectoryEntry True) (dirsFromFiles files)
-        fileEntries <- mapM (packWith Tar.packFileEntry False) files
-        return (tarName, GZip.compress (Tar.write (dirEntries ++ fileEntries)))
+    -- NOTE: Could make this use lazy I/O to only read files as needed
+    -- for upload (both GZip.compress and Tar.write are lazy).
+    -- However, it seems less error prone and more predictable to read
+    -- everything in at once, so that's what we're doing for now:
+    let tarPath isDir fp = either error id
+            (Tar.toTarPath isDir (pkgId FP.</> fp))
+        packWith f isDir fp =
+            liftIO $ f (pkgFp FP.</> fp)
+                (tarPath isDir fp)
+        packDir = packWith Tar.packDirectoryEntry True
+        packFile fp
+            | tweakCabal && isCabalFp fp = do
+                lbs <- getCabalLbs pvpBounds fp
+                return $ Tar.fileEntry (tarPath False fp) lbs
+            | otherwise = packWith Tar.packFileEntry False fp
+        isCabalFp fp = toFilePath pkgDir FP.</> fp == toFilePath cabalfp
+        tarName = pkgId FP.<.> "tar.gz"
+        pkgId = packageIdentifierString (packageIdentifier (lpPackage lp))
+    dirEntries <- mapM packDir (dirsFromFiles files)
+    fileEntries <- mapM packFile files
+    return (tarName, GZip.compress (Tar.write (dirEntries ++ fileEntries)))
+
+-- | Get the PVP bounds-enabled version of the given cabal file
+getCabalLbs :: M env m => PvpBounds -> FilePath -> m L.ByteString
+getCabalLbs pvpBounds fp = do
+    bs <- liftIO $ S.readFile fp
+    (_warnings, gpd) <- readPackageUnresolvedBS Nothing bs
+    (_, _, _, _, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOpts
+    let gpd' = gtraverseT (addBounds sourceMap) gpd
+    return $ TLE.encodeUtf8 $ TL.pack $ showGenericPackageDescription gpd'
+  where
+    addBounds :: SourceMap -> Dependency -> Dependency
+    addBounds sourceMap dep@(Dependency cname range) =
+      case Map.lookup (fromCabalPackageName cname) sourceMap of
+        Nothing -> dep
+        Just (getVersion -> version) -> Dependency cname $ simplifyVersionRange
+          $ (if toAddUpper && not (hasUpper range) then addUpper version else id)
+          $ (if toAddLower && not (hasLower range) then addLower version else id)
+            range
+
+    getVersion (PSLocal lp) = packageVersion $ lpPackage lp
+    getVersion (PSUpstream version _ _) = version
+
+    addUpper version = intersectVersionRanges
+        (earlierVersion $ toCabalVersion $ nextMajorVersion version)
+    addLower version = intersectVersionRanges
+        (orLaterVersion (toCabalVersion version))
+
+    (toAddLower, toAddUpper) =
+      case pvpBounds of
+        PvpBoundsNone  -> (False, False)
+        PvpBoundsUpper -> (False, True)
+        PvpBoundsLower -> (True,  False)
+        PvpBoundsBoth  -> (True,  True)
+
+-- | Traverse a data type.
+gtraverseT :: (Data a,Typeable b) => (Typeable b => b -> b) -> a -> a
+gtraverseT f =
+  gmapT (\x -> case cast x of
+                 Nothing -> gtraverseT f x
+                 Just b  -> fromMaybe x (cast (f b)))
 
 -- Read in a 'LocalPackage' config.  This makes some default decisions
 -- about 'LocalPackage' fields that might not be appropriate for other
@@ -106,7 +171,8 @@ readLocalPackage pkgDir = do
         , lpComponents = Set.empty
         }
 
-getSDistFileList :: M env m => LocalPackage -> m String
+-- | Returns a newline-separate list of paths, and the absolute path to the .cabal file.
+getSDistFileList :: M env m => LocalPackage -> m (String, Path Abs File)
 getSDistFileList lp =
     withSystemTempDirectory (stackProgName <> "-sdist") $ \tmpdir -> do
         menv <- getMinimalEnvOverride
@@ -117,10 +183,11 @@ getSDistFileList lp =
         withExecuteEnv menv bopts baseConfigOpts locals
             [] -- provide empty list of globals. This is a hack around custom Setup.hs files
             sourceMap $ \ee -> do
-            withSingleContext runInBase ac ee task Nothing (Just "sdist") $ \_package _cabalfp _pkgDir cabal _announce _console _mlogFile -> do
+            withSingleContext runInBase ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _console _mlogFile -> do
                 let outFile = tmpdir FP.</> "source-files-list"
                 cabal False ["sdist", "--list-sources", outFile]
-                liftIO (readFile outFile)
+                contents <- liftIO (readFile outFile)
+                return (contents, cabalfp)
   where
     package = lpPackage lp
     ac = ActionContext Set.empty

@@ -185,6 +185,7 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
          configScmInit = configMonoidScmInit
          configGhcOptions = configMonoidGhcOptions
          configSetupInfoLocations = configMonoidSetupInfoLocations
+         configPvpBounds = fromMaybe PvpBoundsNone configMonoidPvpBounds
 
      return Config {..}
 

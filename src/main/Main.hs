@@ -255,11 +255,15 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
              addCommand "upload"
                         "Upload a package to Hackage"
                         uploadCmd
-                        (many $ strArgument $ metavar "TARBALL/DIR")
+                        ((,)
+                         <$> (many $ strArgument $ metavar "TARBALL/DIR")
+                         <*> optional pvpBoundsOption)
              addCommand "sdist"
                         "Create source distribution tarballs"
                         sdistCmd
-                        (many $ strArgument $ metavar "DIR")
+                        ((,)
+                         <$> (many $ strArgument $ metavar "DIR")
+                         <*> optional pvpBoundsOption)
              addCommand "dot"
                         "Visualize your project's dependency graph using Graphviz dot"
                         dotCmd
@@ -740,9 +744,9 @@ upgradeCmd (fromGit, repo) go = withConfigAndLock go $ globalFixCodePage go $
     upgrade (if fromGit then Just repo else Nothing) (globalResolver go)
 
 -- | Upload to Hackage
-uploadCmd :: [String] -> GlobalOpts -> IO ()
-uploadCmd [] _ = error "To upload the current package, please run 'stack upload .'"
-uploadCmd args go = do
+uploadCmd :: ([String], Maybe PvpBounds) -> GlobalOpts -> IO ()
+uploadCmd ([], _) _ = error "To upload the current package, please run 'stack upload .'"
+uploadCmd (args, mpvpBounds) go = do
     let partitionM _ [] = return ([], [])
         partitionM f (x:xs) = do
             r <- f x
@@ -770,18 +774,18 @@ uploadCmd args go = do
             liftIO $ forM_ files (canonicalizePath >=> Upload.upload uploader)
             forM_ dirs $ \dir -> do
                 pkgDir <- parseAbsDir =<< liftIO (canonicalizePath dir)
-                (tarName, tarBytes) <- getSDistTarball pkgDir
+                (tarName, tarBytes) <- getSDistTarball mpvpBounds pkgDir
                 liftIO $ Upload.uploadBytes uploader tarName tarBytes
 
-sdistCmd :: [String] -> GlobalOpts -> IO ()
-sdistCmd dirs go =
+sdistCmd :: ([String], Maybe PvpBounds) -> GlobalOpts -> IO ()
+sdistCmd (dirs, mpvpBounds) go =
     withBuildConfig go $ do -- No locking needed.
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null dirs
             then asks (Map.keys . envConfigPackages . getEnvConfig)
             else mapM (parseAbsDir <=< liftIO . canonicalizePath) dirs
         forM_ dirs' $ \dir -> do
-            (tarName, tarBytes) <- getSDistTarball dir
+            (tarName, tarBytes) <- getSDistTarball mpvpBounds dir
             distDir <- distDirFromDir dir
             tarPath <- fmap (distDir </>) $ parseRelFile tarName
             liftIO $ createTree $ parent tarPath

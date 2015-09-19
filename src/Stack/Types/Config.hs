@@ -15,6 +15,7 @@
 module Stack.Types.Config where
 
 import           Control.Applicative
+import           Control.Arrow ((&&&))
 import           Control.Exception
 import           Control.Monad (liftM, mzero, forM)
 import           Control.Monad.Catch (MonadThrow, throwM)
@@ -135,6 +136,8 @@ data Config =
          -- or a specific package (Just).
          ,configSetupInfoLocations  :: ![SetupInfoLocation]
          -- ^ Additional SetupInfo (inline or remote) to use to find tools.
+         ,configPvpBounds           :: !PvpBounds
+         -- ^ How PVP upper bounds should be added to packages
          }
 
 -- | Information on a single package index
@@ -557,6 +560,8 @@ data ConfigMonoid =
     -- ^ Additional paths to search for executables in
     ,configMonoidSetupInfoLocations  :: ![SetupInfoLocation]
     -- ^ Additional setup info (inline or remote) to use for installing tools
+    ,configMonoidPvpBounds           :: !(Maybe PvpBounds)
+    -- ^ See 'configPvpBounds'
     }
   deriving Show
 
@@ -587,6 +592,7 @@ instance Monoid ConfigMonoid where
     , configMonoidGhcOptions = mempty
     , configMonoidExtraPath = []
     , configMonoidSetupInfoLocations = mempty
+    , configMonoidPvpBounds = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -615,6 +621,7 @@ instance Monoid ConfigMonoid where
     , configMonoidGhcOptions = Map.unionWith (++) (configMonoidGhcOptions l) (configMonoidGhcOptions r)
     , configMonoidExtraPath = configMonoidExtraPath l ++ configMonoidExtraPath r
     , configMonoidSetupInfoLocations = configMonoidSetupInfoLocations l ++ configMonoidSetupInfoLocations r
+    , configMonoidPvpBounds = configMonoidPvpBounds l <|> configMonoidPvpBounds r
     }
 
 instance FromJSON (ConfigMonoid, [JSONWarning]) where
@@ -668,6 +675,8 @@ parseConfigMonoidJSON obj = do
 
     configMonoidSetupInfoLocations <-
         maybeToList <$> jsonSubWarningsT (obj ..:? "setup-info")
+
+    configMonoidPvpBounds <- obj ..:? "pvp-bounds"
 
     return ConfigMonoid {..}
   where
@@ -1130,3 +1139,30 @@ instance FromJSON (SetupInfoLocation, [JSONWarning]) where
         inline = do
             (si,w) <- parseJSON v
             return (SetupInfoInline si, w)
+
+-- | How PVP bounds should be added to .cabal files
+data PvpBounds
+  = PvpBoundsNone
+  | PvpBoundsUpper
+  | PvpBoundsLower
+  | PvpBoundsBoth
+  deriving (Show, Read, Eq, Typeable, Ord, Enum, Bounded)
+
+pvpBoundsText :: PvpBounds -> Text
+pvpBoundsText PvpBoundsNone = "none"
+pvpBoundsText PvpBoundsUpper = "upper"
+pvpBoundsText PvpBoundsLower = "lower"
+pvpBoundsText PvpBoundsBoth = "both"
+
+parsePvpBounds :: Text -> Either String PvpBounds
+parsePvpBounds t =
+    case Map.lookup t m of
+        Nothing -> Left $ "Invalid PVP bounds: " ++ T.unpack t
+        Just x -> Right x
+  where
+    m = Map.fromList $ map (pvpBoundsText &&& id) [minBound..maxBound]
+
+instance ToJSON PvpBounds where
+  toJSON = toJSON . pvpBoundsText
+instance FromJSON PvpBounds where
+  parseJSON = withText "PvpBounds" (either fail return . parsePvpBounds)

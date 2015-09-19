@@ -24,7 +24,8 @@ module Stack.Types.Version
   ,withinRange
   ,Stack.Types.Version.intersectVersionRanges
   ,toMajorVersion
-  ,checkVersion)
+  ,checkVersion
+  ,nextMajorVersion)
   where
 
 import           Control.Applicative
@@ -174,6 +175,14 @@ toMajorVersion  (Version v) =
         0 -> Version (V.fromList [0,        0])
         1 -> Version (V.fromList [V.head v, 0])
         _ -> Version (V.fromList [V.head v, v V.! 1])
+
+-- | Get the next major version number for the given version
+nextMajorVersion :: Version -> Version
+nextMajorVersion (Version v) =
+  case  V.length v of
+    0 -> Version (V.fromList [0,        1])
+    1 -> Version (V.fromList [V.head v, 1])
+    _ -> Version (V.fromList [V.head v, (v V.! 1) + 1])
 
 data VersionCheck
     = MatchMinor

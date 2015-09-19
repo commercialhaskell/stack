@@ -17,6 +17,7 @@ module Stack.Options
     ,abstractResolverOptsParser
     ,solverOptsParser
     ,testOptsParser
+    ,pvpBoundsOption
     ) where
 
 import           Control.Monad.Logger (LogLevel(..))
@@ -659,3 +660,17 @@ newOptsParser = (,) <$> newOpts <*> initOptsParser
                        help
                            "Parameter for the template in the format key:value"))) <*
         abortOption ShowHelpText (long "help" <> help "Show help text.")
+
+pvpBoundsOption :: Parser PvpBounds
+pvpBoundsOption =
+    option
+        readPvpBounds
+        (long "pvp-bounds" <> metavar "PVP-BOUNDS" <>
+         help
+             "How PVP version bounds should be added to .cabal file: none, lower, upper, both")
+  where
+    readPvpBounds = do
+        s <- readerAsk
+        case parsePvpBounds $ T.pack s of
+            Left e -> readerError e
+            Right v -> return v
