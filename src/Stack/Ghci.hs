@@ -55,6 +55,7 @@ data GhciPkgInfo = GhciPkgInfo
   , ghciPkgDir :: Path Abs Dir
   , ghciPkgModules :: Set ModuleName
   , ghciPkgModFiles :: Set (Path Abs File) -- ^ Module file paths.
+  , ghciPkgCFiles :: Set (Path Abs File) -- ^ C files.
   , ghciPkgMainIs :: Map NamedComponent (Set (Path Abs File))
   }
 
@@ -272,6 +273,9 @@ makeGhciPkgInfo sourceMap locals name cabalfp components = do
               (filterWithinWantedComponents
                    (M.map (setMapMaybe dotCabalModulePath) componentFiles))
         , ghciPkgMainIs = M.map (setMapMaybe dotCabalMainPath) componentFiles
+        , ghciPkgCFiles = mconcat
+              (filterWithinWantedComponents
+                   (M.map (setMapMaybe dotCabalCFilePath) componentFiles))
         }
   where
     badForGhci :: String -> Bool

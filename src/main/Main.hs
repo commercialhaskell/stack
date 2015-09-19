@@ -316,7 +316,13 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                          "packages"
                          "List all available local loadable packages"
                          packagesCmd
-                         (pure ()))
+                         (pure ())
+                     addCommand
+                         "load-targets"
+                         "List all load targets for a package target"
+                         targetsCmd
+                         (textArgument
+                            (metavar "TARGET")))
              addSubCommands
                Docker.dockerCmdName
                "Subcommands specific to Docker use"
@@ -857,7 +863,7 @@ ideCmd (targets,args) go@GlobalOpts{..} =
     withBuildConfig go $ -- No locking needed.
       ide targets args
 
--- | Run ide-backend in the context of a project.
+-- | List packages in the project.
 packagesCmd :: () -> GlobalOpts -> IO ()
 packagesCmd () go@GlobalOpts{..} =
     withBuildConfig go $
@@ -868,6 +874,18 @@ packagesCmd () go@GlobalOpts{..} =
                   do cabalfp <- getCabalFileName dir
                      parsePackageNameFromFilePath cabalfp
          forM_ locals (liftIO . putStrLn . packageNameString)
+
+-- | List load targets for a package target.
+targetsCmd :: Text -> GlobalOpts -> IO ()
+targetsCmd target go@GlobalOpts{..} =
+    withBuildConfig go $
+    do (_realTargets,_,pkgs) <- ghciSetup Nothing [target]
+       pwd <- getWorkingDir
+       targets <-
+           fmap
+               (concat . snd . unzip)
+               (mapM (getPackageOptsAndTargetFiles pwd) pkgs)
+       forM_ targets (liftIO . putStrLn)
 
 -- | Pull the current Docker image.
 dockerPullCmd :: () -> GlobalOpts -> IO ()
