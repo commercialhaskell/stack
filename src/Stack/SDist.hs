@@ -85,7 +85,7 @@ getSDistTarball mpvpBounds pkgDir = do
         packDir = packWith Tar.packDirectoryEntry True
         packFile fp
             | tweakCabal && isCabalFp fp = do
-                lbs <- getCabalLbs pvpBounds fp
+                lbs <- getCabalLbs pvpBounds $ toFilePath cabalfp
                 return $ Tar.fileEntry (tarPath False fp) lbs
             | otherwise = packWith Tar.packFileEntry False fp
         isCabalFp fp = toFilePath pkgDir FP.</> fp == toFilePath cabalfp
