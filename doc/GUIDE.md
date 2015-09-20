@@ -1696,6 +1696,6 @@ users. Here's a quick rundown:
 * `stack setup --upgrade-cabal` can install a newer version of the Cabal
   library, used for performing actual builds. You shouldn't generally do this,
   since new Cabal versions may introduce incompatibilities with package sets,
-  but it can be useful if you're trying to test a specific bugfix. 
+  but it can be useful if you're trying to test a specific bugfix.
 * `stack list-dependencies` lists all of the packages and versions used for a
   project
