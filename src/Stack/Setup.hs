@@ -439,7 +439,7 @@ upgradeCabal menv wc = do
                 , " to replace "
                 , T.pack $ versionString installed
                 ]
-            tmpdir' <- parseAbsDir tmpdir
+            tmpdir' <- parseAbsDir =<< liftIO (D.canonicalizePath tmpdir)
             let ident = PackageIdentifier name newest
             m <- unpackPackageIdents menv tmpdir' Nothing (Set.singleton ident)
 
@@ -766,7 +766,7 @@ installGHCPosix _ archiveFile archiveType destDir ident = do
     $logDebug $ "tar: " <> T.pack tarTool
 
     withSystemTempDirectory "stack-setup" $ \root' -> do
-        root <- parseAbsDir root'
+        root <- parseAbsDir =<< liftIO (D.canonicalizePath root')
         dir <-
             liftM (root Path.</>) $
             parseRelDir $
@@ -1069,7 +1069,7 @@ sanityCheck :: (MonadIO m, MonadMask m, MonadLogger m, MonadBaseControl IO m)
             => EnvOverride
             -> m ()
 sanityCheck menv = withSystemTempDirectory "stack-sanity-check" $ \dir -> do
-    dir' <- parseAbsDir dir
+    dir' <- parseAbsDir =<< liftIO (D.canonicalizePath dir)
     let fp = toFilePath $ dir' </> $(mkRelFile "Main.hs")
     liftIO $ writeFile fp $ unlines
         [ "import Distribution.Simple" -- ensure Cabal library is present
