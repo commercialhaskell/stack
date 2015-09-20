@@ -717,6 +717,7 @@ downloadFromInfo downloadInfo ident = do
         case extension of
             ".tar.xz" -> return TarXz
             ".tar.bz2" -> return TarBz2
+            ".tar.gz" -> return TarGz
             ".7z.exe" -> return SevenZ
             _ -> error $ "Unknown extension: " ++ extension
     relfile <- parseRelFile $ packageIdentifierString ident ++ extension
@@ -729,7 +730,7 @@ downloadFromInfo downloadInfo ident = do
         loop $ T.unpack url
       where
         loop fp
-            | ext `elem` [".tar", ".bz2", ".xz", ".exe", ".7z"] = loop fp' ++ ext
+            | ext `elem` [".tar", ".bz2", ".xz", ".exe", ".7z", ".gz"] = loop fp' ++ ext
             | otherwise = ""
           where
             (fp', ext) = FP.splitExtension fp
@@ -737,6 +738,7 @@ downloadFromInfo downloadInfo ident = do
 data ArchiveType
     = TarBz2
     | TarXz
+    | TarGz
     | SevenZ
 
 installGHCPosix :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
@@ -755,6 +757,7 @@ installGHCPosix _ archiveFile archiveType destDir ident = do
         case archiveType of
             TarXz -> return "xz"
             TarBz2 -> return "bzip2"
+            TarGz -> return "gzip"
             SevenZ -> error "Don't know how to deal with .7z files on non-Windows"
     (zipTool, makeTool, tarTool) <- checkDependencies $ (,,)
         <$> checkDependency zipTool'
@@ -832,6 +835,7 @@ installGHCWindows si archiveFile archiveType destDir ident = do
         case archiveType of
             TarXz -> return ".xz"
             TarBz2 -> return ".bz2"
+            TarGz -> return ".gz"
             _ -> error $ "GHC on Windows must be a tarball file"
     tarFile <-
         case T.stripSuffix suffix $ T.pack $ toFilePath archiveFile of
