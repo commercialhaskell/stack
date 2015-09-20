@@ -52,6 +52,7 @@ import qualified Data.Streaming.Process         as Process
 import           Data.Traversable               (forM)
 import           Data.Text                      (Text)
 import qualified Data.Text                      as T
+import           Data.Time.Clock                (getCurrentTime)
 import           Data.Word8                     (_colon)
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
@@ -928,6 +929,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         () <- announce "build"
         config <- asks getConfig
         extraOpts <- extraBuildOptions eeBuildOpts
+        preBuildTime <- modTime <$> liftIO getCurrentTime
         cabal (console && configHideTHLoading config) $
             (case taskType of
                 TTLocal lp -> concat
@@ -947,12 +949,26 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                     ]
                 TTUpstream _ _ -> ["build"]) ++ extraOpts
 
+        case taskType of
+            TTLocal lp -> do
+                (addBuildCache,warnings) <-
+                    addUnlistedToBuildCache
+                        preBuildTime
+                        (lpPackage lp)
+                        (lpCabalFile lp)
+                        (lpNewBuildCache lp)
+                mapM_ ($logWarn . ("Warning: " <>) . T.pack . show) warnings
+                unless (null addBuildCache) $
+                    writeBuildCache pkgDir $
+                    Map.unions (lpNewBuildCache lp : addBuildCache)
+            TTUpstream _ _ -> return ()
+
         when (doHaddock package) $ do
             announce "haddock"
             hscolourExists <- doesExecutableExist eeEnvOverride "HsColour"
             unless hscolourExists $ $logWarn
                 ("Warning: haddock not generating hyperlinked sources because 'HsColour' not\n" <>
-                 "found on PATH (use 'stack build hscolour --copy-bins' to install).")
+                 "found on PATH (use 'stack install hscolour' to install).")
             cabal False (concat [["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
                                 ,["--hyperlink-source" | hscolourExists]
                                 ,["--ghcjs" | wc == Ghcjs]])

@@ -14,6 +14,7 @@ module Stack.Build.Source
     , getLocalPackageViews
     , loadLocalPackage
     , parseTargetsFromBuildOpts
+    , addUnlistedToBuildCache
     ) where
 
 
@@ -334,10 +335,7 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
         testpkg = resolvePackage testconfig gpkg
         benchpkg = resolvePackage benchconfig gpkg
     mbuildCache <- tryGetBuildCache $ lpvRoot lpv
-    (_,compFiles,cabalFiles) <- getPackageFiles (packageFiles pkg) (lpvCabalFP lpv)
-    let files =
-            Set.map dotCabalGetPath (mconcat (M.elems compFiles)) <>
-            cabalFiles
+    (files,_) <- getPackageFilesSimple pkg (lpvCabalFP lpv)
     (isDirty, newBuildCache) <- checkBuildCache
         (fromMaybe Map.empty mbuildCache)
         (map toFilePath $ Set.toList files)
@@ -480,27 +478,69 @@ checkBuildCache oldCache files = liftIO $ do
                             return (True, newFci)
                 return (Any isDirty, Map.singleton fp newFci)
 
-    getModTimeMaybe fp =
-        liftIO
-            (catch
-                 (liftM
-                      (Just . modTime)
-                      (getModificationTime fp))
-                 (\e ->
-                       if isDoesNotExistError e
-                           then return Nothing
-                           else throwM e))
+-- | Returns entries to add to the build cache for any newly found unlisted modules
+addUnlistedToBuildCache
+    :: (MonadIO m, MonadReader env m, MonadCatch m, MonadLogger m, HasEnvConfig env)
+    => ModTime
+    -> Package
+    -> Path Abs File
+    -> Map FilePath a
+    -> m ([Map FilePath FileCacheInfo], [PackageWarning])
+addUnlistedToBuildCache preBuildTime pkg cabalFP buildCache = do
+    (files,warnings) <- getPackageFilesSimple pkg cabalFP
+    let newFiles =
+            Set.toList $
+            Set.map toFilePath files `Set.difference` Map.keysSet buildCache
+    addBuildCache <- mapM addFileToCache newFiles
+    return (addBuildCache, warnings)
+  where
+    addFileToCache fp = do
+        mmodTime <- getModTimeMaybe fp
+        case mmodTime of
+            Nothing -> return Map.empty
+            Just modTime' ->
+                if modTime' < preBuildTime
+                    then do
+                        newFci <- calcFci modTime' fp
+                        return (Map.singleton fp newFci)
+                    else return Map.empty
 
-    calcFci modTime' fp =
-        withBinaryFile fp ReadMode $ \h -> do
-            (size, digest) <- CB.sourceHandle h $$ getZipSink
-                ((,)
-                    <$> ZipSink (CL.fold
-                        (\x y -> x + fromIntegral (S.length y))
-                        0)
-                    <*> ZipSink sinkHash)
-            return FileCacheInfo
-                { fciModTime = modTime'
-                , fciSize = size
-                , fciHash = toBytes (digest :: Digest SHA256)
-                }
+-- | Gets list of Paths for files in a package
+getPackageFilesSimple
+    :: (MonadIO m, MonadReader env m, MonadCatch m, MonadLogger m, HasEnvConfig env)
+    => Package -> Path Abs File -> m (Set (Path Abs File), [PackageWarning])
+getPackageFilesSimple pkg cabalFP = do
+    (_,compFiles,cabalFiles,warnings) <-
+        getPackageFiles (packageFiles pkg) cabalFP
+    return
+        ( Set.map dotCabalGetPath (mconcat (M.elems compFiles)) <> cabalFiles
+        , warnings)
+
+-- | Get file modification time, if it exists.
+getModTimeMaybe :: MonadIO m => FilePath -> m (Maybe ModTime)
+getModTimeMaybe fp =
+    liftIO
+        (catch
+             (liftM
+                  (Just . modTime)
+                  (getModificationTime fp))
+             (\e ->
+                   if isDoesNotExistError e
+                       then return Nothing
+                       else throwM e))
+
+-- | Create FileCacheInfo for a file.
+calcFci :: MonadIO m => ModTime -> FilePath -> m FileCacheInfo
+calcFci modTime' fp = liftIO $
+    withBinaryFile fp ReadMode $ \h -> do
+        (size, digest) <- CB.sourceHandle h $$ getZipSink
+            ((,)
+                <$> ZipSink (CL.fold
+                    (\x y -> x + fromIntegral (S.length y))
+                    0)
+                <*> ZipSink sinkHash)
+        return FileCacheInfo
+            { fciModTime = modTime'
+            , fciSize = size
+            , fciHash = toBytes (digest :: Digest SHA256)
+            }

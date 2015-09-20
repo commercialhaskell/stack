@@ -29,6 +29,7 @@ import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
 import           Distribution.System (Platform (..))
+import           Distribution.Text (display)
 import           GHC.Generics
 import           Path as FL
 import           Prelude
@@ -118,10 +119,35 @@ newtype GetPackageFiles = GetPackageFiles
                       => Path Abs File
                       -> m (Map NamedComponent (Set ModuleName)
                            ,Map NamedComponent (Set DotCabalPath)
-                           ,Set (Path Abs File))
+                           ,Set (Path Abs File)
+                           ,[PackageWarning])
     }
 instance Show GetPackageFiles where
     show _ = "<GetPackageFiles>"
+
+-- | Warning generated when reading a package
+data PackageWarning
+    = UnlistedModulesWarning (Path Abs File) (Maybe String) [ModuleName]
+      -- ^ Modules found that are not listed in cabal file
+instance Show PackageWarning where
+    show (UnlistedModulesWarning cabalfp component [unlistedModule]) =
+        concat
+            [ "module not listed in "
+            , toFilePath (filename cabalfp)
+            , (case component of
+                   Nothing -> " for library"
+                   Just c -> " for '" ++ c ++ "'")
+            , " component (add to other-modules): "
+            , display unlistedModule]
+    show (UnlistedModulesWarning cabalfp component unlistedModules) =
+        concat
+            [ "modules not listed in "
+            , toFilePath (filename cabalfp)
+            , (case component of
+                   Nothing -> " for library"
+                   Just c -> " for '" ++ c ++ "'")
+            , " component (add to other-modules):\n    "
+            , intercalate "\n    " (map display unlistedModules)]
 
 -- | Package build configuration
 data PackageConfig =
