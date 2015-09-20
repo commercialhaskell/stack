@@ -1663,15 +1663,28 @@ to stack.yaml:
 
 ```yaml
 image:
+  # YOU NEED A `container` YAML SECTION FOR `stack image container`
   container:
+    # YOU NEED A BASE IMAGE NAME. STACK LAYERS EXES ON TOP OF
+    # THE BASE IMAGE. PREPARE YOUR PROJECT IMAGE IN ADVANCE. PUT
+    # ALL YOUR RUNTIME DEPENDENCIES IN THE IMAGE.
     base: "fpco/ubuntu-with-libgmp:14.04"
+    # YOU CAN OPTIONALY NAME THE IMAGE. STACK WILL USE THE PROJECT
+    # DIRECTORY NAME IF YOU LEAVE OUT THIS OPTION.
+    name: "fpco/hello-world"
+    # OPTIONALLY ADD A HASH OF LOCAL PROJECT DIRECTORIES AND THEIR
+    # DESTINATIONS INSIDE THE DOCKER IMAGE.
     add:
       man/: /usr/local/share/man/
+    # OPTIONALLY SPECIFY A LIST OF EXECUTABLES. STACK WILL CREATE
+    # A TAGGED IMAGE FOR EACH IN THE LIST. THIS IMAGE WILL HAVE
+    # THE "ENTRYPOINT" SET.
     entrypoints:
       - stack
 ```
 
-and then run `stack image container`.
+and then run `stack image container` and then `docker images` to list
+the images.
 
 ## Power user commands
 
