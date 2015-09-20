@@ -42,6 +42,7 @@ import           Path
 import           Prelude -- Fix redundant import warnings
 import           Stack.Build (mkBaseConfigOpts)
 import           Stack.Build.Execute
+import           Stack.Build.Installed
 import           Stack.Build.Source (loadSourceMap, localFlags)
 import           Stack.Build.Target
 import           Stack.Constants
@@ -101,20 +102,33 @@ getCabalLbs pvpBounds fp = do
     bs <- liftIO $ S.readFile fp
     (_warnings, gpd) <- readPackageUnresolvedBS Nothing bs
     (_, _, _, _, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOpts
-    let gpd' = gtraverseT (addBounds sourceMap) gpd
+    menv <- getMinimalEnvOverride
+    (installedMap, _, _) <- getInstalled menv GetInstalledOpts
+                                { getInstalledProfiling = False
+                                , getInstalledHaddock = False
+                                }
+                                sourceMap
+    let gpd' = gtraverseT (addBounds sourceMap installedMap) gpd
     return $ TLE.encodeUtf8 $ TL.pack $ showGenericPackageDescription gpd'
   where
-    addBounds :: SourceMap -> Dependency -> Dependency
-    addBounds sourceMap dep@(Dependency cname range) =
-      case Map.lookup (fromCabalPackageName cname) sourceMap of
+    addBounds :: SourceMap -> InstalledMap -> Dependency -> Dependency
+    addBounds sourceMap installedMap dep@(Dependency cname range) =
+      case lookupVersion (fromCabalPackageName cname) of
         Nothing -> dep
-        Just (getVersion -> version) -> Dependency cname $ simplifyVersionRange
+        Just version -> Dependency cname $ simplifyVersionRange
           $ (if toAddUpper && not (hasUpper range) then addUpper version else id)
           $ (if toAddLower && not (hasLower range) then addLower version else id)
             range
+      where
+        lookupVersion name =
+          case Map.lookup name sourceMap of
+              Just (PSLocal lp) -> Just $ packageVersion $ lpPackage lp
+              Just (PSUpstream version _ _) -> Just version
+              Nothing ->
+                  case Map.lookup name installedMap of
+                      Just (version, _, _) -> Just version
+                      Nothing -> Nothing
 
-    getVersion (PSLocal lp) = packageVersion $ lpPackage lp
-    getVersion (PSUpstream version _ _) = version
 
     addUpper version = intersectVersionRanges
         (earlierVersion $ toCabalVersion $ nextMajorVersion version)
