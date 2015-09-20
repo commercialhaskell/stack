@@ -15,7 +15,7 @@ hasUpper (LaterVersion _) = False
 hasUpper (EarlierVersion _) = True
 hasUpper (WildcardVersion _) = True
 hasUpper (UnionVersionRanges x y) = hasUpper x && hasUpper y
-hasUpper (IntersectVersionRanges x y) = hasUpper x && hasUpper y
+hasUpper (IntersectVersionRanges x y) = hasUpper x || hasUpper y
 hasUpper (VersionRangeParens x) = hasUpper x
 
 -- | Does the version range have a lower bound?
@@ -26,5 +26,5 @@ hasLower (LaterVersion _) = True
 hasLower (EarlierVersion _) = False
 hasLower (WildcardVersion _) = True
 hasLower (UnionVersionRanges x y) = hasLower x && hasLower y
-hasLower (IntersectVersionRanges x y) = hasLower x && hasLower y
+hasLower (IntersectVersionRanges x y) = hasLower x || hasLower y
 hasLower (VersionRangeParens x) = hasLower x
