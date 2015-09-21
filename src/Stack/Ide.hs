@@ -28,7 +28,6 @@ import           Data.Monoid
 import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Distribution.System
 import           Network.HTTP.Client.Conduit
 import           Path
 import           Path.IO
@@ -44,7 +43,6 @@ import           System.Exit
 import           System.IO
 import qualified System.Process as P
 import           System.Process.Read
-import           System.Process.Run
 
 -- | Launch a GHCi IDE for the given local project targets with the
 -- given options and configure it with the load paths and extensions
@@ -75,11 +73,7 @@ ide targets useropts = do
             paths <>
             pkgopts <>
             pkgdbs
-    menv <- getMinimalEnvOverride
-    Platform _ os <- asks getPlatform
-    when (os == OSX)
-         (callProcess (Just pwd) menv "stty" ["cbreak","-imaxbel"])
-    callProcess (Just pwd) menv "stack-ide" args
+    exec "stack-ide" args ""
 
 -- | Get options and target files for the given package info.
 getPackageOptsAndTargetFiles
@@ -103,3 +97,43 @@ getPackageOptsAndTargetFiles pwd pkg = do
                if paths_foo_exists
                    then [paths_foo]
                    else []))
+
+-- | Execute a process within the Stack configured environment.
+exec :: (HasConfig r, MonadReader r m, MonadIO m, MonadLogger m, MonadThrow m)
+        => String -> [String] -> ByteString -> m b
+exec cmd args input = do
+    config <- asks getConfig
+    menv <-
+        liftIO
+            (configEnvOverride
+                 config
+                 defaultEnvSettings
+                 { esIncludeGhcPackagePath = False
+                 })
+    exists <- liftIO $ doesFileExist cmd
+    cmd' <-
+        if exists
+            then return cmd
+            else liftM toFilePath $
+                 join $ System.Process.Read.findExecutable menv cmd
+    let cp =
+            (P.proc cmd' args)
+            { P.env = envHelper menv
+            , P.delegate_ctlc = True
+            , P.std_in = P.CreatePipe
+            }
+    $logProcessRun cmd' args
+    (Just procin,Nothing,Nothing,ph) <- liftIO (P.createProcess cp)
+    liftIO
+        (do hSetBuffering stdin LineBuffering
+            hSetBuffering procin LineBuffering)
+    liftIO (do {-S8.hPutStrLn stdout (L.toStrict input)-}
+               S8.hPutStrLn procin (L.toStrict input))
+    _tid <-
+        liftIO
+            (forkIO
+                 (forever
+                      (do bytes <- S.getLine
+                          S.hPutStr procin bytes)))
+    ec <- liftIO (P.waitForProcess ph)
+    liftIO (exitWith ec)
