@@ -18,7 +18,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask, asks, runReaderT)
 import           Control.Monad.Trans.Control (MonadBaseControl)
-import           Data.Attoparsec.Args (withInterpreterArgs)
+import           Data.Attoparsec.Args (withInterpreterArgs, parseArgs, EscapingMode (Escaping))
 import qualified Data.ByteString.Lazy as L
 import           Data.IORef
 import           Data.List
@@ -699,7 +699,12 @@ cleanCmd () go = withBuildConfigAndLock go (\_ -> clean)
 
 -- | Helper for build and install commands
 buildCmd :: BuildOpts -> GlobalOpts -> IO ()
-buildCmd opts go =
+buildCmd opts go = do
+  when (any (("-prof" `elem`) . either (const []) id . parseArgs Escaping) (boptsGhcOptions opts)) $ do
+    hPutStrLn stderr "When building with stack, you should not use the -prof GHC option"
+    hPutStrLn stderr "Instead, please use --enable-library-profiling and --enable-executable-profiling"
+    hPutStrLn stderr "See: https://github.com/commercialhaskell/stack/issues/1015"
+    error "-prof GHC option submitted"
   case boptsFileWatch opts of
     FileWatchPoll -> fileWatchPoll getProjectRoot inner
     FileWatch -> fileWatch getProjectRoot inner

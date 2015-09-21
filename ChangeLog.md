@@ -24,6 +24,7 @@ Other enhancements:
 * Fully removed `--optimizations` flag
 * Added `--cabal-verbose` flag
 * Added `--file-watch-poll` flag for polling instead of using filesystem events (useful for running tests in a Docker container while modifying code in the host environment. When code is injected into the container via a volume, the container won't propagate filesystem events).
+* Give a preemptive error message when `-prof` is given as a GHC option [#1015](https://github.com/commercialhaskell/stack/issues/1015)
 
 Bug fixes:
 
