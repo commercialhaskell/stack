@@ -71,7 +71,7 @@ import           Stack.Types.StackT
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import           System.Directory (canonicalizePath, doesFileExist, doesDirectoryExist, createDirectoryIfMissing)
-import           System.Environment (getProgName)
+import           System.Environment (getEnvironment, getProgName)
 import           System.Exit
 import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
 import           System.FilePath (dropTrailingPathSeparator, searchPathSeparator)
@@ -581,7 +581,12 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
               $logInfo "stack ghc, stack ghci, stack runghc, or stack exec"
               )
           Nothing
-          (Just $ liftIO$ unlockFile lk)
+          (Just $ munlockFile lk)
+
+-- | Unlock a lock file, if the value is Just
+munlockFile :: MonadIO m => Maybe FileLock -> m ()
+munlockFile Nothing = return ()
+munlockFile (Just lk) = liftIO $ unlockFile lk
 
 -- | Enforce mutual exclusion of every action running via this
 -- function, on this path, on this users account.
@@ -592,27 +597,32 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
 --
 withUserFileLock :: (MonadBaseControl IO m, MonadIO m)
                  => Path Abs Dir
-                 -> (FileLock -> m a)
+                 -> (Maybe FileLock -> m a)
                  -> m a
 withUserFileLock dir act = do
-    let lockfile = $(mkRelFile "lockfile")
-    let pth = dir </> lockfile
-    liftIO $ createDirectoryIfMissing True (toFilePath dir)
-    -- Just in case of asynchronous exceptions, we need to be careful
-    -- when using tryLockFile here:
-    EL.bracket (liftIO $ tryLockFile (toFilePath pth) Exclusive)
-               (\fstTry -> maybe (return ()) (liftIO . unlockFile) fstTry)
-               (\fstTry ->
-                case fstTry of
-                  Just lk -> EL.finally (act lk) (liftIO $ unlockFile lk)
-                  Nothing ->
-                    do liftIO $ hPutStrLn stderr $ "Failed to grab lock ("++show pth++
-                                           "); other stack instance running.  Waiting..."
-                       EL.bracket (liftIO $ lockFile (toFilePath pth) Exclusive)
-                                  (liftIO . unlockFile)
-                                  (\lk -> do
-                                    liftIO $ hPutStrLn stderr "Lock acquired, proceeding."
-                                    act lk))
+    env <- liftIO getEnvironment
+    let toLock = lookup "STACK_LOCK" env == Just "true"
+    if toLock
+        then do
+            let lockfile = $(mkRelFile "lockfile")
+            let pth = dir </> lockfile
+            liftIO $ createDirectoryIfMissing True (toFilePath dir)
+            -- Just in case of asynchronous exceptions, we need to be careful
+            -- when using tryLockFile here:
+            EL.bracket (liftIO $ tryLockFile (toFilePath pth) Exclusive)
+                       (\fstTry -> maybe (return ()) (liftIO . unlockFile) fstTry)
+                       (\fstTry ->
+                        case fstTry of
+                          Just lk -> EL.finally (act $ Just lk) (liftIO $ unlockFile lk)
+                          Nothing ->
+                            do liftIO $ hPutStrLn stderr $ "Failed to grab lock ("++show pth++
+                                                   "); other stack instance running.  Waiting..."
+                               EL.bracket (liftIO $ lockFile (toFilePath pth) Exclusive)
+                                          (liftIO . unlockFile)
+                                          (\lk -> do
+                                            liftIO $ hPutStrLn stderr "Lock acquired, proceeding."
+                                            act $ Just lk))
+        else act Nothing
 
 withConfigAndLock :: GlobalOpts
            -> StackT Config IO ()
@@ -625,7 +635,7 @@ withConfigAndLock go@GlobalOpts{..} inner = do
             Nothing
             (runStackTGlobal manager (lcConfig lc) go inner)
             Nothing
-            (Just $ liftIO $ unlockFile lk)
+            (Just $ munlockFile lk)
 
 -- For now the non-locking version just unlocks immediately.
 -- That is, there's still a serialization point.
@@ -633,11 +643,11 @@ withBuildConfig :: GlobalOpts
                -> (StackT EnvConfig IO ())
                -> IO ()
 withBuildConfig go inner =
-    withBuildConfigAndLock go (\lk -> do liftIO $ unlockFile lk
+    withBuildConfigAndLock go (\lk -> do munlockFile lk
                                          inner)
 
 withBuildConfigAndLock :: GlobalOpts
-                 -> (FileLock -> StackT EnvConfig IO ())
+                 -> (Maybe FileLock -> StackT EnvConfig IO ())
                  -> IO ()
 withBuildConfigAndLock go inner =
     withBuildConfigExt go Nothing inner Nothing
@@ -649,7 +659,7 @@ withBuildConfigExt
     -- OS even if Docker is enabled for builds.  The build config is not
     -- available in this action, since that would require build tools to be
     -- installed on the host OS.
-    -> (FileLock -> StackT EnvConfig IO ())
+    -> (Maybe FileLock -> StackT EnvConfig IO ())
     -- ^ Action that uses the build config.  If Docker is enabled for builds,
     -- this will be run in a Docker container.
     -> Maybe (StackT Config IO ())
@@ -672,7 +682,7 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
                -- Hand-over-hand locking:
                withUserFileLock dir $ \lk2 -> do
                  liftIO $ writeIORef curLk lk2
-                 liftIO $ unlockFile lk
+                 liftIO $ munlockFile lk
                  inner lk2
 
       let inner'' lk = do
@@ -692,7 +702,7 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
          Docker.reexecWithOptionalContainer (lcProjectRoot lc) mbefore (inner'' lk0) mafter
                                             (Just $ liftIO $
                                              do lk' <- readIORef curLk
-                                                unlockFile lk')
+                                                munlockFile lk')
 
 cleanCmd :: () -> GlobalOpts -> IO ()
 cleanCmd () go = withBuildConfigAndLock go (\_ -> clean)
@@ -711,7 +721,7 @@ buildCmd opts go = do
     NoFileWatch -> inner $ const $ return ()
   where
     inner setLocalFiles = withBuildConfigAndLock go $ \lk ->
-        globalFixCodePage go $ Stack.Build.build setLocalFiles (Just lk) opts
+        globalFixCodePage go $ Stack.Build.build setLocalFiles lk opts
     getProjectRoot = do
         (manager, lc) <- loadConfigWithOpts go
         bconfig <-
@@ -814,7 +824,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} = do
                     (lcProjectRoot lc)
                     (return (cmd, args, [], id))
                     -- Unlock before transferring control away, whether using docker or not:
-                    (Just $ liftIO $ unlockFile lk)
+                    (Just $ munlockFile lk)
                     (runStackTGlobal manager (lcConfig lc) go $ do
                         exec plainEnvSettings cmd args)
                     Nothing
@@ -823,10 +833,10 @@ execCmd ExecOpts {..} go@GlobalOpts{..} = do
            withBuildConfigAndLock go $ \lk -> do
                let targets = concatMap words eoPackages
                unless (null targets) $ globalFixCodePage go $
-                   Stack.Build.build (const $ return ()) (Just lk) defaultBuildOpts
+                   Stack.Build.build (const $ return ()) lk defaultBuildOpts
                        { boptsTargets = map T.pack targets
                        }
-               liftIO $ unlockFile lk -- Unlock before transferring control away.
+               munlockFile lk -- Unlock before transferring control away.
                exec eoEnvSettings cmd args
 
 -- | Run GHCi in the context of a project.
@@ -835,10 +845,10 @@ ghciCmd ghciOpts go@GlobalOpts{..} =
   withBuildConfigAndLock go $ \lk -> do
     let packageTargets = concatMap words (ghciAdditionalPackages ghciOpts)
     unless (null packageTargets) $ globalFixCodePage go $
-       Stack.Build.build (const $ return ()) (Just lk) defaultBuildOpts
+       Stack.Build.build (const $ return ()) lk defaultBuildOpts
            { boptsTargets = map T.pack packageTargets
            }
-    liftIO $ unlockFile lk -- Don't hold the lock while in the GHCI.
+    munlockFile lk -- Don't hold the lock while in the GHCI.
     ghci ghciOpts
 
 -- | Run ide-backend in the context of a project.
@@ -896,7 +906,7 @@ imgDockerCmd () go@GlobalOpts{..} = do
               do globalFixCodePage go $
                      Stack.Build.build
                          (const (return ()))
-                         (Just lk)
+                         lk
                          defaultBuildOpts
                  Image.stageContainerImageArtifacts)
         (Just Image.createContainerImageFromStage)
