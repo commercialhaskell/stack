@@ -1016,6 +1016,7 @@ instance ToJSON SCM where
 data GHCVariant
     = GHCStandard -- ^ Standard bindist
     | GHCGMP4 -- ^ Bindist that supports libgmp4 (centos66)
+    | GHCArch -- ^ Bindist built on Arch Linux (bleeding-edge)
     | GHCIntegerSimple -- ^ Bindist that uses integer-simple
     | GHCCustom String -- ^ Other bindists
     deriving (Show)
@@ -1031,6 +1032,7 @@ instance FromJSON GHCVariant where
 ghcVariantName :: GHCVariant -> String
 ghcVariantName GHCStandard = "standard"
 ghcVariantName GHCGMP4 = "gmp4"
+ghcVariantName GHCArch = "arch"
 ghcVariantName GHCIntegerSimple = "integersimple"
 ghcVariantName (GHCCustom name) = "custom-" ++ name
 
@@ -1048,6 +1050,7 @@ parseGHCVariant s =
           | s == "" -> return GHCStandard
           | s == "standard" -> return GHCStandard
           | s == "gmp4" -> return GHCGMP4
+          | s == "arch" -> return GHCArch
           | s == "integersimple" -> return GHCIntegerSimple
           | otherwise -> return (GHCCustom s)
 
