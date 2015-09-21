@@ -287,7 +287,7 @@ withExecuteEnv :: M env m
                -> m a
 withExecuteEnv menv bopts baseConfigOpts locals globals sourceMap inner = do
     withSystemTempDirectory stackProgName $ \tmpdir -> do
-        tmpdir' <- parseAbsDir tmpdir
+        tmpdir' <- parseAbsDir =<< liftIO (D.canonicalizePath tmpdir)
         configLock <- newMVar ()
         installLock <- newMVar ()
         idMap <- liftIO $ newTVarIO Map.empty
