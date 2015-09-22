@@ -18,8 +18,6 @@ NOTE: These executables have been built and tested on a Windows 7, 8.1, and 10 6
 
 We generally test on the current version of OS X, but stack is known to work on Mavericks as well, and may also work on older versions (YMMV).
 
-**Note**: due to [GHC bug 10322](https://ghc.haskell.org/trac/ghc/ticket/10322), building `stack` from source fails with GHC 7.10.1. This bug is fixed in GHC 7.10.2, and GHC 7.8.4 works as well.
-
 ## Ubuntu
 
 *note*: for 32-bit, use the [generic Linux option](#linux)
