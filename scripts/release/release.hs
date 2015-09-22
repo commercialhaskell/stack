@@ -158,27 +158,40 @@ rules global@Global{..} args = do
             (do opt <- addPath [installBinDir] []
                 () <- cmd opt stackProgName (stackArgs global) "build --pedantic --haddock --no-haddock-deps"
                 () <- cmd opt stackProgName (stackArgs global) "clean"
-                () <- cmd opt stackProgName (stackArgs global) "build"
-                () <- cmd opt stackProgName (stackArgs global) "test --flag stack:integration-tests"
+                () <- cmd opt stackProgName (stackArgs global) "build --pedantic"
+                () <- cmd opt stackProgName (stackArgs global) "test --pedantic --flag stack:integration-tests"
                 return ())
             (renameFile tmpExeFile instExeFile)
         copyFileChanged (installBinDir </> stackOrigExeFileName) out
 
     releaseDir </> binaryExeZipFileName %> \out -> do
-        need [releaseDir </> binaryExeFileName]
-        putNormal $ "zip " ++ (releaseDir </> binaryExeFileName)
+        stageFiles <- getStageFiles
+        putNormal $ "zip " ++ out
         liftIO $ do
-            entry <- Zip.readEntry [] (releaseDir </> binaryExeFileName)
-            let entry' = entry{Zip.eRelativePath = binaryExeFileName}
-                archive = Zip.addEntryToArchive entry' Zip.emptyArchive
+            entries <- forM stageFiles $ \stageFile -> do
+                Zip.readEntry
+                    [Zip.OptLocation
+                        (dropDirectoryPrefix (releaseDir </> binaryExeStageDirName) stageFile)
+                        False]
+                    stageFile
+            let archive = foldr Zip.addEntryToArchive Zip.emptyArchive entries
             L8.writeFile out (Zip.fromArchive archive)
 
     releaseDir </> binaryExeTarGzFileName %> \out -> do
-        need [releaseDir </> binaryExeFileName]
-        putNormal $ "tar gzip " ++ (releaseDir </> binaryExeFileName)
+        stageFiles <- getStageFiles
+        putNormal $ "tar gzip " ++ out
         liftIO $ do
-            content <- Tar.pack releaseDir [binaryExeFileName]
+            content <- Tar.pack releaseDir $
+                map (dropDirectoryPrefix releaseDir) stageFiles
             L8.writeFile out $ GZip.compress $ Tar.write content
+
+    releaseDir </> binaryExeStageDirName </> binaryExeFileName %> \out -> do
+        copyFile' (releaseDir </> binaryExeFileName) out
+
+    releaseDir </> (binaryExeStageDirName ++ "//*") %> \out -> do
+        copyFile'
+            (dropDirectoryPrefix (releaseDir </> binaryExeStageDirName) out)
+            out
 
     releaseDir </> binaryExeFileName %> \out -> do
         need [installBinDir </> stackOrigExeFileName]
@@ -202,7 +215,7 @@ rules global@Global{..} args = do
 
     installBinDir </> stackOrigExeFileName %> \_ -> do
         alwaysRerun
-        cmd stackProgName (stackArgs global) "build"
+        cmd stackProgName (stackArgs global) "build --pedantic"
 
     forM_ distros $ \distro0 -> do
 
@@ -256,6 +269,16 @@ rules global@Global{..} args = do
         writeFileChanged out =<< readTemplate (distroTemplateDir dvDistro </> "docker/run.sh")
 
   where
+
+    getStageFiles = do
+        docs <- getDirectoryFiles rootDir
+            ["LICENSE", "*.md", "doc//*"]
+        let stageFiles = concat
+                [[releaseDir </> binaryExeStageDirName </> binaryExeFileName]
+                ,map ((releaseDir </> binaryExeStageDirName) </>) docs]
+        need stageFiles
+        return stageFiles
+
     distroVersionFromPath path =
         case stripPrefix (releaseDir ++ "/") path of
             Nothing -> error ("Cannot determine Ubuntu version from path: " ++ path)
@@ -284,6 +307,7 @@ rules global@Global{..} args = do
             _ -> binaryExeTarGzFileName
     binaryExeZipFileName = binaryName global <.> zipExt
     binaryExeTarGzFileName = binaryName global <.> tarGzExt
+    binaryExeStageDirName = binaryName global
     binaryExeFileName = stackOrigExeFileName
     stackOrigExeFileName = stackProgName <.> exe
     distroPackageFileName distro
@@ -457,6 +481,14 @@ callGithubApi Global{..} headers mpostFile url = do
         res <- http req manager
         responseBody res $$+- CC.sinkLazy
 
+-- | Drops a directory prefix from a path.  The prefix automatically has a path
+-- separator character appended.  Fails if the path does not begin with the prefix.
+dropDirectoryPrefix :: FilePath -> FilePath -> FilePath
+dropDirectoryPrefix prefix path =
+    case stripPrefix (prefix ++ "/") path of
+        Nothing -> error ("dropDirectoryPrefix: cannot drop " ++ show prefix ++ " from " ++ show path)
+        Just stripped -> stripped
+
 -- | Build a Docker image and write its ID to a file if changed.
 buildDockerImage :: FilePath -> String -> FilePath -> Action String
 buildDockerImage buildDir imageTag out = do
@@ -496,6 +528,10 @@ platformOS =
 -- | Directory in which to store build and intermediate files.
 releaseDir :: FilePath
 releaseDir = "_release"
+
+-- | Root directory of the project
+rootDir :: FilePath
+rootDir = "."
 
 -- | @GITHUB_AUTH_TOKEN@ environment variale name.
 githubAuthTokenEnvVar :: String

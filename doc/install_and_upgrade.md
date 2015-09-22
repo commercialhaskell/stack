@@ -5,14 +5,16 @@ Binaries are signed with this [[Signing key]].
 ## Windows
 
 * Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest). Note: while generally i386/32-bit GHC is better tested on Windows, there are reports that recent versions of Windows only work with the 64-bit version of stack (see [issue #393](https://github.com/commercialhaskell/stack/issues/393)).
-* Unpack the archive (you may need to rename the contents to `stack.exe`) and place `stack.exe` somewhere on your `%PATH%` (see [Path section below](#path)) and you can then run `stack` on the command line.
+* Unpack the archive and place `stack.exe` somewhere on your `%PATH%` (see [Path section below](#path)) and you can then run `stack` on the command line.
+* Now you can run `stack` from the terminal.
 
 NOTE: These executables have been built and tested on a Windows 7, 8.1, and 10 64-bit machines. They should run on older Windows installs as well, but have not been tested. If you do test, please edit and update this page to indicate as such.
 
 ## OS X
 
 * Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest)
-* Extract the `stack` executable and put it somewhere on your `$PATH` (see [Path section below](#path))
+* Extract the archive and place `stack` somewhere on your `$PATH` (see [Path section below](#path))
+* Now you can run `stack` from the terminal.
 
 We generally test on the current version of OS X, but stack is known to work on Mavericks as well, and may also work on older versions (YMMV).
 
@@ -153,7 +155,7 @@ Alternatively, the package can be built from source as follows.
 (64-bit and 32-bit options available)
 
 * Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest).  Note: the `-gmp4` variants are for older distributions (such as CentOS 6.x) that only include libgmp4 (libgmp.so.3).
-* The download is compressed. Extract the compressed file somewhere on your PATH  (see [PATH section below](#path)).
+* Extract the archive and place `stack` somewhere on your `$PATH` (see [Path section below](#path))
 * Now you can run `stack` from the terminal.
 
 Tested on Fedora 20: make sure to install the following packages `sudo yum install perl make automake gcc gmp-devel`.
