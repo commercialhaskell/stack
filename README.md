@@ -21,16 +21,16 @@ It features:
 
 Downloads are available by operating system:
 
-* [Windows](https://github.com/commercialhaskell/stack/wiki/Downloads#windows)
-* [OS X](https://github.com/commercialhaskell/stack/wiki/Downloads#os-x)
-* [Ubuntu](https://github.com/commercialhaskell/stack/wiki/Downloads#ubuntu)
-* [Debian](https://github.com/commercialhaskell/stack/wiki/Downloads#debian)
-* [CentOS / Red Hat / Amazon Linux](https://github.com/commercialhaskell/stack/wiki/Downloads#centos--red-hat--amazon-linux)
-* [Fedora](https://github.com/commercialhaskell/stack/wiki/Downloads#fedora)
-* [Arch Linux](https://github.com/commercialhaskell/stack/wiki/Downloads#arch-linux)
-* [Linux (general)](https://github.com/commercialhaskell/stack/wiki/Downloads#linux)
+* [Windows](doc/install_and_upgrade.md#windows)
+* [OS X](doc/install_and_upgrade.md#os-x)
+* [Ubuntu](doc/install_and_upgrade.md#ubuntu)
+* [Debian](doc/install_and_upgrade.md#debian)
+* [CentOS / Red Hat / Amazon Linux](doc/install_and_upgrade.md#centos--red-hat--amazon-linux)
+* [Fedora](doc/install_and_upgrade.md#fedora)
+* [Arch Linux](doc/install_and_upgrade.md#arch-linux)
+* [Linux (general)](doc/install_and_upgrade.md#linux)
 
-[Upgrade instructions](https://github.com/commercialhaskell/stack/wiki/Downloads#upgrade)
+[Upgrade instructions](doc/install_and_upgrade.md#upgrade)
 
 Note: if you are using cabal-install to install stack, you may need to pass a constraint to work around a [Cabal issue](https://github.com/haskell/cabal/issues/2759): `cabal install --constraint 'mono-traversable >= 0.9' stack`.
 
@@ -80,15 +80,14 @@ git clone https://github.com/commercialhaskell/stack.git && cd stack && stack se
 
 #### Complete guide to stack
 
-This repository also contains [a complete guide to using
-stack](https://github.com/commercialhaskell/stack/blob/master/doc/GUIDE.md),
-covering all of the most common use cases.
+This repository also contains a complete [user guide to using stack
+](doc/GUIDE.md), covering all of the most common use cases.
+
 
 #### Questions, Feedback, Discussion
 
-* For frequently asked questions about detailed or specific use-cases,
-  please see
-  [the FAQ](https://github.com/commercialhaskell/stack/wiki/FAQ).
+* For frequently asked questions about detailed or specific use-cases, please
+  see [the FAQ](doc/faq.md).
 * For general questions, comments, feedback and support please write
   to [the stack mailing list](https://groups.google.com/d/forum/haskell-stack).
 * For bugs, issues, or requests please
@@ -116,3 +115,30 @@ in
 Haskell](https://www.fpcomplete.com/blog/2015/05/thousand-user-haskell-survey),
 which rated build issues as a major concern. The stack team hopes that stack
 can address these concerns.
+
+<hr>
+
+## Documentation Table Of Contents
+
+* Project Documentation
+    * [Maintainer Guide](doc/MAINTAINER_GUIDE.md): includes releasing information
+    * [Signing Key](doc/SIGNING_KEY.md): downloadable stack binaries are signed with this key
+* Tool Documentation
+    * [Architecture](doc/architecture.md): reference for people curious about stack internals, wanting to get involved deeply in the codebase, or wanting to use stack in unusual ways
+    * [Build Command](doc/build_command.md): reference for the syntax of the build command and the command line targets
+    * [Custom Snapshots](doc/custom_snapshots.md)
+    * [Dependency Visualization](doc/dependency_visualization.md): uses Graphviz
+    * [Docker Integration](doc/docker_integration.md)
+    * [FAQ](doc/faq.md): frequently asked questions about detailed or specific use-cases
+    * [Haskell Newcomers](doc/haskell_newcomers.md)
+    * [Install/Upgrade](doc/install_and_upgrade.md): a list of downloads available by operating system, installation instructions, and upgrade instructions
+    * [Lowering The Bar For Contributions To Open-Source Software](doc/oss_contribs_bar_lowered.md)
+    * [Nonstandard Project Initialization](doc/nonstandard_project_init.md)
+    * [Origins Of Stack](doc/origins_of_stack.md)
+    * [Shell Autocompletion](doc/shell_autocompletion.md)
+    * [Travis Integration](doc/travis_integration.md)
+    * [User Guide](doc/GUIDE.md): in-depth tutorial covering the most common use cases and all major stack features (requires no prior Haskell tooling experience)
+    * [YAML Configuration](doc/yaml_configuration.md): reference for writing `stack.yaml` files
+* Historical/Deprecated Tool Documentation (subject to removal)
+    * [Proto-User Guide: Script Interpreter](doc/usr_script_interpreter.md): mostly superseded by the User Guide
+    * [Proto-User Guide: Transition Guide](doc/usr_transition_guide.md): mostly superseded by the User Guide
