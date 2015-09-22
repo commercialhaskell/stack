@@ -32,7 +32,10 @@ Downloads are available by operating system:
 
 [Upgrade instructions](doc/install_and_upgrade.md#upgrade)
 
-Note: if you are using cabal-install to install stack, you may need to pass a constraint to work around a [Cabal issue](https://github.com/haskell/cabal/issues/2759): `cabal install --constraint 'mono-traversable >= 0.9' stack`.
+Note: if you are using cabal-install to install stack, you may need to pass a
+constraint to work around a
+[Cabal issue](https://github.com/haskell/cabal/issues/2759): `cabal install
+--constraint 'mono-traversable >= 0.9' stack`.
 
 #### How to use
 
@@ -61,21 +64,26 @@ Run `stack` for a complete list of commands.
 
 #### How to contribute
 
-This assumes that you have already installed a version of stack, and have `git` installed.
+This assumes that you have already installed a version of stack, and have `git`
+installed.
 
 1. Clone `stack` from git with
    `git clone https://github.com/commercialhaskell/stack.git`.
 2. Enter into the stack folder with `cd stack`.
 3. Build `stack` using a pre-existing `stack` install with
    `stack setup && stack build`.
-4. Once `stack` finishes building, check the stack version with 
+4. Once `stack` finishes building, check the stack version with
    `stack --version`. Make sure the version is the latest.
-5. Look for issues tagged with [`newcomer` and `awaiting-pr` labels](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3Anewcomer+label%3Aawaiting-pr)
+5. Look for issues tagged with
+   [`newcomer` and `awaiting-pr` labels](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3Anewcomer+label%3Aawaiting-pr)
 
 Build from source as a one-liner:
 
 ```bash
-git clone https://github.com/commercialhaskell/stack.git && cd stack && stack setup && stack build
+git clone https://github.com/commercialhaskell/stack.git && \
+cd stack && \
+stack setup && \
+stack build
 ```
 
 #### Complete guide to stack
@@ -122,16 +130,26 @@ can address these concerns.
 
 * Project Documentation
     * [Maintainer Guide](doc/MAINTAINER_GUIDE.md): includes releasing information
-    * [Signing Key](doc/SIGNING_KEY.md): downloadable stack binaries are signed with this key
+    * [Signing Key](doc/SIGNING_KEY.md): downloadable stack binaries are signed
+      with this key
 * Tool Documentation
-    * [Build Command](doc/build_command.md): reference for the syntax of the build command and the command line targets
+    * [Build Command](doc/build_command.md): reference for the syntax of the
+      build command and the command line targets
     * [Dependency Visualization](doc/dependency_visualization.md): uses Graphviz
     * [Docker Integration](doc/docker_integration.md)
-    * [FAQ](doc/faq.md): frequently asked questions about detailed or specific use-cases
-    * [Install/Upgrade](doc/install_and_upgrade.md): a list of downloads available by operating system, installation instructions, and upgrade instructions
+    * [FAQ](doc/faq.md): frequently asked questions about detailed or specific
+      use-cases
+    * [Install/Upgrade](doc/install_and_upgrade.md): a list of downloads
+      available by operating system, installation instructions, and upgrade
+      instructions
     * [Nonstandard Project Initialization](doc/nonstandard_project_init.md)
     * [Shell Autocompletion](doc/shell_autocompletion.md)
-    * [User Guide](doc/GUIDE.md): in-depth tutorial covering the most common use cases and all major stack features (requires no prior Haskell tooling experience)
-    * [YAML Configuration](doc/yaml_configuration.md): reference for writing `stack.yaml` files
+    * [User Guide](doc/GUIDE.md): in-depth tutorial covering the most common use
+      cases and all major stack features (requires no prior Haskell tooling
+      experience)
+    * [YAML Configuration](doc/yaml_configuration.md): reference for writing
+      `stack.yaml` files
 * Advanced Documentation
-    * [Architecture](doc/architecture.md): reference for people curious about stack internals, wanting to get involved deeply in the codebase, or wanting to use stack in unusual ways
+    * [Architecture](doc/architecture.md): reference for people curious about
+      stack internals, wanting to get involved deeply in the codebase, or
+      wanting to use stack in unusual ways
