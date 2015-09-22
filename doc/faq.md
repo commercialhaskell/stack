@@ -1,10 +1,10 @@
 So that this doesn't become repetitive: for the reasons behind the answers
-below, see the [[Architecture]] page. The goal of the answers here is to be as
+below, see the [Architecture](architecture.md) page. The goal of the answers here is to be as
 helpful and concise as possible.
 
 #### Where is stack installed and will it interfere with `ghc` (etc) I already have installed?
 
-Stack itself is installed in normal system locations based on the mechanism you used (see the [[Downloads]] page). Stack installs the Stackage libraries in `~/.stack` and any project libraries or extra dependencies in a `.stack-work` directory within each project's directory. None of this should affect any existing Haskell tools at all.
+Stack itself is installed in normal system locations based on the mechanism you used (see the [Install and upgrade](install_and_upgrade.md) page). Stack installs the Stackage libraries in `~/.stack` and any project libraries or extra dependencies in a `.stack-work` directory within each project's directory. None of this should affect any existing Haskell tools at all.
 
 #### What is the relationship between stack and cabal?
 
@@ -174,7 +174,7 @@ of those three. Updating the index will have no impact on stack's behavior.
 
 #### I have a custom package index I'd like to use, how do I do so?
 
-You can configure this in your stack.yaml. See [[stack.yaml]]
+You can configure this in your stack.yaml. See [YAML configuration](yaml_configuration.md).
 
 #### How can I make sure my project builds against multiple ghc versions?
 
@@ -202,7 +202,7 @@ $ STACK_YAML=stack-7.10.yaml stack build  # builds using the given yaml file
 #### I heard you can use this with Docker?
 
 Yes, stack supports using Docker with images that contain preinstalled Stackage
-packages and the tools. See [[Docker]] for details.
+packages and the tools. See [Docker integration](docker_integration.md) for details.
 
 #### How do I use this with Travis CI?
 
