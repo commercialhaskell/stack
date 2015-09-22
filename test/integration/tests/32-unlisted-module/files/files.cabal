@@ -12,5 +12,6 @@ executable files-exe
   hs-source-dirs:      src/../src
   main-is:             Main.hs
   build-depends:       base >= 4.7 && < 5
+                     , bytestring
                      , file-embed
   default-language:    Haskell2010
