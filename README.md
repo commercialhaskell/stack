@@ -124,21 +124,14 @@ can address these concerns.
     * [Maintainer Guide](doc/MAINTAINER_GUIDE.md): includes releasing information
     * [Signing Key](doc/SIGNING_KEY.md): downloadable stack binaries are signed with this key
 * Tool Documentation
-    * [Architecture](doc/architecture.md): reference for people curious about stack internals, wanting to get involved deeply in the codebase, or wanting to use stack in unusual ways
     * [Build Command](doc/build_command.md): reference for the syntax of the build command and the command line targets
-    * [Custom Snapshots](doc/custom_snapshots.md)
     * [Dependency Visualization](doc/dependency_visualization.md): uses Graphviz
     * [Docker Integration](doc/docker_integration.md)
     * [FAQ](doc/faq.md): frequently asked questions about detailed or specific use-cases
-    * [Haskell Newcomers](doc/haskell_newcomers.md)
     * [Install/Upgrade](doc/install_and_upgrade.md): a list of downloads available by operating system, installation instructions, and upgrade instructions
-    * [Lowering The Bar For Contributions To Open-Source Software](doc/oss_contribs_bar_lowered.md)
     * [Nonstandard Project Initialization](doc/nonstandard_project_init.md)
-    * [Origins Of Stack](doc/origins_of_stack.md)
     * [Shell Autocompletion](doc/shell_autocompletion.md)
-    * [Travis Integration](doc/travis_integration.md)
     * [User Guide](doc/GUIDE.md): in-depth tutorial covering the most common use cases and all major stack features (requires no prior Haskell tooling experience)
     * [YAML Configuration](doc/yaml_configuration.md): reference for writing `stack.yaml` files
-* Historical/Deprecated Tool Documentation (subject to removal)
-    * [Proto-User Guide: Script Interpreter](doc/usr_script_interpreter.md): mostly superseded by the User Guide
-    * [Proto-User Guide: Transition Guide](doc/usr_transition_guide.md): mostly superseded by the User Guide
+* Advanced Documentation
+    * [Architecture](doc/architecture.md): reference for people curious about stack internals, wanting to get involved deeply in the codebase, or wanting to use stack in unusual ways
