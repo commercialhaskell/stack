@@ -1,12 +1,12 @@
-Stack release tool
-==================
+release.hs
+==========
 
 This tool automates some aspects of releasing a new version of Stack. It
 currently handles some tasks that need to be performed on each platform:
 building the release, running some pre-release checks, and uploading binaries to
 a Github release.
 
-See [Checklist](https://github.com/commercialhaskell/stack/wiki/Checklist) of
+See [Checklist](../../doc/MAINTAINER_GUIDE.md) of
 additional manual release steps.
 
 Prerequisites
@@ -16,6 +16,7 @@ These must be installed in the PATH to use the release tool:
 
 - stack
 - git (for Windows, [msysgit](https://msysgit.github.io) is recommended).
+- cabal (cabal-install)
 
 To create a signed binary, you need:
 
@@ -34,7 +35,6 @@ To upload a binary to a Github release, you also need:
 
 To create and upload Debian/Ubuntu packages, you need:
 
-- Docker installed.
 - deb-s3 installed (`sudo gem install deb-s3`).
 - `dev@fpcomplete.com` secret key in GPG keyring.
 - Set `AWS_SECRET_ACCESS_KEY` and `AWS_ACCESS_KEY_ID` environment variables with
@@ -42,16 +42,19 @@ To create and upload Debian/Ubuntu packages, you need:
 
 To create and upload Red Hat/CentOS packages, you need:
 
-- Docker installed.
-- rpm-s3 installed (see https://github.com/crohr/rpm-s3).
+- [rpm-s3 installed](https://github.com/crohr/rpm-s3).
 - `dev@fpcomplete.com` secret key in GPG keyring.
 - Set `AWS_SECRET_ACCESS_KEY` and `AWS_ACCESS_KEY_ID` environment variables with
   credentials that allow uploading to download.fpcomplete.com S3 bucket.
 
+To create and upload Arch packages, you need:
+
+- [AWS CLI installed](http://docs.aws.amazon.com/cli/latest/userguide/installing.html).
+
 Invocation
 ----------
 
-Usage: `scripts/release/release.hs [OPTIONS] TARGET`
+Usage: `etc/scripts/release.hs [OPTIONS] TARGET`
 
 The tool must be run in the root of the working tree.
 

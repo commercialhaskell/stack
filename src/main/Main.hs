@@ -355,7 +355,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
              , " as a script interpreter, a\n'-- "
              , stackProgName
              , " [options] runghc [options]' comment is required."
-             , "\nSee https://github.com/commercialhaskell/stack/wiki/Script-interpreter" ]
+             , "\nSee https://github.com/commercialhaskell/stack/blob/master/doc/GUIDE.md#ghcrunghc" ]
          throwIO exitCode
        Right (global,run) -> do
          when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'

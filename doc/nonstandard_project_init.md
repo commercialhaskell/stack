@@ -62,18 +62,18 @@ packages:
     commit: 8debedd3fcb6525ac0d7de2dd49217dce2abc0d9
 ```
 
-## Issues Referenced 
+## Issues Referenced
   - https://github.com/commercialhaskell/stack/issues/254
   - https://github.com/commercialhaskell/stack/issues/199
 
 # Private Hackage
 Working with a private Hackage is currently supported in certain situations.
-There exist special entries in `stack.yaml` that may help you. In a `stack.yaml` file, it is possible 
+There exist special entries in `stack.yaml` that may help you. In a `stack.yaml` file, it is possible
 to add lines for packages in your database referencing the sdist locations via an `http` entry, or to use a `Hackage` entry.
 
 The recommended stack workflow is to use git submodules instead of a private Hackage. Either by using git submodules and listing the directories in the packages section of `stack.yaml`, or by adding the private dependencies as git URIs with a commit SHA to the `stack.yaml`. This has the large benefit of eliminating the need to manage a Hackage database and pointless version bumps.
 
-For further information see [[stack.yaml]]
+For further information see [YAML configuration](yaml_configuration.md)
 
 ## Issues Referenced
   - https://github.com/commercialhaskell/stack/issues/445

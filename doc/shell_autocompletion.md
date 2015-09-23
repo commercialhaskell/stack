@@ -1,5 +1,9 @@
 ## Shell Autocompletion:
 
+Note: if you installed a package for you Linux distribution, the bash completion
+file was automatically installed (you may need the `bash-completion` package to
+have it take effect).
+
 The following adds support for shell tab completion for standard Stack arguments, although completion for filenames and executables etc. within stack is still lacking (see [issue 82](https://github.com/commercialhaskell/stack/issues/832)).
 
 ### for bash users

@@ -719,7 +719,7 @@ instance Show ConfigException where
         , toFilePath configFile
         , "':\n"
         , show exception
-        , "\nSee https://github.com/commercialhaskell/stack/wiki/stack.yaml."
+        , "\nSee https://github.com/commercialhaskell/stack/blob/master/doc/yaml_configuration.md."
         ]
     show (ParseResolverException t) = concat
         [ "Invalid resolver value: "
@@ -757,7 +757,7 @@ instance Show ConfigException where
             (\name -> "    stack init --resolver " ++ T.unpack (renderSnapName name))
             names
         , "\nYou'll then need to add some extra-deps. See:\n\n"
-        , "    https://github.com/commercialhaskell/stack/wiki/stack.yaml#extra-deps"
+        , "    https://github.com/commercialhaskell/stack/blob/master/doc/yaml_configuration.md#extra-deps"
         , "\n\nYou can also try falling back to a dependency solver with:\n\n"
         , "    stack init --solver"
         ]

@@ -1,10 +1,10 @@
 So that this doesn't become repetitive: for the reasons behind the answers
-below, see the [[Architecture]] page. The goal of the answers here is to be as
+below, see the [Architecture](architecture.md) page. The goal of the answers here is to be as
 helpful and concise as possible.
 
 #### Where is stack installed and will it interfere with `ghc` (etc) I already have installed?
 
-Stack itself is installed in normal system locations based on the mechanism you used (see the [[Downloads]] page). Stack installs the Stackage libraries in `~/.stack` and any project libraries or extra dependencies in a `.stack-work` directory within each project's directory. None of this should affect any existing Haskell tools at all.
+Stack itself is installed in normal system locations based on the mechanism you used (see the [Install and upgrade](install_and_upgrade.md) page). Stack installs the Stackage libraries in `~/.stack` and any project libraries or extra dependencies in a `.stack-work` directory within each project's directory. None of this should affect any existing Haskell tools at all.
 
 #### What is the relationship between stack and cabal?
 
@@ -153,7 +153,7 @@ Like all other targets, `stack test` runs test suites in parallel by default. Th
 
 #### Can I get bash autocompletion?
 
-Yes, see the [Shell-autocompletion](https://github.com/commercialhaskell/stack/wiki/Shell-autocompletion) wiki entry
+Yes, see the [shell-autocompletion documentation](shell_autocompletion.md)
 
 #### How do I update my package index?
 
@@ -174,7 +174,7 @@ of those three. Updating the index will have no impact on stack's behavior.
 
 #### I have a custom package index I'd like to use, how do I do so?
 
-You can configure this in your stack.yaml. See [[stack.yaml]]
+You can configure this in your stack.yaml. See [YAML configuration](yaml_configuration.md).
 
 #### How can I make sure my project builds against multiple ghc versions?
 
@@ -202,32 +202,11 @@ $ STACK_YAML=stack-7.10.yaml stack build  # builds using the given yaml file
 #### I heard you can use this with Docker?
 
 Yes, stack supports using Docker with images that contain preinstalled Stackage
-packages and the tools. See [[Docker]] for details.
+packages and the tools. See [Docker integration](docker_integration.md) for details.
 
 #### How do I use this with Travis CI?
 
-Stack is in beta now, so keep in mind that the tool's interface is still under flux. For early adopters, here's a sample `.travis.yaml` file:
-
-```YAML
-language: haskell
-
-before_install:
-  # Instructions taken from https://github.com/commercialhaskell/stack/wiki/Downloads
-  - wget -q -O- http://download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
-  - echo 'deb http://download.fpcomplete.com/ubuntu/precise stable main' | sudo tee /etc/apt/sources.list.d/fpco.list
-  - sudo apt-get update
-  - sudo apt-get install stack -y
-
-install:
-  - stack setup
-
-script:
-  - stack test
-```
-
-If you wish to use stack as part of a larger matrix, à la [hvr/multi-ghc-travis](https://github.com/hvr/multi-ghc-travis), then you need to do a bit more work. Take a look at [tebello-thejane/bitx-haskell/.travis.yml](https://github.com/tebello-thejane/bitx-haskell/blob/master/.travis.yml), and note the extensive use of `if` statements to select between building with Cabal and stack.
-
-Also, note that some `stack` commands have been known to take longer than 20 minutes when on Travis, thus causing Travis to kill the build. A cheap trick is to cause `stack` to display verbose output (with the `-v` option), which causes it to display more often and thus Travis is less likely to kill it due to lack of perceived activity.
+See the [Travis section in the GUIDE](GUIDE.md#travis-with-caching)
 
 #### What is licensing restrictions on Windows?
 
