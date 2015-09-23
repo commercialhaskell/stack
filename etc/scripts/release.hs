@@ -184,9 +184,20 @@ rules global@Global{..} args = do
     releaseDir </> binaryExeFileName %> \out -> do
         need [installBinDir </> stackExeFileName]
         case platformOS of
-            Windows ->
+            Windows -> do
                 -- Windows doesn't have or need a 'strip' command, so skip it.
+                -- Instead, we sign the executable
                 liftIO $ copyFile (installBinDir </> stackExeFileName) out
+                actionOnException
+                    (command_ [] "c:\\Program Files\\Microsoft SDKs\\Windows\\v7.1\\Bin\\signtool.exe"
+                        ["sign"
+                        ,"/v"
+                        ,"/d", synopsis gStackPackageDescription
+                        ,"/du", homepage gStackPackageDescription
+                        ,"/n", "FP Complete, Corporation"
+                        ,"/t", "http://timestamp.verisign.com/scripts/timestamp.dll"
+                        ,out])
+                    (removeFile out)
             Linux ->
                 cmd "strip -p --strip-unneeded --remove-section=.comment -o"
                     [out, installBinDir </> stackExeFileName]
@@ -518,7 +529,7 @@ writeTarGz out baseDir inputFiles = liftIO $ do
 -- separator character appended.  Fails if the path does not begin with the prefix.
 dropDirectoryPrefix :: FilePath -> FilePath -> FilePath
 dropDirectoryPrefix prefix path =
-    case stripPrefix (prefix ++ "/") path of
+    case stripPrefix (toStandard prefix ++ "/") (toStandard path) of
         Nothing -> error ("dropDirectoryPrefix: cannot drop " ++ show prefix ++ " from " ++ show path)
         Just stripped -> stripped
 
