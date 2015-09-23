@@ -163,7 +163,7 @@ rules global@Global{..} args = do
             entries <- forM stageFiles $ \stageFile -> do
                 Zip.readEntry
                     [Zip.OptLocation
-                        (dropDirectoryPrefix (releaseDir </> binaryPkgStageDirName) stageFile)
+                        (dropDirectoryPrefix (releaseStageDir </> binaryPkgStageDirName) stageFile)
                         False]
                     stageFile
             let archive = foldr Zip.addEntryToArchive Zip.emptyArchive entries
@@ -171,14 +171,14 @@ rules global@Global{..} args = do
 
     releaseDir </> binaryPkgTarGzFileName %> \out -> do
         stageFiles <- getBinaryPkgStageFiles
-        writeTarGz out releaseDir stageFiles
+        writeTarGz out releaseStageDir stageFiles
 
-    releaseDir </> binaryPkgStageDirName </> stackExeFileName %> \out -> do
+    releaseStageDir </> binaryPkgStageDirName </> stackExeFileName %> \out -> do
         copyFileChanged (releaseDir </> binaryExeFileName) out
 
-    releaseDir </> (binaryPkgStageDirName ++ "//*") %> \out -> do
+    releaseStageDir </> (binaryPkgStageDirName ++ "//*") %> \out -> do
         copyFileChanged
-            (dropDirectoryPrefix (releaseDir </> binaryPkgStageDirName) out)
+            (dropDirectoryPrefix (releaseStageDir </> binaryPkgStageDirName) out)
             out
 
     releaseDir </> binaryExeFileName %> \out -> do
@@ -346,8 +346,8 @@ rules global@Global{..} args = do
     getBinaryPkgStageFiles = do
         docFiles <- getDocFiles
         let stageFiles = concat
-                [[releaseDir </> binaryPkgStageDirName </> stackExeFileName]
-                ,map ((releaseDir </> binaryPkgStageDirName) </>) docFiles]
+                [[releaseStageDir </> binaryPkgStageDirName </> stackExeFileName]
+                ,map ((releaseStageDir </> binaryPkgStageDirName) </>) docFiles]
         need stageFiles
         return stageFiles
 
@@ -380,6 +380,7 @@ rules global@Global{..} args = do
     archBuildPhony = "build-" ++ archDistro
 
     releaseCheckDir = releaseDir </> "check"
+    releaseStageDir = releaseDir </> "stage"
     installBinDir = gLocalInstallRoot </> "bin"
     distroVersionDir DistroVersion{..} = releaseDir </> dvDistro </> dvVersion
 
