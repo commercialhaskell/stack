@@ -10,8 +10,7 @@ Vagrant.configure(2) do |config|
     set -xe
     export PATH=/usr/local/bin:$PATH
     yum -y install epel-release
-    yum -y install perl make automake gcc gmp-devel zlib-devel tar which docker-io git python-boto deltarpm python-deltarpm rpm-build rpm-sign
-    service docker start
+    yum -y install perl make automake gcc gmp-devel zlib-devel tar which git python-boto deltarpm python-deltarpm rpm-build rpm-sign
     if ! [[ -f /usr/local/bin/stack ]]; then
       curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/centos/7/fpco.repo >/etc/yum.repos.d/fpco.repo
       yum -y install stack
@@ -22,10 +21,9 @@ Vagrant.configure(2) do |config|
       cp `stack exec which cabal` /usr/local/bin/cabal
       popd
     fi
-    if ! [[ -f /usr/local/bin/docker ]]; then
-      echo '#!/bin/sh' >/usr/local/bin/docker
-      echo "exec sudo $(which docker)" '"$@"' >>/usr/local/bin/docker
-      chmod a+x /usr/local/bin/docker
+    if ! which fpm; then
+        yum -y install ruby-devel
+        gem install fpm --version '< 1.4.0'
     fi
     if ! [[ -d /opt/rpm-s3 ]]; then
       mkdir -p /opt

@@ -54,10 +54,7 @@ main =
             gGitRevCount <- length . lines <$> readProcess "git" ["rev-list", "HEAD"] ""
             gGitSha <- trim <$> readProcess "git" ["rev-parse", "HEAD"] ""
             gHomeDir <- getHomeDirectory
-            let -- @gScriptPath@ was retrived using the @executable-path@ package, but it
-                -- has trouble with GHC 7.10.2 on OS X
-                gScriptPath = "scripts/release/release.hs"
-                gGpgKey = "9BEFB442"
+            let gGpgKey = "9BEFB442"
                 gAllowDirty = False
                 gGithubReleaseTag = Nothing
                 Platform arch _ = buildPlatform
@@ -123,22 +120,17 @@ rules global@Global{..} args = do
         need [releaseCheckDir </> binaryExeFileName]
 
     phony uploadPhony $
-        mapM_ (\f -> need [releaseDir </> f <.> uploadExt]) binaryFileNames
+        mapM_ (\f -> need [releaseDir </> f <.> uploadExt]) binaryPkgFileNames
 
     phony buildPhony $
-        mapM_ (\f -> need [releaseDir </> f]) binaryFileNames
+        mapM_ (\f -> need [releaseDir </> f]) binaryPkgFileNames
 
-    forM_ distros $ \distro -> do
-
-        phony (distroUploadPhony distro) $
-            mapM_
-                (\v -> need [distroVersionDir (DistroVersion distro (fst v)) </> distroPackageFileName distro <.> uploadExt])
-                (distroVersions distro)
-
-        phony (distroPackagesPhony distro) $
-            mapM_
-                (\v -> need [distroVersionDir (DistroVersion distro (fst v)) </> distroPackageFileName distro])
-                (distroVersions distro)
+    distroPhonies ubuntuDistro ubuntuVersions debPackageFileName
+    distroPhonies debianDistro debianVersions debPackageFileName
+    distroPhonies centosDistro centosVersions rpmPackageFileName
+    distroPhonies fedoraDistro fedoraVersions rpmPackageFileName
+    phony archUploadPhony $ need [archDir </> archPackageFileName <.> uploadExt]
+    phony archBuildPhony $ need [archDir </> archPackageFileName]
 
     releaseDir </> "*" <.> uploadExt %> \out -> do
         need [dropExtension out]
@@ -146,12 +138,12 @@ rules global@Global{..} args = do
         copyFile' (dropExtension out) out
 
     releaseCheckDir </> binaryExeFileName %> \out -> do
-        need [installBinDir </> stackOrigExeFileName]
+        need [installBinDir </> stackExeFileName]
         Stdout dirty <- cmd "git status --porcelain"
         when (not gAllowDirty && not (null (trim dirty))) $
             error ("Working tree is dirty.  Use --" ++ allowDirtyOptName ++ " option to continue anyway.")
-        let instExeFile = installBinDir </> stackOrigExeFileName
-            tmpExeFile = installBinDir </> stackOrigExeFileName <.> "tmp"
+        let instExeFile = installBinDir </> stackExeFileName
+            tmpExeFile = installBinDir </> stackExeFileName <.> "tmp"
         --EKB FIXME: once 'stack install --path' implemented, use it instead of this temp file.
         liftIO $ renameFile instExeFile tmpExeFile
         actionFinally
@@ -162,163 +154,237 @@ rules global@Global{..} args = do
                 () <- cmd opt stackProgName (stackArgs global) "test --pedantic --flag stack:integration-tests"
                 return ())
             (renameFile tmpExeFile instExeFile)
-        copyFileChanged (installBinDir </> stackOrigExeFileName) out
+        copyFileChanged (installBinDir </> stackExeFileName) out
 
-    releaseDir </> binaryExeZipFileName %> \out -> do
-        stageFiles <- getStageFiles
+    releaseDir </> binaryPkgZipFileName %> \out -> do
+        stageFiles <- getBinaryPkgStageFiles
         putNormal $ "zip " ++ out
         liftIO $ do
             entries <- forM stageFiles $ \stageFile -> do
                 Zip.readEntry
                     [Zip.OptLocation
-                        (dropDirectoryPrefix (releaseDir </> binaryExeStageDirName) stageFile)
+                        (dropDirectoryPrefix (releaseDir </> binaryPkgStageDirName) stageFile)
                         False]
                     stageFile
             let archive = foldr Zip.addEntryToArchive Zip.emptyArchive entries
             L8.writeFile out (Zip.fromArchive archive)
 
-    releaseDir </> binaryExeTarGzFileName %> \out -> do
-        stageFiles <- getStageFiles
-        putNormal $ "tar gzip " ++ out
-        liftIO $ do
-            content <- Tar.pack releaseDir $
-                map (dropDirectoryPrefix releaseDir) stageFiles
-            L8.writeFile out $ GZip.compress $ Tar.write content
+    releaseDir </> binaryPkgTarGzFileName %> \out -> do
+        stageFiles <- getBinaryPkgStageFiles
+        writeTarGz out releaseDir stageFiles
 
-    releaseDir </> binaryExeStageDirName </> binaryExeFileName %> \out -> do
+    releaseDir </> binaryPkgStageDirName </> stackExeFileName %> \out -> do
         copyFile' (releaseDir </> binaryExeFileName) out
 
-    releaseDir </> (binaryExeStageDirName ++ "//*") %> \out -> do
+    releaseDir </> (binaryPkgStageDirName ++ "//*") %> \out -> do
         copyFile'
-            (dropDirectoryPrefix (releaseDir </> binaryExeStageDirName) out)
+            (dropDirectoryPrefix (releaseDir </> binaryPkgStageDirName) out)
             out
 
     releaseDir </> binaryExeFileName %> \out -> do
-        need [installBinDir </> stackOrigExeFileName]
+        need [installBinDir </> stackExeFileName]
         case platformOS of
             Windows ->
                 -- Windows doesn't have or need a 'strip' command, so skip it.
-                liftIO $ copyFile (installBinDir </> stackOrigExeFileName) out
+                liftIO $ copyFile (installBinDir </> stackExeFileName) out
             Linux ->
                 cmd "strip -p --strip-unneeded --remove-section=.comment -o"
-                    [out, installBinDir </> stackOrigExeFileName]
+                    [out, installBinDir </> stackExeFileName]
             _ ->
                 cmd "strip -o"
-                    [out, installBinDir </> stackOrigExeFileName]
+                    [out, installBinDir </> stackExeFileName]
 
-    releaseDir </> binaryExeCompressedAscFileName %> \out -> do
+    releaseDir </> binaryPkgSignatureFileName %> \out -> do
         need [out -<.> ""]
         _ <- liftIO $ tryJust (guard . isDoesNotExistError) (removeFile out)
         cmd "gpg --detach-sig --armor"
             [ "-u", gGpgKey
             , dropExtension out ]
 
-    installBinDir </> stackOrigExeFileName %> \_ -> do
+    installBinDir </> stackExeFileName %> \_ -> do
         alwaysRerun
         cmd stackProgName (stackArgs global) "build --pedantic"
 
-    forM_ distros $ \distro0 -> do
+    debDistroRules ubuntuDistro ubuntuVersions
+    debDistroRules debianDistro debianVersions
+    rpmDistroRules centosDistro centosVersions
+    rpmDistroRules fedoraDistro fedoraVersions
 
-        distroVersionDir (anyDistroVersion' distro0) </> distroPackageFileName distro0 <.> uploadExt %> \out -> do
-            let dv@DistroVersion{..} = distroVersionFromPath out
-            need [dropExtension out]
-            uploadPackage dvDistro dv (dropExtension out)
-            copyFileChanged (dropExtension out) out
+    archDir </> archPackageFileName <.> uploadExt %> \out -> do
+       let pkgFile = dropExtension out
+       need [pkgFile]
+       () <- cmd "aws s3 cp"
+           [ pkgFile
+           , "s3://download.fpcomplete.com/archlinux/" ++ takeFileName pkgFile ]
+       copyFileChanged pkgFile out
+    archDir </> archPackageFileName %> \out -> do
+        docFiles <- getDocFiles
+        let inputFiles = concat
+                [[archStagedExeFile
+                 ,archStagedBashCompletionFile]
+                ,map (archStagedDocDir </>) docFiles]
+        need inputFiles
+        putNormal $ "tar gzip " ++ out
+        writeTarGz out archStagingDir inputFiles
+    archStagedExeFile %> \out -> do
+        copyFile' (releaseDir </> binaryExeFileName) out
+    archStagedBashCompletionFile %> \out -> do
+        writeBashCompletion archStagedExeFile archStagingDir out
+    archStagedDocDir ++ "//*" %> \out -> do
+        let origFile = dropDirectoryPrefix archStagedDocDir out
+        copyFile' origFile out
 
-        distroVersionDir (anyDistroVersion' distro0) </> distroPackageFileName distro0 %> \out -> do
-            alwaysRerun
-            let dv@DistroVersion{..} = distroVersionFromPath out
-            need [distroVersionDir dv </> imageIDFileName]
-            liftIO $ createDirectoryIfMissing True (takeDirectory out)
-            cmd "docker run --rm"
-                [ "--volume=" ++ gProjectRoot </> distroVersionDir dv </> "stack-root" ++
-                ":/mnt/stack-root"
-                , "--env=STACK_ROOT=/mnt/stack-root"
-                , "--volume=" ++ gProjectRoot </> distroVersionDir dv </> "stack-work" ++
-                ":/mnt/src/.stack-work"
-                , "--volume=" ++ gProjectRoot ++ ":/mnt/src"
-                , "--workdir=/mnt/src"
-                , "--volume=" ++ gProjectRoot </> distroVersionDir dv ++ ":/mnt/out"
-                , "--env=OUTPUT_PKG=/mnt/out/" ++ distroPackageFileName dvDistro
-                , "--env=PKG_VERSION=" ++ distroPackageVersionStr dvDistro
-                , "--env=PKG_MAINTAINER=" ++ maintainer gStackPackageDescription
-                , "--env=PKG_DESCRIPTION=" ++ synopsis gStackPackageDescription
-                , "--env=PKG_LICENSE=" ++ display (license gStackPackageDescription)
-                , "--env=PKG_URL=" ++ homepage gStackPackageDescription
-                , distroVersionDockerImageTag dv ]
-
-    distroVersionDir anyDistroVersion </> imageIDFileName %> \out -> do
-        alwaysRerun
-        let dv@DistroVersion{..} = distroVersionFromPath out
-            imageTag = distroVersionDockerImageTag dv
-        need
-            [ distroVersionDockerDir dv </> "Dockerfile"
-            , distroVersionDockerDir dv </> "run.sh" ]
-        _ <- buildDockerImage (distroVersionDockerDir dv) imageTag out
-        return ()
-
-    distroVersionDockerDir anyDistroVersion </> "Dockerfile" %> \out -> do
-        let DistroVersion{..} = distroVersionFromPath out
-        template <- readTemplate (distroTemplateDir dvDistro </> "docker/Dockerfile")
-        writeFileChanged out $
-            replace "<<DISTRO-VERSION>>" dvVersion $
-            replace "<<DISTRO>>" dvDistro template
-
-    distroVersionDockerDir anyDistroVersion </> "run.sh" %> \out -> do
-        let DistroVersion{..} = distroVersionFromPath out
-        writeFileChanged out =<< readTemplate (distroTemplateDir dvDistro </> "docker/run.sh")
+    --XXX: remove the dockerfile etc. template (also, get rid of old Arch dockerfile)
 
   where
 
-    getStageFiles = do
-        docs <- getDirectoryFiles rootDir
-            ["LICENSE", "*.md", "doc//*"]
+    debDistroRules debDistro0 debVersions = do
+        let anyVersion0 = anyDistroVersion debDistro0
+        distroVersionDir anyVersion0 </> debPackageFileName anyVersion0 <.> uploadExt %> \out -> do
+           let DistroVersion{..} = distroVersionFromPath out debVersions
+               pkgFile = dropExtension out
+           need [pkgFile]
+           () <- cmd "deb-s3 upload -b download.fpcomplete.com --preserve-versions"
+               [ "--sign=" ++ gGpgKey
+               , "--prefix=" ++ dvDistro ++ "/" ++ dvCodeName
+               , pkgFile ]
+           copyFileChanged pkgFile out
+        distroVersionDir anyVersion0 </> debPackageFileName anyVersion0 %> \out -> do
+            docFiles <- getDocFiles
+            let dv@DistroVersion{..} = distroVersionFromPath out debVersions
+                inputFiles = concat
+                    [[debStagedExeFile dv
+                     ,debStagedBashCompletionFile dv]
+                    ,map (debStagedDocDir dv </>) docFiles]
+            need inputFiles
+            cmd "fpm -f -s dir -t deb"
+                "--deb-recommends git --deb-recommends gnupg"
+                "-d g++ -d gcc -d libc6-dev -d libffi-dev -d libgmp-dev -d make -d xz-utils -d zlib1g-dev"
+                ["-n", stackProgName
+                ,"-C", debStagingDir dv
+                ,"-v", debPackageVersionStr dv
+                ,"-p", out
+                ,"-m", maintainer gStackPackageDescription
+                ,"--description", synopsis gStackPackageDescription
+                ,"--license", display (license gStackPackageDescription)
+                ,"--url", homepage gStackPackageDescription]
+                (map (dropDirectoryPrefix (debStagingDir dv)) inputFiles)
+        debStagedExeFile anyVersion0 %> \out -> do
+            copyFile' (releaseDir </> binaryExeFileName) out
+        debStagedBashCompletionFile anyVersion0 %> \out -> do
+            let dv = distroVersionFromPath out debVersions
+            writeBashCompletion (debStagedExeFile dv) (debStagingDir dv) out
+        debStagedDocDir anyVersion0 ++ "//*" %> \out -> do
+            let dv@DistroVersion{..} = distroVersionFromPath out debVersions
+                origFile = dropDirectoryPrefix (debStagedDocDir dv) out
+            copyFile' origFile out
+
+    rpmDistroRules rpmDistro0 rpmVersions = do
+        let anyVersion0 = anyDistroVersion rpmDistro0
+        distroVersionDir anyVersion0 </> rpmPackageFileName anyVersion0 <.> uploadExt %> \out -> do
+           let DistroVersion{..} = distroVersionFromPath out rpmVersions
+               pkgFile = dropExtension out
+           need [pkgFile]
+           let rpmmacrosFile = gHomeDir </> ".rpmmacros"
+           rpmmacrosExists <- liftIO $ System.Directory.doesFileExist rpmmacrosFile
+           when rpmmacrosExists $
+               error ("'" ++ rpmmacrosFile ++ "' already exists.  Move it out of the way first.")
+           actionFinally
+               (do writeFileLines rpmmacrosFile
+                       [ "%_signature gpg"
+                       , "%_gpg_name " ++ gGpgKey ]
+                   () <- cmd "rpm-s3 --verbose --sign --bucket=download.fpcomplete.com"
+                       [ "--repopath=" ++ dvDistro ++ "/" ++ dvVersion
+                       , pkgFile ]
+                   return ())
+               (liftIO $ removeFile rpmmacrosFile)
+           copyFileChanged pkgFile out
+        distroVersionDir anyVersion0 </> rpmPackageFileName anyVersion0 %> \out -> do
+            docFiles <- getDocFiles
+            let dv@DistroVersion{..} = distroVersionFromPath out rpmVersions
+                inputFiles = concat
+                    [[rpmStagedExeFile dv
+                     ,rpmStagedBashCompletionFile dv]
+                    ,map (rpmStagedDocDir dv </>) docFiles]
+            need inputFiles
+            cmd "fpm -s dir -t rpm"
+                "-d perl -d make -d automake -d gcc -d gmp-devel -d libffi -d zlib -d xz -d tar"
+                ["-n", stackProgName
+                ,"-C", rpmStagingDir dv
+                ,"-v", rpmPackageVersionStr dv
+                ,"--iteration", rpmPackageIterationStr dv
+                ,"-p", out
+                ,"-m", maintainer gStackPackageDescription
+                ,"--description", synopsis gStackPackageDescription
+                ,"--license", display (license gStackPackageDescription)
+                ,"--url", homepage gStackPackageDescription]
+                (map (dropDirectoryPrefix (rpmStagingDir dv)) inputFiles)
+        rpmStagedExeFile anyVersion0 %> \out -> do
+            copyFile' (releaseDir </> binaryExeFileName) out
+        rpmStagedBashCompletionFile anyVersion0 %> \out -> do
+            let dv = distroVersionFromPath out rpmVersions
+            writeBashCompletion (rpmStagedExeFile dv) (rpmStagingDir dv) out
+        rpmStagedDocDir anyVersion0 ++ "//*" %> \out -> do
+            let dv@DistroVersion{..} = distroVersionFromPath out rpmVersions
+                origFile = dropDirectoryPrefix (rpmStagedDocDir dv) out
+            copyFile' origFile out
+
+    writeBashCompletion stagedStackExeFile stageDir out = do
+        need [stagedStackExeFile]
+        (Stdout bashCompletionScript) <- cmd [stagedStackExeFile] "--bash-completion-script" [dropDirectoryPrefix stageDir stagedStackExeFile]
+        writeFileChanged out bashCompletionScript
+
+    getBinaryPkgStageFiles = do
+        docFiles <- getDocFiles
         let stageFiles = concat
-                [[releaseDir </> binaryExeStageDirName </> binaryExeFileName]
-                ,map ((releaseDir </> binaryExeStageDirName) </>) docs]
+                [[releaseDir </> binaryPkgStageDirName </> stackExeFileName]
+                ,map ((releaseDir </> binaryPkgStageDirName) </>) docFiles]
         need stageFiles
         return stageFiles
 
-    distroVersionFromPath path =
-        case stripPrefix (releaseDir ++ "/") path of
-            Nothing -> error ("Cannot determine Ubuntu version from path: " ++ path)
-            Just path' -> DistroVersion (takeDirectory1 path') (takeDirectory1 (dropDirectory1 path'))
-    readTemplate path =
-        readFile' (takeDirectory gScriptPath </> "templates" </> path)
+    getDocFiles = getDirectoryFiles "." ["LICENSE", "*.md", "doc//*"]
+
+    distroVersionFromPath path versions =
+        let path' = dropDirectoryPrefix releaseDir path
+            version = takeDirectory1 (dropDirectory1 path')
+        in DistroVersion (takeDirectory1 path') version (lookupVersionCodeName version versions)
+
+    distroPhonies distro0 versions0 makePackageFileName =
+        forM_ versions0 $ \(version0,_) -> do
+            let dv@DistroVersion{..} = DistroVersion distro0 version0 (lookupVersionCodeName version0 versions0)
+            phony (distroUploadPhony dv) $ need [distroVersionDir dv </> makePackageFileName dv <.> uploadExt]
+            phony (distroBuildPhony dv) $ need [distroVersionDir dv </> makePackageFileName dv]
+
+    lookupVersionCodeName version versions =
+        fromMaybe (error $ "lookupVersionCodeName: could not find " ++ show version ++ " in " ++ show versions) $
+            lookup version versions
+
 
     releasePhony = "release"
     checkPhony = "check"
     uploadPhony = "upload"
     cleanPhony = "clean"
     buildPhony = "build"
-    distroPackagesPhony distro = distro ++ "-packages"
-    distroUploadPhony distro = distro ++ "-upload"
+    distroUploadPhony DistroVersion{..} = "upload-" ++ dvDistro ++ "-" ++ dvVersion
+    distroBuildPhony DistroVersion{..} = "build-" ++ dvDistro ++ "-" ++ dvVersion
+    archUploadPhony = "upload-" ++ archDistro
+    archBuildPhony = "build-" ++ archDistro
 
     releaseCheckDir = releaseDir </> "check"
     installBinDir = gLocalInstallRoot </> "bin"
-    distroVersionDockerDir dv = distroVersionDir dv </> "docker"
     distroVersionDir DistroVersion{..} = releaseDir </> dvDistro </> dvVersion
 
-    binaryFileNames = [binaryExeCompressedFileName, binaryExeCompressedAscFileName]
-    binaryExeCompressedAscFileName = binaryExeCompressedFileName <.> ascExt
-    binaryExeCompressedFileName =
+    binaryPkgFileNames = [binaryPkgFileName, binaryPkgSignatureFileName]
+    binaryPkgSignatureFileName = binaryPkgFileName <.> ascExt
+    binaryPkgFileName =
         case platformOS of
-            Windows -> binaryExeZipFileName
-            _ -> binaryExeTarGzFileName
-    binaryExeZipFileName = binaryName global <.> zipExt
-    binaryExeTarGzFileName = binaryName global <.> tarGzExt
-    binaryExeStageDirName = binaryName global
-    binaryExeFileName = stackOrigExeFileName
-    stackOrigExeFileName = stackProgName <.> exe
-    distroPackageFileName distro
-        | distroPackageExt distro == debExt =
-            concat [stackProgName, "_", distroPackageVersionStr distro, "_amd64"] <.> debExt
-        | distroPackageExt distro == rpmExt =
-            concat [stackProgName, "-", distroPackageVersionStr distro] <.> "x86_64" <.> rpmExt
-        | distro == archDistro =
-            concat [stackProgName, "_", distroPackageVersionStr distro, "-", "x86_64"] <.> tarGzExt
-        | otherwise = error ("distroPackageFileName: unknown distro: " ++ distro)
-    imageIDFileName = "image-id"
+            Windows -> binaryPkgZipFileName
+            _ -> binaryPkgTarGzFileName
+    binaryPkgZipFileName = binaryName global <.> zipExt
+    binaryPkgTarGzFileName = binaryName global <.> tarGzExt
+    binaryPkgStageDirName = binaryName global
+    binaryExeFileName = binaryName global <.> exe
+    stackExeFileName = stackProgName <.> exe
 
     zipExt = "zip"
     tarGzExt = tarExt <.> gzExt
@@ -329,93 +395,53 @@ rules global@Global{..} args = do
     debExt = "deb"
     rpmExt = "rpm"
 
-    distroVersionDockerImageTag DistroVersion{..} =
-        "stack_release_tool/" ++ dvDistro ++ ":" ++ dvVersion
-    distroPackageVersionStr distro
-        | distroPackageExt distro == debExt =
-            concat [stackVersionStr global, "-", show gGitRevCount, "-", gGitSha]
-        | distroPackageExt distro == rpmExt =
-            concat [stackVersionStr global, "_", show gGitRevCount, "_", gGitSha]
-        | distro == archDistro =
-            stackVersionStr global
-        | otherwise = error ("distroPackageVersionStr: unknown distro: " ++ distro)
+    debStagedDocDir dv = debStagingDir dv </> "usr/share/doc" </> stackProgName
+    debStagedBashCompletionFile dv = debStagingDir dv </> "etc/bash_completion.d/stack"
+    debStagedExeFile dv = debStagingDir dv </> "usr/bin/stack"
+    debStagingDir dv = distroVersionDir dv </> debPackageName dv
+    debPackageFileName dv = debPackageName dv <.> debExt
+    debPackageName dv = stackProgName ++ "_" ++ debPackageVersionStr dv ++ "_amd64"
+    debPackageVersionStr DistroVersion{..} = stackVersionStr global ++ "-0~" ++ dvCodeName
 
-    distroTemplateDir distro
-        | distroPackageExt distro `elem` [debExt, rpmExt] = distroPackageExt distro
-        | distro == archDistro = "arch"
-        | otherwise = error ("distroTemplateDir: unknown distro: " ++ distro)
+    rpmStagedDocDir dv = rpmStagingDir dv </> "usr/share/doc" </> (stackProgName ++ "-" ++ rpmPackageVersionStr dv)
+    rpmStagedBashCompletionFile dv = rpmStagingDir dv </> "etc/bash_completion.d/stack"
+    rpmStagedExeFile dv = rpmStagingDir dv </> "usr/bin/stack"
+    rpmStagingDir dv = distroVersionDir dv </> rpmPackageName dv
+    rpmPackageFileName dv = rpmPackageName dv <.> rpmExt
+    rpmPackageName dv = stackProgName ++ "-" ++ rpmPackageVersionStr dv ++ "-" ++ rpmPackageIterationStr dv ++ ".x86_64"
+    rpmPackageIterationStr DistroVersion{..} = "0." ++ dvCodeName
+    rpmPackageVersionStr _ = stackVersionStr global
 
-    distroPackageExt distro
-        | distro `elem` [ubuntuDistro, debianDistro] = debExt
-        | distro `elem` [centosDistro, fedoraDistro] = rpmExt
-        | distro == archDistro = tarGzExt
-        | otherwise = error ("distroPackageExt: unknown distro: " ++ distro)
+    archStagedDocDir = archStagingDir </> "usr/share/doc" </> stackProgName
+    archStagedBashCompletionFile = archStagingDir </> "usr/share/bash-completion/completions/stack"
+    archStagedExeFile = archStagingDir </> "usr/bin/stack"
+    archStagingDir = archDir </> archPackageName
+    archPackageFileName = archPackageName <.> tarGzExt
+    archPackageName = stackProgName ++ "_" ++ stackVersionStr global ++ "-" ++ "x86_64"
+    archDir = releaseDir </> archDistro
 
-    distroVersions distro
-        | distro == ubuntuDistro =
-            [ ("12.04", "precise")
-            , ("14.04", "trusty")
-            , ("14.10", "utopic")
-            , ("15.04", "vivid") ]
-        | distro == debianDistro =
-            [ ("7", "wheezy")
-            , ("8", "jessie") ]
-        | distro == centosDistro =
-            [ ("7", "7")
-            , ("6", "6") ]
-        | distro == fedoraDistro =
-            [ ("21", "21")
-            , ("22", "22") ]
-        | distro == archDistro =
-            [ ("current", "current") ]
-        | otherwise = error ("distroVersions: unknown distro: " ++ distro)
+    ubuntuVersions =
+        [ ("12.04", "precise")
+        , ("14.04", "trusty")
+        , ("14.10", "utopic")
+        , ("15.04", "vivid") ]
+    debianVersions =
+        [ ("7", "wheezy")
+        , ("8", "jessie") ]
+    centosVersions =
+        [ ("7", "el7")
+        , ("6", "el6") ]
+    fedoraVersions =
+        [ ("21", "fc21")
+        , ("22", "fc22") ]
 
-    distroVersionCodeName DistroVersion{..} =
-        fromMaybe
-            ("distroVersionCodeName: unknown " ++ dvDistro ++ " version: " ++ dvVersion)
-            (lookup dvVersion (distroVersions dvDistro))
-
-    distros =
-        [ ubuntuDistro
-        , debianDistro
-        , centosDistro
-        , fedoraDistro
-        , archDistro ]
     ubuntuDistro = "ubuntu"
     debianDistro = "debian"
     centosDistro = "centos"
     fedoraDistro = "fedora"
     archDistro = "arch"
 
-    anyDistroVersion = DistroVersion "*" "*"
-    anyDistroVersion' distro = DistroVersion distro "*"
-
-    uploadPackage :: String -> DistroVersion -> FilePath -> Action ()
-    uploadPackage distro dv@DistroVersion{..} pkgFile
-        | distroPackageExt distro == debExt =
-            cmd "deb-s3 upload -b download.fpcomplete.com --preserve-versions"
-                [ "--sign=" ++ gGpgKey
-                , "--prefix=" ++ dvDistro ++ "/" ++ distroVersionCodeName dv
-                , pkgFile ]
-        | distroPackageExt distro == rpmExt = do
-            let rpmmacrosFile = gHomeDir </> ".rpmmacros"
-            rpmmacrosExists <- liftIO $ System.Directory.doesFileExist rpmmacrosFile
-            when rpmmacrosExists $
-                error ("'" ++ rpmmacrosFile ++ "' already exists.  Move it out of the way first.")
-            actionFinally
-                (do writeFileLines rpmmacrosFile
-                        [ "%_signature gpg"
-                        , "%_gpg_name " ++ gGpgKey ]
-                    cmd "rpm-s3 --verbose --sign --bucket=download.fpcomplete.com"
-                        [ "--repopath=" ++ dvDistro ++ "/" ++ dvVersion
-                        , pkgFile ])
-                (liftIO $ removeFile rpmmacrosFile)
-        | distro == archDistro = do
-            () <- cmd "aws s3 cp"
-                [ pkgFile
-                , "s3://download.fpcomplete.com/archlinux/" ++ takeFileName pkgFile ]
-            putNormal "WARNING: Arch package uploaded, but applying the AUR patch is a manual step."
-        | otherwise = error ("uploadPackage: unknown distro: " ++ distro)
+    anyDistroVersion distro = DistroVersion distro "*" "*"
 
 
 -- | Upload file to Github release.
@@ -481,6 +507,13 @@ callGithubApi Global{..} headers mpostFile url = do
         res <- http req manager
         responseBody res $$+- CC.sinkLazy
 
+-- | Create a .tar.gz files from files.  The paths should be absolute, and will
+-- be made relative to the base directory in the tarball.
+writeTarGz :: FilePath -> FilePath -> [FilePath] -> Action ()
+writeTarGz out baseDir inputFiles = liftIO $ do
+    content <- Tar.pack baseDir $ map (dropDirectoryPrefix baseDir) inputFiles
+    L8.writeFile out $ GZip.compress $ Tar.write content
+
 -- | Drops a directory prefix from a path.  The prefix automatically has a path
 -- separator character appended.  Fails if the path does not begin with the prefix.
 dropDirectoryPrefix :: FilePath -> FilePath -> FilePath
@@ -498,7 +531,7 @@ buildDockerImage buildDir imageTag out = do
     writeFileChanged out imageIdOut
     return (trim imageIdOut)
 
--- | Name of the release binary (e.g. @stack-x.y.x-arch-os@)
+-- | Name of the release binary (e.g. @stack-x.y.x-arch-os[-variant]@)
 binaryName :: Global -> String
 binaryName global@Global{..} =
     concat
@@ -528,10 +561,6 @@ platformOS =
 -- | Directory in which to store build and intermediate files.
 releaseDir :: FilePath
 releaseDir = "_release"
-
--- | Root directory of the project
-rootDir :: FilePath
-rootDir = "."
 
 -- | @GITHUB_AUTH_TOKEN@ environment variale name.
 githubAuthTokenEnvVar :: String
@@ -572,7 +601,8 @@ stackProgName = "stack"
 -- | Linux distribution/version combination.
 data DistroVersion = DistroVersion
     { dvDistro :: !String
-    , dvVersion :: !String }
+    , dvVersion :: !String
+    , dvCodeName :: !String }
 
 -- | A Github release, as returned by the Github API.
 data GithubRelease = GithubRelease
@@ -606,7 +636,6 @@ data Global = Global
     , gGitSha :: !String
     , gProjectRoot :: !FilePath
     , gHomeDir :: !FilePath
-    , gScriptPath :: !FilePath
     , gArch :: !Arch
     , gBinarySuffix :: !String }
     deriving (Show)
