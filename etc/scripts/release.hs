@@ -135,7 +135,7 @@ rules global@Global{..} args = do
     releaseDir </> "*" <.> uploadExt %> \out -> do
         need [dropExtension out]
         uploadToGithubRelease global (dropExtension out)
-        copyFile' (dropExtension out) out
+        copyFileChanged (dropExtension out) out
 
     releaseCheckDir </> binaryExeFileName %> \out -> do
         need [installBinDir </> stackExeFileName]
@@ -174,10 +174,10 @@ rules global@Global{..} args = do
         writeTarGz out releaseDir stageFiles
 
     releaseDir </> binaryPkgStageDirName </> stackExeFileName %> \out -> do
-        copyFile' (releaseDir </> binaryExeFileName) out
+        copyFileChanged (releaseDir </> binaryExeFileName) out
 
     releaseDir </> (binaryPkgStageDirName ++ "//*") %> \out -> do
-        copyFile'
+        copyFileChanged
             (dropDirectoryPrefix (releaseDir </> binaryPkgStageDirName) out)
             out
 
@@ -238,14 +238,12 @@ rules global@Global{..} args = do
         putNormal $ "tar gzip " ++ out
         writeTarGz out archStagingDir inputFiles
     archStagedExeFile %> \out -> do
-        copyFile' (releaseDir </> binaryExeFileName) out
+        copyFileChanged (releaseDir </> binaryExeFileName) out
     archStagedBashCompletionFile %> \out -> do
         writeBashCompletion archStagedExeFile archStagingDir out
     archStagedDocDir ++ "//*" %> \out -> do
         let origFile = dropDirectoryPrefix archStagedDocDir out
-        copyFile' origFile out
-
-    --XXX: remove the dockerfile etc. template (also, get rid of old Arch dockerfile)
+        copyFileChanged origFile out
 
   where
 
@@ -281,14 +279,14 @@ rules global@Global{..} args = do
                 ,"--url", homepage gStackPackageDescription]
                 (map (dropDirectoryPrefix (debStagingDir dv)) inputFiles)
         debStagedExeFile anyVersion0 %> \out -> do
-            copyFile' (releaseDir </> binaryExeFileName) out
+            copyFileChanged (releaseDir </> binaryExeFileName) out
         debStagedBashCompletionFile anyVersion0 %> \out -> do
             let dv = distroVersionFromPath out debVersions
             writeBashCompletion (debStagedExeFile dv) (debStagingDir dv) out
         debStagedDocDir anyVersion0 ++ "//*" %> \out -> do
             let dv@DistroVersion{..} = distroVersionFromPath out debVersions
                 origFile = dropDirectoryPrefix (debStagedDocDir dv) out
-            copyFile' origFile out
+            copyFileChanged origFile out
 
     rpmDistroRules rpmDistro0 rpmVersions = do
         let anyVersion0 = anyDistroVersion rpmDistro0
@@ -331,14 +329,14 @@ rules global@Global{..} args = do
                 ,"--url", homepage gStackPackageDescription]
                 (map (dropDirectoryPrefix (rpmStagingDir dv)) inputFiles)
         rpmStagedExeFile anyVersion0 %> \out -> do
-            copyFile' (releaseDir </> binaryExeFileName) out
+            copyFileChanged (releaseDir </> binaryExeFileName) out
         rpmStagedBashCompletionFile anyVersion0 %> \out -> do
             let dv = distroVersionFromPath out rpmVersions
             writeBashCompletion (rpmStagedExeFile dv) (rpmStagingDir dv) out
         rpmStagedDocDir anyVersion0 ++ "//*" %> \out -> do
             let dv@DistroVersion{..} = distroVersionFromPath out rpmVersions
                 origFile = dropDirectoryPrefix (rpmStagedDocDir dv) out
-            copyFile' origFile out
+            copyFileChanged origFile out
 
     writeBashCompletion stagedStackExeFile stageDir out = do
         need [stagedStackExeFile]
