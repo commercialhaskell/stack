@@ -1099,6 +1099,7 @@ data SetupInfo = SetupInfo
     , siSevenzDll :: Maybe DownloadInfo
     , siMsys2 :: Map Text VersionedDownloadInfo
     , siGHCs :: Map Text (Map Version DownloadInfo)
+    , siGHCJSs :: Map Text (Map CompilerVersion DownloadInfo)
     }
     deriving Show
 
@@ -1108,6 +1109,7 @@ instance FromJSON (SetupInfo, [JSONWarning]) where
         siSevenzDll <- jsonSubWarningsT (o ..:? "sevenzdll-info")
         siMsys2 <- jsonSubWarningsT (o ..:? "msys2" ..!= mempty)
         siGHCs <- jsonSubWarningsTT (o ..:? "ghc" ..!= mempty)
+        siGHCJSs <- jsonSubWarningsTT (o ..:? "ghcjs" ..!= mempty)
         -- Don't warn about 'portable-git' that is no-longer used
         tellJSONField "portable-git"
         return SetupInfo {..}
@@ -1119,13 +1121,15 @@ instance Monoid SetupInfo where
         , siSevenzDll = Nothing
         , siMsys2 = Map.empty
         , siGHCs = Map.empty
+        , siGHCJSs = Map.empty
         }
     mappend l r =
         SetupInfo
         { siSevenzExe = siSevenzExe l <|> siSevenzExe r
         , siSevenzDll = siSevenzDll l <|> siSevenzDll r
         , siMsys2 = siMsys2 l <> siMsys2 r
-        , siGHCs = siGHCs l <> siGHCs r }
+        , siGHCs = siGHCs l <> siGHCs r
+        , siGHCJSs = siGHCJSs l <> siGHCJSs r }
 
 -- | Remote or inline 'SetupInfo'
 data SetupInfoLocation

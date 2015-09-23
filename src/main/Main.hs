@@ -556,7 +556,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                                  )
               miniConfig <- loadMiniConfig (lcConfig lc)
               mpaths <- runStackTGlobal manager miniConfig go $
-                  ensureGHC SetupOpts
+                  ensureCompiler SetupOpts
                   { soptsInstallIfMissing = True
                   , soptsUseSystem =
                     (configSystemGHC $ lcConfig lc)
@@ -573,11 +573,14 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                   , soptsStackSetupYaml = scoStackSetupYaml
                   , soptsGHCBindistURL = scoGHCBindistURL
                   }
+              let compiler = case wantedCompiler of
+                      GhcVersion _ -> "GHC"
+                      GhcjsVersion {} -> "GHCJS"
               case mpaths of
-                  Nothing -> $logInfo "stack will use the GHC on your PATH"
-                  Just _ -> $logInfo "stack will use a locally installed GHC"
+                  Nothing -> $logInfo $ "stack will use the " <> compiler <> " on your PATH"
+                  Just _ -> $logInfo $ "stack will use a locally installed " <> compiler
               $logInfo "For more information on paths, see 'stack path' and 'stack exec env'"
-              $logInfo "To use this GHC and packages outside of a project, consider using:"
+              $logInfo $ "To use this " <> compiler <> " and packages outside of a project, consider using:"
               $logInfo "stack ghc, stack ghci, stack runghc, or stack exec"
               )
           Nothing

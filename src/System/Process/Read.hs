@@ -13,6 +13,7 @@ module System.Process.Read
   (readProcessStdout
   ,tryProcessStdout
   ,sinkProcessStdout
+  ,sinkProcessStderrStdout
   ,readProcess
   ,EnvOverride(..)
   ,unEnvOverride
