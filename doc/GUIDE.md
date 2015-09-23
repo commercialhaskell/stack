@@ -45,8 +45,8 @@ all commands work cross-platform, unless explicitly stated otherwise.
 
 ## Downloading and Installation
 
-The [wiki page dedicated to downloading
-stack](https://github.com/commercialhaskell/stack/wiki/Downloads) has the most
+The [documentation dedicated to downloading
+stack](install_and_upgrade.md) has the most
 up-to-date information for a variety of operating systems, including multiple
 GNU/Linux flavors. Instead of repeating that content here, please go check out
 that page and come back here when you can successfully run `stack --version`.
@@ -616,8 +616,8 @@ At the time of writing:
 * Experimental GHCJS support
 * Experimental custom snapshot support
 
-The most up-to-date information can always be found on the [stack.yaml wiki
-page](https://github.com/commercialhaskell/stack/wiki/stack.yaml#resolver).
+The most up-to-date information can always be found in the
+[stack.yaml documentation](yaml_configuration.md#resolver).
 
 ## Existing projects
 
@@ -722,9 +722,8 @@ Please choose one of the following commands to get started.
     stack init --resolver nightly-2015-08-26
     stack init --resolver lts-2.22
 
-You'll then need to add some extra-deps. See:
-
-    https://github.com/commercialhaskell/stack/wiki/stack.yaml#extra-deps
+You'll then need to add some extra-deps. See the
+[stack.yaml documentation](yaml_configuration.md#extra-deps).
 
 You can also try falling back to a dependency solver with:
 
@@ -1026,8 +1025,8 @@ to achieve a high level of flexibility in telling stack exactly what you want
 to build.
 
 We're not going to cover the full generality of these arguments here; instead,
-there's [a Wiki page covering the full build command
-syntax](https://github.com/commercialhaskell/stack/wiki/Build-command).
+there's [documentation covering the full build command
+syntax](build_command.md).
 Here, we'll just point out a few different types of arguments:
 
 * You can specify a *package name*, e.g. `stack build vector`.
@@ -1162,10 +1161,9 @@ Notice that multiple directories are listed in the `packages` key.
 
 In addition to local directories, you can also refer to packages available in a
 Git repository or in a tarball over HTTP/HTTPS. This can be useful for using a
-modified version of a dependency that hasn't yet been released upstream. This
-is a slightly more advanced usage that we won't go into detail with here, but
-it's covered in the [stack.yaml wiki
-page](https://github.com/commercialhaskell/stack/wiki/stack.yaml#packages).
+modified version of a dependency that hasn't yet been released upstream. This is
+a slightly more advanced usage that we won't go into detail with here, but it's
+covered in the [stack.yaml documentation](yaml_configuration.md#packages).
 
 ## Flags and GHC options
 
@@ -1252,8 +1250,8 @@ confusion.
 
 Final point: if you have GHC options that you'll be regularly passing to your
 packages, you can add them to your stack.yaml file (starting with
-stack-0.1.4.0). See [the wiki page section on
-ghc-options](https://github.com/commercialhaskell/stack/wiki/stack.yaml#ghc-options)
+stack-0.1.4.0). See [the documentation section on
+ghc-options](yaml_configuration.md#ghc-options)
 for more information.
 
 ## path
@@ -1513,8 +1511,8 @@ There are lots of resources available for learning more about stack:
 * `--verbose` (or `-v`) — much more info about internal operations (useful for bug reports)
 * The [README](https://github.com/commercialhaskell/stack#readme)
 * The [stack mailing list](https://groups.google.com/d/forum/haskell-stack)
-* The [stack wiki](https://github.com/commercialhaskell/stack/wiki),
-    * in particular [the FAQ page](https://github.com/commercialhaskell/stack/wiki/FAQ)
+* The [the FAQ](faq.md)
+* The [stack wiki](https://github.com/commercialhaskell/stack/wiki)
 * The [haskell-stack tag on Stack Overflow](http://stackoverflow.com/questions/tagged/haskell-stack)
 * [Another getting started with stack tutorial](http://seanhess.github.io/2015/08/04/practical-haskell-getting-started.html)
 * [Why is stack not cabal?](https://www.fpcomplete.com/blog/2015/06/why-is-stack-not-cabal)
@@ -1568,10 +1566,9 @@ getting type information in Emacs. For more information, see
 
 ### Visualizing dependencies
 
-If you'd like to get some insight into the dependency tree of your packages,
-you can use the `stack dot` command and Graphviz. More information is
-[available on the
-wiki](https://github.com/commercialhaskell/stack/wiki/Visualizing-dependencies-with-Graphviz).
+If you'd like to get some insight into the dependency tree of your packages, you
+can use the `stack dot` command and Graphviz. More information is
+[available in the Dependency visualization documentation](dependency_visualization.md).
 
 ### Travis with caching
 
@@ -1656,8 +1653,8 @@ code inside a Docker image, which means:
 * the Docker images ship with entire precompiled snapshots. That means you have
   a large initial download, but much faster builds
 
-For more information, see [the Docker wiki
-page](https://github.com/commercialhaskell/stack/wiki/Docker).
+For more information, see
+[the Docker-integration documentation](docker_integration.md).
 
 stack can also generate Docker images for you containing your built executables.
 This feature is great for automating deployments from CI. This feature is not

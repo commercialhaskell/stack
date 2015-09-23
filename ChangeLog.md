@@ -95,7 +95,7 @@ Major changes:
 * Respect TemplateHaskell addDependentFile dependency changes ([#105](https://github.com/commercialhaskell/stack/issues/105))
     * TH dependent files are taken into account when determining whether a package needs to be built.
 * Overhauled target parsing, added `--test` and `--bench` options [#651](https://github.com/commercialhaskell/stack/issues/651)
-    * For details, see [Build commands Wiki page](https://github.com/commercialhaskell/stack/wiki/Build-command)
+    * For details, see [Build commands documentation](doc/build_command.md)
 
 Other enhancements:
 

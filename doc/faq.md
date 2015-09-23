@@ -153,7 +153,7 @@ Like all other targets, `stack test` runs test suites in parallel by default. Th
 
 #### Can I get bash autocompletion?
 
-Yes, see the [Shell-autocompletion](https://github.com/commercialhaskell/stack/wiki/Shell-autocompletion) wiki entry
+Yes, see the [shell-autocompletion documentation](shell_autocompletion.md)
 
 #### How do I update my package index?
 
@@ -206,28 +206,7 @@ packages and the tools. See [Docker integration](docker_integration.md) for deta
 
 #### How do I use this with Travis CI?
 
-Stack is in beta now, so keep in mind that the tool's interface is still under flux. For early adopters, here's a sample `.travis.yaml` file:
-
-```YAML
-language: haskell
-
-before_install:
-  # Instructions taken from https://github.com/commercialhaskell/stack/wiki/Downloads
-  - wget -q -O- http://download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
-  - echo 'deb http://download.fpcomplete.com/ubuntu/precise stable main' | sudo tee /etc/apt/sources.list.d/fpco.list
-  - sudo apt-get update
-  - sudo apt-get install stack -y
-
-install:
-  - stack setup
-
-script:
-  - stack test
-```
-
-If you wish to use stack as part of a larger matrix, à la [hvr/multi-ghc-travis](https://github.com/hvr/multi-ghc-travis), then you need to do a bit more work. Take a look at [tebello-thejane/bitx-haskell/.travis.yml](https://github.com/tebello-thejane/bitx-haskell/blob/master/.travis.yml), and note the extensive use of `if` statements to select between building with Cabal and stack.
-
-Also, note that some `stack` commands have been known to take longer than 20 minutes when on Travis, thus causing Travis to kill the build. A cheap trick is to cause `stack` to display verbose output (with the `-v` option), which causes it to display more often and thus Travis is less likely to kill it due to lack of perceived activity.
+See the [Travis section in the GUIDE](GUIDE.md#travis-with-caching)
 
 #### What is licensing restrictions on Windows?
 
