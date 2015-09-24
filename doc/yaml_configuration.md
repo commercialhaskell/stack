@@ -271,3 +271,23 @@ setup-info:
       7.10.2:
         url: "https://example.com/ghc-7.10.2-i386-unknown-mingw32-foo.tar.xz"
 ```
+
+### pvp-bounds
+
+(Since 0.1.5)
+
+When using the `sdist` and `upload` commands, this setting determines whether
+the cabal file's dependencies should be modified to reflect PVP lower and upper
+bounds. Values are `none` (unchanged), `upper` (add upper bounds), `lower` (add
+lower bounds), and both (and upper and lower bounds). The algorithm it follows
+is:
+
+* If an upper or lower bound already exists on a dependency, it's left alone
+* When adding a lower bound, we look at the current version specified by stack.yaml, and set it as the lower bound (e.g., `foo >= 1.2.3`)
+* When adding an upper bound, we require less than the next major version (e.g., `foo < 1.3`)
+
+```yaml
+pvp-bounds: none
+```
+
+For more information, see [the announcement blog post](https://www.fpcomplete.com/blog/2015/09/stack-pvp).
