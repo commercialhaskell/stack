@@ -4,14 +4,14 @@ Vagrant.configure(2) do |config|
   config.vm.box = "chef/debian-7.8"
   config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__exclude: [".stack_work/", "_release/"]
   config.vm.provider "virtualbox" do |vb|
-    vb.memory = "1024"
+    vb.memory = "2048"
   end
   config.vm.provision "shell", run: "always", inline: <<-SHELL
     set -xe
     export PATH=/usr/local/bin:$PATH
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
-    apt-get install -y net-tools wget zlib1g-dev ruby-dev libgmp-dev lsb-release ca-certificates
+    apt-get install -y net-tools wget zlib1g-dev ruby-dev libgmp-dev lsb-release ca-certificates libtinfo-dev
     if ! which stack; then
       wget -q -O- http://download.fpcomplete.com/ubuntu/fpco.key | apt-key add -
       echo "deb http://download.fpcomplete.com/debian/$(lsb_release -cs) stable main" >/etc/apt/sources.list.d/fpco.list
@@ -33,8 +33,8 @@ Vagrant.configure(2) do |config|
     if ! which aws; then
         apt-get install -y python2.7
         curl -O https://bootstrap.pypa.io/get-pip.py
-        python27 get-pip.py
-        pip install awscli
+        sudo python2.7 get-pip.py
+        sudo pip install awscli
     fi
   SHELL
 end

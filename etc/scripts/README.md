@@ -18,11 +18,18 @@ These must be installed in the PATH to use the release tool:
 - git (for Windows, [msysgit](https://msysgit.github.io) is recommended).
 - cabal (cabal-install)
 
-To create a signed binary, you need:
+To create a signed binary package, you need:
 
 - GPG installed and in the PATH (included with
   [msysgit](https://msysgit.github.io) on Windows)
-- Your private key in GPG keyring.
+- `dev@fpcomplete.com` secret key in GPG keyring.
+
+To create signed Windows executables, you also need:
+
+- `signtool.exe`, which is installed with the
+  [Windows SDK](microsoft.com/en-us/download/confirmation.aspx?id=8279).
+- "FP Complete, Corporation" code signing key installed. See
+  [instructions for creating one with StartSSL](https://forum.startcom.org/viewtopic.php?p=5480&sid=143a360f30427e979f6c5b05c2df82cc#p5480).
 
 To upload a binary to a Github release, you also need:
 

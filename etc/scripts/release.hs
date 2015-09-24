@@ -60,6 +60,7 @@ main =
                 Platform arch _ = buildPlatform
                 gArch = arch
                 gBinarySuffix = ""
+                gUploadLabel = Nothing
                 gLocalInstallRoot = "" -- Set to real value below.
                 gProjectRoot = "" -- Set to real value velow.
                 global0 = foldl (flip id) Global{..} flags
@@ -100,7 +101,10 @@ options =
         "Architecture to build (e.g. 'i386' or 'x86_64')."
     , Option "" [binaryVariantOptName]
         (ReqArg (\v -> Right $ \g -> g{gBinarySuffix = v}) "SUFFIX")
-        "Extra suffix to add to binary executable archive filename." ]
+        "Extra suffix to add to binary executable archive filename."
+    , Option "" [uploadLabelOptName]
+        (ReqArg (\v -> Right $ \g -> g{gUploadLabel = Just v}) "LABEL")
+        "Label to give the uploaded release asset" ]
 
 -- | Shake rules.
 rules :: Global -> [String] -> Rules ()
@@ -133,9 +137,13 @@ rules global@Global{..} args = do
     phony archBuildPhony $ need [archDir </> archPackageFileName]
 
     releaseDir </> "*" <.> uploadExt %> \out -> do
-        need [dropExtension out]
-        uploadToGithubRelease global (dropExtension out)
-        copyFile' (dropExtension out) out
+        let srcFile = dropExtension out
+            mUploadLabel =
+                if takeExtension srcFile == ascExt
+                    then fmap (++ " (GPG signature)") gUploadLabel
+                    else gUploadLabel
+        uploadToGithubRelease global srcFile mUploadLabel
+        copyFileChanged srcFile out
 
     releaseCheckDir </> binaryExeFileName %> \out -> do
         need [installBinDir </> stackExeFileName]
@@ -148,7 +156,8 @@ rules global@Global{..} args = do
         liftIO $ renameFile instExeFile tmpExeFile
         actionFinally
             (do opt <- addPath [installBinDir] []
-                () <- cmd opt stackProgName (stackArgs global) "build --pedantic --haddock --no-haddock-deps"
+                -- () <- cmd opt stackProgName (stackArgs global) "build --pedantic --haddock --no-haddock-deps"
+                () <- cmd opt stackProgName (stackArgs global) "build --pedantic"
                 () <- cmd opt stackProgName (stackArgs global) "clean"
                 () <- cmd opt stackProgName (stackArgs global) "build --pedantic"
                 () <- cmd opt stackProgName (stackArgs global) "test --pedantic --flag stack:integration-tests"
@@ -163,7 +172,7 @@ rules global@Global{..} args = do
             entries <- forM stageFiles $ \stageFile -> do
                 Zip.readEntry
                     [Zip.OptLocation
-                        (dropDirectoryPrefix (releaseDir </> binaryPkgStageDirName) stageFile)
+                        (dropDirectoryPrefix (releaseStageDir </> binaryPkgStageDirName) stageFile)
                         False]
                     stageFile
             let archive = foldr Zip.addEntryToArchive Zip.emptyArchive entries
@@ -171,22 +180,33 @@ rules global@Global{..} args = do
 
     releaseDir </> binaryPkgTarGzFileName %> \out -> do
         stageFiles <- getBinaryPkgStageFiles
-        writeTarGz out releaseDir stageFiles
+        writeTarGz out releaseStageDir stageFiles
 
-    releaseDir </> binaryPkgStageDirName </> stackExeFileName %> \out -> do
-        copyFile' (releaseDir </> binaryExeFileName) out
+    releaseStageDir </> binaryPkgStageDirName </> stackExeFileName %> \out -> do
+        copyFileChanged (releaseDir </> binaryExeFileName) out
 
-    releaseDir </> (binaryPkgStageDirName ++ "//*") %> \out -> do
-        copyFile'
-            (dropDirectoryPrefix (releaseDir </> binaryPkgStageDirName) out)
+    releaseStageDir </> (binaryPkgStageDirName ++ "//*") %> \out -> do
+        copyFileChanged
+            (dropDirectoryPrefix (releaseStageDir </> binaryPkgStageDirName) out)
             out
 
     releaseDir </> binaryExeFileName %> \out -> do
         need [installBinDir </> stackExeFileName]
         case platformOS of
-            Windows ->
+            Windows -> do
                 -- Windows doesn't have or need a 'strip' command, so skip it.
+                -- Instead, we sign the executable
                 liftIO $ copyFile (installBinDir </> stackExeFileName) out
+                actionOnException
+                    (command_ [] "c:\\Program Files\\Microsoft SDKs\\Windows\\v7.1\\Bin\\signtool.exe"
+                        ["sign"
+                        ,"/v"
+                        ,"/d", synopsis gStackPackageDescription
+                        ,"/du", homepage gStackPackageDescription
+                        ,"/n", "FP Complete, Corporation"
+                        ,"/t", "http://timestamp.verisign.com/scripts/timestamp.dll"
+                        ,out])
+                    (removeFile out)
             Linux ->
                 cmd "strip -p --strip-unneeded --remove-section=.comment -o"
                     [out, installBinDir </> stackExeFileName]
@@ -201,9 +221,11 @@ rules global@Global{..} args = do
             [ "-u", gGpgKey
             , dropExtension out ]
 
-    installBinDir </> stackExeFileName %> \_ -> do
+    installBinDir </> stackExeFileName %> \out -> do
         alwaysRerun
-        cmd stackProgName (stackArgs global) "build --pedantic"
+        actionOnException
+            (cmd stackProgName (stackArgs global) "--install-ghc build --pedantic")
+            (removeFile out)
 
     debDistroRules ubuntuDistro ubuntuVersions
     debDistroRules debianDistro debianVersions
@@ -227,14 +249,12 @@ rules global@Global{..} args = do
         putNormal $ "tar gzip " ++ out
         writeTarGz out archStagingDir inputFiles
     archStagedExeFile %> \out -> do
-        copyFile' (releaseDir </> binaryExeFileName) out
+        copyFileChanged (releaseDir </> binaryExeFileName) out
     archStagedBashCompletionFile %> \out -> do
         writeBashCompletion archStagedExeFile archStagingDir out
     archStagedDocDir ++ "//*" %> \out -> do
         let origFile = dropDirectoryPrefix archStagedDocDir out
-        copyFile' origFile out
-
-    --XXX: remove the dockerfile etc. template (also, get rid of old Arch dockerfile)
+        copyFileChanged origFile out
 
   where
 
@@ -270,14 +290,14 @@ rules global@Global{..} args = do
                 ,"--url", homepage gStackPackageDescription]
                 (map (dropDirectoryPrefix (debStagingDir dv)) inputFiles)
         debStagedExeFile anyVersion0 %> \out -> do
-            copyFile' (releaseDir </> binaryExeFileName) out
+            copyFileChanged (releaseDir </> binaryExeFileName) out
         debStagedBashCompletionFile anyVersion0 %> \out -> do
             let dv = distroVersionFromPath out debVersions
             writeBashCompletion (debStagedExeFile dv) (debStagingDir dv) out
         debStagedDocDir anyVersion0 ++ "//*" %> \out -> do
             let dv@DistroVersion{..} = distroVersionFromPath out debVersions
                 origFile = dropDirectoryPrefix (debStagedDocDir dv) out
-            copyFile' origFile out
+            copyFileChanged origFile out
 
     rpmDistroRules rpmDistro0 rpmVersions = do
         let anyVersion0 = anyDistroVersion rpmDistro0
@@ -320,14 +340,14 @@ rules global@Global{..} args = do
                 ,"--url", homepage gStackPackageDescription]
                 (map (dropDirectoryPrefix (rpmStagingDir dv)) inputFiles)
         rpmStagedExeFile anyVersion0 %> \out -> do
-            copyFile' (releaseDir </> binaryExeFileName) out
+            copyFileChanged (releaseDir </> binaryExeFileName) out
         rpmStagedBashCompletionFile anyVersion0 %> \out -> do
             let dv = distroVersionFromPath out rpmVersions
             writeBashCompletion (rpmStagedExeFile dv) (rpmStagingDir dv) out
         rpmStagedDocDir anyVersion0 ++ "//*" %> \out -> do
             let dv@DistroVersion{..} = distroVersionFromPath out rpmVersions
                 origFile = dropDirectoryPrefix (rpmStagedDocDir dv) out
-            copyFile' origFile out
+            copyFileChanged origFile out
 
     writeBashCompletion stagedStackExeFile stageDir out = do
         need [stagedStackExeFile]
@@ -337,8 +357,8 @@ rules global@Global{..} args = do
     getBinaryPkgStageFiles = do
         docFiles <- getDocFiles
         let stageFiles = concat
-                [[releaseDir </> binaryPkgStageDirName </> stackExeFileName]
-                ,map ((releaseDir </> binaryPkgStageDirName) </>) docFiles]
+                [[releaseStageDir </> binaryPkgStageDirName </> stackExeFileName]
+                ,map ((releaseStageDir </> binaryPkgStageDirName) </>) docFiles]
         need stageFiles
         return stageFiles
 
@@ -371,6 +391,7 @@ rules global@Global{..} args = do
     archBuildPhony = "build-" ++ archDistro
 
     releaseCheckDir = releaseDir </> "check"
+    releaseStageDir = releaseDir </> "stage"
     installBinDir = gLocalInstallRoot </> "bin"
     distroVersionDir DistroVersion{..} = releaseDir </> dvDistro </> dvVersion
 
@@ -385,15 +406,6 @@ rules global@Global{..} args = do
     binaryPkgStageDirName = binaryName global
     binaryExeFileName = binaryName global <.> exe
     stackExeFileName = stackProgName <.> exe
-
-    zipExt = "zip"
-    tarGzExt = tarExt <.> gzExt
-    gzExt = "gz"
-    tarExt = "tar"
-    ascExt = "asc"
-    uploadExt = "upload"
-    debExt = "deb"
-    rpmExt = "rpm"
 
     debStagedDocDir dv = debStagingDir dv </> "usr/share/doc" </> stackProgName
     debStagedBashCompletionFile dv = debStagingDir dv </> "etc/bash_completion.d/stack"
@@ -443,18 +455,31 @@ rules global@Global{..} args = do
 
     anyDistroVersion distro = DistroVersion distro "*" "*"
 
+    zipExt = ".zip"
+    tarGzExt = tarExt <.> gzExt
+    gzExt = ".gz"
+    tarExt = ".tar"
+    ascExt = ".asc"
+    uploadExt = ".upload"
+    debExt = ".deb"
+    rpmExt = ".rpm"
+
 
 -- | Upload file to Github release.
-uploadToGithubRelease :: Global -> FilePath -> Action ()
-uploadToGithubRelease global@Global{..} file = do
+uploadToGithubRelease :: Global -> FilePath -> Maybe String -> Action ()
+uploadToGithubRelease global@Global{..} file mUploadLabel = do
+    need [file]
     putNormal $ "Uploading to Github: " ++ file
     GithubRelease{..} <- getGithubRelease
     resp <- liftIO $ callGithubApi global
         [(CI.mk $ S8.pack "Content-Type", defaultMimeLookup (T.pack file))]
         (Just file)
         (replace
-            "{?name}"
-            ("?name=" ++ S8.unpack (urlEncode True (S8.pack (takeFileName file))))
+            "{?name,label}"
+            ("?name=" ++ urlEncodeStr (takeFileName file) ++
+             (case mUploadLabel of
+                 Nothing -> ""
+                 Just uploadLabel -> "&label=" ++ urlEncodeStr uploadLabel))
             relUploadUrl)
     case eitherDecode resp of
         Left e -> error ("Could not parse Github asset upload response (" ++ e ++ "):\n" ++ L8.unpack resp ++ "\n")
@@ -462,6 +487,7 @@ uploadToGithubRelease global@Global{..} file = do
             when (assetState /= "uploaded") $
                 error ("Invalid asset state after Github asset upload: " ++ assetState)
   where
+    urlEncodeStr = S8.unpack . urlEncode True . S8.pack
     getGithubRelease = do
         releases <- getGithubReleases
         let tag = fromMaybe ("v" ++ stackVersionStr global) gGithubReleaseTag
@@ -518,7 +544,7 @@ writeTarGz out baseDir inputFiles = liftIO $ do
 -- separator character appended.  Fails if the path does not begin with the prefix.
 dropDirectoryPrefix :: FilePath -> FilePath -> FilePath
 dropDirectoryPrefix prefix path =
-    case stripPrefix (prefix ++ "/") path of
+    case stripPrefix (toStandard prefix ++ "/") (toStandard path) of
         Nothing -> error ("dropDirectoryPrefix: cannot drop " ++ show prefix ++ " from " ++ show path)
         Just stripped -> stripped
 
@@ -590,6 +616,10 @@ archOptName = "arch"
 binaryVariantOptName :: String
 binaryVariantOptName = "binary-variant"
 
+-- | @--upload-label@ command-line option name.
+uploadLabelOptName :: String
+uploadLabelOptName = "upload-label"
+
 -- | Arguments to pass to all 'stack' invocations.
 stackArgs :: Global -> [String]
 stackArgs Global{..} = ["--arch=" ++ display gArch]
@@ -637,5 +667,6 @@ data Global = Global
     , gProjectRoot :: !FilePath
     , gHomeDir :: !FilePath
     , gArch :: !Arch
-    , gBinarySuffix :: !String }
+    , gBinarySuffix :: !String
+    , gUploadLabel ::(Maybe String)}
     deriving (Show)
