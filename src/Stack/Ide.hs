@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
 -- | Run a IDE configured with the user's project(s).
@@ -67,7 +68,8 @@ ide targets useropts = do
     Platform _ os <- asks getPlatform
     when
         (os == OSX)
-        (callProcess (Just pwd) menv "stty" ["cbreak", "-imaxbel"])
+        (catch (callProcess (Just pwd) menv "stty" ["cbreak", "-imaxbel"])
+               (\(_ :: ProcessExitedUnsuccessfully) -> undefined))
     callProcess (Just pwd) menv "stack-ide" args
   where
     includeDirs pkgopts =
