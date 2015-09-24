@@ -1,4 +1,4 @@
-## 0.1.6.0
+## Unreleased changes
 
 Major changes:
 
