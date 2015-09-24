@@ -221,9 +221,11 @@ rules global@Global{..} args = do
             [ "-u", gGpgKey
             , dropExtension out ]
 
-    installBinDir </> stackExeFileName %> \_ -> do
+    installBinDir </> stackExeFileName %> \out -> do
         alwaysRerun
-        cmd stackProgName (stackArgs global) "build --pedantic"
+        actionOnException
+            (cmd stackProgName (stackArgs global) "--install-ghc build --pedantic")
+            (removeFile out)
 
     debDistroRules ubuntuDistro ubuntuVersions
     debDistroRules debianDistro debianVersions
