@@ -60,6 +60,7 @@ main =
                 Platform arch _ = buildPlatform
                 gArch = arch
                 gBinarySuffix = ""
+                gUploadLabel = Nothing
                 gLocalInstallRoot = "" -- Set to real value below.
                 gProjectRoot = "" -- Set to real value velow.
                 global0 = foldl (flip id) Global{..} flags
@@ -100,7 +101,10 @@ options =
         "Architecture to build (e.g. 'i386' or 'x86_64')."
     , Option "" [binaryVariantOptName]
         (ReqArg (\v -> Right $ \g -> g{gBinarySuffix = v}) "SUFFIX")
-        "Extra suffix to add to binary executable archive filename." ]
+        "Extra suffix to add to binary executable archive filename."
+    , Option "" [uploadLabelOptName]
+        (ReqArg (\v -> Right $ \g -> g{gUploadLabel = Just v}) "LABEL")
+        "Label to give the uploaded release asset" ]
 
 -- | Shake rules.
 rules :: Global -> [String] -> Rules ()
@@ -133,9 +137,13 @@ rules global@Global{..} args = do
     phony archBuildPhony $ need [archDir </> archPackageFileName]
 
     releaseDir </> "*" <.> uploadExt %> \out -> do
-        need [dropExtension out]
-        uploadToGithubRelease global (dropExtension out)
-        copyFileChanged (dropExtension out) out
+        let srcFile = dropExtension out
+            mUploadLabel =
+                if takeExtension srcFile == ascExt
+                    then fmap (++ " (GPG signature)") gUploadLabel
+                    else gUploadLabel
+        uploadToGithubRelease global srcFile mUploadLabel
+        copyFileChanged srcFile out
 
     releaseCheckDir </> binaryExeFileName %> \out -> do
         need [installBinDir </> stackExeFileName]
@@ -396,15 +404,6 @@ rules global@Global{..} args = do
     binaryExeFileName = binaryName global <.> exe
     stackExeFileName = stackProgName <.> exe
 
-    zipExt = "zip"
-    tarGzExt = tarExt <.> gzExt
-    gzExt = "gz"
-    tarExt = "tar"
-    ascExt = "asc"
-    uploadExt = "upload"
-    debExt = "deb"
-    rpmExt = "rpm"
-
     debStagedDocDir dv = debStagingDir dv </> "usr/share/doc" </> stackProgName
     debStagedBashCompletionFile dv = debStagingDir dv </> "etc/bash_completion.d/stack"
     debStagedExeFile dv = debStagingDir dv </> "usr/bin/stack"
@@ -453,18 +452,31 @@ rules global@Global{..} args = do
 
     anyDistroVersion distro = DistroVersion distro "*" "*"
 
+    zipExt = ".zip"
+    tarGzExt = tarExt <.> gzExt
+    gzExt = ".gz"
+    tarExt = ".tar"
+    ascExt = ".asc"
+    uploadExt = ".upload"
+    debExt = ".deb"
+    rpmExt = ".rpm"
+
 
 -- | Upload file to Github release.
-uploadToGithubRelease :: Global -> FilePath -> Action ()
-uploadToGithubRelease global@Global{..} file = do
+uploadToGithubRelease :: Global -> FilePath -> Maybe String -> Action ()
+uploadToGithubRelease global@Global{..} file mUploadLabel = do
     putNormal $ "Uploading to Github: " ++ file
+    need [file]
     GithubRelease{..} <- getGithubRelease
     resp <- liftIO $ callGithubApi global
         [(CI.mk $ S8.pack "Content-Type", defaultMimeLookup (T.pack file))]
         (Just file)
         (replace
-            "{?name}"
-            ("?name=" ++ S8.unpack (urlEncode True (S8.pack (takeFileName file))))
+            "{?name,label}"
+            ("?name=" ++ urlEncodeStr (takeFileName file) ++
+             (case mUploadLabel of
+                 Nothing -> ""
+                 Just uploadLabel -> "&label=" ++ urlEncodeStr uploadLabel))
             relUploadUrl)
     case eitherDecode resp of
         Left e -> error ("Could not parse Github asset upload response (" ++ e ++ "):\n" ++ L8.unpack resp ++ "\n")
@@ -472,6 +484,7 @@ uploadToGithubRelease global@Global{..} file = do
             when (assetState /= "uploaded") $
                 error ("Invalid asset state after Github asset upload: " ++ assetState)
   where
+    urlEncodeStr = S8.unpack . urlEncode True . S8.pack
     getGithubRelease = do
         releases <- getGithubReleases
         let tag = fromMaybe ("v" ++ stackVersionStr global) gGithubReleaseTag
@@ -600,6 +613,10 @@ archOptName = "arch"
 binaryVariantOptName :: String
 binaryVariantOptName = "binary-variant"
 
+-- | @--upload-label@ command-line option name.
+uploadLabelOptName :: String
+uploadLabelOptName = "upload-label"
+
 -- | Arguments to pass to all 'stack' invocations.
 stackArgs :: Global -> [String]
 stackArgs Global{..} = ["--arch=" ++ display gArch]
@@ -647,5 +664,6 @@ data Global = Global
     , gProjectRoot :: !FilePath
     , gHomeDir :: !FilePath
     , gArch :: !Arch
-    , gBinarySuffix :: !String }
+    , gBinarySuffix :: !String
+    , gUploadLabel ::(Maybe String)}
     deriving (Show)
