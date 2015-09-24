@@ -302,7 +302,7 @@ precompiledCacheFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
 precompiledCacheFile pkgident copts = do
     ec <- asks getEnvConfig
 
-    compiler <- parseRelDir $ T.unpack $ compilerVersionName $ envConfigCompilerVersion ec
+    compiler <- parseRelDir $ compilerVersionString $ envConfigCompilerVersion ec
     cabal <- parseRelDir $ versionString $ envConfigCabalVersion ec
     pkg <- parseRelDir $ packageIdentifierString pkgident
 

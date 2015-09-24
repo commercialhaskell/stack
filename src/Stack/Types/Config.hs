@@ -448,7 +448,7 @@ instance FromJSON (Resolver,[JSONWarning]) where
 -- directory names
 resolverName :: Resolver -> Text
 resolverName (ResolverSnapshot name) = renderSnapName name
-resolverName (ResolverCompiler v) = compilerVersionName v
+resolverName (ResolverCompiler v) = compilerVersionText v
 resolverName (ResolverCustom name _) = "custom-" <> name
 
 -- | Try to parse a @Resolver@ from a @Text@. Won't work for complex resolvers (like custom).
@@ -875,7 +875,7 @@ compilerVersionDir = do
     compilerVersion <- asks (envConfigCompilerVersion . getEnvConfig)
     parseRelDir $ case compilerVersion of
         GhcVersion version -> versionString version
-        GhcjsVersion {} -> T.unpack (compilerVersionName compilerVersion)
+        GhcjsVersion {} -> compilerVersionString compilerVersion
 
 -- | Package database for installing dependencies into
 packageDatabaseDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
@@ -1099,6 +1099,7 @@ data SetupInfo = SetupInfo
     , siSevenzDll :: Maybe DownloadInfo
     , siMsys2 :: Map Text VersionedDownloadInfo
     , siGHCs :: Map Text (Map Version DownloadInfo)
+    , siGHCJSs :: Map Text (Map CompilerVersion DownloadInfo)
     }
     deriving Show
 
@@ -1108,6 +1109,7 @@ instance FromJSON (SetupInfo, [JSONWarning]) where
         siSevenzDll <- jsonSubWarningsT (o ..:? "sevenzdll-info")
         siMsys2 <- jsonSubWarningsT (o ..:? "msys2" ..!= mempty)
         siGHCs <- jsonSubWarningsTT (o ..:? "ghc" ..!= mempty)
+        siGHCJSs <- jsonSubWarningsTT (o ..:? "ghcjs" ..!= mempty)
         -- Don't warn about 'portable-git' that is no-longer used
         tellJSONField "portable-git"
         return SetupInfo {..}
@@ -1119,13 +1121,15 @@ instance Monoid SetupInfo where
         , siSevenzDll = Nothing
         , siMsys2 = Map.empty
         , siGHCs = Map.empty
+        , siGHCJSs = Map.empty
         }
     mappend l r =
         SetupInfo
         { siSevenzExe = siSevenzExe l <|> siSevenzExe r
         , siSevenzDll = siSevenzDll l <|> siSevenzDll r
         , siMsys2 = siMsys2 l <> siMsys2 r
-        , siGHCs = siGHCs l <> siGHCs r }
+        , siGHCs = siGHCs l <> siGHCs r
+        , siGHCJSs = siGHCJSs l <> siGHCJSs r }
 
 -- | Remote or inline 'SetupInfo'
 data SetupInfoLocation

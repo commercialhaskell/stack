@@ -13,6 +13,7 @@ module System.Process.Read
   (readProcessStdout
   ,tryProcessStdout
   ,sinkProcessStdout
+  ,sinkProcessStderrStdout
   ,readProcess
   ,EnvOverride(..)
   ,unEnvOverride
@@ -233,7 +234,7 @@ sinkProcessStdout wd menv name args sinkStdout = do
                menv
                name
                args
-               (CL.mapM_ (\bytes -> liftIO (modifyIORef' stdoutBuffer (<> byteString bytes))))
+               (CL.mapM_ (\bytes -> liftIO (modifyIORef' stderrBuffer (<> byteString bytes))))
                (CL.iterM (\bytes -> liftIO (modifyIORef' stdoutBuffer (<> byteString bytes))) $=
                 sinkStdout))
           (\(ProcessExitedUnsuccessfully cp ec) ->

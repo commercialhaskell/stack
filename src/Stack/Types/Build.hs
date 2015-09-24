@@ -137,7 +137,7 @@ instance Show StackBuildException where
                     Nothing -> "No compiler found, expected "
                     Just (actual, arch) -> concat
                         [ "Compiler version mismatched, found "
-                        , T.unpack (compilerVersionName actual)
+                        , compilerVersionString actual
                         , " ("
                         , display arch
                         , ")"
@@ -147,7 +147,7 @@ instance Show StackBuildException where
                     MatchMinor -> "minor version match with "
                     MatchExact -> "exact version "
                     NewerMinor -> "minor version match or newer with "
-                , T.unpack (compilerVersionName expected)
+                , compilerVersionString expected
                 , " ("
                 , display earch
                 , ghcVariantSuffix ghcVariant
