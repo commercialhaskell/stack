@@ -4,7 +4,7 @@ Vagrant.configure(2) do |config|
   config.vm.box = "chef/centos-6.6-i386"
   config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__exclude: [".stack_work/", "_release/"]
   config.vm.provider "virtualbox" do |vb|
-    vb.memory = "1024"
+    vb.memory = "2048"
   end
   config.vm.provision "shell", run: "always", inline: <<-SHELL
     set -xe
