@@ -930,6 +930,8 @@ ensureGhcjsBooted menv cv shouldBoot  = do
     eres <- try $ sinkProcessStdout Nothing menv "ghcjs" [] (return ())
     case eres of
         Right () -> return ()
+        Left (ReadProcessException _ _ _ err) | "no input files" `S.isInfixOf` LBS.toStrict err ->
+            return ()
         Left (ReadProcessException _ _ _ err) | "ghcjs_boot.completed" `S.isInfixOf` LBS.toStrict err ->
             if not shouldBoot then throwM GHCJSNotBooted else do
                 dir <- case cv of
