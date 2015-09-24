@@ -465,8 +465,8 @@ rules global@Global{..} args = do
 -- | Upload file to Github release.
 uploadToGithubRelease :: Global -> FilePath -> Maybe String -> Action ()
 uploadToGithubRelease global@Global{..} file mUploadLabel = do
-    putNormal $ "Uploading to Github: " ++ file
     need [file]
+    putNormal $ "Uploading to Github: " ++ file
     GithubRelease{..} <- getGithubRelease
     resp <- liftIO $ callGithubApi global
         [(CI.mk $ S8.pack "Content-Type", defaultMimeLookup (T.pack file))]
