@@ -28,6 +28,7 @@ import           Data.Text.Encoding          (decodeUtf8, encodeUtf8)
 import qualified Data.Yaml                   as Yaml
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
+import           Path.IO                     (withCanonicalizedSystemTempDirectory)
 import           Prelude
 import           Stack.BuildPlan
 import           Stack.Types
@@ -35,7 +36,6 @@ import           System.Directory            (copyFile,
                                               createDirectoryIfMissing,
                                               getTemporaryDirectory)
 import qualified System.FilePath             as FP
-import           System.IO.Temp
 import           System.Process.Read
 
 cabalSolver :: (MonadIO m, MonadLogger m, MonadMask m, MonadBaseControl IO m, MonadReader env m, HasConfig env)
@@ -44,7 +44,7 @@ cabalSolver :: (MonadIO m, MonadLogger m, MonadMask m, MonadBaseControl IO m, Mo
             -> Map PackageName Version -- ^ constraints
             -> [String] -- ^ additional arguments
             -> m (CompilerVersion, Map PackageName (Version, Map FlagName Bool))
-cabalSolver wc cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-solver" $ \dir -> do
+cabalSolver wc cabalfps constraints cabalArgs = withCanonicalizedSystemTempDirectory "cabal-solver" $ \dir -> do
     configLines <- getCabalConfig dir constraints
     let configFile = dir FP.</> "cabal.config"
     liftIO $ S.writeFile configFile $ encodeUtf8 $ T.unlines configLines

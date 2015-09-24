@@ -10,10 +10,10 @@ import Data.Maybe
 import Data.Monoid
 import Network.HTTP.Conduit (Manager)
 import Path
+import Path.IO
 --import System.FilePath
 import Prelude -- Fix redundant import warnings
 import System.Directory
-import System.IO.Temp
 import System.Environment
 import Test.Hspec
 
@@ -48,7 +48,7 @@ spec = beforeAll setup $ afterAll teardown $ do
   -- TODO(danburton): not use inTempDir
   let inTempDir action = do
         currentDirectory <- getCurrentDirectory
-        withSystemTempDirectory "Stack_ConfigSpec" $ \tempDir -> do
+        withCanonicalizedSystemTempDirectory "Stack_ConfigSpec" $ \tempDir -> do
           let enterDir = setCurrentDirectory tempDir
           let exitDir = setCurrentDirectory currentDirectory
           bracket_ enterDir exitDir action
@@ -85,7 +85,7 @@ spec = beforeAll setup $ afterAll teardown $ do
       bcRoot bc `shouldBe` parentDir
 
     it "respects the STACK_YAML env variable" $ \T{..} -> inTempDir $ do
-      withSystemTempDirectory "config-is-here" $ \dirFilePath -> do
+      withCanonicalizedSystemTempDirectory "config-is-here" $ \dirFilePath -> do
         dir <- parseAbsDir dirFilePath
         let stackYamlFp = toFilePath (dir </> stackDotYaml)
         writeFile stackYamlFp sampleConfig
