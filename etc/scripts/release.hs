@@ -156,7 +156,8 @@ rules global@Global{..} args = do
         liftIO $ renameFile instExeFile tmpExeFile
         actionFinally
             (do opt <- addPath [installBinDir] []
-                () <- cmd opt stackProgName (stackArgs global) "build --pedantic --haddock --no-haddock-deps"
+                -- () <- cmd opt stackProgName (stackArgs global) "build --pedantic --haddock --no-haddock-deps"
+                () <- cmd opt stackProgName (stackArgs global) "build --pedantic"
                 () <- cmd opt stackProgName (stackArgs global) "clean"
                 () <- cmd opt stackProgName (stackArgs global) "build --pedantic"
                 () <- cmd opt stackProgName (stackArgs global) "test --pedantic --flag stack:integration-tests"
