@@ -35,8 +35,8 @@ Vagrant.configure(2) do |config|
     if ! which aws; then
         apt-get install -y python2.7
         curl -O https://bootstrap.pypa.io/get-pip.py
-        python27 get-pip.py
-        pip install awscli
+        sudo python2.7 get-pip.py
+        sudo pip install awscli
     fi
   SHELL
 end
