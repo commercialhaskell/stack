@@ -9,7 +9,7 @@ Vagrant.configure(2) do |config|
   config.vm.provision "shell", run: "always", inline: <<-SHELL
     set -xe
     export PATH=/usr/local/bin:$PATH
-    yum -y install perl make automake gcc gmp-devel zlib-devel tar which git xz
+    yum -y install perl make automake gcc gmp-devel zlib-devel tar which git xz ncurses-devel
     if ! which stack; then
       curl -sSL $(curl -sSL https://api.github.com/repos/commercialhaskell/stack/releases/latest \
                |grep '"browser_download_url": ".*/stack-[0-9\\.]\\+-i386-linux-gmp4.gz"' \

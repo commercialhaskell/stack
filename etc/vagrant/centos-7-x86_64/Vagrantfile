@@ -10,7 +10,7 @@ Vagrant.configure(2) do |config|
     set -xe
     export PATH=/usr/local/bin:$PATH
     yum -y install epel-release
-    yum -y install perl make automake gcc gmp-devel zlib-devel tar which git python-boto deltarpm python-deltarpm rpm-build rpm-sign
+    yum -y install perl make automake gcc gmp-devel zlib-devel tar which git python-boto deltarpm python-deltarpm rpm-build rpm-sign ncurses-devel
     if ! [[ -f /usr/local/bin/stack ]]; then
       curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/centos/7/fpco.repo >/etc/yum.repos.d/fpco.repo
       yum -y install stack
