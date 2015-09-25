@@ -345,7 +345,9 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                (addCommand Image.imgDockerCmdName
                 "Build a Docker image for the project"
                 imgDockerCmd
-                (pure ())))
+                (flag False True
+                  (long "push" <>
+                   help "Push generated Docker images"))))
      case eGlobalRun of
        Left (exitCode :: ExitCode) -> do
          when isInterpreter $
@@ -918,8 +920,9 @@ dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
         Docker.preventInContainer $
             Docker.cleanup cleanupOpts
 
-imgDockerCmd :: () -> GlobalOpts -> IO ()
-imgDockerCmd () go@GlobalOpts{..} = do
+imgDockerCmd :: Bool -- ^ push?
+             -> GlobalOpts -> IO ()
+imgDockerCmd push go@GlobalOpts{..} = do
     withBuildConfigExt
         go
         Nothing
@@ -930,7 +933,7 @@ imgDockerCmd () go@GlobalOpts{..} = do
                          lk
                          defaultBuildOpts
                  Image.stageContainerImageArtifacts)
-        (Just Image.createContainerImageFromStage)
+        (Just $ Image.createContainerImageFromStage push)
 
 -- | Load the configuration with a manager. Convenience function used
 -- throughout this module.

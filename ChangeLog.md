@@ -4,6 +4,12 @@ Major changes:
 
 * "stack setup" now supports building and booting GHCJS from source tarball.
 
+Other enhancements:
+
+* `stack image container` now accepts a `--push` option
+
+Bug fixes:
+
 ## 0.1.5.0
 
 Major changes:
