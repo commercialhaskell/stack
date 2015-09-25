@@ -901,28 +901,33 @@ installGHCJSPosix version _ archiveFile archiveType destDir = do
     -- This is also used by 'ensureGhcjsBooted', because it can use the
     -- environment of the stack.yaml which came with ghcjs, in order to install
     -- cabal-install. This lets us also fix the version of cabal-install used.
-    let root = destDir Path.</> $(mkRelDir "src")
-    createTree root
-    dir <-
-        liftM (root Path.</>) $
-        parseRelDir $
-        "ghcjs-" ++ versionString version
+    let srcDir = destDir Path.</> $(mkRelDir "src")
+    createTree srcDir
+    stackYaml <- ghcjsStackYaml version destDir
 
-    $logSticky $ T.concat ["Unpacking GHCJS into ", (T.pack . toFilePath $ root), " ..."]
+    $logSticky $ T.concat ["Unpacking GHCJS into ", (T.pack . toFilePath $ srcDir), " ..."]
     $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
-    readInNull root tarTool menv ["xf", toFilePath archiveFile] Nothing
+    readInNull srcDir tarTool menv ["xf", toFilePath archiveFile] Nothing
 
     $logSticky "Installing GHCJS (this will take a long time) ..."
     let destBinDir = destDir Path.</> $(mkRelDir "bin")
     stackPath <- liftIO getExecutablePath
     createTree destBinDir
-    runAndLog (Just dir) stackPath menv
+    runAndLog Nothing stackPath menv
         [ "--install-ghc"
+        , "--stack-yaml"
+        , toFilePath stackYaml
         , "--local-bin-path"
         , toFilePath destBinDir
         , "install"
         ]
     $logStickyDone "Installed GHCJS."
+
+ghcjsStackYaml :: MonadThrow m => Version -> Path Abs Dir -> m (Path Abs File)
+ghcjsStackYaml version destDir =
+    liftM ((destDir Path.</> $(mkRelDir "src")) Path.</>) $
+    parseRelFile $
+    "ghcjs-" ++ versionString version ++ "/stack.yaml"
 
 ensureGhcjsBooted :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
                   => EnvOverride -> CompilerVersion -> Bool -> m ()
@@ -934,22 +939,18 @@ ensureGhcjsBooted menv cv shouldBoot  = do
             return ()
         Left (ReadProcessException _ _ _ err) | "ghcjs_boot.completed" `S.isInfixOf` LBS.toStrict err ->
             if not shouldBoot then throwM GHCJSNotBooted else do
-                dir <- case cv of
-                    GhcjsVersion version _ -> do
-                        root <- installDir (ToolGhcjs cv)
-                        liftM (root Path.</>) $
-                            parseRelDir $
-                            "ghcjs-" ++ versionString version
+                stackYaml <- case cv of
+                    GhcjsVersion version _ -> ghcjsStackYaml version =<< installDir (ToolGhcjs cv)
                     _ -> fail "ensureGhcjsBooted invoked on non GhcjsVersion"
-                bootGhcjs menv dir
+                bootGhcjs menv stackYaml
         Left err -> throwM err
 
 bootGhcjs :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m)
-          => EnvOverride -> Path Abs Dir -> m ()
-bootGhcjs menv dir  = do
+          => EnvOverride -> Path Abs File -> m ()
+bootGhcjs menv stackYaml  = do
     stackPath <- liftIO getExecutablePath
     -- Install cabal-install if missing, or if the installed one is old.
-    mcabal <- getCabalInstallVersion dir menv
+    mcabal <- getCabalInstallVersion menv stackYaml
     shouldInstallCabal <- case mcabal of
         Nothing -> do
             $logInfo "No 'cabal' binary found for use with GHCJS.  Installing a local copy of 'cabal' from source."
@@ -964,13 +965,17 @@ bootGhcjs menv dir  = do
             | otherwise -> return False
     when shouldInstallCabal $ do
         $logSticky "Building cabal-install for use by ghcjs-boot ... "
-        runAndLog (Just dir) stackPath menv
-            [ "build"
+        runAndLog Nothing stackPath menv
+            [ "--stack-yaml"
+            , toFilePath stackYaml
+            , "build"
             , "cabal-install"
             ]
     $logSticky "Booting GHCJS (this will take a long time) ..."
-    runAndLog (Just dir) stackPath menv
-        [ "exec"
+    runAndLog Nothing stackPath menv
+        [ "--stack-yaml"
+        , toFilePath stackYaml
+        , "exec"
         , "--no-ghc-package-path"
         , "--"
         , "ghcjs-boot"
@@ -987,9 +992,15 @@ runAndLog mdir name menv args = liftBaseWith $ \restore -> do
     void $ restore $ sinkProcessStderrStdout mdir menv name args logLines logLines
 
 getCabalInstallVersion :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m)
-                       => Path Abs Dir -> EnvOverride -> m (Maybe Version)
-getCabalInstallVersion dir menv = do
-    ebs <- tryProcessStdout (Just dir) menv "stack" ["exec", "--", "cabal", "--numeric-version"]
+                       => EnvOverride -> Path Abs File -> m (Maybe Version)
+getCabalInstallVersion menv stackYaml = do
+    ebs <- tryProcessStdout Nothing menv "stack"
+      [ "--stack-yaml"
+      , toFilePath stackYaml
+      , "exec"
+      , "--"
+      , "cabal"
+      , "--numeric-version"]
     case ebs of
         Left _ -> return Nothing
         Right bs -> Just <$> parseVersion (T.encodeUtf8 (T.dropWhileEnd isSpace (T.decodeUtf8 bs)))
