@@ -955,7 +955,7 @@ bootGhcjs menv dir  = do
             $logInfo "No 'cabal' binary found for use with GHCJS.  Installing a local copy of 'cabal' from source."
             return True
         Just v
-            | v < $(mkVersion "1.22") -> do
+            | v < $(mkVersion "1.22.4") -> do
                 $logInfo $
                     "'cabal' binary found on PATH is too old to be used for booting GHCJS (version " <>
                     versionText v <>
