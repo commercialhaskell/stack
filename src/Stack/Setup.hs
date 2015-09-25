@@ -531,8 +531,7 @@ getSetupInfo sopts manager = do
             loadSetupInfo
             (SetupInfoFileOrURL (soptsStackSetupYaml sopts) :
              configSetupInfoLocations config)
-    return
-        (mconcat setupInfos)
+    return (mconcat setupInfos)
   where
     loadSetupInfo (SetupInfoInline si) = return si
     loadSetupInfo (SetupInfoFileOrURL urlOrFile) = do
@@ -548,7 +547,8 @@ getSetupInfo sopts manager = do
                     return $ S8.concat bss
                 Nothing -> liftIO $ S.readFile urlOrFile
         (si,warnings) <- either throwM return (Yaml.decodeEither' bs)
-        logJSONWarnings urlOrFile warnings
+        when (urlOrFile /= defaultStackSetupYaml) $
+            logJSONWarnings urlOrFile warnings
         return si
 
 data Tool
