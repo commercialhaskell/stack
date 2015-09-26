@@ -302,7 +302,7 @@ getImplicitGlobalProjectDir
     => Config -> m (Path Abs Dir)
 getImplicitGlobalProjectDir config =
     --TEST no warning printed
-    fst <$> tryDeprecatedPath
+    liftM fst $ tryDeprecatedPath
         Nothing
         dirExists
         (implicitGlobalProjectDir stackRoot)

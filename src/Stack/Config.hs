@@ -565,7 +565,7 @@ getDefaultGlobalConfigPath
 getDefaultGlobalConfigPath =
     case (defaultGlobalConfigPath, defaultGlobalConfigPathDeprecated) of
         (Just new,Just old) ->
-            (Just . fst ) <$>
+            liftM (Just . fst ) $
             tryDeprecatedPath
                 (Just "non-project global configuration file")
                 fileExists
