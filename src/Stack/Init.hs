@@ -9,6 +9,8 @@ module Stack.Init
     , SnapPref (..)
     , Method (..)
     , makeConcreteResolver
+    , tryDeprecatedPath
+    , getImplicitGlobalProjectDir
     ) where
 
 import           Control.Exception               (assert)
@@ -118,7 +120,7 @@ renderStackYaml p =
         _ -> assert False $ B.byteString $ Yaml.encode p
   where
     renderObject o =
-        B.byteString "# For more information, see: https://github.com/commercialhaskell/stack/blob/master/doc/yaml_configuration.md\n\n" <>
+        B.byteString "# For more information, see: https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md\n\n" <>
         F.foldMap (goComment o) comments <>
         goOthers (o `HM.difference` HM.fromList comments) <>
         B.byteString
@@ -170,7 +172,7 @@ getSnapshots' =
         $logError ""
         $logError "You can try again, or create your stack.yaml file by hand. See:"
         $logError ""
-        $logError "    https://github.com/commercialhaskell/stack/blob/master/doc/yaml_configuration.md"
+        $logError "    https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md"
         $logError ""
         $logError $ "Exception was: " <> T.pack (show e)
         return Nothing
@@ -272,8 +274,9 @@ makeConcreteResolver ar = do
         case ar of
             ARResolver r -> assert False $ return r
             ARGlobal -> do
-                stackRoot <- asks $ configStackRoot . getConfig
-                let fp = implicitGlobalDir stackRoot </> stackDotYaml
+                config <- asks getConfig
+                implicitGlobalDir <- getImplicitGlobalProjectDir config
+                let fp = implicitGlobalDir </> stackDotYaml
                 (ProjectAndConfigMonoid project _, _warnings) <-
                     liftIO (Yaml.decodeFileEither $ toFilePath fp)
                     >>= either throwM return
@@ -290,3 +293,48 @@ makeConcreteResolver ar = do
                      in return $ ResolverSnapshot $ LTS x y
     $logInfo $ "Selected resolver: " <> resolverName r
     return r
+
+-- | Get the location of the implicit global project directory.
+-- If the directory already exists at the deprecated location, its location is returned.
+-- Otherwise, the new location is returned.
+getImplicitGlobalProjectDir
+    :: (MonadIO m, MonadLogger m)
+    => Config -> m (Path Abs Dir)
+getImplicitGlobalProjectDir config =
+    --TEST no warning printed
+    fst <$> tryDeprecatedPath
+        Nothing
+        dirExists
+        (implicitGlobalProjectDir stackRoot)
+        (implicitGlobalProjectDirDeprecated stackRoot)
+  where
+    stackRoot = configStackRoot config
+
+-- | If deprecated path exists, use it and print a warning.
+-- Otherwise, return the new path.
+tryDeprecatedPath
+    :: (MonadIO m, MonadLogger m)
+    => Maybe T.Text -- ^ Description of file for warning (if Nothing, no deprecation warning is displayed)
+    -> (Path Abs a -> m Bool) -- ^ Test for existence
+    -> Path Abs a -- ^ New path
+    -> Path Abs a -- ^ Deprecated path
+    -> m (Path Abs a, Bool) -- ^ (Path to use, whether it already exists)
+tryDeprecatedPath mWarningDesc exists new old = do
+    newExists <- exists new
+    if newExists
+        then return (new, True)
+        else do
+            oldExists <- exists old
+            if oldExists
+                then do
+                    case mWarningDesc of
+                        Nothing -> return ()
+                        Just desc ->
+                            $logWarn
+                                ("Warning: Location of " <> desc <> " at '" <>
+                                 T.pack (toFilePath old) <>
+                                 "' is deprecated; rename it to '" <>
+                                 T.pack (toFilePath new) <>
+                                 "' instead")
+                    return (old, True)
+                else return (new, False)

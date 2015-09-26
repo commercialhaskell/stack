@@ -275,7 +275,7 @@ data NeedTargets
 
 parseTargets :: (MonadThrow m, MonadIO m)
              => NeedTargets -- ^ need at least one target
-             -> Bool -- ^ using implicit global?
+             -> Bool -- ^ using implicit global project?
              -> Map PackageName Version -- ^ snapshot
              -> Map PackageName Version -- ^ extra deps
              -> Map PackageName LocalPackageView

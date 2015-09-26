@@ -26,13 +26,17 @@ module Stack.Constants
     ,stackProgName
     ,wiredInPackages
     ,cabalPackageName
-    ,implicitGlobalDir
+    ,implicitGlobalProjectDirDeprecated
+    ,implicitGlobalProjectDir
     ,hpcRelativeDir
     ,hpcDirFromDir
     ,dotHpc
     ,objectInterfaceDir
     ,templatesDir
-    ,globalConfigPath
+    ,defaultUserConfigPathDeprecated
+    ,defaultUserConfigPath
+    ,defaultGlobalConfigPathDeprecated
+    ,defaultGlobalConfigPath
     )
     where
 
@@ -285,17 +289,41 @@ cabalPackageName :: PackageName
 cabalPackageName =
     $(mkPackageName "Cabal")
 
--- | Implicit global directory used when outside of a project.
-implicitGlobalDir :: Path Abs Dir -- ^ Stack root.
-                  -> Path Abs Dir
-implicitGlobalDir p =
+-- | Deprecated implicit global project directory used when outside of a project.
+implicitGlobalProjectDirDeprecated :: Path Abs Dir -- ^ Stack root.
+                                   -> Path Abs Dir
+implicitGlobalProjectDirDeprecated p =
     p </>
     $(mkRelDir "global")
+
+-- | Implicit global project directory used when outside of a project.
+-- Normally, @getImplicitGlobalProjectDir@ should be used instead.
+implicitGlobalProjectDir :: Path Abs Dir -- ^ Stack root.
+                         -> Path Abs Dir
+implicitGlobalProjectDir p =
+    p </>
+    $(mkRelDir "global-project")
 
 -- | Where .mix files go.
 dotHpc :: Path Rel Dir
 dotHpc = $(mkRelDir ".hpc")
 
--- | Global config path.
-globalConfigPath :: Config -> Path Abs File
-globalConfigPath = (</> $(mkRelFile "stack.yaml")) . configStackRoot
+-- | Deprecated default global config path.
+defaultUserConfigPathDeprecated :: Path Abs Dir -> Path Abs File
+defaultUserConfigPathDeprecated = (</> $(mkRelFile "stack.yaml"))
+
+-- | Default global config path.
+-- Normally, @getDefaultUserConfigPath@ should be used instead.
+defaultUserConfigPath :: Path Abs Dir -> Path Abs File
+defaultUserConfigPath = (</> $(mkRelFile "config.yaml"))
+
+-- | Deprecated default global config path.
+-- Note that this will be @Nothing@ on Windows, which is by design.
+defaultGlobalConfigPathDeprecated :: Maybe (Path Abs File)
+defaultGlobalConfigPathDeprecated = parseAbsFile "/etc/stack/config"
+
+-- | Default global config path.
+-- Normally, @getDefaultGlobalConfigPath@ should be used instead.
+-- Note that this will be @Nothing@ on Windows, which is by design.
+defaultGlobalConfigPath :: Maybe (Path Abs File)
+defaultGlobalConfigPath = parseAbsFile "/etc/stack/config.yaml"

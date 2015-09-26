@@ -150,7 +150,7 @@ instance Show SetupException where
         [ "The GHC located at "
         , toFilePath ghc
         , " failed to compile a sanity check. Please see:\n\n"
-        , "    https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md\n\n"
+        , "    https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md\n\n"
         , "for more information. Exception was:\n"
         , show e
         ]

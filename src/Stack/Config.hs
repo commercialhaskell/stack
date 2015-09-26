@@ -26,6 +26,7 @@ module Stack.Config
   ,loadMiniConfig
   ,packagesParser
   ,resolvePackageEntry
+  ,getImplicitGlobalProjectDir
   ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -41,6 +42,7 @@ import           Control.Monad.Reader (MonadReader, ask, runReaderT)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson.Extended
+import qualified Data.ByteString as S
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as L
 import qualified Data.IntMap as IntMap
@@ -89,18 +91,15 @@ getLatestResolver = do
                 Just lts -> lts
     return (ResolverSnapshot snap)
 
--- | Note that this will be @Nothing@ on Windows, which is by design.
-defaultStackGlobalConfig :: Maybe (Path Abs File)
-defaultStackGlobalConfig = parseAbsFile "/etc/stack/config"
-
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid
     :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env)
     => Path Abs Dir -- ^ stack root, e.g. ~/.stack
+    -> Path Abs File -- ^ user config file path, e.g. ~/.stack/config.yaml
     -> Maybe Project
     -> ConfigMonoid
     -> m Config
-configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = do
+configFromConfigMonoid configStackRoot configUserConfigPath mproject configMonoid@ConfigMonoid{..} = do
      let configDocker = Docker.dockerOptsFromMonoid mproject configStackRoot configMonoidDockerOpts
          configConnectionCount = fromMaybe 8 configMonoidConnectionCount
          configHideTHLoading = fromMaybe True configMonoidHideTHLoading
@@ -257,9 +256,10 @@ loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadThrow m,MonadBaseContro
            -> m (LoadConfig m)
 loadConfig configArgs mstackYaml = do
     stackRoot <- determineStackRoot
-    extraConfigs <- getExtraConfigs stackRoot >>= mapM loadYaml
+    userConfigPath <- getDefaultUserConfigPath stackRoot
+    extraConfigs <- getExtraConfigs userConfigPath >>= mapM loadYaml
     mproject <- loadProjectConfig mstackYaml
-    config <- configFromConfigMonoid stackRoot (fmap (\(proj, _, _) -> proj) mproject) $ mconcat $
+    config <- configFromConfigMonoid stackRoot userConfigPath (fmap (\(proj, _, _) -> proj) mproject) $ mconcat $
         case mproject of
             Nothing -> configArgs : extraConfigs
             Just (_, _, projectConfig) -> configArgs : projectConfig : extraConfigs
@@ -267,7 +267,7 @@ loadConfig configArgs mstackYaml = do
         (throwM (BadStackVersionException (configRequireStackVersion config)))
     return $ LoadConfig
         { lcConfig          = config
-        , lcLoadBuildConfig = loadBuildConfig mproject config stackRoot
+        , lcLoadBuildConfig = loadBuildConfig mproject config
         , lcProjectRoot     = fmap (\(_, fp, _) -> parent fp) mproject
         }
 
@@ -276,20 +276,19 @@ loadConfig configArgs mstackYaml = do
 loadBuildConfig :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m, HasTerminal env)
                 => Maybe (Project, Path Abs File, ConfigMonoid)
                 -> Config
-                -> Path Abs Dir
                 -> Maybe AbstractResolver -- override resolver
                 -> m BuildConfig
-loadBuildConfig mproject config stackRoot mresolver = do
+loadBuildConfig mproject config mresolver = do
     env <- ask
     miniConfig <- loadMiniConfig config
 
     (project', stackYamlFP) <- case mproject of
       Just (project, fp, _) -> return (project, fp)
       Nothing -> do
-            $logInfo "Run from outside a project, using implicit global config"
+            $logInfo "Run from outside a project, using implicit global project config"
+            destDir <- getImplicitGlobalProjectDir config
             let dest :: Path Abs File
                 dest = destDir </> stackDotYaml
-                destDir = implicitGlobalDir stackRoot
                 dest' :: FilePath
                 dest' = toFilePath dest
             createTree destDir
@@ -301,7 +300,7 @@ loadBuildConfig mproject config stackRoot mresolver = do
                        case mresolver of
                            Nothing ->
                                $logInfo ("Using resolver: " <> resolverName (projectResolver project) <>
-                                         " from global config file: " <> T.pack dest')
+                                         " from implicit global project's config file: " <> T.pack dest')
                            Just aresolver -> do
                                let name =
                                         case aresolver of
@@ -316,7 +315,7 @@ loadBuildConfig mproject config stackRoot mresolver = do
                else do
                    r <- runReaderT getLatestResolver miniConfig
                    $logInfo ("Using latest snapshot resolver: " <> resolverName r)
-                   $logInfo ("Writing global (non-project-specific) config file to: " <> T.pack dest')
+                   $logInfo ("Writing implicit global project config file to: " <> T.pack dest')
                    $logInfo "Note: You can change the snapshot via the resolver field there."
                    let p = Project
                            { projectPackages = mempty
@@ -324,7 +323,20 @@ loadBuildConfig mproject config stackRoot mresolver = do
                            , projectFlags = mempty
                            , projectResolver = r
                            }
-                   liftIO $ Yaml.encodeFile dest' p
+                   liftIO $ do
+                       S.writeFile dest'
+                           ("# This is the implicit global project's config file, which is only used when\n" <>
+                            "# 'stack' is run outside of a real project.  Settings here do _not_ act as\n" <>
+                            "# defaults for all projects.  To change stack's default settings, edit\n" <>
+                            "# '" <> encodeUtf8 (T.pack $ toFilePath $ configUserConfigPath config) <> "' instead.\n" <>
+                            "#\n" <>
+                            "# For more information about stack's configuration, see\n" <>
+                            "# https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md\n" <>
+                            "#\n" <>
+                            Yaml.encode p)
+                       S.writeFile (toFilePath $ parent dest </> $(mkRelFile "README.txt")) $
+                           "This is the implicit global project, which is used only when 'stack' is run\n" <>
+                           "outside of a real project.\n"
                    return (p, dest)
     resolver <-
         case mresolver of
@@ -372,7 +384,7 @@ resolvePackageEntry menv projRoot pe = do
             subs -> mapM (resolveDir entryRoot) subs
     case peValidWanted pe of
         Nothing -> return ()
-        Just _ -> $logWarn "Warning: you are using the deprecated valid-wanted field. You should instead use extra-dep. See: https://github.com/commercialhaskell/stack/blob/master/doc/yaml_configuration.md#packages"
+        Just _ -> $logWarn "Warning: you are using the deprecated valid-wanted field. You should instead use extra-dep. See: https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md#packages"
     return $ map (, not $ peExtraDep pe) paths
 
 -- | Resolve a PackageLocation into a path, downloading and cloning as
@@ -460,10 +472,12 @@ determineStackRoot = do
 -- | Determine the extra config file locations which exist.
 --
 -- Returns most local first
-getExtraConfigs :: MonadIO m
-                => Path Abs Dir -- ^ stack root
+getExtraConfigs :: (MonadIO m, MonadLogger m)
+                => Path Abs File -- ^ use config path
                 -> m [Path Abs File]
-getExtraConfigs stackRoot = liftIO $ do
+getExtraConfigs userConfigPath = do
+  defaultStackGlobalConfigPath <- getDefaultGlobalConfigPath
+  liftIO $ do
     env <- getEnvironment
     mstackConfig <-
         maybe (return Nothing) (fmap Just . parseAbsFile)
@@ -472,8 +486,8 @@ getExtraConfigs stackRoot = liftIO $ do
         maybe (return Nothing) (fmap Just . parseAbsFile)
       $ lookup "STACK_GLOBAL_CONFIG" env
     filterM fileExists
-        $ fromMaybe (stackRoot </> stackDotYaml) mstackConfig
-        : maybe [] return (mstackGlobalConfig <|> defaultStackGlobalConfig)
+        $ fromMaybe userConfigPath mstackConfig
+        : maybe [] return (mstackGlobalConfig <|> defaultStackGlobalConfigPath)
 
 -- | Load and parse YAML from the given file.
 loadYaml :: (FromJSON (a, [JSONWarning]), MonadIO m, MonadLogger m) => Path Abs File -> m a
@@ -541,6 +555,47 @@ loadProjectConfig mstackYaml = do
     load fp = do
         ProjectAndConfigMonoid project config <- loadYaml fp
         return $ Just (project, fp, config)
+
+-- | Get the location of the default stack configuration file.
+-- If a file already exists at the deprecated location, its location is returned.
+-- Otherwise, the new location is returned.
+getDefaultGlobalConfigPath
+    :: (MonadIO m, MonadLogger m)
+    => m (Maybe (Path Abs File))
+getDefaultGlobalConfigPath =
+    case (defaultGlobalConfigPath, defaultGlobalConfigPathDeprecated) of
+        (Just new,Just old) ->
+            (Just . fst ) <$>
+            tryDeprecatedPath
+                (Just "non-project global configuration file")
+                fileExists
+                new
+                old
+        (Just new,Nothing) -> return (Just new)
+        _ -> return Nothing
+
+-- | Get the location of the default user configuration file.
+-- If a file already exists at the deprecated location, its location is returned.
+-- Otherwise, the new location is returned.
+getDefaultUserConfigPath
+    :: (MonadIO m, MonadLogger m)
+    => Path Abs Dir -> m (Path Abs File)
+getDefaultUserConfigPath stackRoot = do
+    (path, exists) <- tryDeprecatedPath
+        (Just "non-project configuration file")
+        fileExists
+        (defaultUserConfigPath stackRoot)
+        (defaultUserConfigPathDeprecated stackRoot)
+    unless exists $ do
+        createTree (parent path)
+        liftIO $ S.writeFile (toFilePath path) $
+            "# This file contains default non-project-specific settings for 'stack', used\n" <>
+            "# in all projects.  For more information about stack's configuration, see\n" <>
+            "# https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md\n" <>
+            "#\n" <>
+            Yaml.encode (mempty :: Object)
+    return path
+
 
 packagesParser :: Parser [String]
 packagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))

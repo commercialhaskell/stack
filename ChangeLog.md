@@ -2,7 +2,12 @@
 
 Major changes:
 
-* "stack setup" now supports building and booting GHCJS from source tarball.
+* "stack setup" now supports building and booting GHCJS from source tarball
+* Rename config files and clarify their purposes (#969)
+    * `~/.stack/stack.yaml` --> `~/.stack/config.yaml`
+    * `~/.stack/global` --> `~/.stack/global-project`
+    * `/etc/stack/config` --> `/etc/stack/config.yaml`
+    * Old locations still supported, with deprecation warnings
 
 ## 0.1.5.0
 

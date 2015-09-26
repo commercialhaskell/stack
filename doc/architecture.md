@@ -78,7 +78,7 @@ stack has two layers of configuration: project and non-project. All of these
 are stored in stack.yaml files, but the former has extra fields (resolver,
 packages, extra-deps, and flags). The latter can be monoidally combined so that
 a system config file provides defaults, which a user can override with
-~/.stack/stack.yaml, and a project can further customize. In addition,
+`~/.stack/config.yaml`, and a project can further customize. In addition,
 environment variables STACK\_ROOT and STACK\_YAML can be used to tweak where
 stack gets its configuration from.
 
