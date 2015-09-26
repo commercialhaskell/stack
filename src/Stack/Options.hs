@@ -450,8 +450,9 @@ ghciOptsParser = GhciOpts
 
 -- | Parser for exec command
 execOptsParser :: Maybe String -- ^ command
+               -> Maybe String -- ^ metavar for arguments
                -> Parser ExecOpts
-execOptsParser mcmd =
+execOptsParser mcmd mmvr =
     ExecOpts
         <$> pure mcmd
         <*> eoArgsParser
@@ -463,9 +464,10 @@ execOptsParser mcmd =
     eoArgsParser :: Parser [String]
     eoArgsParser = many (strArgument (metavar meta))
       where
-        meta =
-            (maybe ("CMD ") (const "") mcmd) ++
-            "-- ARGS (e.g. stack ghc -- X.hs -o x)"
+        meta = case mmvr of
+                   Nothing -> (maybe ("CMD ") (const "") mcmd) ++
+                              "-- ARGS (e.g. stack ghc -- X.hs -o x)"
+                   Just x -> x
 
     eoEnvSettingsParser :: Parser EnvSettings
     eoEnvSettingsParser = EnvSettings

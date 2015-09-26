@@ -271,11 +271,11 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
              addCommand "exec"
                         "Execute a command"
                         execCmd
-                        (execOptsParser Nothing)
+                        (execOptsParser Nothing Nothing)
              addCommand "ghc"
                         "Run ghc"
                         execCmd
-                        (execOptsParser $ Just "ghc")
+                        (execOptsParser (Just "ghc") Nothing)
              addCommand "ghci"
                         "Run ghci in the context of project(s) (experimental)"
                         ghciCmd
@@ -283,7 +283,11 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
              addCommand "runghc"
                         "Run runghc"
                         execCmd
-                        (execOptsParser $ Just "runghc")
+                        (execOptsParser (Just "runghc") Nothing)
+             addCommand "eval"
+                        "Evaluate some haskell code inline. Shortcut for 'stack exec ghc -- -e CODE'"
+                        evalCmd
+                        (execOptsParser Nothing (Just "CODE"))
              addCommand "clean"
                         "Clean the local packages"
                         cleanCmd
@@ -847,6 +851,14 @@ execCmd ExecOpts {..} go@GlobalOpts{..} = do
                        }
                munlockFile lk -- Unlock before transferring control away.
                exec eoEnvSettings cmd args
+
+-- | Evaluate some haskell code inline.
+evalCmd :: ExecOpts -> GlobalOpts -> IO ()
+evalCmd e@ExecOpts { eoArgs = [arg] } go@GlobalOpts {..} = execCmd execOpts go
+    where execOpts = e { eoCmd = Just "ghc"
+                       , eoArgs = ["-e", arg]
+                       }
+evalCmd _ _ = error "Expecting ONE string argument to 'eval'"
 
 -- | Run GHCi in the context of a project.
 ghciCmd :: GhciOpts -> GlobalOpts -> IO ()
