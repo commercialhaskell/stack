@@ -16,9 +16,7 @@ import Test.Hspec hiding (shouldNotBe, shouldNotReturn)
 
 -- TODO: share across test files
 withTempDir :: (Path Abs Dir -> IO a) -> IO a
-withTempDir f = withCanonicalizedSystemTempDirectory "NHD_VerifiedSpec" $ \dirFp -> do
-  dir <- parseAbsDir dirFp
-  f dir
+withTempDir = withCanonicalizedSystemTempDirectory "NHD_VerifiedSpec"
 
 
 -- | An example path to download the exampleReq.

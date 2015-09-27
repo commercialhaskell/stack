@@ -15,6 +15,7 @@ import Path.IO
 import Prelude -- Fix redundant import warnings
 import System.Directory
 import System.Environment
+import System.IO.Temp (withSystemTempDirectory)
 import Test.Hspec
 
 import Stack.Config
@@ -48,7 +49,7 @@ spec = beforeAll setup $ afterAll teardown $ do
   -- TODO(danburton): not use inTempDir
   let inTempDir action = do
         currentDirectory <- getCurrentDirectory
-        withCanonicalizedSystemTempDirectory "Stack_ConfigSpec" $ \tempDir -> do
+        withSystemTempDirectory "Stack_ConfigSpec" $ \tempDir -> do
           let enterDir = setCurrentDirectory tempDir
           let exitDir = setCurrentDirectory currentDirectory
           bracket_ enterDir exitDir action
@@ -85,8 +86,7 @@ spec = beforeAll setup $ afterAll teardown $ do
       bcRoot bc `shouldBe` parentDir
 
     it "respects the STACK_YAML env variable" $ \T{..} -> inTempDir $ do
-      withCanonicalizedSystemTempDirectory "config-is-here" $ \dirFilePath -> do
-        dir <- parseAbsDir dirFilePath
+      withCanonicalizedSystemTempDirectory "config-is-here" $ \dir -> do
         let stackYamlFp = toFilePath (dir </> stackDotYaml)
         writeFile stackYamlFp sampleConfig
         withEnvVar "STACK_YAML" stackYamlFp $ do
