@@ -907,6 +907,9 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             D.createDirectoryIfMissing True bindir
             let dst = bindir FP.</> FP.takeFileName exe
             createLink exe dst `catchIO` \_ -> D.copyFile exe dst
+        case (mlib, exes) of
+            (Nothing, _:_) -> markExeInstalled (taskLocation task) taskProvides
+            _ -> return ()
 
         -- Find the package in the database
         wc <- getWhichCompiler
