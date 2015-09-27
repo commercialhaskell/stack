@@ -8,7 +8,5 @@ flags:
 image:
   container:
     base: "fpco/ubuntu-with-libgmp:14.04"
-    add:
-      man/: /usr/local/share/man/
     entrypoints:
       - stack
