@@ -15,6 +15,7 @@ Other enhancements:
   [#1046](https://github.com/commercialhaskell/stack/issues/1046). You
   can still get this behavior by running the following yourself:
   `stack exec -- pacman -Sy --noconfirm git`.
+* Typing enter during --file-watch triggers a rebuild [#1023](https://github.com/commercialhaskell/stack/pull/1023)
 
 Bug fixes:
 
