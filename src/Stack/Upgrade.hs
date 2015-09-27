@@ -36,9 +36,8 @@ upgrade :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpMan
         => Maybe String -- ^ git repository to use
         -> Maybe AbstractResolver
         -> m ()
-upgrade gitRepo mresolver = withCanonicalizedSystemTempDirectory "stack-upgrade" $ \tmp' -> do
+upgrade gitRepo mresolver = withCanonicalizedSystemTempDirectory "stack-upgrade" $ \tmp -> do
     menv <- getMinimalEnvOverride
-    tmp <- parseAbsDir tmp'
     mdir <- case gitRepo of
       Just repo -> do
         remote <- liftIO $ readProcess "git" ["ls-remote", repo, "master"] []

@@ -456,9 +456,8 @@ upgradeCabal menv wc = do
                 , " to replace "
                 , T.pack $ versionString installed
                 ]
-            tmpdir' <- parseAbsDir tmpdir
             let ident = PackageIdentifier name newest
-            m <- unpackPackageIdents menv tmpdir' Nothing (Set.singleton ident)
+            m <- unpackPackageIdents menv tmpdir Nothing (Set.singleton ident)
 
             compilerPath <- join $ findExecutable menv (compilerExeName wc)
             newestDir <- parseRelDir $ versionString newest
@@ -842,8 +841,7 @@ installGHCPosix version _ archiveFile archiveType destDir = do
     $logDebug $ "make: " <> T.pack makeTool
     $logDebug $ "tar: " <> T.pack tarTool
 
-    withCanonicalizedSystemTempDirectory "stack-setup" $ \root' -> do
-        root <- parseAbsDir root'
+    withCanonicalizedSystemTempDirectory "stack-setup" $ \root -> do
         dir <-
             liftM (root Path.</>) $
             parseRelDir $
@@ -1059,8 +1057,7 @@ installGHCWindows version si archiveFile archiveType destDir = do
     run7z <- setup7z si
 
     withCanonicalizedTempDirectory (toFilePath $ parent destDir)
-                      ((FP.dropTrailingPathSeparator $ toFilePath $ dirname destDir) ++ "-tmp") $ \tmpDir0 -> do
-        tmpDir <- parseAbsDir tmpDir0
+                      ((FP.dropTrailingPathSeparator $ toFilePath $ dirname destDir) ++ "-tmp") $ \tmpDir -> do
         run7z (parent archiveFile) archiveFile
         run7z tmpDir tarFile
         removeFile tarFile `catchIO` \e ->
@@ -1291,8 +1288,7 @@ sanityCheck :: (MonadIO m, MonadMask m, MonadLogger m, MonadBaseControl IO m)
             -> WhichCompiler
             -> m ()
 sanityCheck menv wc = withCanonicalizedSystemTempDirectory "stack-sanity-check" $ \dir -> do
-    dir' <- parseAbsDir dir
-    let fp = toFilePath $ dir' </> $(mkRelFile "Main.hs")
+    let fp = toFilePath $ dir </> $(mkRelFile "Main.hs")
     liftIO $ writeFile fp $ unlines
         [ "import Distribution.Simple" -- ensure Cabal library is present
         , "main = putStrLn \"Hello World\""
@@ -1300,7 +1296,7 @@ sanityCheck menv wc = withCanonicalizedSystemTempDirectory "stack-sanity-check" 
     let exeName = compilerExeName wc
     ghc <- join $ findExecutable menv exeName
     $logDebug $ "Performing a sanity check on: " <> T.pack (toFilePath ghc)
-    eres <- tryProcessStdout (Just dir') menv exeName
+    eres <- tryProcessStdout (Just dir) menv exeName
         [ fp
         , "-no-user-package-db"
         ]

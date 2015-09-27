@@ -294,16 +294,16 @@ ignoreDoesNotExist f =
     liftIO $ catch f $ \e -> unless (isDoesNotExistError e) (throwIO e)
 
 withCanonicalizedSystemTempDirectory :: (MonadMask m, MonadIO m)
-    => String            -- ^ Directory name template.
-    -> (FilePath -> m a) -- ^ Callback that can use the canonicalized directory
+    => String                -- ^ Directory name template.
+    -> (Path Abs Dir -> m a) -- ^ Callback that can use the canonicalized directory
     -> m a
 withCanonicalizedSystemTempDirectory template action =
-  withSystemTempDirectory template (\path -> liftIO (D.canonicalizePath path) >>= action)
+  withSystemTempDirectory template (parseRelAsAbsDir >=> action)
 
 withCanonicalizedTempDirectory :: (MonadMask m, MonadIO m)
-    => FilePath          -- ^ Temp directory to create the directory in
-    -> String            -- ^ Directory name template.
-    -> (FilePath -> m a) -- ^ Callback that can use the canonicalized directory
+    => FilePath              -- ^ Temp directory to create the directory in
+    -> String                -- ^ Directory name template.
+    -> (Path Abs Dir -> m a) -- ^ Callback that can use the canonicalized directory
     -> m a
 withCanonicalizedTempDirectory targetDir template action =
-  withTempDirectory targetDir template (\path -> liftIO (D.canonicalizePath path) >>= action)
+  withTempDirectory targetDir template (parseRelAsAbsDir >=> action)

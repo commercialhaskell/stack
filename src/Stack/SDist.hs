@@ -198,7 +198,7 @@ getSDistFileList lp =
             [] -- provide empty list of globals. This is a hack around custom Setup.hs files
             sourceMap $ \ee -> do
             withSingleContext runInBase ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _console _mlogFile -> do
-                let outFile = tmpdir FP.</> "source-files-list"
+                let outFile = toFilePath tmpdir FP.</> "source-files-list"
                 cabal False ["sdist", "--list-sources", outFile]
                 contents <- liftIO (readFile outFile)
                 return (contents, cabalfp)

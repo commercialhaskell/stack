@@ -284,13 +284,12 @@ withExecuteEnv :: M env m
                -> m a
 withExecuteEnv menv bopts baseConfigOpts locals globals sourceMap inner = do
     withCanonicalizedSystemTempDirectory stackProgName $ \tmpdir -> do
-        tmpdir' <- parseAbsDir tmpdir
         configLock <- newMVar ()
         installLock <- newMVar ()
         idMap <- liftIO $ newTVarIO Map.empty
-        let setupHs = tmpdir' </> $(mkRelFile "Setup.hs")
+        let setupHs = tmpdir </> $(mkRelFile "Setup.hs")
         liftIO $ writeFile (toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
-        setupExe <- getSetupExe setupHs tmpdir'
+        setupExe <- getSetupExe setupHs tmpdir
         cabalPkgVer <- asks (envConfigCabalVersion . getEnvConfig)
         globalDB <- getGlobalDB menv =<< getWhichCompiler
         inner ExecuteEnv
@@ -304,7 +303,7 @@ withExecuteEnv menv bopts baseConfigOpts locals globals sourceMap inner = do
             , eeInstallLock = installLock
             , eeBaseConfigOpts = baseConfigOpts
             , eeGhcPkgIds = idMap
-            , eeTempDir = tmpdir'
+            , eeTempDir = tmpdir
             , eeSetupHs = setupHs
             , eeSetupExe = setupExe
             , eeCabalPkgVer = cabalPkgVer
