@@ -2,12 +2,33 @@
 
 Major changes:
 
-* "stack setup" now supports building and booting GHCJS from source tarball
-* Rename config files and clarify their purposes (#969)
+* "stack setup" now supports building and booting GHCJS from source tarball.
+* On Windows, build directories no longer display "pretty" information
+  (like x86_64-windows/Cabal-1.22.4.0), but rather a hash of that
+  content. The reason is to avoid the 260 character path limitation on
+  Windows. See
+  [#1027](https://github.com/commercialhaskell/stack/pull/1027)
+* Rename config files and clarify their purposes [#969](https://github.com/commercialhaskell/stack/issues/969)
     * `~/.stack/stack.yaml` --> `~/.stack/config.yaml`
     * `~/.stack/global` --> `~/.stack/global-project`
     * `/etc/stack/config` --> `/etc/stack/config.yaml`
     * Old locations still supported, with deprecation warnings
+
+Other enhancements:
+
+* No longer install `git` on Windows
+  [#1046](https://github.com/commercialhaskell/stack/issues/1046). You
+  can still get this behavior by running the following yourself:
+  `stack exec -- pacman -Sy --noconfirm git`.
+* Typing enter during --file-watch triggers a rebuild [#1023](https://github.com/commercialhaskell/stack/pull/1023)
+
+Bug fixes:
+
+* Ignore stack-built executables named `ghc`
+  [#1052](https://github.com/commercialhaskell/stack/issues/1052)
+* Fix quoting of output failed command line arguments
+* Mark executable-only packages as installed when copied from cache [#1043](https://github.com/commercialhaskell/stack/pull/1043)
+* Canonicalize temporary directory paths [#1047](https://github.com/commercialhaskell/stack/pull/1047)
 
 ## 0.1.5.0
 

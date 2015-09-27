@@ -78,8 +78,6 @@ import           System.Environment (getExecutablePath)
 import           System.Exit (ExitCode (ExitSuccess))
 import           System.FilePath (searchPathSeparator)
 import qualified System.FilePath as FP
-import           System.IO.Temp (withSystemTempDirectory)
-import           System.IO.Temp (withTempDirectory)
 import           System.Process (rawSystem)
 import           System.Process.Read
 import           System.Process.Run (runIn)
@@ -451,16 +449,15 @@ upgradeCabal menv wc = do
             , T.pack $ versionString newest
             , ". I'm not upgrading Cabal."
             ]
-        else withSystemTempDirectory "stack-cabal-upgrade" $ \tmpdir -> do
+        else withCanonicalizedSystemTempDirectory "stack-cabal-upgrade" $ \tmpdir -> do
             $logInfo $ T.concat
                 [ "Installing Cabal-"
                 , T.pack $ versionString newest
                 , " to replace "
                 , T.pack $ versionString installed
                 ]
-            tmpdir' <- parseAbsDir tmpdir
             let ident = PackageIdentifier name newest
-            m <- unpackPackageIdents menv tmpdir' Nothing (Set.singleton ident)
+            m <- unpackPackageIdents menv tmpdir Nothing (Set.singleton ident)
 
             compilerPath <- join $ findExecutable menv (compilerExeName wc)
             newestDir <- parseRelDir $ versionString newest
@@ -844,8 +841,7 @@ installGHCPosix version _ archiveFile archiveType destDir = do
     $logDebug $ "make: " <> T.pack makeTool
     $logDebug $ "tar: " <> T.pack tarTool
 
-    withSystemTempDirectory "stack-setup" $ \root' -> do
-        root <- parseAbsDir root'
+    withCanonicalizedSystemTempDirectory "stack-setup" $ \root -> do
         dir <-
             liftM (root Path.</>) $
             parseRelDir $
@@ -1060,9 +1056,8 @@ installGHCWindows version si archiveFile archiveType destDir = do
 
     run7z <- setup7z si
 
-    withTempDirectory (toFilePath $ parent destDir)
-                      ((FP.dropTrailingPathSeparator $ toFilePath $ dirname destDir) ++ "-tmp") $ \tmpDir0 -> do
-        tmpDir <- parseAbsDir tmpDir0
+    withCanonicalizedTempDirectory (toFilePath $ parent destDir)
+                      ((FP.dropTrailingPathSeparator $ toFilePath $ dirname destDir) ++ "-tmp") $ \tmpDir -> do
         run7z (parent archiveFile) archiveFile
         run7z tmpDir tarFile
         removeFile tarFile `catchIO` \e ->
@@ -1132,8 +1127,12 @@ installMsys2Windows osKey si archiveFile archiveType destDir = do
     -- happens, you can just run commands as usual.
     runIn destDir "sh" menv ["--login", "-c", "true"] Nothing
 
+    -- No longer installing git, it's unreliable
+    -- (https://github.com/commercialhaskell/stack/issues/1046) and the
+    -- MSYS2-installed version has bad CRLF defaults.
+    --
     -- Install git. We could install other useful things in the future too.
-    runIn destDir "pacman" menv ["-Sy", "--noconfirm", "git"] Nothing
+    -- runIn destDir "pacman" menv ["-Sy", "--noconfirm", "git"] Nothing
 
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
@@ -1288,9 +1287,8 @@ sanityCheck :: (MonadIO m, MonadMask m, MonadLogger m, MonadBaseControl IO m)
             => EnvOverride
             -> WhichCompiler
             -> m ()
-sanityCheck menv wc = withSystemTempDirectory "stack-sanity-check" $ \dir -> do
-    dir' <- parseAbsDir dir
-    let fp = toFilePath $ dir' </> $(mkRelFile "Main.hs")
+sanityCheck menv wc = withCanonicalizedSystemTempDirectory "stack-sanity-check" $ \dir -> do
+    let fp = toFilePath $ dir </> $(mkRelFile "Main.hs")
     liftIO $ writeFile fp $ unlines
         [ "import Distribution.Simple" -- ensure Cabal library is present
         , "main = putStrLn \"Hello World\""
@@ -1298,7 +1296,7 @@ sanityCheck menv wc = withSystemTempDirectory "stack-sanity-check" $ \dir -> do
     let exeName = compilerExeName wc
     ghc <- join $ findExecutable menv exeName
     $logDebug $ "Performing a sanity check on: " <> T.pack (toFilePath ghc)
-    eres <- tryProcessStdout (Just dir') menv exeName
+    eres <- tryProcessStdout (Just dir) menv exeName
         [ fp
         , "-no-user-package-db"
         ]

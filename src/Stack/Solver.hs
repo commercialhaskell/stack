@@ -28,6 +28,7 @@ import           Data.Text.Encoding          (decodeUtf8, encodeUtf8)
 import qualified Data.Yaml                   as Yaml
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
+import           Path.IO                     (parseRelAsAbsDir)
 import           Prelude
 import           Stack.BuildPlan
 import           Stack.Types
@@ -35,7 +36,7 @@ import           System.Directory            (copyFile,
                                               createDirectoryIfMissing,
                                               getTemporaryDirectory)
 import qualified System.FilePath             as FP
-import           System.IO.Temp
+import           System.IO.Temp              (withSystemTempDirectory)
 import           System.Process.Read
 
 cabalSolver :: (MonadIO m, MonadLogger m, MonadMask m, MonadBaseControl IO m, MonadReader env m, HasConfig env)
@@ -58,7 +59,7 @@ cabalSolver wc cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-s
     --
     -- In theory we could use --ignore-sandbox, but not all versions of cabal
     -- support it.
-    tmpdir <- liftIO getTemporaryDirectory >>= parseAbsDir
+    tmpdir <- liftIO getTemporaryDirectory >>= parseRelAsAbsDir
 
     let args = ("--config-file=" ++ configFile)
              : "install"

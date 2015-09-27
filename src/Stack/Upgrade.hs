@@ -18,6 +18,7 @@ import qualified Data.Text as T
 import           Development.GitRev          (gitHash)
 import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager)
 import           Path
+import           Path.IO
 import qualified Paths_stack as Paths
 import           Stack.Build
 import           Stack.Types.Build
@@ -28,7 +29,6 @@ import           Stack.Setup
 import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Types.StackT
-import           System.IO.Temp              (withSystemTempDirectory)
 import           System.Process              (readProcess)
 import           System.Process.Run
 
@@ -36,9 +36,8 @@ upgrade :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpMan
         => Maybe String -- ^ git repository to use
         -> Maybe AbstractResolver
         -> m ()
-upgrade gitRepo mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> do
+upgrade gitRepo mresolver = withCanonicalizedSystemTempDirectory "stack-upgrade" $ \tmp -> do
     menv <- getMinimalEnvOverride
-    tmp <- parseAbsDir tmp'
     mdir <- case gitRepo of
       Just repo -> do
         remote <- liftIO $ readProcess "git" ["ls-remote", repo, "master"] []

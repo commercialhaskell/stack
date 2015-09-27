@@ -39,6 +39,7 @@ import           Distribution.Version (simplifyVersionRange, orLaterVersion, ear
 import           Distribution.Version.Extra
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
+import           Path.IO
 import           Prelude -- Fix redundant import warnings
 import           Stack.Build (mkBaseConfigOpts)
 import           Stack.Build.Execute
@@ -50,7 +51,6 @@ import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal
 import qualified System.FilePath as FP
-import           System.IO.Temp (withSystemTempDirectory)
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
 
@@ -188,7 +188,7 @@ readLocalPackage pkgDir = do
 -- | Returns a newline-separate list of paths, and the absolute path to the .cabal file.
 getSDistFileList :: M env m => LocalPackage -> m (String, Path Abs File)
 getSDistFileList lp =
-    withSystemTempDirectory (stackProgName <> "-sdist") $ \tmpdir -> do
+    withCanonicalizedSystemTempDirectory (stackProgName <> "-sdist") $ \tmpdir -> do
         menv <- getMinimalEnvOverride
         let bopts = defaultBuildOpts
         baseConfigOpts <- mkBaseConfigOpts bopts
@@ -198,7 +198,7 @@ getSDistFileList lp =
             [] -- provide empty list of globals. This is a hack around custom Setup.hs files
             sourceMap $ \ee -> do
             withSingleContext runInBase ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _console _mlogFile -> do
-                let outFile = tmpdir FP.</> "source-files-list"
+                let outFile = toFilePath tmpdir FP.</> "source-files-list"
                 cabal False ["sdist", "--list-sources", outFile]
                 contents <- liftIO (readFile outFile)
                 return (contents, cabalfp)

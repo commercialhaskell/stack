@@ -10,11 +10,12 @@ import Data.Maybe
 import Data.Monoid
 import Network.HTTP.Conduit (Manager)
 import Path
+import Path.IO
 --import System.FilePath
 import Prelude -- Fix redundant import warnings
 import System.Directory
-import System.IO.Temp
 import System.Environment
+import System.IO.Temp (withSystemTempDirectory)
 import Test.Hspec
 
 import Stack.Config
@@ -85,8 +86,7 @@ spec = beforeAll setup $ afterAll teardown $ do
       bcRoot bc `shouldBe` parentDir
 
     it "respects the STACK_YAML env variable" $ \T{..} -> inTempDir $ do
-      withSystemTempDirectory "config-is-here" $ \dirFilePath -> do
-        dir <- parseAbsDir dirFilePath
+      withCanonicalizedSystemTempDirectory "config-is-here" $ \dir -> do
         let stackYamlFp = toFilePath (dir </> stackDotYaml)
         writeFile stackYamlFp sampleConfig
         withEnvVar "STACK_YAML" stackYamlFp $ do

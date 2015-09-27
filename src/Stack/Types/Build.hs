@@ -78,6 +78,7 @@ import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           System.Exit (ExitCode (ExitFailure))
 import           System.FilePath (dropTrailingPathSeparator, pathSeparator)
+import           System.Process.Log (showProcessArgDebug)
 
 ----------------------------------------------
 -- Exceptions
@@ -233,7 +234,9 @@ instance Show StackBuildException where
                 go _ = Map.empty
      -- Supressing duplicate output
     show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bs) =
-        let fullCmd = (dropQuotes (toFilePath execName) ++ " " ++ (unwords fullArgs))
+        let fullCmd = unwords
+                    $ dropQuotes (toFilePath execName)
+                    : map (T.unpack . showProcessArgDebug) fullArgs
             logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ toFilePath fp) logFiles
         in "\n--  While building package " ++ dropQuotes (show taskProvides') ++ " using:\n" ++
            "      " ++ fullCmd ++ "\n" ++

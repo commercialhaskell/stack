@@ -14,8 +14,8 @@ import qualified Data.Set as Set
 import Network.HTTP.Conduit (Manager)
 import Prelude -- Fix redundant import warnings
 import System.Directory
-import System.IO.Temp
 import System.Environment
+import System.IO.Temp (withSystemTempDirectory)
 import Test.Hspec
 import Stack.Config
 import Stack.Types

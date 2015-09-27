@@ -81,8 +81,6 @@ import           System.Environment             (getExecutablePath)
 import           System.Exit                    (ExitCode (ExitSuccess))
 import qualified System.FilePath                as FP
 import           System.IO
-import           System.IO.Temp                 (withSystemTempDirectory)
-
 import           System.PosixCompat.Files       (createLink)
 import           System.Process.Read
 import           System.Process.Run
@@ -285,14 +283,13 @@ withExecuteEnv :: M env m
                -> (ExecuteEnv -> m a)
                -> m a
 withExecuteEnv menv bopts baseConfigOpts locals globals sourceMap inner = do
-    withSystemTempDirectory stackProgName $ \tmpdir -> do
-        tmpdir' <- parseAbsDir tmpdir
+    withCanonicalizedSystemTempDirectory stackProgName $ \tmpdir -> do
         configLock <- newMVar ()
         installLock <- newMVar ()
         idMap <- liftIO $ newTVarIO Map.empty
-        let setupHs = tmpdir' </> $(mkRelFile "Setup.hs")
+        let setupHs = tmpdir </> $(mkRelFile "Setup.hs")
         liftIO $ writeFile (toFilePath setupHs) "import Distribution.Simple\nmain = defaultMain"
-        setupExe <- getSetupExe setupHs tmpdir'
+        setupExe <- getSetupExe setupHs tmpdir
         cabalPkgVer <- asks (envConfigCabalVersion . getEnvConfig)
         globalDB <- getGlobalDB menv =<< getWhichCompiler
         inner ExecuteEnv
@@ -306,7 +303,7 @@ withExecuteEnv menv bopts baseConfigOpts locals globals sourceMap inner = do
             , eeInstallLock = installLock
             , eeBaseConfigOpts = baseConfigOpts
             , eeGhcPkgIds = idMap
-            , eeTempDir = tmpdir'
+            , eeTempDir = tmpdir
             , eeSetupHs = setupHs
             , eeSetupExe = setupExe
             , eeCabalPkgVer = cabalPkgVer
@@ -600,7 +597,18 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp = do
     when needConfig $ withMVar eeConfigureLock $ \_ -> do
         deleteCaches pkgDir
         announce
-        cabal False $ "configure" : dirs ++ nodirs
+        menv <- getMinimalEnvOverride
+        exes <- forM (words "ghc ghcjs") $ \name -> do
+            mpath <- findExecutable menv name
+            return $ case mpath of
+                Nothing -> []
+                Just x -> return $ concat ["--with-", name, "=", toFilePath x]
+        liftIO $ print exes
+        cabal False $ "configure" : concat
+            [ concat exes
+            , dirs
+            , nodirs
+            ]
         writeConfigCache pkgDir newConfigCache
         writeCabalMod pkgDir newCabalMod
 
@@ -896,6 +904,9 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             D.createDirectoryIfMissing True bindir
             let dst = bindir FP.</> FP.takeFileName exe
             createLink exe dst `catchIO` \_ -> D.copyFile exe dst
+        case (mlib, exes) of
+            (Nothing, _:_) -> markExeInstalled (taskLocation task) taskProvides
+            _ -> return ()
 
         -- Find the package in the database
         wc <- getWhichCompiler
