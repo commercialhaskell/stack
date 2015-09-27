@@ -33,7 +33,9 @@ module Path.IO
   ,createTree
   ,dropRoot
   ,parseCollapsedAbsFile
-  ,parseCollapsedAbsDir)
+  ,parseCollapsedAbsDir
+  ,withCanonicalizedSystemTempDirectory
+  ,withCanonicalizedTempDirectory)
   where
 
 import           Control.Exception hiding (catch)
@@ -48,6 +50,7 @@ import           Path.Internal (Path(..))
 import qualified System.Directory as D
 import qualified System.FilePath as FP
 import           System.IO.Error
+import           System.IO.Temp
 
 data ResolveException
     = ResolveDirFailed (Path Abs Dir) FilePath FilePath
@@ -289,3 +292,18 @@ dropRoot (Path l) = Path (FP.dropDrive l)
 ignoreDoesNotExist :: MonadIO m => IO () -> m ()
 ignoreDoesNotExist f =
     liftIO $ catch f $ \e -> unless (isDoesNotExistError e) (throwIO e)
+
+withCanonicalizedSystemTempDirectory :: (MonadMask m, MonadIO m)
+    => String            -- ^ Directory name template.
+    -> (FilePath -> m a) -- ^ Callback that can use the canonicalized directory
+    -> m a
+withCanonicalizedSystemTempDirectory template action =
+  withSystemTempDirectory template (\path -> liftIO (D.canonicalizePath path) >>= action)
+
+withCanonicalizedTempDirectory :: (MonadMask m, MonadIO m)
+    => FilePath          -- ^ Temp directory to create the directory in
+    -> String            -- ^ Directory name template.
+    -> (FilePath -> m a) -- ^ Callback that can use the canonicalized directory
+    -> m a
+withCanonicalizedTempDirectory targetDir template action =
+  withTempDirectory targetDir template (\path -> liftIO (D.canonicalizePath path) >>= action)

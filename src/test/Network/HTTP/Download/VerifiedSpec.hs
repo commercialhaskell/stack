@@ -9,14 +9,14 @@ import Data.Maybe
 import Network.HTTP.Client.Conduit
 import Network.HTTP.Download.Verified
 import Path
+import Path.IO
 import System.Directory
-import System.IO.Temp
 import Test.Hspec hiding (shouldNotBe, shouldNotReturn)
 
 
 -- TODO: share across test files
 withTempDir :: (Path Abs Dir -> IO a) -> IO a
-withTempDir f = withSystemTempDirectory "NHD_VerifiedSpec" $ \dirFp -> do
+withTempDir f = withCanonicalizedSystemTempDirectory "NHD_VerifiedSpec" $ \dirFp -> do
   dir <- parseAbsDir dirFp
   f dir
 

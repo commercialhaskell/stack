@@ -22,6 +22,7 @@ import Control.Exception (try,IOException,throwIO,Exception)
 import Data.ByteString.Lazy (ByteString,hPut,readFile)
 import Data.ByteString.Builder (Builder,stringUtf8,hPutBuilder)
 import Data.Typeable (Typeable)
+import Path.IO
 import System.Directory (findExecutable)
 import System.Environment (lookupEnv)
 import System.Exit (ExitCode(..))
@@ -29,7 +30,6 @@ import System.FilePath ((</>))
 import System.Process (createProcess,shell,proc,waitForProcess,StdStream (CreatePipe)
                       ,CreateProcess(std_in, close_fds, delegate_ctlc))
 import System.IO (hClose,Handle,hPutStr,readFile,withFile,IOMode(WriteMode),stdout)
-import System.IO.Temp (withSystemTempDirectory)
 
 -- | Run pager, providing a function that writes to the pager's input.
 pageWriter :: (Handle -> IO ()) -> IO ()
@@ -89,7 +89,7 @@ editFile path =
 -- | Run editor, providing functions to write and read the file contents.
 editReaderWriter :: forall a. String -> (Handle -> IO ()) -> (FilePath -> IO a) -> IO a
 editReaderWriter filename writer reader =
-  withSystemTempDirectory ""
+  withCanonicalizedSystemTempDirectory ""
                           (\p -> do let p' = p </> filename
                                     withFile p' WriteMode writer
                                     editFile p'

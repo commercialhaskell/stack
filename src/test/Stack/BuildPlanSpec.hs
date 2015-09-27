@@ -12,9 +12,9 @@ import Data.Monoid
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Network.HTTP.Conduit (Manager)
+import Path.IO
 import Prelude -- Fix redundant import warnings
 import System.Directory
-import System.IO.Temp
 import System.Environment
 import Test.Hspec
 import Stack.Config
@@ -44,7 +44,7 @@ spec = beforeAll setup $ afterAll teardown $ do
     let loadBuildConfigRest m = runStackLoggingT m logLevel False False
     let inTempDir action = do
             currentDirectory <- getCurrentDirectory
-            withSystemTempDirectory "Stack_BuildPlanSpec" $ \tempDir -> do
+            withCanonicalizedSystemTempDirectory "Stack_BuildPlanSpec" $ \tempDir -> do
                 let enterDir = setCurrentDirectory tempDir
                 let exitDir = setCurrentDirectory currentDirectory
                 bracket_ enterDir exitDir action

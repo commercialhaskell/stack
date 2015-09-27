@@ -78,8 +78,6 @@ import           System.Environment (getExecutablePath)
 import           System.Exit (ExitCode (ExitSuccess))
 import           System.FilePath (searchPathSeparator)
 import qualified System.FilePath as FP
-import           System.IO.Temp (withSystemTempDirectory)
-import           System.IO.Temp (withTempDirectory)
 import           System.Process (rawSystem)
 import           System.Process.Read
 import           System.Process.Run (runIn)
@@ -451,7 +449,7 @@ upgradeCabal menv wc = do
             , T.pack $ versionString newest
             , ". I'm not upgrading Cabal."
             ]
-        else withSystemTempDirectory "stack-cabal-upgrade" $ \tmpdir -> do
+        else withCanonicalizedSystemTempDirectory "stack-cabal-upgrade" $ \tmpdir -> do
             $logInfo $ T.concat
                 [ "Installing Cabal-"
                 , T.pack $ versionString newest
@@ -844,7 +842,7 @@ installGHCPosix version _ archiveFile archiveType destDir = do
     $logDebug $ "make: " <> T.pack makeTool
     $logDebug $ "tar: " <> T.pack tarTool
 
-    withSystemTempDirectory "stack-setup" $ \root' -> do
+    withCanonicalizedSystemTempDirectory "stack-setup" $ \root' -> do
         root <- parseAbsDir root'
         dir <-
             liftM (root Path.</>) $
@@ -1060,7 +1058,7 @@ installGHCWindows version si archiveFile archiveType destDir = do
 
     run7z <- setup7z si
 
-    withTempDirectory (toFilePath $ parent destDir)
+    withCanonicalizedTempDirectory (toFilePath $ parent destDir)
                       ((FP.dropTrailingPathSeparator $ toFilePath $ dirname destDir) ++ "-tmp") $ \tmpDir0 -> do
         tmpDir <- parseAbsDir tmpDir0
         run7z (parent archiveFile) archiveFile
@@ -1292,7 +1290,7 @@ sanityCheck :: (MonadIO m, MonadMask m, MonadLogger m, MonadBaseControl IO m)
             => EnvOverride
             -> WhichCompiler
             -> m ()
-sanityCheck menv wc = withSystemTempDirectory "stack-sanity-check" $ \dir -> do
+sanityCheck menv wc = withCanonicalizedSystemTempDirectory "stack-sanity-check" $ \dir -> do
     dir' <- parseAbsDir dir
     let fp = toFilePath $ dir' </> $(mkRelFile "Main.hs")
     liftIO $ writeFile fp $ unlines

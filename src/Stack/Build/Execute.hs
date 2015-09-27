@@ -81,8 +81,6 @@ import           System.Environment             (getExecutablePath)
 import           System.Exit                    (ExitCode (ExitSuccess))
 import qualified System.FilePath                as FP
 import           System.IO
-import           System.IO.Temp                 (withSystemTempDirectory)
-
 import           System.PosixCompat.Files       (createLink)
 import           System.Process.Read
 import           System.Process.Run
@@ -285,7 +283,7 @@ withExecuteEnv :: M env m
                -> (ExecuteEnv -> m a)
                -> m a
 withExecuteEnv menv bopts baseConfigOpts locals globals sourceMap inner = do
-    withSystemTempDirectory stackProgName $ \tmpdir -> do
+    withCanonicalizedSystemTempDirectory stackProgName $ \tmpdir -> do
         tmpdir' <- parseAbsDir tmpdir
         configLock <- newMVar ()
         installLock <- newMVar ()
