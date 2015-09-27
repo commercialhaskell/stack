@@ -56,10 +56,11 @@ stageContainerImageArtifacts = do
 -- extended with an ENTRYPOINT specified for each `entrypoint` listed
 -- in the config file.
 createContainerImageFromStage :: Assemble e m
-                              => m ()
-createContainerImageFromStage = do
+                              => Bool -- ^ should we follow up with a docker push?
+                              -> m ()
+createContainerImageFromStage push = do
     imageDir <- imageStagingDir <$> getWorkingDir
-    createDockerImage imageDir
+    createDockerImage push imageDir
     extendDockerImageWithEntrypoint imageDir
 
 -- | Stage all the Package executables in the usr/local/bin
@@ -98,10 +99,13 @@ imageName = map toLower . dropTrailingPathSeparator . toFilePath . dirname
 
 -- | Create a general purpose docker image from the temporary
 -- directory of executables & static content.
-createDockerImage :: Assemble e m => Path Abs Dir -> m ()
-createDockerImage dir = do
+createDockerImage :: Assemble e m => Bool -> Path Abs Dir -> m ()
+createDockerImage push dir = do
     config <- asks getConfig
     let dockerConfig = imgDocker (configImage config)
+        name = fromMaybe
+            (imageName (parent (parent dir)))
+            (imgDockerImageName =<< dockerConfig)
     case imgDockerBase =<< dockerConfig of
         Nothing -> throwM StackImageDockerBaseUnspecifiedException
         Just base -> do
@@ -115,10 +119,9 @@ createDockerImage dir = do
                         "docker"
                         [ "build"
                         , "-t"
-                        , fromMaybe
-                              (imageName (parent (parent dir)))
-                              (imgDockerImageName =<< dockerConfig)
-                        , toFilePath dir])
+                        , name
+                        , toFilePath dir]
+                    when push (callProcess "docker" ["push", name]))
 
 -- | Extend the general purpose docker image with entrypoints (if
 -- specified).

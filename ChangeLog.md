@@ -23,6 +23,12 @@ Bug fixes:
 * Fix quoting of output failed command line arguments
 * Mark executable-only packages as installed when copied from cache [#1043](https://github.com/commercialhaskell/stack/pull/1043)
 
+Other enhancements:
+
+* `stack image container` now accepts a `--push` option
+
+Bug fixes:
+
 ## 0.1.5.0
 
 Major changes:
