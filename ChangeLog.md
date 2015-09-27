@@ -4,6 +4,13 @@ Major changes:
 
 * "stack setup" now supports building and booting GHCJS from source tarball.
 
+Other enhancements:
+
+Bug fixes:
+
+* Ignore stack-built executables named `ghc`
+  [#1052](https://github.com/commercialhaskell/stack/issues/1052)
+
 ## 0.1.5.0
 
 Major changes:

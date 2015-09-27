@@ -600,7 +600,18 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp = do
     when needConfig $ withMVar eeConfigureLock $ \_ -> do
         deleteCaches pkgDir
         announce
-        cabal False $ "configure" : dirs ++ nodirs
+        menv <- getMinimalEnvOverride
+        exes <- forM (words "ghc ghcjs") $ \name -> do
+            mpath <- findExecutable menv name
+            return $ case mpath of
+                Nothing -> []
+                Just x -> return $ concat ["--with-", name, "=", toFilePath x]
+        liftIO $ print exes
+        cabal False $ "configure" : concat
+            [ concat exes
+            , dirs
+            , nodirs
+            ]
         writeConfigCache pkgDir newConfigCache
         writeCabalMod pkgDir newCabalMod
 
