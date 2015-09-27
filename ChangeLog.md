@@ -3,6 +3,11 @@
 Major changes:
 
 * "stack setup" now supports building and booting GHCJS from source tarball.
+* On Windows, build directories no longer display "pretty" information
+  (like x86_64-windows/Cabal-1.22.4.0), but rather a hash of that
+  content. The reason is to avoid the 260 character path limitation on
+  Windows. See
+  [#1027](https://github.com/commercialhaskell/stack/pull/1027)
 
 Other enhancements:
 
