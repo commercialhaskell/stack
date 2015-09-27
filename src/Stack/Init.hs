@@ -330,11 +330,11 @@ tryDeprecatedPath mWarningDesc exists new old = do
                     case mWarningDesc of
                         Nothing -> return ()
                         Just desc ->
-                            $logWarn
-                                ("Warning: Location of " <> desc <> " at '" <>
-                                 T.pack (toFilePath old) <>
-                                 "' is deprecated; rename it to '" <>
-                                 T.pack (toFilePath new) <>
-                                 "' instead")
+                            $logWarn $ T.concat
+                                [ "Warning: Location of ", desc, " at '"
+                                , T.pack (toFilePath old)
+                                , "' is deprecated; rename it to '"
+                                , T.pack (toFilePath new)
+                                , "' instead" ]
                     return (old, True)
                 else return (new, False)

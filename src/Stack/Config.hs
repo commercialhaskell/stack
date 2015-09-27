@@ -324,19 +324,19 @@ loadBuildConfig mproject config mresolver = do
                            , projectResolver = r
                            }
                    liftIO $ do
-                       S.writeFile dest'
-                           ("# This is the implicit global project's config file, which is only used when\n" <>
-                            "# 'stack' is run outside of a real project.  Settings here do _not_ act as\n" <>
-                            "# defaults for all projects.  To change stack's default settings, edit\n" <>
-                            "# '" <> encodeUtf8 (T.pack $ toFilePath $ configUserConfigPath config) <> "' instead.\n" <>
-                            "#\n" <>
-                            "# For more information about stack's configuration, see\n" <>
-                            "# https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md\n" <>
-                            "#\n" <>
-                            Yaml.encode p)
-                       S.writeFile (toFilePath $ parent dest </> $(mkRelFile "README.txt")) $
-                           "This is the implicit global project, which is used only when 'stack' is run\n" <>
-                           "outside of a real project.\n"
+                       S.writeFile dest' $ S.concat
+                           [ "# This is the implicit global project's config file, which is only used when\n"
+                           , "# 'stack' is run outside of a real project.  Settings here do _not_ act as\n"
+                           , "# defaults for all projects.  To change stack's default settings, edit\n"
+                           , "# '", encodeUtf8 (T.pack $ toFilePath $ configUserConfigPath config), "' instead.\n"
+                           , "#\n"
+                           , "# For more information about stack's configuration, see\n"
+                           , "# https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md\n"
+                           , "#\n"
+                           , Yaml.encode p]
+                       S.writeFile (toFilePath $ parent dest </> $(mkRelFile "README.txt")) $ S.concat
+                           [ "This is the implicit global project, which is used only when 'stack' is run\n"
+                           , "outside of a real project.\n" ]
                    return (p, dest)
     resolver <-
         case mresolver of
@@ -588,12 +588,12 @@ getDefaultUserConfigPath stackRoot = do
         (defaultUserConfigPathDeprecated stackRoot)
     unless exists $ do
         createTree (parent path)
-        liftIO $ S.writeFile (toFilePath path) $
-            "# This file contains default non-project-specific settings for 'stack', used\n" <>
-            "# in all projects.  For more information about stack's configuration, see\n" <>
-            "# https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md\n" <>
-            "#\n" <>
-            Yaml.encode (mempty :: Object)
+        liftIO $ S.writeFile (toFilePath path) $ S.concat
+            [ "# This file contains default non-project-specific settings for 'stack', used\n"
+            , "# in all projects.  For more information about stack's configuration, see\n"
+            , "# https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md\n"
+            , "#\n"
+            , Yaml.encode (mempty :: Object) ]
     return path
 
 
