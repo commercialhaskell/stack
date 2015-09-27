@@ -46,7 +46,7 @@ import           Data.Typeable (Typeable)
 import           Path
 import           Path.IO (getWorkingDir,listDirectory,createTree,removeFile,removeTree,dirExists)
 import           Prelude -- Fix redundant import warnings
-import           Stack.Constants (projectDockerSandboxDir,stackProgName,stackDotYaml,stackRootEnvVar)
+import           Stack.Constants (projectDockerSandboxDir,stackProgName,stackRootEnvVar)
 import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Docker.GlobalDB
@@ -816,14 +816,13 @@ instance Exception StackDockerException
 -- | Show instance for StackDockerException.
 instance Show StackDockerException where
   show DockerMustBeEnabledException =
-    concat ["Docker must be enabled in your ",toFilePath stackDotYaml," to use this command."]
+    concat ["Docker must be enabled in your configuration file to use this command."]
   show OnlyOnHostException =
     "This command must be run on host OS (not in a Docker container)."
   show (InspectFailedException image) =
     concat ["'docker inspect' failed for image after pull: ",image,"."]
   show (NotPulledException image) =
-    concat ["The Docker image referenced by "
-           ,toFilePath stackDotYaml
+    concat ["The Docker image referenced by your configuration file"
            ," has not\nbeen downloaded:\n    "
            ,image
            ,"\n\nRun '"
@@ -841,8 +840,7 @@ instance Show StackDockerException where
     concat ["Could not pull Docker image:\n    "
            ,image
            ,"\nThere may not be an image on the registry for your resolver's LTS version in\n"
-           ,toFilePath stackDotYaml
-           ,"."]
+           ,"your configuration file."]
   show (DockerTooOldException minVersion haveVersion) =
     concat ["Minimum docker version '"
            ,versionString minVersion
@@ -884,9 +882,7 @@ instance Show StackDockerException where
            ,show resolver
            ,"\nUse an LTS resolver, or set the '"
            ,T.unpack dockerImageArgName
-           ,"' explicitly, in "
-           ,toFilePath stackDotYaml
-           ,"."]
+           ,"' explicitly, in your configuration file."]
   show CannotDetermineProjectRootException =
     "Cannot determine project root directory for Docker sandbox."
   show DockerNotInstalledException=

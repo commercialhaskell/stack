@@ -103,7 +103,7 @@ Downloading template "new-template" to create project "helloworld" in helloworld
 Using the following authorship configuration:
 author-email: example@example.com
 author-name: Example Author Name
-Copy these to /home/michael/.stack/stack.yaml and edit to use different values.
+Copy these to /home/michael/.stack/config.yaml and edit to use different values.
 Writing default config file to: /home/michael/helloworld/stack.yaml
 Basing on cabal files:
 - /home/michael/helloworld/helloworld.cabal
@@ -1321,7 +1321,7 @@ follows the Unix convention of `--` to separate these, e.g.:
 
 ```
 michael@d30748af6d3d:~$ stack exec --package stm -- echo I installed the stm package via --package stm
-Run from outside a project, using implicit global config
+Run from outside a project, using implicit global project config
 Using latest snapshot resolver: lts-3.2
 Writing global (non-project-specific) config file to: /home/michael/.stack/global/stack.yaml
 Note: You can change the snapshot via the resolver field there.
@@ -1368,14 +1368,14 @@ import Turtle
 main = echo "Hello World!"
 michael@d30748af6d3d:~$ chmod +x turtle.hs
 michael@d30748af6d3d:~$ ./turtle.hs
-Run from outside a project, using implicit global config
+Run from outside a project, using implicit global project config
 Using resolver: lts-3.2 specified on command line
 hashable-1.2.3.3: configure
 # installs some more dependencies
 Completed all 22 actions.
 Hello World!
 michael@d30748af6d3d:~$ ./turtle.hs
-Run from outside a project, using implicit global config
+Run from outside a project, using implicit global project config
 Using resolver: lts-3.2 specified on command line
 Hello World!
 ```
@@ -1545,7 +1545,7 @@ Downloading template "yesod-simple" to create project "my-yesod-project" in my-y
 Using the following authorship configuration:
 author-email: example@example.com
 author-name: Example Author Name
-Copy these to /home/michael/.stack/stack.yaml and edit to use different values.
+Copy these to /home/michael/.stack/config.yaml and edit to use different values.
 Writing default config file to: /home/michael/my-yesod-project/stack.yaml
 Basing on cabal files:
 - /home/michael/my-yesod-project/my-yesod-project.cabal

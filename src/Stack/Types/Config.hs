@@ -66,7 +66,10 @@ import           System.Process.Read (EnvOverride)
 data Config =
   Config {configStackRoot           :: !(Path Abs Dir)
          -- ^ ~/.stack more often than not
+         ,configUserConfigPath      :: !(Path Abs File)
+         -- ^ Path to user configuration file (usually ~/.stack/config.yaml)
          ,configDocker              :: !DockerOpts
+         -- ^ Docker configuration
          ,configEnvOverride         :: !(EnvSettings -> IO EnvOverride)
          -- ^ Environment variables to be passed to external tools
          ,configLocalPrograms       :: !(Path Abs Dir)
@@ -719,7 +722,7 @@ instance Show ConfigException where
         , toFilePath configFile
         , "':\n"
         , show exception
-        , "\nSee https://github.com/commercialhaskell/stack/blob/master/doc/yaml_configuration.md."
+        , "\nSee https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md."
         ]
     show (ParseResolverException t) = concat
         [ "Invalid resolver value: "
@@ -757,7 +760,7 @@ instance Show ConfigException where
             (\name -> "    stack init --resolver " ++ T.unpack (renderSnapName name))
             names
         , "\nYou'll then need to add some extra-deps. See:\n\n"
-        , "    https://github.com/commercialhaskell/stack/blob/master/doc/yaml_configuration.md#extra-deps"
+        , "    https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md#extra-deps"
         , "\n\nYou can also try falling back to a dependency solver with:\n\n"
         , "    stack init --solver"
         ]

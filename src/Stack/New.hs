@@ -139,7 +139,7 @@ applyTemplate project template nonceParams dir templateText = do
                  templateText
                  (mkStrContextM (contextFunction context)))
     when (not (S.null missingKeys))
-         ($logInfo (T.pack (show (MissingParameters project template config missingKeys))))
+         ($logInfo (T.pack (show (MissingParameters project template missingKeys (configUserConfigPath config)))))
     files :: Map FilePath LB.ByteString <-
         execWriterT $
         yield (T.encodeUtf8 (LT.toStrict applied)) $$
@@ -271,7 +271,7 @@ data NewException
     | BadTemplatesResponse !Int
     | BadTemplatesJSON !String !LB.ByteString
     | AlreadyExists !(Path Abs Dir)
-    | MissingParameters !PackageName !TemplateName !Config !(Set String)
+    | MissingParameters !PackageName !TemplateName !(Set String) !(Path Abs File)
     deriving (Typeable)
 
 instance Exception NewException
@@ -301,13 +301,13 @@ instance Show NewException where
     show (BadTemplatesJSON err bytes) =
         "Github returned some JSON that couldn't be parsed: " <> err <> "\n\n" <>
         L8.unpack bytes
-    show (MissingParameters name template config missingKeys) =
+    show (MissingParameters name template missingKeys userConfigPath) =
         intercalate
             "\n"
             [ "The following parameters were needed by the template but not provided: " <>
               intercalate ", " (S.toList missingKeys)
             , "You can provide them in " <>
-              toFilePath (globalConfigPath config) <>
+              toFilePath userConfigPath <>
               ", like this:"
             , "templates:"
             , "  params:"

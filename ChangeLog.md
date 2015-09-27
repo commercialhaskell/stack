@@ -8,6 +8,11 @@ Major changes:
   content. The reason is to avoid the 260 character path limitation on
   Windows. See
   [#1027](https://github.com/commercialhaskell/stack/pull/1027)
+* Rename config files and clarify their purposes [#969](https://github.com/commercialhaskell/stack/issues/969)
+    * `~/.stack/stack.yaml` --> `~/.stack/config.yaml`
+    * `~/.stack/global` --> `~/.stack/global-project`
+    * `/etc/stack/config` --> `/etc/stack/config.yaml`
+    * Old locations still supported, with deprecation warnings
 
 Other enhancements:
 

@@ -6,8 +6,8 @@ The stack.yaml configuration options break down into [project specific](#project
 
 and [non-project specific](#non-project-config) options in:
 
-- `/etc/stack/config` -- for system global non-project default options
--  `~/.stack/stack.yaml` -- for user non-project default options
+- `/etc/stack/config.yaml` -- for system global non-project default options
+-  `~/.stack/config.yaml` -- for user non-project default options
 - The project file itself may also contain non-project specific options
 
 *Note:* When stack is invoked outside a stack project it will source project specific options from `~/.stack/global/stack.yaml`.  Options in this file will be ignored for a project with its own `<project dir>/stack.yaml`.
@@ -115,7 +115,7 @@ image:
 
 ## Non-project config
 
-Non-project config options may go in the global config (`/etc/stack/config`) or the user config (`~/.stack/stack.yaml`).
+Non-project config options may go in the global config (`/etc/stack/config.yaml`) or the user config (`~/.stack/config.yaml`).
 
 ### docker
 
