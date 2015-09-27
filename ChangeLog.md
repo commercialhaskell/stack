@@ -16,6 +16,7 @@ Bug fixes:
 * Ignore stack-built executables named `ghc`
   [#1052](https://github.com/commercialhaskell/stack/issues/1052)
 * Fix quoting of output failed command line arguments
+* Mark executable-only packages as installed when copied from cache [#1043](https://github.com/commercialhaskell/stack/pull/1043)
 
 ## 0.1.5.0
 
