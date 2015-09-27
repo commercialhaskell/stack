@@ -1132,8 +1132,12 @@ installMsys2Windows osKey si archiveFile archiveType destDir = do
     -- happens, you can just run commands as usual.
     runIn destDir "sh" menv ["--login", "-c", "true"] Nothing
 
+    -- No longer installing git, it's unreliable
+    -- (https://github.com/commercialhaskell/stack/issues/1046) and the
+    -- MSYS2-installed version has bad CRLF defaults.
+    --
     -- Install git. We could install other useful things in the future too.
-    runIn destDir "pacman" menv ["-Sy", "--noconfirm", "git"] Nothing
+    -- runIn destDir "pacman" menv ["-Sy", "--noconfirm", "git"] Nothing
 
 -- | Download 7z as necessary, and get a function for unpacking things.
 --

@@ -6,6 +6,11 @@ Major changes:
 
 Other enhancements:
 
+* No longer install `git` on Windows
+  [#1046](https://github.com/commercialhaskell/stack/issues/1046). You
+  can still get this behavior by running the following yourself:
+  `stack exec -- pacman -Sy --noconfirm git`.
+
 Bug fixes:
 
 * Ignore stack-built executables named `ghc`
