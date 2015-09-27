@@ -136,7 +136,6 @@ fileWatchConf cfg getProjectRoot inner = withManagerConf cfg $ \manager -> do
 
         case eres of
             Left e -> printExceptionStderr e
-            Right () -> putStrLn "Success! Waiting for next file change. " ++
-              "Press enter to force a rebuild."
+            Right () -> putStrLn "Success! Waiting for next file change."
 
         putStrLn "Type help for available commands. Press enter to force a rebuild."
