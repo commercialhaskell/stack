@@ -974,12 +974,21 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
         when (doHaddock package) $ do
             announce "haddock"
-            hscolourExists <- doesExecutableExist eeEnvOverride "HsColour"
-            unless hscolourExists $ $logWarn
-                ("Warning: haddock not generating hyperlinked sources because 'HsColour' not\n" <>
-                 "found on PATH (use 'stack install hscolour' to install).")
+            sourceFlag <- do
+                hyped <- tryProcessStdout Nothing eeEnvOverride "haddock" ["--hyperlinked-source"]
+                case hyped of
+                    -- Fancy crosslinked source
+                    Right _ -> do
+                        return ["--haddock-option=--hyperlinked-source"]
+                    -- Older hscolour colouring
+                    Left _  -> do
+                        hscolourExists <- doesExecutableExist eeEnvOverride "HsColour"
+                        unless hscolourExists $ $logWarn
+                            ("Warning: haddock not generating hyperlinked sources because 'HsColour' not\n" <>
+                             "found on PATH (use 'stack install hscolour' to install).")
+                        return ["--hyperlink-source" | hscolourExists]
             cabal False (concat [["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
-                                ,["--hyperlink-source" | hscolourExists]
+                                ,sourceFlag
                                 ,["--ghcjs" | wc == Ghcjs]])
 
         withMVar eeInstallLock $ \() -> do
