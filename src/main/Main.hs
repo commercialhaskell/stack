@@ -380,6 +380,11 @@ pathCmd keys go =
          do env <- ask
             let cfg = envConfig env
                 bc = envConfigBuildConfig cfg
+            -- This is the modified 'bin-path',
+            -- including the local GHC or MSYS if not configured to operate on
+            -- global GHC.
+            -- It was set up in 'withBuildConfigAndLock -> withBuildConfigExt -> setupEnv'.
+            -- So it's not the *minimal* override path.
             menv <- getMinimalEnvOverride
             snap <- packageDatabaseDeps
             local <- packageDatabaseLocal
@@ -388,12 +393,16 @@ pathCmd keys go =
             localroot <- installationRootLocal
             distDir <- distRelativeDir
             forM_
+                -- filter the chosen paths in flags (keys),
+                -- or show all of them if no specific paths chosen.
                 (filter
                      (\(_,key,_) ->
                            null keys || elem key keys)
                      paths)
                 (\(_,key,path) ->
                       liftIO $ T.putStrLn
+                          -- If a single path type is requested, output it directly.
+                          -- Otherwise, name all the paths.
                           ((if length keys == 1
                                then ""
                                else key <> ": ") <>
