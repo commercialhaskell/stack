@@ -33,6 +33,7 @@ import qualified Data.Text.IO as T
 import           Data.Traversable
 import           Data.Version (showVersion)
 import           Distribution.System (buildArch)
+import           Distribution.Text (display)
 import           Development.GitRev (gitCommitCount)
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Network.HTTP.Client
@@ -157,7 +158,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
               -- See https://github.com/commercialhaskell/stack/issues/792
             , [" (" ++ $gitCommitCount ++ " commits)" | $gitCommitCount /= ("1"::String) &&
                                                         $gitCommitCount /= ("UNKNOWN" :: String)]
-            , [" ", show buildArch]
+            , [" ", display buildArch]
             ]
 
      let numericVersion :: Parser (a -> a)
