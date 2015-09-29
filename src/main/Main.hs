@@ -854,12 +854,12 @@ execCmd ExecOpts {..} go@GlobalOpts{..} = do
 
 -- | Evaluate some haskell code inline.
 evalCmd :: EvalOpts -> GlobalOpts -> IO ()
-evalCmd eopts go@GlobalOpts {..} = execCmd execOpts go
+evalCmd EvalOpts {..} go@GlobalOpts {..} = execCmd execOpts go
     where
       execOpts =
           ExecOpts { eoCmd = Just "ghc"
-                   , eoArgs = ["-e", evalArg eopts]
-                   , eoExtra = evalExtra eopts
+                   , eoArgs = ["-e", evalArg]
+                   , eoExtra = evalExtra
                    }
 
 -- | Run GHCi in the context of a project.

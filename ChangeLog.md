@@ -13,6 +13,7 @@ Major changes:
     * `~/.stack/global` --> `~/.stack/global-project`
     * `/etc/stack/config` --> `/etc/stack/config.yaml`
     * Old locations still supported, with deprecation warnings
+* New command "stack eval CODE", which evaluates to "stack exec ghc -- -e CODE".
 
 Other enhancements:
 
