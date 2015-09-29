@@ -9,6 +9,7 @@ module Stack.Options
     ,dockerCleanupOptsParser
     ,dotOptsParser
     ,execOptsParser
+    ,evalOptsParser
     ,globalOptsParser
     ,initOptsParser
     ,newOptsParser
@@ -455,18 +456,32 @@ execOptsParser mcmd =
     ExecOpts
         <$> pure mcmd
         <*> eoArgsParser
-        <*> (eoPlainParser <|>
-             ExecOptsEmbellished
-                <$> eoEnvSettingsParser
-                <*> eoPackagesParser)
+        <*> execOptsExtraParser
   where
     eoArgsParser :: Parser [String]
     eoArgsParser = many (strArgument (metavar meta))
       where
-        meta =
-            (maybe ("CMD ") (const "") mcmd) ++
-            "-- ARGS (e.g. stack ghc -- X.hs -o x)"
+        meta = (maybe ("CMD ") (const "") mcmd) ++
+               "-- ARGS (e.g. stack ghc -- X.hs -o x)"
 
+evalOptsParser :: Maybe String -- ^ metavar
+               -> Parser EvalOpts
+evalOptsParser mmeta =
+    EvalOpts
+        <$> eoArgsParser
+        <*> execOptsExtraParser
+  where
+    eoArgsParser :: Parser String
+    eoArgsParser = strArgument (metavar meta)
+    meta = maybe ("CODE") id mmeta
+
+-- | Parser for extra options to exec command
+execOptsExtraParser :: Parser ExecOptsExtra
+execOptsExtraParser = eoPlainParser <|>
+                      ExecOptsEmbellished
+                         <$> eoEnvSettingsParser
+                         <*> eoPackagesParser
+  where
     eoEnvSettingsParser :: Parser EnvSettings
     eoEnvSettingsParser = EnvSettings
         <$> pure True

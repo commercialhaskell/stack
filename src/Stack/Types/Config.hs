@@ -226,6 +226,12 @@ data ExecOptsExtra
         { eoEnvSettings :: !EnvSettings
         , eoPackages :: ![String]
         }
+
+data EvalOpts = EvalOpts
+    { evalArg :: !String
+    , evalExtra :: !ExecOptsExtra
+    }
+
 -- | Parsed global command-line options.
 data GlobalOpts = GlobalOpts
     { globalReExec       :: !Bool

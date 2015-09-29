@@ -285,6 +285,10 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                         "Run runghc"
                         execCmd
                         (execOptsParser $ Just "runghc")
+             addCommand "eval"
+                        "Evaluate some haskell code inline. Shortcut for 'stack exec ghc -- -e CODE'"
+                        evalCmd
+                        (evalOptsParser $ Just "CODE") -- metavar = "CODE"
              addCommand "clean"
                         "Clean the local packages"
                         cleanCmd
@@ -848,6 +852,16 @@ execCmd ExecOpts {..} go@GlobalOpts{..} = do
                        }
                munlockFile lk -- Unlock before transferring control away.
                exec eoEnvSettings cmd args
+
+-- | Evaluate some haskell code inline.
+evalCmd :: EvalOpts -> GlobalOpts -> IO ()
+evalCmd EvalOpts {..} go@GlobalOpts {..} = execCmd execOpts go
+    where
+      execOpts =
+          ExecOpts { eoCmd = Just "ghc"
+                   , eoArgs = ["-e", evalArg]
+                   , eoExtra = evalExtra
+                   }
 
 -- | Run GHCi in the context of a project.
 ghciCmd :: GhciOpts -> GlobalOpts -> IO ()
