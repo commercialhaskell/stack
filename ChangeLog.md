@@ -21,6 +21,7 @@ Other enhancements:
   can still get this behavior by running the following yourself:
   `stack exec -- pacman -Sy --noconfirm git`.
 * Typing enter during --file-watch triggers a rebuild [#1023](https://github.com/commercialhaskell/stack/pull/1023)
+* Use Haddock's `--hyperlinked-source` (crosslinked source), if available [#1070](https://github.com/commercialhaskell/stack/pull/1070)
 
 Bug fixes:
 
