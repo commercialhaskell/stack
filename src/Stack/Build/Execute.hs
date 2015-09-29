@@ -603,7 +603,6 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp = do
             return $ case mpath of
                 Nothing -> []
                 Just x -> return $ concat ["--with-", name, "=", toFilePath x]
-        liftIO $ print exes
         cabal False $ "configure" : concat
             [ concat exes
             , dirs
