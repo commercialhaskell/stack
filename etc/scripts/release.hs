@@ -351,7 +351,7 @@ rules global@Global{..} args = do
 
     writeBashCompletion stagedStackExeFile stageDir out = do
         need [stagedStackExeFile]
-        (Stdout bashCompletionScript) <- cmd [stagedStackExeFile] "--bash-completion-script" [dropDirectoryPrefix stageDir stagedStackExeFile]
+        (Stdout bashCompletionScript) <- cmd [stagedStackExeFile] "--bash-completion-script" ["/" ++ dropDirectoryPrefix stageDir stagedStackExeFile]
         writeFileChanged out bashCompletionScript
 
     getBinaryPkgStageFiles = do
