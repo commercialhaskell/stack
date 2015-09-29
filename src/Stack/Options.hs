@@ -4,6 +4,7 @@ module Stack.Options
     (Command(..)
     ,benchOptsParser
     ,buildOptsParser
+    ,configCmdSetParser
     ,configOptsParser
     ,dockerOptsParser
     ,dockerCleanupOptsParser
@@ -36,8 +37,9 @@ import           Data.Text.Read (decimal)
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Simple
-import           Options.Applicative.Types (readerAsk)
+import           Options.Applicative.Types (fromM, oneM, readerAsk)
 import           Stack.Config (packagesParser)
+import           Stack.ConfigCmd
 import           Stack.Constants (stackProgName)
 import           Stack.Docker
 import qualified Stack.Docker as Docker
@@ -701,5 +703,27 @@ pvpBoundsOption =
     readPvpBounds = do
         s <- readerAsk
         case parsePvpBounds $ T.pack s of
-            Left e -> readerError e
-            Right v -> return v
+            Left e ->
+                readerError e
+            Right v ->
+                return v
+
+configCmdSetParser :: Parser ConfigCmdSet
+configCmdSetParser =
+    fromM
+        (do field <-
+                oneM
+                    (strArgument
+                         (metavar "FIELD VALUE"))
+            oneM (fieldToValParser field))
+  where
+    fieldToValParser :: String -> Parser ConfigCmdSet
+    fieldToValParser s = do
+        case s of
+            "resolver" ->
+                ConfigCmdSetResolver <$>
+                argument
+                    readAbstractResolver
+                    idm
+            _ ->
+                error "parse stack config set field: only set resolver is implemented"

@@ -71,3 +71,17 @@ copy :: FilePath -> FilePath -> IO ()
 copy src dest = do
     putStrLn ("Copy " ++ show src ++ " to " ++ show dest)
     System.Directory.copyFile src dest
+
+fileContentsMatch :: FilePath -> FilePath -> IO ()
+fileContentsMatch f1 f2 = do
+    doesExist f1
+    doesExist f2
+    f1Contents <- readFile f1
+    f2Contents <- readFile f2
+    if f1Contents == f2Contents
+          then return ()
+          else error
+                   ("contents do not match for " ++
+                    show f1 ++
+                    " " ++
+                    show f2)
