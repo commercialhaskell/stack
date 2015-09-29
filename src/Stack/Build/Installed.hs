@@ -81,15 +81,15 @@ getInstalled menv opts sourceMap = do
 
     let loadDatabase' = loadDatabase menv opts mcache sourceMap
 
-    (installedLibs0, globalInstalled) <- loadDatabase' [] Nothing []
+    (installedLibs0, globalInstalled) <- loadDatabase' Nothing []
     (installedLibs1, _extraInstalled) <-
-      (snd <$> (foldM (\(prevDBs, lhs') pkgdb -> do
-        lhs'' <- loadDatabase' prevDBs (Just (ExtraGlobal, pkgdb)) (fst lhs')
-        return (prevDBs ++ [pkgdb], lhs'')) ([], (installedLibs0, globalInstalled)) extraDBPaths))
+      (foldM (\lhs' pkgdb -> do
+        lhs'' <- loadDatabase' (Just (ExtraGlobal, pkgdb)) (fst lhs')
+        return lhs'') ((installedLibs0, globalInstalled)) extraDBPaths)
     (installedLibs2, _snapInstalled) <-
-        loadDatabase' extraDBPaths (Just (InstalledTo Snap, snapDBPath)) installedLibs1
+        loadDatabase' (Just (InstalledTo Snap, snapDBPath)) installedLibs1
     (installedLibs3, localInstalled) <-
-        loadDatabase' extraDBPaths (Just (InstalledTo Local, localDBPath)) installedLibs2
+        loadDatabase' (Just (InstalledTo Local, localDBPath)) installedLibs2
     let installedLibs = M.fromList $ map lhPair installedLibs3
 
     case mcache of
@@ -133,13 +133,12 @@ loadDatabase :: (M env m, PackageInstallInfo pii)
              -> GetInstalledOpts
              -> Maybe InstalledCache -- ^ if Just, profiling or haddock is required
              -> Map PackageName pii -- ^ to determine which installed things we should include
-             -> [Path Abs Dir] -- ^ extra package databases this database depends on
              -> Maybe (InstalledPackageLocation, Path Abs Dir) -- ^ package database, Nothing for global
              -> [LoadHelper] -- ^ from parent databases
              -> m ([LoadHelper], [DumpPackage () ()])
-loadDatabase menv opts mcache sourceMap extraDBs mdb lhs0 = do
+loadDatabase menv opts mcache sourceMap mdb lhs0 = do
     wc <- getWhichCompiler
-    (lhs1, dps) <- ghcPkgDump menv wc (extraDBs ++ (fmap snd (maybeToList mdb)))
+    (lhs1, dps) <- ghcPkgDump menv wc (fmap snd (maybeToList mdb))
                 $ conduitDumpPackage =$ sink
 
     let lhs = pruneDeps
