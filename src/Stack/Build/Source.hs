@@ -182,18 +182,16 @@ parseTargetsFromBuildOpts needTargets bopts = do
         (bcExtraDeps bconfig)
         (catMaybes $ Map.keys $ boptsFlags bopts)
 
-    let extraDeps' = flagExtraDeps <> bcExtraDeps bconfig
-
-    (_cliExtraDeps, targets) <-
+    (cliExtraDeps, targets) <-
         parseTargets
             needTargets
             (bcImplicitGlobal bconfig)
             snapshot
-            extraDeps'
+            (flagExtraDeps <> bcExtraDeps bconfig)
             (fst <$> rawLocals)
             workingDir
             (boptsTargets bopts)
-    return (mbp0, extraDeps', targets)
+    return (mbp0, cliExtraDeps <> flagExtraDeps, targets)
 
 -- | For every package in the snapshot which is referenced by a flag, give the
 -- user a warning and then add it to extra-deps.
