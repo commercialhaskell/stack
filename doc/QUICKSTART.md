@@ -1,6 +1,9 @@
 # `stack` Quick Start Guide
 
-Start your new project:
+If not already done you first need to
+[install `stack`](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md).
+
+## Start your new project:
 
 ~~~ {.bash}
 stack new my-project
