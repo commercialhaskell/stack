@@ -718,9 +718,6 @@ modTime x =
         , toRational
               (utctDayTime x))
 
-data Installed = Library PackageIdentifier GhcPkgId | Executable PackageIdentifier
-    deriving (Show, Eq, Ord)
-
 -- | Configure options to be sent to Setup.hs configure
 data ConfigureOpts = ConfigureOpts
     { coDirs :: ![String]

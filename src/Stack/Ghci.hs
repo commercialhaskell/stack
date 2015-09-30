@@ -30,6 +30,7 @@ import           Network.HTTP.Client.Conduit
 import           Path
 import           Prelude
 import           Stack.Build
+import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Build.Target
 import           Stack.Constants
@@ -177,6 +178,14 @@ ghciSetup mainIs stringTargets = do
     let bopts = makeBuildOpts targets
     econfig <- asks getEnvConfig
     (realTargets,_,_,_,sourceMap) <- loadSourceMap AllowNoTargets bopts
+    menv <- getMinimalEnvOverride
+    (installedMap, _, _) <- getInstalled
+        menv
+        GetInstalledOpts
+            { getInstalledProfiling = False
+            , getInstalledHaddock   = False
+            }
+        sourceMap
     locals <-
         liftM catMaybes $
         forM (M.toList (envConfigPackages econfig)) $
@@ -192,7 +201,7 @@ ghciSetup mainIs stringTargets = do
     infos <-
         forM locals $
         \(name,(cabalfp,components)) ->
-             makeGhciPkgInfo sourceMap (map fst locals) name cabalfp components
+             makeGhciPkgInfo sourceMap installedMap (map fst locals) name cabalfp components
     unless (M.null realTargets) (build (const (return ())) Nothing bopts)
     return (realTargets, mainIsTargets, infos)
   where
@@ -231,12 +240,13 @@ ghciSetup mainIs stringTargets = do
 makeGhciPkgInfo
     :: (MonadReader r m, HasEnvConfig r, MonadLogger m, MonadIO m, MonadCatch m)
     => SourceMap
+    -> InstalledMap
     -> [PackageName]
     -> PackageName
     -> Path Abs File
     -> SimpleTarget
     -> m GhciPkgInfo
-makeGhciPkgInfo sourceMap locals name cabalfp components = do
+makeGhciPkgInfo sourceMap installedMap locals name cabalfp components = do
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
     let config =
@@ -250,7 +260,7 @@ makeGhciPkgInfo sourceMap locals name cabalfp components = do
     (warnings,pkg) <- readPackage config cabalfp
     mapM_ (printCabalFileWarning cabalfp) warnings
     (componentsModules,componentFiles,componentsOpts,generalOpts) <-
-        getPackageOpts (packageOpts pkg) sourceMap locals cabalfp
+        getPackageOpts (packageOpts pkg) sourceMap installedMap locals cabalfp
     let filterWithinWantedComponents m =
             M.elems
                 (M.filterWithKey

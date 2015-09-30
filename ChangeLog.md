@@ -29,6 +29,7 @@ Bug fixes:
 * Fix quoting of output failed command line arguments
 * Mark executable-only packages as installed when copied from cache [#1043](https://github.com/commercialhaskell/stack/pull/1043)
 * Canonicalize temporary directory paths [#1047](https://github.com/commercialhaskell/stack/pull/1047)
+* Pass -package-id to ghci [#867](https://github.com/commercialhaskell/stack/issues/867)
 
 ## 0.1.5.0
 
