@@ -1135,6 +1135,8 @@ instance FromJSON (SetupInfo, [JSONWarning]) where
         tellJSONField "portable-git"
         return SetupInfo {..}
 
+-- | For @siGHCs@ and @siGHCJSs@ fields maps are deeply merged.
+-- For all fields the values from the last @SetupInfo@ win.
 instance Monoid SetupInfo where
     mempty =
         SetupInfo
@@ -1146,11 +1148,11 @@ instance Monoid SetupInfo where
         }
     mappend l r =
         SetupInfo
-        { siSevenzExe = siSevenzExe l <|> siSevenzExe r
-        , siSevenzDll = siSevenzDll l <|> siSevenzDll r
-        , siMsys2 = siMsys2 l <> siMsys2 r
-        , siGHCs = siGHCs l <> siGHCs r
-        , siGHCJSs = siGHCJSs l <> siGHCJSs r }
+        { siSevenzExe = siSevenzExe r <|> siSevenzExe l
+        , siSevenzDll = siSevenzDll r <|> siSevenzDll l
+        , siMsys2 = siMsys2 r <> siMsys2 l
+        , siGHCs = Map.unionWith (<>) (siGHCs r) (siGHCs l)
+        , siGHCJSs = Map.unionWith (<>) (siGHCJSs r) (siGHCJSs l) }
 
 -- | Remote or inline 'SetupInfo'
 data SetupInfoLocation
