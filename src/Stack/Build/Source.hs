@@ -80,7 +80,6 @@ loadSourceMap needTargets bopts = do
     bconfig <- asks getBuildConfig
     rawLocals <- getLocalPackageViews
     (mbp0, cliExtraDeps, targets) <- parseTargetsFromBuildOpts needTargets bopts
-
     menv <- getMinimalEnvOverride
     caches <- getPackageCaches menv
     let latestVersion = Map.fromListWith max $ map toTuple $ Map.keys caches

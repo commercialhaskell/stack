@@ -122,12 +122,14 @@ mkBaseConfigOpts bopts = do
     localDBPath <- packageDatabaseLocal
     snapInstallRoot <- installationRootDeps
     localInstallRoot <- installationRootLocal
+    packageExtraDBs <- packageDatabaseExtra
     return BaseConfigOpts
         { bcoSnapDB = snapDBPath
         , bcoLocalDB = localDBPath
         , bcoSnapInstallRoot = snapInstallRoot
         , bcoLocalInstallRoot = localInstallRoot
         , bcoBuildOpts = bopts
+        , bcoExtraDBs = packageExtraDBs
         }
 
 -- | Provide a function for loading package information from the package index

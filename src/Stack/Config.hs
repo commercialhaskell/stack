@@ -322,6 +322,7 @@ loadBuildConfig mproject config mresolver = do
                            , projectExtraDeps = mempty
                            , projectFlags = mempty
                            , projectResolver = r
+                           , projectExtraPackageDBs = []
                            }
                    liftIO $ do
                        S.writeFile dest' $ S.concat
@@ -355,12 +356,15 @@ loadBuildConfig mproject config mresolver = do
                 return $ mbpCompilerVersion mbp
             ResolverCompiler wantedCompiler -> return wantedCompiler
 
+    extraPackageDBs <- mapM parseRelAsAbsDir (projectExtraPackageDBs project)
+
     return BuildConfig
         { bcConfig = config
         , bcResolver = projectResolver project
         , bcWantedCompiler = wantedCompiler
         , bcPackageEntries = projectPackages project
         , bcExtraDeps = projectExtraDeps project
+        , bcExtraPackageDBs = extraPackageDBs
         , bcStackYaml = stackYamlFP
         , bcFlags = projectFlags project
         , bcImplicitGlobal = isNothing mproject

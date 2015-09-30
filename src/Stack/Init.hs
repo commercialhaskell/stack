@@ -14,9 +14,9 @@ module Stack.Init
     ) where
 
 import           Control.Exception               (assert)
-import           Control.Exception.Enclosed      (handleIO, catchAny)
+import           Control.Exception.Enclosed      (catchAny, handleIO)
 import           Control.Monad                   (liftM, when)
-import           Control.Monad.Catch             (MonadMask, throwM, MonadThrow)
+import           Control.Monad.Catch             (MonadMask, MonadThrow, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader            (MonadReader, asks)
@@ -94,6 +94,7 @@ initProject currDir initOpts = do
             , projectExtraDeps = extraDeps
             , projectFlags = flags
             , projectResolver = r
+            , projectExtraPackageDBs = []
             }
         pkgs = map toPkg cabalfps
         toPkg fp = PackageEntry
@@ -250,7 +251,7 @@ getRecommendedSnapshots snapshots pref = do
         PrefNightly -> return $ namesNightly ++ namesLTS
 
 data InitOpts = InitOpts
-    { ioMethod :: !Method
+    { ioMethod       :: !Method
     -- ^ Preferred snapshots
     , forceOverwrite :: Bool
     -- ^ Overwrite existing files
