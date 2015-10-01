@@ -56,6 +56,7 @@ library
                      Stack.Image
                      Stack.SDist
                      Stack.Setup
+                     Stack.Setup.Installed
                      Stack.Solver
                      Stack.Types
                      Stack.Types.Internal

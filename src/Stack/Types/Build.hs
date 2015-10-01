@@ -117,6 +117,8 @@ data StackBuildException
   | InvalidFlagSpecification (Set UnusedFlags)
   | TargetParseException [Text]
   | DuplicateLocalPackageNames [(PackageName, [Path Abs Dir])]
+  | SolverMissingCabalInstall
+  | SolverMissingGHC
   deriving Typeable
 
 data FlagSource = FSCommandLine | FSStackYaml
@@ -315,6 +317,14 @@ instance Show StackBuildException where
             : (packageNameString name ++ " used in:")
             : map goDir dirs
         goDir dir = "- " ++ toFilePath dir
+    show SolverMissingCabalInstall = unlines
+        [ "Solver requires that cabal be on your PATH"
+        , "Try running 'stack install cabal-install'"
+        ]
+    show SolverMissingGHC = unlines
+        [ "Solver requires that GHC be on your PATH"
+        , "Try running 'stack setup'"
+        ]
 
 instance Exception StackBuildException
 

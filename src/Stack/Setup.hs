@@ -70,7 +70,7 @@ import           Stack.Config (resolvePackageEntry)
 import           Stack.Constants (distRelativeDir)
 import           Stack.Fetch
 import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath)
-import           Stack.Solver (getCompilerVersion)
+import           Stack.Setup.Installed
 import           Stack.Types
 import           Stack.Types.StackT
 import qualified System.Directory as D
@@ -293,18 +293,6 @@ addIncludeLib (ExtraDirs _bins includes libs) config = config
         (configExtraLibDirs config)
         (Set.fromList $ map T.pack libs)
     }
-
-data ExtraDirs = ExtraDirs
-    { edBins :: ![FilePath]
-    , edInclude :: ![FilePath]
-    , edLib :: ![FilePath]
-    }
-instance Monoid ExtraDirs where
-    mempty = ExtraDirs [] [] []
-    mappend (ExtraDirs a b c) (ExtraDirs x y z) = ExtraDirs
-        (a ++ x)
-        (b ++ y)
-        (c ++ z)
 
 -- | Ensure compiler (ghc or ghcjs) is installed and provide the PATHs to add if necessary
 ensureCompiler :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, HasGHCVariant env, MonadBaseControl IO m)
@@ -547,104 +535,6 @@ getSetupInfo sopts manager = do
         when (urlOrFile /= defaultStackSetupYaml) $
             logJSONWarnings urlOrFile warnings
         return si
-
-data Tool
-    = Tool PackageIdentifier -- ^ e.g. ghc-7.8.4, msys2-20150512
-    | ToolGhcjs CompilerVersion -- ^ e.g. ghcjs-0.1.0_ghc-7.10.2
-
-toolString :: Tool -> String
-toolString (Tool ident) = packageIdentifierString ident
-toolString (ToolGhcjs cv) = compilerVersionString cv
-
-toolNameString :: Tool -> String
-toolNameString (Tool ident) = packageNameString $ packageIdentifierName ident
-toolNameString ToolGhcjs{} = "ghcjs"
-
-parseToolText :: Text -> Maybe Tool
-parseToolText (parseCompilerVersion -> Just (cv@GhcjsVersion{})) = Just (ToolGhcjs cv)
-parseToolText (parsePackageIdentifierFromString . T.unpack -> Just pkgId) = Just (Tool pkgId)
-parseToolText _ = Nothing
-
-markInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
-              => Tool
-              -> m ()
-markInstalled tool = do
-    dir <- asks $ configLocalPrograms . getConfig
-    fpRel <- parseRelFile $ toolString tool ++ ".installed"
-    liftIO $ writeFile (toFilePath $ dir </> fpRel) "installed"
-
-unmarkInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
-                => Tool
-                -> m ()
-unmarkInstalled tool = do
-    dir <- asks $ configLocalPrograms . getConfig
-    fpRel <- parseRelFile $ toolString tool ++ ".installed"
-    removeFileIfExists $ dir </> fpRel
-
-listInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
-              => m [Tool]
-listInstalled = do
-    dir <- asks $ configLocalPrograms . getConfig
-    createTree dir
-    (_, files) <- listDirectory dir
-    return $ mapMaybe toTool files
-  where
-    toTool fp = do
-        x <- T.stripSuffix ".installed" $ T.pack $ toFilePath $ filename fp
-        parseToolText x
-
-installDir :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
-           => Tool
-           -> m (Path Abs Dir)
-installDir tool = do
-    config <- asks getConfig
-    reldir <- parseRelDir $ toolString tool
-    return $ configLocalPrograms config </> reldir
-
--- | Binary directories for the given installed package
-extraDirs :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
-          => Tool
-          -> m ExtraDirs
-extraDirs tool = do
-    platform <- asks getPlatform
-    dir <- installDir tool
-    case (platform, toolNameString tool) of
-        (Platform _ Cabal.Windows, isGHC -> True) -> return mempty
-            { edBins = goList
-                [ dir </> $(mkRelDir "bin")
-                , dir </> $(mkRelDir "mingw") </> $(mkRelDir "bin")
-                ]
-            }
-        (Platform _ Cabal.Windows, "msys2") -> return mempty
-            { edBins = goList
-                [ dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
-                ]
-            , edInclude = goList
-                [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "include")
-                , dir </> $(mkRelDir "mingw32") </> $(mkRelDir "include")
-                ]
-            , edLib = goList
-                [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "lib")
-                , dir </> $(mkRelDir "mingw32") </> $(mkRelDir "lib")
-                ]
-            }
-        (_, isGHC -> True) -> return mempty
-            { edBins = goList
-                [ dir </> $(mkRelDir "bin")
-                ]
-            }
-        (_, isGHCJS -> True) -> return mempty
-            { edBins = goList
-                [ dir </> $(mkRelDir "bin")
-                ]
-            }
-        (Platform _ x, toolName) -> do
-            $logWarn $ "binDirs: unexpected OS/tool combo: " <> T.pack (show (x, toolName))
-            return mempty
-  where
-    goList = map toFilePathNoTrailingSlash
-    isGHC n = "ghc" == n || "ghc-" `isPrefixOf` n
-    isGHCJS n = "ghcjs" == n
 
 getInstalledTool :: [Tool]            -- ^ already installed
                  -> PackageName       -- ^ package to find
