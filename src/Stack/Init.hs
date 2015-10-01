@@ -142,6 +142,7 @@ renderStackYaml p =
         , ("packages", "Local packages, usually specified by relative directory name")
         , ("extra-deps", "Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)")
         , ("flags", "Override default flag values for local packages and extra-deps")
+        , ("extra-package-dbs", "Extra package databases containing global packages")
         ]
 
     goComment o (name, comment) =
