@@ -1722,8 +1722,9 @@ The following command installs with profiling enabled:
 
 This command will allow you to use various tools profile the time, allocation,
 heap, and more of a program. The `-prof` GHC option is unnecessary and will
-result in a warning. To see a general overview of the time and allocation of a
-program called `main` compiled with the above command, you can run
+result in a warning. Additional compiling options can be added to
+`--ghc-options` if needed. To see a general overview of the time and allocation
+of a program called `main` compiled with the above command, you can run
 
 `./main +RTS -p`
 
