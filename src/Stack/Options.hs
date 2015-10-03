@@ -665,7 +665,8 @@ newOptsParser = (,) <$> newOpts <*> initOptsParser
             (metavar "PACKAGE_NAME" <> help "A valid package name.") <*>
         templateNameArgument
             (metavar "TEMPLATE_NAME" <>
-             help "Name of a template, for example: foo or foo.hsfiles" <>
+             help "Name of a template or a local template in a subdirectory,\
+                  \ for example: foo or foo.hsfiles" <>
              value defaultTemplateName) <*>
         fmap
             M.fromList
