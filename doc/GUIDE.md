@@ -1721,8 +1721,9 @@ The following command installs with profiling enabled:
 --ghc-options="-rtsopts"`
 
 This command will allow you to use various tools profile the time, allocation,
-heap, and more of a program. To see a general overview of the time and
-allocation of a program compiled with the above command, you can run
+heap, and more of a program. The `-prof` GHC option is unnecessary and will
+result in a warning. To see a general overview of the time and allocation of a
+program called `main` compiled with the above command, you can run
 
 `./main +RTS -p`
 
