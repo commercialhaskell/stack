@@ -333,10 +333,9 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
 -- support others later).
 pathCmd :: [Text] -> GlobalOpts -> IO ()
 pathCmd keys go =
-    withBuildConfigAndLock
+    withBuildConfig
         go
-        (\_ ->
-         do env <- ask
+        (do env <- ask
             let cfg = envConfig env
                 bc = envConfigBuildConfig cfg
             menv <- getMinimalEnvOverride
