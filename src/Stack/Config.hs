@@ -186,6 +186,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mproject configMonoi
          configSetupInfoLocations = configMonoidSetupInfoLocations
          configPvpBounds = fromMaybe PvpBoundsNone configMonoidPvpBounds
          configModifyCodePage = fromMaybe True configMonoidModifyCodePage
+         configExplicitSetupDeps = configMonoidExplicitSetupDeps
 
      return Config {..}
 

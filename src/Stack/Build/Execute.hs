@@ -707,7 +707,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                                           eeCabalPkgVer)
                 packageArgs =
                     case mdeps of
-                        Just deps ->
+                        Just deps | explicitSetupDeps (packageName package) config ->
                             -- Stack always builds with the global Cabal for various
                             -- reproducibility issues.
                             let depsMinusCabal
@@ -736,13 +736,15 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         -- 2. This doesn't provide enough packages: we should also
                         -- include the local database when building local packages.
                         --
-                        -- Currently, this branch is only taken via `stack sdist`.
-                        Nothing ->
-                            [ cabalPackageArg
-                            , "-clear-package-db"
-                            , "-global-package-db"
-                            , "-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts)
-                            ]
+                        -- Currently, this branch is only taken via `stack
+                        -- sdist` or when explicitly requested in the
+                        -- stack.yaml file.
+                        _ ->
+                              cabalPackageArg
+                            : "-clear-package-db"
+                            : "-global-package-db"
+                            : "-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts)
+                            : map (("-package-db=" ++) . toFilePath) (bcoExtraDBs eeBaseConfigOpts)
 
                 setupArgs = ("--builddir=" ++ toFilePath distRelativeDir') : args
                 runExe exeName fullArgs = do

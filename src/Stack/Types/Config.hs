@@ -143,6 +143,8 @@ data Config =
          -- ^ How PVP upper bounds should be added to packages
          ,configModifyCodePage      :: !Bool
          -- ^ Force the code page to UTF-8 on Windows
+         ,configExplicitSetupDeps   :: !(Map (Maybe PackageName) Bool)
+         -- ^ See 'explicitSetupDeps'. 'Nothing' provides the default value.
          }
 
 -- | Information on a single package index
@@ -578,6 +580,8 @@ data ConfigMonoid =
     -- ^ See 'configPvpBounds'
     ,configMonoidModifyCodePage      :: !(Maybe Bool)
     -- ^ See 'configModifyCodePage'
+    ,configMonoidExplicitSetupDeps   :: !(Map (Maybe PackageName) Bool)
+    -- ^ See 'configExplicitSetupDeps'
     }
   deriving Show
 
@@ -610,6 +614,7 @@ instance Monoid ConfigMonoid where
     , configMonoidSetupInfoLocations = mempty
     , configMonoidPvpBounds = Nothing
     , configMonoidModifyCodePage = Nothing
+    , configMonoidExplicitSetupDeps = mempty
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -640,6 +645,7 @@ instance Monoid ConfigMonoid where
     , configMonoidSetupInfoLocations = configMonoidSetupInfoLocations l ++ configMonoidSetupInfoLocations r
     , configMonoidPvpBounds = configMonoidPvpBounds l <|> configMonoidPvpBounds r
     , configMonoidModifyCodePage = configMonoidModifyCodePage l <|> configMonoidModifyCodePage r
+    , configMonoidExplicitSetupDeps = configMonoidExplicitSetupDeps l <> configMonoidExplicitSetupDeps r
     }
 
 instance FromJSON (ConfigMonoid, [JSONWarning]) where
@@ -696,6 +702,9 @@ parseConfigMonoidJSON obj = do
 
     configMonoidPvpBounds <- obj ..:? "pvp-bounds"
     configMonoidModifyCodePage <- obj ..:? "modify-code-page"
+    configMonoidExplicitSetupDeps <-
+        (obj ..:? "explicit-setup-deps" ..!= mempty)
+        >>= fmap Map.fromList . mapM handleExplicitSetupDep . Map.toList
 
     return ConfigMonoid {..}
   where
@@ -711,6 +720,16 @@ parseConfigMonoidJSON obj = do
         case parseArgs Escaping vals' of
             Left e -> fail e
             Right vals -> return (name, map T.pack vals)
+
+    handleExplicitSetupDep :: Monad m => (Text, Bool) -> m (Maybe PackageName, Bool)
+    handleExplicitSetupDep (name', b) = do
+        name <-
+            if name' == "*"
+                then return Nothing
+                else case parsePackageNameFromString $ T.unpack name' of
+                        Left e -> fail $ show e
+                        Right x -> return $ Just x
+        return (name, b)
 
 -- | Newtype for non-orphan FromJSON instance.
 newtype VersionRangeJSON = VersionRangeJSON { unVersionRangeJSON :: VersionRange }
@@ -1202,3 +1221,17 @@ instance ToJSON PvpBounds where
   toJSON = toJSON . pvpBoundsText
 instance FromJSON PvpBounds where
   parseJSON = withText "PvpBounds" (either fail return . parsePvpBounds)
+
+-- | Provide an explicit list of package dependencies when running a custom Setup.hs
+explicitSetupDeps :: (MonadReader env m, HasConfig env) => PackageName -> m Bool
+explicitSetupDeps name = do
+    m <- asks $ configExplicitSetupDeps . getConfig
+    return $
+        -- Yes there are far cleverer ways to write this. I honestly consider
+        -- the explicit pattern matching much easier to parse at a glance.
+        case Map.lookup (Just name) m of
+            Just b -> b
+            Nothing ->
+                case Map.lookup Nothing m of
+                    Just b -> b
+                    Nothing -> True -- default value
