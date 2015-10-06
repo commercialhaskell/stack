@@ -991,8 +991,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                              "found on PATH (use 'stack install hscolour' to install).")
                         return ["--hyperlink-source" | hscolourExists]
             cabal False (concat [["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
-                                ,sourceFlag
-                                ,["--ghcjs" | wc == Ghcjs]])
+                                ,sourceFlag])
 
         withMVar eeInstallLock $ \() -> do
             announce "install"
