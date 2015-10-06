@@ -503,7 +503,7 @@ setupParser = SetupCmdOpts
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
-  withUserFileLock (configStackRoot $ lcConfig lc) $ \lk ->
+  withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
    runStackTGlobal manager (lcConfig lc) go $
       Docker.reexecWithOptionalContainer
           (lcProjectRoot lc)
@@ -563,10 +563,11 @@ munlockFile (Just lk) = liftIO $ unlockFile lk
 -- this to an even more fine-grain locking approach.
 --
 withUserFileLock :: (MonadBaseControl IO m, MonadIO m)
-                 => Path Abs Dir
+                 => GlobalOpts
+                 -> Path Abs Dir
                  -> (Maybe FileLock -> m a)
                  -> m a
-withUserFileLock dir act = do
+withUserFileLock go@GlobalOpts{} dir act = do
     env <- liftIO getEnvironment
     let toLock = lookup "STACK_LOCK" env == Just "true"
     if toLock
@@ -582,12 +583,15 @@ withUserFileLock dir act = do
                         case fstTry of
                           Just lk -> EL.finally (act $ Just lk) (liftIO $ unlockFile lk)
                           Nothing ->
-                            do liftIO $ hPutStrLn stderr $ "Failed to grab lock ("++show pth++
-                                                   "); other stack instance running.  Waiting..."
+                            do let chatter = globalLogLevel go /= LevelOther "silent"
+                               when chatter $
+                                 liftIO $ hPutStrLn stderr $ "Failed to grab lock ("++show pth++
+                                                     "); other stack instance running.  Waiting..."
                                EL.bracket (liftIO $ lockFile (toFilePath pth) Exclusive)
                                           (liftIO . unlockFile)
                                           (\lk -> do
-                                            liftIO $ hPutStrLn stderr "Lock acquired, proceeding."
+                                            when chatter $
+                                              liftIO $ hPutStrLn stderr "Lock acquired, proceeding."
                                             act $ Just lk))
         else act Nothing
 
@@ -596,7 +600,7 @@ withConfigAndLock :: GlobalOpts
            -> IO ()
 withConfigAndLock go@GlobalOpts{..} inner = do
     (manager, lc) <- loadConfigWithOpts go
-    withUserFileLock (configStackRoot $ lcConfig lc) $ \lk ->
+    withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
      runStackTGlobal manager (lcConfig lc) go $
         Docker.reexecWithOptionalContainer (lcProjectRoot lc)
             Nothing
@@ -638,7 +642,7 @@ withBuildConfigExt
 withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
     (manager, lc) <- loadConfigWithOpts go
 
-    withUserFileLock (configStackRoot $ lcConfig lc) $ \lk0 -> do
+    withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk0 -> do
       -- A local bit of state for communication between callbacks:
       curLk <- newIORef lk0
       let inner' lk =
@@ -647,7 +651,7 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
             -- trade in the lock here.
             do dir <- installationRootDeps
                -- Hand-over-hand locking:
-               withUserFileLock dir $ \lk2 -> do
+               withUserFileLock go dir $ \lk2 -> do
                  liftIO $ writeIORef curLk lk2
                  liftIO $ munlockFile lk
                  inner lk2
@@ -777,7 +781,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} = do
     case eoExtra of
         ExecOptsPlain -> do
             (manager,lc) <- liftIO $ loadConfigWithOpts go
-            withUserFileLock (configStackRoot $ lcConfig lc) $ \lk ->
+            withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
              runStackTGlobal manager (lcConfig lc) go $
                 Docker.execWithOptionalContainer
                     (lcProjectRoot lc)
@@ -855,7 +859,7 @@ dockerPullCmd :: () -> GlobalOpts -> IO ()
 dockerPullCmd _ go@GlobalOpts{..} = do
     (manager,lc) <- liftIO $ loadConfigWithOpts go
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock (configStackRoot $ lcConfig lc) $ \_ ->
+    withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
      runStackTGlobal manager (lcConfig lc) go $
        Docker.preventInContainer Docker.pull
 
@@ -864,7 +868,7 @@ dockerResetCmd :: Bool -> GlobalOpts -> IO ()
 dockerResetCmd keepHome go@GlobalOpts{..} = do
     (manager,lc) <- liftIO (loadConfigWithOpts go)
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock (configStackRoot $ lcConfig lc) $ \_ ->
+    withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
      runStackLoggingTGlobal manager go $
         Docker.preventInContainer $ Docker.reset (lcProjectRoot lc) keepHome
 
@@ -873,7 +877,7 @@ dockerCleanupCmd :: Docker.CleanupOpts -> GlobalOpts -> IO ()
 dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
     (manager,lc) <- liftIO $ loadConfigWithOpts go
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
-    withUserFileLock (configStackRoot $ lcConfig lc) $ \_ ->
+    withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
      runStackTGlobal manager (lcConfig lc) go $
         Docker.preventInContainer $
             Docker.cleanup cleanupOpts
