@@ -4,6 +4,8 @@ Binary packages are signed with this [signing key](SIGNING_KEY.md).
 
 ## Windows
 
+*Note*: Due to specific Windows limitations, [some temporary workarounds](https://www.fpcomplete.com/blog/2015/08/stack-ghc-windows) may be required. It is strongly advised to set your `STACK_ROOT` environment variable similarly to your root (e.g., `set STACK_ROOT=c:\stack_root`) *before* running `stack`.
+
 * Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest). Note: while generally i386/32-bit GHC is better tested on Windows, there are reports that recent versions of Windows only work with the 64-bit version of stack (see [issue #393](https://github.com/commercialhaskell/stack/issues/393)).
 * Unpack the archive and place `stack.exe` somewhere on your `%PATH%` (see [Path section below](#path)) and you can then run `stack` on the command line.
 * Now you can run `stack` from the terminal.
