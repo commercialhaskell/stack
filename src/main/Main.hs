@@ -13,7 +13,6 @@ module Main where
 import           Control.Exception
 import qualified Control.Exception.Lifted as EL
 import           Control.Monad hiding (mapM, forM)
-import qualified Control.Monad.Catch as Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask, asks, runReaderT)
@@ -78,51 +77,6 @@ import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclu
 import           System.FilePath (dropTrailingPathSeparator, searchPathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, Handle, hGetEncoding, hSetEncoding)
 import           System.Process.Read
-
-#ifdef WINDOWS
-import System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
-#endif
-
--- | Set the code page for this process as necessary. Only applies to Windows.
--- See: https://github.com/commercialhaskell/stack/issues/738
-fixCodePage :: (MonadIO m, Catch.MonadMask m, MonadLogger m) => m a -> m a
-#ifdef WINDOWS
-fixCodePage inner = do
-    origCPI <- liftIO getConsoleCP
-    origCPO <- liftIO getConsoleOutputCP
-
-    let setInput = origCPI /= expected
-        setOutput = origCPO /= expected
-        fixInput
-            | setInput = Catch.bracket_
-                (liftIO $ do
-                    setConsoleCP expected)
-                (liftIO $ setConsoleCP origCPI)
-            | otherwise = id
-        fixOutput
-            | setInput = Catch.bracket_
-                (liftIO $ do
-                    setConsoleOutputCP expected)
-                (liftIO $ setConsoleOutputCP origCPO)
-            | otherwise = id
-
-    case (setInput, setOutput) of
-        (False, False) -> return ()
-        (True, True) -> warn ""
-        (True, False) -> warn " input"
-        (False, True) -> warn " output"
-
-    fixInput $ fixOutput inner
-  where
-    expected = 65001 -- UTF-8
-    warn typ = $logInfo $ T.concat
-        [ "Setting"
-        , typ
-        , " codepage to UTF-8 (65001) to ensure correct output from GHC"
-        ]
-#else
-fixCodePage = id
-#endif
 
 -- | Change the character encoding of the given Handle to transliterate
 -- on unsupported characters instead of throwing an exception
@@ -735,21 +689,13 @@ buildCmd opts go = do
     NoFileWatch -> inner $ const $ return ()
   where
     inner setLocalFiles = withBuildConfigAndLock go $ \lk ->
-        globalFixCodePage go $ Stack.Build.build setLocalFiles lk opts
+        Stack.Build.build setLocalFiles lk opts
     getProjectRoot = do
         (manager, lc) <- loadConfigWithOpts go
         bconfig <-
             runStackLoggingTGlobal manager go $
             lcLoadBuildConfig lc (globalResolver go)
         return (bcRoot bconfig)
-
-globalFixCodePage :: (Catch.MonadMask m, MonadIO m, MonadLogger m)
-                  => GlobalOpts
-                  -> m a
-                  -> m a
-globalFixCodePage go
-    | globalModifyCodePage go = fixCodePage
-    | otherwise = id
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
 uninstallCmd _ go = withConfigAndLock go $ do
@@ -769,7 +715,7 @@ updateCmd () go = withConfigAndLock go $
     getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
 
 upgradeCmd :: (Bool, String) -> GlobalOpts -> IO ()
-upgradeCmd (fromGit, repo) go = withConfigAndLock go $ globalFixCodePage go $
+upgradeCmd (fromGit, repo) go = withConfigAndLock go $
     upgrade (if fromGit then Just repo else Nothing) (globalResolver go)
 
 -- | Upload to Hackage
@@ -846,7 +792,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} = do
         ExecOptsEmbellished {..} ->
            withBuildConfigAndLock go $ \lk -> do
                let targets = concatMap words eoPackages
-               unless (null targets) $ globalFixCodePage go $
+               unless (null targets) $
                    Stack.Build.build (const $ return ()) lk defaultBuildOpts
                        { boptsTargets = map T.pack targets
                        }
@@ -868,7 +814,7 @@ ghciCmd :: GhciOpts -> GlobalOpts -> IO ()
 ghciCmd ghciOpts go@GlobalOpts{..} =
   withBuildConfigAndLock go $ \lk -> do
     let packageTargets = concatMap words (ghciAdditionalPackages ghciOpts)
-    unless (null packageTargets) $ globalFixCodePage go $
+    unless (null packageTargets) $
        Stack.Build.build (const $ return ()) lk defaultBuildOpts
            { boptsTargets = map T.pack packageTargets
            }
@@ -939,8 +885,7 @@ imgDockerCmd () go@GlobalOpts{..} = do
         go
         Nothing
         (\lk ->
-              do globalFixCodePage go $
-                     Stack.Build.build
+              do Stack.Build.build
                          (const (return ()))
                          lk
                          defaultBuildOpts

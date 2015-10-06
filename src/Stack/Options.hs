@@ -218,7 +218,7 @@ readFlag = do
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser docker =
-    (\opts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin -> mempty
+    (\opts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin modifyCodePage -> mempty
         { configMonoidDockerOpts = opts
         , configMonoidSystemGHC = systemGHC
         , configMonoidInstallGHC = installGHC
@@ -231,6 +231,7 @@ configOptsParser docker =
         , configMonoidExtraLibDirs = libs
         , configMonoidSkipMsys = skipMsys
         , configMonoidLocalBinPath = localBin
+        , configMonoidModifyCodePage = modifyCodePage
         })
     <$> dockerOptsParser docker
     <*> maybeBoolFlags
@@ -281,6 +282,10 @@ configOptsParser docker =
              <> metavar "DIR"
              <> help "Install binaries to DIR"
               ))
+    <*> maybeBoolFlags
+            "modify-code-page"
+            "setting the codepage to support UTF-8 (Windows only)"
+            idm
 
 -- | Options parser configuration for Docker.
 dockerOptsParser :: Bool -> Parser DockerOptsMonoid
@@ -523,11 +528,7 @@ globalOptsParser defaultTerminal =
     optional (strOption (long "stack-yaml" <>
                          metavar "STACK-YAML" <>
                          help ("Override project stack.yaml file " <>
-                               "(overrides any STACK_YAML environment variable)"))) <*>
-    boolFlags True
-        "modify-code-page"
-        "setting the codepage to support UTF-8 (Windows only)"
-        idm
+                               "(overrides any STACK_YAML environment variable)")))
 
 initOptsParser :: Parser InitOpts
 initOptsParser =

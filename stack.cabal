@@ -178,6 +178,7 @@ library
                    , project-template >= 0.2
   if os(windows)
     cpp-options:     -DWINDOWS
+    build-depends:   Win32
   else
     build-depends:   unix >= 2.7.0.1
   default-language:  Haskell2010

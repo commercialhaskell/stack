@@ -291,3 +291,14 @@ pvp-bounds: none
 ```
 
 For more information, see [the announcement blog post](https://www.fpcomplete.com/blog/2015/09/stack-pvp).
+
+### modify-code-page
+
+(Since 0.1.6)
+
+Modify the code page for UTF-8 output when running on Windows. Default behavior
+is to modify.
+
+```yaml
+modify-code-page: false
+```

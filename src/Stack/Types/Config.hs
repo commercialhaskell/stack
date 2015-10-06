@@ -141,6 +141,8 @@ data Config =
          -- ^ Additional SetupInfo (inline or remote) to use to find tools.
          ,configPvpBounds           :: !PvpBounds
          -- ^ How PVP upper bounds should be added to packages
+         ,configModifyCodePage      :: !Bool
+         -- ^ Force the code page to UTF-8 on Windows
          }
 
 -- | Information on a single package index
@@ -240,7 +242,6 @@ data GlobalOpts = GlobalOpts
     , globalResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
     , globalTerminal     :: !Bool -- ^ We're in a terminal?
     , globalStackYaml    :: !(Maybe FilePath) -- ^ Override project stack.yaml
-    , globalModifyCodePage :: !Bool -- ^ Force the code page to UTF-8 on Windows
     } deriving (Show)
 
 -- | Either an actual resolver value, or an abstract description of one (e.g.,
@@ -575,6 +576,8 @@ data ConfigMonoid =
     -- ^ Additional setup info (inline or remote) to use for installing tools
     ,configMonoidPvpBounds           :: !(Maybe PvpBounds)
     -- ^ See 'configPvpBounds'
+    ,configMonoidModifyCodePage      :: !(Maybe Bool)
+    -- ^ See 'configModifyCodePage'
     }
   deriving Show
 
@@ -606,6 +609,7 @@ instance Monoid ConfigMonoid where
     , configMonoidExtraPath = []
     , configMonoidSetupInfoLocations = mempty
     , configMonoidPvpBounds = Nothing
+    , configMonoidModifyCodePage = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -635,6 +639,7 @@ instance Monoid ConfigMonoid where
     , configMonoidExtraPath = configMonoidExtraPath l ++ configMonoidExtraPath r
     , configMonoidSetupInfoLocations = configMonoidSetupInfoLocations l ++ configMonoidSetupInfoLocations r
     , configMonoidPvpBounds = configMonoidPvpBounds l <|> configMonoidPvpBounds r
+    , configMonoidModifyCodePage = configMonoidModifyCodePage l <|> configMonoidModifyCodePage r
     }
 
 instance FromJSON (ConfigMonoid, [JSONWarning]) where
@@ -690,6 +695,7 @@ parseConfigMonoidJSON obj = do
         maybeToList <$> jsonSubWarningsT (obj ..:? "setup-info")
 
     configMonoidPvpBounds <- obj ..:? "pvp-bounds"
+    configMonoidModifyCodePage <- obj ..:? "modify-code-page"
 
     return ConfigMonoid {..}
   where
