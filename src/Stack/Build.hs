@@ -21,7 +21,6 @@ module Stack.Build
 
 import           Control.Monad
 import           Control.Monad.Catch (MonadCatch, MonadMask)
-import qualified Control.Monad.Catch as Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
@@ -52,6 +51,7 @@ import           System.FileLock (FileLock, unlockFile)
 
 #ifdef WINDOWS
 import System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
+import qualified Control.Monad.Catch as Catch
 #endif
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
