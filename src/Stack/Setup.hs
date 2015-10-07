@@ -627,7 +627,7 @@ downloadAndInstallCompiler si wanted@(GhcjsVersion version _) versionCheck _mbin
         Just pairs -> getWantedCompilerInfo "source" versionCheck wanted id pairs
     $logInfo "Preparing to install GHCJS to an isolated location."
     $logInfo "This will not interfere with any system-level installation."
-    downloadAndInstallTool si downloadInfo (ToolGhcjs selectedVersion) (installGHCJSPosix version)
+    downloadAndInstallTool si downloadInfo (ToolGhcjs selectedVersion) (installGHCJS version)
 
 getWantedCompilerInfo :: (Ord k, MonadThrow m)
                       => Text
@@ -751,32 +751,20 @@ installGHCPosix version _ archiveFile archiveType destDir = do
         $logStickyDone $ "Installed GHC."
         $logDebug $ "GHC installed to " <> T.pack (toFilePath destDir)
 
-installGHCJSPosix :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
-                => Version
-                -> SetupInfo
-                -> Path Abs File
-                -> ArchiveType
-                -> Path Abs Dir
-                -> m ()
-installGHCJSPosix version _ archiveFile archiveType destDir = do
+installGHCJS :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+             => Version
+             -> SetupInfo
+             -> Path Abs File
+             -> ArchiveType
+             -> Path Abs Dir
+             -> m ()
+installGHCJS version si archiveFile archiveType destDir = do
     platform <- asks getPlatform
     menv0 <- getMinimalEnvOverride
     -- This ensures that locking is disabled for the invocations of stack below.
     let removeLockVar = Map.delete "STACK_LOCK"
     menv <- mkEnvOverride platform (removeLockVar (removeHaskellEnvVars (unEnvOverride menv0)))
     $logDebug $ "menv = " <> T.pack (show (unEnvOverride menv))
-    zipTool' <-
-        case archiveType of
-            TarXz -> return "xz"
-            TarBz2 -> return "bzip2"
-            TarGz -> return "gzip"
-            SevenZ -> error "Don't know how to deal with .7z files on non-Windows"
-    (zipTool, tarTool) <- checkDependencies $ (,)
-        <$> checkDependency zipTool'
-        <*> checkDependency "tar"
-
-    $logDebug $ "ziptool: " <> T.pack zipTool
-    $logDebug $ "tar: " <> T.pack tarTool
 
     -- NOTE: this is a bit of a hack - instead of using a temp directory, put
     -- the source tarball in the destination directory. This way, the absolute
@@ -791,9 +779,28 @@ installGHCJSPosix version _ archiveFile archiveType destDir = do
     createTree srcDir
     stackYaml <- ghcjsStackYaml version destDir
 
+    platform <- asks getPlatform
+    runUnpack <- case platform of
+        Platform _ Cabal.Windows -> do
+            run7z <- setup7z si
+            return $ run7z srcDir archiveFile
+        _ -> do
+            zipTool' <-
+                case archiveType of
+                    TarXz -> return "xz"
+                    TarBz2 -> return "bzip2"
+                    TarGz -> return "gzip"
+                    SevenZ -> error "Don't know how to deal with .7z files on non-Windows"
+            (zipTool, tarTool) <- checkDependencies $ (,)
+                <$> checkDependency zipTool'
+                <*> checkDependency "tar"
+            $logDebug $ "ziptool: " <> T.pack zipTool
+            $logDebug $ "tar: " <> T.pack tarTool
+            return $ readInNull srcDir tarTool menv ["xf", toFilePath archiveFile] Nothing
+
     $logSticky $ T.concat ["Unpacking GHCJS into ", (T.pack . toFilePath $ srcDir), " ..."]
     $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
-    readInNull srcDir tarTool menv ["xf", toFilePath archiveFile] Nothing
+    runUnpack
 
     $logSticky "Installing GHCJS (this will take a long time) ..."
     let destBinDir = destDir Path.</> $(mkRelDir "bin")
