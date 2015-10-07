@@ -112,13 +112,14 @@ generateHpcMarkupIndex = do
     installDir <- installationRootLocal
     let markupDir = installDir </> hpcDirSuffix
         outputFile = markupDir </> $(mkRelFile "index.html")
-    (dirs, _) <- listDirectory markupDir
+    exists <- dirExists markupDir
+    dirs <- if exists then fst <$> listDirectory markupDir else return []
     rows <- liftM (catMaybes . concat) $ forM dirs $ \dir -> do
         (subdirs, _) <- listDirectory dir
         forM subdirs $ \subdir -> do
             let indexPath = subdir </> $(mkRelFile "hpc_index.html")
-            exists <- fileExists indexPath
-            if not exists then return Nothing else do
+            exists' <- fileExists indexPath
+            if not exists' then return Nothing else do
                 relPath <- stripDir markupDir indexPath
                 let package = dirname dir
                     testsuite = dirname subdir
