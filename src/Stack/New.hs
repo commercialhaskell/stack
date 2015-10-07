@@ -60,6 +60,8 @@ import           Text.ProjectTemplate
 data NewOpts = NewOpts
     { newOptsProjectName  :: PackageName
     -- ^ Name of the project to create.
+    , newOptsCreateBare   :: Bool
+    -- ^ Whether to create the project without a directory.
     , newOptsTemplate     :: TemplateName
     -- ^ Name of the template to use.
     , newOptsNonceParams  :: Map Text Text
@@ -72,13 +74,14 @@ new
     => NewOpts -> m (Path Abs Dir)
 new opts = do
     pwd <- getWorkingDir
-    relDir <- parseRelDir (packageNameString (newOptsProjectName opts))
-    absDir <- liftM (pwd </>) (return relDir)
+    absDir <- if bare then return pwd
+                      else do relDir <- parseRelDir (packageNameString project)
+                              liftM (pwd </>) (return relDir)
     exists <- dirExists absDir
-    if exists
+    if exists && not bare
         then throwM (AlreadyExists absDir)
         else do
-            logUsing relDir
+            logUsing absDir
             templateText <- loadTemplate template
             files <-
                 applyTemplate
@@ -93,13 +96,15 @@ new opts = do
   where
     template = newOptsTemplate opts
     project = newOptsProjectName opts
-    logUsing relDir =
+    bare = newOptsCreateBare opts
+    logUsing absDir =
         $logInfo
             ("Downloading template \"" <> templateName template <>
              "\" to create project \"" <>
              packageNameText project <>
              "\" in " <>
-             T.pack (toFilePath relDir) <>
+             if bare then "the current directory"
+                     else T.pack (toFilePath (dirname absDir)) <>
              " ...")
 
 -- | Download and read in a template's text content.

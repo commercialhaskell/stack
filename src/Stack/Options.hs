@@ -664,6 +664,9 @@ newOptsParser = (,) <$> newOpts <*> initOptsParser
         NewOpts <$>
         packageNameArgument
             (metavar "PACKAGE_NAME" <> help "A valid package name.") <*>
+        switch
+            (long "bare" <>
+             help "Do not create a subdirectory for the project") <*>
         templateNameArgument
             (metavar "TEMPLATE_NAME" <>
              help "Name of a template, for example: foo or foo.hsfiles" <>
