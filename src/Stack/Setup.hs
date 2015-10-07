@@ -779,7 +779,6 @@ installGHCJS version si archiveFile archiveType destDir = do
     createTree srcDir
     stackYaml <- ghcjsStackYaml version destDir
 
-    platform <- asks getPlatform
     runUnpack <- case platform of
         Platform _ Cabal.Windows -> do
             run7z <- setup7z si
