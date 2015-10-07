@@ -113,7 +113,7 @@ generateHpcMarkupIndex = do
     let markupDir = installDir </> hpcDirSuffix
         outputFile = markupDir </> $(mkRelFile "index.html")
     exists <- dirExists markupDir
-    dirs <- if exists then fst <$> listDirectory markupDir else return []
+    dirs <- if exists then liftM fst (listDirectory markupDir) else return []
     rows <- liftM (catMaybes . concat) $ forM dirs $ \dir -> do
         (subdirs, _) <- listDirectory dir
         forM subdirs $ \subdir -> do
