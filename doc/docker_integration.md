@@ -197,6 +197,12 @@ otherwise noted.
       #   /path/to/stack: path on the host's local filesystem
       stack-exe: host
 
+      # If true (the default when using the local Docker Engine), run processes
+      # in the Docker container as the same UID/GID as the host.  The ensures
+      # that files written by the container are owned by you on the host.
+      # When the Docker Engine is remote (accessed by tcp), defaults to false.
+      set-user: true
+
 Image Repositories
 -------------------------------------------------------------------------------
 

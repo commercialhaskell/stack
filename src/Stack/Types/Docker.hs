@@ -44,6 +44,8 @@ data DockerOpts = DockerOpts
     -- ^ Location of image usage database.
   ,dockerStackExe :: !DockerStackExe
     -- ^ Location of container-compatible stack executable
+  ,dockerSetUser :: !(Maybe Bool)
+   -- ^ Set in-container user to match host's
   }
   deriving (Show)
 
@@ -82,6 +84,8 @@ data DockerOptsMonoid = DockerOptsMonoid
     -- ^ Location of image usage database.
   ,dockerMonoidStackExe :: !(Maybe String)
     -- ^ Location of container-compatible stack executable
+  ,dockerMonoidSetUser :: !(Maybe Bool)
+   -- ^ Set in-container user to match host's
   }
   deriving (Show)
 
@@ -105,6 +109,7 @@ instance FromJSON (DockerOptsMonoid, [JSONWarning]) where
               dockerMonoidEnv              <- o ..:? dockerEnvArgName ..!= []
               dockerMonoidDatabasePath     <- o ..:? dockerDatabasePathArgName
               dockerMonoidStackExe         <- o ..:? dockerStackExeArgName
+              dockerMonoidSetUser          <- o ..:? dockerSetUserArgName
               return DockerOptsMonoid{..})
 
 -- | Left-biased combine Docker options
@@ -125,6 +130,7 @@ instance Monoid DockerOptsMonoid where
     ,dockerMonoidEnv              = []
     ,dockerMonoidDatabasePath     = Nothing
     ,dockerMonoidStackExe         = Nothing
+    ,dockerMonoidSetUser          = Nothing
     }
   mappend l r = DockerOptsMonoid
     {dockerMonoidExists           = dockerMonoidExists l <|> dockerMonoidExists r
@@ -142,6 +148,7 @@ instance Monoid DockerOptsMonoid where
     ,dockerMonoidEnv              = dockerMonoidEnv r <> dockerMonoidEnv l
     ,dockerMonoidDatabasePath     = dockerMonoidDatabasePath l <|> dockerMonoidDatabasePath r
     ,dockerMonoidStackExe         = dockerMonoidStackExe l <|> dockerMonoidStackExe r
+    ,dockerMonoidSetUser          = dockerMonoidSetUser l <|> dockerMonoidSetUser r
     }
 
 -- | Where to get the `stack` executable to run in Docker containers
@@ -258,3 +265,7 @@ dockerStackExeHostVal = "host"
 -- | Value for @--docker-stack-exe=image@
 dockerStackExeImageVal :: String
 dockerStackExeImageVal = "image"
+
+-- | Docker @set-user@ argument name
+dockerSetUserArgName :: Text
+dockerSetUserArgName = "set-user"

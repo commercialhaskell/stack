@@ -53,6 +53,7 @@ dockerOptsFromMonoid mproject stackRoot DockerOptsMonoid{..} = do
         dockerRunArgs = dockerMonoidRunArgs
         dockerMount = dockerMonoidMount
         dockerEnv = dockerMonoidEnv
+        dockerSetUser = dockerMonoidSetUser
     dockerDatabasePath <-
         case dockerMonoidDatabasePath of
             Nothing -> return $ stackRoot </> $(mkRelFile "docker.db")

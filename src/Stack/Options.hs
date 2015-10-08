@@ -360,6 +360,9 @@ dockerOptsParser showOptions =
              help (concat [ "Location of "
                           , stackProgName
                           , " executable used in container" ])))
+    <*> maybeBoolFlags (dockerOptName dockerSetUserArgName)
+                       "setting user in container to match host"
+                       hide
   where
     dockerOptName optName = dockerCmdName ++ "-" ++ T.unpack optName
     maybeStrOption = optional . option str

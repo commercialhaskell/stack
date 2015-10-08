@@ -197,19 +197,27 @@ runContainerAndExit modConfig
      let docker = configDocker config
      envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride
-     uidOut <- readProcessStdout Nothing envOverride "id" ["-u"]
-     gidOut <- readProcessStdout Nothing envOverride "id" ["-g"]
      (dockerHost,dockerCertPath,bamboo,jenkins) <-
        liftIO ((,,,) <$> lookupEnv "DOCKER_HOST"
                      <*> lookupEnv "DOCKER_CERT_PATH"
                      <*> lookupEnv "bamboo_buildKey"
                      <*> lookupEnv "JENKINS_HOME")
+     let isRemoteDocker = maybe False (isPrefixOf "tcp://") dockerHost
+     userEnvVars <-
+         if fromMaybe (not isRemoteDocker) (dockerSetUser docker)
+             then do
+                 uidOut <- readProcessStdout Nothing envOverride "id" ["-u"]
+                 gidOut <- readProcessStdout Nothing envOverride "id" ["-g"]
+                 return
+                     [ "-e","WORK_UID=" ++ dropWhileEnd isSpace (decodeUtf8 uidOut)
+                     , "-e","WORK_GID=" ++ dropWhileEnd isSpace (decodeUtf8 gidOut) ]
+             else return []
      isStdoutTerminal <- asks getTerminal
      (isStdinTerminal,isStderrTerminal) <-
        liftIO ((,) <$> hIsTerminalDevice stdin
                    <*> hIsTerminalDevice stderr)
      pwd <- getWorkingDir
-     when (maybe False (isPrefixOf "tcp://") dockerHost &&
+     when (isRemoteDocker &&
            maybe False (isInfixOf "boot2docker") dockerCertPath)
           ($logWarn "Warning: Using boot2docker is NOT supported, and not likely to perform well.")
      let image = dockerImage docker
@@ -224,9 +232,7 @@ runContainerAndExit modConfig
                   Just ii2 -> return ii2
                   Nothing -> throwM (InspectFailedException image)
          | otherwise -> throwM (NotPulledException image)
-     let uid = dropWhileEnd isSpace (decodeUtf8 uidOut)
-         gid = dropWhileEnd isSpace (decodeUtf8 gidOut)
-         imageEnvVars = map (break (== '=')) (icEnv (iiConfig imageInfo))
+     let imageEnvVars = map (break (== '=')) (icEnv (iiConfig imageInfo))
          sandboxID = fromMaybe "default" (lookupImageEnv sandboxIDEnvVar imageEnvVars)
      sandboxIDDir <- parseRelDir (sandboxID ++ "/")
      let stackRoot = configStackRoot config
@@ -241,6 +247,7 @@ runContainerAndExit modConfig
                   isStdoutTerminal &&
                   isStderrTerminal
          keepStdinOpen = not (dockerDetach docker) &&
+                         -- Workaround for https://github.com/docker/docker/issues/12319
                          (isTerm || (isNothing bamboo && isNothing jenkins))
      liftIO
        (do updateDockerImageLastUsed config
@@ -257,8 +264,6 @@ runContainerAndExit modConfig
           ,"--net=host"
           ,"-e",inContainerEnvVar ++ "=1"
           ,"-e",stackRootEnvVar ++ "=" ++ toFPNoTrailingSep stackRoot
-          ,"-e","WORK_UID=" ++ uid
-          ,"-e","WORK_GID=" ++ gid
           ,"-e","WORK_WD=" ++ toFPNoTrailingSep pwd
           ,"-e","WORK_HOME=" ++ toFPNoTrailingSep sandboxRepoDir
           ,"-e","WORK_ROOT=" ++ toFPNoTrailingSep projectRoot
@@ -268,6 +273,7 @@ runContainerAndExit modConfig
           ,"-v",toFPNoTrailingSep sandboxHomeDir ++ ":" ++ toFPNoTrailingSep sandboxRepoDir
           ,"-v",toFPNoTrailingSep stackRoot ++ ":" ++
                 toFPNoTrailingSep (sandboxRepoDir </> $(mkRelDir ("." ++ stackProgName ++ "/")))]
+         ,userEnvVars
          ,concatMap (\(k,v) -> ["-e", k ++ "=" ++ v]) envVars
          ,concatMap sandboxSubdirArg sandboxSubdirs
          ,concatMap mountArg (dockerMount docker)
