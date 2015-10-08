@@ -256,6 +256,10 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                                            "and package version.") <>
                                      value " " <>
                                      showDefault))
+             addCommand "query"
+                        "Query general build information (experimental)"
+                        queryCmd
+                        (many $ strArgument $ metavar "SELECTOR...")
              addSubCommands
                  "ide"
                  "IDE-specific commands"
@@ -945,3 +949,7 @@ dotCmd dotOpts go = withBuildConfigAndLock go (\_ -> dot dotOpts)
 listDependenciesCmd :: Text -> GlobalOpts -> IO ()
 listDependenciesCmd sep go = withBuildConfig go (listDependencies sep')
   where sep' = T.replace "\\t" "\t" (T.replace "\\n" "\n" sep)
+
+-- | Query build information
+queryCmd :: [String] -> GlobalOpts -> IO ()
+queryCmd selectors go = withBuildConfig go $ queryBuildInfo $ map T.pack selectors

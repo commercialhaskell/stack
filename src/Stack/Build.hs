@@ -16,7 +16,8 @@ module Stack.Build
   (build
   ,clean
   ,withLoadPackage
-  ,mkBaseConfigOpts)
+  ,mkBaseConfigOpts
+  ,queryBuildInfo)
   where
 
 import           Control.Monad
@@ -25,11 +26,20 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Resource
+import           Data.Aeson (Value (Object, Array), (.=), object)
 import           Data.Function
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Map as Map
 import           Data.Map.Strict (Map)
 import           Data.Set (Set)
 import qualified Data.Set as Set
+import           Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
+import           Data.Text.Encoding (decodeUtf8)
+import           Data.Text.Read (decimal)
+import qualified Data.Vector as V
+import qualified Data.Yaml as Yaml
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.IO
@@ -228,3 +238,47 @@ fixCodePage' inner = do
     if mcp
         then fixCodePage inner
         else inner
+
+-- | Query information about the build and print the result to stdout in YAML format.
+queryBuildInfo :: M env m
+               => [Text] -- ^ selectors
+               -> m ()
+queryBuildInfo selectors0 = do
+        rawBuildInfo
+    >>= select id selectors0
+    >>= liftIO . TIO.putStrLn . decodeUtf8 . Yaml.encode
+  where
+    select _ [] value = return value
+    select front (sel:sels) value =
+        case value of
+            Object o ->
+                case HM.lookup sel o of
+                    Nothing -> err "Selector not found"
+                    Just value' -> cont value'
+            Array v ->
+                case decimal sel of
+                    Right (i, "")
+                        | i >= 0 && i < V.length v -> cont $ v V.! i
+                        | otherwise -> err "Index out of range"
+                    _ -> err "Encountered array and needed numeric selector"
+            _ -> err $ "Cannot apply selector to " ++ show value
+      where
+        cont = select (front . (sel:)) sels
+        err msg = error $ msg ++ ": " ++ show (front [sel])
+
+-- | Get the raw build information object
+rawBuildInfo :: M env m => m Value
+rawBuildInfo = do
+    (_, _mbp, locals, _extraToBuild, _sourceMap) <- loadSourceMap NeedTargets defaultBuildOpts
+    return $ object
+        [ "locals" .= Object (HM.fromList $ map localToPair locals)
+        ]
+  where
+    localToPair lp =
+        (T.pack $ packageNameString $ packageName p, value)
+      where
+        p = lpPackage lp
+        value = object
+            [ "version" .= packageVersion p
+            , "path" .= toFilePath (lpDir lp)
+            ]
