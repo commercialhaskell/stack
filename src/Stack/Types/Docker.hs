@@ -5,6 +5,7 @@
 module Stack.Types.Docker where
 
 import Control.Applicative
+import Control.Monad
 import Control.Monad.Catch (MonadThrow)
 import Data.Aeson.Extended
 import Data.Monoid
@@ -152,12 +153,12 @@ data DockerStackExe
     deriving (Show)
 
 -- | Parse 'DockerStackExe'.
-parseDockerStackExe :: MonadThrow m => String -> m DockerStackExe
+parseDockerStackExe :: (MonadThrow m) => String -> m DockerStackExe
 parseDockerStackExe t
     | t == dockerStackExeDownloadVal = return DockerStackExeDownload
     | t == dockerStackExeHostVal = return DockerStackExeHost
     | t == dockerStackExeImageVal = return DockerStackExeImage
-    | otherwise = fmap DockerStackExePath (parseAbsFile t)
+    | otherwise = liftM DockerStackExePath (parseAbsFile t)
 
 -- | Docker volume mount.
 data Mount = Mount String String

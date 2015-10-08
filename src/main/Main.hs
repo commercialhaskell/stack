@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -30,6 +31,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Data.Traversable
+import           Data.Typeable (Typeable)
 import           Data.Version (showVersion)
 import           Distribution.System (buildArch)
 import           Distribution.Text (display)
@@ -960,6 +962,7 @@ queryCmd :: [String] -> GlobalOpts -> IO ()
 queryCmd selectors go = withBuildConfig go $ queryBuildInfo $ map T.pack selectors
 
 data MainException = InvalidReExecVersion String String
+     deriving (Typeable)
 instance Exception MainException
 instance Show MainException where
     show (InvalidReExecVersion expected actual) = concat

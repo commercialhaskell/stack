@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, RecordWildCards, TemplateHaskell #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, RecordWildCards, TemplateHaskell #-}
 
 -- | Docker configuration
 module Stack.Config.Docker where
@@ -8,6 +8,7 @@ import Control.Monad.Catch (throwM, MonadThrow)
 import Data.List (find)
 import Data.Maybe
 import qualified Data.Text as T
+import Data.Typeable (Typeable)
 import Path
 import Stack.Types
 
@@ -75,9 +76,10 @@ dockerOptsFromMonoid mproject stackRoot DockerOptsMonoid{..} = do
 -- | Exceptions thrown by Stack.Docker.Config.
 data StackDockerConfigException
     = ResolverNotSupportedException String
-      -- ^ Only LTS resolvers are supported for default image tag.
+    -- ^ Only LTS resolvers are supported for default image tag.
     | InvalidDatabasePathException SomeException
-      -- ^ Invalid global database path.
+    -- ^ Invalid global database path.
+    deriving (Typeable)
 
 -- | Exception instance for StackDockerConfigException.
 instance Exception StackDockerConfigException
