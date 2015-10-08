@@ -882,7 +882,9 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
     getPrecompiled cache =
         case taskLocation task of
             Snap | not shouldHaddockPackage' -> do
-                mpc <- readPrecompiledCache taskProvides $ configCacheOpts cache
+                mpc <- readPrecompiledCache taskProvides
+                    (configCacheOpts cache)
+                    (configCacheDeps cache)
                 case mpc of
                     Nothing -> return Nothing
                     Just pc -> do
@@ -1028,7 +1030,10 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                     Set.empty
 
         case taskLocation task of
-            Snap -> writePrecompiledCache eeBaseConfigOpts taskProvides (configCacheOpts cache) mpkgid (packageExes package)
+            Snap -> writePrecompiledCache eeBaseConfigOpts taskProvides
+                (configCacheOpts cache)
+                (configCacheDeps cache)
+                mpkgid (packageExes package)
             Local -> return ()
 
         return mpkgid'
