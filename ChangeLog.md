@@ -24,6 +24,7 @@ Other enhancements:
 * Typing enter during --file-watch triggers a rebuild [#1023](https://github.com/commercialhaskell/stack/pull/1023)
 * Use Haddock's `--hyperlinked-source` (crosslinked source), if available [#1070](https://github.com/commercialhaskell/stack/pull/1070)
 * Use Stack-installed GHCs for `stack init --solver` [#1072](https://github.com/commercialhaskell/stack/issues/1072)
+* New experimental `stack query` command [#1087](https://github.com/commercialhaskell/stack/issues/1087)
 
 Bug fixes:
 
