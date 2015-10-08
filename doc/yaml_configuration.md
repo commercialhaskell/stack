@@ -325,3 +325,13 @@ explicit-setup-deps:
     "*": true # change the default
     entropy: false # override the new default for one package
 ```
+
+### rebuild-ghc-options
+
+(Since 0.1.6)
+
+Should we rebuild a package when its GHC options change? Before 0.1.6, this was a non-configurable true. However, in most cases, the flag is used to affect optimization levels and warning behavior, for which GHC itself doesn't actually recompile the modules anyway. Therefore, the new behavior is to not recompile on an options change, but this behavior can be changed back with the following:
+
+```yaml
+rebuild-ghc-options: true
+```

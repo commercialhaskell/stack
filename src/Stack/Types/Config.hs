@@ -145,6 +145,8 @@ data Config =
          -- ^ Force the code page to UTF-8 on Windows
          ,configExplicitSetupDeps   :: !(Map (Maybe PackageName) Bool)
          -- ^ See 'explicitSetupDeps'. 'Nothing' provides the default value.
+         ,configRebuildGhcOptions   :: !Bool
+         -- ^ Rebuild on GHC options changes
          }
 
 -- | Information on a single package index
@@ -582,6 +584,8 @@ data ConfigMonoid =
     -- ^ See 'configModifyCodePage'
     ,configMonoidExplicitSetupDeps   :: !(Map (Maybe PackageName) Bool)
     -- ^ See 'configExplicitSetupDeps'
+    ,configMonoidRebuildGhcOptions   :: !(Maybe Bool)
+    -- ^ See 'configMonoidRebuildGhcOptions'
     }
   deriving Show
 
@@ -615,6 +619,7 @@ instance Monoid ConfigMonoid where
     , configMonoidPvpBounds = Nothing
     , configMonoidModifyCodePage = Nothing
     , configMonoidExplicitSetupDeps = mempty
+    , configMonoidRebuildGhcOptions = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -646,6 +651,7 @@ instance Monoid ConfigMonoid where
     , configMonoidPvpBounds = configMonoidPvpBounds l <|> configMonoidPvpBounds r
     , configMonoidModifyCodePage = configMonoidModifyCodePage l <|> configMonoidModifyCodePage r
     , configMonoidExplicitSetupDeps = configMonoidExplicitSetupDeps l <> configMonoidExplicitSetupDeps r
+    , configMonoidRebuildGhcOptions = configMonoidRebuildGhcOptions l <|> configMonoidRebuildGhcOptions r
     }
 
 instance FromJSON (ConfigMonoid, [JSONWarning]) where
@@ -705,6 +711,7 @@ parseConfigMonoidJSON obj = do
     configMonoidExplicitSetupDeps <-
         (obj ..:? "explicit-setup-deps" ..!= mempty)
         >>= fmap Map.fromList . mapM handleExplicitSetupDep . Map.toList
+    configMonoidRebuildGhcOptions <- obj ..:? "rebuild-ghc-options"
 
     return ConfigMonoid {..}
   where

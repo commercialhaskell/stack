@@ -187,6 +187,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mproject configMonoi
          configPvpBounds = fromMaybe PvpBoundsNone configMonoidPvpBounds
          configModifyCodePage = fromMaybe True configMonoidModifyCodePage
          configExplicitSetupDeps = configMonoidExplicitSetupDeps
+         configRebuildGhcOptions = fromMaybe False configMonoidRebuildGhcOptions
 
      return Config {..}
 

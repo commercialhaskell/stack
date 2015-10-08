@@ -446,17 +446,18 @@ checkDirtiness ps installed package present wanted = do
             case moldOpts of
                 Nothing -> Just "old configure information not found"
                 Just oldOpts
-                    | Just reason <- describeConfigDiff oldOpts wantConfigCache -> Just reason
+                    | Just reason <- describeConfigDiff config oldOpts wantConfigCache -> Just reason
                     | psDirty ps -> Just "local file changes"
                     | otherwise -> Nothing
+        config = getConfig ctx
     case mreason of
         Nothing -> return False
         Just reason -> do
             tell mempty { wDirty = Map.singleton (packageName package) reason }
             return True
 
-describeConfigDiff :: ConfigCache -> ConfigCache -> Maybe Text
-describeConfigDiff old new
+describeConfigDiff :: Config -> ConfigCache -> ConfigCache -> Maybe Text
+describeConfigDiff config old new
     | configCacheDeps old /= configCacheDeps new = Just "dependencies changed"
     | not $ Set.null $ Set.filter isLibExe newComponents =
         Just $ "components added: " `T.append` T.intercalate ", "
@@ -486,7 +487,25 @@ describeConfigDiff old new
         , "--enable-benchmarks"
         ]
 
+    stripGhcOptions =
+        go
+      where
+        go [] = []
+        go ("--ghc-option":_:xs) = go xs
+        go ("--ghc-options":_:xs) = go xs
+        go (x:xs)
+          | isPrefixed x = go xs
+          | otherwise = x : go xs
+
+        isPrefixed t = any (`T.isPrefixOf` t)
+            [ "--ghc-option="
+            , "--ghc-options="
+            ]
+
     userOpts = filter (not . isStackOpt)
+             . (if configRebuildGhcOptions config
+                   then id
+                   else stripGhcOptions)
              . map T.pack
              . (\(ConfigureOpts x y) -> x ++ y)
              . configCacheOpts
