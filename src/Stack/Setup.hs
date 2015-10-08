@@ -14,6 +14,7 @@
 module Stack.Setup
   ( setupEnv
   , ensureCompiler
+  , ensureDockerStackExe
   , SetupOpts (..)
   , defaultStackSetupYaml
   ) where
@@ -64,10 +65,11 @@ import           Network.HTTP.Client.Conduit
 import           Network.HTTP.Download.Verified
 import           Path
 import           Path.IO
+import qualified Paths_stack as Meta
 import           Prelude hiding (concat, elem) -- Fix AMP warning
 import           Safe (readMay)
 import           Stack.Config (resolvePackageEntry)
-import           Stack.Constants (distRelativeDir)
+import           Stack.Constants (distRelativeDir, stackProgName)
 import           Stack.Fetch
 import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath)
 import           Stack.Setup.Installed
@@ -124,6 +126,7 @@ data SetupException = UnsupportedSetupCombo OS Arch
                     | SetupInfoMissingSevenz
                     | GHCJSRequiresStandardVariant
                     | GHCJSNotBooted
+                    | DockerStackExeNotFound Version Text
     deriving Typeable
 instance Exception SetupException
 instance Show SetupException where
@@ -164,6 +167,15 @@ instance Show SetupException where
         "stack does not yet support using --ghc-variant with GHCJS"
     show GHCJSNotBooted =
         "GHCJS does not yet have its boot packages installed.  Use \"stack setup\" to attempt to run ghcjs-boot."
+    show (DockerStackExeNotFound stackVersion osKey) = concat
+        [ stackProgName
+        , "-"
+        , versionString stackVersion
+        , " executable not found for "
+        , T.unpack osKey
+        , "\nUse the '"
+        , T.unpack dockerStackExeArgName
+        , "' option to specify a location"]
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasBuildConfig env, HasHttpManager env, HasGHCVariant env, MonadBaseControl IO m)
@@ -327,7 +339,7 @@ ensureCompiler sopts = do
     -- If we need to install a GHC, try to do so
     mtools <- if needLocal
         then do
-            getSetupInfo' <- runOnce (getSetupInfo sopts =<< asks getHttpManager)
+            getSetupInfo' <- runOnce (getSetupInfo (soptsStackSetupYaml sopts) =<< asks getHttpManager)
 
             installed <- listInstalled
 
@@ -370,13 +382,13 @@ ensureCompiler sopts = do
                         Nothing
                             | soptsInstallIfMissing sopts -> do
                                 si <- getSetupInfo'
-                                osKey <- getOSKey
+                                osKey <- getOSKey platform
                                 VersionedDownloadInfo version info <-
                                     case Map.lookup osKey $ siMsys2 si of
                                         Just x -> return x
                                         Nothing -> error $ "MSYS2 not found for " ++ T.unpack osKey
                                 let tool = Tool (PackageIdentifier $(mkPackageName "msys2") version)
-                                Just <$> downloadAndInstallTool si info tool (installMsys2Windows osKey)
+                                Just <$> downloadAndInstallTool (configLocalPrograms config) si info tool (installMsys2Windows osKey)
                             | otherwise -> do
                                 $logWarn "Continuing despite missing tool: msys2"
                                 return Nothing
@@ -413,6 +425,40 @@ ensureCompiler sopts = do
     when (soptsSanityCheck sopts) $ sanityCheck menv wc
 
     return mpaths
+
+-- Ensure Docker container-compatible 'stack' executable is downloaded
+ensureDockerStackExe
+    :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+    => Platform -> m (Path Abs File)
+ensureDockerStackExe containerPlatform = do
+    config <- asks getConfig
+    containerPlatformDir <- runReaderT platformOnlyRelDir containerPlatform
+    let programsPath = configLocalProgramsBase config </> containerPlatformDir
+        stackVersion = fromCabalVersion Meta.version
+        tool = Tool (PackageIdentifier $(mkPackageName "stack") stackVersion)
+    stackExePath <- (</> $(mkRelFile "stack")) <$> installDir programsPath tool
+    stackExeExists <- fileExists stackExePath
+    unless stackExeExists $
+        do
+           $logInfo $ mconcat ["Downloading Docker-compatible ", T.pack stackProgName, " executable"]
+           si <- getSetupInfo defaultStackSetupYaml =<< asks getHttpManager
+           osKey <- getOSKey containerPlatform
+           info <-
+               case Map.lookup osKey (siStack si) of
+                   Just versions ->
+                       case Map.lookup stackVersion versions of
+                           Just x -> return x
+                           Nothing -> throwM (DockerStackExeNotFound stackVersion osKey)
+                   Nothing -> throwM (DockerStackExeNotFound stackVersion osKey)
+           _ <-
+               downloadAndInstallTool
+                   programsPath
+                   si
+                   info
+                   tool
+                   installDockerStackExe
+           return ()
+    return stackExePath
 
 -- | Install the newest version of Cabal globally
 upgradeCabal :: (MonadIO m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m, MonadMask m)
@@ -508,13 +554,13 @@ getSystemCompiler menv wc = do
 -- | Download the most recent SetupInfo
 getSetupInfo
     :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasConfig env)
-    => SetupOpts -> Manager -> m SetupInfo
-getSetupInfo sopts manager = do
+    => String -> Manager -> m SetupInfo
+getSetupInfo stackSetupYaml manager = do
     config <- asks getConfig
     setupInfos <-
         mapM
             loadSetupInfo
-            (SetupInfoFileOrURL (soptsStackSetupYaml sopts) :
+            (SetupInfoFileOrURL stackSetupYaml :
              configSetupInfoLocations config)
     return (mconcat setupInfos)
   where
@@ -566,14 +612,15 @@ getInstalledGhcjs installed goodVersion =
     goodPackage _ = Nothing
 
 downloadAndInstallTool :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
-                       => SetupInfo
+                       => Path Abs Dir
+                       -> SetupInfo
                        -> DownloadInfo
                        -> Tool
                        -> (SetupInfo -> Path Abs File -> ArchiveType -> Path Abs Dir -> m ())
                        -> m Tool
-downloadAndInstallTool si downloadInfo tool installer = do
-    (file, at) <- downloadFromInfo downloadInfo tool
-    dir <- installDir tool
+downloadAndInstallTool programsDir si downloadInfo tool installer = do
+    (file, at) <- downloadFromInfo programsDir downloadInfo tool
+    dir <- installDir programsDir tool
     unmarkInstalled tool
     installer si file at dir
     markInstalled tool
@@ -602,9 +649,9 @@ downloadAndInstallCompiler si wanted@(GhcVersion{}) versionCheck mbindistURL = d
             case Map.lookup ghcKey $ siGHCs si of
                 Nothing -> throwM $ UnknownOSKey ghcKey
                 Just pairs -> getWantedCompilerInfo ghcKey versionCheck wanted GhcVersion pairs
-    platform <- asks getPlatform
+    config <- asks getConfig
     let installer =
-            case platform of
+            case configPlatform config of
                 Platform _ Cabal.Windows -> installGHCWindows selectedVersion
                 _ -> installGHCPosix selectedVersion
     $logInfo $
@@ -616,8 +663,9 @@ downloadAndInstallCompiler si wanted@(GhcVersion{}) versionCheck mbindistURL = d
     $logInfo "This will not interfere with any system-level installation."
     ghcPkgName <- parsePackageNameFromString ("ghc" ++ ghcVariantSuffix ghcVariant)
     let tool = Tool $ PackageIdentifier ghcPkgName selectedVersion
-    downloadAndInstallTool si downloadInfo tool installer
+    downloadAndInstallTool (configLocalPrograms config) si downloadInfo tool installer
 downloadAndInstallCompiler si wanted@(GhcjsVersion version _) versionCheck _mbindistUrl = do
+    config <- asks getConfig
     ghcVariant <- asks getGHCVariant
     case ghcVariant of
         GHCStandard -> return ()
@@ -627,7 +675,7 @@ downloadAndInstallCompiler si wanted@(GhcjsVersion version _) versionCheck _mbin
         Just pairs -> getWantedCompilerInfo "source" versionCheck wanted id pairs
     $logInfo "Preparing to install GHCJS to an isolated location."
     $logInfo "This will not interfere with any system-level installation."
-    downloadAndInstallTool si downloadInfo (ToolGhcjs selectedVersion) (installGHCJS version)
+    downloadAndInstallTool (configLocalPrograms config) si downloadInfo (ToolGhcjs selectedVersion) (installGHCJS version)
 
 getWantedCompilerInfo :: (Ord k, MonadThrow m)
                       => Text
@@ -650,13 +698,13 @@ getGhcKey :: (MonadReader env m, MonadThrow m, HasPlatform env, HasGHCVariant en
           => m Text
 getGhcKey = do
     ghcVariant <- asks getGHCVariant
-    osKey <- getOSKey
+    platform <- asks getPlatform
+    osKey <- getOSKey platform
     return $ osKey <> T.pack (ghcVariantSuffix ghcVariant)
 
 getOSKey :: (MonadReader env m, MonadThrow m, HasPlatform env, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
-         => m Text
-getOSKey = do
-    platform <- asks getPlatform
+         => Platform -> m Text
+getOSKey platform = do
     case platform of
         Platform I386   Cabal.Linux   -> return "linux32"
         Platform X86_64 Cabal.Linux   -> return "linux64"
@@ -670,12 +718,10 @@ getOSKey = do
         Platform X86_64 Cabal.Windows -> return "windows64"
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
-downloadFromInfo :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
-             => DownloadInfo
-             -> Tool
-             -> m (Path Abs File, ArchiveType)
-downloadFromInfo downloadInfo tool = do
-    config <- asks getConfig
+downloadFromInfo
+    :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+    => Path Abs Dir -> DownloadInfo -> Tool -> m (Path Abs File, ArchiveType)
+downloadFromInfo programsDir downloadInfo tool = do
     at <-
         case extension of
             ".tar.xz" -> return TarXz
@@ -684,7 +730,7 @@ downloadFromInfo downloadInfo tool = do
             ".7z.exe" -> return SevenZ
             _ -> error $ "Unknown extension for url: " ++ T.unpack url
     relfile <- parseRelFile $ toolString tool ++ extension
-    let path = configLocalPrograms config </> relfile
+    let path = programsDir </> relfile
     chattyDownload (T.pack (toolString tool)) downloadInfo path
     return (path, at)
   where
@@ -815,6 +861,27 @@ installGHCJS version si archiveFile archiveType destDir = do
         ]
     $logStickyDone "Installed GHCJS."
 
+-- Install the downloaded stack binary distribution
+installDockerStackExe
+    :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+    => SetupInfo
+    -> Path Abs File
+    -> ArchiveType
+    -> Path Abs Dir
+    -> m ()
+installDockerStackExe _ archiveFile _ destDir = do
+    (_,tarTool) <-
+        checkDependencies $
+        (,) <$> checkDependency "gzip" <*> checkDependency "tar"
+    menv <- getMinimalEnvOverride
+    createTree destDir
+    readInNull
+        destDir
+        tarTool
+        menv
+        ["xf", toFilePath archiveFile, "--strip-components", "1"]
+        Nothing
+
 ghcjsStackYaml :: MonadThrow m => Version -> Path Abs Dir -> m (Path Abs File)
 ghcjsStackYaml version destDir =
     liftM ((destDir Path.</> $(mkRelDir "src")) Path.</>) $
@@ -832,7 +899,10 @@ ensureGhcjsBooted menv cv shouldBoot  = do
         Left (ReadProcessException _ _ _ err) | "ghcjs_boot.completed" `S.isInfixOf` LBS.toStrict err ->
             if not shouldBoot then throwM GHCJSNotBooted else do
                 stackYaml <- case cv of
-                    GhcjsVersion version _ -> ghcjsStackYaml version =<< installDir (ToolGhcjs cv)
+                    GhcjsVersion version _ -> do
+                        config <- asks getConfig
+                        destDir <- installDir (configLocalPrograms config) (ToolGhcjs cv)
+                        ghcjsStackYaml version destDir
                     _ -> fail "ensureGhcjsBooted invoked on non GhcjsVersion"
                 bootGhcjs menv stackYaml
         Left err -> throwM err

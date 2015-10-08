@@ -27,6 +27,7 @@ module Stack.Config
   ,packagesParser
   ,resolvePackageEntry
   ,getImplicitGlobalProjectDir
+  ,getIsGMP4
   ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -66,7 +67,7 @@ import qualified Paths_stack as Meta
 import           Safe (headMay)
 import           Stack.BuildPlan
 import           Stack.Constants
-import qualified Stack.Docker as Docker
+import           Stack.Config.Docker
 import qualified Stack.Image as Image
 import           Stack.Init
 import           Stack.Types
@@ -100,8 +101,7 @@ configFromConfigMonoid
     -> ConfigMonoid
     -> m Config
 configFromConfigMonoid configStackRoot configUserConfigPath mproject configMonoid@ConfigMonoid{..} = do
-     let configDocker = Docker.dockerOptsFromMonoid mproject configStackRoot configMonoidDockerOpts
-         configConnectionCount = fromMaybe 8 configMonoidConnectionCount
+     let configConnectionCount = fromMaybe 8 configMonoidConnectionCount
          configHideTHLoading = fromMaybe True configMonoidHideTHLoading
          configLatestSnapshotUrl = fromMaybe
             "https://s3.amazonaws.com/haddock.stackage.org/snapshots.json"
@@ -145,6 +145,8 @@ configFromConfigMonoid configStackRoot configUserConfigPath mproject configMonoi
 
          configCompilerCheck = fromMaybe MatchMinor configMonoidCompilerCheck
 
+     configDocker <- dockerOptsFromMonoid mproject configStackRoot configMonoidDockerOpts
+
      rawEnv <- liftIO getEnvironment
      origEnv <- mkEnvOverride configPlatform
               $ augmentPathMap (map toFilePath configMonoidExtraPath)
@@ -153,15 +155,15 @@ configFromConfigMonoid configStackRoot configUserConfigPath mproject configMonoi
      let configEnvOverride _ = return origEnv
 
      platformOnlyDir <- runReaderT platformOnlyRelDir configPlatform
-     configLocalPrograms <-
+     configLocalProgramsBase <-
          case configPlatform of
              Platform _ Windows -> do
                  progsDir <- getWindowsProgsDir configStackRoot origEnv
-                 return $ progsDir </> $(mkRelDir stackProgName) </> platformOnlyDir
+                 return $ progsDir </> $(mkRelDir stackProgName)
              _ ->
                  return $
-                 configStackRoot </> $(mkRelDir "programs") </>
-                 platformOnlyDir
+                 configStackRoot </> $(mkRelDir "programs")
+     let configLocalPrograms = configLocalProgramsBase </> platformOnlyDir
 
      configLocalBin <-
          case configMonoidLocalBinPath of
@@ -197,20 +199,25 @@ getDefaultGHCVariant
     :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m)
     => EnvOverride -> Platform -> m GHCVariant
 getDefaultGHCVariant menv (Platform _ Linux) = do
+    isGMP4 <- getIsGMP4 menv
+    return (if isGMP4 then GHCGMP4 else GHCStandard)
+getDefaultGHCVariant _ _ = return GHCStandard
+
+-- Determine whether 'stack' is linked with libgmp4 (libgmp.so.3)
+getIsGMP4
+    :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m)
+    => EnvOverride -> m Bool
+getIsGMP4 menv = do
     executablePath <- liftIO getExecutablePath
     elddOut <- tryProcessStdout Nothing menv "ldd" [executablePath]
     return $
         case elddOut of
-            Left _ -> GHCStandard
-            Right lddOut ->
-                if hasLineWithFirstWord "libgmp.so.3" lddOut
-                    then GHCGMP4
-                    else GHCStandard
+            Left _ -> False
+            Right lddOut -> hasLineWithFirstWord "libgmp.so.3" lddOut
   where
     hasLineWithFirstWord w =
         elem (Just w) .
         map (headMay . T.words) . T.lines . decodeUtf8With lenientDecode
-getDefaultGHCVariant _ _ = return GHCStandard
 
 -- | Get the directory on Windows where we should install extra programs. For
 -- more information, see discussion at:

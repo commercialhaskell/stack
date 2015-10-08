@@ -27,6 +27,7 @@ Other enhancements:
 * New experimental `stack query` command [#1087](https://github.com/commercialhaskell/stack/issues/1087)
 * By default, stack no longer rebuilds a package due to GHC options changes. This behavior can be tweaked with the `rebuild-ghc-options` setting. [#1089](https://github.com/commercialhaskell/stack/issues/1089)
 * By default, ghc-options are applied to all local packages, not just targets. This behavior can be tweaked with the `apply-ghc-options` setting. [#1089](https://github.com/commercialhaskell/stack/issues/1089)
+* Download or override location of stack executable to re-run in Docker container [#974](https://github.com/commercialhaskell/stack/issues/974)
 
 Bug fixes:
 

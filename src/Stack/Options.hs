@@ -23,6 +23,7 @@ module Stack.Options
 
 import           Control.Monad.Logger (LogLevel(..))
 import           Data.Char (isSpace, toLower)
+import           Data.List (intercalate)
 import           Data.List.Split (splitOn)
 import qualified Data.Map as Map
 import           Data.Map.Strict (Map)
@@ -37,6 +38,7 @@ import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Simple
 import           Options.Applicative.Types (readerAsk)
 import           Stack.Config (packagesParser)
+import           Stack.Constants (stackProgName)
 import           Stack.Docker
 import qualified Stack.Docker as Docker
 import           Stack.Dot
@@ -347,6 +349,17 @@ dockerOptsParser showOptions =
                         hide <>
                         metavar "PATH" <>
                         help "Location of image usage tracking database")
+    <*> optional (option str
+            (long(dockerOptName dockerStackExeArgName) <>
+             hide <>
+             metavar (intercalate "|"
+                          [ dockerStackExeDownloadVal
+                          , dockerStackExeHostVal
+                          , dockerStackExeImageVal
+                          , "PATH" ]) <>
+             help (concat [ "Location of "
+                          , stackProgName
+                          , " executable used in container" ])))
   where
     dockerOptName optName = dockerCmdName ++ "-" ++ T.unpack optName
     maybeStrOption = optional . option str
@@ -513,9 +526,9 @@ execOptsExtraParser = eoPlainParser <|>
 globalOptsParser :: Bool -> Parser GlobalOpts
 globalOptsParser defaultTerminal =
     GlobalOpts <$>
-    switch (long Docker.reExecArgName <>
-            hidden <>
-            internal) <*>
+    optional (strOption (long Docker.reExecArgName <>
+                         hidden <>
+                         internal)) <*>
     logLevelOptsParser <*>
     configOptsParser False <*>
     optional abstractResolverOptsParser <*>

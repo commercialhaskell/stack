@@ -1,5 +1,5 @@
 name:                stack
-version:             0.1.5.0
+version:             0.1.5.1
 synopsis:            The Haskell Tool Stack
 description:         Please see the README.md for usage information, and
                      the wiki on Github for more details.  Also, note that
@@ -30,6 +30,11 @@ flag integration-tests
   default: False
   description: Run the integration test suite
 
+flag mount-in-docker
+  manual: True
+  default: False
+  description: Bind-mount generated executable directly into created Docker containers (set when known to work, e.g. for linux-x86_64 w/ libgmp10)
+
 library
   hs-source-dirs:    src/
   ghc-options:       -Wall
@@ -37,6 +42,7 @@ library
                      Options.Applicative.Args
                      Stack.BuildPlan
                      Stack.Config
+                     Stack.Config.Docker
                      Stack.Constants
                      Stack.Docker
                      Stack.Docker.GlobalDB
@@ -181,13 +187,15 @@ library
     build-depends:   Win32
   else
     build-depends:   unix >= 2.7.0.1
+  if flag(mount-in-docker)
+    cpp-options:     -DMOUNT_IN_DOCKER
   default-language:  Haskell2010
 
 executable stack
   hs-source-dirs: src/main
   main-is:        Main.hs
   ghc-options:    -Wall -threaded -rtsopts
-  other-modules:     Paths_stack
+  other-modules:  Paths_stack
 
   build-depends:  base >=4.7 && < 5
                 , bytestring >= 0.10.4.0

@@ -89,7 +89,7 @@ instance (MonadIO m) => MonadLogger (StackT config m) where
 runStackTGlobal :: (MonadIO m,MonadBaseControl IO m)
                 => Manager -> config -> GlobalOpts -> StackT config m a -> m a
 runStackTGlobal manager config GlobalOpts{..} m =
-    runStackT manager globalLogLevel config globalTerminal globalReExec m
+    runStackT manager globalLogLevel config globalTerminal (isJust globalReExecVersion) m
 
 -- | Run a Stack action.
 runStackT :: (MonadIO m,MonadBaseControl IO m)
@@ -170,7 +170,7 @@ instance HasSupportsUnicode LoggingEnv where
 runStackLoggingTGlobal :: MonadIO m
                        => Manager -> GlobalOpts -> StackLoggingT m a -> m a
 runStackLoggingTGlobal manager GlobalOpts{..} m =
-    runStackLoggingT manager globalLogLevel globalTerminal globalReExec m
+    runStackLoggingT manager globalLogLevel globalTerminal (isJust globalReExecVersion) m
 
 -- | Run the logging monad.
 runStackLoggingT :: MonadIO m

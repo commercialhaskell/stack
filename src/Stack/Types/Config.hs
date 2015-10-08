@@ -25,7 +25,7 @@ import           Data.Aeson.Extended
                  (ToJSON, toJSON, FromJSON, parseJSON, withText, object,
                   (.=), (..:), (..:?), (..!=), Value(String, Object),
                   withObjectWarnings, WarningParser, Object, jsonSubWarnings, JSONWarning,
-                  jsonSubWarningsT, jsonSubWarningsTT, tellJSONField)
+                  jsonSubWarningsT, jsonSubWarningsTT)
 import           Data.Attoparsec.Args
 import           Data.Binary (Binary)
 import           Data.ByteString (ByteString)
@@ -72,6 +72,8 @@ data Config =
          -- ^ Docker configuration
          ,configEnvOverride         :: !(EnvSettings -> IO EnvOverride)
          -- ^ Environment variables to be passed to external tools
+         ,configLocalProgramsBase   :: !(Path Abs Dir)
+         -- ^ Non-platform-specific path containing local installations
          ,configLocalPrograms       :: !(Path Abs Dir)
          -- ^ Path containing local installations (mainly GHC)
          ,configConnectionCount     :: !Int
@@ -256,7 +258,7 @@ data EvalOpts = EvalOpts
 
 -- | Parsed global command-line options.
 data GlobalOpts = GlobalOpts
-    { globalReExec       :: !Bool
+    { globalReExecVersion :: !(Maybe String) -- ^ Expected re-exec in container version
     , globalLogLevel     :: !LogLevel -- ^ Log level
     , globalConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
@@ -1143,8 +1145,6 @@ parseDownloadInfoFromObject o = do
     url <- o ..: "url"
     contentLength <- o ..:? "content-length"
     sha1TextMay <- o ..:? "sha1"
-    -- Don't warn about 'version' field that is sometimes included
-    tellJSONField "version"
     return
         DownloadInfo
         { downloadInfoUrl = url
@@ -1173,6 +1173,7 @@ data SetupInfo = SetupInfo
     , siMsys2 :: Map Text VersionedDownloadInfo
     , siGHCs :: Map Text (Map Version DownloadInfo)
     , siGHCJSs :: Map Text (Map CompilerVersion DownloadInfo)
+    , siStack :: Map Text (Map Version DownloadInfo)
     }
     deriving Show
 
@@ -1183,8 +1184,7 @@ instance FromJSON (SetupInfo, [JSONWarning]) where
         siMsys2 <- jsonSubWarningsT (o ..:? "msys2" ..!= mempty)
         siGHCs <- jsonSubWarningsTT (o ..:? "ghc" ..!= mempty)
         siGHCJSs <- jsonSubWarningsTT (o ..:? "ghcjs" ..!= mempty)
-        -- Don't warn about 'portable-git' that is no-longer used
-        tellJSONField "portable-git"
+        siStack <- jsonSubWarningsTT (o ..:? "stack" ..!= mempty)
         return SetupInfo {..}
 
 -- | For @siGHCs@ and @siGHCJSs@ fields maps are deeply merged.
@@ -1197,6 +1197,7 @@ instance Monoid SetupInfo where
         , siMsys2 = Map.empty
         , siGHCs = Map.empty
         , siGHCJSs = Map.empty
+        , siStack = Map.empty
         }
     mappend l r =
         SetupInfo
@@ -1204,7 +1205,8 @@ instance Monoid SetupInfo where
         , siSevenzDll = siSevenzDll r <|> siSevenzDll l
         , siMsys2 = siMsys2 r <> siMsys2 l
         , siGHCs = Map.unionWith (<>) (siGHCs r) (siGHCs l)
-        , siGHCJSs = Map.unionWith (<>) (siGHCJSs r) (siGHCJSs l) }
+        , siGHCJSs = Map.unionWith (<>) (siGHCJSs r) (siGHCJSs l)
+        , siStack = Map.unionWith (<>) (siStack l) (siStack r) }
 
 -- | Remote or inline 'SetupInfo'
 data SetupInfoLocation

@@ -322,6 +322,11 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
          throwIO exitCode
        Right (global,run) -> do
          when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
+         case globalReExecVersion global of
+             Just expectVersion
+                 | expectVersion /= showVersion Meta.version ->
+                     throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
+             _ -> return ()
          run global `catch` \e -> do
             -- This special handler stops "stack: " from being printed before the
             -- exception
@@ -953,3 +958,14 @@ listDependenciesCmd sep go = withBuildConfig go (listDependencies sep')
 -- | Query build information
 queryCmd :: [String] -> GlobalOpts -> IO ()
 queryCmd selectors go = withBuildConfig go $ queryBuildInfo $ map T.pack selectors
+
+data MainException = InvalidReExecVersion String String
+instance Exception MainException
+instance Show MainException where
+    show (InvalidReExecVersion expected actual) = concat
+        [ "When re-executing '"
+        , stackProgName
+        , "' in a container, the incorrect version was found\nExpected: "
+        , expected
+        , "; found: "
+        , actual]

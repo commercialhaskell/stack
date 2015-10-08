@@ -184,6 +184,19 @@ otherwise noted.
       # all users share a single database.
       database-path: "~/.stack/docker.db"
 
+      # Location of a Docker container-compatible 'stack' executable with the
+      # matching version. This executable must be built on linux-x86_64 and
+      # statically linked.
+      # Valid values are:
+      #   host: use the host's executable.  This is the default when the host's
+      #     executable is known to work (e.g., from official linux-x86_64 bindist)
+      #   download: download a compatible executable matching the host's version.
+      #     This is the default when the host's executable is not known to work
+      #   image: use the 'stack' executable baked into the image.  The version
+      #     must match the host's version
+      #   /path/to/stack: path on the host's local filesystem
+      stack-exe: host
+
 Image Repositories
 -------------------------------------------------------------------------------
 

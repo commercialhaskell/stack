@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, ConstraintKinds, DeriveDataTypeable, FlexibleContexts, MultiWayIf, NamedFieldPuns,
-             OverloadedStrings, RankNTypes, RecordWildCards, TemplateHaskell, TupleSections #-}
+             OverloadedStrings, RankNTypes, RecordWildCards, ScopedTypeVariables, TemplateHaskell,
+             TupleSections #-}
 
 -- | Run commands in Docker containers
 module Stack.Docker
@@ -8,7 +9,6 @@ module Stack.Docker
   ,CleanupAction(..)
   ,dockerCleanupCmdName
   ,dockerCmdName
-  ,dockerOptsFromMonoid
   ,dockerPullCmdName
   ,execWithOptionalContainer
   ,preventInContainer
@@ -21,7 +21,7 @@ module Stack.Docker
 import           Control.Applicative
 import           Control.Exception.Lifted
 import           Control.Monad
-import           Control.Monad.Catch (MonadThrow,throwM,MonadCatch)
+import           Control.Monad.Catch (MonadThrow,throwM,MonadCatch,MonadMask)
 import           Control.Monad.IO.Class (MonadIO,liftIO)
 import           Control.Monad.Logger (MonadLogger,logError,logInfo,logWarn)
 import           Control.Monad.Reader (MonadReader,asks)
@@ -32,7 +32,7 @@ import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Char (isSpace,toUpper,isAscii,isDigit)
-import           Data.List (dropWhileEnd,find,intercalate,intersperse,isPrefixOf,isInfixOf,foldl',sortBy)
+import           Data.List (dropWhileEnd,intercalate,intersperse,isPrefixOf,isInfixOf,foldl',sortBy)
 import           Data.List.Extra (trim)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -43,17 +43,23 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Data.Time (UTCTime,LocalTime(..),diffDays,utcToLocalTime,getZonedTime,ZonedTime(..))
 import           Data.Typeable (Typeable)
+import           Data.Version (showVersion)
+import           Distribution.System (Platform (Platform), Arch (X86_64), OS (Linux))
+import           Distribution.Text (display)
+import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.IO (getWorkingDir,listDirectory,createTree,removeFile,removeTree,dirExists)
+import qualified Paths_stack as Meta
 import           Prelude -- Fix redundant import warnings
 import           Stack.Constants (projectDockerSandboxDir,stackProgName,stackRootEnvVar)
+import           Stack.Docker.GlobalDB
 import           Stack.Types
 import           Stack.Types.Internal
-import           Stack.Docker.GlobalDB
-import           System.Environment (lookupEnv,getProgName,getArgs,getExecutablePath)
+import           Stack.Setup (ensureDockerStackExe)
+import           System.Directory (canonicalizePath)
+import           System.Environment (lookupEnv,getProgName, getArgs,getExecutablePath)
 import           System.Exit (exitSuccess, exitWith)
 import           System.FilePath (dropTrailingPathSeparator,takeBaseName)
-import           System.Info (arch,os)
 import           System.IO (stderr,stdin,stdout,hIsTerminalDevice)
 import           System.Process.PagerEditor (editByteString)
 import           System.Process.Read
@@ -84,19 +90,37 @@ reexecWithOptionalContainer
 reexecWithOptionalContainer mprojectRoot =
   execWithOptionalContainer mprojectRoot getCmdArgs
   where
-    getCmdArgs =
-      do args <- (("--" ++ reExecArgName) :) <$> getArgs
-         if arch == "x86_64" && os == "linux"
-             then do exePath <- getExecutablePath
-                     let mountPath = concat ["/opt/host/bin/",takeBaseName exePath]
-                     return (mountPath
-                            ,args
-                            ,[]
-                            ,\c -> c{configDocker=(configDocker c)
-                                                  {dockerMount=Mount exePath mountPath :
-                                                               dockerMount (configDocker c)}})
-             else do progName <- getProgName
-                     return (takeBaseName progName,args,[],id)
+    getCmdArgs = do
+        config <- asks getConfig
+        args <-
+            fmap
+                (("--" ++ reExecArgName ++ "=" ++ showVersion Meta.version) :)
+                (liftIO getArgs)
+        case dockerStackExe (configDocker config) of
+            DockerStackExeHost
+              | configPlatform config == dockerContainerPlatform ->
+                  fmap (cmdArgs args) (liftIO getExecutablePath)
+              | otherwise ->
+                  throwM UnsupportedStackExeHostPlatformException
+            DockerStackExeImage -> do
+                progName <- liftIO getProgName
+                return (takeBaseName progName, args, [], id)
+            DockerStackExePath path ->
+                fmap (cmdArgs args) (liftIO $ canonicalizePath (toFilePath path))
+            DockerStackExeDownload ->
+                fmap (cmdArgs args . toFilePath) (ensureDockerStackExe dockerContainerPlatform)
+    cmdArgs args exePath =
+        let mountPath = concat ["/opt/host/bin/", takeBaseName exePath]
+        in ( mountPath
+           , args
+           , []
+           , \c ->
+                  c
+                  { configDocker = (configDocker c)
+                    { dockerMount = Mount exePath mountPath :
+                      dockerMount (configDocker c)
+                    }
+                  })
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
 -- Docker container.  Otherwise, runs the inner action.
@@ -105,7 +129,7 @@ reexecWithOptionalContainer mprojectRoot =
 execWithOptionalContainer
     :: M env m
     => Maybe (Path Abs Dir)
-    -> IO (FilePath,[String],[(String,String)],Config -> Config)
+    -> m (FilePath,[String],[(String,String)],Config -> Config)
     -> Maybe (m ())
     -> IO ()
     -> Maybe (m ())
@@ -126,7 +150,7 @@ execWithOptionalContainer mprojectRoot getCmdArgs mbefore inner mafter mrelease 
                fromMaybeAction mafter
                liftIO exitSuccess
         | otherwise ->
-            do (cmd_,args,envVars,modConfig) <- liftIO getCmdArgs
+            do (cmd_,args,envVars,modConfig) <- getCmdArgs
                fromMaybeAction mrelease
                runContainerAndExit
                  modConfig
@@ -476,8 +500,8 @@ cleanup opts =
              buildInspect hash
              return True
         buildContainer removeAge (hash,(image,name),created) =
-          do let display = (name ++ " (image: " ++ image ++ ")")
-             buildTime containerStr removeAge created display
+          do let disp = (name ++ " (image: " ++ image ++ ")")
+             buildTime containerStr removeAge created disp
              buildInspect hash
              return True
         buildProject (lastUsedTime, projectPath) =
@@ -507,10 +531,10 @@ cleanup opts =
               LocalTime oldDay _ = utcToLocalTime zone oldTime
           in diffDays today oldDay
         buildImageTime = buildTime imageStr
-        buildTime t removeAge time display =
+        buildTime t removeAge time disp =
           case removeAge of
-            Just d | daysAgo time >= d -> buildStrLn ("R " ++ t ++ " " ++ display)
-            _ -> buildKeep t display
+            Just d | daysAgo time >= d -> buildStrLn ("R " ++ t ++ " " ++ disp)
+            _ -> buildKeep t disp
         buildKeep t d = buildStrLn ("  " ++ t ++ " " ++ d)
         buildKeepImage = buildKeep imageStr
         buildSectionHead s = buildStrLn ("\n#\n# " ++ s ++ "\n#\n")
@@ -648,48 +672,6 @@ sandboxedHomeSubdirectories =
 homeDirName :: Path Rel Dir
 homeDirName = $(mkRelDir "_home/")
 
--- | Interprets DockerOptsMonoid options.
-dockerOptsFromMonoid :: Maybe Project -> Path Abs Dir -> DockerOptsMonoid -> DockerOpts
-dockerOptsFromMonoid mproject stackRoot DockerOptsMonoid{..} = DockerOpts
-  {dockerEnable = fromMaybe (fromMaybe False dockerMonoidExists) dockerMonoidEnable
-  ,dockerImage =
-     let defaultTag =
-           case mproject of
-             Nothing -> ""
-             Just proj ->
-               case projectResolver proj of
-                 ResolverSnapshot n@(LTS _ _) -> ":" ++  T.unpack (renderSnapName n)
-                 _ -> throw (ResolverNotSupportedException (projectResolver proj))
-     in case dockerMonoidRepoOrImage of
-       Nothing -> "fpco/stack-build" ++ defaultTag
-       Just (DockerMonoidImage image) -> image
-       Just (DockerMonoidRepo repo) ->
-         case find (`elem` (":@" :: String)) repo of
-           Just _ -> -- Repo already specified a tag or digest, so don't append default
-                     repo
-           Nothing -> repo ++ defaultTag
-  ,dockerRegistryLogin = fromMaybe (isJust (emptyToNothing dockerMonoidRegistryUsername))
-                                   dockerMonoidRegistryLogin
-  ,dockerRegistryUsername = emptyToNothing dockerMonoidRegistryUsername
-  ,dockerRegistryPassword = emptyToNothing dockerMonoidRegistryPassword
-  ,dockerAutoPull = fromMaybe False dockerMonoidAutoPull
-  ,dockerDetach = fromMaybe False dockerMonoidDetach
-  ,dockerPersist = fromMaybe False dockerMonoidPersist
-  ,dockerContainerName = emptyToNothing dockerMonoidContainerName
-  ,dockerRunArgs = dockerMonoidRunArgs
-  ,dockerMount = dockerMonoidMount
-  ,dockerEnv = dockerMonoidEnv
-  ,dockerDatabasePath =
-     case dockerMonoidDatabasePath of
-       Nothing -> stackRoot </> $(mkRelFile "docker.db")
-       Just fp -> case parseAbsFile fp of
-                    Left e -> throw (InvalidDatabasePathException e)
-                    Right p -> p
-  }
-  where emptyToNothing Nothing = Nothing
-        emptyToNothing (Just s) | null s = Nothing
-                                | otherwise = Just s
-
 -- | Convenience function to decode ByteString to String.
 decodeUtf8 :: BS.ByteString -> String
 decodeUtf8 bs = T.unpack (T.decodeUtf8 (bs))
@@ -724,7 +706,7 @@ dockerCleanupCmdName = "cleanup"
 
 -- | Command-line option for @--internal-re-exec@.
 reExecArgName :: String
-reExecArgName = "internal-re-exec"
+reExecArgName = "internal-re-exec-version"
 
 -- | Options for 'cleanup'.
 data CleanupOpts = CleanupOpts
@@ -800,14 +782,12 @@ data StackDockerException
     -- ^ Version of @stack@ on host is too old for version in image.
   | ContainerStackTooOldException Version Version
     -- ^ Version of @stack@ in container/image is too old for version on host.
-  | ResolverNotSupportedException Resolver
-    -- ^ Only LTS resolvers are supported for default image tag.
   | CannotDetermineProjectRootException
     -- ^ Can't determine the project root (where to put docker sandbox).
   | DockerNotInstalledException
     -- ^ @docker --version@ failed.
-  | InvalidDatabasePathException SomeException
-    -- ^ Invalid global database path.
+  | UnsupportedStackExeHostPlatformException
+    -- ^ Using host stack-exe on unsupported platform.
   deriving (Typeable)
 
 -- | Exception instance for StackDockerException.
@@ -877,18 +857,20 @@ instance Show StackDockerException where
            ," is required; the container has "
            ,versionString containerVersion
            ,"."]
-  show (ResolverNotSupportedException resolver) =
-    concat ["Resolver not supported for Docker images:\n    "
-           ,show resolver
-           ,"\nUse an LTS resolver, or set the '"
-           ,T.unpack dockerImageArgName
-           ,"' explicitly, in your configuration file."]
   show CannotDetermineProjectRootException =
     "Cannot determine project root directory for Docker sandbox."
-  show DockerNotInstalledException=
+  show DockerNotInstalledException =
     "Cannot find 'docker' in PATH.  Is Docker installed?"
-  show (InvalidDatabasePathException ex) =
-    concat ["Invalid database path: ",show ex]
+  show UnsupportedStackExeHostPlatformException = concat
+    [ "Using host's "
+    , stackProgName
+    , " executable in Docker container is only supported on "
+    , display dockerContainerPlatform
+    , " platform" ]
+
+-- | Platform that Docker containers run
+dockerContainerPlatform :: Platform
+dockerContainerPlatform = Platform X86_64 Linux
 
 type M env m = (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadCatch m
-               ,HasConfig env,HasTerminal env,HasReExec env)
+               ,HasConfig env,HasTerminal env,HasReExec env,HasHttpManager env,MonadMask m)

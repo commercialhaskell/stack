@@ -107,9 +107,9 @@ extraDirs :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
           => Tool
           -> m ExtraDirs
 extraDirs tool = do
-    platform <- asks getPlatform
-    dir <- installDir tool
-    case (platform, toolNameString tool) of
+    config <- asks getConfig
+    dir <- installDir (configLocalPrograms config) tool
+    case (configPlatform config, toolNameString tool) of
         (Platform _ Cabal.Windows, isGHC -> True) -> return mempty
             { edBins = goList
                 [ dir </> $(mkRelDir "bin")
@@ -160,12 +160,12 @@ instance Monoid ExtraDirs where
         (c ++ z)
 
 installDir :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
-           => Tool
+           => Path Abs Dir
+           -> Tool
            -> m (Path Abs Dir)
-installDir tool = do
-    config <- asks getConfig
+installDir programsDir tool = do
     reldir <- parseRelDir $ toolString tool
-    return $ configLocalPrograms config </> reldir
+    return $ programsDir </> reldir
 
 toFilePathNoTrailingSlash :: Path loc Dir -> FilePath
 toFilePathNoTrailingSlash = FP.dropTrailingPathSeparator . toFilePath
