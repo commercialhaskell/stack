@@ -53,15 +53,23 @@ stack exec my-project-exe
 
 - The `stack new` command will create a new directory containing all
 the needed files to start a project correctly.
-- The `stack setup` will download the compiler if necessary.
+- The `stack setup` will download the compiler if necessary in an isolated
+  location (default `~/.stack`) that won't interfere with any system-level
+  installations. (For information on installation paths, please use the `stack
+  path` command.).
 - The `stack build` command will build the minimal project.
 - `stack exec my-project-exe` will execute the command.
+- If you just want to install an executable using stack, then all you have to do
+is`stack install <package-name>`.
 
 If you want to launch a REPL:
 
 ~~~ {.bash}
 stack ghci
 ~~~
+
+
+Run `stack` for a complete list of commands.
 
 ##### Workflow
 
@@ -101,31 +109,6 @@ executables.
 
 It was a really fast introduction on how to start to code in Haskell using `stack`.
 If you want to go further, we highly recommend you to read the [`stack` guide](https://github.com/commercialhaskell/stack/blob/master/doc/GUIDE.md).
-
-#### How to use
-
-Go into a Haskell project directory and run `stack build`. If everything is
-already configured, this will:
-
-* Download the package index.
-* Download and install all necessary dependencies for the project.
-* Build and install the project.
-
-You may be prompted to run some of the following along the way:
-
-* `stack new` to create a brand new project.
-* `stack init` to create a stack configuration file for an existing project.
-  stack will figure out what Stackage release (LTS or nightly) is appropriate
-  for the dependencies.
-* `stack setup` to download and install the correct GHC version in an
-  isolated location (default `~/.stack`) that won't interfere with any
-  system-level installations. (For information on installation paths,
-  please use the `stack path` command.)
-
-If you just want to install an executable using stack, then all you have
-to do is `stack install <package-name>`.
-
-Run `stack` for a complete list of commands.
 
 #### How to contribute
 
