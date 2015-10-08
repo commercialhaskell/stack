@@ -614,12 +614,13 @@ configureOpts :: EnvConfig
               -> BaseConfigOpts
               -> Map PackageIdentifier GhcPkgId -- ^ dependencies
               -> Bool -- ^ wanted?
+              -> Bool -- ^ local non-extra-dep?
               -> InstallLocation
               -> Package
               -> ConfigureOpts
-configureOpts econfig bco deps wanted loc package = ConfigureOpts
+configureOpts econfig bco deps wanted isLocal loc package = ConfigureOpts
     { coDirs = configureOptsDirs bco loc package
-    , coNoDirs = configureOptsNoDir econfig bco deps wanted package
+    , coNoDirs = configureOptsNoDir econfig bco deps wanted isLocal package
     }
 
 configureOptsDirs :: BaseConfigOpts
@@ -660,9 +661,10 @@ configureOptsNoDir :: EnvConfig
                    -> BaseConfigOpts
                    -> Map PackageIdentifier GhcPkgId -- ^ dependencies
                    -> Bool -- ^ wanted?
+                   -> Bool -- ^ is this a local, non-extra-dep?
                    -> Package
                    -> [String]
-configureOptsNoDir econfig bco deps wanted package = concat
+configureOptsNoDir econfig bco deps wanted isLocal package = concat
     [ depOptions
     , ["--enable-library-profiling" | boptsLibProfile bopts || boptsExeProfile bopts]
     , ["--enable-executable-profiling" | boptsExeProfile bopts]
@@ -711,10 +713,16 @@ configureOptsNoDir econfig bco deps wanted package = concat
     allGhcOptions = concat
         [ fromMaybe [] $ Map.lookup Nothing ghcOptionsMap
         , fromMaybe [] $ Map.lookup (Just $ packageName package) ghcOptionsMap
-        , if wanted
+        , if includeExtraOptions
             then boptsGhcOptions bopts
             else []
         ]
+
+    includeExtraOptions =
+        case configApplyGhcOptions config of
+            AGOTargets -> wanted
+            AGOLocals -> isLocal
+            AGOEverything -> True
 
 -- | Get set of wanted package names from locals.
 wantedLocalPackages :: [LocalPackage] -> Set PackageName

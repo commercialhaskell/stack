@@ -233,6 +233,7 @@ addFinal lp lptb = do
                             (baseConfigOpts ctx)
                             allDeps
                             True -- wanted
+                            True -- local
                             Local
                             package
                 , taskPresent = present
@@ -350,6 +351,7 @@ installPackage treatAsDep name ps = do
                             (baseConfigOpts ctx)
                             allDeps
                             (psWanted ps)
+                            (psLocal ps)
                             -- An assertion to check for a recurrence of
                             -- https://github.com/commercialhaskell/stack/issues/345
                             (assert (destLoc == piiLocation ps) destLoc)
@@ -427,6 +429,7 @@ checkDirtiness ps installed package present wanted = do
             (baseConfigOpts ctx)
             present
             (psWanted ps)
+            (psLocal ps)
             (piiLocation ps) -- should be Local always
             package
         buildOpts = bcoBuildOpts (baseConfigOpts ctx)
@@ -525,6 +528,10 @@ psDirty (PSUpstream _ _ _) = False -- files never change in an upstream package
 psWanted :: PackageSource -> Bool
 psWanted (PSLocal lp) = lpWanted lp
 psWanted (PSUpstream _ _ _) = False
+
+psLocal :: PackageSource -> Bool
+psLocal (PSLocal _) = True
+psLocal (PSUpstream _ _ _) = False
 
 psPackage :: PackageName -> PackageSource -> M Package
 psPackage _ (PSLocal lp) = return $ lpPackage lp

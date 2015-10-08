@@ -335,3 +335,17 @@ Should we rebuild a package when its GHC options change? Before 0.1.6, this was 
 ```yaml
 rebuild-ghc-options: true
 ```
+
+### apply-ghc-options
+
+(Since 0.1.6)
+
+Which packages do ghc-options on the command line get applied to? Before 0.1.6, the default value was `targets`
+
+```yaml
+apply-ghc-options: locals # all local packages, the default
+# apply-ghc-options: targets # all local packages that are targets
+# apply-ghc-options: everything # applied even to snapshot and extra-deps
+```
+
+Note that `everything` is a slightly dangerous value, as it can break invariants about your snapshot database.

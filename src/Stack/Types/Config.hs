@@ -147,7 +147,23 @@ data Config =
          -- ^ See 'explicitSetupDeps'. 'Nothing' provides the default value.
          ,configRebuildGhcOptions   :: !Bool
          -- ^ Rebuild on GHC options changes
+         ,configApplyGhcOptions     :: !ApplyGhcOptions
+         -- ^ Which packages to ghc-options on the command line apply to?
          }
+
+-- | Which packages to ghc-options on the command line apply to?
+data ApplyGhcOptions = AGOTargets -- ^ all local targets
+                     | AGOLocals -- ^ all local packages, even non-targets
+                     | AGOEverything -- ^ every package
+  deriving (Show, Read, Eq, Ord, Enum, Bounded)
+
+instance FromJSON ApplyGhcOptions where
+    parseJSON = withText "ApplyGhcOptions" $ \t ->
+        case t of
+            "targets" -> return AGOTargets
+            "locals" -> return AGOLocals
+            "everything" -> return AGOEverything
+            _ -> fail $ "Invalid ApplyGhcOptions: " ++ show t
 
 -- | Information on a single package index
 data PackageIndex = PackageIndex
@@ -586,6 +602,7 @@ data ConfigMonoid =
     -- ^ See 'configExplicitSetupDeps'
     ,configMonoidRebuildGhcOptions   :: !(Maybe Bool)
     -- ^ See 'configMonoidRebuildGhcOptions'
+    ,configMonoidApplyGhcOptions     :: !(Maybe ApplyGhcOptions)
     }
   deriving Show
 
@@ -620,6 +637,7 @@ instance Monoid ConfigMonoid where
     , configMonoidModifyCodePage = Nothing
     , configMonoidExplicitSetupDeps = mempty
     , configMonoidRebuildGhcOptions = Nothing
+    , configMonoidApplyGhcOptions = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -652,6 +670,7 @@ instance Monoid ConfigMonoid where
     , configMonoidModifyCodePage = configMonoidModifyCodePage l <|> configMonoidModifyCodePage r
     , configMonoidExplicitSetupDeps = configMonoidExplicitSetupDeps l <> configMonoidExplicitSetupDeps r
     , configMonoidRebuildGhcOptions = configMonoidRebuildGhcOptions l <|> configMonoidRebuildGhcOptions r
+    , configMonoidApplyGhcOptions = configMonoidApplyGhcOptions l <|> configMonoidApplyGhcOptions r
     }
 
 instance FromJSON (ConfigMonoid, [JSONWarning]) where
@@ -712,6 +731,7 @@ parseConfigMonoidJSON obj = do
         (obj ..:? "explicit-setup-deps" ..!= mempty)
         >>= fmap Map.fromList . mapM handleExplicitSetupDep . Map.toList
     configMonoidRebuildGhcOptions <- obj ..:? "rebuild-ghc-options"
+    configMonoidApplyGhcOptions <- obj ..:? "apply-ghc-options"
 
     return ConfigMonoid {..}
   where
