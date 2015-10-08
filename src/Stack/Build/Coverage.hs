@@ -5,13 +5,15 @@
 {-# LANGUAGE TemplateHaskell       #-}
 -- | Generate HPC (Haskell Program Coverage) reports
 module Stack.Build.Coverage
-    ( generateHpcReport
+    ( updateTixFile
+    , generateHpcReport
+    , generateHpcUnifiedReport
     , generateHpcMarkupIndex
     ) where
 
 import           Control.Applicative
 import           Control.Exception.Lifted
-import           Control.Monad                  (liftM)
+import           Control.Monad                  (liftM, when)
 import           Control.Monad.Catch            (MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -30,6 +32,7 @@ import qualified Data.Text.Encoding             as T
 import qualified Data.Text.IO                   as T
 import qualified Data.Text.Lazy                 as LT
 import           Data.Traversable               (forM)
+import           Trace.Hpc.Tix
 import           Path
 import           Path.IO
 import           Prelude                        hiding (FilePath, writeFile)
@@ -39,11 +42,35 @@ import           Stack.Types
 import           System.Process.Read
 import           Text.Hastache                  (htmlEscape)
 
+-- | Move a tix file into a sub-directory of the hpc report directory.
+-- Deletes the old one if one is present.
+updateTixFile :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
+            => Path Abs File -> String -> m ()
+updateTixFile tixSrc pkgId = do
+    exists <- fileExists tixSrc
+    when exists $ do
+        outputDir <- hpcReportDir
+        pkgIdRel <- parseRelDir pkgId
+        let tixDest = outputDir </> pkgIdRel </> filename tixSrc
+        removeFileIfExists tixDest
+        createTree (parent tixDest)
+        renameFile tixSrc tixDest
+
+-- | Get the tix file location, given the name of the file (without
+-- extension), and the package identifier string.
+tixFilePath ::  (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
+            => String -> String ->  m (Path Abs File)
+tixFilePath pkgId tixName = do
+    outputDir <- hpcReportDir
+    pkgIdRel <- parseRelDir pkgId
+    tixRel <- parseRelFile (tixName ++ ".tix")
+    return (outputDir </> pkgIdRel </> tixRel)
+
 -- | Generates the HTML coverage report and shows a textual coverage
--- summary.
+-- summary for a package.
 generateHpcReport :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
-                  => Path Abs Dir -> Package -> [Text] -> (PackageName -> m (Maybe Text)) -> m ()
-generateHpcReport pkgDir package tests getGhcPkgKey = do
+                  => Package -> [Text] -> (PackageName -> m (Maybe Text)) -> m ()
+generateHpcReport package tests getGhcPkgKey = do
     -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a
     -- ghc package key. See
     -- https://github.com/commercialhaskell/stack/issues/785
@@ -59,68 +86,124 @@ generateHpcReport pkgDir package tests getGhcPkgKey = do
                     Nothing -> fail $ "Before computing test coverage report, failed to find GHC package key for " ++ T.unpack pkgName
                     Just ghcPkgKey -> return $ T.unpack ghcPkgKey
     forM_ tests $ \testName -> do
-        let whichTest = pkgName <> "'s test-suite \"" <> testName <> "\""
-        -- Compute destination directory.
-        installDir <- installationRootLocal
-        testNamePath <- parseRelDir (T.unpack testName)
-        pkgIdPath <- parseRelDir pkgId
-        let destDir = installDir </> hpcDirSuffix </> pkgIdPath </> testNamePath
-        -- Directories for .mix files.
-        hpcDir <- hpcDirFromDir pkgDir
-        hpcRelDir <- (</> dotHpc) <$> hpcRelativeDir
-        -- Compute arguments used for both "hpc markup" and "hpc report".
-        pkgDirs <- Map.keys . envConfigPackages <$> asks getEnvConfig
-        let args =
-                -- Use index files from all packages (allows cross-package
-                -- coverage results).
-                concatMap (\x -> ["--srcdir", toFilePath x]) pkgDirs ++
-                -- Look for index files in the correct dir (relative to
-                -- each pkgdir).
-                ["--hpcdir", toFilePath hpcRelDir, "--reset-hpcdirs"
-                -- Restrict to just the current library code (see #634 -
-                -- this will likely be customizable in the future)
-                ,"--include", includeName ++ ":"]
-        -- If a .tix file exists, generate an HPC report for it.
-        tixFile <- parseRelFile (T.unpack testName ++ ".tix")
-        let tixFileAbs = hpcDir </> tixFile
-        tixFileExists <- fileExists tixFileAbs
-        if not tixFileExists
-            then $logError $ T.concat
-                [ "Didn't find .tix coverage file for "
-                , whichTest
-                , " - expected to find it at "
-                , T.pack (toFilePath tixFileAbs)
-                , "."
-                ]
-            else (`onException` $logError ("Error occurred while producing coverage report for " <> whichTest)) $ do
-                menv <- getMinimalEnvOverride
-                $logInfo $ "Generating HTML coverage report for " <> whichTest
-                _ <- readProcessStdout (Just hpcDir) menv "hpc"
-                    ("markup" : toFilePath tixFileAbs : ("--destdir=" ++ toFilePath destDir) : args)
-                output <- readProcessStdout (Just hpcDir) menv "hpc"
-                    ("report" : toFilePath tixFileAbs : args)
-                -- Print output, stripping @\r@ characters because
-                -- Windows.
-                forM_ (S8.lines output) ($logInfo . T.decodeUtf8 . S8.filter (not . (=='\r')))
-                $logInfo
-                    ("The HTML coverage report for " <> whichTest <> " is available at " <>
-                     T.pack (toFilePath (destDir </> $(mkRelFile "hpc_index.html"))))
+        tixSrc <- tixFilePath pkgId (T.unpack testName)
+        subdir <- parseRelDir (T.unpack testName)
+        let report = "coverage report for " <> pkgName <> "'s test-suite \"" <> testName <> "\""
+            -- Restrict to just the current library code (see #634 -
+            -- this will likely be customizable in the future)
+            extraArgs = ["--include", includeName ++ ":"]
+        generateHpcReportInternal tixSrc subdir report extraArgs extraArgs
+
+generateHpcReportInternal :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
+                          => Path Abs File -> Path Rel Dir -> Text -> [String] -> [String] -> m ()
+generateHpcReportInternal tixSrc subdir report extraMarkupArgs extraReportArgs = do
+    -- If a .tix file exists, move it to the HPC output directory
+    -- and generate a report for it.
+    tixFileExists <- fileExists tixSrc
+    if not tixFileExists
+        then $logError $ T.concat
+            [ "Didn't find .tix for "
+            , report
+            , " - expected to find it at "
+            , T.pack (toFilePath tixSrc)
+            , "."
+            ]
+        else (`onException` $logError ("Error occurred while producing " <> report)) $ do
+            -- Directories for .mix files.
+            hpcRelDir <- (</> dotHpc) <$> hpcRelativeDir
+            -- Compute arguments used for both "hpc markup" and "hpc report".
+            pkgDirs <- Map.keys . envConfigPackages <$> asks getEnvConfig
+            let args =
+                    -- Use index files from all packages (allows cross-package
+                    -- coverage results).
+                    concatMap (\x -> ["--srcdir", toFilePath x]) pkgDirs ++
+                    -- Look for index files in the correct dir (relative to
+                    -- each pkgdir).
+                    ["--hpcdir", toFilePath hpcRelDir, "--reset-hpcdirs"]
+                reportDest = parent tixSrc </> subdir
+            menv <- getMinimalEnvOverride
+            $logInfo $ "Generating " <> report
+            _ <- readProcessStdout Nothing menv "hpc"
+                ( "markup"
+                : toFilePath tixSrc
+                : ("--destdir=" ++ toFilePath reportDest)
+                : (args ++ extraMarkupArgs)
+                )
+            output <- readProcessStdout Nothing menv "hpc"
+                ( "report"
+                : toFilePath tixSrc
+                : (args ++ extraReportArgs)
+                )
+            -- Print output, stripping @\r@ characters because
+            -- Windows.
+            forM_ (S8.lines output) ($logInfo . T.decodeUtf8 . S8.filter (not . (=='\r')))
+            $logInfo
+                ("The " <> report <> " is available at " <>
+                 T.pack (toFilePath (reportDest </> $(mkRelFile "hpc_index.html"))))
+
+generateHpcUnifiedReport :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
+                     => m ()
+generateHpcUnifiedReport = do
+    outputDir <- hpcReportDir
+    createTree outputDir
+    (dirs, _) <- listDirectory outputDir
+    tixFiles <- liftM concat $ forM dirs $ \dir -> do
+        (_, files) <- listDirectory dir
+        return (filter ((".tix" `isSuffixOf`) . toFilePath) files)
+    if length tixFiles < 2
+        then $logInfo $ T.concat $
+            [ if null tixFiles then "No tix files" else "Only one tix file"
+            , " found in "
+            , T.pack (toFilePath outputDir)
+            , ", so not generating a unified coverage report."
+            ]
+        else do
+            tixes <- mapM (liftM (fmap removeExeModules) . readTixOrLog) tixFiles
+            let (errs, tix) = unionTixes (catMaybes tixes)
+            when (not (null errs)) $ $logWarn $ T.concat $
+                "The following modules are left out of the unified report due to version mismatches: " :
+                intersperse ", " (map T.pack errs)
+            let tixDest = outputDir </> $(mkRelFile "unified/unified.tix")
+            createTree (parent tixDest)
+            liftIO $ writeTix (toFilePath tixDest) tix
+            generateHpcReportInternal tixDest $(mkRelDir "unified") "unified report" [] []
+
+readTixOrLog :: (MonadLogger m, MonadIO m) => Path b File -> m (Maybe Tix)
+readTixOrLog path = do
+    mtix <- liftIO $ readTix (toFilePath path)
+    when (isNothing mtix) $
+        $logError $ "Failed to read tix file " <> T.pack (toFilePath path)
+    return mtix
+
+-- | Module names which contain '/' have a package name, and so they
+-- weren't built into the executable.
+removeExeModules :: Tix -> Tix
+removeExeModules (Tix ms) = Tix (filter (\(TixModule name _ _ _) -> '/' `elem` name) ms)
+
+unionTixes :: [Tix] -> ([String], Tix)
+unionTixes tixes = (Map.keys errs, Tix (Map.elems outputs))
+  where
+    (errs, outputs) = Map.mapEither id $ Map.unionsWith merge $ map toMap tixes
+    toMap (Tix ms) = Map.fromList (map (\x@(TixModule k _ _ _) -> (k, Right x)) ms)
+    merge (Right (TixModule k hash1 len1 tix1))
+          (Right (TixModule _ hash2 len2 tix2))
+        | hash1 == hash2 && len1 == len2 = Right (TixModule k hash1 len1 (zipWith (+) tix1 tix2))
+    merge _ _ = Left ()
 
 generateHpcMarkupIndex :: (MonadIO m,MonadReader env m,MonadLogger m,MonadCatch m,HasEnvConfig env)
                        => m ()
 generateHpcMarkupIndex = do
-    installDir <- installationRootLocal
-    let markupDir = installDir </> hpcDirSuffix
-        outputFile = markupDir </> $(mkRelFile "index.html")
-    createTree markupDir
-    (dirs, _) <- listDirectory markupDir
+    outputDir <- hpcReportDir
+    let outputFile = outputDir </> $(mkRelFile "index.html")
+    createTree outputDir
+    (dirs, _) <- listDirectory outputDir
     rows <- liftM (catMaybes . concat) $ forM dirs $ \dir -> do
         (subdirs, _) <- listDirectory dir
         forM subdirs $ \subdir -> do
             let indexPath = subdir </> $(mkRelFile "hpc_index.html")
             exists' <- fileExists indexPath
             if not exists' then return Nothing else do
-                relPath <- stripDir markupDir indexPath
+                relPath <- stripDir outputDir indexPath
                 let package = dirname dir
                     testsuite = dirname subdir
                 return $ Just $ T.concat
@@ -146,7 +229,7 @@ generateHpcMarkupIndex = do
         (if null rows
             then
                 [ "<b>No hpc_index.html files found in \""
-                , pathToHtml markupDir
+                , pathToHtml outputDir
                 , "\".</b>"
                 ]
             else

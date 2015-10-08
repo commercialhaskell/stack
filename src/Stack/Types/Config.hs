@@ -987,9 +987,12 @@ bindirSuffix = $(mkRelDir "bin")
 docDirSuffix :: Path Rel Dir
 docDirSuffix = $(mkRelDir "doc")
 
--- | Suffix applied to an installation root to get the hpc dir
-hpcDirSuffix :: Path Rel Dir
-hpcDirSuffix = $(mkRelDir "hpc")
+-- | Where HPC reports and tix files get stored.
+hpcReportDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
+             => m (Path Abs Dir)
+hpcReportDir = do
+   root <- installationRootLocal
+   return $ root </> $(mkRelDir "hpc")
 
 -- | Get the extra bin directories (for the PATH). Puts more local first
 --

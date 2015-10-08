@@ -487,7 +487,9 @@ executePlan' installedMap plan ee@ExecuteEnv {..} = do
         generateLocalHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeLocals
         generateDepsHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeLocals
         generateSnapHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeGlobalDB
-    when (toCoverage $ boptsTestOpts eeBuildOpts) generateHpcMarkupIndex
+    when (toCoverage $ boptsTestOpts eeBuildOpts) $ do
+        generateHpcUnifiedReport
+        generateHpcMarkupIndex
   where
     installedMap' = Map.difference installedMap
                   $ Map.fromList
@@ -1162,10 +1164,11 @@ singleTest runInBase topts lptb ac ee task installedMap = do
                         (Just inH, Nothing, Nothing, ph) <- liftIO $ createProcess_ "singleBuild.runTests" cp
                         liftIO $ hClose inH
                         ec <- liftIO $ waitForProcess ph
-                        -- Move the .tix file out of the package directory
-                        -- into the hpc work dir, for tidiness.
+                        -- Move the .tix file out of the package
+                        -- directory into the hpc work dir, for
+                        -- tidiness.
                         when needHpc $
-                            moveFileIfExists nameTix hpcDir
+                            updateTixFile nameTix (packageIdentifierString (packageIdentifier package))
                         return $ case ec of
                             ExitSuccess -> Map.empty
                             _ -> Map.singleton testName $ Just ec
@@ -1184,7 +1187,7 @@ singleTest runInBase topts lptb ac ee task installedMap = do
                         [ bcoSnapDB (eeBaseConfigOpts ee)
                         , bcoLocalDB (eeBaseConfigOpts ee)
                         ]
-                generateHpcReport pkgDir package testsToRun (findGhcPkgKey (eeEnvOverride ee) wc pkgDbs)
+                generateHpcReport package testsToRun (findGhcPkgKey (eeEnvOverride ee) wc pkgDbs)
 
             bs <- liftIO $
                 case mlogFile of
