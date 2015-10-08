@@ -180,6 +180,7 @@ parseTargetsFromBuildOpts needTargets bopts = do
     flagExtraDeps <- convertSnapshotToExtra
         snapshot
         (bcExtraDeps bconfig)
+        rawLocals
         (catMaybes $ Map.keys $ boptsFlags bopts)
 
     (cliExtraDeps, targets) <-
@@ -199,14 +200,16 @@ convertSnapshotToExtra
     :: MonadLogger m
     => Map PackageName Version -- ^ snapshot
     -> Map PackageName Version -- ^ extra-deps
+    -> Map PackageName a -- ^ locals
     -> [PackageName] -- ^ packages referenced by a flag
     -> m (Map PackageName Version)
-convertSnapshotToExtra snapshot extra0 flags0 =
+convertSnapshotToExtra snapshot extra0 locals flags0 =
     go Map.empty flags0
   where
     go !extra [] = return extra
     go extra (flag:flags)
         | Just _ <- Map.lookup flag extra0 = go extra flags
+        | flag `Map.member` locals = go extra flags
         | otherwise = case Map.lookup flag snapshot of
             Nothing -> go extra flags
             Just version -> do
