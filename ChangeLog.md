@@ -33,7 +33,7 @@ Bug fixes:
 * Mark executable-only packages as installed when copied from cache [#1043](https://github.com/commercialhaskell/stack/pull/1043)
 * Canonicalize temporary directory paths [#1047](https://github.com/commercialhaskell/stack/pull/1047)
 * Put code page fix inside the build function itself [#1066](https://github.com/commercialhaskell/stack/issues/1066)
-* Add `explicit-setup-deps` option [#1110](https://github.com/commercialhaskell/stack/issues/1110)
+* Add `explicit-setup-deps` option [#1110](https://github.com/commercialhaskell/stack/issues/1110), and change the default to the old behavior of using any package in the global and snapshot database [#1025](https://github.com/commercialhaskell/stack/issues/1025)
 
 ## 0.1.5.0
 

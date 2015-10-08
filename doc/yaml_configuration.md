@@ -322,6 +322,6 @@ support for explicit Setup.hs dependencies.
 
 ```yaml
 explicit-setup-deps:
-    "*": false # change the default
-    entropy: true # override the new default for one package
+    "*": true # change the default
+    entropy: false # override the new default for one package
 ```

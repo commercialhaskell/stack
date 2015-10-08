@@ -1234,4 +1234,4 @@ explicitSetupDeps name = do
             Nothing ->
                 case Map.lookup Nothing m of
                     Just b -> b
-                    Nothing -> True -- default value
+                    Nothing -> False -- default value

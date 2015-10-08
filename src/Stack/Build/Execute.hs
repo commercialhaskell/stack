@@ -745,8 +745,8 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                               cabalPackageArg
                             : "-clear-package-db"
                             : "-global-package-db"
-                            : ("-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts))
                             : map (("-package-db=" ++) . toFilePath) (bcoExtraDBs eeBaseConfigOpts)
+                           ++ ["-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts)]
 
                 setupArgs = ("--builddir=" ++ toFilePath distRelativeDir') : args
                 runExe exeName fullArgs = do
