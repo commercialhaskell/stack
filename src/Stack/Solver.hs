@@ -4,7 +4,6 @@
 {-# LANGUAGE TemplateHaskell       #-}
 module Stack.Solver
     ( cabalSolver
-    , getCompilerVersion
     , solveExtraDeps
     ) where
 
@@ -17,11 +16,11 @@ import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
 import           Data.Aeson.Extended         (object, (.=), toJSON, logJSONWarnings)
 import qualified Data.ByteString             as S
-import qualified Data.ByteString.Char8       as S8
 import           Data.Either
 import qualified Data.HashMap.Strict         as HashMap
 import           Data.Map                    (Map)
 import qualified Data.Map                    as Map
+import           Data.Monoid
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import           Data.Text.Encoding          (decodeUtf8, encodeUtf8)
@@ -31,6 +30,7 @@ import           Path
 import           Path.IO                     (parseRelAsAbsDir)
 import           Prelude
 import           Stack.BuildPlan
+import           Stack.Setup.Installed
 import           Stack.Types
 import           System.Directory            (copyFile,
                                               createDirectoryIfMissing,
@@ -50,7 +50,30 @@ cabalSolver wc cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-s
     let configFile = dir FP.</> "cabal.config"
     liftIO $ S.writeFile configFile $ encodeUtf8 $ T.unlines configLines
 
-    menv <- getMinimalEnvOverride
+    menv0 <- getMinimalEnvOverride
+    mghc <- findExecutable menv0 "ghc"
+    platform <- asks getPlatform
+    menv <-
+        case mghc of
+            Just _ -> return menv0
+            Nothing -> do
+                tools <- listInstalled
+                let ghcName = $(mkPackageName "ghc")
+                case [version | Tool (PackageIdentifier name version) <- tools, name == ghcName] of
+                    [] -> throwM SolverMissingGHC
+                    versions -> do
+                        let version = maximum versions
+                        $logInfo $ "No GHC on path, selecting: " <>
+                                   T.pack (versionString version)
+                        ed <- extraDirs $ Tool $ PackageIdentifier ghcName version
+                        mkEnvOverride platform
+                            $ augmentPathMap (edBins ed)
+                            $ unEnvOverride menv0
+    mcabal <- findExecutable menv "cabal"
+    case mcabal of
+        Nothing -> throwM SolverMissingCabalInstall
+        Just _ -> return ()
+
     compilerVersion <- getCompilerVersion menv wc
 
     -- Run from a temporary directory to avoid cabal getting confused by any
@@ -78,7 +101,6 @@ cabalSolver wc cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-s
 
     $logInfo "Asking cabal to calculate a build plan, please wait"
 
-    platform <- asks getPlatform
     menv' <- mkEnvOverride platform
            $ Map.delete "GHCJS_PACKAGE_PATH"
            $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv
@@ -110,26 +132,6 @@ cabalSolver wc cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-s
                         Nothing -> (t0, True)
                         Just x -> (x, True)
                 Just x -> (x, False)
-
-getCompilerVersion :: (MonadLogger m, MonadCatch m, MonadBaseControl IO m, MonadIO m)
-              => EnvOverride -> WhichCompiler -> m CompilerVersion
-getCompilerVersion menv wc =
-    case wc of
-        Ghc -> do
-            bs <- readProcessStdout Nothing menv "ghc" ["--numeric-version"]
-            let (_, ghcVersion) = versionFromEnd bs
-            GhcVersion <$> parseVersion ghcVersion
-        Ghcjs -> do
-            -- Output looks like
-            --
-            -- The Glorious Glasgow Haskell Compilation System for JavaScript, version 0.1.0 (GHC 7.10.2)
-            bs <- readProcessStdout Nothing menv "ghcjs" ["--version"]
-            let (rest, ghcVersion) = versionFromEnd bs
-                (_, ghcjsVersion) = versionFromEnd rest
-            GhcjsVersion <$> parseVersion ghcjsVersion <*> parseVersion ghcVersion
-  where
-    versionFromEnd = S8.spanEnd isValid . fst . S8.breakEnd isValid
-    isValid c = c == '.' || ('0' <= c && c <= '9')
 
 getCabalConfig :: (MonadReader env m, HasConfig env, MonadIO m, MonadThrow m)
                => FilePath -- ^ temp dir
@@ -180,7 +182,7 @@ solveExtraDeps modStackYaml = do
 
     let packages = Map.union
             (bcExtraDeps bconfig)
-            (fmap mpiVersion snapshot)
+            (mpiVersion <$> snapshot)
 
     wc <- getWhichCompiler
     (_compilerVersion, extraDeps) <- cabalSolver

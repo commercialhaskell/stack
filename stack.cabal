@@ -56,6 +56,7 @@ library
                      Stack.Image
                      Stack.SDist
                      Stack.Setup
+                     Stack.Setup.Installed
                      Stack.Solver
                      Stack.Types
                      Stack.Types.Internal
@@ -177,6 +178,7 @@ library
                    , project-template >= 0.2
   if os(windows)
     cpp-options:     -DWINDOWS
+    build-depends:   Win32
   else
     build-depends:   unix >= 2.7.0.1
   default-language:  Haskell2010

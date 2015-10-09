@@ -13,7 +13,6 @@ module Main where
 import           Control.Exception
 import qualified Control.Exception.Lifted as EL
 import           Control.Monad hiding (mapM, forM)
-import qualified Control.Monad.Catch as Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask, asks, runReaderT)
@@ -33,6 +32,7 @@ import qualified Data.Text.IO as T
 import           Data.Traversable
 import           Data.Version (showVersion)
 import           Distribution.System (buildArch)
+import           Distribution.Text (display)
 import           Development.GitRev (gitCommitCount)
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Network.HTTP.Client
@@ -78,51 +78,6 @@ import           System.FilePath (dropTrailingPathSeparator, searchPathSeparator
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, Handle, hGetEncoding, hSetEncoding)
 import           System.Process.Read
 
-#ifdef WINDOWS
-import System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
-#endif
-
--- | Set the code page for this process as necessary. Only applies to Windows.
--- See: https://github.com/commercialhaskell/stack/issues/738
-fixCodePage :: (MonadIO m, Catch.MonadMask m, MonadLogger m) => m a -> m a
-#ifdef WINDOWS
-fixCodePage inner = do
-    origCPI <- liftIO getConsoleCP
-    origCPO <- liftIO getConsoleOutputCP
-
-    let setInput = origCPI /= expected
-        setOutput = origCPO /= expected
-        fixInput
-            | setInput = Catch.bracket_
-                (liftIO $ do
-                    setConsoleCP expected)
-                (liftIO $ setConsoleCP origCPI)
-            | otherwise = id
-        fixOutput
-            | setInput = Catch.bracket_
-                (liftIO $ do
-                    setConsoleOutputCP expected)
-                (liftIO $ setConsoleOutputCP origCPO)
-            | otherwise = id
-
-    case (setInput, setOutput) of
-        (False, False) -> return ()
-        (True, True) -> warn ""
-        (True, False) -> warn " input"
-        (False, True) -> warn " output"
-
-    fixInput $ fixOutput inner
-  where
-    expected = 65001 -- UTF-8
-    warn typ = $logInfo $ T.concat
-        [ "Setting"
-        , typ
-        , " codepage to UTF-8 (65001) to ensure correct output from GHC"
-        ]
-#else
-fixCodePage = id
-#endif
-
 -- | Change the character encoding of the given Handle to transliterate
 -- on unsupported characters instead of throwing an exception
 hSetTranslit :: Handle -> IO ()
@@ -157,7 +112,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
               -- See https://github.com/commercialhaskell/stack/issues/792
             , [" (" ++ $gitCommitCount ++ " commits)" | $gitCommitCount /= ("1"::String) &&
                                                         $gitCommitCount /= ("UNKNOWN" :: String)]
-            , [" ", show buildArch]
+            , [" ", display buildArch]
             ]
 
      let numericVersion :: Parser (a -> a)
@@ -284,6 +239,10 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                         "Run runghc"
                         execCmd
                         (execOptsParser $ Just "runghc")
+             addCommand "eval"
+                        "Evaluate some haskell code inline. Shortcut for 'stack exec ghc -- -e CODE'"
+                        evalCmd
+                        (evalOptsParser $ Just "CODE") -- metavar = "CODE"
              addCommand "clean"
                         "Clean the local packages"
                         cleanCmd
@@ -297,6 +256,10 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                                            "and package version.") <>
                                      value " " <>
                                      showDefault))
+             addCommand "query"
+                        "Query general build information (experimental)"
+                        queryCmd
+                        (many $ strArgument $ metavar "SELECTOR...")
              addSubCommands
                  "ide"
                  "IDE-specific commands"
@@ -374,10 +337,9 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
 -- support others later).
 pathCmd :: [Text] -> GlobalOpts -> IO ()
 pathCmd keys go =
-    withBuildConfigAndLock
+    withBuildConfig
         go
-        (\_ ->
-         do env <- ask
+        (do env <- ask
             let cfg = envConfig env
                 bc = envConfigBuildConfig cfg
             menv <- getMinimalEnvOverride
@@ -730,21 +692,13 @@ buildCmd opts go = do
     NoFileWatch -> inner $ const $ return ()
   where
     inner setLocalFiles = withBuildConfigAndLock go $ \lk ->
-        globalFixCodePage go $ Stack.Build.build setLocalFiles lk opts
+        Stack.Build.build setLocalFiles lk opts
     getProjectRoot = do
         (manager, lc) <- loadConfigWithOpts go
         bconfig <-
             runStackLoggingTGlobal manager go $
             lcLoadBuildConfig lc (globalResolver go)
         return (bcRoot bconfig)
-
-globalFixCodePage :: (Catch.MonadMask m, MonadIO m, MonadLogger m)
-                  => GlobalOpts
-                  -> m a
-                  -> m a
-globalFixCodePage go
-    | globalModifyCodePage go = fixCodePage
-    | otherwise = id
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
 uninstallCmd _ go = withConfigAndLock go $ do
@@ -764,7 +718,7 @@ updateCmd () go = withConfigAndLock go $
     getMinimalEnvOverride >>= Stack.PackageIndex.updateAllIndices
 
 upgradeCmd :: (Bool, String) -> GlobalOpts -> IO ()
-upgradeCmd (fromGit, repo) go = withConfigAndLock go $ globalFixCodePage go $
+upgradeCmd (fromGit, repo) go = withConfigAndLock go $
     upgrade (if fromGit then Just repo else Nothing) (globalResolver go)
 
 -- | Upload to Hackage
@@ -841,19 +795,29 @@ execCmd ExecOpts {..} go@GlobalOpts{..} = do
         ExecOptsEmbellished {..} ->
            withBuildConfigAndLock go $ \lk -> do
                let targets = concatMap words eoPackages
-               unless (null targets) $ globalFixCodePage go $
+               unless (null targets) $
                    Stack.Build.build (const $ return ()) lk defaultBuildOpts
                        { boptsTargets = map T.pack targets
                        }
                munlockFile lk -- Unlock before transferring control away.
                exec eoEnvSettings cmd args
 
+-- | Evaluate some haskell code inline.
+evalCmd :: EvalOpts -> GlobalOpts -> IO ()
+evalCmd EvalOpts {..} go@GlobalOpts {..} = execCmd execOpts go
+    where
+      execOpts =
+          ExecOpts { eoCmd = Just "ghc"
+                   , eoArgs = ["-e", evalArg]
+                   , eoExtra = evalExtra
+                   }
+
 -- | Run GHCi in the context of a project.
 ghciCmd :: GhciOpts -> GlobalOpts -> IO ()
 ghciCmd ghciOpts go@GlobalOpts{..} =
   withBuildConfigAndLock go $ \lk -> do
     let packageTargets = concatMap words (ghciAdditionalPackages ghciOpts)
-    unless (null packageTargets) $ globalFixCodePage go $
+    unless (null packageTargets) $
        Stack.Build.build (const $ return ()) lk defaultBuildOpts
            { boptsTargets = map T.pack packageTargets
            }
@@ -924,8 +888,7 @@ imgDockerCmd () go@GlobalOpts{..} = do
         go
         Nothing
         (\lk ->
-              do globalFixCodePage go $
-                     Stack.Build.build
+              do Stack.Build.build
                          (const (return ()))
                          lk
                          defaultBuildOpts
@@ -986,3 +949,7 @@ dotCmd dotOpts go = withBuildConfigAndLock go (\_ -> dot dotOpts)
 listDependenciesCmd :: Text -> GlobalOpts -> IO ()
 listDependenciesCmd sep go = withBuildConfig go (listDependencies sep')
   where sep' = T.replace "\\t" "\t" (T.replace "\\n" "\n" sep)
+
+-- | Query build information
+queryCmd :: [String] -> GlobalOpts -> IO ()
+queryCmd selectors go = withBuildConfig go $ queryBuildInfo $ map T.pack selectors

@@ -47,6 +47,7 @@ stageContainerImageArtifacts :: Build e m
                              => m ()
 stageContainerImageArtifacts = do
     imageDir <- imageStagingDir <$> getWorkingDir
+    removeTreeIfExists imageDir
     createTree imageDir
     stageExesInDir imageDir
     syncAddContentToDir imageDir

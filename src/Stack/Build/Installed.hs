@@ -1,6 +1,7 @@
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell       #-}
 -- Determine which packages are already installed
 module Stack.Build.Installed
@@ -67,6 +68,7 @@ getInstalled :: (M env m, PackageInstallInfo pii)
 getInstalled menv opts sourceMap = do
     snapDBPath <- packageDatabaseDeps
     localDBPath <- packageDatabaseLocal
+    extraDBPaths <- packageDatabaseExtra
 
     bconfig <- asks getBuildConfig
 
@@ -76,12 +78,17 @@ getInstalled menv opts sourceMap = do
             else return Nothing
 
     let loadDatabase' = loadDatabase menv opts mcache sourceMap
+
     (installedLibs0, globalInstalled) <- loadDatabase' Nothing []
-    (installedLibs1, _snapInstalled) <-
-        loadDatabase' (Just (Snap, snapDBPath)) installedLibs0
-    (installedLibs2, localInstalled) <-
-        loadDatabase' (Just (Local, localDBPath)) installedLibs1
-    let installedLibs = M.fromList $ map lhPair installedLibs2
+    (installedLibs1, _extraInstalled) <-
+      (foldM (\lhs' pkgdb -> do
+        lhs'' <- loadDatabase' (Just (ExtraGlobal, pkgdb)) (fst lhs')
+        return lhs'') ((installedLibs0, globalInstalled)) extraDBPaths)
+    (installedLibs2, _snapInstalled) <-
+        loadDatabase' (Just (InstalledTo Snap, snapDBPath)) installedLibs1
+    (installedLibs3, localInstalled) <-
+        loadDatabase' (Just (InstalledTo Local, localDBPath)) installedLibs2
+    let installedLibs = M.fromList $ map lhPair installedLibs3
 
     case mcache of
         Nothing -> return ()
@@ -124,13 +131,14 @@ loadDatabase :: (M env m, PackageInstallInfo pii)
              -> GetInstalledOpts
              -> Maybe InstalledCache -- ^ if Just, profiling or haddock is required
              -> Map PackageName pii -- ^ to determine which installed things we should include
-             -> Maybe (InstallLocation, Path Abs Dir) -- ^ package database, Nothing for global
+             -> Maybe (InstalledPackageLocation, Path Abs Dir) -- ^ package database, Nothing for global
              -> [LoadHelper] -- ^ from parent databases
              -> m ([LoadHelper], [DumpPackage () ()])
 loadDatabase menv opts mcache sourceMap mdb lhs0 = do
     wc <- getWhichCompiler
-    (lhs1, dps) <- ghcPkgDump menv wc (fmap snd mdb)
-                  $ conduitDumpPackage =$ sink
+    (lhs1, dps) <- ghcPkgDump menv wc (fmap snd (maybeToList mdb))
+                $ conduitDumpPackage =$ sink
+
     let lhs = pruneDeps
             id
             lhId
@@ -166,7 +174,7 @@ isAllowed :: PackageInstallInfo pii
           => GetInstalledOpts
           -> Maybe InstalledCache
           -> Map PackageName pii
-          -> Maybe InstallLocation
+          -> Maybe InstalledPackageLocation
           -> DumpPackage Bool Bool
           -> Maybe LoadHelper
 isAllowed opts mcache sourceMap mloc dp
@@ -186,10 +194,15 @@ isAllowed opts mcache sourceMap mloc dp
             if name `HashSet.member` wiredInPackages
                 then []
                 else dpDepends dp
-        , lhPair = (name, (version, fromMaybe Snap mloc, Library ident gid))
+        , lhPair = (name, (version, toPackageLocation mloc, Library ident gid))
         }
     | otherwise = Nothing
   where
+    toPackageLocation :: Maybe InstalledPackageLocation -> InstallLocation
+    toPackageLocation Nothing = Snap
+    toPackageLocation (Just ExtraGlobal) = Snap
+    toPackageLocation (Just (InstalledTo loc)) = loc
+
     toInclude =
         case Map.lookup name sourceMap of
             Nothing ->
@@ -197,6 +210,7 @@ isAllowed opts mcache sourceMap mloc dp
                     -- The sourceMap has nothing to say about this global
                     -- package, so we can use it
                     Nothing -> True
+                    Just ExtraGlobal -> True
                     -- For non-global packages, don't include unknown packages.
                     -- See:
                     -- https://github.com/commercialhaskell/stack/issues/292
@@ -208,8 +222,8 @@ isAllowed opts mcache sourceMap mloc dp
 
     -- Ensure that the installed location matches where the sourceMap says it
     -- should be installed
-    checkLocation Snap = mloc /= Just Local -- we can allow either global or snap
-    checkLocation Local = mloc == Just Local
+    checkLocation Snap = mloc /= Just (InstalledTo Local) -- we can allow either global or snap
+    checkLocation Local = mloc == Just (InstalledTo Local) || mloc == Just ExtraGlobal -- 'locally' installed snapshot packages can come from extra dbs
 
     gid = dpGhcPkgId dp
     ident@(PackageIdentifier name version) = dpPackageIdent dp

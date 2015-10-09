@@ -1,11 +1,11 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE ViewPatterns               #-}
 
 -- | Build-specific types.
 
@@ -117,6 +117,8 @@ data StackBuildException
   | InvalidFlagSpecification (Set UnusedFlags)
   | TargetParseException [Text]
   | DuplicateLocalPackageNames [(PackageName, [Path Abs Dir])]
+  | SolverMissingCabalInstall
+  | SolverMissingGHC
   deriving Typeable
 
 data FlagSource = FSCommandLine | FSStackYaml
@@ -315,6 +317,14 @@ instance Show StackBuildException where
             : (packageNameString name ++ " used in:")
             : map goDir dirs
         goDir dir = "- " ++ toFilePath dir
+    show SolverMissingCabalInstall = unlines
+        [ "Solver requires that cabal be on your PATH"
+        , "Try running 'stack install cabal-install'"
+        ]
+    show SolverMissingGHC = unlines
+        [ "Solver requires that GHC be on your PATH"
+        , "Try running 'stack setup'"
+        ]
 
 instance Exception StackBuildException
 
@@ -596,6 +606,7 @@ data BaseConfigOpts = BaseConfigOpts
     , bcoSnapInstallRoot :: !(Path Abs Dir)
     , bcoLocalInstallRoot :: !(Path Abs Dir)
     , bcoBuildOpts :: !BuildOpts
+    , bcoExtraDBs :: ![(Path Abs Dir)]
     }
 
 -- | Render a @BaseConfigOpts@ to an actual list of options
@@ -603,12 +614,13 @@ configureOpts :: EnvConfig
               -> BaseConfigOpts
               -> Map PackageIdentifier GhcPkgId -- ^ dependencies
               -> Bool -- ^ wanted?
+              -> Bool -- ^ local non-extra-dep?
               -> InstallLocation
               -> Package
               -> ConfigureOpts
-configureOpts econfig bco deps wanted loc package = ConfigureOpts
+configureOpts econfig bco deps wanted isLocal loc package = ConfigureOpts
     { coDirs = configureOptsDirs bco loc package
-    , coNoDirs = configureOptsNoDir econfig bco deps wanted package
+    , coNoDirs = configureOptsNoDir econfig bco deps wanted isLocal package
     }
 
 configureOptsDirs :: BaseConfigOpts
@@ -618,8 +630,8 @@ configureOptsDirs :: BaseConfigOpts
 configureOptsDirs bco loc package = concat
     [ ["--user", "--package-db=clear", "--package-db=global"]
     , map (("--package-db=" ++) . toFilePath) $ case loc of
-        Snap -> [bcoSnapDB bco]
-        Local -> [bcoSnapDB bco, bcoLocalDB bco]
+        Snap -> bcoExtraDBs bco ++ [bcoSnapDB bco]
+        Local -> bcoExtraDBs bco ++ [bcoSnapDB bco] ++ [bcoLocalDB bco]
     , [ "--libdir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "lib"))
       , "--bindir=" ++ toFilePathNoTrailingSlash (installRoot </> bindirSuffix)
       , "--datadir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "share"))
@@ -649,9 +661,10 @@ configureOptsNoDir :: EnvConfig
                    -> BaseConfigOpts
                    -> Map PackageIdentifier GhcPkgId -- ^ dependencies
                    -> Bool -- ^ wanted?
+                   -> Bool -- ^ is this a local, non-extra-dep?
                    -> Package
                    -> [String]
-configureOptsNoDir econfig bco deps wanted package = concat
+configureOptsNoDir econfig bco deps wanted isLocal package = concat
     [ depOptions
     , ["--enable-library-profiling" | boptsLibProfile bopts || boptsExeProfile bopts]
     , ["--enable-executable-profiling" | boptsExeProfile bopts]
@@ -700,10 +713,16 @@ configureOptsNoDir econfig bco deps wanted package = concat
     allGhcOptions = concat
         [ fromMaybe [] $ Map.lookup Nothing ghcOptionsMap
         , fromMaybe [] $ Map.lookup (Just $ packageName package) ghcOptionsMap
-        , if wanted
+        , if includeExtraOptions
             then boptsGhcOptions bopts
             else []
         ]
+
+    includeExtraOptions =
+        case configApplyGhcOptions config of
+            AGOTargets -> wanted
+            AGOLocals -> isLocal
+            AGOEverything -> True
 
 -- | Get set of wanted package names from locals.
 wantedLocalPackages :: [LocalPackage] -> Set PackageName
@@ -737,7 +756,7 @@ data PrecompiledCache = PrecompiledCache
     -- Use FilePath instead of Path Abs File for Binary instances
     { pcLibrary :: !(Maybe FilePath)
     -- ^ .conf file inside the package database
-    , pcExes :: ![FilePath]
+    , pcExes    :: ![FilePath]
     -- ^ Full paths to executables
     }
     deriving (Show, Eq, Generic)

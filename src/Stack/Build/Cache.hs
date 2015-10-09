@@ -298,17 +298,36 @@ checkBenchBuilt dir =
 precompiledCacheFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
                      => PackageIdentifier
                      -> ConfigureOpts
+                     -> Set GhcPkgId -- ^ dependencies
                      -> m (Path Abs File)
-precompiledCacheFile pkgident copts = do
+precompiledCacheFile pkgident copts installedPackageIDs = do
     ec <- asks getEnvConfig
 
     compiler <- parseRelDir $ compilerVersionString $ envConfigCompilerVersion ec
     cabal <- parseRelDir $ versionString $ envConfigCabalVersion ec
     pkg <- parseRelDir $ packageIdentifierString pkgident
 
+    -- In Cabal versions 1.22 and later, the configure options contain the
+    -- installed package IDs, which is what we need for a unique hash.
+    -- Unfortunately, earlier Cabals don't have the information, so we must
+    -- supplement it with the installed package IDs directly. In 20/20
+    -- hindsight, we would simply always do that, but previous Stack releases
+    -- used only the options, and we don't want to invalidate old caches
+    -- unnecessarily.
+    --
+    -- See issue: https://github.com/commercialhaskell/stack/issues/1103
+    let cacheInput
+            | envConfigCabalVersion ec >= $(mkVersion "1.22") =
+                Binary.encode $ coNoDirs copts
+            | otherwise =
+                Binary.encode
+                    ( coNoDirs copts
+                    , installedPackageIDs
+                    )
+
     -- We only pay attention to non-directory options. We don't want to avoid a
     -- cache hit just because it was installed in a different directory.
-    copts' <- parseRelFile $ S8.unpack $ B16.encode $ SHA256.hashlazy $ Binary.encode $ coNoDirs copts
+    copts' <- parseRelFile $ S8.unpack $ B16.encode $ SHA256.hashlazy cacheInput
 
     return $ getStackRoot ec
          </> $(mkRelDir "precompiled")
@@ -322,11 +341,12 @@ writePrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, Mon
                       => BaseConfigOpts
                       -> PackageIdentifier
                       -> ConfigureOpts
+                      -> Set GhcPkgId -- ^ dependencies
                       -> Maybe GhcPkgId -- ^ library
                       -> Set Text -- ^ executables
                       -> m ()
-writePrecompiledCache baseConfigOpts pkgident copts mghcPkgId exes = do
-    file <- precompiledCacheFile pkgident copts
+writePrecompiledCache baseConfigOpts pkgident copts depIDs mghcPkgId exes = do
+    file <- precompiledCacheFile pkgident copts depIDs
     createTree $ parent file
     mlibpath <-
         case mghcPkgId of
@@ -347,7 +367,8 @@ writePrecompiledCache baseConfigOpts pkgident copts mghcPkgId exes = do
 readPrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadIO m)
                      => PackageIdentifier -- ^ target package
                      -> ConfigureOpts
+                     -> Set GhcPkgId -- ^ dependencies
                      -> m (Maybe PrecompiledCache)
-readPrecompiledCache pkgident copts = do
-    file <- precompiledCacheFile pkgident copts
+readPrecompiledCache pkgident copts depIDs = do
+    file <- precompiledCacheFile pkgident copts depIDs
     decodeFileOrFailDeep $ toFilePath file

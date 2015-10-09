@@ -16,7 +16,8 @@ module Stack.Build
   (build
   ,clean
   ,withLoadPackage
-  ,mkBaseConfigOpts)
+  ,mkBaseConfigOpts
+  ,queryBuildInfo)
   where
 
 import           Control.Monad
@@ -25,11 +26,20 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Resource
+import           Data.Aeson (Value (Object, Array), (.=), object)
 import           Data.Function
+import qualified Data.HashMap.Strict as HM
 import qualified Data.Map as Map
 import           Data.Map.Strict (Map)
 import           Data.Set (Set)
 import qualified Data.Set as Set
+import           Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
+import           Data.Text.Encoding (decodeUtf8)
+import           Data.Text.Read (decimal)
+import qualified Data.Vector as V
+import qualified Data.Yaml as Yaml
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.IO
@@ -48,6 +58,12 @@ import           Stack.Types
 import           Stack.Types.Internal
 import           System.FileLock (FileLock, unlockFile)
 
+#ifdef WINDOWS
+import System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
+import qualified Control.Monad.Catch as Catch
+import qualified Data.Text as T
+#endif
+
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
 
 -- | Build.
@@ -60,7 +76,7 @@ build :: M env m
       -> Maybe FileLock
       -> BuildOpts
       -> m ()
-build setLocalFiles mbuildLk bopts = do
+build setLocalFiles mbuildLk bopts = fixCodePage' $ do
     menv <- getMinimalEnvOverride
 
     (_, mbp, locals, extraToBuild, sourceMap) <- loadSourceMap NeedTargets bopts
@@ -122,12 +138,14 @@ mkBaseConfigOpts bopts = do
     localDBPath <- packageDatabaseLocal
     snapInstallRoot <- installationRootDeps
     localInstallRoot <- installationRootLocal
+    packageExtraDBs <- packageDatabaseExtra
     return BaseConfigOpts
         { bcoSnapDB = snapDBPath
         , bcoLocalDB = localDBPath
         , bcoSnapInstallRoot = snapInstallRoot
         , bcoLocalInstallRoot = localInstallRoot
         , bcoBuildOpts = bopts
+        , bcoExtraDBs = packageExtraDBs
         }
 
 -- | Provide a function for loading package information from the package index
@@ -170,3 +188,97 @@ clean = do
     forM_
         (Map.keys (envConfigPackages econfig))
         (distDirFromDir >=> removeTreeIfExists)
+
+-- | Set the code page for this process as necessary. Only applies to Windows.
+-- See: https://github.com/commercialhaskell/stack/issues/738
+fixCodePage :: (MonadIO m, MonadMask m, MonadLogger m) => m a -> m a
+#ifdef WINDOWS
+fixCodePage inner = do
+    origCPI <- liftIO getConsoleCP
+    origCPO <- liftIO getConsoleOutputCP
+
+    let setInput = origCPI /= expected
+        setOutput = origCPO /= expected
+        fixInput
+            | setInput = Catch.bracket_
+                (liftIO $ do
+                    setConsoleCP expected)
+                (liftIO $ setConsoleCP origCPI)
+            | otherwise = id
+        fixOutput
+            | setInput = Catch.bracket_
+                (liftIO $ do
+                    setConsoleOutputCP expected)
+                (liftIO $ setConsoleOutputCP origCPO)
+            | otherwise = id
+
+    case (setInput, setOutput) of
+        (False, False) -> return ()
+        (True, True) -> warn ""
+        (True, False) -> warn " input"
+        (False, True) -> warn " output"
+
+    fixInput $ fixOutput inner
+  where
+    expected = 65001 -- UTF-8
+    warn typ = $logInfo $ T.concat
+        [ "Setting"
+        , typ
+        , " codepage to UTF-8 (65001) to ensure correct output from GHC"
+        ]
+#else
+fixCodePage = id
+#endif
+
+fixCodePage' :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env)
+             => m a
+             -> m a
+fixCodePage' inner = do
+    mcp <- asks $ configModifyCodePage . getConfig
+    if mcp
+        then fixCodePage inner
+        else inner
+
+-- | Query information about the build and print the result to stdout in YAML format.
+queryBuildInfo :: M env m
+               => [Text] -- ^ selectors
+               -> m ()
+queryBuildInfo selectors0 = do
+        rawBuildInfo
+    >>= select id selectors0
+    >>= liftIO . TIO.putStrLn . decodeUtf8 . Yaml.encode
+  where
+    select _ [] value = return value
+    select front (sel:sels) value =
+        case value of
+            Object o ->
+                case HM.lookup sel o of
+                    Nothing -> err "Selector not found"
+                    Just value' -> cont value'
+            Array v ->
+                case decimal sel of
+                    Right (i, "")
+                        | i >= 0 && i < V.length v -> cont $ v V.! i
+                        | otherwise -> err "Index out of range"
+                    _ -> err "Encountered array and needed numeric selector"
+            _ -> err $ "Cannot apply selector to " ++ show value
+      where
+        cont = select (front . (sel:)) sels
+        err msg = error $ msg ++ ": " ++ show (front [sel])
+
+-- | Get the raw build information object
+rawBuildInfo :: M env m => m Value
+rawBuildInfo = do
+    (_, _mbp, locals, _extraToBuild, _sourceMap) <- loadSourceMap NeedTargets defaultBuildOpts
+    return $ object
+        [ "locals" .= Object (HM.fromList $ map localToPair locals)
+        ]
+  where
+    localToPair lp =
+        (T.pack $ packageNameString $ packageName p, value)
+      where
+        p = lpPackage lp
+        value = object
+            [ "version" .= packageVersion p
+            , "path" .= toFilePath (lpDir lp)
+            ]

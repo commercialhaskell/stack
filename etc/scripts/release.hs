@@ -351,7 +351,7 @@ rules global@Global{..} args = do
 
     writeBashCompletion stagedStackExeFile stageDir out = do
         need [stagedStackExeFile]
-        (Stdout bashCompletionScript) <- cmd [stagedStackExeFile] "--bash-completion-script" [dropDirectoryPrefix stageDir stagedStackExeFile]
+        (Stdout bashCompletionScript) <- cmd [stagedStackExeFile] "--bash-completion-script" ["/" ++ dropDirectoryPrefix stageDir stagedStackExeFile]
         writeFileChanged out bashCompletionScript
 
     getBinaryPkgStageFiles = do
@@ -436,7 +436,8 @@ rules global@Global{..} args = do
         [ ("12.04", "precise")
         , ("14.04", "trusty")
         , ("14.10", "utopic")
-        , ("15.04", "vivid") ]
+        , ("15.04", "vivid")
+        , ("15.10", "wily") ]
     debianVersions =
         [ ("7", "wheezy")
         , ("8", "jessie") ]

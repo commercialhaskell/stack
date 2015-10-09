@@ -70,7 +70,7 @@ import           Stack.Config (resolvePackageEntry)
 import           Stack.Constants (distRelativeDir)
 import           Stack.Fetch
 import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath)
-import           Stack.Solver (getCompilerVersion)
+import           Stack.Setup.Installed
 import           Stack.Types
 import           Stack.Types.StackT
 import qualified System.Directory as D
@@ -293,18 +293,6 @@ addIncludeLib (ExtraDirs _bins includes libs) config = config
         (configExtraLibDirs config)
         (Set.fromList $ map T.pack libs)
     }
-
-data ExtraDirs = ExtraDirs
-    { edBins :: ![FilePath]
-    , edInclude :: ![FilePath]
-    , edLib :: ![FilePath]
-    }
-instance Monoid ExtraDirs where
-    mempty = ExtraDirs [] [] []
-    mappend (ExtraDirs a b c) (ExtraDirs x y z) = ExtraDirs
-        (a ++ x)
-        (b ++ y)
-        (c ++ z)
 
 -- | Ensure compiler (ghc or ghcjs) is installed and provide the PATHs to add if necessary
 ensureCompiler :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, HasGHCVariant env, MonadBaseControl IO m)
@@ -548,104 +536,6 @@ getSetupInfo sopts manager = do
             logJSONWarnings urlOrFile warnings
         return si
 
-data Tool
-    = Tool PackageIdentifier -- ^ e.g. ghc-7.8.4, msys2-20150512
-    | ToolGhcjs CompilerVersion -- ^ e.g. ghcjs-0.1.0_ghc-7.10.2
-
-toolString :: Tool -> String
-toolString (Tool ident) = packageIdentifierString ident
-toolString (ToolGhcjs cv) = compilerVersionString cv
-
-toolNameString :: Tool -> String
-toolNameString (Tool ident) = packageNameString $ packageIdentifierName ident
-toolNameString ToolGhcjs{} = "ghcjs"
-
-parseToolText :: Text -> Maybe Tool
-parseToolText (parseCompilerVersion -> Just (cv@GhcjsVersion{})) = Just (ToolGhcjs cv)
-parseToolText (parsePackageIdentifierFromString . T.unpack -> Just pkgId) = Just (Tool pkgId)
-parseToolText _ = Nothing
-
-markInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
-              => Tool
-              -> m ()
-markInstalled tool = do
-    dir <- asks $ configLocalPrograms . getConfig
-    fpRel <- parseRelFile $ toolString tool ++ ".installed"
-    liftIO $ writeFile (toFilePath $ dir </> fpRel) "installed"
-
-unmarkInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
-                => Tool
-                -> m ()
-unmarkInstalled tool = do
-    dir <- asks $ configLocalPrograms . getConfig
-    fpRel <- parseRelFile $ toolString tool ++ ".installed"
-    removeFileIfExists $ dir </> fpRel
-
-listInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
-              => m [Tool]
-listInstalled = do
-    dir <- asks $ configLocalPrograms . getConfig
-    createTree dir
-    (_, files) <- listDirectory dir
-    return $ mapMaybe toTool files
-  where
-    toTool fp = do
-        x <- T.stripSuffix ".installed" $ T.pack $ toFilePath $ filename fp
-        parseToolText x
-
-installDir :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
-           => Tool
-           -> m (Path Abs Dir)
-installDir tool = do
-    config <- asks getConfig
-    reldir <- parseRelDir $ toolString tool
-    return $ configLocalPrograms config </> reldir
-
--- | Binary directories for the given installed package
-extraDirs :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
-          => Tool
-          -> m ExtraDirs
-extraDirs tool = do
-    platform <- asks getPlatform
-    dir <- installDir tool
-    case (platform, toolNameString tool) of
-        (Platform _ Cabal.Windows, isGHC -> True) -> return mempty
-            { edBins = goList
-                [ dir </> $(mkRelDir "bin")
-                , dir </> $(mkRelDir "mingw") </> $(mkRelDir "bin")
-                ]
-            }
-        (Platform _ Cabal.Windows, "msys2") -> return mempty
-            { edBins = goList
-                [ dir </> $(mkRelDir "usr") </> $(mkRelDir "bin")
-                ]
-            , edInclude = goList
-                [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "include")
-                , dir </> $(mkRelDir "mingw32") </> $(mkRelDir "include")
-                ]
-            , edLib = goList
-                [ dir </> $(mkRelDir "mingw64") </> $(mkRelDir "lib")
-                , dir </> $(mkRelDir "mingw32") </> $(mkRelDir "lib")
-                ]
-            }
-        (_, isGHC -> True) -> return mempty
-            { edBins = goList
-                [ dir </> $(mkRelDir "bin")
-                ]
-            }
-        (_, isGHCJS -> True) -> return mempty
-            { edBins = goList
-                [ dir </> $(mkRelDir "bin")
-                ]
-            }
-        (Platform _ x, toolName) -> do
-            $logWarn $ "binDirs: unexpected OS/tool combo: " <> T.pack (show (x, toolName))
-            return mempty
-  where
-    goList = map toFilePathNoTrailingSlash
-    isGHC n = "ghc" == n || "ghc-" `isPrefixOf` n
-    isGHCJS n = "ghcjs" == n
-
 getInstalledTool :: [Tool]            -- ^ already installed
                  -> PackageName       -- ^ package to find
                  -> (Version -> Bool) -- ^ which versions are acceptable
@@ -737,7 +627,7 @@ downloadAndInstallCompiler si wanted@(GhcjsVersion version _) versionCheck _mbin
         Just pairs -> getWantedCompilerInfo "source" versionCheck wanted id pairs
     $logInfo "Preparing to install GHCJS to an isolated location."
     $logInfo "This will not interfere with any system-level installation."
-    downloadAndInstallTool si downloadInfo (ToolGhcjs selectedVersion) (installGHCJSPosix version)
+    downloadAndInstallTool si downloadInfo (ToolGhcjs selectedVersion) (installGHCJS version)
 
 getWantedCompilerInfo :: (Ord k, MonadThrow m)
                       => Text
@@ -861,32 +751,20 @@ installGHCPosix version _ archiveFile archiveType destDir = do
         $logStickyDone $ "Installed GHC."
         $logDebug $ "GHC installed to " <> T.pack (toFilePath destDir)
 
-installGHCJSPosix :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
-                => Version
-                -> SetupInfo
-                -> Path Abs File
-                -> ArchiveType
-                -> Path Abs Dir
-                -> m ()
-installGHCJSPosix version _ archiveFile archiveType destDir = do
+installGHCJS :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+             => Version
+             -> SetupInfo
+             -> Path Abs File
+             -> ArchiveType
+             -> Path Abs Dir
+             -> m ()
+installGHCJS version si archiveFile archiveType destDir = do
     platform <- asks getPlatform
     menv0 <- getMinimalEnvOverride
     -- This ensures that locking is disabled for the invocations of stack below.
     let removeLockVar = Map.delete "STACK_LOCK"
     menv <- mkEnvOverride platform (removeLockVar (removeHaskellEnvVars (unEnvOverride menv0)))
     $logDebug $ "menv = " <> T.pack (show (unEnvOverride menv))
-    zipTool' <-
-        case archiveType of
-            TarXz -> return "xz"
-            TarBz2 -> return "bzip2"
-            TarGz -> return "gzip"
-            SevenZ -> error "Don't know how to deal with .7z files on non-Windows"
-    (zipTool, tarTool) <- checkDependencies $ (,)
-        <$> checkDependency zipTool'
-        <*> checkDependency "tar"
-
-    $logDebug $ "ziptool: " <> T.pack zipTool
-    $logDebug $ "tar: " <> T.pack tarTool
 
     -- NOTE: this is a bit of a hack - instead of using a temp directory, put
     -- the source tarball in the destination directory. This way, the absolute
@@ -901,9 +779,27 @@ installGHCJSPosix version _ archiveFile archiveType destDir = do
     createTree srcDir
     stackYaml <- ghcjsStackYaml version destDir
 
+    runUnpack <- case platform of
+        Platform _ Cabal.Windows -> do
+            run7z <- setup7z si
+            return $ run7z srcDir archiveFile
+        _ -> do
+            zipTool' <-
+                case archiveType of
+                    TarXz -> return "xz"
+                    TarBz2 -> return "bzip2"
+                    TarGz -> return "gzip"
+                    SevenZ -> error "Don't know how to deal with .7z files on non-Windows"
+            (zipTool, tarTool) <- checkDependencies $ (,)
+                <$> checkDependency zipTool'
+                <*> checkDependency "tar"
+            $logDebug $ "ziptool: " <> T.pack zipTool
+            $logDebug $ "tar: " <> T.pack tarTool
+            return $ readInNull srcDir tarTool menv ["xf", toFilePath archiveFile] Nothing
+
     $logSticky $ T.concat ["Unpacking GHCJS into ", (T.pack . toFilePath $ srcDir), " ..."]
     $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
-    readInNull srcDir tarTool menv ["xf", toFilePath archiveFile] Nothing
+    runUnpack
 
     $logSticky "Installing GHCJS (this will take a long time) ..."
     let destBinDir = destDir Path.</> $(mkRelDir "bin")

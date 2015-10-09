@@ -9,6 +9,7 @@ module Stack.Options
     ,dockerCleanupOptsParser
     ,dotOptsParser
     ,execOptsParser
+    ,evalOptsParser
     ,globalOptsParser
     ,initOptsParser
     ,newOptsParser
@@ -217,7 +218,7 @@ readFlag = do
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser docker =
-    (\opts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin -> mempty
+    (\opts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin modifyCodePage -> mempty
         { configMonoidDockerOpts = opts
         , configMonoidSystemGHC = systemGHC
         , configMonoidInstallGHC = installGHC
@@ -230,6 +231,7 @@ configOptsParser docker =
         , configMonoidExtraLibDirs = libs
         , configMonoidSkipMsys = skipMsys
         , configMonoidLocalBinPath = localBin
+        , configMonoidModifyCodePage = modifyCodePage
         })
     <$> dockerOptsParser docker
     <*> maybeBoolFlags
@@ -280,6 +282,10 @@ configOptsParser docker =
              <> metavar "DIR"
              <> help "Install binaries to DIR"
               ))
+    <*> maybeBoolFlags
+            "modify-code-page"
+            "setting the codepage to support UTF-8 (Windows only)"
+            idm
 
 -- | Options parser configuration for Docker.
 dockerOptsParser :: Bool -> Parser DockerOptsMonoid
@@ -455,18 +461,32 @@ execOptsParser mcmd =
     ExecOpts
         <$> pure mcmd
         <*> eoArgsParser
-        <*> (eoPlainParser <|>
-             ExecOptsEmbellished
-                <$> eoEnvSettingsParser
-                <*> eoPackagesParser)
+        <*> execOptsExtraParser
   where
     eoArgsParser :: Parser [String]
     eoArgsParser = many (strArgument (metavar meta))
       where
-        meta =
-            (maybe ("CMD ") (const "") mcmd) ++
-            "-- ARGS (e.g. stack ghc -- X.hs -o x)"
+        meta = (maybe ("CMD ") (const "") mcmd) ++
+               "-- ARGS (e.g. stack ghc -- X.hs -o x)"
 
+evalOptsParser :: Maybe String -- ^ metavar
+               -> Parser EvalOpts
+evalOptsParser mmeta =
+    EvalOpts
+        <$> eoArgsParser
+        <*> execOptsExtraParser
+  where
+    eoArgsParser :: Parser String
+    eoArgsParser = strArgument (metavar meta)
+    meta = maybe ("CODE") id mmeta
+
+-- | Parser for extra options to exec command
+execOptsExtraParser :: Parser ExecOptsExtra
+execOptsExtraParser = eoPlainParser <|>
+                      ExecOptsEmbellished
+                         <$> eoEnvSettingsParser
+                         <*> eoPackagesParser
+  where
     eoEnvSettingsParser :: Parser EnvSettings
     eoEnvSettingsParser = EnvSettings
         <$> pure True
@@ -508,11 +528,7 @@ globalOptsParser defaultTerminal =
     optional (strOption (long "stack-yaml" <>
                          metavar "STACK-YAML" <>
                          help ("Override project stack.yaml file " <>
-                               "(overrides any STACK_YAML environment variable)"))) <*>
-    boolFlags True
-        "modify-code-page"
-        "setting the codepage to support UTF-8 (Windows only)"
-        idm
+                               "(overrides any STACK_YAML environment variable)")))
 
 initOptsParser :: Parser InitOpts
 initOptsParser =
@@ -648,6 +664,9 @@ newOptsParser = (,) <$> newOpts <*> initOptsParser
         NewOpts <$>
         packageNameArgument
             (metavar "PACKAGE_NAME" <> help "A valid package name.") <*>
+        switch
+            (long "bare" <>
+             help "Do not create a subdirectory for the project") <*>
         templateNameArgument
             (metavar "TEMPLATE_NAME" <>
              help "Name of a template, for example: foo or foo.hsfiles" <>

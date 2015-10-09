@@ -598,7 +598,9 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp = do
         deleteCaches pkgDir
         announce
         menv <- getMinimalEnvOverride
-        exes <- forM (words "ghc ghcjs") $ \name -> do
+        let programNames =
+                if eeCabalPkgVer < $(mkVersion "1.22") then ["ghc"] else ["ghc", "ghcjs"]
+        exes <- forM programNames $ \name -> do
             mpath <- findExecutable menv name
             return $ case mpath of
                 Nothing -> []
@@ -707,7 +709,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                                           eeCabalPkgVer)
                 packageArgs =
                     case mdeps of
-                        Just deps ->
+                        Just deps | explicitSetupDeps (packageName package) config ->
                             -- Stack always builds with the global Cabal for various
                             -- reproducibility issues.
                             let depsMinusCabal
@@ -715,13 +717,16 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                  $ Set.toList
                                  $ addGlobalPackages deps eeGlobalPackages
                             in
-                              "-clear-package-db"
-                            : "-global-package-db"
-                            : ("-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts))
-                            : ("-package-db=" ++ toFilePath (bcoLocalDB eeBaseConfigOpts))
-                            : "-hide-all-packages"
-                            : cabalPackageArg
-                            : map ("-package-id=" ++) depsMinusCabal
+                                ( "-clear-package-db"
+                                : "-global-package-db"
+                                : map (("-package-db=" ++) . toFilePath) (bcoExtraDBs eeBaseConfigOpts)
+                                ) ++
+                                ( ("-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts))
+                                : ("-package-db=" ++ toFilePath (bcoLocalDB eeBaseConfigOpts))
+                                : "-hide-all-packages"
+                                : cabalPackageArg
+                                : map ("-package-id=" ++) depsMinusCabal
+                                )
                         -- This branch is debatable. It adds access to the
                         -- snapshot package database for Cabal. There are two
                         -- possible objections:
@@ -733,13 +738,15 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         -- 2. This doesn't provide enough packages: we should also
                         -- include the local database when building local packages.
                         --
-                        -- Currently, this branch is only taken via `stack sdist`.
-                        Nothing ->
-                            [ cabalPackageArg
-                            , "-clear-package-db"
-                            , "-global-package-db"
-                            , "-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts)
-                            ]
+                        -- Currently, this branch is only taken via `stack
+                        -- sdist` or when explicitly requested in the
+                        -- stack.yaml file.
+                        _ ->
+                              cabalPackageArg
+                            : "-clear-package-db"
+                            : "-global-package-db"
+                            : map (("-package-db=" ++) . toFilePath) (bcoExtraDBs eeBaseConfigOpts)
+                           ++ ["-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts)]
 
                 setupArgs = ("--builddir=" ++ toFilePath distRelativeDir') : args
                 runExe exeName fullArgs = do
@@ -875,7 +882,9 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
     getPrecompiled cache =
         case taskLocation task of
             Snap | not shouldHaddockPackage' -> do
-                mpc <- readPrecompiledCache taskProvides $ configCacheOpts cache
+                mpc <- readPrecompiledCache taskProvides
+                    (configCacheOpts cache)
+                    (configCacheDeps cache)
                 case mpc of
                     Nothing -> return Nothing
                     Just pc -> do
@@ -974,13 +983,21 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
         when (doHaddock package) $ do
             announce "haddock"
-            hscolourExists <- doesExecutableExist eeEnvOverride "HsColour"
-            unless hscolourExists $ $logWarn
-                ("Warning: haddock not generating hyperlinked sources because 'HsColour' not\n" <>
-                 "found on PATH (use 'stack install hscolour' to install).")
+            sourceFlag <- do
+                hyped <- tryProcessStdout Nothing eeEnvOverride "haddock" ["--hyperlinked-source"]
+                case hyped of
+                    -- Fancy crosslinked source
+                    Right _ -> do
+                        return ["--haddock-option=--hyperlinked-source"]
+                    -- Older hscolour colouring
+                    Left _  -> do
+                        hscolourExists <- doesExecutableExist eeEnvOverride "HsColour"
+                        unless hscolourExists $ $logWarn
+                            ("Warning: haddock not generating hyperlinked sources because 'HsColour' not\n" <>
+                             "found on PATH (use 'stack install hscolour' to install).")
+                        return ["--hyperlink-source" | hscolourExists]
             cabal False (concat [["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
-                                ,["--hyperlink-source" | hscolourExists]
-                                ,["--ghcjs" | wc == Ghcjs]])
+                                ,sourceFlag])
 
         withMVar eeInstallLock $ \() -> do
             announce "install"
@@ -1013,7 +1030,10 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                     Set.empty
 
         case taskLocation task of
-            Snap -> writePrecompiledCache eeBaseConfigOpts taskProvides (configCacheOpts cache) mpkgid (packageExes package)
+            Snap -> writePrecompiledCache eeBaseConfigOpts taskProvides
+                (configCacheOpts cache)
+                (configCacheDeps cache)
+                mpkgid (packageExes package)
             Local -> return ()
 
         return mpkgid'

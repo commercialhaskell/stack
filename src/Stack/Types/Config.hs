@@ -141,7 +141,29 @@ data Config =
          -- ^ Additional SetupInfo (inline or remote) to use to find tools.
          ,configPvpBounds           :: !PvpBounds
          -- ^ How PVP upper bounds should be added to packages
+         ,configModifyCodePage      :: !Bool
+         -- ^ Force the code page to UTF-8 on Windows
+         ,configExplicitSetupDeps   :: !(Map (Maybe PackageName) Bool)
+         -- ^ See 'explicitSetupDeps'. 'Nothing' provides the default value.
+         ,configRebuildGhcOptions   :: !Bool
+         -- ^ Rebuild on GHC options changes
+         ,configApplyGhcOptions     :: !ApplyGhcOptions
+         -- ^ Which packages to ghc-options on the command line apply to?
          }
+
+-- | Which packages to ghc-options on the command line apply to?
+data ApplyGhcOptions = AGOTargets -- ^ all local targets
+                     | AGOLocals -- ^ all local packages, even non-targets
+                     | AGOEverything -- ^ every package
+  deriving (Show, Read, Eq, Ord, Enum, Bounded)
+
+instance FromJSON ApplyGhcOptions where
+    parseJSON = withText "ApplyGhcOptions" $ \t ->
+        case t of
+            "targets" -> return AGOTargets
+            "locals" -> return AGOLocals
+            "everything" -> return AGOEverything
+            _ -> fail $ "Invalid ApplyGhcOptions: " ++ show t
 
 -- | Information on a single package index
 data PackageIndex = PackageIndex
@@ -226,6 +248,12 @@ data ExecOptsExtra
         { eoEnvSettings :: !EnvSettings
         , eoPackages :: ![String]
         }
+
+data EvalOpts = EvalOpts
+    { evalArg :: !String
+    , evalExtra :: !ExecOptsExtra
+    }
+
 -- | Parsed global command-line options.
 data GlobalOpts = GlobalOpts
     { globalReExec       :: !Bool
@@ -234,7 +262,6 @@ data GlobalOpts = GlobalOpts
     , globalResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
     , globalTerminal     :: !Bool -- ^ We're in a terminal?
     , globalStackYaml    :: !(Maybe FilePath) -- ^ Override project stack.yaml
-    , globalModifyCodePage :: !Bool -- ^ Force the code page to UTF-8 on Windows
     } deriving (Show)
 
 -- | Either an actual resolver value, or an abstract description of one (e.g.,
@@ -269,6 +296,8 @@ data BuildConfig = BuildConfig
       --
       -- These dependencies will not be installed to a shared location, and
       -- will override packages provided by the resolver.
+    , bcExtraPackageDBs :: ![Path Abs Dir]
+      -- ^ Extra package databases
     , bcStackYaml  :: !(Path Abs File)
       -- ^ Location of the stack.yaml file.
       --
@@ -404,15 +433,17 @@ data Project = Project
     -- ^ Per-package flag overrides
     , projectResolver :: !Resolver
     -- ^ How we resolve which dependencies to use
+    , projectExtraPackageDBs :: ![FilePath]
     }
   deriving Show
 
 instance ToJSON Project where
     toJSON p = object
-        [ "packages"   .= projectPackages p
-        , "extra-deps" .= map fromTuple (Map.toList $ projectExtraDeps p)
-        , "flags"      .= projectFlags p
-        , "resolver"   .= projectResolver p
+        [ "packages"          .= projectPackages p
+        , "extra-deps"        .= map fromTuple (Map.toList $ projectExtraDeps p)
+        , "flags"             .= projectFlags p
+        , "resolver"          .= projectResolver p
+        , "extra-package-dbs" .= projectExtraPackageDBs p
         ]
 
 -- | How we resolve which dependencies to install given a set of packages.
@@ -565,6 +596,13 @@ data ConfigMonoid =
     -- ^ Additional setup info (inline or remote) to use for installing tools
     ,configMonoidPvpBounds           :: !(Maybe PvpBounds)
     -- ^ See 'configPvpBounds'
+    ,configMonoidModifyCodePage      :: !(Maybe Bool)
+    -- ^ See 'configModifyCodePage'
+    ,configMonoidExplicitSetupDeps   :: !(Map (Maybe PackageName) Bool)
+    -- ^ See 'configExplicitSetupDeps'
+    ,configMonoidRebuildGhcOptions   :: !(Maybe Bool)
+    -- ^ See 'configMonoidRebuildGhcOptions'
+    ,configMonoidApplyGhcOptions     :: !(Maybe ApplyGhcOptions)
     }
   deriving Show
 
@@ -596,6 +634,10 @@ instance Monoid ConfigMonoid where
     , configMonoidExtraPath = []
     , configMonoidSetupInfoLocations = mempty
     , configMonoidPvpBounds = Nothing
+    , configMonoidModifyCodePage = Nothing
+    , configMonoidExplicitSetupDeps = mempty
+    , configMonoidRebuildGhcOptions = Nothing
+    , configMonoidApplyGhcOptions = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -625,6 +667,10 @@ instance Monoid ConfigMonoid where
     , configMonoidExtraPath = configMonoidExtraPath l ++ configMonoidExtraPath r
     , configMonoidSetupInfoLocations = configMonoidSetupInfoLocations l ++ configMonoidSetupInfoLocations r
     , configMonoidPvpBounds = configMonoidPvpBounds l <|> configMonoidPvpBounds r
+    , configMonoidModifyCodePage = configMonoidModifyCodePage l <|> configMonoidModifyCodePage r
+    , configMonoidExplicitSetupDeps = configMonoidExplicitSetupDeps l <> configMonoidExplicitSetupDeps r
+    , configMonoidRebuildGhcOptions = configMonoidRebuildGhcOptions l <|> configMonoidRebuildGhcOptions r
+    , configMonoidApplyGhcOptions = configMonoidApplyGhcOptions l <|> configMonoidApplyGhcOptions r
     }
 
 instance FromJSON (ConfigMonoid, [JSONWarning]) where
@@ -680,6 +726,12 @@ parseConfigMonoidJSON obj = do
         maybeToList <$> jsonSubWarningsT (obj ..:? "setup-info")
 
     configMonoidPvpBounds <- obj ..:? "pvp-bounds"
+    configMonoidModifyCodePage <- obj ..:? "modify-code-page"
+    configMonoidExplicitSetupDeps <-
+        (obj ..:? "explicit-setup-deps" ..!= mempty)
+        >>= fmap Map.fromList . mapM handleExplicitSetupDep . Map.toList
+    configMonoidRebuildGhcOptions <- obj ..:? "rebuild-ghc-options"
+    configMonoidApplyGhcOptions <- obj ..:? "apply-ghc-options"
 
     return ConfigMonoid {..}
   where
@@ -695,6 +747,16 @@ parseConfigMonoidJSON obj = do
         case parseArgs Escaping vals' of
             Left e -> fail e
             Right vals -> return (name, map T.pack vals)
+
+    handleExplicitSetupDep :: Monad m => (Text, Bool) -> m (Maybe PackageName, Bool)
+    handleExplicitSetupDep (name', b) = do
+        name <-
+            if name' == "*"
+                then return Nothing
+                else case parsePackageNameFromString $ T.unpack name' of
+                        Left e -> fail $ show e
+                        Right x -> return $ Just x
+        return (name, b)
 
 -- | Newtype for non-orphan FromJSON instance.
 newtype VersionRangeJSON = VersionRangeJSON { unVersionRangeJSON :: VersionRange }
@@ -892,6 +954,12 @@ packageDatabaseLocal = do
     root <- installationRootLocal
     return $ root </> $(mkRelDir "pkgdb")
 
+-- | Extra package databases
+packageDatabaseExtra :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m [Path Abs Dir]
+packageDatabaseExtra = do
+    bc <- asks getBuildConfig
+    return $ bcExtraPackageDBs bc
+
 -- | Directory for holding flag cache information
 flagCacheLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
 flagCacheLocal = do
@@ -967,11 +1035,13 @@ instance (warnings ~ [JSONWarning]) => FromJSON (ProjectAndConfigMonoid, warning
         flags <- o ..:? "flags" ..!= mempty
         resolver <- jsonSubWarnings (o ..: "resolver")
         config <- parseConfigMonoidJSON o
+        extraPackageDBs <- o ..:? "extra-package-dbs" ..!= []
         let project = Project
                 { projectPackages = dirs
                 , projectExtraDeps = extraDeps
                 , projectFlags = flags
                 , projectResolver = resolver
+                , projectExtraPackageDBs = extraPackageDBs
                 }
         return $ ProjectAndConfigMonoid project config
       where
@@ -1117,6 +1187,8 @@ instance FromJSON (SetupInfo, [JSONWarning]) where
         tellJSONField "portable-git"
         return SetupInfo {..}
 
+-- | For @siGHCs@ and @siGHCJSs@ fields maps are deeply merged.
+-- For all fields the values from the last @SetupInfo@ win.
 instance Monoid SetupInfo where
     mempty =
         SetupInfo
@@ -1128,11 +1200,11 @@ instance Monoid SetupInfo where
         }
     mappend l r =
         SetupInfo
-        { siSevenzExe = siSevenzExe l <|> siSevenzExe r
-        , siSevenzDll = siSevenzDll l <|> siSevenzDll r
-        , siMsys2 = siMsys2 l <> siMsys2 r
-        , siGHCs = siGHCs l <> siGHCs r
-        , siGHCJSs = siGHCJSs l <> siGHCJSs r }
+        { siSevenzExe = siSevenzExe r <|> siSevenzExe l
+        , siSevenzDll = siSevenzDll r <|> siSevenzDll l
+        , siMsys2 = siMsys2 r <> siMsys2 l
+        , siGHCs = Map.unionWith (<>) (siGHCs r) (siGHCs l)
+        , siGHCJSs = Map.unionWith (<>) (siGHCJSs r) (siGHCJSs l) }
 
 -- | Remote or inline 'SetupInfo'
 data SetupInfoLocation
@@ -1176,3 +1248,17 @@ instance ToJSON PvpBounds where
   toJSON = toJSON . pvpBoundsText
 instance FromJSON PvpBounds where
   parseJSON = withText "PvpBounds" (either fail return . parsePvpBounds)
+
+-- | Provide an explicit list of package dependencies when running a custom Setup.hs
+explicitSetupDeps :: (MonadReader env m, HasConfig env) => PackageName -> m Bool
+explicitSetupDeps name = do
+    m <- asks $ configExplicitSetupDeps . getConfig
+    return $
+        -- Yes there are far cleverer ways to write this. I honestly consider
+        -- the explicit pattern matching much easier to parse at a glance.
+        case Map.lookup (Just name) m of
+            Just b -> b
+            Nothing ->
+                case Map.lookup Nothing m of
+                    Just b -> b
+                    Nothing -> False -- default value
