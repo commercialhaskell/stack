@@ -1712,3 +1712,25 @@ users. Here's a quick rundown:
   but it can be useful if you're trying to test a specific bugfix.
 * `stack list-dependencies` lists all of the packages and versions used for a
   project
+
+## Debugging
+
+The following command installs with profiling enabled:
+
+`stack install --enable-executable-profiling --enable-library-profiling
+--ghc-options="-rtsopts"`
+
+This command will allow you to use various tools to profile the time,
+allocation, heap, and more of a program. The `-prof` GHC option is unnecessary
+and will result in a warning. Additional compilation options can be added to
+`--ghc-options` if needed. To see a general overview of the time and allocation
+of a program called `main` compiled with the above command, you can run
+
+`./main +RTS -p`
+
+to generate a `main.prof` file containing the requested profiling information.
+For more commands and uses, see [the official GHC chapter on
+profiling](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/profiling.html),
+[the Haskell wiki](https://wiki.haskell.org/How_to_profile_a_Haskell_program),
+and [the chapter on profiling in Real World
+Haskell](http://book.realworldhaskell.org/read/profiling-and-optimization.html).
