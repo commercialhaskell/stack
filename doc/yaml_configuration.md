@@ -46,8 +46,7 @@ settings:
 * A list of subdirectories to build (useful for mega-repos like
 [wai](https://github.com/yesodweb/wai/) or
 [digestive-functors](https://github.com/jaspervdj/digestive-functors))
-* Whether a package should be treated as a dependency, in which case it will only be built if demanded by a non-dependency, and its test suites and benchmarks will not be run. This is useful for tweaking an upstream package.
-    * The current name for this is `valid-wanted`, which when `false` means "treat as a dependency." That's a confusing name choice, and therefore we're switching it to be `extra-dep: true` to mean "treat as dependency." You'll get a deprecation warning once that new naming is release.
+* Whether a package should be treated as a dependency: a package marked `extra-dep: true` will only be built if demanded by a non-dependency, and its test suites and benchmarks will not be run. This is useful for tweaking upstream packages.
 
 To tie this all together, here's an example of the different settings:
 
@@ -55,7 +54,7 @@ To tie this all together, here's an example of the different settings:
 packages:
 - local-package
 - location: vendor/binary
-  valid-wanted: false
+  extra-dep: true
 - location:
     git: git@github.com:yesodweb/wai
     commit: 2f8a8e1b771829f4a8a77c0111352ce45a14c30f
