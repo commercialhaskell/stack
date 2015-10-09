@@ -242,7 +242,9 @@ a 64-bit kernel. If you do not already have one, we suggest Ubuntu 14.04
 
 While Docker does support non-Linux operating systems through the `boot2docker`
 VM, there are issues with host volume mounting that prevent stack from being
-usable in this configuration.
+usable in this configuration. See
+[#194](https://github.com/commercialhaskell/stack/issues/194) for details and
+workarounds.
 
 ### Docker
 
