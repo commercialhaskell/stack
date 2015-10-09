@@ -13,7 +13,7 @@ module Stack.Build.Coverage
 
 import           Control.Applicative
 import           Control.Exception.Lifted
-import           Control.Monad                  (liftM, when)
+import           Control.Monad                  (liftM, when, void)
 import           Control.Monad.Catch            (MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -123,23 +123,35 @@ generateHpcReportInternal tixSrc subdir report extraMarkupArgs extraReportArgs =
                 reportDest = parent tixSrc </> subdir
             menv <- getMinimalEnvOverride
             $logInfo $ "Generating " <> report
-            _ <- readProcessStdout Nothing menv "hpc"
+            outputLines <- liftM S8.lines $ readProcessStdout Nothing menv "hpc"
+                ( "report"
+                : toFilePath tixSrc
+                : (args ++ extraReportArgs)
+                )
+            if all ("(0/0)" `S8.isSuffixOf`) outputLines
+                then $logError $ T.concat
+                    [ "Error: The "
+                    , report
+                    , " did not consider any code. One possible cause of this is"
+                    , " if your test-suite builds the library code (see stack"
+                    , " issue #1008). It may also indicate a bug in stack or"
+                    , " the hpc program. Please report this issue if you think"
+                    , " your coverage report should have meaningful results."
+                    ]
+                else do
+                    -- Print output, stripping @\r@ characters because
+                    -- Windows.
+                    forM_ outputLines ($logInfo . T.decodeUtf8 . S8.filter (not . (=='\r')))
+                    $logInfo
+                        ("The " <> report <> " is available at " <>
+                         T.pack (toFilePath (reportDest </> $(mkRelFile "hpc_index.html"))))
+            -- Generate the markup.
+            void $ readProcessStdout Nothing menv "hpc"
                 ( "markup"
                 : toFilePath tixSrc
                 : ("--destdir=" ++ toFilePath reportDest)
                 : (args ++ extraMarkupArgs)
                 )
-            output <- readProcessStdout Nothing menv "hpc"
-                ( "report"
-                : toFilePath tixSrc
-                : (args ++ extraReportArgs)
-                )
-            -- Print output, stripping @\r@ characters because
-            -- Windows.
-            forM_ (S8.lines output) ($logInfo . T.decodeUtf8 . S8.filter (not . (=='\r')))
-            $logInfo
-                ("The " <> report <> " is available at " <>
-                 T.pack (toFilePath (reportDest </> $(mkRelFile "hpc_index.html"))))
 
 generateHpcUnifiedReport :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
                      => m ()
