@@ -309,12 +309,10 @@ modify-code-page: false
 Decide whether a custom `Setup.hs` script should be run with an explicit list
 of dependencies based on the dependencies of the package itself, or simply
 provided the global package database. This option is most often needed when
-overriding packages in the global database, see [issue
-#1110](https://github.com/commercialhaskell/stack/issues/1110).
+overriding packages in the global database, see [issue #1110](https://github.com/commercialhaskell/stack/issues/1110).
 
 Setting the list explicitly can help when a Setup.hs depends on packages in the
-local package database. For more information on that case, see [issue
-#897](https://github.com/commercialhaskell/stack/issues/897).
+local package database. For more information on that case, see [issue #897](https://github.com/commercialhaskell/stack/issues/897).
 
 Note that in the future, this should all disappear once Cabal provides full
 support for explicit Setup.hs dependencies.
