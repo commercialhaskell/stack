@@ -4,6 +4,7 @@
 module Stack.Config.Docker where
 
 import Control.Exception.Lifted
+import Control.Monad
 import Control.Monad.Catch (throwM, MonadThrow)
 import Data.List (find)
 import Data.Maybe
@@ -63,7 +64,7 @@ dockerOptsFromMonoid mproject stackRoot DockerOptsMonoid{..} = do
                     Right p -> return p
     dockerStackExe <-
         case dockerMonoidStackExe of
-            Just e -> Just <$> parseDockerStackExe e
+            Just e -> liftM Just (parseDockerStackExe e)
             Nothing -> return Nothing
     return DockerOpts{..}
   where emptyToNothing Nothing = Nothing
