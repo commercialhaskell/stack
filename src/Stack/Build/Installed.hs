@@ -48,8 +48,6 @@ data LoadHelper = LoadHelper
     }
     deriving Show
 
-type InstalledMap = Map PackageName (Version, InstallLocation, Installed) -- TODO Version is now redundant and can be gleaned from Installed
-
 -- | Options for 'getInstalled'.
 data GetInstalledOpts = GetInstalledOpts
     { getInstalledProfiling :: !Bool
