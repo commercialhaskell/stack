@@ -9,7 +9,10 @@ module Stack.Docker.GlobalDB
   ,getDockerImagesLastUsed
   ,pruneDockerImagesLastUsed
   ,DockerImageLastUsed
-  ,DockerImageProjectId)
+  ,DockerImageProjectId
+  ,getDockerImageExe
+  ,setDockerImageExe
+  ,DockerImageExeId)
   where
 
 import           Control.Exception (IOException,catch,throwIO)
@@ -35,6 +38,13 @@ DockerImageProject
     projectPath               FilePath
     lastUsedTime              UTCTime
     DockerImageProjectPathKey imageHash projectPath
+    deriving Show
+DockerImageExe
+    imageHash                 String
+    exePath                   FilePath
+    exeTimestamp              UTCTime
+    compatible                Bool
+    DockerImageExeUnique      imageHash exePath exeTimestamp
     deriving Show
 |]
 
@@ -70,6 +80,20 @@ pruneDockerImagesLastUsed config existingHashes =
                            if h `elem` existingHashes
                              then return ()
                              else delete k)
+
+-- | Get the record of whether an executable is compatible with a Docker image
+getDockerImageExe :: Config -> String -> FilePath -> UTCTime -> IO (Maybe Bool)
+getDockerImageExe config imageId exePath exeTimestamp =
+    withGlobalDB config $ do
+        mentity <- getBy (DockerImageExeUnique imageId exePath exeTimestamp)
+        return (fmap (dockerImageExeCompatible . entityVal) mentity)
+
+-- | Seet the record of whether an executable is compatible with a Docker image
+setDockerImageExe :: Config -> String -> FilePath -> UTCTime -> Bool -> IO ()
+setDockerImageExe config imageId exePath exeTimestamp compatible =
+    withGlobalDB config $
+    do _ <- upsert (DockerImageExe imageId exePath exeTimestamp compatible) []
+       return ()
 
 -- | Run an action with the global database.  This performs any needed migrations as well.
 withGlobalDB :: forall a. Config -> SqlPersistT (NoLoggingT (ResourceT IO)) a -> IO a

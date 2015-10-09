@@ -796,7 +796,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} = do
              runStackTGlobal manager (lcConfig lc) go $
                 Docker.execWithOptionalContainer
                     (lcProjectRoot lc)
-                    (return (cmd, args, [], id))
+                    (\_ _ -> return (cmd, args, [], []))
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
                     (runStackTGlobal manager (lcConfig lc) go $ do

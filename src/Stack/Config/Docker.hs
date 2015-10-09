@@ -63,12 +63,8 @@ dockerOptsFromMonoid mproject stackRoot DockerOptsMonoid{..} = do
                     Right p -> return p
     dockerStackExe <-
         case dockerMonoidStackExe of
-            Just e -> parseDockerStackExe e
-#ifdef MOUNT_IN_DOCKER
-            Nothing -> return DockerStackExeHost
-#else
-            Nothing -> return DockerStackExeDownload
-#endif
+            Just e -> Just <$> parseDockerStackExe e
+            Nothing -> return Nothing
     return DockerOpts{..}
   where emptyToNothing Nothing = Nothing
         emptyToNothing (Just s) | null s = Nothing

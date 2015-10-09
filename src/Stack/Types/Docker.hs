@@ -42,7 +42,7 @@ data DockerOpts = DockerOpts
     -- ^ Environment variables to set in the container.
   ,dockerDatabasePath :: !(Path Abs File)
     -- ^ Location of image usage database.
-  ,dockerStackExe :: !DockerStackExe
+  ,dockerStackExe :: !(Maybe DockerStackExe)
     -- ^ Location of container-compatible stack executable
   ,dockerSetUser :: !(Maybe Bool)
    -- ^ Set in-container user to match host's

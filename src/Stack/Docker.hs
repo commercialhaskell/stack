@@ -32,6 +32,7 @@ import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Char (isSpace,toUpper,isAscii,isDigit)
+import           Data.Conduit.List (sinkNull)
 import           Data.List (dropWhileEnd,intercalate,intersperse,isPrefixOf,isInfixOf,foldl',sortBy)
 import           Data.List.Extra (trim)
 import           Data.Map.Strict (Map)
@@ -56,7 +57,7 @@ import           Stack.Docker.GlobalDB
 import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Setup (ensureDockerStackExe)
-import           System.Directory (canonicalizePath)
+import           System.Directory (canonicalizePath, getModificationTime)
 import           System.Environment (lookupEnv,getProgName, getArgs,getExecutablePath)
 import           System.Exit (exitSuccess, exitWith)
 import           System.FilePath (dropTrailingPathSeparator,takeBaseName)
@@ -88,39 +89,88 @@ reexecWithOptionalContainer
     -> Maybe (m ())
     -> m ()
 reexecWithOptionalContainer mprojectRoot =
-  execWithOptionalContainer mprojectRoot getCmdArgs
+    execWithOptionalContainer mprojectRoot getCmdArgs
   where
-    getCmdArgs = do
+    getCmdArgs envOverride imageInfo = do
         config <- asks getConfig
         args <-
             fmap
                 (("--" ++ reExecArgName ++ "=" ++ showVersion Meta.version) :)
                 (liftIO getArgs)
         case dockerStackExe (configDocker config) of
-            DockerStackExeHost
+            Just DockerStackExeHost
               | configPlatform config == dockerContainerPlatform ->
                   fmap (cmdArgs args) (liftIO getExecutablePath)
-              | otherwise ->
-                  throwM UnsupportedStackExeHostPlatformException
-            DockerStackExeImage -> do
+              | otherwise -> throwM UnsupportedStackExeHostPlatformException
+            Just DockerStackExeImage -> do
                 progName <- liftIO getProgName
-                return (takeBaseName progName, args, [], id)
-            DockerStackExePath path ->
-                fmap (cmdArgs args) (liftIO $ canonicalizePath (toFilePath path))
-            DockerStackExeDownload ->
-                fmap (cmdArgs args . toFilePath) (ensureDockerStackExe dockerContainerPlatform)
+                return (takeBaseName progName, args, [], [])
+            Just (DockerStackExePath path) ->
+                fmap
+                    (cmdArgs args)
+                    (liftIO $ canonicalizePath (toFilePath path))
+            Just DockerStackExeDownload -> exeDownload args
+            Nothing | configPlatform config == dockerContainerPlatform -> do
+                (exePath,exeTimestamp,misCompatible) <-
+                    liftIO $
+                    do exePath <- liftIO getExecutablePath
+                       exeTimestamp <- liftIO (getModificationTime exePath)
+                       isKnown <-
+                           liftIO $
+                           getDockerImageExe
+                               config
+                               (iiId imageInfo)
+                               exePath
+                               exeTimestamp
+                       return (exePath, exeTimestamp, isKnown)
+                case misCompatible of
+                    Just True -> do
+                        return (cmdArgs args exePath)
+                    Just False -> do
+                        exeDownload args
+                    Nothing -> do
+                        e <-
+                            try $
+                            sinkProcessStderrStdout
+                                Nothing
+                                envOverride
+                                "docker"
+                                [ "run"
+                                , "-v"
+                                , exePath ++ ":" ++ "/tmp/stack"
+                                , iiId imageInfo
+                                , "/tmp/stack"
+                                , "--version" ]
+                                sinkNull
+                                sinkNull
+                        case e of
+                            Left (ProcessExitedUnsuccessfully _ _) -> do
+                                liftIO $
+                                    setDockerImageExe
+                                        config
+                                        (iiId imageInfo)
+                                        exePath
+                                        exeTimestamp
+                                        False
+                                exeDownload args
+                            Right _ -> do
+                                liftIO $
+                                    setDockerImageExe
+                                        config
+                                        (iiId imageInfo)
+                                        exePath
+                                        exeTimestamp
+                                        True
+                                return (cmdArgs args exePath)
+            Nothing | otherwise -> do
+                exeDownload args
+    exeDownload args =
+        fmap
+            (cmdArgs args . toFilePath)
+            (ensureDockerStackExe dockerContainerPlatform)
     cmdArgs args exePath =
         let mountPath = concat ["/opt/host/bin/", takeBaseName exePath]
-        in ( mountPath
-           , args
-           , []
-           , \c ->
-                  c
-                  { configDocker = (configDocker c)
-                    { dockerMount = Mount exePath mountPath :
-                      dockerMount (configDocker c)
-                    }
-                  })
+        in (mountPath, args, [], [Mount exePath mountPath])
 
 -- | If Docker is enabled, re-runs the OS command returned by the second argument in a
 -- Docker container.  Otherwise, runs the inner action.
@@ -129,7 +179,7 @@ reexecWithOptionalContainer mprojectRoot =
 execWithOptionalContainer
     :: M env m
     => Maybe (Path Abs Dir)
-    -> m (FilePath,[String],[(String,String)],Config -> Config)
+    -> (EnvOverride -> Inspect -> m (FilePath,[String],[(String,String)],[Mount]))
     -> Maybe (m ())
     -> IO ()
     -> Maybe (m ())
@@ -150,15 +200,11 @@ execWithOptionalContainer mprojectRoot getCmdArgs mbefore inner mafter mrelease 
                fromMaybeAction mafter
                liftIO exitSuccess
         | otherwise ->
-            do (cmd_,args,envVars,modConfig) <- getCmdArgs
-               fromMaybeAction mrelease
+            do fromMaybeAction mrelease
                runContainerAndExit
-                 modConfig
+                 getCmdArgs
                  mprojectRoot
                  (fromMaybeAction mbefore)
-                 cmd_
-                 args
-                 envVars
                  (fromMaybeAction mafter)
   where
     fromMaybeAction Nothing = return ()
@@ -178,22 +224,16 @@ getInContainer = liftIO (isJust <$> lookupEnv inContainerEnvVar)
 
 -- | Run a command in a new Docker container, then exit the process.
 runContainerAndExit :: M env m
-                    => (Config -> Config)
+                    => (EnvOverride -> Inspect -> m (FilePath,[String],[(String,String)],[Mount]))
                     -> Maybe (Path Abs Dir)
                     -> m ()
-                    -> FilePath
-                    -> [String]
-                    -> [(String, String)]
                     -> m ()
                     -> m ()
-runContainerAndExit modConfig
+runContainerAndExit getCmdArgs
                     mprojectRoot
                     before
-                    cmnd
-                    args
-                    envVars
                     after =
-  do config <- fmap modConfig (asks getConfig)
+  do config <- asks getConfig
      let docker = configDocker config
      envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride
@@ -232,6 +272,7 @@ runContainerAndExit modConfig
                   Just ii2 -> return ii2
                   Nothing -> throwM (InspectFailedException image)
          | otherwise -> throwM (NotPulledException image)
+     (cmnd,args,envVars,extraMount) <- getCmdArgs envOverride imageInfo
      let imageEnvVars = map (break (== '=')) (icEnv (iiConfig imageInfo))
          sandboxID = fromMaybe "default" (lookupImageEnv sandboxIDEnvVar imageEnvVars)
      sandboxIDDir <- parseRelDir (sandboxID ++ "/")
@@ -276,7 +317,7 @@ runContainerAndExit modConfig
          ,userEnvVars
          ,concatMap (\(k,v) -> ["-e", k ++ "=" ++ v]) envVars
          ,concatMap sandboxSubdirArg sandboxSubdirs
-         ,concatMap mountArg (dockerMount docker)
+         ,concatMap mountArg (extraMount ++ dockerMount docker)
          ,concatMap (\nv -> ["-e", nv]) (dockerEnv docker)
          ,case dockerContainerName docker of
             Just name -> ["--name=" ++ name]
