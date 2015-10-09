@@ -1074,7 +1074,10 @@ singleTest runInBase topts lptb ac ee task installedMap = do
 
         let needBuild = neededConfig ||
                 (case taskType task of
-                    TTLocal lp -> lpDirtyFiles lp
+                    TTLocal lp ->
+                        case lpDirtyFiles lp of
+                            Just _ -> True
+                            Nothing -> False
                     _ -> assert False True) ||
                 not testBuilt
 
@@ -1228,7 +1231,10 @@ singleBench runInBase beopts _lptb ac ee task installedMap = do
 
         let needBuild = neededConfig ||
                 (case taskType task of
-                    TTLocal lp -> lpDirtyFiles lp
+                    TTLocal lp ->
+                        case lpDirtyFiles lp of
+                            Just _ -> True
+                            Nothing -> False
                     _ -> assert False True) ||
                 not benchBuilt
         when needBuild $ do

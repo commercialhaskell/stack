@@ -33,7 +33,7 @@ import           Data.Text.Encoding.Error (lenientDecode)
 import           Distribution.Package (Dependency (..))
 import           Distribution.Version         (anyVersion)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
-import           Prelude hiding (FilePath, pi, writeFile)
+import           Prelude hiding (pi, writeFile)
 import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
@@ -375,11 +375,13 @@ checkNeedInstall treatAsDep name ps installed wanted = assert (piiLocation ps ==
             | otherwise -> do
                 tell mempty { wDirty = Map.singleton name $
                     let t = T.intercalate ", " $ map (T.pack . packageNameString . packageIdentifierName) (Set.toList missing)
-                     in T.append "missing dependencies: " $
-                            if T.length t < 100
-                                then t
-                                else T.take 97 t <> "..." }
+                     in T.append "missing dependencies: " $ addEllipsis t }
                 return True
+
+addEllipsis :: Text -> Text
+addEllipsis t
+    | T.length t < 100 = t
+    | otherwise = T.take 97 t <> "..."
 
 addPackageDeps :: Bool -- ^ is this being used by a dependency?
                -> Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, InstallLocation))
@@ -450,7 +452,8 @@ checkDirtiness ps installed package present wanted = do
                 Nothing -> Just "old configure information not found"
                 Just oldOpts
                     | Just reason <- describeConfigDiff config oldOpts wantConfigCache -> Just reason
-                    | psDirty ps -> Just "local file changes"
+                    | Just files <- psDirty ps -> Just $ "local file changes: " <>
+                                                         addEllipsis (T.pack $ unwords $ Set.toList files)
                     | otherwise -> Nothing
         config = getConfig ctx
     case mreason of
@@ -521,9 +524,9 @@ describeConfigDiff config old new
 
     newComponents = configCacheComponents new `Set.difference` configCacheComponents old
 
-psDirty :: PackageSource -> Bool
+psDirty :: PackageSource -> Maybe (Set FilePath)
 psDirty (PSLocal lp) = lpDirtyFiles lp
-psDirty (PSUpstream _ _ _) = False -- files never change in an upstream package
+psDirty (PSUpstream _ _ _) = Nothing -- files never change in an upstream package
 
 psWanted :: PackageSource -> Bool
 psWanted (PSLocal lp) = lpWanted lp

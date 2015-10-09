@@ -218,7 +218,10 @@ data LocalPackage = LocalPackage
 
     , lpDir            :: !(Path Abs Dir)  -- ^ Directory of the package.
     , lpCabalFile      :: !(Path Abs File) -- ^ The .cabal file
-    , lpDirtyFiles     :: !Bool            -- ^ are there files that have changed since the last build?
+    , lpDirtyFiles     :: !(Maybe (Set FilePath))
+    -- ^ Nothing == not dirty, Just == dirty. Note that the Set may be empty if
+    -- we forced the build to treat packages as dirty. Also, the Set may not
+    -- include all modified files.
     , lpNewBuildCache  :: !(Map FilePath FileCacheInfo) -- ^ current state of the files
     , lpFiles          :: !(Set (Path Abs File)) -- ^ all files used by this package
     , lpComponents     :: !(Set NamedComponent)
