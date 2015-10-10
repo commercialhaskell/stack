@@ -154,6 +154,10 @@ Alternatively, the package can be built from source as follows.
 
          nix-env -i -f shell.nix
 
+For more information on using Stack together with Nix, please see [the NixOS
+manual section on
+Stack](http://nixos.org/nixpkgs/manual/#using-stack-together-with-nix).
+
 ## Linux
 
 (64-bit and 32-bit options available)
