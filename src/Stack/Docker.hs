@@ -110,60 +110,58 @@ reexecWithOptionalContainer mprojectRoot =
                     (cmdArgs args)
                     (liftIO $ canonicalizePath (toFilePath path))
             Just DockerStackExeDownload -> exeDownload args
-            Nothing | configPlatform config == dockerContainerPlatform -> do
-                (exePath,exeTimestamp,misCompatible) <-
-                    liftIO $
-                    do exePath <- liftIO getExecutablePath
-                       exeTimestamp <- liftIO (getModificationTime exePath)
-                       isKnown <-
-                           liftIO $
-                           getDockerImageExe
-                               config
-                               (iiId imageInfo)
-                               exePath
-                               exeTimestamp
-                       return (exePath, exeTimestamp, isKnown)
-                case misCompatible of
-                    Just True -> do
-                        return (cmdArgs args exePath)
-                    Just False -> do
-                        exeDownload args
-                    Nothing -> do
-                        e <-
-                            try $
-                            sinkProcessStderrStdout
-                                Nothing
-                                envOverride
-                                "docker"
-                                [ "run"
-                                , "-v"
-                                , exePath ++ ":" ++ "/tmp/stack"
-                                , iiId imageInfo
-                                , "/tmp/stack"
-                                , "--version" ]
-                                sinkNull
-                                sinkNull
-                        case e of
-                            Left (ProcessExitedUnsuccessfully _ _) -> do
-                                liftIO $
-                                    setDockerImageExe
-                                        config
-                                        (iiId imageInfo)
-                                        exePath
-                                        exeTimestamp
-                                        False
-                                exeDownload args
-                            Right _ -> do
-                                liftIO $
-                                    setDockerImageExe
-                                        config
-                                        (iiId imageInfo)
-                                        exePath
-                                        exeTimestamp
-                                        True
-                                return (cmdArgs args exePath)
-            Nothing | otherwise -> do
-                exeDownload args
+            Nothing
+              | configPlatform config == dockerContainerPlatform -> do
+                  (exePath,exeTimestamp,misCompatible) <-
+                      liftIO $
+                      do exePath <- liftIO getExecutablePath
+                         exeTimestamp <- liftIO (getModificationTime exePath)
+                         isKnown <-
+                             liftIO $
+                             getDockerImageExe
+                                 config
+                                 (iiId imageInfo)
+                                 exePath
+                                 exeTimestamp
+                         return (exePath, exeTimestamp, isKnown)
+                  case misCompatible of
+                      Just True -> do
+                          return (cmdArgs args exePath)
+                      Just False -> do
+                          exeDownload args
+                      Nothing -> do
+                          e <-
+                              try $
+                              sinkProcessStderrStdout
+                                  Nothing
+                                  envOverride
+                                  "docker"
+                                  [ "run"
+                                  , "-v"
+                                  , exePath ++ ":" ++ "/tmp/stack"
+                                  , iiId imageInfo
+                                  , "/tmp/stack"
+                                  , "--version"]
+                                  sinkNull
+                                  sinkNull
+                          let compatible =
+                                  case e of
+                                      Left (ProcessExitedUnsuccessfully _ _) ->
+                                          False
+                                      Right _ -> True
+                          liftIO $
+                              setDockerImageExe
+                                  config
+                                  (iiId imageInfo)
+                                  exePath
+                                  exeTimestamp
+                                  compatible
+                          if compatible
+                              then return (cmdArgs args exePath)
+                              else exeDownload args
+            Nothing
+              | otherwise -> do
+                  exeDownload args
     exeDownload args =
         fmap
             (cmdArgs args . toFilePath)
