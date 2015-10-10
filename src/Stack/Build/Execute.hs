@@ -694,7 +694,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
             , esStackExe = False
             , esLocaleUtf8 = True
             }
-        getRunhaskellPath <- runOnce $ liftIO $ join $ findExecutable menv "runhaskell"
+        getGhcPath <- runOnce $ liftIO $ join $ findExecutable menv "ghc"
         getGhcjsPath <- runOnce $ liftIO $ join $ findExecutable menv "ghcjs"
         distRelativeDir' <- distRelativeDir
         esetupexehs <-
@@ -808,17 +808,16 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
             wc <- getWhichCompiler
             (exeName, fullArgs) <- case (esetupexehs, wc) of
                 (Left setupExe, _) -> return (setupExe, setupArgs)
-                (Right setuphs, Ghc) -> do
-                    exeName <- getRunhaskellPath
-                    let fullArgs = packageArgs ++ (toFilePath setuphs : setupArgs)
-                    return (exeName, fullArgs)
-                (Right setuphs, Ghcjs) -> do
+                (Right setuphs, compiler) -> do
                     distDir <- distDirFromDir pkgDir
                     let setupDir = distDir </> $(mkRelDir "setup")
                         outputFile = setupDir </> $(mkRelFile "setup")
                     createTree setupDir
-                    ghcjsPath <- getGhcjsPath
-                    runExe ghcjsPath $
+                    compilerPath <-
+                        case compiler of
+                            Ghc -> getGhcPath
+                            Ghcjs -> getGhcjsPath
+                    runExe compilerPath $
                         [ "--make"
                         , "-odir", toFilePath setupDir
                         , "-hidir", toFilePath setupDir
@@ -826,8 +825,10 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                         ] ++ packageArgs ++
                         [ toFilePath setuphs
                         , "-o", toFilePath outputFile
-                        , "-build-runner"
-                        ]
+                        ] ++
+                        (case compiler of
+                            Ghc -> []
+                            Ghcjs -> ["-build-runner"])
                     return (outputFile, setupArgs)
             runExe exeName $ (if boptsCabalVerbose eeBuildOpts then ("--verbose":) else id) fullArgs
 
