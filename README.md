@@ -28,6 +28,7 @@ Downloads are available by operating system:
 * [CentOS / Red Hat / Amazon Linux](doc/install_and_upgrade.md#centos--red-hat--amazon-linux)
 * [Fedora](doc/install_and_upgrade.md#fedora)
 * [Arch Linux](doc/install_and_upgrade.md#arch-linux)
+* [NixOS](doc/install_and_upgrade.md#nixos)
 * [Linux (general)](doc/install_and_upgrade.md#linux)
 
 [Upgrade instructions](doc/install_and_upgrade.md#upgrade)
