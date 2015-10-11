@@ -10,7 +10,7 @@ import Blaze.ByteString.Builder (toLazyByteString, copyByteString)
 import Blaze.ByteString.Builder.Char.Utf8 (fromShow)
 import Control.Concurrent.Async (race_)
 import Control.Concurrent.STM
-import Control.Exception (Exception)
+import Control.Exception (Exception, fromException)
 import Control.Exception.Enclosed (tryAny)
 import Control.Monad (forever, unless, when)
 import qualified Data.ByteString.Lazy as L
@@ -20,10 +20,13 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.String (fromString)
 import Data.Traversable (forM)
+import GHC.IO.Handle (hIsTerminalDevice)
 import Ignore
 import Path
+import System.Console.ANSI
+import System.Exit
 import System.FSNotify
-import System.IO (stderr)
+import System.IO (stdout, stderr)
 
 -- | Print an exception to stderr
 printExceptionStderr :: Exception e => e -> IO ()
@@ -134,8 +137,22 @@ fileWatchConf cfg getProjectRoot inner = withManagerConf cfg $ \manager -> do
         -- https://github.com/commercialhaskell/stack/issues/822
         atomically $ writeTVar dirtyVar False
 
+        let withColor color action = do
+                outputIsTerminal <- hIsTerminalDevice stdout
+                if outputIsTerminal
+                then do
+                    setSGR [SetColor Foreground Dull color]
+                    action
+                    setSGR [Reset]
+                else action
+
         case eres of
-            Left e -> printExceptionStderr e
-            Right () -> putStrLn "Success! Waiting for next file change."
+            Left e -> do
+                let color = case fromException e of
+                        Just ExitSuccess -> Green
+                        _ -> Red
+                withColor color $ printExceptionStderr e
+            _ -> withColor Green $
+                putStrLn "Success! Waiting for next file change."
 
         putStrLn "Type help for available commands. Press enter to force a rebuild."
