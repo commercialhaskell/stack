@@ -80,9 +80,9 @@ enableDisableFlagsNoDefault' enabledValue disabledValue maybeHideValue name help
 -- To actually show have that help appear, use 'execExtraHelp' before executing the main parser.
 extraHelpOption :: String -> String -> String -> Parser (a -> a)
 extraHelpOption progName fakeName helpName =
-    infoOption (optDesc ++ ".") (long helpName <> hidden <> internal) <*>
-    infoOption (optDesc ++ ".") (long fakeName <> help optDesc)
-  where optDesc = concat ["Run '", takeBaseName progName, " --", helpName, "' for details"]
+    infoOption (optDesc' ++ ".") (long helpName <> hidden <> internal) <*>
+    infoOption (optDesc' ++ ".") (long fakeName <> help optDesc')
+  where optDesc' = concat ["Run '", takeBaseName progName, " --", helpName, "' for details"]
 
 -- | Display extra help if extea help option passed in arguments.
 -- Since optparse-applicative doesn't allow an arbirary IO action for an 'abortOption', this
