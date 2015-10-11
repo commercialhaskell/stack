@@ -293,7 +293,7 @@ configOptsParser docker =
 dockerOptsParser :: Bool -> Parser DockerOptsMonoid
 dockerOptsParser showOptions =
     DockerOptsMonoid
-    <$> pure Nothing
+    <$> pure False
     <*> maybeBoolFlags dockerCmdName
                        "using a Docker container"
                        hide

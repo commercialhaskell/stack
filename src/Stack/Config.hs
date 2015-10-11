@@ -268,7 +268,13 @@ loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadThrow m,MonadBaseContro
 loadConfig configArgs mstackYaml = do
     stackRoot <- determineStackRoot
     userConfigPath <- getDefaultUserConfigPath stackRoot
-    extraConfigs <- getExtraConfigs userConfigPath >>= mapM loadYaml
+    extraConfigs0 <- getExtraConfigs userConfigPath >>= mapM loadYaml
+    let extraConfigs =
+            -- non-project config files' existence of a docker section should never default docker
+            -- to enabled, so make it look like they didn't exist
+            map (\c -> c {configMonoidDockerOpts =
+                              (configMonoidDockerOpts c) {dockerMonoidDefaultEnable = False}})
+                extraConfigs0
     mproject <- loadProjectConfig mstackYaml
     config <- configFromConfigMonoid stackRoot userConfigPath (fmap (\(proj, _, _) -> proj) mproject) $ mconcat $
         case mproject of

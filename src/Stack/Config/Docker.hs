@@ -19,7 +19,7 @@ dockerOptsFromMonoid
     => Maybe Project -> Path Abs Dir -> DockerOptsMonoid -> m DockerOpts
 dockerOptsFromMonoid mproject stackRoot DockerOptsMonoid{..} = do
     let dockerEnable =
-            fromMaybe (fromMaybe False dockerMonoidExists) dockerMonoidEnable
+            fromMaybe dockerMonoidDefaultEnable dockerMonoidEnable
         dockerImage =
             let defaultTag =
                     case mproject of

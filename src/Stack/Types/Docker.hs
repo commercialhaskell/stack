@@ -52,8 +52,8 @@ data DockerOpts = DockerOpts
 -- | An uninterpreted representation of docker options.
 -- Configurations may be "cascaded" using mappend (left-biased).
 data DockerOptsMonoid = DockerOptsMonoid
-  {dockerMonoidExists :: !(Maybe Bool)
-    -- ^ Does a @docker:@ section exist in the top-level (usually project) config?
+  {dockerMonoidDefaultEnable :: !Bool
+    -- ^ Should Docker be defaulted to enabled (does @docker:@ section exist in the config)?
   ,dockerMonoidEnable :: !(Maybe Bool)
     -- ^ Is using Docker enabled?
   ,dockerMonoidRepoOrImage :: !(Maybe DockerMonoidRepoOrImage)
@@ -92,7 +92,7 @@ data DockerOptsMonoid = DockerOptsMonoid
 -- | Decode uninterpreted docker options from JSON/YAML.
 instance FromJSON (DockerOptsMonoid, [JSONWarning]) where
   parseJSON = withObjectWarnings "DockerOptsMonoid"
-    (\o -> do dockerMonoidExists           <- pure (Just True)
+    (\o -> do dockerMonoidDefaultEnable    <- pure True
               dockerMonoidEnable           <- o ..:? dockerEnableArgName
               dockerMonoidRepoOrImage      <- ((Just . DockerMonoidImage) <$> o ..: dockerImageArgName) <|>
                                               ((Just . DockerMonoidRepo) <$> o ..: dockerRepoArgName) <|>
@@ -115,7 +115,7 @@ instance FromJSON (DockerOptsMonoid, [JSONWarning]) where
 -- | Left-biased combine Docker options
 instance Monoid DockerOptsMonoid where
   mempty = DockerOptsMonoid
-    {dockerMonoidExists           = Just False
+    {dockerMonoidDefaultEnable    = False
     ,dockerMonoidEnable           = Nothing
     ,dockerMonoidRepoOrImage      = Nothing
     ,dockerMonoidRegistryLogin    = Nothing
@@ -133,7 +133,7 @@ instance Monoid DockerOptsMonoid where
     ,dockerMonoidSetUser          = Nothing
     }
   mappend l r = DockerOptsMonoid
-    {dockerMonoidExists           = dockerMonoidExists l <|> dockerMonoidExists r
+    {dockerMonoidDefaultEnable    = dockerMonoidDefaultEnable l || dockerMonoidDefaultEnable r
     ,dockerMonoidEnable           = dockerMonoidEnable l <|> dockerMonoidEnable r
     ,dockerMonoidRepoOrImage      = dockerMonoidRepoOrImage l <|> dockerMonoidRepoOrImage r
     ,dockerMonoidRegistryLogin    = dockerMonoidRegistryLogin l <|> dockerMonoidRegistryLogin r
