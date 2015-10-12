@@ -18,6 +18,7 @@ module System.Process.Read
   ,EnvOverride(..)
   ,unEnvOverride
   ,mkEnvOverride
+  ,modifyEnvOverride
   ,envHelper
   ,doesExecutableExist
   ,findExecutable
@@ -77,6 +78,7 @@ data EnvOverride = EnvOverride
     , eoPath :: [FilePath]
     , eoExeCache :: IORef (Map FilePath (Either ReadProcessException (Path Abs File)))
     , eoExeExtension :: String
+    , eoPlatform :: Platform
     }
 
 -- | Get the environment variables from @EnvOverride@
@@ -86,6 +88,15 @@ unEnvOverride = eoTextMap
 -- | Get the list of directories searched
 envSearchPath :: EnvOverride -> [FilePath]
 envSearchPath = eoPath
+
+-- | Modify an EnvOverride
+modifyEnvOverride :: MonadIO m
+                  => EnvOverride
+                  -> (Map Text Text -> Map Text Text)
+                  -> m EnvOverride
+modifyEnvOverride eo f = mkEnvOverride
+    (eoPlatform eo)
+    (f $ eoTextMap eo)
 
 -- | Create a new @EnvOverride@
 mkEnvOverride :: MonadIO m
@@ -100,6 +111,7 @@ mkEnvOverride platform tm' = do
         , eoPath = maybe [] (FP.splitSearchPath . T.unpack) (Map.lookup "PATH" tm)
         , eoExeCache = ref
         , eoExeExtension = if isWindows then ".exe" else ""
+        , eoPlatform = platform
         }
   where
     -- Fix case insensitivity of the PATH environment variable on Windows.

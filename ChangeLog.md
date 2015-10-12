@@ -43,6 +43,7 @@ Bug fixes:
 * Add `explicit-setup-deps` option [#1110](https://github.com/commercialhaskell/stack/issues/1110), and change the default to the old behavior of using any package in the global and snapshot database [#1025](https://github.com/commercialhaskell/stack/issues/1025)
 * Precompiled cache checks full package IDs on Cabal < 1.22 [#1103](https://github.com/commercialhaskell/stack/issues/1103)
 * Pass -package-id to ghci [#867](https://github.com/commercialhaskell/stack/issues/867)
+* Ignore global packages when copying precompiled packages [#1146](https://github.com/commercialhaskell/stack/issues/1146)
 
 ## 0.1.5.0
 

@@ -903,11 +903,18 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         announceTask task "copying precompiled package"
         forM_ mlib $ \libpath -> do
             menv <- getMinimalEnvOverride
-            withMVar eeInstallLock $ \() ->
-                readProcessNull Nothing menv "ghc-pkg"
+            withMVar eeInstallLock $ \() -> do
+                -- We want to ignore the global and user databases.
+                -- Unfortunately, ghc-pkg doesn't take such arguments on the
+                -- command line. Instead, we'll set GHC_PACKAGE_PATH. See:
+                -- https://github.com/commercialhaskell/stack/issues/1146
+
+                menv' <- modifyEnvOverride menv
+                       $ Map.insert
+                            "GHC_PACKAGE_PATH"
+                            (T.pack $ toFilePath $ bcoSnapDB eeBaseConfigOpts)
+                readProcessNull Nothing menv' "ghc-pkg"
                     [ "register"
-                    , "--no-user-package-db"
-                    , "--package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts)
                     , "--force"
                     , libpath
                     ]
