@@ -842,6 +842,7 @@ installGHCJS version si archiveFile archiveType destDir = do
             $logDebug $ "ziptool: " <> T.pack zipTool
             $logDebug $ "tar: " <> T.pack tarTool
             return $ do
+                removeTreeIfExists unpackDir
                 readInNull destDir tarTool menv ["xf", toFilePath archiveFile] Nothing
                 renameDir (destDir Path.</> tarComponent) unpackDir
 
