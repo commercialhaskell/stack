@@ -944,10 +944,8 @@ bootGhcjs menv stackYaml  = do
 runAndLog :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
           => Maybe (Path Abs Dir) -> String -> EnvOverride -> [String] -> m ()
 runAndLog mdir name menv args = liftBaseWith $ \restore -> do
-    let logLines = CB.lines =$ CL.mapM_ (void . restore . monadLoggerLog defaultLoc "" LevelInfo . toLogStr)
+    let logLines = CB.lines =$ CL.mapM_ (void . restore . monadLoggerLog $(TH.location >>= liftLoc) "" LevelInfo . toLogStr)
     void $ restore $ sinkProcessStderrStdout mdir menv name args logLines logLines
-  where
-    defaultLoc = Loc "<unknown>" "<unknown>" "<unknown>" (0,0) (0,0) 
 
 getCabalInstallVersion :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m)
                        => EnvOverride -> Path Abs File -> m (Maybe Version)
