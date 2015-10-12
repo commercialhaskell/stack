@@ -508,7 +508,10 @@ setupParser = SetupCmdOpts
     readVersion = do
         s <- readerAsk
         case parseCompilerVersion ("ghc-" <> T.pack s) of
-            Nothing -> readerError $ "Invalid version: " ++ s
+            Nothing ->
+                case parseCompilerVersion (T.pack s) of
+                    Nothing -> readerError $ "Invalid version: " ++ s
+                    Just x -> return x
             Just x -> return x
 
 setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
