@@ -60,7 +60,7 @@ import qualified Data.Yaml as Yaml
 import           Distribution.System (OS, Arch (..), Platform (..))
 import qualified Distribution.System as Cabal
 import           Distribution.Text (simpleParse)
-import           Language.Haskell.TH as TH (location)
+import           Language.Haskell.TH as TH
 import           Network.HTTP.Client.Conduit
 import           Network.HTTP.Download.Verified
 import           Path
@@ -807,28 +807,28 @@ installGHCJS :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasCo
 installGHCJS version si archiveFile archiveType destDir = do
     platform <- asks getPlatform
     menv0 <- getMinimalEnvOverride
-    -- This ensures that locking is disabled for the invocations of stack below.
+    -- This ensures that locking is disabled for the invocations of
+    -- stack below.
     let removeLockVar = Map.delete "STACK_LOCK"
     menv <- mkEnvOverride platform (removeLockVar (removeHaskellEnvVars (unEnvOverride menv0)))
     $logDebug $ "menv = " <> T.pack (show (unEnvOverride menv))
 
-    -- NOTE: this is a bit of a hack - instead of using a temp directory, put
-    -- the source tarball in the destination directory. This way, the absolute
-    -- paths in the wrapper scripts will point to executables that exist in
+    -- NOTE: this is a bit of a hack - instead of using a temp
+    -- directory, leave the unpacked source tarball in the destination
+    -- directory. This way, the absolute paths in the wrapper scripts
+    -- will point to executables that exist in
     -- src/.stack-work/install/... - see
     -- https://github.com/commercialhaskell/stack/issues/1016
     --
     -- This is also used by 'ensureGhcjsBooted', because it can use the
-    -- environment of the stack.yaml which came with ghcjs, in order to install
-    -- cabal-install. This lets us also fix the version of cabal-install used.
-    let srcDir = destDir Path.</> $(mkRelDir "src")
-    createTree srcDir
-    stackYaml <- ghcjsStackYaml version destDir
-
+    -- environment of the stack.yaml which came with ghcjs, in order to
+    -- install cabal-install. This lets us also fix the version of
+    -- cabal-install used.
+    let unpackDir = destDir Path.</> $(mkRelDir "src")
+    tarComponent <- parseRelDir ("ghcjs-" ++ versionString version)
     runUnpack <- case platform of
-        Platform _ Cabal.Windows -> do
-            run7z <- setup7z si
-            return $ run7z srcDir archiveFile
+        Platform _ Cabal.Windows -> return $ do
+            withUnpackedTarball7z "GHCJS" si archiveFile archiveType tarComponent unpackDir
         _ -> do
             zipTool' <-
                 case archiveType of
@@ -841,9 +841,11 @@ installGHCJS version si archiveFile archiveType destDir = do
                 <*> checkDependency "tar"
             $logDebug $ "ziptool: " <> T.pack zipTool
             $logDebug $ "tar: " <> T.pack tarTool
-            return $ readInNull srcDir tarTool menv ["xf", toFilePath archiveFile] Nothing
+            return $ do
+                readInNull destDir tarTool menv ["xf", toFilePath archiveFile] Nothing
+                renameDir (destDir Path.</> tarComponent) unpackDir
 
-    $logSticky $ T.concat ["Unpacking GHCJS into ", (T.pack . toFilePath $ srcDir), " ..."]
+    $logSticky $ T.concat ["Unpacking GHCJS into ", (T.pack . toFilePath $ unpackDir), " ..."]
     $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
     runUnpack
 
@@ -851,13 +853,14 @@ installGHCJS version si archiveFile archiveType destDir = do
     let destBinDir = destDir Path.</> $(mkRelDir "bin")
     stackPath <- liftIO getExecutablePath
     createTree destBinDir
-    runAndLog Nothing stackPath menv
+    runAndLog (Just unpackDir) stackPath menv
         [ "--install-ghc"
         , "--stack-yaml"
-        , toFilePath stackYaml
+        , toFilePath (unpackDir </> $(mkRelFile "stack.yaml"))
         , "--local-bin-path"
         , toFilePath destBinDir
         , "install"
+        , "-v"
         ]
     $logStickyDone "Installed GHCJS."
 
@@ -882,12 +885,6 @@ installDockerStackExe _ archiveFile _ destDir = do
         ["xf", toFilePath archiveFile, "--strip-components", "1"]
         Nothing
 
-ghcjsStackYaml :: MonadThrow m => Version -> Path Abs Dir -> m (Path Abs File)
-ghcjsStackYaml version destDir =
-    liftM ((destDir Path.</> $(mkRelDir "src")) Path.</>) $
-    parseRelFile $
-    "ghcjs-" ++ versionString version ++ "/stack.yaml"
-
 ensureGhcjsBooted :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
                   => EnvOverride -> CompilerVersion -> Bool -> m ()
 ensureGhcjsBooted menv cv shouldBoot  = do
@@ -898,13 +895,9 @@ ensureGhcjsBooted menv cv shouldBoot  = do
             return ()
         Left (ReadProcessException _ _ _ err) | "ghcjs_boot.completed" `S.isInfixOf` LBS.toStrict err ->
             if not shouldBoot then throwM GHCJSNotBooted else do
-                stackYaml <- case cv of
-                    GhcjsVersion version _ -> do
-                        config <- asks getConfig
-                        destDir <- installDir (configLocalPrograms config) (ToolGhcjs cv)
-                        ghcjsStackYaml version destDir
-                    _ -> fail "ensureGhcjsBooted invoked on non GhcjsVersion"
-                bootGhcjs menv stackYaml
+                config <- asks getConfig
+                destDir <- installDir (configLocalPrograms config) (ToolGhcjs cv)
+                bootGhcjs menv (destDir </> $(mkRelFile "src/stack.yaml"))
         Left err -> throwM err
 
 bootGhcjs :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m)
@@ -950,8 +943,10 @@ bootGhcjs menv stackYaml  = do
 runAndLog :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
           => Maybe (Path Abs Dir) -> String -> EnvOverride -> [String] -> m ()
 runAndLog mdir name menv args = liftBaseWith $ \restore -> do
-    let logLines = CB.lines =$ CL.mapM_ (void . restore . monadLoggerLog $(TH.location >>= liftLoc) "" LevelInfo . toLogStr)
+    let logLines = CB.lines =$ CL.mapM_ (void . restore . monadLoggerLog defaultLoc "" LevelInfo . toLogStr)
     void $ restore $ sinkProcessStderrStdout mdir menv name args logLines logLines
+  where
+    defaultLoc = Loc "<unknown>" "<unknown>" "<unknown>" (0,0) (0,0) 
 
 getCabalInstallVersion :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m)
                        => EnvOverride -> Path Abs File -> m (Maybe Version)
@@ -1009,33 +1004,8 @@ installGHCWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, 
                   -> Path Abs Dir
                   -> m ()
 installGHCWindows version si archiveFile archiveType destDir = do
-    suffix <-
-        case archiveType of
-            TarXz -> return ".xz"
-            TarBz2 -> return ".bz2"
-            TarGz -> return ".gz"
-            _ -> error $ "GHC on Windows must be a tarball file"
-    tarFile <-
-        case T.stripSuffix suffix $ T.pack $ toFilePath archiveFile of
-            Nothing -> error $ "Invalid GHC filename: " ++ show archiveFile
-            Just x -> parseAbsFile $ T.unpack x
-
-    run7z <- setup7z si
-
-    withCanonicalizedTempDirectory (toFilePath $ parent destDir)
-                      ((FP.dropTrailingPathSeparator $ toFilePath $ dirname destDir) ++ "-tmp") $ \tmpDir -> do
-        run7z (parent archiveFile) archiveFile
-        run7z tmpDir tarFile
-        removeFile tarFile `catchIO` \e ->
-            $logWarn (T.concat
-                [ "Exception when removing "
-                , T.pack $ toFilePath tarFile
-                , ": "
-                , T.pack $ show e
-                ])
-        tarComponent <- parseRelDir $ "ghc-" ++ versionString version
-        renameDir (tmpDir </> tarComponent) destDir
-
+    tarComponent <- parseRelDir $ "ghc-" ++ versionString version
+    withUnpackedTarball7z "GHC" si archiveFile archiveType tarComponent destDir
     $logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
 
 installMsys2Windows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
@@ -1046,18 +1016,6 @@ installMsys2Windows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m
                   -> Path Abs Dir
                   -> m ()
 installMsys2Windows osKey si archiveFile archiveType destDir = do
-    suffix <-
-        case archiveType of
-            TarXz -> return ".xz"
-            TarBz2 -> return ".bz2"
-            _ -> error $ "MSYS2 must be a .tar.xz archive"
-    tarFile <-
-        case T.stripSuffix suffix $ T.pack $ toFilePath archiveFile of
-            Nothing -> error $ "Invalid MSYS2 filename: " ++ show archiveFile
-            Just x -> parseAbsFile $ T.unpack x
-
-    run7z <- setup7z si
-
     exists <- liftIO $ D.doesDirectoryExist $ toFilePath destDir
     when exists $ liftIO (D.removeDirectoryRecursive $ toFilePath destDir) `catchIO` \e -> do
         $logError $ T.pack $
@@ -1065,20 +1023,8 @@ installMsys2Windows osKey si archiveFile archiveType destDir = do
             toFilePath destDir
         throwM e
 
-    run7z (parent archiveFile) archiveFile
-    run7z (parent archiveFile) tarFile
-    removeFile tarFile `catchIO` \e ->
-        $logWarn (T.concat
-            [ "Exception when removing "
-            , T.pack $ toFilePath tarFile
-            , ": "
-            , T.pack $ show e
-            ])
-
     msys <- parseRelDir $ "msys" ++ T.unpack (fromMaybe "32" $ T.stripPrefix "windows" osKey)
-    liftIO $ D.renameDirectory
-        (toFilePath $ parent archiveFile </> msys)
-        (toFilePath destDir)
+    withUnpackedTarball7z "MSYS2" si archiveFile archiveType msys destDir
 
     platform <- asks getPlatform
     menv0 <- getMinimalEnvOverride
@@ -1099,6 +1045,45 @@ installMsys2Windows osKey si archiveFile archiveType destDir = do
     --
     -- Install git. We could install other useful things in the future too.
     -- runIn destDir "pacman" menv ["-Sy", "--noconfirm", "git"] Nothing
+
+-- | Unpack a compressed tarball using 7zip.  Expects a single directory in
+-- the unpacked results, which is renamed to the destination directory.
+withUnpackedTarball7z :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+                      => String -- ^ Name of tool, used in error messages
+                      -> SetupInfo
+                      -> Path Abs File -- ^ Path to archive file
+                      -> ArchiveType
+                      -> Path Rel Dir -- ^ Name of directory expected to be in archive.
+                      -> Path Abs Dir -- ^ Destination directory.
+                      -> m ()
+withUnpackedTarball7z name si archiveFile archiveType srcDir destDir = do
+    suffix <-
+        case archiveType of
+            TarXz -> return ".xz"
+            TarBz2 -> return ".bz2"
+            TarGz -> return ".gz"
+            _ -> error $ name ++ " must be a tarball file"
+    tarFile <-
+        case T.stripSuffix suffix $ T.pack $ toFilePath archiveFile of
+            Nothing -> error $ "Invalid " ++ name ++ " filename: " ++ show archiveFile
+            Just x -> parseAbsFile $ T.unpack x
+    run7z <- setup7z si
+    let tmpName = (FP.dropTrailingPathSeparator $ toFilePath $ dirname destDir) ++ "-tmp"
+    withCanonicalizedTempDirectory (toFilePath $ parent destDir) tmpName $ \tmpDir -> do
+        let absSrcDir = tmpDir </> srcDir
+        removeTreeIfExists absSrcDir
+        removeFileIfExists tarFile
+        removeTreeIfExists destDir
+        run7z (parent archiveFile) archiveFile
+        run7z tmpDir tarFile
+        removeFile tarFile `catchIO` \e ->
+            $logWarn (T.concat
+                [ "Exception when removing "
+                , T.pack $ toFilePath tarFile
+                , ": "
+                , T.pack $ show e
+                ])
+        renameDir absSrcDir destDir
 
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
