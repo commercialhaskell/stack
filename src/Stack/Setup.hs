@@ -898,7 +898,26 @@ ensureGhcjsBooted menv cv shouldBoot  = do
             if not shouldBoot then throwM GHCJSNotBooted else do
                 config <- asks getConfig
                 destDir <- installDir (configLocalPrograms config) (ToolGhcjs cv)
-                bootGhcjs menv (destDir </> $(mkRelFile "src/stack.yaml"))
+                let stackYaml = destDir </> $(mkRelFile "src/stack.yaml")
+                -- TODO: Remove 'actualStackYaml' and just use
+                -- 'stackYaml' for a version after 0.1.6. It's for
+                -- compatibility with the directories setup used for
+                -- most of the life of the development branch between
+                -- 0.1.5 and 0.1.6. See
+                -- https://github.com/commercialhaskell/stack/issues/749#issuecomment-147382783
+                -- This only affects the case where GHCJS has been
+                -- installed with an older version and not yet booted.
+                stackYamlExists <- fileExists stackYaml
+                actualStackYaml <- if stackYamlExists then return stackYaml
+                    else case cv of
+                        GhcjsVersion version _ ->
+                            liftM ((destDir Path.</> $(mkRelDir "src")) Path.</>) $
+                            parseRelFile $ "ghcjs-" ++ versionString version ++ "/stack.yaml"
+                        _ -> fail "ensureGhcjsBooted invoked on non GhcjsVersion"
+                actualStackYamlExists <- fileExists actualStackYaml
+                when (not actualStackYamlExists) $
+                    fail "Couldn't find GHCJS stack.yaml in old or new location."
+                bootGhcjs menv actualStackYaml
         Left err -> throwM err
 
 bootGhcjs :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m)
