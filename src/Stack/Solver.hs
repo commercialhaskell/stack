@@ -43,9 +43,10 @@ cabalSolver :: (MonadIO m, MonadLogger m, MonadMask m, MonadBaseControl IO m, Mo
             => WhichCompiler
             -> [Path Abs Dir] -- ^ cabal files
             -> Map PackageName Version -- ^ constraints
+            -> Map PackageName (Map FlagName Bool) -- ^ user-specified flags
             -> [String] -- ^ additional arguments
             -> m (CompilerVersion, Map PackageName (Version, Map FlagName Bool))
-cabalSolver wc cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-solver" $ \dir -> do
+cabalSolver wc cabalfps constraints userFlags cabalArgs = withSystemTempDirectory "cabal-solver" $ \dir -> do
     configLines <- getCabalConfig dir constraints
     let configFile = dir FP.</> "cabal.config"
     liftIO $ S.writeFile configFile $ encodeUtf8 $ T.unlines configLines
@@ -96,6 +97,7 @@ cabalSolver wc cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-s
              : "--package-db=clear"
              : "--package-db=global"
              : cabalArgs ++
+               toConstraintArgs userFlags ++
                (map toFilePath cabalfps) ++
                ["--ghcjs" | wc == Ghcjs]
 
@@ -132,6 +134,13 @@ cabalSolver wc cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-s
                         Nothing -> (t0, True)
                         Just x -> (x, True)
                 Just x -> (x, False)
+    toConstraintArgs userFlagMap =
+        [formatFlagConstraint package flag enabled | (package, fs) <- Map.toList userFlagMap
+                                                   , (flag, enabled) <- Map.toList fs]
+    formatFlagConstraint package flag enabled =
+        let sign = if enabled then '+' else '-'
+        in
+        "--constraint=" ++ unwords [packageNameString package, sign : flagNameString flag]
 
 getCabalConfig :: (MonadReader env m, HasConfig env, MonadIO m, MonadThrow m)
                => FilePath -- ^ temp dir
@@ -189,6 +198,7 @@ solveExtraDeps modStackYaml = do
         wc
         (Map.keys $ envConfigPackages econfig)
         packages
+        (bcFlags bconfig)
         []
 
     let newDeps = extraDeps `Map.difference` packages
