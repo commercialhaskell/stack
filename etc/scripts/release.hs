@@ -1,6 +1,3 @@
-#!/usr/bin/env stack
--- stack --install-ghc runghc --package=shake --package=extra --package=zip-archive --package=mime-types --package=http-types --package=http-conduit --package=text --package=conduit-combinators --package=conduit --package=case-insensitive --package=aeson --package=zlib --package tar
-{-# OPTIONS_GHC -Wall -Werror #-}
 {-# LANGUAGE RecordWildCards #-}
 
 import Control.Applicative
@@ -22,6 +19,7 @@ import System.Environment
 import System.Directory
 import System.IO.Error
 import System.Process
+import System.Exit
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Zip as Zip
@@ -61,15 +59,13 @@ main =
                 gArch = arch
                 gBinarySuffix = ""
                 gUploadLabel = Nothing
-                gLocalInstallRoot = "" -- Set to real value below.
                 gProjectRoot = "" -- Set to real value velow.
                 global0 = foldl (flip id) Global{..} flags
             -- Need to get paths after options since the '--arch' argument can effect them.
             localInstallRoot' <- getStackPath global0 "local-install-root"
             projectRoot' <- getStackPath global0 "project-root"
             let global = global0
-                    { gLocalInstallRoot = localInstallRoot'
-                    , gProjectRoot = projectRoot' }
+                    { gProjectRoot = projectRoot' }
             return $ Just $ rules global args
   where
     getStackPath global path = do
@@ -146,24 +142,22 @@ rules global@Global{..} args = do
         copyFileChanged srcFile out
 
     releaseCheckDir </> binaryExeFileName %> \out -> do
-        need [installBinDir </> stackExeFileName]
+        need [releaseBinDir </> binaryName </> stackExeFileName]
         Stdout dirty <- cmd "git status --porcelain"
         when (not gAllowDirty && not (null (trim dirty))) $
             error ("Working tree is dirty.  Use --" ++ allowDirtyOptName ++ " option to continue anyway.")
-        let instExeFile = installBinDir </> stackExeFileName
-            tmpExeFile = installBinDir </> stackExeFileName <.> "tmp"
-        --EKB FIXME: once 'stack install --path' implemented, use it instead of this temp file.
-        liftIO $ renameFile instExeFile tmpExeFile
-        actionFinally
-            (do opt <- addPath [installBinDir] []
-                -- () <- cmd opt stackProgName (stackArgs global) "build --pedantic --haddock --no-haddock-deps"
-                () <- cmd opt stackProgName (stackArgs global) "build --pedantic"
-                () <- cmd opt stackProgName (stackArgs global) "clean"
-                () <- cmd opt stackProgName (stackArgs global) "build --pedantic"
-                () <- cmd opt stackProgName (stackArgs global) "test --pedantic --flag stack:integration-tests"
-                return ())
-            (renameFile tmpExeFile instExeFile)
-        copyFileChanged (installBinDir </> stackExeFileName) out
+        withTempDir $ \tmpDir -> do
+            let cmd0 = cmd (releaseBinDir </> binaryName </> stackExeFileName)
+                    (stackArgs global)
+                    ["--local-bin-path=" ++ tmpDir]
+            () <- cmd0 "install --pedantic --haddock --no-haddock-deps"
+            () <- cmd0 "install cabal-install"
+            let cmd' = cmd (AddPath [tmpDir] []) stackProgName (stackArgs global)
+            () <- cmd' "clean"
+            () <- cmd' "build --pedantic"
+            () <- cmd' "test --pedantic --flag stack:integration-tests"
+            return ()
+        copyFileChanged (releaseBinDir </> binaryName </> stackExeFileName) out
 
     releaseDir </> binaryPkgZipFileName %> \out -> do
         stageFiles <- getBinaryPkgStageFiles
@@ -172,7 +166,7 @@ rules global@Global{..} args = do
             entries <- forM stageFiles $ \stageFile -> do
                 Zip.readEntry
                     [Zip.OptLocation
-                        (dropDirectoryPrefix (releaseStageDir </> binaryPkgStageDirName) stageFile)
+                        (dropDirectoryPrefix (releaseStageDir </> binaryName) stageFile)
                         False]
                     stageFile
             let archive = foldr Zip.addEntryToArchive Zip.emptyArchive entries
@@ -182,21 +176,21 @@ rules global@Global{..} args = do
         stageFiles <- getBinaryPkgStageFiles
         writeTarGz out releaseStageDir stageFiles
 
-    releaseStageDir </> binaryPkgStageDirName </> stackExeFileName %> \out -> do
+    releaseStageDir </> binaryName </> stackExeFileName %> \out -> do
         copyFileChanged (releaseDir </> binaryExeFileName) out
 
-    releaseStageDir </> (binaryPkgStageDirName ++ "//*") %> \out -> do
+    releaseStageDir </> (binaryName ++ "//*") %> \out -> do
         copyFileChanged
-            (dropDirectoryPrefix (releaseStageDir </> binaryPkgStageDirName) out)
+            (dropDirectoryPrefix (releaseStageDir </> binaryName) out)
             out
 
     releaseDir </> binaryExeFileName %> \out -> do
-        need [installBinDir </> stackExeFileName]
+        need [releaseBinDir </> binaryName </> stackExeFileName]
         case platformOS of
             Windows -> do
                 -- Windows doesn't have or need a 'strip' command, so skip it.
                 -- Instead, we sign the executable
-                liftIO $ copyFile (installBinDir </> stackExeFileName) out
+                liftIO $ copyFile (releaseBinDir </> binaryName </> stackExeFileName) out
                 actionOnException
                     (command_ [] "c:\\Program Files\\Microsoft SDKs\\Windows\\v7.1\\Bin\\signtool.exe"
                         ["sign"
@@ -209,10 +203,10 @@ rules global@Global{..} args = do
                     (removeFile out)
             Linux ->
                 cmd "strip -p --strip-unneeded --remove-section=.comment -o"
-                    [out, installBinDir </> stackExeFileName]
+                    [out, releaseBinDir </> binaryName </> stackExeFileName]
             _ ->
                 cmd "strip -o"
-                    [out, installBinDir </> stackExeFileName]
+                    [out, releaseBinDir </> binaryName </> stackExeFileName]
 
     releaseDir </> binaryPkgSignatureFileName %> \out -> do
         need [out -<.> ""]
@@ -221,10 +215,13 @@ rules global@Global{..} args = do
             [ "-u", gGpgKey
             , dropExtension out ]
 
-    installBinDir </> stackExeFileName %> \out -> do
+    releaseBinDir </> binaryName </> stackExeFileName %> \out -> do
         alwaysRerun
         actionOnException
-            (cmd stackProgName (stackArgs global) "--install-ghc build --pedantic")
+            (cmd stackProgName
+                (stackArgs global)
+                ["--local-bin-path=" ++ takeDirectory out]
+                 "--install-ghc install --pedantic")
             (removeFile out)
 
     debDistroRules ubuntuDistro ubuntuVersions
@@ -357,8 +354,8 @@ rules global@Global{..} args = do
     getBinaryPkgStageFiles = do
         docFiles <- getDocFiles
         let stageFiles = concat
-                [[releaseStageDir </> binaryPkgStageDirName </> stackExeFileName]
-                ,map ((releaseStageDir </> binaryPkgStageDirName) </>) docFiles]
+                [[releaseStageDir </> binaryName </> stackExeFileName]
+                ,map ((releaseStageDir </> binaryName) </>) docFiles]
         need stageFiles
         return stageFiles
 
@@ -392,7 +389,7 @@ rules global@Global{..} args = do
 
     releaseCheckDir = releaseDir </> "check"
     releaseStageDir = releaseDir </> "stage"
-    installBinDir = gLocalInstallRoot </> "bin"
+    releaseBinDir = releaseDir </> "bin"
     distroVersionDir DistroVersion{..} = releaseDir </> dvDistro </> dvVersion
 
     binaryPkgFileNames = [binaryPkgFileName, binaryPkgSignatureFileName]
@@ -401,10 +398,19 @@ rules global@Global{..} args = do
         case platformOS of
             Windows -> binaryPkgZipFileName
             _ -> binaryPkgTarGzFileName
-    binaryPkgZipFileName = binaryName global <.> zipExt
-    binaryPkgTarGzFileName = binaryName global <.> tarGzExt
-    binaryPkgStageDirName = binaryName global
-    binaryExeFileName = binaryName global <.> exe
+    binaryPkgZipFileName = binaryName <.> zipExt
+    binaryPkgTarGzFileName = binaryName <.> tarGzExt
+    binaryExeFileName = binaryName <.> exe
+    binaryName =
+        concat
+            [ stackProgName
+            , "-"
+            , stackVersionStr global
+            , "-"
+            , display platformOS
+            , "-"
+            , display gArch
+            , if null gBinarySuffix then "" else "-" ++ gBinarySuffix ]
     stackExeFileName = stackProgName <.> exe
 
     debStagedDocDir dv = debStagingDir dv </> "usr/share/doc" </> stackProgName
@@ -549,19 +555,6 @@ dropDirectoryPrefix prefix path =
         Nothing -> error ("dropDirectoryPrefix: cannot drop " ++ show prefix ++ " from " ++ show path)
         Just stripped -> stripped
 
--- | Name of the release binary (e.g. @stack-x.y.x-os-arch[-variant]@)
-binaryName :: Global -> String
-binaryName global@Global{..} =
-    concat
-        [ stackProgName
-        , "-"
-        , stackVersionStr global
-        , "-"
-        , display platformOS
-        , "-"
-        , display gArch
-        , if null gBinarySuffix then "" else "-" ++ gBinarySuffix ]
-
 -- | String representation of stack package version.
 stackVersionStr :: Global -> String
 stackVersionStr =
@@ -646,7 +639,6 @@ instance FromJSON GithubReleaseAsset where
 -- | Global values and options.
 data Global = Global
     { gStackPackageDescription :: !PackageDescription
-    , gLocalInstallRoot :: !FilePath
     , gGpgKey :: !String
     , gAllowDirty :: !Bool
     , gGithubAuthToken :: !(Maybe String)
