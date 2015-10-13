@@ -61,7 +61,6 @@ import           System.FileLock (FileLock, unlockFile)
 #ifdef WINDOWS
 import System.Win32.Console (setConsoleCP, setConsoleOutputCP, getConsoleCP, getConsoleOutputCP)
 import qualified Control.Monad.Catch as Catch
-import qualified Data.Text as T
 #endif
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
