@@ -17,3 +17,5 @@ tags
 *.imports
 /.idea/
 /*.iml
+/src/highlight.js
+/src/style.css
