@@ -1,5 +1,8 @@
 ## Unreleased changes
 
+
+## v0.1.6.0
+
 Major changes:
 
 * "stack setup" now supports building and booting GHCJS from source tarball.
