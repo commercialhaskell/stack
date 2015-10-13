@@ -558,7 +558,7 @@ buildDockerImage buildDir imageTag out = do
     writeFileChanged out imageIdOut
     return (trim imageIdOut)
 
--- | Name of the release binary (e.g. @stack-x.y.x-arch-os[-variant]@)
+-- | Name of the release binary (e.g. @stack-x.y.x-os-arch[-variant]@)
 binaryName :: Global -> String
 binaryName global@Global{..} =
     concat
@@ -566,18 +566,15 @@ binaryName global@Global{..} =
         , "-"
         , stackVersionStr global
         , "-"
-        , platformName global
+        , display platformOS
+        , "-"
+        , display gArch
         , if null gBinarySuffix then "" else "-" ++ gBinarySuffix ]
 
 -- | String representation of stack package version.
 stackVersionStr :: Global -> String
 stackVersionStr =
     display . pkgVersion . package . gStackPackageDescription
-
--- | Name of current platform.
-platformName :: Global -> String
-platformName Global{..} =
-    display (Platform gArch platformOS)
 
 -- | Current operating system.
 platformOS :: OS
