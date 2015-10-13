@@ -549,15 +549,6 @@ dropDirectoryPrefix prefix path =
         Nothing -> error ("dropDirectoryPrefix: cannot drop " ++ show prefix ++ " from " ++ show path)
         Just stripped -> stripped
 
--- | Build a Docker image and write its ID to a file if changed.
-buildDockerImage :: FilePath -> String -> FilePath -> Action String
-buildDockerImage buildDir imageTag out = do
-    alwaysRerun
-    () <- cmd "docker build" ["--tag=" ++ imageTag, buildDir]
-    (Stdout imageIdOut) <- cmd "docker inspect --format={{.Id}}" [imageTag]
-    writeFileChanged out imageIdOut
-    return (trim imageIdOut)
-
 -- | Name of the release binary (e.g. @stack-x.y.x-os-arch[-variant]@)
 binaryName :: Global -> String
 binaryName global@Global{..} =
