@@ -21,7 +21,6 @@ import qualified Data.Set as Set
 import Data.String (fromString)
 import Data.Traversable (forM)
 import GHC.IO.Handle (hIsTerminalDevice)
-import Ignore
 import Path
 import System.Console.ANSI
 import System.Exit
@@ -33,13 +32,11 @@ printExceptionStderr :: Exception e => e -> IO ()
 printExceptionStderr e =
     L.hPut stderr $ toLazyByteString $ fromShow e <> copyByteString "\n"
 
-fileWatch :: IO (Path Abs Dir)
-          -> ((Set (Path Abs File) -> IO ()) -> IO ())
+fileWatch :: ((Set (Path Abs File) -> IO ()) -> IO ())
           -> IO ()
 fileWatch = fileWatchConf defaultConfig
 
-fileWatchPoll :: IO (Path Abs Dir)
-               -> ((Set (Path Abs File) -> IO ()) -> IO ())
+fileWatchPoll :: ((Set (Path Abs File) -> IO ()) -> IO ())
                -> IO ()
 fileWatchPoll = fileWatchConf $ defaultConfig { confUsePolling = True }
 
@@ -48,21 +45,12 @@ fileWatchPoll = fileWatchConf $ defaultConfig { confUsePolling = True }
 -- The action provided takes a callback that is used to set the files to be
 -- watched. When any of those files are changed, we rerun the action again.
 fileWatchConf :: WatchConfig
-              -> IO (Path Abs Dir)
               -> ((Set (Path Abs File) -> IO ()) -> IO ())
               -> IO ()
-fileWatchConf cfg getProjectRoot inner = withManagerConf cfg $ \manager -> do
+fileWatchConf cfg inner = withManagerConf cfg $ \manager -> do
     allFiles <- newTVarIO Set.empty
     dirtyVar <- newTVarIO True
     watchVar <- newTVarIO Map.empty
-    projRoot <- getProjectRoot
-    mChecker <- findIgnoreFiles [VCSGit, VCSMercurial, VCSDarcs] projRoot >>= buildChecker
-    (FileIgnoredChecker isFileIgnored) <-
-        case mChecker of
-          Left err ->
-              do putStrLn $ "Failed to parse VCS's ignore file: " ++ err
-                 return $ FileIgnoredChecker (const False)
-          Right chk -> return chk
 
     let onChange event = atomically $ do
             files <- readTVar allFiles
@@ -96,7 +84,7 @@ fileWatchConf cfg getProjectRoot inner = withManagerConf cfg $ \manager -> do
                 return Nothing
             startListening = Map.mapWithKey $ \dir () -> do
                 let dir' = fromString $ toFilePath dir
-                listen <- watchDir manager dir' (not . isFileIgnored . eventPath) onChange
+                listen <- watchDir manager dir' (const True) onChange
                 return $ Just listen
 
     let watchInput = do
