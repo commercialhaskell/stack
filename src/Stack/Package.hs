@@ -983,7 +983,7 @@ warnMultiple name candidate rest =
     $logWarn
         ("There were multiple candidates for the Cabal entry \"" <>
          showName name <>
-         "(" <>
+         "\" (" <>
          T.intercalate "," (map (T.pack . toFilePath) rest) <>
          "), picking " <>
          T.pack (toFilePath candidate))
