@@ -151,6 +151,9 @@ data Config =
          -- ^ Rebuild on GHC options changes
          ,configApplyGhcOptions     :: !ApplyGhcOptions
          -- ^ Which packages to ghc-options on the command line apply to?
+         ,configAllowNewer          :: !Bool
+         -- ^ Ignore version ranges in .cabal files. Funny naming chosen to
+         -- match cabal.
          }
 
 -- | Which packages to ghc-options on the command line apply to?
@@ -605,6 +608,9 @@ data ConfigMonoid =
     ,configMonoidRebuildGhcOptions   :: !(Maybe Bool)
     -- ^ See 'configMonoidRebuildGhcOptions'
     ,configMonoidApplyGhcOptions     :: !(Maybe ApplyGhcOptions)
+    -- ^ See 'configApplyGhcOptions'
+    ,configMonoidAllowNewer          :: !(Maybe Bool)
+    -- ^ See 'configMonoidAllowNewer'
     }
   deriving Show
 
@@ -640,6 +646,7 @@ instance Monoid ConfigMonoid where
     , configMonoidExplicitSetupDeps = mempty
     , configMonoidRebuildGhcOptions = Nothing
     , configMonoidApplyGhcOptions = Nothing
+    , configMonoidAllowNewer = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -673,6 +680,7 @@ instance Monoid ConfigMonoid where
     , configMonoidExplicitSetupDeps = configMonoidExplicitSetupDeps l <> configMonoidExplicitSetupDeps r
     , configMonoidRebuildGhcOptions = configMonoidRebuildGhcOptions l <|> configMonoidRebuildGhcOptions r
     , configMonoidApplyGhcOptions = configMonoidApplyGhcOptions l <|> configMonoidApplyGhcOptions r
+    , configMonoidAllowNewer = configMonoidAllowNewer l <|> configMonoidAllowNewer r
     }
 
 instance FromJSON (ConfigMonoid, [JSONWarning]) where
@@ -734,6 +742,7 @@ parseConfigMonoidJSON obj = do
         >>= fmap Map.fromList . mapM handleExplicitSetupDep . Map.toList
     configMonoidRebuildGhcOptions <- obj ..:? "rebuild-ghc-options"
     configMonoidApplyGhcOptions <- obj ..:? "apply-ghc-options"
+    configMonoidAllowNewer <- obj ..:? "allow-newer"
 
     return ConfigMonoid {..}
   where

@@ -346,3 +346,16 @@ apply-ghc-options: locals # all local packages, the default
 ```
 
 Note that `everything` is a slightly dangerous value, as it can break invariants about your snapshot database.
+
+### allow-newer
+
+(Since 0.1.7)
+
+Ignore version bounds in .cabal files. Default is false.
+
+```yaml
+allow-newer: true
+```
+
+Note that this also ignores lower bounds. The name "allow-newer" is chosen to
+match the commonly used cabal option.

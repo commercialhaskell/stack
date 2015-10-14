@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
 -- | Construct a @Plan@ for how to build
 module Stack.Build.ConstructPlan
@@ -13,7 +14,7 @@ import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger (MonadLogger)
+import           Control.Monad.Logger (MonadLogger, logWarn)
 import           Control.Monad.RWS.Strict
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Char8 as S8
@@ -82,10 +83,12 @@ data W = W
     -- ^ why a local package is considered dirty
     , wDeps :: !(Set PackageName)
     -- ^ Packages which count as dependencies
+    , wWarnings :: !([Text] -> [Text])
+    -- ^ Warnings
     }
 instance Monoid W where
-    mempty = W mempty mempty mempty mempty
-    mappend (W a b c d) (W w x y z) = W (mappend a w) (mappend b x) (mappend c y) (mappend d z)
+    mempty = W mempty mempty mempty mempty mempty
+    mappend (W a b c d e) (W w x y z z') = W (mappend a w) (mappend b x) (mappend c y) (mappend d z) (mappend e z')
 
 type M = RWST
     Ctx
@@ -143,7 +146,9 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
     let inner = do
             mapM_ onWanted $ filter lpWanted locals
             mapM_ (addDep False) $ Set.toList extraToBuild0
-    ((), m, W efinals installExes dirtyReason deps) <- liftIO $ runRWST inner (ctx econfig latest) M.empty
+    ((), m, W efinals installExes dirtyReason deps warnings) <-
+        liftIO $ runRWST inner (ctx econfig latest) M.empty
+    mapM_ $logWarn (warnings [])
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
         (errlibs, adrs) = partitionEithers $ map toEither $ M.toList m
@@ -398,14 +403,33 @@ addPackageDeps treatAsDep package = do
                             UnknownPackage name -> assert (name == depname) NotInBuildPlan
                             _ -> Couldn'tResolveItsDependencies
                  in return $ Left (depname, (range, mlatest, bd))
-            Right adr | not $ adrVersion adr `withinRange` range ->
-                return $ Left (depname, (range, mlatest, DependencyMismatch $ adrVersion adr))
-            Right (ADRToInstall task) -> return $ Right
-                (Set.singleton $ taskProvides task, Map.empty, taskLocation task)
-            Right (ADRFound loc _ (Executable _)) -> return $ Right
-                (Set.empty, Map.empty, loc)
-            Right (ADRFound loc _ (Library ident gid)) -> return $ Right
-                (Set.empty, Map.singleton ident gid, loc)
+            Right adr -> do
+                inRange <- if adrVersion adr `withinRange` range
+                    then return True
+                    else do
+                        allowNewer <- asks $ configAllowNewer . getConfig
+                        if allowNewer
+                            then do
+                                let msg = T.concat
+                                        [ "WARNING: Ignoring out of range dependency: "
+                                        , T.pack $ packageIdentifierString $ PackageIdentifier depname (adrVersion adr)
+                                        , ". "
+                                        , T.pack $ packageNameString $ packageName package
+                                        , " requires: "
+                                        , versionRangeText range
+                                        ]
+                                tell mempty { wWarnings = (msg:) }
+                                return True
+                            else return False
+                if inRange
+                    then case adr of
+                        ADRToInstall task -> return $ Right
+                            (Set.singleton $ taskProvides task, Map.empty, taskLocation task)
+                        ADRFound loc _ (Executable _) -> return $ Right
+                            (Set.empty, Map.empty, loc)
+                        ADRFound loc _ (Library ident gid) -> return $ Right
+                            (Set.empty, Map.singleton ident gid, loc)
+                    else return $ Left (depname, (range, mlatest, DependencyMismatch $ adrVersion adr))
     case partitionEithers deps of
         ([], pairs) -> return $ Right $ mconcat pairs
         (errs, _) -> return $ Left $ DependencyPlanFailures

@@ -191,6 +191,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mproject configMonoi
          configExplicitSetupDeps = configMonoidExplicitSetupDeps
          configRebuildGhcOptions = fromMaybe False configMonoidRebuildGhcOptions
          configApplyGhcOptions = fromMaybe AGOLocals configMonoidApplyGhcOptions
+         configAllowNewer = fromMaybe False configMonoidAllowNewer
 
      return Config {..}
 
