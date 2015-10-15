@@ -107,6 +107,7 @@ data Ctx = Ctx
     , extraToBuild   :: !(Set PackageName)
     , latestVersions :: !(Map PackageName Version)
     , wanted         :: !(Set PackageName)
+    , localNames     :: !(Set PackageName)
     }
 
 instance HasStackRoot Ctx
@@ -188,6 +189,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
         , extraToBuild = extraToBuild0
         , latestVersions = latest
         , wanted = wantedLocalPackages locals
+        , localNames = Set.fromList $ map (packageName . lpPackage) locals
         }
     -- TODO Currently, this will only consider and install tools from the
     -- snapshot. It will not automatically install build tools from extra-deps
@@ -618,6 +620,8 @@ markAsDep name = tell mempty { wDeps = Set.singleton name }
 inSnapshot :: PackageName -> Version -> M Bool
 inSnapshot name version = do
     p <- asks mbp
+    ls <- asks localNames
     return $ fromMaybe False $ do
+        guard $ not $ name `Set.member` ls
         mpi <- Map.lookup name (mbpPackages p)
         return $ mpiVersion mpi == version
