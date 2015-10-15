@@ -1,38 +1,132 @@
-The following should be tested minimally before a release is considered good
-to go. This list will likely expand over time:
+## Pre-release checks
 
-* Run `etc/scripts/release.hs check` on Linux (32-bit and 64-bit), Windows (`--arch=i386` and `--arch=x86_64`), and OS X. See its
-  [README](../etc/scripts/README.md#release.hs) for build and invocation instructions.
-  This performs the following checks automatically:
-    * `stack install && stack clean && stack install --pedantic && stack test --flag stack:integration-tests` on Linux, Windows, and OS X, which covers:
-        * Self-hosting
-        * Unit tests
-        * Integration tests
-        * stack can install GHC
-    * Working tree is clean.
-* Ensure that `stack --version` gives the correct version number and Git hash, and does not have a dirty tree
+The following should be tested minimally before a release is considered good
+to go:
+
+* Integration tests pass on a representative sample of platforms: `stack test
+  --flag stack:integration-tests`. The actual release script will perform a more
+  thorough test for every platform/variant prior to uploading, so this is just a
+  pre-check
 * stack can build the wai repo
 * Running `stack build` a second time on either stack or wai is a no-op
-* Build something that depends on `happy` (suggestion: `hlint`), since `happy` has special logic for moving around the `dist` directory
-* Make sure to bump the version number in the .cabal file and the ChangeLog appropriately
-* Review man page and other documentation for any changes that need to be made.
+* Build something that depends on `happy` (suggestion: `hlint`), since `happy`
+  has special logic for moving around the `dist` directory
+* Make sure to bump the version number in the .cabal file and the ChangeLog
+  appropriately (check for any entries that snuck into the previous version's
+  changes)
+* In release candidate, remove the Changelog's "unreleased changes" section
+* Review documentation for any changes that need to be made
+    * Search for old Stack version and replace with new version
+* Ensure all `doc/*.md` files are listed in `stack.cabal`'s 'extra-source-files`
+* Check that any new Linux distribution versions added to
+  `etc/scripts/release.hs` and `etc/scripts/vagrant-releases.sh`
 
-Release checklist after testing:
+## Release process
 
-* Create a draft Github release with tag `vX.Y.Z` (where X.Y.Z is the stack package's version).
-* Run `etc/scripts/release.hs release` on Linux (Debian 7 32-bit [Vagrantfile](https://github.com/commercialhaskell/stack/tree/master/etc/vagrant/debian-7-i386)/64-bit [Vagrantfile](https://github.com/commercialhaskell/stack/tree/master/etc/vagrant/debian-7-amd64)), Windows (`--arch=i386` and `--arch=x86_64`), and OS X.  This performs the following tasks automatically:
-    * Binaries for Linux, Windows, and OS X uploaded to draft Github release.
-* Run `etc/scripts/release.hs --binary-variant=gmp4 release` on CentOS 6 32-bit [Vagrantfile](https://github.com/commercialhaskell/stack/tree/master/etc/vagrant/centos-6-i386)/64-bit [Vagrantfile](centos-6-x86_64)).
-* Run `etc/scripts/release.hs ubuntu-upload debian-upload` in Linux (Ubuntu or Debian - [Vagrantfile](https://github.com/commercialhaskell/stack/tree/master/etc/vagrant/debian-7-amd64))
-* Run `etc/scripts/release.hs centos-upload fedora-upload` on Linux (CentOS or Fedora - [Vagrantfile](https://github.com/commercialhaskell/stack/tree/master/etc/vagrant/centos-7-x86_64))
-* Upload Arch Linux packages (manual process)
-* Build new MinGHC distribution (See https://github.com/fpco/minghc/commit/51490f398e6722672364548a3855a0bfcba48ffe)
+See
+[stack-release-script's README](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/README.md#prerequisites)
+for requirements to perform the release, and more details about the tool.
 
-After binaries uploaded:
+* Create a draft Github release with tag `vX.Y.Z` (where X.Y.Z is the stack
+  package's version)
 
-* Push signed Git tag (matching Github release tag name).
-* Publish Github release.
-* Upload package to Hackage.
-* Announce to haskell-cafe, commercialhaskell, and haskell-stack mailing lists.
+* On each machine you'll be releasing from, set environment variables:
+  `GITHUB_AUTHORIZATION_TOKEN`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
 
-For more information, see: https://github.com/commercialhaskell/stack/issues/324
+* On a machine with Vagrant installed:
+    * Run `etc/scripts/vagrant-releases.sh`
+
+* On Mac OS X:
+    * Run `etc/scripts/osx-release.sh`
+
+* On Windows:
+    * Ensure your working tree is in `C:\stack` (or a similarly short path)
+    * Run `etc\scripts\windows-releases.bat`
+
+* Push signed Git tag, matching Github release tag name, e.g.: `git tag -u
+  9BEFB442 vX.Y.Z && git push origin vX.Y.Z`
+
+* Reset the `release` branch to the released commit, e.g.: `git merge --ff-only
+  vX.Y.Z && git push origin release`
+
+* Publish Github release
+
+* Edit
+  [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml),
+  and add the new linux64 stack bindist
+
+* Upload package to Hackage: `stack upload . --pvp-bounds=both`
+
+    Note: due to a
+    Cabal pretty-printer bug, this may fail with a syntax error. If so, use
+    `stack upload .`, then run `stack sdist --pvp-bounds=both`, and use
+    Hackage's
+    [edit package information](http://hackage.haskell.org/package/stack/maintain)
+    feature to paste the bounds in from the sdist's `stack.cabal`.
+
+* On a machine with Vagrant installed:
+    * Run `etc/scripts/vagrant-distros.sh`
+
+* Update in Arch Linux's
+  [haskell-stack.git](ssh+git://aur@aur.archlinux.org/haskell-stack.git):
+  `PKGBUILD` and `.SRCINFO`
+    * Be sure to reset `pkgrel` in both files, and update the SHA1 sum
+
+* Submit a PR for the
+  [haskell-stack Homebrew formula](https://github.com/Homebrew/homebrew/blob/master/Library/Formula/haskell-stack.rb).
+  The commit message should just be `haskell-stack <VERSION>`.
+
+* [Build new MinGHC distribution](#build_minghc)
+
+* [Upload haddocks to Hackage](#upload_haddocks), if hackage couldn't build on its own
+
+* Announce to haskell-cafe, commercialhaskell, and haskell-stack mailing lists
+
+# Extra steps
+
+## <a name="upload_haddocks"></a>Upload haddocks to Hackage
+
+* Set `STACKVER` environment variable to the Stack version (e.g. `0.1.6.0`)
+* Run:
+
+```
+STACKDOCDIR=stack-$STACKVER-docs
+rm -rf _release/$STACKDOCDIR
+mkdir -p _release
+cp -r $(stack path --local-doc-root)/stack-$STACKVER _release/$STACKDOCDIR
+sed -i '' 's/href="\.\.\/\([^/]*\)\//href="..\/..\/\1\/docs\//g' _release/$STACKDOCDIR/*.html
+(cd _release && tar cvz --format=ustar -f $STACKDOCDIR.tar.gz $STACKDOCDIR)
+curl -X PUT \
+     -H 'Content-Type: application/x-tar' \
+     -H 'Content-Encoding: gzip' \
+     -u borsboom \
+     --data-binary "@_release/$STACKDOCDIR.tar.gz" \
+     "https://hackage.haskell.org/package/stack-$STACKVER/docs"
+```
+
+## <a name="build_minghc"></a>Build MinGHC
+
+Full details of prerequisites and steps for building MinGHC are in its
+[README](https://github.com/fpco/minghc#building-installers). What follows is an
+abbreviated set specifically for including the latest stack version.
+
+* Ensure `makensis.exe` and `signtool.exe` are on your PATH.
+* If you edit build-post-install.hs, run `stack exec -- cmd /c build-post-install.bat`
+* Set `STACKVER` environment variable to latest Stack verion (e.g. `0.1.6.0`)
+* Adjust commands below for new GHC versions
+* Run:
+
+```
+stack build
+stack exec -- minghc-generate 7.10.2 --stack=%STACKVER%
+signtool sign /v /n "FP Complete, Corporation" /t "http://timestamp.verisign.com/scripts/timestamp.dll" .build\minghc-7.10.2-i386.exe
+stack exec -- minghc-generate 7.10.2 --arch64 --stack=%STACKVER%
+signtool sign /v /n "FP Complete, Corporation" /t "http://timestamp.verisign.com/scripts/timestamp.dll" .build\minghc-7.10.2-x86_64.exe
+stack exec -- minghc-generate 7.8.4 --stack=%STACKVER%
+signtool sign /v /n "FP Complete, Corporation" /t "http://timestamp.verisign.com/scripts/timestamp.dll" .build\minghc-7.8.4-i386.exe
+stack exec -- minghc-generate 7.8.4 --arch64 --stack=%STACKVER%
+signtool sign /v /n "FP Complete, Corporation" /t "http://timestamp.verisign.com/scripts/timestamp.dll" .build\minghc-7.8.4-x86_64.exe
+```
+
+* Upload the build binaries to a new Github release
+* Edit [README.md](https://github.com/fpco/minghc/blob/master/README.md#using-the-installer) and update download links

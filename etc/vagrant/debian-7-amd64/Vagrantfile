@@ -6,7 +6,8 @@ Vagrant.configure(2) do |config|
   config.vm.provider "virtualbox" do |vb|
     vb.memory = "2048"
   end
-  config.vm.provision "shell", run: "always", inline: <<-SHELL
+  config.ssh.forward_agent = true
+  config.vm.provision "shell", inline: <<-SHELL
     set -xe
     export PATH=/usr/local/bin:$PATH
     export DEBIAN_FRONTEND=noninteractive
@@ -16,8 +17,8 @@ Vagrant.configure(2) do |config|
       wget -q -O- http://download.fpcomplete.com/ubuntu/fpco.key | apt-key add -
       echo "deb http://download.fpcomplete.com/debian/$(lsb_release -cs) stable main" >/etc/apt/sources.list.d/fpco.list
       apt-get update
-      apt-get install -y stack
     fi
+    apt-get install -y stack
     if ! which cabal; then
       stack --install-ghc build cabal-install
       sudo cp `stack exec which cabal` /usr/local/bin/cabal

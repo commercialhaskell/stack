@@ -60,12 +60,18 @@ To create and upload Arch packages, you need:
 Building
 --------
 
-    (cd etc/scripts && stack build)
+Ensure that `~/.local/bin` is in your PATH, then:
+
+    (cd etc/scripts && stack install)
+
+(note: do not use `stack exec stack-release-script`, because certain parts of
+the build do not work properly while in a `stack exec` context, especially on
+Windows)
 
 Invocation
 ----------
 
-Usage: `$(cd etc/scripts && stack exec which stack-release-script) [OPTIONS] TARGET`
+Usage: `stack-release-script [OPTIONS] TARGET`
 
 The tool must be run in the root of the working tree.
 

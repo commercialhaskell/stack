@@ -6,18 +6,17 @@ Vagrant.configure(2) do |config|
   config.vm.provider "virtualbox" do |vb|
     vb.memory = "2048"
   end
-  config.vm.provision "shell", run: "always", inline: <<-SHELL
+  config.ssh.forward_agent = true
+  config.vm.provision "shell", inline: <<-SHELL
     set -xe
     export PATH=/usr/local/bin:$PATH
+    yum update
     yum -y install perl make automake gcc gmp-devel zlib-devel tar which git xz ncurses-devel
-    if ! which stack; then
-      curl -sSL $(curl -sSL https://api.github.com/repos/commercialhaskell/stack/releases/latest \
-               |grep '"browser_download_url": ".*/stack-[0-9\\.]\\+-i386-linux-gmp4.gz"' \
-               |sed 's/.*"\\(.*\\)"$/\\1/') \
-        | gzip -dc \
-        >/usr/local/bin/stack
-      chmod a+x /usr/local/bin/stack
-    fi
+    curl -sSL $(curl -sSL https://api.github.com/repos/commercialhaskell/stack/releases/latest \
+                  | grep '"browser_download_url": ".*/stack-.*-i386-linux-gmp4.tar.gz"' \
+                  | sed 's/.*"\(.*\)"$/\1/') \
+      | tar xzvf - --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
+    chmod a+x /usr/local/bin/stack
     if ! which cabal; then
       pushd /vagrant
       stack --install-ghc install cabal-install
