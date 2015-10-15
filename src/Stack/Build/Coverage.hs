@@ -20,7 +20,7 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader           (MonadReader, asks)
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Char8          as S8
-import           Data.Foldable                  (forM_)
+import           Data.Foldable                  (forM_, asum)
 import           Data.Function
 import           Data.List
 import qualified Data.Map.Strict                as Map
@@ -69,8 +69,8 @@ tixFilePath pkgId tixName = do
 -- | Generates the HTML coverage report and shows a textual coverage
 -- summary for a package.
 generateHpcReport :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
-                  => Package -> [Text] -> (PackageName -> m (Maybe Text)) -> m ()
-generateHpcReport package tests getGhcPkgKey = do
+                  => Path Abs Dir -> Package -> [Text] -> m ()
+generateHpcReport pkgDir package tests = do
     -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a
     -- ghc package key. See
     -- https://github.com/commercialhaskell/stack/issues/785
@@ -81,7 +81,7 @@ generateHpcReport package tests getGhcPkgKey = do
         if getGhcVersion compilerVersion < $(mkVersion "7.10")
             then return pkgId
             else do
-                mghcPkgKey <- getGhcPkgKey (packageName package)
+                mghcPkgKey <- findPackageKeyForBuiltPackage pkgDir (packageIdentifier package)
                 case mghcPkgKey of
                     Nothing -> fail $ "Before computing test coverage report, failed to find GHC package key for " ++ T.unpack pkgName
                     Just ghcPkgKey -> return $ T.unpack ghcPkgKey
@@ -257,3 +257,12 @@ generateHpcMarkupIndex = do
 
 pathToHtml :: Path b t -> Text
 pathToHtml = T.dropWhileEnd (=='/') . LT.toStrict . htmlEscape . LT.pack . toFilePath
+
+findPackageKeyForBuiltPackage :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env)
+                              => Path Abs Dir -> PackageIdentifier -> m (Maybe Text)
+findPackageKeyForBuiltPackage pkgDir pkgId = do
+    distDir <- distDirFromDir pkgDir
+    path <- liftM (distDir </>) $
+        parseRelFile ("package.conf.inplace/" ++ packageIdentifierString pkgId ++ "-inplace.conf")
+    contents <- liftIO $ T.readFile (toFilePath path)
+    return $ asum (map (T.stripPrefix "key: ") (T.lines contents))
