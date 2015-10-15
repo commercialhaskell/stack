@@ -102,7 +102,7 @@ Flags will only affect packages in your `packages` and `extra-deps` settings.
 Packages that come from the snapshot global database or are not affected.
 
 ### image
-The image settings are used for the creation of container images using `stack container image`, e.g.
+The image settings are used for the creation of container images using `stack image container`, e.g.
 ```yaml
 image:
   container:
