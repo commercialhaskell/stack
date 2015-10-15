@@ -33,7 +33,7 @@ import           Stack.Types
 import           Stack.Types.Internal
 import           System.Environment (lookupEnv)
 import           System.Process.Run
-
+import           System.FilePath (searchPathSeparator)
 -- | Launch a GHCi IDE for the given local project targets with the
 -- given options and configure it with the load paths and extensions
 -- of those targets.
@@ -52,11 +52,11 @@ ide targets useropts = do
     mpath <- liftIO $ lookupEnv "PATH"
     bindirs <- extraBinDirs `ap` return True {- include local bin -}
     let pkgdbs =
-            ["--package-db=" <> toFilePath depsdb <> ":" <> toFilePath localdb]
+            ["--package-db=" <> toFilePath depsdb <> [searchPathSeparator] <> toFilePath localdb]
         paths =
             [ "--ide-backend-tools-path=" <>
-              intercalate ":" (map toFilePath bindirs) <>
-              (maybe "" (':' :) mpath)]
+              intercalate [searchPathSeparator] (map toFilePath bindirs) <>
+              (maybe "" (searchPathSeparator :) mpath)]
         args =
             ["--verbose"] <> ["--include=" <> includeDirs pkgopts] <>
             ["--local-work-dir=" ++ toFilePath pwd] <>
@@ -74,7 +74,7 @@ ide targets useropts = do
   where
     includeDirs pkgopts =
         intercalate
-            ":"
+            [searchPathSeparator]
             (mapMaybe
                  (stripPrefix "--ghc-option=-i")
                  pkgopts)
