@@ -32,7 +32,7 @@ We generally test on the current version of OS X, but stack is known to work on 
 
     * Ubuntu 15.10 (amd64):
 
-        echo 'deb http://download.fpcomplete.com/ubuntu/wily stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
+            echo 'deb http://download.fpcomplete.com/ubuntu/wily stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
     * Ubuntu 15.04 (amd64):
 

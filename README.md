@@ -21,17 +21,17 @@ It features:
 
 Downloads are available by operating system:
 
-* [Windows](doc/install_and_upgrade.md#windows)
-* [OS X](doc/install_and_upgrade.md#os-x)
-* [Ubuntu](doc/install_and_upgrade.md#ubuntu)
-* [Debian](doc/install_and_upgrade.md#debian)
-* [CentOS / Red Hat / Amazon Linux](doc/install_and_upgrade.md#centos--red-hat--amazon-linux)
-* [Fedora](doc/install_and_upgrade.md#fedora)
-* [Arch Linux](doc/install_and_upgrade.md#arch-linux)
-* [NixOS](doc/install_and_upgrade.md#nixos)
-* [Linux (general)](doc/install_and_upgrade.md#linux)
+* [Windows](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#windows)
+* [OS X](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#os-x)
+* [Ubuntu](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#ubuntu)
+* [Debian](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#debian)
+* [CentOS / Red Hat / Amazon Linux](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#centos--red-hat--amazon-linux)
+* [Fedora](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#fedora)
+* [Arch Linux](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#arch-linux)
+* [NixOS](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#nixos)
+* [Linux (general)](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#linux)
 
-[Upgrade instructions](doc/install_and_upgrade.md#upgrade)
+[Upgrade instructions](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#upgrade)
 
 Note: if you are using cabal-install to install stack, you may need to pass a
 constraint to work around a
@@ -138,13 +138,13 @@ stack build
 #### Complete guide to stack
 
 This repository also contains a complete [user guide to using stack
-](doc/GUIDE.md), covering all of the most common use cases.
+](https://github.com/commercialhaskell/stack/blob/release/doc/GUIDE.md), covering all of the most common use cases.
 
 
 #### Questions, Feedback, Discussion
 
 * For frequently asked questions about detailed or specific use-cases, please
-  see [the FAQ](doc/faq.md).
+  see [the FAQ](https://github.com/commercialhaskell/stack/blob/release/doc/faq.md).
 * For general questions, comments, feedback and support please write
   to [the stack mailing list](https://groups.google.com/d/forum/haskell-stack).
 * For bugs, issues, or requests please
@@ -178,27 +178,27 @@ can address these concerns.
 ## Documentation Table Of Contents
 
 * Project Documentation
-    * [Maintainer Guide](doc/MAINTAINER_GUIDE.md): includes releasing information
-    * [Signing Key](doc/SIGNING_KEY.md): downloadable stack binaries are signed
+    * [Maintainer Guide](https://github.com/commercialhaskell/stack/blob/release/doc/MAINTAINER_GUIDE.md): includes releasing information
+    * [Signing Key](https://github.com/commercialhaskell/stack/blob/release/doc/SIGNING_KEY.md): downloadable stack binaries are signed
       with this key
 * Tool Documentation
-    * [Build Command](doc/build_command.md): reference for the syntax of the
+    * [Build Command](https://github.com/commercialhaskell/stack/blob/release/doc/build_command.md): reference for the syntax of the
       build command and the command line targets
-    * [Dependency Visualization](doc/dependency_visualization.md): uses Graphviz
-    * [Docker Integration](doc/docker_integration.md)
-    * [FAQ](doc/faq.md): frequently asked questions about detailed or specific
+    * [Dependency Visualization](https://github.com/commercialhaskell/stack/blob/release/doc/dependency_visualization.md): uses Graphviz
+    * [Docker Integration](https://github.com/commercialhaskell/stack/blob/release/doc/docker_integration.md)
+    * [FAQ](https://github.com/commercialhaskell/stack/blob/release/doc/faq.md): frequently asked questions about detailed or specific
       use-cases
-    * [Install/Upgrade](doc/install_and_upgrade.md): a list of downloads
+    * [Install/Upgrade](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md): a list of downloads
       available by operating system, installation instructions, and upgrade
       instructions
-    * [Nonstandard Project Initialization](doc/nonstandard_project_init.md)
-    * [Shell Autocompletion](doc/shell_autocompletion.md)
-    * [User Guide](doc/GUIDE.md): in-depth tutorial covering the most common use
+    * [Nonstandard Project Initialization](https://github.com/commercialhaskell/stack/blob/release/doc/nonstandard_project_init.md)
+    * [Shell Autocompletion](https://github.com/commercialhaskell/stack/blob/release/doc/shell_autocompletion.md)
+    * [User Guide](https://github.com/commercialhaskell/stack/blob/release/doc/GUIDE.md): in-depth tutorial covering the most common use
       cases and all major stack features (requires no prior Haskell tooling
       experience)
-    * [YAML Configuration](doc/yaml_configuration.md): reference for writing
+    * [YAML Configuration](https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md): reference for writing
       `stack.yaml` files
 * Advanced Documentation
-    * [Architecture](doc/architecture.md): reference for people curious about
+    * [Architecture](https://github.com/commercialhaskell/stack/blob/release/doc/architecture.md): reference for people curious about
       stack internals, wanting to get involved deeply in the codebase, or
       wanting to use stack in unusual ways
