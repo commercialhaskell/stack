@@ -407,20 +407,32 @@ addPackageDeps treatAsDep package = do
                 inRange <- if adrVersion adr `withinRange` range
                     then return True
                     else do
+                        let warn reason = do
+                                tell mempty { wWarnings = (msg:) }
+                              where
+                                msg = T.concat
+                                    [ "WARNING: Ignoring out of range dependency"
+                                    , reason
+                                    , ": "
+                                    , T.pack $ packageIdentifierString $ PackageIdentifier depname (adrVersion adr)
+                                    , ". "
+                                    , T.pack $ packageNameString $ packageName package
+                                    , " requires: "
+                                    , versionRangeText range
+                                    ]
                         allowNewer <- asks $ configAllowNewer . getConfig
                         if allowNewer
                             then do
-                                let msg = T.concat
-                                        [ "WARNING: Ignoring out of range dependency: "
-                                        , T.pack $ packageIdentifierString $ PackageIdentifier depname (adrVersion adr)
-                                        , ". "
-                                        , T.pack $ packageNameString $ packageName package
-                                        , " requires: "
-                                        , versionRangeText range
-                                        ]
-                                tell mempty { wWarnings = (msg:) }
+                                warn " (allow-newer enabled)"
                                 return True
-                            else return False
+                            else do
+                                x <- inSnapshot (packageName package) (packageVersion package)
+                                y <- inSnapshot depname (adrVersion adr)
+                                if x && y
+                                    then do
+                                        warn " (trusting snapshot over Hackage revisions)"
+                                        return True
+                                    else return False
                 if inRange
                     then case adr of
                         ADRToInstall task -> return $ Right
@@ -601,3 +613,11 @@ stripNonDeps deps plan = plan
 
 markAsDep :: PackageName -> M ()
 markAsDep name = tell mempty { wDeps = Set.singleton name }
+
+-- | Is the given package/version combo defined in the snapshot?
+inSnapshot :: PackageName -> Version -> M Bool
+inSnapshot name version = do
+    p <- asks mbp
+    return $ fromMaybe False $ do
+        mpi <- Map.lookup name (mbpPackages p)
+        return $ mpiVersion mpi == version
