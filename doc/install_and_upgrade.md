@@ -1,6 +1,15 @@
-Distribution packages are available for [Ubuntu](#ubuntu), [Debian](#debian), [CentOS / Red Hat](#centos--red-hat), [Fedora](#fedora) and [Arch Linux](#arch-linux). Binaries for other operating systems are available on [the releases page](https://github.com/fpco/stack/releases). For the future, we have plans to support more OSes.
+Distribution packages are available for [Ubuntu](#ubuntu), [Debian](#debian),
+[CentOS / Red Hat](#centos--red-hat), [Fedora](#fedora) and
+[Arch Linux](#arch-linux). Binaries for other operating systems are available on
+[the releases page](https://github.com/fpco/stack/releases). For the future, we
+are open to supporting more OSes (to request one, please
+[submit an issue](https://github.com/commercialhaskell/stack/issues/new)).
 
 Binary packages are signed with this [signing key](SIGNING_KEY.md).
+
+If you are writing a script that needs to download the latest binary, you can
+find links that always point to the latest bindists
+[here](https://www.stackage.org/stack).
 
 ## Windows
 
@@ -13,6 +22,16 @@ Binary packages are signed with this [signing key](SIGNING_KEY.md).
 NOTE: These executables have been built and tested on a Windows 7, 8.1, and 10 64-bit machines. They should run on older Windows installs as well, but have not been tested. If you do test, please edit and update this page to indicate as such.
 
 ## OS X
+
+### Using brew
+
+If you have a popular [brew](http://brew.sh/) tool installed, you can just do:
+
+```
+brew install haskell-stack
+```
+
+### Manual download
 
 * Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest)
 * Extract the archive and place `stack` somewhere on your `$PATH` (see [Path section below](#path))
