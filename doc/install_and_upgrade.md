@@ -36,7 +36,7 @@ NOTE: These executables have been built and tested on a Windows 7, 8.1, and 10
 been tested. If you do test, please edit and update this page to indicate as
 such.
 
-## OS X
+## Mac OS X
 
 ### Using brew
 
@@ -54,7 +54,7 @@ brew install haskell-stack
   [Path section below](#path))
 * Now you can run `stack` from the terminal.
 
-We generally test on the current version of OS X, but stack is known to work on
+We generally test on the current version of Mac OS X, but stack is known to work on
 Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
 ## Ubuntu
@@ -204,7 +204,7 @@ Stack](http://nixos.org/nixpkgs/manual/#using-stack-together-with-nix).
       * [Linux 64-bit, standard](https://www.stackage.org/stack/linux-x86_64)
       * [Linux 32-bit, standard](https://www.stackage.org/stack/linux-i386)
 
-    If you are on an older distribution that only includes libgmp4 (libgmp.so.3), Such as CentOS/RHEL/Amazon Linux 6.x, use one of these instead:
+    If you are on an older distribution that only includes libgmp4 (libgmp.so.3), such as CentOS/RHEL/Amazon Linux 6.x, use one of these instead:
 
       * [Linux 64-bit, libgmp4](https://www.stackage.org/stack/linux-x86_64-gmp4)
       * [Linux 32-bit, libgmp4](https://www.stackage.org/stack/linux-i386-gmp4)
