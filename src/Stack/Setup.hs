@@ -850,19 +850,35 @@ installGHCJS version si archiveFile archiveType destDir = do
     $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
     runUnpack
 
+    let stackYaml = unpackDir </> $(mkRelFile "stack.yaml")
+
+    -- On windows we need to copy options files out of the install dir.  Argh!
+    -- This is done before the build, so that if it fails, things fail
+    -- earlier.
+    stackPath <- liftIO getExecutablePath
+    mwindowsInstallDir <- case platform of
+        Platform _ Cabal.Windows -> do
+            $logSticky "Querying GHCJS install dir"
+            liftM Just $ getGhcjsInstallDir menv stackPath stackYaml
+        _ -> return Nothing
+
     $logSticky "Installing GHCJS (this will take a long time) ..."
     let destBinDir = destDir Path.</> $(mkRelDir "bin")
-    stackPath <- liftIO getExecutablePath
     createTree destBinDir
     runAndLog (Just unpackDir) stackPath menv
         [ "--install-ghc"
         , "--stack-yaml"
-        , toFilePath (unpackDir </> $(mkRelFile "stack.yaml"))
+        , toFilePath stackYaml
         , "--local-bin-path"
         , toFilePath destBinDir
         , "install"
-        , "-v"
         ]
+    forM_ mwindowsInstallDir $ \dir -> do
+        (_, files) <- listDirectory (dir </> $(mkRelDir "bin"))
+        forM_ (filter ((".options" `isSuffixOf`). toFilePath) files) $ \optionsFile -> do
+            let dest = destDir </> $(mkRelDir "bin") </> filename optionsFile
+            removeFileIfExists dest
+            copyFile optionsFile dest
     $logStickyDone "Installed GHCJS."
 
 -- Install the downloaded stack binary distribution
@@ -925,7 +941,7 @@ bootGhcjs :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m)
 bootGhcjs menv stackYaml  = do
     stackPath <- liftIO getExecutablePath
     -- Install cabal-install if missing, or if the installed one is old.
-    mcabal <- getCabalInstallVersion menv stackYaml
+    mcabal <- getCabalInstallVersion menv stackPath stackYaml
     shouldInstallCabal <- case mcabal of
         Nothing -> do
             $logInfo "No 'cabal' binary found for use with GHCJS.  Installing a local copy of 'cabal' from source."
@@ -967,9 +983,9 @@ runAndLog mdir name menv args = liftBaseWith $ \restore -> do
     void $ restore $ sinkProcessStderrStdout mdir menv name args logLines logLines
 
 getCabalInstallVersion :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m)
-                       => EnvOverride -> Path Abs File -> m (Maybe Version)
-getCabalInstallVersion menv stackYaml = do
-    ebs <- tryProcessStdout Nothing menv "stack"
+                       => EnvOverride -> FilePath -> Path Abs File -> m (Maybe Version)
+getCabalInstallVersion menv stackPath stackYaml = do
+    ebs <- tryProcessStdout Nothing menv stackPath
       [ "--stack-yaml"
       , toFilePath stackYaml
       , "exec"
@@ -979,6 +995,17 @@ getCabalInstallVersion menv stackYaml = do
     case ebs of
         Left _ -> return Nothing
         Right bs -> Just <$> parseVersion (T.encodeUtf8 (T.dropWhileEnd isSpace (T.decodeUtf8 bs)))
+
+getGhcjsInstallDir :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m)
+                   => EnvOverride -> FilePath -> Path Abs File -> m (Path Abs Dir)
+getGhcjsInstallDir menv stackPath stackYaml = do
+    bs <- readProcessStdout Nothing menv stackPath
+      [ "--stack-yaml"
+      , toFilePath stackYaml
+      , "path"
+      , "--local-install-root"
+      ]
+    parseAbsDir $ T.unpack $ T.dropWhileEnd isSpace $ T.decodeUtf8 bs
 
 -- | Check if given processes appear to be present, throwing an exception if
 -- missing.
@@ -1087,10 +1114,9 @@ withUnpackedTarball7z name si archiveFile archiveType srcDir destDir = do
             Just x -> parseAbsFile $ T.unpack x
     run7z <- setup7z si
     let tmpName = (FP.dropTrailingPathSeparator $ toFilePath $ dirname destDir) ++ "-tmp"
+    createTree (parent destDir)
     withCanonicalizedTempDirectory (toFilePath $ parent destDir) tmpName $ \tmpDir -> do
         let absSrcDir = tmpDir </> srcDir
-        removeTreeIfExists absSrcDir
-        removeFileIfExists tarFile
         removeTreeIfExists destDir
         run7z (parent archiveFile) archiveFile
         run7z tmpDir tarFile
