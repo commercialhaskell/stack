@@ -57,12 +57,11 @@ for requirements to perform the release, and more details about the tool.
 
 * Upload package to Hackage: `stack upload . --pvp-bounds=both`
 
-    Note: due to a
-    Cabal pretty-printer bug, this may fail with a syntax error. If so, use
-    `stack upload .`, then run `stack sdist --pvp-bounds=both`, and use
-    Hackage's
-    [edit package information](http://hackage.haskell.org/package/stack/maintain)
-    feature to paste the bounds in from the sdist's `stack.cabal`.
+    Note: due to a Cabal pretty-printer bug, this may fail with a syntax error.
+    This bug is fixed in Cabal HEAD. Can also work around it by running `stack
+    sdist --pvp-bounds=both`, updating `stack.cabal`'s bounds from the sdist's
+    version, then uploading with `stack upload .`. Don't forget to undo the change to
+    `stack.cabal` afterward (don't commit it).
 
 * On a machine with Vagrant installed:
     * Run `etc/scripts/vagrant-distros.sh`
@@ -74,7 +73,9 @@ for requirements to perform the release, and more details about the tool.
 
 * Submit a PR for the
   [haskell-stack Homebrew formula](https://github.com/Homebrew/homebrew/blob/master/Library/Formula/haskell-stack.rb).
-  The commit message should just be `haskell-stack <VERSION>`.
+  The commit message should just be `haskell-stack <VERSION>`
+      * Note: for v0.1.8.0, check if `pcre` should still be a dependency
+          * Also, update the homepage
 
 * [Build new MinGHC distribution](#build_minghc)
 
@@ -84,7 +85,7 @@ for requirements to perform the release, and more details about the tool.
 
 # Extra steps
 
-## <a name="upload_haddocks"></a>Upload haddocks to Hackage
+## Upload haddocks to Hackage <a name="upload_haddocks"></a>
 
 * Set `STACKVER` environment variable to the Stack version (e.g. `0.1.6.0`)
 * Run:
@@ -104,7 +105,7 @@ curl -X PUT \
      "https://hackage.haskell.org/package/stack-$STACKVER/docs"
 ```
 
-## <a name="build_minghc"></a>Build MinGHC
+## Update MinGHC <a name="build_minghc"></a>
 
 Full details of prerequisites and steps for building MinGHC are in its
 [README](https://github.com/fpco/minghc#building-installers). What follows is an
@@ -128,5 +129,5 @@ stack exec -- minghc-generate 7.8.4 --arch64 --stack=%STACKVER%
 signtool sign /v /n "FP Complete, Corporation" /t "http://timestamp.verisign.com/scripts/timestamp.dll" .build\minghc-7.8.4-x86_64.exe
 ```
 
-* Upload the build binaries to a new Github release
+* Upload the built binaries to a new Github release
 * Edit [README.md](https://github.com/fpco/minghc/blob/master/README.md#using-the-installer) and update download links
