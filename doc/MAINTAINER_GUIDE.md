@@ -55,6 +55,9 @@ for requirements to perform the release, and more details about the tool.
   [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml),
   and add the new linux64 stack bindist
 
+* Check that no new entries need to be added to
+  [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml)
+
 * Upload package to Hackage: `stack upload . --pvp-bounds=both`
 
     Note: due to a Cabal pretty-printer bug, this may fail with a syntax error.

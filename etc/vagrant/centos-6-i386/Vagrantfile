@@ -12,9 +12,7 @@ Vagrant.configure(2) do |config|
     export PATH=/usr/local/bin:$PATH
     yum update
     yum -y install perl make automake gcc gmp-devel zlib-devel tar which git xz ncurses-devel
-    curl -sSL $(curl -sSL https://api.github.com/repos/commercialhaskell/stack/releases/latest \
-                  | grep '"browser_download_url": ".*/stack-.*-i386-linux-gmp4.tar.gz"' \
-                  | sed 's/.*"\(.*\)"$/\1/') \
+    curl -sSL https://www.stackage.org/stack/linux-i386-gmp4 \
       | tar xzvf - --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
     chmod a+x /usr/local/bin/stack
     if ! which cabal; then
