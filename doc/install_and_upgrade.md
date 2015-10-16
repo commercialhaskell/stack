@@ -1,6 +1,15 @@
-Distribution packages are available for [Ubuntu](#ubuntu), [Debian](#debian), [CentOS / Red Hat](#centos--red-hat), [Fedora](#fedora) and [Arch Linux](#arch-linux). Binaries for other operating systems are available on [the releases page](https://github.com/fpco/stack/releases). For the future, we have plans to support more OSes.
+Distribution packages are available for [Ubuntu](#ubuntu), [Debian](#debian),
+[CentOS / Red Hat](#centos--red-hat), [Fedora](#fedora) and
+[Arch Linux](#arch-linux). Binaries for other operating systems are available on
+[the releases page](https://github.com/fpco/stack/releases). For the future, we
+are open to supporting more OSes (to request one, please
+[submit an issue](https://github.com/commercialhaskell/stack/issues/new)).
 
 Binary packages are signed with this [signing key](SIGNING_KEY.md).
+
+If you are writing a script that needs to download the latest binary, you can
+find links that always point to the latest bindists
+[here](https://www.stackage.org/stack).
 
 ## Windows
 
