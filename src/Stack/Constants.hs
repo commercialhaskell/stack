@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -52,13 +51,6 @@ import           Prelude
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
-#ifdef mingw32_HOST_OS
-import qualified Crypto.Hash.SHA1 as SHA1
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as Base16
-import qualified Data.ByteString.Char8 as B8
-import qualified Data.Text.Encoding as T
-#endif
 
 -- | Extensions for anything that can be a Haskell module.
 haskellModuleExts :: [Text]
@@ -217,18 +209,7 @@ distRelativeDir = do
         parseRelDir $
         packageIdentifierString
             (PackageIdentifier cabalPackageName cabalPkgVer)
-
-#ifdef mingw32_HOST_OS
-    -- This is an attempt to shorten path to stack build artifacts dir on Windows to
-    -- decrease our chances of hitting 260 symbol path limit.
-    -- The idea is to calculate SHA1 hash from concatenated platform and cabal strings,
-    -- encode with base 16 and take first 8 symbols of it.
-    let concatenatedText = T.pack . toFilePath $ platform </> cabal
-        sha1 = SHA1.hash $ T.encodeUtf8 concatenatedText
-    platformAndCabal <- parseRelDir . B8.unpack . B.take 8 $ Base16.encode sha1
-#else
-    let platformAndCabal = platform </> cabal
-#endif
+    platformAndCabal <- useShaPathOnWindows (platform </> cabal)
     return $
         workDirRel </>
         $(mkRelDir "dist") </>
