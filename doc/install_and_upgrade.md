@@ -14,6 +14,16 @@ NOTE: These executables have been built and tested on a Windows 7, 8.1, and 10 6
 
 ## OS X
 
+### Using brew
+
+If you have a popular [brew](http://brew.sh/) tool installed, you can just do:
+
+```
+brew install haskell-stack
+```
+
+### Manual download
+
 * Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest)
 * Extract the archive and place `stack` somewhere on your `$PATH` (see [Path section below](#path))
 * Now you can run `stack` from the terminal.
