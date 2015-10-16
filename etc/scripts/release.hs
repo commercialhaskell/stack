@@ -186,6 +186,10 @@ rules global@Global{..} args = do
 
     releaseDir </> binaryExeFileName %> \out -> do
         need [releaseBinDir </> binaryName </> stackExeFileName]
+        (Stdout versionOut) <- cmd (releaseBinDir </> binaryName </> stackExeFileName) "--version"
+        when (not gAllowDirty && "dirty" `isInfixOf` lower versionOut) $
+            error ("Refusing continue because 'stack --version' reports dirty.  Use --" ++
+                   allowDirtyOptName ++ " option to continue anyway.")
         case platformOS of
             Windows -> do
                 -- Windows doesn't have or need a 'strip' command, so skip it.
@@ -221,7 +225,7 @@ rules global@Global{..} args = do
             (cmd stackProgName
                 (stackArgs global)
                 ["--local-bin-path=" ++ takeDirectory out]
-                 "--install-ghc install --pedantic")
+                 "install --pedantic")
             (removeFile out)
 
     debDistroRules ubuntuDistro ubuntuVersions
@@ -604,7 +608,7 @@ uploadLabelOptName = "upload-label"
 
 -- | Arguments to pass to all 'stack' invocations.
 stackArgs :: Global -> [String]
-stackArgs Global{..} = ["--arch=" ++ display gArch]
+stackArgs Global{..} = ["--install-ghc", "--arch=" ++ display gArch]
 
 -- | Name of the 'stack' program.
 stackProgName :: FilePath
