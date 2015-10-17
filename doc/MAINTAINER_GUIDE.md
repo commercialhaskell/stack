@@ -20,6 +20,11 @@ to go:
 * Ensure all `doc/*.md` files are listed in `stack.cabal`'s 'extra-source-files`
 * Check that any new Linux distribution versions added to
   `etc/scripts/release.hs` and `etc/scripts/vagrant-releases.sh`
+* Check that no new entries need to be added to
+  [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml),
+  [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md),
+  and
+  [README.md](https://github.com/commercialhaskell/stack/blob/master/README.md)
 
 ## Release process
 
@@ -55,9 +60,6 @@ for requirements to perform the release, and more details about the tool.
   [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml),
   and add the new linux64 stack bindist
 
-* Check that no new entries need to be added to
-  [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml)
-
 * Upload package to Hackage: `stack upload . --pvp-bounds=both`
 
     Note: due to a Cabal pretty-printer bug, this may fail with a syntax error.
@@ -79,6 +81,8 @@ for requirements to perform the release, and more details about the tool.
   The commit message should just be `haskell-stack <VERSION>`
       * Note: for v0.1.8.0, check if `pcre` should still be a dependency
           * Also, update the homepage
+
+* Build Windows installers.  See https://github.com/borsboom/stack-installer#readme
 
 * [Build new MinGHC distribution](#build_minghc)
 
