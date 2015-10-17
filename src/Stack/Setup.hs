@@ -68,12 +68,15 @@ import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude hiding (concat, elem) -- Fix AMP warning
 import           Safe (readMay)
-import           Stack.Config (resolvePackageEntry)
+import           Stack.Build (build)
+import           Stack.Config (resolvePackageEntry, loadConfig)
 import           Stack.Constants (distRelativeDir, stackProgName)
+import           Stack.Exec (defaultEnvSettings)
 import           Stack.Fetch
 import           Stack.GhcPkg (createDatabase, getCabalPkgVer, getGlobalDB, mkGhcPackagePath)
 import           Stack.Setup.Installed
 import           Stack.Types
+import           Stack.Types.Internal (HasTerminal, HasReExec, HasLogLevel)
 import           Stack.Types.StackT
 import qualified System.Directory as D
 import           System.Environment (getExecutablePath)
@@ -178,7 +181,7 @@ instance Show SetupException where
         , "' option to specify a location"]
 
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
-setupEnv :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasBuildConfig env, HasHttpManager env, HasGHCVariant env, MonadBaseControl IO m)
+setupEnv :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasBuildConfig env, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, HasGHCVariant env, MonadBaseControl IO m)
          => Maybe Text -- ^ Message to give user when necessary GHC is not available
          -> m EnvConfig
 setupEnv mResolveMissingGHC = do
@@ -307,7 +310,7 @@ addIncludeLib (ExtraDirs _bins includes libs) config = config
     }
 
 -- | Ensure compiler (ghc or ghcjs) is installed and provide the PATHs to add if necessary
-ensureCompiler :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, HasGHCVariant env, MonadBaseControl IO m)
+ensureCompiler :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, HasGHCVariant env, MonadBaseControl IO m)
                => SetupOpts
                -> m (Maybe ExtraDirs)
 ensureCompiler sopts = do
@@ -626,7 +629,7 @@ downloadAndInstallTool programsDir si downloadInfo tool installer = do
     markInstalled tool
     return tool
 
-downloadAndInstallCompiler :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasGHCVariant env, HasHttpManager env, MonadBaseControl IO m)
+downloadAndInstallCompiler :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasGHCVariant env, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, MonadBaseControl IO m)
                            => SetupInfo
                            -> CompilerVersion
                            -> VersionCheck
@@ -797,7 +800,7 @@ installGHCPosix version _ archiveFile archiveType destDir = do
         $logStickyDone $ "Installed GHC."
         $logDebug $ "GHC installed to " <> T.pack (toFilePath destDir)
 
-installGHCJS :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+installGHCJS :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, MonadBaseControl IO m)
              => Version
              -> SetupInfo
              -> Path Abs File
@@ -850,29 +853,24 @@ installGHCJS version si archiveFile archiveType destDir = do
     $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
     runUnpack
 
+    $logSticky "Setting up GHCJS build environment"
     let stackYaml = unpackDir </> $(mkRelFile "stack.yaml")
+        destBinDir = destDir Path.</> $(mkRelDir "bin")
+    createTree destBinDir
+    envConfig <- loadGhcjsEnvConfig stackYaml destBinDir
 
     -- On windows we need to copy options files out of the install dir.  Argh!
     -- This is done before the build, so that if it fails, things fail
     -- earlier.
-    stackPath <- liftIO getExecutablePath
     mwindowsInstallDir <- case platform of
-        Platform _ Cabal.Windows -> do
-            $logSticky "Querying GHCJS install dir"
-            liftM Just $ getGhcjsInstallDir menv stackPath stackYaml
+        Platform _ Cabal.Windows ->
+            liftM Just $ runInnerStackT envConfig installationRootLocal
         _ -> return Nothing
 
     $logSticky "Installing GHCJS (this will take a long time) ..."
-    let destBinDir = destDir Path.</> $(mkRelDir "bin")
-    createTree destBinDir
-    runAndLog (Just unpackDir) stackPath menv
-        [ "--install-ghc"
-        , "--stack-yaml"
-        , toFilePath stackYaml
-        , "--local-bin-path"
-        , toFilePath destBinDir
-        , "install"
-        ]
+    runInnerStackT envConfig $
+        build (\_ -> return ()) Nothing defaultBuildOpts { boptsInstallExes = True }
+    -- Copy over *.options files needed on windows.
     forM_ mwindowsInstallDir $ \dir -> do
         (_, files) <- listDirectory (dir </> $(mkRelDir "bin"))
         forM_ (filter ((".options" `isSuffixOf`). toFilePath) files) $ \optionsFile -> do
@@ -902,7 +900,7 @@ installDockerStackExe _ archiveFile _ destDir = do
         ["xf", toFilePath archiveFile, "--strip-components", "1"]
         Nothing
 
-ensureGhcjsBooted :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
+ensureGhcjsBooted :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m, HasConfig env, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, MonadReader env m)
                   => EnvOverride -> CompilerVersion -> Bool -> m ()
 ensureGhcjsBooted menv cv shouldBoot  = do
     eres <- try $ sinkProcessStdout Nothing menv "ghcjs" [] (return ())
@@ -933,45 +931,38 @@ ensureGhcjsBooted menv cv shouldBoot  = do
                 actualStackYamlExists <- fileExists actualStackYaml
                 when (not actualStackYamlExists) $
                     fail "Couldn't find GHCJS stack.yaml in old or new location."
-                bootGhcjs menv actualStackYaml
+                bootGhcjs actualStackYaml destDir
         Left err -> throwM err
 
-bootGhcjs :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m)
-          => EnvOverride -> Path Abs File -> m ()
-bootGhcjs menv stackYaml  = do
-    stackPath <- liftIO getExecutablePath
+bootGhcjs :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, MonadReader env m)
+          => Path Abs File -> Path Abs Dir -> m ()
+bootGhcjs stackYaml destDir = do
+    envConfig <- loadGhcjsEnvConfig stackYaml (destDir </> $(mkRelDir "bin"))
+    menv <- liftIO $ configEnvOverride (getConfig envConfig) defaultEnvSettings
     -- Install cabal-install if missing, or if the installed one is old.
-    mcabal <- getCabalInstallVersion menv stackPath stackYaml
+    mcabal <- getCabalInstallVersion menv
     shouldInstallCabal <- case mcabal of
         Nothing -> do
-            $logInfo "No 'cabal' binary found for use with GHCJS.  Installing a local copy of 'cabal' from source."
+            $logInfo "No cabal-install binary found for use with GHCJS.  Installing a local copy of cabal-install from source."
             return True
         Just v
             | v < $(mkVersion "1.22.4") -> do
                 $logInfo $
-                    "'cabal' binary found on PATH is too old to be used for booting GHCJS (version " <>
+                    "cabal-install found on PATH is too old to be used for booting GHCJS (version " <>
                     versionText v <>
-                    ").  Installing a local copy of 'cabal' from source."
+                    ").  Installing a local copy of cabal-install from source."
                 return True
             | otherwise -> return False
     when shouldInstallCabal $ do
         $logSticky "Building cabal-install for use by ghcjs-boot ... "
-        runAndLog Nothing stackPath menv
-            [ "--stack-yaml"
-            , toFilePath stackYaml
-            , "build"
-            , "cabal-install"
-            ]
+        runInnerStackT envConfig $
+            build (\_ -> return ())
+                  Nothing
+                  defaultBuildOpts { boptsTargets = ["cabal-install"] }
     $logSticky "Booting GHCJS (this will take a long time) ..."
-    runAndLog Nothing stackPath menv
-        [ "--stack-yaml"
-        , toFilePath stackYaml
-        , "exec"
-        , "--no-ghc-package-path"
-        , "--"
-        , "ghcjs-boot"
-        , "--clean"
-        ]
+    let envSettings = defaultEnvSettings { esIncludeGhcPackagePath = False }
+    menv' <- liftIO $ configEnvOverride (getConfig envConfig) envSettings
+    runAndLog Nothing "ghcjs-boot" menv' ["--clean"]
     $logStickyDone "GHCJS booted."
 
 -- TODO: something similar is done in Stack.Build.Execute. Create some utilities
@@ -982,30 +973,25 @@ runAndLog mdir name menv args = liftBaseWith $ \restore -> do
     let logLines = CB.lines =$ CL.mapM_ (void . restore . monadLoggerLog $(TH.location >>= liftLoc) "" LevelInfo . toLogStr)
     void $ restore $ sinkProcessStderrStdout mdir menv name args logLines logLines
 
+loadGhcjsEnvConfig :: (MonadIO m, HasHttpManager r, MonadReader r m, HasTerminal r, HasReExec r, HasLogLevel r)
+                     => Path Abs File -> Path b t -> m EnvConfig
+loadGhcjsEnvConfig stackYaml binPath = runInnerStackLoggingT $ do
+    lc <- loadConfig
+        (mempty
+            { configMonoidInstallGHC = Just True
+            , configMonoidLocalBinPath = Just (toFilePath binPath)
+            })
+        (Just stackYaml)
+    bconfig <- lcLoadBuildConfig lc Nothing
+    runInnerStackT bconfig $ setupEnv Nothing
+
 getCabalInstallVersion :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m)
-                       => EnvOverride -> FilePath -> Path Abs File -> m (Maybe Version)
-getCabalInstallVersion menv stackPath stackYaml = do
-    ebs <- tryProcessStdout Nothing menv stackPath
-      [ "--stack-yaml"
-      , toFilePath stackYaml
-      , "exec"
-      , "--"
-      , "cabal"
-      , "--numeric-version"]
+                       => EnvOverride -> m (Maybe Version)
+getCabalInstallVersion menv = do
+    ebs <- tryProcessStdout Nothing menv "cabal" ["--numeric-version"]
     case ebs of
         Left _ -> return Nothing
         Right bs -> Just <$> parseVersion (T.encodeUtf8 (T.dropWhileEnd isSpace (T.decodeUtf8 bs)))
-
-getGhcjsInstallDir :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m)
-                   => EnvOverride -> FilePath -> Path Abs File -> m (Path Abs Dir)
-getGhcjsInstallDir menv stackPath stackYaml = do
-    bs <- readProcessStdout Nothing menv stackPath
-      [ "--stack-yaml"
-      , toFilePath stackYaml
-      , "path"
-      , "--local-install-root"
-      ]
-    parseAbsDir $ T.unpack $ T.dropWhileEnd isSpace $ T.decodeUtf8 bs
 
 -- | Check if given processes appear to be present, throwing an exception if
 -- missing.
