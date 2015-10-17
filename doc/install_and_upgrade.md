@@ -1,8 +1,9 @@
 Distribution packages are available for [Ubuntu](#ubuntu), [Debian](#debian),
 [CentOS / Red Hat](#centos--red-hat), [Fedora](#fedora) and
-[Arch Linux](#arch-linux). Binaries for other operating systems are available on
-[the releases page](https://github.com/fpco/stack/releases). For the future, we
-are open to supporting more OSes (to request one, please
+[Arch Linux](#arch-linux). Binaries for other operating systems are listed
+below, and available on
+[the Github releases page](https://github.com/fpco/stack/releases). For the
+future, we are open to supporting more OSes (to request one, please
 [submit an issue](https://github.com/commercialhaskell/stack/issues/new)).
 
 Binary packages are signed with this [signing key](SIGNING_KEY.md).
@@ -13,15 +14,41 @@ find links that always point to the latest bindists
 
 ## Windows
 
-*Note*: Due to specific Windows limitations, [some temporary workarounds](https://www.fpcomplete.com/blog/2015/08/stack-ghc-windows) may be required. It is strongly advised to set your `STACK_ROOT` environment variable similarly to your root (e.g., `set STACK_ROOT=c:\stack_root`) *before* running `stack`.
+*Note*: Due to specific Windows limitations,
+ [some temporary workarounds](https://www.fpcomplete.com/blog/2015/08/stack-ghc-windows)
+ may be required. It is strongly advised to set your `STACK_ROOT` environment
+ variable similarly to your root (e.g., `set STACK_ROOT=c:\stack_root`) *before*
+ running `stack`.
 
-* Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest). Note: while generally i386/32-bit GHC is better tested on Windows, there are reports that recent versions of Windows only work with the 64-bit version of stack (see [issue #393](https://github.com/commercialhaskell/stack/issues/393)).
-* Unpack the archive and place `stack.exe` somewhere on your `%PATH%` (see [Path section below](#path)) and you can then run `stack` on the command line.
+* Download the latest release:
+
+      * [Windows 32-bit](https://www.stackage.org/stack/windows-i386)
+      * [Windows 64-bit](https://www.stackage.org/stack/windows-x86_64)
+
+    Note: while generally 32-bit GHC is better tested on Windows, there are
+    reports that recent versions of Windows only work with the 64-bit version of
+    stack (see
+    [issue #393](https://github.com/commercialhaskell/stack/issues/393)).
+
+* Unpack the archive and place `stack.exe` somewhere on your `%PATH%` (see
+  [Path section below](#path)) and you can then run `stack` on the command line.
+
 * Now you can run `stack` from the terminal.
 
-NOTE: These executables have been built and tested on a Windows 7, 8.1, and 10 64-bit machines. They should run on older Windows installs as well, but have not been tested. If you do test, please edit and update this page to indicate as such.
+NOTE: These executables have been built and tested on a Windows 7, 8.1, and 10
+64-bit machines. They should run on older Windows installs as well, but have not
+been tested. If you do test, please edit and update this page to indicate as
+such.
 
-## OS X
+### Installer (experimental)
+
+We recommend installing to the default location with these installers, as that
+will make `stack install` and `stack upgrade` work correctly out of the box.
+
+  * [Windows 32-bit Installer](https://www.stackage.org/stack/windows-i386-installer) (experimental)
+  * [Windows 64-bit Installer](https://www.stackage.org/stack/windows-x86_64-installer) (experimental)
+
+## Mac OS X
 
 ### Using brew
 
@@ -33,11 +60,14 @@ brew install haskell-stack
 
 ### Manual download
 
-* Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest)
-* Extract the archive and place `stack` somewhere on your `$PATH` (see [Path section below](#path))
+* Download the latest release:
+    * [Mac OS X 64-bit](https://www.stackage.org/stack/osx-x86_64)
+* Extract the archive and place `stack` somewhere on your `$PATH` (see
+  [Path section below](#path))
 * Now you can run `stack` from the terminal.
 
-We generally test on the current version of OS X, but stack is known to work on Mavericks as well, and may also work on older versions (YMMV).
+We generally test on the current version of Mac OS X, but stack is known to work on
+Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
 ## Ubuntu
 
@@ -181,8 +211,18 @@ Stack](http://nixos.org/nixpkgs/manual/#using-stack-together-with-nix).
 
 (64-bit and 32-bit options available)
 
-* Download [the latest release](https://github.com/commercialhaskell/stack/releases/latest).  Note: the `-gmp4` variants are for older distributions (such as CentOS 6.x) that only include libgmp4 (libgmp.so.3).
+* Download the latest release:
+
+      * [Linux 64-bit, standard](https://www.stackage.org/stack/linux-x86_64)
+      * [Linux 32-bit, standard](https://www.stackage.org/stack/linux-i386)
+
+    If you are on an older distribution that only includes libgmp4 (libgmp.so.3), such as CentOS/RHEL/Amazon Linux 6.x, use one of these instead:
+
+      * [Linux 64-bit, libgmp4](https://www.stackage.org/stack/linux-x86_64-gmp4)
+      * [Linux 32-bit, libgmp4](https://www.stackage.org/stack/linux-i386-gmp4)
+
 * Extract the archive and place `stack` somewhere on your `$PATH` (see [Path section below](#path))
+
 * Now you can run `stack` from the terminal.
 
 Tested on Fedora 20: make sure to install the following packages `sudo yum install perl make automake gcc gmp-devel`.

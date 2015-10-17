@@ -22,7 +22,7 @@ It features:
 Downloads are available by operating system:
 
 * [Windows](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#windows)
-* [OS X](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#os-x)
+* [Mac OS X](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#mac-os-x)
 * [Ubuntu](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#ubuntu)
 * [Debian](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#debian)
 * [CentOS / Red Hat / Amazon Linux](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#centos--red-hat--amazon-linux)
