@@ -31,10 +31,10 @@ import qualified Data.Text as T
 import           Distribution.System (Platform (..))
 import qualified Distribution.System as Cabal
 import           Path
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Prelude hiding (concat, elem) -- Fix AMP warning
 import           Stack.Types
-import qualified System.FilePath as FP
 import           System.Process.Read
 
 data Tool
@@ -143,7 +143,7 @@ extraDirs tool = do
             $logWarn $ "binDirs: unexpected OS/tool combo: " <> T.pack (show (x, toolName))
             return mempty
   where
-    goList = map toFilePathNoTrailingSlash
+    goList = map toFilePathNoTrailingSep
     isGHC n = "ghc" == n || "ghc-" `isPrefixOf` n
     isGHCJS n = "ghcjs" == n
 
@@ -166,6 +166,3 @@ installDir :: (MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m)
 installDir programsDir tool = do
     reldir <- parseRelDir $ toolString tool
     return $ programsDir </> reldir
-
-toFilePathNoTrailingSlash :: Path loc Dir -> FilePath
-toFilePathNoTrailingSlash = FP.dropTrailingPathSeparator . toFilePath

@@ -43,12 +43,13 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO (dirExists, createTree)
 import           Prelude hiding (FilePath)
 import           Stack.Constants
 import           Stack.Types
 import           System.Directory (canonicalizePath, doesDirectoryExist)
-import           System.FilePath (FilePath, searchPathSeparator, dropTrailingPathSeparator)
+import           System.FilePath (searchPathSeparator)
 import           System.Process.Read
 
 -- | Get the global package database
@@ -293,11 +294,7 @@ listGhcPkgDbs menv wc pkgDbs = do
 mkGhcPackagePath :: Bool -> Path Abs Dir -> Path Abs Dir -> Path Abs Dir -> Text
 mkGhcPackagePath locals localdb deps globaldb =
   T.pack $ intercalate [searchPathSeparator] $ concat
-    [ [toFilePathNoTrailingSlash localdb | locals]
-    , [toFilePathNoTrailingSlash deps]
-    , [toFilePathNoTrailingSlash globaldb]
+    [ [toFilePathNoTrailingSep localdb | locals]
+    , [toFilePathNoTrailingSep deps]
+    , [toFilePathNoTrailingSep globaldb]
     ]
-
--- TODO: dedupe with copy in Stack.Setup
-toFilePathNoTrailingSlash :: Path loc Dir -> FilePath
-toFilePathNoTrailingSlash = dropTrailingPathSeparator . toFilePath
