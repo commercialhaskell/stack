@@ -182,7 +182,7 @@ library
                    , transformers-base >= 0.4.4
                    , unix-compat
                    , unordered-containers >= 0.2.5.1
-                   , vector >= 0.10.12.3
+                   , vector >= 0.10.12.3 && < 0.12
                    , vector-binary-instances
                    , void >= 0.7
                    , yaml >= 0.8.10.1
