@@ -332,7 +332,12 @@ dotCabalGetPath dcp =
         DotCabalFilePath fp -> fp
         DotCabalCFilePath fp -> fp
 
-type InstalledMap = Map PackageName (Version, InstallLocation, Installed) -- TODO Version is now redundant and can be gleaned from Installed
+type InstalledMap = Map PackageName (InstallLocation, Installed)
 
 data Installed = Library PackageIdentifier GhcPkgId | Executable PackageIdentifier
     deriving (Show, Eq, Ord)
+
+-- | Get the installed Version.
+installedVersion :: Installed -> Version
+installedVersion (Library (PackageIdentifier _ v) _) = v
+installedVersion (Executable (PackageIdentifier _ v)) = v

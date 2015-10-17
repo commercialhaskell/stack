@@ -47,19 +47,19 @@ import           Stack.PackageIndex
 import           Stack.Types
 
 data PackageInfo
-    = PIOnlyInstalled Version InstallLocation Installed
+    = PIOnlyInstalled InstallLocation Installed
     | PIOnlySource PackageSource
     | PIBoth PackageSource Installed
 
 combineSourceInstalled :: PackageSource
-                       -> (Version, InstallLocation, Installed)
+                       -> (InstallLocation, Installed)
                        -> PackageInfo
-combineSourceInstalled ps (version, location, installed) =
-    assert (piiVersion ps == version) $
+combineSourceInstalled ps (location, installed) =
+    assert (piiVersion ps == installedVersion installed) $
     assert (piiLocation ps == location) $
     case location of
         -- Always trust something in the snapshot
-        Snap -> PIOnlyInstalled version location installed
+        Snap -> PIOnlyInstalled location installed
         Local -> PIBoth ps installed
 
 type CombinedMap = Map PackageName PackageInfo
@@ -68,7 +68,7 @@ combineMap :: SourceMap -> InstalledMap -> CombinedMap
 combineMap = Map.mergeWithKey
     (\_ s i -> Just $ combineSourceInstalled s i)
     (fmap PIOnlySource)
-    (fmap (\(v, l, i) -> PIOnlyInstalled v l i))
+    (fmap (\(l, i) -> PIOnlyInstalled l i))
 
 data AddDepRes
     = ADRToInstall Task
@@ -282,7 +282,8 @@ addDep'' treatAsDep name = do
         -- TODO look up in the package index and see if there's a
         -- recommendation available
         Nothing -> return $ Left $ UnknownPackage name
-        Just (PIOnlyInstalled version loc installed) -> do
+        Just (PIOnlyInstalled loc installed) -> do
+            let version = installedVersion installed
             tellExecutablesUpstream name version loc Map.empty -- slightly hacky, no flags since they likely won't affect executable names
             return $ Right $ ADRFound loc version installed
         Just (PIOnlySource ps) -> do
@@ -316,7 +317,7 @@ tellExecutablesPackage loc p = do
     let myComps =
             case Map.lookup (packageName p) cm of
                 Nothing -> assert False Set.empty
-                Just (PIOnlyInstalled _ _ _) -> Set.empty
+                Just (PIOnlyInstalled _ _) -> Set.empty
                 Just (PIOnlySource ps) -> goSource ps
                 Just (PIBoth ps _) -> goSource ps
 
