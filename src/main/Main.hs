@@ -701,18 +701,12 @@ buildCmd opts go = do
     hPutStrLn stderr "See: https://github.com/commercialhaskell/stack/issues/1015"
     error "-prof GHC option submitted"
   case boptsFileWatch opts of
-    FileWatchPoll -> fileWatchPoll getProjectRoot inner
-    FileWatch -> fileWatch getProjectRoot inner
+    FileWatchPoll -> fileWatchPoll inner
+    FileWatch -> fileWatch inner
     NoFileWatch -> inner $ const $ return ()
   where
     inner setLocalFiles = withBuildConfigAndLock go $ \lk ->
         Stack.Build.build setLocalFiles lk opts
-    getProjectRoot = do
-        (manager, lc) <- loadConfigWithOpts go
-        bconfig <-
-            runStackLoggingTGlobal manager go $
-            lcLoadBuildConfig lc (globalResolver go)
-        return (bcRoot bconfig)
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
 uninstallCmd _ go = withConfigAndLock go $ do

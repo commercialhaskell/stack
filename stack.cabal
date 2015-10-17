@@ -153,7 +153,6 @@ library
                    , http-client-tls >= 0.2.2
                    , http-conduit >= 2.1.7
                    , http-types >= 0.8.6
-                   , ignore >= 0.1.1
                    , lifted-base
                    , monad-control
                    , monad-logger >= 0.3.13.1
