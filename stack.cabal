@@ -170,6 +170,7 @@ library
                    , resourcet >= 1.1.4.1
                    , retry >= 0.6
                    , safe >= 0.3
+                   , semigroups >= 0.5
                    , split
                    , stm >= 2.4.4
                    , streaming-commons >= 0.1.10.0

@@ -50,7 +50,9 @@ import qualified Data.Foldable                  as F
 import           Data.Function                  (fix)
 import           Data.IORef                     (newIORef, readIORef,
                                                  writeIORef)
-import           Data.List                      (intercalate, intersperse)
+import           Data.List                      (intercalate)
+import           Data.List.NonEmpty             (NonEmpty)
+import qualified Data.List.NonEmpty             as NonEmpty
 import           Data.Map                       (Map)
 import qualified Data.Map                       as Map
 import           Data.Maybe                     (maybeToList, catMaybes)
@@ -312,7 +314,8 @@ withCabalLoader menv inner = do
     inner doLookup
   where
     unknownIdent = UnknownPackageIdentifiers . Set.singleton
-    commaSeparatedIdents = F.fold . intersperse ", " . map packageIdentifierString
+    commaSeparatedIdents =
+        F.fold . NonEmpty.intersperse ", " . NonEmpty.map packageIdentifierString
 
 type PackageCaches = Map PackageIdentifier (PackageIndex, PackageCache)
 
@@ -328,11 +331,10 @@ lookupPackageIdentifierExact ident env caches = do
                   $ \_ _ bs -> return bs
             return $ Just bs
 
--- TODO: use 'Maybe (NonEmpty PackageIdentifier)' return-type
 fuzzyLookupCandidates :: PackageIdentifier -> PackageCaches
-                      -> Maybe [PackageIdentifier]
+                      -> Maybe (NonEmpty PackageIdentifier)
 fuzzyLookupCandidates (PackageIdentifier name ver) caches =
-    if null sameMajor then Nothing else Just (map fst sameMajor)
+    NonEmpty.nonEmpty (map fst sameMajor)
   where
     sameMajor = filter (\(PackageIdentifier _ v, _) ->
                              toMajorVersion ver == toMajorVersion v)
