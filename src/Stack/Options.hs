@@ -117,10 +117,14 @@ buildOptsParser cmd =
 
         dryRun = flag False True (long "dry-run" <>
                                   help "Don't build anything, just prepare to")
-        ghcOpts = (++)
+        ghcOpts = (\x y z -> concat [x, y, z])
           <$> flag [] ["-Wall", "-Werror"]
               ( long "pedantic"
-             <> help "Turn on -Wall and -Werror (note: option name may change in the future"
+             <> help "Turn on -Wall and -Werror"
+              )
+          <*> flag [] ["-O0"]
+              ( long "fast"
+             <> help "Turn off optimizations (-O0)"
               )
           <*> many (textOption (long "ghc-options" <>
                                 metavar "OPTION" <>
