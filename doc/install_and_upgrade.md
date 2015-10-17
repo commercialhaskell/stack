@@ -14,7 +14,11 @@ find links that always point to the latest bindists
 
 ## Windows
 
-*Note*: Due to specific Windows limitations, [some temporary workarounds](https://www.fpcomplete.com/blog/2015/08/stack-ghc-windows) may be required. It is strongly advised to set your `STACK_ROOT` environment variable similarly to your root (e.g., `set STACK_ROOT=c:\stack_root`) *before* running `stack`.
+*Note*: Due to specific Windows limitations,
+ [some temporary workarounds](https://www.fpcomplete.com/blog/2015/08/stack-ghc-windows)
+ may be required. It is strongly advised to set your `STACK_ROOT` environment
+ variable similarly to your root (e.g., `set STACK_ROOT=c:\stack_root`) *before*
+ running `stack`.
 
 * Download the latest release:
 
@@ -35,6 +39,14 @@ NOTE: These executables have been built and tested on a Windows 7, 8.1, and 10
 64-bit machines. They should run on older Windows installs as well, but have not
 been tested. If you do test, please edit and update this page to indicate as
 such.
+
+### Installer (experimental)
+
+We recommend installing to the default location with these installers, as that
+will make `stack install` and `stack upgrade` work correctly out of the box.
+
+  * [Windows 32-bit Installer](https://www.stackage.org/stack/windows-i386-installer) (experimental)
+  * [Windows 64-bit Installer](https://www.stackage.org/stack/windows-x86_64-installer) (experimental)
 
 ## Mac OS X
 
