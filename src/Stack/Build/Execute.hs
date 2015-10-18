@@ -1062,7 +1062,7 @@ depsPresent :: InstalledMap -> Map PackageName VersionRange -> Bool
 depsPresent installedMap deps = all
     (\(name, range) ->
         case Map.lookup name installedMap of
-            Just (_, installed) -> (installedVersion installed) `withinRange` range
+            Just (_, installed) -> installedVersion installed `withinRange` range
             Nothing -> False)
     (Map.toList deps)
 

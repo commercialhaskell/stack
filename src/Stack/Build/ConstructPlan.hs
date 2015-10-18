@@ -73,7 +73,7 @@ combineMap = Map.mergeWithKey
 
 data AddDepRes
     = ADRToInstall Task
-    | ADRFound InstallLocation Version Installed
+    | ADRFound InstallLocation Installed
     deriving Show
 
 data W = W
@@ -158,7 +158,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPa
         errs = errlibs ++ errfinals
     if null errs
         then do
-            let toTask (_, ADRFound _ _ _) = Nothing
+            let toTask (_, ADRFound _ _) = Nothing
                 toTask (name, ADRToInstall task) = Just (name, task)
                 tasks = M.fromList $ mapMaybe toTask adrs
                 takeSubset =
@@ -284,9 +284,8 @@ addDep'' treatAsDep name = do
         -- recommendation available
         Nothing -> return $ Left $ UnknownPackage name
         Just (PIOnlyInstalled loc installed) -> do
-            let version = installedVersion installed
-            tellExecutablesUpstream name version loc Map.empty -- slightly hacky, no flags since they likely won't affect executable names
-            return $ Right $ ADRFound loc version installed
+            tellExecutablesUpstream name (installedVersion installed) loc Map.empty -- slightly hacky, no flags since they likely won't affect executable names
+            return $ Right $ ADRFound loc installed
         Just (PIOnlySource ps) -> do
             tellExecutables name ps
             installPackage treatAsDep name ps
@@ -295,7 +294,7 @@ addDep'' treatAsDep name = do
             needInstall <- checkNeedInstall treatAsDep name ps installed (wanted ctx)
             if needInstall
                 then installPackage treatAsDep name ps
-                else return $ Right $ ADRFound (piiLocation ps) (piiVersion ps) installed
+                else return $ Right $ ADRFound (piiLocation ps) installed
 
 tellExecutables :: PackageName -> PackageSource -> M () -- TODO merge this with addFinal above?
 tellExecutables _ (PSLocal lp)
@@ -441,9 +440,9 @@ addPackageDeps treatAsDep package = do
                     then case adr of
                         ADRToInstall task -> return $ Right
                             (Set.singleton $ taskProvides task, Map.empty, taskLocation task)
-                        ADRFound loc _ (Executable _) -> return $ Right
+                        ADRFound loc (Executable _) -> return $ Right
                             (Set.empty, Map.empty, loc)
-                        ADRFound loc _ (Library ident gid) -> return $ Right
+                        ADRFound loc (Library ident gid) -> return $ Right
                             (Set.empty, Map.singleton ident gid, loc)
                     else return $ Left (depname, (range, mlatest, DependencyMismatch $ adrVersion adr))
     case partitionEithers deps of
@@ -455,7 +454,7 @@ addPackageDeps treatAsDep package = do
             (Map.fromList errs)
   where
     adrVersion (ADRToInstall task) = packageIdentifierVersion $ taskProvides task
-    adrVersion (ADRFound _ v _) = v
+    adrVersion (ADRFound _ installed) = installedVersion installed
 
 checkDirtiness :: PackageSource
                -> Installed
