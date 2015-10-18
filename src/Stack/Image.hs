@@ -30,7 +30,7 @@ import qualified Data.Text as T
 import           Data.Typeable
 import           Options.Applicative
 import           Path
-import           Path.Extra (toFilePathNoTrailingSep)
+import           Path.Extra
 import           Path.IO
 import           Stack.Constants
 import           Stack.Types
