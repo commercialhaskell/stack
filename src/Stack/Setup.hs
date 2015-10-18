@@ -64,6 +64,7 @@ import           Language.Haskell.TH as TH
 import           Network.HTTP.Client.Conduit
 import           Network.HTTP.Download.Verified
 import           Path
+import           Path.Extra (toFilePathNoTrailingSlash)
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude hiding (concat, elem) -- Fix AMP warning
@@ -1285,9 +1286,6 @@ sanityCheck menv wc = withCanonicalizedSystemTempDirectory "stack-sanity-check" 
     case eres of
         Left e -> throwM $ GHCSanityCheckCompileFailed e ghc
         Right _ -> return () -- TODO check that the output of running the command is correct
-
-toFilePathNoTrailingSlash :: Path loc Dir -> FilePath
-toFilePathNoTrailingSlash = FP.dropTrailingPathSeparator . toFilePath
 
 -- Remove potentially confusing environment variables
 removeHaskellEnvVars :: Map Text Text -> Map Text Text

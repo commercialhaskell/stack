@@ -43,12 +43,13 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
+import           Path.Extra (toFilePathNoTrailingSlash)
 import           Path.IO (dirExists, createTree)
 import           Prelude hiding (FilePath)
 import           Stack.Constants
 import           Stack.Types
 import           System.Directory (canonicalizePath, doesDirectoryExist)
-import           System.FilePath (FilePath, searchPathSeparator, dropTrailingPathSeparator)
+import           System.FilePath (searchPathSeparator)
 import           System.Process.Read
 
 -- | Get the global package database
@@ -297,7 +298,3 @@ mkGhcPackagePath locals localdb deps globaldb =
     , [toFilePathNoTrailingSlash deps]
     , [toFilePathNoTrailingSlash globaldb]
     ]
-
--- TODO: dedupe with copy in Stack.Setup
-toFilePathNoTrailingSlash :: Path loc Dir -> FilePath
-toFilePathNoTrailingSlash = dropTrailingPathSeparator . toFilePath

@@ -118,6 +118,7 @@ library
                      Data.Maybe.Extra
                      Data.Set.Monad
                      Distribution.Version.Extra
+                     Path.Extra
   build-depends:     Cabal >= 1.18.1.5
                    , aeson >= 0.8.0.2 && < 0.10
                    , ansi-terminal >= 0.6.2.3
