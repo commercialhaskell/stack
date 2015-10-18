@@ -92,7 +92,7 @@ createDependencyGraph dotOpts = do
   (_,_,locals,_,sourceMap) <- loadSourceMap NeedTargets defaultBuildOpts
   let graph = Map.fromList (localDependencies dotOpts locals)
   menv <- getMinimalEnvOverride
-  installedMap <- fmap thrd . fst3 <$> getInstalled menv
+  installedMap <- fmap snd . fst3 <$> getInstalled menv
                                                    (GetInstalledOpts False False)
                                                    sourceMap
   withLoadPackage menv (\loader -> do
@@ -104,9 +104,6 @@ createDependencyGraph dotOpts = do
   where -- fmap a function over the result of a function with 3 arguments
         fmap3 :: Functor f => (d -> e) -> (a -> b -> c -> f d) -> a -> b -> c -> f e
         fmap3 f g a b c = f <$> g a b c
-
-        thrd :: (a,b,c) -> c
-        thrd (_,_,x) = x
 
         fst3 :: (a,b,c) -> a
         fst3 (x,_,_) = x
