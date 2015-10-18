@@ -55,27 +55,27 @@ parseToolText (parsePackageIdentifierFromString . T.unpack -> Just pkgId) = Just
 parseToolText _ = Nothing
 
 markInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
-              => Tool
+              => Path Abs Dir
+              -> Tool
               -> m ()
-markInstalled tool = do
-    dir <- asks $ configLocalPrograms . getConfig
+markInstalled programsPath tool = do
     fpRel <- parseRelFile $ toolString tool ++ ".installed"
-    liftIO $ writeFile (toFilePath $ dir </> fpRel) "installed"
+    liftIO $ writeFile (toFilePath $ programsPath </> fpRel) "installed"
 
 unmarkInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
-                => Tool
+                => Path Abs Dir
+                -> Tool
                 -> m ()
-unmarkInstalled tool = do
-    dir <- asks $ configLocalPrograms . getConfig
+unmarkInstalled programsPath tool = do
     fpRel <- parseRelFile $ toolString tool ++ ".installed"
-    removeFileIfExists $ dir </> fpRel
+    removeFileIfExists $ programsPath </> fpRel
 
 listInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
-              => m [Tool]
-listInstalled = do
-    dir <- asks $ configLocalPrograms . getConfig
-    createTree dir
-    (_, files) <- listDirectory dir
+              => Path Abs Dir
+              -> m [Tool]
+listInstalled programsPath = do
+    createTree programsPath
+    (_, files) <- listDirectory programsPath
     return $ mapMaybe toTool files
   where
     toTool fp = do

@@ -344,7 +344,8 @@ ensureCompiler sopts = do
         then do
             getSetupInfo' <- runOnce (getSetupInfo (soptsStackSetupYaml sopts) =<< asks getHttpManager)
 
-            installed <- listInstalled
+            localPrograms <- asks $ configLocalPrograms . getConfig
+            installed <- listInstalled localPrograms
 
             -- Install GHC
             ghcVariant <- asks getGHCVariant
@@ -624,9 +625,9 @@ downloadAndInstallTool :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader en
 downloadAndInstallTool programsDir si downloadInfo tool installer = do
     (file, at) <- downloadFromInfo programsDir downloadInfo tool
     dir <- installDir programsDir tool
-    unmarkInstalled tool
+    unmarkInstalled programsDir tool
     installer si file at dir
-    markInstalled tool
+    markInstalled programsDir tool
     return tool
 
 downloadAndInstallCompiler :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasGHCVariant env, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, MonadBaseControl IO m)
