@@ -42,8 +42,8 @@ import           Stack.Types
 import           System.Process.Read
 import           Text.Hastache                  (htmlEscape)
 
--- | Move a tix file into a sub-directory of the hpc report directory.
--- Deletes the old one if one is present.
+-- | Move a tix file into a sub-directory of the hpc report directory. Deletes the old one if one is
+-- present.
 updateTixFile :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
             => Path Abs File -> String -> m ()
 updateTixFile tixSrc pkgId = do
@@ -56,8 +56,8 @@ updateTixFile tixSrc pkgId = do
         createTree (parent tixDest)
         renameFile tixSrc tixDest
 
--- | Get the tix file location, given the name of the file (without
--- extension), and the package identifier string.
+-- | Get the tix file location, given the name of the file (without extension), and the package
+-- identifier string.
 tixFilePath ::  (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
             => String -> String ->  m (Path Abs File)
 tixFilePath pkgId tixName = do
@@ -66,13 +66,11 @@ tixFilePath pkgId tixName = do
     tixRel <- parseRelFile (tixName ++ ".tix")
     return (outputDir </> pkgIdRel </> tixRel)
 
--- | Generates the HTML coverage report and shows a textual coverage
--- summary for a package.
+-- | Generates the HTML coverage report and shows a textual coverage summary for a package.
 generateHpcReport :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
                   => Path Abs Dir -> Package -> [Text] -> m ()
 generateHpcReport pkgDir package tests = do
-    -- If we're using > GHC 7.10, the hpc 'include' parameter must
-    -- specify a ghc package key. See
+    -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a ghc package key. See
     -- https://github.com/commercialhaskell/stack/issues/785
     let pkgName = packageNameText (packageName package)
         pkgId = packageIdentifierString (packageIdentifier package)
@@ -82,7 +80,7 @@ generateHpcReport pkgDir package tests = do
         if getGhcVersion compilerVersion < $(mkVersion "7.10") then return $ Right $ Just pkgId
         -- We don't expect to find a package key if there is no library.
         else if not (packageHasLibrary package) then return $ Right Nothing
-        -- Look in the
+        -- Look in the inplace DB for the package key.
         -- See https://github.com/commercialhaskell/stack/issues/1181#issuecomment-148968986
         else do
             mghcPkgKey <- findPackageKeyForBuiltPackage pkgDir (packageIdentifier package)
@@ -99,9 +97,8 @@ generateHpcReport pkgDir package tests = do
             reportDir = parent tixSrc </> subdir
         case eincludeName of
             Left err -> generateHpcErrorReport reportDir (sanitize (T.unpack err))
-            -- Restrict to just the current library code, if there is a
-            -- library in the package (see #634 - this will likely be
-            -- customizable in the future)
+            -- Restrict to just the current library code, if there is a library in the package (see
+            -- #634 - this will likely be customizable in the future)
             Right mincludeName -> do
                 let extraArgs = case mincludeName of
                         Just includeName -> ["--include", includeName ++ ":"]
@@ -111,8 +108,7 @@ generateHpcReport pkgDir package tests = do
 generateHpcReportInternal :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
                           => Path Abs File -> Path Abs Dir -> Text -> [String] -> [String] -> m ()
 generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArgs = do
-    -- If a .tix file exists, move it to the HPC output directory
-    -- and generate a report for it.
+    -- If a .tix file exists, move it to the HPC output directory and generate a report for it.
     tixFileExists <- fileExists tixSrc
     if not tixFileExists
         then $logError $ T.concat
@@ -129,11 +125,9 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
             -- Compute arguments used for both "hpc markup" and "hpc report".
             pkgDirs <- Map.keys . envConfigPackages <$> asks getEnvConfig
             let args =
-                    -- Use index files from all packages (allows cross-package
-                    -- coverage results).
+                    -- Use index files from all packages (allows cross-package coverage results).
                     concatMap (\x -> ["--srcdir", toFilePath x]) pkgDirs ++
-                    -- Look for index files in the correct dir (relative to
-                    -- each pkgdir).
+                    -- Look for index files in the correct dir (relative to each pkgdir).
                     ["--hpcdir", toFilePath hpcRelDir, "--reset-hpcdirs"]
             menv <- getMinimalEnvOverride
             $logInfo $ "Generating " <> report
@@ -159,8 +153,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     $logError (msg False)
                     generateHpcErrorReport reportDir (msg True)
                 else do
-                    -- Print output, stripping @\r@ characters because
-                    -- Windows.
+                    -- Print output, stripping @\r@ characters because Windows.
                     forM_ outputLines ($logInfo . T.decodeUtf8 . S8.filter (not . (=='\r')))
                     $logInfo
                         ("The " <> report <> " is available at " <>
@@ -207,8 +200,8 @@ readTixOrLog path = do
         $logError $ "Failed to read tix file " <> T.pack (toFilePath path)
     return mtix
 
--- | Module names which contain '/' have a package name, and so they
--- weren't built into the executable.
+-- | Module names which contain '/' have a package name, and so they weren't built into the
+-- executable.
 removeExeModules :: Tix -> Tix
 removeExeModules (Tix ms) = Tix (filter (\(TixModule name _ _ _) -> '/' `elem` name) ms)
 
