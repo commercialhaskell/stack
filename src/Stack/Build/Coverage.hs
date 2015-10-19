@@ -97,6 +97,7 @@ generateHpcReport package tests getGhcPkgKey = do
 generateHpcReportInternal :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
                           => Path Abs File -> Path Rel Dir -> Text -> [String] -> [String] -> m ()
 generateHpcReportInternal tixSrc subdir report extraMarkupArgs extraReportArgs = do
+    let reportDest = parent tixSrc </> subdir
     -- If a .tix file exists, move it to the HPC output directory
     -- and generate a report for it.
     tixFileExists <- fileExists tixSrc
@@ -108,7 +109,8 @@ generateHpcReportInternal tixSrc subdir report extraMarkupArgs extraReportArgs =
             , T.pack (toFilePath tixSrc)
             , "."
             ]
-        else (`onException` $logError ("Error occurred while producing " <> report)) $ do
+        else (`catch` \err -> generateHpcErrorReport reportDir $ sanitize $ show (err :: ReadProcessException)) $
+             (`onException` $logError ("Error occurred while producing " <> report)) $ do
             -- Directories for .mix files.
             hpcRelDir <- (</> dotHpc) <$> hpcRelativeDir
             -- Compute arguments used for both "hpc markup" and "hpc report".
@@ -120,7 +122,6 @@ generateHpcReportInternal tixSrc subdir report extraMarkupArgs extraReportArgs =
                     -- Look for index files in the correct dir (relative to
                     -- each pkgdir).
                     ["--hpcdir", toFilePath hpcRelDir, "--reset-hpcdirs"]
-                reportDest = parent tixSrc </> subdir
             menv <- getMinimalEnvOverride
             $logInfo $ "Generating " <> report
             outputLines <- liftM S8.lines $ readProcessStdout Nothing menv "hpc"
@@ -129,15 +130,21 @@ generateHpcReportInternal tixSrc subdir report extraMarkupArgs extraReportArgs =
                 : (args ++ extraReportArgs)
                 )
             if all ("(0/0)" `S8.isSuffixOf`) outputLines
-                then $logError $ T.concat
-                    [ "Error: The "
-                    , report
-                    , " did not consider any code. One possible cause of this is"
-                    , " if your test-suite builds the library code (see stack"
-                    , " issue #1008). It may also indicate a bug in stack or"
-                    , " the hpc program. Please report this issue if you think"
-                    , " your coverage report should have meaningful results."
-                    ]
+                then do
+                    let msg html = T.concat
+                            [ "Error: The "
+                            , report
+                            , " did not consider any code. One possible cause of this is"
+                            , " if your test-suite builds the library code (see stack "
+                            , if html then "<a href='https://github.com/commercialhaskell/stack/issues/1008'>" else ""
+                            , "issue #1008"
+                            , if html then "</a>" else ""
+                            , "). It may also indicate a bug in stack or"
+                            , " the hpc program. Please report this issue if you think"
+                            , " your coverage report should have meaningful results."
+                            ]
+                    $logError (msg False)
+                    generateHpcErrorReport reportDest (msg True)
                 else do
                     -- Print output, stripping @\r@ characters because
                     -- Windows.
@@ -145,13 +152,13 @@ generateHpcReportInternal tixSrc subdir report extraMarkupArgs extraReportArgs =
                     $logInfo
                         ("The " <> report <> " is available at " <>
                          T.pack (toFilePath (reportDest </> $(mkRelFile "hpc_index.html"))))
-            -- Generate the markup.
-            void $ readProcessStdout Nothing menv "hpc"
-                ( "markup"
-                : toFilePath tixSrc
-                : ("--destdir=" ++ toFilePath reportDest)
-                : (args ++ extraMarkupArgs)
-                )
+                    -- Generate the markup.
+                    void $ readProcessStdout Nothing menv "hpc"
+                        ( "markup"
+                        : toFilePath tixSrc
+                        : ("--destdir=" ++ toFilePath reportDest)
+                        : (args ++ extraMarkupArgs)
+                        )
 
 generateHpcUnifiedReport :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
                      => m ()
@@ -255,5 +262,20 @@ generateHpcMarkupIndex = do
     $logInfo $ "\nAn index of the generated HTML coverage reports is available at " <>
         T.pack (toFilePath outputFile)
 
+generateHpcErrorReport :: MonadIO m => Path Abs Dir -> Text -> m ()
+generateHpcErrorReport dir err = do
+    createTree dir
+    liftIO $ T.writeFile (toFilePath (dir </> $(mkRelFile "hpc_index.html"))) $ T.concat $
+        [ "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\"></head><body>"
+        , "<h1>HPC Report Generation Error</h1>"
+        , "<p>"
+        , err
+        , "</p>"
+        , "</body></html>"
+        ]
+
 pathToHtml :: Path b t -> Text
-pathToHtml = T.dropWhileEnd (=='/') . LT.toStrict . htmlEscape . LT.pack . toFilePath
+pathToHtml = T.dropWhileEnd (=='/') . sanitize . toFilePath
+
+sanitize :: String -> Text
+sanitize = LT.toStrict . htmlEscape . LT.pack

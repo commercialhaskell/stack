@@ -482,14 +482,14 @@ executePlan' installedMap plan ee@ExecuteEnv {..} = do
         if total > 1
             then loop 0
             else return ()
+    when (toCoverage $ boptsTestOpts eeBuildOpts) $ do
+        generateHpcUnifiedReport
+        generateHpcMarkupIndex
     unless (null errs) $ throwM $ ExecutionFailure errs
     when (boptsHaddock eeBuildOpts) $ do
         generateLocalHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeLocals
         generateDepsHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeLocals
         generateSnapHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeGlobalDB
-    when (toCoverage $ boptsTestOpts eeBuildOpts) $ do
-        generateHpcUnifiedReport
-        generateHpcMarkupIndex
   where
     installedMap' = Map.difference installedMap
                   $ Map.fromList
