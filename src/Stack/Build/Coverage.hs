@@ -54,7 +54,14 @@ updateTixFile tixSrc pkgId = do
         let tixDest = outputDir </> pkgIdRel </> filename tixSrc
         removeFileIfExists tixDest
         createTree (parent tixDest)
-        renameFile tixSrc tixDest
+        -- Remove exe modules because they are problematic. This could be revisited if there's a GHC
+        -- version that fixes https://ghc.haskell.org/trac/ghc/ticket/1853
+        mtix <- readTixOrLog tixSrc
+        case mtix of
+            Nothing -> $logError $ "Failed to read " <> T.pack (toFilePath tixSrc)
+            Just tix -> do
+                liftIO $ writeTix (toFilePath tixDest) (removeExeModules tix)
+                removeFileIfExists tixSrc
 
 -- | Get the tix file location, given the name of the file (without extension), and the package
 -- identifier string.
