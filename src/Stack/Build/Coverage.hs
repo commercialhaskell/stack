@@ -20,7 +20,7 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader           (MonadReader, asks)
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Char8          as S8
-import           Data.Foldable                  (forM_)
+import           Data.Foldable                  (forM_, asum)
 import           Data.Function
 import           Data.List
 import qualified Data.Map.Strict                as Map
@@ -69,35 +69,48 @@ tixFilePath pkgId tixName = do
 -- | Generates the HTML coverage report and shows a textual coverage
 -- summary for a package.
 generateHpcReport :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
-                  => Package -> [Text] -> (PackageName -> m (Maybe Text)) -> m ()
-generateHpcReport package tests getGhcPkgKey = do
-    -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a
-    -- ghc package key. See
+                  => Path Abs Dir -> Package -> [Text] -> m ()
+generateHpcReport pkgDir package tests = do
+    -- If we're using > GHC 7.10, the hpc 'include' parameter must
+    -- specify a ghc package key. See
     -- https://github.com/commercialhaskell/stack/issues/785
     let pkgName = packageNameText (packageName package)
         pkgId = packageIdentifierString (packageIdentifier package)
     compilerVersion <- asks (envConfigCompilerVersion . getEnvConfig)
-    includeName <-
-        if getGhcVersion compilerVersion < $(mkVersion "7.10")
-            then return pkgId
-            else do
-                mghcPkgKey <- getGhcPkgKey (packageName package)
-                case mghcPkgKey of
-                    Nothing -> fail $ "Before computing test coverage report, failed to find GHC package key for " ++ T.unpack pkgName
-                    Just ghcPkgKey -> return $ T.unpack ghcPkgKey
+    eincludeName <-
+        -- Pre-7.8 uses plain PKG-version in tix files.
+        if getGhcVersion compilerVersion < $(mkVersion "7.10") then return $ Right $ Just pkgId
+        -- We don't expect to find a package key if there is no library.
+        else if not (packageHasLibrary package) then return $ Right Nothing
+        -- Look in the
+        -- See https://github.com/commercialhaskell/stack/issues/1181#issuecomment-148968986
+        else do
+            mghcPkgKey <- findPackageKeyForBuiltPackage pkgDir (packageIdentifier package)
+            case mghcPkgKey of
+                Nothing -> do
+                    let msg = "Failed to find GHC package key for " <> pkgName
+                    $logError msg
+                    return $ Left msg
+                Just ghcPkgKey -> return $ Right $ Just $ T.unpack ghcPkgKey
     forM_ tests $ \testName -> do
         tixSrc <- tixFilePath pkgId (T.unpack testName)
         subdir <- parseRelDir (T.unpack testName)
         let report = "coverage report for " <> pkgName <> "'s test-suite \"" <> testName <> "\""
-            -- Restrict to just the current library code (see #634 -
-            -- this will likely be customizable in the future)
-            extraArgs = ["--include", includeName ++ ":"]
-        generateHpcReportInternal tixSrc subdir report extraArgs extraArgs
+            reportDir = parent tixSrc </> subdir
+        case eincludeName of
+            Left err -> generateHpcErrorReport reportDir (sanitize (T.unpack err))
+            -- Restrict to just the current library code, if there is a
+            -- library in the package (see #634 - this will likely be
+            -- customizable in the future)
+            Right mincludeName -> do
+                let extraArgs = case mincludeName of
+                        Just includeName -> ["--include", includeName ++ ":"]
+                        Nothing -> []
+                generateHpcReportInternal tixSrc reportDir report extraArgs extraArgs
 
 generateHpcReportInternal :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
-                          => Path Abs File -> Path Rel Dir -> Text -> [String] -> [String] -> m ()
-generateHpcReportInternal tixSrc subdir report extraMarkupArgs extraReportArgs = do
-    let reportDest = parent tixSrc </> subdir
+                          => Path Abs File -> Path Abs Dir -> Text -> [String] -> [String] -> m ()
+generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArgs = do
     -- If a .tix file exists, move it to the HPC output directory
     -- and generate a report for it.
     tixFileExists <- fileExists tixSrc
@@ -144,19 +157,19 @@ generateHpcReportInternal tixSrc subdir report extraMarkupArgs extraReportArgs =
                             , " your coverage report should have meaningful results."
                             ]
                     $logError (msg False)
-                    generateHpcErrorReport reportDest (msg True)
+                    generateHpcErrorReport reportDir (msg True)
                 else do
                     -- Print output, stripping @\r@ characters because
                     -- Windows.
                     forM_ outputLines ($logInfo . T.decodeUtf8 . S8.filter (not . (=='\r')))
                     $logInfo
                         ("The " <> report <> " is available at " <>
-                         T.pack (toFilePath (reportDest </> $(mkRelFile "hpc_index.html"))))
+                         T.pack (toFilePath (reportDir </> $(mkRelFile "hpc_index.html"))))
                     -- Generate the markup.
                     void $ readProcessStdout Nothing menv "hpc"
                         ( "markup"
                         : toFilePath tixSrc
-                        : ("--destdir=" ++ toFilePath reportDest)
+                        : ("--destdir=" ++ toFilePath reportDir)
                         : (args ++ extraMarkupArgs)
                         )
 
@@ -185,7 +198,7 @@ generateHpcUnifiedReport = do
             let tixDest = outputDir </> $(mkRelFile "unified/unified.tix")
             createTree (parent tixDest)
             liftIO $ writeTix (toFilePath tixDest) tix
-            generateHpcReportInternal tixDest $(mkRelDir "unified") "unified report" [] []
+            generateHpcReportInternal tixDest (outputDir </> $(mkRelDir "unified/unified")) "unified report" [] []
 
 readTixOrLog :: (MonadLogger m, MonadIO m) => Path b File -> m (Maybe Tix)
 readTixOrLog path = do
@@ -279,3 +292,12 @@ pathToHtml = T.dropWhileEnd (=='/') . sanitize . toFilePath
 
 sanitize :: String -> Text
 sanitize = LT.toStrict . htmlEscape . LT.pack
+
+findPackageKeyForBuiltPackage :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env)
+                              => Path Abs Dir -> PackageIdentifier -> m (Maybe Text)
+findPackageKeyForBuiltPackage pkgDir pkgId = do
+    distDir <- distDirFromDir pkgDir
+    path <- liftM (distDir </>) $
+        parseRelFile ("package.conf.inplace/" ++ packageIdentifierString pkgId ++ "-inplace.conf")
+    contents <- liftIO $ T.readFile (toFilePath path)
+    return $ asum (map (T.stripPrefix "key: ") (T.lines contents))

@@ -1194,13 +1194,7 @@ singleTest runInBase topts lptb ac ee task installedMap = do
                             ]
                         return $ Map.singleton testName Nothing
 
-            when needHpc $ do
-                wc <- getWhichCompiler
-                let pkgDbs =
-                        [ bcoSnapDB (eeBaseConfigOpts ee)
-                        , bcoLocalDB (eeBaseConfigOpts ee)
-                        ]
-                generateHpcReport package testsToRun (findGhcPkgKey (eeEnvOverride ee) wc pkgDbs)
+            when needHpc $ generateHpcReport pkgDir package testsToRun
 
             bs <- liftIO $
                 case mlogFile of
