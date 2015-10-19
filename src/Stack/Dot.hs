@@ -108,11 +108,6 @@ createDependencyGraph dotOpts = do
         fst3 :: (a,b,c) -> a
         fst3 (x,_,_) = x
 
--- Given an 'Installed' try to get the 'Version'
-libVersionFromInstalled :: Installed -> Maybe Version
-libVersionFromInstalled (Library (PackageIdentifier _ v) _) = Just v
-libVersionFromInstalled (Executable _) = Nothing
-
 listDependencies :: (HasEnvConfig env
                     ,HasHttpManager env
                     ,HasLogLevel env
@@ -195,8 +190,7 @@ createDepLoader sourceMap installed loadPackageDeps pkgName =
   case Map.lookup pkgName sourceMap of
     Just (PSLocal lp) -> pure ((packageAllDeps &&& (Just . packageVersion)) (lpPackage lp))
     Just (PSUpstream version _ flags) -> loadPackageDeps pkgName version flags
-    Nothing -> pure (Set.empty, do m' <- T.traverse libVersionFromInstalled installed
-                                   Map.lookup pkgName m')
+    Nothing -> pure (Set.empty, fmap installedVersion (Map.lookup pkgName installed))
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages
 localDependencies :: DotOpts -> [LocalPackage] -> [(PackageName,(Set PackageName,Maybe Version))]
