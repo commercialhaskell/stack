@@ -64,10 +64,8 @@ benchOptsParser = BenchmarkOpts
                                  metavar "BENCH_ARGS" <>
                                  help ("Forward BENCH_ARGS to the benchmark suite. " <>
                                        "Supports templates from `cabal bench`")))
-        <*> flag False
-                 True
-                 (long "no-run-benchmarks" <>
-                  help "Disable running of benchmarks. (Benchmarks will still be built.)")
+        <*> switch (long "no-run-benchmarks" <>
+                   help "Disable running of benchmarks. (Benchmarks will still be built.)")
 
 addCoverageFlags :: BuildOpts -> BuildOpts
 addCoverageFlags bopts
@@ -115,8 +113,8 @@ buildOptsParser cmd =
             "copying binaries to the local-bin-path (see 'stack path')"
             idm
 
-        dryRun = flag False True (long "dry-run" <>
-                                  help "Don't build anything, just prepare to")
+        dryRun = switch (long "dry-run" <>
+                         help "Don't build anything, just prepare to")
         ghcOpts = (\x y z -> concat [x, y, z])
           <$> flag [] ["-Wall", "-Werror"]
               ( long "pedantic"
@@ -137,7 +135,7 @@ buildOptsParser cmd =
                        help ("Override flags set in stack.yaml " <>
                              "(applies to local packages and extra-deps)")))
 
-        preFetch = flag False True
+        preFetch = switch
             (long "prefetch" <>
              help "Fetch packages necessary for the build immediately, useful with --dry-run")
 
@@ -167,7 +165,7 @@ buildOptsParser cmd =
             "continue running after a step fails (default: false for build, true for test/bench)"
             idm
 
-        forceDirty = flag False True
+        forceDirty = switch
             (long "force-dirty" <>
              help "Force treating all local packages as having dirty files (useful for cases where stack can't detect a file change)")
 
@@ -186,15 +184,15 @@ buildOptsParser cmd =
               metavar "CMD [ARGS]" <>
               help "Command and arguments to run after a successful build" )
 
-        onlyConfigure = flag False True
+        onlyConfigure = switch
             (long "only-configure" <>
              help "Only perform the configure step, not any builds. Intended for tool usage, may break when used on multiple packages at once!")
 
-        reconfigure = flag False True
+        reconfigure = switch
             (long "reconfigure" <>
              help "Perform the configure step even if unnecessary. Useful in some corner cases with custom Setup.hs files")
 
-        cabalVerbose = flag False True
+        cabalVerbose = switch
             (long "cabal-verbose" <>
              help "Ask Cabal to be verbose in its output")
 
@@ -463,8 +461,8 @@ ghciOptsParser = GhciOpts
                      (strOption (long "with-ghc" <>
                                  metavar "GHC" <>
                                  help "Use this command for the GHC to run"))
-             <*> flag False True (long "no-load" <>
-                   help "Don't load modules on start-up")
+             <*> switch (long "no-load" <>
+                         help "Don't load modules on start-up")
              <*> packagesParser
              <*> optional
                      (textOption
@@ -554,14 +552,10 @@ initOptsParser :: Parser InitOpts
 initOptsParser =
     InitOpts <$> method <*> overwrite <*> fmap not ignoreSubDirs
   where
-    ignoreSubDirs = flag False
-                         True
-                         (long "ignore-subdirs" <>
-                         help "Do not search for .cabal files in sub directories")
-    overwrite = flag False
-                     True
-                     (long "force" <>
-                      help "Force overwriting of an existing stack.yaml if it exists")
+    ignoreSubDirs = switch (long "ignore-subdirs" <>
+                           help "Do not search for .cabal files in sub directories")
+    overwrite = switch (long "force" <>
+                       help "Force overwriting of an existing stack.yaml if it exists")
     method = solver
          <|> (MethodResolver <$> resolver)
          <|> (MethodSnapshot <$> snapPref)
@@ -667,14 +661,10 @@ testOptsParser = TestOpts
                 (optional (argsOption(long "test-arguments" <>
                                       metavar "TEST_ARGS" <>
                                       help "Arguments passed in to the test suite program")))
-      <*> flag False
-               True
-               (long "coverage" <>
-               help "Generate a code coverage report")
-      <*> flag False
-               True
-               (long "no-run-tests" <>
-                help "Disable running of tests. (Tests will still be built.)")
+      <*> switch (long "coverage" <>
+                 help "Generate a code coverage report")
+      <*> switch (long "no-run-tests" <>
+                 help "Disable running of tests. (Tests will still be built.)")
 
 -- | Parser for @stack new@.
 newOptsParser :: Parser (NewOpts,InitOpts)

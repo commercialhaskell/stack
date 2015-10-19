@@ -298,8 +298,8 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                    addCommand "reset"
                               "Reset the Docker sandbox"
                               dockerResetCmd
-                              (flag False True (long "keep-home" <>
-                                               help "Do not delete sandbox's home directory"))
+                              (switch (long "keep-home" <>
+                                       help "Do not delete sandbox's home directory"))
                    addCommand Docker.dockerCleanupCmdName
                               "Clean up Docker images and containers"
                               dockerCleanupCmd
