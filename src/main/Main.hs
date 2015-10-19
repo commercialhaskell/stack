@@ -43,6 +43,7 @@ import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Simple
 import           Options.Applicative.Types (readerAsk)
 import           Path
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude hiding (pi, mapM)
@@ -76,7 +77,7 @@ import           System.Directory (canonicalizePath, doesFileExist, doesDirector
 import           System.Environment (getEnvironment, getProgName)
 import           System.Exit
 import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
-import           System.FilePath (dropTrailingPathSeparator, searchPathSeparator)
+import           System.FilePath (searchPathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, Handle, hGetEncoding, hSetEncoding)
 import           System.Process.Read
 
@@ -403,15 +404,15 @@ paths =
     [ ( "Global stack root directory"
       , "global-stack-root"
       , \pi ->
-             T.pack (toFilePathNoTrailing (configStackRoot (bcConfig (piBuildConfig pi)))))
+             T.pack (toFilePathNoTrailingSep (configStackRoot (bcConfig (piBuildConfig pi)))))
     , ( "Project root (derived from stack.yaml file)"
       , "project-root"
       , \pi ->
-             T.pack (toFilePathNoTrailing (bcRoot (piBuildConfig pi))))
+             T.pack (toFilePathNoTrailingSep (bcRoot (piBuildConfig pi))))
     , ( "Configuration location (where the stack.yaml file is)"
       , "config-location"
       , \pi ->
-             T.pack (toFilePathNoTrailing (bcStackYaml (piBuildConfig pi))))
+             T.pack (toFilePath (bcStackYaml (piBuildConfig pi))))
     , ( "PATH environment variable"
       , "bin-path"
       , \pi ->
@@ -419,11 +420,11 @@ paths =
     , ( "Installed GHCs (unpacked and archives)"
       , "ghc-paths"
       , \pi ->
-             T.pack (toFilePathNoTrailing (configLocalPrograms (bcConfig (piBuildConfig pi)))))
+             T.pack (toFilePathNoTrailingSep (configLocalPrograms (bcConfig (piBuildConfig pi)))))
     , ( "Local bin path where stack installs executables"
       , "local-bin-path"
       , \pi ->
-             T.pack (toFilePathNoTrailing (configLocalBin (bcConfig (piBuildConfig pi)))))
+             T.pack (toFilePathNoTrailingSep (configLocalBin (bcConfig (piBuildConfig pi)))))
     , ( "Extra include directories"
       , "extra-include-dirs"
       , \pi ->
@@ -437,39 +438,38 @@ paths =
     , ( "Snapshot package database"
       , "snapshot-pkg-db"
       , \pi ->
-             T.pack (toFilePathNoTrailing (piSnapDb pi)))
+             T.pack (toFilePathNoTrailingSep (piSnapDb pi)))
     , ( "Local project package database"
       , "local-pkg-db"
       , \pi ->
-             T.pack (toFilePathNoTrailing (piLocalDb pi)))
+             T.pack (toFilePathNoTrailingSep (piLocalDb pi)))
     , ( "Global package database"
       , "global-pkg-db"
       , \pi ->
-             T.pack (toFilePathNoTrailing (piGlobalDb pi)))
+             T.pack (toFilePathNoTrailingSep (piGlobalDb pi)))
     , ( "GHC_PACKAGE_PATH environment variable"
       , "ghc-package-path"
       , \pi -> mkGhcPackagePath True (piLocalDb pi) (piSnapDb pi) (piGlobalDb pi))
     , ( "Snapshot installation root"
       , "snapshot-install-root"
       , \pi ->
-             T.pack (toFilePathNoTrailing (piSnapRoot pi)))
+             T.pack (toFilePathNoTrailingSep (piSnapRoot pi)))
     , ( "Local project installation root"
       , "local-install-root"
       , \pi ->
-             T.pack (toFilePathNoTrailing (piLocalRoot pi)))
+             T.pack (toFilePathNoTrailingSep (piLocalRoot pi)))
     , ( "Snapshot documentation root"
       , "snapshot-doc-root"
       , \pi ->
-             T.pack (toFilePathNoTrailing (piSnapRoot pi </> docDirSuffix)))
+             T.pack (toFilePathNoTrailingSep (piSnapRoot pi </> docDirSuffix)))
     , ( "Local project documentation root"
       , "local-doc-root"
       , \pi ->
-             T.pack (toFilePathNoTrailing (piLocalRoot pi </> docDirSuffix)))
+             T.pack (toFilePathNoTrailingSep (piLocalRoot pi </> docDirSuffix)))
     , ( "Dist work directory"
       , "dist-dir"
       , \pi ->
-             T.pack (toFilePathNoTrailing (piDistDir pi)))]
-  where toFilePathNoTrailing = dropTrailingPathSeparator . toFilePath
+             T.pack (toFilePathNoTrailingSep (piDistDir pi)))]
 
 data SetupCmdOpts = SetupCmdOpts
     { scoCompilerVersion :: !(Maybe CompilerVersion)

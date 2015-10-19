@@ -64,6 +64,7 @@ import           Language.Haskell.TH as TH
 import           Network.HTTP.Client.Conduit
 import           Network.HTTP.Download.Verified
 import           Path
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude hiding (concat, elem) -- Fix AMP warning
@@ -269,19 +270,19 @@ setupEnv mResolveMissingGHC = do
                                 else id)
 
                         -- For reasoning and duplication, see: https://github.com/fpco/stack/issues/70
-                        $ Map.insert "HASKELL_PACKAGE_SANDBOX" (T.pack $ toFilePathNoTrailingSlash deps)
+                        $ Map.insert "HASKELL_PACKAGE_SANDBOX" (T.pack $ toFilePathNoTrailingSep deps)
                         $ Map.insert "HASKELL_PACKAGE_SANDBOXES"
                             (T.pack $ if esIncludeLocals es
                                 then intercalate [searchPathSeparator]
-                                        [ toFilePathNoTrailingSlash localdb
-                                        , toFilePathNoTrailingSlash deps
+                                        [ toFilePathNoTrailingSep localdb
+                                        , toFilePathNoTrailingSep deps
                                         , ""
                                         ]
                                 else intercalate [searchPathSeparator]
-                                        [ toFilePathNoTrailingSlash deps
+                                        [ toFilePathNoTrailingSep deps
                                         , ""
                                         ])
-                        $ Map.insert "HASKELL_DIST_DIR" (T.pack $ toFilePathNoTrailingSlash distDir)
+                        $ Map.insert "HASKELL_DIST_DIR" (T.pack $ toFilePathNoTrailingSep distDir)
                         $ env
                     !() <- atomicModifyIORef envRef $ \m' ->
                         (Map.insert es eo m', ())
@@ -1100,7 +1101,7 @@ withUnpackedTarball7z name si archiveFile archiveType srcDir destDir = do
             Nothing -> error $ "Invalid " ++ name ++ " filename: " ++ show archiveFile
             Just x -> parseAbsFile $ T.unpack x
     run7z <- setup7z si
-    let tmpName = (FP.dropTrailingPathSeparator $ toFilePath $ dirname destDir) ++ "-tmp"
+    let tmpName = (toFilePathNoTrailingSep $ dirname destDir) ++ "-tmp"
     createTree (parent destDir)
     withCanonicalizedTempDirectory (toFilePath $ parent destDir) tmpName $ \tmpDir -> do
         let absSrcDir = tmpDir </> srcDir
@@ -1285,9 +1286,6 @@ sanityCheck menv wc = withCanonicalizedSystemTempDirectory "stack-sanity-check" 
     case eres of
         Left e -> throwM $ GHCSanityCheckCompileFailed e ghc
         Right _ -> return () -- TODO check that the output of running the command is correct
-
-toFilePathNoTrailingSlash :: Path loc Dir -> FilePath
-toFilePathNoTrailingSlash = FP.dropTrailingPathSeparator . toFilePath
 
 -- Remove potentially confusing environment variables
 removeHaskellEnvVars :: Map Text Text -> Map Text Text

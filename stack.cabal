@@ -106,6 +106,7 @@ library
                      Network.HTTP.Download.Verified
                      Data.Attoparsec.Args
                      Path.IO
+                     Path.Extra
   other-modules:     Network.HTTP.Download
                      Control.Concurrent.Execute
                      Path.Find

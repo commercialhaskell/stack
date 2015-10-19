@@ -70,6 +70,7 @@ import           Distribution.Simple.Utils
 import           Distribution.System (OS (..), Arch, Platform (..))
 import           Distribution.Text (display, simpleParse)
 import           Path as FL
+import           Path.Extra
 import           Path.Find
 import           Path.IO
 import           Prelude

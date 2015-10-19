@@ -67,6 +67,7 @@ import           Distribution.System (Arch)
 import           Distribution.Text (display)
 import           GHC.Generics
 import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, parseRelDir, (</>))
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Prelude
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
@@ -77,7 +78,7 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           System.Exit (ExitCode (ExitFailure))
-import           System.FilePath (dropTrailingPathSeparator, pathSeparator)
+import           System.FilePath (pathSeparator)
 import           System.Process.Log (showProcessArgDebug)
 
 ----------------------------------------------
@@ -632,17 +633,16 @@ configureOptsDirs bco loc package = concat
     , map (("--package-db=" ++) . toFilePath) $ case loc of
         Snap -> bcoExtraDBs bco ++ [bcoSnapDB bco]
         Local -> bcoExtraDBs bco ++ [bcoSnapDB bco] ++ [bcoLocalDB bco]
-    , [ "--libdir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "lib"))
-      , "--bindir=" ++ toFilePathNoTrailingSlash (installRoot </> bindirSuffix)
-      , "--datadir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "share"))
-      , "--libexecdir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "libexec"))
-      , "--sysconfdir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "etc"))
-      , "--docdir=" ++ toFilePathNoTrailingSlash docDir
-      , "--htmldir=" ++ toFilePathNoTrailingSlash docDir
-      , "--haddockdir=" ++ toFilePathNoTrailingSlash docDir]
+    , [ "--libdir=" ++ toFilePathNoTrailingSep (installRoot </> $(mkRelDir "lib"))
+      , "--bindir=" ++ toFilePathNoTrailingSep (installRoot </> bindirSuffix)
+      , "--datadir=" ++ toFilePathNoTrailingSep (installRoot </> $(mkRelDir "share"))
+      , "--libexecdir=" ++ toFilePathNoTrailingSep (installRoot </> $(mkRelDir "libexec"))
+      , "--sysconfdir=" ++ toFilePathNoTrailingSep (installRoot </> $(mkRelDir "etc"))
+      , "--docdir=" ++ toFilePathNoTrailingSep docDir
+      , "--htmldir=" ++ toFilePathNoTrailingSep docDir
+      , "--haddockdir=" ++ toFilePathNoTrailingSep docDir]
     ]
   where
-    toFilePathNoTrailingSlash = dropTrailingPathSeparator . toFilePath
     installRoot =
         case loc of
             Snap -> bcoSnapInstallRoot bco
