@@ -389,7 +389,7 @@ getPackageCaches :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env,
 getPackageCaches menv = do
     config <- askConfig
     liftM mconcat $ forM (configPackageIndices config) $ \index -> do
-        fp <- liftM toFilePath $ configPackageIndexCache (indexName index)
+        fp <- configPackageIndexCache (indexName index)
         PackageCacheMap pis' <- taggedDecodeOrLoad fp $ liftM PackageCacheMap $ populateCache menv index
 
         return (fmap (index,) pis')
