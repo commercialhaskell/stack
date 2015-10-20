@@ -49,6 +49,7 @@ import           Distribution.System (Platform (Platform), Arch (X86_64), OS (Li
 import           Distribution.Text (display)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO (getWorkingDir,listDirectory,createTree,removeFile,removeTree,dirExists)
 import qualified Paths_stack as Meta
 import           Prelude -- Fix redundant import warnings
@@ -60,7 +61,7 @@ import           Stack.Setup (ensureDockerStackExe)
 import           System.Directory (canonicalizePath, getModificationTime)
 import           System.Environment (lookupEnv,getProgName, getArgs,getExecutablePath)
 import           System.Exit (exitSuccess, exitWith)
-import           System.FilePath (dropTrailingPathSeparator,takeBaseName)
+import           System.FilePath (takeBaseName)
 import           System.IO (stderr,stdin,stdout,hIsTerminalDevice)
 import           System.Process.PagerEditor (editByteString)
 import           System.Process.Read
@@ -302,16 +303,16 @@ runContainerAndExit getCmdArgs
          [["create"
           ,"--net=host"
           ,"-e",inContainerEnvVar ++ "=1"
-          ,"-e",stackRootEnvVar ++ "=" ++ toFPNoTrailingSep stackRoot
-          ,"-e","WORK_WD=" ++ toFPNoTrailingSep pwd
-          ,"-e","WORK_HOME=" ++ toFPNoTrailingSep sandboxRepoDir
-          ,"-e","WORK_ROOT=" ++ toFPNoTrailingSep projectRoot
-          ,"-v",toFPNoTrailingSep stackRoot ++ ":" ++ toFPNoTrailingSep stackRoot
-          ,"-v",toFPNoTrailingSep projectRoot ++ ":" ++ toFPNoTrailingSep projectRoot
-          ,"-v",toFPNoTrailingSep sandboxSandboxDir ++ ":" ++ toFPNoTrailingSep sandboxDir
-          ,"-v",toFPNoTrailingSep sandboxHomeDir ++ ":" ++ toFPNoTrailingSep sandboxRepoDir
-          ,"-v",toFPNoTrailingSep stackRoot ++ ":" ++
-                toFPNoTrailingSep (sandboxRepoDir </> $(mkRelDir ("." ++ stackProgName ++ "/")))]
+          ,"-e",stackRootEnvVar ++ "=" ++ toFilePathNoTrailingSep stackRoot
+          ,"-e","WORK_WD=" ++ toFilePathNoTrailingSep pwd
+          ,"-e","WORK_HOME=" ++ toFilePathNoTrailingSep sandboxRepoDir
+          ,"-e","WORK_ROOT=" ++ toFilePathNoTrailingSep projectRoot
+          ,"-v",toFilePathNoTrailingSep stackRoot ++ ":" ++ toFilePathNoTrailingSep stackRoot
+          ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toFilePathNoTrailingSep projectRoot
+          ,"-v",toFilePathNoTrailingSep sandboxSandboxDir ++ ":" ++ toFilePathNoTrailingSep sandboxDir
+          ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toFilePathNoTrailingSep sandboxRepoDir
+          ,"-v",toFilePathNoTrailingSep stackRoot ++ ":" ++
+                toFilePathNoTrailingSep (sandboxRepoDir </> $(mkRelDir ("." ++ stackProgName ++ "/")))]
          ,userEnvVars
          ,concatMap (\(k,v) -> ["-e", k ++ "=" ++ v]) envVars
          ,concatMap sandboxSubdirArg sandboxSubdirs
@@ -361,8 +362,7 @@ runContainerAndExit getCmdArgs
         Just ('=':val) -> Just val
         _ -> Nothing
     mountArg (Mount host container) = ["-v",host ++ ":" ++ container]
-    sandboxSubdirArg subdir = ["-v",toFPNoTrailingSep subdir++ ":" ++ toFPNoTrailingSep subdir]
-    toFPNoTrailingSep = dropTrailingPathSeparator . toFilePath
+    sandboxSubdirArg subdir = ["-v",toFilePathNoTrailingSep subdir++ ":" ++ toFilePathNoTrailingSep subdir]
     projectRoot = fromMaybeProjectRoot mprojectRoot
 
 -- | Clean-up old docker images and containers.

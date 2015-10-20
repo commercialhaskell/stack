@@ -482,14 +482,14 @@ executePlan' installedMap plan ee@ExecuteEnv {..} = do
         if total > 1
             then loop 0
             else return ()
+    when (toCoverage $ boptsTestOpts eeBuildOpts) $ do
+        generateHpcUnifiedReport
+        generateHpcMarkupIndex
     unless (null errs) $ throwM $ ExecutionFailure errs
     when (boptsHaddock eeBuildOpts) $ do
         generateLocalHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeLocals
         generateDepsHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeLocals
         generateSnapHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeGlobalDB
-    when (toCoverage $ boptsTestOpts eeBuildOpts) $ do
-        generateHpcUnifiedReport
-        generateHpcMarkupIndex
   where
     installedMap' = Map.difference installedMap
                   $ Map.fromList
@@ -601,7 +601,9 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp = do
         announce
         menv <- getMinimalEnvOverride
         let programNames =
-                if eeCabalPkgVer < $(mkVersion "1.22") then ["ghc"] else ["ghc", "ghcjs"]
+                if eeCabalPkgVer < $(mkVersion "1.22")
+                    then ["ghc", "ghc-pkg"]
+                    else ["ghc", "ghc-pkg", "ghcjs", "ghcjs-pkg"]
         exes <- forM programNames $ \name -> do
             mpath <- findExecutable menv name
             return $ case mpath of
@@ -1053,7 +1055,7 @@ depsPresent :: InstalledMap -> Map PackageName VersionRange -> Bool
 depsPresent installedMap deps = all
     (\(name, range) ->
         case Map.lookup name installedMap of
-            Just (version, _, _) -> version `withinRange` range
+            Just (_, installed) -> (installedVersion installed) `withinRange` range
             Nothing -> False)
     (Map.toList deps)
 
@@ -1192,13 +1194,7 @@ singleTest runInBase topts lptb ac ee task installedMap = do
                             ]
                         return $ Map.singleton testName Nothing
 
-            when needHpc $ do
-                wc <- getWhichCompiler
-                let pkgDbs =
-                        [ bcoSnapDB (eeBaseConfigOpts ee)
-                        , bcoLocalDB (eeBaseConfigOpts ee)
-                        ]
-                generateHpcReport package testsToRun (findGhcPkgKey (eeEnvOverride ee) wc pkgDbs)
+            when needHpc $ generateHpcReport pkgDir package testsToRun
 
             bs <- liftIO $
                 case mlogFile of

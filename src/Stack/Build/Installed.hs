@@ -44,7 +44,7 @@ type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasEnvConfig env,
 data LoadHelper = LoadHelper
     { lhId   :: !GhcPkgId
     , lhDeps :: ![GhcPkgId]
-    , lhPair :: !(PackageName, (Version, InstallLocation, Installed)) -- TODO Version is now redundant and can be gleaned from Installed
+    , lhPair :: !(PackageName, (InstallLocation, Installed))
     }
     deriving Show
 
@@ -107,7 +107,7 @@ getInstalled menv opts sourceMap = do
 
                     | otherwise -> m
           where
-            m = Map.singleton name (version, loc, Executable $ PackageIdentifier name version)
+            m = Map.singleton name (loc, Executable $ PackageIdentifier name version)
     exesSnap <- getInstalledExes Snap
     exesLocal <- getInstalledExes Local
     let installedMap = Map.unions
@@ -194,7 +194,7 @@ isAllowed opts mcache sourceMap mloc dp
             if name `HashSet.member` wiredInPackages
                 then []
                 else dpDepends dp
-        , lhPair = (name, (version, toPackageLocation mloc, Library ident gid))
+        , lhPair = (name, (toPackageLocation mloc, Library ident gid))
         }
     | otherwise = Nothing
   where

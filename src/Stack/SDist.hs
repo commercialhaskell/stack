@@ -126,7 +126,7 @@ getCabalLbs pvpBounds fp = do
               Just (PSUpstream version _ _) -> Just version
               Nothing ->
                   case Map.lookup name installedMap of
-                      Just (version, _, _) -> Just version
+                      Just (_, installed) -> Just (installedVersion installed)
                       Nothing -> Nothing
 
 

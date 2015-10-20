@@ -16,7 +16,7 @@ import qualified Data.Monoid
 import qualified Data.Set                    as Set
 import qualified Data.Text as T
 import           Development.GitRev          (gitHash)
-import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager)
+import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.IO
 import qualified Paths_stack as Paths
@@ -80,25 +80,20 @@ upgrade gitRepo mresolver = withCanonicalizedSystemTempDirectory "stack-upgrade"
                     Nothing -> error "Stack.Upgrade.upgrade: invariant violated, unpacked directory not found"
                     Just path -> return $ Just path
 
-    manager <- asks getHttpManager
-    logLevel <- asks getLogLevel
-    terminal <- asks getTerminal
-    reExec <- asks getReExec
     config <- asks getConfig
-
-    forM_ mdir $ \dir -> liftIO $ do
-        bconfig <- runStackLoggingT manager logLevel terminal reExec $ do
+    forM_ mdir $ \dir -> do
+        bconfig <- runInnerStackLoggingT $ do
             lc <- loadConfig
                 (configConfigMonoid config <> Data.Monoid.mempty
                     { configMonoidInstallGHC = Just True
                     })
                 (Just $ dir </> $(mkRelFile "stack.yaml"))
             lcLoadBuildConfig lc mresolver
-        envConfig1 <- runStackT manager logLevel bconfig terminal reExec $ setupEnv $ Just $
+        envConfig1 <- runInnerStackT bconfig $ setupEnv $ Just $
             "Try rerunning with --install-ghc to install the correct GHC into " <>
             T.pack (toFilePath (configLocalPrograms config))
-        runStackT manager logLevel envConfig1 terminal reExec $
-          build (const $ return ()) Nothing defaultBuildOpts
-            { boptsTargets = ["stack"]
-            , boptsInstallExes = True
-            }
+        runInnerStackT envConfig1 $
+            build (const $ return ()) Nothing defaultBuildOpts
+                { boptsTargets = ["stack"]
+                , boptsInstallExes = True
+                }

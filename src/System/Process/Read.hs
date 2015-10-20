@@ -53,7 +53,7 @@ import           Data.Foldable (forM_)
 import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (fromMaybe, isJust)
+import           Data.Maybe (isJust)
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -352,13 +352,8 @@ getEnvOverride platform =
 augmentPath :: [FilePath] -> Maybe Text -> Text
 augmentPath dirs mpath =
     T.intercalate (T.singleton FP.searchPathSeparator)
-    $ map (stripTrailingSlashT . T.pack) dirs
+    $ map (T.pack . FP.dropTrailingPathSeparator) dirs
    ++ maybe [] return mpath
-
-stripTrailingSlashT :: Text -> Text
-stripTrailingSlashT t = fromMaybe t $ T.stripSuffix
-        (T.singleton FP.pathSeparator)
-        t
 
 -- | Apply 'augmentPath' on the PATH value in the given Map.
 augmentPathMap :: [FilePath] -> Map Text Text -> Map Text Text

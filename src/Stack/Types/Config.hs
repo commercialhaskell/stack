@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -35,7 +36,6 @@ import           Data.List (stripPrefix)
 import           Data.Hashable (Hashable)
 import           Data.Map (Map)
 import qualified Data.Map as Map
-
 import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Monoid
@@ -61,6 +61,10 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           System.Process.Read (EnvOverride)
+#ifdef mingw32_HOST_OS
+import qualified Crypto.Hash.SHA1 as SHA1
+import qualified Data.ByteString.Base16 as B16
+#endif
 
 -- | The top-level Stackage configuration.
 data Config =
@@ -904,15 +908,6 @@ platformOnlyRelDir = do
     platform <- asks getPlatform
     parseRelDir (Distribution.Text.display platform)
 
--- | Relative directory for the platform identifier
-platformVariantRelDir
-    :: (MonadReader env m, HasPlatform env, HasGHCVariant env, MonadThrow m)
-    => m (Path Rel Dir)
-platformVariantRelDir = do
-    platform <- asks getPlatform
-    ghcVariant <- asks getGHCVariant
-    parseRelDir (Distribution.Text.display platform <> ghcVariantSuffix ghcVariant)
-
 -- | Path to .shake files.
 configShakeFilesDir :: (MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
 configShakeFilesDir = liftM (</> $(mkRelDir "shake")) configProjectWorkDir
@@ -931,20 +926,50 @@ snapshotsDir = do
 -- | Installation root for dependencies
 installationRootDeps :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
 installationRootDeps = do
-    snapshots <- snapshotsDir
-    bc <- asks getBuildConfig
-    name <- parseRelDir $ T.unpack $ resolverName $ bcResolver bc
-    ghc <- compilerVersionDir
-    return $ snapshots </> name </> ghc
+    config <- asks getConfig
+    -- TODO: also useShaPathOnWindows here, once #1173 is resolved.
+    psc <- platformSnapAndCompilerRel
+    return $ configStackRoot config </> $(mkRelDir "snapshots") </> psc
 
 -- | Installation root for locals
 installationRootLocal :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Abs Dir)
 installationRootLocal = do
     bc <- asks getBuildConfig
+    psc <- useShaPathOnWindows =<< platformSnapAndCompilerRel
+    return $ configProjectWorkDir bc </> $(mkRelDir "install") </> psc
+
+-- | Path for platform followed by snapshot name followed by compiler
+-- name.
+platformSnapAndCompilerRel
+    :: (MonadReader env m, HasPlatform env, HasEnvConfig env, MonadThrow m)
+    => m (Path Rel Dir)
+platformSnapAndCompilerRel = do
+    bc <- asks getBuildConfig
+    platform <- platformVariantRelDir
     name <- parseRelDir $ T.unpack $ resolverName $ bcResolver bc
     ghc <- compilerVersionDir
-    platform <- platformVariantRelDir
-    return $ configProjectWorkDir bc </> $(mkRelDir "install") </> platform </> name </> ghc
+    useShaPathOnWindows (platform </> name </> ghc)
+
+-- | Relative directory for the platform identifier
+platformVariantRelDir
+    :: (MonadReader env m, HasPlatform env, HasGHCVariant env, MonadThrow m)
+    => m (Path Rel Dir)
+platformVariantRelDir = do
+    platform <- asks getPlatform
+    ghcVariant <- asks getGHCVariant
+    parseRelDir (Distribution.Text.display platform <> ghcVariantSuffix ghcVariant)
+
+-- | This is an attempt to shorten stack paths on Windows to decrease our
+-- chances of hitting 260 symbol path limit. The idea is to calculate
+-- SHA1 hash of the path used on other architectures, encode with base
+-- 16 and take first 8 symbols of it.
+useShaPathOnWindows :: MonadThrow m => Path Rel Dir -> m (Path Rel Dir)
+useShaPathOnWindows =
+#ifdef mingw32_HOST_OS
+    parseRelDir . S8.unpack . S8.take 8 . B16.encode . SHA1.hash . encodeUtf8 . T.pack . toFilePath
+#else
+    return
+#endif
 
 compilerVersionDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Rel Dir)
 compilerVersionDir = do

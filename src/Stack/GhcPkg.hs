@@ -11,7 +11,6 @@
 
 module Stack.GhcPkg
   (findGhcPkgId
-  ,findGhcPkgKey
   ,getGlobalDB
   ,EnvOverride
   ,envHelper
@@ -43,12 +42,13 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO (dirExists, createTree)
 import           Prelude hiding (FilePath)
 import           Stack.Constants
 import           Stack.Types
 import           System.Directory (canonicalizePath, doesDirectoryExist)
-import           System.FilePath (FilePath, searchPathSeparator, dropTrailingPathSeparator)
+import           System.FilePath (searchPathSeparator)
 import           System.Process.Read
 
 -- | Get the global package database
@@ -146,18 +146,6 @@ findGhcPkgId menv wc pkgDbs name = do
     case mpid of
         Just !pid -> return (parseGhcPkgId (T.encodeUtf8 pid))
         _ -> return Nothing
-
--- | Get the package key e.g. @foo_9bTCpMF7G4UFWJJvtDrIdB@.
---
--- NOTE: GHC > 7.10 only! Will always yield 'Nothing' otherwise.
-findGhcPkgKey :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
-             => EnvOverride
-             -> WhichCompiler
-             -> [Path Abs Dir] -- ^ package databases
-             -> PackageName
-             -> m (Maybe Text)
-findGhcPkgKey menv wc pkgDbs name =
-    findGhcPkgField menv wc pkgDbs (packageNameString name) "key"
 
 -- | Get the version of the package
 findGhcPkgVersion :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
@@ -293,11 +281,7 @@ listGhcPkgDbs menv wc pkgDbs = do
 mkGhcPackagePath :: Bool -> Path Abs Dir -> Path Abs Dir -> Path Abs Dir -> Text
 mkGhcPackagePath locals localdb deps globaldb =
   T.pack $ intercalate [searchPathSeparator] $ concat
-    [ [toFilePathNoTrailingSlash localdb | locals]
-    , [toFilePathNoTrailingSlash deps]
-    , [toFilePathNoTrailingSlash globaldb]
+    [ [toFilePathNoTrailingSep localdb | locals]
+    , [toFilePathNoTrailingSep deps]
+    , [toFilePathNoTrailingSep globaldb]
     ]
-
--- TODO: dedupe with copy in Stack.Setup
-toFilePathNoTrailingSlash :: Path loc Dir -> FilePath
-toFilePathNoTrailingSlash = dropTrailingPathSeparator . toFilePath

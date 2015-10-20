@@ -20,7 +20,7 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader           (MonadReader, asks)
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString.Char8          as S8
-import           Data.Foldable                  (forM_)
+import           Data.Foldable                  (forM_, asum)
 import           Data.Function
 import           Data.List
 import qualified Data.Map.Strict                as Map
@@ -42,8 +42,8 @@ import           Stack.Types
 import           System.Process.Read
 import           Text.Hastache                  (htmlEscape)
 
--- | Move a tix file into a sub-directory of the hpc report directory.
--- Deletes the old one if one is present.
+-- | Move a tix file into a sub-directory of the hpc report directory. Deletes the old one if one is
+-- present.
 updateTixFile :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
             => Path Abs File -> String -> m ()
 updateTixFile tixSrc pkgId = do
@@ -54,10 +54,17 @@ updateTixFile tixSrc pkgId = do
         let tixDest = outputDir </> pkgIdRel </> filename tixSrc
         removeFileIfExists tixDest
         createTree (parent tixDest)
-        renameFile tixSrc tixDest
+        -- Remove exe modules because they are problematic. This could be revisited if there's a GHC
+        -- version that fixes https://ghc.haskell.org/trac/ghc/ticket/1853
+        mtix <- readTixOrLog tixSrc
+        case mtix of
+            Nothing -> $logError $ "Failed to read " <> T.pack (toFilePath tixSrc)
+            Just tix -> do
+                liftIO $ writeTix (toFilePath tixDest) (removeExeModules tix)
+                removeFileIfExists tixSrc
 
--- | Get the tix file location, given the name of the file (without
--- extension), and the package identifier string.
+-- | Get the tix file location, given the name of the file (without extension), and the package
+-- identifier string.
 tixFilePath ::  (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
             => String -> String ->  m (Path Abs File)
 tixFilePath pkgId tixName = do
@@ -66,39 +73,49 @@ tixFilePath pkgId tixName = do
     tixRel <- parseRelFile (tixName ++ ".tix")
     return (outputDir </> pkgIdRel </> tixRel)
 
--- | Generates the HTML coverage report and shows a textual coverage
--- summary for a package.
+-- | Generates the HTML coverage report and shows a textual coverage summary for a package.
 generateHpcReport :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
-                  => Package -> [Text] -> (PackageName -> m (Maybe Text)) -> m ()
-generateHpcReport package tests getGhcPkgKey = do
-    -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a
-    -- ghc package key. See
+                  => Path Abs Dir -> Package -> [Text] -> m ()
+generateHpcReport pkgDir package tests = do
+    -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a ghc package key. See
     -- https://github.com/commercialhaskell/stack/issues/785
     let pkgName = packageNameText (packageName package)
         pkgId = packageIdentifierString (packageIdentifier package)
     compilerVersion <- asks (envConfigCompilerVersion . getEnvConfig)
-    includeName <-
-        if getGhcVersion compilerVersion < $(mkVersion "7.10")
-            then return pkgId
-            else do
-                mghcPkgKey <- getGhcPkgKey (packageName package)
-                case mghcPkgKey of
-                    Nothing -> fail $ "Before computing test coverage report, failed to find GHC package key for " ++ T.unpack pkgName
-                    Just ghcPkgKey -> return $ T.unpack ghcPkgKey
+    eincludeName <-
+        -- Pre-7.8 uses plain PKG-version in tix files.
+        if getGhcVersion compilerVersion < $(mkVersion "7.10") then return $ Right $ Just pkgId
+        -- We don't expect to find a package key if there is no library.
+        else if not (packageHasLibrary package) then return $ Right Nothing
+        -- Look in the inplace DB for the package key.
+        -- See https://github.com/commercialhaskell/stack/issues/1181#issuecomment-148968986
+        else do
+            mghcPkgKey <- findPackageKeyForBuiltPackage pkgDir (packageIdentifier package)
+            case mghcPkgKey of
+                Nothing -> do
+                    let msg = "Failed to find GHC package key for " <> pkgName
+                    $logError msg
+                    return $ Left msg
+                Just ghcPkgKey -> return $ Right $ Just $ T.unpack ghcPkgKey
     forM_ tests $ \testName -> do
         tixSrc <- tixFilePath pkgId (T.unpack testName)
         subdir <- parseRelDir (T.unpack testName)
         let report = "coverage report for " <> pkgName <> "'s test-suite \"" <> testName <> "\""
-            -- Restrict to just the current library code (see #634 -
-            -- this will likely be customizable in the future)
-            extraArgs = ["--include", includeName ++ ":"]
-        generateHpcReportInternal tixSrc subdir report extraArgs extraArgs
+            reportDir = parent tixSrc </> subdir
+        case eincludeName of
+            Left err -> generateHpcErrorReport reportDir (sanitize (T.unpack err))
+            -- Restrict to just the current library code, if there is a library in the package (see
+            -- #634 - this will likely be customizable in the future)
+            Right mincludeName -> do
+                let extraArgs = case mincludeName of
+                        Just includeName -> ["--include", includeName ++ ":"]
+                        Nothing -> []
+                generateHpcReportInternal tixSrc reportDir report extraArgs extraArgs
 
 generateHpcReportInternal :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
-                          => Path Abs File -> Path Rel Dir -> Text -> [String] -> [String] -> m ()
-generateHpcReportInternal tixSrc subdir report extraMarkupArgs extraReportArgs = do
-    -- If a .tix file exists, move it to the HPC output directory
-    -- and generate a report for it.
+                          => Path Abs File -> Path Abs Dir -> Text -> [String] -> [String] -> m ()
+generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArgs = do
+    -- If a .tix file exists, move it to the HPC output directory and generate a report for it.
     tixFileExists <- fileExists tixSrc
     if not tixFileExists
         then $logError $ T.concat
@@ -108,19 +125,17 @@ generateHpcReportInternal tixSrc subdir report extraMarkupArgs extraReportArgs =
             , T.pack (toFilePath tixSrc)
             , "."
             ]
-        else (`onException` $logError ("Error occurred while producing " <> report)) $ do
+        else (`catch` \err -> generateHpcErrorReport reportDir $ sanitize $ show (err :: ReadProcessException)) $
+             (`onException` $logError ("Error occurred while producing " <> report)) $ do
             -- Directories for .mix files.
             hpcRelDir <- (</> dotHpc) <$> hpcRelativeDir
             -- Compute arguments used for both "hpc markup" and "hpc report".
             pkgDirs <- Map.keys . envConfigPackages <$> asks getEnvConfig
             let args =
-                    -- Use index files from all packages (allows cross-package
-                    -- coverage results).
+                    -- Use index files from all packages (allows cross-package coverage results).
                     concatMap (\x -> ["--srcdir", toFilePath x]) pkgDirs ++
-                    -- Look for index files in the correct dir (relative to
-                    -- each pkgdir).
+                    -- Look for index files in the correct dir (relative to each pkgdir).
                     ["--hpcdir", toFilePath hpcRelDir, "--reset-hpcdirs"]
-                reportDest = parent tixSrc </> subdir
             menv <- getMinimalEnvOverride
             $logInfo $ "Generating " <> report
             outputLines <- liftM S8.lines $ readProcessStdout Nothing menv "hpc"
@@ -129,29 +144,34 @@ generateHpcReportInternal tixSrc subdir report extraMarkupArgs extraReportArgs =
                 : (args ++ extraReportArgs)
                 )
             if all ("(0/0)" `S8.isSuffixOf`) outputLines
-                then $logError $ T.concat
-                    [ "Error: The "
-                    , report
-                    , " did not consider any code. One possible cause of this is"
-                    , " if your test-suite builds the library code (see stack"
-                    , " issue #1008). It may also indicate a bug in stack or"
-                    , " the hpc program. Please report this issue if you think"
-                    , " your coverage report should have meaningful results."
-                    ]
+                then do
+                    let msg html = T.concat
+                            [ "Error: The "
+                            , report
+                            , " did not consider any code. One possible cause of this is"
+                            , " if your test-suite builds the library code (see stack "
+                            , if html then "<a href='https://github.com/commercialhaskell/stack/issues/1008'>" else ""
+                            , "issue #1008"
+                            , if html then "</a>" else ""
+                            , "). It may also indicate a bug in stack or"
+                            , " the hpc program. Please report this issue if you think"
+                            , " your coverage report should have meaningful results."
+                            ]
+                    $logError (msg False)
+                    generateHpcErrorReport reportDir (msg True)
                 else do
-                    -- Print output, stripping @\r@ characters because
-                    -- Windows.
+                    -- Print output, stripping @\r@ characters because Windows.
                     forM_ outputLines ($logInfo . T.decodeUtf8 . S8.filter (not . (=='\r')))
                     $logInfo
                         ("The " <> report <> " is available at " <>
-                         T.pack (toFilePath (reportDest </> $(mkRelFile "hpc_index.html"))))
-            -- Generate the markup.
-            void $ readProcessStdout Nothing menv "hpc"
-                ( "markup"
-                : toFilePath tixSrc
-                : ("--destdir=" ++ toFilePath reportDest)
-                : (args ++ extraMarkupArgs)
-                )
+                         T.pack (toFilePath (reportDir </> $(mkRelFile "hpc_index.html"))))
+                    -- Generate the markup.
+                    void $ readProcessStdout Nothing menv "hpc"
+                        ( "markup"
+                        : toFilePath tixSrc
+                        : ("--destdir=" ++ toFilePath reportDir)
+                        : (args ++ extraMarkupArgs)
+                        )
 
 generateHpcUnifiedReport :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
                      => m ()
@@ -178,7 +198,7 @@ generateHpcUnifiedReport = do
             let tixDest = outputDir </> $(mkRelFile "unified/unified.tix")
             createTree (parent tixDest)
             liftIO $ writeTix (toFilePath tixDest) tix
-            generateHpcReportInternal tixDest $(mkRelDir "unified") "unified report" [] []
+            generateHpcReportInternal tixDest (outputDir </> $(mkRelDir "unified/unified")) "unified report" [] []
 
 readTixOrLog :: (MonadLogger m, MonadIO m) => Path b File -> m (Maybe Tix)
 readTixOrLog path = do
@@ -187,8 +207,8 @@ readTixOrLog path = do
         $logError $ "Failed to read tix file " <> T.pack (toFilePath path)
     return mtix
 
--- | Module names which contain '/' have a package name, and so they
--- weren't built into the executable.
+-- | Module names which contain '/' have a package name, and so they weren't built into the
+-- executable.
 removeExeModules :: Tix -> Tix
 removeExeModules (Tix ms) = Tix (filter (\(TixModule name _ _ _) -> '/' `elem` name) ms)
 
@@ -255,5 +275,29 @@ generateHpcMarkupIndex = do
     $logInfo $ "\nAn index of the generated HTML coverage reports is available at " <>
         T.pack (toFilePath outputFile)
 
+generateHpcErrorReport :: MonadIO m => Path Abs Dir -> Text -> m ()
+generateHpcErrorReport dir err = do
+    createTree dir
+    liftIO $ T.writeFile (toFilePath (dir </> $(mkRelFile "hpc_index.html"))) $ T.concat $
+        [ "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\"></head><body>"
+        , "<h1>HPC Report Generation Error</h1>"
+        , "<p>"
+        , err
+        , "</p>"
+        , "</body></html>"
+        ]
+
 pathToHtml :: Path b t -> Text
-pathToHtml = T.dropWhileEnd (=='/') . LT.toStrict . htmlEscape . LT.pack . toFilePath
+pathToHtml = T.dropWhileEnd (=='/') . sanitize . toFilePath
+
+sanitize :: String -> Text
+sanitize = LT.toStrict . htmlEscape . LT.pack
+
+findPackageKeyForBuiltPackage :: (MonadIO m, MonadReader env m, MonadThrow m, HasEnvConfig env)
+                              => Path Abs Dir -> PackageIdentifier -> m (Maybe Text)
+findPackageKeyForBuiltPackage pkgDir pkgId = do
+    distDir <- distDirFromDir pkgDir
+    path <- liftM (distDir </>) $
+        parseRelFile ("package.conf.inplace/" ++ packageIdentifierString pkgId ++ "-inplace.conf")
+    contents <- liftIO $ T.readFile (toFilePath path)
+    return $ asum (map (T.stripPrefix "key: ") (T.lines contents))

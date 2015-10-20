@@ -20,6 +20,8 @@ module Stack.Types.StackT
   ,runStackTGlobal
   ,runStackLoggingT
   ,runStackLoggingTGlobal
+  ,runInnerStackT
+  ,runInnerStackLoggingT
   ,newTLSManager
   ,logSticky
   ,logStickyDone)
@@ -165,6 +167,24 @@ instance HasReExec LoggingEnv where
 
 instance HasSupportsUnicode LoggingEnv where
     getSupportsUnicode = lenvSupportsUnicode
+
+runInnerStackT :: (HasHttpManager r, HasLogLevel r, HasTerminal r, HasReExec r, MonadReader r m, MonadIO m)
+               => config -> StackT config IO a -> m a
+runInnerStackT config inner = do
+    manager <- asks getHttpManager
+    logLevel <- asks getLogLevel
+    terminal <- asks getTerminal
+    reExec <- asks getReExec
+    liftIO $ runStackT manager logLevel config terminal reExec inner
+
+runInnerStackLoggingT :: (HasHttpManager r, HasLogLevel r, HasTerminal r, HasReExec r, MonadReader r m, MonadIO m)
+                      => StackLoggingT IO a -> m a
+runInnerStackLoggingT inner = do
+    manager <- asks getHttpManager
+    logLevel <- asks getLogLevel
+    terminal <- asks getTerminal
+    reExec <- asks getReExec
+    liftIO $ runStackLoggingT manager logLevel terminal reExec inner
 
 -- | Run the logging monad, using global options.
 runStackLoggingTGlobal :: MonadIO m

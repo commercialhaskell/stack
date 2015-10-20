@@ -70,6 +70,7 @@ import           Distribution.Simple.Utils
 import           Distribution.System (OS (..), Arch, Platform (..))
 import           Distribution.Text (display, simpleParse)
 import           Path as FL
+import           Path.Extra
 import           Path.Find
 import           Path.IO
 import           Prelude
@@ -306,7 +307,7 @@ generateBuildInfoOpts sourceMap installedMap mcabalmacros cabalDir distDir local
     deps =
         concat
             [ case M.lookup (fromCabalPackageName name) installedMap of
-                Just (_, _, Stack.Types.Library _ident ipid) -> ["-package-id=" <> ghcPkgIdString ipid]
+                Just (_, Stack.Types.Library _ident ipid) -> ["-package-id=" <> ghcPkgIdString ipid]
                 _ -> ["-package=" <> display name <>
                  maybe "" -- This empty case applies to e.g. base.
                      ((("-" <>) . versionString) . sourceVersion)

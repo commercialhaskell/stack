@@ -106,6 +106,7 @@ library
                      Network.HTTP.Download.Verified
                      Data.Attoparsec.Args
                      Path.IO
+                     Path.Extra
   other-modules:     Network.HTTP.Download
                      Control.Concurrent.Execute
                      Path.Find
@@ -283,9 +284,7 @@ test-suite stack-integration-test
   main-is:        IntegrationSpec.hs
   ghc-options:    -Wall -threaded -rtsopts -with-rtsopts=-N
 
-  if flag(integration-tests)
-    buildable: True
-  else
+  if !flag(integration-tests)
     buildable: False
 
   build-depends:  base >= 4.7 && < 10

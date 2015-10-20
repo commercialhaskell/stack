@@ -30,11 +30,11 @@ import qualified Data.Text as T
 import           Data.Typeable
 import           Options.Applicative
 import           Path
+import           Path.Extra
 import           Path.IO
 import           Stack.Constants
 import           Stack.Types
 import           Stack.Types.Internal
-import           System.FilePath (dropTrailingPathSeparator)
 import           System.Process
 
 type Build e m = (HasBuildConfig e, HasConfig e, HasEnvConfig e, HasTerminal e, MonadBaseControl IO m, MonadCatch m, MonadIO m, MonadLogger m, MonadReader e m)
@@ -95,7 +95,7 @@ syncAddContentToDir dir = do
 
 -- | Derive an image name from the project directory.
 imageName :: Path Abs Dir -> String
-imageName = map toLower . dropTrailingPathSeparator . toFilePath . dirname
+imageName = map toLower . toFilePathNoTrailingSep . dirname
 
 -- | Create a general purpose docker image from the temporary
 -- directory of executables & static content.

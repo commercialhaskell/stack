@@ -62,12 +62,6 @@ for requirements to perform the release, and more details about the tool.
 
 * Upload package to Hackage: `stack upload . --pvp-bounds=both`
 
-    Note: due to a Cabal pretty-printer bug, this may fail with a syntax error.
-    This bug is fixed in Cabal HEAD. Can also work around it by running `stack
-    sdist --pvp-bounds=both`, updating `stack.cabal`'s bounds from the sdist's
-    version, then uploading with `stack upload .`. Don't forget to undo the change to
-    `stack.cabal` afterward (don't commit it).
-
 * On a machine with Vagrant installed:
     * Run `etc/scripts/vagrant-distros.sh`
 

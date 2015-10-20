@@ -58,7 +58,8 @@ cabalSolver wc cabalfps constraints userFlags cabalArgs = withSystemTempDirector
         case mghc of
             Just _ -> return menv0
             Nothing -> do
-                tools <- listInstalled
+                localPrograms <- asks $ configLocalPrograms . getConfig
+                tools <- listInstalled localPrograms
                 let ghcName = $(mkPackageName "ghc")
                 case [version | Tool (PackageIdentifier name version) <- tools, name == ghcName] of
                     [] -> throwM SolverMissingGHC
