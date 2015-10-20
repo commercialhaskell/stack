@@ -9,6 +9,8 @@ Other enhancements:
 
 * Added an `allow-newer` config option [#922](https://github.com/commercialhaskell/stack/issues/922) [#770](https://github.com/commercialhaskell/stack/issues/770)
 * When a Hackage revision invalidates a build plan in a snapshot, trust the snapshot [#770](https://github.com/commercialhaskell/stack/issues/770)
+* Added a `stack config set resolver RESOLVER` command. Part of work on [#115](https://github.com/commercialhaskell/stack/issues/115)
+
 
 Bug fixes:
 
