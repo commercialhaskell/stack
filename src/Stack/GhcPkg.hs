@@ -41,6 +41,7 @@ import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import           Debug.Trace
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO (dirExists, createTree)
@@ -168,16 +169,20 @@ findGhcPkgHaddockHtml :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, Monad
                       -> String -- ^ PackageIdentifier or GhcPkgId
                       -> m (Maybe (PackageIdentifier, Path Abs Dir))
 findGhcPkgHaddockHtml menv wc pkgDbs ghcPkgId = do
+    traceM $ unwords ["findGhcPkgHaddockHtml:", show pkgDbs, ghcPkgId]
     mpath <- findGhcPkgField menv wc pkgDbs ghcPkgId "haddock-html"
-    mid <- findGhcPkgField menv wc pkgDbs ghcPkgId "id"
+    mname <- findGhcPkgField menv wc pkgDbs ghcPkgId "name"
     mversion <- findGhcPkgField menv wc pkgDbs ghcPkgId "version"
+    traceM $ unwords $ map show [mpath, mname, mversion]
     let mpkgId = PackageIdentifier
-            <$> (mid >>= parsePackageName . T.encodeUtf8)
+            <$> (mname >>= parsePackageName . T.encodeUtf8)
             <*> (mversion >>= parseVersion . T.encodeUtf8)
+    traceShowM mpkgId
     case (,) <$> mpath <*> mpkgId of
         Just (path0, pkgId) -> do
             let path = T.unpack path0
             exists <- liftIO $ doesDirectoryExist path
+            traceShowM exists
             path' <- if exists
                 then liftIO $ canonicalizePath path
                 else return path
