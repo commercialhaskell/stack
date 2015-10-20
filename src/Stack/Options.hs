@@ -695,7 +695,8 @@ newOptsParser = (,) <$> newOpts <*> initOptsParser
              help "Do not create a subdirectory for the project") <*>
         templateNameArgument
             (metavar "TEMPLATE_NAME" <>
-             help "Name of a template, for example: foo or foo.hsfiles" <>
+             help "Name of a template or a local template in a subdirectory,\
+                  \ for example: foo or foo.hsfiles" <>
              value defaultTemplateName) <*>
         fmap
             M.fromList
