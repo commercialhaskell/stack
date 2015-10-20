@@ -115,12 +115,18 @@ loadTemplate name = do
     req <-
         parseUrl (defaultTemplateUrl <> "/" <> toFilePath (templatePath name))
     config <- asks getConfig
-    let path = templatesDir config </> templatePath name
-    _ <- catch (redownload req path) (throwM . FailedToDownloadTemplate name)
-    exists <- fileExists path
-    if exists
-        then liftIO (T.readFile (toFilePath path))
-        else throwM (FailedToLoadTemplate name path)
+    localExists <- fileExists . templatePath $ name
+    if localExists
+        then liftIO . T.readFile . toFilePath . templatePath $ name
+        else do
+            let path = templatesDir config </> templatePath name
+            _ <- catch
+                 (redownload req path)
+                 (throwM . FailedToDownloadTemplate name)
+            pathExists <- fileExists path
+            if pathExists
+                then liftIO . T.readFile . toFilePath $ path
+                else throwM $ FailedToLoadTemplate name path
 
 -- | Apply and unpack a template into a directory.
 applyTemplate
