@@ -61,7 +61,6 @@ import qualified Data.Text                      as T
 import           Data.Text.Encoding             (decodeUtf8)
 import           Data.Typeable                  (Typeable)
 import           Data.Word                      (Word64)
-import           Debug.Trace
 import           Network.HTTP.Download
 import           Path
 import           Path.IO                         (dirExists, createTree)
@@ -135,7 +134,6 @@ unpackPackages :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasHttpM
                -> [String] -- ^ names or identifiers
                -> m ()
 unpackPackages menv dest input = do
-    traceM "unpackPackages"
     dest' <- liftIO (canonicalizePath dest) >>= parseAbsDir
     (names, idents) <- case partitionEithers $ map parse input of
         ([], x) -> return $ partitionEithers x

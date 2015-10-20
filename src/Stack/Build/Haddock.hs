@@ -29,7 +29,6 @@ import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
 import           Data.Text                      (Text)
 import qualified Data.Text                      as T
-import           Debug.Trace
 import           Path
 import           Path.IO
 import           Prelude
@@ -46,7 +45,7 @@ import           System.Process.Read
 -- | Determine whether we should haddock for a package.
 shouldHaddockPackage :: BuildOpts -> Set PackageName -> PackageName -> Bool
 shouldHaddockPackage bopts wanted name =
-    trace "shouldHaddockPackage" $ if Set.member name wanted
+    if Set.member name wanted
         then boptsHaddock bopts
         else shouldHaddockDeps bopts
 
@@ -68,11 +67,7 @@ copyDepHaddocks :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadB
                 -> Set (Path Abs Dir)
                 -> m ()
 copyDepHaddocks envOverride wc bco pkgDbs pkgId extraDestDirs = do
-    let f = "copyDepHaddocks: "
-    traceM $ f ++ "begin"
     mpkgHtmlDir <- findGhcPkgHaddockHtml envOverride wc pkgDbs pkgId
-    traceM "mpkgHtmlDir:"
-    traceShowM mpkgHtmlDir
     case mpkgHtmlDir of
         Nothing -> return ()
         Just (_pkgId, pkgHtmlDir) -> do

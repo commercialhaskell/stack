@@ -40,7 +40,6 @@ import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Debug.Trace
 import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO (dirExists, createTree)
@@ -168,14 +167,11 @@ findGhcPkgHaddockHtml :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, Monad
                       -> PackageIdentifier
                       -> m (Maybe (PackageIdentifier, Path Abs Dir))
 findGhcPkgHaddockHtml menv wc pkgDbs pkgId = do
-    traceM $ unwords ["findGhcPkgHaddockHtml:", show pkgDbs, show pkgId]
     mpath <- findGhcPkgField menv wc pkgDbs (packageIdentifierName pkgId) "haddock-html"
-    traceShowM mpath
     case mpath of
         Just path0 -> do
             let path = T.unpack path0
             exists <- liftIO $ doesDirectoryExist path
-            traceShowM exists
             path' <- if exists
                 then liftIO $ canonicalizePath path
                 else return path
