@@ -80,8 +80,8 @@ copyDepHaddocks envOverride wc bco pkgDbs pkgId extraDestDirs = do
             forM_ depGhcIds $ copyDepWhenNeeded pkgHtmlDir
   where
     copyDepWhenNeeded pkgHtmlDir depGhcId = do
-        depPkgId <- parsePackageIdentifierFromGhcPkgId depGhcId
-        mDepOrigDir <- findGhcPkgHaddockHtml envOverride wc pkgDbs depPkgId
+        let mdepPkgId = parsePackageIdentifierFromGhcPkgId depGhcId
+        mDepOrigDir <- (findGhcPkgHaddockHtml envOverride wc pkgDbs) =<< mdepPkgId
         case mDepOrigDir of
             Nothing -> return ()
             Just (depId, depOrigDir) -> do
