@@ -69,7 +69,7 @@ ide targets useropts = do
     when
         (os == OSX)
         (catch (callProcess (Just pwd) menv "stty" ["cbreak", "-imaxbel"])
-               (\(_ :: ProcessExitedUnsuccessfully) -> undefined))
+               (\(_ :: ProcessExitedUnsuccessfully) -> return ()))
     callProcess (Just pwd) menv "stack-ide" args
   where
     includeDirs pkgopts =
