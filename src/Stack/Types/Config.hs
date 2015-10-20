@@ -705,58 +705,57 @@ instance FromJSON (ConfigMonoid, [JSONWarning]) where
 -- warnings for missing fields.
 parseConfigMonoidJSON :: Object -> WarningParser ConfigMonoid
 parseConfigMonoidJSON obj = do
-    configMonoidDockerOpts <- jsonSubWarnings (obj ..:? "docker" ..!= mempty)
-    configMonoidConnectionCount <- obj ..:? "connection-count"
-    configMonoidHideTHLoading <- obj ..:? "hide-th-loading"
-    configMonoidLatestSnapshotUrl <- obj ..:? "latest-snapshot-url"
-    configMonoidPackageIndices <- jsonSubWarningsTT (obj ..:? "package-indices")
-    configMonoidSystemGHC <- obj ..:? "system-ghc"
-    configMonoidInstallGHC <- obj ..:? "install-ghc"
-    configMonoidSkipGHCCheck <- obj ..:? "skip-ghc-check"
-    configMonoidSkipMsys <- obj ..:? "skip-msys"
+    configMonoidDockerOpts <- jsonSubWarnings (obj ..:? configMonoidDockerOptsName ..!= mempty)
+    configMonoidConnectionCount <- obj ..:? configMonoidConnectionCountName
+    configMonoidHideTHLoading <- obj ..:? configMonoidHideTHLoadingName
+    configMonoidLatestSnapshotUrl <- obj ..:? configMonoidLatestSnapshotUrlName
+    configMonoidPackageIndices <- jsonSubWarningsTT (obj ..:?  configMonoidPackageIndicesName)
+    configMonoidSystemGHC <- obj ..:? configMonoidSystemGHCName
+    configMonoidInstallGHC <- obj ..:? configMonoidInstallGHCName
+    configMonoidSkipGHCCheck <- obj ..:? configMonoidSkipGHCCheckName
+    configMonoidSkipMsys <- obj ..:? configMonoidSkipMsysName
     configMonoidRequireStackVersion <- unVersionRangeJSON <$>
-                                       obj ..:? "require-stack-version"
+                                       obj ..:? configMonoidRequireStackVersionName
                                            ..!= VersionRangeJSON anyVersion
-    configMonoidOS <- obj ..:? "os"
-    configMonoidArch <- obj ..:? "arch"
-    configMonoidGHCVariant <- obj ..:? "ghc-variant"
-    configMonoidJobs <- obj ..:? "jobs"
-    configMonoidExtraIncludeDirs <- obj ..:? "extra-include-dirs" ..!= Set.empty
-    configMonoidExtraLibDirs <- obj ..:? "extra-lib-dirs" ..!= Set.empty
-    configMonoidConcurrentTests <- obj ..:? "concurrent-tests"
-    configMonoidLocalBinPath <- obj ..:? "local-bin-path"
-    configMonoidImageOpts <- jsonSubWarnings (obj ..:? "image" ..!= mempty)
+    configMonoidOS <- obj ..:? configMonoidOSName
+    configMonoidArch <- obj ..:? configMonoidArchName
+    configMonoidGHCVariant <- obj ..:? configMonoidGHCVariantName
+    configMonoidJobs <- obj ..:? configMonoidJobsName
+    configMonoidExtraIncludeDirs <- obj ..:?  configMonoidExtraIncludeDirsName ..!= Set.empty
+    configMonoidExtraLibDirs <- obj ..:?  configMonoidExtraLibDirsName ..!= Set.empty
+    configMonoidConcurrentTests <- obj ..:? configMonoidConcurrentTestsName
+    configMonoidLocalBinPath <- obj ..:? configMonoidLocalBinPathName
+    configMonoidImageOpts <- jsonSubWarnings (obj ..:?  configMonoidImageOptsName ..!= mempty)
     templates <- obj ..:? "templates"
     (configMonoidScmInit,configMonoidTemplateParameters) <-
       case templates of
         Nothing -> return (Nothing,M.empty)
         Just tobj -> do
-          scmInit <- tobj ..:? "scm-init"
-          params <- tobj ..:? "params"
+          scmInit <- tobj ..:? configMonoidScmInitName
+          params <- tobj ..:? configMonoidTemplateParametersName
           return (scmInit,fromMaybe M.empty params)
-    configMonoidCompilerCheck <- obj ..:? "compiler-check"
+    configMonoidCompilerCheck <- obj ..:? configMonoidCompilerCheckName
 
-    mghcoptions <- obj ..:? "ghc-options"
+    mghcoptions <- obj ..:? configMonoidGhcOptionsName
     configMonoidGhcOptions <-
         case mghcoptions of
             Nothing -> return mempty
             Just m -> fmap Map.fromList $ mapM handleGhcOptions $ Map.toList m
 
-    extraPath <- obj ..:? "extra-path" ..!= []
+    extraPath <- obj ..:? configMonoidExtraPathName ..!= []
     configMonoidExtraPath <- forM extraPath $
         either (fail . show) return . parseAbsDir . T.unpack
 
     configMonoidSetupInfoLocations <-
-        maybeToList <$> jsonSubWarningsT (obj ..:? "setup-info")
-
-    configMonoidPvpBounds <- obj ..:? "pvp-bounds"
-    configMonoidModifyCodePage <- obj ..:? "modify-code-page"
+        maybeToList <$> jsonSubWarningsT (obj ..:?  configMonoidSetupInfoLocationsName)
+    configMonoidPvpBounds <- obj ..:? configMonoidPvpBoundsName
+    configMonoidModifyCodePage <- obj ..:? configMonoidModifyCodePageName
     configMonoidExplicitSetupDeps <-
-        (obj ..:? "explicit-setup-deps" ..!= mempty)
+        (obj ..:? configMonoidExplicitSetupDepsName ..!= mempty)
         >>= fmap Map.fromList . mapM handleExplicitSetupDep . Map.toList
-    configMonoidRebuildGhcOptions <- obj ..:? "rebuild-ghc-options"
-    configMonoidApplyGhcOptions <- obj ..:? "apply-ghc-options"
-    configMonoidAllowNewer <- obj ..:? "allow-newer"
+    configMonoidRebuildGhcOptions <- obj ..:? configMonoidRebuildGhcOptionsName
+    configMonoidApplyGhcOptions <- obj ..:? configMonoidApplyGhcOptionsName
+    configMonoidAllowNewer <- obj ..:? configMonoidAllowNewerName
 
     return ConfigMonoid {..}
   where
@@ -782,6 +781,102 @@ parseConfigMonoidJSON obj = do
                         Left e -> fail $ show e
                         Right x -> return $ Just x
         return (name, b)
+
+configMonoidDockerOptsName :: Text
+configMonoidDockerOptsName = "docker"
+
+configMonoidConnectionCountName :: Text
+configMonoidConnectionCountName = "connection-count"
+
+configMonoidHideTHLoadingName :: Text
+configMonoidHideTHLoadingName = "hide-th-loading"
+
+configMonoidLatestSnapshotUrlName :: Text
+configMonoidLatestSnapshotUrlName = "latest-snapshot-url"
+
+configMonoidPackageIndicesName :: Text
+configMonoidPackageIndicesName = "package-indices"
+
+configMonoidSystemGHCName :: Text
+configMonoidSystemGHCName = "system-ghc"
+
+configMonoidInstallGHCName :: Text
+configMonoidInstallGHCName = "install-ghc"
+
+configMonoidSkipGHCCheckName :: Text
+configMonoidSkipGHCCheckName = "skip-ghc-check"
+
+configMonoidSkipMsysName :: Text
+configMonoidSkipMsysName = "skip-msys"
+
+configMonoidRequireStackVersionName :: Text
+configMonoidRequireStackVersionName = "require-stack-version"
+
+configMonoidOSName :: Text
+configMonoidOSName = "os"
+
+configMonoidArchName :: Text
+configMonoidArchName = "arch"
+
+configMonoidGHCVariantName :: Text
+configMonoidGHCVariantName = "ghc-variant"
+
+configMonoidJobsName :: Text
+configMonoidJobsName = "jobs"
+
+configMonoidExtraIncludeDirsName :: Text
+configMonoidExtraIncludeDirsName = "extra-include-dirs"
+
+configMonoidExtraLibDirsName :: Text
+configMonoidExtraLibDirsName = "extra-lib-dirs"
+
+configMonoidConcurrentTestsName :: Text
+configMonoidConcurrentTestsName = "concurrent-tests"
+
+configMonoidLocalBinPathName :: Text
+configMonoidLocalBinPathName = "local-bin-path"
+
+configMonoidImageOptsName :: Text
+configMonoidImageOptsName = "image"
+
+configMonoidTemplatesName :: Text
+configMonoidTemplatesName = "templates"
+
+configMonoidScmInitName :: Text
+configMonoidScmInitName = "scm-init"
+
+configMonoidTemplateParametersName :: Text
+configMonoidTemplateParametersName = "params"
+
+configMonoidCompilerCheckName :: Text
+configMonoidCompilerCheckName = "compiler-check"
+
+configMonoidGhcOptionsName :: Text
+configMonoidGhcOptionsName = "ghc-options"
+
+configMonoidExtraPathName :: Text
+configMonoidExtraPathName = "extra-path"
+
+configMonoidSetupInfoLocationsName :: Text
+configMonoidSetupInfoLocationsName = "setup-info"
+
+configMonoidPvpBoundsName :: Text
+configMonoidPvpBoundsName = "pvp-bounds"
+
+configMonoidModifyCodePageName :: Text
+configMonoidModifyCodePageName = "modify-code-page"
+
+configMonoidExplicitSetupDepsName :: Text
+configMonoidExplicitSetupDepsName = "explicit-setup-deps"
+
+configMonoidRebuildGhcOptionsName :: Text
+configMonoidRebuildGhcOptionsName = "rebuild-ghc-options"
+
+configMonoidApplyGhcOptionsName :: Text
+configMonoidApplyGhcOptionsName = "apply-ghc-options"
+
+configMonoidAllowNewerName :: Text
+configMonoidAllowNewerName = "allow-newer"
 
 -- | Newtype for non-orphan FromJSON instance.
 newtype VersionRangeJSON = VersionRangeJSON { unVersionRangeJSON :: VersionRange }
