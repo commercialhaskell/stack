@@ -70,17 +70,18 @@ copyDepHaddocks :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadB
 copyDepHaddocks envOverride wc bco pkgDbs pkgId extraDestDirs = do
     let f = "copyDepHaddocks: "
     traceM $ f ++ "begin"
-    mpkgHtmlDir <- findGhcPkgHaddockHtml envOverride wc pkgDbs $ packageIdentifierString pkgId
+    mpkgHtmlDir <- findGhcPkgHaddockHtml envOverride wc pkgDbs pkgId
     traceM "mpkgHtmlDir:"
     traceShowM mpkgHtmlDir
     case mpkgHtmlDir of
         Nothing -> return ()
         Just (_pkgId, pkgHtmlDir) -> do
-            depGhcIds <- findGhcPkgDepends envOverride wc pkgDbs $ packageIdentifierString pkgId
+            depGhcIds <- findGhcPkgDepends envOverride wc pkgDbs (packageIdentifierName pkgId)
             forM_ depGhcIds $ copyDepWhenNeeded pkgHtmlDir
   where
     copyDepWhenNeeded pkgHtmlDir depGhcId = do
-        mDepOrigDir <- findGhcPkgHaddockHtml envOverride wc pkgDbs $ ghcPkgIdString depGhcId
+        depPkgId <- parsePackageIdentifierFromGhcPkgId depGhcId
+        mDepOrigDir <- findGhcPkgHaddockHtml envOverride wc pkgDbs depPkgId
         case mDepOrigDir of
             Nothing -> return ()
             Just (depId, depOrigDir) -> do

@@ -25,7 +25,6 @@ module Stack.GhcPkg
   ,mkGhcPackagePath)
   where
 
-import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -117,16 +116,16 @@ findGhcPkgField
     => EnvOverride
     -> WhichCompiler
     -> [Path Abs Dir] -- ^ package databases
-    -> String -- ^ package identifier, or GhcPkgId
+    -> PackageName
     -> Text
     -> m (Maybe Text)
-findGhcPkgField menv wc pkgDbs name field = do
+findGhcPkgField menv wc pkgDbs pkgName field = do
     result <-
         ghcPkg
             menv
             wc
             pkgDbs
-            ["field", "--simple-output", name, T.unpack field]
+            ["field", "--simple-output", packageNameString pkgName, T.unpack field]
     return $
         case result of
             Left{} -> Nothing
@@ -143,7 +142,7 @@ findGhcPkgId :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, 
              -> PackageName
              -> m (Maybe GhcPkgId)
 findGhcPkgId menv wc pkgDbs name = do
-    mpid <- findGhcPkgField menv wc pkgDbs (packageNameString name) "id"
+    mpid <- findGhcPkgField menv wc pkgDbs name "id"
     case mpid of
         Just !pid -> return (parseGhcPkgId (T.encodeUtf8 pid))
         _ -> return Nothing
@@ -156,7 +155,7 @@ findGhcPkgVersion :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatc
                   -> PackageName
                   -> m (Maybe Version)
 findGhcPkgVersion menv wc pkgDbs name = do
-    mv <- findGhcPkgField menv wc pkgDbs (packageNameString name) "version"
+    mv <- findGhcPkgField menv wc pkgDbs name "version"
     case mv of
         Just !v -> return (parseVersion (T.encodeUtf8 v))
         _ -> return Nothing
@@ -166,20 +165,14 @@ findGhcPkgHaddockHtml :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, Monad
                       => EnvOverride
                       -> WhichCompiler
                       -> [Path Abs Dir] -- ^ package databases
-                      -> String -- ^ PackageIdentifier or GhcPkgId
+                      -> PackageIdentifier
                       -> m (Maybe (PackageIdentifier, Path Abs Dir))
-findGhcPkgHaddockHtml menv wc pkgDbs ghcPkgId = do
-    traceM $ unwords ["findGhcPkgHaddockHtml:", show pkgDbs, ghcPkgId]
-    mpath <- findGhcPkgField menv wc pkgDbs ghcPkgId "haddock-html"
-    mname <- findGhcPkgField menv wc pkgDbs ghcPkgId "name"
-    mversion <- findGhcPkgField menv wc pkgDbs ghcPkgId "version"
-    traceM $ unwords $ map show [mpath, mname, mversion]
-    let mpkgId = PackageIdentifier
-            <$> (mname >>= parsePackageName . T.encodeUtf8)
-            <*> (mversion >>= parseVersion . T.encodeUtf8)
-    traceShowM mpkgId
-    case (,) <$> mpath <*> mpkgId of
-        Just (path0, pkgId) -> do
+findGhcPkgHaddockHtml menv wc pkgDbs pkgId = do
+    traceM $ unwords ["findGhcPkgHaddockHtml:", show pkgDbs, show pkgId]
+    mpath <- findGhcPkgField menv wc pkgDbs (packageIdentifierName pkgId) "haddock-html"
+    traceShowM mpath
+    case mpath of
+        Just path0 -> do
             let path = T.unpack path0
             exists <- liftIO $ doesDirectoryExist path
             traceShowM exists
@@ -200,37 +193,33 @@ findTransitiveGhcPkgDepends
     -> m (Set PackageIdentifier)
 findTransitiveGhcPkgDepends menv wc pkgDbs pkgId0 =
     liftM (Set.fromList . Map.elems)
-    (go (packageIdentifierString pkgId0) Map.empty)
+    (go (packageIdentifierName pkgId0) Map.empty)
   where
-    go pkgId res = do
-        deps <- findGhcPkgDepends menv wc pkgDbs pkgId
+    go pkgName res = do
+        deps <- findGhcPkgDepends menv wc pkgDbs pkgName
         loop deps res
     loop [] res = return res
     loop (dep:deps) res = do
         if Map.member dep res
             then loop deps res
             else do
-                let pkgId = ghcPkgIdString dep
-                mname <- findGhcPkgField menv wc pkgDbs pkgId "name"
-                mversion <- findGhcPkgField menv wc pkgDbs pkgId "version"
-                let mident = do
-                        name <- mname >>= parsePackageName . T.encodeUtf8
-                        version <- mversion >>= parseVersion . T.encodeUtf8
-                        Just $ PackageIdentifier name version
-                    res' = maybe id (Map.insert dep) mident res
-                res'' <- go pkgId res'
-                -- FIXME is the Map.union actually necessary?
-                loop deps (Map.union res res'')
+                case parsePackageIdentifierFromGhcPkgId dep of
+                    Just pkgId -> do
+                        res' <- go (packageIdentifierName pkgId) (Map.insert dep pkgId res)
+                        -- FIXME is the Map.union actually necessary?
+                        loop deps (Map.union res res')
+                    Nothing ->
+                        loop deps res
 
 -- | Get the dependencies of the package.
 findGhcPkgDepends :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
                   => EnvOverride
                   -> WhichCompiler
                   -> [Path Abs Dir] -- ^ package databases
-                  -> String -- ^ package identifier or GhcPkgId
+                  -> PackageName
                   -> m [GhcPkgId]
-findGhcPkgDepends menv wc pkgDbs pkgId = do
-    mdeps <- findGhcPkgField menv wc pkgDbs pkgId "depends"
+findGhcPkgDepends menv wc pkgDbs pkgName = do
+    mdeps <- findGhcPkgField menv wc pkgDbs pkgName "depends"
     case mdeps of
         Just !deps -> return (mapMaybe (parseGhcPkgId . T.encodeUtf8) (T.words deps))
         _ -> return []
