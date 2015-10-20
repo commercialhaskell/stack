@@ -37,6 +37,7 @@ import           Data.List
 import           Data.Maybe
 import           Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.Set.Monad as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -194,8 +195,7 @@ findTransitiveGhcPkgDepends
     -> m (Set PackageIdentifier)
 findTransitiveGhcPkgDepends menv wc pkgDbs pkgId0 = do
     deps <- go (packageIdentifierString pkgId0) Set.empty
-    mpkgIds <- mapM (getPackageIdentifier menv wc pkgDbs) (Set.toList deps)
-    (return . Set.fromList . catMaybes) mpkgIds
+    Set.mapMaybeM (getPackageIdentifier menv wc pkgDbs) deps
   where
     go pkgId res = do
         deps <- findGhcPkgDepends menv wc pkgDbs pkgId
