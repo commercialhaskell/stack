@@ -67,7 +67,7 @@ wp ..!= d =
          do a <- fmap snd p
             fmap (, a) (fmap fst p .!= d)
 
--- | Tell warning parser about about an expected field, so it doesn't warn about it.
+-- | Tell warning parser about an expected field, so it doesn't warn about it.
 tellJSONField :: Text -> WarningParser ()
 tellJSONField key = tell (mempty { wpmExpectedFields = Set.singleton key})
 
