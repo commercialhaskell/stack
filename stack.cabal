@@ -52,6 +52,7 @@ library
                      Stack.BuildPlan
                      Stack.Config
                      Stack.Config.Docker
+                     Stack.ConfigCmd
                      Stack.Constants
                      Stack.Docker
                      Stack.Docker.GlobalDB

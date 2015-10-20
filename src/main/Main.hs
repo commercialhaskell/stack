@@ -50,6 +50,7 @@ import           Prelude hiding (pi, mapM)
 import           Stack.Build
 import           Stack.Types.Build
 import           Stack.Config
+import           Stack.ConfigCmd as ConfigCmd
 import           Stack.Constants
 import qualified Stack.Docker as Docker
 import           Stack.Dot
@@ -305,6 +306,13 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                               "Clean up Docker images and containers"
                               dockerCleanupCmd
                               dockerCleanupOptsParser)
+             addSubCommands
+                ConfigCmd.cfgCmdName
+                "Subcommands specific to modifying stack.yaml files"
+                (addCommand ConfigCmd.cfgCmdSetName
+                            "Sets a field in the project's stack.yaml to value"
+                            cfgSetCmd
+                            configCmdSetParser)
              addSubCommands
                Image.imgCmdName
                "Subcommands specific to imaging (EXPERIMENTAL)"
@@ -889,6 +897,15 @@ dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
      runStackTGlobal manager (lcConfig lc) go $
         Docker.preventInContainer $
             Docker.cleanup cleanupOpts
+
+cfgSetCmd :: ConfigCmd.ConfigCmdSet -> GlobalOpts -> IO ()
+cfgSetCmd co go@GlobalOpts{..} = do
+    withBuildConfigAndLock
+        go
+        (\_ -> do env <- ask
+                  runReaderT
+                      (cfgCmdSet co)
+                      env)
 
 imgDockerCmd :: () -> GlobalOpts -> IO ()
 imgDockerCmd () go@GlobalOpts{..} = do
