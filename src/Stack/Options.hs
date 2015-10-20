@@ -19,6 +19,7 @@ module Stack.Options
     ,abstractResolverOptsParser
     ,solverOptsParser
     ,testOptsParser
+    ,hpcReportOptsParser
     ,pvpBoundsOption
     ) where
 
@@ -691,6 +692,13 @@ newOptsParser = (,) <$> newOpts <*> initOptsParser
                        help
                            "Parameter for the template in the format key:value"))) <*
         abortOption ShowHelpText (long "help" <> help "Show help text.")
+
+-- | Parser for @stack hpc report@.
+hpcReportOptsParser :: Parser HpcReportOpts
+hpcReportOptsParser = HpcReportOpts
+    <$> (many $ textArgument $ metavar "TARGET_OR_TIX")
+    <*> switch (long "all" <> help "Use results from all packages and components")
+    <*> optional (strOption (long "destdir" <> help "Output directy for HTML report"))
 
 pvpBoundsOption :: Parser PvpBounds
 pvpBoundsOption =

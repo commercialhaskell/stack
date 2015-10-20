@@ -64,11 +64,17 @@ getWorkingDir = liftIO (D.canonicalizePath "." >>= parseAbsDir)
 
 -- | Parse a directory path. If it's relative, then the absolute version
 -- is yielded, based off the working directory.
+--
+-- NOTE that this only works if the directory exists, but does not
+-- ensure that it's a directory.
 parseRelAsAbsDir :: (MonadThrow m, MonadIO m) => FilePath -> m (Path Abs Dir)
 parseRelAsAbsDir fp = parseAbsDir =<< liftIO (D.canonicalizePath fp)
 
 -- | Parse a file path. If it's relative, then the absolute version is
 -- yielded, based off the working directory.
+--
+-- NOTE that this only works if the file exists, but does not ensure
+-- that it's a file.
 parseRelAsAbsFile :: (MonadThrow m, MonadIO m) => FilePath -> m (Path Abs File)
 parseRelAsAbsFile fp = parseAbsFile =<< liftIO (D.canonicalizePath fp)
 

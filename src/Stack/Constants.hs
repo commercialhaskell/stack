@@ -30,7 +30,6 @@ module Stack.Constants
     ,implicitGlobalProjectDir
     ,hpcRelativeDir
     ,hpcDirFromDir
-    ,dotHpc
     ,objectInterfaceDir
     ,templatesDir
     ,defaultUserConfigPathDeprecated
@@ -303,10 +302,6 @@ implicitGlobalProjectDir :: Path Abs Dir -- ^ Stack root.
 implicitGlobalProjectDir p =
     p </>
     $(mkRelDir "global-project")
-
--- | Where .mix files go.
-dotHpc :: Path Rel Dir
-dotHpc = $(mkRelDir ".hpc")
 
 -- | Deprecated default global config path.
 defaultUserConfigPathDeprecated :: Path Abs Dir -> Path Abs File

@@ -48,6 +48,7 @@ import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude hiding (pi, mapM)
 import           Stack.Build
+import           Stack.Build.Coverage
 import           Stack.Types.Build
 import           Stack.Config
 import           Stack.ConfigCmd as ConfigCmd
@@ -319,7 +320,14 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                (addCommand Image.imgDockerCmdName
                 "Build a Docker image for the project"
                 imgDockerCmd
-                (pure ())))
+                (pure ()))
+             addSubCommands
+               "hpc"
+               "Subcommands specific to Haskell Program Coverage"
+               (do addCommand "report"
+                              "Generate HPC report a combined HPC report"
+                              hpcReportCmd
+                              hpcReportOptsParser))
      case eGlobalRun of
        Left (exitCode :: ExitCode) -> do
          when isInterpreter $
@@ -978,6 +986,10 @@ listDependenciesCmd sep go = withBuildConfig go (listDependencies sep')
 -- | Query build information
 queryCmd :: [String] -> GlobalOpts -> IO ()
 queryCmd selectors go = withBuildConfig go $ queryBuildInfo $ map T.pack selectors
+
+-- | Generate a combined HPC report
+hpcReportCmd :: HpcReportOpts -> GlobalOpts -> IO ()
+hpcReportCmd hropts go = withBuildConfig go $ generateHpcReportForTargets hropts
 
 data MainException = InvalidReExecVersion String String
      deriving (Typeable)

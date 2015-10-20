@@ -420,6 +420,8 @@ executePlan' :: M env m
              -> ExecuteEnv
              -> m ()
 executePlan' installedMap plan ee@ExecuteEnv {..} = do
+    when (toCoverage $ boptsTestOpts eeBuildOpts) deleteHpcReports
+
     wc <- getWhichCompiler
     cv <- asks $ envConfigCompilerVersion . getEnvConfig
     case Map.toList $ planUnregisterLocal plan of
@@ -1182,7 +1184,7 @@ singleTest runInBase topts lptb ac ee task installedMap = do
                         -- directory into the hpc work dir, for
                         -- tidiness.
                         when needHpc $
-                            updateTixFile nameTix (packageIdentifierString (packageIdentifier package))
+                            updateTixFile (packageName package) nameTix
                         return $ case ec of
                             ExitSuccess -> Map.empty
                             _ -> Map.singleton testName $ Just ec
@@ -1348,7 +1350,7 @@ extraBuildOptions bopts = do
     let ddumpOpts = " -ddump-hi -ddump-to-file"
     case toCoverage (boptsTestOpts bopts) of
       True -> do
-        hpcIndexDir <- toFilePath . (</> dotHpc) <$> hpcRelativeDir
+        hpcIndexDir <- toFilePath <$> hpcRelativeDir
         return ["--ghc-options", "-hpcdir " ++ hpcIndexDir ++ ddumpOpts]
       False -> return ["--ghc-options", ddumpOpts]
 
