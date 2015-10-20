@@ -1012,8 +1012,9 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                                 ,sourceFlag])
 
         withMVar eeInstallLock $ \() -> do
-            announce "install"
-            cabal False ["install"]
+            announce "copy/register"
+            cabal False ["copy"]
+            cabal False ["register"]
 
         let pkgDbs =
                 case taskLocation task of
