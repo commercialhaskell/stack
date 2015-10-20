@@ -120,10 +120,9 @@ cabalSolver wc cabalfps constraints userFlags cabalArgs = withSystemTempDirector
     parseLine t0 = maybe (Left t0) Right $ do
         -- get rid of (new package) and (latest: ...) bits
         ident':flags' <- Just $ T.words $ T.takeWhile (/= '(') t0
-        PackageIdentifier name version <-
-            parsePackageIdentifierFromString $ T.unpack ident'
+        let mpkgId = parsePackageIdentifierFromString $ T.unpack ident'
         flags <- mapM parseFlag flags'
-        Just (name, (version, Map.fromList flags))
+        liftA (\(PackageIdentifier n v) -> (n, (v, Map.fromList flags))) mpkgId
     parseFlag t0 = do
         flag <- parseFlagNameFromString $ T.unpack t1
         return (flag, enabled)
