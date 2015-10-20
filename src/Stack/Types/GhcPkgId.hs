@@ -5,7 +5,7 @@
 -- | A ghc-pkg id.
 
 module Stack.Types.GhcPkgId
-  (GhcPkgId
+  (GhcPkgId(..)
   ,ghcPkgIdParser
   ,parseGhcPkgId
   ,ghcPkgIdString)
