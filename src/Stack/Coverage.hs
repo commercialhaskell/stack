@@ -364,8 +364,9 @@ generateHpcMarkupIndex = do
                 rows ++
                 ["</tbody></table>"]) ++
         ["</body></html>"]
-    $logInfo $ "\nAn index of the generated HTML coverage reports is available at " <>
-        T.pack (toFilePath outputFile)
+    when (not (null rows)) $
+        $logInfo $ "\nAn index of the generated HTML coverage reports is available at " <>
+            T.pack (toFilePath outputFile)
 
 generateHpcErrorReport :: MonadIO m => Path Abs Dir -> Text -> m ()
 generateHpcErrorReport dir err = do
