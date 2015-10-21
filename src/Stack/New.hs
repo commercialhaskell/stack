@@ -109,25 +109,38 @@ new opts = do
 
 -- | Download and read in a template's text content.
 loadTemplate
-    :: (HasConfig r, HasHttpManager r, MonadReader r m, MonadIO m, MonadThrow m, MonadCatch m)
+    :: forall m r.
+       (HasConfig r, HasHttpManager r, MonadReader r m, MonadIO m, MonadThrow m, MonadCatch m)
     => TemplateName -> m Text
-loadTemplate name = do
-    req <-
-        parseUrl (defaultTemplateUrl <> "/" <> toFilePath (templatePath name))
-    config <- asks getConfig
-    localExists <- fileExists . templatePath $ name
-    if localExists
-        then liftIO . T.readFile . toFilePath . templatePath $ name
-        else do
-            let path = templatesDir config </> templatePath name
-            _ <-
-                catch
-                    (redownload req path)
-                    (throwM . FailedToDownloadTemplate name)
-            exists <- fileExists path
-            if exists
-                then liftIO (T.readFile (toFilePath path))
-                else throwM (FailedToLoadTemplate name path)
+loadTemplate name =
+    case templatePath name of
+        Left absFile -> loadLocalFile absFile
+        Right relFile ->
+            catch
+                (loadLocalFile relFile)
+                (\(_ :: NewException) ->
+                      downloadTemplate relFile)
+  where
+    loadLocalFile :: Path b File -> m Text
+    loadLocalFile path = do
+        exists <- fileExists path
+        if exists
+            then liftIO (T.readFile (toFilePath path))
+            else throwM (FailedToLoadTemplate name (toFilePath path))
+    downloadTemplate :: Path Rel File -> m Text
+    downloadTemplate rel = do
+        config <- asks getConfig
+        req <- parseUrl (defaultTemplateUrl <> "/" <> toFilePath rel)
+        let path :: Path Abs File
+            path = templatesDir config </> rel
+        _ <-
+            catch
+                (redownload req path)
+                (throwM . FailedToDownloadTemplate name)
+        exists <- fileExists path
+        if exists
+            then liftIO (T.readFile (toFilePath path))
+            else throwM (FailedToLoadTemplate name (toFilePath path))
 
 -- | Apply and unpack a template into a directory.
 applyTemplate
@@ -276,7 +289,7 @@ defaultTemplatesList =
 -- | Exception that might occur when making a new project.
 data NewException
     = FailedToLoadTemplate !TemplateName
-                           !(Path Abs File)
+                           !FilePath
     | FailedToDownloadTemplate !TemplateName
                                !DownloadException
     | FailedToDownloadTemplates !HttpException
@@ -292,7 +305,7 @@ instance Show NewException where
     show (FailedToLoadTemplate name path) =
         "Failed to load download template " <> T.unpack (templateName name) <>
         " from " <>
-        toFilePath path
+        path
     show (FailedToDownloadTemplate name (RedownloadFailed _ _ resp)) =
         case statusCode (responseStatus resp) of
             404 ->
