@@ -798,7 +798,7 @@ sdistCmd (dirs, mpvpBounds) go =
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
-execCmd eo@ExecOpts {..} go@GlobalOpts{..} = do
+execCmd ExecOpts {..} go@GlobalOpts{..} = do
     let needCmdErr = error "You must provide a command to exec, e.g. 'stack exec echo Hello World'"
     case eoExtra of
         ExecOptsPlain -> do
