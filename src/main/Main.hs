@@ -319,7 +319,10 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                (addCommand Image.imgDockerCmdName
                 "Build a Docker image for the project"
                 imgDockerCmd
-                (pure ()))
+                (boolFlags True
+                    "build"
+                    "building the project before creating the container"
+                    idm))
              addSubCommands
                "hpc"
                "Subcommands specific to Haskell Program Coverage"
@@ -927,13 +930,13 @@ cfgSetCmd co go@GlobalOpts{..} = do
                       (cfgCmdSet co)
                       env)
 
-imgDockerCmd :: () -> GlobalOpts -> IO ()
-imgDockerCmd () go@GlobalOpts{..} = do
+imgDockerCmd :: Bool -> GlobalOpts -> IO ()
+imgDockerCmd rebuild go@GlobalOpts{..} = do
     withBuildConfigExt
         go
         Nothing
         (\lk ->
-              do Stack.Build.build
+              do when rebuild $ Stack.Build.build
                          (const (return ()))
                          lk
                          defaultBuildOpts
