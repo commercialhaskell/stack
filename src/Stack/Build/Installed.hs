@@ -28,11 +28,14 @@ import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import qualified Data.Map.Strict              as Map
 import           Data.Maybe
+import           Data.Monoid
+import qualified Data.Text                    as T
 import           Network.HTTP.Client.Conduit  (HasHttpManager)
 import           Path
 import           Prelude                      hiding (FilePath, writeFile)
 import           Stack.Build.Cache
 import           Stack.Types.Build
+import           Stack.Types.Version
 import           Stack.Constants
 import           Stack.GhcPkg
 import           Stack.PackageDump
@@ -40,13 +43,6 @@ import           Stack.Types
 import           Stack.Types.Internal
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasEnvConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env)
-
-data LoadHelper = LoadHelper
-    { lhId   :: !GhcPkgId
-    , lhDeps :: ![GhcPkgId]
-    , lhPair :: !(PackageName, (InstallLocation, Installed))
-    }
-    deriving Show
 
 -- | Options for 'getInstalled'.
 data GetInstalledOpts = GetInstalledOpts
@@ -83,7 +79,7 @@ getInstalled menv opts sourceMap = do
     (installedLibs1, _extraInstalled) <-
       (foldM (\lhs' pkgdb -> do
         lhs'' <- loadDatabase' (Just (ExtraGlobal, pkgdb)) (fst lhs')
-        return lhs'') ((installedLibs0, globalInstalled)) extraDBPaths)
+        return lhs'') (installedLibs0, globalInstalled) extraDBPaths)
     (installedLibs2, _snapInstalled) <-
         loadDatabase' (Just (InstalledTo Snap, snapDBPath)) installedLibs1
     (installedLibs3, localInstalled) <-
@@ -136,9 +132,10 @@ loadDatabase :: (M env m, PackageInstallInfo pii)
              -> m ([LoadHelper], [DumpPackage () ()])
 loadDatabase menv opts mcache sourceMap mdb lhs0 = do
     wc <- getWhichCompiler
-    (lhs1, dps) <- ghcPkgDump menv wc (fmap snd (maybeToList mdb))
+    (lhs1', dps) <- ghcPkgDump menv wc (fmap snd (maybeToList mdb))
                 $ conduitDumpPackage =$ sink
-
+    let ghcjsHack = wc == Ghcjs && isNothing mdb
+    lhs1 <- liftM catMaybes $ mapM (processLoadResult mdb ghcjsHack) lhs1'
     let lhs = pruneDeps
             id
             lhId
@@ -159,13 +156,64 @@ loadDatabase menv opts mcache sourceMap mdb lhs0 = do
             -- Just an optimization to avoid calculating the haddock
             -- values when they aren't necessary
             _ -> CL.map (\dp -> dp { dpHaddock = False })
+    mloc = fmap fst mdb
     sinkDP = conduitProfilingCache
           =$ conduitHaddockCache
-          =$ CL.mapMaybe (isAllowed opts mcache sourceMap (fmap fst mdb))
+          =$ CL.map (\dp -> (isAllowed opts mcache sourceMap mloc dp, toLoadHelper mloc dp))
           =$ CL.consume
     sink = getZipSink $ (,)
         <$> ZipSink sinkDP
         <*> ZipSink CL.consume
+
+processLoadResult :: MonadLogger m
+                  => Maybe (InstalledPackageLocation, Path Abs Dir)
+                  -> Bool
+                  -> (Allowed, LoadHelper)
+                  -> m (Maybe LoadHelper)
+processLoadResult _ _ (Allowed, lh) = return (Just lh)
+processLoadResult _ True (WrongVersion actual wanted, lh)
+    -- Allow some packages in the ghcjs global DB to have the wrong
+    -- versions.  Treat them as wired-ins by setting deps to [].
+    | fst (lhPair lh) `HashSet.member` ghcjsBootPackages = do
+        $logWarn $ T.concat
+            [ "Ignoring that the GHCJS boot package \""
+            , packageNameText (fst (lhPair lh))
+            , "\" has a different version, "
+            , versionText actual
+            , ", than the resolver's wanted version, "
+            , versionText wanted
+            ]
+        return (Just lh)
+processLoadResult mdb _ (reason, lh) = do
+    $logDebug $ T.concat $
+        [ "Ignoring package "
+        , packageNameText (fst (lhPair lh))
+        ] ++
+        (maybe [] (\db -> [", from ", T.pack (show db), ","]) mdb) ++
+        [ " due to "
+        , case reason of
+            Allowed -> " the impossible?!?!"
+            NeedsProfiling -> " it needing profiling."
+            NeedsHaddock -> " it needing haddocks."
+            UnknownPkg -> " it being unknown to the resolver / extra-deps."
+            WrongLocation mloc loc -> " wrong location: " <> T.pack (show (mloc, loc))
+            WrongVersion actual wanted -> T.concat $
+                [ " wanting version "
+                , versionText wanted
+                , " instead of "
+                , versionText actual
+                ]
+        ]
+    return Nothing
+
+data Allowed
+    = Allowed
+    | NeedsProfiling
+    | NeedsHaddock
+    | UnknownPkg
+    | WrongLocation (Maybe InstalledPackageLocation) InstallLocation
+    | WrongVersion Version Version
+    deriving (Eq, Show)
 
 -- | Check if a can be included in the set of installed packages or not, based
 -- on the package selections made by the user. This does not perform any
@@ -176,54 +224,62 @@ isAllowed :: PackageInstallInfo pii
           -> Map PackageName pii
           -> Maybe InstalledPackageLocation
           -> DumpPackage Bool Bool
-          -> Maybe LoadHelper
+          -> Allowed
 isAllowed opts mcache sourceMap mloc dp
     -- Check that it can do profiling if necessary
-    | getInstalledProfiling opts && isJust mcache && not (dpProfiling dp) = Nothing
+    | getInstalledProfiling opts && isJust mcache && not (dpProfiling dp) = NeedsProfiling
     -- Check that it has haddocks if necessary
-    | getInstalledHaddock opts && isJust mcache && not (dpHaddock dp) = Nothing
-    | toInclude = Just LoadHelper
-        { lhId = gid
-        , lhDeps =
-            -- We always want to consider the wired in packages as having all
-            -- of their dependencies installed, since we have no ability to
-            -- reinstall them. This is especially important for using different
-            -- minor versions of GHC, where the dependencies of wired-in
-            -- packages may change slightly and therefore not match the
-            -- snapshot.
-            if name `HashSet.member` wiredInPackages
-                then []
-                else dpDepends dp
-        , lhPair = (name, (toPackageLocation mloc, Library ident gid))
-        }
-    | otherwise = Nothing
-  where
-    toPackageLocation :: Maybe InstalledPackageLocation -> InstallLocation
-    toPackageLocation Nothing = Snap
-    toPackageLocation (Just ExtraGlobal) = Snap
-    toPackageLocation (Just (InstalledTo loc)) = loc
-
-    toInclude =
+    | getInstalledHaddock opts && isJust mcache && not (dpHaddock dp) = NeedsHaddock
+    | otherwise =
         case Map.lookup name sourceMap of
             Nothing ->
                 case mloc of
                     -- The sourceMap has nothing to say about this global
                     -- package, so we can use it
-                    Nothing -> True
-                    Just ExtraGlobal -> True
+                    Nothing -> Allowed
+                    Just ExtraGlobal -> Allowed
                     -- For non-global packages, don't include unknown packages.
                     -- See:
                     -- https://github.com/commercialhaskell/stack/issues/292
-                    Just _ -> False
-
-            Just pii ->
-                version == piiVersion pii -- only accept the desired version
-                && checkLocation (piiLocation pii)
-
+                    Just _ -> UnknownPkg
+            Just pii
+                | not (checkLocation (piiLocation pii)) -> WrongLocation mloc (piiLocation pii)
+                | version /= piiVersion pii -> WrongVersion version (piiVersion pii)
+                | otherwise -> Allowed
+  where
+    PackageIdentifier name version = dpPackageIdent dp
     -- Ensure that the installed location matches where the sourceMap says it
     -- should be installed
     checkLocation Snap = mloc /= Just (InstalledTo Local) -- we can allow either global or snap
     checkLocation Local = mloc == Just (InstalledTo Local) || mloc == Just ExtraGlobal -- 'locally' installed snapshot packages can come from extra dbs
 
+data LoadHelper = LoadHelper
+    { lhId   :: !GhcPkgId
+    , lhDeps :: ![GhcPkgId]
+    , lhPair :: !(PackageName, (InstallLocation, Installed))
+    }
+    deriving Show
+
+toLoadHelper :: Maybe InstalledPackageLocation -> DumpPackage Bool Bool -> LoadHelper
+toLoadHelper mloc dp = LoadHelper
+    { lhId = gid
+    , lhDeps =
+        -- We always want to consider the wired in packages as having all
+        -- of their dependencies installed, since we have no ability to
+        -- reinstall them. This is especially important for using different
+        -- minor versions of GHC, where the dependencies of wired-in
+        -- packages may change slightly and therefore not match the
+        -- snapshot.
+        if name `HashSet.member` wiredInPackages
+            then []
+            else dpDepends dp
+    , lhPair = (name, (toPackageLocation mloc, Library ident gid))
+    }
+  where
     gid = dpGhcPkgId dp
-    ident@(PackageIdentifier name version) = dpPackageIdent dp
+    ident@(PackageIdentifier name _) = dpPackageIdent dp
+
+toPackageLocation :: Maybe InstalledPackageLocation -> InstallLocation
+toPackageLocation Nothing = Snap
+toPackageLocation (Just ExtraGlobal) = Snap
+toPackageLocation (Just (InstalledTo loc)) = loc

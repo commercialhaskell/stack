@@ -2,6 +2,7 @@
 
 Major changes:
 
+* GHCJS can now be used with stackage snapshots.
 * Windows installers are now available:
   [download them here](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#windows) [#613](https://github.com/commercialhaskell/stack/issues/613)
 
