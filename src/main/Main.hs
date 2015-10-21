@@ -70,7 +70,6 @@ import           Stack.SDist (getSDistTarball)
 import           Stack.Setup
 import           Stack.Solver (solveExtraDeps)
 import           Stack.Types
-import           Stack.Types.Build
 import           Stack.Types.Internal
 import           Stack.Types.StackT
 import           Stack.Upgrade
