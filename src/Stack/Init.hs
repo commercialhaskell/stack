@@ -94,6 +94,7 @@ initProject currDir initOpts = do
             , projectExtraDeps = extraDeps
             , projectFlags = flags
             , projectResolver = r
+            , projectCompiler = Nothing
             , projectExtraPackageDBs = []
             }
         pkgs = map toPkg cabalfps

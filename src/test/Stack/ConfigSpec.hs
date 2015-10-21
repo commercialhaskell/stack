@@ -82,7 +82,7 @@ spec = beforeAll setup $ afterAll teardown $ do
       setCurrentDirectory childDir
       LoadConfig{..} <- loadConfig' manager
       bc@BuildConfig{..} <- loadBuildConfigRest manager
-                            (lcLoadBuildConfig Nothing)
+                            (lcLoadBuildConfig Nothing Nothing)
       bcRoot bc `shouldBe` parentDir
 
     it "respects the STACK_YAML env variable" $ \T{..} -> inTempDir $ do
@@ -92,7 +92,7 @@ spec = beforeAll setup $ afterAll teardown $ do
         withEnvVar "STACK_YAML" stackYamlFp $ do
           LoadConfig{..} <- loadConfig' manager
           BuildConfig{..} <- loadBuildConfigRest manager
-                                (lcLoadBuildConfig Nothing)
+                                (lcLoadBuildConfig Nothing Nothing)
           bcStackYaml `shouldBe` dir </> stackDotYaml
           parent bcStackYaml `shouldBe` dir
 
@@ -106,5 +106,5 @@ spec = beforeAll setup $ afterAll teardown $ do
         withEnvVar "STACK_YAML" (toFilePath yamlRel) $ do
             LoadConfig{..} <- loadConfig' manager
             BuildConfig{..} <- loadBuildConfigRest manager
-                                (lcLoadBuildConfig Nothing)
+                                (lcLoadBuildConfig Nothing Nothing)
             bcStackYaml `shouldBe` yamlAbs

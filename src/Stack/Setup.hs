@@ -984,7 +984,7 @@ loadGhcjsEnvConfig stackYaml binPath = runInnerStackLoggingT $ do
             , configMonoidLocalBinPath = Just (toFilePath binPath)
             })
         (Just stackYaml)
-    bconfig <- lcLoadBuildConfig lc Nothing
+    bconfig <- lcLoadBuildConfig lc Nothing Nothing
     runInnerStackT bconfig $ setupEnv Nothing
 
 getCabalInstallVersion :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m)

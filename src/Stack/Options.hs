@@ -16,7 +16,6 @@ module Stack.Options
     ,newOptsParser
     ,logLevelOptsParser
     ,ghciOptsParser
-    ,abstractResolverOptsParser
     ,solverOptsParser
     ,testOptsParser
     ,hpcReportOptsParser
@@ -532,6 +531,7 @@ globalOptsParser defaultTerminal =
     logLevelOptsParser <*>
     configOptsParser False <*>
     optional abstractResolverOptsParser <*>
+    optional compilerOptsParser <*>
     flag
         defaultTerminal
         False
@@ -622,6 +622,20 @@ readAbstractResolver = do
             case parseResolverText $ T.pack s of
                 Left e -> readerError $ show e
                 Right x -> return $ ARResolver x
+
+compilerOptsParser :: Parser CompilerVersion
+compilerOptsParser =
+    option readCompilerVersion
+        (long "compiler" <>
+         metavar "COMPILER" <>
+         help "Use the specified compiler")
+
+readCompilerVersion :: ReadM CompilerVersion
+readCompilerVersion = do
+    s <- readerAsk
+    case parseCompilerVersion (T.pack s) of
+        Nothing -> readerError $ "Failed to parse compiler: " ++ s
+        Just x -> return x
 
 -- | GHC variant parser
 ghcVariantParser :: Parser GHCVariant

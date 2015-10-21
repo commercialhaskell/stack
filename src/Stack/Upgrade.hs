@@ -88,7 +88,7 @@ upgrade gitRepo mresolver = withCanonicalizedSystemTempDirectory "stack-upgrade"
                     { configMonoidInstallGHC = Just True
                     })
                 (Just $ dir </> $(mkRelFile "stack.yaml"))
-            lcLoadBuildConfig lc mresolver
+            lcLoadBuildConfig lc mresolver Nothing
         envConfig1 <- runInnerStackT bconfig $ setupEnv $ Just $
             "Try rerunning with --install-ghc to install the correct GHC into " <>
             T.pack (toFilePath (configLocalPrograms config))

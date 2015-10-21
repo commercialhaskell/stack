@@ -275,6 +275,7 @@ data GlobalOpts = GlobalOpts
     , globalLogLevel     :: !LogLevel -- ^ Log level
     , globalConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
+    , globalCompiler     :: !(Maybe CompilerVersion) -- ^ Compiler override
     , globalTerminal     :: !Bool -- ^ We're in a terminal?
     , globalStackYaml    :: !(Maybe FilePath) -- ^ Override project stack.yaml
     } deriving (Show)
@@ -356,7 +357,7 @@ instance HasEnvConfig EnvConfig where
 data LoadConfig m = LoadConfig
     { lcConfig          :: !Config
       -- ^ Top-level Stack configuration.
-    , lcLoadBuildConfig :: !(Maybe AbstractResolver -> m BuildConfig)
+    , lcLoadBuildConfig :: !(Maybe AbstractResolver -> Maybe CompilerVersion -> m BuildConfig)
         -- ^ Action to load the remaining 'BuildConfig'.
     , lcProjectRoot     :: !(Maybe (Path Abs Dir))
         -- ^ The project root directory, if in a project.
@@ -448,12 +449,15 @@ data Project = Project
     -- ^ Per-package flag overrides
     , projectResolver :: !Resolver
     -- ^ How we resolve which dependencies to use
+    , projectCompiler :: !(Maybe CompilerVersion)
+    -- ^ When specified, overrides which compiler to use
     , projectExtraPackageDBs :: ![FilePath]
     }
   deriving Show
 
 instance ToJSON Project where
-    toJSON p = object
+    toJSON p = object $
+        (maybe id (\cv -> (("compiler" .= cv) :)) (projectCompiler p))
         [ "packages"          .= projectPackages p
         , "extra-deps"        .= map fromTuple (Map.toList $ projectExtraDeps p)
         , "flags"             .= projectFlags p
@@ -1079,6 +1083,7 @@ instance (warnings ~ [JSONWarning]) => FromJSON (ProjectAndConfigMonoid, warning
 
         flags <- o ..:? "flags" ..!= mempty
         resolver <- jsonSubWarnings (o ..: "resolver")
+        compiler <- o ..:? "compiler"
         config <- parseConfigMonoidJSON o
         extraPackageDBs <- o ..:? "extra-package-dbs" ..!= []
         let project = Project
@@ -1086,6 +1091,7 @@ instance (warnings ~ [JSONWarning]) => FromJSON (ProjectAndConfigMonoid, warning
                 , projectExtraDeps = extraDeps
                 , projectFlags = flags
                 , projectResolver = resolver
+                , projectCompiler = compiler
                 , projectExtraPackageDBs = extraPackageDBs
                 }
         return $ ProjectAndConfigMonoid project config
