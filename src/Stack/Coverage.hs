@@ -37,7 +37,7 @@ import qualified Data.Text.IO                   as T
 import qualified Data.Text.Lazy                 as LT
 import           Data.Traversable               (forM)
 import           Trace.Hpc.Tix
-import           Network.HTTP.Client            (HasHttpManager)
+import           Network.HTTP.Download          (HasHttpManager)
 import           Path
 import           Path.IO
 import           Prelude                        hiding (FilePath, writeFile)
