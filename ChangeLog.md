@@ -10,7 +10,8 @@ Other enhancements:
 * Added an `allow-newer` config option [#922](https://github.com/commercialhaskell/stack/issues/922) [#770](https://github.com/commercialhaskell/stack/issues/770)
 * When a Hackage revision invalidates a build plan in a snapshot, trust the snapshot [#770](https://github.com/commercialhaskell/stack/issues/770)
 * Added a `stack config set resolver RESOLVER` command. Part of work on [#115](https://github.com/commercialhaskell/stack/issues/115)
-
+* `stack setup` can now install GHCJS on windows.  See [#1145](https://github.com/commercialhaskell/stack/issues/1145) and [#749](https://github.com/commercialhaskell/stack/issues/749)
+* `stack hpc report` command added, which generates reports for HPC tix files
 
 Bug fixes:
 
@@ -18,7 +19,7 @@ Bug fixes:
 
 Major changes:
 
-* "stack setup" now supports building and booting GHCJS from source tarball.
+* `stack setup` now supports building and booting GHCJS from source tarball.
 * On Windows, build directories no longer display "pretty" information
   (like x86_64-windows/Cabal-1.22.4.0), but rather a hash of that
   content. The reason is to avoid the 260 character path limitation on
