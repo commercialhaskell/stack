@@ -243,13 +243,18 @@ data EnvSettings = EnvSettings
     deriving (Show, Eq, Ord)
 
 data ExecOpts = ExecOpts
-    { eoCmd :: !(Maybe String)
-    -- ^ Usage of @Maybe@ here is nothing more than a hack, to avoid some weird
-    -- bug in optparse-applicative. See:
+    { eoCmd :: !(Maybe SpecialExecCmd)
+    -- ^ When 'Nothing', then the program to run is the head of
+    -- 'eoArgs'. See:
     -- https://github.com/commercialhaskell/stack/issues/806
     , eoArgs :: ![String]
     , eoExtra :: !ExecOptsExtra
-    }
+    } deriving (Show)
+
+data SpecialExecCmd
+    = ExecGhc
+    | ExecRunGhc
+    deriving (Show, Eq)
 
 data ExecOptsExtra
     = ExecOptsPlain
@@ -257,11 +262,12 @@ data ExecOptsExtra
         { eoEnvSettings :: !EnvSettings
         , eoPackages :: ![String]
         }
+    deriving (Show)
 
 data EvalOpts = EvalOpts
     { evalArg :: !String
     , evalExtra :: !ExecOptsExtra
-    }
+    } deriving (Show)
 
 -- | Parsed global command-line options.
 data GlobalOpts = GlobalOpts

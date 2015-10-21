@@ -470,8 +470,7 @@ ghciOptsParser = GhciOpts
                                  \test suite or benchmark."))
 
 -- | Parser for exec command
-execOptsParser :: Maybe String -- ^ command
-               -> Parser ExecOpts
+execOptsParser :: Maybe SpecialExecCmd -> Parser ExecOpts
 execOptsParser mcmd =
     ExecOpts
         <$> pure mcmd
@@ -484,16 +483,15 @@ execOptsParser mcmd =
         meta = (maybe ("CMD ") (const "") mcmd) ++
                "-- ARGS (e.g. stack ghc -- X.hs -o x)"
 
-evalOptsParser :: Maybe String -- ^ metavar
+evalOptsParser :: String -- ^ metavar
                -> Parser EvalOpts
-evalOptsParser mmeta =
+evalOptsParser meta =
     EvalOpts
         <$> eoArgsParser
         <*> execOptsExtraParser
   where
     eoArgsParser :: Parser String
     eoArgsParser = strArgument (metavar meta)
-    meta = maybe ("CODE") id mmeta
 
 -- | Parser for extra options to exec command
 execOptsExtraParser :: Parser ExecOptsExtra

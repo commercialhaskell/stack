@@ -234,7 +234,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
              addCommand "ghc"
                         "Run ghc"
                         execCmd
-                        (execOptsParser $ Just "ghc")
+                        (execOptsParser $ Just ExecGhc)
              addCommand "ghci"
                         "Run ghci in the context of project(s) (experimental)"
                         ghciCmd
@@ -242,11 +242,11 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
              addCommand "runghc"
                         "Run runghc"
                         execCmd
-                        (execOptsParser $ Just "runghc")
+                        (execOptsParser $ Just ExecRunGhc)
              addCommand "eval"
                         "Evaluate some haskell code inline. Shortcut for 'stack exec ghc -- -e CODE'"
                         evalCmd
-                        (evalOptsParser $ Just "CODE") -- metavar = "CODE"
+                        (evalOptsParser "CODE")
              addCommand "clean"
                         "Clean the local packages"
                         cleanCmd
@@ -795,14 +795,16 @@ sdistCmd (dirs, mpvpBounds) go =
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
-execCmd ExecOpts {..} go@GlobalOpts{..} = do
-    (cmd, args) <-
-        case (eoCmd, eoArgs) of
-            (Just cmd, args) -> return (cmd, args)
-            (Nothing, cmd:args) -> return (cmd, args)
-            (Nothing, []) -> error "You must provide a command to exec, e.g. 'stack exec echo Hello World'"
+execCmd eo@ExecOpts {..} go@GlobalOpts{..} = do
+    print eo
+    let needCmdErr = error "You must provide a command to exec, e.g. 'stack exec echo Hello World'"
     case eoExtra of
         ExecOptsPlain -> do
+            (cmd, args) <- case (eoCmd, eoArgs) of
+                 (Just ExecGhc, args) -> return ("ghc", args)
+                 (Just ExecRunGhc, args) -> return ("runghc", args)
+                 (Nothing, cmd:args) -> return (cmd, args)
+                 (Nothing, []) -> needCmdErr
             (manager,lc) <- liftIO $ loadConfigWithOpts go
             withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
              runStackTGlobal manager (lcConfig lc) go $
@@ -817,6 +819,17 @@ execCmd ExecOpts {..} go@GlobalOpts{..} = do
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} ->
            withBuildConfigAndLock go $ \lk -> do
+               (cmd, args) <- case (eoCmd, eoArgs) of
+                   (Nothing, cmd:args) -> return (cmd, args)
+                   (Nothing, []) -> needCmdErr
+                   (Just scmd, args) -> do
+                       wc <- getWhichCompiler
+                       let cmd = case scmd of
+                               ExecGhc -> compilerExeName wc
+                               -- NOTE: this won't currently work for GHCJS, because it doesn't have
+                               -- a runghcjs binary. It probably will someday, though.
+                               ExecRunGhc -> "run" ++ compilerExeName wc
+                       return (cmd, args)
                let targets = concatMap words eoPackages
                unless (null targets) $
                    Stack.Build.build (const $ return ()) lk defaultBuildOpts
@@ -830,7 +843,7 @@ evalCmd :: EvalOpts -> GlobalOpts -> IO ()
 evalCmd EvalOpts {..} go@GlobalOpts {..} = execCmd execOpts go
     where
       execOpts =
-          ExecOpts { eoCmd = Just "ghc"
+          ExecOpts { eoCmd = Just ExecGhc
                    , eoArgs = ["-e", evalArg]
                    , eoExtra = evalExtra
                    }
