@@ -70,17 +70,10 @@ benchOptsParser = BenchmarkOpts
         <*> switch (long "no-run-benchmarks" <>
                    help "Disable running of benchmarks. (Benchmarks will still be built.)")
 
-addCoverageFlags :: BuildOpts -> BuildOpts
-addCoverageFlags bopts
-    | toCoverage $ boptsTestOpts bopts
-        = bopts { boptsGhcOptions = "-fhpc" : boptsGhcOptions bopts }
-    | otherwise = bopts
-
 -- | Parser for build arguments.
 buildOptsParser :: Command
                 -> Parser BuildOpts
 buildOptsParser cmd =
-            fmap addCoverageFlags $
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             haddock <*> haddockDeps <*> dryRun <*> ghcOpts <*>
             flags <*> copyBins <*> preFetch <*> buildSubset <*>
