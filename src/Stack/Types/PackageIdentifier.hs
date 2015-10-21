@@ -11,6 +11,7 @@ module Stack.Types.PackageIdentifier
   ,toTuple
   ,fromTuple
   ,parsePackageIdentifier
+  ,parsePackageIdentifierFromGhcPkgId
   ,parsePackageIdentifierFromString
   ,packageIdentifierVersion
   ,packageIdentifierName
@@ -35,6 +36,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import           GHC.Generics
 import           Prelude hiding (FilePath)
+import           Stack.Types.GhcPkgId
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 
@@ -101,6 +103,13 @@ parsePackageIdentifier x = go x
   where go =
           either (const (throwM (PackageIdentifierParseFail x))) return .
           parseOnly (packageIdentifierParser <* endOfInput)
+
+-- | Parse a package identifier from a ghc-pkg id.
+parsePackageIdentifierFromGhcPkgId :: MonadThrow m => GhcPkgId -> m PackageIdentifier
+parsePackageIdentifierFromGhcPkgId (GhcPkgId bs) = go bs
+  where go =
+          either (const (throwM (PackageIdentifierParseFail bs))) return .
+          parseOnly (packageIdentifierParser <* char8 '-')
 
 -- | Migration function.
 parsePackageIdentifierFromString :: MonadThrow m => String -> m PackageIdentifier
