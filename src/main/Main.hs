@@ -33,9 +33,9 @@ import qualified Data.Text.IO as T
 import           Data.Traversable
 import           Data.Typeable (Typeable)
 import           Data.Version (showVersion)
+import           Development.GitRev (gitCommitCount)
 import           Distribution.System (buildArch)
 import           Distribution.Text (display)
-import           Development.GitRev (gitCommitCount)
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Network.HTTP.Client
 import           Options.Applicative.Args
@@ -48,16 +48,17 @@ import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude hiding (pi, mapM)
 import           Stack.Build
-import           Stack.Build.Coverage
-import           Stack.Types.Build
 import           Stack.Config
 import           Stack.ConfigCmd as ConfigCmd
 import           Stack.Constants
+import           Stack.Coverage
 import qualified Stack.Docker as Docker
 import           Stack.Dot
 import           Stack.Exec
 import           Stack.Fetch
 import           Stack.FileWatch
+import           Stack.GhcPkg (getGlobalDB, mkGhcPackagePath)
+import           Stack.Ghci
 import           Stack.Ide
 import qualified Stack.Image as Image
 import           Stack.Init
@@ -65,12 +66,11 @@ import           Stack.New
 import           Stack.Options
 import           Stack.Package (getCabalFileName)
 import qualified Stack.PackageIndex
-import           Stack.Ghci
-import           Stack.GhcPkg (getGlobalDB, mkGhcPackagePath)
 import           Stack.SDist (getSDistTarball)
 import           Stack.Setup
 import           Stack.Solver (solveExtraDeps)
 import           Stack.Types
+import           Stack.Types.Build
 import           Stack.Types.Internal
 import           Stack.Types.StackT
 import           Stack.Upgrade

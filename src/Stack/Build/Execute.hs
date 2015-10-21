@@ -63,10 +63,10 @@ import           Path
 import           Path.IO
 import           Prelude                        hiding (FilePath, writeFile)
 import           Stack.Build.Cache
-import           Stack.Build.Coverage
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
+import           Stack.Coverage
 import           Stack.Types.Build
 import           Stack.Fetch                    as Fetch
 import           Stack.GhcPkg

@@ -54,6 +54,7 @@ library
                      Stack.Config.Docker
                      Stack.ConfigCmd
                      Stack.Constants
+                     Stack.Coverage
                      Stack.Docker
                      Stack.Docker.GlobalDB
                      Stack.Dot
@@ -92,7 +93,6 @@ library
                      Stack.Types.Package
                      Stack.Build
                      Stack.Build.Cache
-                     Stack.Build.Coverage
                      Stack.Build.ConstructPlan
                      Stack.Build.Execute
                      Stack.Build.Haddock

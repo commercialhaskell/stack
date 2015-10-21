@@ -42,6 +42,7 @@ import           Options.Applicative.Types (fromM, oneM, readerAsk)
 import           Stack.Config (packagesParser)
 import           Stack.ConfigCmd
 import           Stack.Constants (stackProgName)
+import           Stack.Coverage (HpcReportOpts(..))
 import           Stack.Docker
 import qualified Stack.Docker as Docker
 import           Stack.Dot

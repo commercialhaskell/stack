@@ -5,7 +5,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE FlexibleInstances     #-}
 -- | Generate HPC (Haskell Program Coverage) reports
-module Stack.Build.Coverage
+module Stack.Coverage
     ( deleteHpcReports
     , updateTixFile
     , generateHpcReport
