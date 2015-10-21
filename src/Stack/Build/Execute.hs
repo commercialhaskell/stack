@@ -692,14 +692,18 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
 
     withCabal package pkgDir mlogFile inner = do
         config <- asks getConfig
-        menv <- liftIO $ configEnvOverride config EnvSettings
-            { esIncludeLocals = taskLocation task == Local
-            , esIncludeGhcPackagePath = False
-            , esStackExe = False
-            , esLocaleUtf8 = True
-            }
-        getGhcPath <- runOnce $ liftIO $ join $ findExecutable menv "ghc"
-        getGhcjsPath <- runOnce $ liftIO $ join $ findExecutable menv "ghcjs"
+        let envSettings = EnvSettings
+                { esIncludeLocals = taskLocation task == Local
+                , esIncludeGhcPackagePath = False
+                , esStackExe = False
+                , esLocaleUtf8 = True
+                }
+        menv <- liftIO $ configEnvOverride config envSettings
+        -- When looking for ghc to build Setup.hs we want to ignore local binaries, see:
+        -- https://github.com/commercialhaskell/stack/issues/1052
+        menvWithoutLocals <- liftIO $ configEnvOverride config envSettings { esIncludeLocals = False }
+        getGhcPath <- runOnce $ liftIO $ join $ findExecutable menvWithoutLocals "ghc"
+        getGhcjsPath <- runOnce $ liftIO $ join $ findExecutable menvWithoutLocals "ghcjs"
         distRelativeDir' <- distRelativeDir
         esetupexehs <-
             -- Avoid broken Setup.hs files causing problems for simple build
