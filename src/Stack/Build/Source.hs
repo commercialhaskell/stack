@@ -338,9 +338,13 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
         benchpkg = resolvePackage benchconfig gpkg
     mbuildCache <- tryGetBuildCache $ lpvRoot lpv
     (files,_) <- getPackageFilesSimple pkg (lpvCabalFP lpv)
+    
+    -- Filter out the cabal_macros file to avoid spurious recompilations
+    let filteredFiles = Set.filter ((/= $(mkRelFile "cabal_macros.h")) . filename) files
+    
     (dirtyFiles, newBuildCache) <- checkBuildCache
         (fromMaybe Map.empty mbuildCache)
-        (map toFilePath $ Set.toList files)
+        (map toFilePath $ Set.toList filteredFiles)
 
     return LocalPackage
         { lpPackage = pkg
