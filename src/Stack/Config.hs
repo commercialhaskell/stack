@@ -68,6 +68,7 @@ import           Safe (headMay)
 import           Stack.BuildPlan
 import           Stack.Constants
 import           Stack.Config.Docker
+import           Stack.Config.ExecEnv
 import qualified Stack.Image as Image
 import           Stack.Init
 import           Stack.Types
@@ -143,6 +144,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mproject configMonoi
          configCompilerCheck = fromMaybe MatchMinor configMonoidCompilerCheck
 
      configDocker <- dockerOptsFromMonoid mproject configStackRoot configMonoidDockerOpts
+     configExecEnv <- execEnvOptsFromMonoid mproject configStackRoot configMonoidExecEnvOpts
 
      rawEnv <- liftIO getEnvironment
      origEnv <- mkEnvOverride configPlatform

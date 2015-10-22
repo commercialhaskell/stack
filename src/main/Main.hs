@@ -57,6 +57,7 @@ import           Stack.Coverage
 import qualified Stack.Docker as Docker
 import           Stack.Dot
 import           Stack.Exec
+import qualified Stack.ExecEnv.NixShell as Nix
 import           Stack.Fetch
 import           Stack.FileWatch
 import           Stack.GhcPkg (getGlobalDB, mkGhcPackagePath)
@@ -577,7 +578,7 @@ setupParser = SetupCmdOpts
             )
     <*> (optional $ strOption
             (long "ghc-bindist"
-           <> metavar "URL"
+             <> metavar "URL"
            <> help "Alternate GHC binary distribution (requires custom --ghc-variant)"
             ))
   where

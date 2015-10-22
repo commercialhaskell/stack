@@ -1,6 +1,7 @@
 resolver: lts-3.7
 extra-deps:
 - binary-tagged-0.1.1.0
+- language-nix-2.1
 image:
   container:
     base: "fpco/ubuntu-with-libgmp:14.04"
