@@ -23,6 +23,7 @@ execEnvOptsFromMonoid mproject stackRoot ExecEnvOptsMonoid{..} = do
             then Just NixShellExecEnv
             else Nothing
         execEnvPackages = execEnvMonoidPackages
+        execEnvInitFile = execEnvMonoidInitFile
      {- dockerContainerName = emptyToNothing dockerMonoidContainerName
         dockerRunArgs = dockerMonoidRunArgs
         dockerMount = dockerMonoidMount

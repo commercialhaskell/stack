@@ -21,9 +21,11 @@ data ExecEnvType = NixShellExecEnv | DockerContainerExecEnv
 -- | Docker configuration.
 data ExecEnvOpts = ExecEnvOpts
   {execEnvType :: !(Maybe ExecEnvType)
-    -- ^ Are we using a special execution environment? (Docker or Nix-Shell)
+    -- ^ Are we using a special execution environment? (Docker container, Nix-shell, chroot...)
   ,execEnvPackages :: ![PackageName]
     -- ^ The system packages to be installed in the environment before it runs
+  ,execEnvInitFile :: !(Maybe String)
+    -- ^ The path of a file containing preconfiguration of the environment (e.g shell.nix)
 --  ,dockerContainerName :: !(Maybe String)
     -- ^ Container name to use, only makes sense from command-line with `dockerPersist`
     -- or `dockerDetach`.
@@ -46,6 +48,9 @@ data ExecEnvOptsMonoid = ExecEnvOptsMonoid
   ,execEnvMonoidEnable :: !(Maybe Bool)
     -- ^ Is using nix-shell enabled?
   ,execEnvMonoidPackages :: ![PackageName]
+    -- ^ System packages to use (given to nix-shell)
+  ,execEnvMonoidInitFile :: !(Maybe String)
+    -- ^ The path of a file containing preconfiguration of the environment (e.g shell.nix)
 --  ,dockerMonoidContainerName :: !(Maybe String)
     -- ^ Container name to use, only makes sense from command-line with `dockerPersist`
     -- or `dockerDetach`.
@@ -66,6 +71,7 @@ instance FromJSON (ExecEnvOptsMonoid, [JSONWarning]) where
     (\o -> do execEnvMonoidDefaultEnable   <- pure True
               execEnvMonoidEnable          <- o ..:? execEnvEnableArgName
               execEnvMonoidPackages        <- o ..:? execEnvPackagesArgName ..!= []
+              execEnvMonoidInitFile        <- o ..:? execEnvInitFileArgName
 --              dockerMonoidContainerName    <- o ..:? dockerContainerNameArgName
 --              dockerMonoidRunArgs          <- o ..:? dockerRunArgsArgName ..!= []
 --              dockerMonoidEnv              <- o ..:? dockerEnvArgName ..!= []
@@ -79,6 +85,7 @@ instance Monoid ExecEnvOptsMonoid where
     {execEnvMonoidDefaultEnable    = False
     ,execEnvMonoidEnable           = Nothing
     ,execEnvMonoidPackages         = []
+    ,execEnvMonoidInitFile         = Nothing
 --    ,dockerMonoidContainerName    = Nothing
 --    ,dockerMonoidRunArgs          = []
 --    ,dockerMonoidEnv              = []
@@ -89,6 +96,7 @@ instance Monoid ExecEnvOptsMonoid where
     {execEnvMonoidDefaultEnable   = execEnvMonoidDefaultEnable l || execEnvMonoidDefaultEnable r
     ,execEnvMonoidEnable          = execEnvMonoidEnable l <|> execEnvMonoidEnable r
     ,execEnvMonoidPackages        = execEnvMonoidPackages l <> execEnvMonoidPackages r
+    ,execEnvMonoidInitFile        = execEnvMonoidInitFile l <|> execEnvMonoidInitFile r
 --    ,dockerMonoidContainerName    = dockerMonoidContainerName l <|> dockerMonoidContainerName r
 --    ,dockerMonoidRunArgs          = dockerMonoidRunArgs r <> dockerMonoidRunArgs l
 --    ,dockerMonoidEnv              = dockerMonoidEnv r <> dockerMonoidEnv l
@@ -120,6 +128,11 @@ execEnvEnableArgName = "enable"
 -- | ExecEnv system packages argument name.
 execEnvPackagesArgName :: Text
 execEnvPackagesArgName = "packages"
+
+-- | ExecEnv init env file path argument name.
+execEnvInitFileArgName :: Text
+execEnvInitFileArgName = "init-env-file"
+
 {-
 -- | Docker run args argument name.
 dockerRunArgsArgName :: Text
