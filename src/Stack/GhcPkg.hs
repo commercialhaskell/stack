@@ -34,10 +34,10 @@ import           Control.Monad.Trans.Control
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either
 import           Data.List
-import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.Set.Monad as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -193,29 +193,37 @@ findTransitiveGhcPkgDepends
     -> [Path Abs Dir] -- ^ package databases
     -> PackageIdentifier
     -> m (Set PackageIdentifier)
-findTransitiveGhcPkgDepends menv wc pkgDbs pkgId0 =
-    liftM (Set.fromList . Map.elems)
-    (go (packageIdentifierString pkgId0) Map.empty)
+findTransitiveGhcPkgDepends menv wc pkgDbs pkgId0 = do
+    deps <- go (packageIdentifierString pkgId0) Set.empty
+    Set.mapMaybeM (getPackageIdentifier menv wc pkgDbs) deps
   where
     go pkgId res = do
         deps <- findGhcPkgDepends menv wc pkgDbs pkgId
         loop deps res
     loop [] res = return res
     loop (dep:deps) res = do
-        if Map.member dep res
+        if Set.member dep res
             then loop deps res
             else do
-                let pkgId = ghcPkgIdString dep
-                mname <- findGhcPkgField menv wc pkgDbs pkgId "name"
-                mversion <- findGhcPkgField menv wc pkgDbs pkgId "version"
-                let mident = do
-                        name <- mname >>= parsePackageName . T.encodeUtf8
-                        version <- mversion >>= parseVersion . T.encodeUtf8
-                        Just $ PackageIdentifier name version
-                    res' = maybe id (Map.insert dep) mident res
-                res'' <- go pkgId res'
-                -- FIXME is the Map.union actually necessary?
-                loop deps (Map.union res res'')
+                let res' = Set.insert dep res
+                res'' <- go (ghcPkgIdString dep) res'
+                loop deps res''
+
+-- | Get the PackageIdentifier for a ghc-pkg id.
+getPackageIdentifier :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+                     => EnvOverride
+                     -> WhichCompiler
+                     -> [Path Abs Dir] -- ^ package databases
+                     -> GhcPkgId
+                     -> m (Maybe PackageIdentifier)
+getPackageIdentifier menv wc pkgDbs ghcPkgId = do
+    let s = ghcPkgIdString ghcPkgId
+    mname <- findGhcPkgField menv wc pkgDbs s "name"
+    mversion <- findGhcPkgField menv wc pkgDbs s "version"
+    pure $ do
+        name <- mname >>= parsePackageName . T.encodeUtf8
+        version <- mversion >>= parseVersion . T.encodeUtf8
+        Just $ PackageIdentifier name version
 
 -- | Get the dependencies of the package.
 findGhcPkgDepends :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
