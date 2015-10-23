@@ -216,16 +216,18 @@ runShellAndExit getCmdArgs mprojectRoot before after = do
      (cmnd,args,envVars,extraMount) <- getCmdArgs envOverride {-imageInfo-}
      let keepStdinOpen = False  -- always closed
      before
-     let fullArgs = (concat [["-p", "stack", "haskell.packages.lts-3_7.ghc"]
-                            --,(map show (execEnvPackages (configExecEnv config)))
+     let fullArgs = (concat [["--pure", "-p", "which", "stack", "haskell.packages.lts-3_7.ghc"]
+                            ,(map show (execEnvPackages (configExecEnv config)))
                             ,["--command"]
-                            ,[(concat $ intersperse " " (cmnd:args))]])
+                            ,[(concat $ intersperse " " ("which":"stack;":cmnd:args))]])
+     liftIO $ print fullArgs
      e <- try (callProcess'
                  (if keepStdinOpen then id else (\cp -> cp { delegate_ctlc = False }))
                  Nothing
                  envOverride
                  "nix-shell"
                  fullArgs)
+     liftIO $ putStrLn "Nix-shell process called."
      {-unless (dockerPersist docker || dockerDetach docker)
             (readProcessNull Nothing envOverride "docker" ["rm","-f",containerID])-}
      case e of
