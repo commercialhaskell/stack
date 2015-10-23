@@ -96,7 +96,7 @@ reexecWithShell mprojectRoot =
         config <- asks getConfig
         args <-
             fmap
-                (("--" ++ reExecArgName ++ "=" ++ showVersion Meta.version) :)
+                (("--" ++ reExecArgName ++ "=0.1.6.0") :) -- ++ showVersion Meta.version) :)
                 (liftIO getArgs)
         case dockerStackExe (configDocker config) of
             {-Just DockerStackExeHost
@@ -216,11 +216,10 @@ runShellAndExit getCmdArgs mprojectRoot before after = do
      (cmnd,args,envVars,extraMount) <- getCmdArgs envOverride {-imageInfo-}
      let keepStdinOpen = False  -- always closed
      before
-     let fullArgs = (concat [["--pure", "-p", "which", "stack", "haskell.packages.lts-3_7.ghc"]
+     let fullArgs = (concat [["-p", "haskell.packages.lts-3_7.ghc"]
                             ,(map show (execEnvPackages (configExecEnv config)))
                             ,["--command"]
-                            ,[(concat $ intersperse " " ("which":"stack;":cmnd:args))]])
-     liftIO $ print fullArgs
+                            ,[(concat $ intersperse " " ("stack --version;":"stack":args))]])
      e <- try (callProcess'
                  (if keepStdinOpen then id else (\cp -> cp { delegate_ctlc = False }))
                  Nothing
