@@ -16,6 +16,7 @@ module Stack.Docker
   ,reexecWithOptionalContainer
   ,reset
   ,reExecArgName
+  ,StackDockerException(..)
   ) where
 
 import           Control.Applicative
