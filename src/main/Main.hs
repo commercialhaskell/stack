@@ -760,8 +760,20 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
                   go
                   (inner' lk)
 
+      let isUsingNix = execEnvType (configExecEnv (lcConfig lc)) == Just NixShellExecEnv
+          -- for now we bypass docker if nix-shell is on
+      if isUsingNix
+         then do putStr "Nix packages used: "
+                 print (execEnvPackages (configExecEnv (lcConfig lc)))
+                 putStrLn ""
+         else putStrLn "...not using nix..."
       runStackTGlobal manager (lcConfig lc) go $
-         Docker.reexecWithOptionalContainer (lcProjectRoot lc) mbefore (inner'' lk0) mafter
+        if isUsingNix
+          then Nix.reexecWithShell (lcProjectRoot lc) mbefore (inner'' lk0) mafter
+                                        (Just $ liftIO $
+                                             do lk' <- readIORef curLk
+                                                munlockFile lk')
+          else Docker.reexecWithOptionalContainer (lcProjectRoot lc) mbefore (inner'' lk0) mafter
                                             (Just $ liftIO $
                                              do lk' <- readIORef curLk
                                                 munlockFile lk')

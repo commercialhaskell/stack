@@ -13,7 +13,7 @@ module Stack.ExecEnv.NixShell
   ,execWithOptionalContainer
   ,preventInContainer
   ,pull
-  ,reexecWithOptionalContainer
+  ,reexecWithShell
   ,reset
   ,reExecArgName
   ,M
@@ -82,7 +82,7 @@ import           System.Posix.Signals
 -- transfering away from the current process to the intra-container one.  The main use
 -- for this is releasing a lock.  After launching reexecution, the host process becomes
 -- nothing but an manager for the call into docker and thus may not hold the lock.
-reexecWithOptionalContainer
+reexecWithShell
     :: M env m
     => Maybe (Path Abs Dir)
     -> Maybe (m ())
@@ -90,7 +90,7 @@ reexecWithOptionalContainer
     -> Maybe (m ())
     -> Maybe (m ())
     -> m ()
-reexecWithOptionalContainer mprojectRoot =
+reexecWithShell mprojectRoot =
     execWithOptionalContainer mprojectRoot getCmdArgs
   where
     getCmdArgs envOverride imageInfo = do
