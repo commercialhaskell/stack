@@ -83,20 +83,21 @@ import           System.Posix.Signals
 -- nothing but an manager for the call into docker and thus may not hold the lock.
 reexecWithShell
     :: M env m
-    => Maybe (Path Abs Dir)
+    => Resolver  -- ^ Needed for installing ghc in the nix-shell
+    -> Maybe (Path Abs Dir)
     -> Maybe (m ())
     -> IO ()
     -> Maybe (m ())
     -> Maybe (m ())
     -> m ()
-reexecWithShell mprojectRoot =
-    execWithShell mprojectRoot getCmdArgs
+reexecWithShell resolver mprojectRoot =
+    execWithShell resolver mprojectRoot getCmdArgs
   where
     getCmdArgs envOverride {-imageInfo-} = do
         config <- asks getConfig
         args <-
             fmap
-                (("--" ++ reExecArgName ++ "=0.1.6.0") :) -- ++ showVersion Meta.version) :)
+                (("--" ++ reExecArgName ++ "=" ++ showVersion Meta.version) :)
                 (liftIO getArgs)
         case dockerStackExe (configDocker config) of
             {-Just DockerStackExeHost
@@ -168,7 +169,7 @@ reexecWithShell mprojectRoot =
             (cmdArgs args . toFilePath)
             (ensureDockerStackExe dockerContainerPlatform)-}
     cmdArgs args exePath =
-        let mountPath = concat ["/opt/host/bin/", takeBaseName exePath]
+        let mountPath = exePath  -- concat ["/opt/host/bin/", takeBaseName exePath]
         in (mountPath, args, [], [Mount exePath mountPath])
 
 -- | If ExecEnv is enabled, re-runs the OS command returned by the second argument in a
@@ -177,14 +178,15 @@ reexecWithShell mprojectRoot =
 -- This takes an optional release action just like `reexecWithOptionalContainer`.
 execWithShell
     :: M env m
-    => Maybe (Path Abs Dir)
+    => Resolver
+    -> Maybe (Path Abs Dir)
     -> (EnvOverride -> {-Inspect ->-} m (FilePath,[String],[(String,String)],[Mount]))
     -> Maybe (m ())
     -> IO ()
     -> Maybe (m ())
     -> Maybe (m ())
     -> m ()
-execWithShell mprojectRoot getCmdArgs mbefore inner mafter mrelease =
+execWithShell resolver mprojectRoot getCmdArgs mbefore inner mafter mrelease =
   do config <- asks getConfig
      inShell <- getInShell
      isReExec <- asks getReExec
@@ -201,7 +203,7 @@ execWithShell mprojectRoot getCmdArgs mbefore inner mafter mrelease =
                liftIO exitSuccess
         | envType == Just NixShellExecEnv ->
             do fromMaybeAction mrelease
-               runShellAndExit
+               runShellAndExit resolver
                  getCmdArgs
                  mprojectRoot
                  (fromMaybeAction mbefore)
@@ -210,25 +212,30 @@ execWithShell mprojectRoot getCmdArgs mbefore inner mafter mrelease =
     fromMaybeAction Nothing = return ()
     fromMaybeAction (Just hook) = hook
 
-runShellAndExit getCmdArgs mprojectRoot before after = do
+runShellAndExit resolver getCmdArgs mprojectRoot before after = do
      config <- asks getConfig
      envOverride <- getEnvOverride (configPlatform config)
-     (cmnd,args,envVars,extraMount) <- getCmdArgs envOverride {-imageInfo-}
-     let keepStdinOpen = False  -- always closed
+     (cmnd,args,envVars,extraMount) <- getCmdArgs envOverride
      before
-     let fullArgs = (concat [["-p", "haskell.packages.lts-3_7.ghc"]
-                            ,(map show (execEnvPackages (configExecEnv config)))
+     let ghcInNix = case resolver of
+                     ResolverSnapshot (LTS x y) ->
+                       "haskell.packages.lts-" ++ (show x) ++ "_" ++ (show y) ++ ".ghc"
+                     _ -> "ghc"
+         nixpkgs = [ghcInNix] ++ (map show (execEnvPackages (configExecEnv config)))
+         fullArgs = (concat [["--pure", "-p"]
+                            ,nixpkgs
                             ,["--command"]
-                            ,[(concat $ intersperse " " ("stack --version;":"stack":args))]])
+                            ,[(concat $ intersperse " "
+                                  ("export":(inContainerEnvVar++"=1"):";":cmnd:args))]
+                            ])
+     liftIO $ putStrLn $ "Using a nix-shell environment with nix packages: " ++
+                               (concat $ intersperse ", " nixpkgs)
      e <- try (callProcess'
-                 (if keepStdinOpen then id else (\cp -> cp { delegate_ctlc = False }))
+                 (\cp -> cp { delegate_ctlc = False })
                  Nothing
                  envOverride
                  "nix-shell"
                  fullArgs)
-     liftIO $ putStrLn "Nix-shell process called."
-     {-unless (dockerPersist docker || dockerDetach docker)
-            (readProcessNull Nothing envOverride "docker" ["rm","-f",containerID])-}
      case e of
        Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
        Right () -> do after
