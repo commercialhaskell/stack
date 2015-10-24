@@ -110,12 +110,13 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                    dockerHelpOptName
                    (dockerOptsParser True)
                    ("Only showing --" ++ Docker.dockerCmdName ++ "* options.")
-     let versionString' = concat $ concat
+     let commitCount = $gitCommitCount
+         versionString' = concat $ concat
             [ [$(simpleVersion Meta.version)]
               -- Leave out number of commits for --depth=1 clone
               -- See https://github.com/commercialhaskell/stack/issues/792
-            , [" (" ++ $gitCommitCount ++ " commits)" | $gitCommitCount /= ("1"::String) &&
-                                                        $gitCommitCount /= ("UNKNOWN" :: String)]
+            , [" (" ++ commitCount ++ " commits)" | commitCount /= ("1"::String) &&
+                                                    commitCount /= ("UNKNOWN" :: String)]
             , [" ", display buildArch]
             ]
 
