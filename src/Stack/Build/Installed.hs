@@ -12,7 +12,6 @@ module Stack.Build.Installed
     ) where
 
 import           Control.Applicative
-import           Control.Arrow                ((&&&))
 import           Control.Monad
 import           Control.Monad.Catch          (MonadCatch, MonadMask)
 import           Control.Monad.IO.Class
@@ -59,7 +58,8 @@ getInstalled :: (M env m, PackageInstallInfo pii)
              -> Map PackageName pii -- ^ does not contain any installed information
              -> m ( InstalledMap
                   , [DumpPackage () ()] -- globally installed
-                  , Map GhcPkgId PackageIdentifier -- locally installed
+                  , [DumpPackage () ()] -- snapshot installed
+                  , [DumpPackage () ()] -- locally installed
                   )
 getInstalled menv opts sourceMap = do
     snapDBPath <- packageDatabaseDeps
@@ -75,14 +75,14 @@ getInstalled menv opts sourceMap = do
 
     let loadDatabase' = loadDatabase menv opts mcache sourceMap
 
-    (installedLibs0, globalInstalled) <- loadDatabase' Nothing []
+    (installedLibs0, globalDumpPkgs) <- loadDatabase' Nothing []
     (installedLibs1, _extraInstalled) <-
       (foldM (\lhs' pkgdb -> do
         lhs'' <- loadDatabase' (Just (ExtraGlobal, pkgdb)) (fst lhs')
-        return lhs'') (installedLibs0, globalInstalled) extraDBPaths)
-    (installedLibs2, _snapInstalled) <-
+        return lhs'') (installedLibs0, globalDumpPkgs) extraDBPaths)
+    (installedLibs2, snapshotDumpPkgs) <-
         loadDatabase' (Just (InstalledTo Snap, snapDBPath)) installedLibs1
-    (installedLibs3, localInstalled) <-
+    (installedLibs3, localDumpPkgs) <-
         loadDatabase' (Just (InstalledTo Local, localDBPath)) installedLibs2
     let installedLibs = M.fromList $ map lhPair installedLibs3
 
@@ -113,8 +113,9 @@ getInstalled menv opts sourceMap = do
             ]
 
     return ( installedMap
-           , globalInstalled
-           , Map.fromList $ map (dpGhcPkgId &&& dpPackageIdent) localInstalled
+           , globalDumpPkgs
+           , snapshotDumpPkgs
+           , localDumpPkgs
            )
 
 -- | Outputs both the modified InstalledMap and the Set of all installed packages in this database

@@ -3,6 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 
 -- | Generate haddocks
@@ -21,10 +22,12 @@ import           Control.Monad.Catch            (MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Resource
-import           Control.Monad.Writer
 import           Data.Function
 import           Data.List
+import           Data.List.Extra                (nubOrd)
 import           Data.Maybe
+import           Data.Map.Strict                (Map)
+import qualified Data.Map.Strict                as Map
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
 import           Data.Text                      (Text)
@@ -34,10 +37,10 @@ import           Path.IO
 import           Prelude
 import           Safe                           (maximumMay)
 import           Stack.Types.Build
-import           Stack.GhcPkg
-import           Stack.Package
+import           Stack.PackageDump
 import           Stack.Types
-import           System.Directory               (getModificationTime)
+import           System.Directory               (getModificationTime, canonicalizePath,
+                                                 doesDirectoryExist)
 import qualified System.FilePath                as FP
 import           System.IO.Error                (isDoesNotExistError)
 import           System.Process.Read
@@ -59,34 +62,45 @@ shouldHaddockDeps bopts = fromMaybe (boptsHaddock bopts) (boptsHaddockDeps bopts
 -- reliably supported on Windows, and (2) the filesystem containing dependencies' docs may not be
 -- available where viewing the docs (e.g. if building in a Docker container).
 copyDepHaddocks :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadBaseControl IO m)
-                => EnvOverride
-                -> WhichCompiler
-                -> BaseConfigOpts
-                -> [Path Abs Dir]
-                -> PackageIdentifier
+                => BaseConfigOpts
+                -> [Map GhcPkgId (DumpPackage () ())]
+                -> GhcPkgId
                 -> Set (Path Abs Dir)
                 -> m ()
-copyDepHaddocks envOverride wc bco pkgDbs pkgId extraDestDirs = do
-    mpkgHtmlDir <- findGhcPkgHaddockHtml envOverride wc pkgDbs $ packageIdentifierString pkgId
-    case mpkgHtmlDir of
+copyDepHaddocks bco dumpPkgs ghcPkgId extraDestDirs = do
+    let mdp = lookupDumpPackage ghcPkgId dumpPkgs
+    case mdp of
         Nothing -> return ()
-        Just (_pkgId, pkgHtmlDir) -> do
-            depGhcIds <- findGhcPkgDepends envOverride wc pkgDbs $ packageIdentifierString pkgId
-            forM_ depGhcIds $ copyDepWhenNeeded pkgHtmlDir
+        Just dp ->
+            forM_ (dpDepends dp) $ \depDP ->
+                case dpHaddockHtml dp of
+                    Nothing -> return ()
+                    Just pkgHtmlFP -> do
+                        pkgHtmlDir <- parseAbsDir pkgHtmlFP
+                        copyDepWhenNeeded pkgHtmlDir depDP
   where
-    copyDepWhenNeeded pkgHtmlDir depGhcId = do
-        mDepOrigDir <- findGhcPkgHaddockHtml envOverride wc pkgDbs $ ghcPkgIdString depGhcId
-        case mDepOrigDir of
+    copyDepWhenNeeded pkgHtmlDir depGhcPkgId = do
+        let mDepDP = lookupDumpPackage depGhcPkgId dumpPkgs
+        case mDepDP of
             Nothing -> return ()
-            Just (depId, depOrigDir) -> do
-                let extraDestDirs' =
-                        -- Parent test ensures we don't try to copy docs to global locations
-                        if bcoSnapInstallRoot bco `isParentOf` pkgHtmlDir ||
-                           bcoLocalInstallRoot bco `isParentOf` pkgHtmlDir
-                            then Set.insert (parent pkgHtmlDir) extraDestDirs
-                            else extraDestDirs
-                copyWhenNeeded extraDestDirs' depId depOrigDir
-    copyWhenNeeded destDirs depId depOrigDir = do
+            Just depDP ->
+                case dpHaddockHtml depDP of
+                    Nothing -> return ()
+                    Just depOrigFP0 -> do
+                        let extraDestDirs' =
+                                -- Parent test ensures we don't try to copy docs to global locations
+                                if bcoSnapInstallRoot bco `isParentOf` pkgHtmlDir ||
+                                   bcoLocalInstallRoot bco `isParentOf` pkgHtmlDir
+                                    then Set.insert (parent pkgHtmlDir) extraDestDirs
+                                    else extraDestDirs
+                        depOrigFP <- liftIO $ do
+                            exists <- doesDirectoryExist depOrigFP0
+                            if exists
+                                then canonicalizePath depOrigFP0
+                                else return depOrigFP0
+                        depOrigDir <- parseAbsDir depOrigFP
+                        copyWhenNeeded extraDestDirs' (dpPackageIdent depDP) (dpGhcPkgId depDP) depOrigDir
+    copyWhenNeeded destDirs depId depGhcPkgId depOrigDir = do
         depRelDir <- parseRelDir (packageIdentifierString depId)
         copied <- forM (Set.toList destDirs) $ \destDir -> do
             let depCopyDir = destDir </> depRelDir
@@ -97,7 +111,7 @@ copyDepHaddocks envOverride wc bco pkgDbs pkgId extraDestDirs = do
                     when needCopy $ doCopy depOrigDir depCopyDir
                     return needCopy
         when (or copied) $
-            copyDepHaddocks envOverride wc bco pkgDbs depId destDirs
+            copyDepHaddocks bco dumpPkgs depGhcPkgId destDirs
     getNeedCopy depOrigDir depCopyDir = do
         let depOrigIndex = haddockIndexFile depOrigDir
             depCopyIndex = haddockIndexFile depCopyDir
@@ -136,36 +150,66 @@ generateLocalHaddockIndex envOverride wc bco locals = do
 -- | Generate Haddock index and contents for local packages and their dependencies.
 generateDepsHaddockIndex
     :: (MonadIO m, MonadCatch m, MonadThrow m, MonadLogger m, MonadBaseControl IO m)
-    => EnvOverride -> WhichCompiler -> BaseConfigOpts -> [LocalPackage] -> m ()
-generateDepsHaddockIndex envOverride wc bco locals = do
-    depSets <-
-        mapM
-            (\LocalPackage{lpPackage = Package{..}} ->
-                  findTransitiveGhcPkgDepends
-                      envOverride
-                      wc
-                      [bcoSnapDB bco, bcoLocalDB bco]
-                      (PackageIdentifier packageName packageVersion))
-            locals
+    => EnvOverride
+    -> WhichCompiler
+    -> BaseConfigOpts
+    -> Map GhcPkgId (DumpPackage () ())
+    -> Map GhcPkgId (DumpPackage () ())
+    -> Map GhcPkgId (DumpPackage () ())
+    -> [LocalPackage]
+    -> m ()
+generateDepsHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs locals = do
+    let depGhcPkgIds =
+            map
+                (\LocalPackage{lpPackage = Package{..}} ->
+                      let pkgId = PackageIdentifier packageName packageVersion
+                      in case find
+                                  (\dp ->
+                                        dpPackageIdent dp == pkgId)
+                                  (Map.elems localDumpPkgs) of
+                             Nothing -> Set.empty
+                             Just dp -> findTransitiveDepends (dpGhcPkgId dp))
+                locals
+        depDumpPkgs =
+            map
+                (\ghcPkgId ->
+                      lookupDumpPackage ghcPkgId allDumpPkgs)
+                (Set.toList $ Set.unions depGhcPkgIds)
     generateHaddockIndex
         "local packages and dependencies"
         envOverride
         wc
-        (Set.toList (Set.unions depSets))
+        (nubOrd $ map dpPackageIdent $ catMaybes depDumpPkgs)
         ".."
         (localDocDir bco </> $(mkRelDir "all"))
+  where
+    findTransitiveDepends ghcPkgId =
+        case lookupDumpPackage ghcPkgId allDumpPkgs of
+            Nothing -> Set.singleton ghcPkgId
+            Just pkgDP ->
+                Set.unions
+                    (Set.singleton ghcPkgId :
+                     map findTransitiveDepends (dpDepends pkgDP))
+    allDumpPkgs = [localDumpPkgs, snapshotDumpPkgs, globalDumpPkgs]
 
 -- | Generate Haddock index and contents for all snapshot packages.
 generateSnapHaddockIndex
     :: (MonadIO m, MonadCatch m, MonadThrow m, MonadLogger m, MonadBaseControl IO m)
-    => EnvOverride -> WhichCompiler -> BaseConfigOpts -> Path Abs Dir -> m ()
-generateSnapHaddockIndex envOverride wc bco globalDB = do
-    pkgIds <- listGhcPkgDbs envOverride wc [globalDB, bcoSnapDB bco]
+    => EnvOverride
+    -> WhichCompiler
+    -> BaseConfigOpts
+    -> Map GhcPkgId (DumpPackage () ())
+    -> Map GhcPkgId (DumpPackage () ())
+    -> m ()
+generateSnapHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs =
     generateHaddockIndex
         "snapshot packages"
         envOverride
         wc
-        pkgIds
+        (nubOrd $
+         map
+             dpPackageIdent
+             (Map.elems globalDumpPkgs ++ Map.elems snapshotDumpPkgs))
         "."
         (snapDocDir bco)
 
@@ -197,8 +241,8 @@ generateHaddockIndex descr envOverride wc packageIDs docRelDir destDir = do
             when
                 needUpdate $
                 do $logInfo
-                       ("Updating Haddock index for " <> descr <> " in\n" <>
-                        T.pack (toFilePath (haddockIndexFile destDir)))
+                       (T.concat ["Updating Haddock index for ", descr, " in\n",
+                                  T.pack (toFilePath (haddockIndexFile destDir))])
                    readProcessNull
                        (Just destDir)
                        envOverride
@@ -225,6 +269,13 @@ generateHaddockIndex descr envOverride wc packageIDs docRelDir destDir = do
                                 , ","
                                 , interfaceRelFile]]
                         , interfaceModTime)
+
+-- | Find first DumpPackage matching the GhcPkgId
+lookupDumpPackage :: GhcPkgId
+                  -> [Map GhcPkgId (DumpPackage () ())]
+                  -> Maybe (DumpPackage () ())
+lookupDumpPackage ghcPkgId dumpPkgs =
+    listToMaybe $ catMaybes $ map (Map.lookup ghcPkgId) dumpPkgs
 
 -- | Path of haddock index file.
 haddockIndexFile :: Path Abs Dir -> Path Abs File

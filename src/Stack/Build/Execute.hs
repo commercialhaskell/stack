@@ -206,7 +206,9 @@ data ExecuteEnv = ExecuteEnv
     , eeLocals         :: ![LocalPackage]
     , eeSourceMap      :: !SourceMap
     , eeGlobalDB       :: !(Path Abs Dir)
-    , eeGlobalPackages :: ![DumpPackage () ()]
+    , eeGlobalDumpPkgs :: !(Map GhcPkgId (DumpPackage () ()))
+    , eeSnapshotDumpPkgs :: !(TVar (Map GhcPkgId (DumpPackage () ())))
+    , eeLocalDumpPkgs  :: !(TVar (Map GhcPkgId (DumpPackage () ())))
     }
 
 -- | Get a compiled Setup exe
@@ -279,10 +281,12 @@ withExecuteEnv :: M env m
                -> BaseConfigOpts
                -> [LocalPackage]
                -> [DumpPackage () ()] -- ^ global packages
+               -> [DumpPackage () ()] -- ^ snapshot packages
+               -> [DumpPackage () ()] -- ^ local packages
                -> SourceMap
                -> (ExecuteEnv -> m a)
                -> m a
-withExecuteEnv menv bopts baseConfigOpts locals globals sourceMap inner = do
+withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages sourceMap inner = do
     withCanonicalizedSystemTempDirectory stackProgName $ \tmpdir -> do
         configLock <- newMVar ()
         installLock <- newMVar ()
@@ -292,6 +296,8 @@ withExecuteEnv menv bopts baseConfigOpts locals globals sourceMap inner = do
         setupExe <- getSetupExe setupHs tmpdir
         cabalPkgVer <- asks (envConfigCabalVersion . getEnvConfig)
         globalDB <- getGlobalDB menv =<< getWhichCompiler
+        snapshotPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId snapshotPackages)
+        localPackagesTVar <- liftIO $ newTVarIO (toDumpPackagesByGhcPkgId localPackages)
         inner ExecuteEnv
             { eeEnvOverride = menv
             , eeBuildOpts = bopts
@@ -312,8 +318,12 @@ withExecuteEnv menv bopts baseConfigOpts locals globals sourceMap inner = do
             , eeLocals = locals
             , eeSourceMap = sourceMap
             , eeGlobalDB = globalDB
-            , eeGlobalPackages = globals
+            , eeGlobalDumpPkgs = toDumpPackagesByGhcPkgId globalPackages
+            , eeSnapshotDumpPkgs = snapshotPackagesTVar
+            , eeLocalDumpPkgs = localPackagesTVar
             }
+  where
+    toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dpGhcPkgId dp, dp))
 
 -- | Perform the actual plan
 executePlan :: M env m
@@ -321,13 +331,15 @@ executePlan :: M env m
             -> BuildOpts
             -> BaseConfigOpts
             -> [LocalPackage]
-            -> [DumpPackage () ()] -- ^ globals
+            -> [DumpPackage () ()] -- ^ global packages
+            -> [DumpPackage () ()] -- ^ snapshot packages
+            -> [DumpPackage () ()] -- ^ local packages
             -> SourceMap
             -> InstalledMap
             -> Plan
             -> m ()
-executePlan menv bopts baseConfigOpts locals globals sourceMap installedMap plan = do
-    withExecuteEnv menv bopts baseConfigOpts locals globals sourceMap (executePlan' installedMap plan)
+executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages sourceMap installedMap plan = do
+    withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages sourceMap (executePlan' installedMap plan)
 
     unless (Map.null $ planInstallExes plan) $ do
         snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
@@ -419,9 +431,8 @@ executePlan' :: M env m
              -> Plan
              -> ExecuteEnv
              -> m ()
-executePlan' installedMap plan ee@ExecuteEnv {..} = do
+executePlan' installedMap0 plan ee@ExecuteEnv {..} = do
     when (toCoverage $ boptsTestOpts eeBuildOpts) deleteHpcReports
-
     wc <- getWhichCompiler
     cv <- asks $ envConfigCompilerVersion . getEnvConfig
     case Map.toList $ planUnregisterLocal plan of
@@ -441,6 +452,9 @@ executePlan' installedMap plan ee@ExecuteEnv {..} = do
                             ]
                     ]
                 unregisterGhcPkgId eeEnvOverride wc cv localDB id' ident
+
+    liftIO $ atomically $ modifyTVar' eeLocalDumpPkgs $ \initMap ->
+        foldl' (flip Map.delete) initMap $ Map.keys (planUnregisterLocal plan)
 
     -- Yes, we're explicitly discarding result values, which in general would
     -- be bad. monad-unlift does this all properly at the type system level,
@@ -489,11 +503,13 @@ executePlan' installedMap plan ee@ExecuteEnv {..} = do
         generateHpcMarkupIndex
     unless (null errs) $ throwM $ ExecutionFailure errs
     when (boptsHaddock eeBuildOpts) $ do
+        snapshotDumpPkgs <- liftIO (readTVarIO eeSnapshotDumpPkgs)
+        localDumpPkgs <- liftIO (readTVarIO eeLocalDumpPkgs)
         generateLocalHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeLocals
-        generateDepsHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeLocals
-        generateSnapHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeGlobalDB
+        generateDepsHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeGlobalDumpPkgs snapshotDumpPkgs localDumpPkgs eeLocals
+        generateSnapHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeGlobalDumpPkgs snapshotDumpPkgs
   where
-    installedMap' = Map.difference installedMap
+    installedMap' = Map.difference installedMap0
                   $ Map.fromList
                   $ map (\(ident, _) -> (packageIdentifierName ident, ()))
                   $ Map.elems
@@ -725,7 +741,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             let depsMinusCabal
                                  = map ghcPkgIdString
                                  $ Set.toList
-                                 $ addGlobalPackages deps eeGlobalPackages
+                                 $ addGlobalPackages deps (Map.elems eeGlobalDumpPkgs)
                             in
                                 ( "-clear-package-db"
                                 : "-global-package-db"
@@ -937,7 +953,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         -- Find the package in the database
         wc <- getWhichCompiler
         let pkgDbs = [bcoSnapDB eeBaseConfigOpts]
-        mpkgid <- findGhcPkgId eeEnvOverride wc pkgDbs pname
+        mpkgid <- loadInstalledPkg eeEnvOverride wc pkgDbs eeSnapshotDumpPkgs pname
 
         return $ Just $
             case mpkgid of
@@ -1022,14 +1038,17 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             cabal False ["copy"]
             cabal False ["register"]
 
-        let pkgDbs =
+        let (installedPkgDb, installedDumpPkgsTVar, dumpPkgsTVars) =
                 case taskLocation task of
-                    Snap -> [bcoSnapDB eeBaseConfigOpts]
+                    Snap ->
+                         ( bcoSnapDB eeBaseConfigOpts
+                         , eeSnapshotDumpPkgs
+                         , [eeSnapshotDumpPkgs] )
                     Local ->
-                        [ bcoSnapDB eeBaseConfigOpts
-                        , bcoLocalDB eeBaseConfigOpts
-                        ]
-        mpkgid <- findGhcPkgId eeEnvOverride wc pkgDbs (packageName package)
+                        ( bcoLocalDB eeBaseConfigOpts
+                        , eeLocalDumpPkgs
+                        , [eeSnapshotDumpPkgs, eeLocalDumpPkgs] )
+        mpkgid <- loadInstalledPkg eeEnvOverride wc [installedPkgDb] installedDumpPkgsTVar (packageName package)
         let ident = PackageIdentifier (packageName package) (packageVersion package)
         mpkgid' <- case (packageHasLibrary package, mpkgid) of
             (False, _) -> assert (isNothing mpkgid) $ do
@@ -1038,15 +1057,17 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             (True, Nothing) -> throwM $ Couldn'tFindPkgId $ packageName package
             (True, Just pkgid) -> return $ Library ident pkgid
 
-        when (doHaddock package && shouldHaddockDeps eeBuildOpts) $
-            withMVar eeInstallLock $ \() ->
-                copyDepHaddocks
-                    eeEnvOverride
-                    wc
-                    eeBaseConfigOpts
-                    (pkgDbs ++ [eeGlobalDB])
-                    (PackageIdentifier (packageName package) (packageVersion package))
-                    Set.empty
+        case (doHaddock package && shouldHaddockDeps eeBuildOpts, mpkgid') of
+            (False, _) -> return ()
+            (True, Executable _) -> return ()
+            (True, Library _ ghcPkgId) ->
+                withMVar eeInstallLock $ \() -> do
+                    dumpPkgs <- forM dumpPkgsTVars $ \tvar -> liftIO (readTVarIO tvar)
+                    copyDepHaddocks
+                        eeBaseConfigOpts
+                        (reverse (eeGlobalDumpPkgs : dumpPkgs))
+                        ghcPkgId
+                        Set.empty
 
         case taskLocation task of
             Snap -> writePrecompiledCache eeBaseConfigOpts taskProvides
@@ -1056,6 +1077,15 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             Local -> return ()
 
         return mpkgid'
+
+    loadInstalledPkg menv wc pkgDbs tvar name = do
+        dps <- ghcPkgDescribe name menv wc pkgDbs $ conduitDumpPackage =$ CL.consume
+        case dps of
+            [] -> return Nothing
+            [dp] -> do
+                liftIO $ atomically $ modifyTVar' tvar (Map.insert (dpGhcPkgId dp) dp)
+                return $ Just (dpGhcPkgId dp)
+            _ -> error "singleBuild: invariant violated: multiple results when describing installed package"
 
 -- | Determine if all of the dependencies given are installed
 depsPresent :: InstalledMap -> Map PackageName VersionRange -> Bool

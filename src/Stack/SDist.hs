@@ -103,7 +103,7 @@ getCabalLbs pvpBounds fp = do
     (_warnings, gpd) <- readPackageUnresolvedBS Nothing bs
     (_, _, _, _, sourceMap) <- loadSourceMap AllowNoTargets defaultBuildOpts
     menv <- getMinimalEnvOverride
-    (installedMap, _, _) <- getInstalled menv GetInstalledOpts
+    (installedMap, _, _, _) <- getInstalled menv GetInstalledOpts
                                 { getInstalledProfiling = False
                                 , getInstalledHaddock = False
                                 }
@@ -195,7 +195,7 @@ getSDistFileList lp =
         (_, _mbp, locals, _extraToBuild, sourceMap) <- loadSourceMap NeedTargets bopts
         runInBase <- liftBaseWith $ \run -> return (void . run)
         withExecuteEnv menv bopts baseConfigOpts locals
-            [] -- provide empty list of globals. This is a hack around custom Setup.hs files
+            [] [] [] -- provide empty list of globals. This is a hack around custom Setup.hs files
             sourceMap $ \ee -> do
             withSingleContext runInBase ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _console _mlogFile -> do
                 let outFile = toFilePath tmpdir FP.</> "source-files-list"

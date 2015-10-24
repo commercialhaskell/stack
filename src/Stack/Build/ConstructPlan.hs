@@ -11,6 +11,7 @@ module Stack.Build.ConstructPlan
     ( constructPlan
     ) where
 
+import           Control.Arrow ((&&&))
 import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.Catch (MonadCatch)
@@ -42,8 +43,8 @@ import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Types.Build
 import           Stack.BuildPlan
-
 import           Stack.Package
+import           Stack.PackageDump
 import           Stack.PackageIndex
 import           Stack.Types
 
@@ -126,12 +127,13 @@ constructPlan :: forall env m.
               -> BaseConfigOpts
               -> [LocalPackage]
               -> Set PackageName -- ^ additional packages that must be built
-              -> Map GhcPkgId PackageIdentifier -- ^ locally registered
+              -> [DumpPackage () ()] -- ^ locally registered
               -> (PackageName -> Version -> Map FlagName Bool -> IO Package) -- ^ load upstream package
               -> SourceMap
               -> InstalledMap
               -> m Plan
-constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 locallyRegistered loadPackage0 sourceMap installedMap = do
+constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap = do
+    let locallyRegistered = Map.fromList $ map (dpGhcPkgId &&& dpPackageIdent) localDumpPkgs
     menv <- getMinimalEnvOverride
     caches <- getPackageCaches menv
     let latest = Map.fromListWith max $ map toTuple $ Map.keys caches

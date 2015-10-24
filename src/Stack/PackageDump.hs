@@ -13,6 +13,7 @@ module Stack.PackageDump
     , DumpPackage (..)
     , conduitDumpPackage
     , ghcPkgDump
+    , ghcPkgDescribe
     , InstalledCache
     , InstalledCacheEntry (..)
     , newInstalledCache
@@ -45,7 +46,7 @@ import           Data.Either (partitionEithers)
 import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (catMaybes)
+import           Data.Maybe (catMaybes, listToMaybe)
 import qualified Data.Set as Set
 import qualified Data.Text.Encoding as T
 import           Data.Typeable (Typeable)
@@ -83,7 +84,29 @@ ghcPkgDump
     -> [Path Abs Dir] -- ^ if empty, use global
     -> Sink ByteString IO a
     -> m a
-ghcPkgDump menv wc mpkgDbs sink = do
+ghcPkgDump = ghcPkgCmdArgs ["dump"]
+
+-- | Call ghc-pkg describe with appropriate flags and stream to the given @Sink@, for a single database
+ghcPkgDescribe
+    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+    => PackageName
+    -> EnvOverride
+    -> WhichCompiler
+    -> [Path Abs Dir] -- ^ if empty, use global
+    -> Sink ByteString IO a
+    -> m a
+ghcPkgDescribe pkgName = ghcPkgCmdArgs ["describe", "--simple-output", packageNameString pkgName]
+
+-- | Call ghc-pkg and stream to the given @Sink@, for a single database
+ghcPkgCmdArgs
+    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+    => [String]
+    -> EnvOverride
+    -> WhichCompiler
+    -> [Path Abs Dir] -- ^ if empty, use global
+    -> Sink ByteString IO a
+    -> m a
+ghcPkgCmdArgs cmd menv wc mpkgDbs sink = do
     case reverse mpkgDbs of
         (pkgDb:_) -> (createDatabase menv wc) pkgDb -- TODO maybe use some retry logic instead?
         _ -> return ()
@@ -94,7 +117,8 @@ ghcPkgDump menv wc mpkgDbs sink = do
         [ case mpkgDbs of
             [] -> ["--global", "--no-user-package-db"]
             _ -> ["--user", "--no-user-package-db"] ++ concatMap (\pkgDb -> ["--package-db", toFilePath pkgDb]) mpkgDbs
-        , ["dump", "--expand-pkgroot"]
+        , cmd
+        , ["--expand-pkgroot"]
         ]
 
 -- | Create a new, empty @InstalledCache@
@@ -247,6 +271,7 @@ data DumpPackage profiling haddock = DumpPackage
     , dpHasExposedModules :: !Bool
     , dpDepends :: ![GhcPkgId]
     , dpHaddockInterfaces :: ![FilePath]
+    , dpHaddockHtml :: !(Maybe FilePath)
     , dpProfiling :: !profiling
     , dpHaddock :: !haddock
     , dpIsExposed :: !Bool
@@ -321,6 +346,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                     val = parseM key
             libDirPaths <- parseQuoted libDirKey
             haddockInterfaces <- parseQuoted "haddock-interfaces"
+            haddockHtml <- parseQuoted "haddock-html"
 
             return $ Just DumpPackage
                 { dpGhcPkgId = ghcPkgId
@@ -330,6 +356,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 , dpHasExposedModules = not (null libraries || null exposedModules)
                 , dpDepends = catMaybes (depends :: [Maybe GhcPkgId])
                 , dpHaddockInterfaces = haddockInterfaces
+                , dpHaddockHtml = listToMaybe haddockHtml
                 , dpProfiling = ()
                 , dpHaddock = ()
                 , dpIsExposed = exposed == ["True"]

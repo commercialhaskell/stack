@@ -179,7 +179,7 @@ ghciSetup mainIs stringTargets = do
     econfig <- asks getEnvConfig
     (realTargets,_,_,_,sourceMap) <- loadSourceMap AllowNoTargets bopts
     menv <- getMinimalEnvOverride
-    (installedMap, _, _) <- getInstalled
+    (installedMap, _, _, _) <- getInstalled
         menv
         GetInstalledOpts
             { getInstalledProfiling = False

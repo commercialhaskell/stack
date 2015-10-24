@@ -87,7 +87,7 @@ build setLocalFiles mbuildLk bopts = fixCodePage' $ do
            $ Set.unions
            $ map lpFiles locals
 
-    (installedMap, globallyRegistered, locallyRegistered) <-
+    (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
         getInstalled menv
                      GetInstalledOpts
                          { getInstalledProfiling = profiling
@@ -96,7 +96,7 @@ build setLocalFiles mbuildLk bopts = fixCodePage' $ do
 
     baseConfigOpts <- mkBaseConfigOpts bopts
     plan <- withLoadPackage menv $ \loadPackage ->
-        constructPlan mbp baseConfigOpts locals extraToBuild locallyRegistered loadPackage sourceMap installedMap
+        constructPlan mbp baseConfigOpts locals extraToBuild localDumpPkgs loadPackage sourceMap installedMap
 
     -- If our work to do is all local, let someone else have a turn with the snapshot.
     -- They won't damage what's already in there.
@@ -114,7 +114,9 @@ build setLocalFiles mbuildLk bopts = fixCodePage' $ do
     if boptsDryrun bopts
         then printPlan plan
         else executePlan menv bopts baseConfigOpts locals
-                         globallyRegistered
+                         globalDumpPkgs
+                         snapshotDumpPkgs
+                         localDumpPkgs
                          sourceMap
                          installedMap
                          plan
