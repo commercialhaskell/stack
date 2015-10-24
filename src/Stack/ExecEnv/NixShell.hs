@@ -39,7 +39,7 @@ import           System.Process (CreateProcess(delegate_ctlc))
 
 -- | If ExecEnv is enabled, re-runs the currently running OS command in a ExecEnv container.
 -- Otherwise, runs the inner action.
--- 
+--
 -- This takes an optional release action which should be taken IFF control is
 -- transfering away from the current process to the intra-container one.  The main use
 -- for this is releasing a lock.  After launching reexecution, the host process becomes
@@ -103,7 +103,7 @@ execWithShell resolver mprojectRoot getCmdArgs mbefore inner mafter mrelease =
   where
     fromMaybeAction Nothing = return ()
     fromMaybeAction (Just hook) = hook
-    
+
 runShellAndExit :: M env m
                 => Resolver
                 -> m (String, [String])
