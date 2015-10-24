@@ -16,6 +16,8 @@ Other enhancements:
 
 Bug fixes:
 
+* Haddocks not copied for dependencies [#1105](https://github.com/commercialhaskell/stack/issues/1105)
+
 ## v0.1.6.0
 
 Major changes:
