@@ -1,8 +1,8 @@
 {-# LANGUAGE OverloadedStrings, FlexibleInstances, RecordWildCards #-}
 
--- | Docker types.
+-- | Nix types.
 
-module Stack.Types.ExecEnv where
+module Stack.Types.Nix where
 
 import Control.Applicative
 import Control.Monad

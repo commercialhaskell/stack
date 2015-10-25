@@ -55,7 +55,7 @@ import qualified Paths_stack as Meta
 import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
 import           Stack.Types.Compiler
 import           Stack.Types.Docker
-import           Stack.Types.ExecEnv
+import           Stack.Types.Nix
 import           Stack.Types.FlagName
 import           Stack.Types.Image
 import           Stack.Types.PackageIdentifier

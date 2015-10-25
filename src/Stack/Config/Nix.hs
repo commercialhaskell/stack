@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP, DeriveDataTypeable, RecordWildCards, TemplateHaskell #-}
 
--- | Docker configuration
-module Stack.Config.ExecEnv where
+-- | Nix configuration
+module Stack.Config.Nix where
 
 import Control.Exception.Lifted
 import Control.Monad

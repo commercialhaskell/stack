@@ -68,7 +68,7 @@ import           Safe (headMay)
 import           Stack.BuildPlan
 import           Stack.Constants
 import           Stack.Config.Docker
-import           Stack.Config.ExecEnv
+import           Stack.Config.Nix
 import qualified Stack.Image as Image
 import           Stack.Init
 import           Stack.Types

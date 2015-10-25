@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiWayIf #-}
 
 -- | Run commands in a nix-shell
-module Stack.ExecEnv.NixShell
+module Stack.Nix
   (execWithShell
   ,reexecWithShell
   ,reExecArgName

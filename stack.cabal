@@ -53,20 +53,20 @@ library
                      Stack.BuildPlan
                      Stack.Config
                      Stack.Config.Docker
-                     Stack.Config.ExecEnv
+                     Stack.Config.Nix
                      Stack.ConfigCmd
                      Stack.Constants
                      Stack.Coverage
                      Stack.Docker
                      Stack.Docker.GlobalDB
                      Stack.Dot
-                     Stack.ExecEnv.NixShell
                      Stack.Fetch
                      Stack.Exec
                      Stack.FileWatch
                      Stack.GhcPkg
                      Stack.Init
                      Stack.New
+                     Stack.Nix
                      Stack.Options
                      Stack.Package
                      Stack.PackageDump
@@ -84,10 +84,10 @@ library
                      Stack.Types.Compiler
                      Stack.Types.Config
                      Stack.Types.Docker
-                     Stack.Types.ExecEnv
                      Stack.Types.FlagName
                      Stack.Types.GhcPkgId
                      Stack.Types.Image
+                     Stack.Types.Nix
                      Stack.Types.PackageIdentifier
                      Stack.Types.PackageName
                      Stack.Types.TemplateName

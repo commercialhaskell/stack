@@ -57,7 +57,7 @@ import           Stack.Coverage
 import qualified Stack.Docker as Docker
 import           Stack.Dot
 import           Stack.Exec
-import qualified Stack.ExecEnv.NixShell as Nix
+import qualified Stack.Nix as Nix
 import           Stack.Fetch
 import           Stack.FileWatch
 import           Stack.GhcPkg (getGlobalDB, mkGhcPackagePath)
