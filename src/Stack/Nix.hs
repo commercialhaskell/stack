@@ -1,6 +1,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- | Run commands in a nix-shell
 module Stack.Nix
@@ -14,13 +15,14 @@ import           Control.Exception.Lifted
 import           Control.Monad
 import           Control.Monad.Catch (throwM,MonadCatch,MonadMask)
 import           Control.Monad.IO.Class (MonadIO,liftIO)
-import           Control.Monad.Logger (MonadLogger)
+import           Control.Monad.Logger (MonadLogger,logDebug)
 import           Control.Monad.Reader (MonadReader,asks)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Char (toUpper)
 import           Data.List (intercalate)
 import           Data.Maybe
 import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
+import qualified Data.Text as T
 import           Data.Version (showVersion)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import qualified Paths_stack as Meta
@@ -108,7 +110,7 @@ runShellAndExit getCmdArgs = do
                            ,[intercalate " "
                                 ("export":(inContainerEnvVar++"=1"):";":cmnd:args)]
                            ]
-     liftIO $ putStrLn $
+     $logDebug $ T.pack $
          "Using a nix-shell environment with nix packages: " ++
          (intercalate ", " nixpkgs)
      e <- try (callProcess'
