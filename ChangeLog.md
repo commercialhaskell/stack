@@ -13,7 +13,7 @@ Other enhancements:
 * Added a `stack config set resolver RESOLVER` command. Part of work on [#115](https://github.com/commercialhaskell/stack/issues/115)
 * `stack setup` can now install GHCJS on windows.  See [#1145](https://github.com/commercialhaskell/stack/issues/1145) and [#749](https://github.com/commercialhaskell/stack/issues/749)
 * `stack hpc report` command added, which generates reports for HPC tix files
-* `stack ghci` builds the project before launching GHCi.  If the build fails, optimistically launch GHCi anyway [#1065](https://github.com/commercialhaskell/stack/issues/1065)
+* `stack ghci` builds the project before launching GHCi.  If the build fails, optimistically launch GHCi anyway.  Use `stack ghci --no-build` option to disable [#1065](https://github.com/commercialhaskell/stack/issues/1065)
 
 Bug fixes:
 
