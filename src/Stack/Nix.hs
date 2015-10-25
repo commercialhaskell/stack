@@ -18,7 +18,7 @@ import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader (MonadReader,asks)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Char (toUpper)
-import           Data.List (intersperse)
+import           Data.List (intercalate)
 import           Data.Maybe
 import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import           Data.Version (showVersion)
@@ -102,14 +102,15 @@ runShellAndExit getCmdArgs = do
                        "haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc"
                      _ -> "ghc"
          nixpkgs = [ghcInNix] ++ (map show (nixPackages (configNix config)))
-         fullArgs = (concat [["--pure", "-p"]
-                            ,nixpkgs
-                            ,["--command"]
-                            ,[(concat $ intersperse " "
-                                  ("export":(inContainerEnvVar++"=1"):";":cmnd:args))]
-                            ])
-     liftIO $ putStrLn $ "Using a nix-shell environment with nix packages: " ++
-                               (concat $ intersperse ", " nixpkgs)
+         fullArgs = concat [["--pure", "-p"]
+                           ,nixpkgs
+                           ,["--command"]
+                           ,[intercalate " "
+                                ("export":(inContainerEnvVar++"=1"):";":cmnd:args)]
+                           ]
+     liftIO $ putStrLn $
+         "Using a nix-shell environment with nix packages: " ++
+         (intercalate ", " nixpkgs)
      e <- try (callProcess'
                  (if isTerm then id else \cp -> cp { delegate_ctlc = False })
                  Nothing
