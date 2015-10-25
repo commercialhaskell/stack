@@ -26,17 +26,6 @@ data ExecEnvOpts = ExecEnvOpts
     -- ^ The system packages to be installed in the environment before it runs
   ,execEnvInitFile :: !(Maybe String)
     -- ^ The path of a file containing preconfiguration of the environment (e.g shell.nix)
---  ,dockerContainerName :: !(Maybe String)
-    -- ^ Container name to use, only makes sense from command-line with `dockerPersist`
-    -- or `dockerDetach`.
---  ,execEnvRunArgs :: ![String]
-    -- ^ Arguments to pass directly to @docker run@.
---  ,dockerEnv :: ![String]
-    -- ^ Environment variables to set in the container.
---  ,dockerDatabasePath :: !(Path Abs File)
-    -- ^ Location of image usage database.
---  ,dockerStackExe :: !(Maybe DockerStackExe)
-    -- ^ Location of container-compatible stack executable
   }
   deriving (Show)
 
@@ -51,75 +40,32 @@ data ExecEnvOptsMonoid = ExecEnvOptsMonoid
     -- ^ System packages to use (given to nix-shell)
   ,execEnvMonoidInitFile :: !(Maybe String)
     -- ^ The path of a file containing preconfiguration of the environment (e.g shell.nix)
---  ,dockerMonoidContainerName :: !(Maybe String)
-    -- ^ Container name to use, only makes sense from command-line with `dockerPersist`
-    -- or `dockerDetach`.
---  ,dockerMonoidRunArgs :: ![String]
-    -- ^ Arguments to pass directly to @docker run@
---  ,dockerMonoidEnv :: ![String]
-    -- ^ Environment variables to set in the container
---  ,dockerMonoidDatabasePath :: !(Maybe String)
-    -- ^ Location of image usage database.
---  ,dockerMonoidStackExe :: !(Maybe String)
-    -- ^ Location of container-compatible stack executable
   }
   deriving (Show)
 
 -- | Decode uninterpreted docker options from JSON/YAML.
 instance FromJSON (ExecEnvOptsMonoid, [JSONWarning]) where
   parseJSON = withObjectWarnings "DockerOptsMonoid"
-    (\o -> do execEnvMonoidDefaultEnable   <- pure True
-              execEnvMonoidEnable          <- o ..:? execEnvEnableArgName
-              execEnvMonoidPackages        <- o ..:? execEnvPackagesArgName ..!= []
-              execEnvMonoidInitFile        <- o ..:? execEnvInitFileArgName
---              dockerMonoidContainerName    <- o ..:? dockerContainerNameArgName
---              dockerMonoidRunArgs          <- o ..:? dockerRunArgsArgName ..!= []
---              dockerMonoidEnv              <- o ..:? dockerEnvArgName ..!= []
---              dockerMonoidDatabasePath     <- o ..:? dockerDatabasePathArgName
---              dockerMonoidStackExe         <- o ..:? dockerStackExeArgName
+    (\o -> do execEnvMonoidDefaultEnable <- pure True
+              execEnvMonoidEnable <- o ..:? execEnvEnableArgName
+              execEnvMonoidPackages <- o ..:? execEnvPackagesArgName ..!= []
+              execEnvMonoidInitFile <- o ..:? execEnvInitFileArgName
               return ExecEnvOptsMonoid{..})
 
 -- | Left-biased combine Docker options
 instance Monoid ExecEnvOptsMonoid where
   mempty = ExecEnvOptsMonoid
-    {execEnvMonoidDefaultEnable    = False
-    ,execEnvMonoidEnable           = Nothing
-    ,execEnvMonoidPackages         = []
-    ,execEnvMonoidInitFile         = Nothing
---    ,dockerMonoidContainerName    = Nothing
---    ,dockerMonoidRunArgs          = []
---    ,dockerMonoidEnv              = []
---    ,dockerMonoidDatabasePath     = Nothing
---    ,dockerMonoidStackExe         = Nothing
+    {execEnvMonoidDefaultEnable = False
+    ,execEnvMonoidEnable = Nothing
+    ,execEnvMonoidPackages = []
+    ,execEnvMonoidInitFile = Nothing
     }
   mappend l r = ExecEnvOptsMonoid
-    {execEnvMonoidDefaultEnable   = execEnvMonoidDefaultEnable l || execEnvMonoidDefaultEnable r
-    ,execEnvMonoidEnable          = execEnvMonoidEnable l <|> execEnvMonoidEnable r
-    ,execEnvMonoidPackages        = execEnvMonoidPackages l <> execEnvMonoidPackages r
-    ,execEnvMonoidInitFile        = execEnvMonoidInitFile l <|> execEnvMonoidInitFile r
---    ,dockerMonoidContainerName    = dockerMonoidContainerName l <|> dockerMonoidContainerName r
---    ,dockerMonoidRunArgs          = dockerMonoidRunArgs r <> dockerMonoidRunArgs l
---    ,dockerMonoidEnv              = dockerMonoidEnv r <> dockerMonoidEnv l
---    ,dockerMonoidDatabasePath     = dockerMonoidDatabasePath l <|> dockerMonoidDatabasePath r
---    ,dockerMonoidStackExe         = dockerMonoidStackExe l <|> dockerMonoidStackExe r
+    {execEnvMonoidDefaultEnable = execEnvMonoidDefaultEnable l || execEnvMonoidDefaultEnable r
+    ,execEnvMonoidEnable = execEnvMonoidEnable l <|> execEnvMonoidEnable r
+    ,execEnvMonoidPackages = execEnvMonoidPackages l <> execEnvMonoidPackages r
+    ,execEnvMonoidInitFile = execEnvMonoidInitFile l <|> execEnvMonoidInitFile r
     }
-
-{- -- | Where to get the `stack` executable to run in Docker containers
-data DockerStackExe
-    = DockerStackExeDownload  -- ^ Download from official bindist
-    | DockerStackExeHost  -- ^ Host's `stack` (linux-x86_64 only)
-    | DockerStackExeImage  -- ^ Docker image's `stack` (versions must match)
-    | DockerStackExePath (Path Abs File) -- ^ Executable at given path
-    deriving (Show)
-
--- | Parse 'DockerStackExe'.
-parseDockerStackExe :: (MonadThrow m) => String -> m DockerStackExe
-parseDockerStackExe t
-    | t == dockerStackExeDownloadVal = return DockerStackExeDownload
-    | t == dockerStackExeHostVal = return DockerStackExeHost
-    | t == dockerStackExeImageVal = return DockerStackExeImage
-    | otherwise = liftM DockerStackExePath (parseAbsFile t)
--}
 
 -- | ExecEnv enable argument name.
 execEnvEnableArgName :: Text
@@ -132,37 +78,3 @@ execEnvPackagesArgName = "packages"
 -- | ExecEnv init env file path argument name.
 execEnvInitFileArgName :: Text
 execEnvInitFileArgName = "init-env-file"
-
-{-
--- | Docker run args argument name.
-dockerRunArgsArgName :: Text
-dockerRunArgsArgName = "run-args"
-
--- | Docker environment variable argument name.
-dockerEnvArgName :: Text
-dockerEnvArgName = "env"
-
--- | Docker container name argument name.
-dockerContainerNameArgName :: Text
-dockerContainerNameArgName = "container-name"
-
--- | Docker database path argument name.
-dockerDatabasePathArgName :: Text
-dockerDatabasePathArgName = "database-path"
-
--- | Docker database path argument name.
-dockerStackExeArgName :: Text
-dockerStackExeArgName = "stack-exe"
-
--- | Value for @--docker-stack-exe=download@
-dockerStackExeDownloadVal :: String
-dockerStackExeDownloadVal = "download"
-
--- | Value for @--docker-stack-exe=host@
-dockerStackExeHostVal :: String
-dockerStackExeHostVal = "host"
-
--- | Value for @--docker-stack-exe=image@
-dockerStackExeImageVal :: String
-dockerStackExeImageVal = "image"
--}
