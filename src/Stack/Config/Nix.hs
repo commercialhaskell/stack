@@ -14,14 +14,11 @@ import Path
 import Stack.Types
 
 -- | Interprets DockerOptsMonoid options.
-execEnvOptsFromMonoid
+nixOptsFromMonoid
     :: MonadThrow m
-    => Maybe Project -> Path Abs Dir -> ExecEnvOptsMonoid -> m ExecEnvOpts
-execEnvOptsFromMonoid mproject stackRoot ExecEnvOptsMonoid{..} = do
-    let execEnvType =
-            if fromMaybe execEnvMonoidDefaultEnable execEnvMonoidEnable
-            then Just NixShellExecEnv
-            else Nothing
-        execEnvPackages = execEnvMonoidPackages
-        execEnvInitFile = execEnvMonoidInitFile
-    return ExecEnvOpts{..}
+    => Maybe Project -> Path Abs Dir -> NixOptsMonoid -> m NixOpts
+nixOptsFromMonoid mproject stackRoot NixOptsMonoid{..} = do
+    let nixEnable = fromMaybe nixMonoidDefaultEnable nixMonoidEnable
+        nixPackages = nixMonoidPackages
+        nixInitFile = nixMonoidInitFile
+    return NixOpts{..}

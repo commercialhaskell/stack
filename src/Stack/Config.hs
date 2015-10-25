@@ -144,7 +144,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mproject configMonoi
          configCompilerCheck = fromMaybe MatchMinor configMonoidCompilerCheck
 
      configDocker <- dockerOptsFromMonoid mproject configStackRoot configMonoidDockerOpts
-     configExecEnv <- execEnvOptsFromMonoid mproject configStackRoot configMonoidExecEnvOpts
+     configNix <- nixOptsFromMonoid mproject configStackRoot configMonoidNixOpts
 
      rawEnv <- liftIO getEnvironment
      origEnv <- mkEnvOverride configPlatform

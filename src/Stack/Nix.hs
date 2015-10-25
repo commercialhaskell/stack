@@ -4,8 +4,8 @@
 
 -- | Run commands in a nix-shell
 module Stack.Nix
-  (execWithShell
-  ,reexecWithShell
+  (execWithOptionalShell
+  ,reexecWithOptionalShell
   ,reExecArgName
   ) where
 
@@ -37,26 +37,22 @@ import           System.Process.Run
 import           System.Process (CreateProcess(delegate_ctlc))
 
 
--- | If ExecEnv is enabled, re-runs the currently running OS command in a ExecEnv container.
+-- | If Nix is enabled, re-runs the currently running OS command in a Nix container.
 -- Otherwise, runs the inner action.
 --
 -- This takes an optional release action which should be taken IFF control is
 -- transfering away from the current process to the intra-container one.  The main use
 -- for this is releasing a lock.  After launching reexecution, the host process becomes
 -- nothing but an manager for the call into docker and thus may not hold the lock.
-reexecWithShell
+reexecWithOptionalShell
     :: M env m
-    => Resolver  -- ^ Needed for installing ghc in the nix-shell
-    -> Maybe (Path Abs Dir)
-    -> Maybe (m ())
+    => Maybe (Path Abs Dir)
     -> IO ()
-    -> Maybe (m ())
-    -> Maybe (m ())
     -> m ()
-reexecWithShell resolver mprojectRoot =
-    execWithShell resolver mprojectRoot getCmdArgs
+reexecWithOptionalShell mprojectRoot =
+    execWithOptionalShell mprojectRoot getCmdArgs
   where
-    getCmdArgs {-envOverride imageInfo-} = do
+    getCmdArgs = do
         args <-
             fmap
                 (("--" ++ reExecArgName ++ "=" ++ showVersion Meta.version) :)
@@ -64,63 +60,47 @@ reexecWithShell resolver mprojectRoot =
         exePath <- liftIO getExecutablePath
         return (exePath, args)
 
--- | If ExecEnv is enabled, re-runs the OS command returned by the second argument in a
--- ExecEnv container.  Otherwise, runs the inner action.
+-- | If Nix is enabled, re-runs the OS command returned by the second argument in a
+-- Nix container.  Otherwise, runs the inner action.
 --
--- This takes an optional release action just like `reexecWithOptionalContainer`.
-execWithShell
+-- This takes an optional release action just like `reexecWithOptionalShell`.
+execWithOptionalShell
     :: M env m
-    => Resolver
-    -> Maybe (Path Abs Dir)
-    -> ({-EnvOverride -> Inspect ->-} m (FilePath,[String])) --,[(String,String)],[Mount]))
-    -> Maybe (m ())
+    => Maybe (Path Abs Dir)
+    -> m (FilePath,[String])
     -> IO ()
-    -> Maybe (m ())
-    -> Maybe (m ())
     -> m ()
-execWithShell resolver mprojectRoot getCmdArgs mbefore inner mafter mrelease =
+execWithOptionalShell mprojectRoot getCmdArgs inner =
   do config <- asks getConfig
      inShell <- getInShell
      isReExec <- asks getReExec
-     let envType = execEnvType (configExecEnv config)
-     if | inShell && not isReExec && (isJust mbefore || isJust mafter) ->
+     if | inShell && not isReExec ->
             throwM OnlyOnHostException
         | inShell ->
             liftIO (do inner
                        exitSuccess)
-        | isNothing envType ->
-            do fromMaybeAction mbefore
-               liftIO inner
-               fromMaybeAction mafter
+        | not (nixEnable (configNix config)) ->
+            do liftIO inner
                liftIO exitSuccess
-        | envType == Just NixShellExecEnv ->
-            do fromMaybeAction mrelease
-               runShellAndExit resolver
+        | otherwise ->
+            do runShellAndExit
                  getCmdArgs
                  mprojectRoot
-                 (fromMaybeAction mbefore)
-                 (fromMaybeAction mafter)
-  where
-    fromMaybeAction Nothing = return ()
-    fromMaybeAction (Just hook) = hook
 
 runShellAndExit :: M env m
-                => Resolver
-                -> m (String, [String])
-                -> t
+                => m (String, [String])
+                -> Maybe (Path Abs Dir)
                 -> m ()
-                -> m ()
-                -> m ()
-runShellAndExit resolver getCmdArgs mprojectRoot before after = do
+runShellAndExit getCmdArgs mprojectRoot = do
      config <- asks getConfig
      envOverride <- getEnvOverride (configPlatform config)
      (cmnd,args) <- getCmdArgs
-     before
+     resolver <- bcResolver <$> asks getBuildConfig
      let ghcInNix = case resolver of
                      ResolverSnapshot (LTS x y) ->
-                       "haskell.packages.lts-" ++ (show x) ++ "_" ++ (show y) ++ ".ghc"
+                       "haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc"
                      _ -> "ghc"
-         nixpkgs = [ghcInNix] ++ (map show (execEnvPackages (configExecEnv config)))
+         nixpkgs = [ghcInNix] ++ (map show (nixPackages (configNix config)))
          fullArgs = (concat [["--pure", "-p"]
                             ,nixpkgs
                             ,["--command"]
@@ -137,11 +117,9 @@ runShellAndExit resolver getCmdArgs mprojectRoot before after = do
                  fullArgs)
      case e of
        Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
-       Right () -> do after
-                      liftIO exitSuccess
+       Right () -> liftIO exitSuccess
 
-
--- | 'True' if we are currently running inside a ExecEnv.
+-- | 'True' if we are currently running inside a Nix.
 getInShell :: (MonadIO m) => m Bool
 getInShell = liftIO (isJust <$> lookupEnv inContainerEnvVar)
 
@@ -153,6 +131,15 @@ inContainerEnvVar = concat [map toUpper stackProgName,"_IN_CONTAINER"]
 reExecArgName :: String
 reExecArgName = "internal-re-exec-version"
 
--- | A shortcut
-type M env m = (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadCatch m
-               ,HasConfig env,HasTerminal env,HasReExec env,HasHttpManager env,MonadMask m)
+type M env m =
+  (MonadIO m
+  ,MonadReader env m
+  ,MonadLogger m
+  ,MonadBaseControl IO m
+  ,MonadCatch m
+  ,HasBuildConfig env
+  ,HasTerminal env
+  ,HasReExec env
+  ,HasHttpManager env
+  ,MonadMask m
+  )

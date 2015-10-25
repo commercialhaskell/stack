@@ -754,21 +754,21 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
                  runStackTGlobal
                      manager bconfig go
                      (setupEnv Nothing)
-              runStackTGlobal
-                  manager
-                  envConfig
-                  go
-                  (inner' lk)
+              runStackTGlobal manager bconfig go $
+                  Nix.reexecWithOptionalShell
+                      (lcProjectRoot lc)
+                      (runStackTGlobal
+                          manager
+                          envConfig
+                          go
+                          (inner' lk))
 
-      reexecFn <- case execEnvType (configExecEnv (lcConfig lc)) of
-                    Just NixShellExecEnv -> do
-                         -- for now we bypass docker if nix-shell is on
-                         resolver <- bcResolver <$> (runStackLoggingTGlobal manager go $
-                                                      lcLoadBuildConfig lc globalResolver)
-                         return $ Nix.reexecWithShell resolver
-                    _ -> return Docker.reexecWithOptionalContainer
       runStackTGlobal manager (lcConfig lc) go $
-        reexecFn (lcProjectRoot lc) mbefore (inner'' lk0) mafter
+        Docker.reexecWithOptionalContainer
+                 (lcProjectRoot lc)
+                 mbefore
+                 (inner'' lk0)
+                 mafter
                  (Just $ liftIO $
                       do lk' <- readIORef curLk
                          munlockFile lk')
@@ -877,10 +877,17 @@ execCmd ExecOpts {..} go@GlobalOpts{..} = do
                 Docker.execWithOptionalContainer
                     (lcProjectRoot lc)
                     (\_ _ -> return (cmd, args, [], []))
-                    -- Unlock before transferring control away, whether using docker or not:
+                    -- Unlock before transferring control away, whether using
+                    -- docker or not:
                     (Just $ munlockFile lk)
-                    (runStackTGlobal manager (lcConfig lc) go $ do
-                        exec plainEnvSettings cmd args)
+                    (do bconfig <- runStackLoggingTGlobal manager go $
+                            lcLoadBuildConfig lc globalResolver
+                        runStackTGlobal manager bconfig go $ do
+                            Nix.execWithOptionalShell
+                                (lcProjectRoot lc)
+                                (return (cmd, args))
+                                (runStackTGlobal manager (lcConfig lc) go $
+                                    exec plainEnvSettings cmd args))
                     Nothing
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} ->
