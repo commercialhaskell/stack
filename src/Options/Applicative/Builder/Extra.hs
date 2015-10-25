@@ -70,7 +70,7 @@ enableDisableFlagsNoDefault' enabledValue disabledValue maybeHideValue name help
             help
                 (concat $ concat
                      [ ["Disable ", helpSuffix]
-                     , [" (--no-" ++ name ++ " to enable)" | hideEnabled]]) <>
+                     , [" (--" ++ name ++ " to enable)" | hideEnabled]]) <>
             mods) <|>
        flag'
            disabledValue
