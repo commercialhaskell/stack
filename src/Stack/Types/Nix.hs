@@ -7,12 +7,9 @@
 module Stack.Types.Nix where
 
 import Control.Applicative
-import Control.Monad
-import Control.Monad.Catch (MonadThrow)
 import Data.Aeson.Extended
 import Data.Monoid
 import Data.Text (Text)
-import Path
 
 import Stack.Types.PackageName
 

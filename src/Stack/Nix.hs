@@ -23,7 +23,6 @@ import           Data.Maybe
 import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import           Data.Version (showVersion)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
-import           Path
 import qualified Paths_stack as Meta
 import           Prelude -- Fix redundant import warnings
 import           Stack.Constants (stackProgName)
@@ -46,11 +45,10 @@ import           System.Process (CreateProcess(delegate_ctlc))
 -- nothing but an manager for the call into docker and thus may not hold the lock.
 reexecWithOptionalShell
     :: M env m
-    => Maybe (Path Abs Dir)
-    -> IO ()
+    => IO ()
     -> m ()
-reexecWithOptionalShell mprojectRoot =
-    execWithOptionalShell mprojectRoot getCmdArgs
+reexecWithOptionalShell =
+    execWithOptionalShell getCmdArgs
   where
     getCmdArgs = do
         args <-
@@ -66,11 +64,10 @@ reexecWithOptionalShell mprojectRoot =
 -- This takes an optional release action just like `reexecWithOptionalShell`.
 execWithOptionalShell
     :: M env m
-    => Maybe (Path Abs Dir)
-    -> m (FilePath,[String])
+    => m (FilePath,[String])
     -> IO ()
     -> m ()
-execWithOptionalShell mprojectRoot getCmdArgs inner =
+execWithOptionalShell getCmdArgs inner =
   do config <- asks getConfig
      inShell <- getInShell
      isReExec <- asks getReExec
@@ -85,13 +82,11 @@ execWithOptionalShell mprojectRoot getCmdArgs inner =
         | otherwise ->
             do runShellAndExit
                  getCmdArgs
-                 mprojectRoot
 
 runShellAndExit :: M env m
                 => m (String, [String])
-                -> Maybe (Path Abs Dir)
                 -> m ()
-runShellAndExit getCmdArgs mprojectRoot = do
+runShellAndExit getCmdArgs = do
      config <- asks getConfig
      envOverride <- getEnvOverride (configPlatform config)
      (cmnd,args) <- getCmdArgs

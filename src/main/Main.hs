@@ -756,7 +756,6 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
                      (setupEnv Nothing)
               runStackTGlobal manager bconfig go $
                   Nix.reexecWithOptionalShell
-                      (lcProjectRoot lc)
                       (runStackTGlobal
                           manager
                           envConfig
@@ -884,7 +883,6 @@ execCmd ExecOpts {..} go@GlobalOpts{..} = do
                             lcLoadBuildConfig lc globalResolver
                         runStackTGlobal manager bconfig go $ do
                             Nix.execWithOptionalShell
-                                (lcProjectRoot lc)
                                 (return (cmd, args))
                                 (runStackTGlobal manager (lcConfig lc) go $
                                     exec plainEnvSettings cmd args))
