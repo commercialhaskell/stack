@@ -96,11 +96,11 @@ fileWatchConf cfg inner = withManagerConf cfg $ \manager -> do
                         putStrLn "help: display this help"
                         putStrLn "quit: exit"
                         putStrLn "build: force a rebuild"
-                        putStrLn "watched: display watched directories"
+                        putStrLn "watched: display watched files"
                     "build" -> atomically $ writeTVar dirtyVar True
                     "watched" -> do
-                        watch <- readTVarIO watchVar
-                        mapM_ (putStrLn . toFilePath) (Map.keys watch)
+                        watch <- readTVarIO allFiles
+                        mapM_ putStrLn (Set.toList watch)
                     "" -> atomically $ writeTVar dirtyVar True
                     _ -> putStrLn $ concat
                         [ "Unknown command: "
