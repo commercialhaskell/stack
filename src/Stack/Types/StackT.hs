@@ -295,16 +295,18 @@ loggerFunc loc _src level msg =
                       T.hPutStrLn outputChannel out))
   where outputChannel = stderr
         getOutput maxLogLevel =
-          do date <- getDate
+          do timestamp <- getTimestamp
              l <- getLevel
              lc <- getLoc
-             return (T.pack date <> T.pack l <> T.decodeUtf8 (fromLogStr (toLogStr msg)) <> T.pack lc)
-          where getDate
+             return (T.pack timestamp <> T.pack l <> T.decodeUtf8 (fromLogStr (toLogStr msg)) <> T.pack lc)
+          where getTimestamp
                   | maxLogLevel <= LevelDebug =
                     do now <- getCurrentTime
-                       return (formatTime defaultTimeLocale "%Y-%m-%d %T%Q" now ++
-                               ": ")
+                       return (formatTime' now ++ ": ")
                   | otherwise = return ""
+                  where
+                    formatTime' =
+                        take timestampLength . formatTime defaultTimeLocale "%F %T.%q"
                 getLevel
                   | maxLogLevel <= LevelDebug =
                     return ("[" ++
@@ -327,6 +329,12 @@ loggerFunc loc _src level msg =
                   (char loc)
                   where line = show . fst . loc_start
                         char = show . snd . loc_start
+
+-- | The length of a timestamp in the format "YYYY-MM-DD hh:mm:ss.μμμμμμ".
+-- This definition is top-level in order to avoid multiple reevaluation at runtime.
+timestampLength :: Int
+timestampLength =
+  length (formatTime defaultTimeLocale "%F %T.000000" (UTCTime (ModifiedJulianDay 0) 0))
 
 -- | With a sticky state, do the thing.
 withSticky :: (MonadIO m)
