@@ -31,6 +31,7 @@ import           Stack.Types
 import           Stack.Types.Internal
 import           System.Environment (lookupEnv,getArgs,getExecutablePath)
 import           System.Exit (exitSuccess, exitWith)
+import           System.IO (stderr,stdin,hIsTerminalDevice)
 import           System.Process.Read
 import           System.Process.Run
 import           System.Process (CreateProcess(delegate_ctlc))
@@ -91,7 +92,12 @@ runShellAndExit getCmdArgs = do
      envOverride <- getEnvOverride (configPlatform config)
      (cmnd,args) <- getCmdArgs
      resolver <- bcResolver <$> asks getBuildConfig
-     let ghcInNix = case resolver of
+     isStdoutTerminal <- asks getTerminal
+     (isStdinTerminal,isStderrTerminal) <-
+       liftIO ((,) <$> hIsTerminalDevice stdin
+                   <*> hIsTerminalDevice stderr)
+     let isTerm = isStdinTerminal && isStdoutTerminal && isStderrTerminal
+         ghcInNix = case resolver of
                      ResolverSnapshot (LTS x y) ->
                        "haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc"
                      _ -> "ghc"
@@ -105,7 +111,7 @@ runShellAndExit getCmdArgs = do
      liftIO $ putStrLn $ "Using a nix-shell environment with nix packages: " ++
                                (concat $ intersperse ", " nixpkgs)
      e <- try (callProcess'
-                 (\cp -> cp { delegate_ctlc = False })
+                 (if isTerm then id else \cp -> cp { delegate_ctlc = False })
                  Nothing
                  envOverride
                  "nix-shell"
