@@ -410,7 +410,7 @@ data BuildSubset
     -- ^ Only install packages in the snapshot database, skipping
     -- packages intended for the local database.
     | BSOnlyDependencies
-    deriving Show
+    deriving (Show, Eq)
 
 -- | Configuration for building.
 data BuildOpts =
