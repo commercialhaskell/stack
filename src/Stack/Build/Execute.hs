@@ -953,12 +953,16 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         -- Find the package in the database
         wc <- getWhichCompiler
         let pkgDbs = [bcoSnapDB eeBaseConfigOpts]
-        mpkgid <- loadInstalledPkg eeEnvOverride wc pkgDbs eeSnapshotDumpPkgs pname
 
-        return $ Just $
-            case mpkgid of
-                Nothing -> Executable taskProvides
-                Just pkgid -> Library taskProvides pkgid
+        case mlib of
+            Nothing -> return $ Just $ Executable taskProvides
+            Just _ -> do
+                mpkgid <- loadInstalledPkg eeEnvOverride wc pkgDbs eeSnapshotDumpPkgs pname
+
+                return $ Just $
+                    case mpkgid of
+                        Nothing -> assert False $ Executable taskProvides
+                        Just pkgid -> Library taskProvides pkgid
       where
         bindir = toFilePath $ bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
@@ -1036,7 +1040,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         withMVar eeInstallLock $ \() -> do
             announce "copy/register"
             cabal False ["copy"]
-            cabal False ["register"]
+            when (packageHasLibrary package) $ cabal False ["register"]
 
         let (installedPkgDb, installedDumpPkgsTVar, dumpPkgsTVars) =
                 case taskLocation task of
@@ -1048,16 +1052,18 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                         ( bcoLocalDB eeBaseConfigOpts
                         , eeLocalDumpPkgs
                         , [eeSnapshotDumpPkgs, eeLocalDumpPkgs] )
-        mpkgid <- loadInstalledPkg eeEnvOverride wc [installedPkgDb] installedDumpPkgsTVar (packageName package)
         let ident = PackageIdentifier (packageName package) (packageVersion package)
-        mpkgid' <- case (packageHasLibrary package, mpkgid) of
-            (False, _) -> assert (isNothing mpkgid) $ do
+        mpkgid <- if packageHasLibrary package
+            then do
+                mpkgid <- loadInstalledPkg eeEnvOverride wc [installedPkgDb] installedDumpPkgsTVar (packageName package)
+                case mpkgid of
+                    Nothing -> throwM $ Couldn'tFindPkgId $ packageName package
+                    Just pkgid -> return $ Library ident pkgid
+            else do
                 markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
                 return $ Executable ident
-            (True, Nothing) -> throwM $ Couldn'tFindPkgId $ packageName package
-            (True, Just pkgid) -> return $ Library ident pkgid
 
-        case (doHaddock package && shouldHaddockDeps eeBuildOpts, mpkgid') of
+        case (doHaddock package && shouldHaddockDeps eeBuildOpts, mpkgid) of
             (False, _) -> return ()
             (True, Executable _) -> return ()
             (True, Library _ ghcPkgId) ->
@@ -1076,7 +1082,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                 mpkgid (packageExes package)
             Local -> return ()
 
-        return mpkgid'
+        return mpkgid
 
     loadInstalledPkg menv wc pkgDbs tvar name = do
         dps <- ghcPkgDescribe name menv wc pkgDbs $ conduitDumpPackage =$ CL.consume

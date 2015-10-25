@@ -342,7 +342,7 @@ writePrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, Mon
                       -> PackageIdentifier
                       -> ConfigureOpts
                       -> Set GhcPkgId -- ^ dependencies
-                      -> Maybe GhcPkgId -- ^ library
+                      -> Installed -- ^ library
                       -> Set Text -- ^ executables
                       -> m ()
 writePrecompiledCache baseConfigOpts pkgident copts depIDs mghcPkgId exes = do
@@ -350,8 +350,8 @@ writePrecompiledCache baseConfigOpts pkgident copts depIDs mghcPkgId exes = do
     createTree $ parent file
     mlibpath <-
         case mghcPkgId of
-            Nothing -> return Nothing
-            Just ipid -> liftM Just $ do
+            Executable _ -> return Nothing
+            Library _ ipid -> liftM Just $ do
                 ipid' <- parseRelFile $ ghcPkgIdString ipid ++ ".conf"
                 return $ toFilePath $ bcoSnapDB baseConfigOpts </> ipid'
     exes' <- forM (Set.toList exes) $ \exe -> do
