@@ -213,11 +213,11 @@ resolvePackage packageConfig gpkg =
     pkgFiles = GetPackageFiles $
         \cabalfp ->
              do distDir <- distDirFromDir (parent cabalfp)
-                (componentModules,componentFiles,cabalFiles,warnings) <-
+                (componentModules,componentFiles,dataFiles',warnings) <-
                     runReaderT
                         (packageDescModulesAndFiles pkg)
                         (cabalfp, buildDir distDir)
-                return (componentModules, componentFiles, cabalFiles, warnings)
+                return (componentModules, componentFiles, S.insert cabalfp dataFiles', warnings)
     pkgId = package (packageDescription gpkg)
     name = fromCabalPackageName (pkgName pkgId)
     pkg = resolvePackageDescription packageConfig gpkg
