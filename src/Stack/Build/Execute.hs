@@ -1004,20 +1004,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                             Nothing -> packageExes package
                     ]
                 TTUpstream _ _ -> ["build"]) ++ extraOpts
-
-        case taskType of
-            TTLocal lp -> do
-                (addBuildCache,warnings) <-
-                    addUnlistedToBuildCache
-                        preBuildTime
-                        (lpPackage lp)
-                        (lpCabalFile lp)
-                        (lpNewBuildCache lp)
-                mapM_ ($logWarn . ("Warning: " <>) . T.pack . show) warnings
-                unless (null addBuildCache) $
-                    writeBuildCache pkgDir $
-                    Map.unions (lpNewBuildCache lp : addBuildCache)
-            TTUpstream _ _ -> return ()
+        checkForUnlistedFiles taskType preBuildTime pkgDir
 
         when (doHaddock package) $ do
             announce "haddock"
@@ -1093,6 +1080,21 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                 return $ Just (dpGhcPkgId dp)
             _ -> error "singleBuild: invariant violated: multiple results when describing installed package"
 
+-- | Check if any unlisted files have been found, and add them to the build cache.
+checkForUnlistedFiles :: M env m => TaskType -> ModTime -> Path Abs Dir -> m ()
+checkForUnlistedFiles (TTLocal lp) preBuildTime pkgDir = do
+    (addBuildCache,warnings) <-
+        addUnlistedToBuildCache
+            preBuildTime
+            (lpPackage lp)
+            (lpCabalFile lp)
+            (lpNewBuildCache lp)
+    mapM_ ($logWarn . ("Warning: " <>) . T.pack . show) warnings
+    unless (null addBuildCache) $
+        writeBuildCache pkgDir $
+        Map.unions (lpNewBuildCache lp : addBuildCache)
+checkForUnlistedFiles (TTUpstream _ _) _ _ = return ()
+
 -- | Determine if all of the dependencies given are installed
 depsPresent :: InstalledMap -> Map PackageName VersionRange -> Bool
 depsPresent installedMap deps = all
@@ -1147,8 +1149,10 @@ singleTest runInBase topts lptb ac ee task installedMap = do
                 TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
                 TTUpstream _ _ -> assert False $ return ()
             extraOpts <- extraBuildOptions (eeBuildOpts ee)
+            preBuildTime <- modTime <$> liftIO getCurrentTime
             cabal (console && configHideTHLoading config) $
                 "build" : (components ++ extraOpts)
+            checkForUnlistedFiles (taskType task) preBuildTime pkgDir
             setTestBuilt pkgDir
 
         toRun <-
@@ -1292,7 +1296,9 @@ singleBench runInBase beopts _lptb ac ee task installedMap = do
                 TTUpstream _ _ -> assert False $ return ()
             config <- asks getConfig
             extraOpts <- extraBuildOptions (eeBuildOpts ee)
+            preBuildTime <- modTime <$> liftIO getCurrentTime
             cabal (console && configHideTHLoading config) ("build" : extraOpts)
+            checkForUnlistedFiles (taskType task) preBuildTime pkgDir
             setBenchBuilt pkgDir
         let args = maybe []
                          ((:[]) . ("--benchmark-options=" <>))
