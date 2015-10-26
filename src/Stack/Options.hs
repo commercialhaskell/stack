@@ -312,7 +312,8 @@ nixOptsParser showOptions =
   <*> pure Nothing
   <*> many (textOption (long "nix-shell-options" <>
                         metavar "OPTION" <>
-                        help "Additional options passed to nix-shell"))
+                        help "Additional options passed to nix-shell" <>
+                        hide))
   where
     hide = if showOptions
              then idm

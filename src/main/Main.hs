@@ -134,6 +134,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
          "stack - The Haskell Tool Stack"
          ""
          (\isSub -> extraHelpOption isSub progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
+                    extraHelpOption isSub progName (Nix.nixCmdName ++ "*") nixHelpOptName <*>                            
                     globalOptsParser isSub)
          (do addCommand "build"
                         "Build the package(s) in this directory/configuration"
