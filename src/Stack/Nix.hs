@@ -8,6 +8,7 @@ module Stack.Nix
   (execWithOptionalShell
   ,reexecWithOptionalShell
   ,reExecArgName
+  ,nixCmdName
   ) where
 
 import           Control.Applicative
@@ -130,6 +131,10 @@ getInShell = liftIO (isJust <$> lookupEnv inContainerEnvVar)
 -- | Environment variable used to indicate stack is running in container.
 inContainerEnvVar :: String
 inContainerEnvVar = concat [map toUpper stackProgName,"_IN_CONTAINER"]
+
+-- | Command-line argument for "docker"
+nixCmdName :: String
+nixCmdName = "nix"
 
 -- | Command-line option for @--internal-re-exec@.
 reExecArgName :: String

@@ -113,6 +113,10 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                    dockerHelpOptName
                    (dockerOptsParser True)
                    ("Only showing --" ++ Docker.dockerCmdName ++ "* options.")
+     execExtraHelp args
+                   nixHelpOptName
+                   (nixOptsParser True)
+                   ("Only showing --" ++ Nix.nixCmdName ++ "* options.")
      let commitCount = $gitCommitCount
          versionString' = concat $ concat
             [ [$(simpleVersion Meta.version)]
@@ -407,6 +411,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                     exitFailure
   where
     dockerHelpOptName = Docker.dockerCmdName ++ "-help"
+    nixHelpOptName    = Nix.nixCmdName ++ "-help"
     cmdFooter = "Run 'stack --help' for global options that apply to all subcommands."
 
 -- | Print out useful path information in a human-readable format (and
@@ -880,7 +885,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} = do
                     -- docker or not:
                     (Just $ munlockFile lk)
                     (do bconfig <- runStackLoggingTGlobal manager go $
-                            lcLoadBuildConfig lc globalResolver
+                            lcLoadBuildConfig lc globalResolver globalCompiler
                         runStackTGlobal manager bconfig go $ do
                             Nix.execWithOptionalShell
                                 (return (cmd, args))

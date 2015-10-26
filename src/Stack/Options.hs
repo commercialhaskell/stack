@@ -14,6 +14,7 @@ module Stack.Options
     ,globalOptsParser
     ,initOptsParser
     ,newOptsParser
+    ,nixOptsParser
     ,logLevelOptsParser
     ,ghciOptsParser
     ,solverOptsParser
@@ -50,6 +51,7 @@ import           Stack.Dot
 import           Stack.Ghci (GhciOpts(..))
 import           Stack.Init
 import           Stack.New
+import           Stack.Nix
 import           Stack.Types
 import           Stack.Types.TemplateName
 
@@ -221,8 +223,9 @@ readFlag = do
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Bool -> Parser ConfigMonoid
 configOptsParser isSub docker =
-    (\opts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin modifyCodePage -> mempty
-        { configMonoidDockerOpts = opts
+    (\dockerOpts nixOpts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin modifyCodePage -> mempty
+        { configMonoidDockerOpts = dockerOpts
+        , configMonoidNixOpts = nixOpts
         , configMonoidSystemGHC = systemGHC
         , configMonoidInstallGHC = installGHC
         , configMonoidSkipGHCCheck = skipGHCCheck
@@ -237,6 +240,7 @@ configOptsParser isSub docker =
         , configMonoidModifyCodePage = modifyCodePage
         })
     <$> dockerOptsParser (not isSub && docker)
+    <*> nixOptsParser docker  -- Don't show nix opts when docker opts aren't shown
     <*> maybeBoolFlags
             "system-ghc"
             "using the system installed GHC (on the PATH) if available and a matching version"
@@ -296,6 +300,21 @@ configOptsParser isSub docker =
             "setting the codepage to support UTF-8 (Windows only)"
             hide
   where hide = hideMods isSub
+
+nixOptsParser :: Bool -> Parser NixOptsMonoid
+nixOptsParser showOptions =
+  NixOptsMonoid
+  <$> pure False
+  <*> maybeBoolFlags nixCmdName
+                     "using a Nix-shell"
+                     hide
+  <*> pure []
+  <*> pure Nothing
+  where
+    hide = if showOptions
+             then idm
+             else internal <> hidden
+
 
 -- | Options parser configuration for Docker.
 dockerOptsParser :: Bool -> Parser DockerOptsMonoid
