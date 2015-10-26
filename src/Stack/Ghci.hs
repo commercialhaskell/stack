@@ -14,6 +14,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Resource
+import           Data.Either
 import           Data.Function
 import           Data.List
 import           Data.Map.Strict (Map)
@@ -269,13 +270,24 @@ makeGhciPkgInfo sourceMap installedMap locals name cabalfp components = do
                                STLocalComps cs -> S.member k cs
                                _ -> True)
                      m)
+        filteredOptions =
+            nub (map
+                     (\x ->
+                           if badForGhci x
+                               then Left x
+                               else Right x)
+                     (generalOpts <>
+                      concat (filterWithinWantedComponents componentsOpts)))
+    case lefts filteredOptions of
+        [] -> return ()
+        options ->
+            $logWarn
+                ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
+                 T.unwords (map T.pack options))
     return
         GhciPkgInfo
         { ghciPkgName = packageName pkg
-        , ghciPkgOpts = filter
-              (not . badForGhci)
-              (generalOpts <>
-               concat (filterWithinWantedComponents componentsOpts))
+        , ghciPkgOpts = rights filteredOptions
         , ghciPkgDir = parent cabalfp
         , ghciPkgModules = mconcat
               (filterWithinWantedComponents componentsModules)
@@ -290,5 +302,5 @@ makeGhciPkgInfo sourceMap installedMap locals name cabalfp components = do
   where
     badForGhci :: String -> Bool
     badForGhci x =
-        isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky")
+        isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky -static")
     setMapMaybe f = S.fromList . mapMaybe f . S.toList
