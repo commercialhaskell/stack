@@ -100,21 +100,26 @@ runShellAndExit getCmdArgs = do
        liftIO ((,) <$> hIsTerminalDevice stdin
                    <*> hIsTerminalDevice stderr)
      let isTerm = isStdinTerminal && isStdoutTerminal && isStderrTerminal
+         mshellFile = nixInitFile (configNix config)
          ghcInNix = case resolver of
                      ResolverSnapshot (LTS x y) ->
                        "haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc"
                      _ -> "ghc"
          nixpkgs = [ghcInNix] ++ (map show (nixPackages (configNix config)))
-         fullArgs = concat [["--pure", "-p"]
-                           ,nixpkgs
+         packagesOrFile = case mshellFile of
+           Just filePath -> [filePath]
+           Nothing -> "-p" : nixpkgs
+         fullArgs = concat [["--pure"]
+                           ,packagesOrFile
                            ,map T.unpack (nixShellOptions (configNix config))
                            ,["--command"]
                            ,[intercalate " "
-                                ("export":(inContainerEnvVar++"=1"):";":cmnd:args)]
+                                ("export":(inShellEnvVar ++ "=1"):";":cmnd:args)]
                            ]
      $logDebug $ T.pack $
-         "Using a nix-shell environment with nix packages: " ++
-         (intercalate ", " nixpkgs)
+         "Using a nix-shell environment " ++ (case mshellFile of
+            Just filePath -> "from file: " ++ filePath
+            Nothing -> "with nix packages: " ++ (intercalate ", " nixpkgs))
      e <- try (callProcess'
                  (if isTerm then id else \cp -> cp { delegate_ctlc = False })
                  Nothing
@@ -130,8 +135,8 @@ getInShell :: (MonadIO m) => m Bool
 getInShell = liftIO (isJust <$> lookupEnv inContainerEnvVar)
 
 -- | Environment variable used to indicate stack is running in container.
-inContainerEnvVar :: String
-inContainerEnvVar = concat [map toUpper stackProgName,"_IN_CONTAINER"]
+inShellEnvVar :: String
+inShellEnvVar = concat [map toUpper stackProgName,"_IN_NIXSHELL"]
 
 -- | Command-line argument for "docker"
 nixCmdName :: String

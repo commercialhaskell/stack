@@ -78,7 +78,7 @@ nixPackagesArgName = "packages"
 
 -- | Nix init env file path argument name.
 nixInitFileArgName :: Text
-nixInitFileArgName = "init-env-file"
+nixInitFileArgName = "shell-file"
 
 nixShellOptsArgName :: Text
 nixShellOptsArgName = "nix-shell-options"
