@@ -107,6 +107,7 @@ runShellAndExit getCmdArgs = do
          nixpkgs = [ghcInNix] ++ (map show (nixPackages (configNix config)))
          fullArgs = concat [["--pure", "-p"]
                            ,nixpkgs
+                           ,map T.unpack (nixShellOptions (configNix config))
                            ,["--command"]
                            ,[intercalate " "
                                 ("export":(inContainerEnvVar++"=1"):";":cmnd:args)]

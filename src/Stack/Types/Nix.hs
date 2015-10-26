@@ -20,6 +20,8 @@ data NixOpts = NixOpts
     -- ^ The system packages to be installed in the environment before it runs
   ,nixInitFile :: !(Maybe String)
     -- ^ The path of a file containing preconfiguration of the environment (e.g shell.nix)
+  ,nixShellOptions :: ![Text]
+    -- ^ Options to be given to the nix-shell command line
   }
   deriving (Show)
 
@@ -34,6 +36,8 @@ data NixOptsMonoid = NixOptsMonoid
     -- ^ System packages to use (given to nix-shell)
   ,nixMonoidInitFile :: !(Maybe String)
     -- ^ The path of a file containing preconfiguration of the environment (e.g shell.nix)
+  ,nixMonoidShellOptions :: ![Text]
+    -- ^ Options to be given to the nix-shell command line
   }
   deriving (Show)
 
@@ -44,6 +48,7 @@ instance FromJSON (NixOptsMonoid, [JSONWarning]) where
               nixMonoidEnable <- o ..:? nixEnableArgName
               nixMonoidPackages <- o ..:? nixPackagesArgName ..!= []
               nixMonoidInitFile <- o ..:? nixInitFileArgName
+              nixMonoidShellOptions <- o ..:? nixShellOptsArgName ..!= []
               return NixOptsMonoid{..})
 
 -- | Left-biased combine nix options
@@ -53,12 +58,14 @@ instance Monoid NixOptsMonoid where
     ,nixMonoidEnable = Nothing
     ,nixMonoidPackages = []
     ,nixMonoidInitFile = Nothing
+    ,nixMonoidShellOptions = []
     }
   mappend l r = NixOptsMonoid
     {nixMonoidDefaultEnable = nixMonoidDefaultEnable l || nixMonoidDefaultEnable r
     ,nixMonoidEnable = nixMonoidEnable l <|> nixMonoidEnable r
     ,nixMonoidPackages = nixMonoidPackages l <> nixMonoidPackages r
     ,nixMonoidInitFile = nixMonoidInitFile l <|> nixMonoidInitFile r
+    ,nixMonoidShellOptions = nixMonoidShellOptions l <> nixMonoidShellOptions r
     }
 
 -- | Nix enable argument name.
@@ -72,3 +79,6 @@ nixPackagesArgName = "packages"
 -- | Nix init env file path argument name.
 nixInitFileArgName :: Text
 nixInitFileArgName = "init-env-file"
+
+nixShellOptsArgName :: Text
+nixShellOptsArgName = "nix-shell-options"

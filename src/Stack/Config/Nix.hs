@@ -13,4 +13,5 @@ nixOptsFromMonoid _stackRoot NixOptsMonoid{..} = do
     let nixEnable = fromMaybe nixMonoidDefaultEnable nixMonoidEnable
         nixPackages = nixMonoidPackages
         nixInitFile = nixMonoidInitFile
+        nixShellOptions = nixMonoidShellOptions
     return NixOpts{..}
