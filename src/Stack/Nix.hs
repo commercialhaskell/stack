@@ -9,6 +9,7 @@ module Stack.Nix
   ,reexecWithOptionalShell
   ,reExecArgName
   ,nixCmdName
+  ,StackNixException(..)
   ) where
 
 import           Control.Applicative
@@ -24,6 +25,7 @@ import           Data.List (intercalate)
 import           Data.Maybe
 import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import qualified Data.Text as T
+import           Data.Typeable
 import           Data.Version (showVersion)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import qualified Paths_stack as Meta
@@ -99,13 +101,17 @@ runShellAndExit getCmdArgs = do
      (isStdinTerminal,isStderrTerminal) <-
        liftIO ((,) <$> hIsTerminalDevice stdin
                    <*> hIsTerminalDevice stderr)
+     let mshellFile = nixInitFile (configNix config)
+         pkgsInConfig = map show (nixPackages (configNix config))
+     if not (null pkgsInConfig) && isJust mshellFile then
+       throwM NixCannotUseShellFileAndPackagesException
+       else return ()
      let isTerm = isStdinTerminal && isStdoutTerminal && isStderrTerminal
-         mshellFile = nixInitFile (configNix config)
          ghcInNix = case resolver of
                      ResolverSnapshot (LTS x y) ->
                        "haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc"
                      _ -> "ghc"
-         nixpkgs = [ghcInNix] ++ (map show (nixPackages (configNix config)))
+         nixpkgs = ghcInNix : pkgsInConfig
          packagesOrFile = case mshellFile of
            Just filePath -> [filePath]
            Nothing -> "-p" : nixpkgs
@@ -132,7 +138,7 @@ runShellAndExit getCmdArgs = do
 
 -- | 'True' if we are currently running inside a Nix.
 getInShell :: (MonadIO m) => m Bool
-getInShell = liftIO (isJust <$> lookupEnv inContainerEnvVar)
+getInShell = liftIO (isJust <$> lookupEnv inShellEnvVar)
 
 -- | Environment variable used to indicate stack is running in container.
 inShellEnvVar :: String
@@ -158,3 +164,15 @@ type M env m =
   ,HasHttpManager env
   ,MonadMask m
   )
+
+-- Exceptions thown specifically by Stack.Nix
+data StackNixException
+  = NixCannotUseShellFileAndPackagesException
+    -- ^ Nix can't be given packages and a shell file at the same time
+    deriving (Typeable)
+
+instance Exception StackNixException
+
+instance Show StackNixException where
+  show NixCannotUseShellFileAndPackagesException =
+    "You cannot have packages and a shell-file filled at the same time in your nix-shell configuration."
