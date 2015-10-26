@@ -143,7 +143,7 @@ getInShell = liftIO (isJust <$> lookupEnv inShellEnvVar)
 inShellEnvVar :: String
 inShellEnvVar = concat [map toUpper stackProgName,"_IN_NIXSHELL"]
 
--- | Command-line argument for "docker"
+-- | Command-line argument for "nix"
 nixCmdName :: String
 nixCmdName = "nix"
 
