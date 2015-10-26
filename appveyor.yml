@@ -1,6 +1,5 @@
 cache:
 - "c:\\sr" # stack root, short paths == less problems
-- "%LOCALAPPDATA%\\Programs\\stack"
 
 build: off
 
