@@ -7,7 +7,6 @@
 module Stack.Nix
   (execWithOptionalShell
   ,reexecWithOptionalShell
-  ,reExecArgName
   ,nixCmdName
   ,StackNixException(..)
   ) where
@@ -31,7 +30,7 @@ import           Network.HTTP.Client.Conduit (HasHttpManager)
 import qualified Paths_stack as Meta
 import           Prelude -- Fix redundant import warnings
 import           Stack.Constants (stackProgName)
-import           Stack.Docker (StackDockerException(OnlyOnHostException))
+import           Stack.Docker (StackDockerException(OnlyOnHostException), reExecArgName)
 import           Stack.Types
 import           Stack.Types.Internal
 import           System.Environment (lookupEnv,getArgs,getExecutablePath)
@@ -147,10 +146,6 @@ inShellEnvVar = concat [map toUpper stackProgName,"_IN_NIXSHELL"]
 -- | Command-line argument for "docker"
 nixCmdName :: String
 nixCmdName = "nix"
-
--- | Command-line option for @--internal-re-exec@.
-reExecArgName :: String
-reExecArgName = "internal-re-exec-version"
 
 type M env m =
   (MonadIO m
