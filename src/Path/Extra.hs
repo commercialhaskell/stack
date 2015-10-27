@@ -46,8 +46,8 @@ collapseFilePath = FP.joinPath . reverse . foldl go [] . FP.splitDirectories
   where
     go rs "." = rs
     go r@(p:rs) ".." = case p of
-                            ".." -> ("..":r)
-                            (checkPathSeperator -> Just True) -> ("..":r)
+                            ".." -> "..":r
+                            (checkPathSeperator -> Just True) -> "..":r
                             _ -> rs
     go _ (checkPathSeperator -> Just True) = [[FP.pathSeparator]]
     go rs x = x:rs

@@ -70,7 +70,7 @@ combineMap :: SourceMap -> InstalledMap -> CombinedMap
 combineMap = Map.mergeWithKey
     (\_ s i -> Just $ combineSourceInstalled s i)
     (fmap PIOnlySource)
-    (fmap (\(l, i) -> PIOnlyInstalled l i))
+    (fmap (uncurry PIOnlyInstalled))
 
 data AddDepRes
     = ADRToInstall Task
@@ -185,7 +185,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
         , loadPackage = loadPackage0
         , combinedMap = combineMap sourceMap installedMap
         , toolToPackages = \ (Dependency name _) ->
-          maybe Map.empty (Map.fromSet (\_ -> anyVersion)) $
+          maybe Map.empty (Map.fromSet (const anyVersion)) $
           Map.lookup (S8.pack . packageNameString . fromCabalPackageName $ name) toolMap
         , ctxEnvConfig = econfig
         , callStack = []
@@ -274,7 +274,7 @@ addDep' treatAsDep name = do
     if name `elem` callStack ctx
         then return $ Left $ DependencyCycleDetected $ name : callStack ctx
         else local
-            (\ctx' -> ctx' { callStack = name : callStack ctx' }) $ do
+            (\ctx' -> ctx' { callStack = name : callStack ctx' }) $
             (addDep'' treatAsDep name)
 
 addDep'' :: Bool -- ^ is this being used by a dependency?
@@ -302,7 +302,7 @@ tellExecutables :: PackageName -> PackageSource -> M () -- TODO merge this with 
 tellExecutables _ (PSLocal lp)
     | lpWanted lp = tellExecutablesPackage Local $ lpPackage lp
     | otherwise = return ()
-tellExecutables name (PSUpstream version loc flags) = do
+tellExecutables name (PSUpstream version loc flags) =
     tellExecutablesUpstream name version loc flags
 
 tellExecutablesUpstream :: PackageName -> Version -> InstallLocation -> Map FlagName Bool -> M ()
@@ -324,7 +324,7 @@ tellExecutablesPackage loc p = do
                 Just (PIBoth ps _) -> goSource ps
 
         goSource (PSLocal lp) = fromMaybe Set.empty $ lpExeComponents lp
-        goSource (PSUpstream _ _ _) = Set.empty
+        goSource (PSUpstream{}) = Set.empty
 
     tell mempty { wInstall = m myComps }
   where
@@ -348,7 +348,7 @@ installPackage treatAsDep name ps = do
     depsRes <- addPackageDeps treatAsDep package
     case depsRes of
         Left e -> return $ Left e
-        Right (missing, present, minLoc) -> do
+        Right (missing, present, minLoc) ->
             return $ Right $ ADRToInstall Task
                 { taskProvides = PackageIdentifier
                     (packageName package)
@@ -412,7 +412,7 @@ addPackageDeps treatAsDep package = do
                 inRange <- if adrVersion adr `withinRange` range
                     then return True
                     else do
-                        let warn reason = do
+                        let warn reason =
                                 tell mempty { wWarnings = (msg:) }
                               where
                                 msg = T.concat
@@ -482,7 +482,7 @@ checkDirtiness ps installed package present wanted = do
             , configCacheComponents =
                 case ps of
                     PSLocal lp -> Set.map renderComponent $ lpComponents lp
-                    PSUpstream _ _ _ -> Set.empty
+                    PSUpstream{} -> Set.empty
             , configCacheHaddock =
                 shouldHaddockPackage buildOpts wanted (packageName package) ||
                 -- Disabling haddocks when old config had haddocks doesn't make dirty.
@@ -576,15 +576,15 @@ describeConfigDiff config old new
 
 psDirty :: PackageSource -> Maybe (Set FilePath)
 psDirty (PSLocal lp) = lpDirtyFiles lp
-psDirty (PSUpstream _ _ _) = Nothing -- files never change in an upstream package
+psDirty (PSUpstream {}) = Nothing -- files never change in an upstream package
 
 psWanted :: PackageSource -> Bool
 psWanted (PSLocal lp) = lpWanted lp
-psWanted (PSUpstream _ _ _) = False
+psWanted (PSUpstream {}) = False
 
 psLocal :: PackageSource -> Bool
 psLocal (PSLocal _) = True
-psLocal (PSUpstream _ _ _) = False
+psLocal (PSUpstream {}) = False
 
 psPackage :: PackageName -> PackageSource -> M Package
 psPackage _ (PSLocal lp) = return $ lpPackage lp

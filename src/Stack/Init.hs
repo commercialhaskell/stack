@@ -15,7 +15,7 @@ module Stack.Init
 
 import           Control.Exception               (assert)
 import           Control.Exception.Enclosed      (catchAny, handleIO)
-import           Control.Monad                   (liftM, when)
+import           Control.Monad                   (liftM, when, zipWithM_)
 import           Control.Monad.Catch             (MonadMask, MonadThrow, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -86,7 +86,7 @@ initProject currDir initOpts = do
 
     when (null cabalfps) $ error "In order to init, you should have an existing .cabal file. Please try \"stack new\" instead"
     (warnings,gpds) <- fmap unzip (mapM readPackageUnresolved cabalfps)
-    sequence_ (zipWith (mapM_ . printCabalFileWarning) cabalfps warnings)
+    zipWithM_ (mapM_ . printCabalFileWarning) cabalfps warnings
 
     (r, flags, extraDeps) <- getDefaultResolver cabalfps gpds initOpts
     let p = Project
@@ -290,7 +290,7 @@ makeConcreteResolver ar = do
                     Nothing -> error $ "No LTS release found with major version " ++ show x
                     Just y -> return $ ResolverSnapshot $ LTS x y
             ARLatestLTS
-                | IntMap.null $ snapshotsLts snapshots -> error $ "No LTS releases found"
+                | IntMap.null $ snapshotsLts snapshots -> error "No LTS releases found"
                 | otherwise ->
                     let (x, y) = IntMap.findMax $ snapshotsLts snapshots
                      in return $ ResolverSnapshot $ LTS x y

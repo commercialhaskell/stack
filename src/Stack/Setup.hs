@@ -366,7 +366,7 @@ ensureCompiler sopts = do
                             (soptsWantedCompiler sopts)
                             (soptsCompilerCheck sopts)
                             (soptsGHCBindistURL sopts)
-                    | otherwise -> do
+                    | otherwise ->
                         throwM $ CompilerVersionMismatch
                             msystem
                             (soptsWantedCompiler sopts, expectedArch)
@@ -506,7 +506,7 @@ upgradeCabal menv wc = do
 
             dir <-
                 case Map.lookup ident m of
-                    Nothing -> error $ "upgradeCabal: Invariant violated, dir missing"
+                    Nothing -> error "upgradeCabal: Invariant violated, dir missing"
                     Just dir -> return dir
 
             runIn dir (compilerExeName wc) menv ["Setup.hs"] Nothing
@@ -635,7 +635,7 @@ downloadAndInstallCompiler :: (MonadIO m, MonadMask m, MonadLogger m, MonadReade
                            => SetupInfo
                            -> CompilerVersion
                            -> VersionCheck
-                           -> (Maybe String)
+                           -> Maybe String
                            -> m Tool
 downloadAndInstallCompiler si wanted@(GhcVersion{}) versionCheck mbindistURL = do
     ghcVariant <- asks getGHCVariant
@@ -689,7 +689,7 @@ getWantedCompilerInfo :: (Ord k, MonadThrow m)
                       -> (k -> CompilerVersion)
                       -> Map k a
                       -> m (k, a)
-getWantedCompilerInfo key versionCheck wanted toCV pairs = do
+getWantedCompilerInfo key versionCheck wanted toCV pairs =
     case mpair of
         Just pair -> return pair
         Nothing -> throwM $ UnknownCompilerVersion key wanted (map toCV (Map.keys pairs))
@@ -709,7 +709,7 @@ getGhcKey = do
 
 getOSKey :: (MonadReader env m, MonadThrow m, HasPlatform env, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
          => Platform -> m Text
-getOSKey platform = do
+getOSKey platform =
     case platform of
         Platform I386   Cabal.Linux   -> return "linux32"
         Platform X86_64 Cabal.Linux   -> return "linux64"
@@ -832,7 +832,7 @@ installGHCJS version si archiveFile archiveType destDir = do
     let unpackDir = destDir Path.</> $(mkRelDir "src")
     tarComponent <- parseRelDir ("ghcjs-" ++ versionString version)
     runUnpack <- case platform of
-        Platform _ Cabal.Windows -> return $ do
+        Platform _ Cabal.Windows -> return $
             withUnpackedTarball7z "GHCJS" si archiveFile archiveType tarComponent unpackDir
         _ -> do
             zipTool' <-
@@ -931,7 +931,7 @@ ensureGhcjsBooted menv cv shouldBoot  = do
                             parseRelFile $ "ghcjs-" ++ versionString version ++ "/stack.yaml"
                         _ -> fail "ensureGhcjsBooted invoked on non GhcjsVersion"
                 actualStackYamlExists <- fileExists actualStackYaml
-                when (not actualStackYamlExists) $
+                unless actualStackYamlExists $
                     fail "Couldn't find GHCJS stack.yaml in old or new location."
                 bootGhcjs actualStackYaml destDir
         Left err -> throwM err
@@ -1219,7 +1219,7 @@ chattyDownload label downloadInfo path = do
                  (T.unpack label)
                  percentage
           where percentage :: Double
-                percentage = (fromIntegral totalSoFar / fromIntegral total * 100)
+                percentage = fromIntegral totalSoFar / fromIntegral total * 100
 
 -- | Given a printf format string for the decimal part and a number of
 -- bytes, formats the bytes using an appropiate unit and returns the
@@ -1318,10 +1318,7 @@ getUtf8LocaleVars menv = do
                 existingVarNames = Set.unions (map snd checkedVars)
                 -- True if a locale is already specified by one of the "global" locale variables.
                 hasAnyExisting =
-                    or $
-                    map
-                        (`Set.member` existingVarNames)
-                        ["LANG", "LANGUAGE", "LC_ALL"]
+                    any (`Set.member` existingVarNames) ["LANG", "LANGUAGE", "LC_ALL"]
             if null needChangeVars && hasAnyExisting
                 then
                      -- If no variables need changes and at least one "global" variable is set, no
@@ -1403,7 +1400,7 @@ getUtf8LocaleVars menv = do
     -- -a@.
     getFallbackLocale
         :: [Text] -> Maybe Text
-    getFallbackLocale utf8Locales = do
+    getFallbackLocale utf8Locales =
         case concatMap (matchingLocales utf8Locales) fallbackPrefixes of
             (v:_) -> Just v
             [] ->
@@ -1420,11 +1417,7 @@ getUtf8LocaleVars menv = do
             utf8Locales
     -- Does the locale have one of the encodings in @utf8Suffixes@ (case-insensitive)?
     isUtf8Locale locale =
-        or $
-        map
-            (\v ->
-                  T.toLower v `T.isSuffixOf` T.toLower locale)
-            utf8Suffixes
+      any (\ v -> T.toLower v `T.isSuffixOf` T.toLower locale) utf8Suffixes
     -- Prefixes of fallback locales (case-insensitive)
     fallbackPrefixes = ["C.", "en_US.", "en_"]
     -- Suffixes of UTF-8 locales (case-insensitive)

@@ -124,7 +124,7 @@ objectInterfaceDir bconfig = bcWorkDir bconfig </> $(mkRelDir "odir/")
 buildCacheFile :: (MonadThrow m, MonadReader env m, HasPlatform env,HasEnvConfig env)
                => Path Abs Dir      -- ^ Package directory.
                -> m (Path Abs File)
-buildCacheFile dir = do
+buildCacheFile dir =
     liftM
         (</> $(mkRelFile "stack-build-cache"))
         (distDirFromDir dir)
@@ -160,7 +160,7 @@ benchBuiltFile dir =
 configCacheFile :: (MonadThrow m, MonadReader env m, HasPlatform env,HasEnvConfig env)
                 => Path Abs Dir      -- ^ Package directory.
                 -> m (Path Abs File)
-configCacheFile dir = do
+configCacheFile dir =
     liftM
         (</> $(mkRelFile "stack-config-cache"))
         (distDirFromDir dir)
@@ -169,7 +169,7 @@ configCacheFile dir = do
 configCabalMod :: (MonadThrow m, MonadReader env m, HasPlatform env,HasEnvConfig env)
                => Path Abs Dir      -- ^ Package directory.
                -> m (Path Abs File)
-configCabalMod dir = do
+configCabalMod dir =
     liftM
         (</> $(mkRelFile "stack-cabal-mod"))
         (distDirFromDir dir)
@@ -271,7 +271,7 @@ wiredInPackages :: HashSet PackageName
 wiredInPackages =
     maybe (error "Parse error in wiredInPackages") HashSet.fromList mparsed
   where
-    mparsed = sequence $ map parsePackageName
+    mparsed = mapM parsePackageName
       [ "ghc-prim"
       , "integer-gmp"
       , "integer-simple"
@@ -290,7 +290,7 @@ ghcjsBootPackages :: HashSet PackageName
 ghcjsBootPackages =
     maybe (error "Parse error in ghcjsBootPackages") HashSet.fromList mparsed
   where
-    mparsed = sequence $ map parsePackageName
+    mparsed = mapM parsePackageName
       -- stage1a
       [ "array"
       , "base"

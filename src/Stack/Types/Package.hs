@@ -137,18 +137,18 @@ instance Show PackageWarning where
         concat
             [ "module not listed in "
             , toFilePath (filename cabalfp)
-            , (case component of
+            , case component of
                    Nothing -> " for library"
-                   Just c -> " for '" ++ c ++ "'")
+                   Just c -> " for '" ++ c ++ "'"
             , " component (add to other-modules): "
             , display unlistedModule]
     show (UnlistedModulesWarning cabalfp component unlistedModules) =
         concat
             [ "modules not listed in "
             , toFilePath (filename cabalfp)
-            , (case component of
+            , case component of
                    Nothing -> " for library"
-                   Just c -> " for '" ++ c ++ "'")
+                   Just c -> " for '" ++ c ++ "'"
             , " component (add to other-modules):\n    "
             , intercalate "\n    " (map display unlistedModules)]
 

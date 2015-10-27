@@ -171,9 +171,7 @@ generateDepsHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs loca
                              Just dp -> findTransitiveDepends (dpGhcPkgId dp))
                 locals
         depDumpPkgs =
-            map
-                (\ghcPkgId ->
-                      lookupDumpPackage ghcPkgId allDumpPkgs)
+            map (`lookupDumpPackage` allDumpPkgs)
                 (Set.toList $ Set.unions depGhcPkgIds)
     generateHaddockIndex
         "local packages and dependencies"
@@ -275,7 +273,7 @@ lookupDumpPackage :: GhcPkgId
                   -> [Map GhcPkgId (DumpPackage () ())]
                   -> Maybe (DumpPackage () ())
 lookupDumpPackage ghcPkgId dumpPkgs =
-    listToMaybe $ catMaybes $ map (Map.lookup ghcPkgId) dumpPkgs
+    listToMaybe $ mapMaybe (Map.lookup ghcPkgId) dumpPkgs
 
 -- | Path of haddock index file.
 haddockIndexFile :: Path Abs Dir -> Path Abs File

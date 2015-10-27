@@ -6,7 +6,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -331,7 +330,7 @@ loggerFunc loc _src level msg =
 -- | With a sticky state, do the thing.
 withSticky :: (MonadIO m)
            => Bool -> (Sticky -> m b) -> m b
-withSticky terminal m = do
+withSticky terminal m =
     if terminal
        then do state <- liftIO (newMVar Nothing)
                originalMode <- liftIO (hGetBuffering stdout)

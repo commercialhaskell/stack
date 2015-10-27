@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
@@ -56,7 +55,7 @@ ide targets useropts = do
         paths =
             [ "--ide-backend-tools-path=" <>
               intercalate [searchPathSeparator] (map toFilePath bindirs) <>
-              (maybe "" (searchPathSeparator :) mpath)]
+              maybe "" (searchPathSeparator :) mpath]
         args =
             ["--verbose"] <> ["--include=" <> includeDirs pkgopts] <>
             ["--local-work-dir=" ++ toFilePath pwd] <>
@@ -98,6 +97,4 @@ getPackageOptsAndTargetFiles pwd pkg = do
         , mapMaybe
               (fmap toFilePath . stripDir pwd)
               (S.toList (ghciPkgCFiles pkg) <> S.toList (ghciPkgModFiles pkg) <>
-               if paths_foo_exists
-                   then [paths_foo]
-                   else []))
+               [paths_foo | paths_foo_exists]))

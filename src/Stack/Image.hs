@@ -105,7 +105,7 @@ createDockerImage dir = do
     let dockerConfig = imgDocker (configImage config)
     case imgDockerBase =<< dockerConfig of
         Nothing -> throwM StackImageDockerBaseUnspecifiedException
-        Just base -> do
+        Just base ->
             liftIO
                 (do writeFile
                         (toFilePath
@@ -133,7 +133,7 @@ extendDockerImageWithEntrypoint dir = do
     let imgEntrypoints = maybe Nothing imgDockerEntrypoints dockerConfig
     case imgEntrypoints of
         Nothing -> return ()
-        Just eps -> do
+        Just eps ->
             forM_
                 eps
                 (\ep ->

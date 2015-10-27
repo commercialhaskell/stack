@@ -67,12 +67,11 @@ ghcPkg :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadT
        -> m (Either ReadProcessException S8.ByteString)
 ghcPkg menv wc pkgDbs args = do
     eres <- go
-    r <- case eres of
-            Left _ -> do
-                mapM_ (createDatabase menv wc) pkgDbs
-                go
-            Right _ -> return eres
-    return r
+    case eres of
+          Left _ -> do
+              mapM_ (createDatabase menv wc) pkgDbs
+              go
+          Right _ -> return eres
   where
     go = tryProcessStdout Nothing menv (ghcPkgExeName wc) args'
     args' = packageDbFlags pkgDbs ++ args
@@ -99,7 +98,7 @@ ghcPkgExeName Ghcjs = "ghcjs-pkg"
 packageDbFlags :: [Path Abs Dir] -> [String]
 packageDbFlags pkgDbs =
           "--no-user-package-db"
-        : map (\x -> ("--package-db=" ++ toFilePath x)) pkgDbs
+        : map (\x -> "--package-db=" ++ toFilePath x) pkgDbs
 
 -- | Get the value of a field of the package.
 findGhcPkgField
