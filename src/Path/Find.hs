@@ -45,15 +45,9 @@ findPathUp pathType dir p upperBound =
   do entries <- listDirectory dir
      case find p (pathType entries) of
        Just path -> return (Just path)
-       Nothing ->
-         if Just dir == upperBound
-            then return Nothing
-            else if parent dir == dir
-                    then return Nothing
-                    else findPathUp pathType
-                                    (parent dir)
-                                    p
-                                    upperBound
+       Nothing | Just dir == upperBound -> return Nothing
+               | parent dir == dir -> return Nothing
+               | otherwise -> findPathUp pathType (parent dir) p upperBound
 
 -- | Find files matching predicate below a root directory.
 findFiles :: Path Abs Dir            -- ^ Root directory to begin with.
