@@ -29,6 +29,7 @@ import           Distribution.ModuleName (ModuleName)
 import           Distribution.Text (display)
 import           Network.HTTP.Client.Conduit
 import           Path
+import           Path.IO
 import           Prelude
 import           Stack.Build
 import           Stack.Build.Installed
@@ -39,6 +40,7 @@ import           Stack.Exec
 import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal
+import           System.Directory (getTemporaryDirectory)
 
 -- | Command-line options for GHC.
 data GhciOpts = GhciOpts
@@ -73,10 +75,11 @@ ghci GhciOpts{..} = do
     mainFile <- figureOutMainFile mainIsTargets targets pkgs
     wc <- getWhichCompiler
     let pkgopts = concatMap ghciPkgOpts pkgs
-        srcfiles
+        modulesToLoad
           | ghciNoLoadModules = []
           | otherwise =
-              nub (maybe [] (return . toFilePath) mainFile <>
+              nub
+                  (maybe [] (return . toFilePath) mainFile <>
                    concatMap (map display . S.toList . ghciPkgModules) pkgs)
         odir =
             [ "-odir=" <> toFilePath (objectInterfaceDir bconfig)
@@ -84,10 +87,23 @@ ghci GhciOpts{..} = do
     $logInfo
         ("Configuring GHCi with the following packages: " <>
          T.intercalate ", " (map (packageNameText . ghciPkgName) pkgs))
-    exec
-        defaultEnvSettings
-        (fromMaybe (compilerExeName wc) ghciGhcCommand)
-        ("--interactive" : odir <> pkgopts <> srcfiles <> ghciArgs)
+    tmp <- liftIO getTemporaryDirectory
+    withCanonicalizedTempDirectory
+        tmp
+        "ghci-script"
+        (\tmpDir ->
+              do let scriptPath = tmpDir </> $(mkRelFile "ghci-script")
+                     fp = toFilePath scriptPath
+                     loadModules = ":l " <> unwords modulesToLoad
+                     bringIntoScope = ":m + " <> unwords modulesToLoad
+                 liftIO (writeFile fp (unlines [loadModules,bringIntoScope]))
+                 finally (exec
+                              defaultEnvSettings
+                              (fromMaybe (compilerExeName wc) ghciGhcCommand)
+                              ("--interactive" :
+                               odir <> pkgopts <> ghciArgs <>
+                               ["-ghci-script=" <> fp]))
+                         (removeFile scriptPath))
 
 -- | Figure out the main-is file to load based on the targets. Sometimes there
 -- is none, sometimes it's unambiguous, sometimes it's
