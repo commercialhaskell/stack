@@ -29,14 +29,15 @@ import           Control.Monad.Trans.Resource
 import           Data.Aeson (Value (Object, Array), (.=), object)
 import           Data.Function
 import qualified Data.HashMap.Strict as HM
+import           Data.IORef.RunOnce (runOnce)
 import qualified Data.Map as Map
 import           Data.Map.Strict (Map)
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 import           Data.Text.Encoding (decodeUtf8)
+import qualified Data.Text.IO as TIO
 import           Data.Text.Read (decimal)
 import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
@@ -162,7 +163,7 @@ withLoadPackage :: ( MonadIO m
                 -> m a
 withLoadPackage menv inner = do
     econfig <- asks getEnvConfig
-    withCabalLoader menv $ \cabalLoader ->
+    withCabalLoader' <- runOnce $ withCabalLoader menv $ \cabalLoader ->
         inner $ \name version flags -> do
             bs <- cabalLoader $ PackageIdentifier name version -- TODO automatically update index the first time this fails
 
@@ -171,6 +172,7 @@ withLoadPackage menv inner = do
             -- resolving the package index.
             (_warnings,pkg) <- readPackageBS (depPackageConfig econfig flags) bs
             return pkg
+    withCabalLoader'
   where
     -- | Package config to be used for dependencies
     depPackageConfig :: EnvConfig -> Map FlagName Bool -> PackageConfig
