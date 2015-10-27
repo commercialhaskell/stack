@@ -300,7 +300,7 @@ loggerFunc loc _src level msg =
              return (T.pack timestamp <> T.pack l <> T.decodeUtf8 (fromLogStr (toLogStr msg)) <> T.pack lc)
           where getTimestamp
                   | maxLogLevel <= LevelDebug =
-                    do now <- getCurrentTime
+                    do now <- getZonedTime
                        return (formatTime' now ++ ": ")
                   | otherwise = return ""
                   where
