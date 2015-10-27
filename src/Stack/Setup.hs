@@ -42,7 +42,7 @@ import           Data.Either
 import           Data.Foldable hiding (concatMap, or, maximum)
 import           Data.IORef
 import           Data.IORef.RunOnce (runOnce)
-import           Data.List hiding (concat, elem, maximumBy)
+import           Data.List hiding (concat, elem, maximumBy, any)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe
@@ -67,7 +67,7 @@ import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import qualified Paths_stack as Meta
-import           Prelude hiding (concat, elem) -- Fix AMP warning
+import           Prelude hiding (concat, elem, any) -- Fix AMP warning
 import           Safe (readMay)
 import           Stack.Build (build)
 import           Stack.Config (resolvePackageEntry, loadConfig)
