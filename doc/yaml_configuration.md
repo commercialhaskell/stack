@@ -359,3 +359,33 @@ allow-newer: true
 
 Note that this also ignores lower bounds. The name "allow-newer" is chosen to
 match the commonly used cabal option.
+
+### templates
+
+Templates used with `stack new` have a number of parameters that affect the generated code. These can be set for all new projects you create. The result of them can be observed in the generated LICENSE and cabal files.
+
+The 5 parameters are: `author-email`, `author-name`, `category`, `copyright` and `github-username`.
+
+* _author-email_ - sets the `maintainer` property in cabal
+* _author-name_ - sets the `author` property in cabal and the name used in LICENSE
+* _category_ - sets the `category` property in cabal. This is used in Hackage. For examples of categories see [Packages by category](https://hackage.haskell.org/packages/). It makes sense for `category` to be set on a per project basis because it is uncommon for all projects a user creates to belong to the same category. The category can be set per project by passing `-p "category:value"` to the `stack new` command.
+* _copyright_ - sets the `copyright` property in cabal. It is typically the name of the holder of the copyright on the package and the year(s) from which copyright is claimed. For example: `Copyright: (c) 2006-2007 Joe Bloggs`
+* _github-username_ - used to generate `homepage` and `source-repository` in cabal. For instance `github-username: myusername` and `stack new my-project new-template` would result:
+```yaml
+homepage: http://github.com/myusername/my-project#readme
+
+source-repository head
+  type: git
+  location: https://github.com/myusername/my-project
+```
+
+These properties can be set in `config.yaml` as follows:
+```yaml
+templates:
+  params:
+    author-name: Your Name
+    author-email: youremail@example.com
+    category: Your Projects Category
+    copyright: Copyright: (c) 2015 Your Name
+    github-username: yourusername
+```

@@ -20,15 +20,25 @@ find links that always point to the latest bindists
  variable similarly to your root (e.g., `set STACK_ROOT=c:\stack_root`) *before*
  running `stack`.
 
+*Note:* while generally 32-bit GHC is better tested on Windows, there are
+reports that recent versions of Windows only work with the 64-bit version of
+Stack (see
+[issue #393](https://github.com/commercialhaskell/stack/issues/393)).
+
+### Installer
+
+We recommend installing to the default location with these installers, as that
+will make `stack install` and `stack upgrade` work correctly out of the box.
+
+  * [Windows 32-bit Installer](https://www.stackage.org/stack/windows-i386-installer)
+  * [Windows 64-bit Installer](https://www.stackage.org/stack/windows-x86_64-installer)
+
+### Manual download
+
 * Download the latest release:
 
       * [Windows 32-bit](https://www.stackage.org/stack/windows-i386)
       * [Windows 64-bit](https://www.stackage.org/stack/windows-x86_64)
-
-    Note: while generally 32-bit GHC is better tested on Windows, there are
-    reports that recent versions of Windows only work with the 64-bit version of
-    stack (see
-    [issue #393](https://github.com/commercialhaskell/stack/issues/393)).
 
 * Unpack the archive and place `stack.exe` somewhere on your `%PATH%` (see
   [Path section below](#path)) and you can then run `stack` on the command line.
@@ -39,14 +49,6 @@ NOTE: These executables have been built and tested on a Windows 7, 8.1, and 10
 64-bit machines. They should run on older Windows installs as well, but have not
 been tested. If you do test, please edit and update this page to indicate as
 such.
-
-### Installer (experimental)
-
-We recommend installing to the default location with these installers, as that
-will make `stack install` and `stack upgrade` work correctly out of the box.
-
-  * [Windows 32-bit Installer](https://www.stackage.org/stack/windows-i386-installer) (experimental)
-  * [Windows 64-bit Installer](https://www.stackage.org/stack/windows-x86_64-installer) (experimental)
 
 ## Mac OS X
 
