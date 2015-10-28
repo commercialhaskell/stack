@@ -217,8 +217,8 @@ ghciSetup mainIs stringTargets = do
                     else return Nothing
     infos <-
         forM locals $
-        \(name,(cabalfp,components)) ->
-             makeGhciPkgInfo sourceMap installedMap (map fst locals) name cabalfp components
+        \(name,(cabalfp,component)) ->
+             makeGhciPkgInfo sourceMap installedMap (map fst locals) name cabalfp component
     unless (M.null realTargets) (build (const (return ())) Nothing bopts)
     return (realTargets, mainIsTargets, infos)
   where
@@ -263,7 +263,7 @@ makeGhciPkgInfo
     -> Path Abs File
     -> SimpleTarget
     -> m GhciPkgInfo
-makeGhciPkgInfo sourceMap installedMap locals name cabalfp components = do
+makeGhciPkgInfo sourceMap installedMap locals name cabalfp component = do
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
     let config =
@@ -282,7 +282,7 @@ makeGhciPkgInfo sourceMap installedMap locals name cabalfp components = do
             M.elems
                 (M.filterWithKey
                      (\k _ ->
-                           case components of
+                           case component of
                                STLocalComps cs -> S.member k cs
                                _ -> True)
                      m)

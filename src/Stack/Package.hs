@@ -196,10 +196,10 @@ resolvePackage packageConfig gpkg =
       [T.pack (exeName b) | b <- executables pkg
                           , buildable (buildInfo b)]
     , packageOpts = GetPackageOpts $
-      \sourceMap installedMap locals cabalfp ->
+      \sourceMap installedMap omitPkgs cabalfp ->
            do (componentsModules,componentFiles,_,_) <- getPackageFiles pkgFiles cabalfp
               (componentsOpts,generalOpts) <-
-                  generatePkgDescOpts sourceMap installedMap locals cabalfp pkg componentFiles
+                  generatePkgDescOpts sourceMap installedMap omitPkgs cabalfp pkg componentFiles
               return (componentsModules,componentFiles,componentsOpts,generalOpts)
     , packageHasExposedModules = maybe
           False
@@ -230,12 +230,12 @@ generatePkgDescOpts
     :: (HasEnvConfig env, HasPlatform env, MonadThrow m, MonadReader env m, MonadIO m)
     => SourceMap
     -> InstalledMap
-    -> [PackageName]
+    -> [PackageName] -- ^ Packages to omit from the "-package" / "-package-id" flags
     -> Path Abs File
     -> PackageDescription
     -> Map NamedComponent (Set DotCabalPath)
     -> m (Map NamedComponent [String],[String])
-generatePkgDescOpts sourceMap installedMap locals cabalfp pkg componentPaths = do
+generatePkgDescOpts sourceMap installedMap omitPkgs cabalfp pkg componentPaths = do
     distDir <- distDirFromDir cabalDir
     let cabalmacros = autogenDir distDir </> $(mkRelFile "cabal_macros.h")
     exists <- fileExists cabalmacros
@@ -251,7 +251,7 @@ generatePkgDescOpts sourceMap installedMap locals cabalfp pkg componentPaths = d
                   mcabalmacros
                   cabalDir
                   distDir
-                  locals
+                  omitPkgs
                   binfo
                   (fromMaybe mempty (M.lookup namedComponent componentPaths))
                   namedComponent)
@@ -296,7 +296,7 @@ generateBuildInfoOpts
     -> Set DotCabalPath
     -> NamedComponent
     -> [String]
-generateBuildInfoOpts sourceMap installedMap mcabalmacros cabalDir distDir locals b dotCabalPaths componentName =
+generateBuildInfoOpts sourceMap installedMap mcabalmacros cabalDir distDir omitPkgs b dotCabalPaths componentName =
     nubOrd (concat [ghcOpts b, extOpts b, srcOpts, includeOpts, macros, deps, extra b, extraDirs, fworks b, cObjectFiles])
   where
     cObjectFiles =
@@ -313,7 +313,7 @@ generateBuildInfoOpts sourceMap installedMap mcabalmacros cabalDir distDir local
                      ((("-" <>) . versionString) . sourceVersion)
                      (M.lookup (fromCabalPackageName name) sourceMap)]
             | Dependency name _ <- targetBuildDepends b
-            , not (elem name (map toCabalPackageName locals))]
+            , not (elem name (map toCabalPackageName omitPkgs))]
         -- Generates: -package=base -package=base16-bytestring-0.1.1.6 ...
     sourceVersion (PSUpstream ver _ _) = ver
     sourceVersion (PSLocal localPkg) = packageVersion (lpPackage localPkg)
