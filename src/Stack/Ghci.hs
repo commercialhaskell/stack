@@ -215,7 +215,7 @@ ghciSetup mainIs stringTargets = do
                                  return (Just (name, (cabalfp, simpleTargets)))
                              Nothing -> return Nothing
                     else return Nothing
-    let localLibs = [name | (name, (_, target)) <- locals, targetIncludesLib target]
+    let localLibs = [name | (name, (_, target)) <- locals, hasLocalComp isCLib target]
     infos <-
         forM locals $
         \(name,(cabalfp,component)) ->
@@ -223,11 +223,6 @@ ghciSetup mainIs stringTargets = do
     unless (M.null realTargets) (build (const (return ())) Nothing bopts)
     return (realTargets, mainIsTargets, infos)
   where
-    -- NOTE: this doesn't mean that the cabal package actually has a
-    -- library, just that if it does, the requested target includes it.
-    targetIncludesLib STLocalAll = True
-    targetIncludesLib (STLocalComps comps) = S.member CLib comps
-    targetIncludesLib _ = False
     makeBuildOpts targets =
         base
         { boptsTargets = stringTargets
@@ -245,19 +240,23 @@ ghciSetup mainIs stringTargets = do
       where
         base = defaultBuildOpts
         elems = M.elems targets
-        hasLocalComp p t =
-            case t of
-                STLocalComps s -> any p (S.toList s)
-                STLocalAll -> True
-                _ -> False
-        isCTest nc =
-            case nc of
-                CTest{} -> True
-                _ -> False
-        isCBench nc =
-            case nc of
-                CBench{} -> True
-                _ -> False
+    hasLocalComp p t =
+        case t of
+            STLocalComps s -> any p (S.toList s)
+            STLocalAll -> True
+            _ -> False
+    isCLib nc =
+        case nc of
+            CLib{} -> True
+            _ -> False
+    isCTest nc =
+        case nc of
+            CTest{} -> True
+            _ -> False
+    isCBench nc =
+        case nc of
+            CBench{} -> True
+            _ -> False
 
 -- | Make information necessary to load the given package in GHCi.
 makeGhciPkgInfo
