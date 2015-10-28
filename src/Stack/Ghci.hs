@@ -5,7 +5,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
 
--- | Run a GHCi configured with the user's project(s).
+-- | Run a GHCi configured with the user's package(s).
 
 module Stack.Ghci (GhciOpts(..),GhciPkgInfo(..), ghciSetup, ghci) where
 
@@ -63,7 +63,7 @@ data GhciPkgInfo = GhciPkgInfo
   , ghciPkgMainIs :: Map NamedComponent (Set (Path Abs File))
   }
 
--- | Launch a GHCi session for the given local project targets with the
+-- | Launch a GHCi session for the given local package targets with the
 -- given options and configure it with the load paths and extensions
 -- of those targets.
 ghci

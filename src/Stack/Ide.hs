@@ -6,7 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
--- | Run a IDE configured with the user's project(s).
+-- | Run a IDE configured with the user's package(s).
 
 module Stack.Ide
     (ide, getPackageOptsAndTargetFiles)

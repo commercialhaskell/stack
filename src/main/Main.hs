@@ -135,7 +135,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
          (numericVersion <*> extraHelpOption progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
           globalOptsParser isTerminal)
          (do addCommand "build"
-                        "Build the project(s) in this directory/configuration"
+                        "Build the package(s) in this directory/configuration"
                         buildCmd
                         (buildOptsParser Build)
              addCommand "install"
@@ -237,7 +237,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                         execCmd
                         (execOptsParser $ Just ExecGhc)
              addCommand "ghci"
-                        "Run ghci in the context of project(s) (experimental)"
+                        "Run ghci in the context of package(s) (experimental)"
                         ghciCmd
                         ghciOptsParser
              addCommand "runghc"

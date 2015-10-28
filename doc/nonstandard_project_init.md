@@ -1,15 +1,15 @@
 # Introduction
-The purpose of this page is to collect information about issues that arise when users either have an existing cabal project or another nonstandard setup such as a private hackage database. 
+The purpose of this page is to collect information about issues that arise when users either have an existing cabal project or another nonstandard setup such as a private hackage database.
 
 # Using a Cabal File
-New users may be confused by the fact that you must add dependencies to the projects cabal file, even in the case when you have already listed the package in the `stack.yaml`. In most cases, dependencies for your project that are in the Stackage snapshot need *only* be added to the cabal file. stack makes heavy use of Cabal the library under the hood. In general, your stack packages should also end up being valid cabal-install packages.
+New users may be confused by the fact that you must add dependencies to the package's cabal file, even in the case when you have already listed the package in the `stack.yaml`. In most cases, dependencies for your package that are in the Stackage snapshot need *only* be added to the cabal file. stack makes heavy use of Cabal the library under the hood. In general, your stack packages should also end up being valid cabal-install packages.
 
 ## Issues Referenced
   - https://github.com/commercialhaskell/stack/issues/105
 
 # Passing Flags to Cabal
 
-Any build command, `bench`, `install`, `haddock`, `test`, etc. takes a `--flag` option which passes flags to cabal. Another way to do this is using the flags field in a `stack.yaml`, with the option to specify flags on a per project basis. 
+Any build command, `bench`, `install`, `haddock`, `test`, etc. takes a `--flag` option which passes flags to cabal. Another way to do this is using the flags field in a `stack.yaml`, with the option to specify flags on a per package basis.
 
 As an example, in a `stack.yaml` for multi-package project with packages `foo`, `bar`, `baz`:
 
@@ -25,7 +25,7 @@ flags:
 
 It is also possible to pass the same flag to multiple packages, i.e. `stack build --flag *:necessary`
 
-Currently one needs to list all of your modules that interpret flags in the `other-modules` section of a cabal file. `cabal-install` has a different behavior currently and doesn't require that the modules be listed. This may change in a future release. 
+Currently one needs to list all of your modules that interpret flags in the `other-modules` section of a cabal file. `cabal-install` has a different behavior currently and doesn't require that the modules be listed. This may change in a future release.
 
 
 ## Issues Referenced
@@ -87,7 +87,7 @@ Currently WIP?
   - https://github.com/commercialhaskell/stack/issues/137
 
 # Intra-package Targets
-stack supports intra-package targets, similar to `cabal build COMPONENTS` for situations when you don't want to build every target inside your package. 
+stack supports intra-package targets, similar to `cabal build COMPONENTS` for situations when you don't want to build every target inside your package.
 
 Example:
 ```

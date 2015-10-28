@@ -939,7 +939,7 @@ understand why rebuilding may occur at different points.
 Let's look at a subset of the `stack --help` output:
 
 ```
-build    Build the project(s) in this directory/configuration
+build    Build the package(s) in this directory/configuration
 install  Shortcut for 'build --copy-bins'
 test     Shortcut for 'build --test'
 bench    Shortcut for 'build --bench'

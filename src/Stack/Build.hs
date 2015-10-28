@@ -10,7 +10,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 
--- | Build project(s).
+-- | Build the project.
 
 module Stack.Build
   (build

@@ -104,7 +104,7 @@ buildOptsParser cmd =
         haddock =
           boolFlags (cmd == Haddock)
                     "haddock"
-                    "generating Haddocks the project(s) in this directory/configuration"
+                    "generating Haddocks the package(s) in this directory/configuration"
                     idm
         haddockDeps =
              maybeBoolFlags
@@ -174,12 +174,12 @@ buildOptsParser cmd =
 
         tests = boolFlags (cmd == Test)
             "test"
-            "testing the project(s) in this directory/configuration"
+            "testing the package(s) in this directory/configuration"
             idm
 
         benches = boolFlags (cmd == Bench)
             "bench"
-            "benchmarking the project(s) in this directory/configuration"
+            "benchmarking the package(s) in this directory/configuration"
             idm
 
         exec = cmdOption

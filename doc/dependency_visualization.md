@@ -1,4 +1,4 @@
-You can use stack to visualize the dependencies between your projects and optionally also external dependencies.
+You can use stack to visualize the dependencies between your packages and optionally also external dependencies.
 
 As an example, let's look at `wreq`:
 
@@ -39,5 +39,3 @@ and pass in options to `dot` or use another graph layout engine like `twopi`:
 $ stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | twopi -Groot=wreq -Goverlap=false -Tpng -o wreq_pruned.png
 ```
 [![wreq_pruned](https://cloud.githubusercontent.com/assets/591567/8495538/9fae1184-216e-11e5-9931-99e6147f8aed.png)](https://cloud.githubusercontent.com/assets/591567/8495538/9fae1184-216e-11e5-9931-99e6147f8aed.png)
-
-
