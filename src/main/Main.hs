@@ -605,44 +605,48 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
       Docker.reexecWithOptionalContainer
           (lcProjectRoot lc)
           Nothing
-          (runStackLoggingTGlobal manager go $ do
-              (wantedCompiler, compilerCheck, mstack) <-
-                  case scoCompilerVersion of
-                      Just v -> return (v, MatchMinor, Nothing)
-                      Nothing -> do
-                          bc <- lcLoadBuildConfig lc globalResolver globalCompiler
-                          return ( bcWantedCompiler bc
-                                 , configCompilerCheck (lcConfig lc)
-                                 , Just $ bcStackYaml bc
-                                 )
-              miniConfig <- loadMiniConfig (lcConfig lc)
-              mpaths <- runStackTGlobal manager miniConfig go $
-                  ensureCompiler SetupOpts
-                  { soptsInstallIfMissing = True
-                  , soptsUseSystem =
-                    (configSystemGHC $ lcConfig lc)
-                    && not scoForceReinstall
-                  , soptsWantedCompiler = wantedCompiler
-                  , soptsCompilerCheck = compilerCheck
-                  , soptsStackYaml = mstack
-                  , soptsForceReinstall = scoForceReinstall
-                  , soptsSanityCheck = True
-                  , soptsSkipGhcCheck = False
-                  , soptsSkipMsys = configSkipMsys $ lcConfig lc
-                  , soptsUpgradeCabal = scoUpgradeCabal
-                  , soptsResolveMissingGHC = Nothing
-                  , soptsStackSetupYaml = scoStackSetupYaml
-                  , soptsGHCBindistURL = scoGHCBindistURL
-                  }
-              let compiler = case wantedCompiler of
-                      GhcVersion _ -> "GHC"
-                      GhcjsVersion {} -> "GHCJS"
-              case mpaths of
-                  Nothing -> $logInfo $ "stack will use the " <> compiler <> " on your PATH"
-                  Just _ -> $logInfo $ "stack will use a locally installed " <> compiler
-              $logInfo "For more information on paths, see 'stack path' and 'stack exec env'"
-              $logInfo $ "To use this " <> compiler <> " and packages outside of a project, consider using:"
-              $logInfo "stack ghc, stack ghci, stack runghc, or stack exec"
+          (do bconfig <- runStackLoggingTGlobal manager go $
+                         lcLoadBuildConfig lc globalResolver globalCompiler
+              runStackTGlobal manager bconfig go $
+                Nix.reexecWithOptionalShell $
+                  runStackLoggingTGlobal manager go $ do
+                     (wantedCompiler, compilerCheck, mstack) <-
+                         case scoCompilerVersion of
+                             Just v -> return (v, MatchMinor, Nothing)
+                             Nothing -> do
+                                 bc <- lcLoadBuildConfig lc globalResolver globalCompiler
+                                 return ( bcWantedCompiler bc
+                                        , configCompilerCheck (lcConfig lc)
+                                        , Just $ bcStackYaml bc
+                                        )
+                     miniConfig <- loadMiniConfig (lcConfig lc)
+                     mpaths <- runStackTGlobal manager miniConfig go $
+                         ensureCompiler SetupOpts
+                         { soptsInstallIfMissing = True
+                         , soptsUseSystem =
+                           (configSystemGHC $ lcConfig lc)
+                           && not scoForceReinstall
+                         , soptsWantedCompiler = wantedCompiler
+                         , soptsCompilerCheck = compilerCheck
+                         , soptsStackYaml = mstack
+                         , soptsForceReinstall = scoForceReinstall
+                         , soptsSanityCheck = True
+                         , soptsSkipGhcCheck = False
+                         , soptsSkipMsys = configSkipMsys $ lcConfig lc
+                         , soptsUpgradeCabal = scoUpgradeCabal
+                         , soptsResolveMissingGHC = Nothing
+                         , soptsStackSetupYaml = scoStackSetupYaml
+                         , soptsGHCBindistURL = scoGHCBindistURL
+                         }
+                     let compiler = case wantedCompiler of
+                             GhcVersion _ -> "GHC"
+                             GhcjsVersion {} -> "GHCJS"
+                     case mpaths of
+                         Nothing -> $logInfo $ "stack will use the " <> compiler <> " on your PATH"
+                         Just _ -> $logInfo $ "stack will use a locally installed " <> compiler
+                     $logInfo "For more information on paths, see 'stack path' and 'stack exec env'"
+                     $logInfo $ "To use this " <> compiler <> " and packages outside of a project, consider using:"
+                     $logInfo "stack ghc, stack ghci, stack runghc, or stack exec"
               )
           Nothing
           (Just $ munlockFile lk)
