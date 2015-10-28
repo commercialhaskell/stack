@@ -14,7 +14,6 @@ import System.Directory
 import System.IO.Temp (withSystemTempDirectory)
 
 import Stack.Config
-import Stack.Types.PackageName
 import Stack.Types.Config
 import Stack.Types.StackT
 import Stack.Types.Nix
@@ -60,6 +59,5 @@ spec = beforeAll setup $ afterAll teardown $ do
     it "sees that the only package asked for is glpk" $ \T{..} -> inTempDir $ do
       writeFile (toFilePath stackDotYaml) sampleConfig
       lc <- loadConfig' manager
-      pn <- parsePackageNameFromString "glpk"
-      (nixPackages $ configNix $ lcConfig lc) `shouldBe` [pn]
+      (nixPackages $ configNix $ lcConfig lc) `shouldBe` ["glpk"]
 

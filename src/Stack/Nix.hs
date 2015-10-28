@@ -101,7 +101,7 @@ runShellAndExit getCmdArgs = do
        liftIO ((,) <$> hIsTerminalDevice stdin
                    <*> hIsTerminalDevice stderr)
      let mshellFile = nixInitFile (configNix config)
-         pkgsInConfig = map show (nixPackages (configNix config))
+         pkgsInConfig = nixPackages (configNix config)
      if not (null pkgsInConfig) && isJust mshellFile then
        throwM NixCannotUseShellFileAndPackagesException
        else return ()

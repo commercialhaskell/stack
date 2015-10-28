@@ -11,12 +11,10 @@ import Data.Aeson.Extended
 import Data.Monoid
 import Data.Text (Text)
 
-import Stack.Types.PackageName
-
 -- | Nix configuration.
 data NixOpts = NixOpts
   {nixEnable   :: !Bool
-  ,nixPackages :: ![PackageName]
+  ,nixPackages :: ![String]
     -- ^ The system packages to be installed in the environment before it runs
   ,nixInitFile :: !(Maybe String)
     -- ^ The path of a file containing preconfiguration of the environment (e.g shell.nix)
@@ -32,7 +30,7 @@ data NixOptsMonoid = NixOptsMonoid
     -- ^ Should nix-shell be defaulted to enabled (does @nix:@ section exist in the config)?
   ,nixMonoidEnable :: !(Maybe Bool)
     -- ^ Is using nix-shell enabled?
-  ,nixMonoidPackages :: ![PackageName]
+  ,nixMonoidPackages :: ![String]
     -- ^ System packages to use (given to nix-shell)
   ,nixMonoidInitFile :: !(Maybe String)
     -- ^ The path of a file containing preconfiguration of the environment (e.g shell.nix)
