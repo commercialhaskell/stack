@@ -120,6 +120,7 @@ data StackBuildException
   | DuplicateLocalPackageNames [(PackageName, [Path Abs Dir])]
   | SolverMissingCabalInstall
   | SolverMissingGHC
+  | SolverNoCabalFiles
   deriving Typeable
 
 data FlagSource = FSCommandLine | FSStackYaml
@@ -325,6 +326,10 @@ instance Show StackBuildException where
     show SolverMissingGHC = unlines
         [ "Solver requires that GHC be on your PATH"
         , "Try running 'stack setup'"
+        ]
+    show SolverNoCabalFiles = unlines
+        [ "No cabal files provided.  Maybe this is due to not having a stack.yaml file?"
+        , "Try running 'stack init' to create a stack.yaml"
         ]
 
 instance Exception StackBuildException
