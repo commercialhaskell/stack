@@ -277,7 +277,7 @@ generatePkgDescOpts sourceMap installedMap locals cabalfp pkg componentPaths = d
                    , map
                          (\test ->
                                (generate
-                                    (CBench (T.pack (testName test)))
+                                    (CTest (T.pack (testName test)))
                                     (testBuildInfo test)))
                          (testSuites pkg)])
         , ["-hide-all-packages"])
