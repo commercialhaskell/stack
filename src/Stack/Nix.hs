@@ -110,7 +110,7 @@ runShellAndExit getCmdArgs = do
                      ResolverSnapshot (LTS x y) ->
                        "haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc"
                      _ -> "ghc"
-         nixpkgs = ghcInNix : pkgsInConfig
+         nixpkgs = ghcInNix : "gnused" : "coreutils" : pkgsInConfig
          packagesOrFile = case mshellFile of
            Just filePath -> [filePath]
            Nothing -> "-p" : nixpkgs
@@ -119,7 +119,7 @@ runShellAndExit getCmdArgs = do
                            ,map T.unpack (nixShellOptions (configNix config))
                            ,["--command"]
                            ,[intercalate " "
-                                ("export":(inShellEnvVar ++ "=1"):";":cmnd:args)]
+                                ("export":(inShellEnvVar ++ "=1"):";":exportLDPath:";":cmnd:args)]
                            ]
      $logDebug $ T.pack $
          "Using a nix-shell environment " ++ (case mshellFile of
@@ -134,6 +134,8 @@ runShellAndExit getCmdArgs = do
      case e of
        Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
        Right () -> liftIO exitSuccess
+
+exportLDPath = "export LD_LIBRARY_PATH=`echo -n $NIX_LDFLAGS | tr ' ' $'\n' | sed -n '/-L/{s/-L//; p}' | tr $'\n' ':'`"
 
 -- | 'True' if we are currently running inside a Nix.
 getInShell :: (MonadIO m) => m Bool
