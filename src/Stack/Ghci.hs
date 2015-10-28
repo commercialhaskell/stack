@@ -215,13 +215,19 @@ ghciSetup mainIs stringTargets = do
                                  return (Just (name, (cabalfp, simpleTargets)))
                              Nothing -> return Nothing
                     else return Nothing
+    let localLibs = [name | (name, (_, target)) <- locals, targetIncludesLib target]
     infos <-
         forM locals $
         \(name,(cabalfp,component)) ->
-             makeGhciPkgInfo sourceMap installedMap (map fst locals) name cabalfp component
+             makeGhciPkgInfo sourceMap installedMap localLibs name cabalfp component
     unless (M.null realTargets) (build (const (return ())) Nothing bopts)
     return (realTargets, mainIsTargets, infos)
   where
+    -- NOTE: this doesn't mean that the cabal package actually has a
+    -- library, just that if it does, the requested target includes it.
+    targetIncludesLib STLocalAll = True
+    targetIncludesLib (STLocalComps comps) = S.member CLib comps
+    targetIncludesLib _ = False
     makeBuildOpts targets =
         base
         { boptsTargets = stringTargets
