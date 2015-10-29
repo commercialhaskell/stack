@@ -460,6 +460,14 @@ ghciOptsParser = GhciOpts
              <*> fmap concat (many (argsOption (long "ghc-options" <>
                                        metavar "OPTION" <>
                                        help "Additional options passed to GHCi")))
+             <*> ((++)
+                    <$> flag [] ["-Wall", "-Werror"]
+                        ( long "pedantic"
+                       <> help "Turn on -Wall and -Werror (note: option name may change in the future"
+                        )
+                    <*> many (textOption (long "build-ghc-options" <>
+                                          metavar "OPTION" <>
+                                          help "Additional options passed to GHC for the build")))
              <*> optional
                      (strOption (long "with-ghc" <>
                                  metavar "GHC" <>

@@ -40,9 +40,10 @@ ide
     :: (HasConfig r, HasBuildConfig r, HasTerminal r, HasLogLevel r, MonadMask m, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m, HasHttpManager r)
     => [Text] -- ^ Targets.
     -> [String] -- ^ GHC options.
+    -> [Text] -- ^ Build GHC options.
     -> m ()
-ide targets useropts = do
-    (_realTargets,_,pkgs) <- ghciSetup Nothing targets
+ide targets useropts buildArgs = do
+    (_realTargets,_,pkgs) <- ghciSetup Nothing targets buildArgs
     pwd <- getWorkingDir
     (pkgopts,_srcfiles) <-
         liftM mconcat $ forM pkgs $ getPackageOptsAndTargetFiles pwd

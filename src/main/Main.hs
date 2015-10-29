@@ -272,14 +272,22 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                          "start"
                          "Start the ide-backend service"
                          ideCmd
-                         ((,) <$> many (textArgument
-                                          (metavar "TARGET" <>
-                                           help ("If none specified, use all " <>
-                                                 "packages defined in current directory")))
-                              <*> argsOption (long "ghc-options" <>
-                                              metavar "OPTION" <>
-                                              help "Additional options passed to GHCi" <>
-                                              value []))
+                         ((,,) <$> many (textArgument
+                                           (metavar "TARGET" <>
+                                            help ("If none specified, use all " <>
+                                                  "packages defined in current directory")))
+                               <*> argsOption (long "ghc-options" <>
+                                               metavar "OPTION" <>
+                                               help "Additional options passed to GHCi" <>
+                                               value [])
+                               <*> ((++)
+                                      <$> flag [] ["-Wall", "-Werror"]
+                                          ( long "pedantic"
+                                         <> help "Turn on -Wall and -Werror (note: option name may change in the future"
+                                          )
+                                      <*> many (textOption (long "ghc-options" <>
+                                                            metavar "OPTION" <>
+                                                            help "Additional options passed to GHC"))))
                      addCommand
                          "packages"
                          "List all available local loadable packages"
@@ -873,10 +881,10 @@ ghciCmd ghciOpts go@GlobalOpts{..} =
     ghci ghciOpts
 
 -- | Run ide-backend in the context of a project.
-ideCmd :: ([Text], [String]) -> GlobalOpts -> IO ()
-ideCmd (targets,args) go@GlobalOpts{..} =
+ideCmd :: ([Text], [String], [Text]) -> GlobalOpts -> IO ()
+ideCmd (targets,args,buildArgs) go@GlobalOpts{..} =
     withBuildConfig go $ -- No locking needed.
-      ide targets args
+      ide targets args buildArgs
 
 -- | List packages in the project.
 packagesCmd :: () -> GlobalOpts -> IO ()
