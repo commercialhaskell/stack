@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
@@ -46,7 +45,7 @@ import           Data.Either (partitionEithers)
 import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (catMaybes, listToMaybe)
+import           Data.Maybe (catMaybes, listToMaybe, fromMaybe)
 import qualified Data.Set as Set
 import qualified Data.Text.Encoding as T
 import           Data.Typeable (Typeable)
@@ -108,10 +107,9 @@ ghcPkgCmdArgs
     -> m a
 ghcPkgCmdArgs cmd menv wc mpkgDbs sink = do
     case reverse mpkgDbs of
-        (pkgDb:_) -> (createDatabase menv wc) pkgDb -- TODO maybe use some retry logic instead?
+        (pkgDb:_) -> createDatabase menv wc pkgDb -- TODO maybe use some retry logic instead?
         _ -> return ()
-    a <- sinkProcessStdout Nothing menv (ghcPkgExeName wc) args sink
-    return a
+    sinkProcessStdout Nothing menv (ghcPkgExeName wc) args sink
   where
     args = concat
         [ case mpkgDbs of
@@ -307,10 +305,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 _ -> throwM $ MissingSingleField k m
         -- Can't fail: if not found, same as an empty list. See:
         -- https://github.com/fpco/stack/issues/182
-        parseM k =
-            case Map.lookup k m of
-                Just vs -> vs
-                Nothing -> []
+        parseM k = fromMaybe [] (Map.lookup k m)
 
         parseDepend :: MonadThrow m => ByteString -> m (Maybe GhcPkgId)
         parseDepend "builtin_rts" = return Nothing

@@ -25,7 +25,7 @@ boolFlags :: Bool -> String -> String -> Mod FlagFields Bool -> Parser Bool
 boolFlags defaultValue = enableDisableFlags defaultValue True False
 
 -- | Enable/disable flags for a @Bool@, without a default case (to allow chaining @<|>@s).
-boolFlagsNoDefault :: (Maybe Bool) -> String -> String -> Mod FlagFields Bool -> Parser Bool
+boolFlagsNoDefault :: Maybe Bool -> String -> String -> Mod FlagFields Bool -> Parser Bool
 boolFlagsNoDefault = enableDisableFlagsNoDefault True False
 
 -- | Enable/disable flags for a @(Maybe Bool)@.
@@ -39,11 +39,11 @@ enableDisableFlags defaultValue enabledValue disabledValue name helpSuffix mods 
   pure defaultValue
 
 -- | Enable/disable flags for any type, without a default (to allow chaining @<|>@s)
-enableDisableFlagsNoDefault :: (Eq a) => a -> a -> (Maybe a) -> String -> String -> Mod FlagFields a -> Parser a
+enableDisableFlagsNoDefault :: (Eq a) => a -> a -> Maybe a -> String -> String -> Mod FlagFields a -> Parser a
 enableDisableFlagsNoDefault enabledValue disabledValue maybeHideValue name helpSuffix mods =
   last <$> some (enableDisableFlagsNoDefault' enabledValue disabledValue maybeHideValue name helpSuffix mods)
 
-enableDisableFlagsNoDefault' :: (Eq a) => a -> a -> (Maybe a) -> String -> String -> Mod FlagFields a -> Parser a
+enableDisableFlagsNoDefault' :: (Eq a) => a -> a -> Maybe a -> String -> String -> Mod FlagFields a -> Parser a
 enableDisableFlagsNoDefault' enabledValue disabledValue maybeHideValue name helpSuffix mods =
     let hideEnabled = Just enabledValue == maybeHideValue
         hideDisabled = Just disabledValue == maybeHideValue

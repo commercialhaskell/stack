@@ -33,7 +33,7 @@ import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Char (isSpace,toUpper,isAscii,isDigit)
 import           Data.Conduit.List (sinkNull)
-import           Data.List (dropWhileEnd,intercalate,intersperse,isPrefixOf,isInfixOf,foldl',sortBy)
+import           Data.List (dropWhileEnd,intercalate,isPrefixOf,isInfixOf,foldl',sortBy)
 import           Data.List.Extra (trim)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -126,10 +126,8 @@ reexecWithOptionalContainer mprojectRoot =
                                  exeTimestamp
                          return (exePath, exeTimestamp, isKnown)
                   case misCompatible of
-                      Just True -> do
-                          return (cmdArgs args exePath)
-                      Just False -> do
-                          exeDownload args
+                      Just True -> return (cmdArgs args exePath)
+                      Just False -> exeDownload args
                       Nothing -> do
                           e <-
                               try $
@@ -160,9 +158,7 @@ reexecWithOptionalContainer mprojectRoot =
                           if compatible
                               then return (cmdArgs args exePath)
                               else exeDownload args
-            Nothing
-              | otherwise -> do
-                  exeDownload args
+            Nothing -> exeDownload args
     exeDownload args =
         fmap
             (cmdArgs args . toFilePath)
@@ -433,7 +429,7 @@ cleanup opts =
                         | otherwise -> throwM (InvalidCleanupCommandException line)
              e <- try (readDockerProcess envOverride args)
              case e of
-               Left (ReadProcessException _ _ _ _) ->
+               Left (ReadProcessException{}) ->
                  $logError (concatT ["Could not remove: '",v,"'"])
                Left e' -> throwM e'
                Right _ -> return ()
@@ -520,10 +516,9 @@ cleanup opts =
                                           l)))
         buildSection sectionHead items itemBuilder =
           do let (anyWrote,b) = runWriter (forM items itemBuilder)
-             if or anyWrote
-               then do buildSectionHead sectionHead
-                       tell b
-               else return ()
+             when (or anyWrote) $
+                do buildSectionHead sectionHead
+                   tell b
         buildKnownImage (imageHash,lastUsedProjects) =
           case Map.lookup imageHash imageRepos of
             Just repos@(_:_) ->
@@ -545,7 +540,7 @@ cleanup opts =
              buildInspect hash
              return True
         buildContainer removeAge (hash,(image,name),created) =
-          do let disp = (name ++ " (image: " ++ image ++ ")")
+          do let disp = name ++ " (image: " ++ image ++ ")"
              buildTime containerStr removeAge created disp
              buildInspect hash
              return True
@@ -614,7 +609,7 @@ inspects envOverride images =
          case eitherDecode (LBS.pack (filter isAscii (decodeUtf8 inspectOut))) of
            Left msg -> throwM (InvalidInspectOutputException msg)
            Right results -> return (Map.fromList (map (\r -> (iiId r,r)) results))
-       Left (ReadProcessException _ _ _ _) -> return Map.empty
+       Left (ReadProcessException{}) -> return Map.empty
        Left e -> throwM e
 
 -- | Pull latest version of configured Docker image from registry.
@@ -719,7 +714,7 @@ homeDirName = $(mkRelDir "_home/")
 
 -- | Convenience function to decode ByteString to String.
 decodeUtf8 :: BS.ByteString -> String
-decodeUtf8 bs = T.unpack (T.decodeUtf8 (bs))
+decodeUtf8 bs = T.unpack (T.decodeUtf8 bs)
 
 -- | Convenience function constructing message for @$log*@.
 concatT :: [String] -> Text
@@ -795,7 +790,7 @@ data ImageConfig = ImageConfig
 instance FromJSON ImageConfig where
   parseJSON v =
     do o <- parseJSON v
-       (ImageConfig <$> o .:? T.pack "Env" .!= [])
+       ImageConfig <$> o .:? T.pack "Env" .!= []
 
 -- | Exceptions thrown by Stack.Docker.
 data StackDockerException
@@ -876,7 +871,7 @@ instance Show StackDockerException where
     concat ["These Docker versions are prohibited (you have '"
            ,versionString haveVersion
            ,"'): "
-           ,concat (intersperse ", " (map versionString prohibitedVersions))
+           ,intercalate ", " (map versionString prohibitedVersions)
            ,"."]
   show InvalidVersionOutputException =
     "Cannot get Docker version (invalid 'docker --version' output)."

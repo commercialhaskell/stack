@@ -114,7 +114,7 @@ figureOutMainFile
     -> Map PackageName SimpleTarget
     -> [GhciPkgInfo]
     -> m (Maybe (Path Abs File))
-figureOutMainFile mainIsTargets targets0 packages = do
+figureOutMainFile mainIsTargets targets0 packages =
     case candidates of
         [] -> return Nothing
         [c@(_,_,fp)] -> do $logInfo ("Using main module: " <> renderCandidate c)
@@ -122,7 +122,7 @@ figureOutMainFile mainIsTargets targets0 packages = do
         candidate:_ -> do
             let border = $logWarn "* * * * * * * *"
             border
-            $logWarn ("The main module to load is ambiguous. Candidates are: ")
+            $logWarn "The main module to load is ambiguous. Candidates are: "
             forM_ (map renderCandidate candidates) $logWarn
             $logWarn
                 "None will be loaded. You can specify which one to pick by: "

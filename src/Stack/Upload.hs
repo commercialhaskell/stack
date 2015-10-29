@@ -30,7 +30,7 @@ module Stack.Upload
 import           Control.Applicative
 import           Control.Exception                     (bracket)
 import qualified Control.Exception                     as E
-import           Control.Monad                         (when)
+import           Control.Monad                         (when, unless)
 import           Data.Aeson                            (FromJSON (..),
                                                         ToJSON (..),
                                                         eitherDecode', encode,
@@ -211,7 +211,7 @@ mkUploader config us = do
                         putStrLn "authentication failure"
                         cfp <- credsFile config
                         handleIO (const $ return ()) (removeFile cfp)
-                        error $ "Authentication failure uploading to server"
+                        error "Authentication failure uploading to server"
                     403 -> do
                         putStrLn "forbidden upload"
                         putStrLn "Usually means: you've already uploaded this package/version combination"
@@ -234,7 +234,7 @@ printBody res =
   where
     loop = do
         bs <- brRead $ responseBody res
-        when (not $ S.null bs) $ do
+        unless (S.null bs) $ do
             S.hPut stdout bs
             loop
 
