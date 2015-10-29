@@ -22,7 +22,9 @@ import           Control.Monad.Catch            (MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Trans.Resource
+import qualified Data.Foldable                  as F
 import           Data.Function
+import qualified Data.HashSet                   as HS
 import           Data.List
 import           Data.List.Extra                (nubOrd)
 import           Data.Maybe
@@ -153,43 +155,44 @@ generateDepsHaddockIndex
     => EnvOverride
     -> WhichCompiler
     -> BaseConfigOpts
-    -> Map GhcPkgId (DumpPackage () ())
-    -> Map GhcPkgId (DumpPackage () ())
-    -> Map GhcPkgId (DumpPackage () ())
+    -> Map GhcPkgId (DumpPackage () ())  -- ^ Global dump information
+    -> Map GhcPkgId (DumpPackage () ())  -- ^ Snapshot dump information
+    -> Map GhcPkgId (DumpPackage () ())  -- ^ Local dump information
     -> [LocalPackage]
     -> m ()
 generateDepsHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs locals = do
-    let depGhcPkgIds =
-            map
-                (\LocalPackage{lpPackage = Package{..}} ->
-                      let pkgId = PackageIdentifier packageName packageVersion
-                      in case find
-                                  (\dp ->
-                                        dpPackageIdent dp == pkgId)
-                                  (Map.elems localDumpPkgs) of
-                             Nothing -> Set.empty
-                             Just dp -> findTransitiveDepends (dpGhcPkgId dp))
-                locals
-        depDumpPkgs =
-            map
-                (\ghcPkgId ->
-                      lookupDumpPackage ghcPkgId allDumpPkgs)
-                (Set.toList $ Set.unions depGhcPkgIds)
+    let deps = (nubOrd . mapMaybe getPkgId .  findTransitiveDepends . mapMaybe getGhcPkgId) locals
+        depDocDir = localDocDir bco </> $(mkRelDir "all")
     generateHaddockIndex
         "local packages and dependencies"
         envOverride
         wc
-        (nubOrd $ map dpPackageIdent $ catMaybes depDumpPkgs)
+        deps
         ".."
-        (localDocDir bco </> $(mkRelDir "all"))
+        depDocDir
   where
-    findTransitiveDepends ghcPkgId =
-        case lookupDumpPackage ghcPkgId allDumpPkgs of
-            Nothing -> Set.singleton ghcPkgId
-            Just pkgDP ->
-                Set.unions
-                    (Set.singleton ghcPkgId :
-                     map findTransitiveDepends (dpDepends pkgDP))
+    getGhcPkgId :: LocalPackage -> Maybe GhcPkgId
+    getGhcPkgId LocalPackage{lpPackage = Package{..}} =
+        let pkgId = PackageIdentifier packageName packageVersion
+            mdpPkg = F.find (\dp -> dpPackageIdent dp == pkgId) localDumpPkgs
+        in fmap dpGhcPkgId mdpPkg
+    findTransitiveDepends :: [GhcPkgId] -> [GhcPkgId]
+    findTransitiveDepends = (`go` HS.empty) . HS.fromList
+      where
+        go todo checked =
+            case HS.toList todo of
+                [] -> HS.toList checked
+                (ghcPkgId:_) ->
+                    let deps =
+                            case lookupDumpPackage ghcPkgId allDumpPkgs of
+                                Nothing -> HS.empty
+                                Just pkgDP -> HS.fromList (dpDepends pkgDP)
+                        deps' = deps `HS.difference` checked
+                        todo' = HS.delete ghcPkgId (deps' `HS.union` todo)
+                        checked' = HS.insert ghcPkgId checked
+                    in go todo' checked'
+    getPkgId :: GhcPkgId -> Maybe PackageIdentifier
+    getPkgId = fmap dpPackageIdent . (`lookupDumpPackage` allDumpPkgs)
     allDumpPkgs = [localDumpPkgs, snapshotDumpPkgs, globalDumpPkgs]
 
 -- | Generate Haddock index and contents for all snapshot packages.
