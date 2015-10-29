@@ -244,7 +244,7 @@ fixCodePage' inner = do
 queryBuildInfo :: M env m
                => [Text] -- ^ selectors
                -> m ()
-queryBuildInfo selectors0 = do
+queryBuildInfo selectors0 =
         rawBuildInfo
     >>= select id selectors0
     >>= liftIO . TIO.putStrLn . decodeUtf8 . Yaml.encode

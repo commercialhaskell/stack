@@ -86,10 +86,7 @@ getLatestResolver = do
     let mlts = do
             (x,y) <- listToMaybe (reverse (IntMap.toList (snapshotsLts snapshots)))
             return (LTS x y)
-        snap =
-            case mlts of
-                Nothing -> Nightly (snapshotsNightly snapshots)
-                Just lts -> lts
+        snap = fromMaybe (Nightly (snapshotsNightly snapshots)) mlts
     return (ResolverSnapshot snap)
 
 -- Interprets ConfigMonoid options.
@@ -283,7 +280,7 @@ loadConfig configArgs mstackYaml = do
             Just (_, _, projectConfig) -> configArgs : projectConfig : extraConfigs
     unless (fromCabalVersion Meta.version `withinRange` configRequireStackVersion config)
         (throwM (BadStackVersionException (configRequireStackVersion config)))
-    return $ LoadConfig
+    return LoadConfig
         { lcConfig          = config
         , lcLoadBuildConfig = loadBuildConfig mproject config
         , lcProjectRoot     = fmap (\(_, fp, _) -> parent fp) mproject
@@ -362,7 +359,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
     resolver <-
         case mresolver of
             Nothing -> return $ projectResolver project'
-            Just aresolver -> do
+            Just aresolver ->
                 runReaderT (makeConcreteResolver aresolver) miniConfig
     let project = project'
             { projectResolver = resolver

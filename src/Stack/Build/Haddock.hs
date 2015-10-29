@@ -278,7 +278,7 @@ lookupDumpPackage :: GhcPkgId
                   -> [Map GhcPkgId (DumpPackage () ())]
                   -> Maybe (DumpPackage () ())
 lookupDumpPackage ghcPkgId dumpPkgs =
-    listToMaybe $ catMaybes $ map (Map.lookup ghcPkgId) dumpPkgs
+    listToMaybe $ mapMaybe (Map.lookup ghcPkgId) dumpPkgs
 
 -- | Path of haddock index file.
 haddockIndexFile :: Path Abs Dir -> Path Abs File

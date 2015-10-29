@@ -77,9 +77,9 @@ getInstalled menv opts sourceMap = do
 
     (installedLibs0, globalDumpPkgs) <- loadDatabase' Nothing []
     (installedLibs1, _extraInstalled) <-
-      (foldM (\lhs' pkgdb -> do
-        lhs'' <- loadDatabase' (Just (ExtraGlobal, pkgdb)) (fst lhs')
-        return lhs'') (installedLibs0, globalDumpPkgs) extraDBPaths)
+      (foldM (\lhs' pkgdb ->
+        loadDatabase' (Just (ExtraGlobal, pkgdb)) (fst lhs')
+        ) (installedLibs0, globalDumpPkgs) extraDBPaths)
     (installedLibs2, snapshotDumpPkgs) <-
         loadDatabase' (Just (InstalledTo Snap, snapDBPath)) installedLibs1
     (installedLibs3, localDumpPkgs) <-
@@ -198,7 +198,7 @@ processLoadResult mdb _ (reason, lh) = do
             NeedsHaddock -> " it needing haddocks."
             UnknownPkg -> " it being unknown to the resolver / extra-deps."
             WrongLocation mloc loc -> " wrong location: " <> T.pack (show (mloc, loc))
-            WrongVersion actual wanted -> T.concat $
+            WrongVersion actual wanted -> T.concat
                 [ " wanting version "
                 , versionText wanted
                 , " instead of "

@@ -130,9 +130,9 @@ writeBuildCache dir times =
     writeCache
         dir
         buildCacheFile
-        (BuildCache
+        BuildCache
          { buildCacheTimes = times
-         })
+         }
 
 -- | Write the dirtiness cache for this package's configuration.
 writeConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)

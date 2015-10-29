@@ -486,7 +486,7 @@ execOptsParser mcmd =
     eoArgsParser :: Parser [String]
     eoArgsParser = many (strArgument (metavar meta))
       where
-        meta = (maybe ("CMD ") (const "") mcmd) ++
+        meta = (maybe "CMD " (const "") mcmd) ++
                "-- ARGS (e.g. stack ghc -- X.hs -o x)"
 
 evalOptsParser :: String -- ^ metavar
@@ -740,7 +740,7 @@ configCmdSetParser =
             oneM (fieldToValParser field))
   where
     fieldToValParser :: String -> Parser ConfigCmdSet
-    fieldToValParser s = do
+    fieldToValParser s =
         case s of
             "resolver" ->
                 ConfigCmdSetResolver <$>

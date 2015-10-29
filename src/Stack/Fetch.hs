@@ -38,8 +38,7 @@ import           Control.Monad                  (join, liftM, unless, void,
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader           (asks)
-import           Control.Monad.Reader           (runReaderT)
+import           Control.Monad.Reader           (asks, runReaderT)
 import           Control.Monad.Trans.Control
 import           Crypto.Hash                    (SHA512 (..))
 import           Data.ByteString                (ByteString)
@@ -322,7 +321,7 @@ type PackageCaches = Map PackageIdentifier (PackageIndex, PackageCache)
 lookupPackageIdentifierExact :: HasConfig env
                              => PackageIdentifier -> env -> PackageCaches
                              -> IO (Maybe ByteString)
-lookupPackageIdentifierExact ident env caches = do
+lookupPackageIdentifierExact ident env caches =
     case Map.lookup ident caches of
         Nothing -> return Nothing
         Just (index, cache) -> do
@@ -435,10 +434,10 @@ fetchPackages' mdistDir toFetchAll = do
         let downloadReq = DownloadRequest
                 { drRequest = req
                 , drHashChecks = map toHashCheck $ maybeToList (tfSHA512 toFetch)
-                , drLengthCheck = fmap fromIntegral $ tfSize toFetch
+                , drLengthCheck = fromIntegral <$> tfSize toFetch
                 , drRetryPolicy = drRetryPolicyDefault
                 }
-        let progressSink _ = do
+        let progressSink _ =
                 liftIO $ runInBase $ $logInfo $ packageIdentifierText ident <> ": download"
         _ <- verifiedDownload downloadReq destpath progressSink
 
