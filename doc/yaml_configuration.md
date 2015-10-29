@@ -118,7 +118,7 @@ Non-project config options may go in the global config (`/etc/stack/config.yaml`
 
 ### docker
 
-See [Docker configuration](Docker#configuration).
+See [Docker configuration](https://github.com/commercialhaskell/stack/blob/release/doc/docker_integration.md).
 
 ### connection-count
 
