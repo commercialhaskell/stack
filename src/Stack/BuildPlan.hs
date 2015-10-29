@@ -434,8 +434,7 @@ loadMiniBuildPlan
     -> m MiniBuildPlan
 loadMiniBuildPlan name = do
     path <- configMiniBuildPlanCache name
-    let fp = toFilePath path
-    taggedDecodeOrLoad fp $ liftM buildPlanFixes $ do
+    taggedDecodeOrLoad path $ liftM buildPlanFixes $ do
         bp <- loadBuildPlan name
         toMiniBuildPlan
             (siCompilerVersion $ bpSystemInfo bp)
@@ -693,7 +692,7 @@ parseCustomMiniBuildPlan stackYamlFP url0 = do
     customPlanDir <- getCustomPlanDir
     let binaryFP = customPlanDir </> $(mkRelDir "bin") </> binaryFilename
 
-    taggedDecodeOrLoad (toFilePath binaryFP) $ do
+    taggedDecodeOrLoad binaryFP $ do
         cs <- either throwM return $ decodeEither' yamlBS
         let addFlags :: PackageIdentifier -> (PackageName, (Version, Map FlagName Bool))
             addFlags (PackageIdentifier name ver) =

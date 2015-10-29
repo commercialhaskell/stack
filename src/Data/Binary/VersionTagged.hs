@@ -25,53 +25,55 @@ import Data.Binary (Binary (..))
 import Data.Binary.Get (ByteOffset)
 import Data.Binary.Tagged (HasStructuralInfo, HasSemanticVersion)
 import qualified Data.Binary.Tagged as BinaryTagged
+import Data.Monoid ((<>))
 import Data.Typeable (Typeable)
 import Control.Exception.Enclosed (tryAnyDeep)
-import System.FilePath (takeDirectory)
-import System.Directory (createDirectoryIfMissing)
+import Path
+import Path.IO (createTree)
 import qualified Data.Text as T
 
 type BinarySchema a = (Binary a, NFData a, HasStructuralInfo a, HasSemanticVersion a)
 
 -- | Write to the given file, with a binary-tagged tag.
 taggedEncodeFile :: (BinarySchema a, MonadIO m)
-                 => FilePath
+                 => Path Abs File
                  -> a
                  -> m ()
 taggedEncodeFile fp x = liftIO $ do
-    createDirectoryIfMissing True $ takeDirectory fp
-    BinaryTagged.taggedEncodeFile fp x
+    createTree (parent fp)
+    BinaryTagged.taggedEncodeFile (toFilePath fp) x
 
 -- | Read from the given file. If the read fails, run the given action and
 -- write that back to the file. Always starts the file off with the version
 -- tag.
 taggedDecodeOrLoad :: (BinarySchema a, MonadIO m, MonadLogger m)
-                   => FilePath
+                   => Path Abs File
                    -> m a
                    -> m a
 taggedDecodeOrLoad fp mx = do
-    $logDebug $ T.pack $ "Trying to decode " ++ fp
+    let fpt = T.pack (toFilePath fp)
+    $logDebug $ "Trying to decode " <> fpt
     eres <- decodeFileOrFailDeep fp
     case eres of
         Left _ -> do
-            $logDebug $ T.pack $ "Failure decoding " ++ fp
+            $logDebug $ "Failure decoding " <> fpt
             x <- mx
             taggedEncodeFile fp x
             return x
         Right x -> do
-            $logDebug $ T.pack $ "Success decoding " ++ fp
+            $logDebug $ "Success decoding " <> fpt
             return x
 
 -- | Ensure that there are no lurking exceptions deep inside the parsed
 -- value... because that happens unfortunately. See
 -- https://github.com/commercialhaskell/stack/issues/554
 decodeFileOrFailDeep :: (BinarySchema a, MonadIO m, MonadThrow n)
-                     => FilePath
+                     => Path loc File
                      -> m (n a)
 decodeFileOrFailDeep fp = liftIO $ fmap (either throwM return) $ tryAnyDeep $ do
-    eres <- BinaryTagged.taggedDecodeFileOrFail fp
+    eres <- BinaryTagged.taggedDecodeFileOrFail (toFilePath fp)
     case eres of
-        Left (offset, str) -> throwM $ DecodeFileFailure fp offset str
+        Left (offset, str) -> throwM $ DecodeFileFailure (toFilePath fp) offset str
         Right x -> return x
 
 data DecodeFileFailure = DecodeFileFailure FilePath ByteOffset String

@@ -127,14 +127,14 @@ newInstalledCache = liftIO $ InstalledCache <$> newIORef (InstalledCacheInner Ma
 -- empty cache.
 loadInstalledCache :: (MonadLogger m, MonadIO m) => Path Abs File -> m InstalledCache
 loadInstalledCache path = do
-    m <- taggedDecodeOrLoad (toFilePath path) (return $ InstalledCacheInner Map.empty)
+    m <- taggedDecodeOrLoad path (return $ InstalledCacheInner Map.empty)
     liftIO $ fmap InstalledCache $ newIORef m
 
 -- | Save a @InstalledCache@ to disk
 saveInstalledCache :: MonadIO m => Path Abs File -> InstalledCache -> m ()
 saveInstalledCache path (InstalledCache ref) = liftIO $ do
     createTree (parent path)
-    readIORef ref >>= taggedEncodeFile (toFilePath path)
+    readIORef ref >>= taggedEncodeFile path
 
 -- | Prune a list of possible packages down to those whose dependencies are met.
 --
