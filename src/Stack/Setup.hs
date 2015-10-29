@@ -340,7 +340,8 @@ ensureCompiler sopts = do
                 arch /= expectedArch
         isWanted = isWantedCompiler (soptsCompilerCheck sopts) (soptsWantedCompiler sopts)
 
-    -- If we need to install a GHC, try to do so
+        -- If we need to install a GHC or MSYS, try to do so
+        -- Return the additional directory paths of GHC & MSYS.
     mtools <- if needLocal
         then do
             getSetupInfo' <- runOnce (getSetupInfo (soptsStackSetupYaml sopts) =<< asks getHttpManager)
@@ -405,6 +406,7 @@ ensureCompiler sopts = do
     mpaths <- case mtools of
         Nothing -> return Nothing
         Just (compilerTool, mmsys2Tool) -> do
+            -- Add GHC's and MSYS's paths to the config.
             let idents = catMaybes [Just compilerTool, mmsys2Tool]
             paths <- mapM extraDirs idents
             return $ Just $ mconcat paths
