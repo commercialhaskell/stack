@@ -671,7 +671,7 @@ downloadAndInstallCompiler si wanted@(GhcVersion{}) versionCheck mbindistURL = d
     ghcPkgName <- parsePackageNameFromString ("ghc" ++ ghcVariantSuffix ghcVariant)
     let tool = Tool $ PackageIdentifier ghcPkgName selectedVersion
     downloadAndInstallTool (configLocalPrograms config) si downloadInfo tool installer
-downloadAndInstallCompiler si wanted@(GhcjsVersion version _) versionCheck _mbindistUrl = do
+downloadAndInstallCompiler si wanted versionCheck _mbindistUrl = do
     config <- asks getConfig
     ghcVariant <- asks getGHCVariant
     case ghcVariant of
@@ -682,7 +682,11 @@ downloadAndInstallCompiler si wanted@(GhcjsVersion version _) versionCheck _mbin
         Just pairs -> getWantedCompilerInfo "source" versionCheck wanted id pairs
     $logInfo "Preparing to install GHCJS to an isolated location."
     $logInfo "This will not interfere with any system-level installation."
-    downloadAndInstallTool (configLocalPrograms config) si downloadInfo (ToolGhcjs selectedVersion) (installGHCJS version)
+    let tool = ToolGhcjs selectedVersion
+        installer = installGHCJS $ case selectedVersion of
+            GhcjsVersion version _ -> version
+            _ -> error "Invariant violated: expected ghcjs version in downloadAndInstallCompiler."
+    downloadAndInstallTool (configLocalPrograms config) si downloadInfo tool installer
 
 getWantedCompilerInfo :: (Ord k, MonadThrow m)
                       => Text
