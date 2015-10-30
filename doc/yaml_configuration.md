@@ -222,6 +222,23 @@ Specifies how the compiler version in the resolver is matched against concrete v
 * `match-exact`: the entire version number must match precisely
 * `newer-minor`: the third component can be increased, e.g. if your resolver is `ghc-7.10.1`, then 7.10.2 will also be allowed. This was the default up through stack 0.1.3
 
+### compiler
+
+(Since 0.1.7)
+
+Overrides the compiler version in the resolver. Note that the `compiler-check`
+flag also applies to the version numbers. This uses the same syntax as compiler
+resolvers like `ghc-7.10.2` or `ghcjs-0.1.0.20150924_ghc-7.10.2` (version used
+for the 'old-base' version of GHCJS).  While it's useful to override the
+compiler for a variety of reasons, the main usecase is to use GHCJS with a
+stackage snapshot, like this:
+
+```yaml
+resolver: lts-3.10
+compiler: ghcjs-0.1.0.20150924_ghc-7.10.2
+compiler-check: match-exact
+```
+
 ### ghc-options
 
 (Since 0.1.4)
