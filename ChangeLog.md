@@ -16,8 +16,9 @@ Other enhancements:
 
 Bug fixes:
 
-* Haddocks not copied for dependencies [#1105](https://github.com/commercialhaskell/stack/issues/1105)
+* Haddocks are now copied for dependencies [#1105](https://github.com/commercialhaskell/stack/issues/1105)
 * Rebuild when cabal file is changed
+* Global options now work consistently after subcommand [#519](https://github.com/commercialhaskell/stack/issues/519)
 
 ## v0.1.6.0
 
