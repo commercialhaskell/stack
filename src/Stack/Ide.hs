@@ -42,7 +42,7 @@ ide
     -> [String] -- ^ GHC options.
     -> m ()
 ide targets useropts = do
-    (_realTargets,_,pkgs) <- ghciSetup (Just BSAll) Nothing targets
+    (_realTargets,_,pkgs) <- ghciSetup (Just BSOnlyDependencies) Nothing targets
     pwd <- getWorkingDir
     (pkgopts,_srcfiles) <-
         liftM mconcat $ forM pkgs $ getPackageOptsAndTargetFiles pwd

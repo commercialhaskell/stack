@@ -197,7 +197,7 @@ ghciSetup mbuildFirst mainIs stringTargets = do
                 return (Just targets')
     let bopts = makeBuildOpts targets
     econfig <- asks getEnvConfig
-    (realTargets,_,_,_,sourceMap) <- loadSourceMap AllowNoTargets bopts
+    (realTargets,_,_,_,sourceMap) <- loadSourceMap AllowNoTargets (bopts BSAll)
     menv <- getMinimalEnvOverride
     (installedMap, _, _, _) <- getInstalled
         menv
@@ -219,15 +219,15 @@ ghciSetup mbuildFirst mainIs stringTargets = do
                              Nothing -> return Nothing
                     else return Nothing
     -- Try to build, but optimistically launch GHCi anyway if it fails (#1065)
-    case (mbuildFirst, M.null realTargets) of
-        (Just _, False) -> do
-            eres <- tryAny $ build (const (return ())) Nothing bopts
+    case mbuildFirst of
+        Just buildFirst -> do
+            eres <- tryAny $ build (const (return ())) Nothing (bopts buildFirst)
             case eres of
                 Left err -> do
                     $logError $ T.pack (show err)
                     $logWarn "Warning: build failed, but optimistically launching GHCi anyway"
                 Right () -> return ()
-        _ -> return ()
+        Nothing -> return ()
     -- Load the list of modules _after_ building, to catch changes in unlisted dependencies (#1180)
     let localLibs = [name | (name, (_, target)) <- locals, hasLocalComp isCLib target]
     infos <-
@@ -236,7 +236,7 @@ ghciSetup mbuildFirst mainIs stringTargets = do
              makeGhciPkgInfo sourceMap installedMap localLibs name cabalfp component
     return (realTargets, mainIsTargets, infos)
   where
-    makeBuildOpts targets =
+    makeBuildOpts targets buildFirst =
         base
         { boptsTargets = stringTargets
         , boptsTests = any (hasLocalComp isCTest) elems
@@ -248,7 +248,7 @@ ghciSetup mbuildFirst mainIs stringTargets = do
         , boptsBenchmarkOpts = (boptsBenchmarkOpts base)
           { beoDisableRun = True
           }
-        , boptsBuildSubset = fromMaybe BSAll mbuildFirst
+        , boptsBuildSubset = buildFirst
         }
       where
         base = defaultBuildOpts
