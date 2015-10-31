@@ -275,3 +275,7 @@ collect2: error: ld returned 1 exit status
       /home/philip/.stack/programs/x86_64-linux/ghc-7.10.1/bin/runghc-7.10.1 -package=Cabal-1.22.2.0 -clear-package-db -global-package-db /home/philip/tmp/Setup.hs --builddir=dist-stack/x86_64-linux/Cabal-1.22.2.0/ build
     Process exited with code: ExitFailure 1
 ```
+
+#### Where does the output from `--ghc-options=-ddump-splices` (and other `-ddump*` options) go?
+
+These are written to `*.dump-*` files inside the package's `.stack-work` directory.
