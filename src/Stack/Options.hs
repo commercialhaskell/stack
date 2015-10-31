@@ -144,16 +144,10 @@ buildOptsParser cmd =
              help "Fetch packages necessary for the build immediately, useful with --dry-run")
 
         buildSubset =
-            flag' BSOnlySnapshot
-                (long "only-snapshot" <>
-                 help "Only build packages for the snapshot database, not the local database")
-            <|> flag' BSOnlyDependencies
-                (long "only-dependencies" <>
-                 help "Only build packages that are dependencies of targets on the command line")
-            <|> flag' BSOnlyDependencies
+            flag' BSOnlyDependencies
                 (long "dependencies-only" <>
                  help "A synonym for --only-dependencies")
-            <|> pure BSAll
+            <|> buildSubsetParser "" ""
 
         fileWatch' =
             flag' FileWatch
@@ -470,8 +464,7 @@ ghciOptsParser = GhciOpts
                      (strOption (long "with-ghc" <>
                                  metavar "GHC" <>
                                  help "Use this command for the GHC to run"))
-             <*> switch (long "no-load" <>
-                         help "Don't load modules on start-up")
+             <*> (not <$> boolFlags True "load" "load modules on start-up" idm)
              <*> packagesParser
              <*> optional
                      (textOption
@@ -480,6 +473,8 @@ ghciOptsParser = GhciOpts
                             help "Specify which target should contain the main \
                                  \module to load, such as for an executable for \
                                  \test suite or benchmark."))
+             <*> (flag' Nothing (long "no-build" <> help "Don't build before launching GHCi") <|>
+                  (Just <$> buildSubsetParser "build-" " before launching GHCi"))
 
 -- | Parser for exec command
 execOptsParser :: Maybe SpecialExecCmd -> Parser ExecOpts
@@ -529,6 +524,17 @@ execOptsExtraParser = eoPlainParser <|>
     eoPlainParser = flag' ExecOptsPlain
                           (long "plain" <>
                            help "Use an unmodified environment (only useful with Docker)")
+
+-- | Parser for BuildSubset options
+buildSubsetParser :: String -> String -> Parser BuildSubset
+buildSubsetParser longPrefix helpSuffix =
+    flag' BSOnlySnapshot
+        (long (longPrefix ++ "only-snapshot") <>
+         help ("Only build packages for the snapshot database, not the local database" ++ helpSuffix))
+    <|> flag' BSOnlyDependencies
+        (long (longPrefix ++ "only-dependencies") <>
+         help ("Only build packages that are dependencies of targets on the command line" ++ helpSuffix))
+    <|> pure BSAll
 
 -- | Parser for global command-line options.
 globalOptsParser :: Bool -> Parser GlobalOptsMonoid

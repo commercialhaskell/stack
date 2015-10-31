@@ -10,6 +10,7 @@
 module Stack.Ghci (GhciOpts(..),GhciPkgInfo(..), ghciSetup, ghci) where
 
 import           Control.Monad.Catch
+import           Control.Exception.Enclosed (tryAny)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
@@ -50,6 +51,7 @@ data GhciOpts = GhciOpts
     ,ghciNoLoadModules      :: !Bool
     ,ghciAdditionalPackages :: ![String]
     ,ghciMainIs             :: !(Maybe Text)
+    ,ghciBuildFirst         :: !(Maybe BuildSubset)
     } deriving (Show,Eq)
 
 -- | Necessary information to load a package or its components.
@@ -70,7 +72,7 @@ ghci
     :: (HasConfig r, HasBuildConfig r, HasHttpManager r, MonadMask m, HasLogLevel r, HasTerminal r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
     => GhciOpts -> m ()
 ghci GhciOpts{..} = do
-    (targets,mainIsTargets,pkgs) <- ghciSetup ghciMainIs ghciTargets
+    (targets,mainIsTargets,pkgs) <- ghciSetup ghciBuildFirst ghciMainIs ghciTargets
     bconfig <- asks getBuildConfig
     mainFile <- figureOutMainFile mainIsTargets targets pkgs
     wc <- getWhichCompiler
@@ -171,10 +173,11 @@ figureOutMainFile mainIsTargets targets0 packages =
 -- information to load that package/components.
 ghciSetup
     :: (HasConfig r, HasHttpManager r, HasBuildConfig r, MonadMask m, HasTerminal r, HasLogLevel r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
-    => Maybe Text
+    => Maybe BuildSubset
+    -> Maybe Text
     -> [Text]
     -> m (Map PackageName SimpleTarget, Maybe (Map PackageName SimpleTarget), [GhciPkgInfo])
-ghciSetup mainIs stringTargets = do
+ghciSetup mbuildFirst mainIs stringTargets = do
     (_,_,targets) <-
         parseTargetsFromBuildOpts
             AllowNoTargets
@@ -194,7 +197,7 @@ ghciSetup mainIs stringTargets = do
                 return (Just targets')
     let bopts = makeBuildOpts targets
     econfig <- asks getEnvConfig
-    (realTargets,_,_,_,sourceMap) <- loadSourceMap AllowNoTargets bopts
+    (realTargets,_,_,_,sourceMap) <- loadSourceMap AllowNoTargets (bopts BSAll)
     menv <- getMinimalEnvOverride
     (installedMap, _, _, _) <- getInstalled
         menv
@@ -215,15 +218,25 @@ ghciSetup mainIs stringTargets = do
                                  return (Just (name, (cabalfp, simpleTargets)))
                              Nothing -> return Nothing
                     else return Nothing
+    -- Try to build, but optimistically launch GHCi anyway if it fails (#1065)
+    case mbuildFirst of
+        Just buildFirst -> do
+            eres <- tryAny $ build (const (return ())) Nothing (bopts buildFirst)
+            case eres of
+                Left err -> do
+                    $logError $ T.pack (show err)
+                    $logWarn "Warning: build failed, but optimistically launching GHCi anyway"
+                Right () -> return ()
+        Nothing -> return ()
+    -- Load the list of modules _after_ building, to catch changes in unlisted dependencies (#1180)
     let localLibs = [name | (name, (_, target)) <- locals, hasLocalComp isCLib target]
     infos <-
         forM locals $
         \(name,(cabalfp,component)) ->
              makeGhciPkgInfo sourceMap installedMap localLibs name cabalfp component
-    unless (M.null realTargets) (build (const (return ())) Nothing bopts)
     return (realTargets, mainIsTargets, infos)
   where
-    makeBuildOpts targets =
+    makeBuildOpts targets buildFirst =
         base
         { boptsTargets = stringTargets
         , boptsTests = any (hasLocalComp isCTest) elems
@@ -235,7 +248,7 @@ ghciSetup mainIs stringTargets = do
         , boptsBenchmarkOpts = (boptsBenchmarkOpts base)
           { beoDisableRun = True
           }
-        , boptsBuildSubset = BSOnlyDependencies
+        , boptsBuildSubset = buildFirst
         }
       where
         base = defaultBuildOpts
