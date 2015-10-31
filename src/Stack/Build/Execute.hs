@@ -785,8 +785,8 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
 
                     ec <-
                         liftIO $
-                        withAsync (runInBase $ maybePrintBuildOutput stripTHLoading makeAbsolute LevelInfo mlogFile moutH) $ \outThreadID ->
-                        withAsync (runInBase $ maybePrintBuildOutput False makeAbsolute LevelWarn mlogFile merrH) $ \errThreadID -> do
+                        withAsync (runInBase $ maybePrintBuildOutput stripTHLoading makeAbsolute pkgDir LevelInfo mlogFile moutH) $ \outThreadID ->
+                        withAsync (runInBase $ maybePrintBuildOutput False makeAbsolute pkgDir LevelWarn mlogFile merrH) $ \errThreadID -> do
                             ec <- waitForProcess ph
                             wait errThreadID
                             wait outThreadID
@@ -856,12 +856,12 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                     return (outputFile, setupArgs)
             runExe exeName $ (if boptsCabalVerbose eeBuildOpts then ("--verbose":) else id) fullArgs
 
-    maybePrintBuildOutput stripTHLoading makeAbsolute level mlogFile mh =
+    maybePrintBuildOutput stripTHLoading makeAbsolute pkgDir level mlogFile mh =
         case mh of
             Just h ->
                 case mlogFile of
                   Just{} -> return ()
-                  Nothing -> printBuildOutput stripTHLoading makeAbsolute level h
+                  Nothing -> printBuildOutput stripTHLoading makeAbsolute pkgDir level h
             Nothing -> return ()
 
 singleBuild :: M env m
@@ -1321,10 +1321,11 @@ singleBench runInBase beopts _lptb ac ee task installedMap = do
 printBuildOutput :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
                  => Bool -- ^ exclude TH loading?
                  -> Bool -- ^ convert paths to absolute?
+                 -> Path Abs Dir -- ^ package's root directory
                  -> LogLevel
                  -> Handle -> m ()
-printBuildOutput excludeTHLoading makeAbsolute level outH = void $
-         CB.sourceHandle outH
+printBuildOutput excludeTHLoading makeAbsolute pkgDir level outH = void $
+    CB.sourceHandle outH
     $$ CB.lines
     =$ CL.map stripCarriageReturn
     =$ CL.filter (not . isTHLoading)
@@ -1346,10 +1347,10 @@ printBuildOutput excludeTHLoading makeAbsolute level outH = void $
         mabs <-
             if isValidSuffix y
                 then do
-                    efp <- liftIO $ tryIO $ D.canonicalizePath $ S8.unpack x
+                    efp <- liftIO $ tryIO $ resolveFile pkgDir (S8.unpack x)
                     case efp of
                         Left _ -> return Nothing
-                        Right fp -> return $ Just $ S8.pack fp
+                        Right fp -> return $ Just $ S8.pack (toFilePath fp)
                 else return Nothing
         case mabs of
             Nothing -> return bs
