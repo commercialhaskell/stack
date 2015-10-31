@@ -38,9 +38,11 @@ import           Distribution.System (buildArch)
 import           Distribution.Text (display)
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Network.HTTP.Client
+import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
-import           Options.Applicative.Simple
+import           Options.Applicative.Complicated
+import           Options.Applicative.Simple (simpleVersion)
 import           Options.Applicative.Types (readerAsk)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
@@ -120,66 +122,72 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
             , [" ", display buildArch]
             ]
 
-     let numericVersion :: Parser (a -> a)
-         numericVersion =
-          infoOption
-            (showVersion Meta.version)
-            (long "numeric-version" <>
-             help "Show only version number")
-
      eGlobalRun <- try $
-       simpleOptions
-         versionString'
+       complicatedOptions
+         Meta.version
+         (Just versionString')
          "stack - The Haskell Tool Stack"
          ""
-         (numericVersion <*> extraHelpOption progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
-          globalOptsParser isTerminal)
+         (\isSub -> extraHelpOption isSub progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
+                    globalOptsParser isSub)
          (do addCommand "build"
                         "Build the package(s) in this directory/configuration"
+                        cmdFooter
                         buildCmd
                         (buildOptsParser Build)
              addCommand "install"
                         "Shortcut for 'build --copy-bins'"
+                        cmdFooter
                         buildCmd
                         (buildOptsParser Install)
              addCommand "uninstall"
                         "DEPRECATED: This command performs no actions, and is present for documentation only"
+                        cmdFooter
                         uninstallCmd
                         (many $ strArgument $ metavar "IGNORED")
              addCommand "test"
                         "Shortcut for 'build --test'"
+                        cmdFooter
                         buildCmd
                         (buildOptsParser Test)
              addCommand "bench"
                         "Shortcut for 'build --bench'"
+                        cmdFooter
                         buildCmd
                         (buildOptsParser Bench)
              addCommand "haddock"
                         "Shortcut for 'build --haddock'"
+                        cmdFooter
                         buildCmd
                         (buildOptsParser Haddock)
              addCommand "new"
                         "Create a new project from a template. Run `stack templates' to see available templates."
+                        cmdFooter
                         newCmd
                         newOptsParser
              addCommand "templates"
                         "List the templates available for `stack new'."
+                        cmdFooter
                         templatesCmd
                         (pure ())
              addCommand "init"
                         "Initialize a stack project based on one or more cabal packages"
+                        cmdFooter
                         initCmd
                         initOptsParser
              addCommand "solver"
                         "Use a dependency solver to try and determine missing extra-deps"
+                        cmdFooter
                         solverCmd
                         solverOptsParser
              addCommand "setup"
                         "Get the appropriate GHC for your project"
+                        cmdFooter
                         setupCmd
                         setupParser
              addCommand "path"
                         "Print out handy path information"
+                        cmdFooter
                         pathCmd
                         (fmap
                              catMaybes
@@ -193,14 +201,17 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                                       paths)))
              addCommand "unpack"
                         "Unpack one or more packages locally"
+                        cmdFooter
                         unpackCmd
                         (some $ strArgument $ metavar "PACKAGE")
              addCommand "update"
                         "Update the package index"
+                        cmdFooter
                         updateCmd
                         (pure ())
              addCommand "upgrade"
                         "Upgrade to the latest stack (experimental)"
+                        cmdFooter
                         upgradeCmd
                         ((,) <$> (switch
                                   ( long "git"
@@ -214,46 +225,56 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                                   )))
              addCommand "upload"
                         "Upload a package to Hackage"
+                        cmdFooter
                         uploadCmd
                         ((,)
                          <$> (many $ strArgument $ metavar "TARBALL/DIR")
                          <*> optional pvpBoundsOption)
              addCommand "sdist"
                         "Create source distribution tarballs"
+                        cmdFooter
                         sdistCmd
                         ((,)
                          <$> (many $ strArgument $ metavar "DIR")
                          <*> optional pvpBoundsOption)
              addCommand "dot"
                         "Visualize your project's dependency graph using Graphviz dot"
+                        cmdFooter
                         dotCmd
                         dotOptsParser
              addCommand "exec"
                         "Execute a command"
+                        cmdFooter
                         execCmd
                         (execOptsParser Nothing)
              addCommand "ghc"
                         "Run ghc"
+                        cmdFooter
                         execCmd
                         (execOptsParser $ Just ExecGhc)
              addCommand "ghci"
                         "Run ghci in the context of package(s) (experimental)"
+                        cmdFooter
                         ghciCmd
                         ghciOptsParser
              addCommand "runghc"
                         "Run runghc"
+                        cmdFooter
                         execCmd
                         (execOptsParser $ Just ExecRunGhc)
              addCommand "eval"
                         "Evaluate some haskell code inline. Shortcut for 'stack exec ghc -- -e CODE'"
+                        cmdFooter
                         evalCmd
                         (evalOptsParser "CODE")
              addCommand "clean"
                         "Clean the local packages"
+                        cmdFooter
                         cleanCmd
                         (pure ())
              addCommand "list-dependencies"
                         "List the dependencies"
+                        cmdFooter
                         listDependenciesCmd
                         (textOption (long "separator" <>
                                      metavar "SEP" <>
@@ -263,14 +284,17 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                                      showDefault))
              addCommand "query"
                         "Query general build information (experimental)"
+                        cmdFooter
                         queryCmd
                         (many $ strArgument $ metavar "SELECTOR...")
              addSubCommands
                  "ide"
                  "IDE-specific commands"
+                 cmdFooter
                  (do addCommand
                          "start"
                          "Start the ide-backend service"
+                         cmdFooter
                          ideCmd
                          ((,) <$> many (textArgument
                                           (metavar "TARGET" <>
@@ -283,42 +307,52 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                      addCommand
                          "packages"
                          "List all available local loadable packages"
+                         cmdFooter
                          packagesCmd
                          (pure ())
                      addCommand
                          "load-targets"
                          "List all load targets for a package target"
+                         cmdFooter
                          targetsCmd
                          (textArgument
                             (metavar "TARGET")))
              addSubCommands
                Docker.dockerCmdName
                "Subcommands specific to Docker use"
+               cmdFooter
                (do addCommand Docker.dockerPullCmdName
                               "Pull latest version of Docker image from registry"
+                              cmdFooter
                               dockerPullCmd
                               (pure ())
                    addCommand "reset"
                               "Reset the Docker sandbox"
+                              cmdFooter
                               dockerResetCmd
                               (switch (long "keep-home" <>
                                        help "Do not delete sandbox's home directory"))
                    addCommand Docker.dockerCleanupCmdName
                               "Clean up Docker images and containers"
+                              cmdFooter
                               dockerCleanupCmd
                               dockerCleanupOptsParser)
              addSubCommands
                 ConfigCmd.cfgCmdName
                 "Subcommands specific to modifying stack.yaml files"
+                cmdFooter
                 (addCommand ConfigCmd.cfgCmdSetName
                             "Sets a field in the project's stack.yaml to value"
+                            cmdFooter
                             cfgSetCmd
                             configCmdSetParser)
              addSubCommands
                Image.imgCmdName
                "Subcommands specific to imaging (EXPERIMENTAL)"
+               cmdFooter
                (addCommand Image.imgDockerCmdName
                 "Build a Docker image for the project"
+                cmdFooter
                 imgDockerCmd
                 (boolFlags True
                     "build"
@@ -327,8 +361,10 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
              addSubCommands
                "hpc"
                "Subcommands specific to Haskell Program Coverage"
+               cmdFooter
                (do addCommand "report"
                               "Generate HPC report a combined HPC report"
+                              cmdFooter
                               hpcReportCmd
                               hpcReportOptsParser))
      case eGlobalRun of
@@ -342,7 +378,8 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
              , " [options] runghc [options]' comment is required."
              , "\nSee https://github.com/commercialhaskell/stack/blob/release/doc/GUIDE.md#ghcrunghc" ]
          throwIO exitCode
-       Right (global,run) -> do
+       Right (globalMonoid,run) -> do
+         let global = globalOptsFromMonoid isTerminal globalMonoid
          when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
          case globalReExecVersion global of
              Just expectVersion
@@ -359,6 +396,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                     exitFailure
   where
     dockerHelpOptName = Docker.dockerCmdName ++ "-help"
+    cmdFooter = "Run 'stack --help' for global options that apply to all subcommands."
 
 -- | Print out useful path information in a human-readable format (and
 -- support others later).
@@ -809,14 +847,12 @@ sdistCmd (dirs, mpvpBounds) go =
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
 execCmd ExecOpts {..} go@GlobalOpts{..} = do
-    let needCmdErr = error "You must provide a command to exec, e.g. 'stack exec echo Hello World'"
     case eoExtra of
         ExecOptsPlain -> do
             (cmd, args) <- case (eoCmd, eoArgs) of
-                 (Just ExecGhc, args) -> return ("ghc", args)
-                 (Just ExecRunGhc, args) -> return ("runghc", args)
-                 (Nothing, cmd:args) -> return (cmd, args)
-                 (Nothing, []) -> needCmdErr
+                 (ExecCmd cmd, args) -> return (cmd, args)
+                 (ExecGhc, args) -> return ("ghc", args)
+                 (ExecRunGhc, args) -> return ("runghc", args)
             (manager,lc) <- liftIO $ loadConfigWithOpts go
             withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
              runStackTGlobal manager (lcConfig lc) go $
@@ -832,16 +868,11 @@ execCmd ExecOpts {..} go@GlobalOpts{..} = do
         ExecOptsEmbellished {..} ->
            withBuildConfigAndLock go $ \lk -> do
                (cmd, args) <- case (eoCmd, eoArgs) of
-                   (Nothing, cmd:args) -> return (cmd, args)
-                   (Nothing, []) -> needCmdErr
-                   (Just scmd, args) -> do
-                       wc <- getWhichCompiler
-                       let cmd = case scmd of
-                               ExecGhc -> compilerExeName wc
-                               -- NOTE: this won't currently work for GHCJS, because it doesn't have
-                               -- a runghcjs binary. It probably will someday, though.
-                               ExecRunGhc -> "run" ++ compilerExeName wc
-                       return (cmd, args)
+                   (ExecCmd cmd, args) -> return (cmd, args)
+                   (ExecGhc, args) -> execCompiler "" args
+                    -- NOTE: this won't currently work for GHCJS, because it doesn't have
+                    -- a runghcjs binary. It probably will someday, though.
+                   (ExecRunGhc, args) -> execCompiler "run" args
                let targets = concatMap words eoPackages
                unless (null targets) $
                    Stack.Build.build (const $ return ()) lk defaultBuildOpts
@@ -849,13 +880,18 @@ execCmd ExecOpts {..} go@GlobalOpts{..} = do
                        }
                munlockFile lk -- Unlock before transferring control away.
                exec eoEnvSettings cmd args
+  where
+    execCompiler cmdPrefix args = do
+        wc <- getWhichCompiler
+        let cmd = cmdPrefix ++ compilerExeName wc
+        return (cmd, args)
 
 -- | Evaluate some haskell code inline.
 evalCmd :: EvalOpts -> GlobalOpts -> IO ()
 evalCmd EvalOpts {..} go@GlobalOpts {..} = execCmd execOpts go
     where
       execOpts =
-          ExecOpts { eoCmd = Just ExecGhc
+          ExecOpts { eoCmd = ExecGhc
                    , eoArgs = ["-e", evalArg]
                    , eoExtra = evalExtra
                    }

@@ -78,10 +78,12 @@ enableDisableFlagsNoDefault' enabledValue disabledValue maybeHideValue name help
 
 -- | Show an extra help option (e.g. @--docker-help@ shows help for all @--docker*@ args).
 -- To actually show have that help appear, use 'execExtraHelp' before executing the main parser.
-extraHelpOption :: String -> String -> String -> Parser (a -> a)
-extraHelpOption progName fakeName helpName =
+extraHelpOption :: Bool -> String -> String -> String -> Parser (a -> a)
+extraHelpOption hide progName fakeName helpName =
     infoOption (optDesc' ++ ".") (long helpName <> hidden <> internal) <*>
-    infoOption (optDesc' ++ ".") (long fakeName <> help optDesc')
+    infoOption (optDesc' ++ ".") (long fakeName <>
+                                  help optDesc' <>
+                                  (if hide then hidden <> internal else idm))
   where optDesc' = concat ["Run '", takeBaseName progName, " --", helpName, "' for details"]
 
 -- | Display extra help if extea help option passed in arguments.

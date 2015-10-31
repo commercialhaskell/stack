@@ -243,16 +243,14 @@ data EnvSettings = EnvSettings
     deriving (Show, Eq, Ord)
 
 data ExecOpts = ExecOpts
-    { eoCmd :: !(Maybe SpecialExecCmd)
-    -- ^ When 'Nothing', then the program to run is the head of
-    -- 'eoArgs'. See:
-    -- https://github.com/commercialhaskell/stack/issues/806
+    { eoCmd :: !SpecialExecCmd
     , eoArgs :: ![String]
     , eoExtra :: !ExecOptsExtra
     } deriving (Show)
 
 data SpecialExecCmd
-    = ExecGhc
+    = ExecCmd String
+    | ExecGhc
     | ExecRunGhc
     deriving (Show, Eq)
 
@@ -279,6 +277,28 @@ data GlobalOpts = GlobalOpts
     , globalTerminal     :: !Bool -- ^ We're in a terminal?
     , globalStackYaml    :: !(Maybe FilePath) -- ^ Override project stack.yaml
     } deriving (Show)
+
+-- | Parsed global command-line options monoid.
+data GlobalOptsMonoid = GlobalOptsMonoid
+    { globalMonoidReExecVersion :: !(Maybe String) -- ^ Expected re-exec in container version
+    , globalMonoidLogLevel     :: !(Maybe LogLevel) -- ^ Log level
+    , globalMonoidConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
+    , globalMonoidResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
+    , globalMonoidCompiler     :: !(Maybe CompilerVersion) -- ^ Compiler override
+    , globalMonoidTerminal     :: !(Maybe Bool) -- ^ We're in a terminal?
+    , globalMonoidStackYaml    :: !(Maybe FilePath) -- ^ Override project stack.yaml
+    } deriving (Show)
+
+instance Monoid GlobalOptsMonoid where
+    mempty = GlobalOptsMonoid Nothing Nothing mempty Nothing Nothing Nothing Nothing
+    mappend l r = GlobalOptsMonoid
+        { globalMonoidReExecVersion = globalMonoidReExecVersion l <|> globalMonoidReExecVersion r
+        , globalMonoidLogLevel = globalMonoidLogLevel l <|> globalMonoidLogLevel r
+        , globalMonoidConfigMonoid = globalMonoidConfigMonoid l <> globalMonoidConfigMonoid r
+        , globalMonoidResolver = globalMonoidResolver l <|> globalMonoidResolver r
+        , globalMonoidCompiler = globalMonoidCompiler l <|> globalMonoidCompiler r
+        , globalMonoidTerminal = globalMonoidTerminal l <|> globalMonoidTerminal r
+        , globalMonoidStackYaml = globalMonoidStackYaml l <|> globalMonoidStackYaml r }
 
 -- | Either an actual resolver value, or an abstract description of one (e.g.,
 -- latest nightly).
