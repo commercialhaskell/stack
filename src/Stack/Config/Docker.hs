@@ -10,6 +10,7 @@ import Data.List (find)
 import Data.Maybe
 import qualified Data.Text as T
 import Data.Typeable (Typeable)
+import Distribution.Version (simplifyVersionRange)
 import Path
 import Stack.Types
 
@@ -55,6 +56,7 @@ dockerOptsFromMonoid mproject stackRoot DockerOptsMonoid{..} = do
         dockerMount = dockerMonoidMount
         dockerEnv = dockerMonoidEnv
         dockerSetUser = dockerMonoidSetUser
+        dockerRequireDockerVersion = simplifyVersionRange dockerMonoidRequireDockerVersion
     dockerDatabasePath <-
         case dockerMonoidDatabasePath of
             Nothing -> return $ stackRoot </> $(mkRelFile "docker.db")

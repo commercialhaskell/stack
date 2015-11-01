@@ -898,16 +898,6 @@ configMonoidApplyGhcOptionsName = "apply-ghc-options"
 configMonoidAllowNewerName :: Text
 configMonoidAllowNewerName = "allow-newer"
 
--- | Newtype for non-orphan FromJSON instance.
-newtype VersionRangeJSON = VersionRangeJSON { unVersionRangeJSON :: VersionRange }
-
--- | Parse VersionRange.
-instance FromJSON VersionRangeJSON where
-  parseJSON = withText "VersionRange"
-                (\s -> maybe (fail ("Invalid cabal-style VersionRange: " ++ T.unpack s))
-                             (return . VersionRangeJSON)
-                             (Distribution.Text.simpleParse (T.unpack s)))
-
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
   | ParseResolverException Text
@@ -951,9 +941,9 @@ instance Show ConfigException where
         [ "The version of stack you are using ("
         , show (fromCabalVersion Meta.version)
         , ") is outside the required\n"
-        ,"version range ("
+        ,"version range specified in stack.yaml ("
         , T.unpack (versionRangeText requiredRange)
-        , ") specified in stack.yaml." ]
+        , ")." ]
     show (NoMatchingSnapshot names) = concat
         [ "There was no snapshot found that matched the package "
         , "bounds in your .cabal files.\n"

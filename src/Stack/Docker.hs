@@ -231,7 +231,7 @@ runContainerAndExit getCmdArgs
   do config <- asks getConfig
      let docker = configDocker config
      envOverride <- getEnvOverride (configPlatform config)
-     checkDockerVersion envOverride
+     checkDockerVersion envOverride docker
      (dockerHost,dockerCertPath,bamboo,jenkins) <-
        liftIO ((,,,) <$> lookupEnv "DOCKER_HOST"
                      <*> lookupEnv "DOCKER_CERT_PATH"
@@ -366,8 +366,9 @@ cleanup :: M env m
         => CleanupOpts -> m ()
 cleanup opts =
   do config <- asks getConfig
+     let docker = configDocker config
      envOverride <- getEnvOverride (configPlatform config)
-     checkDockerVersion envOverride
+     checkDockerVersion envOverride docker
      let runDocker = readDockerProcess envOverride
      imagesOut <- runDocker ["images","--no-trunc","-f","dangling=false"]
      danglingImagesOut <- runDocker ["images","--no-trunc","-f","dangling=true"]
@@ -618,7 +619,7 @@ pull =
   do config <- asks getConfig
      let docker = configDocker config
      envOverride <- getEnvOverride (configPlatform config)
-     checkDockerVersion envOverride
+     checkDockerVersion envOverride docker
      pullImage envOverride docker (dockerImage docker)
 
 -- | Pull Docker image from registry.
@@ -645,19 +646,21 @@ pullImage envOverride docker image =
 -- | Check docker version (throws exception if incorrect)
 checkDockerVersion
     :: (MonadIO m, MonadThrow m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
-    => EnvOverride -> m ()
-checkDockerVersion envOverride =
+    => EnvOverride -> DockerOpts -> m ()
+checkDockerVersion envOverride docker =
   do dockerExists <- doesExecutableExist envOverride "docker"
      unless dockerExists (throwM DockerNotInstalledException)
      dockerVersionOut <- readDockerProcess envOverride ["--version"]
      case words (decodeUtf8 dockerVersionOut) of
-       (_:_:v:_) ->
+       (_:_:v:_) -> do
          case parseVersionFromString (dropWhileEnd (not . isDigit) v) of
            Just v'
              | v' < minimumDockerVersion ->
                throwM (DockerTooOldException minimumDockerVersion v')
              | v' `elem` prohibitedDockerVersions ->
                throwM (DockerVersionProhibitedException prohibitedDockerVersions v')
+             | not (v' `withinRange` dockerRequireDockerVersion docker) ->
+               (throwM (BadDockerVersionException (dockerRequireDockerVersion docker) v'))
              | otherwise ->
                return ()
            _ -> throwM InvalidVersionOutputException
@@ -816,6 +819,8 @@ data StackDockerException
     -- ^ Installed version of @docker@ below minimum version.
   | DockerVersionProhibitedException [Version] Version
     -- ^ Installed version of @docker@ is prohibited.
+  | BadDockerVersionException VersionRange Version
+    -- ^ Installed version of @docker@ is out of range specified in config file.
   | InvalidVersionOutputException
     -- ^ Invalid output from @docker --version@.
   | HostStackTooOldException Version (Maybe Version)
@@ -864,15 +869,26 @@ instance Show StackDockerException where
   show (DockerTooOldException minVersion haveVersion) =
     concat ["Minimum docker version '"
            ,versionString minVersion
-           ,"' is required (you have '"
+           ,"' is required by "
+           ,stackProgName
+           ," (you have '"
            ,versionString haveVersion
            ,"')."]
   show (DockerVersionProhibitedException prohibitedVersions haveVersion) =
-    concat ["These Docker versions are prohibited (you have '"
+    concat ["These Docker versions are incompatible with "
+           ,stackProgName
+           ," (you have '"
            ,versionString haveVersion
            ,"'): "
            ,intercalate ", " (map versionString prohibitedVersions)
            ,"."]
+  show (BadDockerVersionException requiredRange haveVersion) =
+    concat ["The version of 'docker' you are using ("
+           ,show haveVersion
+           ,") is outside the required\n"
+           ,"version range specified in stack.yaml ("
+           ,T.unpack (versionRangeText requiredRange)
+           ,")."]
   show InvalidVersionOutputException =
     "Cannot get Docker version (invalid 'docker --version' output)."
   show (HostStackTooOldException minVersion (Just hostVersion)) =

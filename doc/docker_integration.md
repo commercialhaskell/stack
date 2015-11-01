@@ -203,6 +203,10 @@ otherwise noted.
       # When the Docker Engine is remote (accessed by tcp), defaults to false.
       set-user: true
 
+      # Require the version of the Docker client to be within the specified
+      # Cabal-style version range (e.g., ">= 1.6.0 && < 1.9.0")
+      require-docker-version: "any"
+
 Image Repositories
 -------------------------------------------------------------------------------
 

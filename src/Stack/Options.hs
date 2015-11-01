@@ -35,6 +35,7 @@ import           Data.Monoid
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Read (decimal)
+import           Distribution.Version (anyVersion)
 import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
@@ -370,6 +371,7 @@ dockerOptsParser showOptions =
     <*> maybeBoolFlags (dockerOptName dockerSetUserArgName)
                        "setting user in container to match host"
                        hide
+    <*> pure anyVersion
   where
     dockerOptName optName = dockerCmdName ++ "-" ++ T.unpack optName
     maybeStrOption = optional . option str

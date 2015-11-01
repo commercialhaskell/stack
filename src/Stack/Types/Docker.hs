@@ -10,7 +10,11 @@ import Control.Monad.Catch (MonadThrow)
 import Data.Aeson.Extended
 import Data.Monoid
 import Data.Text (Text)
+import qualified Data.Text as T
+import Distribution.Text (simpleParse)
+import Distribution.Version (anyVersion)
 import Path
+import Stack.Types.Version
 
 -- | Docker configuration.
 data DockerOpts = DockerOpts
@@ -46,6 +50,8 @@ data DockerOpts = DockerOpts
     -- ^ Location of container-compatible stack executable
   ,dockerSetUser :: !(Maybe Bool)
    -- ^ Set in-container user to match host's
+  ,dockerRequireDockerVersion :: !VersionRange
+   -- ^ Require a version of Docker within this range.
   }
   deriving (Show)
 
@@ -86,6 +92,8 @@ data DockerOptsMonoid = DockerOptsMonoid
     -- ^ Location of container-compatible stack executable
   ,dockerMonoidSetUser :: !(Maybe Bool)
    -- ^ Set in-container user to match host's
+  ,dockerMonoidRequireDockerVersion :: !VersionRange
+  -- ^ See: 'dockerRequireDockerVersion'
   }
   deriving (Show)
 
@@ -110,6 +118,10 @@ instance FromJSON (DockerOptsMonoid, [JSONWarning]) where
               dockerMonoidDatabasePath     <- o ..:? dockerDatabasePathArgName
               dockerMonoidStackExe         <- o ..:? dockerStackExeArgName
               dockerMonoidSetUser          <- o ..:? dockerSetUserArgName
+              dockerMonoidRequireDockerVersion
+                                           <- unVersionRangeJSON <$>
+                                                 o ..:? dockerRequireDockerVersionArgName
+                                                   ..!= VersionRangeJSON anyVersion
               return DockerOptsMonoid{..})
 
 -- | Left-biased combine Docker options
@@ -131,6 +143,7 @@ instance Monoid DockerOptsMonoid where
     ,dockerMonoidDatabasePath     = Nothing
     ,dockerMonoidStackExe         = Nothing
     ,dockerMonoidSetUser          = Nothing
+    ,dockerMonoidRequireDockerVersion = anyVersion
     }
   mappend l r = DockerOptsMonoid
     {dockerMonoidDefaultEnable    = dockerMonoidDefaultEnable l || dockerMonoidDefaultEnable r
@@ -149,6 +162,9 @@ instance Monoid DockerOptsMonoid where
     ,dockerMonoidDatabasePath     = dockerMonoidDatabasePath l <|> dockerMonoidDatabasePath r
     ,dockerMonoidStackExe         = dockerMonoidStackExe l <|> dockerMonoidStackExe r
     ,dockerMonoidSetUser          = dockerMonoidSetUser l <|> dockerMonoidSetUser r
+    ,dockerMonoidRequireDockerVersion
+                                  = intersectVersionRanges (dockerMonoidRequireDockerVersion l)
+                                                           (dockerMonoidRequireDockerVersion r)
     }
 
 -- | Where to get the `stack` executable to run in Docker containers
@@ -193,6 +209,16 @@ data DockerMonoidRepoOrImage
   = DockerMonoidRepo String
   | DockerMonoidImage String
   deriving (Show)
+
+-- | Newtype for non-orphan FromJSON instance.
+newtype VersionRangeJSON = VersionRangeJSON { unVersionRangeJSON :: VersionRange }
+
+-- | Parse VersionRange.
+instance FromJSON VersionRangeJSON where
+  parseJSON = withText "VersionRange"
+                (\s -> maybe (fail ("Invalid cabal-style VersionRange: " ++ T.unpack s))
+                             (return . VersionRangeJSON)
+                             (Distribution.Text.simpleParse (T.unpack s)))
 
 -- | Docker enable argument name.
 dockerEnableArgName :: Text
@@ -269,3 +295,7 @@ dockerStackExeImageVal = "image"
 -- | Docker @set-user@ argument name
 dockerSetUserArgName :: Text
 dockerSetUserArgName = "set-user"
+
+-- | Docker @require-version@ argument name
+dockerRequireDockerVersionArgName :: Text
+dockerRequireDockerVersionArgName = "require-docker-version"

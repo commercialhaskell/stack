@@ -34,7 +34,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
 import           Distribution.Package (Dependency (..))
-import           Distribution.Version         (anyVersion)
+import           Distribution.Version (anyVersion)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Prelude hiding (pi, writeFile)
 import           Stack.Build.Cache
