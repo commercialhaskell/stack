@@ -1366,7 +1366,7 @@ printBuildOutput excludeTHLoading makeAbsolute pkgDir level outH = void $
         guard $ S.head bs1 == _colon
         (_, bs2) <- S8.readInt $ S.drop 1 bs1
 
-        guard $ bs2 == ":"
+        guard $ (bs2 == ":" || bs2 == ": Warning:")
 
     -- | Strip @\r@ characters from the byte vector. Used because Windows.
     stripCarriageReturn :: ByteString -> ByteString
