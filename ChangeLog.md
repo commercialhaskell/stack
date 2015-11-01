@@ -22,6 +22,7 @@ Bug fixes:
 * Fix: Global options did not work consistently after subcommand [#519](https://github.com/commercialhaskell/stack/issues/519)
 * Fix: 'stack ghci' doesn't notice that a module got deleted [#1180](https://github.com/commercialhaskell/stack/issues/1180)
 * Rebuild when cabal file is changed
+* Fix: Paths in GHC warnings not canonicalized, nor those for packages in subdirectories or outside the project root [#1259](https://github.com/commercialhaskell/stack/issues/1259)
 
 ## v0.1.6.0
 
