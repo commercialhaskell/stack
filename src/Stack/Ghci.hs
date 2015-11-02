@@ -103,6 +103,9 @@ ghci GhciOpts{..} = do
                               defaultEnvSettings
                               (fromMaybe (compilerExeName wc) ghciGhcCommand)
                               ("--interactive" :
+                              -- This initial "-i" resets the include directories to not
+                              -- include CWD.
+                               "-i" :
                                odir <> pkgopts <> ghciArgs <>
                                ["-ghci-script=" <> fp]))
                          (removeFile scriptPath))

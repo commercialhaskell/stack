@@ -328,9 +328,6 @@ generateBuildInfoOpts sourceMap installedMap mcabalmacros cabalDir distDir omitP
         isGhc _ = False
     extOpts = map (("-X" ++) . display) . usedExtensions
     srcOpts =
-        -- This initial "-i" resets the include directories to not
-        -- include CWD.
-        "-i" :
         map
             (("-i" <>) . toFilePath)
             ((if null (hsSourceDirs b) then [cabalDir] else []) <>
