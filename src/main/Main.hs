@@ -257,8 +257,18 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                         cmdFooter
                         ghciCmd
                         ghciOptsParser
+             addCommand "repl"
+                        "Run ghci in the context of package(s) (experimental) (alias for 'ghci')"
+                        cmdFooter
+                        ghciCmd
+                        ghciOptsParser
              addCommand "runghc"
                         "Run runghc"
+                        cmdFooter
+                        execCmd
+                        (execOptsParser $ Just ExecRunGhc)
+             addCommand "runhaskell"
+                        "Run runghc (alias for 'runghc')"
                         cmdFooter
                         execCmd
                         (execOptsParser $ Just ExecRunGhc)
