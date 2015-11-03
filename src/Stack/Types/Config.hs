@@ -58,6 +58,7 @@ import           Stack.Types.Docker
 import           Stack.Types.FlagName
 import           Stack.Types.Image
 import           Stack.Types.PackageIdentifier
+import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
 import           Stack.Types.Version
 import           System.Process.Read (EnvOverride)
@@ -346,6 +347,8 @@ data BuildConfig = BuildConfig
       -- for providing better error messages.
     , bcGHCVariant :: !GHCVariant
       -- ^ The variant of GHC used to select a GHC bindist.
+    , bcPackageCaches :: !(Map PackageIdentifier (PackageIndex, PackageCache))
+      -- ^ Shared package cache map
     }
 
 -- | Directory containing the project's stack.yaml file
