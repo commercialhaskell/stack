@@ -187,11 +187,13 @@ resolveBuildPlan :: (MonadThrow m, MonadIO m, MonadReader env m, HasBuildConfig 
 resolveBuildPlan menv mbp isShadowed packages
     | Map.null (rsUnknown rs) && Map.null (rsShadowed rs) = return (rsToInstall rs, rsUsedBy rs)
     | otherwise = do
-        cache <- getPackageCaches menv
-        let maxVer = Map.fromListWith max $ map toTuple $ Map.keys cache
+        bconfig <- asks getBuildConfig
+        let maxVer =
+                Map.fromListWith max $
+                map toTuple $
+                Map.keys (bcPackageCaches bconfig)
             unknown = flip Map.mapWithKey (rsUnknown rs) $ \ident x ->
                 (Map.lookup ident maxVer, x)
-        bconfig <- asks getBuildConfig
         throwM $ UnknownPackages
             (bcStackYaml bconfig)
             unknown
