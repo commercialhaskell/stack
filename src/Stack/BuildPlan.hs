@@ -78,7 +78,6 @@ import           Stack.Constants
 import           Stack.Fetch
 import           Stack.GhcPkg
 import           Stack.Package
-import           Stack.PackageIndex
 import           Stack.Types
 import           Stack.Types.StackT
 import           System.Directory (canonicalizePath)

@@ -47,7 +47,7 @@ import           Data.Foldable (forM_)
 import           Data.Int (Int64)
 import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
-import           Data.Monoid ((<>))
+import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 
