@@ -79,7 +79,7 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
         wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
 
-2. Add the appropriate source repository:
+2. Add the appropriate source repository (if not sure, run ``lsb_release -a`` to find out your Ubuntu version):
 
     * Ubuntu 15.10 (amd64):
 
