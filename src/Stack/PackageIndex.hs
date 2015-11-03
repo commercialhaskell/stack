@@ -17,15 +17,13 @@
 -- | Dealing with the 00-index file and all its cabal files.
 module Stack.PackageIndex
     ( updateAllIndices
-    , PackageDownload (..)
-    , PackageCache (..)
     , getPackageCaches
     ) where
 
 import qualified Codec.Archive.Tar as Tar
 import           Control.Exception (Exception)
 import           Control.Exception.Enclosed (tryIO)
-import           Control.Monad (unless, when, liftM, mzero)
+import           Control.Monad (unless, when, liftM)
 import           Control.Monad.Catch (MonadThrow, throwM, MonadCatch)
 import qualified Control.Monad.Catch as C
 import           Control.Monad.IO.Class (MonadIO, liftIO)
@@ -35,9 +33,7 @@ import           Control.Monad.Reader (asks)
 import           Control.Monad.Trans.Control
 
 import           Data.Aeson.Extended
-import qualified Data.Binary as Binary
 import           Data.Binary.VersionTagged
-import           Data.ByteString (ByteString)
 import qualified Data.Word8 as Word8
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Unsafe as SU
@@ -55,18 +51,10 @@ import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 
-
-import           Data.Text.Encoding (encodeUtf8)
-
 import           Data.Traversable (forM)
 
 import           Data.Typeable (Typeable)
 
-import           Data.Word (Word64)
-
-
-
-import           GHC.Generics (Generic)
 
 import           Network.HTTP.Download
 import           Path                                  (mkRelDir, parent,
@@ -80,24 +68,6 @@ import           System.FilePath (takeBaseName, (<.>))
 import           System.IO                             (IOMode (ReadMode, WriteMode),
                                                         withBinaryFile)
 import           System.Process.Read (readInNull, EnvOverride, doesExecutableExist)
-
-data PackageCache = PackageCache
-    { pcOffset :: !Int64
-    -- ^ offset in bytes into the 00-index.tar file for the .cabal file contents
-    , pcSize :: !Int64
-    -- ^ size in bytes of the .cabal file
-    , pcDownload :: !(Maybe PackageDownload)
-    }
-    deriving (Generic)
-
-instance Binary PackageCache
-instance NFData PackageCache
-instance HasStructuralInfo PackageCache
-
-newtype PackageCacheMap = PackageCacheMap (Map PackageIdentifier PackageCache)
-    deriving (Generic, Binary, NFData)
-instance HasStructuralInfo PackageCacheMap
-instance HasSemanticVersion PackageCacheMap
 
 -- | Populate the package index caches and return them.
 populateCache
@@ -356,31 +326,6 @@ deleteCache indexName' = do
     case eres of
         Left e -> $logDebug $ "Could not delete cache: " <> T.pack (show e)
         Right () -> $logDebug $ "Deleted index cache at " <> T.pack (toFilePath fp)
-
-data PackageDownload = PackageDownload
-    { pdSHA512 :: !ByteString
-    , pdUrl    :: !ByteString
-    , pdSize   :: !Word64
-    }
-    deriving (Show, Generic)
-instance Binary.Binary PackageDownload
-instance HasStructuralInfo PackageDownload
-instance NFData PackageDownload
-instance FromJSON PackageDownload where
-    parseJSON = withObject "Package" $ \o -> do
-        hashes <- o .: "package-hashes"
-        sha512 <- maybe mzero return (Map.lookup ("SHA512" :: Text) hashes)
-        locs <- o .: "package-locations"
-        url <-
-            case reverse locs of
-                [] -> mzero
-                x:_ -> return x
-        size <- o .: "package-size"
-        return PackageDownload
-            { pdSHA512 = encodeUtf8 sha512
-            , pdUrl = encodeUtf8 url
-            , pdSize = size
-            }
 
 -- | Load the cached package URLs, or created the cache if necessary.
 getPackageCaches :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
