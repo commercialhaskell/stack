@@ -45,7 +45,6 @@ import           Stack.Types.Build
 import           Stack.BuildPlan
 import           Stack.Package
 import           Stack.PackageDump
-import           Stack.PackageIndex
 import           Stack.Types
 
 data PackageInfo
@@ -134,9 +133,11 @@ constructPlan :: forall env m.
               -> m Plan
 constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackage0 sourceMap installedMap = do
     let locallyRegistered = Map.fromList $ map (dpGhcPkgId &&& dpPackageIdent) localDumpPkgs
-    menv <- getMinimalEnvOverride
-    caches <- getPackageCaches menv
-    let latest = Map.fromListWith max $ map toTuple $ Map.keys caches
+    bconfig <- asks getBuildConfig
+    let latest =
+            Map.fromListWith max $
+            map toTuple $
+            Map.keys (bcPackageCaches bconfig)
 
     econfig <- asks getEnvConfig
     let onWanted lp = do
