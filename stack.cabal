@@ -8,8 +8,8 @@ description:         Please see the README.md for usage information, and
                      currently only intended for use by the executable.
 license:             BSD3
 license-file:        LICENSE
-author:              Chris Done
-maintainer:          chrisdone@fpcomplete.com
+author:              Commercial Haskell SIG
+maintainer:          borsboom@fpcomplete.com
 category:            Development
 build-type:          Simple
 cabal-version:       >=1.10
