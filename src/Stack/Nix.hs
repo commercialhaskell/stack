@@ -110,7 +110,7 @@ runShellAndExit getCmdArgs = do
                      ResolverSnapshot (LTS x y) ->
                        "haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc"
                      _ -> "ghc"
-         nixpkgs = ghcInNix : "gnused" : "coreutils" : pkgsInConfig
+         nixpkgs = ghcInNix : "gnused" : "coreutils" : "glibcLocales" : pkgsInConfig
          packagesOrFile = case mshellFile of
            Just filePath -> [filePath]
            Nothing -> "-p" : nixpkgs
