@@ -111,6 +111,8 @@ runShellAndExit getCmdArgs = do
                        "haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc"
                      _ -> "ghc"
          nixpkgs = ghcInNix : "gnused" : "coreutils" : "glibcLocales" : pkgsInConfig
+         -- gnused and coreutils (for tr) are necessary for the hack exposed in the doc for 'exportLDPath'.
+         -- glibcLocales is necessary to avoid warnings about GHC being incapable to set the locale.
          packagesOrFile = case mshellFile of
            Just filePath -> [filePath]
            Nothing -> "-p" : nixpkgs
@@ -135,6 +137,11 @@ runShellAndExit getCmdArgs = do
        Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
        Right () -> liftIO exitSuccess
 
+-- | This is a hack!
+-- Nix currently doesn't expose the paths of the shared libraries provided
+-- by the demanded packages in a manner that is suitable to GHC.
+-- Therefore, in the Nix-shell, we retrieve in the NIX_LDFLAGS env var those paths and set LD_LIBRARY_PATH before the build happens.
+exportLDPath :: String
 exportLDPath = "export LD_LIBRARY_PATH=`echo -n $NIX_LDFLAGS | tr ' ' $'\n' | sed -n '/-L/{s/-L//; p}' | tr $'\n' ':'`"
 
 -- | 'True' if we are currently running inside a Nix.
