@@ -78,7 +78,7 @@ data AddDepRes
     deriving Show
 
 data W = W
-    { wFinals :: !(Map PackageName (Either ConstructPlanException (Task, LocalPackageTB)))
+    { wFinals :: !(Map PackageName (Either ConstructPlanException Task))
     , wInstall :: !(Map Text InstallLocation)
     -- ^ executable to be installed, and location where the binary is placed
     , wDirty :: !(Map PackageName Text)
@@ -140,10 +140,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
 
     econfig <- asks getEnvConfig
     let onWanted lp = do
-            case lpExeComponents lp of
-                Nothing -> return ()
-                Just _ -> void $ addDep False $ packageName $ lpPackage lp
-
+            when (lpWanted lp) $ void $ addDep False $ packageName $ lpPackage lp
             case lpTestBench lp of
                 Just tb -> addFinal lp tb
                 Nothing -> return ()
@@ -225,14 +222,14 @@ mkUnregisterLocal tasks dirtyReason locallyRegistered sourceMap =
       where
         name = packageIdentifierName ident
 
-addFinal :: LocalPackage -> LocalPackageTB -> M ()
-addFinal lp lptb = do
+addFinal :: LocalPackage -> Package -> M ()
+addFinal lp package = do
     depsRes <- addPackageDeps False package
     res <- case depsRes of
         Left e -> return $ Left e
         Right (missing, present, _minLoc) -> do
             ctx <- ask
-            return $ Right (Task
+            return $ Right Task
                 { taskProvides = PackageIdentifier
                     (packageName package)
                     (packageVersion package)
@@ -248,10 +245,8 @@ addFinal lp lptb = do
                             package
                 , taskPresent = present
                 , taskType = TTLocal lp
-                }, lptb)
+                }
     tell mempty { wFinals = Map.singleton (packageName package) res }
-  where
-    package = lptbPackage lptb
 
 addDep :: Bool -- ^ is this being used by a dependency?
        -> PackageName -> M (Either ConstructPlanException AddDepRes)
@@ -263,40 +258,25 @@ addDep treatAsDep' name = do
     case Map.lookup name m of
         Just res -> return res
         Nothing -> do
-            res <- addDep' treatAsDep name
+            res <- if name `elem` callStack ctx
+                then return $ Left $ DependencyCycleDetected $ name : callStack ctx
+                else local (\ctx' -> ctx' { callStack = name : callStack ctx' }) $
+                    case Map.lookup name $ combinedMap ctx of
+                        -- TODO look up in the package index and see if there's a
+                        -- recommendation available
+                        Nothing -> return $ Left $ UnknownPackage name
+                        Just (PIOnlyInstalled loc installed) -> do
+                            -- slightly hacky, no flags since they likely won't affect executable names
+                            tellExecutablesUpstream name (installedVersion installed) loc Map.empty
+                            return $ Right $ ADRFound loc installed
+                        Just (PIOnlySource ps) -> do
+                            tellExecutables name ps
+                            installPackage treatAsDep name ps Nothing
+                        Just (PIBoth ps installed) -> do
+                            tellExecutables name ps
+                            installPackage treatAsDep name ps (Just installed)
             modify $ Map.insert name res
             return res
-
-addDep' :: Bool -- ^ is this being used by a dependency?
-        -> PackageName -> M (Either ConstructPlanException AddDepRes)
-addDep' treatAsDep name = do
-    ctx <- ask
-    if name `elem` callStack ctx
-        then return $ Left $ DependencyCycleDetected $ name : callStack ctx
-        else local
-            (\ctx' -> ctx' { callStack = name : callStack ctx' }) $
-            (addDep'' treatAsDep name)
-
-addDep'' :: Bool -- ^ is this being used by a dependency?
-         -> PackageName -> M (Either ConstructPlanException AddDepRes)
-addDep'' treatAsDep name = do
-    ctx <- ask
-    case Map.lookup name $ combinedMap ctx of
-        -- TODO look up in the package index and see if there's a
-        -- recommendation available
-        Nothing -> return $ Left $ UnknownPackage name
-        Just (PIOnlyInstalled loc installed) -> do
-            tellExecutablesUpstream name (installedVersion installed) loc Map.empty -- slightly hacky, no flags since they likely won't affect executable names
-            return $ Right $ ADRFound loc installed
-        Just (PIOnlySource ps) -> do
-            tellExecutables name ps
-            installPackage treatAsDep name ps
-        Just (PIBoth ps installed) -> do
-            tellExecutables name ps
-            needInstall <- checkNeedInstall treatAsDep name ps installed (wanted ctx)
-            if needInstall
-                then installPackage treatAsDep name ps
-                else return $ Right $ ADRFound (piiLocation ps) installed
 
 tellExecutables :: PackageName -> PackageSource -> M () -- TODO merge this with addFinal above?
 tellExecutables _ (PSLocal lp)
@@ -323,70 +303,60 @@ tellExecutablesPackage loc p = do
                 Just (PIOnlySource ps) -> goSource ps
                 Just (PIBoth ps _) -> goSource ps
 
-        goSource (PSLocal lp) = fromMaybe Set.empty $ lpExeComponents lp
+        goSource (PSLocal lp)
+            | lpWanted lp = exeComponents (lpComponents lp)
+            | otherwise = Set.empty
         goSource (PSUpstream{}) = Set.empty
 
-    tell mempty { wInstall = m myComps }
+    tell mempty { wInstall = Map.fromList $ map (, loc) $ Set.toList $ filterComps myComps $ packageExes p }
   where
-    m myComps = Map.fromList $ map (, loc) $ Set.toList
-              $ filterComps myComps $ packageExes p
-
     filterComps myComps x
         | Set.null myComps = x
-        | otherwise = Set.intersection x $ Set.map toExe myComps
-
-    toExe x = fromMaybe x $ T.stripPrefix "exe:" x
-
--- TODO There are a lot of duplicated computations below. I've kept that for
--- simplicity right now
+        | otherwise = Set.intersection x myComps
 
 installPackage :: Bool -- ^ is this being used by a dependency?
-               -> PackageName -> PackageSource -> M (Either ConstructPlanException AddDepRes)
-installPackage treatAsDep name ps = do
+               -> PackageName -> PackageSource -> Maybe Installed -> M (Either ConstructPlanException AddDepRes)
+installPackage treatAsDep name ps minstalled = do
     ctx <- ask
     package <- psPackage name ps
     depsRes <- addPackageDeps treatAsDep package
     case depsRes of
         Left e -> return $ Left e
-        Right (missing, present, minLoc) ->
-            return $ Right $ ADRToInstall Task
-                { taskProvides = PackageIdentifier
-                    (packageName package)
-                    (packageVersion package)
-                , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
-                    let allDeps = Map.union present missing'
-                        destLoc = piiLocation ps <> minLoc
-                     in configureOpts
-                            (getEnvConfig ctx)
-                            (baseConfigOpts ctx)
-                            allDeps
-                            (psWanted ps)
-                            (psLocal ps)
-                            -- An assertion to check for a recurrence of
-                            -- https://github.com/commercialhaskell/stack/issues/345
-                            (assert (destLoc == piiLocation ps) destLoc)
-                            package
-                , taskPresent = present
-                , taskType =
-                    case ps of
-                        PSLocal lp -> TTLocal lp
-                        PSUpstream _ loc _ -> TTUpstream package $ loc <> minLoc
-                }
-
-checkNeedInstall :: Bool
-                 -> PackageName -> PackageSource -> Installed -> Set PackageName -> M Bool
-checkNeedInstall treatAsDep name ps installed wanted = assert (piiLocation ps == Local) $ do
-    package <- psPackage name ps
-    depsRes <- addPackageDeps treatAsDep package
-    case depsRes of
-        Left _e -> return True -- installPackage will find the error again
-        Right (missing, present, _loc)
-            | Set.null missing -> checkDirtiness ps installed package present wanted
-            | otherwise -> do
-                tell mempty { wDirty = Map.singleton name $
+        Right (missing, present, minLoc) -> do
+            mRightVersionInstalled <- case (minstalled, Set.null missing) of
+                (Just installed, True) -> do
+                    shouldInstall <- checkDirtiness ps installed package present (wanted ctx)
+                    return $ if shouldInstall then Nothing else Just installed
+                (Just _, False) -> do
                     let t = T.intercalate ", " $ map (T.pack . packageNameString . packageIdentifierName) (Set.toList missing)
-                     in T.append "missing dependencies: " $ addEllipsis t }
-                return True
+                    tell mempty { wDirty = Map.singleton name $ "missing dependencies: " <> addEllipsis t }
+                    return Nothing
+                (Nothing, _) -> return Nothing
+            return $ Right $ case mRightVersionInstalled of
+                Just installed -> ADRFound (piiLocation ps) installed
+                Nothing -> ADRToInstall Task
+                    { taskProvides = PackageIdentifier
+                        (packageName package)
+                        (packageVersion package)
+                    , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
+                        let allDeps = Map.union present missing'
+                            destLoc = piiLocation ps <> minLoc
+                         in configureOpts
+                                (getEnvConfig ctx)
+                                (baseConfigOpts ctx)
+                                allDeps
+                                (psWanted ps)
+                                (psLocal ps)
+                                -- An assertion to check for a recurrence of
+                                -- https://github.com/commercialhaskell/stack/issues/345
+                                (assert (destLoc == piiLocation ps) destLoc)
+                                package
+                    , taskPresent = present
+                    , taskType =
+                        case ps of
+                            PSLocal lp -> TTLocal lp
+                            PSUpstream _ loc _ -> TTUpstream package $ loc <> minLoc
+                    }
 
 addEllipsis :: Text -> Text
 addEllipsis t

@@ -138,10 +138,10 @@ printPlan plan = do
             $logInfo "Would build:"
             mapM_ ($logInfo . displayTask) xs
 
-    let hasTests = not . Set.null . lptbTests
-        hasBenches = not . Set.null . lptbBenches
-        tests = Map.elems $ fmap fst $ Map.filter (hasTests . snd) $ planFinals plan
-        benches = Map.elems $ fmap fst $ Map.filter (hasBenches . snd) $ planFinals plan
+    let hasTests = not . Set.null . testComponents . taskComponents
+        hasBenches = not . Set.null . benchComponents . taskComponents
+        tests = Map.elems $ Map.filter hasTests $ planFinals plan
+        benches = Map.elems $ Map.filter hasBenches $ planFinals plan
 
     unless (null tests) $ do
         $logInfo ""
@@ -519,7 +519,7 @@ toActions :: M env m
           => InstalledMap
           -> (m () -> IO ())
           -> ExecuteEnv
-          -> (Maybe Task, Maybe (Task, LocalPackageTB)) -- build and final
+          -> (Maybe Task, Maybe Task) -- build and final
           -> [Action]
 toActions installedMap runInBase ee (mbuild, mfinal) =
     abuild ++ afinal
@@ -538,16 +538,20 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
     afinal =
         case mfinal of
             Nothing -> []
-            Just (task@Task {..}, lptb) ->
+            Just task@Task {..} ->
                 [ Action
                     { actionId = ActionId taskProvides ATFinal
                     , actionDeps = addBuild taskProvides $
                         (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
                     , actionDo = \ac -> runInBase $ do
-                        unless (Set.null $ lptbTests lptb) $ do
-                            singleTest runInBase topts lptb ac ee task installedMap
-                        unless (Set.null $ lptbBenches lptb) $ do
-                            singleBench runInBase beopts lptb ac ee task installedMap
+                        let comps = taskComponents task
+                            tests = testComponents comps
+                            benches = benchComponents comps
+                        unless (Set.null tests) $ do
+                            singleTest runInBase topts (Set.toList tests) ac ee task installedMap
+                        unless (Set.null benches) $ do
+                            -- FIXME: shouldn't this use the list of benchmarks to run?
+                            singleBench runInBase beopts ac ee task installedMap
                     }
                 ]
       where
@@ -562,9 +566,21 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
 
 -- | Generate the ConfigCache
 getConfigCache :: MonadIO m
-               => ExecuteEnv -> Task -> [Text]
+               => ExecuteEnv -> Task -> InstalledMap -> Bool -> Bool
                -> m (Map PackageIdentifier GhcPkgId, ConfigCache)
-getConfigCache ExecuteEnv {..} Task {..} extra = do
+getConfigCache ExecuteEnv {..} Task {..} installedMap enableTest enableBench = do
+    let extra =
+            -- We enable tests if the test suite dependencies are already
+            -- installed, so that we avoid unnecessary recompilation based on
+            -- cabal_macros.h changes when switching between 'stack build' and
+            -- 'stack test'. See:
+            -- https://github.com/commercialhaskell/stack/issues/805
+            case taskType of
+                TTLocal lp -> concat
+                    [ ["--enable-tests" | enableTest || (depsPresent installedMap $ lpTestDeps lp)]
+                    , ["--enable-benchmarks" | enableBench || (depsPresent installedMap $ lpBenchDeps lp)]
+                    ]
+                _ -> []
     idMap <- liftIO $ readTVarIO eeGhcPkgIds
     let getMissing ident =
             case Map.lookup ident idMap of
@@ -872,7 +888,7 @@ singleBuild :: M env m
             -> InstalledMap
             -> m ()
 singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap = do
-    (allDepsMap, cache) <- getCache
+    (allDepsMap, cache) <- getConfigCache ee task installedMap False False
     mprecompiled <- getPrecompiled cache
     minstalled <-
         case mprecompiled of
@@ -890,21 +906,6 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                         -- Works around haddock failing on bytestring-builder since it has no modules
                         -- when bytestring is new enough.
                         packageHasExposedModules package
-
-    getCache = do
-        let extra =
-              -- We enable tests if the test suite dependencies are already
-              -- installed, so that we avoid unnecessary recompilation based on
-              -- cabal_macros.h changes when switching between 'stack build' and
-              -- 'stack test'. See:
-              -- https://github.com/commercialhaskell/stack/issues/805
-              case taskType of
-                  TTLocal lp -> concat
-                      [ ["--enable-tests" | depsPresent installedMap $ lpTestDeps lp]
-                      , ["--enable-benchmarks" | depsPresent installedMap $ lpBenchDeps lp]
-                      ]
-                  _ -> []
-        getConfigCache ee task extra
 
     getPrecompiled cache =
         case taskLocation task of
@@ -1015,12 +1016,12 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                       -- desired
                       | packageHasLibrary package]
                     , map (T.unpack . T.append "exe:") $ Set.toList $
-                        case lpExeComponents lp of
-                            Just exes -> exes
+                        if lpWanted lp
+                            then exeComponents (lpComponents lp)
                             -- Build all executables in the event that no
                             -- specific list is provided (as happens with
                             -- extra-deps).
-                            Nothing -> packageExes package
+                            else packageExes package
                     ]
                 TTUpstream _ _ -> ["build"]) ++ extraOpts
         checkForUnlistedFiles taskType preBuildTime pkgDir
@@ -1126,20 +1127,14 @@ depsPresent installedMap deps = all
 singleTest :: M env m
            => (m () -> IO ())
            -> TestOpts
-           -> LocalPackageTB
+           -> [Text]
            -> ActionContext
            -> ExecuteEnv
            -> Task
            -> InstalledMap
            -> m ()
-singleTest runInBase topts lptb ac ee task installedMap = do
-    (allDepsMap, cache) <- getConfigCache ee task $
-        case taskType task of
-            TTLocal lp -> concat
-                [ ["--enable-tests"]
-                , ["--enable-benchmarks" | depsPresent installedMap $ lpBenchDeps lp]
-                ]
-            _ -> []
+singleTest runInBase topts testsToRun ac ee task installedMap = do
+    (allDepsMap, cache) <- getConfigCache ee task installedMap True False
     withSingleContext runInBase ac ee task (Just allDepsMap) (Just "test") $ \package cabalfp pkgDir cabal announce console mlogFile -> do
         neededConfig <- ensureConfig cache pkgDir ee (announce "configure (test)") cabal cabalfp
         config <- asks getConfig
@@ -1154,10 +1149,7 @@ singleTest runInBase topts lptb ac ee task installedMap = do
                             Nothing -> False
                     _ -> assert False True) ||
                 not testBuilt
-
             needHpc = toCoverage topts
-
-            testsToRun = Set.toList $ lptbTests lptb
             components = map (T.unpack . T.append "test:") testsToRun
 
         when needBuild $ do
@@ -1280,20 +1272,13 @@ singleTest runInBase topts lptb ac ee task installedMap = do
 singleBench :: M env m
             => (m () -> IO ())
             -> BenchmarkOpts
-            -> LocalPackageTB
             -> ActionContext
             -> ExecuteEnv
             -> Task
             -> InstalledMap
             -> m ()
-singleBench runInBase beopts _lptb ac ee task installedMap = do
-    (allDepsMap, cache) <- getConfigCache ee task $
-        case taskType task of
-            TTLocal lp -> concat
-                [ ["--enable-tests" | depsPresent installedMap $ lpTestDeps lp]
-                , ["--enable-benchmarks"]
-                ]
-            _ -> []
+singleBench runInBase beopts ac ee task installedMap = do
+    (allDepsMap, cache) <- getConfigCache ee task installedMap False True
     withSingleContext runInBase ac ee task (Just allDepsMap) (Just "bench") $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
         neededConfig <- ensureConfig cache pkgDir ee (announce "configure (benchmarks)") cabal cabalfp
 
@@ -1419,6 +1404,12 @@ extraBuildOptions bopts = do
         hpcIndexDir <- toFilePath <$> hpcRelativeDir
         return ["--ghc-options", "-hpcdir " ++ hpcIndexDir ++ ddumpOpts]
       False -> return ["--ghc-options", ddumpOpts]
+
+taskComponents :: Task -> Set NamedComponent
+taskComponents task =
+    case taskType task of
+        TTLocal lp -> lpComponents lp
+        TTUpstream{} -> Set.empty
 
 -- | Take the given list of package dependencies and the contents of the global
 -- package database, and construct a set of installed package IDs that:

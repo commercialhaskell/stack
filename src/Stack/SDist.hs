@@ -171,7 +171,7 @@ readLocalPackage pkgDir = do
     mapM_ (printCabalFileWarning cabalfp) warnings
     return LocalPackage
         { lpPackage = package
-        , lpExeComponents = Nothing -- HACK: makes it so that sdist output goes to a log instead of a file.
+        , lpWanted = False -- HACK: makes it so that sdist output goes to a log instead of a file.
         , lpDir = pkgDir
         , lpCabalFile = cabalfp
         -- NOTE: these aren't the 'correct values, but aren't used in

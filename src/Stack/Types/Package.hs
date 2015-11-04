@@ -23,6 +23,7 @@ import           Data.Map.Strict (Map)
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Set (Set)
+import qualified Data.Set as Set
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
 import           Distribution.InstalledPackageInfo (PError)
@@ -202,44 +203,37 @@ class PackageInstallInfo a where
     piiVersion :: a -> Version
     piiLocation :: a -> InstallLocation
 
--- | Second-stage build information: tests and benchmarks
-data LocalPackageTB = LocalPackageTB
-    { lptbPackage :: !Package
-    -- ^ Package resolved with dependencies for tests and benchmarks, depending
-    -- on which components are active
-    , lptbTests   :: !(Set Text)
-    -- ^ Test components
-    , lptbBenches :: !(Set Text)
-    -- ^ Benchmark components
-    }
-    deriving Show
-
 -- | Information on a locally available package of source code
 data LocalPackage = LocalPackage
-    { lpPackage        :: !Package         -- ^ The @Package@ info itself, after resolution with package flags, not including any tests or benchmarks
-    , lpTestDeps       :: !(Map PackageName VersionRange)
-    -- ^ Used for determining if we can use --enable-tests in a normal build
-    , lpBenchDeps      :: !(Map PackageName VersionRange)
-    -- ^ Used for determining if we can use --enable-benchmarks in a normal build
-    , lpExeComponents  :: !(Maybe (Set Text)) -- ^ Executable components to build, Nothing if not a target
-
-    , lpTestBench      :: !(Maybe LocalPackageTB)
-
-    , lpDir            :: !(Path Abs Dir)  -- ^ Directory of the package.
-    , lpCabalFile      :: !(Path Abs File) -- ^ The .cabal file
-    , lpDirtyFiles     :: !(Maybe (Set FilePath))
+    { lpPackage       :: !Package
+    -- ^ The @Package@ info itself, after resolution with package flags,
+    -- with tests and benchmarks disabled
+    , lpComponents    :: !(Set NamedComponent)
+    -- ^ Components to build, not including the library component.
+    , lpWanted        :: !Bool
+    -- ^ Whether this package is wanted as a target.
+    , lpTestDeps      :: !(Map PackageName VersionRange)
+    -- ^ Used for determining if we can use --enable-tests in a normal build.
+    , lpBenchDeps     :: !(Map PackageName VersionRange)
+    -- ^ Used for determining if we can use --enable-benchmarks in a normal
+    -- build.
+    , lpTestBench     :: !(Maybe Package)
+    -- ^ This stores the 'Package' with tests and benchmarks enabled, if
+    -- either is asked for by the user.
+    , lpDir           :: !(Path Abs Dir)
+    -- ^ Directory of the package.
+    , lpCabalFile     :: !(Path Abs File)
+    -- ^ The .cabal file
+    , lpDirtyFiles    :: !(Maybe (Set FilePath))
     -- ^ Nothing == not dirty, Just == dirty. Note that the Set may be empty if
     -- we forced the build to treat packages as dirty. Also, the Set may not
     -- include all modified files.
-    , lpNewBuildCache  :: !(Map FilePath FileCacheInfo) -- ^ current state of the files
-    , lpFiles          :: !(Set (Path Abs File)) -- ^ all files used by this package
-    , lpComponents     :: !(Set NamedComponent)
+    , lpNewBuildCache :: !(Map FilePath FileCacheInfo)
+    -- ^ current state of the files
+    , lpFiles         :: !(Set (Path Abs File))
+    -- ^ all files used by this package
     }
     deriving Show
-
--- | Is the given local a target
-lpWanted :: LocalPackage -> Bool
-lpWanted lp = isJust (lpExeComponents lp) || isJust (lpTestBench lp)
 
 -- | A single, fully resolved component of a package
 data NamedComponent
@@ -254,6 +248,40 @@ renderComponent CLib = "lib"
 renderComponent (CExe x) = "exe:" <> encodeUtf8 x
 renderComponent (CTest x) = "test:" <> encodeUtf8 x
 renderComponent (CBench x) = "bench:" <> encodeUtf8 x
+
+exeComponents :: Set NamedComponent -> Set Text
+exeComponents = Set.fromList . mapMaybe mExeName . Set.toList
+  where
+    mExeName (CExe name) = Just name
+    mExeName _ = Nothing
+
+testComponents :: Set NamedComponent -> Set Text
+testComponents = Set.fromList . mapMaybe mTestName . Set.toList
+  where
+    mTestName (CTest name) = Just name
+    mTestName _ = Nothing
+
+benchComponents :: Set NamedComponent -> Set Text
+benchComponents = Set.fromList . mapMaybe mBenchName . Set.toList
+  where
+    mBenchName (CBench name) = Just name
+    mBenchName _ = Nothing
+
+isCLib :: NamedComponent -> Bool
+isCLib CLib{} = True
+isCLib _ = False
+
+isCExe :: NamedComponent -> Bool
+isCExe CExe{} = True
+isCExe _ = False
+
+isCTest :: NamedComponent -> Bool
+isCTest CTest{} = True
+isCTest _ = False
+
+isCBench :: NamedComponent -> Bool
+isCBench CBench{} = True
+isCBench _ = False
 
 -- | A location to install a package into, either snapshot or local
 data InstallLocation = Snap | Local
