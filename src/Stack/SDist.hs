@@ -213,6 +213,7 @@ getSDistFileList lp =
             , tcoOpts = \_ -> ConfigureOpts [] []
             }
         , taskPresent = Map.empty
+        , taskAllInOne = True
         }
 
 normalizeTarballPaths :: M env m => [FilePath] -> m [FilePath]

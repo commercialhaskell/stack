@@ -559,10 +559,15 @@ instance HasSemanticVersion ConfigCache
 
 -- | A task to perform when building
 data Task = Task
-    { taskProvides        :: !PackageIdentifier        -- ^ the package/version to be built
-    , taskType            :: !TaskType                 -- ^ the task type, telling us how to build this
+    { taskProvides        :: !PackageIdentifier
+    -- ^ the package/version to be built
+    , taskType            :: !TaskType
+    -- ^ the task type, telling us how to build this
     , taskConfigOpts      :: !TaskConfigOpts
-    , taskPresent         :: !(Map PackageIdentifier GhcPkgId)           -- ^ GhcPkgIds of already-installed dependencies
+    , taskPresent         :: !(Map PackageIdentifier GhcPkgId)
+    -- ^ GhcPkgIds of already-installed dependencies
+    , taskAllInOne        :: !Bool
+    -- ^ indicates that the package can be built in one step
     }
     deriving Show
 

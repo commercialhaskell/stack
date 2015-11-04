@@ -540,15 +540,16 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
         case mfinal of
             Nothing -> []
             Just task@Task {..} ->
+                (if taskAllInOne then [] else
+                    [Action
+                        { actionId = ActionId taskProvides ATBuildFinal
+                        , actionDeps = addBuild ATBuild
+                            (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
+                        , actionDo = \ac -> runInBase $ singleBuild runInBase ac ee task installedMap True
+                        }]) ++
                 [ Action
-                    { actionId = ActionId taskProvides ATBuildFinal
-                    , actionDeps = addBuild taskProvides
-                        (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
-                    , actionDo = \ac -> runInBase $ singleBuild runInBase ac ee task installedMap True
-                    }
-                , Action
                     { actionId = ActionId taskProvides ATFinal
-                    , actionDeps = Set.singleton (ActionId taskProvides ATBuildFinal)
+                    , actionDeps = addBuild (if taskAllInOne then ATBuild else ATBuildFinal) Set.empty
                     , actionDo = \ac -> runInBase $ do
                         let comps = taskComponents task
                             tests = testComponents comps
@@ -560,10 +561,11 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
                             singleBench runInBase beopts ac ee task installedMap
                     }
                 ]
-    addBuild ident =
-        case mbuild of
-            Nothing -> id
-            Just _ -> Set.insert $ ActionId ident ATBuild
+              where
+                addBuild aty =
+                    case mbuild of
+                        Nothing -> id
+                        Just _ -> Set.insert $ ActionId taskProvides aty
     bopts = eeBuildOpts ee
     topts = boptsTestOpts bopts
     beopts = boptsBenchmarkOpts bopts
@@ -913,14 +915,23 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                         -- when bytestring is new enough.
                         packageHasExposedModules package
 
-    enableTests = isFinalBuild && any isCTest (taskComponents task)
-    enableBenchmarks = isFinalBuild && any isCBench (taskComponents task)
-    annSuffix =
-        case (enableTests, enableBenchmarks) of
-            (False, False) -> ""
-            (True, False) -> " (test)"
-            (False, True) -> " (bench)"
-            (True, True) -> " (test + bench)"
+    buildingFinals = isFinalBuild || taskAllInOne
+    enableTests = buildingFinals && any isCTest (taskComponents task)
+    enableBenchmarks = buildingFinals && any isCBench (taskComponents task)
+
+    annSuffix = if result == "" then "" else " (" <> result <> ")"
+      where
+        result = T.intercalate " + " $ concat $
+            [ ["lib" | taskAllInOne && hasLib]
+            , ["exe" | taskAllInOne && hasExe]
+            , ["test" | enableTests]
+            , ["bench" | enableBenchmarks]
+            ]
+        (hasLib, hasExe) = case taskType of
+            TTLocal lp -> (packageHasLibrary (lpPackage lp), not (Set.null (exesToBuild lp)))
+            -- This isn't true, but we don't want to have this info for
+            -- upstream deps.
+            TTUpstream{} -> (False, False)
 
     getPrecompiled cache =
         case taskLocation task of
@@ -1024,28 +1035,12 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         extraOpts <- extraBuildOptions eeBuildOpts
         preBuildTime <- modTime <$> liftIO getCurrentTime
         cabal (console && configHideTHLoading config) $ ("build" :) $ (++ extraOpts) $
-            case (taskType, isFinalBuild) of
-                -- Normal build
-                (TTLocal lp, False) -> concat
-                    [ ["lib:" ++ packageNameString (packageName package)
-                      -- TODO: get this information from target parsing instead,
-                      -- which will allow users to turn off library building if
-                      -- desired
-                      | packageHasLibrary package]
-                    , map (T.unpack . T.append "exe:") $ Set.toList $
-                        if lpWanted lp
-                            then exeComponents (lpComponents lp)
-                            -- Build all executables in the event that no
-                            -- specific list is provided (as happens with
-                            -- extra-deps).
-                            else packageExes package
-                    ]
-                -- Tests / benchmarks build
-                (TTLocal lp, True) ->
-                    map (T.unpack . decodeUtf8 . renderComponent) $
-                    Set.toList $
-                    Set.filter (\c -> isCTest c || isCBench c) (lpComponents lp)
-                (TTUpstream{}, _) -> []
+            case (taskType, taskAllInOne, isFinalBuild) of
+                (_, True, True) -> fail "Invariant violated: cannot have an all-in-one build that also has a final build step."
+                (TTLocal lp, False, False) -> primaryComponentOptions lp
+                (TTLocal lp, False, True) -> finalComponentOptions lp
+                (TTLocal lp, True, False) -> primaryComponentOptions lp ++ finalComponentOptions lp
+                (TTUpstream{}, _, _) -> []
         checkForUnlistedFiles taskType preBuildTime pkgDir
 
         when (doHaddock package) $ do
@@ -1377,6 +1372,33 @@ extraBuildOptions bopts = do
         hpcIndexDir <- toFilePath <$> hpcRelativeDir
         return ["--ghc-options", "-hpcdir " ++ hpcIndexDir ++ ddumpOpts]
       False -> return ["--ghc-options", ddumpOpts]
+
+-- Library and executable build components.
+primaryComponentOptions :: LocalPackage -> [String]
+primaryComponentOptions lp = concat
+    [ ["lib:" ++ packageNameString (packageName (lpPackage lp))
+      -- TODO: get this information from target parsing instead,
+      -- which will allow users to turn off library building if
+      -- desired
+      | packageHasLibrary (lpPackage lp)]
+    , map (T.unpack . T.append "exe:") $ Set.toList $ exesToBuild lp
+    ]
+
+exesToBuild :: LocalPackage -> Set Text
+exesToBuild lp =
+    if lpWanted lp
+        then exeComponents (lpComponents lp)
+        -- Build all executables in the event that no
+        -- specific list is provided (as happens with
+        -- extra-deps).
+        else packageExes (lpPackage lp)
+
+-- Test-suite and benchmark build components.
+finalComponentOptions :: LocalPackage -> [String]
+finalComponentOptions lp =
+    map (T.unpack . decodeUtf8 . renderComponent) $
+    Set.toList $
+    Set.filter (\c -> isCTest c || isCBench c) (lpComponents lp)
 
 taskComponents :: Task -> Set NamedComponent
 taskComponents task =

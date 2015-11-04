@@ -140,13 +140,33 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
 
     econfig <- asks getEnvConfig
     let onWanted lp = do
-            when (lpWanted lp) $ void $ addDep False $ packageName $ lpPackage lp
+            let name = packageName (lpPackage lp)
             case lpTestBench lp of
-                Just tb -> addFinal lp tb
-                Nothing -> return ()
+                Nothing -> void $ addDep False Nothing name
+                Just tb -> do
+                    -- Attempt to find a plan which performs an all-in-one
+                    -- build.  Ignore the writer action + reset the state if
+                    -- it fails.
+                    s <- get
+                    res <- pass $ do
+                        res <- addDep False (Just tb) name
+                        let writerFunc w = case res of
+                                Left _ -> mempty
+                                _ -> w
+                        return (res, writerFunc)
+                    case res of
+                        Right _ -> addFinal lp tb True
+                        Left _ -> do
+                            -- Reset the state to how it was before attempting
+                            -- to find an all-in-one build plan.
+                            put s
+                            -- Otherwise, fall back on building the tests /
+                            -- benchmarks in a separate step.
+                            _ <- addDep False Nothing name
+                            addFinal lp tb False
     let inner = do
             mapM_ onWanted $ filter lpWanted locals
-            mapM_ (addDep False) $ Set.toList extraToBuild0
+            mapM_ (addDep False Nothing) $ Set.toList extraToBuild0
     ((), m, W efinals installExes dirtyReason deps warnings) <-
         liftIO $ runRWST inner (ctx econfig latest) M.empty
     mapM_ $logWarn (warnings [])
@@ -222,8 +242,8 @@ mkUnregisterLocal tasks dirtyReason locallyRegistered sourceMap =
       where
         name = packageIdentifierName ident
 
-addFinal :: LocalPackage -> Package -> M ()
-addFinal lp package = do
+addFinal :: LocalPackage -> Package -> Bool -> M ()
+addFinal lp package isAllInOne = do
     depsRes <- addPackageDeps False package
     res <- case depsRes of
         Left e -> return $ Left e
@@ -245,12 +265,15 @@ addFinal lp package = do
                             package
                 , taskPresent = present
                 , taskType = TTLocal lp
+                , taskAllInOne = isAllInOne
                 }
     tell mempty { wFinals = Map.singleton (packageName package) res }
 
 addDep :: Bool -- ^ is this being used by a dependency?
-       -> PackageName -> M (Either ConstructPlanException AddDepRes)
-addDep treatAsDep' name = do
+       -> Maybe Package -- ^ override package, used for all-in-one builds.
+       -> PackageName
+       -> M (Either ConstructPlanException AddDepRes)
+addDep treatAsDep' mAllInOne name = do
     ctx <- ask
     let treatAsDep = treatAsDep' || name `Set.notMember` wanted ctx
     when treatAsDep $ markAsDep name
@@ -271,10 +294,10 @@ addDep treatAsDep' name = do
                             return $ Right $ ADRFound loc installed
                         Just (PIOnlySource ps) -> do
                             tellExecutables name ps
-                            installPackage treatAsDep name ps Nothing
+                            installPackage treatAsDep mAllInOne name ps Nothing
                         Just (PIBoth ps installed) -> do
                             tellExecutables name ps
-                            installPackage treatAsDep name ps (Just installed)
+                            installPackage treatAsDep mAllInOne name ps (Just installed)
             modify $ Map.insert name res
             return res
 
@@ -315,10 +338,14 @@ tellExecutablesPackage loc p = do
         | otherwise = Set.intersection x myComps
 
 installPackage :: Bool -- ^ is this being used by a dependency?
-               -> PackageName -> PackageSource -> Maybe Installed -> M (Either ConstructPlanException AddDepRes)
-installPackage treatAsDep name ps minstalled = do
+               -> Maybe Package -- ^ override package, used for all-in-one builds.
+               -> PackageName
+               -> PackageSource
+               -> Maybe Installed
+               -> M (Either ConstructPlanException AddDepRes)
+installPackage treatAsDep mAllInOne name ps minstalled = do
     ctx <- ask
-    package <- psPackage name ps
+    package <- maybe (psPackage name ps) return mAllInOne
     depsRes <- addPackageDeps treatAsDep package
     case depsRes of
         Left e -> return $ Left e
@@ -356,6 +383,7 @@ installPackage treatAsDep name ps minstalled = do
                         case ps of
                             PSLocal lp -> TTLocal lp
                             PSUpstream _ loc _ -> TTUpstream package $ loc <> minLoc
+                    , taskAllInOne = isJust mAllInOne
                     }
 
 addEllipsis :: Text -> Text
@@ -369,7 +397,7 @@ addPackageDeps treatAsDep package = do
     ctx <- ask
     deps' <- packageDepsWithTools package
     deps <- forM (Map.toList deps') $ \(depname, range) -> do
-        eres <- addDep treatAsDep depname
+        eres <- addDep treatAsDep Nothing depname
         let mlatest = Map.lookup depname $ latestVersions ctx
         case eres of
             Left e ->
