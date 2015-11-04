@@ -21,12 +21,6 @@ module Stack.Build.Cache
     , setTestSuccess
     , unsetTestSuccess
     , checkTestSuccess
-    , setTestBuilt
-    , unsetTestBuilt
-    , checkTestBuilt
-    , setBenchBuilt
-    , unsetBenchBuilt
-    , checkBenchBuilt
     , writePrecompiledCache
     , readPrecompiledCache
     ) where
@@ -228,64 +222,6 @@ checkTestSuccess dir =
     liftM
         (fromMaybe False)
         (tryGetCache testSuccessFile dir)
-
--- | Mark a test suite as having built
-setTestBuilt :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
-               => Path Abs Dir
-               -> m ()
-setTestBuilt dir =
-    writeCache
-        dir
-        testBuiltFile
-        True
-
--- | Mark a test suite as not having built
-unsetTestBuilt :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
-                 => Path Abs Dir
-                 -> m ()
-unsetTestBuilt dir =
-    writeCache
-        dir
-        testBuiltFile
-        False
-
--- | Check if the test suite already built
-checkTestBuilt :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
-                 => Path Abs Dir
-                 -> m Bool
-checkTestBuilt dir =
-    liftM
-        (fromMaybe False)
-        (tryGetCache testBuiltFile dir)
-
--- | Mark a bench suite as having built
-setBenchBuilt :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
-               => Path Abs Dir
-               -> m ()
-setBenchBuilt dir =
-    writeCache
-        dir
-        benchBuiltFile
-        True
-
--- | Mark a bench suite as not having built
-unsetBenchBuilt :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
-                 => Path Abs Dir
-                 -> m ()
-unsetBenchBuilt dir =
-    writeCache
-        dir
-        benchBuiltFile
-        False
-
--- | Check if the bench suite already built
-checkBenchBuilt :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
-                 => Path Abs Dir
-                 -> m Bool
-checkBenchBuilt dir =
-    liftM
-        (fromMaybe False)
-        (tryGetCache benchBuiltFile dir)
 
 --------------------------------------
 -- Precompiled Cache

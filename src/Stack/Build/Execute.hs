@@ -37,10 +37,10 @@ import qualified Data.ByteString.Char8          as S8
 import           Data.Conduit
 import qualified Data.Conduit.Binary            as CB
 import qualified Data.Conduit.List              as CL
-import           Data.Foldable                  (forM_)
+import           Data.Foldable                  (forM_, any)
 import           Data.Function
 import           Data.IORef.RunOnce             (runOnce)
-import           Data.List
+import           Data.List                      hiding (any)
 import           Data.Map.Strict                (Map)
 import qualified Data.Map.Strict                as Map
 import           Data.Maybe
@@ -52,6 +52,7 @@ import qualified Data.Streaming.Process         as Process
 import           Data.Traversable               (forM)
 import           Data.Text                      (Text)
 import qualified Data.Text                      as T
+import           Data.Text.Encoding             (decodeUtf8)
 import           Data.Time.Clock                (getCurrentTime)
 import           Data.Word8                     (_colon)
 import           Distribution.System            (OS (Windows),
@@ -61,7 +62,7 @@ import           Language.Haskell.TH            as TH (location)
 import           Network.HTTP.Client.Conduit    (HasHttpManager)
 import           Path
 import           Path.IO
-import           Prelude                        hiding (FilePath, writeFile)
+import           Prelude                        hiding (FilePath, writeFile, any)
 import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
@@ -532,7 +533,7 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
                     { actionId = ActionId taskProvides ATBuild
                     , actionDeps =
                         (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
-                    , actionDo = \ac -> runInBase $ singleBuild runInBase ac ee task installedMap
+                    , actionDo = \ac -> runInBase $ singleBuild runInBase ac ee task installedMap False
                     }
                 ]
     afinal =
@@ -540,9 +541,14 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
             Nothing -> []
             Just task@Task {..} ->
                 [ Action
-                    { actionId = ActionId taskProvides ATFinal
-                    , actionDeps = addBuild taskProvides $
+                    { actionId = ActionId taskProvides ATBuildFinal
+                    , actionDeps = addBuild taskProvides
                         (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
+                    , actionDo = \ac -> runInBase $ singleBuild runInBase ac ee task installedMap True
+                    }
+                , Action
+                    { actionId = ActionId taskProvides ATFinal
+                    , actionDeps = Set.singleton (ActionId taskProvides ATBuildFinal)
                     , actionDo = \ac -> runInBase $ do
                         let comps = taskComponents task
                             tests = testComponents comps
@@ -554,12 +560,10 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
                             singleBench runInBase beopts ac ee task installedMap
                     }
                 ]
-      where
-        addBuild ident =
-            case mbuild of
-                Nothing -> id
-                Just _ -> Set.insert $ ActionId ident ATBuild
-
+    addBuild ident =
+        case mbuild of
+            Nothing -> id
+            Just _ -> Set.insert $ ActionId ident ATBuild
     bopts = eeBuildOpts ee
     topts = boptsTestOpts bopts
     beopts = boptsBenchmarkOpts bopts
@@ -886,9 +890,10 @@ singleBuild :: M env m
             -> ExecuteEnv
             -> Task
             -> InstalledMap
+            -> Bool
             -> m ()
-singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap = do
-    (allDepsMap, cache) <- getConfigCache ee task installedMap False False
+singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap isFinalBuild = do
+    (allDepsMap, cache) <- getConfigCache ee task installedMap enableTests enableBenchmarks
     mprecompiled <- getPrecompiled cache
     minstalled <-
         case mprecompiled of
@@ -903,9 +908,19 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
     pname = packageIdentifierName taskProvides
     shouldHaddockPackage' = shouldHaddockPackage eeBuildOpts eeWanted pname
     doHaddock package = shouldHaddockPackage' &&
+                        not isFinalBuild &&
                         -- Works around haddock failing on bytestring-builder since it has no modules
                         -- when bytestring is new enough.
                         packageHasExposedModules package
+
+    enableTests = isFinalBuild && any isCTest (taskComponents task)
+    enableBenchmarks = isFinalBuild && any isCBench (taskComponents task)
+    annSuffix =
+        case (enableTests, enableBenchmarks) of
+            (False, False) -> ""
+            (True, False) -> " (test)"
+            (False, True) -> " (bench)"
+            (True, True) -> " (test + bench)"
 
     getPrecompiled cache =
         case taskLocation task of
@@ -988,7 +1003,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
     realConfigAndBuild cache allDepsMap = withSingleContext runInBase ac ee task (Just allDepsMap) Nothing
         $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
-            _neededConfig <- ensureConfig cache pkgDir ee (announce "configure") cabal cabalfp
+            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix)) cabal cabalfp
 
             if boptsOnlyConfigure eeBuildOpts
                 then return Nothing
@@ -999,18 +1014,20 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
         markExeNotInstalled (taskLocation task) taskProvides
         case taskType of
-            TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
+            TTLocal lp -> do
+                when enableTests $ unsetTestSuccess pkgDir
+                writeBuildCache pkgDir $ lpNewBuildCache lp
             TTUpstream _ _ -> return ()
 
-        () <- announce "build"
+        () <- announce ("build" <> annSuffix)
         config <- asks getConfig
         extraOpts <- extraBuildOptions eeBuildOpts
         preBuildTime <- modTime <$> liftIO getCurrentTime
-        cabal (console && configHideTHLoading config) $
-            (case taskType of
-                TTLocal lp -> concat
-                    [ ["build"]
-                    , ["lib:" ++ packageNameString (packageName package)
+        cabal (console && configHideTHLoading config) $ ("build" :) $ (++ extraOpts) $
+            case (taskType, isFinalBuild) of
+                -- Normal build
+                (TTLocal lp, False) -> concat
+                    [ ["lib:" ++ packageNameString (packageName package)
                       -- TODO: get this information from target parsing instead,
                       -- which will allow users to turn off library building if
                       -- desired
@@ -1023,7 +1040,12 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                             -- extra-deps).
                             else packageExes package
                     ]
-                TTUpstream _ _ -> ["build"]) ++ extraOpts
+                -- Tests / benchmarks build
+                (TTLocal lp, True) ->
+                    map (T.unpack . decodeUtf8 . renderComponent) $
+                    Set.toList $
+                    Set.filter (\c -> isCTest c || isCBench c) (lpComponents lp)
+                (TTUpstream{}, _) -> []
         checkForUnlistedFiles taskType preBuildTime pkgDir
 
         when (doHaddock package) $ do
@@ -1044,7 +1066,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             cabal False (concat [["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
                                 ,sourceFlag])
 
-        withMVar eeInstallLock $ \() -> do
+        unless isFinalBuild $ withMVar eeInstallLock $ \() -> do
             announce "copy/register"
             cabal False ["copy"]
             when (packageHasLibrary package) $ cabal False ["register"]
@@ -1134,37 +1156,12 @@ singleTest :: M env m
            -> InstalledMap
            -> m ()
 singleTest runInBase topts testsToRun ac ee task installedMap = do
-    (allDepsMap, cache) <- getConfigCache ee task installedMap True False
-    withSingleContext runInBase ac ee task (Just allDepsMap) (Just "test") $ \package cabalfp pkgDir cabal announce console mlogFile -> do
-        neededConfig <- ensureConfig cache pkgDir ee (announce "configure (test)") cabal cabalfp
+    -- FIXME: Since this doesn't use cabal, we should be able to avoid using a
+    -- fullblown 'withSingleContext'.
+    (allDepsMap, _cache) <- getConfigCache ee task installedMap True False
+    withSingleContext runInBase ac ee task (Just allDepsMap) (Just "test") $ \package _cabalfp pkgDir _cabal announce _console mlogFile -> do
         config <- asks getConfig
-
-        testBuilt <- checkTestBuilt pkgDir
-
-        let needBuild = neededConfig ||
-                (case taskType task of
-                    TTLocal lp ->
-                        case lpDirtyFiles lp of
-                            Just _ -> True
-                            Nothing -> False
-                    _ -> assert False True) ||
-                not testBuilt
-            needHpc = toCoverage topts
-            components = map (T.unpack . T.append "test:") testsToRun
-
-        when needBuild $ do
-            announce "build (test)"
-            unsetTestBuilt pkgDir
-            unsetTestSuccess pkgDir
-            case taskType task of
-                TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
-                TTUpstream _ _ -> assert False $ return ()
-            extraOpts <- extraBuildOptions (eeBuildOpts ee)
-            preBuildTime <- modTime <$> liftIO getCurrentTime
-            cabal (console && configHideTHLoading config) $
-                "build" : (components ++ extraOpts)
-            checkForUnlistedFiles (taskType task) preBuildTime pkgDir
-            setTestBuilt pkgDir
+        let needHpc = toCoverage topts
 
         toRun <-
             if toDisableRun topts
@@ -1267,8 +1264,6 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                 (fmap fst mlogFile)
                 bs
 
-            setTestSuccess pkgDir
-
 singleBench :: M env m
             => (m () -> IO ())
             -> BenchmarkOpts
@@ -1278,32 +1273,10 @@ singleBench :: M env m
             -> InstalledMap
             -> m ()
 singleBench runInBase beopts ac ee task installedMap = do
-    (allDepsMap, cache) <- getConfigCache ee task installedMap False True
-    withSingleContext runInBase ac ee task (Just allDepsMap) (Just "bench") $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
-        neededConfig <- ensureConfig cache pkgDir ee (announce "configure (benchmarks)") cabal cabalfp
-
-        benchBuilt <- checkBenchBuilt pkgDir
-
-        let needBuild = neededConfig ||
-                (case taskType task of
-                    TTLocal lp ->
-                        case lpDirtyFiles lp of
-                            Just _ -> True
-                            Nothing -> False
-                    _ -> assert False True) ||
-                not benchBuilt
-        when needBuild $ do
-            announce "build (benchmarks)"
-            unsetBenchBuilt pkgDir
-            case taskType task of
-                TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
-                TTUpstream _ _ -> assert False $ return ()
-            config <- asks getConfig
-            extraOpts <- extraBuildOptions (eeBuildOpts ee)
-            preBuildTime <- modTime <$> liftIO getCurrentTime
-            cabal (console && configHideTHLoading config) ("build" : extraOpts)
-            checkForUnlistedFiles (taskType task) preBuildTime pkgDir
-            setBenchBuilt pkgDir
+    -- FIXME: Since this doesn't use cabal, we should be able to avoid using a
+    -- fullblown 'withSingleContext'.
+    (allDepsMap, _cache) <- getConfigCache ee task installedMap False True
+    withSingleContext runInBase ac ee task (Just allDepsMap) (Just "bench") $ \_package _cabalfp _pkgDir cabal announce _console _mlogFile -> do
         let args = maybe []
                          ((:[]) . ("--benchmark-options=" <>))
                          (beoAdditionalArgs beopts)
