@@ -733,7 +733,7 @@ instance FromJSON (ConfigMonoid, [JSONWarning]) where
 parseConfigMonoidJSON :: Object -> WarningParser ConfigMonoid
 parseConfigMonoidJSON obj = do
     configMonoidDockerOpts <- jsonSubWarnings (obj ..:? configMonoidDockerOptsName ..!= mempty)
-    configMonoidNixOpts <- jsonSubWarnings (obj ..:? "nix-shell" ..!= mempty)
+    configMonoidNixOpts <- jsonSubWarnings (obj ..:? configMonoidNixShellOptsName ..!= mempty)
     configMonoidConnectionCount <- obj ..:? configMonoidConnectionCountName
     configMonoidHideTHLoading <- obj ..:? configMonoidHideTHLoadingName
     configMonoidLatestSnapshotUrl <- obj ..:? configMonoidLatestSnapshotUrlName
@@ -812,6 +812,9 @@ parseConfigMonoidJSON obj = do
 
 configMonoidDockerOptsName :: Text
 configMonoidDockerOptsName = "docker"
+
+configMonoidNixShellOptsName :: Text
+configMonoidNixShellOptsName = "nix-shell"
 
 configMonoidConnectionCountName :: Text
 configMonoidConnectionCountName = "connection-count"
