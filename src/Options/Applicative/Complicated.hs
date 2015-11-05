@@ -7,7 +7,12 @@
 -- subcommands. Because it makes the interface more complex, these workarounds are not suitable for
 -- pushing upstream to optparse-applicative.
 
-module Options.Applicative.Complicated where
+module Options.Applicative.Complicated
+  ( addCommand
+  , addSubCommands
+  , complicatedOptions
+  , complicatedParser
+  ) where
 
 import           Control.Monad.Trans.Class (lift)
 import           Control.Monad.Trans.Either
@@ -30,18 +35,18 @@ complicatedOptions
   -- ^ header
   -> String
   -- ^ program description
-  -> (Bool -> Parser a)
-  -- ^ global settings
-  -> EitherT b (Writer (Parser a -> Mod CommandFields (b,a))) ()
+  -> Parser a
+  -- ^ common settings
+  -> EitherT b (Writer (Mod CommandFields (b,a))) ()
   -- ^ commands (use 'addCommand')
   -> IO (a,b)
-complicatedOptions numericVersion versionString h pd globalParser commandParser =
+complicatedOptions numericVersion versionString h pd commonParser commandParser =
   do args <- getArgs
      (a,(b,c)) <- case execParserPure (prefs noBacktrack) parser args of
        Failure _ | null args -> withArgs ["--help"] (execParser parser)
        parseResult -> handleParseResult parseResult
      return (mappend c a,b)
-  where parser = info (helpOption <*> versionOptions <*> complicatedParser globalParser commandParser) desc
+  where parser = info (helpOption <*> versionOptions <*> complicatedParser commonParser commandParser) desc
         desc = fullDesc <> header h <> progDesc pd
         versionOptions =
           case versionString of
@@ -63,55 +68,60 @@ addCommand :: String   -- ^ command string
            -> String   -- ^ title of command
            -> String   -- ^ footer of command help
            -> (a -> b) -- ^ constructor to wrap up command in common data type
+           -> Parser c -- ^ common parser
            -> Parser a -- ^ command parser
-           -> EitherT b (Writer (Parser c -> Mod CommandFields (b,c))) ()
-addCommand cmd title footerStr constr inner =
-  addCommand' cmd title footerStr constr (const inner)
+           -> EitherT b (Writer (Mod CommandFields (b,c))) ()
+addCommand cmd title footerStr constr commonParser inner =
+  addCommand' cmd title footerStr (\a c -> (constr a,c)) commonParser inner
 
 -- | Add a command that takes sub-commands to the options dispatcher.
 addSubCommands
-  :: Monoid a
+  :: Monoid c
   => String
   -- ^ command string
   -> String
   -- ^ title of command
   -> String
   -- ^ footer of command help
-  -> EitherT b (Writer (Parser a -> Mod CommandFields (b,a))) ()
+  -> Parser c
+  -- ^ common parser
+  -> EitherT b (Writer (Mod CommandFields (b,c))) ()
   -- ^ sub-commands (use 'addCommand')
-  -> EitherT b (Writer (Parser a -> Mod CommandFields (b,a))) ()
-addSubCommands cmd title footerStr commandParser =
+  -> EitherT b (Writer (Mod CommandFields (b,c))) ()
+addSubCommands cmd title footerStr commonParser commandParser =
   addCommand' cmd
               title
               footerStr
-              (\(_, (a, _)) -> a)
-              (\commonParser -> complicatedParser (const commonParser) commandParser)
+              (\(c1,(a,c2)) c3 -> (a,mconcat [c3, c2, c1]))
+              commonParser
+              (complicatedParser commonParser commandParser)
 
 -- | Add a command to the options dispatcher.
 addCommand' :: String   -- ^ command string
             -> String   -- ^ title of command
             -> String   -- ^ footer of command help
-            -> (a -> b) -- ^ constructor to wrap up command in common data type
-            -> (Parser c -> Parser a) -- ^ command parser
-            -> EitherT b (Writer (Parser c -> Mod CommandFields (b,c))) ()
-addCommand' cmd title footerStr constr inner =
-  lift (tell (\commonParser -> command cmd
-                      (info ((,) <$> (constr <$> inner commonParser) <*> commonParser)
+            -> (a -> c -> (b,c)) -- ^ constructor to wrap up command in common data type
+            -> Parser c -- ^ common parser
+            -> Parser a -- ^ command parser
+            -> EitherT b (Writer (Mod CommandFields (b,c))) ()
+addCommand' cmd title footerStr constr commonParser inner =
+  lift (tell (command cmd
+                      (info (constr <$> inner <*> commonParser)
                             (progDesc title <> footer footerStr))))
 
 -- | Generate a complicated options parser.
 complicatedParser
   :: Monoid a
-  => (Bool -> Parser a)
+  => Parser a
   -- ^ common settings
-  -> EitherT b (Writer (Parser a -> Mod CommandFields (b,a))) ()
+  -> EitherT b (Writer (Mod CommandFields (b,a))) ()
   -- ^ commands (use 'addCommand')
   -> Parser (a,(b,a))
 complicatedParser commonParser commandParser =
    (,) <$>
-   commonParser False <*>
+   commonParser <*>
    case runWriter (runEitherT commandParser) of
-     (Right (),d) -> hsubparser' (d (commonParser True))
+     (Right (),d) -> hsubparser' d
      (Left b,_) -> pure (b,mempty)
 
 -- way to do in 'addCommand' | Subparser with @--help@ argument. Borrowed with slight modification
