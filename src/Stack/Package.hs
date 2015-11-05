@@ -339,7 +339,7 @@ generateBuildInfoOpts sourceMap installedMap mcabalmacros cabalDir distDir omitP
     extOpts = map (("-X" ++) . display) . usedExtensions
     srcOpts =
         map
-            (("-i" <>) . toFilePath)
+            (("-i" <>) . FilePath.dropTrailingPathSeparator . toFilePath)
             ((if null (hsSourceDirs b) then [cabalDir] else []) <>
              map (cabalDir </>) (mapMaybe parseRelDir (hsSourceDirs b)) <>
              [autogenDir distDir,buildDir distDir]) ++
