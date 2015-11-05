@@ -33,6 +33,7 @@ import           Stack.Types.Internal
 import           System.Environment (lookupEnv)
 import           System.Process.Run
 import           System.FilePath (searchPathSeparator)
+
 -- | Launch a GHCi IDE for the given local project targets with the
 -- given options and configure it with the load paths and extensions
 -- of those targets.
@@ -93,7 +94,7 @@ getPackageOptsAndTargetFiles pwd pkg = do
     paths_foo_exists <- fileExists paths_foo
     return
         ( ["--dist-dir=" <> toFilePath dist] ++
-          map ("--ghc-option=" ++) (ghciPkgGenOpts pkg ++ ghciPkgGhcOpts pkg)
+          map ("--ghc-option=" ++) (concatMap (\(_, bio) -> bioGeneratedOpts bio ++ bioGhcOpts bio) (ghciPkgOpts pkg))
         , mapMaybe
               (fmap toFilePath . stripDir pwd)
               (S.toList (ghciPkgCFiles pkg) <> S.toList (ghciPkgModFiles pkg) <>

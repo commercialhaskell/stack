@@ -27,6 +27,7 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Text.Encoding (decodeUtf8)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.Text (display)
 import           Network.HTTP.Client.Conduit
@@ -58,12 +59,7 @@ data GhciOpts = GhciOpts
 -- | Necessary information to load a package or its components.
 data GhciPkgInfo = GhciPkgInfo
   { ghciPkgName :: PackageName
-  , ghciPkgGhcOpts :: [String]
-  -- ^ Options from the ghc-options cabal field
-  , ghciPkgGenOpts :: [String]
-  -- ^ Other options from cabal information.  These options can safely have
-  -- 'nubOrd' applied to them, as there are no multi-word options (see
-  -- https://github.com/commercialhaskell/stack/issues/1255)
+  , ghciPkgOpts :: [(NamedComponent, BuildInfoOpts)]
   , ghciPkgDir :: Path Abs Dir
   , ghciPkgModules :: Set ModuleName
   , ghciPkgModFiles :: Set (Path Abs File) -- ^ Module file paths.
@@ -84,8 +80,8 @@ ghci GhciOpts{..} = do
     wc <- getWhichCompiler
     let pkgopts =
             ["-hide-all-packages"] ++
-            nubOrd (concatMap ghciPkgGenOpts pkgs) ++
-            (concatMap ghciPkgGhcOpts pkgs)
+            nubOrd (concatMap (concatMap (bioGeneratedOpts . snd) . ghciPkgOpts) pkgs) ++
+            (concatMap (concatMap (bioGhcOpts . snd) . ghciPkgOpts) pkgs)
         modulesToLoad
           | ghciNoLoadModules = []
           | otherwise =
@@ -133,9 +129,7 @@ figureOutMainFile mainIsTargets targets0 packages =
         [] -> return Nothing
         [c@(_,_,fp)] -> do $logInfo ("Using main module: " <> renderCandidate c)
                            return (Just fp)
-        candidate:_ -> do
-            let border = $logWarn "* * * * * * * *"
-            border
+        candidate:_ -> borderedWarning $ do
             $logWarn "The main module to load is ambiguous. Candidates are: "
             forM_ (map renderCandidate candidates) $logWarn
             $logWarn
@@ -146,7 +140,6 @@ figureOutMainFile mainIsTargets targets0 packages =
             $logWarn
                 (" 2) Specifying what the main is e.g. stack ghci " <>
                  sampleMainIsArg candidate)
-            border
             return Nothing
   where
     targets = fromMaybe targets0 mainIsTargets
@@ -246,6 +239,7 @@ ghciSetup mbuildFirst mainIs stringTargets = do
         forM locals $
         \(name,(cabalfp,target)) ->
              makeGhciPkgInfo sourceMap installedMap localLibs name cabalfp target
+    warnAboutPotentialIssues infos
     return (realTargets, mainIsTargets, infos)
   where
     makeBuildOpts targets buildFirst =
@@ -308,8 +302,8 @@ makeGhciPkgInfo sourceMap installedMap locals name cabalfp target = do
     mapM_ (printCabalFileWarning cabalfp) warnings
     (mods,files,opts) <- getPackageOpts (packageOpts pkg) sourceMap installedMap locals cabalfp
     let filteredOpts = filterWanted opts
-        (omitted, ghcOpts) = partition badForGhci (concatMap bioGhcOpts filteredOpts)
-        genOpts = concatMap bioGeneratedOpts filteredOpts
+        omitUnwanted bio = bio { bioGhcOpts = filter (not . badForGhci) (bioGhcOpts bio) }
+        omitted = filter badForGhci $ concatMap bioGhcOpts filteredOpts
     unless (null omitted) $
         $logWarn
             ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
@@ -317,22 +311,74 @@ makeGhciPkgInfo sourceMap installedMap locals name cabalfp target = do
     return
         GhciPkgInfo
         { ghciPkgName = packageName pkg
-        , ghciPkgGhcOpts = ghcOpts
-        , ghciPkgGenOpts = genOpts
+        , ghciPkgOpts = M.toList (M.map omitUnwanted filteredOpts)
         , ghciPkgDir = parent cabalfp
-        , ghciPkgModules = mconcat (filterWanted mods)
-        , ghciPkgModFiles = mconcat (filterWanted (M.map (setMapMaybe dotCabalModulePath) files))
+        , ghciPkgModules = mconcat (M.elems (filterWanted mods))
+        , ghciPkgModFiles = mconcat (M.elems (filterWanted (M.map (setMapMaybe dotCabalModulePath) files)))
         , ghciPkgMainIs = M.map (setMapMaybe dotCabalMainPath) files
-        , ghciPkgCFiles = mconcat (filterWanted (M.map (setMapMaybe dotCabalCFilePath) files))
+        , ghciPkgCFiles = mconcat (M.elems (filterWanted (M.map (setMapMaybe dotCabalCFilePath) files)))
         }
   where
     badForGhci :: String -> Bool
     badForGhci x =
         isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky -static")
     setMapMaybe f = S.fromList . mapMaybe f . S.toList
-    filterWanted m =
-        M.elems (M.filterWithKey (\k _ -> wantedComponent k) m)
+    filterWanted m = M.filterWithKey (\k _ -> wantedComponent k) m
     wantedComponent k =
         case target of
             STLocalComps cs -> S.member k cs
             _ -> True
+
+warnAboutPotentialIssues :: MonadLogger m => [GhciPkgInfo] -> m ()
+warnAboutPotentialIssues pkgs = borderedWarning $ do
+    $logWarn "There are issues with this project which may prevent GHCi from working properly."
+    $logWarn ""
+    mapM_ $logWarn $ intercalate [""] $ concat
+        [ mixedFlag "-XNoImplicitPrelude"
+          [ "-XNoImplicitPrelude will be used, but GHCi will likely fail to build things which depend on the implicit prelude." ]
+        , mixedFlag "-XCPP"
+          [ "-XCPP will be used, but it can cause issues with multiline strings."
+          , "See https://downloads.haskell.org/~ghc/7.10.2/docs/html/users_guide/options-phases.html#cpp-string-gaps"
+          ]
+        , mixedFlag "-XNoTraditionalRecordSyntax"
+          [ "-XNoTraditionalRecordSyntax will be used, but it break modules which use record syntax." ]
+        , mixedFlag "-XTemplateHaskell"
+          [ "-XTemplateHaskell will be used, but it may cause compilation issues due to different parsing of ($)." ]
+        , mixedFlag "-XSafe"
+          [ "-XSafe will be used, but it will fail to compile unsafe modules." ]
+        ]
+    $logWarn ""
+    $logWarn "To resolve, remove the flag(s) from the cabal file(s) and instead put them at the top of the haskell files."
+    $logWarn ""
+    $logWarn "It isn't yet possible to load multiple packages into GHCi in all cases - see"
+    $logWarn "https://ghc.haskell.org/trac/ghc/ticket/10827"
+  where
+    mixedFlag flag msgs =
+        let x = partitionComps (== flag) in
+        [ msgs ++ showWhich x | mixedSettings x ]
+    mixedSettings (xs, ys) = xs /= [] && ys /= []
+    showWhich (haveIt, don'tHaveIt) =
+        [ "It is specified for:"
+        , "    " <> renderPkgComps haveIt
+        , "But not for: "
+        , "    " <> renderPkgComps don'tHaveIt
+        ]
+    renderPkgComps = T.intercalate " " . map renderPkgComp
+    renderPkgComp (pkg, comp) = packageNameText pkg <> ":" <> decodeUtf8 (renderComponent comp)
+    compsWithOpts = concat
+        [ [ ((ghciPkgName pkg, c), bioGeneratedOpts bio ++ bioGhcOpts bio)
+          | (c, bio) <- ghciPkgOpts pkg
+          ]
+        | pkg <- pkgs ]
+    partitionComps f = (map fst xs, map fst ys)
+      where
+        (xs, ys) = partition (any f . snd) compsWithOpts
+
+borderedWarning :: MonadLogger m => m a -> m a
+borderedWarning f = do
+    $logWarn ""
+    $logWarn "* * * * * * * *"
+    x <- f
+    $logWarn "* * * * * * * *"
+    $logWarn ""
+    return x
