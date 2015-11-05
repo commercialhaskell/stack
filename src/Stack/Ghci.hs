@@ -96,8 +96,8 @@ ghci GhciOpts{..} = do
         (\tmpDir ->
               do let scriptPath = tmpDir </> $(mkRelFile "ghci-script")
                      fp = toFilePath scriptPath
-                     loadModules = ":l " <> unwords modulesToLoad
-                     bringIntoScope = ":m + " <> unwords modulesToLoad
+                     loadModules = ":load " <> unwords modulesToLoad
+                     bringIntoScope = ":module + " <> unwords modulesToLoad
                  liftIO (writeFile fp (unlines [loadModules,bringIntoScope]))
                  finally (exec
                               defaultEnvSettings
