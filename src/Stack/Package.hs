@@ -198,9 +198,9 @@ resolvePackage packageConfig gpkg =
     , packageOpts = GetPackageOpts $
       \sourceMap installedMap omitPkgs cabalfp ->
            do (componentsModules,componentFiles,_,_) <- getPackageFiles pkgFiles cabalfp
-              (componentsOpts,generalOpts) <-
+              componentsOpts <-
                   generatePkgDescOpts sourceMap installedMap omitPkgs cabalfp pkg componentFiles
-              return (componentsModules,componentFiles,componentsOpts,generalOpts)
+              return (componentsModules,componentFiles,componentsOpts)
     , packageHasExposedModules = maybe
           False
           (not . null . exposedModules)
@@ -234,7 +234,7 @@ generatePkgDescOpts
     -> Path Abs File
     -> PackageDescription
     -> Map NamedComponent (Set DotCabalPath)
-    -> m (Map NamedComponent [String],[String])
+    -> m (Map NamedComponent BuildInfoOpts)
 generatePkgDescOpts sourceMap installedMap omitPkgs cabalfp pkg componentPaths = do
     distDir <- distDirFromDir cabalDir
     let cabalmacros = autogenDir distDir </> $(mkRelFile "cabal_macros.h")
@@ -279,8 +279,7 @@ generatePkgDescOpts sourceMap installedMap omitPkgs cabalfp pkg componentPaths =
                                (generate
                                     (CTest (T.pack (testName test)))
                                     (testBuildInfo test)))
-                         (testSuites pkg)])
-        , ["-hide-all-packages"])
+                         (testSuites pkg)]))
   where
     cabalDir = parent cabalfp
 
@@ -295,9 +294,20 @@ generateBuildInfoOpts
     -> BuildInfo
     -> Set DotCabalPath
     -> NamedComponent
-    -> [String]
+    -> BuildInfoOpts
 generateBuildInfoOpts sourceMap installedMap mcabalmacros cabalDir distDir omitPkgs b dotCabalPaths componentName =
-    nubOrd (concat [ghcOpts b, extOpts b, srcOpts, includeOpts, macros, deps, extra b, extraDirs, fworks b, cObjectFiles])
+    BuildInfoOpts
+        { bioGhcOpts = ghcOpts b
+        -- NOTE for future changes: Due to this use of nubOrd (and other uses
+        -- downstream), these generated options must not rely on multiple
+        -- argument sequences.  For example, ["--main-is", "Foo.hs", "--main-
+        -- is", "Bar.hs"] would potentially break due to the duplicate
+        -- "--main-is" being removed.
+        --
+        -- See https://github.com/commercialhaskell/stack/issues/1255
+        , bioGeneratedOpts = nubOrd $ concat
+            [extOpts b, srcOpts, includeOpts, macros, deps, extra b, extraDirs, fworks b, cObjectFiles]
+        }
   where
     cObjectFiles =
         mapMaybe (fmap toFilePath .

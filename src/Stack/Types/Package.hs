@@ -105,10 +105,15 @@ newtype GetPackageOpts = GetPackageOpts
                      -> Path Abs File
                      -> m (Map NamedComponent (Set ModuleName)
                           ,Map NamedComponent (Set DotCabalPath)
-                          ,Map NamedComponent [String],[String])
+                          ,Map NamedComponent BuildInfoOpts)
     }
 instance Show GetPackageOpts where
     show _ = "<GetPackageOpts>"
+
+data BuildInfoOpts = BuildInfoOpts
+    { bioGhcOpts :: [String]
+    , bioGeneratedOpts :: [String]
+    }
 
 -- | Files to get for a cabal package.
 data CabalFileType

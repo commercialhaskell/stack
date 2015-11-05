@@ -93,7 +93,7 @@ getPackageOptsAndTargetFiles pwd pkg = do
     paths_foo_exists <- fileExists paths_foo
     return
         ( ["--dist-dir=" <> toFilePath dist] ++
-          map ("--ghc-option=" ++) (ghciPkgOpts pkg)
+          map ("--ghc-option=" ++) (ghciPkgGenOpts pkg ++ ghciPkgGhcOpts pkg)
         , mapMaybe
               (fmap toFilePath . stripDir pwd)
               (S.toList (ghciPkgCFiles pkg) <> S.toList (ghciPkgModFiles pkg) <>

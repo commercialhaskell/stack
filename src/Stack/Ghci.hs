@@ -18,6 +18,7 @@ import           Control.Monad.Trans.Resource
 import           Data.Either
 import           Data.Function
 import           Data.List
+import           Data.List.Extra (nubOrd)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Maybe
@@ -57,7 +58,12 @@ data GhciOpts = GhciOpts
 -- | Necessary information to load a package or its components.
 data GhciPkgInfo = GhciPkgInfo
   { ghciPkgName :: PackageName
-  , ghciPkgOpts :: [String]
+  , ghciPkgGhcOpts :: [String]
+  -- ^ Options from the ghc-options cabal field
+  , ghciPkgGenOpts :: [String]
+  -- ^ Other options from cabal information.  These options can safely have
+  -- 'nubOrd' applied to them, as there are no multi-word options (see
+  -- https://github.com/commercialhaskell/stack/issues/1255)
   , ghciPkgDir :: Path Abs Dir
   , ghciPkgModules :: Set ModuleName
   , ghciPkgModFiles :: Set (Path Abs File) -- ^ Module file paths.
@@ -76,7 +82,10 @@ ghci GhciOpts{..} = do
     bconfig <- asks getBuildConfig
     mainFile <- figureOutMainFile mainIsTargets targets pkgs
     wc <- getWhichCompiler
-    let pkgopts = concatMap ghciPkgOpts pkgs
+    let pkgopts =
+            ["-hide-all-packages"] ++
+            nubOrd (concatMap ghciPkgGenOpts pkgs) ++
+            (concatMap ghciPkgGhcOpts pkgs)
         modulesToLoad
           | ghciNoLoadModules = []
           | otherwise =
@@ -235,8 +244,8 @@ ghciSetup mbuildFirst mainIs stringTargets = do
     let localLibs = [name | (name, (_, target)) <- locals, hasLocalComp isCLib target]
     infos <-
         forM locals $
-        \(name,(cabalfp,component)) ->
-             makeGhciPkgInfo sourceMap installedMap localLibs name cabalfp component
+        \(name,(cabalfp,target)) ->
+             makeGhciPkgInfo sourceMap installedMap localLibs name cabalfp target
     return (realTargets, mainIsTargets, infos)
   where
     makeBuildOpts targets buildFirst =
@@ -284,7 +293,7 @@ makeGhciPkgInfo
     -> Path Abs File
     -> SimpleTarget
     -> m GhciPkgInfo
-makeGhciPkgInfo sourceMap installedMap locals name cabalfp component = do
+makeGhciPkgInfo sourceMap installedMap locals name cabalfp target = do
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
     let config =
@@ -297,47 +306,33 @@ makeGhciPkgInfo sourceMap installedMap locals name cabalfp component = do
             }
     (warnings,pkg) <- readPackage config cabalfp
     mapM_ (printCabalFileWarning cabalfp) warnings
-    (componentsModules,componentFiles,componentsOpts,generalOpts) <-
-        getPackageOpts (packageOpts pkg) sourceMap installedMap locals cabalfp
-    let filterWithinWantedComponents m =
-            M.elems
-                (M.filterWithKey
-                     (\k _ ->
-                           case component of
-                               STLocalComps cs -> S.member k cs
-                               _ -> True)
-                     m)
-        filteredOptions =
-            nub (map
-                     (\x ->
-                           if badForGhci x
-                               then Left x
-                               else Right x)
-                     (generalOpts <>
-                      concat (filterWithinWantedComponents componentsOpts)))
-    case lefts filteredOptions of
-        [] -> return ()
-        options ->
-            $logWarn
-                ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
-                 T.unwords (map T.pack options))
+    (mods,files,opts) <- getPackageOpts (packageOpts pkg) sourceMap installedMap locals cabalfp
+    let filteredOpts = filterWanted opts
+        (omitted, ghcOpts) = partition badForGhci (concatMap bioGhcOpts filteredOpts)
+        genOpts = concatMap bioGeneratedOpts filteredOpts
+    unless (null omitted) $
+        $logWarn
+            ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
+             T.unwords (map T.pack omitted))
     return
         GhciPkgInfo
         { ghciPkgName = packageName pkg
-        , ghciPkgOpts = rights filteredOptions
+        , ghciPkgGhcOpts = ghcOpts
+        , ghciPkgGenOpts = genOpts
         , ghciPkgDir = parent cabalfp
-        , ghciPkgModules = mconcat
-              (filterWithinWantedComponents componentsModules)
-        , ghciPkgModFiles = mconcat
-              (filterWithinWantedComponents
-                   (M.map (setMapMaybe dotCabalModulePath) componentFiles))
-        , ghciPkgMainIs = M.map (setMapMaybe dotCabalMainPath) componentFiles
-        , ghciPkgCFiles = mconcat
-              (filterWithinWantedComponents
-                   (M.map (setMapMaybe dotCabalCFilePath) componentFiles))
+        , ghciPkgModules = mconcat (filterWanted mods)
+        , ghciPkgModFiles = mconcat (filterWanted (M.map (setMapMaybe dotCabalModulePath) files))
+        , ghciPkgMainIs = M.map (setMapMaybe dotCabalMainPath) files
+        , ghciPkgCFiles = mconcat (filterWanted (M.map (setMapMaybe dotCabalCFilePath) files))
         }
   where
     badForGhci :: String -> Bool
     badForGhci x =
         isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky -static")
     setMapMaybe f = S.fromList . mapMaybe f . S.toList
+    filterWanted m =
+        M.elems (M.filterWithKey (\k _ -> wantedComponent k) m)
+    wantedComponent k =
+        case target of
+            STLocalComps cs -> S.member k cs
+            _ -> True
