@@ -343,7 +343,7 @@ generateBuildInfoOpts sourceMap installedMap mcabalmacros cabalDir distDir omitP
             ((if null (hsSourceDirs b) then [cabalDir] else []) <>
              map (cabalDir </>) (mapMaybe parseRelDir (hsSourceDirs b)) <>
              [autogenDir distDir,buildDir distDir]) ++
-        ["-stubdir=" ++ toFilePath (buildDir distDir)]
+        ["-stubdir=" ++ FilePath.dropTrailingPathSeparator (toFilePath $ buildDir distDir)]
     includeOpts =
         [ "-I" <> toFilePath absDir
         | dir <- includeDirs b
