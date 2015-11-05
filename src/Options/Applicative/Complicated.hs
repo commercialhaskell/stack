@@ -32,7 +32,7 @@ complicatedOptions
   -- ^ program description
   -> (Bool -> Parser a)
   -- ^ global settings
-  -> EitherT b (Writer (Parser a -> Mod CommandFields (a,b))) ()
+  -> EitherT b (Writer (Parser a -> Mod CommandFields (b,a))) ()
   -- ^ commands (use 'addCommand')
   -> IO (a,b)
 complicatedOptions numericVersion versionString h pd globalParser commandParser =
@@ -40,7 +40,7 @@ complicatedOptions numericVersion versionString h pd globalParser commandParser 
      (a,(b,c)) <- case execParserPure (prefs noBacktrack) parser args of
        Failure _ | null args -> withArgs ["--help"] (execParser parser)
        parseResult -> handleParseResult parseResult
-     return (mappend b a,c)
+     return (mappend c a,b)
   where parser = info (helpOption <*> versionOptions <*> complicatedParser globalParser commandParser) desc
         desc = fullDesc <> header h <> progDesc pd
         versionOptions =
@@ -64,7 +64,7 @@ addCommand :: String   -- ^ command string
            -> String   -- ^ footer of command help
            -> (a -> b) -- ^ constructor to wrap up command in common data type
            -> Parser a -- ^ command parser
-           -> EitherT b (Writer (Parser c -> Mod CommandFields (c,b))) ()
+           -> EitherT b (Writer (Parser c -> Mod CommandFields (b,c))) ()
 addCommand cmd title footerStr constr inner =
   addCommand' cmd title footerStr constr (const inner)
 
@@ -77,15 +77,15 @@ addSubCommands
   -- ^ title of command
   -> String
   -- ^ footer of command help
-  -> EitherT b (Writer (Parser a -> Mod CommandFields (a,b))) ()
+  -> EitherT b (Writer (Parser a -> Mod CommandFields (b,a))) ()
   -- ^ sub-commands (use 'addCommand')
-  -> EitherT b (Writer (Parser a -> Mod CommandFields (a,b))) ()
+  -> EitherT b (Writer (Parser a -> Mod CommandFields (b,a))) ()
 addSubCommands cmd title footerStr commandParser =
   addCommand' cmd
               title
               footerStr
-              (\(_, (_, a)) -> a)
-              (\commonParse -> complicatedParser (const commonParse) commandParser)
+              (\(_, (a, _)) -> a)
+              (\commonParser -> complicatedParser (const commonParser) commandParser)
 
 -- | Add a command to the options dispatcher.
 addCommand' :: String   -- ^ command string
@@ -93,10 +93,10 @@ addCommand' :: String   -- ^ command string
             -> String   -- ^ footer of command help
             -> (a -> b) -- ^ constructor to wrap up command in common data type
             -> (Parser c -> Parser a) -- ^ command parser
-            -> EitherT b (Writer (Parser c -> Mod CommandFields (c,b))) ()
+            -> EitherT b (Writer (Parser c -> Mod CommandFields (b,c))) ()
 addCommand' cmd title footerStr constr inner =
-  lift (tell (\commonParse -> command cmd
-                      (info ((,) <$> commonParse <*> (constr <$> inner commonParse))
+  lift (tell (\commonParser -> command cmd
+                      (info ((,) <$> (constr <$> inner commonParser) <*> commonParser)
                             (progDesc title <> footer footerStr))))
 
 -- | Generate a complicated options parser.
@@ -104,14 +104,15 @@ complicatedParser
   :: Monoid a
   => (Bool -> Parser a)
   -- ^ common settings
-  -> EitherT b (Writer (Parser a -> Mod CommandFields (a,b))) ()
+  -> EitherT b (Writer (Parser a -> Mod CommandFields (b,a))) ()
   -- ^ commands (use 'addCommand')
-  -> Parser (a,(a,b))
+  -> Parser (a,(b,a))
 complicatedParser commonParser commandParser =
-   (,) <$> commonParser False <*>
+   (,) <$>
+   commonParser False <*>
    case runWriter (runEitherT commandParser) of
      (Right (),d) -> hsubparser' (d (commonParser True))
-     (Left b,_) -> pure (mempty,b)
+     (Left b,_) -> pure (b,mempty)
 
 -- way to do in 'addCommand' | Subparser with @--help@ argument. Borrowed with slight modification
 -- from Options.Applicative.Extra.
