@@ -51,7 +51,7 @@ import           Data.IORef                     (newIORef, readIORef,
                                                  writeIORef)
 import           Data.List                      (intercalate)
 import           Data.List.NonEmpty             (NonEmpty)
-import qualified Data.List.NonEmpty             as NonEmpty
+import qualified Data.List.NonEmpty             as NE
 import           Data.Map                       (Map)
 import qualified Data.Map                       as Map
 import           Data.Maybe                     (maybeToList, catMaybes)
@@ -79,6 +79,9 @@ import           System.IO                      (IOMode (ReadMode),
                                                  SeekMode (AbsoluteSeek), hSeek,
                                                  withBinaryFile)
 import           System.PosixCompat             (setFileMode)
+import           Text.EditDistance              as ED
+
+type PackageCaches = Map PackageIdentifier (PackageIndex, PackageCache)
 
 data FetchException
     = Couldn'tReadIndexTarball FilePath Tar.FormatError
@@ -194,14 +197,11 @@ resolvePackages menv idents0 names0 = do
             go >>= either throwM return
         Right x -> return x
   where
-    go = do
-        (missingNames, missingIdents, idents) <- resolvePackagesAllowMissing menv idents0 names0
-        return $
-            case () of
-                ()
-                    | not $ Set.null missingNames -> Left $ UnknownPackageNames missingNames
-                    | not $ Set.null missingIdents -> Left $ UnknownPackageIdentifiers missingIdents
-                    | otherwise -> Right idents
+    go = r <$> resolvePackagesAllowMissing menv idents0 names0
+    r (missingNames, missingIdents, idents)
+      | not $ Set.null missingNames  = Left $ UnknownPackageNames       missingNames
+      | not $ Set.null missingIdents = Left $ UnknownPackageIdentifiers missingIdents
+      | otherwise                    = Right idents
 
 resolvePackagesAllowMissing
     :: (MonadIO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadLogger m, MonadThrow m, MonadBaseControl IO m, MonadCatch m)
@@ -290,37 +290,40 @@ withCabalLoader menv inner = do
                 -- Update the cache and try again
                 Nothing -> do
                     let fuzzy = fuzzyLookupCandidates ident cachesCurr
-                        fuzzyCandidatesText = case fuzzy of
-                            Nothing -> ""
-                            Just cs -> "Possible candidates: "
-                                       <> commaSeparatedIdents cs
-                                       <> ". "
+                        candidatesText = case fuzzy of
+                            Nothing ->
+                              case typoCorrectionCandidates ident cachesCurr of
+                                  Nothing -> ""
+                                  Just cs -> "Perhaps you meant " <>
+                                    orSeparated (show <$> cs) <> "?\n"
+                            Just cs -> "Possible candidates: " <>
+                              commaSeparated (NE.map packageIdentifierString cs)
+                              <> ".\n"
                     join $ modifyMVar updateRef $ \toUpdate ->
                         if toUpdate then do
                             runInBase $ do
                                 $logInfo $ T.concat
                                     [ "Didn't see "
                                     , T.pack $ packageIdentifierString ident
-                                    , " in your package indices. "
-                                    , T.pack fuzzyCandidatesText
+                                    , " in your package indices.\n"
+                                    , T.pack candidatesText
                                     , "Updating and trying again."
                                     ]
                                 updateAllIndices menv
                                 caches <- getPackageCaches menv
                                 liftIO $ writeIORef icaches caches
                             return (False, doLookup ident)
-                        else return (toUpdate, throwM (unknownIdent ident))
+                        else return (toUpdate, throwM .
+                                               UnknownPackageIdentifiers .
+                                               Set.singleton $ ident)
     inner doLookup
-  where
-    unknownIdent = UnknownPackageIdentifiers . Set.singleton
-    commaSeparatedIdents =
-        F.fold . NonEmpty.intersperse ", " . NonEmpty.map packageIdentifierString
 
-type PackageCaches = Map PackageIdentifier (PackageIndex, PackageCache)
-
-lookupPackageIdentifierExact :: HasConfig env
-                             => PackageIdentifier -> env -> PackageCaches
-                             -> IO (Maybe ByteString)
+lookupPackageIdentifierExact
+  :: HasConfig env
+  => PackageIdentifier
+  -> env
+  -> PackageCaches
+  -> IO (Maybe ByteString)
 lookupPackageIdentifierExact ident env caches =
     case Map.lookup ident caches of
         Nothing -> return Nothing
@@ -330,21 +333,35 @@ lookupPackageIdentifierExact ident env caches =
                   $ \_ _ bs -> return bs
             return $ Just bs
 
-fuzzyLookupCandidates :: PackageIdentifier -> PackageCaches
-                      -> Maybe (NonEmpty PackageIdentifier)
+-- | Given package identifier and package caches, return list of packages
+-- with the same name and the same two first version number components found
+-- in the caches.
+fuzzyLookupCandidates
+  :: PackageIdentifier
+  -> PackageCaches
+  -> Maybe (NonEmpty PackageIdentifier)
 fuzzyLookupCandidates (PackageIdentifier name ver) caches =
-    NonEmpty.nonEmpty (map fst sameMajor)
-  where
-    sameMajor = filter (\(PackageIdentifier _ v, _) ->
-                             toMajorVersion ver == toMajorVersion v)
-                       sameIdentCaches
-    sameIdentCaches = maybe biggerFiltered
-                            (\z -> (zeroIdent, z) : biggerFiltered)
-                            zeroVer
-    biggerFiltered = takeWhile (\(PackageIdentifier n _, _) -> name == n)
-                               (Map.toList bigger)
-    zeroIdent = PackageIdentifier name $(mkVersion "0.0")
-    (_, zeroVer, bigger) = Map.splitLookup zeroIdent caches
+  let (_, zero, bigger) = Map.splitLookup zeroIdent caches
+      zeroIdent         = PackageIdentifier name $(mkVersion "0.0")
+      sameName  (PackageIdentifier n _) = n == name
+      sameMajor (PackageIdentifier _ v) = toMajorVersion v == toMajorVersion ver
+  in NE.nonEmpty . filter sameMajor $ maybe [] (pure . const zeroIdent) zero
+         <> takeWhile sameName (Map.keys bigger)
+
+-- | Try to come up with typo corrections for given package identifier using
+-- package caches. This should be called before giving up, i.e. when
+-- 'fuzzyLookupCandidates' cannot return anything.
+typoCorrectionCandidates
+  :: PackageIdentifier
+  -> PackageCaches
+  -> Maybe (NonEmpty String)
+typoCorrectionCandidates ident =
+  let getName = packageNameString . packageIdentifierName
+      name    = getName ident
+  in  NE.nonEmpty
+    . Map.keys
+    . Map.filterWithKey (const . (== 1) . damerauLevenshtein name)
+    . Map.mapKeys getName
 
 -- | Figure out where to fetch from.
 getToFetch :: (MonadThrow m, MonadIO m, MonadReader env m, HasConfig env)
@@ -522,3 +539,15 @@ parMapM_ cnt f xs0 = do
         workers 1 = Concurrently worker
         workers i = Concurrently worker *> workers (i - 1)
     liftIO $ runConcurrently $ workers cnt
+
+damerauLevenshtein :: String -> String -> Int
+damerauLevenshtein = ED.restrictedDamerauLevenshteinDistance ED.defaultEditCosts
+
+orSeparated :: NonEmpty String -> String
+orSeparated xs
+  | NE.length xs == 1 = NE.head xs
+  | NE.length xs == 2 = NE.head xs <> " or " <> NE.last xs
+  | otherwise = intercalate ", " (NE.init xs) <> ", or " <> NE.last xs
+
+commaSeparated :: NonEmpty String -> String
+commaSeparated = F.fold . NE.intersperse ", "

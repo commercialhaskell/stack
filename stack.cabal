@@ -142,6 +142,7 @@ library
                    , cryptohash >= 0.11.6
                    , cryptohash-conduit
                    , directory >= 1.2.1.0
+                   , edit-distance >= 0.2
                    , either
                    , enclosed-exceptions
                    , exceptions >= 0.8.0.2
