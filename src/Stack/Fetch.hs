@@ -89,7 +89,7 @@ data FetchException
     | UnpackDirectoryAlreadyExists (Set FilePath)
     | CouldNotParsePackageSelectors [String]
     | UnknownPackageNames (Set PackageName)
-    | UnknownPackageIdentifiers (Set PackageIdentifier)
+    | UnknownPackageIdentifiers (Set PackageIdentifier) String
     deriving Typeable
 instance Exception FetchException
 
@@ -115,9 +115,10 @@ instance Show FetchException where
     show (UnknownPackageNames names) =
         "The following packages were not found in your indices: " ++
         intercalate ", " (map packageNameString $ Set.toList names)
-    show (UnknownPackageIdentifiers idents) =
+    show (UnknownPackageIdentifiers idents suggestions) =
         "The following package identifiers were not found in your indices: " ++
-        intercalate ", " (map packageIdentifierString $ Set.toList idents)
+        intercalate ", " (map packageIdentifierString $ Set.toList idents) ++
+        (if null suggestions then "" else "\n" ++ suggestions)
 
 -- | Fetch packages into the cache without unpacking
 fetchPackages :: (MonadIO m, MonadBaseControl IO m, MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadLogger m, MonadCatch m)
@@ -200,7 +201,7 @@ resolvePackages menv idents0 names0 = do
     go = r <$> resolvePackagesAllowMissing menv idents0 names0
     r (missingNames, missingIdents, idents)
       | not $ Set.null missingNames  = Left $ UnknownPackageNames       missingNames
-      | not $ Set.null missingIdents = Left $ UnknownPackageIdentifiers missingIdents
+      | not $ Set.null missingIdents = Left $ UnknownPackageIdentifiers missingIdents ""
       | otherwise                    = Right idents
 
 resolvePackagesAllowMissing
@@ -290,15 +291,15 @@ withCabalLoader menv inner = do
                 -- Update the cache and try again
                 Nothing -> do
                     let fuzzy = fuzzyLookupCandidates ident cachesCurr
-                        candidatesText = case fuzzy of
+                        suggestions = case fuzzy of
                             Nothing ->
                               case typoCorrectionCandidates ident cachesCurr of
                                   Nothing -> ""
                                   Just cs -> "Perhaps you meant " <>
-                                    orSeparated (show <$> cs) <> "?\n"
+                                    orSeparated (show <$> cs) <> "?"
                             Just cs -> "Possible candidates: " <>
                               commaSeparated (NE.map packageIdentifierString cs)
-                              <> ".\n"
+                              <> "."
                     join $ modifyMVar updateRef $ \toUpdate ->
                         if toUpdate then do
                             runInBase $ do
@@ -306,16 +307,15 @@ withCabalLoader menv inner = do
                                     [ "Didn't see "
                                     , T.pack $ packageIdentifierString ident
                                     , " in your package indices.\n"
-                                    , T.pack candidatesText
                                     , "Updating and trying again."
                                     ]
                                 updateAllIndices menv
                                 caches <- getPackageCaches menv
                                 liftIO $ writeIORef icaches caches
                             return (False, doLookup ident)
-                        else return (toUpdate, throwM .
-                                               UnknownPackageIdentifiers .
-                                               Set.singleton $ ident)
+                        else return (toUpdate,
+                                     throwM $ UnknownPackageIdentifiers
+                                       (Set.singleton ident) suggestions)
     inner doLookup
 
 lookupPackageIdentifierExact
