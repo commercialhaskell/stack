@@ -111,19 +111,33 @@ runShellAndExit getCmdArgs = do
                      ResolverSnapshot (LTS x y) ->
                        "haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc"
                      _ -> "ghc"
-         nixpkgs = ghcInNix : "gnused" : "coreutils" : "glibcLocales" : pkgsInConfig
+         --nixpkgs = ghcInNix : "gnused" : "coreutils" : "glibcLocales" : pkgsInConfig
+         nixpkgs = "glibcLocales" : pkgsInConfig
          -- gnused and coreutils (for tr) are necessary for the hack exposed in the doc for 'exportLDPath'.
          -- glibcLocales is necessary to avoid warnings about GHC being incapable to set the locale.
-         packagesOrFile = case mshellFile of
-           Just filePath -> [filePath]
-           Nothing -> "-p" : nixpkgs
+         --packagesOrFile = case mshellFile of
+         --  Just filePath -> [filePath]
+         --  Nothing -> "-p" : nixpkgs
          fullArgs = concat [["--pure"]
-                           ,packagesOrFile
+                           --,packagesOrFile
                            ,map T.unpack (nixShellOptions (configNix config))
-                           ,["--command"]
-                           ,[intercalate " "
-                                ("export":(inShellEnvVar ++ "=1"):";":exportLDPath:";":cmnd:args)]
-                           ]
+                           ,["-E", intercalate " "
+                              ["with (import <nixpkgs> {});
+                               runCommand \"myEnv\" {
+                                  buildInputs=[",nixpkgs,"];
+                                  shellHook=''
+                                    STACK_EXTRA_ARGS=",
+                                      map (\p -> ["--extra-lib-dirs=", "${"++p++"}/lib"
+                                                 ,"--extra-include-dirs=", "${"++p++"}/include"])
+                                          pkgsInConfig
+                                    ,"
+                                  '';
+                               } \"\""]]
+                           ,["--run"]
+                           ,[concat ["export ",inShellEnvVar,"=1 ;
+                                     "
+                                    ,cmnd:args]
+                           ]]
      $logDebug $ T.pack $
          "Using a nix-shell environment " ++ (case mshellFile of
             Just filePath -> "from file: " ++ filePath
