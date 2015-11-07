@@ -296,7 +296,7 @@ withCabalLoader menv inner = do
                               case typoCorrectionCandidates ident cachesCurr of
                                   Nothing -> ""
                                   Just cs -> "Perhaps you meant " <>
-                                    orSeparated (show <$> cs) <> "?"
+                                    orSeparated cs <> "?"
                             Just cs -> "Possible candidates: " <>
                               commaSeparated (NE.map packageIdentifierString cs)
                               <> "."
