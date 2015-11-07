@@ -914,7 +914,15 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                     (configCacheDeps cache)
                 case mpc of
                     Nothing -> return Nothing
-                    Just pc -> do
+                    Just pc | maybe False
+                                    (bcoSnapInstallRoot eeBaseConfigOpts `isParentOf`)
+                                    (parseAbsFile =<< (pcLibrary pc)) ->
+                        -- If old precompiled cache files are left around but snapshots are deleted,
+                        -- it is possible for the precompiled file to refer to the very library
+                        -- we're building, and if flags are changed it may try to copy the library
+                        -- to itself. This check prevents that from happening.
+                        return Nothing
+                    Just pc | otherwise -> do
                         let allM _ [] = return True
                             allM f (x:xs) = do
                                 b <- f x
@@ -937,6 +945,17 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                        $ Map.insert
                             "GHC_PACKAGE_PATH"
                             (T.pack $ toFilePath $ bcoSnapDB eeBaseConfigOpts)
+
+                -- In case a build of the library with different flags already exists, unregister it
+                -- before copying.
+                catch
+                    (readProcessNull Nothing menv' "ghc-pkg"
+                        [ "unregister"
+                        , "--force"
+                        , packageIdentifierString taskProvides
+                        ])
+                    (\(ReadProcessException _ _ _ _) -> return ())
+
                 readProcessNull Nothing menv' "ghc-pkg"
                     [ "register"
                     , "--force"
