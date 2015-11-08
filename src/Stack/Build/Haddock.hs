@@ -70,7 +70,7 @@ generateLocalHaddockIndex envOverride wc bco localDumpPkgs locals = do
     let dumpPackages =
             mapMaybe
                 (\LocalPackage{lpPackage = Package{..}} ->
-                    find
+                    F.find
                         (\dp -> dpPackageIdent dp == PackageIdentifier packageName packageVersion)
                         localDumpPkgs)
                 locals
