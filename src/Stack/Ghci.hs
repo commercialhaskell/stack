@@ -67,6 +67,7 @@ data GhciOpts = GhciOpts
 data GhciPkgInfo = GhciPkgInfo
     { ghciPkgName :: PackageName
     , ghciPkgOpts :: [(NamedComponent, BuildInfoOpts)]
+    , ghciPkgOmittedOpts :: [String]
     , ghciPkgDir :: Path Abs Dir
     , ghciPkgModules :: Set ModuleName
     , ghciPkgModFiles :: Set (Path Abs File) -- ^ Module file paths.
@@ -310,15 +311,12 @@ makeGhciPkgInfo sourceMap installedMap locals name cabalfp target = do
     (mods,files,opts) <- getPackageOpts (packageOpts pkg) sourceMap installedMap locals cabalfp
     let filteredOpts = filterWanted opts
         omitUnwanted bio = bio { bioGhcOpts = filter (not . badForGhci) (bioGhcOpts bio) }
-        omitted = nubOrd $ filter badForGhci $ concatMap bioGhcOpts (M.elems filteredOpts)
-    unless (null omitted) $
-        $logWarn
-            ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
-             T.unwords (map T.pack omitted))
+        omitted = filter badForGhci $ concatMap bioGhcOpts (M.elems filteredOpts)
     return
         GhciPkgInfo
         { ghciPkgName = packageName pkg
         , ghciPkgOpts = M.toList (M.map omitUnwanted filteredOpts)
+        , ghciPkgOmittedOpts = omitted
         , ghciPkgDir = parent cabalfp
         , ghciPkgModules = mconcat (M.elems (filterWanted mods))
         , ghciPkgModFiles = mconcat (M.elems (filterWanted (M.map (setMapMaybe dotCabalModulePath) files)))
@@ -341,6 +339,11 @@ checkForIssues pkgs = do
     let unbuildable = filter (\(_, bio) -> not (bioBuildable bio)) compsWithBios
     unless (null unbuildable) $
         throwM (SomeTargetsNotBuildable (map fst unbuildable))
+    let omitted = concatMap ghciPkgOmittedOpts pkgs
+    unless (null omitted) $
+        $logWarn
+            ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
+             T.unwords (map T.pack (nubOrd omitted)))
     unless (null issues) $ borderedWarning $ do
         $logWarn "There are issues with this project which may prevent GHCi from working properly."
         $logWarn ""
