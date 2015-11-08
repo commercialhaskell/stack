@@ -117,7 +117,7 @@ data BuildInfoOpts = BuildInfoOpts
     -- ^ Other options from cabal information.  These options can safely have
     -- 'nubOrd' applied to them, as there are no multi-word options (see
     -- https://github.com/commercialhaskell/stack/issues/1255)
-    }
+    } deriving Show
 
 -- | Files to get for a cabal package.
 data CabalFileType

@@ -65,7 +65,7 @@ data GhciPkgInfo = GhciPkgInfo
   , ghciPkgModFiles :: Set (Path Abs File) -- ^ Module file paths.
   , ghciPkgCFiles :: Set (Path Abs File) -- ^ C files.
   , ghciPkgMainIs :: Map NamedComponent (Set (Path Abs File))
-  }
+  } deriving Show
 
 -- | Launch a GHCi session for the given local package targets with the
 -- given options and configure it with the load paths and extensions
