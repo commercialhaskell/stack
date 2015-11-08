@@ -79,7 +79,7 @@ ghci GhciOpts{..} = do
     mainFile <- figureOutMainFile mainIsTargets targets pkgs
     wc <- getWhichCompiler
     let pkgopts =
-            ["-hide-all-packages"] ++
+            (if null pkgs then [] else ["-hide-all-packages"]) ++
             nubOrd (concatMap (concatMap (bioGeneratedOpts . snd) . ghciPkgOpts) pkgs) ++
             (concatMap (concatMap (bioGhcOpts . snd) . ghciPkgOpts) pkgs)
         modulesToLoad
