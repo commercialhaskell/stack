@@ -41,7 +41,7 @@ import           Safe                           (maximumMay)
 import           Stack.Types.Build
 import           Stack.PackageDump
 import           Stack.Types
-import           System.Directory               (getModificationTime)
+import           System.Directory               (getModificationTime, doesDirectoryExist)
 import qualified System.FilePath                as FP
 import           System.IO.Error                (isDoesNotExistError)
 import           System.Process.Read
@@ -125,7 +125,7 @@ copyDepHaddocks bco dumpPkgs ghcPkgId extraDestDirs = do
         createTree depCopyDir
         copyDirectoryRecursive depOrigDir depCopyDir
     parseCanonicalizedAbsDir fp = do
-        exists <- liftIO (D.doesDirectoryExist fp)
+        exists <- liftIO (doesDirectoryExist fp)
         if exists
             then parseRelAsAbsDir fp
             else parseAbsDir fp
