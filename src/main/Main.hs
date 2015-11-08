@@ -433,6 +433,7 @@ pathCmd keys go =
             snaproot <- installationRootDeps
             localroot <- installationRootLocal
             distDir <- distRelativeDir
+            hpcDir <- hpcReportDir
             forM_
                 -- filter the chosen paths in flags (keys),
                 -- or show all of them if no specific paths chosen.
@@ -456,7 +457,8 @@ pathCmd keys go =
                                     global
                                     snaproot
                                     localroot
-                                    distDir))))
+                                    distDir
+                                    hpcDir))))
 
 -- | Passed to all the path printers as a source of info.
 data PathInfo = PathInfo
@@ -468,6 +470,7 @@ data PathInfo = PathInfo
     , piSnapRoot    :: Path Abs Dir
     , piLocalRoot   :: Path Abs Dir
     , piDistDir     :: Path Rel Dir
+    , piHpcDir      :: Path Abs Dir
     }
 
 -- | The paths of interest to a user. The first tuple string is used
@@ -531,7 +534,10 @@ paths =
       , \pi -> T.pack (toFilePathNoTrailingSep (piLocalRoot pi </> docDirSuffix)))
     , ( "Dist work directory"
       , "dist-dir"
-      , T.pack . toFilePathNoTrailingSep . piDistDir ) ]
+      , T.pack . toFilePathNoTrailingSep . piDistDir )
+    , ( "Where HPC reports and tix files are stored"
+      , "local-hpc-root"
+      , T.pack . toFilePathNoTrailingSep . piHpcDir ) ]
 
 data SetupCmdOpts = SetupCmdOpts
     { scoCompilerVersion :: !(Maybe CompilerVersion)
