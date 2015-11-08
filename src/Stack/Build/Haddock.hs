@@ -41,8 +41,7 @@ import           Safe                           (maximumMay)
 import           Stack.Types.Build
 import           Stack.PackageDump
 import           Stack.Types
-import           System.Directory               (getModificationTime, canonicalizePath,
-                                                 doesDirectoryExist)
+import           System.Directory               (getModificationTime)
 import qualified System.FilePath                as FP
 import           System.IO.Error                (isDoesNotExistError)
 import           System.Process.Read
@@ -78,7 +77,7 @@ copyDepHaddocks bco dumpPkgs ghcPkgId extraDestDirs = do
                 case dpHaddockHtml dp of
                     Nothing -> return ()
                     Just pkgHtmlFP -> do
-                        pkgHtmlDir <- parseAbsDir pkgHtmlFP
+                        pkgHtmlDir <- parseCanonicalizedAbsDir pkgHtmlFP
                         copyDepWhenNeeded pkgHtmlDir depDP
   where
     copyDepWhenNeeded pkgHtmlDir depGhcPkgId = do
@@ -88,19 +87,14 @@ copyDepHaddocks bco dumpPkgs ghcPkgId extraDestDirs = do
             Just depDP ->
                 case dpHaddockHtml depDP of
                     Nothing -> return ()
-                    Just depOrigFP0 -> do
+                    Just depOrigFP -> do
                         let extraDestDirs' =
                                 -- Parent test ensures we don't try to copy docs to global locations
                                 if bcoSnapInstallRoot bco `isParentOf` pkgHtmlDir ||
                                    bcoLocalInstallRoot bco `isParentOf` pkgHtmlDir
                                     then Set.insert (parent pkgHtmlDir) extraDestDirs
                                     else extraDestDirs
-                        depOrigFP <- liftIO $ do
-                            exists <- doesDirectoryExist depOrigFP0
-                            if exists
-                                then canonicalizePath depOrigFP0
-                                else return depOrigFP0
-                        depOrigDir <- parseAbsDir depOrigFP
+                        depOrigDir <- parseCanonicalizedAbsDir depOrigFP
                         copyWhenNeeded extraDestDirs' (dpPackageIdent depDP) (dpGhcPkgId depDP) depOrigDir
     copyWhenNeeded destDirs depId depGhcPkgId depOrigDir = do
         depRelDir <- parseRelDir (packageIdentifierString depId)
@@ -130,6 +124,11 @@ copyDepHaddocks bco dumpPkgs ghcPkgId extraDestDirs = do
         removeTreeIfExists depCopyDir
         createTree depCopyDir
         copyDirectoryRecursive depOrigDir depCopyDir
+    parseCanonicalizedAbsDir fp = do
+        exists <- liftIO (D.doesDirectoryExist fp)
+        if exists
+            then parseRelAsAbsDir fp
+            else parseAbsDir fp
 
 -- | Generate Haddock index and contents for local packages.
 generateLocalHaddockIndex
