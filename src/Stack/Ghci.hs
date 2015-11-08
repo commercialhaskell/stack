@@ -303,7 +303,7 @@ makeGhciPkgInfo sourceMap installedMap locals name cabalfp target = do
     (mods,files,opts) <- getPackageOpts (packageOpts pkg) sourceMap installedMap locals cabalfp
     let filteredOpts = filterWanted opts
         omitUnwanted bio = bio { bioGhcOpts = filter (not . badForGhci) (bioGhcOpts bio) }
-        omitted = filter badForGhci $ concatMap bioGhcOpts (M.elems filteredOpts)
+        omitted = nubOrd $ filter badForGhci $ concatMap bioGhcOpts (M.elems filteredOpts)
     unless (null omitted) $
         $logWarn
             ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
