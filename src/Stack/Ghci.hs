@@ -7,7 +7,13 @@
 
 -- | Run a GHCi configured with the user's package(s).
 
-module Stack.Ghci (GhciOpts(..),GhciPkgInfo(..), ghciSetup, ghci) where
+module Stack.Ghci
+    ( GhciOpts(..)
+    , GhciPkgInfo(..)
+    , GhciException(..)
+    , ghciSetup
+    , ghci
+    ) where
 
 import           Control.Monad.Catch
 import           Control.Exception.Enclosed (tryAny)
@@ -28,6 +34,7 @@ import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8)
+import           Data.Typeable (Typeable)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.Text (display)
 import           Network.HTTP.Client.Conduit
@@ -239,7 +246,7 @@ ghciSetup mbuildFirst mainIs stringTargets = do
         forM locals $
         \(name,(cabalfp,target)) ->
              makeGhciPkgInfo sourceMap installedMap localLibs name cabalfp target
-    warnAboutPotentialIssues infos
+    checkForIssues infos
     return (realTargets, mainIsTargets, infos)
   where
     makeBuildOpts targets buildFirst =
@@ -329,16 +336,20 @@ makeGhciPkgInfo sourceMap installedMap locals name cabalfp target = do
             STLocalComps cs -> S.member k cs
             _ -> True
 
-warnAboutPotentialIssues :: MonadLogger m => [GhciPkgInfo] -> m ()
-warnAboutPotentialIssues pkgs = unless (null issues) $ borderedWarning $ do
-    $logWarn "There are issues with this project which may prevent GHCi from working properly."
-    $logWarn ""
-    mapM_ $logWarn $ intercalate [""] issues
-    $logWarn ""
-    $logWarn "To resolve, remove the flag(s) from the cabal file(s) and instead put them at the top of the haskell files."
-    $logWarn ""
-    $logWarn "It isn't yet possible to load multiple packages into GHCi in all cases - see"
-    $logWarn "https://ghc.haskell.org/trac/ghc/ticket/10827"
+checkForIssues :: (MonadThrow m, MonadLogger m) => [GhciPkgInfo] -> m ()
+checkForIssues pkgs = do
+    let unbuildable = filter (\(_, bio) -> not (bioBuildable bio)) compsWithBios
+    unless (null unbuildable) $
+        throwM (SomeTargetsNotBuildable (map fst unbuildable))
+    unless (null issues) $ borderedWarning $ do
+        $logWarn "There are issues with this project which may prevent GHCi from working properly."
+        $logWarn ""
+        mapM_ $logWarn $ intercalate [""] issues
+        $logWarn ""
+        $logWarn "To resolve, remove the flag(s) from the cabal file(s) and instead put them at the top of the haskell files."
+        $logWarn ""
+        $logWarn "It isn't yet possible to load multiple packages into GHCi in all cases - see"
+        $logWarn "https://ghc.haskell.org/trac/ghc/ticket/10827"
   where
     issues = concat
         [ mixedFlag "-XNoImplicitPrelude"
@@ -364,16 +375,15 @@ warnAboutPotentialIssues pkgs = unless (null issues) $ borderedWarning $ do
         , "But not for: "
         , "    " <> renderPkgComps don'tHaveIt
         ]
-    renderPkgComps = T.intercalate " " . map renderPkgComp
-    renderPkgComp (pkg, comp) = packageNameText pkg <> ":" <> decodeUtf8 (renderComponent comp)
-    compsWithOpts = concat
-        [ [ ((ghciPkgName pkg, c), bioGeneratedOpts bio ++ bioGhcOpts bio)
-          | (c, bio) <- ghciPkgOpts pkg
-          ]
-        | pkg <- pkgs ]
     partitionComps f = (map fst xs, map fst ys)
       where
         (xs, ys) = partition (any f . snd) compsWithOpts
+    compsWithOpts = map (\(k, bio) -> (k, bioGeneratedOpts bio ++ bioGhcOpts bio)) compsWithBios
+    compsWithBios = concat
+        [ [ ((ghciPkgName pkg, c), bio)
+          | (c, bio) <- ghciPkgOpts pkg
+          ]
+        | pkg <- pkgs ]
 
 borderedWarning :: MonadLogger m => m a -> m a
 borderedWarning f = do
@@ -383,3 +393,21 @@ borderedWarning f = do
     $logWarn "* * * * * * * *"
     $logWarn ""
     return x
+
+renderPkgComps :: [(PackageName, NamedComponent)] -> Text
+renderPkgComps = T.intercalate " " . map renderPkgComp
+
+renderPkgComp :: (PackageName, NamedComponent) -> Text
+renderPkgComp (pkg, comp) = packageNameText pkg <> ":" <> decodeUtf8 (renderComponent comp)
+
+data GhciException =
+    SomeTargetsNotBuildable [(PackageName, NamedComponent)]
+    deriving (Typeable)
+
+instance Exception GhciException
+
+instance Show GhciException where
+    show (SomeTargetsNotBuildable xs) =
+        "The following components have 'buildable: False' in cabal, and so cannot be ghci targets:\n    " ++
+        T.unpack (renderPkgComps xs) ++
+        "\nTo resolve this, either specify flags such that these components are buildable, or pass buildable targets to \"stack ghci\"."
