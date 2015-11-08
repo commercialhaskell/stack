@@ -47,25 +47,25 @@ import           System.Directory (getTemporaryDirectory)
 
 -- | Command-line options for GHC.
 data GhciOpts = GhciOpts
-    {ghciTargets            :: ![Text]
-    ,ghciArgs               :: ![String]
-    ,ghciGhcCommand         :: !(Maybe FilePath)
-    ,ghciNoLoadModules      :: !Bool
-    ,ghciAdditionalPackages :: ![String]
-    ,ghciMainIs             :: !(Maybe Text)
-    ,ghciBuildFirst         :: !(Maybe BuildSubset)
+    { ghciTargets            :: ![Text]
+    , ghciArgs               :: ![String]
+    , ghciGhcCommand         :: !(Maybe FilePath)
+    , ghciNoLoadModules      :: !Bool
+    , ghciAdditionalPackages :: ![String]
+    , ghciMainIs             :: !(Maybe Text)
+    , ghciBuildFirst         :: !(Maybe BuildSubset)
     } deriving (Show,Eq)
 
 -- | Necessary information to load a package or its components.
 data GhciPkgInfo = GhciPkgInfo
-  { ghciPkgName :: PackageName
-  , ghciPkgOpts :: [(NamedComponent, BuildInfoOpts)]
-  , ghciPkgDir :: Path Abs Dir
-  , ghciPkgModules :: Set ModuleName
-  , ghciPkgModFiles :: Set (Path Abs File) -- ^ Module file paths.
-  , ghciPkgCFiles :: Set (Path Abs File) -- ^ C files.
-  , ghciPkgMainIs :: Map NamedComponent (Set (Path Abs File))
-  } deriving Show
+    { ghciPkgName :: PackageName
+    , ghciPkgOpts :: [(NamedComponent, BuildInfoOpts)]
+    , ghciPkgDir :: Path Abs Dir
+    , ghciPkgModules :: Set ModuleName
+    , ghciPkgModFiles :: Set (Path Abs File) -- ^ Module file paths.
+    , ghciPkgCFiles :: Set (Path Abs File) -- ^ C files.
+    , ghciPkgMainIs :: Map NamedComponent (Set (Path Abs File))
+    } deriving Show
 
 -- | Launch a GHCi session for the given local package targets with the
 -- given options and configure it with the load paths and extensions
