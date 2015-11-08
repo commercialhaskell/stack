@@ -721,8 +721,8 @@ configureOptsNoDir econfig bco deps wanted isLocal package = concat
 
     ghcOptionsMap = configGhcOptions $ getConfig econfig
     allGhcOptions = concat
-        [ fromMaybe [] $ Map.lookup Nothing ghcOptionsMap
-        , fromMaybe [] $ Map.lookup (Just $ packageName package) ghcOptionsMap
+        [ Map.findWithDefault [] Nothing ghcOptionsMap
+        , Map.findWithDefault [] (Just $ packageName package) ghcOptionsMap
         , if includeExtraOptions
             then boptsGhcOptions bopts
             else []
