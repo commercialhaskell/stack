@@ -330,10 +330,17 @@ makeGhciPkgInfo sourceMap installedMap locals name cabalfp target = do
             _ -> True
 
 warnAboutPotentialIssues :: MonadLogger m => [GhciPkgInfo] -> m ()
-warnAboutPotentialIssues pkgs = borderedWarning $ do
+warnAboutPotentialIssues pkgs = unless (null issues) $ borderedWarning $ do
     $logWarn "There are issues with this project which may prevent GHCi from working properly."
     $logWarn ""
-    mapM_ $logWarn $ intercalate [""] $ concat
+    mapM_ $logWarn $ intercalate [""] issues
+    $logWarn ""
+    $logWarn "To resolve, remove the flag(s) from the cabal file(s) and instead put them at the top of the haskell files."
+    $logWarn ""
+    $logWarn "It isn't yet possible to load multiple packages into GHCi in all cases - see"
+    $logWarn "https://ghc.haskell.org/trac/ghc/ticket/10827"
+  where
+    issues = concat
         [ mixedFlag "-XNoImplicitPrelude"
           [ "-XNoImplicitPrelude will be used, but GHCi will likely fail to build things which depend on the implicit prelude." ]
         , mixedFlag "-XCPP"
@@ -347,12 +354,6 @@ warnAboutPotentialIssues pkgs = borderedWarning $ do
         , mixedFlag "-XSafe"
           [ "-XSafe will be used, but it will fail to compile unsafe modules." ]
         ]
-    $logWarn ""
-    $logWarn "To resolve, remove the flag(s) from the cabal file(s) and instead put them at the top of the haskell files."
-    $logWarn ""
-    $logWarn "It isn't yet possible to load multiple packages into GHCi in all cases - see"
-    $logWarn "https://ghc.haskell.org/trac/ghc/ticket/10827"
-  where
     mixedFlag flag msgs =
         let x = partitionComps (== flag) in
         [ msgs ++ showWhich x | mixedSettings x ]
