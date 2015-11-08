@@ -735,6 +735,9 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                                           eeCabalPkgVer)
                 packageArgs =
                     case mdeps of
+                        -- This branch is taken when
+                        -- 'explicit-setup-deps' is requested in your
+                        -- stack.yaml file.
                         Just deps | explicitSetupDeps (packageName package) config ->
                             -- Stack always builds with the global Cabal for various
                             -- reproducibility issues.
@@ -753,7 +756,10 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                 : cabalPackageArg
                                 : map ("-package-id=" ++) depsMinusCabal
                                 )
-                        -- This branch is debatable. It adds access to the
+                        -- This branch is usually taken for builds, and
+                        -- is always taken for `stack sdist`.
+                        --
+                        -- This approach is debatable. It adds access to the
                         -- snapshot package database for Cabal. There are two
                         -- possible objections:
                         --
