@@ -125,10 +125,10 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
      let globalOpts hide =
              extraHelpOption hide progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
              globalOptsParser hide
-         addCommand' cmd title footerStr constr inner =
-             addCommand cmd title footerStr constr (globalOpts True) inner
-         addSubCommands' cmd title footerStr commandParser =
-             addSubCommands cmd title footerStr (globalOpts True) commandParser
+         addCommand' cmd title footerStr constr =
+             addCommand cmd title footerStr constr (globalOpts True)
+         addSubCommands' cmd title footerStr =
+             addSubCommands cmd title footerStr (globalOpts True)
      eGlobalRun <- try $
        complicatedOptions
          Meta.version
@@ -219,29 +219,27 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                         "Upgrade to the latest stack (experimental)"
                         cmdFooter
                         upgradeCmd
-                        ((,) <$> (switch
+                        ((,) <$> switch
                                   ( long "git"
-                                 <> help "Clone from Git instead of downloading from Hackage (more dangerous)"
-                                  ))
-                             <*> (strOption
+                                 <> help "Clone from Git instead of downloading from Hackage (more dangerous)" )
+                             <*> strOption
                                   ( long "git-repo"
                                  <> help "Clone from specified git repository"
                                  <> value "https://github.com/commercialhaskell/stack"
-                                 <> showDefault
-                                  )))
+                                 <> showDefault ))
              addCommand' "upload"
                         "Upload a package to Hackage"
                         cmdFooter
                         uploadCmd
                         ((,)
-                         <$> (many $ strArgument $ metavar "TARBALL/DIR")
+                         <$> many (strArgument $ metavar "TARBALL/DIR")
                          <*> optional pvpBoundsOption)
              addCommand' "sdist"
                         "Create source distribution tarballs"
                         cmdFooter
                         sdistCmd
                         ((,)
-                         <$> (many $ strArgument $ metavar "DIR")
+                         <$> many (strArgument $ metavar "DIR")
                          <*> optional pvpBoundsOption)
              addCommand' "dot"
                         "Visualize your project's dependency graph using Graphviz dot"
@@ -378,11 +376,11 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                "hpc"
                "Subcommands specific to Haskell Program Coverage"
                cmdFooter
-               (do addCommand' "report"
-                              "Generate HPC report a combined HPC report"
-                              cmdFooter
-                              hpcReportCmd
-                              hpcReportOptsParser))
+               (addCommand' "report"
+                            "Generate HPC report a combined HPC report"
+                            cmdFooter
+                            hpcReportCmd
+                            hpcReportOptsParser))
      case eGlobalRun of
        Left (exitCode :: ExitCode) -> do
          when isInterpreter $
@@ -402,7 +400,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                  | expectVersion /= showVersion Meta.version ->
                      throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
              _ -> return ()
-         run global `catch` \e -> do
+         run global `catch` \e ->
             -- This special handler stops "stack: " from being printed before the
             -- exception
             case fromException e of
@@ -462,14 +460,14 @@ pathCmd keys go =
 
 -- | Passed to all the path printers as a source of info.
 data PathInfo = PathInfo
-    {piBuildConfig :: BuildConfig
-    ,piEnvOverride :: EnvOverride
-    ,piSnapDb :: Path Abs Dir
-    ,piLocalDb :: Path Abs Dir
-    ,piGlobalDb :: Path Abs Dir
-    ,piSnapRoot :: Path Abs Dir
-    ,piLocalRoot :: Path Abs Dir
-    ,piDistDir :: Path Rel Dir
+    { piBuildConfig :: BuildConfig
+    , piEnvOverride :: EnvOverride
+    , piSnapDb      :: Path Abs Dir
+    , piLocalDb     :: Path Abs Dir
+    , piGlobalDb    :: Path Abs Dir
+    , piSnapRoot    :: Path Abs Dir
+    , piLocalRoot   :: Path Abs Dir
+    , piDistDir     :: Path Rel Dir
     }
 
 -- | The paths of interest to a user. The first tuple string is used
@@ -485,85 +483,67 @@ paths :: [(String, Text, PathInfo -> Text)]
 paths =
     [ ( "Global stack root directory"
       , "global-stack-root"
-      , \pi ->
-             T.pack (toFilePathNoTrailingSep (configStackRoot (bcConfig (piBuildConfig pi)))))
+      , T.pack . toFilePathNoTrailingSep . configStackRoot . bcConfig . piBuildConfig )
     , ( "Project root (derived from stack.yaml file)"
       , "project-root"
-      , \pi ->
-             T.pack (toFilePathNoTrailingSep (bcRoot (piBuildConfig pi))))
+      , T.pack . toFilePathNoTrailingSep . bcRoot . piBuildConfig )
     , ( "Configuration location (where the stack.yaml file is)"
       , "config-location"
-      , \pi ->
-             T.pack (toFilePath (bcStackYaml (piBuildConfig pi))))
+      , T.pack . toFilePath . bcStackYaml . piBuildConfig )
     , ( "PATH environment variable"
       , "bin-path"
-      , \pi ->
-             T.pack (intercalate [searchPathSeparator] (eoPath (piEnvOverride pi))))
+      , T.pack . intercalate [searchPathSeparator] . eoPath . piEnvOverride )
     , ( "Installed GHCs (unpacked and archives)"
       , "ghc-paths"
-      , \pi ->
-             T.pack (toFilePathNoTrailingSep (configLocalPrograms (bcConfig (piBuildConfig pi)))))
+      , T.pack . toFilePathNoTrailingSep . configLocalPrograms . bcConfig . piBuildConfig )
     , ( "Local bin path where stack installs executables"
       , "local-bin-path"
-      , \pi ->
-             T.pack (toFilePathNoTrailingSep (configLocalBin (bcConfig (piBuildConfig pi)))))
+      , T.pack . toFilePathNoTrailingSep . configLocalBin . bcConfig . piBuildConfig )
     , ( "Extra include directories"
       , "extra-include-dirs"
-      , \pi ->
-             T.intercalate
-                 ", "
-                 (Set.elems (configExtraIncludeDirs (bcConfig (piBuildConfig pi)))))
+      , T.intercalate ", " . Set.elems . configExtraIncludeDirs . bcConfig . piBuildConfig )
     , ( "Extra library directories"
       , "extra-library-dirs"
-      , \pi ->
-             T.intercalate ", " (Set.elems (configExtraLibDirs (bcConfig (piBuildConfig pi)))))
+      , T.intercalate ", " . Set.elems . configExtraLibDirs . bcConfig . piBuildConfig )
     , ( "Snapshot package database"
       , "snapshot-pkg-db"
-      , \pi ->
-             T.pack (toFilePathNoTrailingSep (piSnapDb pi)))
+      , T.pack . toFilePathNoTrailingSep . piSnapDb )
     , ( "Local project package database"
       , "local-pkg-db"
-      , \pi ->
-             T.pack (toFilePathNoTrailingSep (piLocalDb pi)))
+      , T.pack . toFilePathNoTrailingSep . piLocalDb )
     , ( "Global package database"
       , "global-pkg-db"
-      , \pi ->
-             T.pack (toFilePathNoTrailingSep (piGlobalDb pi)))
+      , T.pack . toFilePathNoTrailingSep . piGlobalDb )
     , ( "GHC_PACKAGE_PATH environment variable"
       , "ghc-package-path"
-      , \pi -> mkGhcPackagePath True (piLocalDb pi) (piSnapDb pi) (piGlobalDb pi))
+      , \pi -> mkGhcPackagePath True (piLocalDb pi) (piSnapDb pi) (piGlobalDb pi) )
     , ( "Snapshot installation root"
       , "snapshot-install-root"
-      , \pi ->
-             T.pack (toFilePathNoTrailingSep (piSnapRoot pi)))
+      , T.pack . toFilePathNoTrailingSep . piSnapRoot )
     , ( "Local project installation root"
       , "local-install-root"
-      , \pi ->
-             T.pack (toFilePathNoTrailingSep (piLocalRoot pi)))
+      , T.pack . toFilePathNoTrailingSep . piLocalRoot )
     , ( "Snapshot documentation root"
       , "snapshot-doc-root"
-      , \pi ->
-             T.pack (toFilePathNoTrailingSep (piSnapRoot pi </> docDirSuffix)))
+      , \pi -> T.pack (toFilePathNoTrailingSep (piSnapRoot pi </> docDirSuffix)))
     , ( "Local project documentation root"
       , "local-doc-root"
-      , \pi ->
-             T.pack (toFilePathNoTrailingSep (piLocalRoot pi </> docDirSuffix)))
+      , \pi -> T.pack (toFilePathNoTrailingSep (piLocalRoot pi </> docDirSuffix)))
     , ( "Dist work directory"
       , "dist-dir"
-      , \pi ->
-             T.pack (toFilePathNoTrailingSep (piDistDir pi)))]
+      , T.pack . toFilePathNoTrailingSep . piDistDir ) ]
 
 data SetupCmdOpts = SetupCmdOpts
     { scoCompilerVersion :: !(Maybe CompilerVersion)
-    , scoForceReinstall :: !Bool
-    , scoUpgradeCabal :: !Bool
-    , scoStackSetupYaml :: !String
-    , scoGHCBindistURL :: !(Maybe String)
+    , scoForceReinstall  :: !Bool
+    , scoUpgradeCabal    :: !Bool
+    , scoStackSetupYaml  :: !String
+    , scoGHCBindistURL   :: !(Maybe String)
     }
 
 setupParser :: Parser SetupCmdOpts
 setupParser = SetupCmdOpts
-    <$> (optional $ argument readVersion
+    <$> optional (argument readVersion
             (metavar "GHC_VERSION" <>
              help ("Version of GHC to install, e.g. 7.10.2. " ++
                    "The default is to install the version implied by the resolver.")))
@@ -579,13 +559,11 @@ setupParser = SetupCmdOpts
             ( long "stack-setup-yaml"
            <> help "Location of the main stack-setup.yaml file"
            <> value defaultStackSetupYaml
-           <> showDefault
-            )
-    <*> (optional $ strOption
+           <> showDefault )
+    <*> optional (strOption
             (long "ghc-bindist"
            <> metavar "URL"
-           <> help "Alternate GHC binary distribution (requires custom --ghc-variant)"
-            ))
+           <> help "Alternate GHC binary distribution (requires custom --ghc-variant)"))
   where
     readVersion = do
         s <- readerAsk
@@ -619,8 +597,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                   ensureCompiler SetupOpts
                   { soptsInstallIfMissing = True
                   , soptsUseSystem =
-                    (configSystemGHC $ lcConfig lc)
-                    && not scoForceReinstall
+                    configSystemGHC (lcConfig lc) && not scoForceReinstall
                   , soptsWantedCompiler = wantedCompiler
                   , soptsCompilerCheck = compilerCheck
                   , soptsStackYaml = mstack
@@ -674,7 +651,7 @@ withUserFileLock go@GlobalOpts{} dir act = do
             -- Just in case of asynchronous exceptions, we need to be careful
             -- when using tryLockFile here:
             EL.bracket (liftIO $ tryLockFile (toFilePath pth) Exclusive)
-                       (\fstTry -> maybe (return ()) (liftIO . unlockFile) fstTry)
+                       (maybe (return ()) (liftIO . unlockFile))
                        (\fstTry ->
                         case fstTry of
                           Just lk -> EL.finally (act $ Just lk) (liftIO $ unlockFile lk)
@@ -707,7 +684,7 @@ withConfigAndLock go@GlobalOpts{..} inner = do
 -- For now the non-locking version just unlocks immediately.
 -- That is, there's still a serialization point.
 withBuildConfig :: GlobalOpts
-               -> (StackT EnvConfig IO ())
+               -> StackT EnvConfig IO ()
                -> IO ()
 withBuildConfig go inner =
     withBuildConfigAndLock go (\lk -> do munlockFile lk
@@ -772,7 +749,7 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
                                                 munlockFile lk')
 
 cleanCmd :: () -> GlobalOpts -> IO ()
-cleanCmd () go = withBuildConfigAndLock go (\_ -> clean)
+cleanCmd () go = withBuildConfigAndLock go (const clean)
 
 -- | Helper for build and install commands
 buildCmd :: BuildOpts -> GlobalOpts -> IO ()
@@ -822,7 +799,7 @@ uploadCmd (args, mpvpBounds) go = do
             return $ if r then (x:as, bs) else (as, x:bs)
     (files, nonFiles) <- partitionM doesFileExist args
     (dirs, invalid) <- partitionM doesDirectoryExist nonFiles
-    when (not (null invalid)) $ error $
+    unless (null invalid) $ error $
         "stack upload expects a list sdist tarballs or cabal directories.  Can't find " ++
         show invalid
     let getUploader :: (HasStackRoot config, HasPlatform config, HasConfig config) => StackT config IO Upload.Uploader
@@ -830,8 +807,7 @@ uploadCmd (args, mpvpBounds) go = do
             config <- asks getConfig
             manager <- asks envManager
             let uploadSettings =
-                    Upload.setGetManager (return manager) $
-                    Upload.defaultUploadSettings
+                    Upload.setGetManager (return manager) Upload.defaultUploadSettings
             liftIO $ Upload.mkUploader config uploadSettings
     if null dirs
         then withConfigAndLock go $ do
@@ -855,14 +831,14 @@ sdistCmd (dirs, mpvpBounds) go =
         forM_ dirs' $ \dir -> do
             (tarName, tarBytes) <- getSDistTarball mpvpBounds dir
             distDir <- distDirFromDir dir
-            tarPath <- fmap (distDir </>) $ parseRelFile tarName
+            tarPath <- (distDir </>) <$> parseRelFile tarName
             liftIO $ createTree $ parent tarPath
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
             $logInfo $ "Wrote sdist tarball to " <> T.pack (toFilePath tarPath)
 
 -- | Execute a command.
 execCmd :: ExecOpts -> GlobalOpts -> IO ()
-execCmd ExecOpts {..} go@GlobalOpts{..} = do
+execCmd ExecOpts {..} go@GlobalOpts{..} =
     case eoExtra of
         ExecOptsPlain -> do
             (cmd, args) <- case (eoCmd, eoArgs) of
@@ -877,7 +853,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} = do
                     (\_ _ -> return (cmd, args, [], []))
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
-                    (runStackTGlobal manager (lcConfig lc) go $ do
+                    (runStackTGlobal manager (lcConfig lc) go $
                         exec plainEnvSettings cmd args)
                     Nothing
                     Nothing -- Unlocked already above.
@@ -983,7 +959,7 @@ dockerCleanupCmd cleanupOpts go@GlobalOpts{..} = do
             Docker.cleanup cleanupOpts
 
 cfgSetCmd :: ConfigCmd.ConfigCmdSet -> GlobalOpts -> IO ()
-cfgSetCmd co go@GlobalOpts{..} = do
+cfgSetCmd co go@GlobalOpts{..} =
     withBuildConfigAndLock
         go
         (\_ -> do env <- ask
@@ -992,7 +968,7 @@ cfgSetCmd co go@GlobalOpts{..} = do
                       env)
 
 imgDockerCmd :: Bool -> GlobalOpts -> IO ()
-imgDockerCmd rebuild go@GlobalOpts{..} = do
+imgDockerCmd rebuild go@GlobalOpts{..} =
     withBuildConfigExt
         go
         Nothing
