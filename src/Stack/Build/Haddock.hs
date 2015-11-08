@@ -48,7 +48,12 @@ import           System.IO.Error                (isDoesNotExistError)
 import           System.Process.Read
 
 -- | Determine whether we should haddock for a package.
-shouldHaddockPackage :: BuildOpts -> Set PackageName -> PackageName -> Bool
+shouldHaddockPackage :: BuildOpts
+                     -> Set PackageName  -- ^ Packages that we want to generate haddocks for
+                                         -- in any case (whether or not we are going to generate
+                                         -- haddocks for dependencies)
+                     -> PackageName
+                     -> Bool
 shouldHaddockPackage bopts wanted name =
     if Set.member name wanted
         then boptsHaddock bopts
@@ -64,7 +69,7 @@ generateLocalHaddockIndex
     => EnvOverride
     -> WhichCompiler
     -> BaseConfigOpts
-    -> Map GhcPkgId (DumpPackage () ())
+    -> Map GhcPkgId (DumpPackage () ())  -- ^ Local package dump
     -> [LocalPackage]
     -> m ()
 generateLocalHaddockIndex envOverride wc bco localDumpPkgs locals = do
@@ -133,8 +138,8 @@ generateSnapHaddockIndex
     => EnvOverride
     -> WhichCompiler
     -> BaseConfigOpts
-    -> Map GhcPkgId (DumpPackage () ())
-    -> Map GhcPkgId (DumpPackage () ())
+    -> Map GhcPkgId (DumpPackage () ())  -- ^ Global package dump
+    -> Map GhcPkgId (DumpPackage () ())  -- ^ Snapshot package dump
     -> m ()
 generateSnapHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs =
     generateHaddockIndex
