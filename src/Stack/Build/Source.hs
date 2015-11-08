@@ -416,9 +416,9 @@ localFlags :: (Map (Maybe PackageName) (Map FlagName Bool))
            -> PackageName
            -> Map FlagName Bool
 localFlags boptsflags bconfig name = Map.unions
-    [ fromMaybe Map.empty $ Map.lookup (Just name) boptsflags
-    , fromMaybe Map.empty $ Map.lookup Nothing boptsflags
-    , fromMaybe Map.empty $ Map.lookup name $ bcFlags bconfig
+    [ Map.findWithDefault Map.empty (Just name) boptsflags
+    , Map.findWithDefault Map.empty Nothing boptsflags
+    , Map.findWithDefault Map.empty name (bcFlags bconfig)
     ]
 
 -- | Add in necessary packages to extra dependencies
