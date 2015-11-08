@@ -506,7 +506,7 @@ executePlan' installedMap0 plan ee@ExecuteEnv {..} = do
     when (boptsHaddock eeBuildOpts) $ do
         snapshotDumpPkgs <- liftIO (readTVarIO eeSnapshotDumpPkgs)
         localDumpPkgs <- liftIO (readTVarIO eeLocalDumpPkgs)
-        generateLocalHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeLocals
+        generateLocalHaddockIndex eeEnvOverride wc eeBaseConfigOpts localDumpPkgs eeLocals
         generateDepsHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeGlobalDumpPkgs snapshotDumpPkgs localDumpPkgs eeLocals
         generateSnapHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeGlobalDumpPkgs snapshotDumpPkgs
   where
@@ -941,7 +941,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
     getPrecompiled cache =
         case taskLocation task of
-            Snap | not shouldHaddockPackage' -> do
+            Snap -> do
                 mpc <- readPrecompiledCache taskProvides
                     (configCacheOpts cache)
                     (configCacheDeps cache)
@@ -1075,16 +1075,14 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             when shouldCopy $ cabal False ["copy"]
             when (packageHasLibrary package) $ cabal False ["register"]
 
-        let (installedPkgDb, installedDumpPkgsTVar, dumpPkgsTVars) =
+        let (installedPkgDb, installedDumpPkgsTVar) =
                 case taskLocation task of
                     Snap ->
                          ( bcoSnapDB eeBaseConfigOpts
-                         , eeSnapshotDumpPkgs
-                         , [eeSnapshotDumpPkgs] )
+                         , eeSnapshotDumpPkgs )
                     Local ->
                         ( bcoLocalDB eeBaseConfigOpts
-                        , eeLocalDumpPkgs
-                        , [eeSnapshotDumpPkgs, eeLocalDumpPkgs] )
+                        , eeLocalDumpPkgs )
         let ident = PackageIdentifier (packageName package) (packageVersion package)
         mpkgid <- if packageHasLibrary package
             then do
@@ -1095,18 +1093,6 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             else do
                 markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
                 return $ Executable ident
-
-        case (doHaddock package && shouldHaddockDeps eeBuildOpts, mpkgid) of
-            (False, _) -> return ()
-            (True, Executable _) -> return ()
-            (True, Library _ ghcPkgId) ->
-                withMVar eeInstallLock $ \() -> do
-                    dumpPkgs <- forM dumpPkgsTVars $ \tvar -> liftIO (readTVarIO tvar)
-                    copyDepHaddocks
-                        eeBaseConfigOpts
-                        (reverse (eeGlobalDumpPkgs : dumpPkgs))
-                        ghcPkgId
-                        Set.empty
 
         case taskLocation task of
             Snap -> writePrecompiledCache eeBaseConfigOpts taskProvides
