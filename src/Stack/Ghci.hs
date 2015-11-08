@@ -7,7 +7,13 @@
 
 -- | Run a GHCi configured with the user's package(s).
 
-module Stack.Ghci (GhciOpts(..),GhciPkgInfo(..), ghciSetup, ghci) where
+module Stack.Ghci
+    ( GhciOpts(..)
+    , GhciPkgInfo(..)
+    , GhciException(..)
+    , ghciSetup
+    , ghci
+    ) where
 
 import           Control.Monad.Catch
 import           Control.Exception.Enclosed (tryAny)
@@ -28,6 +34,7 @@ import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8)
+import           Data.Typeable (Typeable)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.Text (display)
 import           Network.HTTP.Client.Conduit
@@ -47,25 +54,26 @@ import           System.Directory (getTemporaryDirectory)
 
 -- | Command-line options for GHC.
 data GhciOpts = GhciOpts
-    {ghciTargets            :: ![Text]
-    ,ghciArgs               :: ![String]
-    ,ghciGhcCommand         :: !(Maybe FilePath)
-    ,ghciNoLoadModules      :: !Bool
-    ,ghciAdditionalPackages :: ![String]
-    ,ghciMainIs             :: !(Maybe Text)
-    ,ghciBuildFirst         :: !(Maybe BuildSubset)
+    { ghciTargets            :: ![Text]
+    , ghciArgs               :: ![String]
+    , ghciGhcCommand         :: !(Maybe FilePath)
+    , ghciNoLoadModules      :: !Bool
+    , ghciAdditionalPackages :: ![String]
+    , ghciMainIs             :: !(Maybe Text)
+    , ghciBuildFirst         :: !(Maybe BuildSubset)
     } deriving (Show,Eq)
 
 -- | Necessary information to load a package or its components.
 data GhciPkgInfo = GhciPkgInfo
-  { ghciPkgName :: PackageName
-  , ghciPkgOpts :: [(NamedComponent, BuildInfoOpts)]
-  , ghciPkgDir :: Path Abs Dir
-  , ghciPkgModules :: Set ModuleName
-  , ghciPkgModFiles :: Set (Path Abs File) -- ^ Module file paths.
-  , ghciPkgCFiles :: Set (Path Abs File) -- ^ C files.
-  , ghciPkgMainIs :: Map NamedComponent (Set (Path Abs File))
-  } deriving Show
+    { ghciPkgName :: PackageName
+    , ghciPkgOpts :: [(NamedComponent, BuildInfoOpts)]
+    , ghciPkgOmittedOpts :: [String]
+    , ghciPkgDir :: Path Abs Dir
+    , ghciPkgModules :: Set ModuleName
+    , ghciPkgModFiles :: Set (Path Abs File) -- ^ Module file paths.
+    , ghciPkgCFiles :: Set (Path Abs File) -- ^ C files.
+    , ghciPkgMainIs :: Map NamedComponent (Set (Path Abs File))
+    } deriving Show
 
 -- | Launch a GHCi session for the given local package targets with the
 -- given options and configure it with the load paths and extensions
@@ -239,7 +247,7 @@ ghciSetup mbuildFirst mainIs stringTargets = do
         forM locals $
         \(name,(cabalfp,target)) ->
              makeGhciPkgInfo sourceMap installedMap localLibs name cabalfp target
-    warnAboutPotentialIssues infos
+    checkForIssues infos
     return (realTargets, mainIsTargets, infos)
   where
     makeBuildOpts targets buildFirst =
@@ -303,15 +311,12 @@ makeGhciPkgInfo sourceMap installedMap locals name cabalfp target = do
     (mods,files,opts) <- getPackageOpts (packageOpts pkg) sourceMap installedMap locals cabalfp
     let filteredOpts = filterWanted opts
         omitUnwanted bio = bio { bioGhcOpts = filter (not . badForGhci) (bioGhcOpts bio) }
-        omitted = nubOrd $ filter badForGhci $ concatMap bioGhcOpts (M.elems filteredOpts)
-    unless (null omitted) $
-        $logWarn
-            ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
-             T.unwords (map T.pack omitted))
+        omitted = filter badForGhci $ concatMap bioGhcOpts (M.elems filteredOpts)
     return
         GhciPkgInfo
         { ghciPkgName = packageName pkg
         , ghciPkgOpts = M.toList (M.map omitUnwanted filteredOpts)
+        , ghciPkgOmittedOpts = omitted
         , ghciPkgDir = parent cabalfp
         , ghciPkgModules = mconcat (M.elems (filterWanted mods))
         , ghciPkgModFiles = mconcat (M.elems (filterWanted (M.map (setMapMaybe dotCabalModulePath) files)))
@@ -329,11 +334,27 @@ makeGhciPkgInfo sourceMap installedMap locals name cabalfp target = do
             STLocalComps cs -> S.member k cs
             _ -> True
 
-warnAboutPotentialIssues :: MonadLogger m => [GhciPkgInfo] -> m ()
-warnAboutPotentialIssues pkgs = borderedWarning $ do
-    $logWarn "There are issues with this project which may prevent GHCi from working properly."
-    $logWarn ""
-    mapM_ $logWarn $ intercalate [""] $ concat
+checkForIssues :: (MonadThrow m, MonadLogger m) => [GhciPkgInfo] -> m ()
+checkForIssues pkgs = do
+    let unbuildable = filter (\(_, bio) -> not (bioBuildable bio)) compsWithBios
+    unless (null unbuildable) $
+        throwM (SomeTargetsNotBuildable (map fst unbuildable))
+    let omitted = concatMap ghciPkgOmittedOpts pkgs
+    unless (null omitted) $
+        $logWarn
+            ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
+             T.unwords (map T.pack (nubOrd omitted)))
+    unless (null issues) $ borderedWarning $ do
+        $logWarn "There are issues with this project which may prevent GHCi from working properly."
+        $logWarn ""
+        mapM_ $logWarn $ intercalate [""] issues
+        $logWarn ""
+        $logWarn "To resolve, remove the flag(s) from the cabal file(s) and instead put them at the top of the haskell files."
+        $logWarn ""
+        $logWarn "It isn't yet possible to load multiple packages into GHCi in all cases - see"
+        $logWarn "https://ghc.haskell.org/trac/ghc/ticket/10827"
+  where
+    issues = concat
         [ mixedFlag "-XNoImplicitPrelude"
           [ "-XNoImplicitPrelude will be used, but GHCi will likely fail to build things which depend on the implicit prelude." ]
         , mixedFlag "-XCPP"
@@ -347,12 +368,6 @@ warnAboutPotentialIssues pkgs = borderedWarning $ do
         , mixedFlag "-XSafe"
           [ "-XSafe will be used, but it will fail to compile unsafe modules." ]
         ]
-    $logWarn ""
-    $logWarn "To resolve, remove the flag(s) from the cabal file(s) and instead put them at the top of the haskell files."
-    $logWarn ""
-    $logWarn "It isn't yet possible to load multiple packages into GHCi in all cases - see"
-    $logWarn "https://ghc.haskell.org/trac/ghc/ticket/10827"
-  where
     mixedFlag flag msgs =
         let x = partitionComps (== flag) in
         [ msgs ++ showWhich x | mixedSettings x ]
@@ -363,16 +378,15 @@ warnAboutPotentialIssues pkgs = borderedWarning $ do
         , "But not for: "
         , "    " <> renderPkgComps don'tHaveIt
         ]
-    renderPkgComps = T.intercalate " " . map renderPkgComp
-    renderPkgComp (pkg, comp) = packageNameText pkg <> ":" <> decodeUtf8 (renderComponent comp)
-    compsWithOpts = concat
-        [ [ ((ghciPkgName pkg, c), bioGeneratedOpts bio ++ bioGhcOpts bio)
-          | (c, bio) <- ghciPkgOpts pkg
-          ]
-        | pkg <- pkgs ]
     partitionComps f = (map fst xs, map fst ys)
       where
         (xs, ys) = partition (any f . snd) compsWithOpts
+    compsWithOpts = map (\(k, bio) -> (k, bioGeneratedOpts bio ++ bioGhcOpts bio)) compsWithBios
+    compsWithBios = concat
+        [ [ ((ghciPkgName pkg, c), bio)
+          | (c, bio) <- ghciPkgOpts pkg
+          ]
+        | pkg <- pkgs ]
 
 borderedWarning :: MonadLogger m => m a -> m a
 borderedWarning f = do
@@ -382,3 +396,21 @@ borderedWarning f = do
     $logWarn "* * * * * * * *"
     $logWarn ""
     return x
+
+renderPkgComps :: [(PackageName, NamedComponent)] -> Text
+renderPkgComps = T.intercalate " " . map renderPkgComp
+
+renderPkgComp :: (PackageName, NamedComponent) -> Text
+renderPkgComp (pkg, comp) = packageNameText pkg <> ":" <> decodeUtf8 (renderComponent comp)
+
+data GhciException =
+    SomeTargetsNotBuildable [(PackageName, NamedComponent)]
+    deriving (Typeable)
+
+instance Exception GhciException
+
+instance Show GhciException where
+    show (SomeTargetsNotBuildable xs) =
+        "The following components have 'buildable: False' in cabal, and so cannot be ghci targets:\n    " ++
+        T.unpack (renderPkgComps xs) ++
+        "\nTo resolve this, either specify flags such that these components are buildable, or pass buildable targets to \"stack ghci\"."
