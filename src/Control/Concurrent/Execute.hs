@@ -24,6 +24,7 @@ import           Stack.Types
 
 data ActionType
     = ATBuild
+    | ATBuildFinal
     | ATFinal
     deriving (Show, Eq, Ord)
 data ActionId = ActionId !PackageIdentifier !ActionType

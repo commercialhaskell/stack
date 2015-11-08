@@ -272,18 +272,6 @@ ghciSetup mbuildFirst mainIs stringTargets = do
             STLocalComps s -> any p (S.toList s)
             STLocalAll -> True
             _ -> False
-    isCLib nc =
-        case nc of
-            CLib{} -> True
-            _ -> False
-    isCTest nc =
-        case nc of
-            CTest{} -> True
-            _ -> False
-    isCBench nc =
-        case nc of
-            CBench{} -> True
-            _ -> False
 
 -- | Make information necessary to load the given package in GHCi.
 makeGhciPkgInfo

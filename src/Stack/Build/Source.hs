@@ -329,11 +329,7 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
 
         btpkg
             | Set.null tests && Set.null benches = Nothing
-            | otherwise = Just LocalPackageTB
-                { lptbPackage = resolvePackage btconfig gpkg
-                , lptbTests = tests
-                , lptbBenches = benches
-                }
+            | otherwise = Just (resolvePackage btconfig gpkg)
         testpkg = resolvePackage testconfig gpkg
         benchpkg = resolvePackage benchconfig gpkg
     mbuildCache <- tryGetBuildCache $ lpvRoot lpv
@@ -350,10 +346,6 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
         { lpPackage = pkg
         , lpTestDeps = packageDeps testpkg
         , lpBenchDeps = packageDeps benchpkg
-        , lpExeComponents =
-            case mtarget of
-                Nothing -> Nothing
-                Just _ -> Just exes
         , lpTestBench = btpkg
         , lpFiles = files
         , lpDirtyFiles =
@@ -365,6 +357,7 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
         , lpNewBuildCache = newBuildCache
         , lpCabalFile = lpvCabalFP lpv
         , lpDir = lpvRoot lpv
+        , lpWanted = isJust mtarget
         , lpComponents = Set.unions
             [ Set.map CExe exes
             , Set.map CTest tests
