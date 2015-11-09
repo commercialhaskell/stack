@@ -71,25 +71,25 @@ import           System.Exit
 import qualified System.FilePath as FP
 import           System.Process.Log
 
--- | Override the environment received by a child process
+-- | Override the environment received by a child process.
 data EnvOverride = EnvOverride
-    { eoTextMap :: Map Text Text
-    , eoStringList :: [(String, String)]
-    , eoPath :: [FilePath]
+    { eoTextMap :: Map Text Text -- ^ Environment variables as map
+    , eoStringList :: [(String, String)] -- ^ Environment variables as association list
+    , eoPath :: [FilePath] -- ^ List of directories searched for executables (@PATH@)
     , eoExeCache :: IORef (Map FilePath (Either ReadProcessException (Path Abs File)))
-    , eoExeExtension :: String
+    , eoExeExtension :: String -- ^ @""@ or @".exe"@, depending on the platform
     , eoPlatform :: Platform
     }
 
--- | Get the environment variables from @EnvOverride@
+-- | Get the environment variables from an 'EnvOverride'.
 unEnvOverride :: EnvOverride -> Map Text Text
 unEnvOverride = eoTextMap
 
--- | Get the list of directories searched
+-- | Get the list of directories searched (@PATH@).
 envSearchPath :: EnvOverride -> [FilePath]
 envSearchPath = eoPath
 
--- | Modify an EnvOverride
+-- | Modify the environment variables of an 'EnvOverride'.
 modifyEnvOverride :: MonadIO m
                   => EnvOverride
                   -> (Map Text Text -> Map Text Text)
@@ -98,7 +98,7 @@ modifyEnvOverride eo f = mkEnvOverride
     (eoPlatform eo)
     (f $ eoTextMap eo)
 
--- | Create a new @EnvOverride@
+-- | Create a new 'EnvOverride'.
 mkEnvOverride :: MonadIO m
               => Platform
               -> Map Text Text
@@ -126,16 +126,16 @@ mkEnvOverride platform tm' = do
             Platform _ Windows -> True
             _ -> False
 
--- | Helper conversion function
+-- | Helper conversion function.
 envHelper :: EnvOverride -> Maybe [(String, String)]
 envHelper = Just . eoStringList
 
 -- | Read from the process, ignoring any output.
 readProcessNull :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
-                => Maybe (Path Abs Dir)
+                => Maybe (Path Abs Dir) -- ^ Optional working directory
                 -> EnvOverride
-                -> String
-                -> [String]
+                -> String -- ^ Command
+                -> [String] -- ^ Command line arguments
                 -> m ()
 readProcessNull wd menv name args =
     sinkProcessStdout wd menv name args CL.sinkNull
@@ -143,11 +143,11 @@ readProcessNull wd menv name args =
 -- | Run the given command in the given directory. If it exits with anything
 -- but success, prints an error and then calls 'exitWith' to exit the program.
 readInNull :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
-           => Path Abs Dir -- ^ directory to run in
-           -> FilePath -- ^ command to run
+           => Path Abs Dir -- ^ Directory to run in
+           -> FilePath -- ^ Command to run
            -> EnvOverride
-           -> [String] -- ^ command line arguments
-           -> Maybe Text
+           -> [String] -- ^ Command line arguments
+           -> Maybe Text -- ^ Optional additional error message
            -> m ()
 readInNull wd cmd menv args errMsg = do
     result <- try (readProcessNull (Just wd) menv cmd args)
@@ -169,27 +169,28 @@ readInNull wd cmd menv args errMsg = do
 -- | Try to produce a strict 'S.ByteString' from the stdout of a
 -- process.
 tryProcessStdout :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
-                 => Maybe (Path Abs Dir)
+                 => Maybe (Path Abs Dir) -- ^ Optional directory to run in
                  -> EnvOverride
-                 -> String
-                 -> [String]
+                 -> String -- ^ Command
+                 -> [String] -- ^ Command line arguments
                  -> m (Either ReadProcessException S.ByteString)
 tryProcessStdout wd menv name args =
     try (readProcessStdout wd menv name args)
 
--- | Produce a strict 'S.ByteString' from the stdout of a
--- process. Throws a 'ProcessExitedUnsuccessfully' exception if the
--- process fails.
+-- | Produce a strict 'S.ByteString' from the stdout of a process.
+--
+-- Throws a 'ProcessExitedUnsuccessfully' exception if the  process fails.
 readProcessStdout :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
-                  => Maybe (Path Abs Dir)
+                  => Maybe (Path Abs Dir) -- ^ Optional directory to run in
                   -> EnvOverride
-                  -> String
-                  -> [String]
+                  -> String -- ^ Command
+                  -> [String] -- ^ Command line arguments
                   -> m S.ByteString
 readProcessStdout wd menv name args =
   sinkProcessStdout wd menv name args CL.consume >>=
   liftIO . evaluate . S.concat
 
+-- | An exception while trying to read from process.
 data ReadProcessException
     = ReadProcessException CreateProcess ExitCode L.ByteString L.ByteString
     | NoPathFound
@@ -230,10 +231,10 @@ instance Exception ReadProcessException
 -- lots of output; for that use 'sinkProcessStdoutLogStderr'.
 sinkProcessStdout
     :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
-    => Maybe (Path Abs Dir)
+    => Maybe (Path Abs Dir) -- ^ Optional directory to run in
     -> EnvOverride
-    -> String
-    -> [String]
+    -> String -- ^ Command
+    -> [String] -- ^ Command line arguments
     -> Sink S.ByteString IO a -- ^ Sink for stdout
     -> m a
 sinkProcessStdout wd menv name args sinkStdout = do
@@ -261,10 +262,10 @@ sinkProcessStdout wd menv name args sinkStdout = do
 
 -- | Consume the stdout and stderr of a process feeding strict 'S.ByteString's to the consumers.
 sinkProcessStderrStdout :: (MonadIO m, MonadLogger m)
-                        => Maybe (Path Abs Dir)
+                        => Maybe (Path Abs Dir) -- ^ Optional directory to run in
                         -> EnvOverride
-                        -> String
-                        -> [String]
+                        -> String -- ^ Command
+                        -> [String] -- ^ Command line arguments
                         -> Sink S.ByteString IO e -- ^ Sink for stderr
                         -> Sink S.ByteString IO o -- ^ Sink for stdout
                         -> m (e,o)
@@ -283,13 +284,17 @@ sinkProcessStderrStdout wd menv name args sinkStderr sinkStdout = do
 
 -- | Perform pre-call-process tasks.  Ensure the working directory exists and find the
 -- executable path.
-preProcess :: (MonadIO m) => Maybe (Path Abs Dir) -> EnvOverride -> String -> m FilePath
+preProcess :: (MonadIO m)
+           => Maybe (Path Abs Dir) -- ^ Optional directory to create if necessary
+           -> EnvOverride
+           -> String -- ^ Command name
+           -> m FilePath
 preProcess wd menv name = do
   name' <- liftIO $ liftM toFilePath $ join $ findExecutable menv name
   maybe (return ()) createTree wd
   return name'
 
--- | Check if the given executable exists on the given PATH
+-- | Check if the given executable exists on the given PATH.
 doesExecutableExist :: MonadIO m => EnvOverride -> String -> m Bool
 doesExecutableExist menv name = liftM isJust $ findExecutable menv name
 
@@ -304,7 +309,9 @@ makeAbsolute = fmap FP.normalise . absolutize
           | FP.isRelative path = fmap (FP.</> path) getCurrentDirectory
           | otherwise          = return path
 
--- | Find the complete path for the executable
+-- | Find the complete path for the executable.
+--
+-- Throws a 'ReadProcessException' if unsuccessful.
 findExecutable :: (MonadIO m, MonadThrow n) => EnvOverride -> String -> m (n (Path Abs File))
 findExecutable _ name | any FP.isPathSeparator name = do
     exists <- liftIO $ doesFileExist name
@@ -340,7 +347,7 @@ findExecutable eo name = liftIO $ do
             return epath
     return $ either throwM return epath
 
--- | Load up an EnvOverride from the standard environment
+-- | Load up an 'EnvOverride' from the standard environment.
 getEnvOverride :: MonadIO m => Platform -> m EnvOverride
 getEnvOverride platform =
     liftIO $
@@ -348,7 +355,7 @@ getEnvOverride platform =
           mkEnvOverride platform
         . Map.fromList . map (T.pack *** T.pack)
 
--- | Augment the PATH environment variable with the given extra paths
+-- | Augment the PATH environment variable with the given extra paths.
 augmentPath :: [FilePath] -> Maybe Text -> Text
 augmentPath dirs mpath =
     T.intercalate (T.singleton FP.searchPathSeparator)

@@ -6,7 +6,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
 
--- | Reading from external processes.
+-- | Run sub-processes.
 
 module System.Process.Run
     (runIn
@@ -29,8 +29,9 @@ import           System.Exit (exitWith, ExitCode (..))
 import qualified System.Process
 import           System.Process.Read
 
--- | Run the given command in the given directory, inheriting stdout
--- and stderr. If it exits with anything but success, prints an error
+-- | Run the given command in the given directory, inheriting stdout and stderr.
+--
+-- If it exits with anything but success, prints an error
 -- and then calls 'exitWith' to exit the program.
 runIn :: forall (m :: * -> *).
          (MonadLogger m,MonadIO m,MonadBaseControl IO m)
@@ -38,7 +39,7 @@ runIn :: forall (m :: * -> *).
       -> FilePath -- ^ command to run
       -> EnvOverride
       -> [String] -- ^ command line arguments
-      -> Maybe Text
+      -> Maybe Text -- ^ optional additional error message
       -> m ()
 runIn wd cmd menv args errMsg = do
     result <- try (callProcess (Just wd) menv cmd args)
@@ -57,27 +58,31 @@ runIn wd cmd menv args errMsg = do
             liftIO (exitWith ec)
         Right () -> return ()
 
--- | Like as @System.Process.callProcess@, but takes an optional working directory and
--- environment override, and throws ProcessExitedUnsuccessfully if the
--- process exits unsuccessfully. Inherits stdout and stderr.
+-- | Like 'System.Process.callProcess', but takes an optional working directory and
+-- environment override, and throws 'ProcessExitedUnsuccessfully' if the
+-- process exits unsuccessfully.
+--
+-- Inherits stdout and stderr.
 callProcess :: (MonadIO m, MonadLogger m)
-            => Maybe (Path Abs Dir)
+            => Maybe (Path Abs Dir) -- ^ optional directory to run in
             -> EnvOverride
-            -> String
-            -> [String]
+            -> String -- ^ command to run
+            -> [String] -- ^ command line arguments
             -> m ()
 callProcess =
     callProcess' id
 
--- | Like as @System.Process.callProcess@, but takes an optional working directory and
--- environment override, and throws ProcessExitedUnsuccessfully if the
--- process exits unsuccessfully. Inherits stdout and stderr.
+-- | Like 'System.Process.callProcess', but takes an optional working directory and
+-- environment override, and throws 'ProcessExitedUnsuccessfully' if the
+-- process exits unsuccessfully.
+--
+-- Inherits stdout and stderr.
 callProcess' :: (MonadIO m, MonadLogger m)
              => (CreateProcess -> CreateProcess)
-             -> Maybe (Path Abs Dir)
+             -> Maybe (Path Abs Dir) -- ^ optional directory to run in
              -> EnvOverride
-             -> String
-             -> [String]
+             -> String -- ^ command to run
+             -> [String] -- ^ command line arguments
              -> m ()
 callProcess' modCP wd menv cmd0 args = do
     cmd <- preProcess wd menv cmd0
