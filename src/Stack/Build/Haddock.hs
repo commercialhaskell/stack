@@ -210,7 +210,7 @@ generateHaddockIndex descr envOverride wc dumpPackages docRelFP destDir = do
                                 , srcInterfaceAbsFile
                                 , destInterfaceAbsFile )
     copyPkgDocs (_,srcInterfaceModTime,srcInterfaceAbsFile,destInterfaceAbsFile) = do
-        -- | Copy dependencies' haddocks to documentation directory.  This way, relative @../$pkg-$ver@
+        -- Copy dependencies' haddocks to documentation directory.  This way, relative @../$pkg-$ver@
         -- links work and it's easy to upload docs to a web server or otherwise view them in a
         -- non-local-filesystem context. We copy instead of symlink for two reasons: (1) symlinks
         -- aren't reliably supported on Windows, and (2) the filesystem containing dependencies'
