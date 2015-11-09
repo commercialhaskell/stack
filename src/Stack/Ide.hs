@@ -85,7 +85,7 @@ getPackageOptsAndTargetFiles
     => Path Abs Dir -> GhciPkgInfo -> m ([FilePath], [FilePath])
 getPackageOptsAndTargetFiles pwd pkg = do
     dist <- distDirFromDir (ghciPkgDir pkg)
-    autogen <- return (autogenDir dist)
+    let autogen = autogenDir dist
     paths_foo <-
         liftM
             (autogen </>)
@@ -93,7 +93,7 @@ getPackageOptsAndTargetFiles pwd pkg = do
                  ("Paths_" ++ packageNameString (ghciPkgName pkg) ++ ".hs"))
     paths_foo_exists <- fileExists paths_foo
     return
-        ( ["--dist-dir=" <> toFilePath dist] ++
+        ( ("--dist-dir=" <> toFilePath dist) :
           map ("--ghc-option=" ++) (concatMap (\(_, bio) -> bioGeneratedOpts bio ++ bioGhcOpts bio) (ghciPkgOpts pkg))
         , mapMaybe
               (fmap toFilePath . stripDir pwd)

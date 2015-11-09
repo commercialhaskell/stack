@@ -737,7 +737,7 @@ newOptsParser = (,) <$> newOpts <*> initOptsParser
 -- | Parser for @stack hpc report@.
 hpcReportOptsParser :: Parser HpcReportOpts
 hpcReportOptsParser = HpcReportOpts
-    <$> (many $ textArgument $ metavar "TARGET_OR_TIX")
+    <$> many (textArgument $ metavar "TARGET_OR_TIX")
     <*> switch (long "all" <> help "Use results from all packages and components")
     <*> optional (strOption (long "destdir" <> help "Output directy for HTML report"))
 

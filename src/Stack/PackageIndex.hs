@@ -214,7 +214,7 @@ updateIndex menv index =
         (True, ILGitHttp url _) -> logUpdate url >> updateIndexGit menv name index url
         (_, ILHttp url) -> logUpdate url >> updateIndexHTTP name index url
         (False, ILGitHttp _ url) -> logUpdate url >> updateIndexHTTP name index url
-        (False, ILGit url) -> logUpdate url >> (throwM $ GitNotAvailable name)
+        (False, ILGit url) -> logUpdate url >> throwM (GitNotAvailable name)
 
 -- | Update the index Git repo and the index tarball
 updateIndexGit :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasConfig env,MonadBaseControl IO m, MonadCatch m)
@@ -250,15 +250,15 @@ updateIndexGit menv indexName' index gitUrl = do
             $logStickyDone "Fetched package index."
             removeFileIfExists tarFile
             when (indexGpgVerify index)
-                 (do readInNull acfDir
-                                "git"
-                                menv
-                                ["tag","-v","current-hackage"]
-                                (Just (T.unlines ["Signature verification failed. "
-                                                 ,"Please ensure you've set up your"
-                                                 ,"GPG keychain to accept the D6CF60FD signing key."
-                                                 ,"For more information, see:"
-                                                 ,"https://github.com/fpco/stackage-update#readme"])))
+                 (readInNull acfDir
+                             "git"
+                             menv
+                             ["tag","-v","current-hackage"]
+                             (Just (T.unlines ["Signature verification failed. "
+                                              ,"Please ensure you've set up your"
+                                              ,"GPG keychain to accept the D6CF60FD signing key."
+                                              ,"For more information, see:"
+                                              ,"https://github.com/fpco/stackage-update#readme"])))
             $logDebug ("Exporting a tarball to " <>
                        (T.pack . toFilePath) tarFile)
             deleteCache indexName'

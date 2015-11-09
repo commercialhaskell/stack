@@ -100,7 +100,7 @@ cabalSolver wc cabalfps constraints userFlags cabalArgs = withSystemTempDirector
              : "--package-db=global"
              : cabalArgs ++
                toConstraintArgs userFlags ++
-               (map toFilePath cabalfps) ++
+               fmap toFilePath cabalfps ++
                ["--ghcjs" | wc == Ghcjs]
 
     $logInfo "Asking cabal to calculate a build plan, please wait"
@@ -210,7 +210,7 @@ solveExtraDeps modStackYaml = do
         else do
             $logInfo "It's possible that even with the changes generated below, you will still need to do some manual tweaking"
             let o = object
-                    $ ("extra-deps" .= (map fromTuple $ Map.toList $ fmap fst newDeps))
+                    $ ("extra-deps" .= map fromTuple (Map.toList $ fmap fst newDeps))
                     : (if Map.null newFlags
                         then []
                         else ["flags" .= newFlags])
