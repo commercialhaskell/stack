@@ -76,9 +76,7 @@ import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Stack.Constants
 import           Stack.Fetch
-import           Stack.GhcPkg
 import           Stack.Package
-import           Stack.PackageIndex
 import           Stack.Types
 import           Stack.Types.StackT
 import           System.Directory (canonicalizePath)
@@ -177,21 +175,22 @@ instance Show BuildPlanException where
 --
 -- This may fail if a target package is not present in the @BuildPlan@.
 resolveBuildPlan :: (MonadThrow m, MonadIO m, MonadReader env m, HasBuildConfig env, MonadLogger m, HasHttpManager env, MonadBaseControl IO m,MonadCatch m)
-                 => EnvOverride
-                 -> MiniBuildPlan
+                 => MiniBuildPlan
                  -> (PackageName -> Bool) -- ^ is it shadowed by a local package?
                  -> Map PackageName (Set PackageName) -- ^ required packages, and users of it
                  -> m ( Map PackageName (Version, Map FlagName Bool)
                       , Map PackageName (Set PackageName)
                       )
-resolveBuildPlan menv mbp isShadowed packages
+resolveBuildPlan mbp isShadowed packages
     | Map.null (rsUnknown rs) && Map.null (rsShadowed rs) = return (rsToInstall rs, rsUsedBy rs)
     | otherwise = do
-        cache <- getPackageCaches menv
-        let maxVer = Map.fromListWith max $ map toTuple $ Map.keys cache
+        bconfig <- asks getBuildConfig
+        let maxVer =
+                Map.fromListWith max $
+                map toTuple $
+                Map.keys (bcPackageCaches bconfig)
             unknown = flip Map.mapWithKey (rsUnknown rs) $ \ident x ->
                 (Map.lookup ident maxVer, x)
-        bconfig <- asks getBuildConfig
         throwM $ UnknownPackages
             (bcStackYaml bconfig)
             unknown

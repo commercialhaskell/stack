@@ -86,6 +86,7 @@ library
                      Stack.Types.GhcPkgId
                      Stack.Types.Image
                      Stack.Types.PackageIdentifier
+                     Stack.Types.PackageIndex
                      Stack.Types.PackageName
                      Stack.Types.TemplateName
                      Stack.Types.Version

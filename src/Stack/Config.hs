@@ -70,6 +70,7 @@ import           Stack.Constants
 import           Stack.Config.Docker
 import qualified Stack.Image as Image
 import           Stack.Init
+import           Stack.PackageIndex
 import           Stack.Types
 import           Stack.Types.Internal
 import           System.Directory (getAppUserDataDirectory, createDirectoryIfMissing, canonicalizePath)
@@ -380,6 +381,8 @@ loadBuildConfig mproject config mresolver mcompiler = do
 
     extraPackageDBs <- mapM parseRelAsAbsDir (projectExtraPackageDBs project)
 
+    packageCaches <- runReaderT (getMinimalEnvOverride >>= getPackageCaches) miniConfig
+
     return BuildConfig
         { bcConfig = config
         , bcResolver = projectResolver project
@@ -391,6 +394,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
         , bcFlags = projectFlags project
         , bcImplicitGlobal = isNothing mproject
         , bcGHCVariant = getGHCVariant miniConfig
+        , bcPackageCaches = packageCaches
         }
 
 -- | Resolve a PackageEntry into a list of paths, downloading and cloning as
