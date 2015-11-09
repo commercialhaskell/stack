@@ -258,7 +258,7 @@ parseTemplateSet a = do
     parseTemplate v = do
         o <- parseJSON v
         name <- o .: "name"
-        if isSuffixOf ".hsfiles" name
+        if ".hsfiles" `isSuffixOf` name
             then case parseTemplateNameFromString name of
                      Left{} ->
                          fail ("Unable to parse template name from " <> name)

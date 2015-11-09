@@ -31,7 +31,7 @@ data EscapingMode
 
 -- | Parse arguments using 'argsParser'.
 parseArgs :: EscapingMode -> Text -> Either String [String]
-parseArgs mode t = P.parseOnly (argsParser mode) t
+parseArgs mode = P.parseOnly (argsParser mode)
 
 -- | A basic argument parser. It supports space-separated text, and
 -- string quotation with identity escaping: \x -> x.

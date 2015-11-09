@@ -27,7 +27,7 @@ logProcessRun =
 
 -- | Show a process arg including speechmarks when necessary. Just for
 -- debugging purposes, not functionally important.
-showProcessArgDebug :: [Char] -> Text
+showProcessArgDebug :: String -> Text
 showProcessArgDebug x
     | any special x = T.pack (show x)
     | otherwise = T.pack x

@@ -1,5 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
-
 -- | Simple interface to complicated program arguments.
 --
 -- This is a "fork" of the @optparse-simple@ package that has some workarounds for
@@ -71,8 +69,8 @@ addCommand :: String   -- ^ command string
            -> Parser c -- ^ common parser
            -> Parser a -- ^ command parser
            -> EitherT b (Writer (Mod CommandFields (b,c))) ()
-addCommand cmd title footerStr constr commonParser inner =
-  addCommand' cmd title footerStr (\a c -> (constr a,c)) commonParser inner
+addCommand cmd title footerStr constr =
+  addCommand' cmd title footerStr (\a c -> (constr a,c))
 
 -- | Add a command that takes sub-commands to the options dispatcher.
 addSubCommands
