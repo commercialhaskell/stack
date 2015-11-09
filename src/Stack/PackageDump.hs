@@ -46,6 +46,7 @@ import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (catMaybes, listToMaybe)
+import           Data.Maybe.Extra (mapMaybeM)
 import qualified Data.Set as Set
 import qualified Data.Text.Encoding as T
 import           Data.Typeable (Typeable)
@@ -331,7 +332,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 libraries = parseM "hs-libraries"
                 exposedModules = parseM "exposed-modules"
                 exposed = parseM "exposed"
-            depends <- mapM parseDepend $ parseM "depends"
+            depends <- mapMaybeM parseDepend $ parseM "depends"
 
             let parseQuoted key =
                     case mapM (P.parseOnly (argsParser NoEscaping) . T.decodeUtf8) val of
@@ -349,7 +350,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 , dpLibDirs = libDirPaths
                 , dpLibraries = S8.words $ S8.unwords libraries
                 , dpHasExposedModules = not (null libraries || null exposedModules)
-                , dpDepends = catMaybes (depends :: [Maybe GhcPkgId])
+                , dpDepends = depends
                 , dpHaddockInterfaces = haddockInterfaces
                 , dpHaddockHtml = listToMaybe haddockHtml
                 , dpProfiling = ()

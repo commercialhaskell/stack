@@ -25,6 +25,7 @@ import           Data.List
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
 import           Data.Maybe
+import           Data.Maybe.Extra (mapMaybeA)
 import           Data.Monoid
 import qualified Data.Set as Set
 import           Data.Text (Text)
@@ -195,16 +196,13 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                         "Print out handy path information"
                         cmdFooter
                         pathCmd
-                        (fmap
-                             catMaybes
-                             (sequenceA
-                                  (map
-                                      (\(desc,name,_) ->
-                                           flag Nothing
-                                                (Just name)
-                                                (long (T.unpack name) <>
-                                                 help desc))
-                                      paths)))
+                        (mapMaybeA
+                            (\(desc,name,_) ->
+                                 flag Nothing
+                                      (Just name)
+                                      (long (T.unpack name) <>
+                                       help desc))
+                            paths)
              addCommand' "unpack"
                         "Unpack one or more packages locally"
                         cmdFooter

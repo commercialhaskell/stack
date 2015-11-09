@@ -928,7 +928,7 @@ resolveFiles
     -> [Text] -- ^ Extentions.
     -> m [DotCabalPath]
 resolveFiles dirs names exts = do
-    liftM catMaybes (forM names (findCandidate dirs exts))
+    forMaybeM names (findCandidate dirs exts)
 
 -- | Find a candidate for the given module-or-filename from the list
 -- of directories and given extensions.

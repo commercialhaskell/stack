@@ -26,9 +26,10 @@ import           Data.Function
 import qualified Data.HashSet                   as HS
 import           Data.List
 import           Data.List.Extra                (nubOrd)
-import           Data.Maybe
 import           Data.Map.Strict                (Map)
 import qualified Data.Map.Strict                as Map
+import           Data.Maybe
+import           Data.Maybe.Extra               (mapMaybeM)
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
 import           Data.Text                      (Text)
@@ -156,7 +157,7 @@ generateHaddockIndex
     -> m ()
 generateHaddockIndex descr envOverride wc dumpPackages docRelFP destDir = do
     createTree destDir
-    interfaceOpts <- liftIO $ fmap (nubOrd . catMaybes) (mapM toInterfaceOpt dumpPackages)
+    interfaceOpts <- (liftIO . fmap nubOrd . mapMaybeM toInterfaceOpt) dumpPackages
     case maximumMay (map (\(_,x,_,_) -> x) interfaceOpts) of
         Nothing -> return ()
         Just maxInterfaceModTime -> do

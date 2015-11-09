@@ -28,6 +28,7 @@ import           Data.List.Extra (nubOrd)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Maybe
+import           Data.Maybe.Extra (forMaybeM)
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as S
@@ -220,8 +221,7 @@ ghciSetup mbuildFirst mainIs stringTargets = do
             }
         sourceMap
     locals <-
-        liftM catMaybes $
-        forM (M.toList (envConfigPackages econfig)) $
+        forMaybeM (M.toList (envConfigPackages econfig)) $
         \(dir,validWanted) ->
              do cabalfp <- getCabalFileName dir
                 name <- parsePackageNameFromFilePath cabalfp

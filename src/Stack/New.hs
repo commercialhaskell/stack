@@ -30,7 +30,7 @@ import           Data.Conduit
 import           Data.List
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
-import           Data.Maybe
+import           Data.Maybe.Extra (mapMaybeM)
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as S
@@ -253,7 +253,7 @@ getTemplates = do
 parseTemplateSet :: Value -> Parser (Set TemplateName)
 parseTemplateSet a = do
     xs <- parseJSON a
-    fmap (S.fromList . catMaybes) (mapM parseTemplate xs)
+    fmap S.fromList (mapMaybeM parseTemplate xs)
   where
     parseTemplate v = do
         o <- parseJSON v

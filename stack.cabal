@@ -107,6 +107,7 @@ library
                      System.Process.Run
                      Network.HTTP.Download.Verified
                      Data.Attoparsec.Args
+                     Data.Maybe.Extra
                      Path.IO
                      Path.Extra
   other-modules:     Network.HTTP.Download
@@ -118,7 +119,6 @@ library
                      Data.Attoparsec.Combinators
                      Data.Binary.VersionTagged
                      Data.IORef.RunOnce
-                     Data.Maybe.Extra
                      Data.Set.Monad
                      Distribution.Version.Extra
   build-depends:     Cabal >= 1.18.1.5

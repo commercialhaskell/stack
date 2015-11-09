@@ -44,6 +44,7 @@ import           Data.List                      hiding (any)
 import           Data.Map.Strict                (Map)
 import qualified Data.Map.Strict                as Map
 import           Data.Maybe
+import           Data.Maybe.Extra               (forMaybeM)
 import           Data.Monoid                    ((<>))
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
@@ -365,7 +366,7 @@ executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages loc
 
         currExe <- liftIO getExecutablePath -- needed for windows, see below
 
-        installed <- forM (Map.toList $ planInstallExes plan) $ \(name, loc) -> do
+        installed <- forMaybeM (Map.toList $ planInstallExes plan) $ \(name, loc) -> do
             let bindir =
                     case loc of
                         Snap -> snapBin
@@ -395,7 +396,7 @@ executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages loc
                         _ -> D.copyFile (toFilePath file) destFile
                     return $ Just (destDir', [T.append name (T.pack ext)])
 
-        let destToInstalled = Map.fromListWith (++) (catMaybes installed)
+        let destToInstalled = Map.fromListWith (++) installed
         unless (Map.null destToInstalled) $ $logInfo ""
         forM_ (Map.toList destToInstalled) $ \(dest, executables) -> do
             $logInfo $ T.concat

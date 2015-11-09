@@ -39,7 +39,7 @@ import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Data.Either
-import           Data.Maybe
+import           Data.Maybe.Extra
 import           Data.Typeable
 import           Path
 import qualified System.Directory as D
@@ -134,8 +134,8 @@ resolveFileMaybe = resolveCheckParse D.doesFileExist parseAbsFile
 listDirectory :: (MonadIO m,MonadThrow m) => Path Abs Dir -> m ([Path Abs Dir],[Path Abs File])
 listDirectory dir =
   do entriesFP <- liftIO (D.getDirectoryContents dirFP)
-     maybeEntries <-
-       forM (map (dirFP ++) entriesFP)
+     entries <-
+       forMaybeM (map (dirFP ++) entriesFP)
             (\entryFP ->
                do isDir <- liftIO (D.doesDirectoryExist entryFP)
                   if isDir
@@ -148,7 +148,6 @@ listDirectory dir =
                      else case parseAbsFile entryFP of
                             Nothing -> return Nothing
                             Just entryFile -> return (Just (Right entryFile)))
-     let entries = catMaybes maybeEntries
      return (lefts entries,rights entries)
   where dirFP = toFilePath dir
 

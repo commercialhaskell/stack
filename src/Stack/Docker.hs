@@ -33,11 +33,12 @@ import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Char (isSpace,toUpper,isAscii,isDigit)
 import           Data.Conduit.List (sinkNull)
-import           Data.List (dropWhileEnd,intercalate,isPrefixOf,isInfixOf,foldl',sortBy)
+import           Data.List (dropWhileEnd,intercalate,isPrefixOf,isInfixOf,foldl')
 import           Data.List.Extra (trim)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
+import           Data.Ord (Down(..))
 import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -47,6 +48,7 @@ import           Data.Typeable (Typeable)
 import           Data.Version (showVersion)
 import           Distribution.System (Platform (Platform), Arch (X86_64), OS (Linux))
 import           Distribution.Text (display)
+import           GHC.Exts (sortWith)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
@@ -510,11 +512,12 @@ cleanup opts =
           case accessor opts of
             Just days -> buildStrLn ("#   - " ++ description ++ " at least " ++ showDays days ++ ".")
             Nothing -> return ()
-        sortCreated l =
-          reverse (sortBy (\(_,_,a) (_,_,b) -> compare a b)
-                          (catMaybes (map (\(h,r) -> fmap (\ii -> (h,r,iiCreated ii))
-                                                          (Map.lookup h inspectMap))
-                                          l)))
+        sortCreated =
+            sortWith (\(_,_,x) -> Down x) .
+            (mapMaybe (\(h,r) ->
+                case Map.lookup h inspectMap of
+                    Nothing -> Nothing
+                    Just ii -> Just (h,r,iiCreated ii)))
         buildSection sectionHead items itemBuilder =
           do let (anyWrote,b) = runWriter (forM items itemBuilder)
              when (or anyWrote) $
