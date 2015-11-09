@@ -34,11 +34,11 @@ import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
 import           Data.Text                      (Text)
 import qualified Data.Text                      as T
+import           Data.Time                      (UTCTime)
 import           Path
 import           Path.Extra
 import           Path.IO
 import           Prelude
-import           Safe                           (maximumMay)
 import           Stack.Types.Build
 import           Stack.PackageDump
 import           Stack.Types
@@ -163,30 +163,26 @@ generateHaddockIndex
 generateHaddockIndex descr envOverride wc dumpPackages docRelFP destDir = do
     createTree destDir
     interfaceOpts <- (liftIO . fmap nubOrd . mapMaybeM toInterfaceOpt) dumpPackages
-    case maximumMay (map (\(_,x,_,_) -> x) interfaceOpts) of
-        Nothing -> return ()
-        Just maxInterfaceModTime -> do
-            eindexModTime <-
-                liftIO $
-                tryJust (guard . isDoesNotExistError) $
-                getModificationTime (toFilePath (haddockIndexFile destDir))
-            let needUpdate =
-                    case eindexModTime of
-                        Left _ -> True
-                        Right indexModTime ->
-                            indexModTime < maxInterfaceModTime
-            when
-                needUpdate $
-                do $logInfo
-                       (T.concat ["Updating Haddock index for ", descr, " in\n",
-                                  T.pack (toFilePath (haddockIndexFile destDir))])
-                   liftIO (mapM_ copyPkgDocs interfaceOpts)
-                   readProcessNull
-                       (Just destDir)
-                       envOverride
-                       (haddockExeName wc)
-                       (["--gen-contents", "--gen-index"] ++ concatMap (\(x,_,_,_) -> x) interfaceOpts)
+    unless (null interfaceOpts) $ do
+        let destIndexFile = toFilePath (haddockIndexFile destDir)
+        eindexModTime <- liftIO (tryGetModificationTime destIndexFile)
+        let needUpdate =
+                case eindexModTime of
+                    Left _ -> True
+                    Right indexModTime ->
+                        or [mt > indexModTime | (_,mt,_,_) <- interfaceOpts]
+        when needUpdate $ do
+            $logInfo
+                (T.concat ["Updating Haddock index for ", descr, " in\n",
+                           T.pack destIndexFile])
+            liftIO (mapM_ copyPkgDocs interfaceOpts)
+            readProcessNull
+                (Just destDir)
+                envOverride
+                (haddockExeName wc)
+                (["--gen-contents", "--gen-index"] ++ [x | (xs,_,_,_) <- interfaceOpts, x <- xs])
   where
+    toInterfaceOpt :: DumpPackage a b -> IO (Maybe ([String], UTCTime, Path Abs File, Path Abs File))
     toInterfaceOpt DumpPackage {..} = do
         case dpHaddockInterfaces of
             [] -> return Nothing
@@ -198,9 +194,7 @@ generateHaddockIndex descr envOverride wc dumpPackages docRelFP destDir = do
                         packageIdentifierString dpPackageIdent FP.</>
                         (packageNameString name FP.<.> "haddock")
                 destInterfaceAbsFile <- parseCollapsedAbsFile (toFilePath destDir FP.</> destInterfaceRelFP)
-                esrcInterfaceModTime <-
-                    tryJust (guard . isDoesNotExistError) $
-                    getModificationTime (toFilePath srcInterfaceAbsFile)
+                esrcInterfaceModTime <- tryGetModificationTime (toFilePath srcInterfaceAbsFile)
                 return $
                     case esrcInterfaceModTime of
                         Left _ -> Nothing
@@ -214,6 +208,9 @@ generateHaddockIndex descr envOverride wc dumpPackages docRelFP destDir = do
                                 , srcInterfaceModTime
                                 , srcInterfaceAbsFile
                                 , destInterfaceAbsFile )
+    tryGetModificationTime :: FilePath -> IO (Either () UTCTime)
+    tryGetModificationTime = tryJust (guard . isDoesNotExistError) . getModificationTime
+    copyPkgDocs :: (a, UTCTime, Path Abs File, Path Abs File) -> IO ()
     copyPkgDocs (_,srcInterfaceModTime,srcInterfaceAbsFile,destInterfaceAbsFile) = do
         -- Copy dependencies' haddocks to documentation directory.  This way, relative @../$pkg-$ver@
         -- links work and it's easy to upload docs to a web server or otherwise view them in a
@@ -221,9 +218,7 @@ generateHaddockIndex descr envOverride wc dumpPackages docRelFP destDir = do
         -- aren't reliably supported on Windows, and (2) the filesystem containing dependencies'
         -- docs may not be available where viewing the docs (e.g. if building in a Docker
         -- container).
-        edestInterfaceModTime <-
-            tryJust (guard . isDoesNotExistError) $
-            getModificationTime (toFilePath destInterfaceAbsFile)
+        edestInterfaceModTime <- tryGetModificationTime (toFilePath destInterfaceAbsFile)
         case edestInterfaceModTime of
             Left _ -> doCopy
             Right destInterfaceModTime
