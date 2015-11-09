@@ -29,6 +29,7 @@ import           Data.Function
 import           Data.List
 import qualified Data.Map.Strict                as Map
 import           Data.Maybe
+import           Data.Maybe.Extra               (mapMaybeM)
 import           Data.Monoid                    ((<>))
 import           Data.Text                      (Text)
 import qualified Data.Text                      as T
@@ -279,9 +280,8 @@ generateHpcUnifiedReport = do
 generateUnionReport :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
                     => Text -> Path Abs Dir -> [Path Abs File] -> m ()
 generateUnionReport report reportDir tixFiles = do
-    tixes <- mapM (liftM (fmap removeExeModules) . readTixOrLog) tixFiles
+    (errs, tix) <- fmap (unionTixes . map removeExeModules) (mapMaybeM readTixOrLog tixFiles)
     $logDebug $ "Using the following tix files: " <> T.pack (show tixFiles)
-    let (errs, tix) = unionTixes (catMaybes tixes)
     unless (null errs) $ $logWarn $ T.concat $
         "The following modules are left out of the " : report : " due to version mismatches: " :
         intersperse ", " (map T.pack errs)

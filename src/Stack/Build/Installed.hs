@@ -27,6 +27,7 @@ import           Data.Map.Strict              (Map)
 import qualified Data.Map.Strict              as M
 import qualified Data.Map.Strict              as Map
 import           Data.Maybe
+import           Data.Maybe.Extra             (mapMaybeM)
 import           Data.Monoid
 import qualified Data.Text                    as T
 import           Network.HTTP.Client.Conduit  (HasHttpManager)
@@ -136,7 +137,7 @@ loadDatabase menv opts mcache sourceMap mdb lhs0 = do
     (lhs1', dps) <- ghcPkgDump menv wc (fmap snd (maybeToList mdb))
                 $ conduitDumpPackage =$ sink
     let ghcjsHack = wc == Ghcjs && isNothing mdb
-    lhs1 <- liftM catMaybes $ mapM (processLoadResult mdb ghcjsHack) lhs1'
+    lhs1 <- mapMaybeM (processLoadResult mdb ghcjsHack) lhs1'
     let lhs = pruneDeps
             id
             lhId
