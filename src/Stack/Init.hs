@@ -26,7 +26,7 @@ import qualified Data.ByteString.Lazy            as L
 import qualified Data.HashMap.Strict             as HM
 import qualified Data.IntMap                     as IntMap
 import qualified Data.Foldable                   as F
-import           Data.List                       (isSuffixOf,sort)
+import           Data.List                       (isSuffixOf,sortBy)
 import           Data.List.Extra                 (nubOrd)
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
@@ -227,7 +227,7 @@ getRecommendedSnapshots snapshots pref = do
     -- prefer them over anything else, since odds are high that something
     -- already exists for them.
     existing <-
-        liftM (reverse . sort . mapMaybe (parseSnapName . T.pack)) $
+        liftM (sortBy (flip compare) . mapMaybe (parseSnapName . T.pack)) $
         snapshotsDir >>=
         liftIO . handleIO (const $ return [])
                . getDirectoryContents . toFilePath

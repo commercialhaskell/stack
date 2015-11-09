@@ -169,7 +169,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mproject configMonoi
                  localDir <- liftIO (getAppUserDataDirectory "local") >>= parseAbsDir
                  return $ localDir </> $(mkRelDir "bin")
              Just userPath ->
-                 (liftIO $ canonicalizePath userPath >>= parseAbsDir)
+                 liftIO (canonicalizePath userPath >>= parseAbsDir)
                  `catches`
                  [Handler (\(_ :: IOException) -> throwM $ NoSuchDirectory userPath)
                  ,Handler (\(_ :: PathParseException) -> throwM $ NoSuchDirectory userPath)
@@ -248,7 +248,7 @@ loadMiniConfig
     :: (MonadIO m, HasHttpManager a, MonadReader a m, MonadBaseControl IO m, MonadCatch m, MonadLogger m)
     => Config -> m MiniConfig
 loadMiniConfig config = do
-    menv <- liftIO $ (configEnvOverride config) minimalEnvSettings
+    menv <- liftIO $ configEnvOverride config minimalEnvSettings
     manager <- getHttpManager <$> ask
     ghcVariant <-
         case configGHCVariant0 config of

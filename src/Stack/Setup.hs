@@ -282,9 +282,8 @@ setupEnv mResolveMissingGHC = do
                                         [ toFilePathNoTrailingSep deps
                                         , ""
                                         ])
-                        $ Map.insert "HASKELL_DIST_DIR" (T.pack $ toFilePathNoTrailingSep distDir)
-                        $ env
-                    !() <- atomicModifyIORef envRef $ \m' ->
+                        $ Map.insert "HASKELL_DIST_DIR" (T.pack $ toFilePathNoTrailingSep distDir) env
+                    () <- atomicModifyIORef envRef $ \m' ->
                         (Map.insert es eo m', ())
                     return eo
 
@@ -794,7 +793,7 @@ installGHCPosix version _ archiveFile archiveType destDir = do
             parseRelDir $
             "ghc-" ++ versionString version
 
-        $logSticky $ T.concat ["Unpacking GHC into ", (T.pack . toFilePath $ root), " ..."]
+        $logSticky $ T.concat ["Unpacking GHC into ", T.pack . toFilePath $ root, " ..."]
         $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
         readInNull root tarTool menv ["xf", toFilePath archiveFile] Nothing
 
@@ -857,7 +856,7 @@ installGHCJS version si archiveFile archiveType destDir = do
                 readInNull destDir tarTool menv ["xf", toFilePath archiveFile] Nothing
                 renameDir (destDir Path.</> tarComponent) unpackDir
 
-    $logSticky $ T.concat ["Unpacking GHCJS into ", (T.pack . toFilePath $ unpackDir), " ..."]
+    $logSticky $ T.concat ["Unpacking GHCJS into ", T.pack . toFilePath $ unpackDir, " ..."]
     $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
     runUnpack
 
@@ -1107,7 +1106,7 @@ withUnpackedTarball7z name si archiveFile archiveType srcDir destDir = do
             Nothing -> error $ "Invalid " ++ name ++ " filename: " ++ show archiveFile
             Just x -> parseAbsFile $ T.unpack x
     run7z <- setup7z si
-    let tmpName = (toFilePathNoTrailingSep $ dirname destDir) ++ "-tmp"
+    let tmpName = toFilePathNoTrailingSep (dirname destDir) ++ "-tmp"
     createTree (parent destDir)
     withCanonicalizedTempDirectory (toFilePath $ parent destDir) tmpName $ \tmpDir -> do
         let absSrcDir = tmpDir </> srcDir
@@ -1420,10 +1419,7 @@ getUtf8LocaleVars menv = do
     matchingLocales
         :: [Text] -> Text -> [Text]
     matchingLocales utf8Locales prefix =
-        filter
-            (\v ->
-                  (T.toLower prefix) `T.isPrefixOf` T.toLower v)
-            utf8Locales
+        filter (\v -> T.toLower prefix `T.isPrefixOf` T.toLower v) utf8Locales
     -- Does the locale have one of the encodings in @utf8Suffixes@ (case-insensitive)?
     isUtf8Locale locale =
       any (\ v -> T.toLower v `T.isSuffixOf` T.toLower locale) utf8Suffixes

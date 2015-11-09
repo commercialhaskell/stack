@@ -129,7 +129,7 @@ newInstalledCache = liftIO $ InstalledCache <$> newIORef (InstalledCacheInner Ma
 loadInstalledCache :: (MonadLogger m, MonadIO m) => Path Abs File -> m InstalledCache
 loadInstalledCache path = do
     m <- taggedDecodeOrLoad path (return $ InstalledCacheInner Map.empty)
-    liftIO $ fmap InstalledCache $ newIORef m
+    liftIO $ InstalledCache <$> newIORef m
 
 -- | Save a @InstalledCache@ to disk
 saveInstalledCache :: MonadIO m => Path Abs File -> InstalledCache -> m ()
@@ -152,7 +152,7 @@ pruneDeps
     -> Map name item
 pruneDeps getName getId getDepends chooseBest =
       Map.fromList
-    . (map $ \item -> (getName $ getId item, item))
+    . fmap (getName . getId &&& id)
     . loop Set.empty Set.empty []
   where
     loop foundIds usedNames foundItems dps =

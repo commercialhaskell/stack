@@ -42,7 +42,7 @@ upgrade gitRepo mresolver = withCanonicalizedSystemTempDirectory "stack-upgrade"
       Just repo -> do
         remote <- liftIO $ readProcess "git" ["ls-remote", repo, "master"] []
         let latestCommit = head . words $ remote
-        if (latestCommit == $gitHash) then do
+        if latestCommit == $gitHash then do
           $logInfo "Already up-to-date, no upgrade required"
           return Nothing
         else do $logInfo "Cloning stack"

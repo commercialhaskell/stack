@@ -6,7 +6,6 @@
 {-# LANGUAGE TemplateHaskell    #-}
 {-# LANGUAGE TupleSections      #-}
 
-
 -- | Resolving a build plan for a set of packages in a given Stackage
 -- snapshot.
 

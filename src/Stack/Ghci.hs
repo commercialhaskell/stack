@@ -90,7 +90,7 @@ ghci GhciOpts{..} = do
     let pkgopts =
             (if null pkgs then [] else ["-hide-all-packages"]) ++
             nubOrd (concatMap (concatMap (bioGeneratedOpts . snd) . ghciPkgOpts) pkgs) ++
-            (concatMap (concatMap (bioGhcOpts . snd) . ghciPkgOpts) pkgs)
+            concatMap (concatMap (bioGhcOpts . snd) . ghciPkgOpts) pkgs
         modulesToLoad
           | ghciNoLoadModules = []
           | otherwise =
@@ -316,7 +316,7 @@ makeGhciPkgInfo sourceMap installedMap locals name cabalfp target = do
     badForGhci x =
         isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky -static")
     setMapMaybe f = S.fromList . mapMaybe f . S.toList
-    filterWanted m = M.filterWithKey (\k _ -> wantedComponent k) m
+    filterWanted = M.filterWithKey (\k _ -> wantedComponent k)
     wantedComponent k =
         case target of
             STLocalComps cs -> S.member k cs
