@@ -1069,10 +1069,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
         unless isFinalBuild $ withMVar eeInstallLock $ \() -> do
             announce "copy/register"
-            let shouldCopy = case taskType of
-                    TTUpstream{} -> True
-                    TTLocal lp -> not (Set.null (exesToBuild lp))
-            when shouldCopy $ cabal False ["copy"]
+            cabal False ["copy"]
             when (packageHasLibrary package) $ cabal False ["register"]
 
         let (installedPkgDb, installedDumpPkgsTVar) =
