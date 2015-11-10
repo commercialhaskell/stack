@@ -13,7 +13,109 @@
 
 -- | The Config type.
 
-module Stack.Types.Config where
+module Stack.Types.Config
+  (
+  -- * Main configuration types and classes
+  -- ** HasPlatform & HasStackRoot
+   HasPlatform(..)
+  ,HasStackRoot(..)
+  -- ** Config & HasConfig
+  ,Config(..)
+  ,HasConfig(..)
+  ,askConfig
+  ,askLatestSnapshotUrl
+  ,explicitSetupDeps
+  ,getMinimalEnvOverride
+  -- ** BuildConfig & HasBuildConfig
+  ,BuildConfig(..)
+  ,bcRoot
+  ,bcWorkDir
+  ,HasBuildConfig(..)
+  -- ** GHCVariant & HasGHCVariant
+  ,GHCVariant(..)
+  ,ghcVariantName
+  ,ghcVariantSuffix
+  ,parseGHCVariant
+  ,HasGHCVariant(..)
+  ,snapshotsDir
+  -- ** EnvConfig & HasEnvConfig
+  ,EnvConfig(..)
+  ,HasEnvConfig(..)
+  ,getWhichCompiler
+  -- * Details
+  -- ** ApplyGhcOptions
+  ,ApplyGhcOptions(..)
+  -- ** ConfigException
+  ,ConfigException(..)
+  -- ** ConfigMonoid
+  ,ConfigMonoid(..)
+  -- ** EnvSettings
+  ,EnvSettings(..)
+  ,minimalEnvSettings
+  -- ** GlobalOpts & GlobalOptsMonoid
+  ,GlobalOpts(..)
+  ,GlobalOptsMonoid(..)
+  ,defaultLogLevel
+  -- ** LoadConfig
+  ,LoadConfig(..)
+  -- ** PackageEntry & PackageLocation
+  ,PackageEntry(..)
+  ,peExtraDep
+  ,PackageLocation(..)
+  -- ** PackageIndex, IndexName & IndexLocation
+  ,PackageIndex(..)
+  ,IndexName(..)
+  ,configPackageIndex
+  ,configPackageIndexCache
+  ,configPackageIndexGz
+  ,configPackageIndexRoot
+  ,configPackageTarball
+  ,indexNameText
+  ,IndexLocation(..)
+  -- ** Project & ProjectAndConfigMonoid
+  ,Project(..)
+  ,ProjectAndConfigMonoid(..)
+  -- ** PvpBounds
+  ,PvpBounds(..)
+  ,parsePvpBounds
+  -- ** Resolver & AbstractResolver
+  ,Resolver(..)
+  ,parseResolverText
+  ,resolverName
+  ,AbstractResolver(..)
+  -- ** SCM
+  ,SCM(..)
+  -- * Paths
+  ,bindirSuffix
+  ,configInstalledCache
+  ,configMiniBuildPlanCache
+  ,configProjectWorkDir
+  ,docDirSuffix
+  ,flagCacheLocal
+  ,extraBinDirs
+  ,hpcReportDir
+  ,installationRootDeps
+  ,installationRootLocal
+  ,packageDatabaseDeps
+  ,packageDatabaseExtra
+  ,packageDatabaseLocal
+  ,platformOnlyRelDir
+  ,platformVariantRelDir
+  ,useShaPathOnWindows
+  ,workDirRel
+  -- * Command-specific types
+  -- ** Eval
+  ,EvalOpts(..)
+  -- ** Exec
+  ,ExecOpts(..)
+  ,SpecialExecCmd(..)
+  ,ExecOptsExtra(..)
+  -- ** Setup
+  ,DownloadInfo(..)
+  ,VersionedDownloadInfo(..)
+  ,SetupInfo(..)
+  ,SetupInfoLocation(..)
+  ) where
 
 import           Control.Applicative
 import           Control.Arrow ((&&&))
