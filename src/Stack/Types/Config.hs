@@ -862,9 +862,6 @@ configMonoidLocalBinPathName = "local-bin-path"
 configMonoidImageOptsName :: Text
 configMonoidImageOptsName = "image"
 
-configMonoidTemplatesName :: Text
-configMonoidTemplatesName = "templates"
-
 configMonoidScmInitName :: Text
 configMonoidScmInitName = "scm-init"
 
@@ -1025,14 +1022,6 @@ platformOnlyRelDir
 platformOnlyRelDir = do
     platform <- asks getPlatform
     parseRelDir (Distribution.Text.display platform)
-
--- | Path to .shake files.
-configShakeFilesDir :: (MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
-configShakeFilesDir = liftM (</> $(mkRelDir "shake")) configProjectWorkDir
-
--- | Where to unpack packages for local build
-configLocalUnpackDir :: (MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
-configLocalUnpackDir = liftM (</> $(mkRelDir "unpacked")) configProjectWorkDir
 
 -- | Directory containing snapshots
 snapshotsDir :: (MonadReader env m, HasConfig env, HasGHCVariant env, MonadThrow m) => m (Path Abs Dir)
