@@ -19,7 +19,6 @@ import System.Environment
 import System.Directory
 import System.IO.Error
 import System.Process
-import System.Exit
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Zip as Zip
@@ -62,7 +61,6 @@ main =
                 gProjectRoot = "" -- Set to real value velow.
                 global0 = foldl (flip id) Global{..} flags
             -- Need to get paths after options since the '--arch' argument can effect them.
-            localInstallRoot' <- getStackPath global0 "local-install-root"
             projectRoot' <- getStackPath global0 "project-root"
             let global = global0
                     { gProjectRoot = projectRoot' }
