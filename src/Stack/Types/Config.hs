@@ -457,9 +457,9 @@ data BuildConfig = BuildConfig
 bcRoot :: BuildConfig -> Path Abs Dir
 bcRoot = parent . bcStackYaml
 
--- | Directory containing the project's stack.yaml file
+-- | @"'bcRoot'/.stack-work"@
 bcWorkDir :: BuildConfig -> Path Abs Dir
-bcWorkDir = (</> workDirRel) . parent . bcStackYaml
+bcWorkDir = (</> workDirRel) . bcRoot
 
 -- | Configuration after the environment has been setup.
 data EnvConfig = EnvConfig
@@ -1104,6 +1104,7 @@ configPackageTarball iname ident = do
     base <- parseRelFile $ packageIdentifierString ident ++ ".tar.gz"
     return (root </> $(mkRelDir "packages") </> name </> ver </> base)
 
+-- | @".stack-work"@
 workDirRel :: Path Rel Dir
 workDirRel = $(mkRelDir ".stack-work")
 
