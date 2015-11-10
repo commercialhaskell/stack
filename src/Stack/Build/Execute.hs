@@ -1381,13 +1381,18 @@ primaryComponentOptions lp = concat
     ]
 
 exesToBuild :: LocalPackage -> Set Text
-exesToBuild lp =
-    if lpWanted lp
-        then exeComponents (lpComponents lp)
-        -- Build all executables in the event that no
-        -- specific list is provided (as happens with
-        -- extra-deps).
-        else packageExes (lpPackage lp)
+exesToBuild lp = packageExes (lpPackage lp)
+    -- NOTE: Ideally we'd do something like the following code, allowing
+    -- the user to control which executables get built. However, due to
+    -- https://github.com/haskell/cabal/issues/2780 we must build all
+    -- exes...
+    --
+    -- if lpWanted lp
+    --     then exeComponents (lpComponents lp)
+    --     -- Build all executables in the event that no
+    --     -- specific list is provided (as happens with
+    --     -- extra-deps).
+    --     else packageExes (lpPackage lp)
 
 -- Test-suite and benchmark build components.
 finalComponentOptions :: LocalPackage -> [String]
