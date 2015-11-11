@@ -148,7 +148,13 @@ buildOptsParser cmd =
             flag' BSOnlyDependencies
                 (long "dependencies-only" <>
                  help "A synonym for --only-dependencies")
-            <|> buildSubsetParser "" ""
+            <|> flag' BSOnlySnapshot
+                (long ("only-snapshot") <>
+                 help ("Only build packages for the snapshot database, not the local database"))
+            <|> flag' BSOnlyDependencies
+                (long ("only-dependencies") <>
+                 help ("Only build packages that are dependencies of targets on the command line"))
+            <|> pure BSAll
 
         fileWatch' =
             flag' FileWatch
@@ -455,17 +461,14 @@ dotOptsParser = DotOpts
 
 ghciOptsParser :: Parser GhciOpts
 ghciOptsParser = GhciOpts
-             <$> many (textArgument
-                         (metavar "TARGET" <>
-                          help ("If none specified, " <>
-                                "use all packages defined in current directory")))
-             <*> fmap concat (many (argsOption (long "ghc-options" <>
+             <$> switch (long "no-build" <> help "Don't build before launching GHCi")
+             <*> fmap concat (many (argsOption (long "ghci-options" <>
                                        metavar "OPTION" <>
                                        help "Additional options passed to GHCi")))
              <*> optional
                      (strOption (long "with-ghc" <>
                                  metavar "GHC" <>
-                                 help "Use this command for the GHC to run"))
+                                 help "Use this GHC to run GHCi"))
              <*> (not <$> boolFlags True "load" "load modules on start-up" idm)
              <*> packagesParser
              <*> optional
@@ -475,8 +478,7 @@ ghciOptsParser = GhciOpts
                             help "Specify which target should contain the main \
                                  \module to load, such as for an executable for \
                                  \test suite or benchmark."))
-             <*> (flag' Nothing (long "no-build" <> help "Don't build before launching GHCi") <|>
-                  (Just <$> buildSubsetParser "build-" " before launching GHCi"))
+             <*> buildOptsParser Build
 
 -- | Parser for exec command
 execOptsParser :: Maybe SpecialExecCmd -> Parser ExecOpts
@@ -526,17 +528,6 @@ execOptsExtraParser = eoPlainParser <|>
     eoPlainParser = flag' ExecOptsPlain
                           (long "plain" <>
                            help "Use an unmodified environment (only useful with Docker)")
-
--- | Parser for BuildSubset options
-buildSubsetParser :: String -> String -> Parser BuildSubset
-buildSubsetParser longPrefix helpSuffix =
-    flag' BSOnlySnapshot
-        (long (longPrefix ++ "only-snapshot") <>
-         help ("Only build packages for the snapshot database, not the local database" ++ helpSuffix))
-    <|> flag' BSOnlyDependencies
-        (long (longPrefix ++ "only-dependencies") <>
-         help ("Only build packages that are dependencies of targets on the command line" ++ helpSuffix))
-    <|> pure BSAll
 
 -- | Parser for global command-line options.
 globalOptsParser :: Bool -> Parser GlobalOptsMonoid

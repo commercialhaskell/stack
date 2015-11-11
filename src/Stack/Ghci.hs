@@ -55,25 +55,26 @@ import           System.Directory (getTemporaryDirectory)
 
 -- | Command-line options for GHC.
 data GhciOpts = GhciOpts
-    { ghciTargets            :: ![Text]
+    { ghciNoBuild            :: !Bool
     , ghciArgs               :: ![String]
     , ghciGhcCommand         :: !(Maybe FilePath)
     , ghciNoLoadModules      :: !Bool
     , ghciAdditionalPackages :: ![String]
     , ghciMainIs             :: !(Maybe Text)
-    , ghciBuildFirst         :: !(Maybe BuildSubset)
-    } deriving (Show,Eq)
+    , ghciBuildOpts          :: !BuildOpts
+    } deriving Show
 
 -- | Necessary information to load a package or its components.
 data GhciPkgInfo = GhciPkgInfo
-    { ghciPkgName :: PackageName
-    , ghciPkgOpts :: [(NamedComponent, BuildInfoOpts)]
-    , ghciPkgOmittedOpts :: [String]
-    , ghciPkgDir :: Path Abs Dir
-    , ghciPkgModules :: Set ModuleName
-    , ghciPkgModFiles :: Set (Path Abs File) -- ^ Module file paths.
-    , ghciPkgCFiles :: Set (Path Abs File) -- ^ C files.
-    , ghciPkgMainIs :: Map NamedComponent (Set (Path Abs File))
+    { ghciPkgName :: !PackageName
+    , ghciPkgOpts :: ![(NamedComponent, BuildInfoOpts)]
+    , ghciPkgOmittedOpts :: ![String]
+    , ghciPkgDir :: !(Path Abs Dir)
+    , ghciPkgModules :: !(Set ModuleName)
+    , ghciPkgModFiles :: !(Set (Path Abs File)) -- ^ Module file paths.
+    , ghciPkgCFiles :: !(Set (Path Abs File)) -- ^ C files.
+    , ghciPkgMainIs :: !(Map NamedComponent (Set (Path Abs File)))
+    , ghciPkgPackage :: !Package
     } deriving Show
 
 -- | Launch a GHCi session for the given local package targets with the
@@ -83,9 +84,13 @@ ghci
     :: (HasConfig r, HasBuildConfig r, HasHttpManager r, MonadMask m, HasLogLevel r, HasTerminal r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
     => GhciOpts -> m ()
 ghci GhciOpts{..} = do
-    (targets,mainIsTargets,pkgs) <- ghciSetup ghciBuildFirst ghciMainIs ghciTargets
+    let bopts = ghciBuildOpts
+            { boptsTestOpts = (boptsTestOpts ghciBuildOpts) { toDisableRun = True }
+            , boptsBenchmarkOpts = (boptsBenchmarkOpts ghciBuildOpts) { beoDisableRun = True }
+            }
+    (targets,mainIsTargets,pkgs) <- ghciSetup bopts ghciNoBuild ghciMainIs
     bconfig <- asks getBuildConfig
-    mainFile <- figureOutMainFile mainIsTargets targets pkgs
+    mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
     wc <- getWhichCompiler
     let pkgopts =
             (if null pkgs then [] else ["-hide-all-packages"]) ++
@@ -94,7 +99,7 @@ ghci GhciOpts{..} = do
         modulesToLoad
           | ghciNoLoadModules = []
           | otherwise =
-              nub
+              nubOrd
                   (maybe [] (return . toFilePath) mainFile <>
                    concatMap (map display . S.toList . ghciPkgModules) pkgs)
         odir =
@@ -129,11 +134,12 @@ ghci GhciOpts{..} = do
 -- ambiguous. Warns and returns nothing if it's ambiguous.
 figureOutMainFile
     :: (Monad m, MonadLogger m)
-    => Maybe (Map PackageName SimpleTarget)
+    => BuildOpts
+    -> Maybe (Map PackageName SimpleTarget)
     -> Map PackageName SimpleTarget
     -> [GhciPkgInfo]
     -> m (Maybe (Path Abs File))
-figureOutMainFile mainIsTargets targets0 packages =
+figureOutMainFile bopts mainIsTargets targets0 packages =
     case candidates of
         [] -> return Nothing
         [c@(_,_,fp)] -> do $logInfo ("Using main module: " <> renderCandidate c)
@@ -158,15 +164,14 @@ figureOutMainFile mainIsTargets targets0 packages =
             Nothing -> []
             Just target -> do
                 (component,mains) <-
-                    M.toList
-                        (M.filterWithKey wantedComponent (ghciPkgMainIs pkg))
+                    M.toList $
+                    M.filterWithKey (\k _ -> k `S.member` wantedComponents)
+                                    (ghciPkgMainIs pkg)
                 main <- S.toList mains
                 return (ghciPkgName pkg, component, main)
-                where wantedComponent namedC _ =
-                          case target of
-                              STLocalAll -> True
-                              STLocalComps cs -> S.member namedC cs
-                              _ -> False
+              where
+                wantedComponents =
+                    wantedPackageComponents bopts target (ghciPkgPackage pkg)
     renderCandidate (pkgName,namedComponent,mainIs) =
         "Package `" <> packageNameText pkgName <> "' component " <>
         renderComp namedComponent <>
@@ -187,31 +192,20 @@ figureOutMainFile mainIsTargets targets0 packages =
 -- information to load that package/components.
 ghciSetup
     :: (HasConfig r, HasHttpManager r, HasBuildConfig r, MonadMask m, HasTerminal r, HasLogLevel r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
-    => Maybe BuildSubset
+    => BuildOpts
+    -> Bool
     -> Maybe Text
-    -> [Text]
     -> m (Map PackageName SimpleTarget, Maybe (Map PackageName SimpleTarget), [GhciPkgInfo])
-ghciSetup mbuildFirst mainIs stringTargets = do
-    (_,_,targets) <-
-        parseTargetsFromBuildOpts
-            AllowNoTargets
-            defaultBuildOpts
-            { boptsTargets = stringTargets
-            }
+ghciSetup bopts noBuild mainIs = do
+    (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets bopts
     mainIsTargets <-
         case mainIs of
             Nothing -> return Nothing
             Just target -> do
-                (_,_,targets') <-
-                    parseTargetsFromBuildOpts
-                        AllowNoTargets
-                        defaultBuildOpts
-                        { boptsTargets = [target]
-                        }
+                (_,_,targets') <- parseTargetsFromBuildOpts AllowNoTargets bopts { boptsTargets = [target] }
                 return (Just targets')
-    let bopts = makeBuildOpts targets
     econfig <- asks getEnvConfig
-    (realTargets,_,_,_,sourceMap) <- loadSourceMap AllowNoTargets (bopts BSAll)
+    (realTargets,_,_,_,sourceMap) <- loadSourceMap AllowNoTargets bopts
     menv <- getMinimalEnvOverride
     (installedMap, _, _, _) <- getInstalled
         menv
@@ -232,41 +226,22 @@ ghciSetup mbuildFirst mainIs stringTargets = do
                              Nothing -> return Nothing
                     else return Nothing
     -- Try to build, but optimistically launch GHCi anyway if it fails (#1065)
-    case mbuildFirst of
-        Just buildFirst -> do
-            eres <- tryAny $ build (const (return ())) Nothing (bopts buildFirst)
-            case eres of
-                Left err -> do
-                    $logError $ T.pack (show err)
-                    $logWarn "Warning: build failed, but optimistically launching GHCi anyway"
-                Right () -> return ()
-        Nothing -> return ()
+    unless noBuild $ do
+        eres <- tryAny $ build (const (return ())) Nothing bopts
+        case eres of
+            Right () -> return ()
+            Left err -> do
+                $logError $ T.pack (show err)
+                $logWarn "Warning: build failed, but optimistically launching GHCi anyway"
     -- Load the list of modules _after_ building, to catch changes in unlisted dependencies (#1180)
     let localLibs = [name | (name, (_, target)) <- locals, hasLocalComp isCLib target]
     infos <-
         forM locals $
         \(name,(cabalfp,target)) ->
-             makeGhciPkgInfo sourceMap installedMap localLibs name cabalfp target
+             makeGhciPkgInfo bopts sourceMap installedMap localLibs name cabalfp target
     checkForIssues infos
     return (realTargets, mainIsTargets, infos)
   where
-    makeBuildOpts targets buildFirst =
-        base
-        { boptsTargets = stringTargets
-        , boptsTests = any (hasLocalComp isCTest) elems
-        , boptsBenchmarks = any (hasLocalComp isCBench) elems
-        , boptsTestOpts = (boptsTestOpts base)
-          { toDisableRun = True
-          , toRerunTests = False
-          }
-        , boptsBenchmarkOpts = (boptsBenchmarkOpts base)
-          { beoDisableRun = True
-          }
-        , boptsBuildSubset = buildFirst
-        }
-      where
-        base = defaultBuildOpts
-        elems = M.elems targets
     hasLocalComp p t =
         case t of
             STLocalComps s -> any p (S.toList s)
@@ -276,25 +251,28 @@ ghciSetup mbuildFirst mainIs stringTargets = do
 -- | Make information necessary to load the given package in GHCi.
 makeGhciPkgInfo
     :: (MonadReader r m, HasEnvConfig r, MonadLogger m, MonadIO m, MonadCatch m)
-    => SourceMap
+    => BuildOpts
+    -> SourceMap
     -> InstalledMap
     -> [PackageName]
     -> PackageName
     -> Path Abs File
     -> SimpleTarget
     -> m GhciPkgInfo
-makeGhciPkgInfo sourceMap installedMap locals name cabalfp target = do
+makeGhciPkgInfo bopts sourceMap installedMap locals name cabalfp target = do
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
     let config =
             PackageConfig
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True
-            , packageConfigFlags = localFlags mempty bconfig name
+            , packageConfigFlags = localFlags (boptsFlags bopts) bconfig name
             , packageConfigCompilerVersion = envConfigCompilerVersion econfig
             , packageConfigPlatform = configPlatform (getConfig bconfig)
             }
     (warnings,pkg) <- readPackage config cabalfp
+    let filterWanted = M.filterWithKey (\k _ -> k `S.member` allWanted)
+        allWanted = wantedPackageComponents bopts target pkg
     mapM_ (printCabalFileWarning cabalfp) warnings
     (mods,files,opts) <- getPackageOpts (packageOpts pkg) sourceMap installedMap locals cabalfp
     let filteredOpts = filterWanted opts
@@ -310,17 +288,25 @@ makeGhciPkgInfo sourceMap installedMap locals name cabalfp target = do
         , ghciPkgModFiles = mconcat (M.elems (filterWanted (M.map (setMapMaybe dotCabalModulePath) files)))
         , ghciPkgMainIs = M.map (setMapMaybe dotCabalMainPath) files
         , ghciPkgCFiles = mconcat (M.elems (filterWanted (M.map (setMapMaybe dotCabalCFilePath) files)))
+        , ghciPkgPackage = pkg
         }
   where
     badForGhci :: String -> Bool
     badForGhci x =
         isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky -static")
     setMapMaybe f = S.fromList . mapMaybe f . S.toList
-    filterWanted = M.filterWithKey (\k _ -> wantedComponent k)
-    wantedComponent k =
-        case target of
-            STLocalComps cs -> S.member k cs
-            _ -> True
+
+-- NOTE: this should make the same choices as the components code in
+-- 'loadLocalPackage'. Unfortunately for now we reiterate this logic
+-- (differently).
+wantedPackageComponents :: BuildOpts -> SimpleTarget -> Package -> Set NamedComponent
+wantedPackageComponents _ (STLocalComps cs) _ = cs
+wantedPackageComponents bopts STLocalAll pkg = S.fromList $
+    (if packageHasLibrary pkg then [CLib] else []) ++
+    map CExe (S.toList (packageExes pkg)) <>
+    (if boptsTests bopts then map CTest (S.toList (packageTests pkg)) else []) <>
+    (if boptsBenchmarks bopts then map CBench (S.toList (packageBenchmarks pkg)) else [])
+wantedPackageComponents _ _ _ = S.empty
 
 checkForIssues :: (MonadThrow m, MonadLogger m) => [GhciPkgInfo] -> m ()
 checkForIssues pkgs = do
