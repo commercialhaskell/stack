@@ -16,7 +16,7 @@
 module Stack.Package
   (readPackage
   ,readPackageBS
-  ,readPackageDir
+  ,readPackageDescriptionDir
   ,readPackageUnresolved
   ,readPackageUnresolvedBS
   ,resolvePackage
@@ -133,17 +133,16 @@ readPackageBS packageConfig bs =
   do (warnings,gpkg) <- readPackageUnresolvedBS Nothing bs
      return (warnings,resolvePackage packageConfig gpkg)
 
--- | Convenience wrapper around @readPackage@ that first finds the cabal file
--- in the given directory.
-readPackageDir :: (MonadLogger m, MonadIO m, MonadThrow m, MonadCatch m)
-               => PackageConfig
-               -> Path Abs Dir
-               -> m (Path Abs File, [PWarning], Package)
-readPackageDir packageConfig dir = do
-    cabalfp <- getCabalFileName dir
-    (warnings,pkg) <- readPackage packageConfig cabalfp
-    checkCabalFileName (packageName pkg) cabalfp
-    return (cabalfp, warnings, pkg)
+-- | Get 'GenericPackageDescription' and 'PackageDescription' reading info
+-- from given directory.
+readPackageDescriptionDir :: (MonadLogger m, MonadIO m, MonadThrow m, MonadCatch m)
+  => PackageConfig
+  -> Path Abs Dir
+  -> m (GenericPackageDescription, PackageDescription)
+readPackageDescriptionDir config pkgDir = do
+    cabalfp <- getCabalFileName pkgDir
+    gdesc   <- liftM snd (readPackageUnresolved cabalfp)
+    return (gdesc, resolvePackageDescription config gdesc)
 
 -- | Print cabal file warnings.
 printCabalFileWarning

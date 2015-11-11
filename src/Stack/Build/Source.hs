@@ -15,8 +15,8 @@ module Stack.Build.Source
     , loadLocalPackage
     , parseTargetsFromBuildOpts
     , addUnlistedToBuildCache
+    , getPackageConfig
     ) where
-
 
 import           Control.Applicative
 import           Control.Arrow ((&&&))
@@ -286,17 +286,9 @@ loadLocalPackage
     -> (PackageName, (LocalPackageView, GenericPackageDescription))
     -> m LocalPackage
 loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
-    bconfig <- asks getBuildConfig
-    econfig <- asks getEnvConfig
+    config  <- getPackageConfig name
 
-    let config = PackageConfig
-            { packageConfigEnableTests = False
-            , packageConfigEnableBenchmarks = False
-            , packageConfigFlags = localFlags (boptsFlags bopts) bconfig name
-            , packageConfigCompilerVersion = envConfigCompilerVersion econfig
-            , packageConfigPlatform = configPlatform $ getConfig bconfig
-            }
-        pkg = resolvePackage config gpkg
+    let pkg = resolvePackage config gpkg
 
         mtarget = Map.lookup name targets
         (exes, tests, benches) =
@@ -571,3 +563,18 @@ checkComponentsBuildable lps =
         | lp <- lps
         , c <- Set.toList (lpUnbuildable lp)
         ]
+
+-- | Get 'PackageConfig' for package given its name.
+getPackageConfig :: (MonadIO m, MonadThrow m, MonadCatch m, MonadLogger m, MonadReader env m, HasEnvConfig env)
+  => PackageName
+  -> m PackageConfig
+getPackageConfig name = do
+  econfig <- asks getEnvConfig
+  bconfig <- asks getBuildConfig
+  return PackageConfig
+    { packageConfigEnableTests = False
+    , packageConfigEnableBenchmarks = False
+    , packageConfigFlags = localFlags Map.empty bconfig name
+    , packageConfigCompilerVersion = envConfigCompilerVersion econfig
+    , packageConfigPlatform = configPlatform $ getConfig bconfig
+    }
