@@ -62,10 +62,11 @@ type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,MonadLogger m,Mon
 -- While this yields a 'FilePath', the name of the tarball, this
 -- tarball is not written to the disk and instead yielded as a lazy
 -- bytestring.
-getSDistTarball :: M env m
-                => Maybe PvpBounds -- ^ override Config value
-                -> Path Abs Dir
-                -> m (FilePath, L.ByteString)
+getSDistTarball
+  :: M env m
+  => Maybe PvpBounds            -- ^ Override Config value
+  -> Path Abs Dir               -- ^ Path to local package
+  -> m (FilePath, L.ByteString) -- ^ Filename and tarball contents
 getSDistTarball mpvpBounds pkgDir = do
     config <- asks getConfig
     let pvpBounds = fromMaybe (configPvpBounds config) mpvpBounds
@@ -149,7 +150,7 @@ gtraverseT f =
                  Nothing -> gtraverseT f x
                  Just b  -> fromMaybe x (cast (f b)))
 
--- Read in a 'LocalPackage' config.  This makes some default decisions
+-- | Read in a 'LocalPackage' config.  This makes some default decisions
 -- about 'LocalPackage' fields that might not be appropriate for other
 -- usecases.
 --
@@ -219,8 +220,8 @@ getSDistFileList lp =
 
 normalizeTarballPaths :: M env m => [FilePath] -> m [FilePath]
 normalizeTarballPaths fps = do
-    --TODO: consider whether erroring out is better - otherwise the
-    --user might upload an incomplete tar?
+    -- TODO: consider whether erroring out is better - otherwise the
+    -- user might upload an incomplete tar?
     unless (null outsideDir) $
         $logWarn $ T.concat
             [ "Warning: These files are outside of the package directory, and will be omitted from the tarball: "
