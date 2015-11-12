@@ -121,23 +121,22 @@ runShellAndExit getCmdArgs = do
          fullArgs = concat [["--pure"]
                            --,packagesOrFile
                            ,map T.unpack (nixShellOptions (configNix config))
-                           ,["-E", intercalate " "
-                              ["with (import <nixpkgs> {});
-                               runCommand \"myEnv\" {
-                                  buildInputs=[",nixpkgs,"];
-                                  shellHook=''
-                                    STACK_EXTRA_ARGS=",
-                                      map (\p -> ["--extra-lib-dirs=", "${"++p++"}/lib"
-                                                 ,"--extra-include-dirs=", "${"++p++"}/include"])
-                                          pkgsInConfig
-                                    ,"
-                                  '';
-                               } \"\""]]
-                           ,["--run"]
-                           ,[concat ["export ",inShellEnvVar,"=1 ;
-                                     "
-                                    ,cmnd:args]
-                           ]]
+                           ,["-E", intercalate " " $ concat
+                              [["with (import <nixpkgs> {});"
+                               ,"runCommand \"myEnv\" {"
+                               ,"buildInputs=["],nixpkgs,["];"
+                               ,"shellHook=''"
+                               ,  ("export " ++ inShellEnvVar ++ "=1 ;")
+                               ,   "STACK_IN_NIX_EXTRA_ARGS='"]
+                               ,      (map (\p -> concat ["--extra-lib-dirs=", "${"++p++"}/lib"
+                                                         ," --extra-include-dirs=", "${"++p++"}/include"])
+                                           pkgsInConfig), ["' ;"
+                               ,   "STACK_IN_NIX_CMD='"]
+                               ,     (cmnd:args), ["' ;"
+                               ,"'';"
+                               ,"} \"\""]]]
+                           ,["--command", "$STACK_IN_NIX_CMD $STACK_IN_NIX_EXTRA_ARGS"]
+                           ]
      $logDebug $ T.pack $
          "Using a nix-shell environment " ++ (case mshellFile of
             Just filePath -> "from file: " ++ filePath
