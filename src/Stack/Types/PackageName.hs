@@ -37,6 +37,7 @@ import qualified Data.ByteString.Char8 as S8
 import           Data.Char (isLetter)
 import           Data.Data
 import           Data.Hashable
+import           Data.List (intercalate)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Text (Text)
@@ -88,14 +89,13 @@ instance FromJSON PackageName where
 -- | Attoparsec parser for a package name from bytestring.
 packageNameParser :: Parser PackageName
 packageNameParser =
-  fmap (PackageName . S8.pack)
-       (appending (many1 (satisfy isAlphaNum))
-                  (concating (many (alternating
-                                      (pured (satisfy isAlphaNum))
-                                      (appending (pured (satisfy (== '-')))
-                                                 (pured (satisfy isLetter)))))))
+  fmap (PackageName . S8.pack . intercalate "-")
+       (sepBy1 word (char '-'))
   where
-    isAlphaNum c = isLetter c || isDigit c
+    word = concat <$> sequence [many digit,
+                                pured letter,
+                                many (alternating letter digit)]
+    letter = satisfy isLetter
 
 -- | Make a package name.
 mkPackageName :: String -> Q Exp
