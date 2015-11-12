@@ -113,29 +113,33 @@ runShellAndExit getCmdArgs = do
                      _ -> "ghc"
          --nixpkgs = ghcInNix : "gnused" : "coreutils" : "glibcLocales" : pkgsInConfig
          nixpkgs = "glibcLocales" : pkgsInConfig
-         -- gnused and coreutils (for tr) are necessary for the hack exposed in the doc for 'exportLDPath'.
-         -- glibcLocales is necessary to avoid warnings about GHC being incapable to set the locale.
-         --packagesOrFile = case mshellFile of
-         --  Just filePath -> [filePath]
-         --  Nothing -> "-p" : nixpkgs
-         fullArgs = concat [["--pure"]
-                           --,packagesOrFile
-                           ,map T.unpack (nixShellOptions (configNix config))
-                           ,["-E", intercalate " " $ concat
+         nixopts = case mshellFile of
+           Just filePath -> [filePath]
+           Nothing -> ["-E", intercalate " " $ concat
                               [["with (import <nixpkgs> {});"
                                ,"runCommand \"myEnv\" {"
                                ,"buildInputs=["],nixpkgs,["];"
                                ,"shellHook=''"
-                               ,  ("export " ++ inShellEnvVar ++ "=1 ;")
                                ,   "STACK_IN_NIX_EXTRA_ARGS='"]
                                ,      (map (\p -> concat ["--extra-lib-dirs=", "${"++p++"}/lib"
                                                          ," --extra-include-dirs=", "${"++p++"}/include"])
                                            pkgsInConfig), ["' ;"
-                               ,   "STACK_IN_NIX_CMD='"]
-                               ,     (cmnd:args), ["' ;"
                                ,"'';"
                                ,"} \"\""]]]
-                           ,["--command", "$STACK_IN_NIX_CMD $STACK_IN_NIX_EXTRA_ARGS"]
+         -- gnused and coreutils (for tr) are necessary for the hack exposed in the doc for 'exportLDPath'.
+         -- glibcLocales is necessary to avoid warnings about GHC being incapable to set the locale.
+         {-baseDerivExpr = case mshellFile of
+           Just filePath -> "(import ./" ++ filePath ++ " {})" 
+           Nothing -> concat $ concat
+                      [["(with (import <nixpkgs> {}); "
+                       ,"runCommand \"dummy\" {"
+                       ,"buildInputs=["],nixpkgs,["]; } \"\""]]-}
+         fullArgs = concat [ -- ["--pure"],
+                            map T.unpack (nixShellOptions (configNix config))
+                           ,nixopts
+                           ,["--command", ("export " ++ inShellEnvVar ++ "=1 ; ")
+                                          ++ intercalate " " (cmnd:args)
+                                          ++ " $STACK_IN_NIX_EXTRA_ARGS"]
                            ]
      $logDebug $ T.pack $
          "Using a nix-shell environment " ++ (case mshellFile of
