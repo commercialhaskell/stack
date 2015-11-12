@@ -103,9 +103,9 @@ runShellAndExit getCmdArgs = do
                    <*> hIsTerminalDevice stderr)
      let mshellFile = nixInitFile (configNix config)
          pkgsInConfig = nixPackages (configNix config)
-     if not (null pkgsInConfig) && isJust mshellFile then
+     {-if not (null pkgsInConfig) && isJust mshellFile then
        throwM NixCannotUseShellFileAndPackagesException
-       else return ()
+       else return ()-}
      let isTerm = isStdinTerminal && isStdoutTerminal && isStderrTerminal
          ghcInNix = case resolver of
                      ResolverSnapshot (LTS x y) ->
