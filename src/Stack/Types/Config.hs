@@ -13,7 +13,109 @@
 
 -- | The Config type.
 
-module Stack.Types.Config where
+module Stack.Types.Config
+  (
+  -- * Main configuration types and classes
+  -- ** HasPlatform & HasStackRoot
+   HasPlatform(..)
+  ,HasStackRoot(..)
+  -- ** Config & HasConfig
+  ,Config(..)
+  ,HasConfig(..)
+  ,askConfig
+  ,askLatestSnapshotUrl
+  ,explicitSetupDeps
+  ,getMinimalEnvOverride
+  -- ** BuildConfig & HasBuildConfig
+  ,BuildConfig(..)
+  ,bcRoot
+  ,bcWorkDir
+  ,HasBuildConfig(..)
+  -- ** GHCVariant & HasGHCVariant
+  ,GHCVariant(..)
+  ,ghcVariantName
+  ,ghcVariantSuffix
+  ,parseGHCVariant
+  ,HasGHCVariant(..)
+  ,snapshotsDir
+  -- ** EnvConfig & HasEnvConfig
+  ,EnvConfig(..)
+  ,HasEnvConfig(..)
+  ,getWhichCompiler
+  -- * Details
+  -- ** ApplyGhcOptions
+  ,ApplyGhcOptions(..)
+  -- ** ConfigException
+  ,ConfigException(..)
+  -- ** ConfigMonoid
+  ,ConfigMonoid(..)
+  -- ** EnvSettings
+  ,EnvSettings(..)
+  ,minimalEnvSettings
+  -- ** GlobalOpts & GlobalOptsMonoid
+  ,GlobalOpts(..)
+  ,GlobalOptsMonoid(..)
+  ,defaultLogLevel
+  -- ** LoadConfig
+  ,LoadConfig(..)
+  -- ** PackageEntry & PackageLocation
+  ,PackageEntry(..)
+  ,peExtraDep
+  ,PackageLocation(..)
+  -- ** PackageIndex, IndexName & IndexLocation
+  ,PackageIndex(..)
+  ,IndexName(..)
+  ,configPackageIndex
+  ,configPackageIndexCache
+  ,configPackageIndexGz
+  ,configPackageIndexRoot
+  ,configPackageTarball
+  ,indexNameText
+  ,IndexLocation(..)
+  -- ** Project & ProjectAndConfigMonoid
+  ,Project(..)
+  ,ProjectAndConfigMonoid(..)
+  -- ** PvpBounds
+  ,PvpBounds(..)
+  ,parsePvpBounds
+  -- ** Resolver & AbstractResolver
+  ,Resolver(..)
+  ,parseResolverText
+  ,resolverName
+  ,AbstractResolver(..)
+  -- ** SCM
+  ,SCM(..)
+  -- * Paths
+  ,bindirSuffix
+  ,configInstalledCache
+  ,configMiniBuildPlanCache
+  ,configProjectWorkDir
+  ,docDirSuffix
+  ,flagCacheLocal
+  ,extraBinDirs
+  ,hpcReportDir
+  ,installationRootDeps
+  ,installationRootLocal
+  ,packageDatabaseDeps
+  ,packageDatabaseExtra
+  ,packageDatabaseLocal
+  ,platformOnlyRelDir
+  ,platformVariantRelDir
+  ,useShaPathOnWindows
+  ,workDirRel
+  -- * Command-specific types
+  -- ** Eval
+  ,EvalOpts(..)
+  -- ** Exec
+  ,ExecOpts(..)
+  ,SpecialExecCmd(..)
+  ,ExecOptsExtra(..)
+  -- ** Setup
+  ,DownloadInfo(..)
+  ,VersionedDownloadInfo(..)
+  ,SetupInfo(..)
+  ,SetupInfoLocation(..)
+  ) where
 
 import           Control.Applicative
 import           Control.Arrow ((&&&))
@@ -355,9 +457,9 @@ data BuildConfig = BuildConfig
 bcRoot :: BuildConfig -> Path Abs Dir
 bcRoot = parent . bcStackYaml
 
--- | Directory containing the project's stack.yaml file
+-- | @"'bcRoot'/.stack-work"@
 bcWorkDir :: BuildConfig -> Path Abs Dir
-bcWorkDir = (</> workDirRel) . parent . bcStackYaml
+bcWorkDir = (</> workDirRel) . bcRoot
 
 -- | Configuration after the environment has been setup.
 data EnvConfig = EnvConfig
@@ -862,9 +964,6 @@ configMonoidLocalBinPathName = "local-bin-path"
 configMonoidImageOptsName :: Text
 configMonoidImageOptsName = "image"
 
-configMonoidTemplatesName :: Text
-configMonoidTemplatesName = "templates"
-
 configMonoidScmInitName :: Text
 configMonoidScmInitName = "scm-init"
 
@@ -1005,6 +1104,7 @@ configPackageTarball iname ident = do
     base <- parseRelFile $ packageIdentifierString ident ++ ".tar.gz"
     return (root </> $(mkRelDir "packages") </> name </> ver </> base)
 
+-- | @".stack-work"@
 workDirRel :: Path Rel Dir
 workDirRel = $(mkRelDir ".stack-work")
 
@@ -1025,14 +1125,6 @@ platformOnlyRelDir
 platformOnlyRelDir = do
     platform <- asks getPlatform
     parseRelDir (Distribution.Text.display platform)
-
--- | Path to .shake files.
-configShakeFilesDir :: (MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
-configShakeFilesDir = liftM (</> $(mkRelDir "shake")) configProjectWorkDir
-
--- | Where to unpack packages for local build
-configLocalUnpackDir :: (MonadReader env m, HasBuildConfig env) => m (Path Abs Dir)
-configLocalUnpackDir = liftM (</> $(mkRelDir "unpacked")) configProjectWorkDir
 
 -- | Directory containing snapshots
 snapshotsDir :: (MonadReader env m, HasConfig env, HasGHCVariant env, MonadThrow m) => m (Path Abs Dir)
