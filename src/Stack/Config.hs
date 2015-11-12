@@ -529,13 +529,10 @@ loadYaml path = do
     logJSONWarnings (toFilePath path) warnings
     return result
 
--- | Get the location of the project config file, if it exists.
-getProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)
-                 => Maybe (Path Abs File)
-                 -- ^ Override stack.yaml
-                 -> m (Maybe (Path Abs File))
-getProjectConfig (Just stackYaml) = return $ Just stackYaml
-getProjectConfig Nothing = do
+-- | Get the parent directory the project config file, if it exists.
+getProjectConfigDir :: (MonadIO m, MonadThrow m, MonadLogger m)
+                    => m (Maybe (Path Abs Dir))
+getProjectConfigDir = do
     env <- liftIO getEnvironment
     case lookup "STACK_YAML" env of
         Just fp -> do
@@ -543,8 +540,8 @@ getProjectConfig Nothing = do
             liftM Just $ case parseAbsFile fp of
                 Left _ -> do
                     currDir <- getWorkingDir
-                    resolveFile currDir fp
-                Right path -> return path
+                    fmap parent (resolveFile currDir fp)
+                Right path -> return (parent path)
         Nothing -> do
             currDir <- getWorkingDir
             search currDir
@@ -555,13 +552,27 @@ getProjectConfig Nothing = do
         $logDebug $ "Checking for project config at: " <> T.pack fp'
         exists <- fileExists fp
         if exists
-            then return $ Just fp
+            then return $ Just dir
             else do
                 let dir' = parent dir
                 if dir == dir'
                     -- fully traversed, give up
                     then return Nothing
                     else search dir'
+
+-- | Get the path of the project config file, if it exists.
+getProjectConfigFile :: (MonadIO m, MonadThrow m, MonadLogger m)
+                         => Maybe (Path Abs File)
+                         -- ^ Override stack.yaml
+                         -> m (Maybe (Path Abs File))
+getProjectConfigFile (Just stackYaml) = return $ Just stackYaml
+getProjectConfigFile Nothing =
+    getProjectConfigDir >>= \case
+        Nothing ->
+            return Nothing
+        Just dir ->
+            return $
+            Just (dir </> stackDotYaml)
 
 -- | Find the project config file location, respecting environment variables
 -- and otherwise traversing parents. If no config is found, we supply a default
@@ -571,7 +582,7 @@ loadProjectConfig :: (MonadIO m, MonadThrow m, MonadLogger m)
                   -- ^ Override stack.yaml
                   -> m (Maybe (Project, Path Abs File, ConfigMonoid))
 loadProjectConfig mstackYaml = do
-    mfp <- getProjectConfig mstackYaml
+    mfp <- getProjectConfigFile mstackYaml
     case mfp of
         Just fp -> do
             currDir <- getWorkingDir
