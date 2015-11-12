@@ -653,10 +653,12 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp = do
             return $ case mpath of
                 Nothing -> []
                 Just x -> return $ concat ["--with-", name, "=", toFilePath x]
+        enableSplitObjs <- asks $ configEnableSplitObjs . getConfig
         cabal False $ "configure" : concat
             [ concat exes
             , dirs
             , nodirs
+            , if enableSplitObjs then ["--enable-split-objs"] else []
             ]
         writeConfigCache pkgDir newConfigCache
         writeCabalMod pkgDir newCabalMod
@@ -886,6 +888,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             Ghc -> []
                             Ghcjs -> ["-build-runner"])
                     return (outputFile, setupArgs)
+
             runExe exeName $ (if boptsCabalVerbose eeBuildOpts then ("--verbose":) else id) fullArgs
 
     maybePrintBuildOutput stripTHLoading makeAbsolute pkgDir level mlogFile mh =
