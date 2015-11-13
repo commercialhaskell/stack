@@ -8,10 +8,16 @@ import Path
 import Stack.Types
 
 -- | Interprets DockerOptsMonoid options.
-nixOptsFromMonoid :: Monad m => Path Abs Dir -> NixOptsMonoid -> m NixOpts
-nixOptsFromMonoid _stackRoot NixOptsMonoid{..} = do
+nixOptsFromMonoid :: Monad m => Maybe Project -> Path Abs Dir -> NixOptsMonoid -> m NixOpts
+nixOptsFromMonoid mproject _stackRoot NixOptsMonoid{..} = do
     let nixEnable = fromMaybe nixMonoidDefaultEnable nixMonoidEnable
-        nixPackages = nixMonoidPackages
+        nixPackages = case mproject of
+           Nothing -> nixMonoidPackages
+           Just p -> nixMonoidPackages ++ ["glibcLocales", case projectResolver p of
+              ResolverSnapshot (LTS x y) ->
+                "haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc"
+              _ -> "ghc"]
+              -- glibcLocales is necessary to avoid warnings about GHC being incapable to set the locale.
         nixInitFile = nixMonoidInitFile
         nixShellOptions = nixMonoidShellOptions
     return NixOpts{..}

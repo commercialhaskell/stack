@@ -605,9 +605,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
       Docker.reexecWithOptionalContainer
           (lcProjectRoot lc)
           Nothing
-          (do bconfig <- runStackLoggingTGlobal manager go $
-                         lcLoadBuildConfig lc globalResolver globalCompiler
-              runStackTGlobal manager bconfig go $
+          (do runStackTGlobal manager (lcConfig lc) go $
                 Nix.reexecWithOptionalShell $
                   runStackLoggingTGlobal manager go $ do
                      (wantedCompiler, compilerCheck, mstack) <-
@@ -764,19 +762,19 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
                  runStackTGlobal
                      manager bconfig go
                      (setupEnv Nothing)
-              runStackTGlobal manager bconfig go $
-                  Nix.reexecWithOptionalShell
-                      (runStackTGlobal
-                          manager
-                          envConfig
-                          go
-                          (inner' lk))
+              runStackTGlobal
+                  manager
+                  envConfig
+                  go
+                  (inner' lk)
 
       runStackTGlobal manager (lcConfig lc) go $
         Docker.reexecWithOptionalContainer
                  (lcProjectRoot lc)
                  mbefore
-                 (inner'' lk0)
+                 (runStackTGlobal manager (lcConfig lc) go $
+                    Nix.reexecWithOptionalShell (inner'' lk0)
+                 )
                  mafter
                  (Just $ liftIO $
                       do lk' <- readIORef curLk
@@ -889,9 +887,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} = do
                     -- Unlock before transferring control away, whether using
                     -- docker or not:
                     (Just $ munlockFile lk)
-                    (do bconfig <- runStackLoggingTGlobal manager go $
-                            lcLoadBuildConfig lc globalResolver globalCompiler
-                        runStackTGlobal manager bconfig go $ do
+                    (runStackTGlobal manager (lcConfig lc) go $ do
                             Nix.execWithOptionalShell
                                 (return (cmd, args))
                                 (runStackTGlobal manager (lcConfig lc) go $

@@ -96,29 +96,22 @@ runShellAndExit getCmdArgs = do
      config <- asks getConfig
      envOverride <- getEnvOverride (configPlatform config)
      (cmnd,args) <- getCmdArgs
-     resolver <- bcResolver <$> asks getBuildConfig
      isStdoutTerminal <- asks getTerminal
      (isStdinTerminal,isStderrTerminal) <-
        liftIO ((,) <$> hIsTerminalDevice stdin
                    <*> hIsTerminalDevice stderr)
      let mshellFile = nixInitFile (configNix config)
          pkgsInConfig = nixPackages (configNix config)
-     {-if not (null pkgsInConfig) && isJust mshellFile then
+     if not (null pkgsInConfig) && isJust mshellFile then
        throwM NixCannotUseShellFileAndPackagesException
-       else return ()-}
+       else return ()
      let isTerm = isStdinTerminal && isStdoutTerminal && isStderrTerminal
-         ghcInNix = case resolver of
-                     ResolverSnapshot (LTS x y) ->
-                       "haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc"
-                     _ -> "ghc"
-         --nixpkgs = ghcInNix : "gnused" : "coreutils" : "glibcLocales" : pkgsInConfig
-         nixpkgs = "glibcLocales" : pkgsInConfig
          nixopts = case mshellFile of
            Just filePath -> [filePath]
            Nothing -> ["-E", intercalate " " $ concat
                               [["with (import <nixpkgs> {});"
                                ,"runCommand \"myEnv\" {"
-                               ,"buildInputs=["],nixpkgs,["];"
+                               ,"buildInputs=["],pkgsInConfig,["];"
                                ,"shellHook=''"
                                ,   "STACK_IN_NIX_EXTRA_ARGS='"]
                                ,      (map (\p -> concat ["--extra-lib-dirs=", "${"++p++"}/lib"
@@ -126,14 +119,6 @@ runShellAndExit getCmdArgs = do
                                            pkgsInConfig), ["' ;"
                                ,"'';"
                                ,"} \"\""]]]
-         -- gnused and coreutils (for tr) are necessary for the hack exposed in the doc for 'exportLDPath'.
-         -- glibcLocales is necessary to avoid warnings about GHC being incapable to set the locale.
-         {-baseDerivExpr = case mshellFile of
-           Just filePath -> "(import ./" ++ filePath ++ " {})" 
-           Nothing -> concat $ concat
-                      [["(with (import <nixpkgs> {}); "
-                       ,"runCommand \"dummy\" {"
-                       ,"buildInputs=["],nixpkgs,["]; } \"\""]]-}
          fullArgs = concat [ -- ["--pure"],
                             map T.unpack (nixShellOptions (configNix config))
                            ,nixopts
@@ -144,7 +129,7 @@ runShellAndExit getCmdArgs = do
      $logDebug $ T.pack $
          "Using a nix-shell environment " ++ (case mshellFile of
             Just filePath -> "from file: " ++ filePath
-            Nothing -> "with nix packages: " ++ (intercalate ", " nixpkgs))
+            Nothing -> "with nix packages: " ++ (intercalate ", " pkgsInConfig))
      e <- try (callProcess'
                  (if isTerm then id else \cp -> cp { delegate_ctlc = False })
                  Nothing
@@ -180,7 +165,7 @@ type M env m =
   ,MonadLogger m
   ,MonadBaseControl IO m
   ,MonadCatch m
-  ,HasBuildConfig env
+  ,HasConfig env
   ,HasTerminal env
   ,HasReExec env
   ,HasHttpManager env
