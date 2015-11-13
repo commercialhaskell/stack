@@ -140,13 +140,6 @@ runShellAndExit getCmdArgs = do
        Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
        Right () -> liftIO exitSuccess
 
--- | This is a hack!
--- Nix currently doesn't expose the paths of the shared libraries provided
--- by the demanded packages in a manner that is suitable to GHC.
--- Therefore, in the Nix-shell, we retrieve in the NIX_LDFLAGS env var those paths and set LD_LIBRARY_PATH before the build happens.
-exportLDPath :: String
-exportLDPath = "export LD_LIBRARY_PATH=`echo -n $NIX_LDFLAGS | tr ' ' $'\n' | sed -n '/-L/{s/-L//; p}' | tr $'\n' ':'`"
-
 -- | 'True' if we are currently running inside a Nix.
 getInShell :: (MonadIO m) => m Bool
 getInShell = liftIO (isJust <$> lookupEnv inShellEnvVar)
