@@ -111,7 +111,7 @@ runShellAndExit getCmdArgs = do
            Nothing -> ["-E", intercalate " " $ concat
                               [["with (import <nixpkgs> {});"
                                ,"runCommand \"myEnv\" {"
-                               ,"buildInputs=["],pkgsInConfig,["];"
+                               ,"buildInputs=lib.optional stdenv.isLinux \"glibcLocales\" ++ ["],pkgsInConfig,["];"
                                ,"shellHook=''"
                                ,   "STACK_IN_NIX_EXTRA_ARGS='"]
                                ,      (map (\p -> concat ["--extra-lib-dirs=", "${"++p++"}/lib"
@@ -119,6 +119,7 @@ runShellAndExit getCmdArgs = do
                                            pkgsInConfig), ["' ;"
                                ,"'';"
                                ,"} \"\""]]]
+                    -- glibcLocales is necessary on Linux to avoid warnings about GHC being incapable to set the locale.
          fullArgs = concat [ -- ["--pure"],
                             map T.unpack (nixShellOptions (configNix config))
                            ,nixopts
@@ -138,6 +139,7 @@ runShellAndExit getCmdArgs = do
                  fullArgs)
      case e of
        Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
+
        Right () -> liftIO exitSuccess
 
 -- | 'True' if we are currently running inside a Nix.
