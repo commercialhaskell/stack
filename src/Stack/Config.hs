@@ -34,9 +34,8 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Arrow ((***))
-import           Control.Exception (IOException)
 import           Control.Monad
-import           Control.Monad.Catch (Handler(..), MonadCatch, MonadThrow, catches, throwM)
+import           Control.Monad.Catch (MonadThrow, MonadCatch, catchAll, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
 import           Control.Monad.Reader (MonadReader, ask, runReaderT)
@@ -169,11 +168,15 @@ configFromConfigMonoid configStackRoot configUserConfigPath mproject configMonoi
                  localDir <- liftIO (getAppUserDataDirectory "local") >>= parseAbsDir
                  return $ localDir </> $(mkRelDir "bin")
              Just userPath ->
-                 liftIO (canonicalizePath userPath >>= parseAbsDir)
-                 `catches`
-                 [Handler (\(_ :: IOException) -> throwM $ NoSuchDirectory userPath)
-                 ,Handler (\(_ :: PathParseException) -> throwM $ NoSuchDirectory userPath)
-                 ]
+                  (getProjectConfig Nothing >>= \case
+                       Nothing ->
+                       -- ^ Not in a project
+                           liftIO (canonicalizePath userPath >>= parseAbsDir)
+                       Just (parent -> sYamlDir) -> (resolveDir sYamlDir userPath))
+                       -- ^ Resolves to the project dir and appends the user path if it is relative
+                  `catchAll`
+                  const (throwM (NoSuchDirectory userPath))
+
      configJobs <-
         case configMonoidJobs of
             Nothing -> liftIO getNumProcessors
