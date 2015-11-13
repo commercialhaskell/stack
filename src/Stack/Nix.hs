@@ -111,7 +111,7 @@ runShellAndExit getCmdArgs = do
            Nothing -> ["-E", intercalate " " $ concat
                               [["with (import <nixpkgs> {});"
                                ,"runCommand \"myEnv\" {"
-                               ,"buildInputs=lib.optional stdenv.isLinux \"glibcLocales\" ++ ["],pkgsInConfig,["];"
+                               ,"buildInputs=lib.optional stdenv.isLinux glibcLocales ++ lib.optional stdenv.isDarwin darwin.cf-private ++ ["],pkgsInConfig,["];"
                                ,"shellHook=''"
                                ,   "STACK_IN_NIX_EXTRA_ARGS='"]
                                ,      (map (\p -> concat ["--extra-lib-dirs=", "${"++p++"}/lib"
