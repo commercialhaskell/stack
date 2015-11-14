@@ -18,6 +18,7 @@ Other enhancements:
 * `stack ghci` now detects and warns about various circumstances where it is liable to fail. See [#1270](https://github.com/commercialhaskell/stack/issues/1270)
 * Added `require-docker-version` configuration option
 * Packages will now usually be built along with their tests and benchmarks. See [#1166](https://github.com/commercialhaskell/stack/issues/1166)
+* Relative `local-bin-path` paths will be relative to the project's root directory, not the current working directory.  [#1340](https://github.com/commercialhaskell/stack/issues/1340)
 
 Bug fixes:
 
