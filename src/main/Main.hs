@@ -427,6 +427,7 @@ pathCmd keys go =
             menv <- getMinimalEnvOverride
             snap <- packageDatabaseDeps
             local <- packageDatabaseLocal
+            extra <- packageDatabaseExtra
             global <- getGlobalDB menv =<< getWhichCompiler
             snaproot <- installationRootDeps
             localroot <- installationRootLocal
@@ -456,7 +457,8 @@ pathCmd keys go =
                                     snaproot
                                     localroot
                                     distDir
-                                    hpcDir))))
+                                    hpcDir
+                                    extra))))
 
 -- | Passed to all the path printers as a source of info.
 data PathInfo = PathInfo
@@ -469,6 +471,7 @@ data PathInfo = PathInfo
     , piLocalRoot   :: Path Abs Dir
     , piDistDir     :: Path Rel Dir
     , piHpcDir      :: Path Abs Dir
+    , piExtraDbs    :: [Path Abs Dir]
     }
 
 -- | The paths of interest to a user. The first tuple string is used
@@ -517,7 +520,7 @@ paths =
       , T.pack . toFilePathNoTrailingSep . piGlobalDb )
     , ( "GHC_PACKAGE_PATH environment variable"
       , "ghc-package-path"
-      , \pi -> mkGhcPackagePath True (piLocalDb pi) (piSnapDb pi) (piGlobalDb pi) )
+      , \pi -> mkGhcPackagePath True (piLocalDb pi) (piSnapDb pi) (piExtraDbs pi) (piGlobalDb pi))
     , ( "Snapshot installation root"
       , "snapshot-install-root"
       , T.pack . toFilePathNoTrailingSep . piSnapRoot )

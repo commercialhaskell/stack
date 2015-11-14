@@ -239,7 +239,8 @@ setupEnv mResolveMissingGHC = do
     localdb <- runReaderT packageDatabaseLocal envConfig0
     createDatabase menv wc localdb
     globaldb <- getGlobalDB menv wc
-    let mkGPP locals = mkGhcPackagePath locals localdb deps globaldb
+    extras <- runReaderT packageDatabaseExtra envConfig0
+    let mkGPP locals = mkGhcPackagePath locals localdb deps extras globaldb
 
     distDir <- runReaderT distRelativeDir envConfig0
 
