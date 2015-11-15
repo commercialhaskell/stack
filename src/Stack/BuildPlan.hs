@@ -469,7 +469,7 @@ loadBuildPlan name = do
     env <- ask
     let stackage = getStackRoot env
     file' <- parseRelFile $ T.unpack file
-    let fp = stackage </> $(mkRelDir "build-plan") </> file'
+    let fp = buildPlanDir stackage </> file'
     $logDebug $ "Decoding build plan from: " <> T.pack (toFilePath fp)
     eres <- liftIO $ decodeFileEither $ toFilePath fp
     case eres of

@@ -115,6 +115,8 @@ module Stack.Types.Config
   ,VersionedDownloadInfo(..)
   ,SetupInfo(..)
   ,SetupInfoLocation(..)
+  -- ** Docker entrypoint
+  ,DockerEntrypoint(..)
   ) where
 
 import           Control.Applicative
@@ -163,6 +165,7 @@ import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
 import           Stack.Types.Version
+import           System.PosixCompat.Types (UserID, GroupID)
 import           System.Process.Read (EnvOverride)
 #ifdef mingw32_HOST_OS
 import qualified Crypto.Hash.SHA1 as SHA1
@@ -373,6 +376,8 @@ data EvalOpts = EvalOpts
 -- | Parsed global command-line options.
 data GlobalOpts = GlobalOpts
     { globalReExecVersion :: !(Maybe String) -- ^ Expected re-exec in container version
+    , globalDockerEntrypoint :: !(Maybe DockerEntrypoint)
+      -- ^ Data used when stack is acting as a Docker entrypoint (internal use only)
     , globalLogLevel     :: !LogLevel -- ^ Log level
     , globalConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
@@ -384,6 +389,8 @@ data GlobalOpts = GlobalOpts
 -- | Parsed global command-line options monoid.
 data GlobalOptsMonoid = GlobalOptsMonoid
     { globalMonoidReExecVersion :: !(Maybe String) -- ^ Expected re-exec in container version
+    , globalMonoidDockerEntrypoint :: !(Maybe DockerEntrypoint)
+      -- ^ Data used when stack is acting as a Docker entrypoint (internal use only)
     , globalMonoidLogLevel     :: !(Maybe LogLevel) -- ^ Log level
     , globalMonoidConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
     , globalMonoidResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
@@ -393,9 +400,11 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     } deriving (Show)
 
 instance Monoid GlobalOptsMonoid where
-    mempty = GlobalOptsMonoid Nothing Nothing mempty Nothing Nothing Nothing Nothing
+    mempty = GlobalOptsMonoid Nothing Nothing Nothing mempty Nothing Nothing Nothing Nothing
     mappend l r = GlobalOptsMonoid
         { globalMonoidReExecVersion = globalMonoidReExecVersion l <|> globalMonoidReExecVersion r
+        , globalMonoidDockerEntrypoint =
+            globalMonoidDockerEntrypoint l <|> globalMonoidDockerEntrypoint r
         , globalMonoidLogLevel = globalMonoidLogLevel l <|> globalMonoidLogLevel r
         , globalMonoidConfigMonoid = globalMonoidConfigMonoid l <> globalMonoidConfigMonoid r
         , globalMonoidResolver = globalMonoidResolver l <|> globalMonoidResolver r
@@ -1513,3 +1522,9 @@ explicitSetupDeps name = do
                 case Map.lookup Nothing m of
                     Just b -> b
                     Nothing -> False -- default value
+
+-- | Data passed into Docker container for the Docker entrypoint's use
+data DockerEntrypoint = DockerEntrypoint
+    { deUidGid :: !(Maybe (UserID, GroupID))
+      -- ^ UID/GID of host user, if we wish to perform UID/GID switch in container
+    } deriving (Read,Show)

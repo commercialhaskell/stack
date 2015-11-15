@@ -6,6 +6,7 @@
 module Stack.Constants
     (builtConfigFileFromDir
     ,builtFileFromDir
+    ,buildPlanDir
     ,configuredFileFromDir
     ,defaultShakeThreads
     ,distDirFromDir
@@ -370,3 +371,8 @@ defaultGlobalConfigPathDeprecated = parseAbsFile "/etc/stack/config"
 -- Note that this will be @Nothing@ on Windows, which is by design.
 defaultGlobalConfigPath :: Maybe (Path Abs File)
 defaultGlobalConfigPath = parseAbsFile "/etc/stack/config.yaml"
+
+-- | Path where build plans are stored.
+buildPlanDir :: Path Abs Dir -- ^ Stack root
+             -> Path Abs Dir
+buildPlanDir = (</> $(mkRelDir "build-plan"))

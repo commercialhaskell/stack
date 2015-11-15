@@ -299,3 +299,7 @@ dockerSetUserArgName = "set-user"
 -- | Docker @require-version@ argument name
 dockerRequireDockerVersionArgName :: Text
 dockerRequireDockerVersionArgName = "require-docker-version"
+
+-- | Argument name used to pass docker entrypoint data (only used internally)
+dockerEntrypointArgName :: String
+dockerEntrypointArgName = "internal-docker-entrypoint"

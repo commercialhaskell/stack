@@ -855,9 +855,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
             (manager,lc) <- liftIO $ loadConfigWithOpts go
             withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
              runStackTGlobal manager (lcConfig lc) go $
-                Docker.execWithOptionalContainer
+                Docker.reexecWithOptionalContainer
                     (lcProjectRoot lc)
-                    (\_ _ -> return (cmd, args, [], []))
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
                     (runStackTGlobal manager (lcConfig lc) go $
@@ -999,10 +998,15 @@ loadConfigWithOpts go@GlobalOpts{..} = do
             Just fp -> do
                 path <- canonicalizePath fp >>= parseAbsFile
                 return $ Just path
-    lc <- runStackLoggingTGlobal
-              manager
-              go
-              (loadConfig globalConfigMonoid mstackYaml)
+    lc <- runStackLoggingTGlobal manager go $ do
+        lc <- loadConfig globalConfigMonoid mstackYaml
+        -- If we have been relaunched in a Docker container, perform in-container initialization
+        -- (switch UID, etc.).  We do this after first loading the configuration since it must
+        -- happen ASAP but needs a configuration.
+        case globalDockerEntrypoint of
+            Just de -> Docker.entrypoint (lcConfig lc) de
+            Nothing -> return ()
+        return lc
     return (manager,lc)
 
 -- | Project initialization
