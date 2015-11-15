@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -201,7 +202,11 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
     liftIO $ whenM' getShouldDownload $ do
         createDirectoryIfMissing True dir
         withBinaryFile fptmp WriteMode $ \h ->
+#if MIN_VERSION_retry(0,7,0)
             recovering drRetryPolicy handlers $ const $
+#else
+            recovering drRetryPolicy handlers $
+#endif
                 flip runReaderT env $
                     withResponse req (go h)
         renameFile fptmp fp
