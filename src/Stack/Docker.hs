@@ -680,8 +680,8 @@ checkDockerVersion envOverride docker =
                return ()
            _ -> throwM InvalidVersionOutputException
        _ -> throwM InvalidVersionOutputException
-  where minimumDockerVersion = $(mkVersion "1.3.0")
-        prohibitedDockerVersions = [$(mkVersion "1.2.0")]
+  where minimumDockerVersion = $(mkVersion "1.6.0")
+        prohibitedDockerVersions = []
 
 -- | Remove the project's Docker sandbox.
 reset :: (MonadIO m) => Maybe (Path Abs Dir) -> Bool -> m ()
