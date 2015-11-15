@@ -717,13 +717,15 @@ entrypoint config@Config{..} DockerEntrypoint{..} = do
           -- its original home directory to the host's stack root, to avoid needing to download them
           origStackHomeDir <- parseAbsDir (User.homeDirectory ue)
           let origStackRoot = origStackHomeDir </> $(mkRelDir ("." ++ stackProgName))
-          (_, buildPlans) <- listDirectory (buildPlanDir origStackRoot)
-          forM_ buildPlans $ \srcBuildPlan -> do
-            let destBuildPlan = buildPlanDir configStackRoot </> filename srcBuildPlan
-            exists <- fileExists destBuildPlan
-            unless exists $ do
-              createTree (parent destBuildPlan)
-              copyFile srcBuildPlan destBuildPlan
+          buildPlanDirExists <- dirExists (buildPlanDir origStackRoot)
+          when buildPlanDirExists $ do
+            (_, buildPlans) <- listDirectory (buildPlanDir origStackRoot)
+            forM_ buildPlans $ \srcBuildPlan -> do
+              let destBuildPlan = buildPlanDir configStackRoot </> filename srcBuildPlan
+              exists <- fileExists destBuildPlan
+              unless exists $ do
+                createTree (parent destBuildPlan)
+                copyFile srcBuildPlan destBuildPlan
           forM_ configPackageIndices $ \pkgIdx -> do
             msrcIndex <- flip runReaderT (config{configStackRoot = origStackRoot}) $ do
                srcIndex <- configPackageIndex (indexName pkgIdx)
