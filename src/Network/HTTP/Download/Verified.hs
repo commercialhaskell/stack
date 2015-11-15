@@ -201,7 +201,7 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
     liftIO $ whenM' getShouldDownload $ do
         createDirectoryIfMissing True dir
         withBinaryFile fptmp WriteMode $ \h ->
-            recovering drRetryPolicy handlers $
+            recovering drRetryPolicy handlers $ const $
                 flip runReaderT env $
                     withResponse req (go h)
         renameFile fptmp fp
