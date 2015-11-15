@@ -9,7 +9,7 @@ description:         Please see the README.md for usage information, and
 license:             BSD3
 license-file:        LICENSE
 author:              Commercial Haskell SIG
-maintainer:          borsboom@fpcomplete.com
+maintainer:          manny@fpcomplete.com
 category:            Development
 build-type:          Simple
 cabal-version:       >=1.10
