@@ -864,7 +864,7 @@ is called a *local* database. That is layered on top of a *snapshot* database,
 which contains the libraries and executables specified in the snapshot itself.
 Finally, GHC itself ships with a number of libraries and executables, which
 forms the *global* database. To get a quick idea of this, we can look at the
-output of the `ghc-pkg list` command in our helloworld project:
+output of the `stack exec ghc-pkg list` command in our helloworld project:
 
 ```
 /home/michael/.stack/programs/x86_64-linux/ghc-7.10.2/lib/ghc-7.10.2/package.conf.d
