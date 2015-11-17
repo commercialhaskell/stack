@@ -49,6 +49,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import           Path as FL
 import           Prelude
+import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
@@ -206,11 +207,14 @@ distRelativeDir :: (MonadThrow m, MonadReader env m, HasPlatform env, HasEnvConf
 distRelativeDir = do
     cabalPkgVer <- asks (envConfigCabalVersion . getEnvConfig)
     platform <- platformVariantRelDir
-    cabal <-
+    wc <- getWhichCompiler
+    -- Cabal version, suffixed with "_ghcjs" if we're using GHCJS.
+    envDir <-
         parseRelDir $
-        packageIdentifierString
-            (PackageIdentifier cabalPackageName cabalPkgVer)
-    platformAndCabal <- useShaPathOnWindows (platform </> cabal)
+        (if wc == Ghcjs then (++ "_ghcjs") else id) $
+        packageIdentifierString $
+        PackageIdentifier cabalPackageName cabalPkgVer
+    platformAndCabal <- useShaPathOnWindows (platform </> envDir)
     return $
         workDirRel </>
         $(mkRelDir "dist") </>
