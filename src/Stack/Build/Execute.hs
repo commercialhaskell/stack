@@ -208,7 +208,6 @@ data ExecuteEnv = ExecuteEnv
     , eeTotalWanted    :: !Int
     , eeWanted         :: !(Set PackageName)
     , eeLocals         :: ![LocalPackage]
-    , eeSourceMap      :: !SourceMap
     , eeGlobalDB       :: !(Path Abs Dir)
     , eeGlobalDumpPkgs :: !(Map GhcPkgId (DumpPackage () ()))
     , eeSnapshotDumpPkgs :: !(TVar (Map GhcPkgId (DumpPackage () ())))
@@ -288,10 +287,9 @@ withExecuteEnv :: M env m
                -> [DumpPackage () ()] -- ^ global packages
                -> [DumpPackage () ()] -- ^ snapshot packages
                -> [DumpPackage () ()] -- ^ local packages
-               -> SourceMap
                -> (ExecuteEnv -> m a)
                -> m a
-withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages sourceMap inner = do
+withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages inner = do
     withCanonicalizedSystemTempDirectory stackProgName $ \tmpdir -> do
         configLock <- newMVar ()
         installLock <- newMVar ()
@@ -321,7 +319,6 @@ withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages 
             , eeTotalWanted = length $ filter lpWanted locals
             , eeWanted = wantedLocalPackages locals
             , eeLocals = locals
-            , eeSourceMap = sourceMap
             , eeGlobalDB = globalDB
             , eeGlobalDumpPkgs = toDumpPackagesByGhcPkgId globalPackages
             , eeSnapshotDumpPkgs = snapshotPackagesTVar
@@ -339,12 +336,11 @@ executePlan :: M env m
             -> [DumpPackage () ()] -- ^ global packages
             -> [DumpPackage () ()] -- ^ snapshot packages
             -> [DumpPackage () ()] -- ^ local packages
-            -> SourceMap
             -> InstalledMap
             -> Plan
             -> m ()
-executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages sourceMap installedMap plan = do
-    withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages sourceMap (executePlan' installedMap plan)
+executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages installedMap plan = do
+    withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages (executePlan' installedMap plan)
 
     unless (Map.null $ planInstallExes plan) $ do
         snapBin <- (</> bindirSuffix) `liftM` installationRootDeps

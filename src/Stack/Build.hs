@@ -115,7 +115,6 @@ build setLocalFiles mbuildLk bopts = fixCodePage' $ do
                          globalDumpPkgs
                          snapshotDumpPkgs
                          localDumpPkgs
-                         sourceMap
                          installedMap
                          plan
   where

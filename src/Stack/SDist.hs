@@ -192,11 +192,11 @@ getSDistFileList lp =
         menv <- getMinimalEnvOverride
         let bopts = defaultBuildOpts
         baseConfigOpts <- mkBaseConfigOpts bopts
-        (_, _mbp, locals, _extraToBuild, sourceMap) <- loadSourceMap NeedTargets bopts
+        (_, _mbp, locals, _extraToBuild, _sourceMap) <- loadSourceMap NeedTargets bopts
         runInBase <- liftBaseWith $ \run -> return (void . run)
         withExecuteEnv menv bopts baseConfigOpts locals
             [] [] [] -- provide empty list of globals. This is a hack around custom Setup.hs files
-            sourceMap $ \ee ->
+            $ \ee ->
             withSingleContext runInBase ac ee task Nothing (Just "sdist") $ \_package cabalfp _pkgDir cabal _announce _console _mlogFile -> do
                 let outFile = toFilePath tmpdir FP.</> "source-files-list"
                 cabal False ["sdist", "--list-sources", outFile]
