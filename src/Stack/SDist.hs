@@ -33,6 +33,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
+import           Data.Time.Clock.POSIX
 import           Distribution.Package (Dependency (..))
 import           Distribution.PackageDescription.PrettyPrint (showGenericPackageDescription)
 import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion)
@@ -50,6 +51,7 @@ import           Stack.Constants
 import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal
+import           System.Directory (getModificationTime, getPermissions, Permissions(..))
 import qualified System.FilePath as FP
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,MonadLogger m,MonadBaseControl IO m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
@@ -80,15 +82,13 @@ getSDistTarball mpvpBounds pkgDir = do
     -- everything in at once, so that's what we're doing for now:
     let tarPath isDir fp = either error id
             (Tar.toTarPath isDir (pkgId FP.</> fp))
-        packWith f isDir fp =
-            liftIO $ f (pkgFp FP.</> fp)
-                (tarPath isDir fp)
+        packWith f isDir fp = liftIO $ f (pkgFp FP.</> fp) (tarPath isDir fp)
         packDir = packWith Tar.packDirectoryEntry True
         packFile fp
             | tweakCabal && isCabalFp fp = do
                 lbs <- getCabalLbs pvpBounds $ toFilePath cabalfp
                 return $ Tar.fileEntry (tarPath False fp) lbs
-            | otherwise = packWith Tar.packFileEntry False fp
+            | otherwise = packWith packFileEntry False fp
         isCabalFp fp = toFilePath pkgDir FP.</> fp == toFilePath cabalfp
         tarName = pkgId FP.<.> "tar.gz"
         pkgId = packageIdentifierString (packageIdentifier (lpPackage lp))
@@ -244,3 +244,27 @@ dirsFromFiles dirs = Set.toAscList (Set.delete "." results)
     go s x
       | Set.member x s = s
       | otherwise = go (Set.insert x s) (FP.takeDirectory x)
+
+--------------------------------------------------------------------------------
+
+-- Copy+modified from the tar package to avoid issues with lazy IO ( see
+-- https://github.com/commercialhaskell/stack/issues/1344 )
+
+packFileEntry :: FilePath -- ^ Full path to find the file on the local disk
+              -> Tar.TarPath  -- ^ Path to use for the tar Entry in the archive
+              -> IO Tar.Entry
+packFileEntry filepath tarpath = do
+  mtime   <- getModTime filepath
+  perms   <- getPermissions filepath
+  content <- S.readFile filepath
+  let size = fromIntegral (S.length content)
+  return (Tar.simpleEntry tarpath (Tar.NormalFile (L.fromStrict content) size)) {
+    Tar.entryPermissions = if executable perms then Tar.executableFilePermissions
+                                               else Tar.ordinaryFilePermissions,
+    Tar.entryTime = mtime
+  }
+
+getModTime :: FilePath -> IO Tar.EpochTime
+getModTime path = do
+    t <- getModificationTime path
+    return . floor . utcTimeToPOSIXSeconds $ t
