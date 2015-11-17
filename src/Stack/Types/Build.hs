@@ -640,7 +640,7 @@ configureOptsDirs :: BaseConfigOpts
                   -> [String]
 configureOptsDirs bco loc package = concat
     [ ["--user", "--package-db=clear", "--package-db=global"]
-    , map (("--package-db=" ++) . toFilePath) $ case loc of
+    , map (("--package-db=" ++) . toFilePathNoTrailingSep) $ case loc of
         Snap -> bcoExtraDBs bco ++ [bcoSnapDB bco]
         Local -> bcoExtraDBs bco ++ [bcoSnapDB bco] ++ [bcoLocalDB bco]
     , [ "--libdir=" ++ toFilePathNoTrailingSep (installRoot </> $(mkRelDir "lib"))

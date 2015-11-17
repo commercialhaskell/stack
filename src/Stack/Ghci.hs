@@ -15,8 +15,8 @@ module Stack.Ghci
     , ghci
     ) where
 
-import           Control.Monad.Catch
 import           Control.Exception.Enclosed (tryAny)
+import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
@@ -40,6 +40,7 @@ import           Distribution.ModuleName (ModuleName)
 import           Distribution.Text (display)
 import           Network.HTTP.Client.Conduit
 import           Path
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Prelude
 import           Stack.Build
@@ -103,8 +104,8 @@ ghci GhciOpts{..} = do
                   (maybe [] (return . toFilePath) mainFile <>
                    concatMap (map display . S.toList . ghciPkgModules) pkgs)
         odir =
-            [ "-odir=" <> toFilePath (objectInterfaceDir bconfig)
-            , "-hidir=" <> toFilePath (objectInterfaceDir bconfig)]
+            [ "-odir=" <> toFilePathNoTrailingSep (objectInterfaceDir bconfig)
+            , "-hidir=" <> toFilePathNoTrailingSep (objectInterfaceDir bconfig)]
     $logInfo
         ("Configuring GHCi with the following packages: " <>
          T.intercalate ", " (map (packageNameText . ghciPkgName) pkgs))

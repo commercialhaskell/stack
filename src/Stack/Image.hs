@@ -122,7 +122,7 @@ createDockerImage dir = do
                 , fromMaybe
                       (imageName (parent (parent dir)))
                       (imgDockerImageName =<< dockerConfig)
-                , toFilePath dir]
+                , toFilePathNoTrailingSep dir]
 
 -- | Extend the general purpose docker image with entrypoints (if
 -- specified).
@@ -158,7 +158,7 @@ extendDockerImageWithEntrypoint dir = do
                           [ "build"
                           , "-t"
                           , dockerImageName ++ "-" ++ ep
-                          , toFilePath dir])
+                          , toFilePathNoTrailingSep dir])
 
 -- | The command name for dealing with images.
 imgCmdName :: String

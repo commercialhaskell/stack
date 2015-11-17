@@ -53,6 +53,7 @@ import           Data.Typeable (Typeable)
 import           GHC.Generics (Generic)
 import           Path
 import           Path.IO (createTree)
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Prelude -- Fix AMP warning
 import           Stack.GhcPkg
 import           Stack.Types
@@ -114,8 +115,9 @@ ghcPkgCmdArgs cmd menv wc mpkgDbs sink = do
   where
     args = concat
         [ case mpkgDbs of
-            [] -> ["--global", "--no-user-package-db"]
-            _ -> ["--user", "--no-user-package-db"] ++ concatMap (\pkgDb -> ["--package-db", toFilePath pkgDb]) mpkgDbs
+              [] -> ["--global", "--no-user-package-db"]
+              _ -> ["--user", "--no-user-package-db"] ++
+                  concatMap (\pkgDb -> ["--package-db", toFilePathNoTrailingSep pkgDb]) mpkgDbs
         , cmd
         , ["--expand-pkgroot"]
         ]

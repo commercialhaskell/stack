@@ -18,78 +18,78 @@ module Stack.Build.Execute
 
 import           Control.Applicative
 import           Control.Arrow ((&&&))
+import           Control.Concurrent.Async (withAsync, wait)
 import           Control.Concurrent.Execute
-import           Control.Concurrent.Async       (withAsync, wait)
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
-import           Control.Exception.Enclosed     (catchIO, tryIO)
+import           Control.Exception.Enclosed (catchIO, tryIO)
 import           Control.Exception.Lifted
-import           Control.Monad                  (liftM, when, unless, void, join, guard, filterM, (<=<))
-import           Control.Monad.Catch            (MonadCatch, MonadMask)
+import           Control.Monad (liftM, when, unless, void, join, guard, filterM, (<=<))
+import           Control.Monad.Catch (MonadCatch, MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader           (MonadReader, asks)
-import           Control.Monad.Trans.Control    (liftBaseWith)
+import           Control.Monad.Reader (MonadReader, asks)
+import           Control.Monad.Trans.Control (liftBaseWith)
 import           Control.Monad.Trans.Resource
-import qualified Data.ByteString                as S
-import           Data.ByteString                (ByteString)
-import qualified Data.ByteString.Char8          as S8
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString as S
+import qualified Data.ByteString.Char8 as S8
 import           Data.Conduit
-import qualified Data.Conduit.Binary            as CB
-import qualified Data.Conduit.List              as CL
-import           Data.Foldable                  (forM_, any)
+import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.List as CL
+import           Data.Foldable (forM_, any)
 import           Data.Function
-import           Data.IORef.RunOnce             (runOnce)
-import           Data.List                      hiding (any)
-import           Data.Map.Strict                (Map)
-import qualified Data.Map.Strict                as Map
+import           Data.IORef.RunOnce (runOnce)
+import           Data.List hiding (any)
+import           Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import           Data.Maybe
-import           Data.Maybe.Extra               (forMaybeM)
-import           Data.Monoid                    ((<>))
-import           Data.Set                       (Set)
-import qualified Data.Set                       as Set
-import           Data.Streaming.Process         hiding (callProcess, env)
-import qualified Data.Streaming.Process         as Process
-import           Data.Traversable               (forM)
-import           Data.Text                      (Text)
-import qualified Data.Text                      as T
-import           Data.Text.Encoding             (decodeUtf8)
-import           Data.Time.Clock                (getCurrentTime)
-import           Data.Word8                     (_colon)
+import           Data.Maybe.Extra (forMaybeM)
+import           Data.Monoid ((<>))
+import           Data.Set (Set)
+import qualified Data.Set as Set
+import qualified Data.Streaming.Process as Process
+import           Data.Streaming.Process hiding (callProcess, env)
+import           Data.Text (Text)
+import qualified Data.Text as T
+import           Data.Text.Encoding (decodeUtf8)
+import           Data.Time.Clock (getCurrentTime)
+import           Data.Traversable (forM)
+import           Data.Word8 (_colon)
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
 import qualified Distribution.Text
-import           Language.Haskell.TH            as TH (location)
-import           Network.HTTP.Client.Conduit    (HasHttpManager)
+import           Language.Haskell.TH as TH (location)
+import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
-import           Prelude                        hiding (FilePath, writeFile, any)
+import           Prelude hiding (FilePath, writeFile, any)
 import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
+import           Stack.Constants
 import           Stack.Coverage
-import           Stack.Types.Build
-import           Stack.Fetch                    as Fetch
+import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.PackageDump
-import           Stack.Constants
 import           Stack.Types
-import           Stack.Types.StackT
 import           Stack.Types.Internal
-import qualified System.Directory               as D
-import           System.Environment             (getExecutablePath)
-import           System.Exit                    (ExitCode (ExitSuccess))
-import qualified System.FilePath                as FP
+import           Stack.Types.StackT
+import qualified System.Directory as D
+import           System.Environment (getExecutablePath)
+import           System.Exit (ExitCode (ExitSuccess))
+import qualified System.FilePath as FP
 import           System.IO
-import           System.PosixCompat.Files       (createLink)
+import           System.PosixCompat.Files (createLink)
+import           System.Process.Log (showProcessArgDebug)
 import           System.Process.Read
 import           System.Process.Run
-import           System.Process.Log             (showProcessArgDebug)
 
 #if !MIN_VERSION_process(1,2,1)
-import           System.Process.Internals       (createProcess_)
+import           System.Process.Internals (createProcess_)
 #endif
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
@@ -770,10 +770,10 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             in
                                 ( "-clear-package-db"
                                 : "-global-package-db"
-                                : map (("-package-db=" ++) . toFilePath) (bcoExtraDBs eeBaseConfigOpts)
+                                : map (("-package-db=" ++) . toFilePathNoTrailingSep) (bcoExtraDBs eeBaseConfigOpts)
                                 ) ++
-                                ( ("-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts))
-                                : ("-package-db=" ++ toFilePath (bcoLocalDB eeBaseConfigOpts))
+                                ( ("-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts))
+                                : ("-package-db=" ++ toFilePathNoTrailingSep (bcoLocalDB eeBaseConfigOpts))
                                 : "-hide-all-packages"
                                 : cabalPackageArg
                                 : map ("-package-id=" ++) depsMinusCabal
@@ -799,10 +799,10 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                               cabalPackageArg
                             : "-clear-package-db"
                             : "-global-package-db"
-                            : map (("-package-db=" ++) . toFilePath) (bcoExtraDBs eeBaseConfigOpts)
-                           ++ ["-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts)]
+                            : map (("-package-db=" ++) . toFilePathNoTrailingSep) (bcoExtraDBs eeBaseConfigOpts)
+                           ++ ["-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts)]
 
-                setupArgs = ("--builddir=" ++ toFilePath distRelativeDir') : args
+                setupArgs = ("--builddir=" ++ toFilePathNoTrailingSep distRelativeDir') : args
                 runExe exeName fullArgs = do
                     $logProcessRun (toFilePath exeName) fullArgs
 
@@ -871,8 +871,8 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             Ghcjs -> getGhcjsPath
                     runExe compilerPath $
                         [ "--make"
-                        , "-odir", toFilePath setupDir
-                        , "-hidir", toFilePath setupDir
+                        , "-odir", toFilePathNoTrailingSep setupDir
+                        , "-hidir", toFilePathNoTrailingSep setupDir
                         , "-i", "-i."
                         ] ++ packageArgs ++
                         [ toFilePath setuphs
@@ -977,7 +977,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                 menv' <- modifyEnvOverride menv
                        $ Map.insert
                             "GHC_PACKAGE_PATH"
-                            (T.pack $ toFilePath $ bcoSnapDB eeBaseConfigOpts)
+                            (T.pack $ toFilePathNoTrailingSep $ bcoSnapDB eeBaseConfigOpts)
 
                 -- In case a build of the library with different flags already exists, unregister it
                 -- before copying.
@@ -1361,7 +1361,7 @@ extraBuildOptions bopts = do
     let ddumpOpts = " -ddump-hi -ddump-to-file"
     case toCoverage (boptsTestOpts bopts) of
       True -> do
-        hpcIndexDir <- toFilePath <$> hpcRelativeDir
+        hpcIndexDir <- toFilePathNoTrailingSep <$> hpcRelativeDir
         return ["--ghc-options", "-hpcdir " ++ hpcIndexDir ++ ddumpOpts]
       False -> return ["--ghc-options", ddumpOpts]
 

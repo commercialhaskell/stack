@@ -61,12 +61,13 @@ import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Ma
 import           Network.HTTP.Download (download)
 import           Options.Applicative (Parser, strOption, long, help)
 import           Path
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Safe (headMay)
 import           Stack.BuildPlan
-import           Stack.Constants
 import           Stack.Config.Docker
+import           Stack.Constants
 import qualified Stack.Image as Image
 import           Stack.Init
 import           Stack.PackageIndex
@@ -478,7 +479,7 @@ resolvePackageLocation menv projRoot (PLGit url commit) = do
         readInNull (parent dirTmp) "git" menv
             [ "clone"
             , T.unpack url
-            , toFilePath dirTmp
+            , toFilePathNoTrailingSep dirTmp
             ]
             Nothing
         readInNull dirTmp "git" menv
