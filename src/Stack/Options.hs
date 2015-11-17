@@ -4,6 +4,7 @@ module Stack.Options
     (Command(..)
     ,benchOptsParser
     ,buildOptsParser
+    ,cleanOptsParser
     ,configCmdSetParser
     ,configOptsParser
     ,dockerOptsParser
@@ -40,6 +41,7 @@ import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Types (fromM, oneM, readerAsk)
+import           Stack.Clean (CleanOpts(..))
 import           Stack.Config (packagesParser)
 import           Stack.ConfigCmd
 import           Stack.Constants (stackProgName)
@@ -223,6 +225,16 @@ readFlag = do
                     Just x -> return x
             return $ Map.singleton pn' $ Map.singleton flagN b
         _ -> readerError "Must have a colon"
+
+-- | Command-line parser for the clean command.
+cleanOptsParser :: Parser CleanOpts
+cleanOptsParser = CleanOpts <$> packages
+  where
+    packages =
+        many
+            (packageNameArgument
+                 (metavar "PACKAGE" <>
+                  help "If none specified, clean all local packages"))
 
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid

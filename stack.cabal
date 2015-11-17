@@ -51,6 +51,7 @@ library
                      Options.Applicative.Args
                      Options.Applicative.Complicated
                      Stack.BuildPlan
+                     Stack.Clean
                      Stack.Config
                      Stack.Config.Docker
                      Stack.ConfigCmd

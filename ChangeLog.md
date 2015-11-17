@@ -21,6 +21,7 @@ Other enhancements:
 * Added `require-docker-version` configuration option
 * Packages will now usually be built along with their tests and benchmarks. See [#1166](https://github.com/commercialhaskell/stack/issues/1166)
 * Relative `local-bin-path` paths will be relative to the project's root directory, not the current working directory.  [#1340](https://github.com/commercialhaskell/stack/issues/1340)
+* `stack clean` now takes an optional `[PACKAGE]` argument for use in multi-package projects. See [#583](https://github.com/commercialhaskell/stack/issues/583)
 
 Bug fixes:
 

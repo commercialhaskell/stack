@@ -51,6 +51,7 @@ import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude hiding (pi, mapM)
 import           Stack.Build
+import           Stack.Clean (CleanOpts, clean)
 import           Stack.Config
 import           Stack.ConfigCmd as ConfigCmd
 import           Stack.Constants
@@ -283,7 +284,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                         "Clean the local packages"
                         cmdFooter
                         cleanCmd
-                        (pure ())
+                        cleanOptsParser
              addCommand' "list-dependencies"
                         "List the dependencies"
                         cmdFooter
@@ -755,8 +756,8 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
                                              do lk' <- readIORef curLk
                                                 munlockFile lk')
 
-cleanCmd :: () -> GlobalOpts -> IO ()
-cleanCmd () go = withBuildConfigAndLock go (const clean)
+cleanCmd :: CleanOpts -> GlobalOpts -> IO ()
+cleanCmd opts go = withBuildConfigAndLock go (const (clean opts))
 
 -- | Helper for build and install commands
 buildCmd :: BuildOpts -> GlobalOpts -> IO ()
