@@ -66,7 +66,6 @@ data GhciOpts = GhciOpts
 data GhciPkgInfo = GhciPkgInfo
     { ghciPkgName :: !PackageName
     , ghciPkgOpts :: ![(NamedComponent, BuildInfoOpts)]
-    , ghciPkgOmittedOpts :: ![String]
     , ghciPkgDir :: !(Path Abs Dir)
     , ghciPkgModules :: !(Set ModuleName)
     , ghciPkgModFiles :: !(Set (Path Abs File)) -- ^ Module file paths.
@@ -87,14 +86,26 @@ ghci GhciOpts{..} = do
             , boptsBenchmarkOpts = (boptsBenchmarkOpts ghciBuildOpts) { beoDisableRun = True }
             }
     (targets,mainIsTargets,pkgs) <- ghciSetup bopts ghciNoBuild ghciMainIs
+    config <- asks getConfig
     bconfig <- asks getBuildConfig
     mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
     wc <- getWhichCompiler
-    let pkgopts =
-            (if null pkgs then [] else ["-hide-all-packages"]) ++
-            nubOrd (concatMap (concatMap (bioGeneratedOpts . snd) . ghciPkgOpts) pkgs) ++
-            concatMap (concatMap (bioGhcOpts . snd) . ghciPkgOpts) pkgs
-        modulesToLoad = nubOrd $
+    let pkgopts = hidePkgOpt ++ genOpts ++ ghcOpts
+        hidePkgOpt = if null pkgs then [] else ["-hide-all-packages"]
+        genOpts = nubOrd (concatMap (concatMap (bioGeneratedOpts . snd) . ghciPkgOpts) pkgs)
+        (omittedOpts, ghcOpts) = partition badForGhci $
+            concatMap (concatMap (bioGhcOpts . snd) . ghciPkgOpts) pkgs ++
+            getUserOptions Nothing ++
+            concatMap (getUserOptions . Just . ghciPkgName) pkgs
+        getUserOptions mpkg =
+            map T.unpack (M.findWithDefault [] mpkg (configGhcOptions config))
+        badForGhci x =
+            isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky -static")
+    unless (null omittedOpts) $
+        $logWarn
+            ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
+             T.unwords (map T.pack (nubOrd omittedOpts)))
+    let modulesToLoad = nubOrd $
             maybe [] (return . toFilePath) mainFile <>
             concatMap (map display . S.toList . ghciPkgModules) pkgs
         odir =
@@ -269,18 +280,16 @@ makeGhciPkgInfo bopts sourceMap installedMap locals name cabalfp target = do
             , packageConfigPlatform = configPlatform (getConfig bconfig)
             }
     (warnings,pkg) <- readPackage config cabalfp
-    let filterWanted = M.filterWithKey (\k _ -> k `S.member` allWanted)
-        allWanted = wantedPackageComponents bopts target pkg
     mapM_ (printCabalFileWarning cabalfp) warnings
     (mods,files,opts) <- getPackageOpts (packageOpts pkg) sourceMap installedMap locals cabalfp
     let filteredOpts = filterWanted opts
-        omitUnwanted bio = bio { bioGhcOpts = filter (not . badForGhci) (bioGhcOpts bio) }
-        omitted = filter badForGhci $ concatMap bioGhcOpts (M.elems filteredOpts)
+        filterWanted = M.filterWithKey (\k _ -> k `S.member` allWanted)
+        allWanted = wantedPackageComponents bopts target pkg
+        setMapMaybe f = S.fromList . mapMaybe f . S.toList
     return
         GhciPkgInfo
         { ghciPkgName = packageName pkg
-        , ghciPkgOpts = M.toList (M.map omitUnwanted filteredOpts)
-        , ghciPkgOmittedOpts = omitted
+        , ghciPkgOpts = M.toList filteredOpts
         , ghciPkgDir = parent cabalfp
         , ghciPkgModules = mconcat (M.elems (filterWanted mods))
         , ghciPkgModFiles = mconcat (M.elems (filterWanted (M.map (setMapMaybe dotCabalModulePath) files)))
@@ -288,11 +297,6 @@ makeGhciPkgInfo bopts sourceMap installedMap locals name cabalfp target = do
         , ghciPkgCFiles = mconcat (M.elems (filterWanted (M.map (setMapMaybe dotCabalCFilePath) files)))
         , ghciPkgPackage = pkg
         }
-  where
-    badForGhci :: String -> Bool
-    badForGhci x =
-        isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky -static")
-    setMapMaybe f = S.fromList . mapMaybe f . S.toList
 
 -- NOTE: this should make the same choices as the components code in
 -- 'loadLocalPackage'. Unfortunately for now we reiterate this logic
@@ -308,11 +312,6 @@ wantedPackageComponents _ _ _ = S.empty
 
 checkForIssues :: (MonadThrow m, MonadLogger m) => [GhciPkgInfo] -> m ()
 checkForIssues pkgs = do
-    let omitted = concatMap ghciPkgOmittedOpts pkgs
-    unless (null omitted) $
-        $logWarn
-            ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
-             T.unwords (map T.pack (nubOrd omitted)))
     unless (null issues) $ borderedWarning $ do
         $logWarn "There are issues with this project which may prevent GHCi from working properly."
         $logWarn ""
