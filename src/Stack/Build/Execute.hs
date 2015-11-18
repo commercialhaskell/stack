@@ -941,7 +941,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
     getPrecompiled cache =
         case taskLocation task of
-            Snap -> do
+            Snap | not shouldHaddockPackage' -> do
                 mpc <- readPrecompiledCache taskProvides
                     (configCacheOpts cache)
                     (configCacheDeps cache)
