@@ -67,7 +67,6 @@ import qualified Paths_stack as Meta
 import           Safe (headMay)
 import           Stack.BuildPlan
 import           Stack.Config.Docker
-import           Stack.Config.Docker
 import           Stack.Config.Nix
 import           Stack.Constants
 import qualified Stack.Image as Image
