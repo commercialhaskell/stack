@@ -18,80 +18,83 @@ module Stack.Build.Execute
 
 import           Control.Applicative
 import           Control.Arrow ((&&&))
+import           Control.Concurrent.Async (withAsync, wait)
 import           Control.Concurrent.Execute
-import           Control.Concurrent.Async       (withAsync, wait)
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
-import           Control.Exception.Enclosed     (catchIO, tryIO)
+import           Control.Exception.Enclosed (catchIO, tryIO)
 import           Control.Exception.Lifted
-import           Control.Monad                  (liftM, when, unless, void, join, guard, filterM, (<=<))
-import           Control.Monad.Catch            (MonadCatch, MonadMask)
+import           Control.Monad (liftM, when, unless, void, join, guard, filterM, (<=<))
+import           Control.Monad.Catch (MonadCatch, MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader           (MonadReader, asks)
-import           Control.Monad.Trans.Control    (liftBaseWith)
+import           Control.Monad.Reader (MonadReader, asks)
+import           Control.Monad.Trans.Control (liftBaseWith)
 import           Control.Monad.Trans.Resource
-import qualified Data.ByteString                as S
-import           Data.ByteString                (ByteString)
-import qualified Data.ByteString.Char8          as S8
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString as S
+import qualified Data.ByteString.Char8 as S8
 import           Data.Conduit
-import qualified Data.Conduit.Binary            as CB
-import qualified Data.Conduit.List              as CL
-import           Data.Foldable                  (forM_)
+import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.List as CL
+import           Data.Foldable (forM_, any)
 import           Data.Function
-import           Data.IORef.RunOnce             (runOnce)
-import           Data.List
-import           Data.Map.Strict                (Map)
-import qualified Data.Map.Strict                as Map
+import           Data.IORef.RunOnce (runOnce)
+import           Data.List hiding (any)
+import           Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import           Data.Maybe
-import           Data.Monoid                    ((<>))
-import           Data.Set                       (Set)
-import qualified Data.Set                       as Set
-import           Data.Streaming.Process         hiding (callProcess, env)
-import qualified Data.Streaming.Process         as Process
-import           Data.Traversable               (forM)
-import           Data.Text                      (Text)
-import qualified Data.Text                      as T
-import           Data.Time.Clock                (getCurrentTime)
-import           Data.Word8                     (_colon)
+import           Data.Maybe.Extra (forMaybeM)
+import           Data.Monoid ((<>))
+import           Data.Set (Set)
+import qualified Data.Set as Set
+import qualified Data.Streaming.Process as Process
+import           Data.Streaming.Process hiding (callProcess, env)
+import           Data.Text (Text)
+import qualified Data.Text as T
+import           Data.Text.Encoding (decodeUtf8)
+import           Data.Time.Clock (getCurrentTime)
+import           Data.Traversable (forM)
+import           Data.Word8 (_colon)
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
 import qualified Distribution.Text
-import           Language.Haskell.TH            as TH (location)
-import           Network.HTTP.Client.Conduit    (HasHttpManager)
+import           Language.Haskell.TH as TH (location)
+import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
-import           Prelude                        hiding (FilePath, writeFile)
+import           Prelude hiding (FilePath, writeFile, any)
 import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
+import           Stack.Constants
 import           Stack.Coverage
-import           Stack.Types.Build
-import           Stack.Fetch                    as Fetch
+import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.PackageDump
-import           Stack.Constants
 import           Stack.Types
-import           Stack.Types.StackT
 import           Stack.Types.Internal
-import qualified System.Directory               as D
-import           System.Environment             (getExecutablePath)
-import           System.Exit                    (ExitCode (ExitSuccess))
-import qualified System.FilePath                as FP
+import           Stack.Types.StackT
+import qualified System.Directory as D
+import           System.Environment (getExecutablePath)
+import           System.Exit (ExitCode (ExitSuccess))
+import qualified System.FilePath as FP
 import           System.IO
-import           System.PosixCompat.Files       (createLink)
+import           System.PosixCompat.Files (createLink)
+import           System.Process.Log (showProcessArgDebug)
 import           System.Process.Read
 import           System.Process.Run
-import           System.Process.Log             (showProcessArgDebug)
 
 #if !MIN_VERSION_process(1,2,1)
-import           System.Process.Internals       (createProcess_)
+import           System.Process.Internals (createProcess_)
 #endif
 
 type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
 
+-- | Fetch the packages necessary for a build, for example in combination with a dry run.
 preFetch :: M env m => Plan -> m ()
 preFetch plan
     | Set.null idents = $logDebug "Nothing to fetch"
@@ -111,6 +114,7 @@ preFetch plan
                 name
                 (packageVersion package)
 
+-- | Print a description of build plan for human consumption.
 printPlan :: M env m
           => Plan
           -> m ()
@@ -138,10 +142,10 @@ printPlan plan = do
             $logInfo "Would build:"
             mapM_ ($logInfo . displayTask) xs
 
-    let hasTests = not . Set.null . lptbTests
-        hasBenches = not . Set.null . lptbBenches
-        tests = Map.elems $ fmap fst $ Map.filter (hasTests . snd) $ planFinals plan
-        benches = Map.elems $ fmap fst $ Map.filter (hasBenches . snd) $ planFinals plan
+    let hasTests = not . Set.null . testComponents . taskComponents
+        hasBenches = not . Set.null . benchComponents . taskComponents
+        tests = Map.elems $ Map.filter hasTests $ planFinals plan
+        benches = Map.elems $ Map.filter hasBenches $ planFinals plan
 
     unless (null tests) $ do
         $logInfo ""
@@ -204,7 +208,6 @@ data ExecuteEnv = ExecuteEnv
     , eeTotalWanted    :: !Int
     , eeWanted         :: !(Set PackageName)
     , eeLocals         :: ![LocalPackage]
-    , eeSourceMap      :: !SourceMap
     , eeGlobalDB       :: !(Path Abs Dir)
     , eeGlobalDumpPkgs :: !(Map GhcPkgId (DumpPackage () ()))
     , eeSnapshotDumpPkgs :: !(TVar (Map GhcPkgId (DumpPackage () ())))
@@ -275,6 +278,7 @@ getSetupExe setupHs tmpdir = do
             renameFile tmpExePath exePath
             return $ Just exePath
 
+-- | Execute a callback that takes an 'ExecuteEnv'.
 withExecuteEnv :: M env m
                => EnvOverride
                -> BuildOpts
@@ -283,10 +287,9 @@ withExecuteEnv :: M env m
                -> [DumpPackage () ()] -- ^ global packages
                -> [DumpPackage () ()] -- ^ snapshot packages
                -> [DumpPackage () ()] -- ^ local packages
-               -> SourceMap
                -> (ExecuteEnv -> m a)
                -> m a
-withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages sourceMap inner = do
+withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages inner = do
     withCanonicalizedSystemTempDirectory stackProgName $ \tmpdir -> do
         configLock <- newMVar ()
         installLock <- newMVar ()
@@ -316,7 +319,6 @@ withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages 
             , eeTotalWanted = length $ filter lpWanted locals
             , eeWanted = wantedLocalPackages locals
             , eeLocals = locals
-            , eeSourceMap = sourceMap
             , eeGlobalDB = globalDB
             , eeGlobalDumpPkgs = toDumpPackagesByGhcPkgId globalPackages
             , eeSnapshotDumpPkgs = snapshotPackagesTVar
@@ -334,12 +336,11 @@ executePlan :: M env m
             -> [DumpPackage () ()] -- ^ global packages
             -> [DumpPackage () ()] -- ^ snapshot packages
             -> [DumpPackage () ()] -- ^ local packages
-            -> SourceMap
             -> InstalledMap
             -> Plan
             -> m ()
-executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages sourceMap installedMap plan = do
-    withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages sourceMap (executePlan' installedMap plan)
+executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages installedMap plan = do
+    withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages (executePlan' installedMap plan)
 
     unless (Map.null $ planInstallExes plan) $ do
         snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
@@ -364,7 +365,7 @@ executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages loc
 
         currExe <- liftIO getExecutablePath -- needed for windows, see below
 
-        installed <- forM (Map.toList $ planInstallExes plan) $ \(name, loc) -> do
+        installed <- forMaybeM (Map.toList $ planInstallExes plan) $ \(name, loc) -> do
             let bindir =
                     case loc of
                         Snap -> snapBin
@@ -394,7 +395,7 @@ executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages loc
                         _ -> D.copyFile (toFilePath file) destFile
                     return $ Just (destDir', [T.append name (T.pack ext)])
 
-        let destToInstalled = Map.fromListWith (++) (catMaybes installed)
+        let destToInstalled = Map.fromListWith (++) installed
         unless (Map.null destToInstalled) $ $logInfo ""
         forM_ (Map.toList destToInstalled) $ \(dest, executables) -> do
             $logInfo $ T.concat
@@ -505,7 +506,7 @@ executePlan' installedMap0 plan ee@ExecuteEnv {..} = do
     when (boptsHaddock eeBuildOpts) $ do
         snapshotDumpPkgs <- liftIO (readTVarIO eeSnapshotDumpPkgs)
         localDumpPkgs <- liftIO (readTVarIO eeLocalDumpPkgs)
-        generateLocalHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeLocals
+        generateLocalHaddockIndex eeEnvOverride wc eeBaseConfigOpts localDumpPkgs eeLocals
         generateDepsHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeGlobalDumpPkgs snapshotDumpPkgs localDumpPkgs eeLocals
         generateSnapHaddockIndex eeEnvOverride wc eeBaseConfigOpts eeGlobalDumpPkgs snapshotDumpPkgs
   where
@@ -519,7 +520,7 @@ toActions :: M env m
           => InstalledMap
           -> (m () -> IO ())
           -> ExecuteEnv
-          -> (Maybe Task, Maybe (Task, LocalPackageTB)) -- build and final
+          -> (Maybe Task, Maybe Task) -- build and final
           -> [Action]
 toActions installedMap runInBase ee (mbuild, mfinal) =
     abuild ++ afinal
@@ -532,39 +533,60 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
                     { actionId = ActionId taskProvides ATBuild
                     , actionDeps =
                         (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
-                    , actionDo = \ac -> runInBase $ singleBuild runInBase ac ee task installedMap
+                    , actionDo = \ac -> runInBase $ singleBuild runInBase ac ee task installedMap False
                     }
                 ]
     afinal =
         case mfinal of
             Nothing -> []
-            Just (task@Task {..}, lptb) ->
+            Just task@Task {..} ->
+                (if taskAllInOne then [] else
+                    [Action
+                        { actionId = ActionId taskProvides ATBuildFinal
+                        , actionDeps = addBuild ATBuild
+                            (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
+                        , actionDo = \ac -> runInBase $ singleBuild runInBase ac ee task installedMap True
+                        }]) ++
                 [ Action
                     { actionId = ActionId taskProvides ATFinal
-                    , actionDeps = addBuild taskProvides $
-                        (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
+                    , actionDeps = addBuild (if taskAllInOne then ATBuild else ATBuildFinal) Set.empty
                     , actionDo = \ac -> runInBase $ do
-                        unless (Set.null $ lptbTests lptb) $ do
-                            singleTest runInBase topts lptb ac ee task installedMap
-                        unless (Set.null $ lptbBenches lptb) $ do
-                            singleBench runInBase beopts lptb ac ee task installedMap
+                        let comps = taskComponents task
+                            tests = testComponents comps
+                            benches = benchComponents comps
+                        unless (Set.null tests) $ do
+                            singleTest runInBase topts (Set.toList tests) ac ee task installedMap
+                        unless (Set.null benches) $ do
+                            -- FIXME: shouldn't this use the list of benchmarks to run?
+                            singleBench runInBase beopts ac ee task installedMap
                     }
                 ]
-      where
-        addBuild ident =
-            case mbuild of
-                Nothing -> id
-                Just _ -> Set.insert $ ActionId ident ATBuild
-
+              where
+                addBuild aty =
+                    case mbuild of
+                        Nothing -> id
+                        Just _ -> Set.insert $ ActionId taskProvides aty
     bopts = eeBuildOpts ee
     topts = boptsTestOpts bopts
     beopts = boptsBenchmarkOpts bopts
 
 -- | Generate the ConfigCache
 getConfigCache :: MonadIO m
-               => ExecuteEnv -> Task -> [Text]
+               => ExecuteEnv -> Task -> InstalledMap -> Bool -> Bool
                -> m (Map PackageIdentifier GhcPkgId, ConfigCache)
-getConfigCache ExecuteEnv {..} Task {..} extra = do
+getConfigCache ExecuteEnv {..} Task {..} installedMap enableTest enableBench = do
+    let extra =
+            -- We enable tests if the test suite dependencies are already
+            -- installed, so that we avoid unnecessary recompilation based on
+            -- cabal_macros.h changes when switching between 'stack build' and
+            -- 'stack test'. See:
+            -- https://github.com/commercialhaskell/stack/issues/805
+            case taskType of
+                TTLocal lp -> concat
+                    [ ["--enable-tests" | enableTest || (depsPresent installedMap $ lpTestDeps lp)]
+                    , ["--enable-benchmarks" | enableBench || (depsPresent installedMap $ lpBenchDeps lp)]
+                    ]
+                _ -> []
     idMap <- liftIO $ readTVarIO eeGhcPkgIds
     let getMissing ident =
             case Map.lookup ident idMap of
@@ -735,6 +757,9 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                                           eeCabalPkgVer)
                 packageArgs =
                     case mdeps of
+                        -- This branch is taken when
+                        -- 'explicit-setup-deps' is requested in your
+                        -- stack.yaml file.
                         Just deps | explicitSetupDeps (packageName package) config ->
                             -- Stack always builds with the global Cabal for various
                             -- reproducibility issues.
@@ -745,15 +770,18 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             in
                                 ( "-clear-package-db"
                                 : "-global-package-db"
-                                : map (("-package-db=" ++) . toFilePath) (bcoExtraDBs eeBaseConfigOpts)
+                                : map (("-package-db=" ++) . toFilePathNoTrailingSep) (bcoExtraDBs eeBaseConfigOpts)
                                 ) ++
-                                ( ("-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts))
-                                : ("-package-db=" ++ toFilePath (bcoLocalDB eeBaseConfigOpts))
+                                ( ("-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts))
+                                : ("-package-db=" ++ toFilePathNoTrailingSep (bcoLocalDB eeBaseConfigOpts))
                                 : "-hide-all-packages"
                                 : cabalPackageArg
                                 : map ("-package-id=" ++) depsMinusCabal
                                 )
-                        -- This branch is debatable. It adds access to the
+                        -- This branch is usually taken for builds, and
+                        -- is always taken for `stack sdist`.
+                        --
+                        -- This approach is debatable. It adds access to the
                         -- snapshot package database for Cabal. There are two
                         -- possible objections:
                         --
@@ -771,10 +799,10 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                               cabalPackageArg
                             : "-clear-package-db"
                             : "-global-package-db"
-                            : map (("-package-db=" ++) . toFilePath) (bcoExtraDBs eeBaseConfigOpts)
-                           ++ ["-package-db=" ++ toFilePath (bcoSnapDB eeBaseConfigOpts)]
+                            : map (("-package-db=" ++) . toFilePathNoTrailingSep) (bcoExtraDBs eeBaseConfigOpts)
+                           ++ ["-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts)]
 
-                setupArgs = ("--builddir=" ++ toFilePath distRelativeDir') : args
+                setupArgs = ("--builddir=" ++ toFilePathNoTrailingSep distRelativeDir') : args
                 runExe exeName fullArgs = do
                     $logProcessRun (toFilePath exeName) fullArgs
 
@@ -843,8 +871,8 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             Ghcjs -> getGhcjsPath
                     runExe compilerPath $
                         [ "--make"
-                        , "-odir", toFilePath setupDir
-                        , "-hidir", toFilePath setupDir
+                        , "-odir", toFilePathNoTrailingSep setupDir
+                        , "-hidir", toFilePathNoTrailingSep setupDir
                         , "-i", "-i."
                         ] ++ packageArgs ++
                         [ toFilePath setuphs
@@ -870,9 +898,10 @@ singleBuild :: M env m
             -> ExecuteEnv
             -> Task
             -> InstalledMap
+            -> Bool             -- ^ Is this a final build?
             -> m ()
-singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap = do
-    (allDepsMap, cache) <- getCache
+singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap isFinalBuild = do
+    (allDepsMap, cache) <- getConfigCache ee task installedMap enableTests enableBenchmarks
     mprecompiled <- getPrecompiled cache
     minstalled <-
         case mprecompiled of
@@ -887,34 +916,46 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
     pname = packageIdentifierName taskProvides
     shouldHaddockPackage' = shouldHaddockPackage eeBuildOpts eeWanted pname
     doHaddock package = shouldHaddockPackage' &&
+                        not isFinalBuild &&
                         -- Works around haddock failing on bytestring-builder since it has no modules
                         -- when bytestring is new enough.
                         packageHasExposedModules package
 
-    getCache = do
-        let extra =
-              -- We enable tests if the test suite dependencies are already
-              -- installed, so that we avoid unnecessary recompilation based on
-              -- cabal_macros.h changes when switching between 'stack build' and
-              -- 'stack test'. See:
-              -- https://github.com/commercialhaskell/stack/issues/805
-              case taskType of
-                  TTLocal lp -> concat
-                      [ ["--enable-tests" | depsPresent installedMap $ lpTestDeps lp]
-                      , ["--enable-benchmarks" | depsPresent installedMap $ lpBenchDeps lp]
-                      ]
-                  _ -> []
-        getConfigCache ee task extra
+    buildingFinals = isFinalBuild || taskAllInOne
+    enableTests = buildingFinals && any isCTest (taskComponents task)
+    enableBenchmarks = buildingFinals && any isCBench (taskComponents task)
+
+    annSuffix = if result == "" then "" else " (" <> result <> ")"
+      where
+        result = T.intercalate " + " $ concat $
+            [ ["lib" | taskAllInOne && hasLib]
+            , ["exe" | taskAllInOne && hasExe]
+            , ["test" | enableTests]
+            , ["bench" | enableBenchmarks]
+            ]
+        (hasLib, hasExe) = case taskType of
+            TTLocal lp -> (packageHasLibrary (lpPackage lp), not (Set.null (exesToBuild lp)))
+            -- This isn't true, but we don't want to have this info for
+            -- upstream deps.
+            TTUpstream{} -> (False, False)
 
     getPrecompiled cache =
         case taskLocation task of
-            Snap | not shouldHaddockPackage' -> do
+            Snap -> do
                 mpc <- readPrecompiledCache taskProvides
                     (configCacheOpts cache)
                     (configCacheDeps cache)
                 case mpc of
                     Nothing -> return Nothing
-                    Just pc -> do
+                    Just pc | maybe False
+                                    (bcoSnapInstallRoot eeBaseConfigOpts `isParentOf`)
+                                    (parseAbsFile =<< (pcLibrary pc)) ->
+                        -- If old precompiled cache files are left around but snapshots are deleted,
+                        -- it is possible for the precompiled file to refer to the very library
+                        -- we're building, and if flags are changed it may try to copy the library
+                        -- to itself. This check prevents that from happening.
+                        return Nothing
+                    Just pc | otherwise -> do
                         let allM _ [] = return True
                             allM f (x:xs) = do
                                 b <- f x
@@ -936,7 +977,18 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                 menv' <- modifyEnvOverride menv
                        $ Map.insert
                             "GHC_PACKAGE_PATH"
-                            (T.pack $ toFilePath $ bcoSnapDB eeBaseConfigOpts)
+                            (T.pack $ toFilePathNoTrailingSep $ bcoSnapDB eeBaseConfigOpts)
+
+                -- In case a build of the library with different flags already exists, unregister it
+                -- before copying.
+                catch
+                    (readProcessNull Nothing menv' "ghc-pkg"
+                        [ "unregister"
+                        , "--force"
+                        , packageIdentifierString taskProvides
+                        ])
+                    (\(ReadProcessException _ _ _ _) -> return ())
+
                 readProcessNull Nothing menv' "ghc-pkg"
                     [ "register"
                     , "--force"
@@ -968,7 +1020,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
     realConfigAndBuild cache allDepsMap = withSingleContext runInBase ac ee task (Just allDepsMap) Nothing
         $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
-            _neededConfig <- ensureConfig cache pkgDir ee (announce "configure") cabal cabalfp
+            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix)) cabal cabalfp
 
             if boptsOnlyConfigure eeBuildOpts
                 then return Nothing
@@ -979,31 +1031,22 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
         markExeNotInstalled (taskLocation task) taskProvides
         case taskType of
-            TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
+            TTLocal lp -> do
+                when enableTests $ unsetTestSuccess pkgDir
+                writeBuildCache pkgDir $ lpNewBuildCache lp
             TTUpstream _ _ -> return ()
 
-        () <- announce "build"
+        () <- announce ("build" <> annSuffix)
         config <- asks getConfig
         extraOpts <- extraBuildOptions eeBuildOpts
         preBuildTime <- modTime <$> liftIO getCurrentTime
-        cabal (console && configHideTHLoading config) $
-            (case taskType of
-                TTLocal lp -> concat
-                    [ ["build"]
-                    , ["lib:" ++ packageNameString (packageName package)
-                      -- TODO: get this information from target parsing instead,
-                      -- which will allow users to turn off library building if
-                      -- desired
-                      | packageHasLibrary package]
-                    , map (T.unpack . T.append "exe:") $ Set.toList $
-                        case lpExeComponents lp of
-                            Just exes -> exes
-                            -- Build all executables in the event that no
-                            -- specific list is provided (as happens with
-                            -- extra-deps).
-                            Nothing -> packageExes package
-                    ]
-                TTUpstream _ _ -> ["build"]) ++ extraOpts
+        cabal (console && configHideTHLoading config) $ ("build" :) $ (++ extraOpts) $
+            case (taskType, taskAllInOne, isFinalBuild) of
+                (_, True, True) -> fail "Invariant violated: cannot have an all-in-one build that also has a final build step."
+                (TTLocal lp, False, False) -> primaryComponentOptions lp
+                (TTLocal lp, False, True) -> finalComponentOptions lp
+                (TTLocal lp, True, False) -> primaryComponentOptions lp ++ finalComponentOptions lp
+                (TTUpstream{}, _, _) -> []
         checkForUnlistedFiles taskType preBuildTime pkgDir
 
         when (doHaddock package) $ do
@@ -1024,21 +1067,19 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             cabal False (concat [["haddock", "--html", "--hoogle", "--html-location=../$pkg-$version/"]
                                 ,sourceFlag])
 
-        withMVar eeInstallLock $ \() -> do
+        unless isFinalBuild $ withMVar eeInstallLock $ \() -> do
             announce "copy/register"
             cabal False ["copy"]
             when (packageHasLibrary package) $ cabal False ["register"]
 
-        let (installedPkgDb, installedDumpPkgsTVar, dumpPkgsTVars) =
+        let (installedPkgDb, installedDumpPkgsTVar) =
                 case taskLocation task of
                     Snap ->
                          ( bcoSnapDB eeBaseConfigOpts
-                         , eeSnapshotDumpPkgs
-                         , [eeSnapshotDumpPkgs] )
+                         , eeSnapshotDumpPkgs )
                     Local ->
                         ( bcoLocalDB eeBaseConfigOpts
-                        , eeLocalDumpPkgs
-                        , [eeSnapshotDumpPkgs, eeLocalDumpPkgs] )
+                        , eeLocalDumpPkgs )
         let ident = PackageIdentifier (packageName package) (packageVersion package)
         mpkgid <- if packageHasLibrary package
             then do
@@ -1049,18 +1090,6 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             else do
                 markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow with writeFlagCache?
                 return $ Executable ident
-
-        case (doHaddock package && shouldHaddockDeps eeBuildOpts, mpkgid) of
-            (False, _) -> return ()
-            (True, Executable _) -> return ()
-            (True, Library _ ghcPkgId) ->
-                withMVar eeInstallLock $ \() -> do
-                    dumpPkgs <- forM dumpPkgsTVars $ \tvar -> liftIO (readTVarIO tvar)
-                    copyDepHaddocks
-                        eeBaseConfigOpts
-                        (reverse (eeGlobalDumpPkgs : dumpPkgs))
-                        ghcPkgId
-                        Set.empty
 
         case taskLocation task of
             Snap -> writePrecompiledCache eeBaseConfigOpts taskProvides
@@ -1107,53 +1136,19 @@ depsPresent installedMap deps = all
 singleTest :: M env m
            => (m () -> IO ())
            -> TestOpts
-           -> LocalPackageTB
+           -> [Text]
            -> ActionContext
            -> ExecuteEnv
            -> Task
            -> InstalledMap
            -> m ()
-singleTest runInBase topts lptb ac ee task installedMap = do
-    (allDepsMap, cache) <- getConfigCache ee task $
-        case taskType task of
-            TTLocal lp -> concat
-                [ ["--enable-tests"]
-                , ["--enable-benchmarks" | depsPresent installedMap $ lpBenchDeps lp]
-                ]
-            _ -> []
-    withSingleContext runInBase ac ee task (Just allDepsMap) (Just "test") $ \package cabalfp pkgDir cabal announce console mlogFile -> do
-        neededConfig <- ensureConfig cache pkgDir ee (announce "configure (test)") cabal cabalfp
+singleTest runInBase topts testsToRun ac ee task installedMap = do
+    -- FIXME: Since this doesn't use cabal, we should be able to avoid using a
+    -- fullblown 'withSingleContext'.
+    (allDepsMap, _cache) <- getConfigCache ee task installedMap True False
+    withSingleContext runInBase ac ee task (Just allDepsMap) (Just "test") $ \package _cabalfp pkgDir _cabal announce _console mlogFile -> do
         config <- asks getConfig
-
-        testBuilt <- checkTestBuilt pkgDir
-
-        let needBuild = neededConfig ||
-                (case taskType task of
-                    TTLocal lp ->
-                        case lpDirtyFiles lp of
-                            Just _ -> True
-                            Nothing -> False
-                    _ -> assert False True) ||
-                not testBuilt
-
-            needHpc = toCoverage topts
-
-            testsToRun = Set.toList $ lptbTests lptb
-            components = map (T.unpack . T.append "test:") testsToRun
-
-        when needBuild $ do
-            announce "build (test)"
-            unsetTestBuilt pkgDir
-            unsetTestSuccess pkgDir
-            case taskType task of
-                TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
-                TTUpstream _ _ -> assert False $ return ()
-            extraOpts <- extraBuildOptions (eeBuildOpts ee)
-            preBuildTime <- modTime <$> liftIO getCurrentTime
-            cabal (console && configHideTHLoading config) $
-                "build" : (components ++ extraOpts)
-            checkForUnlistedFiles (taskType task) preBuildTime pkgDir
-            setTestBuilt pkgDir
+        let needHpc = toCoverage topts
 
         toRun <-
             if toDisableRun topts
@@ -1256,50 +1251,19 @@ singleTest runInBase topts lptb ac ee task installedMap = do
                 (fmap fst mlogFile)
                 bs
 
-            setTestSuccess pkgDir
-
 singleBench :: M env m
             => (m () -> IO ())
             -> BenchmarkOpts
-            -> LocalPackageTB
             -> ActionContext
             -> ExecuteEnv
             -> Task
             -> InstalledMap
             -> m ()
-singleBench runInBase beopts _lptb ac ee task installedMap = do
-    (allDepsMap, cache) <- getConfigCache ee task $
-        case taskType task of
-            TTLocal lp -> concat
-                [ ["--enable-tests" | depsPresent installedMap $ lpTestDeps lp]
-                , ["--enable-benchmarks"]
-                ]
-            _ -> []
-    withSingleContext runInBase ac ee task (Just allDepsMap) (Just "bench") $ \_package cabalfp pkgDir cabal announce console _mlogFile -> do
-        neededConfig <- ensureConfig cache pkgDir ee (announce "configure (benchmarks)") cabal cabalfp
-
-        benchBuilt <- checkBenchBuilt pkgDir
-
-        let needBuild = neededConfig ||
-                (case taskType task of
-                    TTLocal lp ->
-                        case lpDirtyFiles lp of
-                            Just _ -> True
-                            Nothing -> False
-                    _ -> assert False True) ||
-                not benchBuilt
-        when needBuild $ do
-            announce "build (benchmarks)"
-            unsetBenchBuilt pkgDir
-            case taskType task of
-                TTLocal lp -> writeBuildCache pkgDir $ lpNewBuildCache lp
-                TTUpstream _ _ -> assert False $ return ()
-            config <- asks getConfig
-            extraOpts <- extraBuildOptions (eeBuildOpts ee)
-            preBuildTime <- modTime <$> liftIO getCurrentTime
-            cabal (console && configHideTHLoading config) ("build" : extraOpts)
-            checkForUnlistedFiles (taskType task) preBuildTime pkgDir
-            setBenchBuilt pkgDir
+singleBench runInBase beopts ac ee task installedMap = do
+    -- FIXME: Since this doesn't use cabal, we should be able to avoid using a
+    -- fullblown 'withSingleContext'.
+    (allDepsMap, _cache) <- getConfigCache ee task installedMap False True
+    withSingleContext runInBase ac ee task (Just allDepsMap) (Just "bench") $ \_package _cabalfp _pkgDir cabal announce _console _mlogFile -> do
         let args = maybe []
                          ((:[]) . ("--benchmark-options=" <>))
                          (beoAdditionalArgs beopts)
@@ -1397,9 +1361,47 @@ extraBuildOptions bopts = do
     let ddumpOpts = " -ddump-hi -ddump-to-file"
     case toCoverage (boptsTestOpts bopts) of
       True -> do
-        hpcIndexDir <- toFilePath <$> hpcRelativeDir
+        hpcIndexDir <- toFilePathNoTrailingSep <$> hpcRelativeDir
         return ["--ghc-options", "-hpcdir " ++ hpcIndexDir ++ ddumpOpts]
       False -> return ["--ghc-options", ddumpOpts]
+
+-- Library and executable build components.
+primaryComponentOptions :: LocalPackage -> [String]
+primaryComponentOptions lp = concat
+    [ ["lib:" ++ packageNameString (packageName (lpPackage lp))
+      -- TODO: get this information from target parsing instead,
+      -- which will allow users to turn off library building if
+      -- desired
+      | packageHasLibrary (lpPackage lp)]
+    , map (T.unpack . T.append "exe:") $ Set.toList $ exesToBuild lp
+    ]
+
+exesToBuild :: LocalPackage -> Set Text
+exesToBuild lp = packageExes (lpPackage lp)
+    -- NOTE: Ideally we'd do something like the following code, allowing
+    -- the user to control which executables get built. However, due to
+    -- https://github.com/haskell/cabal/issues/2780 we must build all
+    -- exes...
+    --
+    -- if lpWanted lp
+    --     then exeComponents (lpComponents lp)
+    --     -- Build all executables in the event that no
+    --     -- specific list is provided (as happens with
+    --     -- extra-deps).
+    --     else packageExes (lpPackage lp)
+
+-- Test-suite and benchmark build components.
+finalComponentOptions :: LocalPackage -> [String]
+finalComponentOptions lp =
+    map (T.unpack . decodeUtf8 . renderComponent) $
+    Set.toList $
+    Set.filter (\c -> isCTest c || isCBench c) (lpComponents lp)
+
+taskComponents :: Task -> Set NamedComponent
+taskComponents task =
+    case taskType task of
+        TTLocal lp -> lpComponents lp
+        TTUpstream{} -> Set.empty
 
 -- | Take the given list of package dependencies and the contents of the global
 -- package database, and construct a set of installed package IDs that:

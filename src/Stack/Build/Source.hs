@@ -60,7 +60,6 @@ import           Stack.BuildPlan (loadMiniBuildPlan, shadowMiniBuildPlan,
                                   parseCustomMiniBuildPlan)
 import           Stack.Constants (wiredInPackages)
 import           Stack.Package
-import           Stack.PackageIndex
 import           Stack.Types
 
 import           System.Directory
@@ -80,9 +79,10 @@ loadSourceMap needTargets bopts = do
     bconfig <- asks getBuildConfig
     rawLocals <- getLocalPackageViews
     (mbp0, cliExtraDeps, targets) <- parseTargetsFromBuildOpts needTargets bopts
-    menv <- getMinimalEnvOverride
-    caches <- getPackageCaches menv
-    let latestVersion = Map.fromListWith max $ map toTuple $ Map.keys caches
+    let latestVersion =
+            Map.fromListWith max $
+            map toTuple $
+            Map.keys (bcPackageCaches bconfig)
 
     -- Extend extra-deps to encompass targets requested on the command line
     -- that are not in the snapshot.
@@ -94,6 +94,7 @@ loadSourceMap needTargets bopts = do
 
     locals <- mapM (loadLocalPackage bopts targets) $ Map.toList rawLocals
     checkFlagsUsed bopts locals extraDeps0 (mbpPackages mbp0)
+    checkComponentsBuildable locals
 
     let
         -- loadLocals returns PackageName (foo) and PackageIdentifier (bar-1.2.3) targets separately;
@@ -314,6 +315,12 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
                 Just STUnknown -> assert False mempty
                 Nothing -> mempty
 
+        toComponents e t b = Set.unions
+            [ Set.map CExe e
+            , Set.map CTest t
+            , Set.map CBench b
+            ]
+
         btconfig = config
             { packageConfigEnableTests = not $ Set.null tests
             , packageConfigEnableBenchmarks = not $ Set.null benches
@@ -329,11 +336,7 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
 
         btpkg
             | Set.null tests && Set.null benches = Nothing
-            | otherwise = Just LocalPackageTB
-                { lptbPackage = resolvePackage btconfig gpkg
-                , lptbTests = tests
-                , lptbBenches = benches
-                }
+            | otherwise = Just (resolvePackage btconfig gpkg)
         testpkg = resolvePackage testconfig gpkg
         benchpkg = resolvePackage benchconfig gpkg
     mbuildCache <- tryGetBuildCache $ lpvRoot lpv
@@ -350,10 +353,6 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
         { lpPackage = pkg
         , lpTestDeps = packageDeps testpkg
         , lpBenchDeps = packageDeps benchpkg
-        , lpExeComponents =
-            case mtarget of
-                Nothing -> Nothing
-                Just _ -> Just exes
         , lpTestBench = btpkg
         , lpFiles = files
         , lpDirtyFiles =
@@ -365,11 +364,18 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
         , lpNewBuildCache = newBuildCache
         , lpCabalFile = lpvCabalFP lpv
         , lpDir = lpvRoot lpv
-        , lpComponents = Set.unions
-            [ Set.map CExe exes
-            , Set.map CTest tests
-            , Set.map CBench benches
-            ]
+        , lpWanted = isJust mtarget
+        , lpComponents = toComponents exes tests benches
+        -- TODO: refactor this so that it's easier to be sure that these
+        -- components are indeed unbuildable.
+        --
+        -- The reasoning here is that if the STLocalComps specification
+        -- made it through component parsing, but the components aren't
+        -- present, then they must not be buildable.
+        , lpUnbuildable = toComponents
+            (exes `Set.difference` packageExes pkg)
+            (tests `Set.difference` packageTests pkg)
+            (benches `Set.difference` packageBenchmarks pkg)
         }
 
 -- | Ensure that the flags specified in the stack.yaml file and on the command
@@ -423,9 +429,9 @@ localFlags :: (Map (Maybe PackageName) (Map FlagName Bool))
            -> PackageName
            -> Map FlagName Bool
 localFlags boptsflags bconfig name = Map.unions
-    [ fromMaybe Map.empty $ Map.lookup (Just name) boptsflags
-    , fromMaybe Map.empty $ Map.lookup Nothing boptsflags
-    , fromMaybe Map.empty $ Map.lookup name $ bcFlags bconfig
+    [ Map.findWithDefault Map.empty (Just name) boptsflags
+    , Map.findWithDefault Map.empty Nothing boptsflags
+    , Map.findWithDefault Map.empty name (bcFlags bconfig)
     ]
 
 -- | Add in necessary packages to extra dependencies
@@ -555,3 +561,13 @@ calcFci modTime' fp = liftIO $
             , fciSize = size
             , fciHash = toBytes (digest :: Digest SHA256)
             }
+
+checkComponentsBuildable :: MonadThrow m => [LocalPackage] -> m ()
+checkComponentsBuildable lps =
+    unless (null unbuildable) $ throwM $ SomeTargetsNotBuildable unbuildable
+  where
+    unbuildable =
+        [ (packageName (lpPackage lp), c)
+        | lp <- lps
+        , c <- Set.toList (lpUnbuildable lp)
+        ]

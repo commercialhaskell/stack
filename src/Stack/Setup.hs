@@ -239,7 +239,8 @@ setupEnv mResolveMissingGHC = do
     localdb <- runReaderT packageDatabaseLocal envConfig0
     createDatabase menv wc localdb
     globaldb <- getGlobalDB menv wc
-    let mkGPP locals = mkGhcPackagePath locals localdb deps globaldb
+    extras <- runReaderT packageDatabaseExtra envConfig0
+    let mkGPP locals = mkGhcPackagePath locals localdb deps extras globaldb
 
     distDir <- runReaderT distRelativeDir envConfig0
 
@@ -282,9 +283,8 @@ setupEnv mResolveMissingGHC = do
                                         [ toFilePathNoTrailingSep deps
                                         , ""
                                         ])
-                        $ Map.insert "HASKELL_DIST_DIR" (T.pack $ toFilePathNoTrailingSep distDir)
-                        $ env
-                    !() <- atomicModifyIORef envRef $ \m' ->
+                        $ Map.insert "HASKELL_DIST_DIR" (T.pack $ toFilePathNoTrailingSep distDir) env
+                    () <- atomicModifyIORef envRef $ \m' ->
                         (Map.insert es eo m', ())
                     return eo
 
@@ -794,7 +794,7 @@ installGHCPosix version _ archiveFile archiveType destDir = do
             parseRelDir $
             "ghc-" ++ versionString version
 
-        $logSticky $ T.concat ["Unpacking GHC into ", (T.pack . toFilePath $ root), " ..."]
+        $logSticky $ T.concat ["Unpacking GHC into ", T.pack . toFilePath $ root, " ..."]
         $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
         readInNull root tarTool menv ["xf", toFilePath archiveFile] Nothing
 
@@ -857,7 +857,7 @@ installGHCJS version si archiveFile archiveType destDir = do
                 readInNull destDir tarTool menv ["xf", toFilePath archiveFile] Nothing
                 renameDir (destDir Path.</> tarComponent) unpackDir
 
-    $logSticky $ T.concat ["Unpacking GHCJS into ", (T.pack . toFilePath $ unpackDir), " ..."]
+    $logSticky $ T.concat ["Unpacking GHCJS into ", T.pack . toFilePath $ unpackDir, " ..."]
     $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
     runUnpack
 
@@ -1107,7 +1107,7 @@ withUnpackedTarball7z name si archiveFile archiveType srcDir destDir = do
             Nothing -> error $ "Invalid " ++ name ++ " filename: " ++ show archiveFile
             Just x -> parseAbsFile $ T.unpack x
     run7z <- setup7z si
-    let tmpName = (toFilePathNoTrailingSep $ dirname destDir) ++ "-tmp"
+    let tmpName = toFilePathNoTrailingSep (dirname destDir) ++ "-tmp"
     createTree (parent destDir)
     withCanonicalizedTempDirectory (toFilePath $ parent destDir) tmpName $ \tmpDir -> do
         let absSrcDir = tmpDir </> srcDir
@@ -1126,7 +1126,7 @@ withUnpackedTarball7z name si archiveFile archiveType srcDir destDir = do
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
 -- Returned function takes an unpack directory and archive.
-setup7z :: (MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadIO m, MonadIO n, MonadLogger m, MonadBaseControl IO m)
+setup7z :: (MonadReader env m, HasHttpManager env, HasConfig env, MonadThrow m, MonadIO m, MonadIO n, MonadLogger m, MonadLogger n, MonadBaseControl IO m)
         => SetupInfo
         -> m (Path Abs Dir -> Path Abs File -> n ())
 setup7z si = do
@@ -1137,15 +1137,18 @@ setup7z si = do
         (Just sevenzDll, Just sevenzExe) -> do
             chattyDownload "7z.dll" sevenzDll dll
             chattyDownload "7z.exe" sevenzExe exe
-            return $ \outdir archive -> liftIO $ do
-                ec <- rawSystem (toFilePath exe)
-                    [ "x"
-                    , "-o" ++ toFilePath outdir
-                    , "-y"
-                    , toFilePath archive
-                    ]
+            return $ \outdir archive -> do
+                let cmd = toFilePath exe
+                    args =
+                        [ "x"
+                        , "-o" ++ toFilePath outdir
+                        , "-y"
+                        , toFilePath archive
+                        ]
+                $logProcessRun cmd args
+                ec <- liftIO $ rawSystem cmd args
                 when (ec /= ExitSuccess)
-                    $ throwM (ProblemWhileDecompressing archive)
+                    $ liftIO $ throwM (ProblemWhileDecompressing archive)
         _ -> throwM SetupInfoMissingSevenz
 
 chattyDownload :: (MonadReader env m, HasHttpManager env, MonadIO m, MonadLogger m, MonadThrow m, MonadBaseControl IO m)
@@ -1417,10 +1420,7 @@ getUtf8LocaleVars menv = do
     matchingLocales
         :: [Text] -> Text -> [Text]
     matchingLocales utf8Locales prefix =
-        filter
-            (\v ->
-                  (T.toLower prefix) `T.isPrefixOf` T.toLower v)
-            utf8Locales
+        filter (\v -> T.toLower prefix `T.isPrefixOf` T.toLower v) utf8Locales
     -- Does the locale have one of the encodings in @utf8Suffixes@ (case-insensitive)?
     isUtf8Locale locale =
       any (\ v -> T.toLower v `T.isSuffixOf` T.toLower locale) utf8Suffixes

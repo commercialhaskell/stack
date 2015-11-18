@@ -9,7 +9,7 @@ description:         Please see the README.md for usage information, and
 license:             BSD3
 license-file:        LICENSE
 author:              Commercial Haskell SIG
-maintainer:          borsboom@fpcomplete.com
+maintainer:          manny@fpcomplete.com
 category:            Development
 build-type:          Simple
 cabal-version:       >=1.10
@@ -51,6 +51,7 @@ library
                      Options.Applicative.Args
                      Options.Applicative.Complicated
                      Stack.BuildPlan
+                     Stack.Clean
                      Stack.Config
                      Stack.Config.Docker
                      Stack.Config.Nix
@@ -89,6 +90,7 @@ library
                      Stack.Types.Image
                      Stack.Types.Nix
                      Stack.Types.PackageIdentifier
+                     Stack.Types.PackageIndex
                      Stack.Types.PackageName
                      Stack.Types.TemplateName
                      Stack.Types.Version
@@ -110,6 +112,7 @@ library
                      System.Process.Run
                      Network.HTTP.Download.Verified
                      Data.Attoparsec.Args
+                     Data.Maybe.Extra
                      Path.IO
                      Path.Extra
   other-modules:     Network.HTTP.Download
@@ -121,7 +124,6 @@ library
                      Data.Attoparsec.Combinators
                      Data.Binary.VersionTagged
                      Data.IORef.RunOnce
-                     Data.Maybe.Extra
                      Data.Set.Monad
                      Distribution.Version.Extra
   build-depends:     Cabal >= 1.18.1.5
@@ -145,6 +147,7 @@ library
                    , cryptohash >= 0.11.6
                    , cryptohash-conduit
                    , directory >= 1.2.1.0
+                   , edit-distance >= 0.2
                    , either
                    , enclosed-exceptions
                    , exceptions >= 0.8.0.2
@@ -174,7 +177,7 @@ library
                    , pretty
                    , process >= 1.2.0.0
                    , resourcet >= 1.1.4.1
-                   , retry >= 0.6
+                   , retry >= 0.6 && < 0.8
                    , safe >= 0.3
                    , semigroups >= 0.5
                    , split
@@ -282,7 +285,7 @@ test-suite stack-test
                 , optparse-applicative
                 , bytestring
                 , QuickCheck
-                , retry >= 0.6
+                , retry >= 0.6 && < 0.8
   default-language:    Haskell2010
 
 test-suite stack-integration-test
@@ -310,6 +313,20 @@ test-suite stack-integration-test
                 , transformers
                 , bytestring
   default-language:    Haskell2010
+
+  -- This isn't actually needed to build stack-integration-test, but it makes it
+  -- easier to load up an individual integration test into stack ghci. It's
+  -- still a little involved:
+  --
+  -- stack exec -- stack ghci stack:stack-integration-test --flag stack:integration-tests --no-build
+  --
+  -- Then, in ghci:
+  --
+  -- :cd test/integration/tests/.../files
+  -- :load ../Main.hs
+  -- main
+  other-modules: StackTest
+  hs-source-dirs: test/integration/lib
 
 source-repository head
   type:     git

@@ -20,26 +20,53 @@ import System.FilePath (takeBaseName)
 import Data.Text (Text)
 import qualified Data.Text as T
 
--- | Enable/disable flags for a @Bool@.
-boolFlags :: Bool -> String -> String -> Mod FlagFields Bool -> Parser Bool
+-- | Enable/disable flags for a 'Bool'.
+boolFlags :: Bool                 -- ^ Default value
+          -> String               -- ^ Flag name
+          -> String               -- ^ Help suffix
+          -> Mod FlagFields Bool
+          -> Parser Bool
 boolFlags defaultValue = enableDisableFlags defaultValue True False
 
--- | Enable/disable flags for a @Bool@, without a default case (to allow chaining @<|>@s).
-boolFlagsNoDefault :: Maybe Bool -> String -> String -> Mod FlagFields Bool -> Parser Bool
+-- | Enable/disable flags for a 'Bool', without a default case (to allow chaining with '<|>').
+boolFlagsNoDefault :: Maybe Bool           -- ^ Hide the enabling or disabling flag from the
+                                           -- brief description?
+                   -> String               -- ^ Flag name
+                   -> String               -- ^ Help suffix
+                   -> Mod FlagFields Bool
+                   -> Parser Bool
 boolFlagsNoDefault = enableDisableFlagsNoDefault True False
 
--- | Enable/disable flags for a @(Maybe Bool)@.
-maybeBoolFlags :: String -> String -> Mod FlagFields (Maybe Bool) -> Parser (Maybe Bool)
+-- | Enable/disable flags for a @('Maybe' 'Bool')@.
+maybeBoolFlags :: String                       -- ^ Flag name
+               -> String                       -- ^ Help suffix
+               -> Mod FlagFields (Maybe Bool)
+               -> Parser (Maybe Bool)
 maybeBoolFlags = enableDisableFlags Nothing (Just True) (Just False)
 
 -- | Enable/disable flags for any type.
-enableDisableFlags :: (Eq a) => a -> a -> a -> String -> String -> Mod FlagFields a -> Parser a
+enableDisableFlags :: (Eq a)
+                   => a                 -- ^ Default value
+                   -> a                 -- ^ Enabled value
+                   -> a                 -- ^ Disabled value
+                   -> String            -- ^ Name
+                   -> String            -- ^ Help suffix
+                   -> Mod FlagFields a
+                   -> Parser a
 enableDisableFlags defaultValue enabledValue disabledValue name helpSuffix mods =
   enableDisableFlagsNoDefault enabledValue disabledValue (Just defaultValue) name helpSuffix mods <|>
   pure defaultValue
 
--- | Enable/disable flags for any type, without a default (to allow chaining @<|>@s)
-enableDisableFlagsNoDefault :: (Eq a) => a -> a -> Maybe a -> String -> String -> Mod FlagFields a -> Parser a
+-- | Enable/disable flags for any type, without a default (to allow chaining with '<|>')
+enableDisableFlagsNoDefault :: (Eq a)
+                            => a                 -- ^ Enabled value
+                            -> a                 -- ^ Disabled value
+                            -> Maybe a           -- ^ Hide the enabling or disabling flag
+                                                 -- from the brief description??
+                            -> String            -- ^ Name
+                            -> String            -- ^ Help suffix
+                            -> Mod FlagFields a
+                            -> Parser a
 enableDisableFlagsNoDefault enabledValue disabledValue maybeHideValue name helpSuffix mods =
   last <$> some (enableDisableFlagsNoDefault' enabledValue disabledValue maybeHideValue name helpSuffix mods)
 
@@ -77,8 +104,13 @@ enableDisableFlagsNoDefault' enabledValue disabledValue maybeHideValue name help
            (hidden <> internal <> long ("disable-" ++ name) <> mods)
 
 -- | Show an extra help option (e.g. @--docker-help@ shows help for all @--docker*@ args).
--- To actually show have that help appear, use 'execExtraHelp' before executing the main parser.
-extraHelpOption :: Bool -> String -> String -> String -> Parser (a -> a)
+--
+-- To actually have that help appear, use 'execExtraHelp' before executing the main parser.
+extraHelpOption :: Bool             -- ^ Hide from the brief description?
+                -> String           -- ^ Program name, e.g. @"stack"@
+                -> String           -- ^ Option glob expression, e.g. @"docker*"@
+                -> String           -- ^ Help option name, e.g. @"docker-help"@
+                -> Parser (a -> a)
 extraHelpOption hide progName fakeName helpName =
     infoOption (optDesc' ++ ".") (long helpName <> hidden <> internal) <*>
     infoOption (optDesc' ++ ".") (long fakeName <>
@@ -86,10 +118,15 @@ extraHelpOption hide progName fakeName helpName =
                                   (if hide then hidden <> internal else idm))
   where optDesc' = concat ["Run '", takeBaseName progName, " --", helpName, "' for details"]
 
--- | Display extra help if extea help option passed in arguments.
--- Since optparse-applicative doesn't allow an arbirary IO action for an 'abortOption', this
+-- | Display extra help if extra help option passed in arguments.
+--
+-- Since optparse-applicative doesn't allow an arbitrary IO action for an 'abortOption', this
 -- was the best way I found that doesn't require manually formatting the help.
-execExtraHelp :: [String] -> String -> Parser a -> String -> IO ()
+execExtraHelp :: [String]  -- ^ Command line arguments
+              -> String    -- ^ Extra help option name, e.g. @"docker-help"@
+              -> Parser a  -- ^ Option parser for the relevant command
+              -> String    -- ^ Option description
+              -> IO ()
 execExtraHelp args helpOpt parser pd =
     when (args == ["--" ++ helpOpt]) $
       withArgs ["--help"] $ do
@@ -101,8 +138,10 @@ execExtraHelp args helpOpt parser pd =
         return ()
   where hiddenHelper = abortOption ShowHelpText (long "help" <> hidden <> internal)
 
+-- | 'option', specialized to 'Text'.
 textOption :: Mod OptionFields Text -> Parser Text
 textOption = option (T.pack <$> readerAsk)
 
+-- | 'argument', specialized to 'Text'.
 textArgument :: Mod ArgumentFields Text -> Parser Text
 textArgument = argument (T.pack <$> readerAsk)

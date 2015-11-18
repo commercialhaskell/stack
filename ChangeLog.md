@@ -5,6 +5,8 @@ Major changes:
 * GHCJS can now be used with stackage snapshots via the new `compiler` field.
 * Windows installers are now available:
   [download them here](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#windows) [#613](https://github.com/commercialhaskell/stack/issues/613)
+* Docker integration works with non-FPComplete generated images
+  [#531](https://github.com/commercialhaskell/stack/issues/531)
 
 Other enhancements:
 
@@ -13,8 +15,13 @@ Other enhancements:
 * Added a `stack config set resolver RESOLVER` command. Part of work on [#115](https://github.com/commercialhaskell/stack/issues/115)
 * `stack setup` can now install GHCJS on windows.  See [#1145](https://github.com/commercialhaskell/stack/issues/1145) and [#749](https://github.com/commercialhaskell/stack/issues/749)
 * `stack hpc report` command added, which generates reports for HPC tix files
+* `stack ghci` now accepts all the flags accepted by `stack build`.  See [#1186](https://github.com/commercialhaskell/stack/issues/1186)
 * `stack ghci` builds the project before launching GHCi.  If the build fails, optimistically launch GHCi anyway.  Use `stack ghci --no-build` option to disable [#1065](https://github.com/commercialhaskell/stack/issues/1065)
+* `stack ghci` now detects and warns about various circumstances where it is liable to fail. See [#1270](https://github.com/commercialhaskell/stack/issues/1270)
 * Added `require-docker-version` configuration option
+* Packages will now usually be built along with their tests and benchmarks. See [#1166](https://github.com/commercialhaskell/stack/issues/1166)
+* Relative `local-bin-path` paths will be relative to the project's root directory, not the current working directory.  [#1340](https://github.com/commercialhaskell/stack/issues/1340)
+* `stack clean` now takes an optional `[PACKAGE]` argument for use in multi-package projects. See [#583](https://github.com/commercialhaskell/stack/issues/583)
 
 Bug fixes:
 

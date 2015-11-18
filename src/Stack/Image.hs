@@ -35,7 +35,7 @@ import           Path.IO
 import           Stack.Constants
 import           Stack.Types
 import           Stack.Types.Internal
-import           System.Process
+import           System.Process.Run
 
 type Build e m = (HasBuildConfig e, HasConfig e, HasEnvConfig e, HasTerminal e, MonadBaseControl IO m, MonadCatch m, MonadIO m, MonadLogger m, MonadReader e m)
 
@@ -101,30 +101,34 @@ imageName = map toLower . toFilePathNoTrailingSep . dirname
 -- directory of executables & static content.
 createDockerImage :: Assemble e m => Path Abs Dir -> m ()
 createDockerImage dir = do
+    menv <- getMinimalEnvOverride
     config <- asks getConfig
     let dockerConfig = imgDocker (configImage config)
     case imgDockerBase =<< dockerConfig of
         Nothing -> throwM StackImageDockerBaseUnspecifiedException
-        Just base ->
+        Just base -> do
             liftIO
-                (do writeFile
-                        (toFilePath
-                             (dir </>
-                              $(mkRelFile "Dockerfile")))
-                        (unlines ["FROM " ++ base, "ADD ./ /"])
-                    callProcess
-                        "docker"
-                        [ "build"
-                        , "-t"
-                        , fromMaybe
-                              (imageName (parent (parent dir)))
-                              (imgDockerImageName =<< dockerConfig)
-                        , toFilePath dir])
+                (writeFile
+                     (toFilePath
+                          (dir </>
+                           $(mkRelFile "Dockerfile")))
+                     (unlines ["FROM " ++ base, "ADD ./ /"]))
+            callProcess
+                Nothing
+                menv
+                "docker"
+                [ "build"
+                , "-t"
+                , fromMaybe
+                      (imageName (parent (parent dir)))
+                      (imgDockerImageName =<< dockerConfig)
+                , toFilePathNoTrailingSep dir]
 
 -- | Extend the general purpose docker image with entrypoints (if
 -- specified).
 extendDockerImageWithEntrypoint :: Assemble e m => Path Abs Dir -> m ()
 extendDockerImageWithEntrypoint dir = do
+    menv <- getMinimalEnvOverride
     config <- asks getConfig
     let dockerConfig = imgDocker (configImage config)
     let dockerImageName = fromMaybe
@@ -136,23 +140,25 @@ extendDockerImageWithEntrypoint dir = do
         Just eps ->
             forM_
                 eps
-                (\ep ->
+                (\ep -> do
                       liftIO
-                          (do writeFile
-                                  (toFilePath
-                                       (dir </>
-                                        $(mkRelFile "Dockerfile")))
-                                  (unlines
-                                       [ "FROM " ++ dockerImageName
-                                       , "ENTRYPOINT [\"/usr/local/bin/" ++
-                                         ep ++ "\"]"
-                                       , "CMD []"])
-                              callProcess
-                                  "docker"
-                                  [ "build"
-                                  , "-t"
-                                  , dockerImageName ++ "-" ++ ep
-                                  , toFilePath dir]))
+                          (writeFile
+                               (toFilePath
+                                    (dir </>
+                                     $(mkRelFile "Dockerfile")))
+                               (unlines
+                                    [ "FROM " ++ dockerImageName
+                                    , "ENTRYPOINT [\"/usr/local/bin/" ++
+                                      ep ++ "\"]"
+                                    , "CMD []"]))
+                      callProcess
+                          Nothing
+                          menv
+                          "docker"
+                          [ "build"
+                          , "-t"
+                          , dockerImageName ++ "-" ++ ep
+                          , toFilePathNoTrailingSep dir])
 
 -- | The command name for dealing with images.
 imgCmdName :: String

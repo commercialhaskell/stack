@@ -56,10 +56,8 @@ spec = beforeAll setup $ afterAll teardown $ do
         LoadConfig{..} <- loadConfig' manager
         bconfig <- loadBuildConfigRest manager (lcLoadBuildConfig Nothing Nothing)
         runStackT manager logLevel bconfig False False $ do
-            menv <- getMinimalEnvOverride
             mbp <- loadMiniBuildPlan $ LTS 2 9
             eres <- try $ resolveBuildPlan
-                menv
                 mbp
                 (const False)
                 (Map.fromList

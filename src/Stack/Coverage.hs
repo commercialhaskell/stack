@@ -17,39 +17,41 @@ module Stack.Coverage
 
 import           Control.Applicative
 import           Control.Exception.Lifted
-import           Control.Monad                  (liftM, when, unless, void)
-import           Control.Monad.Catch            (MonadCatch)
+import           Control.Monad (liftM, when, unless, void)
+import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader           (MonadReader, asks)
+import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Resource
-import qualified Data.ByteString.Char8          as S8
-import           Data.Foldable                  (forM_, asum, toList)
+import qualified Data.ByteString.Char8 as S8
+import           Data.Foldable (forM_, asum, toList)
 import           Data.Function
 import           Data.List
-import qualified Data.Map.Strict                as Map
+import qualified Data.Map.Strict as Map
 import           Data.Maybe
-import           Data.Monoid                    ((<>))
-import           Data.Text                      (Text)
-import qualified Data.Text                      as T
-import qualified Data.Text.Encoding             as T
-import qualified Data.Text.IO                   as T
-import qualified Data.Text.Lazy                 as LT
-import           Data.Traversable               (forM)
-import           Trace.Hpc.Tix
-import           Network.HTTP.Download          (HasHttpManager)
+import           Data.Maybe.Extra (mapMaybeM)
+import           Data.Monoid ((<>))
+import           Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified Data.Text.IO as T
+import qualified Data.Text.Lazy as LT
+import           Data.Traversable (forM)
+import           Network.HTTP.Download (HasHttpManager)
 import           Path
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
-import           Prelude                        hiding (FilePath, writeFile)
-import           Stack.Build.Source             (parseTargetsFromBuildOpts)
+import           Prelude hiding (FilePath, writeFile)
+import           Stack.Build.Source (parseTargetsFromBuildOpts)
 import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Package
 import           Stack.Types
-import qualified System.Directory               as D
-import           System.FilePath                (dropExtension, isPathSeparator)
+import qualified System.Directory as D
+import           System.FilePath (dropExtension, isPathSeparator)
 import           System.Process.Read
-import           Text.Hastache                  (htmlEscape)
+import           Text.Hastache (htmlEscape)
+import           Trace.Hpc.Tix
 
 -- | Invoked at the beginning of running with "--coverage"
 deleteHpcReports :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
@@ -156,9 +158,9 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
             pkgDirs <- Map.keys . envConfigPackages <$> asks getEnvConfig
             let args =
                     -- Use index files from all packages (allows cross-package coverage results).
-                    concatMap (\x -> ["--srcdir", toFilePath x]) pkgDirs ++
+                    concatMap (\x -> ["--srcdir", toFilePathNoTrailingSep x]) pkgDirs ++
                     -- Look for index files in the correct dir (relative to each pkgdir).
-                    ["--hpcdir", toFilePath hpcRelDir, "--reset-hpcdirs"]
+                    ["--hpcdir", toFilePathNoTrailingSep hpcRelDir, "--reset-hpcdirs"]
             menv <- getMinimalEnvOverride
             $logInfo $ "Generating " <> report
             outputLines <- liftM S8.lines $ readProcessStdout Nothing menv "hpc"
@@ -192,7 +194,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     void $ readProcessStdout Nothing menv "hpc"
                         ( "markup"
                         : toFilePath tixSrc
-                        : ("--destdir=" ++ toFilePath reportDir)
+                        : ("--destdir=" ++ toFilePathNoTrailingSep reportDir)
                         : (args ++ extraMarkupArgs)
                         )
 
@@ -279,9 +281,8 @@ generateHpcUnifiedReport = do
 generateUnionReport :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
                     => Text -> Path Abs Dir -> [Path Abs File] -> m ()
 generateUnionReport report reportDir tixFiles = do
-    tixes <- mapM (liftM (fmap removeExeModules) . readTixOrLog) tixFiles
+    (errs, tix) <- fmap (unionTixes . map removeExeModules) (mapMaybeM readTixOrLog tixFiles)
     $logDebug $ "Using the following tix files: " <> T.pack (show tixFiles)
-    let (errs, tix) = unionTixes (catMaybes tixes)
     unless (null errs) $ $logWarn $ T.concat $
         "The following modules are left out of the " : report : " due to version mismatches: " :
         intersperse ", " (map T.pack errs)

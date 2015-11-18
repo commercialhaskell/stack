@@ -14,7 +14,6 @@
 
 module Stack.Build
   (build
-  ,clean
   ,withLoadPackage
   ,mkBaseConfigOpts
   ,queryBuildInfo)
@@ -29,20 +28,20 @@ import           Control.Monad.Trans.Resource
 import           Data.Aeson (Value (Object, Array), (.=), object)
 import           Data.Function
 import qualified Data.HashMap.Strict as HM
+import           Data.IORef.RunOnce (runOnce)
 import qualified Data.Map as Map
 import           Data.Map.Strict (Map)
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 import           Data.Text.Encoding (decodeUtf8)
+import qualified Data.Text.IO as TIO
 import           Data.Text.Read (decimal)
 import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
-import           Path.IO
 import           Prelude hiding (FilePath, writeFile)
 import           Stack.Build.ConstructPlan
 import           Stack.Build.Execute
@@ -50,7 +49,6 @@ import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Build.Target
-import           Stack.Constants
 import           Stack.Fetch as Fetch
 import           Stack.GhcPkg
 import           Stack.Package
@@ -117,7 +115,6 @@ build setLocalFiles mbuildLk bopts = fixCodePage' $ do
                          globalDumpPkgs
                          snapshotDumpPkgs
                          localDumpPkgs
-                         sourceMap
                          installedMap
                          plan
   where
@@ -162,7 +159,7 @@ withLoadPackage :: ( MonadIO m
                 -> m a
 withLoadPackage menv inner = do
     econfig <- asks getEnvConfig
-    withCabalLoader menv $ \cabalLoader ->
+    withCabalLoader' <- runOnce $ withCabalLoader menv $ \cabalLoader ->
         inner $ \name version flags -> do
             bs <- cabalLoader $ PackageIdentifier name version -- TODO automatically update index the first time this fails
 
@@ -171,6 +168,7 @@ withLoadPackage menv inner = do
             -- resolving the package index.
             (_warnings,pkg) <- readPackageBS (depPackageConfig econfig flags) bs
             return pkg
+    withCabalLoader'
   where
     -- | Package config to be used for dependencies
     depPackageConfig :: EnvConfig -> Map FlagName Bool -> PackageConfig
@@ -181,14 +179,6 @@ withLoadPackage menv inner = do
         , packageConfigCompilerVersion = envConfigCompilerVersion econfig
         , packageConfigPlatform = configPlatform (getConfig econfig)
         }
-
--- | Reset the build (remove Shake database and .gen files).
-clean :: (M env m) => m ()
-clean = do
-    econfig <- asks getEnvConfig
-    forM_
-        (Map.keys (envConfigPackages econfig))
-        (distDirFromDir >=> removeTreeIfExists)
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738
