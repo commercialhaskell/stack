@@ -56,8 +56,8 @@ spec = beforeAll setup $ afterAll teardown $ do
       writeFile (toFilePath stackDotYaml) sampleConfig
       lc <- loadConfig' manager
       (nixEnable $ configNix $ lcConfig lc) `shouldBe` True
-    it "sees that the only package asked for is glpk" $ \T{..} -> inTempDir $ do
+    it "sees that the only package asked for is glpk and adds GHC from nixpkgs mirror of LTS resolver" $ \T{..} -> inTempDir $ do
       writeFile (toFilePath stackDotYaml) sampleConfig
       lc <- loadConfig' manager
-      (nixPackages $ configNix $ lcConfig lc) `shouldBe` ["glpk"]
+      (nixPackages $ configNix $ lcConfig lc) `shouldBe` ["glpk", "haskell.packages.lts-2_10.ghc"]
 
