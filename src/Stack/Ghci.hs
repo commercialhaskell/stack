@@ -357,11 +357,11 @@ checkForIssues pkgs = do
       where
         (xs, ys) = partition (any f . snd) compsWithOpts
     compsWithOpts = map (\(k, bio) -> (k, bioGeneratedOpts bio ++ bioGhcOpts bio)) compsWithBios
-    compsWithBios = concat
-        [ [ ((ghciPkgName pkg, c), bio)
-          | (c, bio) <- ghciPkgOpts pkg
-          ]
-        | pkg <- pkgs ]
+    compsWithBios =
+        [ ((ghciPkgName pkg, c), bio)
+        | pkg <- pkgs
+        , (c, bio) <- ghciPkgOpts pkg
+        ]
 
 borderedWarning :: MonadLogger m => m a -> m a
 borderedWarning f = do
