@@ -94,38 +94,38 @@ ghci GhciOpts{..} = do
             (if null pkgs then [] else ["-hide-all-packages"]) ++
             nubOrd (concatMap (concatMap (bioGeneratedOpts . snd) . ghciPkgOpts) pkgs) ++
             concatMap (concatMap (bioGhcOpts . snd) . ghciPkgOpts) pkgs
-        modulesToLoad
-          | ghciNoLoadModules = []
-          | otherwise =
-              nubOrd
-                  (maybe [] (return . toFilePath) mainFile <>
-                   concatMap (map display . S.toList . ghciPkgModules) pkgs)
+        modulesToLoad = nubOrd $
+            maybe [] (return . toFilePath) mainFile <>
+            concatMap (map display . S.toList . ghciPkgModules) pkgs
         odir =
             [ "-odir=" <> toFilePathNoTrailingSep (objectInterfaceDir bconfig)
             , "-hidir=" <> toFilePathNoTrailingSep (objectInterfaceDir bconfig)]
     $logInfo
         ("Configuring GHCi with the following packages: " <>
          T.intercalate ", " (map (packageNameText . ghciPkgName) pkgs))
-    tmp <- liftIO getTemporaryDirectory
-    withCanonicalizedTempDirectory
-        tmp
-        "ghci-script"
-        (\tmpDir ->
-              do let scriptPath = tmpDir </> $(mkRelFile "ghci-script")
-                     fp = toFilePath scriptPath
-                     loadModules = ":load " <> unwords modulesToLoad
-                     bringIntoScope = ":module + " <> unwords modulesToLoad
-                 liftIO (writeFile fp (unlines [loadModules,bringIntoScope]))
-                 finally (exec
-                              defaultEnvSettings
-                              (fromMaybe (compilerExeName wc) ghciGhcCommand)
-                              ("--interactive" :
-                              -- This initial "-i" resets the include directories to not
-                              -- include CWD.
-                               "-i" :
-                               odir <> pkgopts <> ghciArgs <>
-                               ["-ghci-script=" <> fp]))
-                         (removeFile scriptPath))
+    let execGhci extras =
+            exec defaultEnvSettings
+                 (fromMaybe (compilerExeName wc) ghciGhcCommand)
+                 ("--interactive" :
+                 -- This initial "-i" resets the include directories to not
+                 -- include CWD.
+                  "-i" :
+                  odir <> pkgopts <> ghciArgs <> extras)
+    case ghciNoLoadModules of
+        True -> execGhci []
+        False -> do
+            tmp <- liftIO getTemporaryDirectory
+            withCanonicalizedTempDirectory
+                tmp
+                "ghci-script"
+                (\tmpDir ->
+                      do let scriptPath = tmpDir </> $(mkRelFile "ghci-script")
+                             fp = toFilePath scriptPath
+                             loadModules = ":load " <> unwords modulesToLoad
+                             bringIntoScope = ":module + " <> unwords modulesToLoad
+                         liftIO (writeFile fp (unlines [loadModules,bringIntoScope]))
+                         finally (execGhci ["-ghci-script=" <> fp])
+                                 (removeFile scriptPath))
 
 -- | Figure out the main-is file to load based on the targets. Sometimes there
 -- is none, sometimes it's unambiguous, sometimes it's
