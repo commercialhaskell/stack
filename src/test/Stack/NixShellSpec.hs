@@ -7,7 +7,7 @@ import Test.Hspec
 
 import Control.Monad.Logger
 import Control.Exception
-import Data.Monoid (mempty)
+import Data.Monoid
 import Network.HTTP.Conduit (Manager)
 import System.Environment
 import Path
@@ -18,6 +18,9 @@ import Stack.Config
 import Stack.Types.Config
 import Stack.Types.StackT
 import Stack.Types.Nix
+
+import Prelude -- to remove the warning about Data.Monoid being redundant on GHC 7.10
+
 
 sampleConfig :: String
 sampleConfig =
