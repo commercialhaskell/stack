@@ -25,7 +25,8 @@ import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
-import           Data.Text.Encoding (encodeUtf8)
+import qualified Data.Text as T
+import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
@@ -118,8 +119,6 @@ data BuildInfoOpts = BuildInfoOpts
     -- ^ Other options from cabal information.  These options can safely have
     -- 'nubOrd' applied to them, as there are no multi-word options (see
     -- https://github.com/commercialhaskell/stack/issues/1255)
-    , bioBuildable :: Bool
-    -- ^ Whether the cabal component is buildable.
     } deriving Show
 
 -- | Files to get for a cabal package.
@@ -212,6 +211,9 @@ data LocalPackage = LocalPackage
     -- with tests and benchmarks disabled
     , lpComponents    :: !(Set NamedComponent)
     -- ^ Components to build, not including the library component.
+    , lpUnbuildable   :: !(Set NamedComponent)
+    -- ^ Components explicitly requested for build, that are marked
+    -- "buildable: false".
     , lpWanted        :: !Bool
     -- ^ Whether this package is wanted as a target.
     , lpTestDeps      :: !(Map PackageName VersionRange)
@@ -250,6 +252,12 @@ renderComponent CLib = "lib"
 renderComponent (CExe x) = "exe:" <> encodeUtf8 x
 renderComponent (CTest x) = "test:" <> encodeUtf8 x
 renderComponent (CBench x) = "bench:" <> encodeUtf8 x
+
+renderPkgComponents :: [(PackageName, NamedComponent)] -> Text
+renderPkgComponents = T.intercalate " " . map renderPkgComponent
+
+renderPkgComponent :: (PackageName, NamedComponent) -> Text
+renderPkgComponent (pkg, comp) = packageNameText pkg <> ":" <> decodeUtf8 (renderComponent comp)
 
 exeComponents :: Set NamedComponent -> Set Text
 exeComponents = Set.fromList . mapMaybe mExeName . Set.toList

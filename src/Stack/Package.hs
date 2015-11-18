@@ -308,7 +308,6 @@ generateBuildInfoOpts sourceMap installedMap mcabalmacros cabalDir distDir omitP
         -- See https://github.com/commercialhaskell/stack/issues/1255
         , bioGeneratedOpts = nubOrd $ concat
             [extOpts b, srcOpts, includeOpts, macros, deps, extra b, extraDirs, fworks b, cObjectFiles]
-        , bioBuildable = buildable b
         }
   where
     cObjectFiles =

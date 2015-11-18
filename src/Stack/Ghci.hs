@@ -10,7 +10,6 @@
 module Stack.Ghci
     ( GhciOpts(..)
     , GhciPkgInfo(..)
-    , GhciException(..)
     , ghciSetup
     , ghci
     ) where
@@ -34,8 +33,6 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Data.Text.Encoding (decodeUtf8)
-import           Data.Typeable (Typeable)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.Text (display)
 import           Network.HTTP.Client.Conduit
@@ -311,9 +308,6 @@ wantedPackageComponents _ _ _ = S.empty
 
 checkForIssues :: (MonadThrow m, MonadLogger m) => [GhciPkgInfo] -> m ()
 checkForIssues pkgs = do
-    let unbuildable = filter (\(_, bio) -> not (bioBuildable bio)) compsWithBios
-    unless (null unbuildable) $
-        throwM (SomeTargetsNotBuildable (map fst unbuildable))
     let omitted = concatMap ghciPkgOmittedOpts pkgs
     unless (null omitted) $
         $logWarn
@@ -349,9 +343,9 @@ checkForIssues pkgs = do
     mixedSettings (xs, ys) = xs /= [] && ys /= []
     showWhich (haveIt, don'tHaveIt) =
         [ "It is specified for:"
-        , "    " <> renderPkgComps haveIt
+        , "    " <> renderPkgComponents haveIt
         , "But not for: "
-        , "    " <> renderPkgComps don'tHaveIt
+        , "    " <> renderPkgComponents don'tHaveIt
         ]
     partitionComps f = (map fst xs, map fst ys)
       where
@@ -371,21 +365,3 @@ borderedWarning f = do
     $logWarn "* * * * * * * *"
     $logWarn ""
     return x
-
-renderPkgComps :: [(PackageName, NamedComponent)] -> Text
-renderPkgComps = T.intercalate " " . map renderPkgComp
-
-renderPkgComp :: (PackageName, NamedComponent) -> Text
-renderPkgComp (pkg, comp) = packageNameText pkg <> ":" <> decodeUtf8 (renderComponent comp)
-
-data GhciException =
-    SomeTargetsNotBuildable [(PackageName, NamedComponent)]
-    deriving (Typeable)
-
-instance Exception GhciException
-
-instance Show GhciException where
-    show (SomeTargetsNotBuildable xs) =
-        "The following components have 'buildable: False' in cabal, and so cannot be ghci targets:\n    " ++
-        T.unpack (renderPkgComps xs) ++
-        "\nTo resolve this, either specify flags such that these components are buildable, or pass buildable targets to \"stack ghci\"."

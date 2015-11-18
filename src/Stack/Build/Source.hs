@@ -94,6 +94,7 @@ loadSourceMap needTargets bopts = do
 
     locals <- mapM (loadLocalPackage bopts targets) $ Map.toList rawLocals
     checkFlagsUsed bopts locals extraDeps0 (mbpPackages mbp0)
+    checkComponentsBuildable locals
 
     let
         -- loadLocals returns PackageName (foo) and PackageIdentifier (bar-1.2.3) targets separately;
@@ -314,6 +315,12 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
                 Just STUnknown -> assert False mempty
                 Nothing -> mempty
 
+        toComponents e t b = Set.unions
+            [ Set.map CExe e
+            , Set.map CTest t
+            , Set.map CBench b
+            ]
+
         btconfig = config
             { packageConfigEnableTests = not $ Set.null tests
             , packageConfigEnableBenchmarks = not $ Set.null benches
@@ -358,11 +365,17 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
         , lpCabalFile = lpvCabalFP lpv
         , lpDir = lpvRoot lpv
         , lpWanted = isJust mtarget
-        , lpComponents = Set.unions
-            [ Set.map CExe exes
-            , Set.map CTest tests
-            , Set.map CBench benches
-            ]
+        , lpComponents = toComponents exes tests benches
+        -- TODO: refactor this so that it's easier to be sure that these
+        -- components are indeed unbuildable.
+        --
+        -- The reasoning here is that if the STLocalComps specification
+        -- made it through component parsing, but the components aren't
+        -- present, then they must not be buildable.
+        , lpUnbuildable = toComponents
+            (exes `Set.difference` packageExes pkg)
+            (tests `Set.difference` packageTests pkg)
+            (benches `Set.difference` packageBenchmarks pkg)
         }
 
 -- | Ensure that the flags specified in the stack.yaml file and on the command
@@ -548,3 +561,13 @@ calcFci modTime' fp = liftIO $
             , fciSize = size
             , fciHash = toBytes (digest :: Digest SHA256)
             }
+
+checkComponentsBuildable :: MonadThrow m => [LocalPackage] -> m ()
+checkComponentsBuildable lps =
+    unless (null unbuildable) $ throwM $ SomeTargetsNotBuildable unbuildable
+  where
+    unbuildable =
+        [ (packageName (lpPackage lp), c)
+        | lp <- lps
+        , c <- Set.toList (lpUnbuildable lp)
+        ]

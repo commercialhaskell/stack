@@ -183,6 +183,7 @@ readLocalPackage pkgDir = do
         , lpNewBuildCache = Map.empty
         , lpFiles = Set.empty
         , lpComponents = Set.empty
+        , lpUnbuildable = Set.empty
         }
 
 -- | Returns a newline-separate list of paths, and the absolute path to the .cabal file.
