@@ -34,7 +34,6 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Arrow ((***))
-import           Control.Exception (IOException)
 import           Control.Monad
 import           Control.Monad.Catch (MonadThrow, MonadCatch, catchAll, throwM)
 import           Control.Monad.IO.Class
@@ -68,9 +67,9 @@ import qualified Paths_stack as Meta
 import           Safe (headMay)
 import           Stack.BuildPlan
 import           Stack.Config.Docker
-import           Stack.Constants
 import           Stack.Config.Docker
 import           Stack.Config.Nix
+import           Stack.Constants
 import qualified Stack.Image as Image
 import           Stack.Init
 import           Stack.PackageIndex
