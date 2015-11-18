@@ -7,6 +7,7 @@ import Test.Hspec
 
 import Control.Monad.Logger
 import Control.Exception
+import Data.Monoid (mempty)
 import Network.HTTP.Conduit (Manager)
 import System.Environment
 import Path
