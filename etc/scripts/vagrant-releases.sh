@@ -5,10 +5,11 @@ init_wd="$(pwd)"
 
 with_vagrant() {
   #TODO: set up gpg-agent forwarding for package signing (see http://superuser.com/questions/161973/how-can-i-forward-a-gpg-key-via-ssh-agent).
+  gpg --export-secret-keys --armor dev@fpcomplete.com >.stack-work/gpg-secret-key.asc
   pushd "$init_wd/etc/vagrant/$1"
   vagrant up --provision
   vagrant rsync
-  vagrant ssh -c "export GITHUB_AUTH_TOKEN=$GITHUB_AUTH_TOKEN; export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID; export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY; export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION; cd /vagrant && (cd etc/scripts && stack build) && \$(cd etc/scripts && stack exec which stack-release-script) $2"
+  vagrant ssh -c "export GITHUB_AUTH_TOKEN=$GITHUB_AUTH_TOKEN; export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID; export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY; export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION; gpg --import /vagrant/.stack-work/gpg-secret-key.asc; cd /vagrant && (cd etc/scripts && stack --install-ghc build) && \$(cd etc/scripts && stack exec which stack-release-script) $2"
   vagrant halt
   popd
 }
