@@ -1,4 +1,4 @@
-## Unreleased changes
+## 0.1.8.0
 
 Major changes:
 
@@ -54,8 +54,9 @@ Other enhancements:
   [#1231](https://github.com/commercialhaskell/stack/issues/1231)
 * Support for extra-package-dbs in 'stack ghci'
   [#1229](https://github.com/commercialhaskell/stack/pull/1229)
-* `stack new` disallow package names with "words" consisting solely of numbers
+* `stack new` disallows package names with "words" consisting solely of numbers
   [#1336](https://github.com/commercialhaskell/stack/issues/1336)
+* `stack build --fast` turns off optimizations
 
 Bug fixes:
 
@@ -106,7 +107,6 @@ Other enhancements:
 * Docker: `set-user` option to enable/disable running containerized processes as host's UID/GID [#194](https://github.com/commercialhaskell/stack/issues/194)
 * Custom Setup.hs files are now precompiled instead of interpreted. This should be a major performance win for certain edge cases (biggest example: [building Cabal itself](https://github.com/commercialhaskell/stack/issues/1041)) while being either neutral or a minor slowdown for more common cases.
 * `stack test --coverage` now also generates a unified coverage report for multiple test-suites / packages.  In the unified report, test-suites can contribute to the coverage of other packages.
-* --fast turns off optimizations
 
 Bug fixes:
 
