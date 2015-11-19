@@ -22,6 +22,23 @@ Other enhancements:
 * Packages will now usually be built along with their tests and benchmarks. See [#1166](https://github.com/commercialhaskell/stack/issues/1166)
 * Relative `local-bin-path` paths will be relative to the project's root directory, not the current working directory.  [#1340](https://github.com/commercialhaskell/stack/issues/1340)
 * `stack clean` now takes an optional `[PACKAGE]` argument for use in multi-package projects. See [#583](https://github.com/commercialhaskell/stack/issues/583)
+* Ignore cabal_macros.h as a dependency
+  [#1195](https://github.com/commercialhaskell/stack/issues/1195)
+* Pad timestamps and show local time in --verbose output
+  [#1226](https://github.com/commercialhaskell/stack/issues/1226)
+* GHCi: Import all modules after loading them
+  [#995](https://github.com/commercialhaskell/stack/issues/995)
+* Add subcommand aliases: `repl` for `ghci`, and `runhaskell` for `runghc`
+  [#1241](https://github.com/commercialhaskell/stack/issues/1241)
+* Add typo recommendations for unknown package identifiers
+  [#158](https://github.com/commercialhaskell/stack/issues/158)
+* Add `stack path --local-hpc-root` option
+* Overhaul dependencies' haddocks copying
+  [#1231](https://github.com/commercialhaskell/stack/issues/1231)
+* Support for extra-package-dbs in 'stack ghci'
+  [#1229](https://github.com/commercialhaskell/stack/pull/1229)
+* `stack new` disallow package names with "words" consisting solely of numbers
+  [#1336](https://github.com/commercialhaskell/stack/issues/1336)
 
 Bug fixes:
 
@@ -30,6 +47,8 @@ Bug fixes:
 * Fix: 'stack ghci' doesn't notice that a module got deleted [#1180](https://github.com/commercialhaskell/stack/issues/1180)
 * Rebuild when cabal file is changed
 * Fix: Paths in GHC warnings not canonicalized, nor those for packages in subdirectories or outside the project root [#1259](https://github.com/commercialhaskell/stack/issues/1259)
+* Fix: unlisted files in tests and benchmarks trigger extraneous second build
+  [#838](https://github.com/commercialhaskell/stack/issues/838)
 
 ## v0.1.6.0
 
