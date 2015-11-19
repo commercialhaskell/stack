@@ -234,6 +234,11 @@ FP Complete also builds custom variants of these images for their clients.
 These images can also be used directory with `docker run` and provide a complete
 Haskell build environment.
 
+In addition, most Docker images that contain the basics for running GHC can be
+used with Stack's Docker integration. For example, the
+[official Haskell image repository](https://hub.docker.com/_/haskell/) works.
+See [Custom images](#custom-images) for more details.
+
 Prerequisites
 -------------------------------------------------------------------------------
 
@@ -373,6 +378,26 @@ Note, however, that any time a new image is used, you will have to re-do this
 process. You could also use a Dockerfile to make this reusable. Consult the
 [Docker user guide](https://docs.docker.com/userguide/) for more
 on creating Docker images.
+
+### <a name="custom-images"></a>Custom images
+
+The easiest way to create your own custom image us by extending FP Complete's
+images, but if you prefer to start from scratch, most images that include the
+basics for building code with GHC will work. The image doesn't even, strictly
+speaking, need to include GHC, but it does need to have libraries and tools that
+GHC requires (e.g., libgmp, gcc, etc.).
+
+There are also a few ways to set up images that tightens the integration:
+
+* Create a user and group named `stack`, and create a `~/.stack` directory for
+  it. Any build plans and caches from it will be copied from the image by Stack,
+  meaning they don't need to be downloaded separately.
+* Any packages in GHC's global package database will be available. This can be
+  used to add private libraries to the image, or the make available a set of
+  packages from an LTS release.
+* The `DOCKER_SANDBOX_ID` environment variable (set via `ENV` in the Dockerfile)
+  introduces extra isolation between images, to ensure that parts of the home
+  directory and stack root are kept separate.
 
 Troubleshooting
 -------------------------------------------------------------------------------
