@@ -77,7 +77,7 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
 1. Get the FP Complete key:
 
-        wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
+        sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 575159689BEFB442
 
 2. Add the appropriate source repository (if not sure, run ``lsb_release -a`` to find out your Ubuntu version):
 
