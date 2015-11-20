@@ -37,7 +37,8 @@ for requirements to perform the release, and more details about the tool.
   with tag `vX.Y.Z` (where X.Y.Z is the stack package's version)
 
 * On each machine you'll be releasing from, set environment variables:
-  `GITHUB_AUTHORIZATION_TOKEN`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
+  `GITHUB_AUTHORIZATION_TOKEN`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+  `AWS_DEFAULT_REGION`
 
 * On a machine with Vagrant installed:
     * Run `etc/scripts/vagrant-releases.sh`
@@ -48,12 +49,13 @@ for requirements to perform the release, and more details about the tool.
 * On Windows:
     * Ensure your working tree is in `C:\stack` (or a similarly short path)
     * Run `etc\scripts\windows-releases.bat`
+    * Build Windows installers.  See https://github.com/borsboom/stack-installer#readme
 
 * Push signed Git tag, matching Github release tag name, e.g.: `git tag -u
   9BEFB442 vX.Y.Z && git push origin vX.Y.Z`
 
-* Reset the `release` branch to the released commit, e.g.: `git merge --ff-only
-  vX.Y.Z && git push origin release`
+* Reset the `release` branch to the released commit, e.g.: `git checkout release
+  && git merge --ff-only vX.Y.Z && git push origin release`
 
 * Publish Github release
 
@@ -72,18 +74,16 @@ for requirements to perform the release, and more details about the tool.
     * Be sure to reset `pkgrel` in both files, and update the SHA1 sum
 
 * Submit a PR for the
-  [haskell-stack Homebrew formula](https://github.com/Homebrew/homebrew/blob/master/Library/Formula/haskell-stack.rb).
-  The commit message should just be `haskell-stack <VERSION>`
-      * Note: for v0.1.8.0, check if `pcre` should still be a dependency
-          * Also, update the homepage
-
-* Build Windows installers.  See https://github.com/borsboom/stack-installer#readme
+  [haskell-stack Homebrew formula](https://github.com/Homebrew/homebrew/blob/master/Library/Formula/haskell-stack.rb)
+      * Be sure to update the SHA sum
+      * The commit message should just be `haskell-stack <VERSION>`
 
 * [Build new MinGHC distribution](#build_minghc)
 
 * [Upload haddocks to Hackage](#upload_haddocks), if hackage couldn't build on its own
 
-* Announce to haskell-cafe, commercialhaskell, and haskell-stack mailing lists
+* Announce to haskell-cafe@haskell.org, haskell-stack@googlegroups.com,
+  commercialhaskell@googlegroups.com mailing lists
 
 # Extra steps
 
@@ -93,6 +93,7 @@ for requirements to perform the release, and more details about the tool.
 * Run:
 
 ```
+stack haddock
 STACKDOCDIR=stack-$STACKVER-docs
 rm -rf _release/$STACKDOCDIR
 mkdir -p _release
