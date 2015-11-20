@@ -1,6 +1,13 @@
 ## Unreleased changes
 
+Major changes:
 
+Other enhancements:
+
+* Print latest applicable version of packages on conflicts
+  [#508](https://github.com/commercialhaskell/stack/issues/508)
+
+Bug fixes:
 
 ## 0.1.8.0
 

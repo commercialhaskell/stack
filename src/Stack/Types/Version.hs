@@ -24,6 +24,7 @@ module Stack.Types.Version
   ,withinRange
   ,Stack.Types.Version.intersectVersionRanges
   ,toMajorVersion
+  ,latestApplicableVersion
   ,checkVersion
   ,nextMajorVersion)
   where
@@ -41,6 +42,9 @@ import           Data.Hashable
 import           Data.List
 import           Data.Map (Map)
 import qualified Data.Map as Map
+import           Data.Maybe (listToMaybe)
+import           Data.Set (Set)
+import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Vector.Binary ()
@@ -175,6 +179,11 @@ toMajorVersion  (Version v) =
         0 -> Version (V.fromList [0,        0])
         1 -> Version (V.fromList [V.head v, 0])
         _ -> Version (V.fromList [V.head v, v V.! 1])
+
+-- | Given a version range and a set of versions, find the latest version from
+-- the set that is within the range.
+latestApplicableVersion :: Cabal.VersionRange -> Set Version -> Maybe Version
+latestApplicableVersion r = listToMaybe . filter (`withinRange` r) . Set.toDescList
 
 -- | Get the next major version number for the given version
 nextMajorVersion :: Version -> Version

@@ -341,13 +341,13 @@ instance Exception StackBuildException
 
 data ConstructPlanException
     = DependencyCycleDetected [PackageName]
-    | DependencyPlanFailures PackageIdentifier (Map PackageName (VersionRange, LatestVersion, BadDependency))
+    | DependencyPlanFailures PackageIdentifier (Map PackageName (VersionRange, LatestApplicableVersion, BadDependency))
     | UnknownPackage PackageName -- TODO perhaps this constructor will be removed, and BadDependency will handle it all
     -- ^ Recommend adding to extra-deps, give a helpful version number?
     deriving (Typeable, Eq)
 
 -- | For display purposes only, Nothing if package not found
-type LatestVersion = Maybe Version
+type LatestApplicableVersion = Maybe Version
 
 -- | Reason why a dependency was not used
 data BadDependency
@@ -374,26 +374,26 @@ instance Show ConstructPlanException where
       indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
       doubleIndent = indent . indent
       appendDeps = foldr (\dep-> (++) ("\n" ++ showDep dep)) ""
-      showDep (name, (range, mlatest, badDep)) = concat
+      showDep (name, (range, mlatestApplicable, badDep)) = concat
         [ show name
         , ": needed ("
         , display range
         , ")"
         , ", "
-        , let latestStr =
-                case mlatest of
+        , let latestApplicableStr =
+                case mlatestApplicable of
                     Nothing -> ""
-                    Just latest -> " (latest is " ++ versionString latest ++ ")"
+                    Just la -> " (latest applicable is " ++ versionString la ++ ")"
            in case badDep of
-                NotInBuildPlan -> "not present in build plan" ++ latestStr
+                NotInBuildPlan -> "not present in build plan" ++ latestApplicableStr
                 Couldn'tResolveItsDependencies -> "couldn't resolve its dependencies"
                 DependencyMismatch version ->
-                    case mlatest of
-                        Just latest
-                            | latest == version ->
+                    case mlatestApplicable of
+                        Just la
+                            | la == version ->
                                 versionString version ++
-                                " found (latest version available)"
-                        _ -> versionString version ++ " found" ++ latestStr
+                                " found (latest applicable version available)"
+                        _ -> versionString version ++ " found" ++ latestApplicableStr
         ]
          {- TODO Perhaps change the showDep function to look more like this:
           dropQuotes = filter ((/=) '\"')
