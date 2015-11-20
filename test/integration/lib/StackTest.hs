@@ -41,6 +41,16 @@ stackErr args = do
         then error "stack was supposed to fail, but didn't"
         else return ()
 
+-- | Run stack with arguments and apply a check to the resulting
+-- stderr output if the process succeeded.
+stackCheckStderr :: [String] -> (String -> IO ()) -> IO ()
+stackCheckStderr args check = do
+    stack <- getEnv "STACK_EXE"
+    (ec, _, stderr) <- readProcessWithExitCode stack args ""
+    if ec /= ExitSuccess
+        then error $ "Exited with exit code: " ++ show ec
+        else check stderr
+
 doesNotExist :: FilePath -> IO ()
 doesNotExist fp = do
     logInfo $ "doesNotExist " ++ fp
