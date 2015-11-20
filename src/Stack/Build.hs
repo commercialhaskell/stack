@@ -30,9 +30,11 @@ import           Data.Function
 import qualified Data.HashMap.Strict as HM
 import           Data.IORef.RunOnce (runOnce)
 import           Data.List ((\\))
+import           Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import           Data.Map.Strict (Map)
-import           Data.Monoid
+import           Data.Semigroup ((<>))
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
@@ -138,16 +140,16 @@ warnIfExecutablesWithSameNameCouldBeOverwritten
 warnIfExecutablesWithSameNameCouldBeOverwritten locals plan =
     forM_ (Map.toList warnings) $ \(exe,(toBuild,otherLocals)) -> do
         let exe_s
-                | length toBuild > 1 = "several executables with the same name:"
+                | NE.length toBuild > 1 = "several executables with the same name:"
                 | otherwise = "executable"
             exesText pkgs =
                 T.intercalate
                     ", "
                     ["'" <> packageNameText p <> ":" <> exe <> "'" | p <- pkgs]
         ($logWarn . T.unlines . concat)
-            [ [ "Building " <> exe_s <> " " <> exesText toBuild <> "." ]
+            [ [ "Building " <> exe_s <> " " <> exesText (NE.toList toBuild) <> "." ]
             , [ "Only one of them will be available via 'stack exec' or locally installed."
-              | length toBuild > 1
+              | NE.length toBuild > 1
               ]
             , [ "Other executables with the same name might be overwritten: " <>
                 exesText otherLocals <> "."
@@ -162,39 +164,31 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan =
     --                   , package names for other local packages that have an
     --                     executable with the same name
     --                   )
-    warnings :: Map Text ([PackageName],[PackageName])
+    warnings :: Map Text (NonEmpty PackageName,[PackageName])
     warnings =
-        Map.mergeWithKey
-            (\_exeName pkgsToBuild localPkgs ->
-                case (pkgsToBuild,localPkgs \\ pkgsToBuild) of
-                    ([],_) ->
-                        -- Can't happen because exesToBuild has only non-empty values.
-                        error $
-                            "warnIfExecutablesWithSameNameCouldBeOverwritten/warnings: " ++
-                            "empty value in exesToBuild"
-                    ([_],[]) ->
-                        -- We want to build only a single executable called _exeName
-                        -- and there are no other local packages with an executable
-                        -- of that name. Nothing to warn about, ignore.
+        Map.mapMaybe
+            (\(pkgsToBuild,localPkgs) ->
+                case (pkgsToBuild,NE.toList localPkgs \\ NE.toList pkgsToBuild) of
+                    (_ :| [],[]) ->
+                        -- We want to build the executable of single local package
+                        -- and there are no other local packages with an executable of
+                        -- the same name. Nothing to warn about, ignore.
                         Nothing
                     (_,otherLocals) ->
                         -- We could be here for two reasons (or their combination):
-                        -- 1) We are building two or more executables called _exeName
-                        --    that will end up overwriting each other.
-                        -- 2) There's at least one other local executable called _exeName
-                        --    that we aren't currently building and that might be
-                        --    overwritten.
+                        -- 1) We are building two or more executables with the same
+                        --    name that will end up overwriting each other.
+                        -- 2) In addition to the executable(s) that we want to build
+                        --    there are other local packages with an executable of the
+                        --    same name that might get overwritten.
                         -- Both cases warrant a warning.
                         Just (pkgsToBuild,otherLocals))
-            (const Map.empty)
-            (const Map.empty)
-            exesToBuild
-            localExes
-    exesToBuild :: Map Text [PackageName]
+            (Map.intersectionWith (,) exesToBuild localExes)
+    exesToBuild :: Map Text (NonEmpty PackageName)
     exesToBuild =
         Map.fromListWith
-            (++)
-            [ (exe,[pkgName])
+            (<>)
+            [ (exe,pkgName :| [])
             | (pkgName,task) <- Map.toList (planTasks plan)
             , isLocal task
             , exe <- (Set.toList . exeComponents . lpComponents . taskLP) task
@@ -204,11 +198,11 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan =
         isLocal _ = False
         taskLP Task{taskType = (TTLocal lp)} = lp
         taskLP _ = error "warnIfExecutablesWithSameNameCouldBeOverwritten/taskLP: task isn't local"
-    localExes :: Map Text [PackageName]
+    localExes :: Map Text (NonEmpty PackageName)
     localExes =
         Map.fromListWith
-            (++)
-            [(exe,[pkgName]) | (pkgName,exes) <- pkgExePairs, exe <- exes]
+            (<>)
+            [(exe,pkgName :| []) | (pkgName,exes) <- pkgExePairs, exe <- exes]
       where
         pkgExePairs =
             [ (packageName,Set.toList packageExes)
