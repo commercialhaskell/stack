@@ -454,7 +454,8 @@ rules global@Global{..} args = do
         , ("6", "el6") ]
     fedoraVersions =
         [ ("21", "fc21")
-        , ("22", "fc22") ]
+        , ("22", "fc22")
+        , ("23", "fc23") ]
 
     ubuntuDistro = "ubuntu"
     debianDistro = "debian"

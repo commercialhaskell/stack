@@ -153,6 +153,10 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
 1. Add the appropriate source repository:
 
+    * Fedora 23 (x86_64)
+
+            curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/23/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
+
     * Fedora 22 (x86_64)
 
             curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/22/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
@@ -163,7 +167,7 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
 2. Install:
 
-    * Fedora 22+
+    * Fedora 22 and above
 
             sudo dnf -y install stack
 

@@ -1,8 +1,8 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 Vagrant.configure(2) do |config|
-  config.vm.box = "chef/debian-7.8"
-  config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__exclude: [".stack_work/", "_release/"]
+  config.vm.box = "puppetlabs/debian-7.8-64-nocm"
+  config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__exclude: [".stack_work/", "_release/"], rsync__args: ["--verbose", "--archive", "--delete", "-z"]
   config.vm.provider "virtualbox" do |vb|
     vb.memory = "2048"
   end
@@ -19,10 +19,6 @@ Vagrant.configure(2) do |config|
       apt-get update
     fi
     apt-get install -y stack
-    if ! which cabal; then
-      stack --install-ghc build cabal-install
-      sudo cp `stack exec which cabal` /usr/local/bin/cabal
-    fi
     if ! which fpm; then
         apt-get install -y ruby-dev libffi-dev make build-essential
         apt-get install -y rubygems || true

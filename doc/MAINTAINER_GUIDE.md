@@ -32,8 +32,9 @@ See
 [stack-release-script's README](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/README.md#prerequisites)
 for requirements to perform the release, and more details about the tool.
 
-* Create a draft Github release with tag `vX.Y.Z` (where X.Y.Z is the stack
-  package's version)
+* Create a
+  [new draft Github release](https://github.com/commercialhaskell/stack/releases/new)
+  with tag `vX.Y.Z` (where X.Y.Z is the stack package's version)
 
 * On each machine you'll be releasing from, set environment variables:
   `GITHUB_AUTHORIZATION_TOKEN`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
