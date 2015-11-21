@@ -9,7 +9,7 @@
 
 -- | Main stack tool entry point.
 
-module Main where
+module Main (main) where
 
 import           Control.Exception
 import qualified Control.Exception.Lifted as EL
@@ -70,7 +70,7 @@ import           Stack.New
 import           Stack.Options
 import           Stack.Package (getCabalFileName)
 import qualified Stack.PackageIndex
-import           Stack.SDist (getSDistTarball)
+import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball')
 import           Stack.Setup
 import           Stack.Solver (solveExtraDeps)
 import           Stack.Types
@@ -230,16 +230,18 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                         "Upload a package to Hackage"
                         cmdFooter
                         uploadCmd
-                        ((,)
+                        ((,,)
                          <$> many (strArgument $ metavar "TARBALL/DIR")
-                         <*> optional pvpBoundsOption)
+                         <*> optional pvpBoundsOption
+                         <*> ignoreCheckSwitch)
              addCommand' "sdist"
                         "Create source distribution tarballs"
                         cmdFooter
                         sdistCmd
-                        ((,)
+                        ((,,)
                          <$> many (strArgument $ metavar "DIR")
-                         <*> optional pvpBoundsOption)
+                         <*> optional pvpBoundsOption
+                         <*> ignoreCheckSwitch)
              addCommand' "dot"
                         "Visualize your project's dependency graph using Graphviz dot"
                         cmdFooter
@@ -408,6 +410,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                     printExceptionStderr e
                     exitFailure
   where
+    ignoreCheckSwitch = switch (long "ignore-check" <> help "Do not check package for common mistakes")
     dockerHelpOptName = Docker.dockerCmdName ++ "-help"
     cmdFooter = "Run 'stack --help' for global options that apply to all subcommands."
 
@@ -797,9 +800,9 @@ upgradeCmd (fromGit, repo) go = withConfigAndLock go $
     upgrade (if fromGit then Just repo else Nothing) (globalResolver go)
 
 -- | Upload to Hackage
-uploadCmd :: ([String], Maybe PvpBounds) -> GlobalOpts -> IO ()
-uploadCmd ([], _) _ = error "To upload the current package, please run 'stack upload .'"
-uploadCmd (args, mpvpBounds) go = do
+uploadCmd :: ([String], Maybe PvpBounds, Bool) -> GlobalOpts -> IO ()
+uploadCmd ([], _, _) _ = error "To upload the current package, please run 'stack upload .'"
+uploadCmd (args, mpvpBounds, ignoreCheck) go = do
     let partitionM _ [] = return ([], [])
         partitionM f (x:xs) = do
             r <- f x
@@ -817,20 +820,20 @@ uploadCmd (args, mpvpBounds) go = do
             let uploadSettings =
                     Upload.setGetManager (return manager) Upload.defaultUploadSettings
             liftIO $ Upload.mkUploader config uploadSettings
-    if null dirs
-        then withConfigAndLock go $ do
-            uploader <- getUploader
-            liftIO $ forM_ files (canonicalizePath >=> Upload.upload uploader)
-        else withBuildConfigAndLock go $ \_ -> do
-            uploader <- getUploader
-            liftIO $ forM_ files (canonicalizePath >=> Upload.upload uploader)
+    withBuildConfigAndLock go $ \_ -> do
+        uploader <- getUploader
+        unless ignoreCheck $
+            mapM_ (parseRelAsAbsFile >=> checkSDistTarball) files
+        liftIO $ forM_ files (canonicalizePath >=> Upload.upload uploader)
+        unless (null dirs) $
             forM_ dirs $ \dir -> do
-                pkgDir <- parseAbsDir =<< liftIO (canonicalizePath dir)
+                pkgDir <- parseRelAsAbsDir dir
                 (tarName, tarBytes) <- getSDistTarball mpvpBounds pkgDir
+                unless ignoreCheck $ checkSDistTarball' tarName tarBytes
                 liftIO $ Upload.uploadBytes uploader tarName tarBytes
 
-sdistCmd :: ([String], Maybe PvpBounds) -> GlobalOpts -> IO ()
-sdistCmd (dirs, mpvpBounds) go =
+sdistCmd :: ([String], Maybe PvpBounds, Bool) -> GlobalOpts -> IO ()
+sdistCmd (dirs, mpvpBounds, ignoreCheck) go =
     withBuildConfig go $ do -- No locking needed.
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null dirs
@@ -842,6 +845,7 @@ sdistCmd (dirs, mpvpBounds) go =
             tarPath <- (distDir </>) <$> parseRelFile tarName
             liftIO $ createTree $ parent tarPath
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
+            unless ignoreCheck (checkSDistTarball tarPath)
             $logInfo $ "Wrote sdist tarball to " <> T.pack (toFilePath tarPath)
 
 -- | Execute a command.
