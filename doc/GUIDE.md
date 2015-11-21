@@ -1633,14 +1633,14 @@ In case you're wondering: we need `--no-terminal` because stack does some fancy
 sticky display on smart terminals to give nicer status and progress messages,
 and the terminal detection is broken on Travis.
 
-### Shell autocompletion
+### Shell auto-completion
 
 Love tab-completion of commands? You're not alone. If you're on bash, just run
 the following (or add it to `.bashrc`):
 
     eval "$(stack --bash-completion-script stack)"
 
-For more information and other shells, see [the Shell autocompletion wiki
+For more information and other shells, see [the Shell auto-completion wiki
 page](https://github.com/commercialhaskell/stack/wiki/Shell-autocompletion)
 
 ### Docker
