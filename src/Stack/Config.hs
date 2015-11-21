@@ -434,7 +434,7 @@ resolvePackageLocation
     -> PackageLocation
     -> m (Path Abs Dir)
 resolvePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
-resolvePackageLocation _ projRoot (PLHttpTarball url) = do
+resolvePackageLocation _ projRoot (PLRemote url RPTHttpTarball) = do
     let name = T.unpack $ decodeUtf8 $ B16.encode $ SHA256.hash $ encodeUtf8 url
         root = projRoot </> workDirRel </> $(mkRelDir "downloaded")
     fileRel <- parseRelFile $ name ++ ".tar.gz"
@@ -464,7 +464,7 @@ resolvePackageLocation _ projRoot (PLHttpTarball url) = do
             removeTreeIfExists dir
             throwM $ UnexpectedTarballContents dirs files
 
-resolvePackageLocation menv projRoot (PLGit url commit) = do
+resolvePackageLocation menv projRoot (PLRemote url (RPTGit commit)) = do
     let name = T.unpack $ decodeUtf8 $ B16.encode $ SHA256.hash $ encodeUtf8 $ T.unwords [url, commit]
         root = projRoot </> workDirRel </> $(mkRelDir "downloaded")
     dirRel <- parseRelDir $ name ++ ".git"
