@@ -20,7 +20,7 @@ expectMessage msg stderr =
 
 buildMessage1 =
     unlines
-        [ "Building several executables with the same name: 'has-exe-foo:foo', 'also-has-exe-foo:foo'."
+        [ "Building several executables with the same name: 'also-has-exe-foo:foo', 'has-exe-foo:foo'."
         , "Only one of them will be available via 'stack exec' or locally installed."
         , "Other executables with the same name might be overwritten: 'has-exe-foo-too:foo'."
         ]
@@ -28,5 +28,5 @@ buildMessage1 =
 buildMessage2 =
     unlines
         [ "Building executable 'has-exe-foo-too:foo'."
-        , "Other executables with the same name might be overwritten: 'has-exe-foo:foo', 'also-has-exe-foo:foo'."
+        , "Other executables with the same name might be overwritten: 'also-has-exe-foo:foo', 'has-exe-foo:foo'."
         ]
