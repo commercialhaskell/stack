@@ -100,7 +100,7 @@ ghci GhciOpts{..} = do
         getUserOptions mpkg =
             map T.unpack (M.findWithDefault [] mpkg (configGhcOptions config))
         badForGhci x =
-            isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky -static")
+            isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky -static -Werror")
     unless (null omittedOpts) $
         $logWarn
             ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
