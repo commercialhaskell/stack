@@ -559,15 +559,20 @@ data PackageLocation
 data RemotePackageType
     = RPTHttpTarball
     | RPTGit Text -- ^ Commit
+    | RPTHg  Text -- ^ Commit
     deriving Show
 
 instance ToJSON PackageLocation where
     toJSON (PLFilePath fp) = toJSON fp
     toJSON (PLRemote t RPTHttpTarball) = toJSON t
     toJSON (PLRemote x (RPTGit y)) = toJSON $ T.unwords ["git", x, y]
+    toJSON (PLRemote x (RPTHg  y)) = toJSON $ T.unwords ["hg",  x, y]
 
 instance FromJSON (PackageLocation, [JSONWarning]) where
-    parseJSON v = ((,[]) <$> withText "PackageLocation" (\t -> http t <|> file t) v) <|> git v
+    parseJSON v
+        = ((,[]) <$> withText "PackageLocation" (\t -> http t <|> file t) v)
+        <|> git v
+        <|> hg  v
       where
         file t = pure $ PLFilePath $ T.unpack t
         http t =
@@ -577,6 +582,9 @@ instance FromJSON (PackageLocation, [JSONWarning]) where
         git = withObjectWarnings "PackageGitLocation" $ \o -> PLRemote
             <$> o ..: "git"
             <*> (RPTGit <$> o ..: "commit")
+        hg  = withObjectWarnings "PackageHgLocation"  $ \o -> PLRemote
+            <$> o ..: "hg"
+            <*> (RPTHg  <$> o ..: "commit")
 
 -- | A project is a collection of packages. We can have multiple stack.yaml
 -- files, but only one of them may contain project information.

@@ -438,6 +438,7 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
     let nameBeforeHashing = case remotePackageType of
             RPTHttpTarball -> url
             RPTGit commit  -> T.unwords [url, commit]
+            RPTHg  commit  -> T.unwords [url, commit, "hg"]
         name = T.unpack $ decodeUtf8 $ B16.encode $ SHA256.hash $ encodeUtf8 nameBeforeHashing
         root = projRoot </> workDirRel </> $(mkRelDir "downloaded")
         fileExtension = case remotePackageType of
@@ -454,6 +455,19 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
     exists <- dirExists dir
     unless exists $ do
         removeTreeIfExists dirTmp
+
+        let cloneAndExtract commandName resetCommand commit = do
+                createTree (parent dirTmp)
+                readInNull (parent dirTmp) commandName menv
+                    [ "clone"
+                    , T.unpack url
+                    , toFilePathNoTrailingSep dirTmp
+                    ]
+                    Nothing
+                readInNull dirTmp commandName menv
+                    (resetCommand ++ [T.unpack commit])
+                    Nothing
+
         case remotePackageType of
             RPTHttpTarball -> do
                 req <- parseUrl $ T.unpack url
@@ -464,20 +478,8 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
                     let entries = Tar.read $ GZip.decompress lbs
                     Tar.unpack (toFilePath dirTmp) entries
 
-            RPTGit commit -> do
-                createTree (parent dirTmp)
-                readInNull (parent dirTmp) "git" menv
-                    [ "clone"
-                    , T.unpack url
-                    , toFilePathNoTrailingSep dirTmp
-                    ]
-                    Nothing
-                readInNull dirTmp "git" menv
-                    [ "reset"
-                    , "--hard"
-                    , T.unpack commit
-                    ]
-                    Nothing
+            RPTGit commit -> cloneAndExtract "git" ["reset", "--hard"] commit
+            RPTHg  commit -> cloneAndExtract "hg"  ["update", "-C"]    commit
 
         renameDir dirTmp dir
 
