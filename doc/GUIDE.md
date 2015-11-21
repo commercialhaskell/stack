@@ -1638,7 +1638,7 @@ and the terminal detection is broken on Travis.
 Love tab-completion of commands? You're not alone. If you're on bash, just run
 the following (or add it to `.bashrc`):
 
-    eval "$(stack --bash-completion-script "$(which stack)")"
+    eval "$(stack --bash-completion-script stack)"
 
 For more information and other shells, see [the Shell autocompletion wiki
 page](https://github.com/commercialhaskell/stack/wiki/Shell-autocompletion)

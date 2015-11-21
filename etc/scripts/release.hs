@@ -350,7 +350,7 @@ rules global@Global{..} args = do
 
     writeBashCompletion stagedStackExeFile stageDir out = do
         need [stagedStackExeFile]
-        (Stdout bashCompletionScript) <- cmd [stagedStackExeFile] "--bash-completion-script" ["/" ++ dropDirectoryPrefix stageDir stagedStackExeFile]
+        (Stdout bashCompletionScript) <- cmd [stagedStackExeFile] "--bash-completion-script" [stackProgName]
         writeFileChanged out bashCompletionScript
 
     getBinaryPkgStageFiles = do
@@ -434,7 +434,7 @@ rules global@Global{..} args = do
 
     archStagedDocDir = archStagingDir </> "usr/share/doc" </> stackProgName
     archStagedBashCompletionFile = archStagingDir </> "usr/share/bash-completion/completions/stack"
-    archStagedExeFile = archStagingDir </> "usr/bin/stack"
+    archStagedExeFile = archStagingDir </> "usr/bin" </> stackProgName
     archStagingDir = archDir </> archPackageName
     archPackageFileName = archPackageName <.> tarGzExt
     archPackageName = stackProgName ++ "_" ++ stackVersionStr global ++ "-" ++ "x86_64"
