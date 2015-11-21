@@ -332,9 +332,25 @@ checkForIssues pkgs = do
         , mixedFlag "-XNoTraditionalRecordSyntax"
           [ "-XNoTraditionalRecordSyntax will be used, but it break modules which use record syntax." ]
         , mixedFlag "-XTemplateHaskell"
-          [ "-XTemplateHaskell will be used, but it may cause compilation issues due to different parsing of ($)." ]
+          [ "-XTemplateHaskell will be used, but it may cause compilation issues due to different parsing of '$' when there's no space after it." ]
+        , mixedFlag "-XQuasiQuotes"
+          [ "-XQuasiQuotes will be used, but it may cause parse failures due to a different meaning for list comprehension syntax like [x| ... ]" ]
         , mixedFlag "-XSafe"
           [ "-XSafe will be used, but it will fail to compile unsafe modules." ]
+        , mixedFlag "-XArrows"
+          [ "-XArrows will be used, but it will cause non-arrow usages of proc, (-<), (-<<) to fail" ]
+        , mixedFlag "-XOverloadedStrings"
+          [ "-XOverloadedStrings will be used, but it can cause type ambiguity in code not usually compiled with it." ]
+        , mixedFlag "-XOverloadedLists"
+          [ "-XOverloadedLists will be used, but it can cause type ambiguity in code not usually compiled with it." ]
+        , mixedFlag "-XMonoLocalBinds"
+          [ "-XMonoLocalBinds will be used, but it can cause type errors in code which expects generalized local bindings." ]
+        , mixedFlag "-XTypeFamilies"
+          [ "-XTypeFamilies will be used, but it implies -XMonoLocalBinds, and so can cause type errors in code which expects generalized local bindings." ]
+        , mixedFlag "-XGADTs"
+          [ "-XGADTs will be used, but it implies -XMonoLocalBinds, and so can cause type errors in code which expects generalized local bindings." ]
+        , mixedFlag "-XNewQualifiedOperators"
+          [ "-XNewQualifiedOperators will be used, but this will break usages of the old qualified operator syntax." ]
         ]
     mixedFlag flag msgs =
         let x = partitionComps (== flag) in
