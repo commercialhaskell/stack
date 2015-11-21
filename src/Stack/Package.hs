@@ -297,7 +297,7 @@ generateBuildInfoOpts
     -> BuildInfoOpts
 generateBuildInfoOpts sourceMap installedMap mcabalmacros cabalDir distDir omitPkgs b dotCabalPaths componentName =
     BuildInfoOpts
-        { bioGhcOpts = ghcOpts b
+        { bioOpts = macros ++ ghcOpts b
         -- NOTE for future changes: Due to this use of nubOrd (and other uses
         -- downstream), these generated options must not rely on multiple
         -- argument sequences.  For example, ["--main-is", "Foo.hs", "--main-
@@ -305,8 +305,8 @@ generateBuildInfoOpts sourceMap installedMap mcabalmacros cabalDir distDir omitP
         -- "--main-is" being removed.
         --
         -- See https://github.com/commercialhaskell/stack/issues/1255
-        , bioGeneratedOpts = nubOrd $ concat
-            [extOpts b, srcOpts, includeOpts, macros, deps, extra b, extraDirs, fworks b, cObjectFiles]
+        , bioOneWordOpts = nubOrd $ concat
+            [extOpts b, srcOpts, includeOpts, deps, extra b, extraDirs, fworks b, cObjectFiles]
         }
   where
     cObjectFiles =

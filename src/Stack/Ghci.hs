@@ -92,9 +92,9 @@ ghci GhciOpts{..} = do
     wc <- getWhichCompiler
     let pkgopts = hidePkgOpt ++ genOpts ++ ghcOpts
         hidePkgOpt = if null pkgs then [] else ["-hide-all-packages"]
-        genOpts = nubOrd (concatMap (concatMap (bioGeneratedOpts . snd) . ghciPkgOpts) pkgs)
+        genOpts = nubOrd (concatMap (concatMap (bioOneWordOpts . snd) . ghciPkgOpts) pkgs)
         (omittedOpts, ghcOpts) = partition badForGhci $
-            concatMap (concatMap (bioGhcOpts . snd) . ghciPkgOpts) pkgs ++
+            concatMap (concatMap (bioOpts . snd) . ghciPkgOpts) pkgs ++
             getUserOptions Nothing ++
             concatMap (getUserOptions . Just . ghciPkgName) pkgs
         getUserOptions mpkg =
@@ -349,7 +349,7 @@ checkForIssues pkgs = do
     partitionComps f = (map fst xs, map fst ys)
       where
         (xs, ys) = partition (any f . snd) compsWithOpts
-    compsWithOpts = map (\(k, bio) -> (k, bioGeneratedOpts bio ++ bioGhcOpts bio)) compsWithBios
+    compsWithOpts = map (\(k, bio) -> (k, bioOneWordOpts bio ++ bioOpts bio)) compsWithBios
     compsWithBios =
         [ ((ghciPkgName pkg, c), bio)
         | pkg <- pkgs

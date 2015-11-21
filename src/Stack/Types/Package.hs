@@ -112,12 +112,12 @@ newtype GetPackageOpts = GetPackageOpts
 instance Show GetPackageOpts where
     show _ = "<GetPackageOpts>"
 
+-- | GHC options based on cabal information and ghc-options.
 data BuildInfoOpts = BuildInfoOpts
-    { bioGhcOpts :: [String]
-    -- ^ Options from the ghc-options cabal field
-    , bioGeneratedOpts :: [String]
-    -- ^ Other options from cabal information.  These options can safely have
-    -- 'nubOrd' applied to them, as there are no multi-word options (see
+    { bioOpts :: [String]
+    , bioOneWordOpts :: [String]
+    -- ^ These options can safely have 'nubOrd' applied to them, as
+    -- there are no multi-word options (see
     -- https://github.com/commercialhaskell/stack/issues/1255)
     } deriving Show
 
