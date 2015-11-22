@@ -18,6 +18,7 @@ to go:
 * Review documentation for any changes that need to be made
     * Search for old Stack version and replace with new version
 * Ensure all `doc/*.md` files are listed in `stack.cabal`'s 'extra-source-files`
+* Ensure all documentation pages listed in `mkdocs.yaml`
 * Check that any new Linux distribution versions added to
   `etc/scripts/release.hs` and `etc/scripts/vagrant-releases.sh`
 * Check that no new entries need to be added to

@@ -109,7 +109,7 @@ executables.
    Just try to add a new version in the `stack.yaml` file in the `extra-deps` section.
 
 It was a really fast introduction on how to start to code in Haskell using `stack`.
-If you want to go further, we highly recommend you to read the [`stack` guide](https://github.com/commercialhaskell/stack/blob/master/doc/GUIDE.md).
+If you want to go further, we highly recommend you to read the [`stack` guide](https://github.com/commercialhaskell/stack/blob/release/doc/GUIDE.md).
 
 #### How to contribute
 
