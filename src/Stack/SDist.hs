@@ -40,8 +40,6 @@ import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Time.Clock.POSIX
 import           Distribution.Package (Dependency (..))
-import qualified Distribution.Package as P
-import qualified Distribution.PackageDescription as PD
 import qualified Distribution.PackageDescription.Check as Check
 import           Distribution.PackageDescription.PrettyPrint (showGenericPackageDescription)
 import           Distribution.Version (simplifyVersionRange, orLaterVersion, earlierVersion)
@@ -275,9 +273,8 @@ checkSDistTarball tarball = withTempTarGzContents tarball $ \pkgDir' -> do
     name    <- parsePackageNameFromFilePath cabalfp
     config  <- getPackageConfig name
     (gdesc, pkgDesc) <- readPackageDescriptionDir config pkgDir
-    $logInfo $ "Checking package '" <>
-               (T.pack . P.unPackageName . P.pkgName . PD.package $ pkgDesc) <>
-               "' for common mistakes"
+    $logInfo $
+        "Checking package '" <> packageNameText name <> "' for common mistakes"
     let pkgChecks = Check.checkPackage gdesc (Just pkgDesc)
     fileChecks <- liftIO $ Check.checkPackageFiles pkgDesc (toFilePath pkgDir)
     let checks = pkgChecks ++ fileChecks
