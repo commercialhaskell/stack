@@ -288,6 +288,8 @@ runContainerAndExit getCmdArgs
                   isStderrTerminal
          keepStdinOpen = not (dockerDetach docker) &&
                          -- Workaround for https://github.com/docker/docker/issues/12319
+                         -- This seems be fixed in Docker 1.9.1, but will leave the workaround
+                         -- in place for now, for users who haven't upgraded yet.
                          (isTerm || (isNothing bamboo && isNothing jenkins))
          newPathEnv = intercalate [Posix.searchPathSeparator] $
                       nubOrd $
