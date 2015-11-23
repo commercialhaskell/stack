@@ -62,6 +62,7 @@ module Stack.Types.Config
   ,PackageEntry(..)
   ,peExtraDep
   ,PackageLocation(..)
+  ,RemotePackageType(..)
   -- ** PackageIndex, IndexName & IndexLocation
   ,PackageIndex(..)
   ,IndexName(..)
@@ -551,25 +552,39 @@ data PackageLocation
     = PLFilePath FilePath
     -- ^ Note that we use @FilePath@ and not @Path@s. The goal is: first parse
     -- the value raw, and then use @canonicalizePath@ and @parseAbsDir@.
-    | PLHttpTarball Text
-    | PLGit Text Text
-    -- ^ URL and commit
+    | PLRemote Text RemotePackageType
+     -- ^ URL and further details
     deriving Show
+
+data RemotePackageType
+    = RPTHttpTarball
+    | RPTGit Text -- ^ Commit
+    | RPTHg  Text -- ^ Commit
+    deriving Show
+
 instance ToJSON PackageLocation where
     toJSON (PLFilePath fp) = toJSON fp
-    toJSON (PLHttpTarball t) = toJSON t
-    toJSON (PLGit x y) = toJSON $ T.unwords ["git", x, y]
+    toJSON (PLRemote t RPTHttpTarball) = toJSON t
+    toJSON (PLRemote x (RPTGit y)) = toJSON $ T.unwords ["git", x, y]
+    toJSON (PLRemote x (RPTHg  y)) = toJSON $ T.unwords ["hg",  x, y]
+
 instance FromJSON (PackageLocation, [JSONWarning]) where
-    parseJSON v = ((,[]) <$> withText "PackageLocation" (\t -> http t <|> file t) v) <|> git v
+    parseJSON v
+        = ((,[]) <$> withText "PackageLocation" (\t -> http t <|> file t) v)
+        <|> git v
+        <|> hg  v
       where
         file t = pure $ PLFilePath $ T.unpack t
         http t =
             case parseUrl $ T.unpack t of
                 Left _ -> mzero
-                Right _ -> return $ PLHttpTarball t
-        git = withObjectWarnings "PackageGitLocation" $ \o -> PLGit
+                Right _ -> return $ PLRemote t RPTHttpTarball
+        git = withObjectWarnings "PackageGitLocation" $ \o -> PLRemote
             <$> o ..: "git"
-            <*> o ..: "commit"
+            <*> (RPTGit <$> o ..: "commit")
+        hg  = withObjectWarnings "PackageHgLocation"  $ \o -> PLRemote
+            <$> o ..: "hg"
+            <*> (RPTHg  <$> o ..: "commit")
 
 -- | A project is a collection of packages. We can have multiple stack.yaml
 -- files, but only one of them may contain project information.

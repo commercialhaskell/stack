@@ -6,6 +6,8 @@ Other enhancements:
 
 * Print latest applicable version of packages on conflicts
   [#508](https://github.com/commercialhaskell/stack/issues/508)
+* Support for packages located in Mercurial repositories
+  [#1397](https://github.com/commercialhaskell/stack/issues/1397)
 
 Bug fixes:
 

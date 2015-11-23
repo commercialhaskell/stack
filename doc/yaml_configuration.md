@@ -18,6 +18,8 @@ Project specific options are only valid in the `stack.yaml` file local to a proj
 
 ### packages
 
+(Mercurial support since 0.1.9.0)
+
 This lists all local packages. In the simplest usage, it will be a list of directories, e.g.:
 
 ```yaml
@@ -27,7 +29,7 @@ packages:
 - dir3
 ```
 
-However, it supports two other location types: an HTTP URL referring to a tarball that can be downloaded, and information on a Git repo to clone, together with this SHA1 commit. For example:
+However, it supports three other location types: an HTTP URL referring to a tarball that can be downloaded, and information on a Git or Mercurial repo to clone, together with this SHA1 commit. For example:
 
 ```yaml
 packages:
@@ -36,9 +38,12 @@ packages:
 - location:
     git: git@github.com:commercialhaskell/stack
     commit: 6a86ee32e5b869a877151f74064572225e1a0398
+- location:
+    hg: https://example.com/hg/repo
+    commit: da39a3ee5e6b4b0d3255bfef95601890afd80709
 ```
 
-Note: it is highly recommended that you only use SHA1 values for a Git commit. Other values may work, but they are not officially supported, and may result in unexpected behavior (namely, stack will not automatically pull to update to new versions).
+Note: it is highly recommended that you only use SHA1 values for a Git or Mercurial commit. Other values may work, but they are not officially supported, and may result in unexpected behavior (namely, stack will not automatically pull to update to new versions).
 
 stack further allows you to tweak your packages by specifying two additional
 settings:
