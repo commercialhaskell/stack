@@ -7,6 +7,7 @@ to go:
   --flag stack:integration-tests`. The actual release script will perform a more
   thorough test for every platform/variant prior to uploading, so this is just a
   pre-check
+* Stack builds with `stack-7.8.yaml`
 * stack can build the wai repo
 * Running `stack build` a second time on either stack or wai is a no-op
 * Build something that depends on `happy` (suggestion: `hlint`), since `happy`
@@ -16,7 +17,9 @@ to go:
   changes)
 * In release candidate, remove the Changelog's "unreleased changes" section
 * Review documentation for any changes that need to be made
-    * Search for old Stack version and replace with new version
+    * Search for old Stack version, unstable stack version, and the next
+      "obvious" version in sequence (if doing a non-obvious jump) and replace
+      with new version
 * Ensure all `doc/*.md` files are listed in `stack.cabal`'s 'extra-source-files`
 * Ensure all documentation pages listed in `mkdocs.yaml`
 * Check that any new Linux distribution versions added to
