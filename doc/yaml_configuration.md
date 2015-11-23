@@ -18,6 +18,8 @@ Project specific options are only valid in the `stack.yaml` file local to a proj
 
 ### packages
 
+(Mercurial support since 0.1.9.0)
+
 This lists all local packages. In the simplest usage, it will be a list of directories, e.g.:
 
 ```yaml
