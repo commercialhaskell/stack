@@ -1,3 +1,5 @@
+# Dependency visualization
+
 You can use stack to visualize the dependencies between your packages and optionally also external dependencies.
 
 As an example, let's look at `wreq`:

@@ -19,3 +19,4 @@ tags
 /*.iml
 /src/highlight.js
 /src/style.css
+/doc/_build

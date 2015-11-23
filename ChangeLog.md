@@ -1,10 +1,12 @@
+# Changelog
+
 ## 0.1.8.0
 
 Major changes:
 
 * GHCJS can now be used with stackage snapshots via the new `compiler` field.
 * Windows installers are now available:
-  [download them here](https://github.com/commercialhaskell/stack/blob/release/doc/install_and_upgrade.md#windows)
+  [download them here](http://docs.haskellstack.org/en/stable/install_and_upgrade.html#windows)
   [#613](https://github.com/commercialhaskell/stack/issues/613)
 * Docker integration works with non-FPComplete generated images
   [#531](https://github.com/commercialhaskell/stack/issues/531)
@@ -73,7 +75,7 @@ Bug fixes:
 * Fix: unlisted files in tests and benchmarks trigger extraneous second build
   [#838](https://github.com/commercialhaskell/stack/issues/838)
 
-## v0.1.6.0
+## 0.1.6.0
 
 Major changes:
 
@@ -218,7 +220,7 @@ Major changes:
 * Respect TemplateHaskell addDependentFile dependency changes ([#105](https://github.com/commercialhaskell/stack/issues/105))
     * TH dependent files are taken into account when determining whether a package needs to be built.
 * Overhauled target parsing, added `--test` and `--bench` options [#651](https://github.com/commercialhaskell/stack/issues/651)
-    * For details, see [Build commands documentation](doc/build_command.md)
+    * For details, see [Build commands documentation](http://docs.haskellstack.org/en/stable/build_command.html)
 
 Other enhancements:
 

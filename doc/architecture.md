@@ -1,3 +1,5 @@
+# Architecture
+
 ## Terminology
 
 * Package identifier: a package name and version, e.g. text-1.2.1.0

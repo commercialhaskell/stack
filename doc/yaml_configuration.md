@@ -34,7 +34,7 @@ packages:
 - some-directory
 - https://example.com/foo/bar/baz-0.0.2.tar.gz
 - location:
-    git: git@github.com:commercialhaskell/stack
+    git: git@github.com:commercialhaskell/stack.git
     commit: 6a86ee32e5b869a877151f74064572225e1a0398
 ```
 

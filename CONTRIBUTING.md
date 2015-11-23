@@ -1,3 +1,5 @@
+# Contributors Guide
+
 ## Bug Reports
 
 When reporting a bug, please write in the following format:
