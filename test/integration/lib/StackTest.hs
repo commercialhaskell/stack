@@ -1,6 +1,7 @@
 module StackTest where
 
 import Control.Exception
+import Data.List (intercalate)
 import System.Environment
 import System.FilePath
 import System.Directory
@@ -10,7 +11,7 @@ import System.Exit
 
 run' :: FilePath -> [String] -> IO ExitCode
 run' cmd args = do
-    putStrLn $ "Running " ++ cmd ++ " with args " ++ show args
+    logInfo $ "Running: " ++ cmd ++ " " ++ intercalate " " (map showProcessArgDebug args)
     (Nothing, Nothing, Nothing, ph) <- createProcess (proc cmd args)
     waitForProcess ph
 
@@ -40,9 +41,21 @@ stackErr args = do
         then error "stack was supposed to fail, but didn't"
         else return ()
 
+-- | Run stack with arguments and apply a check to the resulting
+-- stderr output if the process succeeded.
+stackCheckStderr :: [String] -> (String -> IO ()) -> IO ()
+stackCheckStderr args check = do
+    stack <- getEnv "STACK_EXE"
+    logInfo $ "Running: " ++ stack ++ " " ++ intercalate " " (map showProcessArgDebug args)
+    (ec, _, err) <- readProcessWithExitCode stack args ""
+    hPutStr stderr err
+    if ec /= ExitSuccess
+        then error $ "Exited with exit code: " ++ show ec
+        else check err
+
 doesNotExist :: FilePath -> IO ()
 doesNotExist fp = do
-    putStrLn $ "doesNotExist " ++ fp
+    logInfo $ "doesNotExist " ++ fp
     exists <- doesFileOrDirExist fp
     case exists of
       (Right msg) -> error msg
@@ -50,13 +63,13 @@ doesNotExist fp = do
 
 doesExist :: FilePath -> IO ()
 doesExist fp = do
-    putStrLn $ "doesExist " ++ fp
+    logInfo $ "doesExist " ++ fp
     exists <- doesFileOrDirExist fp
     case exists of
       (Right msg) -> return ()
       (Left _) -> error "No file or directory exists"
 
-doesFileOrDirExist :: FilePath -> IO (Either () String) 
+doesFileOrDirExist :: FilePath -> IO (Either () String)
 doesFileOrDirExist fp = do
     isFile <- doesFileExist fp
     if isFile
@@ -69,5 +82,35 @@ doesFileOrDirExist fp = do
 
 copy :: FilePath -> FilePath -> IO ()
 copy src dest = do
-    putStrLn ("Copy " ++ show src ++ " to " ++ show dest)
+    logInfo ("Copy " ++ show src ++ " to " ++ show dest)
     System.Directory.copyFile src dest
+
+fileContentsMatch :: FilePath -> FilePath -> IO ()
+fileContentsMatch f1 f2 = do
+    doesExist f1
+    doesExist f2
+    f1Contents <- readFile f1
+    f2Contents <- readFile f2
+    if f1Contents == f2Contents
+          then return ()
+          else error
+                   ("contents do not match for " ++
+                    show f1 ++
+                    " " ++
+                    show f2)
+
+logInfo :: String -> IO ()
+logInfo = hPutStrLn stderr
+
+-- TODO: use stack's process running utilties?  (better logging)
+-- for now just copy+modifying this one from System.Process.Log
+
+-- | Show a process arg including speechmarks when necessary. Just for
+-- debugging purposes, not functionally important.
+showProcessArgDebug :: String -> String
+showProcessArgDebug x
+    | any special x = show x
+    | otherwise = x
+  where special '"' = True
+        special ' ' = True
+        special _ = False

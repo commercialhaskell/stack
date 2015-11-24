@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE ViewPatterns #-}
 
 -- | IO actions that might be put in a package at some point.
 
@@ -31,9 +30,8 @@ module Path.IO
   ,copyFileIfExists
   ,copyDirectoryRecursive
   ,createTree
-  ,dropRoot
-  ,parseCollapsedAbsFile
-  ,parseCollapsedAbsDir)
+  ,withCanonicalizedSystemTempDirectory
+  ,withCanonicalizedTempDirectory)
   where
 
 import           Control.Exception hiding (catch)
@@ -41,13 +39,13 @@ import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Data.Either
-import           Data.Maybe
+import           Data.Maybe.Extra
 import           Data.Typeable
 import           Path
-import           Path.Internal (Path(..))
 import qualified System.Directory as D
 import qualified System.FilePath as FP
 import           System.IO.Error
+import           System.IO.Temp
 
 data ResolveException
     = ResolveDirFailed (Path Abs Dir) FilePath FilePath
@@ -65,11 +63,17 @@ getWorkingDir = liftIO (D.canonicalizePath "." >>= parseAbsDir)
 
 -- | Parse a directory path. If it's relative, then the absolute version
 -- is yielded, based off the working directory.
+--
+-- NOTE that this only works if the directory exists, but does not
+-- ensure that it's a directory.
 parseRelAsAbsDir :: (MonadThrow m, MonadIO m) => FilePath -> m (Path Abs Dir)
 parseRelAsAbsDir fp = parseAbsDir =<< liftIO (D.canonicalizePath fp)
 
 -- | Parse a file path. If it's relative, then the absolute version is
 -- yielded, based off the working directory.
+--
+-- NOTE that this only works if the file exists, but does not ensure
+-- that it's a file.
 parseRelAsAbsFile :: (MonadThrow m, MonadIO m) => FilePath -> m (Path Abs File)
 parseRelAsAbsFile fp = parseAbsFile =<< liftIO (D.canonicalizePath fp)
 
@@ -126,50 +130,12 @@ resolveFileMaybe :: (MonadIO m,MonadThrow m)
                  => Path Abs Dir -> FilePath -> m (Maybe (Path Abs File))
 resolveFileMaybe = resolveCheckParse D.doesFileExist parseAbsFile
 
--- | Collapse intermediate "." and ".." directories from path, then parse
--- it with 'parseAbsFile'.
--- (probably should be moved to the Path module)
-parseCollapsedAbsFile :: MonadThrow m => FilePath -> m (Path Abs File)
-parseCollapsedAbsFile = parseAbsFile . collapseFilePath
-
--- | Collapse intermediate "." and ".." directories from path, then parse
--- it with 'parseAbsDir'.
--- (probably should be moved to the Path module)
-parseCollapsedAbsDir :: MonadThrow m => FilePath -> m (Path Abs Dir)
-parseCollapsedAbsDir = parseAbsDir . collapseFilePath
-
--- | Collapse intermediate "." and ".." directories from a path.
---
--- > collapseFilePath "./foo" == "foo"
--- > collapseFilePath "/bar/../baz" == "/baz"
--- > collapseFilePath "/../baz" == "/../baz"
--- > collapseFilePath "parent/foo/baz/../bar" ==  "parent/foo/bar"
--- > collapseFilePath "parent/foo/baz/../../bar" ==  "parent/bar"
--- > collapseFilePath "parent/foo/.." ==  "parent"
--- > collapseFilePath "/parent/foo/../../bar" ==  "/bar"
---
--- (borrowed from @Text.Pandoc.Shared@)
-collapseFilePath :: FilePath -> FilePath
-collapseFilePath = FP.joinPath . reverse . foldl go [] . FP.splitDirectories
-  where
-    go rs "." = rs
-    go r@(p:rs) ".." = case p of
-                            ".." -> ("..":r)
-                            (checkPathSeperator -> Just True) -> ("..":r)
-                            _ -> rs
-    go _ (checkPathSeperator -> Just True) = [[FP.pathSeparator]]
-    go rs x = x:rs
-    isSingleton [] = Nothing
-    isSingleton [x] = Just x
-    isSingleton _ = Nothing
-    checkPathSeperator = fmap FP.isPathSeparator . isSingleton
-
 -- | List objects in a directory, excluding "@.@" and "@..@".  Entries are not sorted.
 listDirectory :: (MonadIO m,MonadThrow m) => Path Abs Dir -> m ([Path Abs Dir],[Path Abs File])
 listDirectory dir =
   do entriesFP <- liftIO (D.getDirectoryContents dirFP)
-     maybeEntries <-
-       forM (map (dirFP ++) entriesFP)
+     entries <-
+       forMaybeM (map (dirFP ++) entriesFP)
             (\entryFP ->
                do isDir <- liftIO (D.doesDirectoryExist entryFP)
                   if isDir
@@ -182,7 +148,6 @@ listDirectory dir =
                      else case parseAbsFile entryFP of
                             Nothing -> return Nothing
                             Just entryFile -> return (Just (Right entryFile)))
-     let entries = catMaybes maybeEntries
      return (lefts entries,rights entries)
   where dirFP = toFilePath dir
 
@@ -279,13 +244,22 @@ copyDirectoryRecursive srcDir destDir =
                   Nothing -> return ()
                   Just relSubDir -> copyDirectoryRecursive srcSubDir (destDir </> relSubDir))
 
-
--- | Drop the root (either @\/@ on POSIX or @C:\\@, @D:\\@, etc. on
--- Windows).
-dropRoot :: Path Abs t -> Path Rel t
-dropRoot (Path l) = Path (FP.dropDrive l)
-
 -- Utility function for a common pattern of ignoring does-not-exist errors.
 ignoreDoesNotExist :: MonadIO m => IO () -> m ()
 ignoreDoesNotExist f =
     liftIO $ catch f $ \e -> unless (isDoesNotExistError e) (throwIO e)
+
+withCanonicalizedSystemTempDirectory :: (MonadMask m, MonadIO m)
+    => String                -- ^ Directory name template.
+    -> (Path Abs Dir -> m a) -- ^ Callback that can use the canonicalized directory
+    -> m a
+withCanonicalizedSystemTempDirectory template action =
+  withSystemTempDirectory template (parseRelAsAbsDir >=> action)
+
+withCanonicalizedTempDirectory :: (MonadMask m, MonadIO m)
+    => FilePath              -- ^ Temp directory to create the directory in
+    -> String                -- ^ Directory name template.
+    -> (Path Abs Dir -> m a) -- ^ Callback that can use the canonicalized directory
+    -> m a
+withCanonicalizedTempDirectory targetDir template action =
+  withTempDirectory targetDir template (parseRelAsAbsDir >=> action)

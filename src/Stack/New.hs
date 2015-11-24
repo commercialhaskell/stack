@@ -30,7 +30,7 @@ import           Data.Conduit
 import           Data.List
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
-import           Data.Maybe
+import           Data.Maybe.Extra (mapMaybeM)
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as S
@@ -60,6 +60,8 @@ import           Text.ProjectTemplate
 data NewOpts = NewOpts
     { newOptsProjectName  :: PackageName
     -- ^ Name of the project to create.
+    , newOptsCreateBare   :: Bool
+    -- ^ Whether to create the project without a directory.
     , newOptsTemplate     :: TemplateName
     -- ^ Name of the template to use.
     , newOptsNonceParams  :: Map Text Text
@@ -72,13 +74,14 @@ new
     => NewOpts -> m (Path Abs Dir)
 new opts = do
     pwd <- getWorkingDir
-    relDir <- parseRelDir (packageNameString (newOptsProjectName opts))
-    absDir <- liftM (pwd </>) (return relDir)
+    absDir <- if bare then return pwd
+                      else do relDir <- parseRelDir (packageNameString project)
+                              liftM (pwd </>) (return relDir)
     exists <- dirExists absDir
-    if exists
+    if exists && not bare
         then throwM (AlreadyExists absDir)
         else do
-            logUsing relDir
+            logUsing absDir
             templateText <- loadTemplate template
             files <-
                 applyTemplate
@@ -93,29 +96,51 @@ new opts = do
   where
     template = newOptsTemplate opts
     project = newOptsProjectName opts
-    logUsing relDir =
+    bare = newOptsCreateBare opts
+    logUsing absDir =
         $logInfo
             ("Downloading template \"" <> templateName template <>
              "\" to create project \"" <>
              packageNameText project <>
              "\" in " <>
-             T.pack (toFilePath relDir) <>
+             if bare then "the current directory"
+                     else T.pack (toFilePath (dirname absDir)) <>
              " ...")
 
 -- | Download and read in a template's text content.
 loadTemplate
-    :: (HasConfig r, HasHttpManager r, MonadReader r m, MonadIO m, MonadThrow m, MonadCatch m)
+    :: forall m r.
+       (HasConfig r, HasHttpManager r, MonadReader r m, MonadIO m, MonadThrow m, MonadCatch m)
     => TemplateName -> m Text
-loadTemplate name = do
-    req <-
-        parseUrl (defaultTemplateUrl <> "/" <> toFilePath (templatePath name))
-    config <- asks getConfig
-    let path = templatesDir config </> templatePath name
-    _ <- catch (redownload req path) (throwM . FailedToDownloadTemplate name)
-    exists <- fileExists path
-    if exists
-        then liftIO (T.readFile (toFilePath path))
-        else throwM (FailedToLoadTemplate name path)
+loadTemplate name =
+    case templatePath name of
+        Left absFile -> loadLocalFile absFile
+        Right relFile ->
+            catch
+                (loadLocalFile relFile)
+                (\(_ :: NewException) ->
+                      downloadTemplate relFile)
+  where
+    loadLocalFile :: Path b File -> m Text
+    loadLocalFile path = do
+        exists <- fileExists path
+        if exists
+            then liftIO (T.readFile (toFilePath path))
+            else throwM (FailedToLoadTemplate name (toFilePath path))
+    downloadTemplate :: Path Rel File -> m Text
+    downloadTemplate rel = do
+        config <- asks getConfig
+        req <- parseUrl (defaultTemplateUrl <> "/" <> toFilePath rel)
+        let path :: Path Abs File
+            path = templatesDir config </> rel
+        _ <-
+            catch
+                (redownload req path)
+                (throwM . FailedToDownloadTemplate name)
+        exists <- fileExists path
+        if exists
+            then liftIO (T.readFile (toFilePath path))
+            else throwM (FailedToLoadTemplate name (toFilePath path))
 
 -- | Apply and unpack a template into a directory.
 applyTemplate
@@ -138,8 +163,8 @@ applyTemplate project template nonceParams dir templateText = do
                  defaultConfig
                  templateText
                  (mkStrContextM (contextFunction context)))
-    when (not (S.null missingKeys))
-         ($logInfo (T.pack (show (MissingParameters project template config missingKeys))))
+    unless (S.null missingKeys)
+         ($logInfo (T.pack (show (MissingParameters project template missingKeys (configUserConfigPath config)))))
     files :: Map FilePath LB.ByteString <-
         execWriterT $
         yield (T.encodeUtf8 (LT.toStrict applied)) $$
@@ -160,7 +185,7 @@ applyTemplate project template nonceParams dir templateText = do
         => Map Text Text
         -> String
         -> WriterT (Set String) m (MuType (WriterT (Set String) m))
-    contextFunction context key = do
+    contextFunction context key =
         case M.lookup (T.pack key) context of
             Nothing -> do
                 tell (S.singleton key)
@@ -171,7 +196,7 @@ applyTemplate project template nonceParams dir templateText = do
 writeTemplateFiles
     :: MonadIO m
     => Map (Path Abs File) LB.ByteString -> m ()
-writeTemplateFiles files = do
+writeTemplateFiles files =
     forM_
         (M.toList files)
         (\(fp,bytes) ->
@@ -188,9 +213,8 @@ runTemplateInits dir = do
     case configScmInit config of
         Nothing -> return ()
         Just Git ->
-            do catch
-                   (callProcess (Just dir) menv "git" ["init"])
-                   (\(_ :: ProcessExitedUnsuccessfully) ->
+            catch (callProcess (Just dir) menv "git" ["init"])
+                  (\(_ :: ProcessExitedUnsuccessfully) ->
                          $logInfo "git init failed to run, ignoring ...")
 
 --------------------------------------------------------------------------------
@@ -229,12 +253,12 @@ getTemplates = do
 parseTemplateSet :: Value -> Parser (Set TemplateName)
 parseTemplateSet a = do
     xs <- parseJSON a
-    fmap (S.fromList . catMaybes) (mapM parseTemplate xs)
+    fmap S.fromList (mapMaybeM parseTemplate xs)
   where
     parseTemplate v = do
         o <- parseJSON v
         name <- o .: "name"
-        if isSuffixOf ".hsfiles" name
+        if ".hsfiles" `isSuffixOf` name
             then case parseTemplateNameFromString name of
                      Left{} ->
                          fail ("Unable to parse template name from " <> name)
@@ -264,14 +288,14 @@ defaultTemplatesList =
 -- | Exception that might occur when making a new project.
 data NewException
     = FailedToLoadTemplate !TemplateName
-                           !(Path Abs File)
+                           !FilePath
     | FailedToDownloadTemplate !TemplateName
                                !DownloadException
     | FailedToDownloadTemplates !HttpException
     | BadTemplatesResponse !Int
     | BadTemplatesJSON !String !LB.ByteString
     | AlreadyExists !(Path Abs Dir)
-    | MissingParameters !PackageName !TemplateName !Config !(Set String)
+    | MissingParameters !PackageName !TemplateName !(Set String) !(Path Abs File)
     deriving (Typeable)
 
 instance Exception NewException
@@ -280,7 +304,7 @@ instance Show NewException where
     show (FailedToLoadTemplate name path) =
         "Failed to load download template " <> T.unpack (templateName name) <>
         " from " <>
-        toFilePath path
+        path
     show (FailedToDownloadTemplate name (RedownloadFailed _ _ resp)) =
         case statusCode (responseStatus resp) of
             404 ->
@@ -301,13 +325,13 @@ instance Show NewException where
     show (BadTemplatesJSON err bytes) =
         "Github returned some JSON that couldn't be parsed: " <> err <> "\n\n" <>
         L8.unpack bytes
-    show (MissingParameters name template config missingKeys) =
+    show (MissingParameters name template missingKeys userConfigPath) =
         intercalate
             "\n"
             [ "The following parameters were needed by the template but not provided: " <>
               intercalate ", " (S.toList missingKeys)
             , "You can provide them in " <>
-              toFilePath (globalConfigPath config) <>
+              toFilePath userConfigPath <>
               ", like this:"
             , "templates:"
             , "  params:"

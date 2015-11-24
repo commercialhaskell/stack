@@ -21,24 +21,28 @@
 -- probably default to behaving like cabal, possibly with spitting out
 -- a warning that "you should run `stk init` to make things better".
 module Stack.Config
-  (loadConfig
+  (MiniConfig
+  ,loadConfig
+  ,loadMiniConfig
   ,packagesParser
   ,resolvePackageEntry
+  ,getImplicitGlobalProjectDir
+  ,getIsGMP4
   ) where
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Arrow ((***))
-import           Control.Exception (IOException)
 import           Control.Monad
-import           Control.Monad.Catch (Handler(..), MonadCatch, MonadThrow, catches, throwM)
+import           Control.Monad.Catch (MonadThrow, MonadCatch, catchAll, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
-import           Control.Monad.Reader (MonadReader, ask, asks, runReaderT)
+import           Control.Monad.Reader (MonadReader, ask, runReaderT)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
 import           Data.Aeson.Extended
+import qualified Data.ByteString as S
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as L
 import qualified Data.IntMap as IntMap
@@ -46,7 +50,8 @@ import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
+import           Data.Text.Encoding (encodeUtf8, decodeUtf8, decodeUtf8With)
+import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Data.Yaml as Yaml
 import           Distribution.System (OS (..), Platform (..), buildPlatform)
 import qualified Distribution.Text
@@ -56,13 +61,16 @@ import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager, Ma
 import           Network.HTTP.Download (download)
 import           Options.Applicative (Parser, strOption, long, help)
 import           Path
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import qualified Paths_stack as Meta
+import           Safe (headMay)
 import           Stack.BuildPlan
+import           Stack.Config.Docker
 import           Stack.Constants
-import qualified Stack.Docker as Docker
 import qualified Stack.Image as Image
 import           Stack.Init
+import           Stack.PackageIndex
 import           Stack.Types
 import           Stack.Types.Internal
 import           System.Directory (getAppUserDataDirectory, createDirectoryIfMissing, canonicalizePath)
@@ -79,26 +87,19 @@ getLatestResolver = do
     let mlts = do
             (x,y) <- listToMaybe (reverse (IntMap.toList (snapshotsLts snapshots)))
             return (LTS x y)
-        snap =
-            case mlts of
-                Nothing -> Nightly (snapshotsNightly snapshots)
-                Just lts -> lts
+        snap = fromMaybe (Nightly (snapshotsNightly snapshots)) mlts
     return (ResolverSnapshot snap)
-
--- | Note that this will be @Nothing@ on Windows, which is by design.
-defaultStackGlobalConfig :: Maybe (Path Abs File)
-defaultStackGlobalConfig = parseAbsFile "/etc/stack/config"
 
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid
     :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env)
     => Path Abs Dir -- ^ stack root, e.g. ~/.stack
-    -> Maybe Project
+    -> Path Abs File -- ^ user config file path, e.g. ~/.stack/config.yaml
+    -> Maybe (Project, Path Abs File)
     -> ConfigMonoid
     -> m Config
-configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = do
-     let configDocker = Docker.dockerOptsFromMonoid mproject configStackRoot configMonoidDockerOpts
-         configConnectionCount = fromMaybe 8 configMonoidConnectionCount
+configFromConfigMonoid configStackRoot configUserConfigPath mproject configMonoid@ConfigMonoid{..} = do
+     let configConnectionCount = fromMaybe 8 configMonoidConnectionCount
          configHideTHLoading = fromMaybe True configMonoidHideTHLoading
          configLatestSnapshotUrl = fromMaybe
             "https://s3.amazonaws.com/haddock.stackage.org/snapshots.json"
@@ -115,7 +116,9 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
                 }]
             configMonoidPackageIndices
 
-         configSystemGHC = fromMaybe True configMonoidSystemGHC
+         configGHCVariant0 = configMonoidGHCVariant
+
+         configSystemGHC = fromMaybe (isNothing configGHCVariant0) configMonoidSystemGHC
          configInstallGHC = fromMaybe False configMonoidInstallGHC
          configSkipGHCCheck = fromMaybe False configMonoidSkipGHCCheck
          configSkipMsys = fromMaybe False configMonoidSkipMsys
@@ -140,6 +143,8 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
 
          configCompilerCheck = fromMaybe MatchMinor configMonoidCompilerCheck
 
+     configDocker <- dockerOptsFromMonoid (fmap fst mproject) configStackRoot configMonoidDockerOpts
+
      rawEnv <- liftIO getEnvironment
      origEnv <- mkEnvOverride configPlatform
               $ augmentPathMap (map toFilePath configMonoidExtraPath)
@@ -147,14 +152,16 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
               $ map (T.pack *** T.pack) rawEnv
      let configEnvOverride _ = return origEnv
 
-     platform <- runReaderT platformRelDir configPlatform
-
-     configLocalPrograms <-
-        case configPlatform of
-            Platform _ Windows -> do
-                progsDir <- getWindowsProgsDir configStackRoot origEnv
-                return $ progsDir </> $(mkRelDir stackProgName) </> platform
-            _ -> return $ configStackRoot </> $(mkRelDir "programs") </> platform
+     platformOnlyDir <- runReaderT platformOnlyRelDir configPlatform
+     configLocalProgramsBase <-
+         case configPlatform of
+             Platform _ Windows -> do
+                 progsDir <- getWindowsProgsDir configStackRoot origEnv
+                 return $ progsDir </> $(mkRelDir stackProgName)
+             _ ->
+                 return $
+                 configStackRoot </> $(mkRelDir "programs")
+     let configLocalPrograms = configLocalProgramsBase </> platformOnlyDir
 
      configLocalBin <-
          case configMonoidLocalBinPath of
@@ -162,11 +169,17 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
                  localDir <- liftIO (getAppUserDataDirectory "local") >>= parseAbsDir
                  return $ localDir </> $(mkRelDir "bin")
              Just userPath ->
-                 (liftIO $ canonicalizePath userPath >>= parseAbsDir)
-                 `catches`
-                 [Handler (\(_ :: IOException) -> throwM $ NoSuchDirectory userPath)
-                 ,Handler (\(_ :: PathParseException) -> throwM $ NoSuchDirectory userPath)
-                 ]
+                 (case mproject of
+                     -- Not in a project
+                     Nothing -> parseRelAsAbsDir userPath
+                     -- Resolves to the project dir and appends the user path if it is relative
+                     Just (_, configYaml) -> resolveDir (parent configYaml) userPath)
+                 -- TODO: Either catch specific exceptions or add a
+                 -- parseRelAsAbsDirMaybe utility and use it along with
+                 -- resolveDirMaybe.
+                 `catchAll`
+                 const (throwM (NoSuchDirectory userPath))
+
      configJobs <-
         case configMonoidJobs of
             Nothing -> liftIO getNumProcessors
@@ -176,8 +189,40 @@ configFromConfigMonoid configStackRoot mproject configMonoid@ConfigMonoid{..} = 
      let configTemplateParams = configMonoidTemplateParameters
          configScmInit = configMonoidScmInit
          configGhcOptions = configMonoidGhcOptions
+         configSetupInfoLocations = configMonoidSetupInfoLocations
+         configPvpBounds = fromMaybe PvpBoundsNone configMonoidPvpBounds
+         configModifyCodePage = fromMaybe True configMonoidModifyCodePage
+         configExplicitSetupDeps = configMonoidExplicitSetupDeps
+         configRebuildGhcOptions = fromMaybe False configMonoidRebuildGhcOptions
+         configApplyGhcOptions = fromMaybe AGOLocals configMonoidApplyGhcOptions
+         configAllowNewer = fromMaybe False configMonoidAllowNewer
 
      return Config {..}
+
+-- | Get the default 'GHCVariant'.  On older Linux systems with libgmp4, returns 'GHCGMP4'.
+getDefaultGHCVariant
+    :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m)
+    => EnvOverride -> Platform -> m GHCVariant
+getDefaultGHCVariant menv (Platform _ Linux) = do
+    isGMP4 <- getIsGMP4 menv
+    return (if isGMP4 then GHCGMP4 else GHCStandard)
+getDefaultGHCVariant _ _ = return GHCStandard
+
+-- Determine whether 'stack' is linked with libgmp4 (libgmp.so.3)
+getIsGMP4
+    :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m)
+    => EnvOverride -> m Bool
+getIsGMP4 menv = do
+    executablePath <- liftIO getExecutablePath
+    elddOut <- tryProcessStdout Nothing menv "ldd" [executablePath]
+    return $
+        case elddOut of
+            Left _ -> False
+            Right lddOut -> hasLineWithFirstWord "libgmp.so.3" lddOut
+  where
+    hasLineWithFirstWord w =
+        elem (Just w) .
+        map (headMay . T.words) . T.lines . decodeUtf8With lenientDecode
 
 -- | Get the directory on Windows where we should install extra programs. For
 -- more information, see discussion at:
@@ -193,13 +238,29 @@ getWindowsProgsDir stackRoot m =
             return $ lad </> $(mkRelDir "Programs")
         Nothing -> return $ stackRoot </> $(mkRelDir "Programs")
 
-data MiniConfig = MiniConfig Manager Config
+-- | An environment with a subset of BuildConfig used for setup.
+data MiniConfig = MiniConfig Manager GHCVariant Config
 instance HasConfig MiniConfig where
-    getConfig (MiniConfig _ c) = c
+    getConfig (MiniConfig _ _ c) = c
 instance HasStackRoot MiniConfig
 instance HasHttpManager MiniConfig where
-    getHttpManager (MiniConfig man _) = man
+    getHttpManager (MiniConfig man _ _) = man
 instance HasPlatform MiniConfig
+instance HasGHCVariant MiniConfig where
+    getGHCVariant (MiniConfig _ v _) = v
+
+-- | Load the 'MiniConfig'.
+loadMiniConfig
+    :: (MonadIO m, HasHttpManager a, MonadReader a m, MonadBaseControl IO m, MonadCatch m, MonadLogger m)
+    => Config -> m MiniConfig
+loadMiniConfig config = do
+    menv <- liftIO $ configEnvOverride config minimalEnvSettings
+    manager <- getHttpManager <$> ask
+    ghcVariant <-
+        case configGHCVariant0 config of
+            Just ghcVariant -> return ghcVariant
+            Nothing -> getDefaultGHCVariant menv (configPlatform config)
+    return (MiniConfig manager ghcVariant config)
 
 -- | Load the configuration, using current directory, environment variables,
 -- and defaults as necessary.
@@ -211,17 +272,25 @@ loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadThrow m,MonadBaseContro
            -> m (LoadConfig m)
 loadConfig configArgs mstackYaml = do
     stackRoot <- determineStackRoot
-    extraConfigs <- getExtraConfigs stackRoot >>= mapM loadYaml
+    userConfigPath <- getDefaultUserConfigPath stackRoot
+    extraConfigs0 <- getExtraConfigs userConfigPath >>= mapM loadYaml
+    let extraConfigs =
+            -- non-project config files' existence of a docker section should never default docker
+            -- to enabled, so make it look like they didn't exist
+            map (\c -> c {configMonoidDockerOpts =
+                              (configMonoidDockerOpts c) {dockerMonoidDefaultEnable = False}})
+                extraConfigs0
     mproject <- loadProjectConfig mstackYaml
-    config <- configFromConfigMonoid stackRoot (fmap (\(proj, _, _) -> proj) mproject) $ mconcat $
+    let mproject' = (\(project, stackYaml, _) -> (project, stackYaml)) <$> mproject
+    config <- configFromConfigMonoid stackRoot userConfigPath mproject' $ mconcat $
         case mproject of
             Nothing -> configArgs : extraConfigs
             Just (_, _, projectConfig) -> configArgs : projectConfig : extraConfigs
     unless (fromCabalVersion Meta.version `withinRange` configRequireStackVersion config)
         (throwM (BadStackVersionException (configRequireStackVersion config)))
-    return $ LoadConfig
+    return LoadConfig
         { lcConfig          = config
-        , lcLoadBuildConfig = loadBuildConfig mproject config stackRoot
+        , lcLoadBuildConfig = loadBuildConfig mproject config
         , lcProjectRoot     = fmap (\(_, fp, _) -> parent fp) mproject
         }
 
@@ -230,19 +299,20 @@ loadConfig configArgs mstackYaml = do
 loadBuildConfig :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env, MonadBaseControl IO m, HasTerminal env)
                 => Maybe (Project, Path Abs File, ConfigMonoid)
                 -> Config
-                -> Path Abs Dir
                 -> Maybe AbstractResolver -- override resolver
+                -> Maybe CompilerVersion -- override compiler
                 -> m BuildConfig
-loadBuildConfig mproject config stackRoot mresolver = do
+loadBuildConfig mproject config mresolver mcompiler = do
     env <- ask
-    let miniConfig = MiniConfig (getHttpManager env) config
+    miniConfig <- loadMiniConfig config
+
     (project', stackYamlFP) <- case mproject of
       Just (project, fp, _) -> return (project, fp)
       Nothing -> do
-            $logInfo "Run from outside a project, using implicit global config"
+            $logInfo "Run from outside a project, using implicit global project config"
+            destDir <- getImplicitGlobalProjectDir config
             let dest :: Path Abs File
                 dest = destDir </> stackDotYaml
-                destDir = implicitGlobalDir stackRoot
                 dest' :: FilePath
                 dest' = toFilePath dest
             createTree destDir
@@ -254,7 +324,7 @@ loadBuildConfig mproject config stackRoot mresolver = do
                        case mresolver of
                            Nothing ->
                                $logInfo ("Using resolver: " <> resolverName (projectResolver project) <>
-                                         " from global config file: " <> T.pack dest')
+                                         " from implicit global project's config file: " <> T.pack dest')
                            Just aresolver -> do
                                let name =
                                         case aresolver of
@@ -269,35 +339,56 @@ loadBuildConfig mproject config stackRoot mresolver = do
                else do
                    r <- runReaderT getLatestResolver miniConfig
                    $logInfo ("Using latest snapshot resolver: " <> resolverName r)
-                   $logInfo ("Writing global (non-project-specific) config file to: " <> T.pack dest')
+                   $logInfo ("Writing implicit global project config file to: " <> T.pack dest')
                    $logInfo "Note: You can change the snapshot via the resolver field there."
                    let p = Project
                            { projectPackages = mempty
                            , projectExtraDeps = mempty
                            , projectFlags = mempty
                            , projectResolver = r
+                           , projectCompiler = Nothing
+                           , projectExtraPackageDBs = []
                            }
-                   liftIO $ Yaml.encodeFile dest' p
+                   liftIO $ do
+                       S.writeFile dest' $ S.concat
+                           [ "# This is the implicit global project's config file, which is only used when\n"
+                           , "# 'stack' is run outside of a real project.  Settings here do _not_ act as\n"
+                           , "# defaults for all projects.  To change stack's default settings, edit\n"
+                           , "# '", encodeUtf8 (T.pack $ toFilePath $ configUserConfigPath config), "' instead.\n"
+                           , "#\n"
+                           , "# For more information about stack's configuration, see\n"
+                           , "# https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md\n"
+                           , "#\n"
+                           , Yaml.encode p]
+                       S.writeFile (toFilePath $ parent dest </> $(mkRelFile "README.txt")) $ S.concat
+                           [ "This is the implicit global project, which is used only when 'stack' is run\n"
+                           , "outside of a real project.\n" ]
                    return (p, dest)
     resolver <-
         case mresolver of
             Nothing -> return $ projectResolver project'
-            Just aresolver -> do
-                manager <- asks getHttpManager
-                runReaderT
-                    (makeConcreteResolver aresolver)
-                    (MiniConfig manager config)
-    let project = project' { projectResolver = resolver }
+            Just aresolver ->
+                runReaderT (makeConcreteResolver aresolver) miniConfig
+    let project = project'
+            { projectResolver = resolver
+            , projectCompiler = mcompiler <|> projectCompiler project'
+            }
 
     wantedCompiler <-
-        case projectResolver project of
-            ResolverSnapshot snapName -> do
-                mbp <- runReaderT (loadMiniBuildPlan snapName) miniConfig
-                return $ mbpCompilerVersion mbp
-            ResolverCustom _name url -> do
-                mbp <- runReaderT (parseCustomMiniBuildPlan stackYamlFP url) miniConfig
-                return $ mbpCompilerVersion mbp
-            ResolverCompiler wantedCompiler -> return wantedCompiler
+        case projectCompiler project of
+            Just wantedCompiler -> return wantedCompiler
+            Nothing -> case projectResolver project of
+                ResolverSnapshot snapName -> do
+                    mbp <- runReaderT (loadMiniBuildPlan snapName) miniConfig
+                    return $ mbpCompilerVersion mbp
+                ResolverCustom _name url -> do
+                    mbp <- runReaderT (parseCustomMiniBuildPlan stackYamlFP url) miniConfig
+                    return $ mbpCompilerVersion mbp
+                ResolverCompiler wantedCompiler -> return wantedCompiler
+
+    extraPackageDBs <- mapM parseRelAsAbsDir (projectExtraPackageDBs project)
+
+    packageCaches <- runReaderT (getMinimalEnvOverride >>= getPackageCaches) miniConfig
 
     return BuildConfig
         { bcConfig = config
@@ -305,9 +396,12 @@ loadBuildConfig mproject config stackRoot mresolver = do
         , bcWantedCompiler = wantedCompiler
         , bcPackageEntries = projectPackages project
         , bcExtraDeps = projectExtraDeps project
+        , bcExtraPackageDBs = extraPackageDBs
         , bcStackYaml = stackYamlFP
         , bcFlags = projectFlags project
         , bcImplicitGlobal = isNothing mproject
+        , bcGHCVariant = getGHCVariant miniConfig
+        , bcPackageCaches = packageCaches
         }
 
 -- | Resolve a PackageEntry into a list of paths, downloading and cloning as
@@ -327,7 +421,7 @@ resolvePackageEntry menv projRoot pe = do
             subs -> mapM (resolveDir entryRoot) subs
     case peValidWanted pe of
         Nothing -> return ()
-        Just _ -> $logWarn "Warning: you are using the deprecated valid-wanted field. You should instead use extra-dep. See: https://github.com/commercialhaskell/stack/wiki/stack.yaml#packages"
+        Just _ -> $logWarn "Warning: you are using the deprecated valid-wanted field. You should instead use extra-dep. See: https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md#packages"
     return $ map (, not $ peExtraDep pe) paths
 
 -- | Resolve a PackageLocation into a path, downloading and cloning as
@@ -340,10 +434,18 @@ resolvePackageLocation
     -> PackageLocation
     -> m (Path Abs Dir)
 resolvePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
-resolvePackageLocation _ projRoot (PLHttpTarball url) = do
-    let name = T.unpack $ decodeUtf8 $ B16.encode $ SHA256.hash $ encodeUtf8 url
+resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
+    let nameBeforeHashing = case remotePackageType of
+            RPTHttpTarball -> url
+            RPTGit commit  -> T.unwords [url, commit]
+            RPTHg  commit  -> T.unwords [url, commit, "hg"]
+        name = T.unpack $ decodeUtf8 $ B16.encode $ SHA256.hash $ encodeUtf8 nameBeforeHashing
         root = projRoot </> workDirRel </> $(mkRelDir "downloaded")
-    fileRel <- parseRelFile $ name ++ ".tar.gz"
+        fileExtension = case remotePackageType of
+            RPTHttpTarball -> ".tar.gz"
+            _              -> ".unused"
+
+    fileRel <- parseRelFile $ name ++ fileExtension
     dirRel <- parseRelDir name
     dirRelTmp <- parseRelDir $ name ++ ".tmp"
     let file = root </> fileRel
@@ -352,51 +454,46 @@ resolvePackageLocation _ projRoot (PLHttpTarball url) = do
 
     exists <- dirExists dir
     unless exists $ do
-        req <- parseUrl $ T.unpack url
-        _ <- download req file
-
         removeTreeIfExists dirTmp
-        liftIO $ withBinaryFile (toFilePath file) ReadMode $ \h -> do
-            lbs <- L.hGetContents h
-            let entries = Tar.read $ GZip.decompress lbs
-            Tar.unpack (toFilePath dirTmp) entries
-            renameDir dirTmp dir
 
-    x <- listDirectory dir
-    case x of
-        ([dir'], []) -> return dir'
-        (dirs, files) -> do
-            removeFileIfExists file
-            removeTreeIfExists dir
-            throwM $ UnexpectedTarballContents dirs files
+        let cloneAndExtract commandName resetCommand commit = do
+                createTree (parent dirTmp)
+                readInNull (parent dirTmp) commandName menv
+                    [ "clone"
+                    , T.unpack url
+                    , toFilePathNoTrailingSep dirTmp
+                    ]
+                    Nothing
+                readInNull dirTmp commandName menv
+                    (resetCommand ++ [T.unpack commit])
+                    Nothing
 
-resolvePackageLocation menv projRoot (PLGit url commit) = do
-    let name = T.unpack $ decodeUtf8 $ B16.encode $ SHA256.hash $ encodeUtf8 $ T.unwords [url, commit]
-        root = projRoot </> workDirRel </> $(mkRelDir "downloaded")
-    dirRel <- parseRelDir $ name ++ ".git"
-    dirRelTmp <- parseRelDir $ name ++ ".git.tmp"
-    let dir = root </> dirRel
-        dirTmp = root </> dirRelTmp
+        case remotePackageType of
+            RPTHttpTarball -> do
+                req <- parseUrl $ T.unpack url
+                _ <- download req file
 
-    exists <- dirExists dir
-    unless exists $ do
-        removeTreeIfExists dirTmp
-        createTree (parent dirTmp)
-        readInNull (parent dirTmp) "git" menv
-            [ "clone"
-            , T.unpack url
-            , toFilePath dirTmp
-            ]
-            Nothing
-        readInNull dirTmp "git" menv
-            [ "reset"
-            , "--hard"
-            , T.unpack commit
-            ]
-            Nothing
+                liftIO $ withBinaryFile (toFilePath file) ReadMode $ \h -> do
+                    lbs <- L.hGetContents h
+                    let entries = Tar.read $ GZip.decompress lbs
+                    Tar.unpack (toFilePath dirTmp) entries
+
+            RPTGit commit -> cloneAndExtract "git" ["reset", "--hard"] commit
+            RPTHg  commit -> cloneAndExtract "hg"  ["update", "-C"]    commit
+
         renameDir dirTmp dir
 
-    return dir
+    case remotePackageType of
+        RPTHttpTarball -> do
+            x <- listDirectory dir
+            case x of
+                ([dir'], []) -> return dir'
+                (dirs, files) -> do
+                    removeFileIfExists file
+                    removeTreeIfExists dir
+                    throwM $ UnexpectedTarballContents dirs files
+
+        _ -> return dir
 
 -- | Get the stack root, e.g. ~/.stack
 determineStackRoot :: (MonadIO m, MonadThrow m) => m (Path Abs Dir)
@@ -415,10 +512,12 @@ determineStackRoot = do
 -- | Determine the extra config file locations which exist.
 --
 -- Returns most local first
-getExtraConfigs :: MonadIO m
-                => Path Abs Dir -- ^ stack root
+getExtraConfigs :: (MonadIO m, MonadLogger m)
+                => Path Abs File -- ^ use config path
                 -> m [Path Abs File]
-getExtraConfigs stackRoot = liftIO $ do
+getExtraConfigs userConfigPath = do
+  defaultStackGlobalConfigPath <- getDefaultGlobalConfigPath
+  liftIO $ do
     env <- getEnvironment
     mstackConfig <-
         maybe (return Nothing) (fmap Just . parseAbsFile)
@@ -427,8 +526,8 @@ getExtraConfigs stackRoot = liftIO $ do
         maybe (return Nothing) (fmap Just . parseAbsFile)
       $ lookup "STACK_GLOBAL_CONFIG" env
     filterM fileExists
-        $ fromMaybe (stackRoot </> stackDotYaml) mstackConfig
-        : maybe [] return (mstackGlobalConfig <|> defaultStackGlobalConfig)
+        $ fromMaybe userConfigPath mstackConfig
+        : maybe [] return (mstackGlobalConfig <|> defaultStackGlobalConfigPath)
 
 -- | Load and parse YAML from the given file.
 loadYaml :: (FromJSON (a, [JSONWarning]), MonadIO m, MonadLogger m) => Path Abs File -> m a
@@ -496,6 +595,47 @@ loadProjectConfig mstackYaml = do
     load fp = do
         ProjectAndConfigMonoid project config <- loadYaml fp
         return $ Just (project, fp, config)
+
+-- | Get the location of the default stack configuration file.
+-- If a file already exists at the deprecated location, its location is returned.
+-- Otherwise, the new location is returned.
+getDefaultGlobalConfigPath
+    :: (MonadIO m, MonadLogger m)
+    => m (Maybe (Path Abs File))
+getDefaultGlobalConfigPath =
+    case (defaultGlobalConfigPath, defaultGlobalConfigPathDeprecated) of
+        (Just new,Just old) ->
+            liftM (Just . fst ) $
+            tryDeprecatedPath
+                (Just "non-project global configuration file")
+                fileExists
+                new
+                old
+        (Just new,Nothing) -> return (Just new)
+        _ -> return Nothing
+
+-- | Get the location of the default user configuration file.
+-- If a file already exists at the deprecated location, its location is returned.
+-- Otherwise, the new location is returned.
+getDefaultUserConfigPath
+    :: (MonadIO m, MonadLogger m)
+    => Path Abs Dir -> m (Path Abs File)
+getDefaultUserConfigPath stackRoot = do
+    (path, exists) <- tryDeprecatedPath
+        (Just "non-project configuration file")
+        fileExists
+        (defaultUserConfigPath stackRoot)
+        (defaultUserConfigPathDeprecated stackRoot)
+    unless exists $ do
+        createTree (parent path)
+        liftIO $ S.writeFile (toFilePath path) $ S.concat
+            [ "# This file contains default non-project-specific settings for 'stack', used\n"
+            , "# in all projects.  For more information about stack's configuration, see\n"
+            , "# https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md\n"
+            , "#\n"
+            , Yaml.encode (mempty :: Object) ]
+    return path
+
 
 packagesParser :: Parser [String]
 packagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))

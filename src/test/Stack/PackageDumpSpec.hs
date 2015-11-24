@@ -80,8 +80,10 @@ spec = do
                 , dpLibraries = ["HShaskell2010-1.1.2.0"]
                 , dpHasExposedModules = True
                 , dpHaddockInterfaces = ["/opt/ghc/7.8.4/share/doc/ghc/html/libraries/haskell2010-1.1.2.0/haskell2010.haddock"]
+                , dpHaddockHtml = Just "/opt/ghc/7.8.4/share/doc/ghc/html/libraries/haskell2010-1.1.2.0"
                 , dpProfiling = ()
                 , dpHaddock = ()
+                , dpIsExposed = False
                 }
 
         it "ghc 7.10" $ do
@@ -112,11 +114,13 @@ spec = do
                 , dpPackageIdent = pkgIdent
                 , dpLibDirs = ["/opt/ghc/7.10.1/lib/ghc-7.10.1/ghc_EMlWrQ42XY0BNVbSrKixqY"]
                 , dpHaddockInterfaces = ["/opt/ghc/7.10.1/share/doc/ghc/html/libraries/ghc-7.10.1/ghc.haddock"]
+                , dpHaddockHtml = Just "/opt/ghc/7.10.1/share/doc/ghc/html/libraries/ghc-7.10.1"
                 , dpDepends = depends
                 , dpLibraries = ["HSghc-7.10.1-EMlWrQ42XY0BNVbSrKixqY"]
                 , dpHasExposedModules = True
                 , dpProfiling = ()
                 , dpHaddock = ()
+                , dpIsExposed = False
                 }
         it "ghc 7.8.4 (osx)" $ do
             hmatrix:_ <- runResourceT
@@ -144,18 +148,20 @@ spec = do
                       , "/usr/local/lib/"
                       ,  "C:/Program Files/Example/"]
                 , dpHaddockInterfaces = ["/Users/alexbiehl/.stack/snapshots/x86_64-osx/lts-2.13/7.8.4/doc/html/hmatrix.haddock"]
+                , dpHaddockHtml = Just "/Users/alexbiehl/.stack/snapshots/x86_64-osx/lts-2.13/7.8.4/doc/html"
                 , dpDepends = depends
                 , dpLibraries = ["HShmatrix-0.16.1.5"]
                 , dpHasExposedModules = True
                 , dpProfiling = ()
                 , dpHaddock = ()
+                , dpIsExposed = True
                 }
 
     it "ghcPkgDump + addProfiling + addHaddock" $ (id :: IO () -> IO ()) $ runNoLoggingT $ do
         menv' <- getEnvOverride buildPlatform
         menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
         icache <- newInstalledCache
-        ghcPkgDump menv Ghc Nothing
+        ghcPkgDump menv Ghc []
             $  conduitDumpPackage
             =$ addProfiling icache
             =$ addHaddock icache
@@ -165,7 +171,7 @@ spec = do
         menv' <- getEnvOverride buildPlatform
         menv <- mkEnvOverride buildPlatform $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv'
         icache <- newInstalledCache
-        m <- runNoLoggingT $ ghcPkgDump menv Ghc Nothing
+        m <- runNoLoggingT $ ghcPkgDump menv Ghc []
             $  conduitDumpPackage
             =$ addProfiling icache
             =$ addHaddock icache

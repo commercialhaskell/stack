@@ -24,6 +24,7 @@ import           Stack.Types
 
 data ActionType
     = ATBuild
+    | ATBuildFinal
     | ATFinal
     deriving (Show, Eq, Ord)
 data ActionId = ActionId !PackageIdentifier !ActionType
@@ -94,7 +95,7 @@ runActions' ExecuteState {..} =
         if null as
             then return $ return ()
             else inner as
-    loop = join $ atomically $ breakOnErrs $ withActions $ \as -> do
+    loop = join $ atomically $ breakOnErrs $ withActions $ \as ->
         case break (Set.null . actionDeps) as of
             (_, []) -> do
                 inAction <- readTVar esInAction

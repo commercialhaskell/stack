@@ -23,19 +23,24 @@ import           Data.Map.Strict (Map)
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Set (Set)
+import qualified Data.Set as Set
 import           Data.Text (Text)
-import           Data.Text.Encoding (encodeUtf8)
+import qualified Data.Text as T
+import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
 import           Distribution.System (Platform (..))
+import           Distribution.Text (display)
 import           GHC.Generics
 import           Path as FL
 import           Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.FlagName
+import           Stack.Types.GhcPkgId
 import           Stack.Types.PackageName
+import           Stack.Types.PackageIdentifier
 import           Stack.Types.Version
 
 -- | All exceptions thrown by the library.
@@ -95,14 +100,26 @@ data Package =
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the .cabal file
 newtype GetPackageOpts = GetPackageOpts
-    { getPackageOpts :: forall env m. (MonadIO m,HasEnvConfig env, HasPlatform env, MonadThrow m, MonadReader env m)
+    { getPackageOpts :: forall env m. (MonadIO m,HasEnvConfig env, HasPlatform env, MonadThrow m, MonadReader env m, MonadLogger m, MonadCatch m)
                      => SourceMap
+                     -> InstalledMap
                      -> [PackageName]
                      -> Path Abs File
-                     -> m (Map NamedComponent [String],[String])
+                     -> m (Map NamedComponent (Set ModuleName)
+                          ,Map NamedComponent (Set DotCabalPath)
+                          ,Map NamedComponent BuildInfoOpts)
     }
 instance Show GetPackageOpts where
     show _ = "<GetPackageOpts>"
+
+-- | GHC options based on cabal information and ghc-options.
+data BuildInfoOpts = BuildInfoOpts
+    { bioOpts :: [String]
+    , bioOneWordOpts :: [String]
+    -- ^ These options can safely have 'nubOrd' applied to them, as
+    -- there are no multi-word options (see
+    -- https://github.com/commercialhaskell/stack/issues/1255)
+    } deriving Show
 
 -- | Files to get for a cabal package.
 data CabalFileType
@@ -116,10 +133,35 @@ newtype GetPackageFiles = GetPackageFiles
                       => Path Abs File
                       -> m (Map NamedComponent (Set ModuleName)
                            ,Map NamedComponent (Set DotCabalPath)
-                           ,Set (Path Abs File))
+                           ,Set (Path Abs File)
+                           ,[PackageWarning])
     }
 instance Show GetPackageFiles where
     show _ = "<GetPackageFiles>"
+
+-- | Warning generated when reading a package
+data PackageWarning
+    = UnlistedModulesWarning (Path Abs File) (Maybe String) [ModuleName]
+      -- ^ Modules found that are not listed in cabal file
+instance Show PackageWarning where
+    show (UnlistedModulesWarning cabalfp component [unlistedModule]) =
+        concat
+            [ "module not listed in "
+            , toFilePath (filename cabalfp)
+            , case component of
+                   Nothing -> " for library"
+                   Just c -> " for '" ++ c ++ "'"
+            , " component (add to other-modules): "
+            , display unlistedModule]
+    show (UnlistedModulesWarning cabalfp component unlistedModules) =
+        concat
+            [ "modules not listed in "
+            , toFilePath (filename cabalfp)
+            , case component of
+                   Nothing -> " for library"
+                   Just c -> " for '" ++ c ++ "'"
+            , " component (add to other-modules):\n    "
+            , intercalate "\n    " (map display unlistedModules)]
 
 -- | Package build configuration
 data PackageConfig =
@@ -162,41 +204,40 @@ class PackageInstallInfo a where
     piiVersion :: a -> Version
     piiLocation :: a -> InstallLocation
 
--- | Second-stage build information: tests and benchmarks
-data LocalPackageTB = LocalPackageTB
-    { lptbPackage :: !Package
-    -- ^ Package resolved with dependencies for tests and benchmarks, depending
-    -- on which components are active
-    , lptbTests   :: !(Set Text)
-    -- ^ Test components
-    , lptbBenches :: !(Set Text)
-    -- ^ Benchmark components
-    }
-    deriving Show
-
 -- | Information on a locally available package of source code
 data LocalPackage = LocalPackage
-    { lpPackage        :: !Package         -- ^ The @Package@ info itself, after resolution with package flags, not including any tests or benchmarks
-    , lpTestDeps       :: !(Map PackageName VersionRange)
-    -- ^ Used for determining if we can use --enable-tests in a normal build
-    , lpBenchDeps      :: !(Map PackageName VersionRange)
-    -- ^ Used for determining if we can use --enable-benchmarks in a normal build
-    , lpExeComponents  :: !(Maybe (Set Text)) -- ^ Executable components to build, Nothing if not a target
-
-    , lpTestBench      :: !(Maybe LocalPackageTB)
-
-    , lpDir            :: !(Path Abs Dir)  -- ^ Directory of the package.
-    , lpCabalFile      :: !(Path Abs File) -- ^ The .cabal file
-    , lpDirtyFiles     :: !Bool            -- ^ are there files that have changed since the last build?
-    , lpNewBuildCache  :: !(Map FilePath FileCacheInfo) -- ^ current state of the files
-    , lpFiles          :: !(Set (Path Abs File)) -- ^ all files used by this package
-    , lpComponents     :: !(Set NamedComponent)
+    { lpPackage       :: !Package
+    -- ^ The @Package@ info itself, after resolution with package flags,
+    -- with tests and benchmarks disabled
+    , lpComponents    :: !(Set NamedComponent)
+    -- ^ Components to build, not including the library component.
+    , lpUnbuildable   :: !(Set NamedComponent)
+    -- ^ Components explicitly requested for build, that are marked
+    -- "buildable: false".
+    , lpWanted        :: !Bool
+    -- ^ Whether this package is wanted as a target.
+    , lpTestDeps      :: !(Map PackageName VersionRange)
+    -- ^ Used for determining if we can use --enable-tests in a normal build.
+    , lpBenchDeps     :: !(Map PackageName VersionRange)
+    -- ^ Used for determining if we can use --enable-benchmarks in a normal
+    -- build.
+    , lpTestBench     :: !(Maybe Package)
+    -- ^ This stores the 'Package' with tests and benchmarks enabled, if
+    -- either is asked for by the user.
+    , lpDir           :: !(Path Abs Dir)
+    -- ^ Directory of the package.
+    , lpCabalFile     :: !(Path Abs File)
+    -- ^ The .cabal file
+    , lpDirtyFiles    :: !(Maybe (Set FilePath))
+    -- ^ Nothing == not dirty, Just == dirty. Note that the Set may be empty if
+    -- we forced the build to treat packages as dirty. Also, the Set may not
+    -- include all modified files.
+    , lpNewBuildCache :: !(Map FilePath FileCacheInfo)
+    -- ^ current state of the files
+    , lpFiles         :: !(Set (Path Abs File))
+    -- ^ all files used by this package
     }
     deriving Show
-
--- | Is the given local a target
-lpWanted :: LocalPackage -> Bool
-lpWanted lp = isJust (lpExeComponents lp) || isJust (lpTestBench lp)
 
 -- | A single, fully resolved component of a package
 data NamedComponent
@@ -212,6 +253,46 @@ renderComponent (CExe x) = "exe:" <> encodeUtf8 x
 renderComponent (CTest x) = "test:" <> encodeUtf8 x
 renderComponent (CBench x) = "bench:" <> encodeUtf8 x
 
+renderPkgComponents :: [(PackageName, NamedComponent)] -> Text
+renderPkgComponents = T.intercalate " " . map renderPkgComponent
+
+renderPkgComponent :: (PackageName, NamedComponent) -> Text
+renderPkgComponent (pkg, comp) = packageNameText pkg <> ":" <> decodeUtf8 (renderComponent comp)
+
+exeComponents :: Set NamedComponent -> Set Text
+exeComponents = Set.fromList . mapMaybe mExeName . Set.toList
+  where
+    mExeName (CExe name) = Just name
+    mExeName _ = Nothing
+
+testComponents :: Set NamedComponent -> Set Text
+testComponents = Set.fromList . mapMaybe mTestName . Set.toList
+  where
+    mTestName (CTest name) = Just name
+    mTestName _ = Nothing
+
+benchComponents :: Set NamedComponent -> Set Text
+benchComponents = Set.fromList . mapMaybe mBenchName . Set.toList
+  where
+    mBenchName (CBench name) = Just name
+    mBenchName _ = Nothing
+
+isCLib :: NamedComponent -> Bool
+isCLib CLib{} = True
+isCLib _ = False
+
+isCExe :: NamedComponent -> Bool
+isCExe CExe{} = True
+isCExe _ = False
+
+isCTest :: NamedComponent -> Bool
+isCTest CTest{} = True
+isCTest _ = False
+
+isCBench :: NamedComponent -> Bool
+isCBench CBench{} = True
+isCBench _ = False
+
 -- | A location to install a package into, either snapshot or local
 data InstallLocation = Snap | Local
     deriving (Show, Eq)
@@ -221,6 +302,9 @@ instance Monoid InstallLocation where
     mappend _ Local = Local
     mappend Snap Snap = Snap
 
+data InstalledPackageLocation = InstalledTo InstallLocation | ExtraGlobal
+    deriving (Show, Eq)
+
 data FileCacheInfo = FileCacheInfo
     { fciModTime :: !ModTime
     , fciSize :: !Word64
@@ -228,12 +312,15 @@ data FileCacheInfo = FileCacheInfo
     }
     deriving (Generic, Show)
 instance Binary FileCacheInfo
-instance NFData FileCacheInfo where
-    rnf = genericRnf
+instance HasStructuralInfo FileCacheInfo
+instance NFData FileCacheInfo
 
 -- | Used for storage and comparison.
 newtype ModTime = ModTime (Integer,Rational)
   deriving (Ord,Show,Generic,Eq,NFData,Binary)
+
+instance HasStructuralInfo ModTime
+instance HasSemanticVersion ModTime
 
 -- | A descriptor from a .cabal file indicating one of the following:
 --
@@ -246,7 +333,8 @@ data DotCabalDescriptor
     = DotCabalModule !ModuleName
     | DotCabalMain !FilePath
     | DotCabalFile !FilePath
-    deriving (Eq,Ord)
+    | DotCabalCFile !FilePath
+    deriving (Eq,Ord,Show)
 
 -- | Maybe get the module name from the .cabal descriptor.
 dotCabalModule :: DotCabalDescriptor -> Maybe ModuleName
@@ -264,7 +352,8 @@ data DotCabalPath
     = DotCabalModulePath !(Path Abs File)
     | DotCabalMainPath !(Path Abs File)
     | DotCabalFilePath !(Path Abs File)
-    deriving (Eq,Ord)
+    | DotCabalCFilePath !(Path Abs File)
+    deriving (Eq,Ord,Show)
 
 -- | Get the module path.
 dotCabalModulePath :: DotCabalPath -> Maybe (Path Abs File)
@@ -276,6 +365,11 @@ dotCabalMainPath :: DotCabalPath -> Maybe (Path Abs File)
 dotCabalMainPath (DotCabalMainPath fp) = Just fp
 dotCabalMainPath _ = Nothing
 
+-- | Get the c file path.
+dotCabalCFilePath :: DotCabalPath -> Maybe (Path Abs File)
+dotCabalCFilePath (DotCabalCFilePath fp) = Just fp
+dotCabalCFilePath _ = Nothing
+
 -- | Get the path.
 dotCabalGetPath :: DotCabalPath -> Path Abs File
 dotCabalGetPath dcp =
@@ -283,3 +377,14 @@ dotCabalGetPath dcp =
         DotCabalModulePath fp -> fp
         DotCabalMainPath fp -> fp
         DotCabalFilePath fp -> fp
+        DotCabalCFilePath fp -> fp
+
+type InstalledMap = Map PackageName (InstallLocation, Installed)
+
+data Installed = Library PackageIdentifier GhcPkgId | Executable PackageIdentifier
+    deriving (Show, Eq, Ord)
+
+-- | Get the installed Version.
+installedVersion :: Installed -> Version
+installedVersion (Library (PackageIdentifier _ v) _) = v
+installedVersion (Executable (PackageIdentifier _ v)) = v

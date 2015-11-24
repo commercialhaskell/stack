@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
@@ -13,6 +12,7 @@ module Stack.PackageDump
     , DumpPackage (..)
     , conduitDumpPackage
     , ghcPkgDump
+    , ghcPkgDescribe
     , InstalledCache
     , InstalledCacheEntry (..)
     , newInstalledCache
@@ -42,17 +42,18 @@ import           Data.Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Either (partitionEithers)
-import qualified Data.Foldable as F
 import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (catMaybes)
+import           Data.Maybe (catMaybes, listToMaybe)
+import           Data.Maybe.Extra (mapMaybeM)
 import qualified Data.Set as Set
 import qualified Data.Text.Encoding as T
 import           Data.Typeable (Typeable)
 import           GHC.Generics (Generic)
 import           Path
 import           Path.IO (createTree)
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Prelude -- Fix AMP warning
 import           Stack.GhcPkg
 import           Stack.Types
@@ -62,10 +63,9 @@ import           System.Process.Read
 -- | Cached information on whether package have profiling libraries and haddocks.
 newtype InstalledCache = InstalledCache (IORef InstalledCacheInner)
 newtype InstalledCacheInner = InstalledCacheInner (Map GhcPkgId InstalledCacheEntry)
-    deriving (Binary, NFData)
-instance BinarySchema InstalledCacheInner where
-    -- Don't forget to update this if you change the datatype in any way!
-    binarySchema _ = 2
+    deriving (Binary, NFData, Generic)
+instance HasStructuralInfo InstalledCacheInner
+instance HasSemanticVersion InstalledCacheInner
 
 -- | Cached information on whether a package has profiling libraries and haddocks.
 data InstalledCacheEntry = InstalledCacheEntry
@@ -74,27 +74,52 @@ data InstalledCacheEntry = InstalledCacheEntry
     , installedCacheIdent :: !PackageIdentifier }
     deriving (Eq, Generic)
 instance Binary InstalledCacheEntry
-instance NFData InstalledCacheEntry where
-    rnf = genericRnf
+instance HasStructuralInfo InstalledCacheEntry
+instance NFData InstalledCacheEntry
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump
     :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
     => EnvOverride
     -> WhichCompiler
-    -> Maybe (Path Abs Dir) -- ^ if Nothing, use global
+    -> [Path Abs Dir] -- ^ if empty, use global
     -> Sink ByteString IO a
     -> m a
-ghcPkgDump menv wc mpkgDb sink = do
-    F.mapM_ (createDatabase menv wc) mpkgDb -- TODO maybe use some retry logic instead?
-    a <- sinkProcessStdout Nothing menv (ghcPkgExeName wc) args sink
-    return a
+ghcPkgDump = ghcPkgCmdArgs ["dump"]
+
+-- | Call ghc-pkg describe with appropriate flags and stream to the given @Sink@, for a single database
+ghcPkgDescribe
+    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+    => PackageName
+    -> EnvOverride
+    -> WhichCompiler
+    -> [Path Abs Dir] -- ^ if empty, use global
+    -> Sink ByteString IO a
+    -> m a
+ghcPkgDescribe pkgName = ghcPkgCmdArgs ["describe", "--simple-output", packageNameString pkgName]
+
+-- | Call ghc-pkg and stream to the given @Sink@, for a single database
+ghcPkgCmdArgs
+    :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+    => [String]
+    -> EnvOverride
+    -> WhichCompiler
+    -> [Path Abs Dir] -- ^ if empty, use global
+    -> Sink ByteString IO a
+    -> m a
+ghcPkgCmdArgs cmd menv wc mpkgDbs sink = do
+    case reverse mpkgDbs of
+        (pkgDb:_) -> createDatabase menv wc pkgDb -- TODO maybe use some retry logic instead?
+        _ -> return ()
+    sinkProcessStdout Nothing menv (ghcPkgExeName wc) args sink
   where
     args = concat
-        [ case mpkgDb of
-            Nothing -> ["--global", "--no-user-package-db"]
-            Just pkgdb -> ["--user", "--no-user-package-db", "--package-db", toFilePath pkgdb]
-        , ["dump", "--expand-pkgroot"]
+        [ case mpkgDbs of
+              [] -> ["--global", "--no-user-package-db"]
+              _ -> ["--user", "--no-user-package-db"] ++
+                  concatMap (\pkgDb -> ["--package-db", toFilePathNoTrailingSep pkgDb]) mpkgDbs
+        , cmd
+        , ["--expand-pkgroot"]
         ]
 
 -- | Create a new, empty @InstalledCache@
@@ -105,14 +130,14 @@ newInstalledCache = liftIO $ InstalledCache <$> newIORef (InstalledCacheInner Ma
 -- empty cache.
 loadInstalledCache :: (MonadLogger m, MonadIO m) => Path Abs File -> m InstalledCache
 loadInstalledCache path = do
-    m <- taggedDecodeOrLoad (toFilePath path) (return $ InstalledCacheInner Map.empty)
-    liftIO $ fmap InstalledCache $ newIORef m
+    m <- taggedDecodeOrLoad path (return $ InstalledCacheInner Map.empty)
+    liftIO $ InstalledCache <$> newIORef m
 
 -- | Save a @InstalledCache@ to disk
 saveInstalledCache :: MonadIO m => Path Abs File -> InstalledCache -> m ()
 saveInstalledCache path (InstalledCache ref) = liftIO $ do
     createTree (parent path)
-    readIORef ref >>= taggedEncodeFile (toFilePath path)
+    readIORef ref >>= taggedEncodeFile path
 
 -- | Prune a list of possible packages down to those whose dependencies are met.
 --
@@ -129,7 +154,7 @@ pruneDeps
     -> Map name item
 pruneDeps getName getId getDepends chooseBest =
       Map.fromList
-    . (map $ \item -> (getName $ getId item, item))
+    . fmap (getName . getId &&& id)
     . loop Set.empty Set.empty []
   where
     loop foundIds usedNames foundItems dps =
@@ -231,7 +256,7 @@ addHaddock (InstalledCache ref) =
             Nothing -> do
                 let loop [] = return False
                     loop (ifc:ifcs) = do
-                        exists <- doesFileExist (S8.unpack ifc)
+                        exists <- doesFileExist ifc
                         if exists
                             then return True
                             else loop ifcs
@@ -246,9 +271,11 @@ data DumpPackage profiling haddock = DumpPackage
     , dpLibraries :: ![ByteString]
     , dpHasExposedModules :: !Bool
     , dpDepends :: ![GhcPkgId]
-    , dpHaddockInterfaces :: ![ByteString]
+    , dpHaddockInterfaces :: ![FilePath]
+    , dpHaddockHtml :: !(Maybe FilePath)
     , dpProfiling :: !profiling
     , dpHaddock :: !haddock
+    , dpIsExposed :: !Bool
     }
     deriving (Show, Eq, Ord)
 
@@ -281,10 +308,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 _ -> throwM $ MissingSingleField k m
         -- Can't fail: if not found, same as an empty list. See:
         -- https://github.com/fpco/stack/issues/182
-        parseM k =
-            case Map.lookup k m of
-                Just vs -> vs
-                Nothing -> []
+        parseM k = Map.findWithDefault [] k m
 
         parseDepend :: MonadThrow m => ByteString -> m (Maybe GhcPkgId)
         parseDepend "builtin_rts" = return Nothing
@@ -307,16 +331,20 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
 
             -- if a package has no modules, these won't exist
             let libDirKey = "library-dirs"
-                libDirs = parseM libDirKey
                 libraries = parseM "hs-libraries"
                 exposedModules = parseM "exposed-modules"
-                haddockInterfaces = parseM "haddock-interfaces"
-            depends <- mapM parseDepend $ parseM "depends"
+                exposed = parseM "exposed"
+            depends <- mapMaybeM parseDepend $ parseM "depends"
 
-            libDirPaths <-
-                case mapM (P.parseOnly (argsParser NoEscaping) . T.decodeUtf8) libDirs of
-                    Left{} -> throwM (Couldn'tParseField libDirKey libDirs)
-                    Right dirs -> return (concat dirs)
+            let parseQuoted key =
+                    case mapM (P.parseOnly (argsParser NoEscaping) . T.decodeUtf8) val of
+                        Left{} -> throwM (Couldn'tParseField key val)
+                        Right dirs -> return (concat dirs)
+                  where
+                    val = parseM key
+            libDirPaths <- parseQuoted libDirKey
+            haddockInterfaces <- parseQuoted "haddock-interfaces"
+            haddockHtml <- parseQuoted "haddock-html"
 
             return $ Just DumpPackage
                 { dpGhcPkgId = ghcPkgId
@@ -324,10 +352,12 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 , dpLibDirs = libDirPaths
                 , dpLibraries = S8.words $ S8.unwords libraries
                 , dpHasExposedModules = not (null libraries || null exposedModules)
-                , dpDepends = catMaybes (depends :: [Maybe GhcPkgId])
-                , dpHaddockInterfaces = S8.words $ S8.unwords haddockInterfaces
+                , dpDepends = depends
+                , dpHaddockInterfaces = haddockInterfaces
+                , dpHaddockHtml = listToMaybe haddockHtml
                 , dpProfiling = ()
                 , dpHaddock = ()
+                , dpIsExposed = exposed == ["True"]
                 }
 
 stripPrefixBS :: ByteString -> ByteString -> Maybe ByteString

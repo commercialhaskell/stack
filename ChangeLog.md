@@ -1,18 +1,181 @@
+# Changelog
+
 ## Unreleased changes
 
 Major changes:
 
+Other enhancements:
+
+* Print latest applicable version of packages on conflicts
+  [#508](https://github.com/commercialhaskell/stack/issues/508)
+* Support for packages located in Mercurial repositories
+  [#1397](https://github.com/commercialhaskell/stack/issues/1397)
+
+Bug fixes:
+
+## 0.1.8.0
+
+Major changes:
+
+* GHCJS can now be used with stackage snapshots via the new `compiler` field.
+* Windows installers are now available:
+  [download them here](http://docs.haskellstack.org/en/stable/install_and_upgrade.html#windows)
+  [#613](https://github.com/commercialhaskell/stack/issues/613)
+* Docker integration works with non-FPComplete generated images
+  [#531](https://github.com/commercialhaskell/stack/issues/531)
+
+Other enhancements:
+
+* Added an `allow-newer` config option
+  [#922](https://github.com/commercialhaskell/stack/issues/922)
+  [#770](https://github.com/commercialhaskell/stack/issues/770)
+* When a Hackage revision invalidates a build plan in a snapshot, trust the
+  snapshot [#770](https://github.com/commercialhaskell/stack/issues/770)
+* Added a `stack config set resolver RESOLVER` command. Part of work on
+  [#115](https://github.com/commercialhaskell/stack/issues/115)
+* `stack setup` can now install GHCJS on windows. See
+  [#1145](https://github.com/commercialhaskell/stack/issues/1145) and
+  [#749](https://github.com/commercialhaskell/stack/issues/749)
+* `stack hpc report` command added, which generates reports for HPC tix files
+* `stack ghci` now accepts all the flags accepted by `stack build`. See
+  [#1186](https://github.com/commercialhaskell/stack/issues/1186)
+* `stack ghci` builds the project before launching GHCi. If the build fails,
+  optimistically launch GHCi anyway. Use `stack ghci --no-build` option to
+  disable [#1065](https://github.com/commercialhaskell/stack/issues/1065)
+* `stack ghci` now detects and warns about various circumstances where it is
+  liable to fail. See
+  [#1270](https://github.com/commercialhaskell/stack/issues/1270)
+* Added `require-docker-version` configuration option
+* Packages will now usually be built along with their tests and benchmarks. See
+  [#1166](https://github.com/commercialhaskell/stack/issues/1166)
+* Relative `local-bin-path` paths will be relative to the project's root
+  directory, not the current working directory.
+  [#1340](https://github.com/commercialhaskell/stack/issues/1340)
+* `stack clean` now takes an optional `[PACKAGE]` argument for use in
+  multi-package projects. See
+  [#583](https://github.com/commercialhaskell/stack/issues/583)
+* Ignore cabal_macros.h as a dependency
+  [#1195](https://github.com/commercialhaskell/stack/issues/1195)
+* Pad timestamps and show local time in --verbose output
+  [#1226](https://github.com/commercialhaskell/stack/issues/1226)
+* GHCi: Import all modules after loading them
+  [#995](https://github.com/commercialhaskell/stack/issues/995)
+* Add subcommand aliases: `repl` for `ghci`, and `runhaskell` for `runghc`
+  [#1241](https://github.com/commercialhaskell/stack/issues/1241)
+* Add typo recommendations for unknown package identifiers
+  [#158](https://github.com/commercialhaskell/stack/issues/158)
+* Add `stack path --local-hpc-root` option
+* Overhaul dependencies' haddocks copying
+  [#1231](https://github.com/commercialhaskell/stack/issues/1231)
+* Support for extra-package-dbs in 'stack ghci'
+  [#1229](https://github.com/commercialhaskell/stack/pull/1229)
+* `stack new` disallows package names with "words" consisting solely of numbers
+  [#1336](https://github.com/commercialhaskell/stack/issues/1336)
+* `stack build --fast` turns off optimizations
+
+Bug fixes:
+
+* Fix: Haddocks not copied for dependencies
+  [#1105](https://github.com/commercialhaskell/stack/issues/1105)
+* Fix: Global options did not work consistently after subcommand
+  [#519](https://github.com/commercialhaskell/stack/issues/519)
+* Fix: 'stack ghci' doesn't notice that a module got deleted
+  [#1180](https://github.com/commercialhaskell/stack/issues/1180)
+* Rebuild when cabal file is changed
+* Fix: Paths in GHC warnings not canonicalized, nor those for packages in
+  subdirectories or outside the project root
+  [#1259](https://github.com/commercialhaskell/stack/issues/1259)
+* Fix: unlisted files in tests and benchmarks trigger extraneous second build
+  [#838](https://github.com/commercialhaskell/stack/issues/838)
+
+## 0.1.6.0
+
+Major changes:
+
+* `stack setup` now supports building and booting GHCJS from source tarball.
+* On Windows, build directories no longer display "pretty" information
+  (like x86_64-windows/Cabal-1.22.4.0), but rather a hash of that
+  content. The reason is to avoid the 260 character path limitation on
+  Windows. See
+  [#1027](https://github.com/commercialhaskell/stack/pull/1027)
+* Rename config files and clarify their purposes [#969](https://github.com/commercialhaskell/stack/issues/969)
+    * `~/.stack/stack.yaml` --> `~/.stack/config.yaml`
+    * `~/.stack/global` --> `~/.stack/global-project`
+    * `/etc/stack/config` --> `/etc/stack/config.yaml`
+    * Old locations still supported, with deprecation warnings
+* New command "stack eval CODE", which evaluates to "stack exec ghc -- -e CODE".
+
+Other enhancements:
+
+* No longer install `git` on Windows
+  [#1046](https://github.com/commercialhaskell/stack/issues/1046). You
+  can still get this behavior by running the following yourself:
+  `stack exec -- pacman -Sy --noconfirm git`.
+* Typing enter during --file-watch triggers a rebuild [#1023](https://github.com/commercialhaskell/stack/pull/1023)
+* Use Haddock's `--hyperlinked-source` (crosslinked source), if available [#1070](https://github.com/commercialhaskell/stack/pull/1070)
+* Use Stack-installed GHCs for `stack init --solver` [#1072](https://github.com/commercialhaskell/stack/issues/1072)
+* New experimental `stack query` command [#1087](https://github.com/commercialhaskell/stack/issues/1087)
+* By default, stack no longer rebuilds a package due to GHC options changes. This behavior can be tweaked with the `rebuild-ghc-options` setting. [#1089](https://github.com/commercialhaskell/stack/issues/1089)
+* By default, ghc-options are applied to all local packages, not just targets. This behavior can be tweaked with the `apply-ghc-options` setting. [#1089](https://github.com/commercialhaskell/stack/issues/1089)
+* Docker: download or override location of stack executable to re-run in container [#974](https://github.com/commercialhaskell/stack/issues/974)
+* Docker: when Docker Engine is remote, don't run containerized processes as host's UID/GID [#194](https://github.com/commercialhaskell/stack/issues/194)
+* Docker: `set-user` option to enable/disable running containerized processes as host's UID/GID [#194](https://github.com/commercialhaskell/stack/issues/194)
+* Custom Setup.hs files are now precompiled instead of interpreted. This should be a major performance win for certain edge cases (biggest example: [building Cabal itself](https://github.com/commercialhaskell/stack/issues/1041)) while being either neutral or a minor slowdown for more common cases.
+* `stack test --coverage` now also generates a unified coverage report for multiple test-suites / packages.  In the unified report, test-suites can contribute to the coverage of other packages.
+
+Bug fixes:
+
+* Ignore stack-built executables named `ghc`
+  [#1052](https://github.com/commercialhaskell/stack/issues/1052)
+* Fix quoting of output failed command line arguments
+* Mark executable-only packages as installed when copied from cache [#1043](https://github.com/commercialhaskell/stack/pull/1043)
+* Canonicalize temporary directory paths [#1047](https://github.com/commercialhaskell/stack/pull/1047)
+* Put code page fix inside the build function itself [#1066](https://github.com/commercialhaskell/stack/issues/1066)
+* Add `explicit-setup-deps` option [#1110](https://github.com/commercialhaskell/stack/issues/1110), and change the default to the old behavior of using any package in the global and snapshot database [#1025](https://github.com/commercialhaskell/stack/issues/1025)
+* Precompiled cache checks full package IDs on Cabal < 1.22 [#1103](https://github.com/commercialhaskell/stack/issues/1103)
+* Pass -package-id to ghci [#867](https://github.com/commercialhaskell/stack/issues/867)
+* Ignore global packages when copying precompiled packages [#1146](https://github.com/commercialhaskell/stack/issues/1146)
+
+## 0.1.5.0
+
+Major changes:
+
 * On Windows, we now use a full MSYS2 installation in place of the previous PortableGit. This gives you access to the pacman package manager for more easily installing libraries.
+* Support for custom GHC binary distributions [#530](https://github.com/commercialhaskell/stack/issues/530)
+    * `ghc-variant` option in stack.yaml to specify the variant (also
+      `--ghc-variant` command-line option)
+    * `setup-info` in stack.yaml, to specify where to download custom binary
+      distributions (also `--ghc-bindist` command-line option)
+    * Note: On systems with libgmp4 (aka `libgmp.so.3`), such as CentOS 6, you
+      may need to re-run `stack setup` due to the centos6 GHC bindist being
+      treated like a variant
+* A new `--pvp-bounds` flag to the sdist and upload commands allows automatic adding of PVP upper and/or lower bounds to your dependencies
 
 Other enhancements:
 
 * Adapt to upcoming Cabal installed package identifier format change [#851](https://github.com/commercialhaskell/stack/issues/851)
 * `stack setup` takes a `--stack-setup-yaml` argument
 * `--file-watch` is more discerning about which files to rebuild for [#912](https://github.com/commercialhaskell/stack/issues/912)
+* `stack path` now supports `--global-pkg-db` and `--ghc-package-path`
+* `--reconfigure` flag [#914](https://github.com/commercialhaskell/stack/issues/914) [#946](https://github.com/commercialhaskell/stack/issues/946)
+* Cached data is written with a checksum of its structure [#889](https://github.com/commercialhaskell/stack/issues/889)
+* Fully removed `--optimizations` flag
+* Added `--cabal-verbose` flag
+* Added `--file-watch-poll` flag for polling instead of using filesystem events (useful for running tests in a Docker container while modifying code in the host environment. When code is injected into the container via a volume, the container won't propagate filesystem events).
+* Give a preemptive error message when `-prof` is given as a GHC option [#1015](https://github.com/commercialhaskell/stack/issues/1015)
+* Locking is now optional, and will be turned on by setting the `STACK_LOCK` environment variable to `true` [#950](https://github.com/commercialhaskell/stack/issues/950)
+* Create default stack.yaml with documentation comments and commented out options [#226](https://github.com/commercialhaskell/stack/issues/226)
+* Out of memory warning if Cabal exits with -9 [#947](https://github.com/commercialhaskell/stack/issues/947)
 
 Bug fixes:
 
 * Hacky workaround for optparse-applicative issue with `stack exec --help` [#806](https://github.com/commercialhaskell/stack/issues/806)
+* Build executables for local extra deps [#920](https://github.com/commercialhaskell/stack/issues/920)
+* copyFile can't handle directories [#942](https://github.com/commercialhaskell/stack/pull/942)
+* Support for spaces in Haddock interface files [fpco/minghc#85](https://github.com/fpco/minghc/issues/85)
+* Temporarily building against a "shadowing" local package? [#992](https://github.com/commercialhaskell/stack/issues/992)
+* Fix Setup.exe name for --upgrade-cabal on Windows [#1002](https://github.com/commercialhaskell/stack/issues/1002)
+* Unlisted dependencies no longer trigger extraneous second build [#838](https://github.com/commercialhaskell/stack/issues/838)
 
 ## 0.1.4.1
 
@@ -70,7 +233,7 @@ Major changes:
 * Respect TemplateHaskell addDependentFile dependency changes ([#105](https://github.com/commercialhaskell/stack/issues/105))
     * TH dependent files are taken into account when determining whether a package needs to be built.
 * Overhauled target parsing, added `--test` and `--bench` options [#651](https://github.com/commercialhaskell/stack/issues/651)
-    * For details, see [Build commands Wiki page](https://github.com/commercialhaskell/stack/wiki/Build-command)
+    * For details, see [Build commands documentation](http://docs.haskellstack.org/en/stable/build_command.html)
 
 Other enhancements:
 

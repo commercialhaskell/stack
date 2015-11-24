@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
+{-# LANGUAGE ConstraintKinds       #-}
 -- | Cache information about previous builds
 module Stack.Build.Cache
     ( tryGetBuildCache
@@ -20,12 +21,6 @@ module Stack.Build.Cache
     , setTestSuccess
     , unsetTestSuccess
     , checkTestSuccess
-    , setTestBuilt
-    , unsetTestBuilt
-    , checkTestBuilt
-    , setBenchBuilt
-    , unsetBenchBuilt
-    , checkBenchBuilt
     , writePrecompiledCache
     , readPrecompiledCache
     ) where
@@ -36,7 +31,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger)
 import           Control.Monad.Reader
 import qualified Crypto.Hash.SHA256 as SHA256
-import qualified Data.Binary as Binary
+import qualified Data.Binary as Binary (encode)
 import           Data.Binary.VersionTagged
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Base16 as B16
@@ -96,8 +91,9 @@ data BuildCache = BuildCache
     }
     deriving (Generic)
 instance Binary BuildCache
-instance NFData BuildCache where
-    rnf = genericRnf
+instance HasStructuralInfo BuildCache
+instance HasSemanticVersion BuildCache
+instance NFData BuildCache
 
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
@@ -115,11 +111,13 @@ tryGetCabalMod :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, Mo
 tryGetCabalMod = tryGetCache configCabalMod
 
 -- | Try to load a cache.
-tryGetCache :: (MonadIO m, Binary a, NFData a)
+tryGetCache :: (MonadIO m, BinarySchema a)
             => (Path Abs Dir -> m (Path Abs File))
             -> Path Abs Dir
             -> m (Maybe a)
-tryGetCache get' dir = get' dir >>= decodeFileOrFailDeep . toFilePath
+tryGetCache get' dir = do
+    fp <- get' dir
+    decodeFileOrFailDeep fp
 
 -- | Write the dirtiness cache for this package's files.
 writeBuildCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
@@ -128,9 +126,9 @@ writeBuildCache dir times =
     writeCache
         dir
         buildCacheFile
-        (BuildCache
+        BuildCache
          { buildCacheTimes = times
-         })
+         }
 
 -- | Write the dirtiness cache for this package's configuration.
 writeConfigCache :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, MonadLogger m, HasEnvConfig env)
@@ -158,14 +156,14 @@ deleteCaches dir = do
     removeFileIfExists cfp
 
 -- | Write to a cache.
-writeCache :: (Binary a, MonadIO m)
+writeCache :: (BinarySchema a, MonadIO m)
            => Path Abs Dir
            -> (Path Abs Dir -> m (Path Abs File))
            -> a
            -> m ()
 writeCache dir get' content = do
     fp <- get' dir
-    liftIO $ encodeFile (toFilePath fp) content
+    taggedEncodeFile fp content
 
 flagCacheFile :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
               => Installed
@@ -182,8 +180,9 @@ flagCacheFile installed = do
 tryGetFlagCache :: (MonadIO m, MonadThrow m, MonadReader env m, HasEnvConfig env)
                 => Installed
                 -> m (Maybe ConfigCache)
-tryGetFlagCache gid =
-    flagCacheFile gid >>= decodeFileOrFailDeep . toFilePath
+tryGetFlagCache gid = do
+    fp <- flagCacheFile gid
+    decodeFileOrFailDeep fp
 
 writeFlagCache :: (MonadIO m, MonadReader env m, HasEnvConfig env, MonadThrow m)
                => Installed
@@ -193,7 +192,7 @@ writeFlagCache gid cache = do
     file <- flagCacheFile gid
     liftIO $ do
         createTree (parent file)
-        encodeFile (toFilePath file) cache
+        taggedEncodeFile file cache
 
 -- | Mark a test suite as having succeeded
 setTestSuccess :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
@@ -224,64 +223,6 @@ checkTestSuccess dir =
         (fromMaybe False)
         (tryGetCache testSuccessFile dir)
 
--- | Mark a test suite as having built
-setTestBuilt :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
-               => Path Abs Dir
-               -> m ()
-setTestBuilt dir =
-    writeCache
-        dir
-        testBuiltFile
-        True
-
--- | Mark a test suite as not having built
-unsetTestBuilt :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
-                 => Path Abs Dir
-                 -> m ()
-unsetTestBuilt dir =
-    writeCache
-        dir
-        testBuiltFile
-        False
-
--- | Check if the test suite already built
-checkTestBuilt :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
-                 => Path Abs Dir
-                 -> m Bool
-checkTestBuilt dir =
-    liftM
-        (fromMaybe False)
-        (tryGetCache testBuiltFile dir)
-
--- | Mark a bench suite as having built
-setBenchBuilt :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
-               => Path Abs Dir
-               -> m ()
-setBenchBuilt dir =
-    writeCache
-        dir
-        benchBuiltFile
-        True
-
--- | Mark a bench suite as not having built
-unsetBenchBuilt :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
-                 => Path Abs Dir
-                 -> m ()
-unsetBenchBuilt dir =
-    writeCache
-        dir
-        benchBuiltFile
-        False
-
--- | Check if the bench suite already built
-checkBenchBuilt :: (MonadIO m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env, HasEnvConfig env)
-                 => Path Abs Dir
-                 -> m Bool
-checkBenchBuilt dir =
-    liftM
-        (fromMaybe False)
-        (tryGetCache benchBuiltFile dir)
-
 --------------------------------------
 -- Precompiled Cache
 --
@@ -296,17 +237,36 @@ checkBenchBuilt dir =
 precompiledCacheFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
                      => PackageIdentifier
                      -> ConfigureOpts
+                     -> Set GhcPkgId -- ^ dependencies
                      -> m (Path Abs File)
-precompiledCacheFile pkgident copts = do
+precompiledCacheFile pkgident copts installedPackageIDs = do
     ec <- asks getEnvConfig
 
-    compiler <- parseRelDir $ T.unpack $ compilerVersionName $ envConfigCompilerVersion ec
+    compiler <- parseRelDir $ compilerVersionString $ envConfigCompilerVersion ec
     cabal <- parseRelDir $ versionString $ envConfigCabalVersion ec
     pkg <- parseRelDir $ packageIdentifierString pkgident
 
+    -- In Cabal versions 1.22 and later, the configure options contain the
+    -- installed package IDs, which is what we need for a unique hash.
+    -- Unfortunately, earlier Cabals don't have the information, so we must
+    -- supplement it with the installed package IDs directly. In 20/20
+    -- hindsight, we would simply always do that, but previous Stack releases
+    -- used only the options, and we don't want to invalidate old caches
+    -- unnecessarily.
+    --
+    -- See issue: https://github.com/commercialhaskell/stack/issues/1103
+    let cacheInput
+            | envConfigCabalVersion ec >= $(mkVersion "1.22") =
+                Binary.encode $ coNoDirs copts
+            | otherwise =
+                Binary.encode
+                    ( coNoDirs copts
+                    , installedPackageIDs
+                    )
+
     -- We only pay attention to non-directory options. We don't want to avoid a
     -- cache hit just because it was installed in a different directory.
-    copts' <- parseRelFile $ S8.unpack $ B16.encode $ SHA256.hashlazy $ Binary.encode $ coNoDirs copts
+    copts' <- parseRelFile $ S8.unpack $ B16.encode $ SHA256.hashlazy cacheInput
 
     return $ getStackRoot ec
          </> $(mkRelDir "precompiled")
@@ -320,22 +280,23 @@ writePrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, Mon
                       => BaseConfigOpts
                       -> PackageIdentifier
                       -> ConfigureOpts
-                      -> Maybe GhcPkgId -- ^ library
+                      -> Set GhcPkgId -- ^ dependencies
+                      -> Installed -- ^ library
                       -> Set Text -- ^ executables
                       -> m ()
-writePrecompiledCache baseConfigOpts pkgident copts mghcPkgId exes = do
-    file <- precompiledCacheFile pkgident copts
+writePrecompiledCache baseConfigOpts pkgident copts depIDs mghcPkgId exes = do
+    file <- precompiledCacheFile pkgident copts depIDs
     createTree $ parent file
     mlibpath <-
         case mghcPkgId of
-            Nothing -> return Nothing
-            Just ipid -> liftM Just $ do
+            Executable _ -> return Nothing
+            Library _ ipid -> liftM Just $ do
                 ipid' <- parseRelFile $ ghcPkgIdString ipid ++ ".conf"
                 return $ toFilePath $ bcoSnapDB baseConfigOpts </> ipid'
     exes' <- forM (Set.toList exes) $ \exe -> do
         name <- parseRelFile $ T.unpack exe
         return $ toFilePath $ bcoSnapInstallRoot baseConfigOpts </> bindirSuffix </> name
-    liftIO $ encodeFile (toFilePath file) PrecompiledCache
+    liftIO $ taggedEncodeFile file PrecompiledCache
         { pcLibrary = mlibpath
         , pcExes = exes'
         }
@@ -345,7 +306,8 @@ writePrecompiledCache baseConfigOpts pkgident copts mghcPkgId exes = do
 readPrecompiledCache :: (MonadThrow m, MonadReader env m, HasEnvConfig env, MonadIO m)
                      => PackageIdentifier -- ^ target package
                      -> ConfigureOpts
+                     -> Set GhcPkgId -- ^ dependencies
                      -> m (Maybe PrecompiledCache)
-readPrecompiledCache pkgident copts = do
-    file <- precompiledCacheFile pkgident copts
-    decodeFileOrFailDeep $ toFilePath file
+readPrecompiledCache pkgident copts depIDs = do
+    file <- precompiledCacheFile pkgident copts depIDs
+    decodeFileOrFailDeep file

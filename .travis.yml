@@ -7,64 +7,91 @@
 # sane build environment. In CI, we want to make our life more difficult, so we
 # use cabal without any Stackage snapshots.
 #
+language: c
 sudo: false
 
 cache:
     directories:
         - $HOME/.ghc
         - $HOME/.cabal
-
-addons:
-    apt:
-        sources:
-            - hvr-ghc
-        packages:
-            - cabal-install-1.18
-            - cabal-install-1.22
-            - cabal-install-head
-            - ghc-7.8.4
-            - ghc-7.10.1
-            - ghc-7.10.2
-            - ghc-head
-
-env:
- - CABALVER=1.18 GHCVER=7.8.4
- - CABALVER=1.22 GHCVER=7.10.1
- - CABALVER=1.22 GHCVER=7.10.2
- - CABALVER=head GHCVER=head   # see section about GHC HEAD snapshots
+        - $HOME/.stack
 
 matrix:
+  include:
+    - env: BUILD=cabal CABALVER=1.18 GHCVER=7.8.4
+      compiler: ": #GHC 7.8.4"
+      addons: {apt: {packages: [cabal-install-1.18,ghc-7.8.4], sources: [hvr-ghc]}}
+
+    - env: BUILD=cabal CABALVER=1.22 GHCVER=7.10.1
+      compiler: ": #GHC 7.10.1"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.1], sources: [hvr-ghc]}}
+
+    - env: BUILD=cabal CABALVER=1.22 GHCVER=7.10.2
+      compiler: ": #GHC 7.10.2"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.2], sources: [hvr-ghc]}}
+
+    - env: BUILD=cabal CABALVER=1.22 GHCVER=7.10.3
+      compiler: ": #GHC 7.10.3"
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3], sources: [hvr-ghc]}}
+
+    - env: BUILD=stack GHCVER=7.8.4 STACK_YAML=stack-7.8.yaml
+      compiler: ": #stack 7.8.4"
+      addons: {apt: {packages: [cabal-install-head,ghc-7.8.4], sources: [hvr-ghc]}}
+
+    - env: BUILD=stack GHCVER=7.10.2 STACK_YAML=stack.yaml
+      compiler: ": #stack 7.10.2"
+      addons: {apt: {packages: [cabal-install-head,ghc-7.10.2], sources: [hvr-ghc]}}
+
+    - env: BUILD=cabal CABALVER=head GHCVER=head
+      compiler: ": #GHC head"
+      addons: {apt: {packages: [cabal-install-head,ghc-head], sources: [hvr-ghc]}}
+
+    - env: BUILD=stack STACK_YAML=stack.yaml
+      compiler: ": #stack 7.10.2 osx"
+      os: osx
+
   allow_failures:
-  - env: CABALVER=head GHCVER=head
+    - env: BUILD=cabal CABALVER=head GHCVER=head
 
 # Note: the distinction between `before_install` and `install` is not important.
+# - in before_install we install build tools
+# - in install we install (haskell) dependencies
 before_install:
- - export PATH=$HOME/.cabal/bin:/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
+ - unset CC
+ - case "$BUILD" in
+     stack)
+       export PATH=$HOME/.local/bin:/opt/ghc/$GHCVER/bin:$PATH;;
+     cabal)
+       export PATH=$HOME/.cabal/bin:/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH;;
+   esac
  - ./.travis-setup.sh
 
 install:
- - cabal --version
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
- - travis_retry cabal update
- - cabal install --only-dependencies --constraint="ignore +without-pcre" --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0
+ - case "$BUILD" in
+     stack)
+       stack --no-terminal test --only-dependencies;;
+     cabal)
+       cabal --version;
+       travis_retry cabal update;
+       cabal install --only-dependencies --constraint="ignore +without-pcre" --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0;;
+   esac
 
 script:
- - if [ -f configure.ac ]; then autoreconf -i; fi
- - cabal configure --enable-tests --enable-benchmarks -v2 --ghc-options="-O0 -Werror" # -v2 provides useful information for debugging
- - cabal build   # this builds all libraries and executables (including tests/benchmarks)
- - cabal test
- - cabal check
- - cabal sdist   # tests that a source-distribution can be generated
-
- - cabal copy
- - cd test/integration
- # Takes too long for now
- # - stack setup
- # - stack test
- - cd ../..
-
-# Check that the resulting source distribution can be built & installed.
-# If there are no other `.tar.gz` files in `dist`, this can be even simpler:
-# `cabal install --force-reinstalls dist/*-*.tar.gz`
- - SRC_TGZ=$(cabal info . | awk '{print $2;exit}').tar.gz &&
-   (cd dist && cabal install --force-reinstalls "$SRC_TGZ")
+ - case "$BUILD" in
+     stack)
+       stack --no-terminal test;;
+     cabal)
+       cabal configure --enable-tests --enable-benchmarks -v2 --ghc-options="-O0 -Werror";
+       cabal build;
+       cabal test;
+       cabal check;
+       cabal sdist;
+       cabal copy;
+       cd test/integration;
+       true stack setup;
+       true stack test;
+       cd ../..;
+       SRC_TGZ=$(cabal info . | awk '{print $2;exit}').tar.gz &&
+       (cd dist && cabal install --force-reinstalls "$SRC_TGZ");;
+   esac

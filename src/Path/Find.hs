@@ -1,5 +1,4 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 
 -- | Finding files.
 
@@ -23,7 +22,7 @@ findFileUp :: (MonadIO m,MonadThrow m)
            -> (Path Abs File -> Bool)     -- ^ Predicate to match the file.
            -> Maybe (Path Abs Dir)        -- ^ Do not ascend above this directory.
            -> m (Maybe (Path Abs File))  -- ^ Absolute file path.
-findFileUp s p d = findPathUp snd s p d
+findFileUp = findPathUp snd
 
 -- | Find the location of a directory matching the given predicate.
 findDirUp :: (MonadIO m,MonadThrow m)
@@ -31,7 +30,7 @@ findDirUp :: (MonadIO m,MonadThrow m)
           -> (Path Abs Dir -> Bool)      -- ^ Predicate to match the directory.
           -> Maybe (Path Abs Dir)        -- ^ Do not ascend above this directory.
           -> m (Maybe (Path Abs Dir))   -- ^ Absolute directory path.
-findDirUp s p d = findPathUp fst s p d
+findDirUp = findPathUp fst
 
 -- | Find the location of a path matching the given predicate.
 findPathUp :: (MonadIO m,MonadThrow m)
@@ -45,15 +44,9 @@ findPathUp pathType dir p upperBound =
   do entries <- listDirectory dir
      case find p (pathType entries) of
        Just path -> return (Just path)
-       Nothing ->
-         if Just dir == upperBound
-            then return Nothing
-            else if parent dir == dir
-                    then return Nothing
-                    else findPathUp pathType
-                                    (parent dir)
-                                    p
-                                    upperBound
+       Nothing | Just dir == upperBound -> return Nothing
+               | parent dir == dir -> return Nothing
+               | otherwise -> findPathUp pathType (parent dir) p upperBound
 
 -- | Find files matching predicate below a root directory.
 findFiles :: Path Abs Dir            -- ^ Root directory to begin with.

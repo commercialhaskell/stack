@@ -97,11 +97,11 @@ editReaderWriter filename writer reader =
 
 -- | Run editor on a ByteString.
 editByteString :: String -> ByteString -> IO ByteString
-editByteString f s = editReaderWriter f (flip hPut s) Data.ByteString.Lazy.readFile
+editByteString f s = editReaderWriter f (`hPut` s) Data.ByteString.Lazy.readFile
 
 -- | Run editor on a String.
 editString :: String -> String -> IO String
-editString f s = editReaderWriter f (flip hPutStr s) System.IO.readFile
+editString f s = editReaderWriter f (`hPutStr` s) System.IO.readFile
 
 -- | Short-circuit first Just.
 orElse :: (Monad m) => m (Maybe a) -> m (Maybe a) -> m (Maybe a)

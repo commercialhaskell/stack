@@ -1,24 +1,33 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 Vagrant.configure(2) do |config|
-  config.vm.box = "chef/centos-6.6"
-  config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__exclude: [".stack_work/", "_release/"]
+  config.vm.box = "puppetlabs/centos-6.6-64-nocm"
+  config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__exclude: [".stack_work/", "_release/"], rsync__args: ["--verbose", "--archive", "--delete", "-z"]
   config.vm.provider "virtualbox" do |vb|
-    vb.memory = "1024"
+    vb.memory = "2048"
   end
-  config.vm.provision "shell", run: "always", inline: <<-SHELL
+  config.ssh.forward_agent = true
+  config.vm.provision "shell", inline: <<-SHELL
     set -xe
     export PATH=/usr/local/bin:$PATH
-    yum -y install perl make automake gcc gmp-devel zlib-devel tar which git xz
-    if ! [[ -f /usr/local/bin/stack ]]; then
+    yum -y check-update || true
+    yum -y install epel-release
+    yum -y install perl make automake gcc gmp-devel zlib-devel rpm-build tar which git xz python-boto deltarpm python-deltarpm rpm-build rpm-sign ncurses-devel
+    if ! which stack; then
       curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/centos/6/fpco.repo >/etc/yum.repos.d/fpco.repo
-      yum -y install stack
+      yum -y check-update || true
     fi
-    if ! which cabal; then
-      pushd /vagrant
-      stack --install-ghc install cabal-install
-      cp `stack exec which cabal` /usr/local/bin/cabal
-      popd
+    yum -y install stack
+    if ! which fpm; then
+        yum -y install ruby-devel
+        yum -y install rubygems
+        gem install fpm --version '< 1.4.0'
+    fi
+    if ! [[ -d /opt/rpm-s3 ]]; then
+      mkdir -p /opt
+      git clone https://github.com/crohr/rpm-s3 /opt/rpm-s3
+      (cd /opt/rpm-s3 && git reset --hard c799bbfd7ad8efab6146a273c53cd19800dd6d70 && git submodule update --init)
+      echo 'export PATH="/opt/rpm-s3/bin:$PATH"' >/etc/profile.d/rpm-s3.sh
     fi
   SHELL
 end

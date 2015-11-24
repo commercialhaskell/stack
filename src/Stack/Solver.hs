@@ -4,7 +4,6 @@
 {-# LANGUAGE TemplateHaskell       #-}
 module Stack.Solver
     ( cabalSolver
-    , getCompilerVersion
     , solveExtraDeps
     ) where
 
@@ -17,39 +16,67 @@ import           Control.Monad.Reader
 import           Control.Monad.Trans.Control
 import           Data.Aeson.Extended         (object, (.=), toJSON, logJSONWarnings)
 import qualified Data.ByteString             as S
-import qualified Data.ByteString.Char8       as S8
 import           Data.Either
 import qualified Data.HashMap.Strict         as HashMap
 import           Data.Map                    (Map)
 import qualified Data.Map                    as Map
+import           Data.Monoid
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import           Data.Text.Encoding          (decodeUtf8, encodeUtf8)
 import qualified Data.Yaml                   as Yaml
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
+import           Path.IO                     (parseRelAsAbsDir)
 import           Prelude
 import           Stack.BuildPlan
+import           Stack.Setup.Installed
 import           Stack.Types
 import           System.Directory            (copyFile,
                                               createDirectoryIfMissing,
                                               getTemporaryDirectory)
 import qualified System.FilePath             as FP
-import           System.IO.Temp
+import           System.IO.Temp              (withSystemTempDirectory)
 import           System.Process.Read
 
 cabalSolver :: (MonadIO m, MonadLogger m, MonadMask m, MonadBaseControl IO m, MonadReader env m, HasConfig env)
             => WhichCompiler
             -> [Path Abs Dir] -- ^ cabal files
             -> Map PackageName Version -- ^ constraints
+            -> Map PackageName (Map FlagName Bool) -- ^ user-specified flags
             -> [String] -- ^ additional arguments
             -> m (CompilerVersion, Map PackageName (Version, Map FlagName Bool))
-cabalSolver wc cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-solver" $ \dir -> do
+cabalSolver wc cabalfps constraints userFlags cabalArgs = withSystemTempDirectory "cabal-solver" $ \dir -> do
+    when (null cabalfps) $ throwM SolverNoCabalFiles
     configLines <- getCabalConfig dir constraints
     let configFile = dir FP.</> "cabal.config"
     liftIO $ S.writeFile configFile $ encodeUtf8 $ T.unlines configLines
 
-    menv <- getMinimalEnvOverride
+    menv0 <- getMinimalEnvOverride
+    mghc <- findExecutable menv0 "ghc"
+    platform <- asks getPlatform
+    menv <-
+        case mghc of
+            Just _ -> return menv0
+            Nothing -> do
+                localPrograms <- asks $ configLocalPrograms . getConfig
+                tools <- listInstalled localPrograms
+                let ghcName = $(mkPackageName "ghc")
+                case [version | Tool (PackageIdentifier name version) <- tools, name == ghcName] of
+                    [] -> throwM SolverMissingGHC
+                    versions -> do
+                        let version = maximum versions
+                        $logInfo $ "No GHC on path, selecting: " <>
+                                   T.pack (versionString version)
+                        ed <- extraDirs $ Tool $ PackageIdentifier ghcName version
+                        mkEnvOverride platform
+                            $ augmentPathMap (edBins ed)
+                            $ unEnvOverride menv0
+    mcabal <- findExecutable menv "cabal"
+    case mcabal of
+        Nothing -> throwM SolverMissingCabalInstall
+        Just _ -> return ()
+
     compilerVersion <- getCompilerVersion menv wc
 
     -- Run from a temporary directory to avoid cabal getting confused by any
@@ -58,7 +85,7 @@ cabalSolver wc cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-s
     --
     -- In theory we could use --ignore-sandbox, but not all versions of cabal
     -- support it.
-    tmpdir <- liftIO getTemporaryDirectory >>= parseAbsDir
+    tmpdir <- liftIO getTemporaryDirectory >>= parseRelAsAbsDir
 
     let args = ("--config-file=" ++ configFile)
              : "install"
@@ -72,13 +99,14 @@ cabalSolver wc cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-s
              : "--package-db=clear"
              : "--package-db=global"
              : cabalArgs ++
-               (map toFilePath cabalfps) ++
+               toConstraintArgs userFlags ++
+               fmap toFilePath cabalfps ++
                ["--ghcjs" | wc == Ghcjs]
 
     $logInfo "Asking cabal to calculate a build plan, please wait"
 
-    platform <- asks getPlatform
     menv' <- mkEnvOverride platform
+           $ Map.delete "GHCJS_PACKAGE_PATH"
            $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv
     bs <- readProcessStdout (Just tmpdir) menv' "cabal" args
     let ls = drop 1
@@ -108,26 +136,13 @@ cabalSolver wc cabalfps constraints cabalArgs = withSystemTempDirectory "cabal-s
                         Nothing -> (t0, True)
                         Just x -> (x, True)
                 Just x -> (x, False)
-
-getCompilerVersion :: (MonadLogger m, MonadCatch m, MonadBaseControl IO m, MonadIO m)
-              => EnvOverride -> WhichCompiler -> m CompilerVersion
-getCompilerVersion menv wc =
-    case wc of
-        Ghc -> do
-            bs <- readProcessStdout Nothing menv "ghc" ["--numeric-version"]
-            let (_, ghcVersion) = versionFromEnd bs
-            GhcVersion <$> parseVersion ghcVersion
-        Ghcjs -> do
-            -- Output looks like
-            --
-            -- The Glorious Glasgow Haskell Compilation System for JavaScript, version 0.1.0 (GHC 7.10.2)
-            bs <- readProcessStdout Nothing menv "ghcjs" ["--version"]
-            let (rest, ghcVersion) = versionFromEnd bs
-                (_, ghcjsVersion) = versionFromEnd rest
-            GhcjsVersion <$> parseVersion ghcjsVersion <*> parseVersion ghcVersion
-  where
-    versionFromEnd = S8.spanEnd isValid . fst . S8.breakEnd isValid
-    isValid c = c == '.' || ('0' <= c && c <= '9')
+    toConstraintArgs userFlagMap =
+        [formatFlagConstraint package flag enabled | (package, fs) <- Map.toList userFlagMap
+                                                   , (flag, enabled) <- Map.toList fs]
+    formatFlagConstraint package flag enabled =
+        let sign = if enabled then '+' else '-'
+        in
+        "--constraint=" ++ unwords [packageNameString package, sign : flagNameString flag]
 
 getCabalConfig :: (MonadReader env m, HasConfig env, MonadIO m, MonadThrow m)
                => FilePath -- ^ temp dir
@@ -164,8 +179,6 @@ solveExtraDeps :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadMask m, 
                => Bool -- ^ modify stack.yaml?
                -> m ()
 solveExtraDeps modStackYaml = do
-    $logInfo "This command is not guaranteed to give you a perfect build plan"
-    $logInfo "It's possible that even with the changes generated below, you will still need to do some manual tweaking"
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
     snapshot <-
@@ -178,23 +191,26 @@ solveExtraDeps modStackYaml = do
 
     let packages = Map.union
             (bcExtraDeps bconfig)
-            (fmap mpiVersion snapshot)
+            (mpiVersion <$> snapshot)
 
     wc <- getWhichCompiler
     (_compilerVersion, extraDeps) <- cabalSolver
         wc
         (Map.keys $ envConfigPackages econfig)
         packages
+        (bcFlags bconfig)
         []
 
     let newDeps = extraDeps `Map.difference` packages
         newFlags = Map.filter (not . Map.null) $ fmap snd newDeps
 
+    $logInfo "This command is not guaranteed to give you a perfect build plan"
     if Map.null newDeps
         then $logInfo "No needed changes found"
         else do
+            $logInfo "It's possible that even with the changes generated below, you will still need to do some manual tweaking"
             let o = object
-                    $ ("extra-deps" .= (map fromTuple $ Map.toList $ fmap fst newDeps))
+                    $ ("extra-deps" .= map fromTuple (Map.toList $ fmap fst newDeps))
                     : (if Map.null newFlags
                         then []
                         else ["flags" .= newFlags])

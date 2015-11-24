@@ -2,6 +2,7 @@
 {-# LANGUAGE TupleSections #-}
 module Stack.FileWatch
     ( fileWatch
+    , fileWatchPoll
     , printExceptionStderr
     ) where
 
@@ -9,7 +10,7 @@ import Blaze.ByteString.Builder (toLazyByteString, copyByteString)
 import Blaze.ByteString.Builder.Char.Utf8 (fromShow)
 import Control.Concurrent.Async (race_)
 import Control.Concurrent.STM
-import Control.Exception (Exception)
+import Control.Exception (Exception, fromException)
 import Control.Exception.Enclosed (tryAny)
 import Control.Monad (forever, unless, when)
 import qualified Data.ByteString.Lazy as L
@@ -19,35 +20,37 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.String (fromString)
 import Data.Traversable (forM)
-import Ignore
+import GHC.IO.Handle (hIsTerminalDevice)
 import Path
+import System.Console.ANSI
+import System.Exit
 import System.FSNotify
-import System.IO (stderr)
+import System.IO (stdout, stderr)
 
 -- | Print an exception to stderr
 printExceptionStderr :: Exception e => e -> IO ()
 printExceptionStderr e =
     L.hPut stderr $ toLazyByteString $ fromShow e <> copyByteString "\n"
 
+fileWatch :: ((Set (Path Abs File) -> IO ()) -> IO ())
+          -> IO ()
+fileWatch = fileWatchConf defaultConfig
+
+fileWatchPoll :: ((Set (Path Abs File) -> IO ()) -> IO ())
+               -> IO ()
+fileWatchPoll = fileWatchConf $ defaultConfig { confUsePolling = True }
+
 -- | Run an action, watching for file changes
 --
 -- The action provided takes a callback that is used to set the files to be
 -- watched. When any of those files are changed, we rerun the action again.
-fileWatch :: IO (Path Abs Dir)
-          -> ((Set (Path Abs File) -> IO ()) -> IO ())
-          -> IO ()
-fileWatch getProjectRoot inner = withManager $ \manager -> do
+fileWatchConf :: WatchConfig
+              -> ((Set (Path Abs File) -> IO ()) -> IO ())
+              -> IO ()
+fileWatchConf cfg inner = withManagerConf cfg $ \manager -> do
     allFiles <- newTVarIO Set.empty
     dirtyVar <- newTVarIO True
     watchVar <- newTVarIO Map.empty
-    projRoot <- getProjectRoot
-    mChecker <- findIgnoreFiles [VCSGit, VCSMercurial, VCSDarcs] projRoot >>= buildChecker
-    (FileIgnoredChecker isFileIgnored) <-
-        case mChecker of
-          Left err ->
-              do putStrLn $ "Failed to parse VCS's ignore file: " ++ err
-                 return $ FileIgnoredChecker (const False)
-          Right chk -> return chk
 
     let onChange event = atomically $ do
             files <- readTVar allFiles
@@ -55,7 +58,6 @@ fileWatch getProjectRoot inner = withManager $ \manager -> do
 
         setWatched :: Set (Path Abs File) -> IO ()
         setWatched files = do
-            print files
             atomically $ writeTVar allFiles $ Set.map toFilePath files
             watch0 <- readTVarIO watchVar
             let actions = Map.mergeWithKey
@@ -82,7 +84,7 @@ fileWatch getProjectRoot inner = withManager $ \manager -> do
                 return Nothing
             startListening = Map.mapWithKey $ \dir () -> do
                 let dir' = fromString $ toFilePath dir
-                listen <- watchDir manager dir' (not . isFileIgnored . eventPath) onChange
+                listen <- watchDir manager dir' (const True) onChange
                 return $ Just listen
 
     let watchInput = do
@@ -94,11 +96,12 @@ fileWatch getProjectRoot inner = withManager $ \manager -> do
                         putStrLn "help: display this help"
                         putStrLn "quit: exit"
                         putStrLn "build: force a rebuild"
-                        putStrLn "watched: display watched directories"
+                        putStrLn "watched: display watched files"
                     "build" -> atomically $ writeTVar dirtyVar True
                     "watched" -> do
-                        watch <- readTVarIO watchVar
-                        mapM_ (putStrLn . toFilePath) (Map.keys watch)
+                        watch <- readTVarIO allFiles
+                        mapM_ putStrLn (Set.toList watch)
+                    "" -> atomically $ writeTVar dirtyVar True
                     _ -> putStrLn $ concat
                         [ "Unknown command: "
                         , show line
@@ -122,8 +125,22 @@ fileWatch getProjectRoot inner = withManager $ \manager -> do
         -- https://github.com/commercialhaskell/stack/issues/822
         atomically $ writeTVar dirtyVar False
 
-        case eres of
-            Left e -> printExceptionStderr e
-            Right () -> putStrLn "Success! Waiting for next file change."
+        let withColor color action = do
+                outputIsTerminal <- hIsTerminalDevice stdout
+                if outputIsTerminal
+                then do
+                    setSGR [SetColor Foreground Dull color]
+                    action
+                    setSGR [Reset]
+                else action
 
-        putStrLn "Type help for available commands"
+        case eres of
+            Left e -> do
+                let color = case fromException e of
+                        Just ExitSuccess -> Green
+                        _ -> Red
+                withColor color $ printExceptionStderr e
+            _ -> withColor Green $
+                putStrLn "Success! Waiting for next file change."
+
+        putStrLn "Type help for available commands. Press enter to force a rebuild."

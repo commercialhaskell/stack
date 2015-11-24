@@ -2,29 +2,33 @@
 # vi: set ft=ruby :
 Vagrant.configure(2) do |config|
   config.vm.box = "puppetlabs/debian-7.8-32-nocm"
-  config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__exclude: [".stack_work/", "_release/"]
+  config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__exclude: [".stack_work/", "_release/"], rsync__args: ["--verbose", "--archive", "--delete", "-z"]
   config.vm.provider "virtualbox" do |vb|
-    vb.memory = "1024"
+    vb.memory = "2048"
   end
-  config.vm.provision "shell", run: "always", inline: <<-SHELL
+  config.ssh.forward_agent = true
+  config.vm.provision "shell", inline: <<-SHELL
     set -xe
     export PATH=/usr/local/bin:$PATH
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
-    apt-get install -y net-tools wget zlib1g-dev ruby-dev libgmp-dev lsb-release ca-certificates git
-    if ! which stack; then
-      curl -sSL $(curl -sSL https://api.github.com/repos/commercialhaskell/stack/releases/latest \
-               |grep '"browser_download_url": ".*/stack-[0-9\\.]\\+-i386-linux.gz"' \
-               |sed 's/.*"\\(.*\\)"$/\\1/') \
-        | gzip -dc \
-        >/usr/local/bin/stack
-      chmod a+x /usr/local/bin/stack
+    apt-get install -y net-tools wget zlib1g-dev ruby-dev libgmp-dev lsb-release ca-certificates git libtinfo-dev
+    curl -sSL https://www.stackage.org/stack/linux-i386 \
+      | tar xzvf - --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
+    chmod a+x /usr/local/bin/stack
+    if ! which fpm; then
+      apt-get install -y ruby-dev libffi-dev make build-essential
+      apt-get install -y rubygems || true
+      gem install fpm --version '< 1.4.0'
     fi
-    if ! which cabal; then
-      pushd /vagrant
-      stack --install-ghc install cabal-install
-      cp `stack exec which cabal` /usr/local/bin/cabal
-      popd
+    if ! which deb-s3; then
+      gem install deb-s3
+    fi
+    if ! which aws; then
+      apt-get install -y python2.7
+      curl -O https://bootstrap.pypa.io/get-pip.py
+      sudo python2.7 get-pip.py
+      sudo pip install awscli
     fi
   SHELL
 end

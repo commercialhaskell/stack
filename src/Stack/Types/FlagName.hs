@@ -55,8 +55,9 @@ instance Show FlagNameParseFail where
 newtype FlagName =
   FlagName ByteString
   deriving (Typeable,Data,Generic,Hashable,Binary,NFData)
+instance HasStructuralInfo FlagName
 instance Eq FlagName where
-    x == y = (compare x y) == EQ
+    x == y = compare x y == EQ
 instance Ord FlagName where
     compare (FlagName x) (FlagName y) =
         compare (S.map Word8.toLower x) (S.map Word8.toLower y)

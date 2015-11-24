@@ -14,8 +14,9 @@ module Stack.Build.Source
     , getLocalPackageViews
     , loadLocalPackage
     , parseTargetsFromBuildOpts
+    , addUnlistedToBuildCache
+    , getPackageConfig
     ) where
-
 
 import           Control.Applicative
 import           Control.Arrow ((&&&))
@@ -59,7 +60,6 @@ import           Stack.BuildPlan (loadMiniBuildPlan, shadowMiniBuildPlan,
                                   parseCustomMiniBuildPlan)
 import           Stack.Constants (wiredInPackages)
 import           Stack.Package
-import           Stack.PackageIndex
 import           Stack.Types
 
 import           System.Directory
@@ -79,10 +79,10 @@ loadSourceMap needTargets bopts = do
     bconfig <- asks getBuildConfig
     rawLocals <- getLocalPackageViews
     (mbp0, cliExtraDeps, targets) <- parseTargetsFromBuildOpts needTargets bopts
-
-    menv <- getMinimalEnvOverride
-    caches <- getPackageCaches menv
-    let latestVersion = Map.fromListWith max $ map toTuple $ Map.keys caches
+    let latestVersion =
+            Map.fromListWith max $
+            map toTuple $
+            Map.keys (bcPackageCaches bconfig)
 
     -- Extend extra-deps to encompass targets requested on the command line
     -- that are not in the snapshot.
@@ -94,6 +94,7 @@ loadSourceMap needTargets bopts = do
 
     locals <- mapM (loadLocalPackage bopts targets) $ Map.toList rawLocals
     checkFlagsUsed bopts locals extraDeps0 (mbpPackages mbp0)
+    checkComponentsBuildable locals
 
     let
         -- loadLocals returns PackageName (foo) and PackageIdentifier (bar-1.2.3) targets separately;
@@ -115,7 +116,7 @@ loadSourceMap needTargets bopts = do
         -- the snapshot
         extraDeps2 = Map.union
             (Map.map (\v -> (v, Map.empty)) extraDeps0)
-            (Map.map (\mpi -> (mpiVersion mpi, mpiFlags mpi)) extraDeps1)
+            (Map.map (mpiVersion &&& mpiFlags) extraDeps1)
 
         -- Overwrite any flag settings with those from the config file
         extraDeps3 = Map.mapWithKey
@@ -180,6 +181,7 @@ parseTargetsFromBuildOpts needTargets bopts = do
     flagExtraDeps <- convertSnapshotToExtra
         snapshot
         (bcExtraDeps bconfig)
+        rawLocals
         (catMaybes $ Map.keys $ boptsFlags bopts)
 
     (cliExtraDeps, targets) <-
@@ -199,14 +201,16 @@ convertSnapshotToExtra
     :: MonadLogger m
     => Map PackageName Version -- ^ snapshot
     -> Map PackageName Version -- ^ extra-deps
+    -> Map PackageName a -- ^ locals
     -> [PackageName] -- ^ packages referenced by a flag
     -> m (Map PackageName Version)
-convertSnapshotToExtra snapshot extra0 flags0 =
+convertSnapshotToExtra snapshot extra0 locals flags0 =
     go Map.empty flags0
   where
     go !extra [] = return extra
     go extra (flag:flags)
         | Just _ <- Map.lookup flag extra0 = go extra flags
+        | flag `Map.member` locals = go extra flags
         | otherwise = case Map.lookup flag snapshot of
             Nothing -> go extra flags
             Just version -> do
@@ -218,15 +222,16 @@ convertSnapshotToExtra snapshot extra0 flags0 =
                 go (Map.insert flag version extra) flags
 
 -- | Parse out the local package views for the current project
-getLocalPackageViews :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env)
+getLocalPackageViews :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env, MonadLogger m)
                      => m (Map PackageName (LocalPackageView, GenericPackageDescription))
 getLocalPackageViews = do
     econfig <- asks getEnvConfig
     locals <- forM (Map.toList $ envConfigPackages econfig) $ \(dir, validWanted) -> do
         cabalfp <- getCabalFileName dir
-        gpkg <- readPackageUnresolved cabalfp
+        (warnings,gpkg) <- readPackageUnresolved cabalfp
+        mapM_ (printCabalFileWarning cabalfp) warnings
         let cabalID = package $ packageDescription gpkg
-            name = fromCabalPackageName $ pkgName $ cabalID
+            name = fromCabalPackageName $ pkgName cabalID
         checkCabalFileName name cabalfp
         let lpv = LocalPackageView
                 { lpvVersion = fromCabalVersion $ pkgVersion cabalID
@@ -281,17 +286,9 @@ loadLocalPackage
     -> (PackageName, (LocalPackageView, GenericPackageDescription))
     -> m LocalPackage
 loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
-    bconfig <- asks getBuildConfig
-    econfig <- asks getEnvConfig
+    config  <- getPackageConfig bopts name
 
-    let config = PackageConfig
-            { packageConfigEnableTests = False
-            , packageConfigEnableBenchmarks = False
-            , packageConfigFlags = localFlags (boptsFlags bopts) bconfig name
-            , packageConfigCompilerVersion = envConfigCompilerVersion econfig
-            , packageConfigPlatform = configPlatform $ getConfig bconfig
-            }
-        pkg = resolvePackage config gpkg
+    let pkg = resolvePackage config gpkg
 
         mtarget = Map.lookup name targets
         (exes, tests, benches) =
@@ -310,6 +307,12 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
                 Just STUnknown -> assert False mempty
                 Nothing -> mempty
 
+        toComponents e t b = Set.unions
+            [ Set.map CExe e
+            , Set.map CTest t
+            , Set.map CBench b
+            ]
+
         btconfig = config
             { packageConfigEnableTests = not $ Set.null tests
             , packageConfigEnableBenchmarks = not $ Set.null benches
@@ -325,41 +328,46 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
 
         btpkg
             | Set.null tests && Set.null benches = Nothing
-            | otherwise = Just $ LocalPackageTB
-                { lptbPackage = resolvePackage btconfig gpkg
-                , lptbTests = tests
-                , lptbBenches = benches
-                }
+            | otherwise = Just (resolvePackage btconfig gpkg)
         testpkg = resolvePackage testconfig gpkg
         benchpkg = resolvePackage benchconfig gpkg
     mbuildCache <- tryGetBuildCache $ lpvRoot lpv
-    (_,compFiles,cabalFiles) <- getPackageFiles (packageFiles pkg) (lpvCabalFP lpv)
-    let files =
-            Set.map dotCabalGetPath (mconcat (M.elems compFiles)) <>
-            cabalFiles
-    (isDirty, newBuildCache) <- checkBuildCache
+    (files,_) <- getPackageFilesSimple pkg (lpvCabalFP lpv)
+
+    -- Filter out the cabal_macros file to avoid spurious recompilations
+    let filteredFiles = Set.filter ((/= $(mkRelFile "cabal_macros.h")) . filename) files
+
+    (dirtyFiles, newBuildCache) <- checkBuildCache
         (fromMaybe Map.empty mbuildCache)
-        (map toFilePath $ Set.toList files)
+        (map toFilePath $ Set.toList filteredFiles)
 
     return LocalPackage
         { lpPackage = pkg
-        , lpTestDeps = packageDeps $ testpkg
-        , lpBenchDeps = packageDeps $ benchpkg
-        , lpExeComponents =
-            case mtarget of
-                Nothing -> Nothing
-                Just _ -> Just exes
+        , lpTestDeps = packageDeps testpkg
+        , lpBenchDeps = packageDeps benchpkg
         , lpTestBench = btpkg
         , lpFiles = files
-        , lpDirtyFiles = isDirty || boptsForceDirty bopts
+        , lpDirtyFiles =
+            if not (Set.null dirtyFiles) || boptsForceDirty bopts
+                then let tryStripPrefix y =
+                          fromMaybe y (stripPrefix (toFilePath $ lpvRoot lpv) y)
+                      in Just $ Set.map tryStripPrefix dirtyFiles
+                else Nothing
         , lpNewBuildCache = newBuildCache
         , lpCabalFile = lpvCabalFP lpv
         , lpDir = lpvRoot lpv
-        , lpComponents = Set.unions
-            [ Set.map CExe exes
-            , Set.map CTest tests
-            , Set.map CBench benches
-            ]
+        , lpWanted = isJust mtarget
+        , lpComponents = toComponents exes tests benches
+        -- TODO: refactor this so that it's easier to be sure that these
+        -- components are indeed unbuildable.
+        --
+        -- The reasoning here is that if the STLocalComps specification
+        -- made it through component parsing, but the components aren't
+        -- present, then they must not be buildable.
+        , lpUnbuildable = toComponents
+            (exes `Set.difference` packageExes pkg)
+            (tests `Set.difference` packageTests pkg)
+            (benches `Set.difference` packageBenchmarks pkg)
         }
 
 -- | Ensure that the flags specified in the stack.yaml file and on the command
@@ -413,9 +421,9 @@ localFlags :: (Map (Maybe PackageName) (Map FlagName Bool))
            -> PackageName
            -> Map FlagName Bool
 localFlags boptsflags bconfig name = Map.unions
-    [ fromMaybe Map.empty $ Map.lookup (Just name) $ boptsflags
-    , fromMaybe Map.empty $ Map.lookup Nothing $ boptsflags
-    , fromMaybe Map.empty $ Map.lookup name $ bcFlags bconfig
+    [ Map.findWithDefault Map.empty (Just name) boptsflags
+    , Map.findWithDefault Map.empty Nothing boptsflags
+    , Map.findWithDefault Map.empty name (bcFlags bconfig)
     ]
 
 -- | Add in necessary packages to extra dependencies
@@ -454,15 +462,15 @@ extendExtraDeps extraDeps0 cliExtraDeps unknowns latestVersion
 checkBuildCache :: MonadIO m
                 => Map FilePath FileCacheInfo -- ^ old cache
                 -> [FilePath] -- ^ files in package
-                -> m (Bool, Map FilePath FileCacheInfo)
+                -> m (Set FilePath, Map FilePath FileCacheInfo)
 checkBuildCache oldCache files = liftIO $ do
-    (Any isDirty, m) <- fmap mconcat $ mapM go files
-    return (isDirty, m)
+    (dirtyFiles, m) <- mconcat <$> mapM go files
+    return (dirtyFiles, m)
   where
     go fp = do
         mmodTime <- getModTimeMaybe fp
         case mmodTime of
-            Nothing -> return (Any False, Map.empty)
+            Nothing -> return (Set.empty, Map.empty)
             Just modTime' -> do
                 (isDirty, newFci) <-
                     case Map.lookup fp oldCache of
@@ -477,29 +485,97 @@ checkBuildCache oldCache files = liftIO $ do
                         Nothing -> do
                             newFci <- calcFci modTime' fp
                             return (True, newFci)
-                return (Any isDirty, Map.singleton fp newFci)
+                return (if isDirty then Set.singleton fp else Set.empty, Map.singleton fp newFci)
 
-    getModTimeMaybe fp =
-        liftIO
-            (catch
-                 (liftM
-                      (Just . modTime)
-                      (getModificationTime fp))
-                 (\e ->
-                       if isDoesNotExistError e
-                           then return Nothing
-                           else throwM e))
+-- | Returns entries to add to the build cache for any newly found unlisted modules
+addUnlistedToBuildCache
+    :: (MonadIO m, MonadReader env m, MonadCatch m, MonadLogger m, HasEnvConfig env)
+    => ModTime
+    -> Package
+    -> Path Abs File
+    -> Map FilePath a
+    -> m ([Map FilePath FileCacheInfo], [PackageWarning])
+addUnlistedToBuildCache preBuildTime pkg cabalFP buildCache = do
+    (files,warnings) <- getPackageFilesSimple pkg cabalFP
+    let newFiles =
+            Set.toList $
+            Set.map toFilePath files `Set.difference` Map.keysSet buildCache
+    addBuildCache <- mapM addFileToCache newFiles
+    return (addBuildCache, warnings)
+  where
+    addFileToCache fp = do
+        mmodTime <- getModTimeMaybe fp
+        case mmodTime of
+            Nothing -> return Map.empty
+            Just modTime' ->
+                if modTime' < preBuildTime
+                    then do
+                        newFci <- calcFci modTime' fp
+                        return (Map.singleton fp newFci)
+                    else return Map.empty
 
-    calcFci modTime' fp =
-        withBinaryFile fp ReadMode $ \h -> do
-            (size, digest) <- CB.sourceHandle h $$ getZipSink
-                ((,)
-                    <$> ZipSink (CL.fold
-                        (\x y -> x + fromIntegral (S.length y))
-                        0)
-                    <*> ZipSink sinkHash)
-            return FileCacheInfo
-                { fciModTime = modTime'
-                , fciSize = size
-                , fciHash = toBytes (digest :: Digest SHA256)
-                }
+-- | Gets list of Paths for files in a package
+getPackageFilesSimple
+    :: (MonadIO m, MonadReader env m, MonadCatch m, MonadLogger m, HasEnvConfig env)
+    => Package -> Path Abs File -> m (Set (Path Abs File), [PackageWarning])
+getPackageFilesSimple pkg cabalFP = do
+    (_,compFiles,cabalFiles,warnings) <-
+        getPackageFiles (packageFiles pkg) cabalFP
+    return
+        ( Set.map dotCabalGetPath (mconcat (M.elems compFiles)) <> cabalFiles
+        , warnings)
+
+-- | Get file modification time, if it exists.
+getModTimeMaybe :: MonadIO m => FilePath -> m (Maybe ModTime)
+getModTimeMaybe fp =
+    liftIO
+        (catch
+             (liftM
+                  (Just . modTime)
+                  (getModificationTime fp))
+             (\e ->
+                   if isDoesNotExistError e
+                       then return Nothing
+                       else throwM e))
+
+-- | Create FileCacheInfo for a file.
+calcFci :: MonadIO m => ModTime -> FilePath -> m FileCacheInfo
+calcFci modTime' fp = liftIO $
+    withBinaryFile fp ReadMode $ \h -> do
+        (size, digest) <- CB.sourceHandle h $$ getZipSink
+            ((,)
+                <$> ZipSink (CL.fold
+                    (\x y -> x + fromIntegral (S.length y))
+                    0)
+                <*> ZipSink sinkHash)
+        return FileCacheInfo
+            { fciModTime = modTime'
+            , fciSize = size
+            , fciHash = toBytes (digest :: Digest SHA256)
+            }
+
+checkComponentsBuildable :: MonadThrow m => [LocalPackage] -> m ()
+checkComponentsBuildable lps =
+    unless (null unbuildable) $ throwM $ SomeTargetsNotBuildable unbuildable
+  where
+    unbuildable =
+        [ (packageName (lpPackage lp), c)
+        | lp <- lps
+        , c <- Set.toList (lpUnbuildable lp)
+        ]
+
+-- | Get 'PackageConfig' for package given its name.
+getPackageConfig :: (MonadIO m, MonadThrow m, MonadCatch m, MonadLogger m, MonadReader env m, HasEnvConfig env)
+  => BuildOpts
+  -> PackageName
+  -> m PackageConfig
+getPackageConfig bopts name = do
+  econfig <- asks getEnvConfig
+  bconfig <- asks getBuildConfig
+  return PackageConfig
+    { packageConfigEnableTests = False
+    , packageConfigEnableBenchmarks = False
+    , packageConfigFlags = localFlags (boptsFlags bopts) bconfig name
+    , packageConfigCompilerVersion = envConfigCompilerVersion econfig
+    , packageConfigPlatform = configPlatform $ getConfig bconfig
+    }

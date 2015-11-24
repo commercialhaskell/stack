@@ -1,5 +1,6 @@
-resolver: ghc-7
+resolver: ghc-7.10
 ghc-options:
     "*": -DFOO
     ghc-options: -DBAR
     text: -DBAZ
+rebuild-ghc-options: true

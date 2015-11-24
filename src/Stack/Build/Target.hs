@@ -145,7 +145,7 @@ resolveIdents :: Map PackageName Version -- ^ snapshot
               -> Either Text ((RawInput, RawTarget 'NoIdents), Map PackageName Version)
 resolveIdents _ _ _ (ri, RTPackageComponent x y) = Right ((ri, RTPackageComponent x y), Map.empty)
 resolveIdents _ _ _ (ri, RTComponent x) = Right ((ri, RTComponent x), Map.empty)
-resolveIdents _ _ _ (ri, RTPackage x) = Right $ ((ri, RTPackage x), Map.empty)
+resolveIdents _ _ _ (ri, RTPackage x) = Right ((ri, RTPackage x), Map.empty)
 resolveIdents snap extras locals (ri, RTPackageIdentifier (PackageIdentifier name version)) =
     case mfound of
         Just (foundPlace, foundVersion) | foundVersion /= version -> Left $ T.pack $ concat
@@ -275,7 +275,7 @@ data NeedTargets
 
 parseTargets :: (MonadThrow m, MonadIO m)
              => NeedTargets -- ^ need at least one target
-             -> Bool -- ^ using implicit global?
+             -> Bool -- ^ using implicit global project?
              -> Map PackageName Version -- ^ snapshot
              -> Map PackageName Version -- ^ extra deps
              -> Map PackageName LocalPackageView

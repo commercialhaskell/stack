@@ -31,12 +31,13 @@ import           Control.Monad.Catch
 import           Data.Aeson.Extended
 import           Data.Attoparsec.ByteString.Char8
 import           Data.Attoparsec.Combinators
-import           Data.Binary (Binary)
+import           Data.Binary.VersionTagged (Binary, HasStructuralInfo)
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Char (isLetter)
 import           Data.Data
 import           Data.Hashable
+import           Data.List (intercalate)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Text (Text)
@@ -73,6 +74,8 @@ instance Lift PackageName where
 instance Show PackageName where
   show (PackageName n) = S8.unpack n
 
+instance HasStructuralInfo PackageName
+
 instance ToJSON PackageName where
     toJSON = toJSON . packageNameText
 instance FromJSON PackageName where
@@ -86,14 +89,13 @@ instance FromJSON PackageName where
 -- | Attoparsec parser for a package name from bytestring.
 packageNameParser :: Parser PackageName
 packageNameParser =
-  fmap (PackageName . S8.pack)
-       (appending (many1 (satisfy isAlphaNum))
-                  (concating (many (alternating
-                                      (pured (satisfy isAlphaNum))
-                                      (appending (pured (satisfy (== '-')))
-                                                 (pured (satisfy isLetter)))))))
+  fmap (PackageName . S8.pack . intercalate "-")
+       (sepBy1 word (char '-'))
   where
-    isAlphaNum c = isLetter c || isDigit c
+    word = concat <$> sequence [many digit,
+                                pured letter,
+                                many (alternating letter digit)]
+    letter = satisfy isLetter
 
 -- | Make a package name.
 mkPackageName :: String -> Q Exp

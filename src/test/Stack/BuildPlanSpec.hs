@@ -14,8 +14,8 @@ import qualified Data.Set as Set
 import Network.HTTP.Conduit (Manager)
 import Prelude -- Fix redundant import warnings
 import System.Directory
-import System.IO.Temp
 import System.Environment
+import System.IO.Temp (withSystemTempDirectory)
 import Test.Hspec
 import Stack.Config
 import Stack.Types
@@ -54,12 +54,10 @@ spec = beforeAll setup $ afterAll teardown $ do
         -- github still depends on failure.
         writeFile "stack.yaml" "resolver: lts-2.9"
         LoadConfig{..} <- loadConfig' manager
-        bconfig <- loadBuildConfigRest manager (lcLoadBuildConfig Nothing)
+        bconfig <- loadBuildConfigRest manager (lcLoadBuildConfig Nothing Nothing)
         runStackT manager logLevel bconfig False False $ do
-            menv <- getMinimalEnvOverride
             mbp <- loadMiniBuildPlan $ LTS 2 9
             eres <- try $ resolveBuildPlan
-                menv
                 mbp
                 (const False)
                 (Map.fromList

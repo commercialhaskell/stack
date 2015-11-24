@@ -1,4 +1,4 @@
-resolver: lts-2.17
+resolver: lts-2.22
 extra-deps:
 - path-0.5.2
 - Win32-notify-0.3.0.1
@@ -9,4 +9,15 @@ extra-deps:
 - http-client-0.4.19
 - http-conduit-2.1.8
 - ignore-0.1.1.0
+- binary-tagged-0.1.1.0
 - fsnotify-0.2.1
+- ansi-terminal-0.6.2.3
+# For deepseq-1.4
+- deepseq-1.4.1.2
+- aeson-0.8.0.2
+- bytestring-0.10.6.0
+- Cabal-1.18.1.6
+- containers-0.5.6.3
+- hpc-0.6.0.2
+- process-1.2.1.0
+- time-1.5.0.1

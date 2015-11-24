@@ -1,0 +1,58 @@
+name:                multi-test-suite
+version:             0.1.0.0
+synopsis:            Initial project template from stack
+description:         Please see README.md
+homepage:            http://github.com/commercialhaskell/multi-test-suite#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Your name here
+maintainer:          your.address@example.com
+-- copyright:
+category:            Web
+build-type:          Simple
+-- extra-source-files:
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Lib
+  build-depends:       base >= 4.7 && < 5, cyclic
+  default-language:    Haskell2010
+
+executable multi-test-suite-exe
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , multi-test-suite
+  default-language:    Haskell2010
+
+test-suite multi-test-suite-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  build-depends:       base
+                     , multi-test-suite
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+
+test-suite multi-test-suite-test-2
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test-2
+  main-is:             Spec.hs
+  build-depends:       base
+                     , multi-test-suite
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+
+test-suite multi-test-suite-test-3
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test-3
+  main-is:             Spec.hs
+  build-depends:       base
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+
+source-repository head
+  type:     git
+  location: https://github.com/commercialhaskell/multi-test-suite

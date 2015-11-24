@@ -92,7 +92,7 @@ createDependencyGraph dotOpts = do
   (_,_,locals,_,sourceMap) <- loadSourceMap NeedTargets defaultBuildOpts
   let graph = Map.fromList (localDependencies dotOpts locals)
   menv <- getMinimalEnvOverride
-  installedMap <- fmap thrd . fst <$> getInstalled menv
+  installedMap <- fmap snd . fst4 <$> getInstalled menv
                                                    (GetInstalledOpts False False)
                                                    sourceMap
   withLoadPackage menv (\loader -> do
@@ -105,13 +105,8 @@ createDependencyGraph dotOpts = do
         fmap3 :: Functor f => (d -> e) -> (a -> b -> c -> f d) -> a -> b -> c -> f e
         fmap3 f g a b c = f <$> g a b c
 
-        thrd :: (a,b,c) -> c
-        thrd (_,_,x) = x
-
--- Given an 'Installed' try to get the 'Version'
-libVersionFromInstalled :: Installed -> Maybe Version
-libVersionFromInstalled (Library (PackageIdentifier _ v) _) = Just v
-libVersionFromInstalled (Executable _) = Nothing
+        fst4 :: (a,b,c,d) -> a
+        fst4 (x,_,_,_) = x
 
 listDependencies :: (HasEnvConfig env
                     ,HasHttpManager env
@@ -195,8 +190,7 @@ createDepLoader sourceMap installed loadPackageDeps pkgName =
   case Map.lookup pkgName sourceMap of
     Just (PSLocal lp) -> pure ((packageAllDeps &&& (Just . packageVersion)) (lpPackage lp))
     Just (PSUpstream version _ flags) -> loadPackageDeps pkgName version flags
-    Nothing -> pure (Set.empty, do m' <- T.traverse libVersionFromInstalled installed
-                                   Map.lookup pkgName m')
+    Nothing -> pure (Set.empty, fmap installedVersion (Map.lookup pkgName installed))
 
 -- | Resolve the direct (depth 0) external dependencies of the given local packages
 localDependencies :: DotOpts -> [LocalPackage] -> [(PackageName,(Set PackageName,Maybe Version))]

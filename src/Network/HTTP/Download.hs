@@ -24,6 +24,7 @@ module Network.HTTP.Download
 
 import           Control.Exception           (Exception)
 import           Control.Exception.Enclosed  (handleIO)
+import           Control.Monad               (void)
 import           Control.Monad.Catch         (MonadThrow, throwM)
 import           Control.Monad.IO.Class      (MonadIO, liftIO)
 import           Control.Monad.Reader        (MonadReader, ReaderT, ask,
@@ -52,8 +53,8 @@ import           System.Directory            (createDirectoryIfMissing,
                                               removeFile,
                                               renameFile)
 import           System.FilePath             (takeDirectory, (<.>))
-import           System.IO                   (IOMode (ReadMode))
-import           System.IO                   (IOMode (WriteMode),
+import           System.IO                   (IOMode (ReadMode),
+                                              IOMode (WriteMode),
                                               withBinaryFile)
 
 -- | Download the given URL to the given location. If the file already exists,
@@ -123,7 +124,7 @@ redownload req0 dest = do
 
             return True
         | responseStatus res == status304 -> return False
-        | otherwise -> throwM $ RedownloadFailed req2 dest $ fmap (const ()) res
+        | otherwise -> throwM $ RedownloadFailed req2 dest $ void res
 
 -- | Download a JSON value and parse it using a 'FromJSON' instance.
 downloadJSON :: (FromJSON a, MonadReader env m, HasHttpManager env, MonadIO m, MonadThrow m)

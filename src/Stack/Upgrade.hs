@@ -14,8 +14,11 @@ import qualified Data.Map                    as Map
 import           Data.Monoid                 ((<>))
 import qualified Data.Monoid
 import qualified Data.Set                    as Set
-import           Network.HTTP.Client.Conduit (HasHttpManager, getHttpManager)
+import qualified Data.Text as T
+import           Development.GitRev          (gitHash)
+import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
+import           Path.IO
 import qualified Paths_stack as Paths
 import           Stack.Build
 import           Stack.Types.Build
@@ -26,28 +29,32 @@ import           Stack.Setup
 import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Types.StackT
-import           System.IO.Temp              (withSystemTempDirectory)
+import           System.Process              (readProcess)
 import           System.Process.Run
 
 upgrade :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, HasTerminal env, HasReExec env, HasLogLevel env, MonadBaseControl IO m)
         => Maybe String -- ^ git repository to use
         -> Maybe AbstractResolver
         -> m ()
-upgrade gitRepo mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> do
+upgrade gitRepo mresolver = withCanonicalizedSystemTempDirectory "stack-upgrade" $ \tmp -> do
     menv <- getMinimalEnvOverride
-    tmp <- parseAbsDir tmp'
     mdir <- case gitRepo of
       Just repo -> do
-        $logInfo "Cloning stack"
-        runIn tmp "git" menv
-            [ "clone"
-            , repo
-            , "stack"
-            , "--depth"
-            , "1"
-            ]
-            Nothing
-        return $ Just $ tmp </> $(mkRelDir "stack")
+        remote <- liftIO $ readProcess "git" ["ls-remote", repo, "master"] []
+        let latestCommit = head . words $ remote
+        if latestCommit == $gitHash then do
+          $logInfo "Already up-to-date, no upgrade required"
+          return Nothing
+        else do $logInfo "Cloning stack"
+                runIn tmp "git" menv
+                    [ "clone"
+                    , repo
+                    , "stack"
+                    , "--depth"
+                    , "1"
+                    ]
+                    Nothing
+                return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
         updateAllIndices menv
         caches <- getPackageCaches menv
@@ -73,24 +80,20 @@ upgrade gitRepo mresolver = withSystemTempDirectory "stack-upgrade" $ \tmp' -> d
                     Nothing -> error "Stack.Upgrade.upgrade: invariant violated, unpacked directory not found"
                     Just path -> return $ Just path
 
-    manager <- asks getHttpManager
-    logLevel <- asks getLogLevel
-    terminal <- asks getTerminal
-    reExec <- asks getReExec
-    configMonoid <- asks $ configConfigMonoid . getConfig
-
-    forM_ mdir $ \dir -> liftIO $ do
-        bconfig <- runStackLoggingT manager logLevel terminal reExec $ do
+    config <- asks getConfig
+    forM_ mdir $ \dir -> do
+        bconfig <- runInnerStackLoggingT $ do
             lc <- loadConfig
-                (configMonoid <> Data.Monoid.mempty
+                (configConfigMonoid config <> Data.Monoid.mempty
                     { configMonoidInstallGHC = Just True
                     })
                 (Just $ dir </> $(mkRelFile "stack.yaml"))
-            lcLoadBuildConfig lc mresolver
-        envConfig1 <- runStackT manager logLevel bconfig terminal reExec $ setupEnv $ Just
-            "Try rerunning with --install-ghc to install the appropriate GHC"
-        runStackT manager logLevel envConfig1 terminal reExec $
-          build (const $ return ()) Nothing defaultBuildOpts
-            { boptsTargets = ["stack"]
-            , boptsInstallExes = True
-            }
+            lcLoadBuildConfig lc mresolver Nothing
+        envConfig1 <- runInnerStackT bconfig $ setupEnv $ Just $
+            "Try rerunning with --install-ghc to install the correct GHC into " <>
+            T.pack (toFilePath (configLocalPrograms config))
+        runInnerStackT envConfig1 $
+            build (const $ return ()) Nothing defaultBuildOpts
+                { boptsTargets = ["stack"]
+                , boptsInstallExes = True
+                }

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DeriveDataTypeable    #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -157,7 +158,7 @@ sinkCheckHash req HashCheck{..} = do
             -- https://github.com/commercialhaskell/stack/issues/240
             || b == actualDigestHexByteString
 
-    when (not passedCheck) $
+    unless passedCheck $
         throwM $ WrongDigest req (show hashCheckAlgorithm) hashCheckHexDigest actualDigestString
 
 assertLengthSink :: MonadThrow m
@@ -200,8 +201,12 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
     env <- ask
     liftIO $ whenM' getShouldDownload $ do
         createDirectoryIfMissing True dir
-        withBinaryFile fptmp WriteMode $ \h -> do
+        withBinaryFile fptmp WriteMode $ \h ->
+#if MIN_VERSION_retry(0,7,0)
+            recovering drRetryPolicy handlers $ const $
+#else
             recovering drRetryPolicy handlers $
+#endif
                 flip runReaderT env $
                     withResponse req (go h)
         renameFile fptmp fp
@@ -254,7 +259,7 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
         when (fileSize /= expectedFileSize) $
             throwM $ WrongFileSize expectedFileSize fileSizeInteger
 
-    checkContentLengthHeader headers expectedContentLength = do
+    checkContentLengthHeader headers expectedContentLength =
         case List.lookup hContentLength headers of
             Just lengthBS -> do
               let lengthStr = displayByteString lengthBS

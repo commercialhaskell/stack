@@ -6,7 +6,6 @@
 {-# LANGUAGE TemplateHaskell    #-}
 {-# LANGUAGE TupleSections      #-}
 
-
 -- | Resolving a build plan for a set of packages in a given Stackage
 -- snapshot.
 
@@ -76,9 +75,7 @@ import           Path.IO
 import           Prelude -- Fix AMP warning
 import           Stack.Constants
 import           Stack.Fetch
-import           Stack.GhcPkg
 import           Stack.Package
-import           Stack.PackageIndex
 import           Stack.Types
 import           Stack.Types.StackT
 import           System.Directory (canonicalizePath)
@@ -177,21 +174,22 @@ instance Show BuildPlanException where
 --
 -- This may fail if a target package is not present in the @BuildPlan@.
 resolveBuildPlan :: (MonadThrow m, MonadIO m, MonadReader env m, HasBuildConfig env, MonadLogger m, HasHttpManager env, MonadBaseControl IO m,MonadCatch m)
-                 => EnvOverride
-                 -> MiniBuildPlan
+                 => MiniBuildPlan
                  -> (PackageName -> Bool) -- ^ is it shadowed by a local package?
                  -> Map PackageName (Set PackageName) -- ^ required packages, and users of it
                  -> m ( Map PackageName (Version, Map FlagName Bool)
                       , Map PackageName (Set PackageName)
                       )
-resolveBuildPlan menv mbp isShadowed packages
+resolveBuildPlan mbp isShadowed packages
     | Map.null (rsUnknown rs) && Map.null (rsShadowed rs) = return (rsToInstall rs, rsUsedBy rs)
     | otherwise = do
-        cache <- getPackageCaches menv
-        let maxVer = Map.fromListWith max $ map toTuple $ Map.keys cache
+        bconfig <- asks getBuildConfig
+        let maxVer =
+                Map.fromListWith max $
+                map toTuple $
+                Map.keys (bcPackageCaches bconfig)
             unknown = flip Map.mapWithKey (rsUnknown rs) $ \ident x ->
                 (Map.lookup ident maxVer, x)
-        bconfig <- asks getBuildConfig
         throwM $ UnknownPackages
             (bcStackYaml bconfig)
             unknown
@@ -275,7 +273,7 @@ addDeps allowMissing compilerVersion toCalc = do
                     )])
     res <- forM (Map.toList byIndex) $ \(indexName', pkgs) -> withCabalFiles indexName' pkgs
         $ \ident flags cabalBS -> do
-            gpd <- readPackageUnresolvedBS Nothing cabalBS
+            (_warnings,gpd) <- readPackageUnresolvedBS Nothing cabalBS
             let packageConfig = PackageConfig
                     { packageConfigEnableTests = False
                     , packageConfigEnableBenchmarks = False
@@ -429,13 +427,12 @@ instance FromJSON Snapshots where
 
 -- | Load up a 'MiniBuildPlan', preferably from cache
 loadMiniBuildPlan
-    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m, MonadCatch m)
+    :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m, MonadCatch m)
     => SnapName
     -> m MiniBuildPlan
 loadMiniBuildPlan name = do
     path <- configMiniBuildPlanCache name
-    let fp = toFilePath path
-    taggedDecodeOrLoad fp $ liftM buildPlanFixes $ do
+    taggedDecodeOrLoad path $ liftM buildPlanFixes $ do
         bp <- loadBuildPlan name
         toMiniBuildPlan
             (siCompilerVersion $ bpSystemInfo bp)
@@ -472,7 +469,7 @@ loadBuildPlan name = do
     env <- ask
     let stackage = getStackRoot env
     file' <- parseRelFile $ T.unpack file
-    let fp = stackage </> $(mkRelDir "build-plan") </> file'
+    let fp = buildPlanDir stackage </> file'
     $logDebug $ "Decoding build plan from: " <> T.pack (toFilePath fp)
     eres <- liftIO $ decodeFileEither $ toFilePath fp
     case eres of
@@ -587,7 +584,7 @@ instance Monoid DepError where
 
 -- | Find a snapshot and set of flags that is compatible with the given
 -- 'GenericPackageDescription'. Returns 'Nothing' if no such snapshot is found.
-findBuildPlan :: (MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, MonadBaseControl IO m)
+findBuildPlan :: (MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m)
               => [GenericPackageDescription]
               -> [SnapName]
               -> m (Maybe (SnapName, Map PackageName (Map FlagName Bool)))
@@ -693,7 +690,7 @@ parseCustomMiniBuildPlan stackYamlFP url0 = do
     customPlanDir <- getCustomPlanDir
     let binaryFP = customPlanDir </> $(mkRelDir "bin") </> binaryFilename
 
-    taggedDecodeOrLoad (toFilePath binaryFP) $ do
+    taggedDecodeOrLoad binaryFP $ do
         cs <- either throwM return $ decodeEither' yamlBS
         let addFlags :: PackageIdentifier -> (PackageName, (Version, Map FlagName Bool))
             addFlags (PackageIdentifier name ver) =

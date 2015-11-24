@@ -15,12 +15,12 @@ import qualified Options.Applicative as O
 import           Path
 import           Path.Internal
 
--- | A template name of the format @foo.hsfiles@.
-data TemplateName = TemplateName !Text !(Path Rel File)
+-- | A template name.
+data TemplateName = TemplateName !Text !(Either (Path Abs File) (Path Rel File))
   deriving (Ord,Eq,Show)
 
 -- | An argument which accepts a template name of the format
--- @foo.hsfiles@ or @foo@, ultimately normalized to @foo.hsfiles@.
+-- @foo.hsfiles@ or @foo@, ultimately normalized to @foo@.
 templateNameArgument :: O.Mod O.ArgumentFields TemplateName
                      -> O.Parser TemplateName
 templateNameArgument =
@@ -51,8 +51,11 @@ parseTemplateNameFromString fname =
   where
     parseValidFile prefix str =
         case parseRelFile str of
-            Nothing -> Left expected
-            Just fp -> return (TemplateName prefix fp)
+            Nothing ->
+                case parseAbsFile str of
+                    Nothing -> Left expected
+                    Just fp -> return (TemplateName prefix (Left fp))
+            Just fp -> return (TemplateName prefix (Right fp))
     expected = "Expected a template filename like: foo or foo.hsfiles"
 
 -- | Make a template name.
@@ -60,13 +63,17 @@ mkTemplateName :: String -> Q Exp
 mkTemplateName s =
     case parseTemplateNameFromString s of
         Left{} -> error ("Invalid template name: " ++ show s)
-        Right (TemplateName (T.unpack -> prefix) (Path pn)) ->
-            [|TemplateName (T.pack prefix) (Path pn)|]
+        Right (TemplateName (T.unpack -> prefix) p) ->
+            [|TemplateName (T.pack prefix) $(pn)|]
+            where pn =
+                      case p of
+                          Left (Path fp) -> [|Left (Path fp)|]
+                          Right (Path fp) -> [|Right (Path fp)|]
 
 -- | Get a text representation of the template name.
 templateName :: TemplateName -> Text
 templateName (TemplateName prefix _) = prefix
 
 -- | Get the path of the template.
-templatePath :: TemplateName -> Path Rel File
+templatePath :: TemplateName -> Either (Path Abs File) (Path Rel File)
 templatePath (TemplateName _ fp) = fp

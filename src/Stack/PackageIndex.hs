@@ -17,15 +17,13 @@
 -- | Dealing with the 00-index file and all its cabal files.
 module Stack.PackageIndex
     ( updateAllIndices
-    , PackageDownload (..)
-    , PackageCache (..)
     , getPackageCaches
     ) where
 
 import qualified Codec.Archive.Tar as Tar
 import           Control.Exception (Exception)
 import           Control.Exception.Enclosed (tryIO)
-import           Control.Monad (unless, when, liftM, mzero)
+import           Control.Monad (unless, when, liftM)
 import           Control.Monad.Catch (MonadThrow, throwM, MonadCatch)
 import qualified Control.Monad.Catch as C
 import           Control.Monad.IO.Class (MonadIO, liftIO)
@@ -35,9 +33,7 @@ import           Control.Monad.Reader (asks)
 import           Control.Monad.Trans.Control
 
 import           Data.Aeson.Extended
-import qualified Data.Binary as Binary
 import           Data.Binary.VersionTagged
-import           Data.ByteString (ByteString)
 import qualified Data.Word8 as Word8
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Unsafe as SU
@@ -55,18 +51,10 @@ import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 
-
-import           Data.Text.Encoding (encodeUtf8)
-
 import           Data.Traversable (forM)
 
 import           Data.Typeable (Typeable)
 
-import           Data.Word (Word64)
-
-
-
-import           GHC.Generics (Generic)
 
 import           Network.HTTP.Download
 import           Path                                  (mkRelDir, parent,
@@ -81,23 +69,6 @@ import           System.IO                             (IOMode (ReadMode, WriteM
                                                         withBinaryFile)
 import           System.Process.Read (readInNull, EnvOverride, doesExecutableExist)
 
-data PackageCache = PackageCache
-    { pcOffset :: !Int64
-    -- ^ offset in bytes into the 00-index.tar file for the .cabal file contents
-    , pcSize :: !Int64
-    -- ^ size in bytes of the .cabal file
-    , pcDownload :: !(Maybe PackageDownload)
-    }
-    deriving Generic
-instance Binary.Binary PackageCache
-instance NFData PackageCache where
-    rnf = genericRnf
-
-newtype PackageCacheMap = PackageCacheMap (Map PackageIdentifier PackageCache)
-    deriving (Binary.Binary, NFData)
-instance BinarySchema PackageCacheMap where
-    -- Don't forget to update this if you change the datatype in any way!
-    binarySchema _ = 1
 -- | Populate the package index caches and return them.
 populateCache
     :: (MonadIO m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
@@ -243,7 +214,7 @@ updateIndex menv index =
         (True, ILGitHttp url _) -> logUpdate url >> updateIndexGit menv name index url
         (_, ILHttp url) -> logUpdate url >> updateIndexHTTP name index url
         (False, ILGitHttp _ url) -> logUpdate url >> updateIndexHTTP name index url
-        (False, ILGit url) -> logUpdate url >> (throwM $ GitNotAvailable name)
+        (False, ILGit url) -> logUpdate url >> throwM (GitNotAvailable name)
 
 -- | Update the index Git repo and the index tarball
 updateIndexGit :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasConfig env,MonadBaseControl IO m, MonadCatch m)
@@ -279,15 +250,15 @@ updateIndexGit menv indexName' index gitUrl = do
             $logStickyDone "Fetched package index."
             removeFileIfExists tarFile
             when (indexGpgVerify index)
-                 (do readInNull acfDir
-                                "git"
-                                menv
-                                ["tag","-v","current-hackage"]
-                                (Just (T.unlines ["Signature verification failed. "
-                                                 ,"Please ensure you've set up your"
-                                                 ,"GPG keychain to accept the D6CF60FD signing key."
-                                                 ,"For more information, see:"
-                                                 ,"https://github.com/fpco/stackage-update#readme"])))
+                 (readInNull acfDir
+                             "git"
+                             menv
+                             ["tag","-v","current-hackage"]
+                             (Just (T.unlines ["Signature verification failed. "
+                                              ,"Please ensure you've set up your"
+                                              ,"GPG keychain to accept the D6CF60FD signing key."
+                                              ,"For more information, see:"
+                                              ,"https://github.com/fpco/stackage-update#readme"])))
             $logDebug ("Exporting a tarball to " <>
                        (T.pack . toFilePath) tarFile)
             deleteCache indexName'
@@ -356,31 +327,6 @@ deleteCache indexName' = do
         Left e -> $logDebug $ "Could not delete cache: " <> T.pack (show e)
         Right () -> $logDebug $ "Deleted index cache at " <> T.pack (toFilePath fp)
 
-data PackageDownload = PackageDownload
-    { pdSHA512 :: !ByteString
-    , pdUrl    :: !ByteString
-    , pdSize   :: !Word64
-    }
-    deriving (Show, Generic)
-instance Binary.Binary PackageDownload
-instance NFData PackageDownload where
-    rnf = genericRnf
-instance FromJSON PackageDownload where
-    parseJSON = withObject "Package" $ \o -> do
-        hashes <- o .: "package-hashes"
-        sha512 <- maybe mzero return (Map.lookup ("SHA512" :: Text) hashes)
-        locs <- o .: "package-locations"
-        url <-
-            case reverse locs of
-                [] -> mzero
-                x:_ -> return x
-        size <- o .: "package-size"
-        return PackageDownload
-            { pdSHA512 = encodeUtf8 sha512
-            , pdUrl = encodeUtf8 url
-            , pdSize = size
-            }
-
 -- | Load the cached package URLs, or created the cache if necessary.
 getPackageCaches :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadBaseControl IO m, MonadCatch m)
                  => EnvOverride
@@ -388,7 +334,7 @@ getPackageCaches :: (MonadIO m, MonadLogger m, MonadReader env m, HasConfig env,
 getPackageCaches menv = do
     config <- askConfig
     liftM mconcat $ forM (configPackageIndices config) $ \index -> do
-        fp <- liftM toFilePath $ configPackageIndexCache (indexName index)
+        fp <- configPackageIndexCache (indexName index)
         PackageCacheMap pis' <- taggedDecodeOrLoad fp $ liftM PackageCacheMap $ populateCache menv index
 
         return (fmap (index,) pis')

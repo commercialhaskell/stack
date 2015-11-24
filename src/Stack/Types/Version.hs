@@ -24,7 +24,9 @@ module Stack.Types.Version
   ,withinRange
   ,Stack.Types.Version.intersectVersionRanges
   ,toMajorVersion
-  ,checkVersion)
+  ,latestApplicableVersion
+  ,checkVersion
+  ,nextMajorVersion)
   where
 
 import           Control.Applicative
@@ -32,7 +34,7 @@ import           Control.DeepSeq
 import           Control.Monad.Catch
 import           Data.Aeson.Extended
 import           Data.Attoparsec.ByteString.Char8
-import           Data.Binary (Binary)
+import           Data.Binary.VersionTagged (Binary, HasStructuralInfo)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Data
@@ -40,6 +42,9 @@ import           Data.Hashable
 import           Data.List
 import           Data.Map (Map)
 import qualified Data.Map as Map
+import           Data.Maybe (listToMaybe)
+import           Data.Set (Set)
+import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Vector.Binary ()
@@ -66,7 +71,7 @@ instance Show VersionParseFail where
 newtype Version =
   Version {unVersion :: Vector Word}
   deriving (Eq,Ord,Typeable,Data,Generic,Binary,NFData)
-
+instance HasStructuralInfo Version
 
 instance Hashable Version where
   hashWithSalt i = hashWithSalt i . V.toList . unVersion
@@ -174,6 +179,19 @@ toMajorVersion  (Version v) =
         0 -> Version (V.fromList [0,        0])
         1 -> Version (V.fromList [V.head v, 0])
         _ -> Version (V.fromList [V.head v, v V.! 1])
+
+-- | Given a version range and a set of versions, find the latest version from
+-- the set that is within the range.
+latestApplicableVersion :: Cabal.VersionRange -> Set Version -> Maybe Version
+latestApplicableVersion r = listToMaybe . filter (`withinRange` r) . Set.toDescList
+
+-- | Get the next major version number for the given version
+nextMajorVersion :: Version -> Version
+nextMajorVersion (Version v) =
+  case  V.length v of
+    0 -> Version (V.fromList [0,        1])
+    1 -> Version (V.fromList [V.head v, 1])
+    _ -> Version (V.fromList [V.head v, (v V.! 1) + 1])
 
 data VersionCheck
     = MatchMinor

@@ -15,7 +15,7 @@ import           Data.Conduit.Binary          (sinkLbs)
 import           Data.Conduit.Filesystem      (sourceDirectoryDeep)
 import qualified Data.Conduit.List            as CL
 import           Data.Conduit.Process
-import           Data.List                    (isSuffixOf, stripPrefix)
+import           Data.List                    (isSuffixOf, stripPrefix, sort)
 import qualified Data.Map                     as Map
 import           Data.Text.Encoding.Error     (lenientDecode)
 import qualified Data.Text.Lazy               as TL
@@ -43,7 +43,7 @@ main = do
     stack <- findExe "stack"
 
     let testDir = currDir </> "tests"
-    tests <- getDirectoryContents testDir >>= filterM (hasTest testDir)
+    tests <- getDirectoryContents testDir >>= filterM (hasTest testDir) . sort
 
     envOrig <- getEnvironment
 

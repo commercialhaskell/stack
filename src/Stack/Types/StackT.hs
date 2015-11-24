@@ -6,7 +6,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -20,6 +19,8 @@ module Stack.Types.StackT
   ,runStackTGlobal
   ,runStackLoggingT
   ,runStackLoggingTGlobal
+  ,runInnerStackT
+  ,runInnerStackLoggingT
   ,newTLSManager
   ,logSticky
   ,logStickyDone)
@@ -89,7 +90,7 @@ instance (MonadIO m) => MonadLogger (StackT config m) where
 runStackTGlobal :: (MonadIO m,MonadBaseControl IO m)
                 => Manager -> config -> GlobalOpts -> StackT config m a -> m a
 runStackTGlobal manager config GlobalOpts{..} m =
-    runStackT manager globalLogLevel config globalTerminal globalReExec m
+    runStackT manager globalLogLevel config globalTerminal (isJust globalReExecVersion) m
 
 -- | Run a Stack action.
 runStackT :: (MonadIO m,MonadBaseControl IO m)
@@ -166,11 +167,29 @@ instance HasReExec LoggingEnv where
 instance HasSupportsUnicode LoggingEnv where
     getSupportsUnicode = lenvSupportsUnicode
 
+runInnerStackT :: (HasHttpManager r, HasLogLevel r, HasTerminal r, HasReExec r, MonadReader r m, MonadIO m)
+               => config -> StackT config IO a -> m a
+runInnerStackT config inner = do
+    manager <- asks getHttpManager
+    logLevel <- asks getLogLevel
+    terminal <- asks getTerminal
+    reExec <- asks getReExec
+    liftIO $ runStackT manager logLevel config terminal reExec inner
+
+runInnerStackLoggingT :: (HasHttpManager r, HasLogLevel r, HasTerminal r, HasReExec r, MonadReader r m, MonadIO m)
+                      => StackLoggingT IO a -> m a
+runInnerStackLoggingT inner = do
+    manager <- asks getHttpManager
+    logLevel <- asks getLogLevel
+    terminal <- asks getTerminal
+    reExec <- asks getReExec
+    liftIO $ runStackLoggingT manager logLevel terminal reExec inner
+
 -- | Run the logging monad, using global options.
 runStackLoggingTGlobal :: MonadIO m
                        => Manager -> GlobalOpts -> StackLoggingT m a -> m a
 runStackLoggingTGlobal manager GlobalOpts{..} m =
-    runStackLoggingT manager globalLogLevel globalTerminal globalReExec m
+    runStackLoggingT manager globalLogLevel globalTerminal (isJust globalReExecVersion) m
 
 -- | Run the logging monad.
 runStackLoggingT :: MonadIO m
@@ -275,16 +294,18 @@ loggerFunc loc _src level msg =
                       T.hPutStrLn outputChannel out))
   where outputChannel = stderr
         getOutput maxLogLevel =
-          do date <- getDate
+          do timestamp <- getTimestamp
              l <- getLevel
              lc <- getLoc
-             return (T.pack date <> T.pack l <> T.decodeUtf8 (fromLogStr (toLogStr msg)) <> T.pack lc)
-          where getDate
+             return (T.pack timestamp <> T.pack l <> T.decodeUtf8 (fromLogStr (toLogStr msg)) <> T.pack lc)
+          where getTimestamp
                   | maxLogLevel <= LevelDebug =
-                    do now <- getCurrentTime
-                       return (formatTime defaultTimeLocale "%Y-%m-%d %T%Q" now ++
-                               ": ")
+                    do now <- getZonedTime
+                       return (formatTime' now ++ ": ")
                   | otherwise = return ""
+                  where
+                    formatTime' =
+                        take timestampLength . formatTime defaultTimeLocale "%F %T.%q"
                 getLevel
                   | maxLogLevel <= LevelDebug =
                     return ("[" ++
@@ -308,10 +329,16 @@ loggerFunc loc _src level msg =
                   where line = show . fst . loc_start
                         char = show . snd . loc_start
 
+-- | The length of a timestamp in the format "YYYY-MM-DD hh:mm:ss.μμμμμμ".
+-- This definition is top-level in order to avoid multiple reevaluation at runtime.
+timestampLength :: Int
+timestampLength =
+  length (formatTime defaultTimeLocale "%F %T.000000" (UTCTime (ModifiedJulianDay 0) 0))
+
 -- | With a sticky state, do the thing.
 withSticky :: (MonadIO m)
            => Bool -> (Sticky -> m b) -> m b
-withSticky terminal m = do
+withSticky terminal m =
     if terminal
        then do state <- liftIO (newMVar Nothing)
                originalMode <- liftIO (hGetBuffering stdout)

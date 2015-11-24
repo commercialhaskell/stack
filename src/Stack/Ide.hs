@@ -1,46 +1,39 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ExtendedDefaultRules #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 
--- | Run a IDE configured with the user's project(s).
+-- | Run a IDE configured with the user's package(s).
 
-module Stack.Ide (ide) where
+module Stack.Ide
+    (ide, getPackageOptsAndTargetFiles)
+    where
 
-import           Control.Concurrent
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Control (MonadBaseControl)
-import           Data.Aeson
-import qualified Data.ByteString as S
-import qualified Data.ByteString.Char8 as S8
-import           Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy as L
 import           Data.List
 import           Data.Maybe
 import           Data.Monoid
 import qualified Data.Set as S
 import           Data.Text (Text)
-import qualified Data.Text as T
+import           Distribution.System
 import           Network.HTTP.Client.Conduit
 import           Path
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import           Stack.Constants
-import           Stack.Exec (defaultEnvSettings)
 import           Stack.Ghci (GhciPkgInfo(..), ghciSetup)
 import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal
-import           System.Directory (doesFileExist)
 import           System.Environment (lookupEnv)
-import           System.Exit
-import           System.IO
-import qualified System.Process as P
-import           System.Process.Read
+import           System.FilePath (searchPathSeparator)
+import           System.Process.Run
 
 -- | Launch a GHCi IDE for the given local project targets with the
 -- given options and configure it with the load paths and extensions
@@ -51,101 +44,63 @@ ide
     -> [String] -- ^ GHC options.
     -> m ()
 ide targets useropts = do
-    (_realTargets,_,pkgs) <- ghciSetup Nothing targets
+    let bopts = defaultBuildOpts
+            { boptsTargets = targets
+            , boptsBuildSubset = BSOnlyDependencies
+            }
+    (_realTargets,_,pkgs) <- ghciSetup bopts False Nothing
     pwd <- getWorkingDir
-    (pkgopts,srcfiles) <-
-        liftM mconcat $
-        forM pkgs $
-        \pkg ->
-             do dist <- distDirFromDir (ghciPkgDir pkg)
-                autogen <- return (autogenDir dist)
-                paths_foo <-
-                    liftM
-                        (autogen </>)
-                        (parseRelFile
-                             ("Paths_" ++
-                              packageNameString (ghciPkgName pkg) ++ ".hs"))
-                paths_foo_exists <- fileExists paths_foo
-                return
-                    ( ["--dist-dir=" <> toFilePath dist] ++
-                      map ("--ghc-option=" ++) (ghciPkgOpts pkg)
-                    , mapMaybe
-                          (fmap toFilePath . stripDir pwd)
-                          (S.toList (ghciPkgModFiles pkg) <>
-                           if paths_foo_exists
-                               then [paths_foo]
-                               else []))
+    (pkgopts,_srcfiles) <-
+        liftM mconcat $ forM pkgs $ getPackageOptsAndTargetFiles pwd
     localdb <- packageDatabaseLocal
     depsdb <- packageDatabaseDeps
     mpath <- liftIO $ lookupEnv "PATH"
     bindirs <- extraBinDirs `ap` return True {- include local bin -}
     let pkgdbs =
-            ["--package-db=" <> toFilePath depsdb <> ":" <> toFilePath localdb]
+            ["--package-db=" <> toFilePathNoTrailingSep depsdb <> [searchPathSeparator] <> toFilePathNoTrailingSep localdb]
         paths =
             [ "--ide-backend-tools-path=" <>
-              intercalate ":" (map toFilePath bindirs) <>
-              (maybe "" (':' :) mpath)]
+              intercalate [searchPathSeparator] (map toFilePath bindirs) <>
+              maybe "" (searchPathSeparator :) mpath]
         args =
-            ["--verbose"] <> ["--local-work-dir=" ++ toFilePath pwd] <>
+            ["--verbose"] <> ["--include=" <> includeDirs pkgopts] <>
+            ["--local-work-dir=" ++ toFilePathNoTrailingSep pwd] <>
             map ("--ghc-option=" ++) useropts <>
             paths <>
             pkgopts <>
             pkgdbs
-    let initialStdin = encode (initialRequest srcfiles)
-    $logDebug $ "Initial stack-ide request: " <> T.pack (show initialStdin)
-    exec "stack-ide" args initialStdin
+    menv <- getMinimalEnvOverride
+    Platform _ os <- asks getPlatform
+    when
+        (os == OSX)
+        (catch (callProcess (Just pwd) menv "stty" ["cbreak", "-imaxbel"])
+               (\(_ :: ProcessExitedUnsuccessfully) -> return ()))
+    callProcess (Just pwd) menv "stack-ide" args
+  where
+    includeDirs pkgopts =
+        intercalate
+            [searchPathSeparator]
+            (mapMaybe
+                 (stripPrefix "--ghc-option=-i")
+                 pkgopts)
 
--- | Make the initial request.
-initialRequest :: [FilePath] -> Value
-initialRequest srcfiles =
-    object
-        [ "tag" .= "RequestUpdateSession"
-        , "contents" .=
-            [ object
-                [ "tag" .= "RequestUpdateTargets"
-                , "contents" .= object
-                    [ "tag" .= "TargetsInclude"
-                    , "contents" .= srcfiles ]
-                ]
-            ]
-        ]
-
--- | Execute a process within the Stack configured environment.
-exec :: (HasConfig r, MonadReader r m, MonadIO m, MonadLogger m, MonadThrow m)
-        => String -> [String] -> ByteString -> m b
-exec cmd args input = do
-    config <- asks getConfig
-    menv <-
-        liftIO
-            (configEnvOverride
-                 config
-                 defaultEnvSettings
-                 { esIncludeGhcPackagePath = False
-                 })
-    exists <- liftIO $ doesFileExist cmd
-    cmd' <-
-        if exists
-            then return cmd
-            else liftM toFilePath $
-                 join $ System.Process.Read.findExecutable menv cmd
-    let cp =
-            (P.proc cmd' args)
-            { P.env = envHelper menv
-            , P.delegate_ctlc = True
-            , P.std_in = P.CreatePipe
-            }
-    $logProcessRun cmd' args
-    (Just procin,Nothing,Nothing,ph) <- liftIO (P.createProcess cp)
-    liftIO
-        (do hSetBuffering stdin LineBuffering
-            hSetBuffering procin LineBuffering)
-    liftIO (do {-S8.hPutStrLn stdout (L.toStrict input)-}
-               S8.hPutStrLn procin (L.toStrict input))
-    _tid <-
-        liftIO
-            (forkIO
-                 (forever
-                      (do bytes <- S.getLine
-                          S.hPutStr procin bytes)))
-    ec <- liftIO (P.waitForProcess ph)
-    liftIO (exitWith ec)
+-- | Get options and target files for the given package info.
+getPackageOptsAndTargetFiles
+    :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env)
+    => Path Abs Dir -> GhciPkgInfo -> m ([FilePath], [FilePath])
+getPackageOptsAndTargetFiles pwd pkg = do
+    dist <- distDirFromDir (ghciPkgDir pkg)
+    let autogen = autogenDir dist
+    paths_foo <-
+        liftM
+            (autogen </>)
+            (parseRelFile
+                 ("Paths_" ++ packageNameString (ghciPkgName pkg) ++ ".hs"))
+    paths_foo_exists <- fileExists paths_foo
+    return
+        ( ("--dist-dir=" <> toFilePathNoTrailingSep dist) :
+          map ("--ghc-option=" ++) (concatMap (\(_, bio) -> bioOneWordOpts bio ++ bioOpts bio) (ghciPkgOpts pkg))
+        , mapMaybe
+              (fmap toFilePath . stripDir pwd)
+              (S.toList (ghciPkgCFiles pkg) <> S.toList (ghciPkgModFiles pkg) <>
+               [paths_foo | paths_foo_exists]))

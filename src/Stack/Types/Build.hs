@@ -1,11 +1,11 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE ViewPatterns               #-}
 
 -- | Build-specific types.
 
@@ -25,6 +25,7 @@ module Stack.Types.Build
     ,Plan(..)
     ,TestOpts(..)
     ,BenchmarkOpts(..)
+    ,FileWatchOpts(..)
     ,BuildOpts(..)
     ,BuildSubset(..)
     ,defaultBuildOpts
@@ -66,6 +67,7 @@ import           Distribution.System (Arch)
 import           Distribution.Text (display)
 import           GHC.Generics
 import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, parseRelDir, (</>))
+import           Path.Extra (toFilePathNoTrailingSep)
 import           Prelude
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
@@ -75,8 +77,9 @@ import           Stack.Types.Package
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageName
 import           Stack.Types.Version
-import           System.Exit (ExitCode)
-import           System.FilePath (dropTrailingPathSeparator, pathSeparator)
+import           System.Exit (ExitCode (ExitFailure))
+import           System.FilePath (pathSeparator)
+import           System.Process.Log (showProcessArgDebug)
 
 ----------------------------------------------
 -- Exceptions
@@ -85,6 +88,7 @@ data StackBuildException
   | CompilerVersionMismatch
         (Maybe (CompilerVersion, Arch))
         (CompilerVersion, Arch)
+        GHCVariant
         VersionCheck
         (Maybe (Path Abs File))
         Text -- recommended resolution
@@ -114,6 +118,10 @@ data StackBuildException
   | InvalidFlagSpecification (Set UnusedFlags)
   | TargetParseException [Text]
   | DuplicateLocalPackageNames [(PackageName, [Path Abs Dir])]
+  | SolverMissingCabalInstall
+  | SolverMissingGHC
+  | SolverNoCabalFiles
+  | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
   deriving Typeable
 
 data FlagSource = FSCommandLine | FSStackYaml
@@ -130,12 +138,12 @@ instance Show StackBuildException where
                ", the package id couldn't be found " <> "(via ghc-pkg describe " <>
                packageNameString name <> "). This shouldn't happen, " <>
                "please report as a bug")
-    show (CompilerVersionMismatch mactual (expected, earch) check mstack resolution) = concat
+    show (CompilerVersionMismatch mactual (expected, earch) ghcVariant check mstack resolution) = concat
                 [ case mactual of
                     Nothing -> "No compiler found, expected "
                     Just (actual, arch) -> concat
                         [ "Compiler version mismatched, found "
-                        , T.unpack (compilerVersionName actual)
+                        , compilerVersionString actual
                         , " ("
                         , display arch
                         , ")"
@@ -145,14 +153,15 @@ instance Show StackBuildException where
                     MatchMinor -> "minor version match with "
                     MatchExact -> "exact version "
                     NewerMinor -> "minor version match or newer with "
-                , T.unpack (compilerVersionName expected)
+                , compilerVersionString expected
                 , " ("
                 , display earch
+                , ghcVariantSuffix ghcVariant
                 , ") (based on "
                 , case mstack of
                     Nothing -> "command line arguments"
                     Just stack -> "resolver setting in " ++ toFilePath stack
-                , "). "
+                , ").\n"
                 , T.unpack resolution
                 ]
     show (Couldn'tParseTargets targets) = unlines
@@ -230,11 +239,16 @@ instance Show StackBuildException where
                 go _ = Map.empty
      -- Supressing duplicate output
     show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bs) =
-        let fullCmd = (dropQuotes (toFilePath execName) ++ " " ++ (unwords fullArgs))
+        let fullCmd = unwords
+                    $ dropQuotes (toFilePath execName)
+                    : map (T.unpack . showProcessArgDebug) fullArgs
             logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ toFilePath fp) logFiles
         in "\n--  While building package " ++ dropQuotes (show taskProvides') ++ " using:\n" ++
            "      " ++ fullCmd ++ "\n" ++
            "    Process exited with code: " ++ show exitCode ++
+           (if exitCode == ExitFailure (-9)
+                then " (THIS MAY INDICATE OUT OF MEMORY)"
+                else "") ++
            logLocations ++
            (if S.null bs
                 then ""
@@ -306,18 +320,34 @@ instance Show StackBuildException where
             : (packageNameString name ++ " used in:")
             : map goDir dirs
         goDir dir = "- " ++ toFilePath dir
+    show SolverMissingCabalInstall = unlines
+        [ "Solver requires that cabal be on your PATH"
+        , "Try running 'stack install cabal-install'"
+        ]
+    show SolverMissingGHC = unlines
+        [ "Solver requires that GHC be on your PATH"
+        , "Try running 'stack setup'"
+        ]
+    show SolverNoCabalFiles = unlines
+        [ "No cabal files provided.  Maybe this is due to not having a stack.yaml file?"
+        , "Try running 'stack init' to create a stack.yaml"
+        ]
+    show (SomeTargetsNotBuildable xs) =
+        "The following components have 'buildable: False' set in the cabal configuration, and so cannot be targets:\n    " ++
+        T.unpack (renderPkgComponents xs) ++
+        "\nTo resolve this, either provide flags such that these components are buildable, or only specify buildable targets."
 
 instance Exception StackBuildException
 
 data ConstructPlanException
     = DependencyCycleDetected [PackageName]
-    | DependencyPlanFailures PackageIdentifier (Map PackageName (VersionRange, LatestVersion, BadDependency))
+    | DependencyPlanFailures PackageIdentifier (Map PackageName (VersionRange, LatestApplicableVersion, BadDependency))
     | UnknownPackage PackageName -- TODO perhaps this constructor will be removed, and BadDependency will handle it all
     -- ^ Recommend adding to extra-deps, give a helpful version number?
     deriving (Typeable, Eq)
 
 -- | For display purposes only, Nothing if package not found
-type LatestVersion = Maybe Version
+type LatestApplicableVersion = Maybe Version
 
 -- | Reason why a dependency was not used
 data BadDependency
@@ -344,26 +374,26 @@ instance Show ConstructPlanException where
       indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
       doubleIndent = indent . indent
       appendDeps = foldr (\dep-> (++) ("\n" ++ showDep dep)) ""
-      showDep (name, (range, mlatest, badDep)) = concat
+      showDep (name, (range, mlatestApplicable, badDep)) = concat
         [ show name
         , ": needed ("
         , display range
         , ")"
         , ", "
-        , let latestStr =
-                case mlatest of
+        , let latestApplicableStr =
+                case mlatestApplicable of
                     Nothing -> ""
-                    Just latest -> " (latest is " ++ versionString latest ++ ")"
+                    Just la -> " (latest applicable is " ++ versionString la ++ ")"
            in case badDep of
-                NotInBuildPlan -> "not present in build plan" ++ latestStr
+                NotInBuildPlan -> "not present in build plan" ++ latestApplicableStr
                 Couldn'tResolveItsDependencies -> "couldn't resolve its dependencies"
                 DependencyMismatch version ->
-                    case mlatest of
-                        Just latest
-                            | latest == version ->
+                    case mlatestApplicable of
+                        Just la
+                            | la == version ->
                                 versionString version ++
-                                " found (latest version available)"
-                        _ -> versionString version ++ " found" ++ latestStr
+                                " found (latest applicable version available)"
+                        _ -> versionString version ++ " found" ++ latestApplicableStr
         ]
          {- TODO Perhaps change the showDep function to look more like this:
           dropQuotes = filter ((/=) '\"')
@@ -385,7 +415,7 @@ data BuildSubset
     -- ^ Only install packages in the snapshot database, skipping
     -- packages intended for the local database.
     | BSOnlyDependencies
-    deriving Show
+    deriving (Show, Eq)
 
 -- | Configuration for building.
 data BuildOpts =
@@ -404,7 +434,7 @@ data BuildOpts =
             ,boptsPreFetch :: !Bool
             -- ^ Fetch all packages immediately
             ,boptsBuildSubset :: !BuildSubset
-            ,boptsFileWatch :: !Bool
+            ,boptsFileWatch :: !FileWatchOpts
             -- ^ Watch files for changes and automatically rebuild
             ,boptsKeepGoing :: !(Maybe Bool)
             -- ^ Keep building/running after failure
@@ -424,6 +454,10 @@ data BuildOpts =
             -- ^ Commands (with arguments) to run after a successful build
             ,boptsOnlyConfigure :: !Bool
             -- ^ Only perform the configure step when building
+            ,boptsReconfigure :: !Bool
+            -- ^ Perform the configure step even if already configured
+            ,boptsCabalVerbose :: !Bool
+            -- ^ Ask Cabal to be verbose in its builds
             }
   deriving (Show)
 
@@ -440,7 +474,7 @@ defaultBuildOpts = BuildOpts
     , boptsInstallExes = False
     , boptsPreFetch = False
     , boptsBuildSubset = BSAll
-    , boptsFileWatch = False
+    , boptsFileWatch = NoFileWatch
     , boptsKeepGoing = Nothing
     , boptsForceDirty = False
     , boptsTests = False
@@ -449,6 +483,8 @@ defaultBuildOpts = BuildOpts
     , boptsBenchmarkOpts = defaultBenchmarkOpts
     , boptsExec = []
     , boptsOnlyConfigure = False
+    , boptsReconfigure = False
+    , boptsCabalVerbose = False
     }
 
 -- | Options for the 'FinalAction' 'DoTests'
@@ -478,6 +514,12 @@ defaultBenchmarkOpts = BenchmarkOpts
     { beoAdditionalArgs = Nothing
     , beoDisableRun = False
     }
+
+data FileWatchOpts
+  = NoFileWatch
+  | FileWatch
+  | FileWatchPoll
+  deriving (Show,Eq)
 
 -- | Package dependency oracle.
 newtype PkgDepsOracle =
@@ -516,15 +558,21 @@ instance Binary ConfigCache where
         4 <- getWord8
         8 <- getWord8
         fmap to gget
-instance NFData ConfigCache where
-    rnf = genericRnf
+instance NFData ConfigCache
+instance HasStructuralInfo ConfigCache
+instance HasSemanticVersion ConfigCache
 
 -- | A task to perform when building
 data Task = Task
-    { taskProvides        :: !PackageIdentifier        -- ^ the package/version to be built
-    , taskType            :: !TaskType                 -- ^ the task type, telling us how to build this
+    { taskProvides        :: !PackageIdentifier
+    -- ^ the package/version to be built
+    , taskType            :: !TaskType
+    -- ^ the task type, telling us how to build this
     , taskConfigOpts      :: !TaskConfigOpts
-    , taskPresent         :: !(Map PackageIdentifier GhcPkgId)           -- ^ GhcPkgIds of already-installed dependencies
+    , taskPresent         :: !(Map PackageIdentifier GhcPkgId)
+    -- ^ GhcPkgIds of already-installed dependencies
+    , taskAllInOne        :: !Bool
+    -- ^ indicates that the package can be built in one step
     }
     deriving Show
 
@@ -558,9 +606,9 @@ taskLocation task =
 -- | A complete plan of what needs to be built and how to do it
 data Plan = Plan
     { planTasks :: !(Map PackageName Task)
-    , planFinals :: !(Map PackageName (Task, LocalPackageTB))
+    , planFinals :: !(Map PackageName Task)
     -- ^ Final actions to be taken (test, benchmark, etc)
-    , planUnregisterLocal :: !(Map GhcPkgId (PackageIdentifier, Text))
+    , planUnregisterLocal :: !(Map GhcPkgId (PackageIdentifier, Maybe Text))
     -- ^ Text is reason we're unregistering, for display only
     , planInstallExes :: !(Map Text InstallLocation)
     -- ^ Executables that should be installed after successful building
@@ -574,6 +622,7 @@ data BaseConfigOpts = BaseConfigOpts
     , bcoSnapInstallRoot :: !(Path Abs Dir)
     , bcoLocalInstallRoot :: !(Path Abs Dir)
     , bcoBuildOpts :: !BuildOpts
+    , bcoExtraDBs :: ![(Path Abs Dir)]
     }
 
 -- | Render a @BaseConfigOpts@ to an actual list of options
@@ -581,12 +630,13 @@ configureOpts :: EnvConfig
               -> BaseConfigOpts
               -> Map PackageIdentifier GhcPkgId -- ^ dependencies
               -> Bool -- ^ wanted?
+              -> Bool -- ^ local non-extra-dep?
               -> InstallLocation
               -> Package
               -> ConfigureOpts
-configureOpts econfig bco deps wanted loc package = ConfigureOpts
+configureOpts econfig bco deps wanted isLocal loc package = ConfigureOpts
     { coDirs = configureOptsDirs bco loc package
-    , coNoDirs = configureOptsNoDir econfig bco deps wanted package
+    , coNoDirs = configureOptsNoDir econfig bco deps wanted isLocal package
     }
 
 configureOptsDirs :: BaseConfigOpts
@@ -595,20 +645,19 @@ configureOptsDirs :: BaseConfigOpts
                   -> [String]
 configureOptsDirs bco loc package = concat
     [ ["--user", "--package-db=clear", "--package-db=global"]
-    , map (("--package-db=" ++) . toFilePath) $ case loc of
-        Snap -> [bcoSnapDB bco]
-        Local -> [bcoSnapDB bco, bcoLocalDB bco]
-    , [ "--libdir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "lib"))
-      , "--bindir=" ++ toFilePathNoTrailingSlash (installRoot </> bindirSuffix)
-      , "--datadir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "share"))
-      , "--libexecdir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "libexec"))
-      , "--sysconfdir=" ++ toFilePathNoTrailingSlash (installRoot </> $(mkRelDir "etc"))
-      , "--docdir=" ++ toFilePathNoTrailingSlash docDir
-      , "--htmldir=" ++ toFilePathNoTrailingSlash docDir
-      , "--haddockdir=" ++ toFilePathNoTrailingSlash docDir]
+    , map (("--package-db=" ++) . toFilePathNoTrailingSep) $ case loc of
+        Snap -> bcoExtraDBs bco ++ [bcoSnapDB bco]
+        Local -> bcoExtraDBs bco ++ [bcoSnapDB bco] ++ [bcoLocalDB bco]
+    , [ "--libdir=" ++ toFilePathNoTrailingSep (installRoot </> $(mkRelDir "lib"))
+      , "--bindir=" ++ toFilePathNoTrailingSep (installRoot </> bindirSuffix)
+      , "--datadir=" ++ toFilePathNoTrailingSep (installRoot </> $(mkRelDir "share"))
+      , "--libexecdir=" ++ toFilePathNoTrailingSep (installRoot </> $(mkRelDir "libexec"))
+      , "--sysconfdir=" ++ toFilePathNoTrailingSep (installRoot </> $(mkRelDir "etc"))
+      , "--docdir=" ++ toFilePathNoTrailingSep docDir
+      , "--htmldir=" ++ toFilePathNoTrailingSep docDir
+      , "--haddockdir=" ++ toFilePathNoTrailingSep docDir]
     ]
   where
-    toFilePathNoTrailingSlash = dropTrailingPathSeparator . toFilePath
     installRoot =
         case loc of
             Snap -> bcoSnapInstallRoot bco
@@ -627,9 +676,10 @@ configureOptsNoDir :: EnvConfig
                    -> BaseConfigOpts
                    -> Map PackageIdentifier GhcPkgId -- ^ dependencies
                    -> Bool -- ^ wanted?
+                   -> Bool -- ^ is this a local, non-extra-dep?
                    -> Package
                    -> [String]
-configureOptsNoDir econfig bco deps wanted package = concat
+configureOptsNoDir econfig bco deps wanted isLocal package = concat
     [ depOptions
     , ["--enable-library-profiling" | boptsLibProfile bopts || boptsExeProfile bopts]
     , ["--enable-executable-profiling" | boptsExeProfile bopts]
@@ -674,14 +724,20 @@ configureOptsNoDir econfig bco deps wanted package = concat
       where
         PackageIdentifier name version = ident
 
-    ghcOptionsMap = configGhcOptions $ getConfig econfig
     allGhcOptions = concat
-        [ fromMaybe [] $ Map.lookup Nothing ghcOptionsMap
-        , fromMaybe [] $ Map.lookup (Just $ packageName package) ghcOptionsMap
-        , if wanted
+        [ Map.findWithDefault [] Nothing (configGhcOptions config)
+        , Map.findWithDefault [] (Just $ packageName package) (configGhcOptions config)
+        , concat [["-fhpc", "-fforce-recomp"] | isLocal && toCoverage (boptsTestOpts bopts)]
+        , if includeExtraOptions
             then boptsGhcOptions bopts
             else []
         ]
+
+    includeExtraOptions =
+        case configApplyGhcOptions config of
+            AGOTargets -> wanted
+            AGOLocals -> isLocal
+            AGOEverything -> True
 
 -- | Get set of wanted package names from locals.
 wantedLocalPackages :: [LocalPackage] -> Set PackageName
@@ -696,9 +752,6 @@ modTime x =
         , toRational
               (utctDayTime x))
 
-data Installed = Library PackageIdentifier GhcPkgId | Executable PackageIdentifier
-    deriving (Show, Eq, Ord)
-
 -- | Configure options to be sent to Setup.hs configure
 data ConfigureOpts = ConfigureOpts
     { coDirs :: ![String]
@@ -709,8 +762,8 @@ data ConfigureOpts = ConfigureOpts
     }
     deriving (Show, Eq, Generic)
 instance Binary ConfigureOpts
-instance NFData ConfigureOpts where
-    rnf = genericRnf
+instance HasStructuralInfo ConfigureOpts
+instance NFData ConfigureOpts
 
 -- | Information on a compiled package: the library conf file (if relevant),
 -- and all of the executable paths.
@@ -718,10 +771,11 @@ data PrecompiledCache = PrecompiledCache
     -- Use FilePath instead of Path Abs File for Binary instances
     { pcLibrary :: !(Maybe FilePath)
     -- ^ .conf file inside the package database
-    , pcExes :: ![FilePath]
+    , pcExes    :: ![FilePath]
     -- ^ Full paths to executables
     }
     deriving (Show, Eq, Generic)
 instance Binary PrecompiledCache
-instance NFData PrecompiledCache where
-    rnf = genericRnf
+instance HasSemanticVersion PrecompiledCache
+instance HasStructuralInfo PrecompiledCache
+instance NFData PrecompiledCache

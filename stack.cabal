@@ -1,5 +1,5 @@
 name:                stack
-version:             0.1.4.1
+version:             0.1.9.0
 synopsis:            The Haskell Tool Stack
 description:         Please see the README.md for usage information, and
                      the wiki on Github for more details.  Also, note that
@@ -8,13 +8,15 @@ description:         Please see the README.md for usage information, and
                      currently only intended for use by the executable.
 license:             BSD3
 license-file:        LICENSE
-author:              Chris Done
-maintainer:          chrisdone@fpcomplete.com
+author:              Commercial Haskell SIG
+maintainer:          manny@fpcomplete.com
 category:            Development
 build-type:          Simple
 cabal-version:       >=1.10
-homepage:            https://github.com/commercialhaskell/stack
-extra-source-files:  README.md ChangeLog.md
+homepage:            http://haskellstack.org
+extra-source-files:  CONTRIBUTING.md
+                     ChangeLog.md
+                     README.md
 
                      -- Glob would be nice, but apparently Cabal doesn't support it:
                      --     cabal: filepath wildcard 'test/package-dump/*.txt' does not match any files.
@@ -35,9 +37,14 @@ library
   ghc-options:       -Wall
   exposed-modules:   Options.Applicative.Builder.Extra
                      Options.Applicative.Args
+                     Options.Applicative.Complicated
                      Stack.BuildPlan
+                     Stack.Clean
                      Stack.Config
+                     Stack.Config.Docker
+                     Stack.ConfigCmd
                      Stack.Constants
+                     Stack.Coverage
                      Stack.Docker
                      Stack.Docker.GlobalDB
                      Stack.Dot
@@ -56,6 +63,7 @@ library
                      Stack.Image
                      Stack.SDist
                      Stack.Setup
+                     Stack.Setup.Installed
                      Stack.Solver
                      Stack.Types
                      Stack.Types.Internal
@@ -67,6 +75,7 @@ library
                      Stack.Types.GhcPkgId
                      Stack.Types.Image
                      Stack.Types.PackageIdentifier
+                     Stack.Types.PackageIndex
                      Stack.Types.PackageName
                      Stack.Types.TemplateName
                      Stack.Types.Version
@@ -75,7 +84,6 @@ library
                      Stack.Types.Package
                      Stack.Build
                      Stack.Build.Cache
-                     Stack.Build.Coverage
                      Stack.Build.ConstructPlan
                      Stack.Build.Execute
                      Stack.Build.Haddock
@@ -89,7 +97,9 @@ library
                      System.Process.Run
                      Network.HTTP.Download.Verified
                      Data.Attoparsec.Args
+                     Data.Maybe.Extra
                      Path.IO
+                     Path.Extra
   other-modules:     Network.HTTP.Download
                      Control.Concurrent.Execute
                      Path.Find
@@ -99,17 +109,19 @@ library
                      Data.Attoparsec.Combinators
                      Data.Binary.VersionTagged
                      Data.IORef.RunOnce
-                     Data.Maybe.Extra
                      Data.Set.Monad
+                     Distribution.Version.Extra
   build-depends:     Cabal >= 1.18.1.5
-                   , aeson >= 0.8.0.2
+                   , aeson >= 0.8.0.2 && < 0.10
+                   , ansi-terminal >= 0.6.2.3
                    , async >= 2.0.2
-                   , attoparsec >= 0.12.1.5
+                   , attoparsec >= 0.12.1.5 && < 0.14
                    , base >= 4 && <5
                    , base16-bytestring
                    , base64-bytestring
                    , bifunctors >= 4.2.1
                    , binary >= 0.7
+                   , binary-tagged >= 0.1.1
                    , blaze-builder
                    , byteable
                    , bytestring
@@ -119,8 +131,9 @@ library
                    , containers >= 0.5.5.1
                    , cryptohash >= 0.11.6
                    , cryptohash-conduit
-                   , deepseq-generics
                    , directory >= 1.2.1.0
+                   , edit-distance >= 0.2
+                   , either
                    , enclosed-exceptions
                    , exceptions >= 0.8.0.2
                    , extra
@@ -128,12 +141,13 @@ library
                    , filelock >= 0.1.0.1
                    , filepath >= 1.3.0.2
                    , fsnotify >= 0.2.1
+                   , gitrev >= 1.1
                    , hashable >= 1.2.3.2
+                   , hpc
                    , http-client >= 0.4.17
                    , http-client-tls >= 0.2.2
                    , http-conduit >= 2.1.7
                    , http-types >= 0.8.6
-                   , ignore >= 0.1.1
                    , lifted-base
                    , monad-control
                    , monad-logger >= 0.3.13.1
@@ -141,7 +155,6 @@ library
                    , mtl >= 2.1.3.1
                    , old-locale >= 1.0.0.6
                    , optparse-applicative
-                   , optparse-simple >= 0.0.3
                    , path >= 0.5.1
                    , persistent >= 2.1.2
                    , persistent-sqlite >= 2.1.4
@@ -149,8 +162,9 @@ library
                    , pretty
                    , process >= 1.2.0.0
                    , resourcet >= 1.1.4.1
-                   , retry >= 0.6
+                   , retry >= 0.6 && < 0.8
                    , safe >= 0.3
+                   , semigroups >= 0.5
                    , split
                    , stm >= 2.4.4
                    , streaming-commons >= 0.1.10.0
@@ -163,18 +177,19 @@ library
                    , transformers-base >= 0.4.4
                    , unix-compat
                    , unordered-containers >= 0.2.5.1
-                   , vector >= 0.10.12.3
+                   , vector >= 0.10.12.3 && < 0.12
                    , vector-binary-instances
                    , void >= 0.7
                    , yaml >= 0.8.10.1
                    , zlib >= 0.5.4.2
-                   , deepseq
+                   , deepseq >= 1.4
                    , file-embed
                    , word8
                    , hastache
                    , project-template >= 0.2
   if os(windows)
     cpp-options:     -DWINDOWS
+    build-depends:   Win32
   else
     build-depends:   unix >= 2.7.0.1
   default-language:  Haskell2010
@@ -183,7 +198,7 @@ executable stack
   hs-source-dirs: src/main
   main-is:        Main.hs
   ghc-options:    -Wall -threaded -rtsopts
-  other-modules:     Paths_stack
+  other-modules:  Paths_stack
 
   build-depends:  base >=4.7 && < 5
                 , bytestring >= 0.10.4.0
@@ -254,7 +269,7 @@ test-suite stack-test
                 , optparse-applicative
                 , bytestring
                 , QuickCheck
-                , retry >= 0.6
+                , retry >= 0.6 && < 0.8
   default-language:    Haskell2010
 
 test-suite stack-integration-test
@@ -263,9 +278,7 @@ test-suite stack-integration-test
   main-is:        IntegrationSpec.hs
   ghc-options:    -Wall -threaded -rtsopts -with-rtsopts=-N
 
-  if flag(integration-tests)
-    buildable: True
-  else
+  if !flag(integration-tests)
     buildable: False
 
   build-depends:  base >= 4.7 && < 10
@@ -285,6 +298,20 @@ test-suite stack-integration-test
                 , bytestring
   default-language:    Haskell2010
 
+  -- This isn't actually needed to build stack-integration-test, but it makes it
+  -- easier to load up an individual integration test into stack ghci. It's
+  -- still a little involved:
+  --
+  -- stack exec -- stack ghci stack:stack-integration-test --flag stack:integration-tests --no-build
+  --
+  -- Then, in ghci:
+  --
+  -- :cd test/integration/tests/.../files
+  -- :load ../Main.hs
+  -- main
+  other-modules: StackTest
+  hs-source-dirs: test/integration/lib
+
 source-repository head
   type:     git
-  location: https://github.com/commercialhaskell/stack
+  location: https://github.com/commercialhaskell/stack.git

@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
@@ -52,8 +51,8 @@ instance Binary GhcPkgId where
         4 <- getWord8
         7 <- getWord8
         fmap GhcPkgId get
-instance NFData GhcPkgId where
-    rnf = genericRnf
+instance NFData GhcPkgId
+instance HasStructuralInfo GhcPkgId
 
 instance Show GhcPkgId where
   show = show . ghcPkgIdString

@@ -1,42 +1,37 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 Vagrant.configure(2) do |config|
-  config.vm.box = "chef/debian-7.8"
-  config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__exclude: [".stack_work/", "_release/"]
+  config.vm.box = "puppetlabs/debian-7.8-64-nocm"
+  config.vm.synced_folder "../../..", "/vagrant", type: "rsync", rsync__exclude: [".stack_work/", "_release/"], rsync__args: ["--verbose", "--archive", "--delete", "-z"]
   config.vm.provider "virtualbox" do |vb|
-    vb.memory = "1024"
+    vb.memory = "2048"
   end
-  config.vm.provision "shell", run: "always", inline: <<-SHELL
+  config.ssh.forward_agent = true
+  config.vm.provision "shell", inline: <<-SHELL
     set -xe
     export PATH=/usr/local/bin:$PATH
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
-    apt-get install -y net-tools wget zlib1g-dev ruby-dev libgmp-dev lsb-release ca-certificates
-    if ! which docker; then
-      wget -qO- https://get.docker.com/ | sh
-      #EKB FIXME: Docker 1.7.0 can't start containers on debian-7, so until that's fixed downgrade to 1.6.2.
-      apt-get install -y lxc-docker-1.6.2
-    fi
-    service docker start || true
+    apt-get install -y net-tools wget zlib1g-dev ruby-dev libgmp-dev lsb-release ca-certificates libtinfo-dev
     if ! which stack; then
       wget -q -O- http://download.fpcomplete.com/ubuntu/fpco.key | apt-key add -
       echo "deb http://download.fpcomplete.com/debian/$(lsb_release -cs) stable main" >/etc/apt/sources.list.d/fpco.list
       apt-get update
-      apt-get install -y stack
     fi
-    if ! which cabal; then
-      pushd /vagrant
-      stack --install-ghc install cabal-install
-      cp `stack exec which cabal` /usr/local/bin/cabal
-      popd
-    fi
-    if ! [[ -f /usr/local/bin/docker ]]; then
-      echo '#!/bin/sh' >/usr/local/bin/docker
-      echo "exec sudo $(which docker)" '"$@"' >>/usr/local/bin/docker
-      chmod a+x /usr/local/bin/docker
+    apt-get install -y stack
+    if ! which fpm; then
+        apt-get install -y ruby-dev libffi-dev make build-essential
+        apt-get install -y rubygems || true
+        gem install fpm --version '< 1.4.0'
     fi
     if ! which deb-s3; then
         gem install deb-s3
+    fi
+    if ! which aws; then
+        apt-get install -y python2.7
+        curl -O https://bootstrap.pypa.io/get-pip.py
+        sudo python2.7 get-pip.py
+        sudo pip install awscli
     fi
   SHELL
 end

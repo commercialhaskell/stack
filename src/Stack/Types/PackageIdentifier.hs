@@ -1,22 +1,19 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS -fno-warn-unused-do-bind #-}
 
 -- | Package identifier (name-version).
 
 module Stack.Types.PackageIdentifier
-  (PackageIdentifier(..)
-  ,toTuple
-  ,fromTuple
-  ,parsePackageIdentifier
-  ,parsePackageIdentifierFromString
-  ,packageIdentifierVersion
-  ,packageIdentifierName
-  ,packageIdentifierParser
-  ,packageIdentifierString
-  ,packageIdentifierText)
+  ( PackageIdentifier(..)
+  , toTuple
+  , fromTuple
+  , parsePackageIdentifier
+  , parsePackageIdentifierFromString
+  , packageIdentifierParser
+  , packageIdentifierString
+  , packageIdentifierText )
   where
 
 import           Control.Applicative
@@ -25,7 +22,7 @@ import           Control.Exception (Exception)
 import           Control.Monad.Catch (MonadThrow, throwM)
 import           Data.Aeson.Extended
 import           Data.Attoparsec.ByteString.Char8
-import           Data.Binary (Binary)
+import           Data.Binary.VersionTagged (Binary, HasStructuralInfo)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as S8
 import           Data.Data
@@ -47,10 +44,12 @@ instance Show PackageIdentifierParseFail where
 instance Exception PackageIdentifierParseFail
 
 -- | A pkg-ver combination.
-data PackageIdentifier =
-  PackageIdentifier !PackageName
-                    !Version
-  deriving (Eq,Ord,Generic,Data,Typeable)
+data PackageIdentifier = PackageIdentifier
+  { -- | Get the name part of the identifier.
+    packageIdentifierName    :: !PackageName
+    -- | Get the version part of the identifier.
+  , packageIdentifierVersion :: !Version
+  } deriving (Eq,Ord,Generic,Data,Typeable)
 
 instance NFData PackageIdentifier where
   rnf (PackageIdentifier !p !v) =
@@ -58,6 +57,7 @@ instance NFData PackageIdentifier where
 
 instance Hashable PackageIdentifier
 instance Binary PackageIdentifier
+instance HasStructuralInfo PackageIdentifier
 
 instance Show PackageIdentifier where
   show = show . packageIdentifierString
@@ -77,14 +77,6 @@ toTuple (PackageIdentifier n v) = (n,v)
 -- | Convert from a tuple to a package identifier.
 fromTuple :: (PackageName,Version) -> PackageIdentifier
 fromTuple (n,v) = PackageIdentifier n v
-
--- | Get the version part of the identifier.
-packageIdentifierVersion :: PackageIdentifier -> Version
-packageIdentifierVersion (PackageIdentifier _ ver) = ver
-
--- | Get the name part of the identifier.
-packageIdentifierName :: PackageIdentifier -> PackageName
-packageIdentifierName (PackageIdentifier name _) = name
 
 -- | A parser for a package-version pair.
 packageIdentifierParser :: Parser PackageIdentifier
