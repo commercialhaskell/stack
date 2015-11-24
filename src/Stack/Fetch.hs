@@ -7,6 +7,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
+{-# LANGUAGE PackageImports        #-}
 {-# LANGUAGE ViewPatterns          #-}
 
 -- | Functionality for downloading packages securely for cabal's usage.
@@ -40,7 +41,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader           (asks, runReaderT)
 import           Control.Monad.Trans.Control
-import           Crypto.Hash                    (SHA512 (..))
+import "cryptohash" Crypto.Hash                 (SHA512 (..))
 import           Data.ByteString                (ByteString)
 import qualified Data.ByteString                as S
 import qualified Data.ByteString.Lazy           as L

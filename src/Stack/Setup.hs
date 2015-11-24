@@ -3,6 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE PackageImports        #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -28,7 +29,7 @@ import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, ReaderT (..), asks)
 import           Control.Monad.State (get, put, modify)
 import           Control.Monad.Trans.Control
-import           Crypto.Hash (SHA1(SHA1))
+import "cryptohash" Crypto.Hash (SHA1(SHA1))
 import           Data.Aeson.Extended
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8

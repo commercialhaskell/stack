@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE PackageImports        #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -27,7 +28,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Resource
-import           Crypto.Hash (Digest, SHA256)
+import "cryptohash" Crypto.Hash (Digest, SHA256)
 import           Crypto.Hash.Conduit (sinkHash)
 import qualified Data.ByteString as S
 import           Data.Byteable (toBytes)
