@@ -28,7 +28,7 @@ extra-source-files:  CONTRIBUTING.md
                      doc/install_and_upgrade.md
                      doc/nonstandard_project_init.md
                      doc/shell_autocompletion.md
-                     doc/stack_and_ghcjs.md
+                     doc/ghcjs.md
                      doc/yaml_configuration.md
 
                      -- Glob would be nice, but apparently Cabal doesn't support it:
