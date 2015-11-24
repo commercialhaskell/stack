@@ -396,5 +396,9 @@ findPackageKeyForBuiltPackage pkgDir pkgId = do
     distDir <- distDirFromDir pkgDir
     path <- liftM (distDir </>) $
         parseRelFile ("package.conf.inplace/" ++ packageIdentifierString pkgId ++ "-inplace.conf")
-    contents <- liftIO $ T.readFile (toFilePath path)
-    return $ asum (map (T.stripPrefix "key: ") (T.lines contents))
+    exists <- fileExists path
+    if exists
+        then do
+            contents <- liftIO $ T.readFile (toFilePath path)
+            return $ asum (map (T.stripPrefix "key: ") (T.lines contents))
+        else return Nothing
