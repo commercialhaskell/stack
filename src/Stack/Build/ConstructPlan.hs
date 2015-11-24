@@ -557,8 +557,16 @@ describeConfigDiff config old new
         , "--package-db="
         , "--libdir="
         , "--bindir="
+        , "--datadir="
+        , "--libexecdir="
+        , "--sysconfdir"
+        , "--docdir="
+        , "--htmldir="
+        , "--haddockdir="
         , "--enable-tests"
         , "--enable-benchmarks"
+        ] || elem t
+        [ "--user"
         ]
 
     stripGhcOptions =
