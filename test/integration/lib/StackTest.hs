@@ -46,10 +46,12 @@ stackErr args = do
 stackCheckStderr :: [String] -> (String -> IO ()) -> IO ()
 stackCheckStderr args check = do
     stack <- getEnv "STACK_EXE"
-    (ec, _, stderr) <- readProcessWithExitCode stack args ""
+    logInfo $ "Running: " ++ stack ++ " " ++ intercalate " " (map showProcessArgDebug args)
+    (ec, _, err) <- readProcessWithExitCode stack args ""
+    hPutStr stderr err
     if ec /= ExitSuccess
         then error $ "Exited with exit code: " ++ show ec
-        else check stderr
+        else check err
 
 doesNotExist :: FilePath -> IO ()
 doesNotExist fp = do
