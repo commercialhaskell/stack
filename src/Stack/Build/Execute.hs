@@ -627,13 +627,19 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp = do
         if boptsReconfigure eeBuildOpts
             then return True
             else do
+                -- We can ignore the components portion of the config
+                -- cache, because it's just used to inform 'construct
+                -- plan that we need to plan to build additional
+                -- components. These components don't affect the actual
+                -- package configuration.
+                let ignoreComponents cc = cc { configCacheComponents = Set.empty }
                 -- Determine the old and new configuration in the local directory, to
                 -- determine if we need to reconfigure.
                 mOldConfigCache <- tryGetConfigCache pkgDir
 
                 mOldCabalMod <- tryGetCabalMod pkgDir
 
-                return $ mOldConfigCache /= Just newConfigCache
+                return $ fmap ignoreComponents mOldConfigCache /= Just (ignoreComponents newConfigCache)
                       || mOldCabalMod /= Just newCabalMod
     let ConfigureOpts dirs nodirs = configCacheOpts newConfigCache
     when needConfig $ withMVar eeConfigureLock $ \_ -> do

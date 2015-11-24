@@ -537,8 +537,8 @@ checkDirtiness ps installed package present wanted = do
 
 describeConfigDiff :: Config -> ConfigCache -> ConfigCache -> Maybe Text
 describeConfigDiff config old new
-    | configCacheDeps old /= configCacheDeps new = Just "dependencies changed"
-    | not $ Set.null $ Set.filter isLibExe newComponents =
+    | not (configCacheDeps new `Set.isSubsetOf` configCacheDeps old) = Just "dependencies changed"
+    | not $ Set.null newComponents =
         Just $ "components added: " `T.append` T.intercalate ", "
             (map (decodeUtf8With lenientDecode) (Set.toList newComponents))
     | not (configCacheHaddock old) && configCacheHaddock new = Just "rebuilding with haddocks"
@@ -550,11 +550,6 @@ describeConfigDiff config old new
         ]
     | otherwise = Nothing
   where
-    isLibExe t = not $ any (`S8.isPrefixOf` t)
-        [ "test:"
-        , "bench:"
-        ]
-
     -- options set by stack
     isStackOpt t = any (`T.isPrefixOf` t)
         [ "--dependency="
