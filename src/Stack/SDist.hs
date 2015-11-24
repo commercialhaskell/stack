@@ -178,7 +178,7 @@ readLocalPackage :: M env m => Path Abs Dir -> m LocalPackage
 readLocalPackage pkgDir = do
     cabalfp <- getCabalFileName pkgDir
     name    <- parsePackageNameFromFilePath cabalfp
-    config  <- getPackageConfig name
+    config  <- getPackageConfig defaultBuildOpts name
     (warnings,package) <- readPackage config cabalfp
     mapM_ (printCabalFileWarning cabalfp) warnings
     return LocalPackage
@@ -271,7 +271,7 @@ checkSDistTarball tarball = withTempTarGzContents tarball $ \pkgDir' -> do
     --               ^ drop ".tar"     ^ drop ".gz"
     cabalfp <- getCabalFileName pkgDir
     name    <- parsePackageNameFromFilePath cabalfp
-    config  <- getPackageConfig name
+    config  <- getPackageConfig defaultBuildOpts name
     (gdesc, pkgDesc) <- readPackageDescriptionDir config pkgDir
     $logInfo $
         "Checking package '" <> packageNameText name <> "' for common mistakes"
