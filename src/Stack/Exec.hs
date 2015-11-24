@@ -20,7 +20,7 @@ import           System.Process.Read (EnvOverride)
 import           Control.Exception.Lifted
 import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import           System.Exit
-import           System.Process.Run (callProcess)
+import           System.Process.Run (callProcess, Cmd(..))
 #else
 import           System.Process.Read (envHelper, preProcess)
 import           System.Posix.Process (executeFile)
@@ -50,7 +50,7 @@ exec :: (MonadIO m, MonadLogger m, MonadThrow m, MonadBaseControl IO m)
 exec menv cmd0 args = do
     $logProcessRun cmd0 args
 #ifdef WINDOWS
-    e <- try (callProcess Nothing menv cmd0 args)
+    e <- try (callProcess (Cmd Nothing cmd0 menv args))
     liftIO $ case e of
         Left (ProcessExitedUnsuccessfully _ ec) -> exitWith ec
         Right () -> exitSuccess

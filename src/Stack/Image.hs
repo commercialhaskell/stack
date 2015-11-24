@@ -113,16 +113,14 @@ createDockerImage dir = do
                           (dir </>
                            $(mkRelFile "Dockerfile")))
                      (unlines ["FROM " ++ base, "ADD ./ /"]))
-            callProcess
-                Nothing
-                menv
-                "docker"
-                [ "build"
-                , "-t"
-                , fromMaybe
-                      (imageName (parent (parent dir)))
-                      (imgDockerImageName =<< dockerConfig)
-                , toFilePathNoTrailingSep dir]
+            let args = [ "build"
+                       , "-t"
+                       , fromMaybe
+                             (imageName (parent (parent dir)))
+                             (imgDockerImageName =<< dockerConfig)
+                       , toFilePathNoTrailingSep dir]
+            callProcess $ Cmd Nothing "docker" menv args
+
 
 -- | Extend the general purpose docker image with entrypoints (if
 -- specified).
@@ -151,10 +149,10 @@ extendDockerImageWithEntrypoint dir = do
                                     , "ENTRYPOINT [\"/usr/local/bin/" ++
                                       ep ++ "\"]"
                                     , "CMD []"]))
-                      callProcess
+                      callProcess $ Cmd
                           Nothing
-                          menv
                           "docker"
+                          menv
                           [ "build"
                           , "-t"
                           , dockerImageName ++ "-" ++ ep
