@@ -1,4 +1,4 @@
-Using Docker with Stack
+Docker integration
 ===============================================================================
 
 `stack` has support for automatically performing builds inside a Docker
@@ -379,7 +379,7 @@ process. You could also use a Dockerfile to make this reusable. Consult the
 [Docker user guide](https://docs.docker.com/userguide/) for more
 on creating Docker images.
 
-### <a name="custom-images"></a>Custom images
+### Custom images
 
 The easiest way to create your own custom image us by extending FP Complete's
 images, but if you prefer to start from scratch, most images that include the

@@ -13,23 +13,10 @@ maintainer:          manny@fpcomplete.com
 category:            Development
 build-type:          Simple
 cabal-version:       >=1.10
-homepage:            https://github.com/commercialhaskell/stack
+homepage:            http://haskellstack.org
 extra-source-files:  CONTRIBUTING.md
                      ChangeLog.md
                      README.md
-                     doc/GUIDE.md
-                     doc/MAINTAINER_GUIDE.md
-                     doc/SIGNING_KEY.md
-                     doc/architecture.md
-                     doc/build_command.md
-                     doc/dependency_visualization.md
-                     doc/docker_integration.md
-                     doc/faq.md
-                     doc/ghcjs.md
-                     doc/install_and_upgrade.md
-                     doc/nonstandard_project_init.md
-                     doc/shell_autocompletion.md
-                     doc/yaml_configuration.md
 
                      -- Glob would be nice, but apparently Cabal doesn't support it:
                      --     cabal: filepath wildcard 'test/package-dump/*.txt' does not match any files.
@@ -327,4 +314,4 @@ test-suite stack-integration-test
 
 source-repository head
   type:     git
-  location: https://github.com/commercialhaskell/stack
+  location: https://github.com/commercialhaskell/stack.git

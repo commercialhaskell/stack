@@ -1,3 +1,5 @@
+# Maintainer guide
+
 ## Pre-release checks
 
 The following should be tested minimally before a release is considered good
@@ -20,8 +22,8 @@ to go:
     * Search for old Stack version, unstable stack version, and the next
       "obvious" version in sequence (if doing a non-obvious jump) and replace
       with new version
-* Ensure all `doc/*.md` files are listed in `stack.cabal`'s 'extra-source-files`
-* Ensure all documentation pages listed in `mkdocs.yaml`
+    * Look for any links to "latest" documentation, replace with version tag
+* Ensure all documentation pages listed in `doc/index.rst`
 * Check that any new Linux distribution versions added to
   `etc/scripts/release.hs` and `etc/scripts/vagrant-releases.sh`
 * Check that no new entries need to be added to
@@ -61,6 +63,8 @@ for requirements to perform the release, and more details about the tool.
 * Reset the `release` branch to the released commit, e.g.: `git checkout release
   && git merge --ff-only vX.Y.Z && git push origin release`
 
+* Update the `stable` branch
+
 * Publish Github release
 
 * Edit
@@ -68,6 +72,10 @@ for requirements to perform the release, and more details about the tool.
   and add the new linux64 stack bindist
 
 * Upload package to Hackage: `stack upload . --pvp-bounds=both`
+
+* Activate version for new release tag on
+  [readthedocs.org](https://readthedocs.org/projects/stack/versions/), and
+  ensure that stable documentation has updated
 
 * On a machine with Vagrant installed:
     * Run `etc/scripts/vagrant-distros.sh`
@@ -82,16 +90,17 @@ for requirements to perform the release, and more details about the tool.
       * Be sure to update the SHA sum
       * The commit message should just be `haskell-stack <VERSION>`
 
-* [Build new MinGHC distribution](#build_minghc)
+* [Build new MinGHC distribution](#update-minghc)
 
-* [Upload haddocks to Hackage](#upload_haddocks), if hackage couldn't build on its own
+* [Upload haddocks to Hackage](#upload-haddocks-to-hackage), if hackage couldn't
+  build on its own
 
 * Announce to haskell-cafe@haskell.org, haskell-stack@googlegroups.com,
   commercialhaskell@googlegroups.com mailing lists
 
-# Extra steps
+## Extra steps
 
-## Upload haddocks to Hackage <a name="upload_haddocks"></a>
+### Upload haddocks to Hackage
 
 * Set `STACKVER` environment variable to the Stack version (e.g. `0.1.6.0`)
 * Run:
@@ -112,7 +121,7 @@ curl -X PUT \
      "https://hackage.haskell.org/package/stack-$STACKVER/docs"
 ```
 
-## Update MinGHC <a name="build_minghc"></a>
+### Update MinGHC
 
 Full details of prerequisites and steps for building MinGHC are in its
 [README](https://github.com/fpco/minghc#building-installers). What follows is an

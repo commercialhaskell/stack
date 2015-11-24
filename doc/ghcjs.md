@@ -32,7 +32,7 @@ setup-info:
         url: "https://github.com/fizruk/ghcjs/releases/download/v0.2.0.20151001/ghcjs-0.2.0.20151001.tar.gz"
 ```
 
-or for the 2015-10-29 master branch 
+or for the 2015-10-29 master branch
 ```yaml
 compiler: ghcjs-0.2.0.20151029_ghc-7.10.2
 compiler-check: match-exact
