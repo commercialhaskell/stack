@@ -140,7 +140,7 @@ This repository also contains a complete [user guide to using stack
 #### Questions, Feedback, Discussion
 
 * For frequently asked questions about detailed or specific use-cases, please
-  see [the FAQ](faq.html).
+  see [the FAQ](faq.md).
 * For general questions, comments, feedback and support please write
   to [the stack mailing list](https://groups.google.com/d/forum/haskell-stack).
 * For bugs, issues, or requests please
