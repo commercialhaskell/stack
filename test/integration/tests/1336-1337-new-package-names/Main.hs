@@ -12,3 +12,9 @@ main = do
     stackErr ["new", "1-abc"]
     stackErr ["new", "44444444444444"]
     stackErr ["new", "abc-1"]
+    stackErr ["new", "444-ば日本-4本"]
+    stack ["new", "ば日本-4本"]
+    stack ["new", "אבהץש"]
+    stack ["new", "ΔΘΩϬ"]
+    doesExist "./ΔΘΩϬ/stack.yaml"
+    doesExist "./ΔΘΩϬ/ΔΘΩϬ.cabal"
