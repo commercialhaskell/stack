@@ -1,3 +1,5 @@
+# YAML Configuration
+
 This page is intended to fully document all configuration options available in the stack.yaml file. Note that this page is likely to be both *incomplete* and sometimes *inaccurate*. If you see such cases, please update the page, and if you're not sure how, open an issue labeled "question".
 
 The stack.yaml configuration options break down into [project specific](#project-config) options in:
