@@ -1,5 +1,5 @@
 name:                stack
-version:             0.1.7.0
+version:             0.1.9.0
 synopsis:            The Haskell Tool Stack
 description:         Please see the README.md for usage information, and
                      the wiki on Github for more details.  Also, note that
@@ -13,22 +13,10 @@ maintainer:          manny@fpcomplete.com
 category:            Development
 build-type:          Simple
 cabal-version:       >=1.10
-homepage:            https://github.com/commercialhaskell/stack
-extra-source-files:  README.md
+homepage:            http://haskellstack.org
+extra-source-files:  CONTRIBUTING.md
                      ChangeLog.md
-                     CONTRIBUTING.md
-                     doc/GUIDE.md
-                     doc/build_command.md
-                     doc/install_and_upgrade.md
-                     doc/MAINTAINER_GUIDE.md
-                     doc/dependency_visualization.md
-                     doc/nonstandard_project_init.md
-                     doc/SIGNING_KEY.md
-                     doc/docker_integration.md
-                     doc/shell_autocompletion.md
-                     doc/architecture.md
-                     doc/faq.md
-                     doc/yaml_configuration.md
+                     README.md
 
                      -- Glob would be nice, but apparently Cabal doesn't support it:
                      --     cabal: filepath wildcard 'test/package-dump/*.txt' does not match any files.
@@ -197,7 +185,7 @@ library
                    , void >= 0.7
                    , yaml >= 0.8.10.1
                    , zlib >= 0.5.4.2
-                   , deepseq >= 1.3
+                   , deepseq >= 1.4
                    , file-embed
                    , word8
                    , hastache
@@ -330,4 +318,4 @@ test-suite stack-integration-test
 
 source-repository head
   type:     git
-  location: https://github.com/commercialhaskell/stack
+  location: https://github.com/commercialhaskell/stack.git

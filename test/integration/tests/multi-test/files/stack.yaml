@@ -1,0 +1,7 @@
+flags: {}
+packages:
+- .
+- sub-package
+- cyclic
+extra-deps: []
+resolver: lts-3.9

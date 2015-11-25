@@ -92,22 +92,23 @@ ghci GhciOpts{..} = do
     wc <- getWhichCompiler
     let pkgopts = hidePkgOpt ++ genOpts ++ ghcOpts
         hidePkgOpt = if null pkgs then [] else ["-hide-all-packages"]
-        genOpts = nubOrd (concatMap (concatMap (bioGeneratedOpts . snd) . ghciPkgOpts) pkgs)
+        genOpts = nubOrd (concatMap (concatMap (bioOneWordOpts . snd) . ghciPkgOpts) pkgs)
         (omittedOpts, ghcOpts) = partition badForGhci $
-            concatMap (concatMap (bioGhcOpts . snd) . ghciPkgOpts) pkgs ++
+            concatMap (concatMap (bioOpts . snd) . ghciPkgOpts) pkgs ++
             getUserOptions Nothing ++
             concatMap (getUserOptions . Just . ghciPkgName) pkgs
         getUserOptions mpkg =
             map T.unpack (M.findWithDefault [] mpkg (configGhcOptions config))
         badForGhci x =
-            isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky -static")
+            isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky -static -Werror")
     unless (null omittedOpts) $
         $logWarn
             ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
              T.unwords (map T.pack (nubOrd omittedOpts)))
     let modulesToLoad = nubOrd $
-            maybe [] (return . toFilePath) mainFile <>
             concatMap (map display . S.toList . ghciPkgModules) pkgs
+        thingsToLoad =
+            maybe [] (return . toFilePath) mainFile <> modulesToLoad
         odir =
             [ "-odir=" <> toFilePathNoTrailingSep (objectInterfaceDir bconfig)
             , "-hidir=" <> toFilePathNoTrailingSep (objectInterfaceDir bconfig)]
@@ -132,7 +133,7 @@ ghci GhciOpts{..} = do
                 (\tmpDir ->
                       do let scriptPath = tmpDir </> $(mkRelFile "ghci-script")
                              fp = toFilePath scriptPath
-                             loadModules = ":load " <> unwords modulesToLoad
+                             loadModules = ":load " <> unwords (map show thingsToLoad)
                              bringIntoScope = ":module + " <> unwords modulesToLoad
                          liftIO (writeFile fp (unlines [loadModules,bringIntoScope]))
                          finally (execGhci ["-ghci-script=" <> fp])
@@ -332,9 +333,25 @@ checkForIssues pkgs = do
         , mixedFlag "-XNoTraditionalRecordSyntax"
           [ "-XNoTraditionalRecordSyntax will be used, but it break modules which use record syntax." ]
         , mixedFlag "-XTemplateHaskell"
-          [ "-XTemplateHaskell will be used, but it may cause compilation issues due to different parsing of ($)." ]
+          [ "-XTemplateHaskell will be used, but it may cause compilation issues due to different parsing of '$' when there's no space after it." ]
+        , mixedFlag "-XQuasiQuotes"
+          [ "-XQuasiQuotes will be used, but it may cause parse failures due to a different meaning for list comprehension syntax like [x| ... ]" ]
         , mixedFlag "-XSafe"
           [ "-XSafe will be used, but it will fail to compile unsafe modules." ]
+        , mixedFlag "-XArrows"
+          [ "-XArrows will be used, but it will cause non-arrow usages of proc, (-<), (-<<) to fail" ]
+        , mixedFlag "-XOverloadedStrings"
+          [ "-XOverloadedStrings will be used, but it can cause type ambiguity in code not usually compiled with it." ]
+        , mixedFlag "-XOverloadedLists"
+          [ "-XOverloadedLists will be used, but it can cause type ambiguity in code not usually compiled with it." ]
+        , mixedFlag "-XMonoLocalBinds"
+          [ "-XMonoLocalBinds will be used, but it can cause type errors in code which expects generalized local bindings." ]
+        , mixedFlag "-XTypeFamilies"
+          [ "-XTypeFamilies will be used, but it implies -XMonoLocalBinds, and so can cause type errors in code which expects generalized local bindings." ]
+        , mixedFlag "-XGADTs"
+          [ "-XGADTs will be used, but it implies -XMonoLocalBinds, and so can cause type errors in code which expects generalized local bindings." ]
+        , mixedFlag "-XNewQualifiedOperators"
+          [ "-XNewQualifiedOperators will be used, but this will break usages of the old qualified operator syntax." ]
         ]
     mixedFlag flag msgs =
         let x = partitionComps (== flag) in
@@ -349,7 +366,7 @@ checkForIssues pkgs = do
     partitionComps f = (map fst xs, map fst ys)
       where
         (xs, ys) = partition (any f . snd) compsWithOpts
-    compsWithOpts = map (\(k, bio) -> (k, bioGeneratedOpts bio ++ bioGhcOpts bio)) compsWithBios
+    compsWithOpts = map (\(k, bio) -> (k, bioOneWordOpts bio ++ bioOpts bio)) compsWithBios
     compsWithBios =
         [ ((ghciPkgName pkg, c), bio)
         | pkg <- pkgs

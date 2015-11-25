@@ -557,8 +557,7 @@ toActions installedMap runInBase ee (mbuild, mfinal) =
                         unless (Set.null tests) $ do
                             singleTest runInBase topts (Set.toList tests) ac ee task installedMap
                         unless (Set.null benches) $ do
-                            -- FIXME: shouldn't this use the list of benchmarks to run?
-                            singleBench runInBase beopts ac ee task installedMap
+                            singleBench runInBase beopts (Set.toList benches) ac ee task installedMap
                     }
                 ]
               where
@@ -633,7 +632,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp = do
 
                 mOldCabalMod <- tryGetCabalMod pkgDir
 
-                return $ mOldConfigCache /= Just newConfigCache
+                return $ fmap configCacheOpts mOldConfigCache /= Just (configCacheOpts newConfigCache)
                       || mOldCabalMod /= Just newCabalMod
     let ConfigureOpts dirs nodirs = configCacheOpts newConfigCache
     when needConfig $ withMVar eeConfigureLock $ \_ -> do
@@ -941,7 +940,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
     getPrecompiled cache =
         case taskLocation task of
-            Snap -> do
+            Snap | not shouldHaddockPackage' -> do
                 mpc <- readPrecompiledCache taskProvides
                     (configCacheOpts cache)
                     (configCacheDeps cache)
@@ -1254,17 +1253,18 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
 singleBench :: M env m
             => (m () -> IO ())
             -> BenchmarkOpts
+            -> [Text]
             -> ActionContext
             -> ExecuteEnv
             -> Task
             -> InstalledMap
             -> m ()
-singleBench runInBase beopts ac ee task installedMap = do
+singleBench runInBase beopts benchesToRun ac ee task installedMap = do
     -- FIXME: Since this doesn't use cabal, we should be able to avoid using a
     -- fullblown 'withSingleContext'.
     (allDepsMap, _cache) <- getConfigCache ee task installedMap False True
     withSingleContext runInBase ac ee task (Just allDepsMap) (Just "bench") $ \_package _cabalfp _pkgDir cabal announce _console _mlogFile -> do
-        let args = maybe []
+        let args = map T.unpack benchesToRun <> maybe []
                          ((:[]) . ("--benchmark-options=" <>))
                          (beoAdditionalArgs beopts)
 

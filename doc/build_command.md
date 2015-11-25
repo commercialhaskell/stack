@@ -1,3 +1,5 @@
+# Build command
+
 ## Overview
 
 The primary command you use in stack is build. This page describes the details

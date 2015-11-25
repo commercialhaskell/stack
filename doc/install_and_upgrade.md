@@ -1,12 +1,14 @@
+# Install/upgrade
+
 Distribution packages are available for [Ubuntu](#ubuntu), [Debian](#debian),
-[CentOS / Red Hat](#centos--red-hat), [Fedora](#fedora) and
+[CentOS / Red Hat / Amazon Linux](#centos-red-hat-amazon-linux), [Fedora](#fedora) and
 [Arch Linux](#arch-linux). Binaries for other operating systems are listed
 below, and available on
 [the Github releases page](https://github.com/fpco/stack/releases). For the
 future, we are open to supporting more OSes (to request one, please
 [submit an issue](https://github.com/commercialhaskell/stack/issues/new)).
 
-Binary packages are signed with this [signing key](SIGNING_KEY.md).
+Binary packages are signed with this [signing key](SIGNING_KEY.html).
 
 If you are writing a script that needs to download the latest binary, you can
 find links that always point to the latest bindists
@@ -37,8 +39,8 @@ will make `stack install` and `stack upgrade` work correctly out of the box.
 
 * Download the latest release:
 
-      * [Windows 32-bit](https://www.stackage.org/stack/windows-i386)
-      * [Windows 64-bit](https://www.stackage.org/stack/windows-x86_64)
+    * [Windows 32-bit](https://www.stackage.org/stack/windows-i386)
+    * [Windows 64-bit](https://www.stackage.org/stack/windows-x86_64)
 
 * Unpack the archive and place `stack.exe` somewhere on your `%PATH%` (see
   [Path section below](#path)) and you can then run `stack` on the command line.
@@ -52,7 +54,7 @@ such.
 
 ## Mac OS X
 
-### Using brew
+### Using Homebrew
 
 If you have a popular [brew](http://brew.sh/) tool installed, you can just do:
 
@@ -75,33 +77,33 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
 *note*: for 32-bit, use the [generic Linux option](#linux)
 
-1. Get the FP Complete key:
+ 1. Get the FP Complete key:
 
-        wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/ubuntu/fpco.key | sudo apt-key add -
+        sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 575159689BEFB442
 
-2. Add the appropriate source repository:
+ 2. Add the appropriate source repository (if not sure, run ``lsb_release -a`` to find out your Ubuntu version):
 
-    * Ubuntu 15.10 (amd64):
+      * Ubuntu 15.10 (amd64):
 
             echo 'deb http://download.fpcomplete.com/ubuntu/wily stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
-    * Ubuntu 15.04 (amd64):
+      * Ubuntu 15.04 (amd64):
 
             echo 'deb http://download.fpcomplete.com/ubuntu/vivid stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
-    * Ubuntu 14.10 (amd64)
+      * Ubuntu 14.10 (amd64)
 
             echo 'deb http://download.fpcomplete.com/ubuntu/utopic stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
-    * Ubuntu 14.04 (amd64)
+      * Ubuntu 14.04 (amd64)
 
             echo 'deb http://download.fpcomplete.com/ubuntu/trusty stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
-    * Ubuntu 12.04 (amd64)
+      * Ubuntu 12.04 (amd64)
 
             echo 'deb http://download.fpcomplete.com/ubuntu/precise stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
-3. Update apt and install
+ 3. Update apt and install
 
         sudo apt-get update && sudo apt-get install stack -y
 
@@ -109,21 +111,21 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
 *note*: for 32-bit, use the [generic Linux option](#linux)
 
-1. Get the FP Complete key:
+ 1. Get the FP Complete key:
 
         wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/debian/fpco.key | sudo apt-key add -
 
-2. Add the appropriate source repository:
+ 2. Add the appropriate source repository:
 
-    * Debian 8 (amd64):
+      * Debian 8 (amd64):
 
             echo 'deb http://download.fpcomplete.com/debian/jessie stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
-    * Debian 7 (amd64)
+      * Debian 7 (amd64)
 
             echo 'deb http://download.fpcomplete.com/debian/wheezy stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
-3. Update apt and install
+ 3. Update apt and install
 
         sudo apt-get update && sudo apt-get install stack -y
 
@@ -131,17 +133,17 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
 *note*: for 32-bit, use the [generic Linux option](#linux)
 
-1. Add the appropriate source repository:
+ 1. Add the appropriate source repository:
 
-    * CentOS 7 / RHEL 7 (x86_64)
+      * CentOS 7 / RHEL 7 (x86_64)
 
             curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/centos/7/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 
-    * CentOS 6 / RHEL 6 (x86_64)
+      * CentOS 6 / RHEL 6 (x86_64)
 
             curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/centos/6/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 
-2. Install:
+ 2. Install:
 
         sudo yum -y install stack
 
@@ -149,25 +151,29 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
 *note*: for 32-bit, you can use this [Fedora Copr repo](https://copr.fedoraproject.org/coprs/petersen/stack/) which can be enabled with:
 
-        sudo dnf copr enable petersen/stack
+    sudo dnf copr enable petersen/stack
 
-1. Add the appropriate source repository:
+ 1. Add the appropriate source repository:
 
-    * Fedora 22 (x86_64)
+      * Fedora 23 (x86_64)
+
+            curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/23/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
+
+      * Fedora 22 (x86_64)
 
             curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/22/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 
-    * Fedora 21 (x86_64)
+      * Fedora 21 (x86_64)
 
             curl -sSL https://s3.amazonaws.com/download.fpcomplete.com/fedora/21/fpco.repo | sudo tee /etc/yum.repos.d/fpco.repo
 
-2. Install:
+ 2. Install:
 
-    * Fedora 22+
+      * Fedora 22 and above
 
             sudo dnf -y install stack
 
-    * Fedora < 22
+      * Fedora < 22
 
             sudo yum -y install stack
 
@@ -187,23 +193,23 @@ If you use the [ArchHaskell repository](https://wiki.archlinux.org/index.php/Arc
 
 Users who follow the `nixos-unstable` channel or the Nixpkgs `master` branch can install the latest `stack` release into their profile by running:
 
-         nix-env -f "<nixpkgs>" -iA haskellPackages.stack
+    nix-env -f "<nixpkgs>" -iA haskellPackages.stack
 
 Alternatively, the package can be built from source as follows.
 
-1. Clone the git repo:
+ 1. Clone the git repo:
 
-         git clone https://github.com/commercialhaskell/stack.git
+        git clone https://github.com/commercialhaskell/stack.git
 
-2. Create a `shell.nix` file:
+ 2. Create a `shell.nix` file:
 
-         cabal2nix --shell ./. --no-check --no-haddock > shell.nix
+        cabal2nix --shell ./. --no-check --no-haddock > shell.nix
 
-   Note that the tests fail on NixOS, so disable them with `--no-check`. Also, haddock currently doesn't work for stack, so `--no-haddock` disables it.
+    Note that the tests fail on NixOS, so disable them with `--no-check`. Also, haddock currently doesn't work for stack, so `--no-haddock` disables it.
 
-3. Install stack to your user profile:
+ 3. Install stack to your user profile:
 
-         nix-env -i -f shell.nix
+        nix-env -i -f shell.nix
 
 For more information on using Stack together with Nix, please see [the NixOS
 manual section on
@@ -215,13 +221,13 @@ Stack](http://nixos.org/nixpkgs/manual/#using-stack-together-with-nix).
 
 * Download the latest release:
 
-      * [Linux 64-bit, standard](https://www.stackage.org/stack/linux-x86_64)
-      * [Linux 32-bit, standard](https://www.stackage.org/stack/linux-i386)
+    * [Linux 64-bit, standard](https://www.stackage.org/stack/linux-x86_64)
+    * [Linux 32-bit, standard](https://www.stackage.org/stack/linux-i386)
 
     If you are on an older distribution that only includes libgmp4 (libgmp.so.3), such as CentOS/RHEL/Amazon Linux 6.x, use one of these instead:
 
-      * [Linux 64-bit, libgmp4](https://www.stackage.org/stack/linux-x86_64-gmp4)
-      * [Linux 32-bit, libgmp4](https://www.stackage.org/stack/linux-i386-gmp4)
+    * [Linux 64-bit, libgmp4](https://www.stackage.org/stack/linux-x86_64-gmp4)
+    * [Linux 32-bit, libgmp4](https://www.stackage.org/stack/linux-i386-gmp4)
 
 * Extract the archive and place `stack` somewhere on your `$PATH` (see [Path section below](#path))
 
@@ -237,6 +243,16 @@ You can install stack by copying it anywhere on your PATH environment variable. 
 If you don't have that directory in your PATH, you may need to update your PATH (such as by editing .bashrc).
 
 If you're curious about the choice of these paths, see [issue #153](https://github.com/commercialhaskell/stack/issues/153)
+
+## Shell auto-completion
+
+To get tab-completion of commands on bash, just run the following (or add it to
+`.bashrc`):
+
+    eval "$(stack --bash-completion-script stack)"
+
+For more information and other shells, see [the shell auto-completion wiki
+page](https://github.com/commercialhaskell/stack/wiki/Shell-autocompletion)
 
 ## Upgrade
 

@@ -289,6 +289,8 @@ runContainerAndExit getCmdArgs
                   isStderrTerminal
          keepStdinOpen = not (dockerDetach docker) &&
                          -- Workaround for https://github.com/docker/docker/issues/12319
+                         -- This seems be fixed in Docker 1.9.1, but will leave the workaround
+                         -- in place for now, for users who haven't upgraded yet.
                          (isTerm || (isNothing bamboo && isNothing jenkins))
          newPathEnv = intercalate [Posix.searchPathSeparator] $
                       nubOrd $
@@ -708,8 +710,8 @@ entrypoint config@Config{..} DockerEntrypoint{..} = do
         User.getUserEntryForName stackUserName
       -- Switch UID/GID if needed, and update user's home directory
       case deUidGid of
-        Nothing -> updateRootUser envOverride homeDir
-        Just (0,_) -> updateRootUser envOverride homeDir
+        Nothing -> return ()
+        Just (0,_) -> return ()
         Just (uid,gid) -> updateOrCreateStackUser envOverride estackUserEntry0 homeDir uid gid
       case estackUserEntry0 of
         Left _ -> return ()
@@ -745,13 +747,6 @@ entrypoint config@Config{..} DockerEntrypoint{..} = do
                     copyFile srcIndex destIndex
     return True
   where
-    updateRootUser envOverride homeDir = do
-      -- Adjust the 'root' user's home directory to match HOME environment variable,
-      -- when running as root or no UID/GID provided
-      readProcessNull Nothing envOverride "usermod"
-        ["-o"
-        ,"--home",toFilePathNoTrailingSep homeDir
-        ,rootUserName]
     updateOrCreateStackUser envOverride estackUserEntry homeDir uid gid = do
       case estackUserEntry of
         Left _ -> do
@@ -782,7 +777,6 @@ entrypoint config@Config{..} DockerEntrypoint{..} = do
         User.setGroupID gid
         User.setUserID uid
     stackUserName = "stack"::String
-    rootUserName = "root"::String
 
 -- | MVar used to ensure the Docker entrypoint is performed exactly once
 entrypointMVar :: MVar Bool

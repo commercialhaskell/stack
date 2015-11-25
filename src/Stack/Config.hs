@@ -436,10 +436,18 @@ resolvePackageLocation
     -> PackageLocation
     -> m (Path Abs Dir)
 resolvePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
-resolvePackageLocation _ projRoot (PLHttpTarball url) = do
-    let name = T.unpack $ decodeUtf8 $ B16.encode $ SHA256.hash $ encodeUtf8 url
+resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
+    let nameBeforeHashing = case remotePackageType of
+            RPTHttpTarball -> url
+            RPTGit commit  -> T.unwords [url, commit]
+            RPTHg  commit  -> T.unwords [url, commit, "hg"]
+        name = T.unpack $ decodeUtf8 $ B16.encode $ SHA256.hash $ encodeUtf8 nameBeforeHashing
         root = projRoot </> workDirRel </> $(mkRelDir "downloaded")
-    fileRel <- parseRelFile $ name ++ ".tar.gz"
+        fileExtension = case remotePackageType of
+            RPTHttpTarball -> ".tar.gz"
+            _              -> ".unused"
+
+    fileRel <- parseRelFile $ name ++ fileExtension
     dirRel <- parseRelDir name
     dirRelTmp <- parseRelDir $ name ++ ".tmp"
     let file = root </> fileRel
@@ -448,51 +456,46 @@ resolvePackageLocation _ projRoot (PLHttpTarball url) = do
 
     exists <- dirExists dir
     unless exists $ do
-        req <- parseUrl $ T.unpack url
-        _ <- download req file
-
         removeTreeIfExists dirTmp
-        liftIO $ withBinaryFile (toFilePath file) ReadMode $ \h -> do
-            lbs <- L.hGetContents h
-            let entries = Tar.read $ GZip.decompress lbs
-            Tar.unpack (toFilePath dirTmp) entries
-            renameDir dirTmp dir
 
-    x <- listDirectory dir
-    case x of
-        ([dir'], []) -> return dir'
-        (dirs, files) -> do
-            removeFileIfExists file
-            removeTreeIfExists dir
-            throwM $ UnexpectedTarballContents dirs files
+        let cloneAndExtract commandName resetCommand commit = do
+                createTree (parent dirTmp)
+                readInNull (parent dirTmp) commandName menv
+                    [ "clone"
+                    , T.unpack url
+                    , toFilePathNoTrailingSep dirTmp
+                    ]
+                    Nothing
+                readInNull dirTmp commandName menv
+                    (resetCommand ++ [T.unpack commit])
+                    Nothing
 
-resolvePackageLocation menv projRoot (PLGit url commit) = do
-    let name = T.unpack $ decodeUtf8 $ B16.encode $ SHA256.hash $ encodeUtf8 $ T.unwords [url, commit]
-        root = projRoot </> workDirRel </> $(mkRelDir "downloaded")
-    dirRel <- parseRelDir $ name ++ ".git"
-    dirRelTmp <- parseRelDir $ name ++ ".git.tmp"
-    let dir = root </> dirRel
-        dirTmp = root </> dirRelTmp
+        case remotePackageType of
+            RPTHttpTarball -> do
+                req <- parseUrl $ T.unpack url
+                _ <- download req file
 
-    exists <- dirExists dir
-    unless exists $ do
-        removeTreeIfExists dirTmp
-        createTree (parent dirTmp)
-        readInNull (parent dirTmp) "git" menv
-            [ "clone"
-            , T.unpack url
-            , toFilePathNoTrailingSep dirTmp
-            ]
-            Nothing
-        readInNull dirTmp "git" menv
-            [ "reset"
-            , "--hard"
-            , T.unpack commit
-            ]
-            Nothing
+                liftIO $ withBinaryFile (toFilePath file) ReadMode $ \h -> do
+                    lbs <- L.hGetContents h
+                    let entries = Tar.read $ GZip.decompress lbs
+                    Tar.unpack (toFilePath dirTmp) entries
+
+            RPTGit commit -> cloneAndExtract "git" ["reset", "--hard"] commit
+            RPTHg  commit -> cloneAndExtract "hg"  ["update", "-C"]    commit
+
         renameDir dirTmp dir
 
-    return dir
+    case remotePackageType of
+        RPTHttpTarball -> do
+            x <- listDirectory dir
+            case x of
+                ([dir'], []) -> return dir'
+                (dirs, files) -> do
+                    removeFileIfExists file
+                    removeTreeIfExists dir
+                    throwM $ UnexpectedTarballContents dirs files
+
+        _ -> return dir
 
 -- | Get the stack root, e.g. ~/.stack
 determineStackRoot :: (MonadIO m, MonadThrow m) => m (Path Abs Dir)

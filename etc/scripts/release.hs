@@ -250,7 +250,7 @@ rules global@Global{..} args = do
     archStagedExeFile %> \out -> do
         copyFileChanged (releaseDir </> binaryExeFileName) out
     archStagedBashCompletionFile %> \out -> do
-        writeBashCompletion archStagedExeFile archStagingDir out
+        writeBashCompletion archStagedExeFile out
     archStagedDocDir ++ "//*" %> \out -> do
         let origFile = dropDirectoryPrefix archStagedDocDir out
         copyFileChanged origFile out
@@ -292,7 +292,7 @@ rules global@Global{..} args = do
             copyFileChanged (releaseDir </> binaryExeFileName) out
         debStagedBashCompletionFile anyVersion0 %> \out -> do
             let dv = distroVersionFromPath out debVersions
-            writeBashCompletion (debStagedExeFile dv) (debStagingDir dv) out
+            writeBashCompletion (debStagedExeFile dv) out
         debStagedDocDir anyVersion0 ++ "//*" %> \out -> do
             let dv@DistroVersion{..} = distroVersionFromPath out debVersions
                 origFile = dropDirectoryPrefix (debStagedDocDir dv) out
@@ -342,15 +342,15 @@ rules global@Global{..} args = do
             copyFileChanged (releaseDir </> binaryExeFileName) out
         rpmStagedBashCompletionFile anyVersion0 %> \out -> do
             let dv = distroVersionFromPath out rpmVersions
-            writeBashCompletion (rpmStagedExeFile dv) (rpmStagingDir dv) out
+            writeBashCompletion (rpmStagedExeFile dv) out
         rpmStagedDocDir anyVersion0 ++ "//*" %> \out -> do
             let dv@DistroVersion{..} = distroVersionFromPath out rpmVersions
                 origFile = dropDirectoryPrefix (rpmStagedDocDir dv) out
             copyFileChanged origFile out
 
-    writeBashCompletion stagedStackExeFile stageDir out = do
+    writeBashCompletion stagedStackExeFile out = do
         need [stagedStackExeFile]
-        (Stdout bashCompletionScript) <- cmd [stagedStackExeFile] "--bash-completion-script" ["/" ++ dropDirectoryPrefix stageDir stagedStackExeFile]
+        (Stdout bashCompletionScript) <- cmd [stagedStackExeFile] "--bash-completion-script" [stackProgName]
         writeFileChanged out bashCompletionScript
 
     getBinaryPkgStageFiles = do
@@ -434,7 +434,7 @@ rules global@Global{..} args = do
 
     archStagedDocDir = archStagingDir </> "usr/share/doc" </> stackProgName
     archStagedBashCompletionFile = archStagingDir </> "usr/share/bash-completion/completions/stack"
-    archStagedExeFile = archStagingDir </> "usr/bin/stack"
+    archStagedExeFile = archStagingDir </> "usr/bin" </> stackProgName
     archStagingDir = archDir </> archPackageName
     archPackageFileName = archPackageName <.> tarGzExt
     archPackageName = stackProgName ++ "_" ++ stackVersionStr global ++ "-" ++ "x86_64"
@@ -454,7 +454,8 @@ rules global@Global{..} args = do
         , ("6", "el6") ]
     fedoraVersions =
         [ ("21", "fc21")
-        , ("22", "fc22") ]
+        , ("22", "fc22")
+        , ("23", "fc23") ]
 
     ubuntuDistro = "ubuntu"
     debianDistro = "debian"

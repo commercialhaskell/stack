@@ -76,17 +76,10 @@ benchOptsParser = BenchmarkOpts
         <*> switch (long "no-run-benchmarks" <>
                    help "Disable running of benchmarks. (Benchmarks will still be built.)")
 
-addCoverageFlags :: BuildOpts -> BuildOpts
-addCoverageFlags bopts
-    | toCoverage $ boptsTestOpts bopts
-        = bopts { boptsGhcOptions = "-fhpc" : boptsGhcOptions bopts }
-    | otherwise = bopts
-
 -- | Parser for build arguments.
 buildOptsParser :: Command
                 -> Parser BuildOpts
 buildOptsParser cmd =
-            fmap addCoverageFlags $
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             haddock <*> haddockDeps <*> dryRun <*> ghcOpts <*>
             flags <*> copyBins <*> preFetch <*> buildSubset <*>
@@ -153,11 +146,11 @@ buildOptsParser cmd =
                 (long "dependencies-only" <>
                  help "A synonym for --only-dependencies")
             <|> flag' BSOnlySnapshot
-                (long ("only-snapshot") <>
-                 help ("Only build packages for the snapshot database, not the local database"))
+                (long "only-snapshot" <>
+                 help "Only build packages for the snapshot database, not the local database")
             <|> flag' BSOnlyDependencies
-                (long ("only-dependencies") <>
-                 help ("Only build packages that are dependencies of targets on the command line"))
+                (long "only-dependencies" <>
+                 help "Only build packages that are dependencies of targets on the command line")
             <|> pure BSAll
 
         fileWatch' =

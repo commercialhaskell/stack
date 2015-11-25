@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE PackageImports        #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -15,8 +16,8 @@ module Stack.Build.Source
     , loadLocalPackage
     , parseTargetsFromBuildOpts
     , addUnlistedToBuildCache
+    , getPackageConfig
     ) where
-
 
 import           Control.Applicative
 import           Control.Arrow ((&&&))
@@ -27,7 +28,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Resource
-import           Crypto.Hash (Digest, SHA256)
+import "cryptohash" Crypto.Hash (Digest, SHA256)
 import           Crypto.Hash.Conduit (sinkHash)
 import qualified Data.ByteString as S
 import           Data.Byteable (toBytes)
@@ -286,17 +287,9 @@ loadLocalPackage
     -> (PackageName, (LocalPackageView, GenericPackageDescription))
     -> m LocalPackage
 loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
-    bconfig <- asks getBuildConfig
-    econfig <- asks getEnvConfig
+    config  <- getPackageConfig bopts name
 
-    let config = PackageConfig
-            { packageConfigEnableTests = False
-            , packageConfigEnableBenchmarks = False
-            , packageConfigFlags = localFlags (boptsFlags bopts) bconfig name
-            , packageConfigCompilerVersion = envConfigCompilerVersion econfig
-            , packageConfigPlatform = configPlatform $ getConfig bconfig
-            }
-        pkg = resolvePackage config gpkg
+    let pkg = resolvePackage config gpkg
 
         mtarget = Map.lookup name targets
         (exes, tests, benches) =
@@ -571,3 +564,19 @@ checkComponentsBuildable lps =
         | lp <- lps
         , c <- Set.toList (lpUnbuildable lp)
         ]
+
+-- | Get 'PackageConfig' for package given its name.
+getPackageConfig :: (MonadIO m, MonadThrow m, MonadCatch m, MonadLogger m, MonadReader env m, HasEnvConfig env)
+  => BuildOpts
+  -> PackageName
+  -> m PackageConfig
+getPackageConfig bopts name = do
+  econfig <- asks getEnvConfig
+  bconfig <- asks getBuildConfig
+  return PackageConfig
+    { packageConfigEnableTests = False
+    , packageConfigEnableBenchmarks = False
+    , packageConfigFlags = localFlags (boptsFlags bopts) bconfig name
+    , packageConfigCompilerVersion = envConfigCompilerVersion econfig
+    , packageConfigPlatform = configPlatform $ getConfig bconfig
+    }
