@@ -1686,6 +1686,18 @@ image:
 and then run `stack image container` and then `docker images` to list
 the images.
 
+### Nix
+
+stack provides an integration with [Nix](http://nixos.org/nix), in order to build inside nix-shells. This allows you:
+
+* to gather non-Haskell dependencies that are packaged in [Nixpkgs](http://nixos.org/nixpkgs) before build starts
+* to have these dependencies installed in an isolated location
+* to launch the build in a special environment (a nix-shell) so it may find these dependencies without altering your system
+
+The Nix ecosystem provides a programming language and a package management system. The [Nix manual](http://nixos.org/nix/manual) is a good place to start.
+
+For more information, see [the Nix-integration documentation](nix_integration.md).
+
 ## Power user commands
 
 The following commands are a little more powerful, and won't be needed by all
