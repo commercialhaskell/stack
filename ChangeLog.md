@@ -10,6 +10,8 @@ Other enhancements:
   [#508](https://github.com/commercialhaskell/stack/issues/508)
 * Support for packages located in Mercurial repositories
   [#1397](https://github.com/commercialhaskell/stack/issues/1397)
+* Only run benchmarks specified as build targets
+  [#1412](https://github.com/commercialhaskell/stack/issues/1412)
 
 Bug fixes:
 
