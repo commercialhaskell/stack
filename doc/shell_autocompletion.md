@@ -1,4 +1,4 @@
-# Shell Autocompletion:
+# Shell Autocompletion
 
 Note: if you installed a package for you Linux distribution, the bash completion
 file was automatically installed (you may need the `bash-completion` package to
