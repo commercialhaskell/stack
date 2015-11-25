@@ -68,6 +68,12 @@ In Nixpkgs master branch, you can find the mirrored resolvers in the
 Haskell modules
 [here on Github](https://github.com/NixOS/nixpkgs/tree/master/pkgs/development/haskell-modules).
 
+*Note:* currently, stack only discovers dynamic and static libraries
+in the `lib/` folder of any nix package, and likewise header files in
+the `include/` folder. If you're dealing with a package that doesn't
+follow this standard layout, you'll have to deal with that using
+a custom shell file (see below).
+
 ### Use stack as normal
 
 With Nix enabled, `stack build` and `stack exec` will automatically
