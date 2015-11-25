@@ -20,3 +20,8 @@ tags
 /src/highlight.js
 /src/style.css
 /doc/_build
+
+# test output
+test.dot
+test.html
+
