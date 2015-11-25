@@ -297,7 +297,7 @@ generateBuildInfoOpts
     -> BuildInfoOpts
 generateBuildInfoOpts sourceMap installedMap mcabalmacros cabalDir distDir omitPkgs b dotCabalPaths componentName =
     BuildInfoOpts
-        { bioOpts = macros ++ ghcOpts b
+        { bioOpts = macros ++ ghcOpts b ++ cppOptions b
         -- NOTE for future changes: Due to this use of nubOrd (and other uses
         -- downstream), these generated options must not rely on multiple
         -- argument sequences.  For example, ["--main-is", "Foo.hs", "--main-
