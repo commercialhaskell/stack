@@ -54,6 +54,14 @@ such.
 
 ## Mac OS X
 
+Note: if you are on OS X 10.11 ("El Capitan") or later, System Integrity
+Protection (a.k.a. "rootless") can cause two problems:
+
+  * [GHC 7.8.4 fails with `/usr/bin/ar: permission denied`](faq.html#usr-bin-ar-permission-denied)
+  * [DYLD_LIBRARY_PATH is ignored](faq.html#dyld-library-path-ignored)
+
+See the above links for workarounds.
+
 ### Using Homebrew
 
 If you have a popular [brew](http://brew.sh/) tool installed, you can just do:
