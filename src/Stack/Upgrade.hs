@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 module Stack.Upgrade (upgrade) where
 
+import           Control.Monad               (when)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -11,6 +12,7 @@ import           Control.Monad.Reader        (MonadReader, asks)
 import           Control.Monad.Trans.Control
 import           Data.Foldable               (forM_)
 import qualified Data.Map                    as Map
+import           Data.Maybe                  (isNothing)
 import           Data.Monoid                 ((<>))
 import qualified Data.Monoid
 import qualified Data.Set                    as Set
@@ -43,6 +45,11 @@ upgrade gitRepo mresolver builtHash =
       Just repo -> do
         remote <- liftIO $ readProcess "git" ["ls-remote", repo, "master"] []
         let latestCommit = head . words $ remote
+        when (isNothing builtHash) $
+            $logWarn $ "Information about the commit this version of stack was "
+                    <> "built from is not available due to how it was built. "
+                    <> "Will continue by assuming an upgrade is needed "
+                    <> "because we have no information to the contrary."
         if builtHash == Just latestCommit then do
           $logInfo "Already up-to-date, no upgrade required"
           return Nothing
