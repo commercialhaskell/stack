@@ -37,7 +37,7 @@ import           Data.Version (showVersion)
 #ifdef USE_GIT_INFO
 import           Development.GitRev (gitCommitCount, gitHash)
 #endif
-import           Distribution.System (buildArch)
+import           Distribution.System (buildArch, buildPlatform)
 import           Distribution.Text (display)
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Network.HTTP.Client
@@ -84,6 +84,7 @@ import           Stack.Types.StackT
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import           System.Directory (canonicalizePath, doesFileExist, doesDirectoryExist, createDirectoryIfMissing)
+import qualified System.Directory as Directory (findExecutable)
 import           System.Environment (getEnvironment, getProgName)
 import           System.Exit
 import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
@@ -147,6 +148,21 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
          "stack - The Haskell Tool Stack"
          ""
          (globalOpts False)
+         -- when there's a parse failure
+         (Just $ \f as ->
+           -- fall-through to external executables in `git` style if they exist
+           -- (i.e. `stack something` looks for `stack-something` before
+           -- failing with "Invalid argument `something'")
+           case stripPrefix "Invalid argument" (fst (renderFailure f "")) of
+             Just _ -> do
+               mExternalExec <- Directory.findExecutable ("stack-" ++ head as)
+               case mExternalExec of
+                 Just ex -> do
+                   menv <- getEnvOverride buildPlatform
+                   runNoLoggingT (exec menv ex (tail as))
+                 Nothing -> handleParseResult (Failure f)
+             Nothing -> handleParseResult (Failure f)
+         )
          (do addCommand' "build"
                         "Build the package(s) in this directory/configuration"
                         cmdFooter
@@ -912,17 +928,20 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                  (ExecRunGhc, args) -> return ("runghc", args)
             (manager,lc) <- liftIO $ loadConfigWithOpts go
             withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
-             runStackTGlobal manager (lcConfig lc) go $
+              runStackTGlobal manager (lcConfig lc) go $
                 Docker.reexecWithOptionalContainer
                     (lcProjectRoot lc)
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
-                    (runStackTGlobal manager (lcConfig lc) go $
-                        exec plainEnvSettings cmd args)
+                    (runStackTGlobal manager (lcConfig lc) go $ do
+                        config <- asks getConfig
+                        menv <- liftIO $ configEnvOverride config plainEnvSettings
+                        exec menv cmd args)
                     Nothing
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} ->
            withBuildConfigAndLock go $ \lk -> do
+               config <- asks getConfig
                (cmd, args) <- case (eoCmd, eoArgs) of
                    (ExecCmd cmd, args) -> return (cmd, args)
                    (ExecGhc, args) -> execCompiler "" args
@@ -935,7 +954,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                        { boptsTargets = map T.pack targets
                        }
                munlockFile lk -- Unlock before transferring control away.
-               exec eoEnvSettings cmd args
+               menv <- liftIO $ configEnvOverride config eoEnvSettings
+               exec menv cmd args
   where
     execCompiler cmdPrefix args = do
         wc <- getWhichCompiler

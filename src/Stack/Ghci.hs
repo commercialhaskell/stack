@@ -116,8 +116,9 @@ ghci GhciOpts{..} = do
     $logInfo
         ("Configuring GHCi with the following packages: " <>
          T.intercalate ", " (map (packageNameText . ghciPkgName) pkgs))
-    let execGhci extras =
-            exec defaultEnvSettings
+    let execGhci extras = do
+            menv <- liftIO $ configEnvOverride config defaultEnvSettings
+            exec menv
                  (fromMaybe (compilerExeName wc) ghciGhcCommand)
                  ("--interactive" :
                  -- This initial "-i" resets the include directories to not

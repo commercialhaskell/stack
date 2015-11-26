@@ -14,6 +14,9 @@ Other enhancements:
   [#1412](https://github.com/commercialhaskell/stack/issues/1412)
 * Add optional GPG signing on `stack upload --sign` or with
   `stack sig sign ...`
+* Support git-style executable fall-through (`stack something` executes
+  `stack-something` if present)
+  [#1433](https://github.com/commercialhaskell/stack/issues/1433)
 
 Bug fixes:
 
