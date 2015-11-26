@@ -5,6 +5,7 @@
 The following should be tested minimally before a release is considered good
 to go:
 
+* Ensure `release` and `stable` branches merged to `master`
 * Integration tests pass on a representative sample of platforms: `stack test
   --flag stack:integration-tests`. The actual release script will perform a more
   thorough test for every platform/variant prior to uploading, so this is just a
@@ -14,16 +15,22 @@ to go:
 * Running `stack build` a second time on either stack or wai is a no-op
 * Build something that depends on `happy` (suggestion: `hlint`), since `happy`
   has special logic for moving around the `dist` directory
-* Make sure to bump the version number in the .cabal file and the ChangeLog
-  appropriately (check for any entries that snuck into the previous version's
-  changes)
-* In release candidate, remove the Changelog's "unreleased changes" section
+* In release candidate branch:
+    * Bump the version number (to even second-to-last component) in the .cabal
+      file
+    * Rename Changelog's "unreleased changes" section to the version (check for
+      any entries that snuck into the previous version's changes)
+* In master branch:
+    * Bump version to next odd second-to-last component
+    * Add new "unreleased changes" secion in changelog
+    * Bump to use latest LTS version
 * Review documentation for any changes that need to be made
     * Search for old Stack version, unstable stack version, and the next
       "obvious" version in sequence (if doing a non-obvious jump) and replace
       with new version
     * Look for any links to "latest" documentation, replace with version tag
-* Ensure all documentation pages listed in `doc/index.rst`
+    * Ensure to inter-doc links use `.html` extension (not `.md`)
+    * Ensure all documentation pages listed in `doc/index.rst`
 * Check that any new Linux distribution versions added to
   `etc/scripts/release.hs` and `etc/scripts/vagrant-releases.sh`
 * Check that no new entries need to be added to
@@ -31,6 +38,12 @@ to go:
   [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md),
   and
   [README.md](https://github.com/commercialhaskell/stack/blob/master/README.md)
+* Next release (post-0.1.9.0)
+    - Fix ubuntu/debian repos:
+      https://github.com/commercialhaskell/stack/issues/1378
+    - Test distro package autocompletion to ensure non-absolute path to `stack`
+      works
+      (https://github.com/commercialhaskell/stack/issues/1343#issuecomment-158647308)
 
 ## Release process
 
