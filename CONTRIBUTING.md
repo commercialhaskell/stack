@@ -21,7 +21,7 @@ When reporting a bug, please write in the following format:
 
 > _What actually happened._
 >
-> Here is the `stack ---version` output:
+> Here is the `stack --version` output:
 >
 > ```
 > $ stack --version

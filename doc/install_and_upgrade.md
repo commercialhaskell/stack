@@ -60,7 +60,7 @@ Protection (a.k.a. "rootless") can cause two problems:
   * [GHC 7.8.4 fails with `/usr/bin/ar: permission denied`](faq.html#usr-bin-ar-permission-denied)
   * [DYLD_LIBRARY_PATH is ignored](faq.html#dyld-library-path-ignored)
 
-See the above links for workarounds.
+See the above FAQ links for workarounds.
 
 ### Using Homebrew
 

@@ -304,4 +304,14 @@ later, this is
 [caused by System Integrity Protection (a.k.a. "rootless")](https://github.com/commercialhaskell/stack/issues/563).
 GHC 7.10.2 includes a fix, so this only effects users of GHC 7.8.4. If you
 cannot upgrade to GHC 7.10.2, you can work around it by
-[disabling System Integrity Protection](#rootless)
+[disabling System Integrity Protection](#disable-rootless)
+
+#### Why is the `--` argument separator ignored in Windows PowerShell
+
+Some versions of Windows PowerShell
+[don't pass the `--` to programs](https://github.com/commercialhaskell/stack/issues/813).
+The workaround is to quote the `"--"`, e.g.:
+
+    stack exec "--" cabal --version
+
+This is known to be a problem on Windows 7, but seems to be fixed on Windows 10.
