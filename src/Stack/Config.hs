@@ -196,6 +196,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mproject configMonoi
          configRebuildGhcOptions = fromMaybe False configMonoidRebuildGhcOptions
          configApplyGhcOptions = fromMaybe AGOLocals configMonoidApplyGhcOptions
          configAllowNewer = fromMaybe False configMonoidAllowNewer
+         configEnableSplitObjs = fromMaybe False configMonoidEnableSplitObjs
 
      return Config {..}
 

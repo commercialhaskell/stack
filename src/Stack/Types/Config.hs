@@ -265,6 +265,8 @@ data Config =
          ,configAllowNewer          :: !Bool
          -- ^ Ignore version ranges in .cabal files. Funny naming chosen to
          -- match cabal.
+         ,configEnableSplitObjs     :: !Bool
+         -- ^ Build libraries with split objects
          }
 
 -- | Which packages to ghc-options on the command line apply to?
@@ -774,6 +776,8 @@ data ConfigMonoid =
     -- ^ See 'configApplyGhcOptions'
     ,configMonoidAllowNewer          :: !(Maybe Bool)
     -- ^ See 'configMonoidAllowNewer'
+    ,configMonoidEnableSplitObjs     :: !(Maybe Bool)
+    -- ^ Build libraries with split objects
     }
   deriving Show
 
@@ -810,6 +814,7 @@ instance Monoid ConfigMonoid where
     , configMonoidRebuildGhcOptions = Nothing
     , configMonoidApplyGhcOptions = Nothing
     , configMonoidAllowNewer = Nothing
+    , configMonoidEnableSplitObjs = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
@@ -844,6 +849,7 @@ instance Monoid ConfigMonoid where
     , configMonoidRebuildGhcOptions = configMonoidRebuildGhcOptions l <|> configMonoidRebuildGhcOptions r
     , configMonoidApplyGhcOptions = configMonoidApplyGhcOptions l <|> configMonoidApplyGhcOptions r
     , configMonoidAllowNewer = configMonoidAllowNewer l <|> configMonoidAllowNewer r
+    , configMonoidEnableSplitObjs = configMonoidEnableSplitObjs l <|> configMonoidEnableSplitObjs r
     }
 
 instance FromJSON (ConfigMonoid, [JSONWarning]) where
@@ -905,6 +911,7 @@ parseConfigMonoidJSON obj = do
     configMonoidRebuildGhcOptions <- obj ..:? configMonoidRebuildGhcOptionsName
     configMonoidApplyGhcOptions <- obj ..:? configMonoidApplyGhcOptionsName
     configMonoidAllowNewer <- obj ..:? configMonoidAllowNewerName
+    configMonoidEnableSplitObjs <- obj ..:? configMonoidEnableSplitObjsName
 
     return ConfigMonoid {..}
   where
@@ -1023,6 +1030,9 @@ configMonoidApplyGhcOptionsName = "apply-ghc-options"
 
 configMonoidAllowNewerName :: Text
 configMonoidAllowNewerName = "allow-newer"
+
+configMonoidEnableSplitObjsName :: Text
+configMonoidEnableSplitObjsName = "enable-split-objs"
 
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
