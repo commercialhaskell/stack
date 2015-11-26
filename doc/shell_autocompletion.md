@@ -14,7 +14,7 @@ eval "$(stack --bash-completion-script stack)"
 ```
 You can also add it to your `.bashrc` file if you want.
 
-## for ZSH users:
+## for ZSH users
 
 documentation says:
 > Zsh can handle bash completions functions. The latest development version of zsh has a function bashcompinit, that when run will allow zsh to read bash completion specifications and functions. This is documented in the zshcompsys man page. To use it all **you need to do is run bashcompinit at any time after compinit**. It will define complete and compgen functions corresponding to the bash builtins.
