@@ -15,7 +15,6 @@ import           Data.Monoid                 ((<>))
 import qualified Data.Monoid
 import qualified Data.Set                    as Set
 import qualified Data.Text as T
-import           Development.GitRev          (gitHash)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.IO
@@ -35,14 +34,16 @@ import           System.Process.Run
 upgrade :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, HasTerminal env, HasReExec env, HasLogLevel env, MonadBaseControl IO m)
         => Maybe String -- ^ git repository to use
         -> Maybe AbstractResolver
+        -> Maybe String -- ^ git hash at time of building, if known
         -> m ()
-upgrade gitRepo mresolver = withCanonicalizedSystemTempDirectory "stack-upgrade" $ \tmp -> do
+upgrade gitRepo mresolver builtHash =
+  withCanonicalizedSystemTempDirectory "stack-upgrade" $ \tmp -> do
     menv <- getMinimalEnvOverride
     mdir <- case gitRepo of
       Just repo -> do
         remote <- liftIO $ readProcess "git" ["ls-remote", repo, "master"] []
         let latestCommit = head . words $ remote
-        if latestCommit == $gitHash then do
+        if builtHash == Just latestCommit then do
           $logInfo "Already up-to-date, no upgrade required"
           return Nothing
         else do $logInfo "Cloning stack"

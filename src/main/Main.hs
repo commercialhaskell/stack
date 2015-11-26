@@ -34,7 +34,7 @@ import qualified Data.Text.IO as T
 import           Data.Traversable
 import           Data.Typeable (Typeable)
 import           Data.Version (showVersion)
-import           Development.GitRev (gitCommitCount)
+import           Development.GitRev (gitCommitCount, gitHash)
 import           Distribution.System (buildArch)
 import           Distribution.Text (display)
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
@@ -797,7 +797,9 @@ updateCmd () go = withConfigAndLock go $
 
 upgradeCmd :: (Bool, String) -> GlobalOpts -> IO ()
 upgradeCmd (fromGit, repo) go = withConfigAndLock go $
-    upgrade (if fromGit then Just repo else Nothing) (globalResolver go)
+    upgrade (if fromGit then Just repo else Nothing)
+            (globalResolver go)
+            (find (/= "UNKNOWN") [$gitHash])
 
 -- | Upload to Hackage
 uploadCmd :: ([String], Maybe PvpBounds, Bool) -> GlobalOpts -> IO ()
