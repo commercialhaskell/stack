@@ -34,7 +34,9 @@ import qualified Data.Text.IO as T
 import           Data.Traversable
 import           Data.Typeable (Typeable)
 import           Data.Version (showVersion)
-import           Development.GitRev (gitCommitCount)
+#ifdef USE_GIT_INFO
+import           Development.GitRev (gitCommitCount, gitHash)
+#endif
 import           Distribution.System (buildArch)
 import           Distribution.Text (display)
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
@@ -43,7 +45,9 @@ import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Complicated
+#ifdef USE_GIT_INFO
 import           Options.Applicative.Simple (simpleVersion)
+#endif
 import           Options.Applicative.Types (readerAsk)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
@@ -114,6 +118,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                    dockerHelpOptName
                    (dockerOptsParser False)
                    ("Only showing --" ++ Docker.dockerCmdName ++ "* options.")
+#ifdef USE_GIT_INFO
      let commitCount = $gitCommitCount
          versionString' = concat $ concat
             [ [$(simpleVersion Meta.version)]
@@ -123,6 +128,9 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                                                     commitCount /= ("UNKNOWN" :: String)]
             , [" ", display buildArch]
             ]
+#else
+     let versionString' = showVersion Meta.version ++ ' ' : display buildArch
+#endif
 
      let globalOpts hide =
              extraHelpOption hide progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
@@ -797,7 +805,13 @@ updateCmd () go = withConfigAndLock go $
 
 upgradeCmd :: (Bool, String) -> GlobalOpts -> IO ()
 upgradeCmd (fromGit, repo) go = withConfigAndLock go $
-    upgrade (if fromGit then Just repo else Nothing) (globalResolver go)
+    upgrade (if fromGit then Just repo else Nothing)
+            (globalResolver go)
+#ifdef USE_GIT_INFO
+            (find (/= "UNKNOWN") [$gitHash])
+#else
+            Nothing
+#endif
 
 -- | Upload to Hackage
 uploadCmd :: ([String], Maybe PvpBounds, Bool) -> GlobalOpts -> IO ()
