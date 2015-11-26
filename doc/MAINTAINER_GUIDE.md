@@ -20,6 +20,7 @@ to go:
       file
     * Rename Changelog's "unreleased changes" section to the version (check for
       any entries that snuck into the previous version's changes)
+    * Next release (post-0.1.9.0): Add release note about new documentation/home page
 * In master branch:
     * Bump version to next odd second-to-last component
     * Add new "unreleased changes" secion in changelog
@@ -96,12 +97,14 @@ for requirements to perform the release, and more details about the tool.
 * Update in Arch Linux's
   [haskell-stack.git](ssh+git://aur@aur.archlinux.org/haskell-stack.git):
   `PKGBUILD` and `.SRCINFO`
-    * Be sure to reset `pkgrel` in both files, and update the SHA1 sum
+      * Be sure to reset `pkgrel` in both files, and update the SHA1 sum
+      * Next release (post-0.1.9.0): update home page to haskellstack.org
 
 * Submit a PR for the
   [haskell-stack Homebrew formula](https://github.com/Homebrew/homebrew/blob/master/Library/Formula/haskell-stack.rb)
       * Be sure to update the SHA sum
       * The commit message should just be `haskell-stack <VERSION>`
+      * Next release (post-0.1.9.0): update home page to haskellstack.org
 
 * [Build new MinGHC distribution](#update-minghc)
 
@@ -110,6 +113,10 @@ for requirements to perform the release, and more details about the tool.
 
 * Announce to haskell-cafe@haskell.org, haskell-stack@googlegroups.com,
   commercialhaskell@googlegroups.com mailing lists
+
+* Next release (post-0.1.9.0): update home page to haskellstack.org:
+    * Do a google search for old URL
+    * Update stackage.org home page
 
 ## Extra steps
 
