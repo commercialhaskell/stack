@@ -87,7 +87,7 @@ runShellAndExit getCmdArgs = do
          fullArgs = concat [ -- ["--pure"],
                             map T.unpack (nixShellOptions (configNix config))
                            ,nixopts
-                           ,["--command", intercalate " " (cmnd:args)
+                           ,["--command", intercalate " " (map (\a -> "'"++a++"'") (cmnd:args))
                                           ++ " $STACK_IN_NIX_EXTRA_ARGS"]
                            ]
      $logDebug $
