@@ -33,8 +33,13 @@ module Stack.Package
   ,packageIdentifier
   ,autogenDir
   ,checkCabalFileName
-  ,printCabalFileWarning)
+  ,printCabalFileWarning
+  ,cabalFilePackageId)
   where
+
+#if __GLASGOW_HASKELL__ < 710
+import           Control.Applicative (Applicative, (<$>), (<*>))
+#endif
 
 import           Control.Arrow ((&&&))
 import           Control.Exception hiding (try,catch)
@@ -60,16 +65,21 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8, decodeUtf8With)
 import           Data.Text.Encoding.Error (lenientDecode)
+import           Data.Version (showVersion)
 import           Distribution.Compiler
 import           Distribution.ModuleName (ModuleName)
 import qualified Distribution.ModuleName as Cabal
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
+import qualified Distribution.Package as D
 import           Distribution.PackageDescription hiding (FlagName)
+import qualified Distribution.PackageDescription as D
 import           Distribution.PackageDescription.Parse
+import qualified Distribution.PackageDescription.Parse as D
 import           Distribution.ParseUtils
 import           Distribution.Simple.Utils
 import           Distribution.System (OS (..), Arch, Platform (..))
 import           Distribution.Text (display, simpleParse)
+import qualified Distribution.Verbosity as D
 import           Path as FL
 import           Path.Extra
 import           Path.Find
@@ -1094,3 +1104,16 @@ resolveDirOrWarn :: (MonadThrow m,MonadIO m,MonadLogger m,MonadReader (Path Abs 
                  => FilePath.FilePath
                  -> m (Maybe (Path Abs Dir))
 resolveDirOrWarn = resolveOrWarn "Directory" resolveDirMaybe
+
+-- | Extract the @PackageIdentifier@ given an exploded haskell package
+-- path.
+cabalFilePackageId
+    :: (Applicative m, MonadIO m, MonadThrow m)
+    => Path Abs File -> m PackageIdentifier
+cabalFilePackageId fp = do
+    pkgDescr <- liftIO (D.readPackageDescription D.silent $ toFilePath fp)
+    (toStackPI . D.package . D.packageDescription) pkgDescr
+  where
+    toStackPI (D.PackageIdentifier (D.PackageName name) ver) =
+        PackageIdentifier <$> parsePackageNameFromString name <*>
+        parseVersionFromString (showVersion ver)

@@ -34,7 +34,9 @@ import qualified Data.Text.IO as T
 import           Data.Traversable
 import           Data.Typeable (Typeable)
 import           Data.Version (showVersion)
-import           Development.GitRev (gitCommitCount)
+#ifdef USE_GIT_INFO
+import           Development.GitRev (gitCommitCount, gitHash)
+#endif
 import           Distribution.System (buildArch)
 import           Distribution.Text (display)
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
@@ -43,7 +45,9 @@ import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Complicated
+#ifdef USE_GIT_INFO
 import           Options.Applicative.Simple (simpleVersion)
+#endif
 import           Options.Applicative.Types (readerAsk)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
@@ -73,6 +77,7 @@ import           Stack.Package (getCabalFileName)
 import qualified Stack.PackageIndex
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball')
 import           Stack.Setup
+import qualified Stack.Sig as Sig
 import           Stack.Solver (solveExtraDeps)
 import           Stack.Types
 import           Stack.Types.Internal
@@ -119,6 +124,8 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                    nixHelpOptName
                    (nixOptsParser False)
                    ("Only showing --" ++ Nix.nixCmdName ++ "* options.")
+
+#ifdef USE_GIT_INFO
      let commitCount = $gitCommitCount
          versionString' = concat $ concat
             [ [$(simpleVersion Meta.version)]
@@ -128,6 +135,9 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                                                     commitCount /= ("UNKNOWN" :: String)]
             , [" ", display buildArch]
             ]
+#else
+     let versionString' = showVersion Meta.version ++ ' ' : display buildArch
+#endif
 
      let globalOpts hide =
              extraHelpOption hide progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
@@ -236,10 +246,13 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                         "Upload a package to Hackage"
                         cmdFooter
                         uploadCmd
-                        ((,,)
+                        ((,,,)
                          <$> many (strArgument $ metavar "TARBALL/DIR")
                          <*> optional pvpBoundsOption
-                         <*> ignoreCheckSwitch)
+                         <*> ignoreCheckSwitch
+                         <*> flag False True
+                              (long "sign" <>
+                               help "GPG sign & submit signature"))
              addCommand' "sdist"
                         "Create source distribution tarballs"
                         cmdFooter
@@ -387,7 +400,21 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                             "Generate HPC report a combined HPC report"
                             cmdFooter
                             hpcReportCmd
-                            hpcReportOptsParser))
+                            hpcReportOptsParser)
+             addSubCommands'
+               Sig.sigCmdName
+               "Subcommands specific to package signatures (EXPERIMENTAL)"
+               cmdFooter
+               (do addSubCommands'
+                     Sig.sigSignCmdName
+                     "Sign a a single package or all your packages"
+                     cmdFooter
+                     (do addCommand'
+                           Sig.sigSignSdistCmdName
+                           "Sign a single sdist package file"
+                           cmdFooter
+                           sigSignSdistCmd
+                           Sig.sigSignSdistOpts)))
      case eGlobalRun of
        Left (exitCode :: ExitCode) -> do
          when isInterpreter $
@@ -812,12 +839,18 @@ updateCmd () go = withConfigAndLock go $
 
 upgradeCmd :: (Bool, String) -> GlobalOpts -> IO ()
 upgradeCmd (fromGit, repo) go = withConfigAndLock go $
-    upgrade (if fromGit then Just repo else Nothing) (globalResolver go)
+    upgrade (if fromGit then Just repo else Nothing)
+            (globalResolver go)
+#ifdef USE_GIT_INFO
+            (find (/= "UNKNOWN") [$gitHash])
+#else
+            Nothing
+#endif
 
 -- | Upload to Hackage
-uploadCmd :: ([String], Maybe PvpBounds, Bool) -> GlobalOpts -> IO ()
-uploadCmd ([], _, _) _ = error "To upload the current package, please run 'stack upload .'"
-uploadCmd (args, mpvpBounds, ignoreCheck) go = do
+uploadCmd :: ([String], Maybe PvpBounds, Bool, Bool) -> GlobalOpts -> IO ()
+uploadCmd ([], _, _, _) _ = error "To upload the current package, please run 'stack upload .'"
+uploadCmd (args, mpvpBounds, ignoreCheck, shouldSign) go = do
     let partitionM _ [] = return ([], [])
         partitionM f (x:xs) = do
             r <- f x
@@ -828,6 +861,7 @@ uploadCmd (args, mpvpBounds, ignoreCheck) go = do
     unless (null invalid) $ error $
         "stack upload expects a list sdist tarballs or cabal directories.  Can't find " ++
         show invalid
+    (_,lc) <- liftIO $ loadConfigWithOpts go
     let getUploader :: (HasStackRoot config, HasPlatform config, HasConfig config) => StackT config IO Upload.Uploader
         getUploader = do
             config <- asks getConfig
@@ -835,17 +869,37 @@ uploadCmd (args, mpvpBounds, ignoreCheck) go = do
             let uploadSettings =
                     Upload.setGetManager (return manager) Upload.defaultUploadSettings
             liftIO $ Upload.mkUploader config uploadSettings
+        sigServiceUrl = "https://sig.commercialhaskell.org/"
     withBuildConfigAndLock go $ \_ -> do
         uploader <- getUploader
         unless ignoreCheck $
             mapM_ (parseRelAsAbsFile >=> checkSDistTarball) files
-        liftIO $ forM_ files (canonicalizePath >=> Upload.upload uploader)
+        forM_
+            files
+            (\file ->
+                  do tarFile <- parseRelAsAbsFile file
+                     liftIO
+                         (Upload.upload uploader (toFilePath tarFile))
+                     when
+                         shouldSign
+                         (Sig.sign
+                              (lcProjectRoot lc)
+                              sigServiceUrl
+                              tarFile))
         unless (null dirs) $
             forM_ dirs $ \dir -> do
                 pkgDir <- parseRelAsAbsDir dir
                 (tarName, tarBytes) <- getSDistTarball mpvpBounds pkgDir
                 unless ignoreCheck $ checkSDistTarball' tarName tarBytes
                 liftIO $ Upload.uploadBytes uploader tarName tarBytes
+                tarPath <- parseRelFile tarName
+                when
+                    shouldSign
+                    (Sig.signTarBytes
+                         (lcProjectRoot lc)
+                         sigServiceUrl
+                         tarPath
+                         tarBytes)
 
 sdistCmd :: ([String], Maybe PvpBounds, Bool) -> GlobalOpts -> IO ()
 sdistCmd (dirs, mpvpBounds, ignoreCheck) go =
@@ -1008,6 +1062,18 @@ imgDockerCmd rebuild go@GlobalOpts{..} =
                          defaultBuildOpts
                  Image.stageContainerImageArtifacts)
         (Just Image.createContainerImageFromStage)
+
+sigSignSdistCmd :: (String, String) -> GlobalOpts -> IO ()
+sigSignSdistCmd (url,path) go = do
+    withConfigAndLock
+        go
+        (do (manager,lc) <- liftIO (loadConfigWithOpts go)
+            tarBall <- parseRelAsAbsFile path
+            runStackTGlobal
+                manager
+                (lcConfig lc)
+                go
+                (Sig.sign (lcProjectRoot lc) url tarBall))
 
 -- | Load the configuration with a manager. Convenience function used
 -- throughout this module.
