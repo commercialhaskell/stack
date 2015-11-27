@@ -1705,6 +1705,9 @@ users. Here's a quick rundown:
 * `stack upload` uploads an sdist to Hackage. In the future, it will also
   perform automatic GPG signing of your packages for additional security, when
   configured.
+    * `--sign` provides a way to GPG sign your package & submit the result to
+      sig.commercialhaskell.org for storage in the sig-archive git
+      repo. (Signatures will be used later to verify package integrity.)
 * `stack upgrade` will build a new version of stack from source.
     * `--git` is a convenient way to get the most recent version from master for
       those testing and living on the bleeding edge.
@@ -1714,6 +1717,10 @@ users. Here's a quick rundown:
   but it can be useful if you're trying to test a specific bugfix.
 * `stack list-dependencies` lists all of the packages and versions used for a
   project
+* `stack sig` subcommand can help you with GPG signing & verification
+    * `sign` will sign an sdist tarball and submit the signature to
+      sig.commercialhaskell.org for storage in the sig-archive git repo.
+      (Signatures will be used later to verify package integrity.)
 
 ## Debugging
 

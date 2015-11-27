@@ -88,6 +88,7 @@ library
                      Stack.Types.PackageName
                      Stack.Types.TemplateName
                      Stack.Types.Version
+                     Stack.Types.Sig
                      Stack.Types.StackT
                      Stack.Types.Build
                      Stack.Types.Package
@@ -99,6 +100,9 @@ library
                      Stack.Build.Installed
                      Stack.Build.Source
                      Stack.Build.Target
+                     Stack.Sig
+                     Stack.Sig.GPG
+                     Stack.Sig.Sign
                      Stack.Upgrade
                      Stack.Upload
                      System.Process.Read
@@ -195,6 +199,8 @@ library
                    , word8
                    , hastache
                    , project-template >= 0.2
+                   , email-validate >=2.0
+                   , uuid
   if os(windows)
     cpp-options:     -DWINDOWS
     build-depends:   Win32

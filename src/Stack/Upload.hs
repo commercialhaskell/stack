@@ -4,7 +4,8 @@
 -- | Provide ability to upload tarballs to Hackage.
 module Stack.Upload
     ( -- * Upload
-      mkUploader
+      nopUploader
+    , mkUploader
     , Uploader
     , upload
     , uploadBytes
@@ -180,6 +181,11 @@ promptPassword = do
     fmap T.pack getLine
   putStrLn ""
   return passwd
+
+nopUploader :: Config -> UploadSettings -> IO Uploader
+nopUploader _ _ = return (Uploader nop)
+  where nop :: String -> L.ByteString -> IO ()
+        nop _ _ = return ()
 
 -- | Turn the given settings into an @Uploader@.
 --
