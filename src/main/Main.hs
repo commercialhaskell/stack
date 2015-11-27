@@ -124,7 +124,6 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                    nixHelpOptName
                    (nixOptsParser False)
                    ("Only showing --" ++ Nix.nixCmdName ++ "* options.")
-
 #ifdef USE_GIT_INFO
      let commitCount = $gitCommitCount
          versionString' = concat $ concat
