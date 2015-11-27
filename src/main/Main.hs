@@ -117,7 +117,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                    ("Only showing --" ++ Docker.dockerCmdName ++ "* options.")
      execExtraHelp args
                    nixHelpOptName
-                   (nixOptsParser True)
+                   (nixOptsParser False)
                    ("Only showing --" ++ Nix.nixCmdName ++ "* options.")
      let commitCount = $gitCommitCount
          versionString' = concat $ concat
@@ -880,8 +880,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
                     (runStackTGlobal manager (lcConfig lc) go $
-                        Nix.execWithOptionalShell
-                            (return (cmd, args))
+                        Nix.reexecWithOptionalShell
                             (runStackTGlobal manager (lcConfig lc) go $
                                 exec plainEnvSettings cmd args))
                     Nothing

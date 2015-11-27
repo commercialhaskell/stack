@@ -14,7 +14,7 @@ import Data.Text (Text)
 -- | Nix configuration.
 data NixOpts = NixOpts
   {nixEnable   :: !Bool
-  ,nixPackages :: ![String]
+  ,nixPackages :: ![Text]
     -- ^ The system packages to be installed in the environment before it runs
   ,nixInitFile :: !(Maybe String)
     -- ^ The path of a file containing preconfiguration of the environment (e.g shell.nix)
@@ -30,7 +30,7 @@ data NixOptsMonoid = NixOptsMonoid
     -- ^ Should nix-shell be defaulted to enabled (does @nix:@ section exist in the config)?
   ,nixMonoidEnable :: !(Maybe Bool)
     -- ^ Is using nix-shell enabled?
-  ,nixMonoidPackages :: ![String]
+  ,nixMonoidPackages :: ![Text]
     -- ^ System packages to use (given to nix-shell)
   ,nixMonoidInitFile :: !(Maybe String)
     -- ^ The path of a file containing preconfiguration of the environment (e.g shell.nix)

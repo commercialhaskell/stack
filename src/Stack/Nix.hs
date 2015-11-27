@@ -1,13 +1,10 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, OverloadedStrings, TemplateHaskell #-}
 
 -- | Run commands in a nix-shell
 module Stack.Nix
-  (execWithOptionalShell
-  ,reexecWithOptionalShell
+  (reexecWithOptionalShell
   ,nixCmdName
   ,StackNixException(..)
   ) where
@@ -23,6 +20,7 @@ import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Char (toUpper)
 import           Data.List (intercalate)
 import           Data.Maybe
+import           Data.Monoid
 import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import qualified Data.Text as T
 import           Data.Typeable
@@ -31,30 +29,27 @@ import           Network.HTTP.Client.Conduit (HasHttpManager)
 import qualified Paths_stack as Meta
 import           Prelude -- Fix redundant import warnings
 import           Stack.Constants (stackProgName)
-import           Stack.Docker (StackDockerException(OnlyOnHostException), reExecArgName)
+import           Stack.Docker (reExecArgName)
+import           Stack.Exec (exec)
 import           Stack.Types
 import           Stack.Types.Internal
 import           System.Environment (lookupEnv,getArgs,getExecutablePath)
 import           System.Exit (exitSuccess, exitWith)
-import           System.IO (stderr,stdin,hIsTerminalDevice)
-import           System.Process.Read
-import           System.Process.Run
-import           System.Process (CreateProcess(delegate_ctlc))
 
 
 -- | If Nix is enabled, re-runs the currently running OS command in a Nix container.
 -- Otherwise, runs the inner action.
---
--- This takes an optional release action which should be taken IFF control is
--- transfering away from the current process to the intra-container one.  The main use
--- for this is releasing a lock.  After launching reexecution, the host process becomes
--- nothing but an manager for the call into docker and thus may not hold the lock.
 reexecWithOptionalShell
     :: M env m
     => IO ()
     -> m ()
-reexecWithOptionalShell =
-    execWithOptionalShell getCmdArgs
+reexecWithOptionalShell inner =
+  do config <- asks getConfig
+     inShell <- getInShell
+     isReExec <- asks getReExec
+     if nixEnable (configNix config) && not inShell && not isReExec
+       then runShellAndExit getCmdArgs
+       else liftIO (inner >> exitSuccess)
   where
     getCmdArgs = do
         args <-
@@ -64,77 +59,46 @@ reexecWithOptionalShell =
         exePath <- liftIO getExecutablePath
         return (exePath, args)
 
--- | If Nix is enabled, re-runs the OS command returned by the second argument in a
--- Nix container.  Otherwise, runs the inner action.
---
--- This takes an optional release action just like `reexecWithOptionalShell`.
-execWithOptionalShell
-    :: M env m
-    => m (FilePath,[String])
-    -> IO ()
-    -> m ()
-execWithOptionalShell getCmdArgs inner =
-  do config <- asks getConfig
-     inShell <- getInShell
-     isReExec <- asks getReExec
-     if | inShell && not isReExec ->
-            throwM OnlyOnHostException
-        | inShell ->
-            liftIO (do inner
-                       exitSuccess)
-        | not (nixEnable (configNix config)) ->
-            do liftIO inner
-               liftIO exitSuccess
-        | otherwise ->
-            do runShellAndExit
-                 getCmdArgs
-
 runShellAndExit :: M env m
                 => m (String, [String])
                 -> m ()
 runShellAndExit getCmdArgs = do
      config <- asks getConfig
-     envOverride <- getEnvOverride (configPlatform config)
      (cmnd,args) <- getCmdArgs
-     isStdoutTerminal <- asks getTerminal
-     (isStdinTerminal,isStderrTerminal) <-
-       liftIO ((,) <$> hIsTerminalDevice stdin
-                   <*> hIsTerminalDevice stderr)
      let mshellFile = nixInitFile (configNix config)
          pkgsInConfig = nixPackages (configNix config)
      if not (null pkgsInConfig) && isJust mshellFile then
        throwM NixCannotUseShellFileAndPackagesException
        else return ()
-     let isTerm = isStdinTerminal && isStdoutTerminal && isStderrTerminal
-         nixopts = case mshellFile of
+     let nixopts = case mshellFile of
            Just filePath -> [filePath]
-           Nothing -> ["-E", intercalate " " $ concat
+           Nothing -> ["-E", T.unpack $ T.intercalate " " $ concat
                               [["with (import <nixpkgs> {});"
                                ,"runCommand \"myEnv\" {"
-                               ,"buildInputs=lib.optional stdenv.isLinux glibcLocales ++ lib.optional stdenv.isDarwin darwin.cf-private ++ ["],pkgsInConfig,["];"
-                               ,"shellHook=''"
-                               ,   "STACK_IN_NIX_EXTRA_ARGS='"]
-                               ,      (map (\p -> concat ["--extra-lib-dirs=", "${"++p++"}/lib"
-                                                         ," --extra-include-dirs=", "${"++p++"}/include"])
-                                           pkgsInConfig), ["' ;"
-                               ,"'';"
+                               ,"buildInputs=lib.optional stdenv.isLinux glibcLocales ++ ["],pkgsInConfig,["];"
+                               ,T.pack inShellEnvVar,"=1 ;"
+                               ,"STACK_IN_NIX_EXTRA_ARGS=''"]
+                               ,      (map (\p -> T.concat
+                                                  ["--extra-lib-dirs=${",p,"}/lib"
+                                                  ," --extra-include-dirs=${",p,"}/include "])
+                                           pkgsInConfig), ["'' ;"
                                ,"} \"\""]]]
                     -- glibcLocales is necessary on Linux to avoid warnings about GHC being incapable to set the locale.
          fullArgs = concat [ -- ["--pure"],
                             map T.unpack (nixShellOptions (configNix config))
                            ,nixopts
-                           ,["--command", ("export " ++ inShellEnvVar ++ "=1 ; ")
-                                          ++ intercalate " " (cmnd:args)
+                           ,["--command", intercalate " " (cmnd:args)
                                           ++ " $STACK_IN_NIX_EXTRA_ARGS"]
                            ]
-     $logDebug $ T.pack $
-         "Using a nix-shell environment " ++ (case mshellFile of
-            Just filePath -> "from file: " ++ filePath
-            Nothing -> "with nix packages: " ++ (intercalate ", " pkgsInConfig))
-     e <- try (callProcess'
-                 (if isTerm then id else \cp -> cp { delegate_ctlc = False })
-                 Nothing
-                 envOverride
+     $logDebug $
+         "Using a nix-shell environment " <> (case mshellFile of
+            Just filePath -> "from file: " <> (T.pack filePath)
+            Nothing -> "with nix packages: " <> (T.intercalate ", " pkgsInConfig))
+     e <- try (exec
+                 (EnvSettings {esIncludeLocals = False
+                              ,esIncludeGhcPackagePath = False
+                              ,esStackExe = False
+                              ,esLocaleUtf8 = False})
                  "nix-shell"
                  fullArgs)
      case e of
@@ -147,6 +111,8 @@ getInShell :: (MonadIO m) => m Bool
 getInShell = liftIO (isJust <$> lookupEnv inShellEnvVar)
 
 -- | Environment variable used to indicate stack is running in container.
+-- although we already have STACK_IN_NIX_EXTRA_ARGS that is set in the same conditions,
+-- it can happen that STACK_IN_NIX_EXTRA_ARGS is set to empty.
 inShellEnvVar :: String
 inShellEnvVar = concat [map toUpper stackProgName,"_IN_NIXSHELL"]
 

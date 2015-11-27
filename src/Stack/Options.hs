@@ -313,7 +313,7 @@ configOptsParser hide0 =
   where hide = hideMods hide0
 
 nixOptsParser :: Bool -> Parser NixOptsMonoid
-nixOptsParser showOptions =
+nixOptsParser hide0 =
   NixOptsMonoid
   <$> pure False
   <*> maybeBoolFlags nixCmdName
@@ -321,14 +321,13 @@ nixOptsParser showOptions =
                      hide
   <*> pure []
   <*> pure Nothing
-  <*> many (textOption (long "nix-shell-options" <>
-                        metavar "OPTION" <>
-                        help "Additional options passed to nix-shell" <>
-                        hide))
+  <*> ((map T.pack . fromMaybe [])
+       <$> optional (argsOption (long "nix-shell-options" <>
+                                 metavar "OPTION" <>
+                                 help "Additional options passed to nix-shell" <>
+                                 hide)))
   where
-    hide = if showOptions
-             then idm
-             else internal <> hidden
+    hide = hideMods hide0
 
 
 -- | Options parser configuration for Docker.
