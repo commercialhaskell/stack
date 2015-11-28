@@ -414,16 +414,16 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                Sig.sigCmdName
                "Subcommands specific to package signatures (EXPERIMENTAL)"
                cmdFooter
-               (do addSubCommands'
-                     Sig.sigSignCmdName
-                     "Sign a a single package or all your packages"
+               (addSubCommands'
+                  Sig.sigSignCmdName
+                  "Sign a a single package or all your packages"
+                  cmdFooter
+                  (addCommand'
+                     Sig.sigSignSdistCmdName
+                     "Sign a single sdist package file"
                      cmdFooter
-                     (do addCommand'
-                           Sig.sigSignSdistCmdName
-                           "Sign a single sdist package file"
-                           cmdFooter
-                           sigSignSdistCmd
-                           Sig.sigSignSdistOpts)))
+                     sigSignSdistCmd
+                     Sig.sigSignSdistOpts)))
      case eGlobalRun of
        Left (exitCode :: ExitCode) -> do
          when isInterpreter $
@@ -631,7 +631,7 @@ setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
   withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
-   runStackTGlobal manager (lcConfig lc) go $
+    runStackTGlobal manager (lcConfig lc) go $
       Docker.reexecWithOptionalContainer
           (lcProjectRoot lc)
           Nothing
@@ -1066,7 +1066,7 @@ imgDockerCmd rebuild go@GlobalOpts{..} =
         (Just Image.createContainerImageFromStage)
 
 sigSignSdistCmd :: (String, String) -> GlobalOpts -> IO ()
-sigSignSdistCmd (url,path) go = do
+sigSignSdistCmd (url,path) go =
     withConfigAndLock
         go
         (do (manager,lc) <- liftIO (loadConfigWithOpts go)

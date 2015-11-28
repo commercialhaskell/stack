@@ -561,12 +561,11 @@ globalOptsFromMonoid :: Bool -> GlobalOptsMonoid -> GlobalOpts
 globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
     { globalReExecVersion = globalMonoidReExecVersion
     , globalDockerEntrypoint = globalMonoidDockerEntrypoint
-    , globalLogLevel = fromMaybe defaultLogLevel (globalMonoidLogLevel)
+    , globalLogLevel = fromMaybe defaultLogLevel globalMonoidLogLevel
     , globalConfigMonoid = globalMonoidConfigMonoid
     , globalResolver = globalMonoidResolver
     , globalCompiler = globalMonoidCompiler
-    , globalTerminal = fromMaybe defaultTerminal (globalMonoidTerminal)
-    , globalStackYaml = globalMonoidStackYaml }
+    , globalTerminal = fromMaybe defaultTerminal globalMonoidTerminal
 
 initOptsParser :: Parser InitOpts
 initOptsParser =
@@ -599,7 +598,7 @@ initOptsParser =
          metavar "RESOLVER" <>
          help "Use the given resolver, even if not all dependencies are met")
 
--- | Parse for a logging level.
+-- | Parser for a logging level.
 logLevelOptsParser :: Bool -> Parser (Maybe LogLevel)
 logLevelOptsParser hide =
   fmap (Just . parse)

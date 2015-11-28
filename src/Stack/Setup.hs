@@ -114,7 +114,7 @@ data SetupOpts = SetupOpts
     -- version. Only works reliably with a stack-managed installation.
     , soptsResolveMissingGHC :: !(Maybe Text)
     -- ^ Message shown to user for how to resolve the missing GHC
-    , soptsStackSetupYaml :: !String
+    , soptsStackSetupYaml :: !FilePath
     -- ^ Location of the main stack-setup.yaml file
     , soptsGHCBindistURL :: !(Maybe String)
     -- ^ Alternate GHC binary distribution (requires custom GHCVariant)

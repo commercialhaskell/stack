@@ -89,8 +89,8 @@ instance (MonadIO m) => MonadLogger (StackT config m) where
 -- | Run a Stack action, using global options.
 runStackTGlobal :: (MonadIO m,MonadBaseControl IO m)
                 => Manager -> config -> GlobalOpts -> StackT config m a -> m a
-runStackTGlobal manager config GlobalOpts{..} m =
-    runStackT manager globalLogLevel config globalTerminal (isJust globalReExecVersion) m
+runStackTGlobal manager config GlobalOpts{..} =
+    runStackT manager globalLogLevel config globalTerminal (isJust globalReExecVersion)
 
 -- | Run a Stack action.
 runStackT :: (MonadIO m,MonadBaseControl IO m)
@@ -188,8 +188,8 @@ runInnerStackLoggingT inner = do
 -- | Run the logging monad, using global options.
 runStackLoggingTGlobal :: MonadIO m
                        => Manager -> GlobalOpts -> StackLoggingT m a -> m a
-runStackLoggingTGlobal manager GlobalOpts{..} m =
-    runStackLoggingT manager globalLogLevel globalTerminal (isJust globalReExecVersion) m
+runStackLoggingTGlobal manager GlobalOpts{..} =
+    runStackLoggingT manager globalLogLevel globalTerminal (isJust globalReExecVersion)
 
 -- | Run the logging monad.
 runStackLoggingT :: MonadIO m
@@ -317,15 +317,15 @@ loggerFunc loc _src level msg =
                     return (" @(" ++ fileLocStr ++ ")")
                   | otherwise = return ""
                 fileLocStr =
-                  (loc_package loc) ++
+                  loc_package loc ++
                   ':' :
-                  (loc_module loc) ++
+                  loc_module loc ++
                   ' ' :
-                  (loc_filename loc) ++
+                  loc_filename loc ++
                   ':' :
-                  (line loc) ++
+                  line loc ++
                   ':' :
-                  (char loc)
+                  char loc
                   where line = show . fst . loc_start
                         char = show . snd . loc_start
 
