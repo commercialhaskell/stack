@@ -14,6 +14,7 @@ import           Control.Monad.Catch hiding (try)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Stack.Types
 import           System.Process.Log
+import           System.Process.Read (EnvOverride)
 
 #ifdef WINDOWS
 import           Control.Exception.Lifted
@@ -44,11 +45,9 @@ plainEnvSettings = EnvSettings
     }
 
 -- | Execute a process within the Stack configured environment.
-exec :: (HasConfig r, MonadReader r m, MonadIO m, MonadLogger m, MonadThrow m, MonadBaseControl IO m)
-     => EnvSettings -> String -> [String] -> m b
-exec envSettings cmd0 args = do
-    config <- asks getConfig
-    menv <- liftIO (configEnvOverride config envSettings)
+exec :: (MonadIO m, MonadLogger m, MonadThrow m, MonadBaseControl IO m)
+     => EnvOverride -> String -> [String] -> m b
+exec menv cmd0 args = do
     $logProcessRun cmd0 args
 #ifdef WINDOWS
     e <- try (callProcess Nothing menv cmd0 args)

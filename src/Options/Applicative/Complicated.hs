@@ -35,13 +35,18 @@ complicatedOptions
   -- ^ program description
   -> Parser a
   -- ^ common settings
+  -> Maybe (ParserFailure ParserHelp -> [String] -> IO (a,(b,a)))
+  -- ^ optional handler for parser failure; 'handleParseResult' is called by
+  -- default
   -> EitherT b (Writer (Mod CommandFields (b,a))) ()
   -- ^ commands (use 'addCommand')
   -> IO (a,b)
-complicatedOptions numericVersion versionString h pd commonParser commandParser =
+complicatedOptions numericVersion versionString h pd commonParser mOnFailure commandParser =
   do args <- getArgs
      (a,(b,c)) <- case execParserPure (prefs noBacktrack) parser args of
        Failure _ | null args -> withArgs ["--help"] (execParser parser)
+       -- call onFailure handler if it's present and parsing options failed
+       Failure f | Just onFailure <- mOnFailure -> onFailure f args
        parseResult -> handleParseResult parseResult
      return (mappend c a,b)
   where parser = info (helpOption <*> versionOptions <*> complicatedParser commonParser commandParser) desc
