@@ -48,7 +48,7 @@ all commands work cross-platform, unless explicitly stated otherwise.
 ## Downloading and Installation
 
 The [documentation dedicated to downloading
-stack](install_and_upgrade.html) has the most
+stack](install_and_upgrade.md) has the most
 up-to-date information for a variety of operating systems, including multiple
 GNU/Linux flavors. Instead of repeating that content here, please go check out
 that page and come back here when you can successfully run `stack --version`.
