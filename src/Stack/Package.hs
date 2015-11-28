@@ -196,9 +196,9 @@ resolvePackage packageConfig gpkg =
     , packageFlags = packageConfigFlags packageConfig
     , packageAllDeps = S.fromList (M.keys deps)
     , packageHasLibrary = maybe False (buildable . libBuildInfo) (library pkg)
-    , packageTests = S.fromList
-      [T.pack (testName t) | t <- testSuites pkg
-                           , buildable (testBuildInfo t)]
+    , packageTests = M.fromList
+      [(T.pack (testName t), testInterface t) | t <- testSuites pkg
+                                              , buildable (testBuildInfo t)]
     , packageBenchmarks = S.fromList
       [T.pack (benchmarkName b) | b <- benchmarks pkg
                                 , buildable (benchmarkBuildInfo b)]

@@ -30,6 +30,7 @@ import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Distribution.InstalledPackageInfo (PError)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.Package hiding (Package,PackageName,packageName,packageVersion,PackageIdentifier)
+import           Distribution.PackageDescription (TestSuiteInterface)
 import           Distribution.System (Platform (..))
 import           Distribution.Text (display)
 import           GHC.Generics
@@ -87,7 +88,7 @@ data Package =
           ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
           ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
           ,packageHasLibrary :: !Bool                     -- ^ does the package have a buildable library stanza?
-          ,packageTests :: !(Set Text)                    -- ^ names of test suites
+          ,packageTests :: !(Map Text TestSuiteInterface) -- ^ names and interfaces of test suites
           ,packageBenchmarks :: !(Set Text)               -- ^ names of benchmarks
           ,packageExes :: !(Set Text)                     -- ^ names of executables
           ,packageOpts :: !GetPackageOpts                 -- ^ Args to pass to GHC.
