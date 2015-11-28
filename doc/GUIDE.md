@@ -1028,7 +1028,7 @@ to build.
 
 We're not going to cover the full generality of these arguments here; instead,
 there's [documentation covering the full build command
-syntax](build_command.html).
+syntax](build_command.md).
 Here, we'll just point out a few different types of arguments:
 
 * You can specify a *package name*, e.g. `stack build vector`.
