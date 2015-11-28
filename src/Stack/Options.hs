@@ -483,6 +483,7 @@ ghciOptsParser = GhciOpts
                             help "Specify which target should contain the main \
                                  \module to load, such as for an executable for \
                                  \test suite or benchmark."))
+             <*> switch (long "skip-intermediate-deps" <> help "Skip loading intermediate target dependencies")
              <*> buildOptsParser Build
 
 -- | Parser for exec command

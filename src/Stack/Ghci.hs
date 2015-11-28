@@ -18,7 +18,8 @@ import           Control.Exception.Enclosed (tryAny)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader
+import           Control.Monad.RWS.Strict
+import           Control.Monad.State.Strict
 import           Control.Monad.Trans.Resource
 import           Data.Either
 import           Data.Function
@@ -28,7 +29,6 @@ import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import           Data.Maybe
 import           Data.Maybe.Extra (forMaybeM)
-import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Text (Text)
@@ -59,6 +59,7 @@ data GhciOpts = GhciOpts
     , ghciNoLoadModules      :: !Bool
     , ghciAdditionalPackages :: ![String]
     , ghciMainIs             :: !(Maybe Text)
+    , ghciSkipIntermediate   :: !Bool
     , ghciBuildOpts          :: !BuildOpts
     } deriving Show
 
@@ -85,7 +86,7 @@ ghci GhciOpts{..} = do
             { boptsTestOpts = (boptsTestOpts ghciBuildOpts) { toDisableRun = True }
             , boptsBenchmarkOpts = (boptsBenchmarkOpts ghciBuildOpts) { beoDisableRun = True }
             }
-    (targets,mainIsTargets,pkgs) <- ghciSetup bopts ghciNoBuild ghciMainIs
+    (targets,mainIsTargets,pkgs) <- ghciSetup bopts ghciNoBuild ghciSkipIntermediate ghciMainIs
     config <- asks getConfig
     bconfig <- asks getBuildConfig
     mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
@@ -204,9 +205,10 @@ ghciSetup
     :: (HasConfig r, HasHttpManager r, HasBuildConfig r, MonadMask m, HasTerminal r, HasLogLevel r, HasEnvConfig r, MonadReader r m, MonadIO m, MonadThrow m, MonadLogger m, MonadCatch m, MonadBaseControl IO m)
     => BuildOpts
     -> Bool
+    -> Bool
     -> Maybe Text
     -> m (Map PackageName SimpleTarget, Maybe (Map PackageName SimpleTarget), [GhciPkgInfo])
-ghciSetup bopts noBuild mainIs = do
+ghciSetup bopts noBuild skipIntermediate mainIs = do
     (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets bopts
     mainIsTargets <-
         case mainIs of
@@ -224,7 +226,7 @@ ghciSetup bopts noBuild mainIs = do
             , getInstalledHaddock   = False
             }
         sourceMap
-    locals <-
+    directlyWanted <-
         forMaybeM (M.toList (envConfigPackages econfig)) $
         \(dir,validWanted) ->
              do cabalfp <- getCabalFileName dir
@@ -235,6 +237,18 @@ ghciSetup bopts noBuild mainIs = do
                                  return (Just (name, (cabalfp, simpleTargets)))
                              Nothing -> return Nothing
                     else return Nothing
+    let intermediateDeps = getIntermediateDeps sourceMap directlyWanted
+    wanted <-
+        if skipIntermediate || null intermediateDeps
+            then return directlyWanted
+            else do
+                $logInfo $ T.concat
+                    [ "The following libraries will also be loaded into GHCi because "
+                    , "they are intermediate dependencies of your targets:\n    "
+                    , T.intercalate ", " (map (packageNameText . fst) intermediateDeps)
+                    , "\n(Use --skip-intermediate-deps to omit these)"
+                    ]
+                return (directlyWanted ++ intermediateDeps)
     -- Try to build, but optimistically launch GHCi anyway if it fails (#1065)
     unless noBuild $ do
         eres <- tryAny $ build (const (return ())) Nothing bopts
@@ -244,9 +258,9 @@ ghciSetup bopts noBuild mainIs = do
                 $logError $ T.pack (show err)
                 $logWarn "Warning: build failed, but optimistically launching GHCi anyway"
     -- Load the list of modules _after_ building, to catch changes in unlisted dependencies (#1180)
-    let localLibs = [name | (name, (_, target)) <- locals, hasLocalComp isCLib target]
+    let localLibs = [name | (name, (_, target)) <- wanted , hasLocalComp isCLib target]
     infos <-
-        forM locals $
+        forM wanted $
         \(name,(cabalfp,target)) ->
              makeGhciPkgInfo bopts sourceMap installedMap localLibs name cabalfp target
     checkForIssues infos
@@ -381,3 +395,42 @@ borderedWarning f = do
     $logWarn "* * * * * * * *"
     $logWarn ""
     return x
+
+-- Adds in intermediate dependencies between ghci targets. Note that it
+-- will return a Lib component for these intermediate dependencies even
+-- if they don't have a library (but that's fine for the usage within
+-- this module).
+getIntermediateDeps
+      :: SourceMap
+      -> [(PackageName, (Path Abs File, SimpleTarget))]
+      -> [(PackageName, (Path Abs File, SimpleTarget))]
+getIntermediateDeps sourceMap targets =
+    M.toList $
+    (\mp -> foldl' (flip M.delete) mp (map fst targets)) $
+    M.mapMaybe id $
+    execState (mapM_ (mapM_ go . getDeps . fst) targets)
+              (M.fromList (map (\(k, x) -> (k, Just x)) targets))
+  where
+    getDeps :: PackageName -> [PackageName]
+    getDeps name =
+        case M.lookup name sourceMap of
+            Just (PSLocal lp) -> M.keys (packageDeps (lpPackage lp))
+            _ -> []
+    go :: PackageName -> State (Map PackageName (Maybe (Path Abs File, SimpleTarget))) Bool
+    go name = do
+        cache <- get
+        case (M.lookup name cache, M.lookup name sourceMap) of
+            (Just (Just _), _) -> return True
+            (Just Nothing, _) -> return False
+            (_, Just (PSLocal lp)) -> do
+                let deps = M.keys (packageDeps (lpPackage lp))
+                isIntermediate <- liftM or $ mapM go deps
+                if isIntermediate
+                    then do
+                        modify (M.insert name (Just (lpCabalFile lp, STLocalComps (S.singleton CLib))))
+                        return True
+                    else do
+                        modify (M.insert name Nothing)
+                        return False
+            (_, Just PSUpstream{}) -> return False
+            (Nothing, Nothing) -> return False
