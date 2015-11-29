@@ -181,7 +181,7 @@ library
                    , stm >= 2.4.4
                    , streaming-commons >= 0.1.10.0
                    , tar >= 0.4.1.0
-                   , template-haskell
+                   , template-haskell >= 2.9.0.0
                    , temporary >= 1.2.0.3
                    , text >= 1.2.0.4
                    , time >= 1.4.2
