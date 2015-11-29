@@ -129,7 +129,7 @@ library
                    , ansi-terminal >= 0.6.2.3
                    , async >= 2.0.2
                    , attoparsec >= 0.12.1.5 && < 0.14
-                   , base >= 4 && <5
+                   , base >= 4.7 && <5
                    , base16-bytestring
                    , base64-bytestring
                    , bifunctors >= 4.2.1
@@ -176,7 +176,7 @@ library
                    , resourcet >= 1.1.4.1
                    , retry >= 0.6 && < 0.8
                    , safe >= 0.3
-                   , semigroups >= 0.5
+                   , semigroups >= 0.5 && < 0.18
                    , split
                    , stm >= 2.4.4
                    , streaming-commons >= 0.1.10.0
@@ -265,7 +265,7 @@ test-suite stack-test
                 , Network.HTTP.Download.VerifiedSpec
   ghc-options:    -Wall -threaded
   build-depends:  base >=4.7 && <5
-                , hspec
+                , hspec <2.3
                 , containers
                 , directory
                 , exceptions
@@ -297,9 +297,9 @@ test-suite stack-integration-test
   if !flag(integration-tests)
     buildable: False
 
-  build-depends:  base >= 4.7 && < 10
+  build-depends:  base >= 4.7 && < 5
                 , temporary
-                , hspec
+                , hspec <2.3
                 , process
                 , filepath
                 , directory
