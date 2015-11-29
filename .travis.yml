@@ -74,7 +74,10 @@ install:
      cabal)
        cabal --version;
        travis_retry cabal update;
-       cabal install --only-dependencies --constraint="ignore +without-pcre" --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0;;
+       rm -f $(stack path --dist-dir)/stack-*.tar.gz;
+       stack sdist --pvp-bounds=both;
+       tar xf $(stack path --dist-dir)/stack-*.tar.gz --wildcards --strip-components=1 '*/stack.cabal';
+       cabal install --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0;;
    esac
 
 script:
