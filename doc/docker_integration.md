@@ -395,9 +395,6 @@ There are also a few ways to set up images that tightens the integration:
 * Any packages in GHC's global package database will be available. This can be
   used to add private libraries to the image, or the make available a set of
   packages from an LTS release.
-* The `DOCKER_SANDBOX_ID` environment variable (set via `ENV` in the Dockerfile)
-  introduces extra isolation between images, to ensure that parts of the home
-  directory and stack root are kept separate.
 
 Troubleshooting
 -------------------------------------------------------------------------------

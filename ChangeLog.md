@@ -22,6 +22,9 @@ Bug fixes:
 
 * Show absolute paths in error messages in multi-package builds
   [#1348](https://github.com/commercialhaskell/stack/issues/1348)
+* Docker-built binaries and libraries in different path
+  [#911](https://github.com/commercialhaskell/stack/issues/911)
+  [#1367](https://github.com/commercialhaskell/stack/issues/1367)
 
 ## 0.1.8.0
 

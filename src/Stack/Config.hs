@@ -143,6 +143,9 @@ configFromConfigMonoid configStackRoot configUserConfigPath mproject configMonoi
 
          configCompilerCheck = fromMaybe MatchMinor configMonoidCompilerCheck
 
+     configPlatformVariant <- liftIO $
+         maybe PlatformVariantNone PlatformVariant <$> lookupEnv platformVariantEnvVar
+
      configDocker <- dockerOptsFromMonoid (fmap fst mproject) configStackRoot configMonoidDockerOpts
 
      rawEnv <- liftIO getEnvironment
@@ -152,7 +155,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mproject configMonoi
               $ map (T.pack *** T.pack) rawEnv
      let configEnvOverride _ = return origEnv
 
-     platformOnlyDir <- runReaderT platformOnlyRelDir configPlatform
+     platformOnlyDir <- runReaderT platformOnlyRelDir (configPlatform,configPlatformVariant)
      configLocalProgramsBase <-
          case configPlatform of
              Platform _ Windows -> do

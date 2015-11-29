@@ -440,7 +440,7 @@ ensureDockerStackExe
     => Platform -> m (Path Abs File)
 ensureDockerStackExe containerPlatform = do
     config <- asks getConfig
-    containerPlatformDir <- runReaderT platformOnlyRelDir containerPlatform
+    containerPlatformDir <- runReaderT platformOnlyRelDir (containerPlatform,PlatformVariantNone)
     let programsPath = configLocalProgramsBase config </> containerPlatformDir
         stackVersion = fromCabalVersion Meta.version
         tool = Tool (PackageIdentifier $(mkPackageName "stack") stackVersion)

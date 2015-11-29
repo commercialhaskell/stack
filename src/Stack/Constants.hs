@@ -25,6 +25,7 @@ module Stack.Constants
     ,testBuiltFile
     ,benchBuiltFile
     ,stackProgName
+    ,stackProgNameUpper
     ,wiredInPackages
     ,ghcjsBootPackages
     ,cabalPackageName
@@ -38,11 +39,13 @@ module Stack.Constants
     ,defaultUserConfigPath
     ,defaultGlobalConfigPathDeprecated
     ,defaultGlobalConfigPath
+    ,platformVariantEnvVar
     )
     where
 
 import           Control.Monad.Catch (MonadThrow)
 import           Control.Monad.Reader
+import           Data.Char (toUpper)
 import           Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 import           Data.Text (Text)
@@ -259,6 +262,10 @@ projectDockerSandboxDir projectRoot = projectRoot </> workDirRel </> $(mkRelDir 
 imageStagingDir :: Path Abs Dir -> Path Abs Dir
 imageStagingDir p = p </> workDirRel </> $(mkRelDir "image/")
 
+-- | Name of the 'stack' program, uppercased
+stackProgNameUpper :: String
+stackProgNameUpper = map toUpper stackProgName
+
 -- | Name of the 'stack' program.
 stackProgName :: String
 stackProgName = "stack"
@@ -380,3 +387,8 @@ defaultGlobalConfigPath = parseAbsFile "/etc/stack/config.yaml"
 buildPlanDir :: Path Abs Dir -- ^ Stack root
              -> Path Abs Dir
 buildPlanDir = (</> $(mkRelDir "build-plan"))
+
+-- | Environment variable that stores a variant to append to platform-specific directory
+-- names.  Used to ensure incompatible binaries aren't shared between Docker builds and host
+platformVariantEnvVar :: String
+platformVariantEnvVar = stackProgNameUpper ++ "_PLATFORM_VARIANT"

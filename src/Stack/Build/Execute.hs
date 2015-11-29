@@ -58,7 +58,6 @@ import           Data.Traversable (forM)
 import           Data.Word8 (_colon)
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
-import qualified Distribution.Text
 import           Language.Haskell.TH as TH (location)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
@@ -222,12 +221,11 @@ getSetupExe :: M env m
 getSetupExe setupHs tmpdir = do
     wc <- getWhichCompiler
     econfig <- asks getEnvConfig
+    platformDir <- platformVariantRelDir
     let config = getConfig econfig
         baseNameS = concat
             [ "setup-Simple-Cabal-"
             , versionString $ envConfigCabalVersion econfig
-            , "-"
-            , Distribution.Text.display $ configPlatform config
             , "-"
             , compilerVersionString $ envConfigCompilerVersion econfig
             ]
@@ -243,7 +241,8 @@ getSetupExe setupHs tmpdir = do
             baseNameS ++ ".jsexe"
         setupDir =
             configStackRoot config </>
-            $(mkRelDir "setup-exe-cache")
+            $(mkRelDir "setup-exe-cache") </>
+            platformDir
 
     exePath <- fmap (setupDir </>) $ parseRelFile exeNameS
     jsExePath <- fmap (setupDir </>) $ parseRelDir jsExeNameS

@@ -19,6 +19,7 @@ module Stack.Types.Config
   -- ** HasPlatform & HasStackRoot
    HasPlatform(..)
   ,HasStackRoot(..)
+  ,PlatformVariant(..)
   -- ** Config & HasConfig
   ,Config(..)
   ,HasConfig(..)
@@ -194,6 +195,8 @@ data Config =
          -- console
          ,configPlatform            :: !Platform
          -- ^ The platform we're building for, used in many directory names
+         ,configPlatformVariant     :: !PlatformVariant
+         -- ^ Variant of the platform, also used in directory names
          ,configGHCVariant0         :: !(Maybe GHCVariant)
          -- ^ The variant of GHC requested by the user.
          -- In most cases, use 'BuildConfig' or 'MiniConfig's version instead,
@@ -673,8 +676,13 @@ class HasPlatform env where
     default getPlatform :: HasConfig env => env -> Platform
     getPlatform = configPlatform . getConfig
     {-# INLINE getPlatform #-}
-instance HasPlatform Platform where
-    getPlatform = id
+    getPlatformVariant :: env -> PlatformVariant
+    default getPlatformVariant :: HasConfig env => env -> PlatformVariant
+    getPlatformVariant = configPlatformVariant . getConfig
+    {-# INLINE getPlatformVariant #-}
+instance HasPlatform (Platform,PlatformVariant) where
+    getPlatform (p,_) = p
+    getPlatformVariant (_,v) = v
 
 -- | Class for environment values which have a GHCVariant
 class HasGHCVariant env where
@@ -1148,7 +1156,8 @@ platformOnlyRelDir
     => m (Path Rel Dir)
 platformOnlyRelDir = do
     platform <- asks getPlatform
-    parseRelDir (Distribution.Text.display platform)
+    platformVariant <- asks getPlatformVariant
+    parseRelDir (Distribution.Text.display platform ++ platformVariantSuffix platformVariant)
 
 -- | Directory containing snapshots
 snapshotsDir :: (MonadReader env m, HasConfig env, HasGHCVariant env, MonadThrow m) => m (Path Abs Dir)
@@ -1190,8 +1199,11 @@ platformVariantRelDir
     => m (Path Rel Dir)
 platformVariantRelDir = do
     platform <- asks getPlatform
+    platformVariant <- asks getPlatformVariant
     ghcVariant <- asks getGHCVariant
-    parseRelDir (Distribution.Text.display platform <> ghcVariantSuffix ghcVariant)
+    parseRelDir (mconcat [ Distribution.Text.display platform
+                         , platformVariantSuffix platformVariant
+                         , ghcVariantSuffix ghcVariant ])
 
 -- | This is an attempt to shorten stack paths on Windows to decrease our
 -- chances of hitting 260 symbol path limit. The idea is to calculate
@@ -1359,6 +1371,15 @@ instance FromJSON SCM where
 
 instance ToJSON SCM where
     toJSON Git = toJSON ("git" :: Text)
+
+-- | A variant of the platform, used to differentiate Docker builds from host
+data PlatformVariant = PlatformVariantNone
+                     | PlatformVariant String
+
+-- | Render a platform variant to a String suffix.
+platformVariantSuffix :: PlatformVariant -> String
+platformVariantSuffix PlatformVariantNone = ""
+platformVariantSuffix (PlatformVariant v) = "-" ++ v
 
 -- | Specialized bariant of GHC (e.g. libgmp4 or integer-simple)
 data GHCVariant

@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, ConstraintKinds, DeriveDataTypeable, FlexibleContexts, MultiWayIf, NamedFieldPuns,
-             OverloadedStrings, RankNTypes, RecordWildCards, ScopedTypeVariables, TemplateHaskell,
-             TupleSections #-}
+             OverloadedStrings, PackageImports, RankNTypes, RecordWildCards, ScopedTypeVariables,
+             TemplateHaskell, TupleSections #-}
 
 -- | Run commands in Docker containers
 module Stack.Docker
@@ -28,6 +28,7 @@ import           Control.Monad.Logger (MonadLogger,logError,logInfo,logWarn)
 import           Control.Monad.Reader (MonadReader,asks,runReaderT)
 import           Control.Monad.Writer (execWriter,runWriter,tell)
 import           Control.Monad.Trans.Control (MonadBaseControl)
+import qualified "cryptohash" Crypto.Hash as Hash
 import           Data.Aeson.Extended (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
 import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
 import qualified Data.ByteString.Char8 as BS
@@ -56,7 +57,7 @@ import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude -- Fix redundant import warnings
-import           Stack.Constants (projectDockerSandboxDir,stackProgName,stackRootEnvVar,buildPlanDir)
+import           Stack.Constants
 import           Stack.Docker.GlobalDB
 import           Stack.Types
 import           Stack.Types.Internal
@@ -272,39 +273,29 @@ runContainerAndExit getCmdArgs
          | otherwise -> throwM (NotPulledException image)
      let ImageConfig {..} = iiConfig
          imageEnvVars = map (break (== '=')) icEnv
-         msandboxID = lookupImageEnv sandboxIDEnvVar imageEnvVars
-         sandboxID = fromMaybe "default" msandboxID
-     sandboxIDDir <- parseRelDir (sandboxID ++ "/")
-     let stackRoot = configStackRoot config
+         platformVariant = BS.unpack $ Hash.digestToHexByteString $ hashRepoName image
+         stackRoot = configStackRoot config
          sandboxDir = projectDockerSandboxDir projectRoot
-         sandboxSandboxDir = sandboxDir </> $(mkRelDir "_sandbox/") </> sandboxIDDir
          sandboxHomeDir = sandboxDir </> homeDirName
-         sandboxRepoDir = sandboxDir </> sandboxIDDir
-         sandboxSubdirs = map (\d -> sandboxRepoDir </> d)
-                              sandboxedHomeSubdirectories
          isTerm = not (dockerDetach docker) &&
                   isStdinTerminal &&
                   isStdoutTerminal &&
                   isStderrTerminal
          keepStdinOpen = not (dockerDetach docker) &&
                          -- Workaround for https://github.com/docker/docker/issues/12319
-                         -- This seems be fixed in Docker 1.9.1, but will leave the workaround
+                         -- This is fixed in Docker 1.9.1, but will leave the workaround
                          -- in place for now, for users who haven't upgraded yet.
                          (isTerm || (isNothing bamboo && isNothing jenkins))
          newPathEnv = intercalate [Posix.searchPathSeparator] $
                       nubOrd $
-                      [toFilePathNoTrailingSep $ sandboxRepoDir </> $(mkRelDir ".local/bin")
-                      ,toFilePathNoTrailingSep $ sandboxRepoDir </> $(mkRelDir ".cabal/bin")
-                      ,toFilePathNoTrailingSep $ sandboxRepoDir </> $(mkRelDir "bin")
-                      ,hostBinDir] ++
+                      [hostBinDir
+                      ,toFilePathNoTrailingSep $ sandboxHomeDir </> $(mkRelDir ".local/bin")] ++
                       maybe [] Posix.splitSearchPath (lookupImageEnv "PATH" imageEnvVars)
      (cmnd,args,envVars,extraMount) <- getCmdArgs docker envOverride imageInfo isRemoteDocker
      pwd <- getWorkingDir
      liftIO
        (do updateDockerImageLastUsed config iiId (toFilePath projectRoot)
-           mapM_ createTree
-                 ([sandboxHomeDir, sandboxSandboxDir, stackRoot] ++
-                          sandboxSubdirs))
+           mapM_ createTree ([sandboxHomeDir, stackRoot]))
      containerID <- (trim . decodeUtf8) <$> readDockerProcess
        envOverride
        (concat
@@ -312,22 +303,19 @@ runContainerAndExit getCmdArgs
           ,"--net=host"
           ,"-e",inContainerEnvVar ++ "=1"
           ,"-e",stackRootEnvVar ++ "=" ++ toFilePathNoTrailingSep stackRoot
-          ,"-e","HOME=" ++ toFilePathNoTrailingSep sandboxRepoDir
+          ,"-e",platformVariantEnvVar ++ "=dk" ++ platformVariant
+          ,"-e","HOME=" ++ toFilePathNoTrailingSep sandboxHomeDir
           ,"-e","PATH=" ++ newPathEnv
           ,"-v",toFilePathNoTrailingSep stackRoot ++ ":" ++ toFilePathNoTrailingSep stackRoot
           ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toFilePathNoTrailingSep projectRoot
-          ,"-v",toFilePathNoTrailingSep sandboxSandboxDir ++ ":" ++ toFilePathNoTrailingSep sandboxDir
-          ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toFilePathNoTrailingSep sandboxRepoDir
-          ,"-v",toFilePathNoTrailingSep stackRoot ++ ":" ++
-                toFilePathNoTrailingSep (sandboxRepoDir </> $(mkRelDir ("." ++ stackProgName ++ "/")))
+          ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toFilePathNoTrailingSep sandboxHomeDir
           ,"-w",toFilePathNoTrailingSep pwd]
            -- Disable the deprecated entrypoint in FP Complete-generated images
          ,["--entrypoint=/usr/bin/env"
-             | isJust msandboxID &&
+             | isJust (lookupImageEnv oldSandboxIdEnvVar imageEnvVars) &&
                (icEntrypoint == ["/usr/local/sbin/docker-entrypoint"] ||
                  icEntrypoint == ["/root/entrypoint.sh"])]
          ,concatMap (\(k,v) -> ["-e", k ++ "=" ++ v]) envVars
-         ,concatMap sandboxSubdirArg sandboxSubdirs
          ,concatMap mountArg (extraMount ++ dockerMount docker)
          ,concatMap (\nv -> ["-e", nv]) (dockerEnv docker)
          ,case dockerContainerName docker of
@@ -369,12 +357,15 @@ runContainerAndExit getCmdArgs
        Right () -> do after
                       liftIO exitSuccess
   where
+    -- This is using a hash of the Docker repository (without tag or digest) to ensure
+    -- binaries/libraries aren't shared between Docker and host (or incompatible Docker images)
+    hashRepoName :: String -> Hash.Digest Hash.MD5
+    hashRepoName = Hash.hash . BS.pack . takeWhile (\c -> c /= ':' && c /= '@')
     lookupImageEnv name vars =
       case lookup name vars of
         Just ('=':val) -> Just val
         _ -> Nothing
     mountArg (Mount host container) = ["-v",host ++ ":" ++ container]
-    sandboxSubdirArg subdir = ["-v",toFilePathNoTrailingSep subdir++ ":" ++ toFilePathNoTrailingSep subdir]
     projectRoot = fromMaybeProjectRoot mprojectRoot
 
 -- | Clean-up old docker images and containers.
@@ -808,13 +799,6 @@ readDockerProcess
     => EnvOverride -> [String] -> m BS.ByteString
 readDockerProcess envOverride = readProcessStdout Nothing envOverride "docker"
 
--- | Subdirectories of the home directory to sandbox between GHC/Stackage versions.
-sandboxedHomeSubdirectories :: [Path Rel Dir]
-sandboxedHomeSubdirectories =
-  [$(mkRelDir ".ghc/")
-  ,$(mkRelDir ".cabal/")
-  ,$(mkRelDir ".ghcjs/")]
-
 -- | Name of home directory within docker sandbox.
 homeDirName :: Path Rel Dir
 homeDirName = $(mkRelDir "_home/")
@@ -835,13 +819,14 @@ concatT = T.pack . concat
 fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
 fromMaybeProjectRoot = fromMaybe (throw CannotDetermineProjectRootException)
 
--- | Environment variable that contains the sandbox ID.
-sandboxIDEnvVar :: String
-sandboxIDEnvVar = "DOCKER_SANDBOX_ID"
+-- | Environment variable that contained the old sandbox ID.
+-- | Use of this variable is deprecated, and only used to detect old images.
+oldSandboxIdEnvVar :: String
+oldSandboxIdEnvVar = "DOCKER_SANDBOX_ID"
 
 -- | Environment variable used to indicate stack is running in container.
 inContainerEnvVar :: String
-inContainerEnvVar = fmap toUpper stackProgName ++ "_IN_CONTAINER"
+inContainerEnvVar = stackProgNameUpper ++ "_IN_CONTAINER"
 
 -- | Command-line argument for "docker"
 dockerCmdName :: String
