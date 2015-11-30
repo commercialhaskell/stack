@@ -19,6 +19,7 @@ module Stack.Docker
   ) where
 
 import           Control.Applicative
+import           Control.Concurrent (threadDelay)
 import           Control.Concurrent.MVar.Lifted (MVar,modifyMVar_,newMVar)
 import           Control.Exception.Lifted
 import           Control.Monad
@@ -330,10 +331,14 @@ runContainerAndExit getCmdArgs
      before
 #ifndef WINDOWS
      runInBase <- liftBaseWith $ \run -> return (void . run)
-     oldHandlers <- forM ([sigINT | not keepStdinOpen] ++ [sigTERM]) $ \sig -> do
-       let sigHandler = do
-             runInBase (readProcessNull Nothing envOverride "docker"
-                                        ["kill","--signal=" ++ show sig,containerID])
+     oldHandlers <- forM ([sigINT,sigABRT,sigHUP,sigPIPE,sigTERM,sigUSR1,sigUSR2]) $ \sig -> do
+       let sigHandler = runInBase $ do
+             readProcessNull Nothing envOverride "docker"
+                             ["kill","--signal=" ++ show sig,containerID]
+             when (sig `elem` [sigTERM,sigABRT]) $ do
+               -- Give the container 30 seconds to exit gracefully, then send a sigKILL to force it
+               liftIO $ threadDelay 30000000
+               readProcessNull Nothing envOverride "docker" ["kill",containerID]
        oldHandler <- liftIO $ installHandler sig (Catch sigHandler) Nothing
        return (sig, oldHandler)
 #endif
@@ -344,16 +349,19 @@ runContainerAndExit getCmdArgs
                          ,["-a" | not (dockerDetach docker)]
                          ,["-i" | keepStdinOpen]
                          ,[containerID]])
-     e <- try (callProcess'
-                 (if keepStdinOpen then id else (\cp -> cp { delegate_ctlc = False }))
-                 cmd
-                 )
+     e <- finally
+         (try $ callProcess'
+             (\cp -> cp { delegate_ctlc = False })
+             cmd)
+         (do unless (dockerPersist docker || dockerDetach docker) $
+               catch
+                 (readProcessNull Nothing envOverride "docker" ["rm","-f",containerID])
+                 (\(_::ReadProcessException) -> return ())
 #ifndef WINDOWS
-     forM_ oldHandlers $ \(sig,oldHandler) ->
-       liftIO $ installHandler sig oldHandler Nothing
+             forM_ oldHandlers $ \(sig,oldHandler) ->
+               liftIO $ installHandler sig oldHandler Nothing
 #endif
-     unless (dockerPersist docker || dockerDetach docker)
-            (readProcessNull Nothing envOverride "docker" ["rm","-f",containerID])
+         )
      case e of
        Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
        Right () -> do after
