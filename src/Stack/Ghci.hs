@@ -106,13 +106,14 @@ ghci GhciOpts{..} = do
         $logWarn
             ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
              T.unwords (map T.pack (nubOrd omittedOpts)))
+    oiDir <- objectInterfaceDir bconfig
     let modulesToLoad = nubOrd $
             concatMap (map display . S.toList . ghciPkgModules) pkgs
         thingsToLoad =
             maybe [] (return . toFilePath) mainFile <> modulesToLoad
         odir =
-            [ "-odir=" <> toFilePathNoTrailingSep (objectInterfaceDir bconfig)
-            , "-hidir=" <> toFilePathNoTrailingSep (objectInterfaceDir bconfig)]
+            [ "-odir=" <> toFilePathNoTrailingSep oiDir
+            , "-hidir=" <> toFilePathNoTrailingSep oiDir ]
     $logInfo
         ("Configuring GHCi with the following packages: " <>
          T.intercalate ", " (map (packageNameText . ghciPkgName) pkgs))
@@ -125,21 +126,21 @@ ghci GhciOpts{..} = do
                  -- include CWD.
                   "-i" :
                   odir <> pkgopts <> ghciArgs <> extras)
-    case ghciNoLoadModules of
-        True -> execGhci []
-        False -> do
-            tmp <- liftIO getTemporaryDirectory
-            withCanonicalizedTempDirectory
-                tmp
-                "ghci-script"
-                (\tmpDir ->
-                      do let scriptPath = tmpDir </> $(mkRelFile "ghci-script")
-                             fp = toFilePath scriptPath
-                             loadModules = ":load " <> unwords (map show thingsToLoad)
-                             bringIntoScope = ":module + " <> unwords modulesToLoad
-                         liftIO (writeFile fp (unlines [loadModules,bringIntoScope]))
-                         finally (execGhci ["-ghci-script=" <> fp])
-                                 (removeFile scriptPath))
+    if ghciNoLoadModules
+    then execGhci []
+    else do
+      tmp <- liftIO getTemporaryDirectory
+      withCanonicalizedTempDirectory
+          tmp
+          "ghci-script"
+          (\tmpDir ->
+                do let scriptPath = tmpDir </> $(mkRelFile "ghci-script")
+                       fp = toFilePath scriptPath
+                       loadModules = ":load " <> unwords (map show thingsToLoad)
+                       bringIntoScope = ":module + " <> unwords modulesToLoad
+                   liftIO (writeFile fp (unlines [loadModules,bringIntoScope]))
+                   finally (execGhci ["-ghci-script=" <> fp])
+                           (removeFile scriptPath))
 
 -- | Figure out the main-is file to load based on the targets. Sometimes there
 -- is none, sometimes it's unambiguous, sometimes it's

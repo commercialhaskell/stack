@@ -43,7 +43,7 @@ import qualified System.FilePath as FP
 -- | Sign a haskell package with the given url of the signature
 -- service and a path to a tarball.
 sign
-    :: (MonadCatch m, MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m)
+    :: (MonadCatch m, MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env)
     => Maybe (Path Abs Dir) -> String -> Path Abs File -> m ()
 sign Nothing _ _ = throwM SigNoProjectRootException
 sign (Just projectRoot) url filePath = do
@@ -85,7 +85,7 @@ sign (Just projectRoot) url filePath = do
 -- function will write the bytes to the path in a temp dir and sign
 -- the tarball with GPG.
 signTarBytes
-    :: (MonadCatch m, MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m)
+    :: (MonadCatch m, MonadBaseControl IO m, MonadIO m, MonadMask m, MonadLogger m, MonadThrow m, MonadReader env m, HasConfig env)
     => Maybe (Path Abs Dir) -> String -> Path Rel File -> L.ByteString -> m ()
 signTarBytes Nothing _ _ _ = throwM SigNoProjectRootException
 signTarBytes (Just projectRoot) url tarPath bs =
@@ -125,12 +125,13 @@ signPackage url pkg filePath = do
         (throwM (GPGSignException "unable to sign & upload package"))
 
 withStackWorkTempDir
-    :: (MonadCatch m, MonadIO m, MonadMask m, MonadLogger m)
+    :: (MonadCatch m, MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env)
     => Path Abs Dir -> (Path Abs Dir -> m ()) -> m ()
 withStackWorkTempDir projectRoot f = do
     uuid <- liftIO nextRandom
     uuidPath <- parseRelDir (toString uuid)
-    let tempDir = projectRoot </> workDirRel </> $(mkRelDir "tmp") </> uuidPath
+    workDir <- getWorkDir
+    let tempDir = projectRoot </> workDir </> $(mkRelDir "tmp") </> uuidPath
     bracket
         (createTree tempDir)
         (const (removeTree tempDir))

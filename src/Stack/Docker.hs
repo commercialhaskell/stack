@@ -233,11 +233,11 @@ getInContainer = liftIO (isJust <$> lookupEnv inContainerEnvVar)
 
 -- | Run a command in a new Docker container, then exit the process.
 runContainerAndExit :: M env m
-                    => GetCmdArgs env m
-                    -> Maybe (Path Abs Dir)
-                    -> m ()
-                    -> m ()
-                    -> m ()
+  => GetCmdArgs env m
+  -> Maybe (Path Abs Dir) -- ^ Project root (maybe)
+  -> m ()              -- ^ Action to run before
+  -> m ()              -- ^ Action to run after
+  -> m ()
 runContainerAndExit getCmdArgs
                     mprojectRoot
                     before
@@ -271,11 +271,11 @@ runContainerAndExit getCmdArgs
                   Just ii2 -> return ii2
                   Nothing -> throwM (InspectFailedException image)
          | otherwise -> throwM (NotPulledException image)
+     sandboxDir <- projectDockerSandboxDir projectRoot
      let ImageConfig {..} = iiConfig
          imageEnvVars = map (break (== '=')) icEnv
          platformVariant = BS.unpack $ Hash.digestToHexByteString $ hashRepoName image
          stackRoot = configStackRoot config
-         sandboxDir = projectDockerSandboxDir projectRoot
          sandboxHomeDir = sandboxDir </> homeDirName
          isTerm = not (dockerDetach docker) &&
                   isStdinTerminal &&
@@ -679,10 +679,12 @@ checkDockerVersion envOverride docker =
         prohibitedDockerVersions = []
 
 -- | Remove the project's Docker sandbox.
-reset :: (MonadIO m) => Maybe (Path Abs Dir) -> Bool -> m ()
-reset maybeProjectRoot keepHome =
+reset :: (MonadIO m, MonadReader env m, HasConfig env)
+  => Maybe (Path Abs Dir) -> Bool -> m ()
+reset maybeProjectRoot keepHome = do
+  dockerSandboxDir <- projectDockerSandboxDir projectRoot
   liftIO (removeDirectoryContents
-            (projectDockerSandboxDir projectRoot)
+            dockerSandboxDir
             [homeDirName | keepHome]
             [])
   where projectRoot = fromMaybeProjectRoot maybeProjectRoot
@@ -691,7 +693,7 @@ reset maybeProjectRoot keepHome =
 -- a container, such as switching the UID/GID to the "outside-Docker" user's.
 entrypoint :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m)
            => Config -> DockerEntrypoint -> m ()
-entrypoint config@Config{..} DockerEntrypoint{..} = do
+entrypoint config@Config{..} DockerEntrypoint{..} =
   modifyMVar_ entrypointMVar $ \alreadyRan -> do
     -- Only run the entrypoint once
     unless alreadyRan $ do
