@@ -111,6 +111,9 @@ for requirements to perform the release, and more details about the tool.
 * [Upload haddocks to Hackage](#upload-haddocks-to-hackage), if hackage couldn't
   build on its own
 
+* Keep an eye on the
+  [Hackage matrix builder](http://matrix.hackage.haskell.org/package/stack)
+
 * Announce to haskell-cafe@haskell.org, haskell-stack@googlegroups.com,
   commercialhaskell@googlegroups.com mailing lists
 
