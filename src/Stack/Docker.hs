@@ -337,15 +337,17 @@ runContainerAndExit getCmdArgs
        oldHandler <- liftIO $ installHandler sig (Catch sigHandler) Nothing
        return (sig, oldHandler)
 #endif
-     e <- try (callProcess'
-                 (if keepStdinOpen then id else (\cp -> cp { delegate_ctlc = False }))
-                 Nothing
-                 envOverride
+     let cmd = Cmd Nothing
                  "docker"
+                 envOverride
                  (concat [["start"]
                          ,["-a" | not (dockerDetach docker)]
                          ,["-i" | keepStdinOpen]
-                         ,[containerID]]))
+                         ,[containerID]])
+     e <- try (callProcess'
+                 (if keepStdinOpen then id else (\cp -> cp { delegate_ctlc = False }))
+                 cmd
+                 )
 #ifndef WINDOWS
      forM_ oldHandlers $ \(sig,oldHandler) ->
        liftIO $ installHandler sig oldHandler Nothing
@@ -637,16 +639,16 @@ pullImage envOverride docker image =
   do $logInfo (concatT ["Pulling image from registry: '",image,"'"])
      when (dockerRegistryLogin docker)
           (do $logInfo "You may need to log in."
-              callProcess
+              callProcess $ Cmd
                 Nothing
-                envOverride
                 "docker"
+                envOverride
                 (concat
                    [["login"]
                    ,maybe [] (\n -> ["--username=" ++ n]) (dockerRegistryUsername docker)
                    ,maybe [] (\p -> ["--password=" ++ p]) (dockerRegistryPassword docker)
                    ,[takeWhile (/= '/') image]]))
-     e <- try (callProcess Nothing envOverride "docker" ["pull",image])
+     e <- try (callProcess (Cmd Nothing "docker" envOverride ["pull",image]))
      case e of
        Left (ProcessExitedUnsuccessfully _ _) -> throwM (PullFailedException image)
        Right () -> return ()

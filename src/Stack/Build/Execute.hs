@@ -272,7 +272,7 @@ getSetupExe setupHs tmpdir = do
                     , toFilePath tmpOutputPath
                     ] ++
                     ["-build-runner" | wc == Ghcjs]
-            runIn tmpdir (compilerExeName wc) menv args Nothing
+            runCmd' (\cp -> cp { std_out = UseHandle stderr }) (Cmd (Just tmpdir) (compilerExeName wc) menv args) Nothing
             when (wc == Ghcjs) $ renameDir tmpJsExePath jsExePath
             renameFile tmpExePath exePath
             return $ Just exePath
@@ -412,7 +412,7 @@ executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages loc
                     }
     forM_ (boptsExec bopts) $ \(cmd, args) -> do
         $logProcessRun cmd args
-        callProcess Nothing menv' cmd args
+        callProcess (Cmd Nothing cmd menv' args)
 
 -- | Windows can't write over the current executable. Instead, we rename the
 -- current executable to something else and then do the copy.
