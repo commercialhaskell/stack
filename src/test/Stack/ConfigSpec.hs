@@ -62,7 +62,7 @@ spec = beforeAll setup $ afterAll teardown $ do
 
 
   describe "loadConfig" $ do
-    let loadConfig' m = runStackLoggingT m logLevel False False (loadConfig mempty Nothing)
+    let loadConfig' m = runStackLoggingT m logLevel False False (loadConfig mempty Nothing Nothing)
     let loadBuildConfigRest m = runStackLoggingT m logLevel False False
     -- TODO(danburton): make sure parent dirs also don't have config file
     it "works even if no config file exists" $ \T{..} -> example $ do
@@ -82,7 +82,7 @@ spec = beforeAll setup $ afterAll teardown $ do
       setCurrentDirectory childDir
       LoadConfig{..} <- loadConfig' manager
       bc@BuildConfig{..} <- loadBuildConfigRest manager
-                            (lcLoadBuildConfig Nothing Nothing)
+                            (lcLoadBuildConfig Nothing)
       bcRoot bc `shouldBe` parentDir
 
     it "respects the STACK_YAML env variable" $ \T{..} -> inTempDir $ do
@@ -92,7 +92,7 @@ spec = beforeAll setup $ afterAll teardown $ do
         withEnvVar "STACK_YAML" stackYamlFp $ do
           LoadConfig{..} <- loadConfig' manager
           BuildConfig{..} <- loadBuildConfigRest manager
-                                (lcLoadBuildConfig Nothing Nothing)
+                                (lcLoadBuildConfig Nothing)
           bcStackYaml `shouldBe` dir </> stackDotYaml
           parent bcStackYaml `shouldBe` dir
 
@@ -106,5 +106,5 @@ spec = beforeAll setup $ afterAll teardown $ do
         withEnvVar "STACK_YAML" (toFilePath yamlRel) $ do
             LoadConfig{..} <- loadConfig' manager
             BuildConfig{..} <- loadBuildConfigRest manager
-                                (lcLoadBuildConfig Nothing Nothing)
+                                (lcLoadBuildConfig Nothing)
             bcStackYaml `shouldBe` yamlAbs
