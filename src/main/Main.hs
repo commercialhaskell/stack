@@ -640,7 +640,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                   case scoCompilerVersion of
                       Just v -> return (v, MatchMinor, Nothing)
                       Nothing -> do
-                          bc <- lcLoadBuildConfig lc globalResolver globalCompiler
+                          bc <- lcLoadBuildConfig lc globalCompiler
                           return ( bcWantedCompiler bc
                                  , configCompilerCheck (lcConfig lc)
                                  , Just $ bcStackYaml bc
@@ -784,7 +784,7 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
 
       let inner'' lk = do
               bconfig <- runStackLoggingTGlobal manager go $
-                  lcLoadBuildConfig lc globalResolver globalCompiler
+                  lcLoadBuildConfig lc globalCompiler
               envConfig <-
                  runStackTGlobal
                      manager bconfig go
@@ -1089,7 +1089,7 @@ loadConfigWithOpts go@GlobalOpts{..} = do
                 path <- canonicalizePath fp >>= parseAbsFile
                 return $ Just path
     lc <- runStackLoggingTGlobal manager go $ do
-        lc <- loadConfig globalConfigMonoid mstackYaml
+        lc <- loadConfig globalConfigMonoid mstackYaml globalResolver
         -- If we have been relaunched in a Docker container, perform in-container initialization
         -- (switch UID, etc.).  We do this after first loading the configuration since it must
         -- happen ASAP but needs a configuration.

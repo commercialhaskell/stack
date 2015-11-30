@@ -95,10 +95,12 @@ configFromConfigMonoid
     :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader env m, HasHttpManager env)
     => Path Abs Dir -- ^ stack root, e.g. ~/.stack
     -> Path Abs File -- ^ user config file path, e.g. ~/.stack/config.yaml
+    -> Maybe AbstractResolver
     -> Maybe (Project, Path Abs File)
     -> ConfigMonoid
     -> m Config
-configFromConfigMonoid configStackRoot configUserConfigPath mproject configMonoid@ConfigMonoid{..} = do
+configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject
+                       configMonoid@ConfigMonoid{..} = do
      let configConnectionCount = fromMaybe 8 configMonoidConnectionCount
          configHideTHLoading = fromMaybe True configMonoidHideTHLoading
          configLatestSnapshotUrl = fromMaybe
@@ -146,7 +148,8 @@ configFromConfigMonoid configStackRoot configUserConfigPath mproject configMonoi
      configPlatformVariant <- liftIO $
          maybe PlatformVariantNone PlatformVariant <$> lookupEnv platformVariantEnvVar
 
-     configDocker <- dockerOptsFromMonoid (fmap fst mproject) configStackRoot configMonoidDockerOpts
+     configDocker <-
+         dockerOptsFromMonoid (fmap fst mproject) configStackRoot mresolver configMonoidDockerOpts
 
      rawEnv <- liftIO getEnvironment
      origEnv <- mkEnvOverride configPlatform
@@ -272,8 +275,10 @@ loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadThrow m,MonadBaseContro
            -- ^ Config monoid from parsed command-line arguments
            -> Maybe (Path Abs File)
            -- ^ Override stack.yaml
+           -> Maybe (AbstractResolver)
+           -- ^ Override resolver
            -> m (LoadConfig m)
-loadConfig configArgs mstackYaml = do
+loadConfig configArgs mstackYaml mresolver = do
     stackRoot <- determineStackRoot
     userConfigPath <- getDefaultUserConfigPath stackRoot
     extraConfigs0 <- getExtraConfigs userConfigPath >>= mapM loadYaml
@@ -285,7 +290,7 @@ loadConfig configArgs mstackYaml = do
                 extraConfigs0
     mproject <- loadProjectConfig mstackYaml
     let mproject' = (\(project, stackYaml, _) -> (project, stackYaml)) <$> mproject
-    config <- configFromConfigMonoid stackRoot userConfigPath mproject' $ mconcat $
+    config <- configFromConfigMonoid stackRoot userConfigPath mresolver mproject' $ mconcat $
         case mproject of
             Nothing -> configArgs : extraConfigs
             Just (_, _, projectConfig) -> configArgs : projectConfig : extraConfigs
@@ -293,7 +298,7 @@ loadConfig configArgs mstackYaml = do
         (throwM (BadStackVersionException (configRequireStackVersion config)))
     return LoadConfig
         { lcConfig          = config
-        , lcLoadBuildConfig = loadBuildConfig mproject config
+        , lcLoadBuildConfig = loadBuildConfig mproject config mresolver
         , lcProjectRoot     = fmap (\(_, fp, _) -> parent fp) mproject
         }
 

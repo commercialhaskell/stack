@@ -25,6 +25,7 @@ Bug fixes:
 * Docker-built binaries and libraries in different path
   [#911](https://github.com/commercialhaskell/stack/issues/911)
   [#1367](https://github.com/commercialhaskell/stack/issues/1367)
+* Docker: `--resolver` argument didn't effect selected image tag
 
 ## 0.1.8.0
 
