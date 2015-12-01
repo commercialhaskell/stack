@@ -22,7 +22,7 @@ using system libraries with special requirements.
 
 Add a section to your `stack.yaml` as follows:
 
-    nix-shell:
+    nix:
       enable: true
       packages: [glpk, pcre]
 
@@ -56,7 +56,7 @@ a path of a derivation in the Nix store, like
 
 `«derivation /nix/store/00xx8y0p3r0dqyq2frq277yr1ldqzzg0-ghc-7.10.2.drv»`
 
-then it means this resolver has been mirrored. Whereas an error like
+then it means that this resolver has been mirrored and exists in your local copy of the nixpkgs. Whereas an error like
 
 `error: attribute ‘lts-3_99’ missing, at (string):1:1`
 
@@ -93,14 +93,14 @@ command-line. See `stack --nix-help` for a list of all Nix options.
 
 ## Configuration
 
-`stack.yaml` contains a `nix-shell:` section with Nix settings.
+`stack.yaml` contains a `nix:` section with Nix settings.
 Without this section, Nix will not be used.
 
 Here is a commented configuration file, showing the default values:
 
-    nix-shell:
+    nix:
 
-        # `true` by default when the nix-shell section is present. Set
+        # `true` by default when the nix section is present. Set
         # it to `false` to disable using Nix.
         enable: true
 
@@ -152,7 +152,7 @@ some build options of the libraries you use.
 And now for the `stack.yaml` file:
 
 ```
-nix-shell:
+nix:
     enable: true
     shell-file: shell.nix
 ```

@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards  #-}
 {-# LANGUAGE TemplateHaskell, OverloadedStrings #-}
-module Stack.NixShellSpec where
+module Stack.NixSpec where
 
 import Test.Hspec
 
@@ -26,7 +26,7 @@ sampleConfig :: String
 sampleConfig =
   "resolver: lts-2.10\n" ++
   "packages: ['.']\n" ++
-  "nix-shell:\n" ++
+  "nix:\n" ++
   "   enable: True\n" ++
   "   packages: [glpk]"
 
@@ -55,8 +55,8 @@ spec = beforeAll setup $ afterAll teardown $ do
           let enterDir = setCurrentDirectory tempDir
               exitDir = setCurrentDirectory currentDirectory
           bracket_ enterDir exitDir action
-  describe "nix-shell" $ do
-    it "sees that nix-shell is enabled" $ \T{..} -> inTempDir $ do
+  describe "nix" $ do
+    it "sees that the nix shell is enabled" $ \T{..} -> inTempDir $ do
       writeFile (toFilePath stackDotYaml) sampleConfig
       lc <- loadConfig' manager
       (nixEnable $ configNix $ lcConfig lc) `shouldBe` True

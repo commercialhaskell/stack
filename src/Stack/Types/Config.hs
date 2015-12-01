@@ -879,7 +879,7 @@ parseConfigMonoidJSON :: Object -> WarningParser ConfigMonoid
 parseConfigMonoidJSON obj = do
     configMonoidWorkDir <- obj ..:? configMonoidWorkDirName
     configMonoidDockerOpts <- jsonSubWarnings (obj ..:? configMonoidDockerOptsName ..!= mempty)
-    configMonoidNixOpts <- jsonSubWarnings (obj ..:? configMonoidNixShellOptsName ..!= mempty)
+    configMonoidNixOpts <- jsonSubWarnings (obj ..:? configMonoidNixOptsName ..!= mempty)
     configMonoidConnectionCount <- obj ..:? configMonoidConnectionCountName
     configMonoidHideTHLoading <- obj ..:? configMonoidHideTHLoadingName
     configMonoidLatestSnapshotUrl <- obj ..:? configMonoidLatestSnapshotUrlName
@@ -962,8 +962,8 @@ configMonoidWorkDirName = "work-dir"
 configMonoidDockerOptsName :: Text
 configMonoidDockerOptsName = "docker"
 
-configMonoidNixShellOptsName :: Text
-configMonoidNixShellOptsName = "nix-shell"
+configMonoidNixOptsName :: Text
+configMonoidNixOptsName = "nix"
 
 configMonoidConnectionCountName :: Text
 configMonoidConnectionCountName = "connection-count"

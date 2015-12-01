@@ -70,13 +70,14 @@ instance Monoid NixOptsMonoid where
 nixEnableArgName :: Text
 nixEnableArgName = "enable"
 
--- | Nix system packages argument name.
+-- | Nix packages (build inputs) argument name.
 nixPackagesArgName :: Text
 nixPackagesArgName = "packages"
 
--- | Nix init env file path argument name.
+-- | shell.nix file path argument name.
 nixInitFileArgName :: Text
 nixInitFileArgName = "shell-file"
 
+-- | Extra options for the nix-shell command argument name.
 nixShellOptsArgName :: Text
 nixShellOptsArgName = "nix-shell-options"

@@ -265,7 +265,7 @@ test-suite stack-test
                 , Stack.DotSpec
                 , Stack.PackageDumpSpec
                 , Stack.ArgsSpec
-                , Stack.NixShellSpec
+                , Stack.NixSpec
                 , Network.HTTP.Download.VerifiedSpec
   ghc-options:    -Wall -threaded
   build-depends:  base >=4.7 && <5
