@@ -50,18 +50,14 @@ upgrade gitRepo mresolver builtHash =
                     <> "built from is not available due to how it was built. "
                     <> "Will continue by assuming an upgrade is needed "
                     <> "because we have no information to the contrary."
-        if builtHash == Just latestCommit then do
-          $logInfo "Already up-to-date, no upgrade required"
-          return Nothing
-        else do $logInfo "Cloning stack"
-                runIn tmp "git" menv
-                    [ "clone"
-                    , repo
-                    , "stack"
-                    , "--depth"
-                    , "1"
-                    ]
-                    Nothing
+        if builtHash == Just latestCommit
+            then do
+                $logInfo "Already up-to-date, no upgrade required"
+                return Nothing
+            else do
+                $logInfo "Cloning stack"
+                let args = [ "clone", repo , "stack", "--depth", "1"]
+                runCmd (Cmd (Just tmp) "git" menv args) Nothing
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
         updateAllIndices menv
@@ -96,7 +92,8 @@ upgrade gitRepo mresolver builtHash =
                     { configMonoidInstallGHC = Just True
                     })
                 (Just $ dir </> $(mkRelFile "stack.yaml"))
-            lcLoadBuildConfig lc mresolver Nothing
+                mresolver
+            lcLoadBuildConfig lc Nothing
         envConfig1 <- runInnerStackT bconfig $ setupEnv $ Just $
             "Try rerunning with --install-ghc to install the correct GHC into " <>
             T.pack (toFilePath (configLocalPrograms config))

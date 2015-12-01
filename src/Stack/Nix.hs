@@ -31,6 +31,7 @@ import           Prelude -- Fix redundant import warnings
 import           Stack.Constants (stackProgName)
 import           Stack.Docker (reExecArgName)
 import           Stack.Exec (exec)
+import           System.Process.Read (getEnvOverride)
 import           Stack.Types
 import           Stack.Types.Internal
 import           System.Environment (lookupEnv,getArgs,getExecutablePath)
@@ -64,6 +65,7 @@ runShellAndExit :: M env m
                 -> m ()
 runShellAndExit getCmdArgs = do
      config <- asks getConfig
+     envOverride <- getEnvOverride (configPlatform config)
      (cmnd,args) <- getCmdArgs
      let mshellFile = nixInitFile (configNix config)
          pkgsInConfig = nixPackages (configNix config)
@@ -94,16 +96,9 @@ runShellAndExit getCmdArgs = do
          "Using a nix-shell environment " <> (case mshellFile of
             Just filePath -> "from file: " <> (T.pack filePath)
             Nothing -> "with nix packages: " <> (T.intercalate ", " pkgsInConfig))
-     e <- try (exec
-                 (EnvSettings {esIncludeLocals = False
-                              ,esIncludeGhcPackagePath = False
-                              ,esStackExe = False
-                              ,esLocaleUtf8 = False})
-                 "nix-shell"
-                 fullArgs)
+     e <- try (exec envOverride "nix-shell" fullArgs)
      case e of
        Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
-
        Right () -> liftIO exitSuccess
 
 -- | 'True' if we are currently running inside a Nix.

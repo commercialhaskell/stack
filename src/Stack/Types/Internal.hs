@@ -22,6 +22,7 @@ instance HasStackRoot config => HasStackRoot (Env config) where
     getStackRoot = getStackRoot . envConfig
 instance HasPlatform config => HasPlatform (Env config) where
     getPlatform = getPlatform . envConfig
+    getPlatformVariant = getPlatformVariant . envConfig
 instance HasGHCVariant config => HasGHCVariant (Env config) where
     getGHCVariant = getGHCVariant . envConfig
 instance HasConfig config => HasConfig (Env config) where

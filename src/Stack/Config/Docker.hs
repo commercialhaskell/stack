@@ -17,22 +17,36 @@ import Stack.Types
 -- | Interprets DockerOptsMonoid options.
 dockerOptsFromMonoid
     :: MonadThrow m
-    => Maybe Project -> Path Abs Dir -> DockerOptsMonoid -> m DockerOpts
-dockerOptsFromMonoid mproject stackRoot DockerOptsMonoid{..} = do
+    => Maybe Project
+    -> Path Abs Dir
+    -> Maybe AbstractResolver
+    -> DockerOptsMonoid
+    -> m DockerOpts
+dockerOptsFromMonoid mproject stackRoot maresolver DockerOptsMonoid{..} = do
     let dockerEnable =
             fromMaybe dockerMonoidDefaultEnable dockerMonoidEnable
         dockerImage =
-            let defaultTag =
-                    case mproject of
+            let mresolver =
+                    case maresolver of
+                        Just (ARResolver resolver) ->
+                            Just resolver
+                        Just aresolver ->
+                            throw
+                                (ResolverNotSupportedException $
+                                 show aresolver)
+                        Nothing ->
+                            fmap projectResolver mproject
+                defaultTag =
+                    case mresolver of
                         Nothing -> ""
-                        Just proj ->
-                            case projectResolver proj of
+                        Just resolver ->
+                            case resolver of
                                 ResolverSnapshot n@(LTS _ _) ->
                                     ":" ++ T.unpack (renderSnapName n)
                                 _ ->
-                                    throwM
+                                    throw
                                         (ResolverNotSupportedException $
-                                         show $ projectResolver proj)
+                                         show resolver)
             in case dockerMonoidRepoOrImage of
                    Nothing -> "fpco/stack-build" ++ defaultTag
                    Just (DockerMonoidImage image) -> image

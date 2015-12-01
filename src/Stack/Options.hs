@@ -234,8 +234,9 @@ cleanOptsParser = CleanOpts <$> packages
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser hide0 =
-    (\dockerOpts nixOpts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin modifyCodePage -> mempty
-        { configMonoidDockerOpts = dockerOpts
+    (\workDir dockerOpts nixOpts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin modifyCodePage -> mempty
+        { configMonoidWorkDir = workDir
+        , configMonoidDockerOpts = dockerOpts
         , configMonoidNixOpts = nixOpts
         , configMonoidSystemGHC = systemGHC
         , configMonoidInstallGHC = installGHC
@@ -250,7 +251,13 @@ configOptsParser hide0 =
         , configMonoidLocalBinPath = localBin
         , configMonoidModifyCodePage = modifyCodePage
         })
-    <$> dockerOptsParser True
+    <$> optional (strOption
+            ( long "work-dir"
+            <> metavar "WORK-DIR"
+            <> help "Override work directory (default: .stack-work)"
+            <> hide
+            ))
+    <*> dockerOptsParser True
     <*> nixOptsParser True
     <*> maybeBoolFlags
             "system-ghc"
@@ -505,6 +512,7 @@ ghciOptsParser = GhciOpts
                             help "Specify which target should contain the main \
                                  \module to load, such as for an executable for \
                                  \test suite or benchmark."))
+             <*> switch (long "skip-intermediate-deps" <> help "Skip loading intermediate target dependencies")
              <*> buildOptsParser Build
 
 -- | Parser for exec command
@@ -582,11 +590,11 @@ globalOptsFromMonoid :: Bool -> GlobalOptsMonoid -> GlobalOpts
 globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
     { globalReExecVersion = globalMonoidReExecVersion
     , globalDockerEntrypoint = globalMonoidDockerEntrypoint
-    , globalLogLevel = fromMaybe defaultLogLevel (globalMonoidLogLevel)
+    , globalLogLevel = fromMaybe defaultLogLevel globalMonoidLogLevel
     , globalConfigMonoid = globalMonoidConfigMonoid
     , globalResolver = globalMonoidResolver
     , globalCompiler = globalMonoidCompiler
-    , globalTerminal = fromMaybe defaultTerminal (globalMonoidTerminal)
+    , globalTerminal = fromMaybe defaultTerminal globalMonoidTerminal
     , globalStackYaml = globalMonoidStackYaml }
 
 initOptsParser :: Parser InitOpts
@@ -620,7 +628,7 @@ initOptsParser =
          metavar "RESOLVER" <>
          help "Use the given resolver, even if not all dependencies are met")
 
--- | Parse for a logging level.
+-- | Parser for a logging level.
 logLevelOptsParser :: Bool -> Parser (Maybe LogLevel)
 logLevelOptsParser hide =
   fmap (Just . parse)

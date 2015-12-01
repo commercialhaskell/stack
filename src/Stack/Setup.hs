@@ -87,7 +87,7 @@ import           System.FilePath (searchPathSeparator)
 import qualified System.FilePath as FP
 import           System.Process (rawSystem)
 import           System.Process.Read
-import           System.Process.Run (runIn)
+import           System.Process.Run (runCmd, Cmd(..))
 import           Text.Printf (printf)
 
 -- | Default location of the stack-setup.yaml file
@@ -114,7 +114,7 @@ data SetupOpts = SetupOpts
     -- version. Only works reliably with a stack-managed installation.
     , soptsResolveMissingGHC :: !(Maybe Text)
     -- ^ Message shown to user for how to resolve the missing GHC
-    , soptsStackSetupYaml :: !String
+    , soptsStackSetupYaml :: !FilePath
     -- ^ Location of the main stack-setup.yaml file
     , soptsGHCBindistURL :: !(Maybe String)
     -- ^ Alternate GHC binary distribution (requires custom GHCVariant)
@@ -440,7 +440,7 @@ ensureDockerStackExe
     => Platform -> m (Path Abs File)
 ensureDockerStackExe containerPlatform = do
     config <- asks getConfig
-    containerPlatformDir <- runReaderT platformOnlyRelDir containerPlatform
+    containerPlatformDir <- runReaderT platformOnlyRelDir (containerPlatform,PlatformVariantNone)
     let programsPath = configLocalProgramsBase config </> containerPlatformDir
         stackVersion = fromCabalVersion Meta.version
         tool = Tool (PackageIdentifier $(mkPackageName "stack") stackVersion)
@@ -512,7 +512,7 @@ upgradeCabal menv wc = do
                     Nothing -> error "upgradeCabal: Invariant violated, dir missing"
                     Just dir -> return dir
 
-            runIn dir (compilerExeName wc) menv ["Setup.hs"] Nothing
+            runCmd (Cmd (Just dir) (compilerExeName wc) menv ["Setup.hs"]) Nothing
             platform <- asks getPlatform
             let setupExe = toFilePath $ dir </>
                   (case platform of
@@ -524,13 +524,10 @@ upgradeCabal menv wc = do
                     , "dir="
                     , installRoot FP.</> name'
                     ]
-            runIn dir setupExe menv
-                ( "configure"
-                : map dirArgument (words "lib bin data doc")
-                )
-                Nothing
-            runIn dir setupExe menv ["build"] Nothing
-            runIn dir setupExe menv ["install"] Nothing
+                args = ( "configure": map dirArgument (words "lib bin data doc") )
+            runCmd (Cmd (Just dir) setupExe menv args) Nothing
+            runCmd (Cmd (Just dir) setupExe menv ["build"]) Nothing
+            runCmd (Cmd (Just dir) setupExe menv ["install"]) Nothing
             $logInfo "New Cabal library installed"
 
 -- | Get the version of the system compiler, if available
@@ -991,7 +988,8 @@ loadGhcjsEnvConfig stackYaml binPath = runInnerStackLoggingT $ do
             , configMonoidLocalBinPath = Just (toFilePath binPath)
             })
         (Just stackYaml)
-    bconfig <- lcLoadBuildConfig lc Nothing Nothing
+        Nothing
+    bconfig <- lcLoadBuildConfig lc Nothing
     runInnerStackT bconfig $ setupEnv Nothing
 
 getCabalInstallVersion :: (MonadIO m, MonadBaseControl IO m, MonadLogger m, MonadCatch m)
@@ -1077,14 +1075,14 @@ installMsys2Windows osKey si archiveFile archiveType destDir = do
     -- I couldn't find this officially documented anywhere, but you need to run
     -- the shell once in order to initialize some pacman stuff. Once that run
     -- happens, you can just run commands as usual.
-    runIn destDir "sh" menv ["--login", "-c", "true"] Nothing
+    runCmd (Cmd (Just destDir) "sh" menv ["--login", "-c", "true"]) Nothing
 
     -- No longer installing git, it's unreliable
     -- (https://github.com/commercialhaskell/stack/issues/1046) and the
     -- MSYS2-installed version has bad CRLF defaults.
     --
     -- Install git. We could install other useful things in the future too.
-    -- runIn destDir "pacman" menv ["-Sy", "--noconfirm", "git"] Nothing
+    -- runCmd (Cmd (Just destDir) "pacman" menv ["-Sy", "--noconfirm", "git"]) Nothing
 
 -- | Unpack a compressed tarball using 7zip.  Expects a single directory in
 -- the unpacked results, which is renamed to the destination directory.

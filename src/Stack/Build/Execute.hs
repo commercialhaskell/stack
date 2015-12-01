@@ -58,7 +58,6 @@ import           Data.Traversable (forM)
 import           Data.Word8 (_colon)
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
-import qualified Distribution.Text
 import           Language.Haskell.TH as TH (location)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
@@ -92,7 +91,7 @@ import           System.Process.Run
 import           System.Process.Internals (createProcess_)
 #endif
 
-type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env)
+type M env m = (MonadIO m,MonadReader env m,HasHttpManager env,HasBuildConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,MonadMask m,HasLogLevel env,HasEnvConfig env,HasTerminal env, HasConfig env)
 
 -- | Fetch the packages necessary for a build, for example in combination with a dry run.
 preFetch :: M env m => Plan -> m ()
@@ -222,12 +221,11 @@ getSetupExe :: M env m
 getSetupExe setupHs tmpdir = do
     wc <- getWhichCompiler
     econfig <- asks getEnvConfig
+    platformDir <- platformVariantRelDir
     let config = getConfig econfig
         baseNameS = concat
             [ "setup-Simple-Cabal-"
             , versionString $ envConfigCabalVersion econfig
-            , "-"
-            , Distribution.Text.display $ configPlatform config
             , "-"
             , compilerVersionString $ envConfigCompilerVersion econfig
             ]
@@ -243,7 +241,8 @@ getSetupExe setupHs tmpdir = do
             baseNameS ++ ".jsexe"
         setupDir =
             configStackRoot config </>
-            $(mkRelDir "setup-exe-cache")
+            $(mkRelDir "setup-exe-cache") </>
+            platformDir
 
     exePath <- fmap (setupDir </>) $ parseRelFile exeNameS
     jsExePath <- fmap (setupDir </>) $ parseRelDir jsExeNameS
@@ -273,7 +272,7 @@ getSetupExe setupHs tmpdir = do
                     , toFilePath tmpOutputPath
                     ] ++
                     ["-build-runner" | wc == Ghcjs]
-            runIn tmpdir (compilerExeName wc) menv args Nothing
+            runCmd' (\cp -> cp { std_out = UseHandle stderr }) (Cmd (Just tmpdir) (compilerExeName wc) menv args) Nothing
             when (wc == Ghcjs) $ renameDir tmpJsExePath jsExePath
             renameFile tmpExePath exePath
             return $ Just exePath
@@ -413,7 +412,7 @@ executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages loc
                     }
     forM_ (boptsExec bopts) $ \(cmd, args) -> do
         $logProcessRun cmd args
-        callProcess Nothing menv' cmd args
+        callProcess (Cmd Nothing cmd menv' args)
 
 -- | Windows can't write over the current executable. Instead, we rename the
 -- current executable to something else and then do the copy.
@@ -821,19 +820,22 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                     case ec of
                         ExitSuccess -> return ()
                         _ -> do
-                            bs <- liftIO $
+                            bss <-
                                 case mlogFile of
-                                    Nothing -> return ""
+                                    Nothing -> return []
                                     Just (logFile, h) -> do
-                                        hClose h
-                                        S.readFile $ toFilePath logFile
+                                        liftIO $ hClose h
+                                        runResourceT
+                                            $ CB.sourceFile (toFilePath logFile)
+                                            $$ mungeBuildOutput stripTHLoading makeAbsolute pkgDir
+                                            =$ CL.consume
                             throwM $ CabalExitedUnsuccessfully
                                 ec
                                 taskProvides
                                 exeName
                                 fullArgs
                                 (fmap fst mlogFile)
-                                bs
+                                bss
                   where
                     cp0 = proc (toFilePath exeName) fullArgs
                     cp = cp0
@@ -1018,14 +1020,14 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         bindir = toFilePath $ bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
     realConfigAndBuild cache allDepsMap = withSingleContext runInBase ac ee task (Just allDepsMap) Nothing
-        $ \package cabalfp pkgDir cabal announce console _mlogFile -> do
+        $ \package cabalfp pkgDir cabal announce _console _mlogFile -> do
             _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> annSuffix)) cabal cabalfp
 
             if boptsOnlyConfigure eeBuildOpts
                 then return Nothing
-                else liftM Just $ realBuild cache package pkgDir cabal announce console
+                else liftM Just $ realBuild cache package pkgDir cabal announce
 
-    realBuild cache package pkgDir cabal announce console = do
+    realBuild cache package pkgDir cabal announce = do
         wc <- getWhichCompiler
 
         markExeNotInstalled (taskLocation task) taskProvides
@@ -1039,7 +1041,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
         config <- asks getConfig
         extraOpts <- extraBuildOptions eeBuildOpts
         preBuildTime <- modTime <$> liftIO getCurrentTime
-        cabal (console && configHideTHLoading config) $ ("build" :) $ (++ extraOpts) $
+        cabal (configHideTHLoading config) $ ("build" :) $ (++ extraOpts) $
             case (taskType, taskAllInOne, isFinalBuild) of
                 (_, True, True) -> fail "Invariant violated: cannot have an all-in-one build that also has a final build step."
                 (TTLocal lp, False, False) -> primaryComponentOptions lp
@@ -1280,21 +1282,32 @@ singleBench runInBase beopts benchesToRun ac ee task installedMap = do
           announce "benchmarks"
           cabal False ("bench" : args)
 
--- | Grab all output from the given @Handle@ and print it to stdout, stripping
--- Template Haskell "Loading package" lines. Does work in a separate thread.
+-- | Grab all output from the given @Handle@ and log it, stripping
+-- Template Haskell "Loading package" lines and making paths absolute.
+-- thread.
 printBuildOutput :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
                  => Bool -- ^ exclude TH loading?
                  -> Bool -- ^ convert paths to absolute?
                  -> Path Abs Dir -- ^ package's root directory
                  -> LogLevel
-                 -> Handle -> m ()
+                 -> Handle
+                 -> m ()
 printBuildOutput excludeTHLoading makeAbsolute pkgDir level outH = void $
     CB.sourceHandle outH
-    $$ CB.lines
+    $$ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir
+    =$ CL.mapM_ (monadLoggerLog $(TH.location >>= liftLoc) "" level)
+
+-- | Strip Template Haskell "Loading package" lines and making paths absolute.
+mungeBuildOutput :: MonadIO m
+                 => Bool -- ^ exclude TH loading?
+                 -> Bool -- ^ convert paths to absolute?
+                 -> Path Abs Dir -- ^ package's root directory
+                 -> ConduitM ByteString ByteString m ()
+mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
+    CB.lines
     =$ CL.map stripCarriageReturn
     =$ CL.filter (not . isTHLoading)
     =$ CL.mapM toAbsolutePath
-    =$ CL.mapM_ (monadLoggerLog $(TH.location >>= liftLoc) "" level)
   where
     -- | Is this line a Template Haskell "Loading package" line
     -- ByteString

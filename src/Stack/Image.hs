@@ -43,10 +43,9 @@ type Assemble e m = (HasConfig e, HasTerminal e, MonadBaseControl IO m, MonadCat
 
 -- | Stages the executables & additional content in a staging
 -- directory under '.stack-work'
-stageContainerImageArtifacts :: Build e m
-                             => m ()
+stageContainerImageArtifacts :: Build e m => m ()
 stageContainerImageArtifacts = do
-    imageDir <- imageStagingDir <$> getWorkingDir
+    imageDir <- getWorkingDir >>= imageStagingDir
     removeTreeIfExists imageDir
     createTree imageDir
     stageExesInDir imageDir
@@ -56,10 +55,9 @@ stageContainerImageArtifacts = do
 -- specified in the project's stack.yaml.  Then new image will be
 -- extended with an ENTRYPOINT specified for each `entrypoint` listed
 -- in the config file.
-createContainerImageFromStage :: Assemble e m
-                              => m ()
+createContainerImageFromStage :: Assemble e m => m ()
 createContainerImageFromStage = do
-    imageDir <- imageStagingDir <$> getWorkingDir
+    imageDir <- getWorkingDir >>= imageStagingDir
     createDockerImage imageDir
     extendDockerImageWithEntrypoint imageDir
 
@@ -113,16 +111,14 @@ createDockerImage dir = do
                           (dir </>
                            $(mkRelFile "Dockerfile")))
                      (unlines ["FROM " ++ base, "ADD ./ /"]))
-            callProcess
-                Nothing
-                menv
-                "docker"
-                [ "build"
-                , "-t"
-                , fromMaybe
-                      (imageName (parent (parent dir)))
-                      (imgDockerImageName =<< dockerConfig)
-                , toFilePathNoTrailingSep dir]
+            let args = [ "build"
+                       , "-t"
+                       , fromMaybe
+                             (imageName (parent (parent dir)))
+                             (imgDockerImageName =<< dockerConfig)
+                       , toFilePathNoTrailingSep dir]
+            callProcess $ Cmd Nothing "docker" menv args
+
 
 -- | Extend the general purpose docker image with entrypoints (if
 -- specified).
@@ -151,10 +147,10 @@ extendDockerImageWithEntrypoint dir = do
                                     , "ENTRYPOINT [\"/usr/local/bin/" ++
                                       ep ++ "\"]"
                                     , "CMD []"]))
-                      callProcess
+                      callProcess $ Cmd
                           Nothing
-                          menv
                           "docker"
+                          menv
                           [ "build"
                           , "-t"
                           , dockerImageName ++ "-" ++ ep

@@ -37,7 +37,7 @@ import           Data.Version (showVersion)
 #ifdef USE_GIT_INFO
 import           Development.GitRev (gitCommitCount, gitHash)
 #endif
-import           Distribution.System (buildArch)
+import           Distribution.System (buildArch, buildPlatform)
 import           Distribution.Text (display)
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Network.HTTP.Client
@@ -85,6 +85,7 @@ import           Stack.Types.StackT
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import           System.Directory (canonicalizePath, doesFileExist, doesDirectoryExist, createDirectoryIfMissing)
+import qualified System.Directory as Directory (findExecutable)
 import           System.Environment (getEnvironment, getProgName)
 import           System.Exit
 import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
@@ -153,6 +154,21 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
          "stack - The Haskell Tool Stack"
          ""
          (globalOpts False)
+         -- when there's a parse failure
+         (Just $ \f as ->
+           -- fall-through to external executables in `git` style if they exist
+           -- (i.e. `stack something` looks for `stack-something` before
+           -- failing with "Invalid argument `something'")
+           case stripPrefix "Invalid argument" (fst (renderFailure f "")) of
+             Just _ -> do
+               mExternalExec <- Directory.findExecutable ("stack-" ++ head as)
+               case mExternalExec of
+                 Just ex -> do
+                   menv <- getEnvOverride buildPlatform
+                   runNoLoggingT (exec menv ex (tail as))
+                 Nothing -> handleParseResult (Failure f)
+             Nothing -> handleParseResult (Failure f)
+         )
          (do addCommand' "build"
                         "Build the package(s) in this directory/configuration"
                         cmdFooter
@@ -404,16 +420,16 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                Sig.sigCmdName
                "Subcommands specific to package signatures (EXPERIMENTAL)"
                cmdFooter
-               (do addSubCommands'
-                     Sig.sigSignCmdName
-                     "Sign a a single package or all your packages"
+               (addSubCommands'
+                  Sig.sigSignCmdName
+                  "Sign a a single package or all your packages"
+                  cmdFooter
+                  (addCommand'
+                     Sig.sigSignSdistCmdName
+                     "Sign a single sdist package file"
                      cmdFooter
-                     (do addCommand'
-                           Sig.sigSignSdistCmdName
-                           "Sign a single sdist package file"
-                           cmdFooter
-                           sigSignSdistCmd
-                           Sig.sigSignSdistOpts)))
+                     sigSignSdistCmd
+                     Sig.sigSignSdistOpts)))
      case eGlobalRun of
        Left (exitCode :: ExitCode) -> do
          when isInterpreter $
@@ -622,7 +638,7 @@ setupCmd :: SetupCmdOpts -> GlobalOpts -> IO ()
 setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
   (manager,lc) <- loadConfigWithOpts go
   withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
-   runStackTGlobal manager (lcConfig lc) go $
+    runStackTGlobal manager (lcConfig lc) go $
       Docker.reexecWithOptionalContainer
           (lcProjectRoot lc)
           Nothing
@@ -633,7 +649,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                   case scoCompilerVersion of
                       Just v -> return (v, MatchMinor, Nothing)
                       Nothing -> do
-                          bc <- lcLoadBuildConfig lc globalResolver globalCompiler
+                          bc <- lcLoadBuildConfig lc globalCompiler
                           return ( bcWantedCompiler bc
                                  , configCompilerCheck (lcConfig lc)
                                  , Just $ bcStackYaml bc
@@ -777,7 +793,7 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
 
       let inner'' lk = do
               bconfig <- runStackLoggingTGlobal manager go $
-                  lcLoadBuildConfig lc globalResolver globalCompiler
+                  lcLoadBuildConfig lc globalCompiler
               envConfig <-
                  runStackTGlobal
                      manager bconfig go
@@ -927,19 +943,22 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                  (ExecRunGhc, args) -> return ("runghc", args)
             (manager,lc) <- liftIO $ loadConfigWithOpts go
             withUserFileLock go (configStackRoot $ lcConfig lc) $ \lk ->
-             runStackTGlobal manager (lcConfig lc) go $
+              runStackTGlobal manager (lcConfig lc) go $
                 Docker.reexecWithOptionalContainer
                     (lcProjectRoot lc)
                     -- Unlock before transferring control away, whether using docker or not:
                     (Just $ munlockFile lk)
-                    (runStackTGlobal manager (lcConfig lc) go $
+                    (runStackTGlobal manager (lcConfig lc) go $ do
+                        config <- asks getConfig
+                        menv <- liftIO $ configEnvOverride config plainEnvSettings
                         Nix.reexecWithOptionalShell
                             (runStackTGlobal manager (lcConfig lc) go $
-                                exec plainEnvSettings cmd args))
+                                exec menv cmd args))
                     Nothing
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} ->
            withBuildConfigAndLock go $ \lk -> do
+               config <- asks getConfig
                (cmd, args) <- case (eoCmd, eoArgs) of
                    (ExecCmd cmd, args) -> return (cmd, args)
                    (ExecGhc, args) -> execCompiler "" args
@@ -952,7 +971,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                        { boptsTargets = map T.pack targets
                        }
                munlockFile lk -- Unlock before transferring control away.
-               exec eoEnvSettings cmd args
+               menv <- liftIO $ configEnvOverride config eoEnvSettings
+               exec menv cmd args
   where
     execCompiler cmdPrefix args = do
         wc <- getWhichCompiler
@@ -1004,7 +1024,7 @@ targetsCmd :: Text -> GlobalOpts -> IO ()
 targetsCmd target go@GlobalOpts{..} =
     withBuildConfig go $
     do let bopts = defaultBuildOpts { boptsTargets = [target] }
-       (_realTargets,_,pkgs) <- ghciSetup bopts False Nothing
+       (_realTargets,_,pkgs) <- ghciSetup bopts False False Nothing
        pwd <- getWorkingDir
        targets <-
            fmap
@@ -1027,7 +1047,7 @@ dockerResetCmd keepHome go@GlobalOpts{..} = do
     (manager,lc) <- liftIO (loadConfigWithOpts go)
     -- TODO: can we eliminate this lock if it doesn't touch ~/.stack/?
     withUserFileLock go (configStackRoot $ lcConfig lc) $ \_ ->
-     runStackLoggingTGlobal manager go $
+      runStackTGlobal manager (lcConfig lc) go $
         Docker.preventInContainer $ Docker.reset (lcProjectRoot lc) keepHome
 
 -- | Cleanup Docker images and containers.
@@ -1063,7 +1083,7 @@ imgDockerCmd rebuild go@GlobalOpts{..} =
         (Just Image.createContainerImageFromStage)
 
 sigSignSdistCmd :: (String, String) -> GlobalOpts -> IO ()
-sigSignSdistCmd (url,path) go = do
+sigSignSdistCmd (url,path) go =
     withConfigAndLock
         go
         (do (manager,lc) <- liftIO (loadConfigWithOpts go)
@@ -1086,7 +1106,7 @@ loadConfigWithOpts go@GlobalOpts{..} = do
                 path <- canonicalizePath fp >>= parseAbsFile
                 return $ Just path
     lc <- runStackLoggingTGlobal manager go $ do
-        lc <- loadConfig globalConfigMonoid mstackYaml
+        lc <- loadConfig globalConfigMonoid mstackYaml globalResolver
         -- If we have been relaunched in a Docker container, perform in-container initialization
         -- (switch UID, etc.).  We do this after first loading the configuration since it must
         -- happen ASAP but needs a configuration.

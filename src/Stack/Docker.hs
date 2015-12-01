@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, ConstraintKinds, DeriveDataTypeable, FlexibleContexts, MultiWayIf, NamedFieldPuns,
-             OverloadedStrings, RankNTypes, RecordWildCards, ScopedTypeVariables, TemplateHaskell,
-             TupleSections #-}
+             OverloadedStrings, PackageImports, RankNTypes, RecordWildCards, ScopedTypeVariables,
+             TemplateHaskell, TupleSections #-}
 
 -- | Run commands in Docker containers
 module Stack.Docker
@@ -20,6 +20,7 @@ module Stack.Docker
   ) where
 
 import           Control.Applicative
+import           Control.Concurrent (threadDelay)
 import           Control.Concurrent.MVar.Lifted (MVar,modifyMVar_,newMVar)
 import           Control.Exception.Lifted
 import           Control.Monad
@@ -29,6 +30,7 @@ import           Control.Monad.Logger (MonadLogger,logError,logInfo,logWarn)
 import           Control.Monad.Reader (MonadReader,asks,runReaderT)
 import           Control.Monad.Writer (execWriter,runWriter,tell)
 import           Control.Monad.Trans.Control (MonadBaseControl)
+import qualified "cryptohash" Crypto.Hash as Hash
 import           Data.Aeson.Extended (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
 import           Data.ByteString.Builder (stringUtf8,charUtf8,toLazyByteString)
 import qualified Data.ByteString.Char8 as BS
@@ -57,7 +59,7 @@ import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude -- Fix redundant import warnings
-import           Stack.Constants (projectDockerSandboxDir,stackProgName,stackRootEnvVar,buildPlanDir)
+import           Stack.Constants
 import           Stack.Docker.GlobalDB
 import           Stack.Types
 import           Stack.Types.Internal
@@ -233,11 +235,11 @@ getInContainer = liftIO (isJust <$> lookupEnv inContainerEnvVar)
 
 -- | Run a command in a new Docker container, then exit the process.
 runContainerAndExit :: M env m
-                    => GetCmdArgs env m
-                    -> Maybe (Path Abs Dir)
-                    -> m ()
-                    -> m ()
-                    -> m ()
+  => GetCmdArgs env m
+  -> Maybe (Path Abs Dir) -- ^ Project root (maybe)
+  -> m ()              -- ^ Action to run before
+  -> m ()              -- ^ Action to run after
+  -> m ()
 runContainerAndExit getCmdArgs
                     mprojectRoot
                     before
@@ -271,41 +273,31 @@ runContainerAndExit getCmdArgs
                   Just ii2 -> return ii2
                   Nothing -> throwM (InspectFailedException image)
          | otherwise -> throwM (NotPulledException image)
+     sandboxDir <- projectDockerSandboxDir projectRoot
      let ImageConfig {..} = iiConfig
          imageEnvVars = map (break (== '=')) icEnv
-         msandboxID = lookupImageEnv sandboxIDEnvVar imageEnvVars
-         sandboxID = fromMaybe "default" msandboxID
-     sandboxIDDir <- parseRelDir (sandboxID ++ "/")
-     let stackRoot = configStackRoot config
-         sandboxDir = projectDockerSandboxDir projectRoot
-         sandboxSandboxDir = sandboxDir </> $(mkRelDir "_sandbox/") </> sandboxIDDir
+         platformVariant = BS.unpack $ Hash.digestToHexByteString $ hashRepoName image
+         stackRoot = configStackRoot config
          sandboxHomeDir = sandboxDir </> homeDirName
-         sandboxRepoDir = sandboxDir </> sandboxIDDir
-         sandboxSubdirs = map (\d -> sandboxRepoDir </> d)
-                              sandboxedHomeSubdirectories
          isTerm = not (dockerDetach docker) &&
                   isStdinTerminal &&
                   isStdoutTerminal &&
                   isStderrTerminal
          keepStdinOpen = not (dockerDetach docker) &&
                          -- Workaround for https://github.com/docker/docker/issues/12319
-                         -- This seems be fixed in Docker 1.9.1, but will leave the workaround
+                         -- This is fixed in Docker 1.9.1, but will leave the workaround
                          -- in place for now, for users who haven't upgraded yet.
                          (isTerm || (isNothing bamboo && isNothing jenkins))
          newPathEnv = intercalate [Posix.searchPathSeparator] $
                       nubOrd $
-                      [toFilePathNoTrailingSep $ sandboxRepoDir </> $(mkRelDir ".local/bin")
-                      ,toFilePathNoTrailingSep $ sandboxRepoDir </> $(mkRelDir ".cabal/bin")
-                      ,toFilePathNoTrailingSep $ sandboxRepoDir </> $(mkRelDir "bin")
-                      ,hostBinDir] ++
+                      [hostBinDir
+                      ,toFilePathNoTrailingSep $ sandboxHomeDir </> $(mkRelDir ".local/bin")] ++
                       maybe [] Posix.splitSearchPath (lookupImageEnv "PATH" imageEnvVars)
      (cmnd,args,envVars,extraMount) <- getCmdArgs docker envOverride imageInfo isRemoteDocker
      pwd <- getWorkingDir
      liftIO
        (do updateDockerImageLastUsed config iiId (toFilePath projectRoot)
-           mapM_ createTree
-                 ([sandboxHomeDir, sandboxSandboxDir, stackRoot] ++
-                          sandboxSubdirs))
+           mapM_ createTree ([sandboxHomeDir, stackRoot]))
      containerID <- (trim . decodeUtf8) <$> readDockerProcess
        envOverride
        (concat
@@ -313,22 +305,19 @@ runContainerAndExit getCmdArgs
           ,"--net=host"
           ,"-e",inContainerEnvVar ++ "=1"
           ,"-e",stackRootEnvVar ++ "=" ++ toFilePathNoTrailingSep stackRoot
-          ,"-e","HOME=" ++ toFilePathNoTrailingSep sandboxRepoDir
+          ,"-e",platformVariantEnvVar ++ "=dk" ++ platformVariant
+          ,"-e","HOME=" ++ toFilePathNoTrailingSep sandboxHomeDir
           ,"-e","PATH=" ++ newPathEnv
           ,"-v",toFilePathNoTrailingSep stackRoot ++ ":" ++ toFilePathNoTrailingSep stackRoot
           ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toFilePathNoTrailingSep projectRoot
-          ,"-v",toFilePathNoTrailingSep sandboxSandboxDir ++ ":" ++ toFilePathNoTrailingSep sandboxDir
-          ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toFilePathNoTrailingSep sandboxRepoDir
-          ,"-v",toFilePathNoTrailingSep stackRoot ++ ":" ++
-                toFilePathNoTrailingSep (sandboxRepoDir </> $(mkRelDir ("." ++ stackProgName ++ "/")))
+          ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toFilePathNoTrailingSep sandboxHomeDir
           ,"-w",toFilePathNoTrailingSep pwd]
            -- Disable the deprecated entrypoint in FP Complete-generated images
          ,["--entrypoint=/usr/bin/env"
-             | isJust msandboxID &&
+             | isJust (lookupImageEnv oldSandboxIdEnvVar imageEnvVars) &&
                (icEntrypoint == ["/usr/local/sbin/docker-entrypoint"] ||
                  icEntrypoint == ["/root/entrypoint.sh"])]
          ,concatMap (\(k,v) -> ["-e", k ++ "=" ++ v]) envVars
-         ,concatMap sandboxSubdirArg sandboxSubdirs
          ,concatMap mountArg (extraMount ++ dockerMount docker)
          ,concatMap (\nv -> ["-e", nv]) (dockerEnv docker)
          ,case dockerContainerName docker of
@@ -343,39 +332,51 @@ runContainerAndExit getCmdArgs
      before
 #ifndef WINDOWS
      runInBase <- liftBaseWith $ \run -> return (void . run)
-     oldHandlers <- forM ([sigINT | not keepStdinOpen] ++ [sigTERM]) $ \sig -> do
-       let sigHandler = do
-             runInBase (readProcessNull Nothing envOverride "docker"
-                                        ["kill","--signal=" ++ show sig,containerID])
+     oldHandlers <- forM ([sigINT,sigABRT,sigHUP,sigPIPE,sigTERM,sigUSR1,sigUSR2]) $ \sig -> do
+       let sigHandler = runInBase $ do
+             readProcessNull Nothing envOverride "docker"
+                             ["kill","--signal=" ++ show sig,containerID]
+             when (sig `elem` [sigTERM,sigABRT]) $ do
+               -- Give the container 30 seconds to exit gracefully, then send a sigKILL to force it
+               liftIO $ threadDelay 30000000
+               readProcessNull Nothing envOverride "docker" ["kill",containerID]
        oldHandler <- liftIO $ installHandler sig (Catch sigHandler) Nothing
        return (sig, oldHandler)
 #endif
-     e <- try (callProcess'
-                 (if keepStdinOpen then id else (\cp -> cp { delegate_ctlc = False }))
-                 Nothing
-                 envOverride
+     let cmd = Cmd Nothing
                  "docker"
+                 envOverride
                  (concat [["start"]
                          ,["-a" | not (dockerDetach docker)]
                          ,["-i" | keepStdinOpen]
-                         ,[containerID]]))
+                         ,[containerID]])
+     e <- finally
+         (try $ callProcess'
+             (\cp -> cp { delegate_ctlc = False })
+             cmd)
+         (do unless (dockerPersist docker || dockerDetach docker) $
+               catch
+                 (readProcessNull Nothing envOverride "docker" ["rm","-f",containerID])
+                 (\(_::ReadProcessException) -> return ())
 #ifndef WINDOWS
-     forM_ oldHandlers $ \(sig,oldHandler) ->
-       liftIO $ installHandler sig oldHandler Nothing
+             forM_ oldHandlers $ \(sig,oldHandler) ->
+               liftIO $ installHandler sig oldHandler Nothing
 #endif
-     unless (dockerPersist docker || dockerDetach docker)
-            (readProcessNull Nothing envOverride "docker" ["rm","-f",containerID])
+         )
      case e of
        Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
        Right () -> do after
                       liftIO exitSuccess
   where
+    -- This is using a hash of the Docker repository (without tag or digest) to ensure
+    -- binaries/libraries aren't shared between Docker and host (or incompatible Docker images)
+    hashRepoName :: String -> Hash.Digest Hash.MD5
+    hashRepoName = Hash.hash . BS.pack . takeWhile (\c -> c /= ':' && c /= '@')
     lookupImageEnv name vars =
       case lookup name vars of
         Just ('=':val) -> Just val
         _ -> Nothing
     mountArg (Mount host container) = ["-v",host ++ ":" ++ container]
-    sandboxSubdirArg subdir = ["-v",toFilePathNoTrailingSep subdir++ ":" ++ toFilePathNoTrailingSep subdir]
     projectRoot = fromMaybeProjectRoot mprojectRoot
 
 -- | Clean-up old docker images and containers.
@@ -647,16 +648,16 @@ pullImage envOverride docker image =
   do $logInfo (concatT ["Pulling image from registry: '",image,"'"])
      when (dockerRegistryLogin docker)
           (do $logInfo "You may need to log in."
-              callProcess
+              callProcess $ Cmd
                 Nothing
-                envOverride
                 "docker"
+                envOverride
                 (concat
                    [["login"]
                    ,maybe [] (\n -> ["--username=" ++ n]) (dockerRegistryUsername docker)
                    ,maybe [] (\p -> ["--password=" ++ p]) (dockerRegistryPassword docker)
                    ,[takeWhile (/= '/') image]]))
-     e <- try (callProcess Nothing envOverride "docker" ["pull",image])
+     e <- try (callProcess (Cmd Nothing "docker" envOverride ["pull",image]))
      case e of
        Left (ProcessExitedUnsuccessfully _ _) -> throwM (PullFailedException image)
        Right () -> return ()
@@ -687,10 +688,12 @@ checkDockerVersion envOverride docker =
         prohibitedDockerVersions = []
 
 -- | Remove the project's Docker sandbox.
-reset :: (MonadIO m) => Maybe (Path Abs Dir) -> Bool -> m ()
-reset maybeProjectRoot keepHome =
+reset :: (MonadIO m, MonadReader env m, HasConfig env)
+  => Maybe (Path Abs Dir) -> Bool -> m ()
+reset maybeProjectRoot keepHome = do
+  dockerSandboxDir <- projectDockerSandboxDir projectRoot
   liftIO (removeDirectoryContents
-            (projectDockerSandboxDir projectRoot)
+            dockerSandboxDir
             [homeDirName | keepHome]
             [])
   where projectRoot = fromMaybeProjectRoot maybeProjectRoot
@@ -699,7 +702,7 @@ reset maybeProjectRoot keepHome =
 -- a container, such as switching the UID/GID to the "outside-Docker" user's.
 entrypoint :: (MonadIO m, MonadBaseControl IO m, MonadCatch m, MonadLogger m)
            => Config -> DockerEntrypoint -> m ()
-entrypoint config@Config{..} DockerEntrypoint{..} = do
+entrypoint config@Config{..} DockerEntrypoint{..} =
   modifyMVar_ entrypointMVar $ \alreadyRan -> do
     -- Only run the entrypoint once
     unless alreadyRan $ do
@@ -809,13 +812,6 @@ readDockerProcess
     => EnvOverride -> [String] -> m BS.ByteString
 readDockerProcess envOverride = readProcessStdout Nothing envOverride "docker"
 
--- | Subdirectories of the home directory to sandbox between GHC/Stackage versions.
-sandboxedHomeSubdirectories :: [Path Rel Dir]
-sandboxedHomeSubdirectories =
-  [$(mkRelDir ".ghc/")
-  ,$(mkRelDir ".cabal/")
-  ,$(mkRelDir ".ghcjs/")]
-
 -- | Name of home directory within docker sandbox.
 homeDirName :: Path Rel Dir
 homeDirName = $(mkRelDir "_home/")
@@ -836,13 +832,14 @@ concatT = T.pack . concat
 fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
 fromMaybeProjectRoot = fromMaybe (throw CannotDetermineProjectRootException)
 
--- | Environment variable that contains the sandbox ID.
-sandboxIDEnvVar :: String
-sandboxIDEnvVar = "DOCKER_SANDBOX_ID"
+-- | Environment variable that contained the old sandbox ID.
+-- | Use of this variable is deprecated, and only used to detect old images.
+oldSandboxIdEnvVar :: String
+oldSandboxIdEnvVar = "DOCKER_SANDBOX_ID"
 
 -- | Environment variable used to indicate stack is running in container.
 inContainerEnvVar :: String
-inContainerEnvVar = fmap toUpper stackProgName ++ "_IN_CONTAINER"
+inContainerEnvVar = stackProgNameUpper ++ "_IN_CONTAINER"
 
 -- | Command-line argument for "docker"
 dockerCmdName :: String

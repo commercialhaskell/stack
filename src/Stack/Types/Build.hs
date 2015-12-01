@@ -108,7 +108,7 @@ data StackBuildException
         (Path Abs File)  -- cabal Executable
         [String]         -- cabal arguments
         (Maybe (Path Abs File)) -- logfiles location
-        S.ByteString     -- log contents
+        [S.ByteString]     -- log contents
   | ExecutionFailure [SomeException]
   | LocalPackageDoesn'tMatchTarget
         PackageName
@@ -238,7 +238,7 @@ instance Show StackBuildException where
                     Map.singleton name version
                 go _ = Map.empty
      -- Supressing duplicate output
-    show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bs) =
+    show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bss) =
         let fullCmd = unwords
                     $ dropQuotes (toFilePath execName)
                     : map (T.unpack . showProcessArgDebug) fullArgs
@@ -250,14 +250,12 @@ instance Show StackBuildException where
                 then " (THIS MAY INDICATE OUT OF MEMORY)"
                 else "") ++
            logLocations ++
-           (if S.null bs
+           (if null bss
                 then ""
-                else "\n\n" ++ doubleIndent (T.unpack $ decodeUtf8With lenientDecode bs))
+                else "\n\n" ++ doubleIndent (map (T.unpack . decodeUtf8With lenientDecode) bss))
          where
-          -- appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
-          indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
+          doubleIndent = dropWhileEnd isSpace . unlines . fmap (\line -> "    " ++ line)
           dropQuotes = filter ('\"' /=)
-          doubleIndent = indent . indent
     show (ExecutionFailure es) = intercalate "\n\n" $ map show es
     show (LocalPackageDoesn'tMatchTarget name localV requestedV) = concat
         [ "Version for local package "

@@ -19,6 +19,7 @@ module Stack.Types.Config
   -- ** HasPlatform & HasStackRoot
    HasPlatform(..)
   ,HasStackRoot(..)
+  ,PlatformVariant(..)
   -- ** Config & HasConfig
   ,Config(..)
   ,HasConfig(..)
@@ -103,7 +104,7 @@ module Stack.Types.Config
   ,platformOnlyRelDir
   ,platformVariantRelDir
   ,useShaPathOnWindows
-  ,workDirRel
+  ,getWorkDir
   -- * Command-specific types
   -- ** Eval
   ,EvalOpts(..)
@@ -178,6 +179,8 @@ import qualified Data.ByteString.Base16 as B16
 data Config =
   Config {configStackRoot           :: !(Path Abs Dir)
          -- ^ ~/.stack more often than not
+         ,configWorkDir             :: !(Path Rel Dir)
+         -- ^ this allows to override .stack-work directory
          ,configUserConfigPath      :: !(Path Abs File)
          -- ^ Path to user configuration file (usually ~/.stack/config.yaml)
          ,configDocker              :: !DockerOpts
@@ -197,6 +200,8 @@ data Config =
          -- console
          ,configPlatform            :: !Platform
          -- ^ The platform we're building for, used in many directory names
+         ,configPlatformVariant     :: !PlatformVariant
+         -- ^ Variant of the platform, also used in directory names
          ,configGHCVariant0         :: !(Maybe GHCVariant)
          -- ^ The variant of GHC requested by the user.
          -- In most cases, use 'BuildConfig' or 'MiniConfig's version instead,
@@ -471,8 +476,10 @@ bcRoot :: BuildConfig -> Path Abs Dir
 bcRoot = parent . bcStackYaml
 
 -- | @"'bcRoot'/.stack-work"@
-bcWorkDir :: BuildConfig -> Path Abs Dir
-bcWorkDir = (</> workDirRel) . bcRoot
+bcWorkDir :: (MonadReader env m, HasConfig env) => BuildConfig -> m (Path Abs Dir)
+bcWorkDir bconfig = do
+  workDir <- getWorkDir
+  return (bcRoot bconfig </> workDir)
 
 -- | Configuration after the environment has been setup.
 data EnvConfig = EnvConfig
@@ -495,7 +502,7 @@ instance HasEnvConfig EnvConfig where
 data LoadConfig m = LoadConfig
     { lcConfig          :: !Config
       -- ^ Top-level Stack configuration.
-    , lcLoadBuildConfig :: !(Maybe AbstractResolver -> Maybe CompilerVersion -> m BuildConfig)
+    , lcLoadBuildConfig :: !(Maybe CompilerVersion -> m BuildConfig)
         -- ^ Action to load the remaining 'BuildConfig'.
     , lcProjectRoot     :: !(Maybe (Path Abs Dir))
         -- ^ The project root directory, if in a project.
@@ -676,8 +683,13 @@ class HasPlatform env where
     default getPlatform :: HasConfig env => env -> Platform
     getPlatform = configPlatform . getConfig
     {-# INLINE getPlatform #-}
-instance HasPlatform Platform where
-    getPlatform = id
+    getPlatformVariant :: env -> PlatformVariant
+    default getPlatformVariant :: HasConfig env => env -> PlatformVariant
+    getPlatformVariant = configPlatformVariant . getConfig
+    {-# INLINE getPlatformVariant #-}
+instance HasPlatform (Platform,PlatformVariant) where
+    getPlatform (p,_) = p
+    getPlatformVariant (_,v) = v
 
 -- | Class for environment values which have a GHCVariant
 class HasGHCVariant env where
@@ -715,7 +727,9 @@ instance HasBuildConfig BuildConfig where
 -- Configurations may be "cascaded" using mappend (left-biased).
 data ConfigMonoid =
   ConfigMonoid
-    { configMonoidDockerOpts         :: !DockerOptsMonoid
+    { configMonoidWorkDir            :: !(Maybe FilePath)
+    -- ^ See: 'configWorkDir'.
+    , configMonoidDockerOpts         :: !DockerOptsMonoid
     -- ^ Docker options.
     , configMonoidNixOpts            :: !NixOptsMonoid
     -- ^ Options for the execution environment (nix-shell or container)
@@ -784,7 +798,8 @@ data ConfigMonoid =
 
 instance Monoid ConfigMonoid where
   mempty = ConfigMonoid
-    { configMonoidDockerOpts = mempty
+    { configMonoidWorkDir = Nothing
+    , configMonoidDockerOpts = mempty
     , configMonoidNixOpts = mempty
     , configMonoidConnectionCount = Nothing
     , configMonoidHideTHLoading = Nothing
@@ -818,7 +833,8 @@ instance Monoid ConfigMonoid where
     , configMonoidAllowNewer = Nothing
     }
   mappend l r = ConfigMonoid
-    { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
+    { configMonoidWorkDir = configMonoidWorkDir l <|> configMonoidWorkDir r
+    , configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
     , configMonoidNixOpts = configMonoidNixOpts l <> configMonoidNixOpts r
     , configMonoidConnectionCount = configMonoidConnectionCount l <|> configMonoidConnectionCount r
     , configMonoidHideTHLoading = configMonoidHideTHLoading l <|> configMonoidHideTHLoading r
@@ -861,6 +877,7 @@ instance FromJSON (ConfigMonoid, [JSONWarning]) where
 -- warnings for missing fields.
 parseConfigMonoidJSON :: Object -> WarningParser ConfigMonoid
 parseConfigMonoidJSON obj = do
+    configMonoidWorkDir <- obj ..:? configMonoidWorkDirName
     configMonoidDockerOpts <- jsonSubWarnings (obj ..:? configMonoidDockerOptsName ..!= mempty)
     configMonoidNixOpts <- jsonSubWarnings (obj ..:? configMonoidNixShellOptsName ..!= mempty)
     configMonoidConnectionCount <- obj ..:? configMonoidConnectionCountName
@@ -938,6 +955,9 @@ parseConfigMonoidJSON obj = do
                         Left e -> fail $ show e
                         Right x -> return $ Just x
         return (name, b)
+
+configMonoidWorkDirName :: Text
+configMonoidWorkDirName = "work-dir"
 
 configMonoidDockerOptsName :: Text
 configMonoidDockerOptsName = "docker"
@@ -1140,14 +1160,15 @@ configPackageTarball iname ident = do
     return (root </> $(mkRelDir "packages") </> name </> ver </> base)
 
 -- | @".stack-work"@
-workDirRel :: Path Rel Dir
-workDirRel = $(mkRelDir ".stack-work")
+getWorkDir :: (MonadReader env m, HasConfig env) => m (Path Rel Dir)
+getWorkDir = configWorkDir `liftM` asks getConfig
 
 -- | Per-project work dir
 configProjectWorkDir :: (HasBuildConfig env, MonadReader env m) => m (Path Abs Dir)
 configProjectWorkDir = do
-    bc <- asks getBuildConfig
-    return (bcRoot bc </> workDirRel)
+    bc      <- asks getBuildConfig
+    workDir <- getWorkDir
+    return (bcRoot bc </> workDir)
 
 -- | File containing the installed cache, see "Stack.PackageDump"
 configInstalledCache :: (HasBuildConfig env, MonadReader env m) => m (Path Abs File)
@@ -1159,7 +1180,8 @@ platformOnlyRelDir
     => m (Path Rel Dir)
 platformOnlyRelDir = do
     platform <- asks getPlatform
-    parseRelDir (Distribution.Text.display platform)
+    platformVariant <- asks getPlatformVariant
+    parseRelDir (Distribution.Text.display platform ++ platformVariantSuffix platformVariant)
 
 -- | Directory containing snapshots
 snapshotsDir :: (MonadReader env m, HasConfig env, HasGHCVariant env, MonadThrow m) => m (Path Abs Dir)
@@ -1201,8 +1223,11 @@ platformVariantRelDir
     => m (Path Rel Dir)
 platformVariantRelDir = do
     platform <- asks getPlatform
+    platformVariant <- asks getPlatformVariant
     ghcVariant <- asks getGHCVariant
-    parseRelDir (Distribution.Text.display platform <> ghcVariantSuffix ghcVariant)
+    parseRelDir (mconcat [ Distribution.Text.display platform
+                         , platformVariantSuffix platformVariant
+                         , ghcVariantSuffix ghcVariant ])
 
 -- | This is an attempt to shorten stack paths on Windows to decrease our
 -- chances of hitting 260 symbol path limit. The idea is to calculate
@@ -1370,6 +1395,15 @@ instance FromJSON SCM where
 
 instance ToJSON SCM where
     toJSON Git = toJSON ("git" :: Text)
+
+-- | A variant of the platform, used to differentiate Docker builds from host
+data PlatformVariant = PlatformVariantNone
+                     | PlatformVariant String
+
+-- | Render a platform variant to a String suffix.
+platformVariantSuffix :: PlatformVariant -> String
+platformVariantSuffix PlatformVariantNone = ""
+platformVariantSuffix (PlatformVariant v) = "-" ++ v
 
 -- | Specialized bariant of GHC (e.g. libgmp4 or integer-simple)
 data GHCVariant
