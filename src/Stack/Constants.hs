@@ -122,8 +122,11 @@ userDocsDir :: Config -> Path Abs Dir
 userDocsDir config = configStackRoot config </> $(mkRelDir "doc/")
 
 -- | Output .o/.hi directory.
-objectInterfaceDir :: BuildConfig -> Path Abs Dir
-objectInterfaceDir bconfig = bcWorkDir bconfig </> $(mkRelDir "odir/")
+objectInterfaceDir :: (MonadReader env m, HasConfig env)
+  => BuildConfig -> m (Path Abs Dir)
+objectInterfaceDir bconfig = do
+  bcwd <- bcWorkDir bconfig
+  return (bcwd </> $(mkRelDir "odir/"))
 
 -- | The filename used for dirtiness check of source files.
 buildCacheFile :: (MonadThrow m, MonadReader env m, HasPlatform env,HasEnvConfig env)
@@ -218,8 +221,9 @@ distRelativeDir = do
         packageIdentifierString $
         PackageIdentifier cabalPackageName cabalPkgVer
     platformAndCabal <- useShaPathOnWindows (platform </> envDir)
+    workDir <- getWorkDir
     return $
-        workDirRel </>
+        workDir </>
         $(mkRelDir "dist") </>
         platformAndCabal
 
@@ -255,12 +259,20 @@ rawGithubUrl org repo branch file = T.concat
 -- haddockExtension = "haddock"
 
 -- | Docker sandbox from project root.
-projectDockerSandboxDir :: Path Abs Dir -> Path Abs Dir
-projectDockerSandboxDir projectRoot = projectRoot </> workDirRel </> $(mkRelDir "docker/")
+projectDockerSandboxDir :: (MonadReader env m, HasConfig env)
+  => Path Abs Dir      -- ^ Project root
+  -> m (Path Abs Dir)  -- ^ Docker sandbox
+projectDockerSandboxDir projectRoot = do
+  workDir <- getWorkDir
+  return $ projectRoot </> workDir </> $(mkRelDir "docker/")
 
 -- | Image staging dir from project root.
-imageStagingDir :: Path Abs Dir -> Path Abs Dir
-imageStagingDir p = p </> workDirRel </> $(mkRelDir "image/")
+imageStagingDir :: (MonadReader env m, HasConfig env)
+  => Path Abs Dir      -- ^ Project root
+  -> m (Path Abs Dir)  -- ^ Docker sandbox
+imageStagingDir projectRoot = do
+  workDir <- getWorkDir
+  return $ projectRoot </> workDir </> $(mkRelDir "image/")
 
 -- | Name of the 'stack' program, uppercased
 stackProgNameUpper :: String

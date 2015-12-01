@@ -99,8 +99,8 @@ configFromConfigMonoid
     -> Maybe (Project, Path Abs File)
     -> ConfigMonoid
     -> m Config
-configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject
-                       configMonoid@ConfigMonoid{..} = do
+configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject configMonoid@ConfigMonoid{..} = do
+     configWorkDir <- parseRelDir (fromMaybe ".stack-work" configMonoidWorkDir)
      let configConnectionCount = fromMaybe 8 configMonoidConnectionCount
          configHideTHLoading = fromMaybe True configMonoidHideTHLoading
          configLatestSnapshotUrl = fromMaybe
@@ -416,7 +416,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
 -- necessary.
 resolvePackageEntry
     :: (MonadIO m, MonadThrow m, MonadReader env m, HasHttpManager env, MonadLogger m, MonadCatch m
-       ,MonadBaseControl IO m)
+       ,MonadBaseControl IO m, HasConfig env)
     => EnvOverride
     -> Path Abs Dir -- ^ project root
     -> PackageEntry
@@ -436,19 +436,20 @@ resolvePackageEntry menv projRoot pe = do
 -- necessary.
 resolvePackageLocation
     :: (MonadIO m, MonadThrow m, MonadReader env m, HasHttpManager env, MonadLogger m, MonadCatch m
-       ,MonadBaseControl IO m)
+       ,MonadBaseControl IO m, HasConfig env)
     => EnvOverride
     -> Path Abs Dir -- ^ project root
     -> PackageLocation
     -> m (Path Abs Dir)
 resolvePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
 resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
+    workDir <- getWorkDir
     let nameBeforeHashing = case remotePackageType of
             RPTHttpTarball -> url
             RPTGit commit  -> T.unwords [url, commit]
             RPTHg  commit  -> T.unwords [url, commit, "hg"]
         name = T.unpack $ decodeUtf8 $ B16.encode $ SHA256.hash $ encodeUtf8 nameBeforeHashing
-        root = projRoot </> workDirRel </> $(mkRelDir "downloaded")
+        root = projRoot </> workDir </> $(mkRelDir "downloaded")
         fileExtension = case remotePackageType of
             RPTHttpTarball -> ".tar.gz"
             _              -> ".unused"

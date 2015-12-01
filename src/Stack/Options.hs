@@ -232,8 +232,9 @@ cleanOptsParser = CleanOpts <$> packages
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser hide0 =
-    (\opts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin modifyCodePage -> mempty
-        { configMonoidDockerOpts = opts
+    (\workDir opts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin modifyCodePage -> mempty
+        { configMonoidWorkDir = workDir
+        , configMonoidDockerOpts = opts
         , configMonoidSystemGHC = systemGHC
         , configMonoidInstallGHC = installGHC
         , configMonoidSkipGHCCheck = skipGHCCheck
@@ -247,7 +248,13 @@ configOptsParser hide0 =
         , configMonoidLocalBinPath = localBin
         , configMonoidModifyCodePage = modifyCodePage
         })
-    <$> dockerOptsParser True
+    <$> optional (strOption
+            ( long "work-dir"
+            <> metavar "WORK-DIR"
+            <> help "Override work directory (default: .stack-work)"
+            <> hide
+            ))
+    <*> dockerOptsParser True
     <*> maybeBoolFlags
             "system-ghc"
             "using the system installed GHC (on the PATH) if available and a matching version"
@@ -561,11 +568,11 @@ globalOptsFromMonoid :: Bool -> GlobalOptsMonoid -> GlobalOpts
 globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
     { globalReExecVersion = globalMonoidReExecVersion
     , globalDockerEntrypoint = globalMonoidDockerEntrypoint
-    , globalLogLevel = fromMaybe defaultLogLevel (globalMonoidLogLevel)
+    , globalLogLevel = fromMaybe defaultLogLevel globalMonoidLogLevel
     , globalConfigMonoid = globalMonoidConfigMonoid
     , globalResolver = globalMonoidResolver
     , globalCompiler = globalMonoidCompiler
-    , globalTerminal = fromMaybe defaultTerminal (globalMonoidTerminal)
+    , globalTerminal = fromMaybe defaultTerminal globalMonoidTerminal
     , globalStackYaml = globalMonoidStackYaml }
 
 initOptsParser :: Parser InitOpts
@@ -599,7 +606,7 @@ initOptsParser =
          metavar "RESOLVER" <>
          help "Use the given resolver, even if not all dependencies are met")
 
--- | Parse for a logging level.
+-- | Parser for a logging level.
 logLevelOptsParser :: Bool -> Parser (Maybe LogLevel)
 logLevelOptsParser hide =
   fmap (Just . parse)

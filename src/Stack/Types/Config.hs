@@ -104,7 +104,7 @@ module Stack.Types.Config
   ,platformOnlyRelDir
   ,platformVariantRelDir
   ,useShaPathOnWindows
-  ,workDirRel
+  ,getWorkDir
   -- * Command-specific types
   -- ** Eval
   ,EvalOpts(..)
@@ -178,6 +178,8 @@ import qualified Data.ByteString.Base16 as B16
 data Config =
   Config {configStackRoot           :: !(Path Abs Dir)
          -- ^ ~/.stack more often than not
+         ,configWorkDir             :: !(Path Rel Dir)
+         -- ^ this allows to override .stack-work directory
          ,configUserConfigPath      :: !(Path Abs File)
          -- ^ Path to user configuration file (usually ~/.stack/config.yaml)
          ,configDocker              :: !DockerOpts
@@ -471,8 +473,10 @@ bcRoot :: BuildConfig -> Path Abs Dir
 bcRoot = parent . bcStackYaml
 
 -- | @"'bcRoot'/.stack-work"@
-bcWorkDir :: BuildConfig -> Path Abs Dir
-bcWorkDir = (</> workDirRel) . bcRoot
+bcWorkDir :: (MonadReader env m, HasConfig env) => BuildConfig -> m (Path Abs Dir)
+bcWorkDir bconfig = do
+  workDir <- getWorkDir
+  return (bcRoot bconfig </> workDir)
 
 -- | Configuration after the environment has been setup.
 data EnvConfig = EnvConfig
@@ -720,7 +724,9 @@ instance HasBuildConfig BuildConfig where
 -- Configurations may be "cascaded" using mappend (left-biased).
 data ConfigMonoid =
   ConfigMonoid
-    { configMonoidDockerOpts         :: !DockerOptsMonoid
+    { configMonoidWorkDir            :: !(Maybe FilePath)
+    -- ^ See: 'configWorkDir'.
+    , configMonoidDockerOpts         :: !DockerOptsMonoid
     -- ^ Docker options.
     , configMonoidConnectionCount    :: !(Maybe Int)
     -- ^ See: 'configConnectionCount'
@@ -787,7 +793,8 @@ data ConfigMonoid =
 
 instance Monoid ConfigMonoid where
   mempty = ConfigMonoid
-    { configMonoidDockerOpts = mempty
+    { configMonoidWorkDir = Nothing
+    , configMonoidDockerOpts = mempty
     , configMonoidConnectionCount = Nothing
     , configMonoidHideTHLoading = Nothing
     , configMonoidLatestSnapshotUrl = Nothing
@@ -820,7 +827,8 @@ instance Monoid ConfigMonoid where
     , configMonoidAllowNewer = Nothing
     }
   mappend l r = ConfigMonoid
-    { configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
+    { configMonoidWorkDir = configMonoidWorkDir l <|> configMonoidWorkDir r
+    , configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
     , configMonoidConnectionCount = configMonoidConnectionCount l <|> configMonoidConnectionCount r
     , configMonoidHideTHLoading = configMonoidHideTHLoading l <|> configMonoidHideTHLoading r
     , configMonoidLatestSnapshotUrl = configMonoidLatestSnapshotUrl l <|> configMonoidLatestSnapshotUrl r
@@ -862,6 +870,7 @@ instance FromJSON (ConfigMonoid, [JSONWarning]) where
 -- warnings for missing fields.
 parseConfigMonoidJSON :: Object -> WarningParser ConfigMonoid
 parseConfigMonoidJSON obj = do
+    configMonoidWorkDir <- obj ..:? configMonoidWorkDirName
     configMonoidDockerOpts <- jsonSubWarnings (obj ..:? configMonoidDockerOptsName ..!= mempty)
     configMonoidConnectionCount <- obj ..:? configMonoidConnectionCountName
     configMonoidHideTHLoading <- obj ..:? configMonoidHideTHLoadingName
@@ -938,6 +947,9 @@ parseConfigMonoidJSON obj = do
                         Left e -> fail $ show e
                         Right x -> return $ Just x
         return (name, b)
+
+configMonoidWorkDirName :: Text
+configMonoidWorkDirName = "work-dir"
 
 configMonoidDockerOptsName :: Text
 configMonoidDockerOptsName = "docker"
@@ -1137,14 +1149,15 @@ configPackageTarball iname ident = do
     return (root </> $(mkRelDir "packages") </> name </> ver </> base)
 
 -- | @".stack-work"@
-workDirRel :: Path Rel Dir
-workDirRel = $(mkRelDir ".stack-work")
+getWorkDir :: (MonadReader env m, HasConfig env) => m (Path Rel Dir)
+getWorkDir = configWorkDir `liftM` asks getConfig
 
 -- | Per-project work dir
 configProjectWorkDir :: (HasBuildConfig env, MonadReader env m) => m (Path Abs Dir)
 configProjectWorkDir = do
-    bc <- asks getBuildConfig
-    return (bcRoot bc </> workDirRel)
+    bc      <- asks getBuildConfig
+    workDir <- getWorkDir
+    return (bcRoot bc </> workDir)
 
 -- | File containing the installed cache, see "Stack.PackageDump"
 configInstalledCache :: (HasBuildConfig env, MonadReader env m) => m (Path Abs File)
