@@ -89,7 +89,7 @@ runShellAndExit getCmdArgs = do
          fullArgs = concat [ -- ["--pure"],
                             map T.unpack (nixShellOptions (configNix config))
                            ,nixopts
-                           ,["--command", intercalate " " (map (\a -> "'"++a++"'") (cmnd:args))
+                           ,["--command", intercalate " " (map escape (cmnd:args))
                                           ++ " $STACK_IN_NIX_EXTRA_ARGS"]
                            ]
      $logDebug $
@@ -100,6 +100,13 @@ runShellAndExit getCmdArgs = do
      case e of
        Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
        Right () -> liftIO exitSuccess
+
+-- | Shell-escape quotes inside the string and enclose it in quotes.
+escape :: String -> String
+escape str = "'" ++ foldr (\c -> if c == '\'' then
+                                   ("'\"'\"'"++)
+                                 else (c:)) "" str
+                 ++ "'"
 
 -- | 'True' if we are currently running inside a Nix.
 getInShell :: (MonadIO m) => m Bool
