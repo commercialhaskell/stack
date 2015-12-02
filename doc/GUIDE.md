@@ -1656,7 +1656,7 @@ code inside a Docker image, which means:
   a large initial download, but much faster builds
 
 For more information, see
-[the Docker-integration documentation](docker_integration.html).
+[the Docker-integration documentation](https://github.com/commercialhaskell/stack/blob/master/doc/docker_integration.md).
 
 stack can also generate Docker images for you containing your built executables.
 This feature is great for automating deployments from CI. This feature is not
