@@ -247,18 +247,18 @@ generatePkgDescOpts
     -> m (Map NamedComponent BuildInfoOpts)
 generatePkgDescOpts sourceMap installedMap omitPkgs cabalfp pkg componentPaths = do
     distDir <- distDirFromDir cabalDir
-    let cabalmacros = autogenDir distDir </> $(mkRelFile "cabal_macros.h")
-    exists <- fileExists cabalmacros
-    let mcabalmacros =
+    let cabalMacros = autogenDir distDir </> $(mkRelFile "cabal_macros.h")
+    exists <- fileExists cabalMacros
+    let mcabalMacros =
             if exists
-                then Just cabalmacros
+                then Just cabalMacros
                 else Nothing
     let generate namedComponent binfo =
             ( namedComponent
             , generateBuildInfoOpts
                   sourceMap
                   installedMap
-                  mcabalmacros
+                  mcabalMacros
                   cabalDir
                   distDir
                   omitPkgs
@@ -305,9 +305,9 @@ generateBuildInfoOpts
     -> Set DotCabalPath
     -> NamedComponent
     -> BuildInfoOpts
-generateBuildInfoOpts sourceMap installedMap mcabalmacros cabalDir distDir omitPkgs b dotCabalPaths componentName =
+generateBuildInfoOpts sourceMap installedMap mcabalMacros cabalDir distDir omitPkgs b dotCabalPaths componentName =
     BuildInfoOpts
-        { bioOpts = macros ++ ghcOpts b ++ cppOptions b
+        { bioOpts = ghcOpts b ++ cppOptions b
         -- NOTE for future changes: Due to this use of nubOrd (and other uses
         -- downstream), these generated options must not rely on multiple
         -- argument sequences.  For example, ["--main-is", "Foo.hs", "--main-
@@ -317,6 +317,7 @@ generateBuildInfoOpts sourceMap installedMap mcabalmacros cabalDir distDir omitP
         -- See https://github.com/commercialhaskell/stack/issues/1255
         , bioOneWordOpts = nubOrd $ concat
             [extOpts b, srcOpts, includeOpts, deps, extra b, extraDirs, fworks b, cObjectFiles]
+        , bioCabalMacros = mcabalMacros
         }
   where
     cObjectFiles =
@@ -337,11 +338,6 @@ generateBuildInfoOpts sourceMap installedMap mcabalmacros cabalDir distDir omitP
         -- Generates: -package=base -package=base16-bytestring-0.1.1.6 ...
     sourceVersion (PSUpstream ver _ _) = ver
     sourceVersion (PSLocal localPkg) = packageVersion (lpPackage localPkg)
-    macros =
-        case mcabalmacros of
-            Nothing -> []
-            Just cabalmacros ->
-                ["-optP-include", "-optP" <> toFilePath cabalmacros]
     ghcOpts = concatMap snd . filter (isGhc . fst) . options
       where
         isGhc GHC = True

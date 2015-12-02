@@ -119,6 +119,7 @@ data BuildInfoOpts = BuildInfoOpts
     -- ^ These options can safely have 'nubOrd' applied to them, as
     -- there are no multi-word options (see
     -- https://github.com/commercialhaskell/stack/issues/1255)
+    , bioCabalMacros :: Maybe (Path Abs File)
     } deriving Show
 
 -- | Files to get for a cabal package.

@@ -21,6 +21,7 @@ import           Control.Monad.Logger
 import           Control.Monad.RWS.Strict
 import           Control.Monad.State.Strict
 import           Control.Monad.Trans.Resource
+import qualified Data.ByteString.Char8 as S8
 import           Data.Either
 import           Data.Function
 import           Data.List
@@ -126,21 +127,19 @@ ghci GhciOpts{..} = do
                  -- include CWD.
                   "-i" :
                   odir <> pkgopts <> ghciArgs <> extras)
-    if ghciNoLoadModules
-    then execGhci []
-    else do
-      tmp <- liftIO getTemporaryDirectory
-      withCanonicalizedTempDirectory
-          tmp
-          "ghci-script"
-          (\tmpDir ->
-                do let scriptPath = tmpDir </> $(mkRelFile "ghci-script")
-                       fp = toFilePath scriptPath
-                       loadModules = ":load " <> unwords (map show thingsToLoad)
-                       bringIntoScope = ":module + " <> unwords modulesToLoad
-                   liftIO (writeFile fp (unlines [loadModules,bringIntoScope]))
-                   finally (execGhci ["-ghci-script=" <> fp])
-                           (removeFile scriptPath))
+    tmp <- liftIO getTemporaryDirectory
+    withCanonicalizedTempDirectory tmp "ghci" $ \tmpDir -> do
+        let macrosFile = tmpDir </> $(mkRelFile "cabal_macros.h")
+        macrosOpts <- preprocessCabalMacros pkgs macrosFile
+        if ghciNoLoadModules
+            then execGhci macrosOpts
+            else do
+                let scriptPath = tmpDir </> $(mkRelFile "ghci-script")
+                    fp = toFilePath scriptPath
+                    loadModules = ":load " <> unwords (map show thingsToLoad)
+                    bringIntoScope = ":module + " <> unwords modulesToLoad
+                liftIO (writeFile fp (unlines [loadModules,bringIntoScope]))
+                execGhci (macrosOpts ++ ["-ghci-script=" <> fp])
 
 -- | Figure out the main-is file to load based on the targets. Sometimes there
 -- is none, sometimes it's unambiguous, sometimes it's
@@ -403,9 +402,9 @@ borderedWarning f = do
 -- if they don't have a library (but that's fine for the usage within
 -- this module).
 getIntermediateDeps
-      :: SourceMap
-      -> [(PackageName, (Path Abs File, SimpleTarget))]
-      -> [(PackageName, (Path Abs File, SimpleTarget))]
+    :: SourceMap
+    -> [(PackageName, (Path Abs File, SimpleTarget))]
+    -> [(PackageName, (Path Abs File, SimpleTarget))]
 getIntermediateDeps sourceMap targets =
     M.toList $
     (\mp -> foldl' (flip M.delete) mp (map fst targets)) $
@@ -436,3 +435,11 @@ getIntermediateDeps sourceMap targets =
                         return False
             (_, Just PSUpstream{}) -> return False
             (Nothing, Nothing) -> return False
+
+preprocessCabalMacros :: MonadIO m => [GhciPkgInfo] -> Path Abs File -> m [String]
+preprocessCabalMacros pkgs out = liftIO $ do
+    let fps = nubOrd (concatMap (catMaybes . map (bioCabalMacros . snd) . ghciPkgOpts) pkgs)
+    files <- mapM (S8.readFile . toFilePath) fps
+    if null files then return [] else do
+        S8.writeFile (toFilePath out) $ S8.intercalate "\n#undef CURRENT_PACKAGE_KEY\n" files
+        return ["-optP-include", "-optP" <> toFilePath out]

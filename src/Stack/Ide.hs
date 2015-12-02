@@ -97,9 +97,13 @@ getPackageOptsAndTargetFiles pwd pkg = do
             (parseRelFile
                  ("Paths_" ++ packageNameString (ghciPkgName pkg) ++ ".hs"))
     paths_foo_exists <- fileExists paths_foo
+    let ghcOptions bio =
+            bioOneWordOpts bio ++
+            bioOpts bio ++
+            maybe [] (\cabalMacros -> ["-optP-include", "-optP" <> toFilePath cabalMacros]) (bioCabalMacros bio)
     return
         ( ("--dist-dir=" <> toFilePathNoTrailingSep dist) :
-          map ("--ghc-option=" ++) (concatMap (\(_, bio) -> bioOneWordOpts bio ++ bioOpts bio) (ghciPkgOpts pkg))
+          map ("--ghc-option=" ++) (concatMap (ghcOptions . snd) (ghciPkgOpts pkg))
         , mapMaybe
               (fmap toFilePath . stripDir pwd)
               (S.toList (ghciPkgCFiles pkg) <> S.toList (ghciPkgModFiles pkg) <>
