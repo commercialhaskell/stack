@@ -23,6 +23,7 @@ Downloads are available by operating system:
 * [Debian](install_and_upgrade.html#debian)
 * [CentOS / Red Hat / Amazon Linux](install_and_upgrade.html#centos-red-hat-amazon-linux)
 * [Fedora](install_and_upgrade.html#fedora)
+* [openSUSE / SUSE Linux Enterprise](install_and_upgrade.html#opensuse-suse-linux-enterprise)
 * [Arch Linux](install_and_upgrade.html#arch-linux)
 * [NixOS](install_and_upgrade.html#nixos)
 * [Linux (general)](install_and_upgrade.html#linux)
