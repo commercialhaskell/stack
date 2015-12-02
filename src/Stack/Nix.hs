@@ -1,18 +1,16 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DeriveDataTypeable, OverloadedStrings, TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings, TemplateHaskell #-}
 
 -- | Run commands in a nix-shell
 module Stack.Nix
   (reexecWithOptionalShell
   ,nixCmdName
-  ,StackNixException(..)
   ) where
 
 import           Control.Applicative
-import           Control.Exception.Lifted
 import           Control.Monad
-import           Control.Monad.Catch (throwM,MonadCatch,MonadMask)
+import           Control.Monad.Catch (try,MonadCatch)
 import           Control.Monad.IO.Class (MonadIO,liftIO)
 import           Control.Monad.Logger (MonadLogger,logDebug)
 import           Control.Monad.Reader (MonadReader,asks)
@@ -23,7 +21,6 @@ import           Data.Maybe
 import           Data.Monoid
 import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import qualified Data.Text as T
-import           Data.Typeable
 import           Data.Version (showVersion)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import qualified Paths_stack as Meta
@@ -69,10 +66,7 @@ runShellAndExit getCmdArgs = do
      (cmnd,args) <- getCmdArgs
      let mshellFile = nixInitFile (configNix config)
          pkgsInConfig = nixPackages (configNix config)
-     if not (null pkgsInConfig) && isJust mshellFile then
-       throwM NixCannotUseShellFileAndPackagesException
-       else return ()
-     let nixopts = case mshellFile of
+         nixopts = case mshellFile of
            Just filePath -> [filePath]
            Nothing -> ["-E", T.unpack $ T.intercalate " " $ concat
                               [["with (import <nixpkgs> {});"
@@ -132,17 +126,4 @@ type M env m =
   ,HasTerminal env
   ,HasReExec env
   ,HasHttpManager env
-  ,MonadMask m
   )
-
--- Exceptions thown specifically by Stack.Nix
-data StackNixException
-  = NixCannotUseShellFileAndPackagesException
-    -- ^ Nix can't be given packages and a shell file at the same time
-    deriving (Typeable)
-
-instance Exception StackNixException
-
-instance Show StackNixException where
-  show NixCannotUseShellFileAndPackagesException =
-    "You cannot have packages and a shell-file filled at the same time in your nix-shell configuration."
