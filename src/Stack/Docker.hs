@@ -447,8 +447,8 @@ cleanup opts =
                         | otherwise -> throwM (InvalidCleanupCommandException line)
              e <- try (readDockerProcess envOverride args)
              case e of
-               Left (ReadProcessException{}) ->
-                 $logError (concatT ["Could not remove: '",v,"'"])
+               Left ex@ReadProcessException{} ->
+                 $logError (concatT ["Could not remove: '",v,"': ", show ex])
                Left e' -> throwM e'
                Right _ -> return ()
         _ -> throwM (InvalidCleanupCommandException line)
@@ -628,8 +628,7 @@ inspects envOverride images =
          case eitherDecode (LBS.pack (filter isAscii (decodeUtf8 inspectOut))) of
            Left msg -> throwM (InvalidInspectOutputException msg)
            Right results -> return (Map.fromList (map (\r -> (iiId r,r)) results))
-       Left (ReadProcessException{}) -> return Map.empty
-       Left e -> throwM e
+       Left e -> throwM (e :: ReadProcessException)
 
 -- | Pull latest version of configured Docker image from registry.
 pull :: M env m => m ()
