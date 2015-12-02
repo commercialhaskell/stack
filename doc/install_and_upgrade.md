@@ -185,6 +185,28 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
             sudo yum -y install stack
 
+## openSUSE / SUSE Linux Enterprise
+
+*note:* openSUSE's and SLE's `stack` isn't managed by the Stack release team
+ 
+ 1. Add the appropriate OBS repository:
+      
+      * openSUSE Tumbleweed
+            
+            all needed is in distribution
+
+      * openSUSE Leap
+            
+            sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/openSUSE_Leap_42.1/devel:languages:haskell.repo
+
+       * SUSE Linux Enterprise 12 
+
+            sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/SLE_12/devel:languages:haskell.repo 
+
+ 2. Install:
+    
+    sudo zypper in stack
+
 ## Arch Linux
 
 *note*: for 32-bit, use the [generic Linux option](#linux). (You will need to ensure libtinfo is installed, see below.)
