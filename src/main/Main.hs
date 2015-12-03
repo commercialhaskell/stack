@@ -63,6 +63,7 @@ import           Stack.Coverage
 import qualified Stack.Docker as Docker
 import           Stack.Dot
 import           Stack.Exec
+import qualified Stack.Nix as Nix
 import           Stack.Fetch
 import           Stack.FileWatch
 import           Stack.GhcPkg (getGlobalDB, mkGhcPackagePath)
@@ -120,6 +121,10 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                    dockerHelpOptName
                    (dockerOptsParser False)
                    ("Only showing --" ++ Docker.dockerCmdName ++ "* options.")
+     execExtraHelp args
+                   nixHelpOptName
+                   (nixOptsParser False)
+                   ("Only showing --" ++ Nix.nixCmdName ++ "* options.")
 #ifdef USE_GIT_INFO
      let commitCount = $gitCommitCount
          versionString' = concat $ concat
@@ -136,6 +141,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
 
      let globalOpts hide =
              extraHelpOption hide progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
+             extraHelpOption hide progName (Nix.nixCmdName ++ "*") nixHelpOptName <*>             
              globalOptsParser hide
          addCommand' cmd title footerStr constr =
              addCommand cmd title footerStr constr (globalOpts True)
@@ -454,6 +460,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
   where
     ignoreCheckSwitch = switch (long "ignore-check" <> help "Do not check package for common mistakes")
     dockerHelpOptName = Docker.dockerCmdName ++ "-help"
+    nixHelpOptName    = Nix.nixCmdName ++ "-help"
     cmdFooter = "Run 'stack --help' for global options that apply to all subcommands."
 
 -- | Print out useful path information in a human-readable format (and
@@ -635,7 +642,9 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
       Docker.reexecWithOptionalContainer
           (lcProjectRoot lc)
           Nothing
-          (runStackLoggingTGlobal manager go $ do
+          (runStackTGlobal manager (lcConfig lc) go $
+           Nix.reexecWithOptionalShell $
+           runStackLoggingTGlobal manager go $ do
               (wantedCompiler, compilerCheck, mstack) <-
                   case scoCompilerVersion of
                       Just v -> return (v, MatchMinor, Nothing)
@@ -796,10 +805,16 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
                   (inner' lk)
 
       runStackTGlobal manager (lcConfig lc) go $
-         Docker.reexecWithOptionalContainer (lcProjectRoot lc) mbefore (inner'' lk0) mafter
-                                            (Just $ liftIO $
-                                             do lk' <- readIORef curLk
-                                                munlockFile lk')
+        Docker.reexecWithOptionalContainer
+                 (lcProjectRoot lc)
+                 mbefore
+                 (runStackTGlobal manager (lcConfig lc) go $
+                    Nix.reexecWithOptionalShell (inner'' lk0)
+                 )
+                 mafter
+                 (Just $ liftIO $
+                      do lk' <- readIORef curLk
+                         munlockFile lk')
 
 cleanCmd :: CleanOpts -> GlobalOpts -> IO ()
 cleanCmd opts go = withBuildConfigAndLock go (const (clean opts))
@@ -936,7 +951,9 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                     (runStackTGlobal manager (lcConfig lc) go $ do
                         config <- asks getConfig
                         menv <- liftIO $ configEnvOverride config plainEnvSettings
-                        exec menv cmd args)
+                        Nix.reexecWithOptionalShell
+                            (runStackTGlobal manager (lcConfig lc) go $
+                                exec menv cmd args))
                     Nothing
                     Nothing -- Unlocked already above.
         ExecOptsEmbellished {..} ->

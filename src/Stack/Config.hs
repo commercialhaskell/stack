@@ -67,6 +67,7 @@ import qualified Paths_stack as Meta
 import           Safe (headMay)
 import           Stack.BuildPlan
 import           Stack.Config.Docker
+import           Stack.Config.Nix
 import           Stack.Constants
 import qualified Stack.Image as Image
 import           Stack.Init
@@ -150,6 +151,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject c
 
      configDocker <-
          dockerOptsFromMonoid (fmap fst mproject) configStackRoot mresolver configMonoidDockerOpts
+     configNix <- nixOptsFromMonoid (fmap fst mproject) configStackRoot configMonoidNixOpts
 
      rawEnv <- liftIO getEnvironment
      origEnv <- mkEnvOverride configPlatform

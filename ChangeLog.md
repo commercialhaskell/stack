@@ -4,6 +4,9 @@
 
 Major changes:
 
+* Support for building inside a Nix-shell providing system dependencies
+  [#1285](https://github.com/commercialhaskell/stack/pull/1285)
+
 Other enhancements:
 
 * Print latest applicable version of packages on conflicts

@@ -51,6 +51,7 @@ library
                      Stack.Clean
                      Stack.Config
                      Stack.Config.Docker
+                     Stack.Config.Nix
                      Stack.ConfigCmd
                      Stack.Constants
                      Stack.Coverage
@@ -63,6 +64,7 @@ library
                      Stack.GhcPkg
                      Stack.Init
                      Stack.New
+                     Stack.Nix
                      Stack.Options
                      Stack.Package
                      Stack.PackageDump
@@ -83,6 +85,7 @@ library
                      Stack.Types.FlagName
                      Stack.Types.GhcPkgId
                      Stack.Types.Image
+                     Stack.Types.Nix
                      Stack.Types.PackageIdentifier
                      Stack.Types.PackageIndex
                      Stack.Types.PackageName
@@ -262,6 +265,7 @@ test-suite stack-test
                 , Stack.DotSpec
                 , Stack.PackageDumpSpec
                 , Stack.ArgsSpec
+                , Stack.NixSpec
                 , Network.HTTP.Download.VerifiedSpec
   ghc-options:    -Wall -threaded
   build-depends:  base >=4.7 && <5

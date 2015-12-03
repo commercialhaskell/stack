@@ -161,6 +161,7 @@ import qualified Paths_stack as Meta
 import           Stack.Types.BuildPlan (SnapName, renderSnapName, parseSnapName)
 import           Stack.Types.Compiler
 import           Stack.Types.Docker
+import           Stack.Types.Nix
 import           Stack.Types.FlagName
 import           Stack.Types.Image
 import           Stack.Types.PackageIdentifier
@@ -184,6 +185,8 @@ data Config =
          -- ^ Path to user configuration file (usually ~/.stack/config.yaml)
          ,configDocker              :: !DockerOpts
          -- ^ Docker configuration
+         ,configNix                 :: !NixOpts
+         -- ^ Execution environment (e.g nix-shell) configuration
          ,configEnvOverride         :: !(EnvSettings -> IO EnvOverride)
          -- ^ Environment variables to be passed to external tools
          ,configLocalProgramsBase   :: !(Path Abs Dir)
@@ -728,6 +731,8 @@ data ConfigMonoid =
     -- ^ See: 'configWorkDir'.
     , configMonoidDockerOpts         :: !DockerOptsMonoid
     -- ^ Docker options.
+    , configMonoidNixOpts            :: !NixOptsMonoid
+    -- ^ Options for the execution environment (nix-shell or container)
     , configMonoidConnectionCount    :: !(Maybe Int)
     -- ^ See: 'configConnectionCount'
     , configMonoidHideTHLoading      :: !(Maybe Bool)
@@ -795,6 +800,7 @@ instance Monoid ConfigMonoid where
   mempty = ConfigMonoid
     { configMonoidWorkDir = Nothing
     , configMonoidDockerOpts = mempty
+    , configMonoidNixOpts = mempty
     , configMonoidConnectionCount = Nothing
     , configMonoidHideTHLoading = Nothing
     , configMonoidLatestSnapshotUrl = Nothing
@@ -829,6 +835,7 @@ instance Monoid ConfigMonoid where
   mappend l r = ConfigMonoid
     { configMonoidWorkDir = configMonoidWorkDir l <|> configMonoidWorkDir r
     , configMonoidDockerOpts = configMonoidDockerOpts l <> configMonoidDockerOpts r
+    , configMonoidNixOpts = configMonoidNixOpts l <> configMonoidNixOpts r
     , configMonoidConnectionCount = configMonoidConnectionCount l <|> configMonoidConnectionCount r
     , configMonoidHideTHLoading = configMonoidHideTHLoading l <|> configMonoidHideTHLoading r
     , configMonoidLatestSnapshotUrl = configMonoidLatestSnapshotUrl l <|> configMonoidLatestSnapshotUrl r
@@ -872,6 +879,7 @@ parseConfigMonoidJSON :: Object -> WarningParser ConfigMonoid
 parseConfigMonoidJSON obj = do
     configMonoidWorkDir <- obj ..:? configMonoidWorkDirName
     configMonoidDockerOpts <- jsonSubWarnings (obj ..:? configMonoidDockerOptsName ..!= mempty)
+    configMonoidNixOpts <- jsonSubWarnings (obj ..:? configMonoidNixOptsName ..!= mempty)
     configMonoidConnectionCount <- obj ..:? configMonoidConnectionCountName
     configMonoidHideTHLoading <- obj ..:? configMonoidHideTHLoadingName
     configMonoidLatestSnapshotUrl <- obj ..:? configMonoidLatestSnapshotUrlName
@@ -953,6 +961,9 @@ configMonoidWorkDirName = "work-dir"
 
 configMonoidDockerOptsName :: Text
 configMonoidDockerOptsName = "docker"
+
+configMonoidNixOptsName :: Text
+configMonoidNixOptsName = "nix"
 
 configMonoidConnectionCountName :: Text
 configMonoidConnectionCountName = "connection-count"

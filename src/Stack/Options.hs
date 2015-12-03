@@ -15,6 +15,7 @@ module Stack.Options
     ,globalOptsParser
     ,initOptsParser
     ,newOptsParser
+    ,nixOptsParser
     ,logLevelOptsParser
     ,ghciOptsParser
     ,solverOptsParser
@@ -52,6 +53,7 @@ import           Stack.Dot
 import           Stack.Ghci (GhciOpts(..))
 import           Stack.Init
 import           Stack.New
+import           Stack.Nix
 import           Stack.Types
 import           Stack.Types.TemplateName
 
@@ -232,9 +234,10 @@ cleanOptsParser = CleanOpts <$> packages
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser hide0 =
-    (\workDir opts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin modifyCodePage -> mempty
+    (\workDir dockerOpts nixOpts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin modifyCodePage -> mempty
         { configMonoidWorkDir = workDir
-        , configMonoidDockerOpts = opts
+        , configMonoidDockerOpts = dockerOpts
+        , configMonoidNixOpts = nixOpts
         , configMonoidSystemGHC = systemGHC
         , configMonoidInstallGHC = installGHC
         , configMonoidSkipGHCCheck = skipGHCCheck
@@ -255,6 +258,7 @@ configOptsParser hide0 =
             <> hide
             ))
     <*> dockerOptsParser True
+    <*> nixOptsParser True
     <*> maybeBoolFlags
             "system-ghc"
             "using the system installed GHC (on the PATH) if available and a matching version"
@@ -314,6 +318,24 @@ configOptsParser hide0 =
             "setting the codepage to support UTF-8 (Windows only)"
             hide
   where hide = hideMods hide0
+
+nixOptsParser :: Bool -> Parser NixOptsMonoid
+nixOptsParser hide0 =
+  NixOptsMonoid
+  <$> pure False
+  <*> maybeBoolFlags nixCmdName
+                     "using a Nix-shell"
+                     hide
+  <*> pure []
+  <*> pure Nothing
+  <*> ((map T.pack . fromMaybe [])
+       <$> optional (argsOption (long "nix-shell-options" <>
+                                 metavar "OPTION" <>
+                                 help "Additional options passed to nix-shell" <>
+                                 hide)))
+  where
+    hide = hideMods hide0
+
 
 -- | Options parser configuration for Docker.
 dockerOptsParser :: Bool -> Parser DockerOptsMonoid
