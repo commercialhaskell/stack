@@ -20,6 +20,10 @@ Other enhancements:
 * Support git-style executable fall-through (`stack something` executes
   `stack-something` if present)
   [#1433](https://github.com/commercialhaskell/stack/issues/1433)
+* GHCi now loads intermediate dependencies
+  [#584](https://github.com/commercialhaskell/stack/issues/584)
+* `--work-dir` option for overriding `.stack-work`
+  [#1178](https://github.com/commercialhaskell/stack/issues/1178)
 
 Bug fixes:
 
@@ -29,6 +33,12 @@ Bug fixes:
   [#911](https://github.com/commercialhaskell/stack/issues/911)
   [#1367](https://github.com/commercialhaskell/stack/issues/1367)
 * Docker: `--resolver` argument didn't effect selected image tag
+* GHCi: Spaces in filepaths caused module loading issues
+  [#1401](https://github.com/commercialhaskell/stack/issues/1401)
+* GHCi: cpp-options in cabal files weren't used
+  [#1419](https://github.com/commercialhaskell/stack/issues/1419)
+* Benchmarks couldn't be run independently of eachother
+  [#1412](https://github.com/commercialhaskell/stack/issues/1412)
 
 ## 0.1.8.0
 
