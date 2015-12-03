@@ -25,6 +25,7 @@ Documentation table of contents
    faq.md
    ghcjs.md
    install_and_upgrade.md
+   nix_integration.md
    nonstandard_project_init.md
    shell_autocompletion.md
    GUIDE.md
