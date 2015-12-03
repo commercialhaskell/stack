@@ -298,7 +298,7 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
                 Just STLocalAll ->
                     ( packageExes pkg
                     , if boptsTests bopts
-                        then packageTests pkg
+                        then Map.keysSet (packageTests pkg)
                         else Set.empty
                     , if boptsBenchmarks bopts
                         then packageBenchmarks pkg
@@ -367,7 +367,7 @@ loadLocalPackage bopts targets (name, (lpv, gpkg)) = do
         -- present, then they must not be buildable.
         , lpUnbuildable = toComponents
             (exes `Set.difference` packageExes pkg)
-            (tests `Set.difference` packageTests pkg)
+            (tests `Set.difference` Map.keysSet (packageTests pkg))
             (benches `Set.difference` packageBenchmarks pkg)
         }
 

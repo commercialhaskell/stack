@@ -24,6 +24,8 @@ Other enhancements:
   [#584](https://github.com/commercialhaskell/stack/issues/584)
 * `--work-dir` option for overriding `.stack-work`
   [#1178](https://github.com/commercialhaskell/stack/issues/1178)
+* Support `detailed-0.9` tests
+  [#1429](https://github.com/commercialhaskell/stack/issues/1429)
 
 Bug fixes:
 

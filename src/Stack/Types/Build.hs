@@ -64,6 +64,7 @@ import           Data.Text.Encoding.Error (lenientDecode)
 import           Data.Time.Calendar
 import           Data.Time.Clock
 import           Distribution.System (Arch)
+import           Distribution.PackageDescription (TestSuiteInterface)
 import           Distribution.Text (display)
 import           GHC.Generics
 import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, parseRelDir, (</>))
@@ -99,6 +100,7 @@ data StackBuildException
     (Map PackageName Version) -- not in snapshot, here's the most recent version in the index
     (Path Abs File) -- stack.yaml
   | TestSuiteFailure PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe (Path Abs File)) S.ByteString
+  | TestSuiteTypeUnsupported TestSuiteInterface
   | ConstructPlanExceptions
         [ConstructPlanException]
         (Path Abs File) -- stack.yaml
@@ -209,6 +211,8 @@ instance Show StackBuildException where
          where
           indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
           doubleIndent = indent . indent
+    show (TestSuiteTypeUnsupported interface) =
+              ("Unsupported test suite type: " <> show interface)
     show (ConstructPlanExceptions exceptions stackYaml) =
         "While constructing the BuildPlan the following exceptions were encountered:" ++
         appendExceptions exceptions' ++
@@ -725,7 +729,7 @@ configureOptsNoDir econfig bco deps wanted isLocal package = concat
     allGhcOptions = concat
         [ Map.findWithDefault [] Nothing (configGhcOptions config)
         , Map.findWithDefault [] (Just $ packageName package) (configGhcOptions config)
-        , concat [["-fhpc", "-fforce-recomp"] | isLocal && toCoverage (boptsTestOpts bopts)]
+        , concat [["-fhpc"] | isLocal && toCoverage (boptsTestOpts bopts)]
         , if includeExtraOptions
             then boptsGhcOptions bopts
             else []

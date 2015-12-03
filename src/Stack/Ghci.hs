@@ -322,7 +322,7 @@ wantedPackageComponents _ (STLocalComps cs) _ = cs
 wantedPackageComponents bopts STLocalAll pkg = S.fromList $
     (if packageHasLibrary pkg then [CLib] else []) ++
     map CExe (S.toList (packageExes pkg)) <>
-    (if boptsTests bopts then map CTest (S.toList (packageTests pkg)) else []) <>
+    (if boptsTests bopts then map CTest (M.keys (packageTests pkg)) else []) <>
     (if boptsBenchmarks bopts then map CBench (S.toList (packageBenchmarks pkg)) else [])
 wantedPackageComponents _ _ _ = S.empty
 
