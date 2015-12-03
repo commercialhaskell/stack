@@ -21,10 +21,11 @@ using system libraries with special requirements.
 ### Additions to your `stack.yaml`
 
 Add a section to your `stack.yaml` as follows:
-
-    nix:
-      enable: true
-      packages: [glpk, pcre]
+```yaml
+nix:
+  enable: true
+  packages: [glpk, pcre]
+```
 
 This will instruct `stack` to build inside a nix-shell that will have
 the `glpk` and `pcre` libraries installed and available. Further, the
@@ -38,7 +39,7 @@ something that has not yet been mirrored in the Nixpkgs package
 repository. In order to check this, the quickest way is to install and
 launch a `nix-repl`:
 
-```
+```sh
 $ nix-channel --update
 $ nix-env -i nix-repl
 $ nix-repl
@@ -46,7 +47,7 @@ $ nix-repl
 
 Then, inside the `nix-repl`, do:
 
-```
+```sh
 nix-repl> :l <nixpkgs>
 nix-repl> haskell.packages.lts-3_13.ghc
 ```
@@ -97,42 +98,55 @@ command-line. See `stack --nix-help` for a list of all Nix options.
 Without this section, Nix will not be used.
 
 Here is a commented configuration file, showing the default values:
+```yaml
+nix:
 
-    nix:
+  # `true` by default when the nix section is present. Set
+  # it to `false` to disable using Nix.
+  enable: true
 
-        # `true` by default when the nix section is present. Set
-        # it to `false` to disable using Nix.
-        enable: true
+  # Empty by default. The list of packages you want to be
+  # available in the nix-shell at build time (with `stack
+  # build`) and run time (with `stack exec`).
+  packages: []
 
-        # Empty by default. The list of packages you want to be
-        # available in the nix-shell at build time (with `stack
-        # build`) and run time (with `stack exec`).
-        packages: []
+  # Unset by default. You cannot set this option if `packages:`
+  # is already present and not empty, this will result in an
+  # exception
+  shell-file: shell.nix
 
-        # Unset by default. You cannot set this option if `packages:`
-        # is already present and not empty, this will result in an
-        # exception
-        shell-file: shell.nix
-
-        # A list of strings, empty by default. Additional options that
-        # will be passed verbatim to the `nix-shell` command.
-        nix-shell-options: []
-
+  # A list of strings, empty by default. Additional options that
+  # will be passed verbatim to the `nix-shell` command.
+  nix-shell-options: []
+```
 ## Using a custom shell.nix file
 
 Nix is also a programming language, and as specified
-[here](#using-nix-with-stack) if you know it you can provide to the
+[here](#nix-integration) if you know it you can provide to the
 shell a fully customized derivation as an environment to use. Here is
 the equivalent of the configuration used in
-[this section](#enable-in-stackyaml), but with an explicit `shell.nix`
+[this section](#additions-to-your-stackyaml), but with an explicit `shell.nix`
 file:
 
-```
+```nix
 with (import <nixpkgs> {});
+
 stdenv.mkDerivation {
+
   name = "myEnv";
-  buildInputs = [glpk pcre haskell.packages.lts-3_13.ghc];
-  STACK_IN_NIX_EXTRA_ARGS="--extra-lib-dirs=${glpk}/lib --extra-include-dirs=${glpk}/include --extra-lib-dirs=${pcre}/lib --extra-include-dirs=${pcre}/include";
+  
+  buildInputs = [
+    glpk 
+    pcre 
+    haskell.packages.lts-3_13.ghc
+  ];
+  
+  STACK_IN_NIX_EXTRA_ARGS
+      = " --extra-lib-dirs=${glpk}/lib" 
+      + " --extra-include-dirs=${glpk}/include" 
+      + " --extra-lib-dirs=${pcre}/lib" 
+      + " --extra-include-dirs=${pcre}/include"
+  ;
 }
 ```
 
@@ -151,10 +165,10 @@ some build options of the libraries you use.
 
 And now for the `stack.yaml` file:
 
-```
+```yaml
 nix:
-    enable: true
-    shell-file: shell.nix
+  enable: true
+  shell-file: shell.nix
 ```
 
 The `stack build` command will behave exactly the same as above. Note
