@@ -157,7 +157,7 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
 ## Fedora
 
-*note*: for 32-bit, you can use this [Fedora Copr repo](https://copr.fedoraproject.org/coprs/petersen/stack/) which can be enabled with:
+*note*: for 32-bit, you can use this [Fedora Copr repo](https://copr.fedoraproject.org/coprs/petersen/stack/) (not managed by the Stack release team, so not guaranteed to be up-to-date) which can be enabled with:
 
     sudo dnf copr enable petersen/stack
 
