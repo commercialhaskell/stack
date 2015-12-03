@@ -788,7 +788,7 @@ installGHCPosix version _ archiveFile archiveType destDir = do
 
     withCanonicalizedSystemTempDirectory "stack-setup" $ \root -> do
         dir <-
-            liftM (root Path.</>) $
+            liftM (root </>) $
             parseRelDir $
             "ghc-" ++ versionString version
 
@@ -797,7 +797,7 @@ installGHCPosix version _ archiveFile archiveType destDir = do
         readInNull root tarTool menv ["xf", toFilePath archiveFile] Nothing
 
         $logSticky "Configuring GHC ..."
-        readInNull dir (toFilePath $ dir Path.</> $(mkRelFile "configure"))
+        readInNull dir (toFilePath $ dir </> $(mkRelFile "configure"))
                    menv ["--prefix=" ++ toFilePath destDir] Nothing
 
         $logSticky "Installing GHC ..."
@@ -833,7 +833,7 @@ installGHCJS version si archiveFile archiveType destDir = do
     -- environment of the stack.yaml which came with ghcjs, in order to
     -- install cabal-install. This lets us also fix the version of
     -- cabal-install used.
-    let unpackDir = destDir Path.</> $(mkRelDir "src")
+    let unpackDir = destDir </> $(mkRelDir "src")
     tarComponent <- parseRelDir ("ghcjs-" ++ versionString version)
     runUnpack <- case platform of
         Platform _ Cabal.Windows -> return $
@@ -853,7 +853,7 @@ installGHCJS version si archiveFile archiveType destDir = do
             return $ do
                 removeTreeIfExists unpackDir
                 readInNull destDir tarTool menv ["xf", toFilePath archiveFile] Nothing
-                renameDir (destDir Path.</> tarComponent) unpackDir
+                renameDir (destDir </> tarComponent) unpackDir
 
     $logSticky $ T.concat ["Unpacking GHCJS into ", T.pack . toFilePath $ unpackDir, " ..."]
     $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
@@ -861,7 +861,7 @@ installGHCJS version si archiveFile archiveType destDir = do
 
     $logSticky "Setting up GHCJS build environment"
     let stackYaml = unpackDir </> $(mkRelFile "stack.yaml")
-        destBinDir = destDir Path.</> $(mkRelDir "bin")
+        destBinDir = destDir </> $(mkRelDir "bin")
     createTree destBinDir
     envConfig <- loadGhcjsEnvConfig stackYaml destBinDir
 
@@ -931,7 +931,7 @@ ensureGhcjsBooted menv cv shouldBoot  = do
                 actualStackYaml <- if stackYamlExists then return stackYaml
                     else case cv of
                         GhcjsVersion version _ ->
-                            liftM ((destDir Path.</> $(mkRelDir "src")) Path.</>) $
+                            liftM ((destDir </> $(mkRelDir "src")) </>) $
                             parseRelFile $ "ghcjs-" ++ versionString version ++ "/stack.yaml"
                         _ -> fail "ensureGhcjsBooted invoked on non GhcjsVersion"
                 actualStackYamlExists <- fileExists actualStackYaml
