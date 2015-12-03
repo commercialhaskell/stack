@@ -1716,7 +1716,7 @@ in the common case or even to learn how to use the Nix tools (they're
 called under the hood).
 
 For more information, see
-[the Nix-integration documentation](nix_integration.md).
+[the Nix-integration documentation](nix_integration.html).
 
 ## Power user commands
 
