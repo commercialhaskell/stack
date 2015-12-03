@@ -44,6 +44,16 @@ extra-deps: []
 
 The above example specifies that the `proprietary-dep` package is found in the project's `third-party` folder, that the `conduit` package is found in the project's `github-version-of` folder, and that the `diagrams` package is found in the project's `patched` folder. This autodetects changes and reinstalls the package.
 
+To install packages directly from a Git repository, use e.g.:
+
+```yaml
+resolver: lts-2.10
+packages:
+- location:
+    git: https://github.com/githubuser/reponame.git
+    commit: somecommitID
+```
+
 #### What is the meaning of the arguments given to stack build, test, etc?
 
 Those are the targets of the build, and can have one of three formats:
