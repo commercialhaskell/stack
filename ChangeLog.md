@@ -4,6 +4,17 @@
 
 Major changes:
 
+
+Other enhancements:
+
+
+Bug fixes:
+
+
+## 0.1.10.0
+
+Major changes:
+
 * Support for building inside a Nix-shell providing system dependencies
   [#1285](https://github.com/commercialhaskell/stack/pull/1285)
 
