@@ -93,23 +93,23 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
       * Ubuntu 15.10 (amd64):
 
-            echo 'deb http://download.fpcomplete.com/ubuntu/wily stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
+            echo 'deb http://download.fpcomplete.com/ubuntu wily main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
       * Ubuntu 15.04 (amd64):
 
-            echo 'deb http://download.fpcomplete.com/ubuntu/vivid stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
+            echo 'deb http://download.fpcomplete.com/ubuntu vivid main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
       * Ubuntu 14.10 (amd64)
 
-            echo 'deb http://download.fpcomplete.com/ubuntu/utopic stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
+            echo 'deb http://download.fpcomplete.com/ubuntu utopic main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
       * Ubuntu 14.04 (amd64)
 
-            echo 'deb http://download.fpcomplete.com/ubuntu/trusty stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
+            echo 'deb http://download.fpcomplete.com/ubuntu trusty main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
       * Ubuntu 12.04 (amd64)
 
-            echo 'deb http://download.fpcomplete.com/ubuntu/precise stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
+            echo 'deb http://download.fpcomplete.com/ubuntu precise main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
  3. Update apt and install
 
@@ -121,17 +121,17 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
  1. Get the FP Complete key:
 
-        wget -q -O- https://s3.amazonaws.com/download.fpcomplete.com/debian/fpco.key | sudo apt-key add -
+        sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 575159689BEFB442
 
  2. Add the appropriate source repository:
 
       * Debian 8 (amd64):
 
-            echo 'deb http://download.fpcomplete.com/debian/jessie stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
+            echo 'deb http://download.fpcomplete.com/debian jessie main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
       * Debian 7 (amd64)
 
-            echo 'deb http://download.fpcomplete.com/debian/wheezy stable main'|sudo tee /etc/apt/sources.list.d/fpco.list
+            echo 'deb http://download.fpcomplete.com/debian wheezy main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
  3. Update apt and install
 

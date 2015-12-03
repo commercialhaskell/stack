@@ -21,6 +21,7 @@ to go:
     * Rename Changelog's "unreleased changes" section to the version (check for
       any entries that snuck into the previous version's changes)
     * Next release (post-0.1.9.0): Add release note about new documentation/home page
+    * Next release (post-0.1.9.0): Add release note about moved Debian and Ubuntu repos
 * In master branch:
     * Bump version to next odd second-to-last component
     * Add new "unreleased changes" secion in changelog
@@ -40,8 +41,6 @@ to go:
   and
   [README.md](https://github.com/commercialhaskell/stack/blob/master/README.md)
 * Next release (post-0.1.9.0)
-    - Fix ubuntu/debian repos:
-      https://github.com/commercialhaskell/stack/issues/1378
     - Test distro package autocompletion to ensure non-absolute path to `stack`
       works
       (https://github.com/commercialhaskell/stack/issues/1343#issuecomment-158647308)
@@ -93,6 +92,8 @@ for requirements to perform the release, and more details about the tool.
 
 * On a machine with Vagrant installed:
     * Run `etc/scripts/vagrant-distros.sh`
+    * Next release (post-0.1.9.0): test Ubuntu and Debian repos from new
+      locations (and old)
 
 * Update in Arch Linux's
   [haskell-stack.git](ssh+git://aur@aur.archlinux.org/haskell-stack.git):

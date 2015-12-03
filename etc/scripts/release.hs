@@ -263,7 +263,14 @@ rules global@Global{..} args = do
            let DistroVersion{..} = distroVersionFromPath out debVersions
                pkgFile = dropExtension out
            need [pkgFile]
-           () <- cmd "deb-s3 upload -b download.fpcomplete.com --preserve-versions"
+           () <- cmd "deb-s3 upload --preserve-versions --bucket download.fpcomplete.com"
+               [ "--sign=" ++ gGpgKey
+               , "--prefix=" ++ dvDistro
+               , "--codename=" ++ dvCodeName
+               , pkgFile ]
+           -- Also upload to the old, incorrect location for people who still have their systems
+           -- configured with it.
+           () <- cmd "deb-s3 upload --preserve-versions --bucket download.fpcomplete.com"
                [ "--sign=" ++ gGpgKey
                , "--prefix=" ++ dvDistro ++ "/" ++ dvCodeName
                , pkgFile ]
