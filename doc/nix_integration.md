@@ -1,4 +1,4 @@
-# Using Nix with Stack
+# Nix integration
 
 `stack` can build automatically inside a nix-shell (the equivalent of
 a "container" in Docker parlance), provided Nix is already installed
