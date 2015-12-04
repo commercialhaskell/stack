@@ -157,7 +157,10 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
 ## Fedora
 
-*note*: for 32-bit, you can use this [Fedora Copr repo](https://copr.fedoraproject.org/coprs/petersen/stack/) (not managed by the Stack release team, so not guaranteed to be up-to-date) which can be enabled with:
+*Note*: for 32-bit, you can use this
+ [Fedora Copr repo](https://copr.fedoraproject.org/coprs/petersen/stack/) (not
+ managed by the Stack release team, so not guaranteed to have the very latest
+ version) which can be enabled with:
 
     sudo dnf copr enable petersen/stack
 
@@ -187,25 +190,26 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
 ## openSUSE / SUSE Linux Enterprise
 
-*note:* openSUSE's and SLE's `stack` isn't managed by the Stack release team
- 
+*Note:* openSUSE's and SLE's `stack` isn't managed by the Stack release team, so
+ not guaranteed to have the latest version.
+
  1. Add the appropriate OBS repository:
-      
+
       * openSUSE Tumbleweed
-            
-            all needed is in distribution
+
+        all needed is in distribution
 
       * openSUSE Leap
-            
+
             sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/openSUSE_Leap_42.1/devel:languages:haskell.repo
 
-       * SUSE Linux Enterprise 12 
+      * SUSE Linux Enterprise 12
 
             sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/SLE_12/devel:languages:haskell.repo 
 
  2. Install:
-    
-    sudo zypper in stack
+
+        sudo zypper in stack
 
 ## Arch Linux
 
