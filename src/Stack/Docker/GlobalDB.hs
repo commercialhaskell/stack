@@ -20,6 +20,7 @@ import           Control.Monad (forM_)
 import           Control.Monad.Logger (NoLoggingT)
 import           Control.Monad.Trans.Resource (ResourceT)
 import           Data.List (sortBy, isInfixOf, stripPrefix)
+import           Data.List.Extra (stripSuffix)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe (fromMaybe)
 import qualified Data.Text as T
@@ -105,7 +106,6 @@ withGlobalDB config action =
                    action)
          `catch` \ex -> do
              let str = show ex
-                 stripSuffix x = fmap reverse . stripPrefix x . reverse
                  str' = fromMaybe str $ stripPrefix "user error (" $
                         fromMaybe str $ stripSuffix ")" str
              if "ErrorReadOnly" `isInfixOf` str
