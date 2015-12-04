@@ -1168,15 +1168,9 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                           else return True
 
         when toRun $ do
-            bconfig <- asks getBuildConfig
             buildDir <- distDirFromDir pkgDir
             hpcDir <- hpcDirFromDir pkgDir
             when needHpc (createTree hpcDir)
-
-            let exeExtension =
-                    case configPlatform $ getConfig bconfig of
-                        Platform _ Windows -> ".exe"
-                        _ -> ""
 
             errs <- liftM Map.unions $ forM (Map.toList (packageTests package)) $ \(testName, suiteInterface) -> do
                 let stestName = T.unpack testName
@@ -1186,12 +1180,11 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                         C.TestSuiteExeV10{} -> return (stestName, False)
                         interface -> throwM (TestSuiteTypeUnsupported interface)
 
-                nameDir <- parseRelDir $ testName'
-                nameExe <- parseRelFile $ testName' ++ exeExtension
-                nameTix <- liftM (pkgDir </>) $ parseRelFile $ testName' ++ ".tix"
-                let exeName = buildDir </> $(mkRelDir "build") </> nameDir </> nameExe
-                exists <- fileExists exeName
-                menv <- liftIO $ configEnvOverride config EnvSettings
+                exeName <- testExeName testName'
+                tixPath <- liftM (pkgDir </>) $ parseRelFile $ exeName ++ ".tix"
+                exePath <- liftM (buildDir </>) $ parseRelFile $ "build/" ++ testName' ++ "/" ++ exeName
+                exists <- fileExists exePath
+                menv <- liftIO $    configEnvOverride config EnvSettings
                     { esIncludeLocals = taskLocation task == Local
                     , esIncludeGhcPackagePath = True
                     , esStackExe = True
@@ -1201,17 +1194,17 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                     then do
                         -- We clear out the .tix files before doing a run.
                         when needHpc $ do
-                            tixexists <- fileExists nameTix
+                            tixexists <- fileExists tixPath
                             when tixexists $
-                                $logWarn ("Removing HPC file " <> T.pack (toFilePath nameTix))
-                            removeFileIfExists nameTix
+                                $logWarn ("Removing HPC file " <> T.pack (toFilePath tixPath))
+                            removeFileIfExists tixPath
 
                         let args = toAdditionalArgs topts
                             argsDisplay = case args of
                                             [] -> ""
                                             _ -> ", args: " <> T.intercalate " " (map showProcessArgDebug args)
                         announce $ "test (suite: " <> testName <> argsDisplay <> ")"
-                        let cp = (proc (toFilePath exeName) args)
+                        let cp = (proc (toFilePath exePath) args)
                                 { cwd = Just $ toFilePath pkgDir
                                 , Process.env = envHelper menv
                                 , std_in = CreatePipe
@@ -1237,7 +1230,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                         -- directory into the hpc work dir, for
                         -- tidiness.
                         when needHpc $
-                            updateTixFile (packageName package) nameTix
+                            updateTixFile (packageName package) tixPath
                         return $ case ec of
                             ExitSuccess -> Map.empty
                             _ -> Map.singleton testName $ Just ec
