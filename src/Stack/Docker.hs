@@ -20,7 +20,6 @@ module Stack.Docker
   ) where
 
 import           Control.Applicative
-import           Control.Concurrent (threadDelay)
 import           Control.Concurrent.MVar.Lifted (MVar,modifyMVar_,newMVar)
 import           Control.Exception.Lifted
 import           Control.Monad
@@ -80,6 +79,7 @@ import           System.Process (CreateProcess(delegate_ctlc))
 import           Text.Printf (printf)
 
 #ifndef WINDOWS
+import           Control.Concurrent (threadDelay)
 import           Control.Monad.Trans.Control (liftBaseWith)
 import           System.Posix.Signals
 #endif
