@@ -42,7 +42,13 @@ The more detailed your report, the faster it can be resolved and will ensure it 
 
 
 ## Documentation
+
 If you would like to help with documentation, please note that for most cases the Wiki has been deprecated in favor of markdown files placed in a new `/doc` subdirectory of the repository itself. Please submit a [pull request](https://help.github.com/articles/using-pull-requests/) with your changes/additions.
+
+The documentation is rendered on [haskellstack.org](http://haskellstack.org) by
+readthedocs.org using Sphinx and CommonMark. Since links and formatting vary
+from GFM, please check the documentation there before submitting a PR to fix
+those.
 
 If your changes move or rename files, or subsume Wiki content, please continue to leave a file/page in the old location temporarily, in addition to the new location. This will allow users time to update any shared links to the old location. Please also update any links in other files, or on the Wiki, to point to the new file location.
 
