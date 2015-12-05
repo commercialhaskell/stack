@@ -6,6 +6,7 @@ module Stack.Config.Nix
        ,StackNixException(..)
        ) where
 
+import Control.Monad (when)
 import Data.Text (pack)
 import Data.Maybe
 import Data.Typeable
@@ -35,9 +36,8 @@ nixOptsFromMonoid mproject maresolver NixOptsMonoid{..} = do
               _ -> pack "ghc"]
         nixInitFile = nixMonoidInitFile
         nixShellOptions = nixMonoidShellOptions
-    if not (null nixMonoidPackages) && isJust nixInitFile then
+    when (not (null nixMonoidPackages) && isJust nixInitFile) $
        throwM NixCannotUseShellFileAndPackagesException
-       else return ()
     return NixOpts{..}
 
 -- Exceptions thown specifically by Stack.Nix

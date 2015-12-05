@@ -21,6 +21,7 @@ import           Control.Monad.Trans.Resource
 import           Data.Conduit
 import qualified Data.Conduit.List            as CL
 import           Data.Function
+import qualified Data.Foldable                as F
 import qualified Data.HashSet                 as HashSet
 import           Data.List
 import           Data.Map.Strict              (Map)
@@ -87,9 +88,7 @@ getInstalled menv opts sourceMap = do
         loadDatabase' (Just (InstalledTo Local, localDBPath)) installedLibs2
     let installedLibs = M.fromList $ map lhPair installedLibs3
 
-    case mcache of
-        Nothing -> return ()
-        Just pcache -> saveInstalledCache (configInstalledCache bconfig) pcache
+    F.forM_ mcache (saveInstalledCache (configInstalledCache bconfig))
 
     -- Add in the executables that are installed, making sure to only trust a
     -- listed installation under the right circumstances (see below)
@@ -191,7 +190,7 @@ processLoadResult mdb _ (reason, lh) = do
         [ "Ignoring package "
         , packageNameText (fst (lhPair lh))
         ] ++
-        (maybe [] (\db -> [", from ", T.pack (show db), ","]) mdb) ++
+        maybe [] (\db -> [", from ", T.pack (show db), ","]) mdb ++
         [ " due to "
         , case reason of
             Allowed -> " the impossible?!?!"

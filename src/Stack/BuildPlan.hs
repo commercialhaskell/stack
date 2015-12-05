@@ -84,7 +84,7 @@ import qualified System.FilePath as FP
 data BuildPlanException
     = UnknownPackages
         (Path Abs File) -- stack.yaml file
-        (Map PackageName (Maybe Version, (Set PackageName))) -- truly unknown
+        (Map PackageName (Maybe Version, Set PackageName)) -- truly unknown
         (Map PackageName (Set PackageIdentifier)) -- shadowed
     | SnapshotNotFound SnapName
     deriving (Typeable)
@@ -406,8 +406,7 @@ instance FromJSON Snapshots where
     parseJSON = withObject "Snapshots" $ \o -> Snapshots
         <$> (o .: "nightly" >>= parseNightly)
         <*> (fmap IntMap.unions
-                $ mapM parseLTS
-                $ map snd
+                $ mapM (parseLTS . snd)
                 $ filter (isLTS . fst)
                 $ HM.toList o)
       where

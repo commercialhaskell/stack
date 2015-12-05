@@ -277,7 +277,7 @@ loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadThrow m,MonadBaseContro
            -- ^ Config monoid from parsed command-line arguments
            -> Maybe (Path Abs File)
            -- ^ Override stack.yaml
-           -> Maybe (AbstractResolver)
+           -> Maybe AbstractResolver
            -- ^ Override resolver
            -> m (LoadConfig m)
 loadConfig configArgs mstackYaml mresolver = do

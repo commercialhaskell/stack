@@ -201,7 +201,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan =
     localExes =
         collect
             [ (exe,packageName pkg)
-            | pkg <- map (lpPackage) locals
+            | pkg <- map lpPackage locals
             , exe <- Set.toList (packageExes pkg)
             ]
     collect :: Ord k => [(k,v)] -> Map k (NonEmpty v)
