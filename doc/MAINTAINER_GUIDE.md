@@ -6,11 +6,11 @@ The following should be tested minimally before a release is considered good
 to go:
 
 * Ensure `release` and `stable` branches merged to `master`
-* Integration tests pass on a representative sample of platforms: `stack test
-  --flag stack:integration-tests`. The actual release script will perform a more
-  thorough test for every platform/variant prior to uploading, so this is just a
-  pre-check
-* Stack builds with `stack-7.8.yaml`
+* Integration tests pass on a representative sample of platforms: `stack install
+  --pedantic && stack test --pedantic --flag stack:integration-tests` . The actual
+  release script will perform a more thorough test for every platform/variant
+  prior to uploading, so this is just a pre-check
+* Stack builds with `stack-7.8.yaml` (Travis CI now does this)
 * stack can build the wai repo
 * Running `stack build` a second time on either stack or wai is a no-op
 * Build something that depends on `happy` (suggestion: `hlint`), since `happy`
@@ -18,12 +18,15 @@ to go:
 * In release candidate branch:
     * Bump the version number (to even second-to-last component) in the .cabal
       file
-    * Rename Changelog's "unreleased changes" section to the version (check for
-      any entries that snuck into the previous version's changes)
+    * Update the ChangeLog:
+        * Rename the "unreleased changes" section to the new version
+        * Check for any entries that snuck into the previous version's changes
+          due to merges
 * In master branch:
     * Bump version to next odd second-to-last component
     * Add new "unreleased changes" secion in changelog
     * Bump to use latest LTS version
+* Check for any important changes that missed getting an entry in Changelog
 * Review documentation for any changes that need to be made
     * Search for old Stack version, unstable stack version, and the next
       "obvious" version in sequence (if doing a non-obvious jump) and replace
@@ -62,7 +65,8 @@ for requirements to perform the release, and more details about the tool.
 * On Windows:
     * Ensure your working tree is in `C:\stack` (or a similarly short path)
     * Run `etc\scripts\windows-releases.bat`
-    * Build Windows installers.  See https://github.com/borsboom/stack-installer#readme
+    * Release Windows installers. See
+      [stack-installer README](https://github.com/borsboom/stack-installer#readme)
 
 * Push signed Git tag, matching Github release tag name, e.g.: `git tag -u
   9BEFB442 vX.Y.Z && git push origin vX.Y.Z`
@@ -70,7 +74,7 @@ for requirements to perform the release, and more details about the tool.
 * Reset the `release` branch to the released commit, e.g.: `git checkout release
   && git merge --ff-only vX.Y.Z && git push origin release`
 
-* Update the `stable` branch
+* Update the `stable` branch similarly
 
 * Publish Github release
 
@@ -79,6 +83,8 @@ for requirements to perform the release, and more details about the tool.
   and add the new linux64 stack bindist
 
 * Upload package to Hackage: `stack upload . --pvp-bounds=both`
+
+* Upload haddocks to Hackage: `etc/scripts/upload-haddocks.sh`
 
 * Activate version for new release tag on
   [readthedocs.org](https://readthedocs.org/projects/stack/versions/), and
@@ -99,37 +105,15 @@ for requirements to perform the release, and more details about the tool.
 
 * [Build new MinGHC distribution](#update-minghc)
 
-* [Upload haddocks to Hackage](#upload-haddocks-to-hackage), if hackage couldn't
-  build on its own
-
 * Keep an eye on the
   [Hackage matrix builder](http://matrix.hackage.haskell.org/package/stack)
 
 * Announce to haskell-cafe@haskell.org, haskell-stack@googlegroups.com,
   commercialhaskell@googlegroups.com mailing lists
 
+* Merge any changes made in the RC/release/stable branches to master.
+
 ## Extra steps
-
-### Upload haddocks to Hackage
-
-* Set `STACKVER` environment variable to the Stack version (e.g. `0.1.10.0`)
-* Run:
-
-```
-stack haddock
-STACKDOCDIR=stack-$STACKVER-docs
-rm -rf _release/$STACKDOCDIR
-mkdir -p _release
-cp -r $(stack path --local-doc-root)/stack-$STACKVER _release/$STACKDOCDIR
-sed -i '' 's/href="\.\.\/\([^/]*\)\//href="..\/..\/\1\/docs\//g' _release/$STACKDOCDIR/*.html
-(cd _release && tar cvz --format=ustar -f $STACKDOCDIR.tar.gz $STACKDOCDIR)
-curl -X PUT \
-     -H 'Content-Type: application/x-tar' \
-     -H 'Content-Encoding: gzip' \
-     -u borsboom \
-     --data-binary "@_release/$STACKDOCDIR.tar.gz" \
-     "https://hackage.haskell.org/package/stack-$STACKVER/docs"
-```
 
 ### Update MinGHC
 
@@ -144,6 +128,7 @@ abbreviated set specifically for including the latest stack version.
 * Run:
 
 ```
+del .build\*.nsi
 stack build
 stack exec -- minghc-generate 7.10.2 --stack=%STACKVER%
 signtool sign /v /n "FP Complete, Corporation" /t "http://timestamp.verisign.com/scripts/timestamp.dll" .build\minghc-7.10.2-i386.exe
