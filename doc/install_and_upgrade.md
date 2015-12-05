@@ -71,7 +71,7 @@ brew install haskell-stack
 ```
 
 Note: the Homebrew formula and bottles lag slightly behind new Stack releases,
-but tend to be updated quite quickly.
+but tend to be updated within a day or two.
 
 ### Manual download
 
@@ -193,8 +193,9 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
 ## openSUSE / SUSE Linux Enterprise
 
-*Note:* openSUSE's and SLE's `stack` isn't managed by the Stack release team, so
- not guaranteed to have the latest version.
+*Note:* openSUSE's and SLE's `stack` package isn't managed by the Stack release
+team, and since it is based on the version in Stackage LTS, and may lag new
+releases by ten days or more.
 
  1. Add the appropriate OBS repository:
 
