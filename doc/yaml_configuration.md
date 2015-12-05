@@ -20,7 +20,7 @@ Project specific options are only valid in the `stack.yaml` file local to a proj
 
 ### packages
 
-(Mercurial support since 0.1.9.0)
+(Mercurial support since 0.1.10.0)
 
 This lists all local packages. In the simplest usage, it will be a list of directories, e.g.:
 
@@ -125,7 +125,13 @@ Non-project config options may go in the global config (`/etc/stack/config.yaml`
 
 ### docker
 
-See [Docker configuration](https://github.com/commercialhaskell/stack/blob/release/doc/docker_integration.md).
+See [Docker integration](docker_integration.html#configuration).
+
+### nix
+
+(since 0.1.10.0)
+
+See [Nix integration](nix_integration.html#configuration).
 
 ### connection-count
 
