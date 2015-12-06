@@ -809,8 +809,7 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
                  (lcProjectRoot lc)
                  mbefore
                  (runStackTGlobal manager (lcConfig lc) go $
-                    Nix.reexecWithOptionalShell (inner'' lk0)
-                 )
+                    Nix.reexecWithOptionalShell (inner'' lk0))
                  mafter
                  (Just $ liftIO $
                       do lk' <- readIORef curLk

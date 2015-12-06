@@ -47,7 +47,7 @@ reexecWithOptionalShell inner =
      isReExec <- asks getReExec
      if nixEnable (configNix config) && not inShell && not isReExec
        then runShellAndExit getCmdArgs
-       else liftIO (inner >> exitSuccess)
+       else liftIO inner
   where
     getCmdArgs = do
         args <-
