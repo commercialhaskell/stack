@@ -222,7 +222,7 @@ getSetupExe :: M env m
 getSetupExe setupHs tmpdir = do
     wc <- getWhichCompiler
     econfig <- asks getEnvConfig
-    platformDir <- platformVariantRelDir
+    platformDir <- platformGhcRelDir
     let config = getConfig econfig
         baseNameS = concat
             [ "setup-Simple-Cabal-"

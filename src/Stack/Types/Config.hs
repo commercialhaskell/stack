@@ -102,7 +102,7 @@ module Stack.Types.Config
   ,packageDatabaseExtra
   ,packageDatabaseLocal
   ,platformOnlyRelDir
-  ,platformVariantRelDir
+  ,platformGhcRelDir
   ,useShaPathOnWindows
   ,getWorkDir
   -- * Command-specific types
@@ -1187,7 +1187,7 @@ platformOnlyRelDir = do
 snapshotsDir :: (MonadReader env m, HasConfig env, HasGHCVariant env, MonadThrow m) => m (Path Abs Dir)
 snapshotsDir = do
     config <- asks getConfig
-    platform <- platformVariantRelDir
+    platform <- platformGhcRelDir
     return $ configStackRoot config </> $(mkRelDir "snapshots") </> platform
 
 -- | Installation root for dependencies
@@ -1212,16 +1212,16 @@ platformSnapAndCompilerRel
     => m (Path Rel Dir)
 platformSnapAndCompilerRel = do
     bc <- asks getBuildConfig
-    platform <- platformVariantRelDir
+    platform <- platformGhcRelDir
     name <- parseRelDir $ T.unpack $ resolverName $ bcResolver bc
     ghc <- compilerVersionDir
     useShaPathOnWindows (platform </> name </> ghc)
 
 -- | Relative directory for the platform identifier
-platformVariantRelDir
+platformGhcRelDir
     :: (MonadReader env m, HasPlatform env, HasGHCVariant env, MonadThrow m)
     => m (Path Rel Dir)
-platformVariantRelDir = do
+platformGhcRelDir = do
     platform <- asks getPlatform
     platformVariant <- asks getPlatformVariant
     ghcVariant <- asks getGHCVariant
@@ -1278,7 +1278,7 @@ configMiniBuildPlanCache :: (MonadThrow m, MonadReader env m, HasConfig env, Has
                          -> m (Path Abs File)
 configMiniBuildPlanCache name = do
     root <- asks getStackRoot
-    platform <- platformVariantRelDir
+    platform <- platformGhcRelDir
     file <- parseRelFile $ T.unpack (renderSnapName name) ++ ".cache"
     -- Yes, cached plans differ based on platform
     return (root </> $(mkRelDir "build-plan-cache") </> platform </> file)

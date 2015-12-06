@@ -212,7 +212,7 @@ distRelativeDir :: (MonadThrow m, MonadReader env m, HasPlatform env, HasEnvConf
                 => m (Path Rel Dir)
 distRelativeDir = do
     cabalPkgVer <- asks (envConfigCabalVersion . getEnvConfig)
-    platform <- platformVariantRelDir
+    platform <- platformGhcRelDir
     wc <- getWhichCompiler
     -- Cabal version, suffixed with "_ghcjs" if we're using GHCJS.
     envDir <-
