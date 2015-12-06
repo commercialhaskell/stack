@@ -151,7 +151,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject c
 
      configDocker <-
          dockerOptsFromMonoid (fmap fst mproject) configStackRoot mresolver configMonoidDockerOpts
-     configNix <- nixOptsFromMonoid (fmap fst mproject) configStackRoot configMonoidNixOpts
+     configNix <- nixOptsFromMonoid (fmap fst mproject) mresolver configMonoidNixOpts
 
      rawEnv <- liftIO getEnvironment
      origEnv <- mkEnvOverride configPlatform

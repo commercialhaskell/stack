@@ -9,20 +9,28 @@ module Stack.Config.Nix
 import Data.Text (pack)
 import Data.Maybe
 import Data.Typeable
-import Path
 import Stack.Types
 import Control.Exception.Lifted
 import Control.Monad.Catch (throwM,MonadCatch)
 
 
 -- | Interprets NixOptsMonoid options.
-nixOptsFromMonoid :: (Monad m, MonadCatch m) => Maybe Project -> Path Abs Dir -> NixOptsMonoid -> m NixOpts
-nixOptsFromMonoid mproject _stackRoot NixOptsMonoid{..} = do
+nixOptsFromMonoid
+    :: (Monad m, MonadCatch m)
+    => Maybe Project
+    -> Maybe AbstractResolver
+    -> NixOptsMonoid
+    -> m NixOpts
+nixOptsFromMonoid mproject maresolver NixOptsMonoid{..} = do
     let nixEnable = fromMaybe nixMonoidDefaultEnable nixMonoidEnable
+        mresolver = case maresolver of
+          Just (ARResolver resolver) -> Just resolver
+          Just _ -> Nothing
+          Nothing -> fmap projectResolver mproject
         nixPackages = case mproject of
            Nothing -> nixMonoidPackages
-           Just p -> nixMonoidPackages ++ [case projectResolver p of
-              ResolverSnapshot (LTS x y) ->
+           Just _ -> nixMonoidPackages ++ [case mresolver of
+              Just (ResolverSnapshot (LTS x y)) ->
                 pack ("haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc")
               _ -> pack "ghc"]
         nixInitFile = nixMonoidInitFile
