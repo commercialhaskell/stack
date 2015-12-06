@@ -629,7 +629,9 @@ inspects envOverride images =
          case eitherDecode (LBS.pack (filter isAscii (decodeUtf8 inspectOut))) of
            Left msg -> throwM (InvalidInspectOutputException msg)
            Right results -> return (Map.fromList (map (\r -> (iiId r,r)) results))
-       Left e -> throwM (e :: ReadProcessException)
+       Left (ReadProcessException _ _ _ err)
+         | "Error: No such image" `LBS.isPrefixOf` err -> return Map.empty
+       Left e -> throwM e
 
 -- | Pull latest version of configured Docker image from registry.
 pull :: M env m => m ()
