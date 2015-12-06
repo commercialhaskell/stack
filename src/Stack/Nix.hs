@@ -25,7 +25,7 @@ import           Data.Version (showVersion)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import qualified Paths_stack as Meta
 import           Prelude -- Fix redundant import warnings
-import           Stack.Constants (stackProgName)
+import           Stack.Constants (stackProgName,platformVariantEnvVar)
 import           Stack.Docker (reExecArgName)
 import           Stack.Exec (exec)
 import           System.Process.Read (getEnvOverride)
@@ -72,7 +72,8 @@ runShellAndExit getCmdArgs = do
                               [["with (import <nixpkgs> {});"
                                ,"runCommand \"myEnv\" {"
                                ,"buildInputs=lib.optional stdenv.isLinux glibcLocales ++ ["],pkgsInConfig,["];"
-                               ,T.pack inShellEnvVar,"=1 ;"
+                               ,T.pack platformVariantEnvVar <> "=''nix'';"
+                               ,T.pack inShellEnvVar <> "=1;"
                                ,"STACK_IN_NIX_EXTRA_ARGS=''"]
                                ,      (map (\p -> T.concat
                                                   ["--extra-lib-dirs=${",p,"}/lib"
