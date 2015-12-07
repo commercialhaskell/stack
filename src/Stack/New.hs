@@ -160,7 +160,7 @@ applyTemplate project template nonceParams dir templateText = do
     (applied,missingKeys) <-
         runWriterT
             (hastacheStr
-                 defaultConfig
+                 defaultConfig { muEscapeFunc = id }
                  templateText
                  (mkStrContextM (contextFunction context)))
     unless (S.null missingKeys)
