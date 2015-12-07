@@ -202,7 +202,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     generateHpcErrorReport reportDir (msg True)
                 else do
                     -- Print output, stripping @\r@ characters because Windows.
-                    forM_ outputLines ($logInfo . T.decodeUtf8 . S8.filter (not . (=='\r')))
+                    forM_ outputLines ($logInfo . T.decodeUtf8 . S8.filter (/= '\r'))
                     $logInfo
                         ("The " <> report <> " is available at " <>
                          T.pack (toFilePath (reportDir </> $(mkRelFile "hpc_index.html"))))

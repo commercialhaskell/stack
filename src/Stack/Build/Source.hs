@@ -145,7 +145,7 @@ loadSourceMap needTargets bopts = do
                  in (packageName p, PSLocal lp)
             , extraDeps3
             , flip fmap (mbpPackages mbp) $ \mpi ->
-                (PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi))
+                PSUpstream (mpiVersion mpi) Snap (mpiFlags mpi)
             ] `Map.difference` Map.fromList (map (, ()) (HashSet.toList wiredInPackages))
 
     return (targets, mbp, locals, nonLocalTargets, sourceMap)
@@ -205,8 +205,7 @@ convertSnapshotToExtra
     -> Map PackageName a -- ^ locals
     -> [PackageName] -- ^ packages referenced by a flag
     -> m (Map PackageName Version)
-convertSnapshotToExtra snapshot extra0 locals flags0 =
-    go Map.empty flags0
+convertSnapshotToExtra snapshot extra0 locals = go Map.empty
   where
     go !extra [] = return extra
     go extra (flag:flags)
@@ -417,7 +416,7 @@ checkFlagsUsed bopts lps extraDeps snapshot = do
         $ Set.fromList unusedFlags
 
 -- | All flags for a local package
-localFlags :: (Map (Maybe PackageName) (Map FlagName Bool))
+localFlags :: Map (Maybe PackageName) (Map FlagName Bool)
            -> BuildConfig
            -> PackageName
            -> Map FlagName Bool

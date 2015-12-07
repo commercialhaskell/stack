@@ -96,7 +96,7 @@ argsParser mode = many (P.skipSpace *> (quoted <|> unquoted)) <*
                      Escaping -> escaped <|> nonquote
                      NoEscaping -> nonquote)
     escaped = P.char '\\' *> P.anyChar
-    nonquote = P.satisfy (not . (=='"'))
+    nonquote = P.satisfy (/= '"')
     naked = P.satisfy (not . flip elem ("\" " :: String))
 
 -- | Parser to extract the stack command line embedded inside a comment

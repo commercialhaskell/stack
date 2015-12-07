@@ -95,13 +95,17 @@ syncAddContentToDir dir = do
 imageName :: Path Abs Dir -> String
 imageName = map toLower . toFilePathNoTrailingSep . dirname
 
+mkDockerConfig :: (HasConfig e, MonadReader e m) => m (Maybe ImageDockerOpts)
+mkDockerConfig = do
+  config <- asks getConfig
+  return (imgDocker (configImage config))
+
 -- | Create a general purpose docker image from the temporary
 -- directory of executables & static content.
 createDockerImage :: Assemble e m => Path Abs Dir -> m ()
 createDockerImage dir = do
     menv <- getMinimalEnvOverride
-    config <- asks getConfig
-    let dockerConfig = imgDocker (configImage config)
+    dockerConfig <- mkDockerConfig
     case imgDockerBase =<< dockerConfig of
         Nothing -> throwM StackImageDockerBaseUnspecifiedException
         Just base -> do
@@ -125,8 +129,7 @@ createDockerImage dir = do
 extendDockerImageWithEntrypoint :: Assemble e m => Path Abs Dir -> m ()
 extendDockerImageWithEntrypoint dir = do
     menv <- getMinimalEnvOverride
-    config <- asks getConfig
-    let dockerConfig = imgDocker (configImage config)
+    dockerConfig <- mkDockerConfig
     let dockerImageName = fromMaybe
                 (imageName (parent (parent dir)))
                 (imgDockerImageName =<< dockerConfig)

@@ -297,7 +297,7 @@ runContainerAndExit getCmdArgs
      pwd <- getWorkingDir
      liftIO
        (do updateDockerImageLastUsed config iiId (toFilePath projectRoot)
-           mapM_ createTree ([sandboxHomeDir, stackRoot]))
+           mapM_ createTree [sandboxHomeDir, stackRoot])
      containerID <- (trim . decodeUtf8) <$> readDockerProcess
        envOverride
        (concat
@@ -332,7 +332,7 @@ runContainerAndExit getCmdArgs
      before
 #ifndef WINDOWS
      runInBase <- liftBaseWith $ \run -> return (void . run)
-     oldHandlers <- forM ([sigINT,sigABRT,sigHUP,sigPIPE,sigTERM,sigUSR1,sigUSR2]) $ \sig -> do
+     oldHandlers <- forM [sigINT,sigABRT,sigHUP,sigPIPE,sigTERM,sigUSR1,sigUSR2] $ \sig -> do
        let sigHandler = runInBase $ do
              readProcessNull Nothing envOverride "docker"
                              ["kill","--signal=" ++ show sig,containerID]
@@ -530,10 +530,10 @@ cleanup opts =
             Nothing -> return ()
         sortCreated =
             sortWith (\(_,_,x) -> Down x) .
-            (mapMaybe (\(h,r) ->
+             mapMaybe (\(h,r) ->
                 case Map.lookup h inspectMap of
                     Nothing -> Nothing
-                    Just ii -> Just (h,r,iiCreated ii)))
+                    Just ii -> Just (h,r,iiCreated ii))
         buildSection sectionHead items itemBuilder =
           do let (anyWrote,b) = runWriter (forM items itemBuilder)
              when (or anyWrote) $
@@ -571,7 +571,7 @@ cleanup opts =
                      projectPath)
         buildInspect hash =
           case Map.lookup hash inspectMap of
-            Just (Inspect{iiCreated,iiVirtualSize}) ->
+            Just Inspect{iiCreated,iiVirtualSize} ->
               buildInfo ("Created " ++
                          showDaysAgo iiCreated ++
                          maybe ""

@@ -438,7 +438,7 @@ getIntermediateDeps sourceMap targets =
 
 preprocessCabalMacros :: MonadIO m => [GhciPkgInfo] -> Path Abs File -> m [String]
 preprocessCabalMacros pkgs out = liftIO $ do
-    let fps = nubOrd (concatMap (catMaybes . map (bioCabalMacros . snd) . ghciPkgOpts) pkgs)
+    let fps = nubOrd (concatMap (mapMaybe (bioCabalMacros . snd) . ghciPkgOpts) pkgs)
     files <- mapM (S8.readFile . toFilePath) fps
     if null files then return [] else do
         S8.writeFile (toFilePath out) $ S8.intercalate "\n#undef CURRENT_PACKAGE_KEY\n" files
