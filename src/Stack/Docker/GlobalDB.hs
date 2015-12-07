@@ -78,9 +78,9 @@ pruneDockerImagesLastUsed config existingHashes =
   withGlobalDB config go
   where
     go = do
-      l <- selectList [] []
-      forM_ l (\(Entity k DockerImageProject{dockerImageProjectImageHash = h}) ->
-                   when (h `notElem` existingHashes) $ delete k)
+        l <- selectList [] []
+        forM_ l (\(Entity k DockerImageProject{dockerImageProjectImageHash = h}) ->
+            when (h `notElem` existingHashes) $ delete k)
 
 -- | Get the record of whether an executable is compatible with a Docker image
 getDockerImageExe :: Config -> String -> FilePath -> UTCTime -> IO (Maybe Bool)
