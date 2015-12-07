@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 {- |  This module implements the following:
 
     * Parsing of command line arguments for the stack command
@@ -60,10 +61,11 @@ module Data.Attoparsec.Args
     ) where
 
 import           Control.Applicative
+import           Control.Monad.Catch (MonadThrow)
 import           Data.Attoparsec.Text ((<?>))
 import qualified Data.Attoparsec.Text as P
-import           Data.Attoparsec.Types (Parser, IResult(..))
 import           Data.Conduit
+import           Data.Conduit.Attoparsec
 import qualified Data.Conduit.Binary as CB
 import           Data.Conduit.Text(decodeUtf8)
 import           Data.Char (isSpace)
@@ -84,7 +86,7 @@ parseArgs mode = P.parseOnly (argsParser mode)
 
 -- | A basic argument parser. It supports space-separated text, and
 -- string quotation with identity escaping: \x -> x.
-argsParser :: EscapingMode -> Parser Text [String]
+argsParser :: EscapingMode -> P.Parser [String]
 argsParser mode = many (P.skipSpace *> (quoted <|> unquoted)) <*
                   P.skipSpace <* (P.endOfInput <?> "unterminated string")
   where
@@ -100,9 +102,8 @@ argsParser mode = many (P.skipSpace *> (quoted <|> unquoted)) <*
 -- | Parser to extract the stack command line embedded inside a comment
 -- after validating the placement and formatting rules for a valid
 -- interpreter specification.
-
-interpParser :: String -> Parser Text String
-interpParser progName = P.option "" sheBangLine *> interpComment
+interpreterArgsParser :: String -> P.Parser String
+interpreterArgsParser progName = P.option "" sheBangLine *> interpreterComment
   where
     sheBangLine =   P.string "#!"
                  *> P.manyTill P.anyChar P.endOfLine
@@ -121,7 +122,7 @@ interpParser progName = P.option "" sheBangLine *> interpComment
 
     lineComment =  comment "--" P.endOfLine
     blockComment = comment "{-" (P.string "-}" <?> "unterminated block comment")
-    interpComment = lineComment <|> blockComment
+    interpreterComment = lineComment <|> blockComment
 
 -- | Use 'withArgs' on result of 'getInterpreterArgs'.
 withInterpreterArgs :: String -> ([String] -> Bool -> IO a) -> IO a
@@ -131,7 +132,6 @@ withInterpreterArgs progName inner = do
 
 -- | Extract stack arguments from a correctly placed and correctly formatted
 -- comment when it is being used as an interpreter
-
 getInterpreterArgs :: String -> IO ([String], Bool)
 getInterpreterArgs progName = do
     args0 <- getArgs
@@ -151,19 +151,10 @@ getInterpreterArgs progName = do
                 else return (args0, False)
         _ -> return (args0, False)
 
-sinkInterpreterArgs :: Monad m => String -> Sink Text m (Maybe [String])
-sinkInterpreterArgs progName =
-        await
-      >>= maybe (return Nothing) parseCommand
-      >>= maybe (return Nothing) parseArgs'
-  where
-    parseCommand = continueParse . (P.parse $ interpParser progName)
-
-    continueParse (Done _ r)   = return (Just (pack r))
-    continueParse (Fail _ _ _) = return Nothing
-    continueParse (Partial k)  =   await
-                                 >>= maybe (return Nothing) (continueParse . k)
-
-    parseArgs' txt = case P.parseOnly (argsParser Escaping) txt of
-                        Right args -> return $ Just args
-                        _ -> return Nothing
+sinkInterpreterArgs :: MonadThrow m => String -> Sink Text m (Maybe [String])
+sinkInterpreterArgs progName = do
+    eArgs <- sinkParserEither (interpreterArgsParser progName)
+    case eArgs of
+        Right (P.parseOnly (argsParser Escaping) . pack -> Right args) ->
+            return $ Just args
+        _ -> return Nothing
