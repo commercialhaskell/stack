@@ -56,6 +56,7 @@
 module Data.Attoparsec.Args
     ( EscapingMode(..)
     , argsParser
+    , interpreterArgsParser -- for unit tests
     , parseArgs
     , withInterpreterArgs
     ) where
@@ -111,16 +112,16 @@ interpreterArgsParser progName = P.option "" sheBangLine *> interpreterComment
     commentStart str =   P.string str
                       *> P.skipSpace
                       *> P.string (pack progName)
-                      *> P.space
 
     -- Treat newlines as spaces inside the block comment
     anyCharNormalizeSpace = let normalizeSpace c = if isSpace c then ' ' else c
                             in P.satisfyWith normalizeSpace $ const True
 
-    comment start end =   commentStart start
-                       *> P.manyTill anyCharNormalizeSpace end
+    comment start end = commentStart start
+      *> ((end >> return "")
+          <|> (P.space *> P.manyTill anyCharNormalizeSpace end))
 
-    lineComment =  comment "--" P.endOfLine
+    lineComment =  comment "--" (P.endOfLine <|> P.endOfInput)
     blockComment = comment "{-" (P.string "-}" <?> "unterminated block comment")
     interpreterComment = lineComment <|> blockComment
 
