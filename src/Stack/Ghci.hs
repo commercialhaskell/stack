@@ -4,6 +4,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE CPP #-}
 
 -- | Run a GHCi configured with the user's package(s).
 
@@ -51,6 +52,10 @@ import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal
 import           System.Directory (getTemporaryDirectory)
+
+#ifndef WINDOWS
+import qualified System.Posix.Files as Posix
+#endif
 
 -- | Command-line options for GHC.
 data GhciOpts = GhciOpts
@@ -139,6 +144,7 @@ ghci GhciOpts{..} = do
                     loadModules = ":load " <> unwords (map show thingsToLoad)
                     bringIntoScope = ":module + " <> unwords modulesToLoad
                 liftIO (writeFile fp (unlines [loadModules,bringIntoScope]))
+                setScriptPerms fp
                 execGhci (macrosOpts ++ ["-ghci-script=" <> fp])
 
 -- | Figure out the main-is file to load based on the targets. Sometimes there
@@ -443,3 +449,16 @@ preprocessCabalMacros pkgs out = liftIO $ do
     if null files then return [] else do
         S8.writeFile (toFilePath out) $ S8.intercalate "\n#undef CURRENT_PACKAGE_KEY\n" files
         return ["-optP-include", "-optP" <> toFilePath out]
+
+setScriptPerms :: MonadIO m => FilePath -> m ()
+setScriptPerms fp = do
+#ifdef WINDOWS
+    return ()
+#else
+    liftIO $ Posix.setFileMode fp $ foldl1 Posix.unionFileModes
+        [ Posix.ownerReadMode
+        , Posix.ownerWriteMode
+        , Posix.groupReadMode
+        , Posix.otherReadMode
+        ]
+#endif
