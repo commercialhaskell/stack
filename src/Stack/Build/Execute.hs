@@ -24,19 +24,20 @@ import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
 import           Control.Exception.Enclosed (catchIO, tryIO)
 import           Control.Exception.Lifted
-import           Control.Monad (liftM, when, unless, void, join, guard, filterM, (<=<))
+import           Control.Monad (liftM, when, unless, void, join, filterM, (<=<))
 import           Control.Monad.Catch (MonadCatch, MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
 import           Control.Monad.Trans.Control (liftBaseWith)
 import           Control.Monad.Trans.Resource
-import           Data.ByteString (ByteString)
+import           Data.Attoparsec.Text
 import qualified Data.ByteString as S
-import qualified Data.ByteString.Char8 as S8
 import           Data.Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.Text as CT
+import           Data.Either (isRight)
 import           Data.Foldable (forM_, any)
 import           Data.Function
 import           Data.IORef.RunOnce (runOnce)
@@ -55,7 +56,6 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (decodeUtf8)
 import           Data.Time.Clock (getCurrentTime)
 import           Data.Traversable (forM)
-import           Data.Word8 (_colon)
 import qualified Distribution.PackageDescription as C
 import           Distribution.System            (OS (Windows),
                                                  Platform (Platform))
@@ -828,6 +828,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                                         liftIO $ hClose h
                                         runResourceT
                                             $ CB.sourceFile (toFilePath logFile)
+                                            =$= CT.decodeUtf8
                                             $$ mungeBuildOutput stripTHLoading makeAbsolute pkgDir
                                             =$ CL.consume
                             throwM $ CabalExitedUnsuccessfully
@@ -1297,7 +1298,8 @@ singleBench runInBase beopts benchesToRun ac ee task installedMap = do
 -- | Grab all output from the given @Handle@ and log it, stripping
 -- Template Haskell "Loading package" lines and making paths absolute.
 -- thread.
-printBuildOutput :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
+printBuildOutput :: (MonadIO m, MonadBaseControl IO m, MonadLogger m,
+                     MonadThrow m)
                  => Bool -- ^ exclude TH loading?
                  -> Bool -- ^ convert paths to absolute?
                  -> Path Abs Dir -- ^ package's root directory
@@ -1306,7 +1308,8 @@ printBuildOutput :: (MonadIO m, MonadBaseControl IO m, MonadLogger m)
                  -> m ()
 printBuildOutput excludeTHLoading makeAbsolute pkgDir level outH = void $
     CB.sourceHandle outH
-    $$ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir
+    $$ CT.decodeUtf8
+    =$ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir
     =$ CL.mapM_ (monadLoggerLog $(TH.location >>= liftLoc) "" level)
 
 -- | Strip Template Haskell "Loading package" lines and making paths absolute.
@@ -1314,52 +1317,47 @@ mungeBuildOutput :: MonadIO m
                  => Bool -- ^ exclude TH loading?
                  -> Bool -- ^ convert paths to absolute?
                  -> Path Abs Dir -- ^ package's root directory
-                 -> ConduitM ByteString ByteString m ()
+                 -> ConduitM Text Text m ()
 mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
-    CB.lines
+    CT.lines
     =$ CL.map stripCarriageReturn
     =$ CL.filter (not . isTHLoading)
     =$ CL.mapM toAbsolutePath
   where
     -- | Is this line a Template Haskell "Loading package" line
     -- ByteString
-    isTHLoading :: S8.ByteString -> Bool
+    isTHLoading :: Text -> Bool
     isTHLoading _ | not excludeTHLoading = False
     isTHLoading bs =
-        "Loading package " `S8.isPrefixOf` bs &&
-        ("done." `S8.isSuffixOf` bs || "done.\r" `S8.isSuffixOf` bs)
+        "Loading package " `T.isPrefixOf` bs &&
+        ("done." `T.isSuffixOf` bs || "done.\r" `T.isSuffixOf` bs)
 
     -- | Convert GHC error lines with file paths to have absolute file paths
     toAbsolutePath bs | not makeAbsolute = return bs
     toAbsolutePath bs = do
-        let (x, y) = S.break (== _colon) bs
+        let (x, y) = T.break (== ':') bs
         mabs <-
             if isValidSuffix y
                 then do
-                    efp <- liftIO $ tryIO $ resolveFile pkgDir (S8.unpack x)
+                    efp <- liftIO $ tryIO $ resolveFile pkgDir (T.unpack x)
                     case efp of
                         Left _ -> return Nothing
-                        Right fp -> return $ Just $ S8.pack (toFilePath fp)
+                        Right fp -> return $ Just $ T.pack (toFilePath fp)
                 else return Nothing
         case mabs of
             Nothing -> return bs
-            Just fp -> return $ fp `S.append` y
+            Just fp -> return $ fp `T.append` y
 
     -- | Match the line:column format at the end of lines
-    isValidSuffix bs0 = maybe False (const True) $ do
-        guard $ not $ S.null bs0
-        guard $ S.head bs0 == _colon
-        (_, bs1) <- S8.readInt $ S.drop 1 bs0
-
-        guard $ not $ S.null bs1
-        guard $ S.head bs1 == _colon
-        (_, bs2) <- S8.readInt $ S.drop 1 bs1
-
-        guard $ (bs2 == ":" || bs2 == ": Warning:")
+    isValidSuffix = isRight . parseOnly (lineCol <* endOfInput)
+    lineCol = char ':' >> (decimal :: Parser Int)
+           >> char ':' >> (decimal :: Parser Int)
+           >> (string ":" <|> string ": Warning:")
+           >> return ()
 
     -- | Strip @\r@ characters from the byte vector. Used because Windows.
-    stripCarriageReturn :: ByteString -> ByteString
-    stripCarriageReturn = S8.filter (not . (=='\r'))
+    stripCarriageReturn :: Text -> Text
+    stripCarriageReturn = T.filter (/= '\r')
 
 -- | Find the Setup.hs or Setup.lhs in the given directory. If none exists,
 -- throw an exception.
