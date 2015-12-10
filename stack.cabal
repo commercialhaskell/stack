@@ -187,6 +187,7 @@ library
                    , template-haskell >= 2.9.0.0
                    , temporary >= 1.2.0.3
                    , text >= 1.2.0.4
+                   , text-binary
                    , time >= 1.4.2
                    , transformers >= 0.3.0.0
                    , transformers-base >= 0.4.4

@@ -38,6 +38,7 @@ import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Text.Binary ()
 import qualified Distribution.Package as Cabal
 import           GHC.Generics
 import           Language.Haskell.TH
