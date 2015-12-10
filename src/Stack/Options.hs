@@ -565,12 +565,12 @@ execOptsExtraParser = eoPlainParser <|>
                            help "Use an unmodified environment (only useful with Docker)")
 
 -- | Parser for global command-line options.
-globalOptsParser :: Bool -> Parser GlobalOptsMonoid
-globalOptsParser hide0 =
+globalOptsParser :: Bool -> Maybe LogLevel -> Parser GlobalOptsMonoid
+globalOptsParser hide0 defLogLevel =
     GlobalOptsMonoid <$>
     optional (strOption (long Docker.reExecArgName <> hidden <> internal)) <*>
     optional (option auto (long dockerEntrypointArgName <> hidden <> internal)) <*>
-    logLevelOptsParser hide0 <*>
+    logLevelOptsParser hide0 defLogLevel <*>
     configOptsParser hide0 <*>
     optional (abstractResolverOptsParser hide0) <*>
     optional (compilerOptsParser hide0) <*>
@@ -629,8 +629,8 @@ initOptsParser =
          help "Use the given resolver, even if not all dependencies are met")
 
 -- | Parser for a logging level.
-logLevelOptsParser :: Bool -> Parser (Maybe LogLevel)
-logLevelOptsParser hide =
+logLevelOptsParser :: Bool -> Maybe LogLevel -> Parser (Maybe LogLevel)
+logLevelOptsParser hide defLogLevel =
   fmap (Just . parse)
        (strOption (long "verbosity" <>
                    metavar "VERBOSITY" <>
@@ -640,7 +640,7 @@ logLevelOptsParser hide =
        (short 'v' <> long "verbose" <>
         help ("Enable verbose mode: verbosity level \"" <> showLevel verboseLevel <> "\"") <>
         hideMods hide) <|>
-  pure Nothing
+  pure defLogLevel
   where verboseLevel = LevelDebug
         showLevel l =
           case l of
