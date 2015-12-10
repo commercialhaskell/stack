@@ -142,7 +142,9 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
      let globalOpts hide =
              extraHelpOption hide progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
              extraHelpOption hide progName (Nix.nixCmdName ++ "*") nixHelpOptName <*>             
-             globalOptsParser hide
+             globalOptsParser hide (if isInterpreter
+                                    then Just $ LevelOther "silent"
+                                    else Nothing)
          addCommand' cmd title footerStr constr =
              addCommand cmd title footerStr constr (globalOpts True)
          addSubCommands' cmd title footerStr =
