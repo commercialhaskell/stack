@@ -28,6 +28,7 @@ import           Data.Maybe
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import           Distribution.System (Platform (..))
 import qualified Distribution.System as Cabal
 import           Path
@@ -89,14 +90,14 @@ getCompilerVersion menv wc =
         Ghc -> do
             bs <- readProcessStdout Nothing menv "ghc" ["--numeric-version"]
             let (_, ghcVersion) = versionFromEnd bs
-            GhcVersion <$> parseVersion ghcVersion
+            GhcVersion <$> parseVersion (T.decodeUtf8 ghcVersion)
         Ghcjs -> do
             -- Output looks like
             --
             -- The Glorious Glasgow Haskell Compilation System for JavaScript, version 0.1.0 (GHC 7.10.2)
             bs <- readProcessStdout Nothing menv "ghcjs" ["--version"]
-            let (rest, ghcVersion) = versionFromEnd bs
-                (_, ghcjsVersion) = versionFromEnd rest
+            let (rest, ghcVersion) = T.decodeUtf8 <$> versionFromEnd bs
+                (_, ghcjsVersion) = T.decodeUtf8 <$> versionFromEnd rest
             GhcjsVersion <$> parseVersion ghcjsVersion <*> parseVersion ghcVersion
   where
     versionFromEnd = S8.spanEnd isValid . fst . S8.breakEnd isValid

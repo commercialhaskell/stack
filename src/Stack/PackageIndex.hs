@@ -34,10 +34,6 @@ import           Control.Monad.Trans.Control
 
 import           Data.Aeson.Extended
 import           Data.Binary.VersionTagged
-import qualified Data.Word8 as Word8
-import qualified Data.ByteString as S
-import qualified Data.ByteString.Unsafe as SU
-import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.Conduit (($$), (=$))
 import           Data.Conduit.Binary                   (sinkHandle,
@@ -50,6 +46,7 @@ import qualified Data.Map.Strict as Map
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Text.Unsafe (unsafeTail)
 
 import           Data.Traversable (forM)
 
@@ -139,19 +136,19 @@ populateCache menv index = do
                     m
 
     breakSlash x
-        | S.null z = Nothing
-        | otherwise = Just (y, SU.unsafeTail z)
+        | T.null z = Nothing
+        | otherwise = Just (y, unsafeTail z)
       where
-        (y, z) = S.break (== Word8._slash) x
+        (y, z) = T.break (== '/') x
 
     parseNameVersion t1 = do
         (p', t3) <- breakSlash
-                  $ S.map (\c -> if c == Word8._backslash then Word8._slash else c)
-                  $ S8.pack t1
+                  $ T.map (\c -> if c == '\\' then '/' else c)
+                  $ T.pack t1
         p <- parsePackageName p'
         (v', t5) <- breakSlash t3
         v <- parseVersion v'
-        let (t6, suffix) = S.break (== Word8._period) t5
+        let (t6, suffix) = T.break (== '.') t5
         if t6 == p'
             then return (PackageIdentifier p v, suffix)
             else Nothing
