@@ -14,7 +14,6 @@ module Stack.Types.PackageName
   ,packageNameParser
   ,parsePackageName
   ,parsePackageNameFromString
-  ,packageNameByteString
   ,packageNameString
   ,packageNameText
   ,fromCabalPackageName
@@ -29,19 +28,16 @@ import           Control.DeepSeq
 import           Control.Monad
 import           Control.Monad.Catch
 import           Data.Aeson.Extended
-import           Data.Attoparsec.ByteString.Char8
+import           Data.Attoparsec.Text
 import           Data.Attoparsec.Combinators
 import           Data.Binary.VersionTagged (Binary, HasStructuralInfo)
-import           Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as S8
-import           Data.Char (isLetter)
 import           Data.Data
 import           Data.Hashable
 import           Data.List (intercalate)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Text (Text)
-import qualified Data.Text.Encoding as T
+import qualified Data.Text as T
 import qualified Distribution.Package as Cabal
 import           GHC.Generics
 import           Language.Haskell.TH
@@ -51,7 +47,7 @@ import qualified Options.Applicative as O
 
 -- | A parse fail.
 data PackageNameParseFail
-  = PackageNameParseFail ByteString
+  = PackageNameParseFail Text
   | CabalFileNameParseFail FilePath
   | CabalFileNameInvalidPackageName FilePath
   deriving (Typeable)
@@ -63,16 +59,16 @@ instance Show PackageNameParseFail where
 
 -- | A package name.
 newtype PackageName =
-  PackageName ByteString
+  PackageName Text
   deriving (Eq,Ord,Typeable,Data,Generic,Hashable,Binary,NFData)
 
 instance Lift PackageName where
   lift (PackageName n) =
     appE (conE 'PackageName)
-         (stringE (S8.unpack n))
+         (stringE (T.unpack n))
 
 instance Show PackageName where
-  show (PackageName n) = S8.unpack n
+  show (PackageName n) = T.unpack n
 
 instance HasStructuralInfo PackageName
 
@@ -86,16 +82,15 @@ instance FromJSON PackageName where
            fail ("Couldn't parse package name: " ++ s)
          Just ver -> return ver
 
--- | Attoparsec parser for a package name from bytestring.
+-- | Attoparsec parser for a package name
 packageNameParser :: Parser PackageName
 packageNameParser =
-  fmap (PackageName . S8.pack . intercalate "-")
+  fmap (PackageName . T.pack . intercalate "-")
        (sepBy1 word (char '-'))
   where
     word = concat <$> sequence [many digit,
                                 pured letter,
                                 many (alternating letter digit)]
-    letter = satisfy isLetter
 
 -- | Make a package name.
 mkPackageName :: String -> Q Exp
@@ -104,40 +99,36 @@ mkPackageName s =
     Nothing -> error ("Invalid package name: " ++ show s)
     Just pn -> [|pn|]
 
--- | Convenient way to parse a package name from a bytestring.
-parsePackageName :: MonadThrow m => ByteString -> m PackageName
+-- | Parse a package name from a 'Text'.
+parsePackageName :: MonadThrow m => Text -> m PackageName
 parsePackageName x = go x
   where go =
           either (const (throwM (PackageNameParseFail x))) return .
           parseOnly (packageNameParser <* endOfInput)
 
--- | Migration function.
+-- | Parse a package name from a 'String'.
 parsePackageNameFromString :: MonadThrow m => String -> m PackageName
 parsePackageNameFromString =
-  parsePackageName . S8.pack
-
--- | Produce a bytestring representation of a package name.
-packageNameByteString :: PackageName -> ByteString
-packageNameByteString (PackageName n) = n
+  parsePackageName . T.pack
 
 -- | Produce a string representation of a package name.
 packageNameString :: PackageName -> String
-packageNameString (PackageName n) = S8.unpack n
+packageNameString (PackageName n) = T.unpack n
 
 -- | Produce a string representation of a package name.
 packageNameText :: PackageName -> Text
-packageNameText (PackageName n) = T.decodeUtf8 n
+packageNameText (PackageName n) = n
 
 -- | Convert from a Cabal package name.
 fromCabalPackageName :: Cabal.PackageName -> PackageName
 fromCabalPackageName (Cabal.PackageName name) =
-  let !x = S8.pack name
+  let !x = T.pack name
   in PackageName x
 
 -- | Convert to a Cabal package name.
 toCabalPackageName :: PackageName -> Cabal.PackageName
 toCabalPackageName (PackageName name) =
-  let !x = S8.unpack name
+  let !x = T.unpack name
   in Cabal.PackageName x
 
 -- | Parse a package name from a file path.

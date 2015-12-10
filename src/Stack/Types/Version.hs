@@ -33,10 +33,8 @@ import           Control.Applicative
 import           Control.DeepSeq
 import           Control.Monad.Catch
 import           Data.Aeson.Extended
-import           Data.Attoparsec.ByteString.Char8
+import           Data.Attoparsec.Text
 import           Data.Binary.VersionTagged (Binary, HasStructuralInfo)
-import           Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as S8
 import           Data.Data
 import           Data.Hashable
 import           Data.List
@@ -61,7 +59,7 @@ import           Text.PrettyPrint (render)
 
 -- | A parse fail.
 data VersionParseFail =
-  VersionParseFail ByteString
+  VersionParseFail Text
   deriving (Typeable)
 instance Exception VersionParseFail
 instance Show VersionParseFail where
@@ -117,7 +115,7 @@ versionParser =
         point = satisfy (== '.')
 
 -- | Convenient way to parse a package version from a bytestring.
-parseVersion :: MonadThrow m => ByteString -> m Version
+parseVersion :: MonadThrow m => Text -> m Version
 parseVersion x = go x
   where go =
           either (const (throwM (VersionParseFail x))) return .
@@ -126,7 +124,7 @@ parseVersion x = go x
 -- | Migration function.
 parseVersionFromString :: MonadThrow m => String -> m Version
 parseVersionFromString =
-  parseVersion . S8.pack
+  parseVersion . T.pack
 
 -- | Get a string representation of a package version.
 versionString :: Version -> String

@@ -32,8 +32,6 @@ import           Data.Aeson                      (FromJSON (..), ToJSON (..),
                                                   object, withObject, withText,
                                                   (.!=), (.:), (.:?), (.=))
 import           Data.Binary.VersionTagged
-import           Data.ByteString                 (ByteString)
-import qualified Data.ByteString.Char8           as S8
 import           Data.Hashable                   (Hashable)
 import qualified Data.HashMap.Strict             as HashMap
 import           Data.Map                        (Map)
@@ -44,7 +42,6 @@ import           Data.Set                        (Set)
 import           Data.String                     (IsString, fromString)
 import           Data.Text                       (Text, pack, unpack)
 import qualified Data.Text                       as T
-import           Data.Text.Encoding              (encodeUtf8)
 import Data.Text.Read (decimal)
 import           Data.Time                       (Day)
 import qualified Data.Traversable                as T
@@ -248,13 +245,13 @@ newtype Maintainer = Maintainer { unMaintainer :: Text }
     deriving (Show, Eq, Ord, Hashable, ToJSON, FromJSON, IsString)
 
 -- | Name of an executable.
-newtype ExeName = ExeName { unExeName :: ByteString }
+newtype ExeName = ExeName { unExeName :: Text }
     deriving (Show, Eq, Ord, Hashable, IsString, Generic, Binary, NFData)
 instance HasStructuralInfo ExeName
 instance ToJSON ExeName where
-    toJSON = toJSON . S8.unpack . unExeName
+    toJSON = toJSON . unExeName
 instance FromJSON ExeName where
-    parseJSON = withText "ExeName" $ return . ExeName . encodeUtf8
+    parseJSON = withText "ExeName" $ return . ExeName
 
 -- | A simplified package description that tracks:
 --
@@ -363,9 +360,9 @@ parseSnapName t0 =
         Nightly <$> readMay (T.unpack t1)
 
 instance ToJSON a => ToJSON (Map ExeName a) where
-  toJSON = toJSON . Map.mapKeysWith const (S8.unpack . unExeName)
+  toJSON = toJSON . Map.mapKeysWith const unExeName
 instance FromJSON a => FromJSON (Map ExeName a) where
-    parseJSON = fmap (Map.mapKeysWith const (ExeName . encodeUtf8)) . parseJSON
+    parseJSON = fmap (Map.mapKeysWith const ExeName) . parseJSON
 
 -- | A simplified version of the 'BuildPlan' + cabal file.
 data MiniBuildPlan = MiniBuildPlan
@@ -383,11 +380,11 @@ data MiniPackageInfo = MiniPackageInfo
     { mpiVersion :: !Version
     , mpiFlags :: !(Map FlagName Bool)
     , mpiPackageDeps :: !(Set PackageName)
-    , mpiToolDeps :: !(Set ByteString)
+    , mpiToolDeps :: !(Set Text)
     -- ^ Due to ambiguity in Cabal, it is unclear whether this refers to the
     -- executable name, the package name, or something else. We have to guess
     -- based on what's available, which is why we store this is an unwrapped
-    -- 'ByteString'.
+    -- 'Text'.
     , mpiExes :: !(Set ExeName)
     -- ^ Executables provided by this package
     , mpiHasLibrary :: !Bool

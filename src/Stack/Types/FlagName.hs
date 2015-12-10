@@ -24,20 +24,16 @@ module Stack.Types.FlagName
 import           Control.Applicative
 import           Control.Monad.Catch
 import           Data.Aeson.Extended
-import           Data.Attoparsec.ByteString.Char8
+import           Data.Attoparsec.Text
 import           Data.Attoparsec.Combinators
 import           Data.Binary.VersionTagged
-import qualified Data.ByteString as S
-import           Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as S8
-import           Data.Char (isLetter)
+import           Data.Char (isLetter, isDigit, toLower)
 import           Data.Data
 import           Data.Hashable
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Text (Text)
-import qualified Data.Text.Encoding as T
-import qualified Data.Word8 as Word8
+import qualified Data.Text as T
 import qualified Distribution.PackageDescription as Cabal
 import           GHC.Generics
 import           Language.Haskell.TH
@@ -45,7 +41,7 @@ import           Language.Haskell.TH.Syntax
 
 -- | A parse fail.
 data FlagNameParseFail
-  = FlagNameParseFail ByteString
+  = FlagNameParseFail Text
   deriving (Typeable)
 instance Exception FlagNameParseFail
 instance Show FlagNameParseFail where
@@ -53,22 +49,22 @@ instance Show FlagNameParseFail where
 
 -- | A flag name.
 newtype FlagName =
-  FlagName ByteString
+  FlagName Text
   deriving (Typeable,Data,Generic,Hashable,Binary,NFData)
 instance HasStructuralInfo FlagName
 instance Eq FlagName where
     x == y = compare x y == EQ
 instance Ord FlagName where
     compare (FlagName x) (FlagName y) =
-        compare (S.map Word8.toLower x) (S.map Word8.toLower y)
+        compare (T.map toLower x) (T.map toLower y)
 
 instance Lift FlagName where
   lift (FlagName n) =
     appE (conE 'FlagName)
-         (stringE (S8.unpack n))
+         (stringE (T.unpack n))
 
 instance Show FlagName where
-  show (FlagName n) = S8.unpack n
+  show (FlagName n) = T.unpack n
 
 instance FromJSON FlagName where
   parseJSON j =
@@ -81,7 +77,7 @@ instance FromJSON FlagName where
 -- | Attoparsec parser for a flag name from bytestring.
 flagNameParser :: Parser FlagName
 flagNameParser =
-  fmap (FlagName . S8.pack)
+  fmap (FlagName . T.pack)
        (appending (many1 (satisfy isLetter))
                   (concating (many (alternating
                                       (pured (satisfy isAlphaNum))
@@ -98,7 +94,7 @@ mkFlagName s =
     Just pn -> [|pn|]
 
 -- | Convenient way to parse a flag name from a bytestring.
-parseFlagName :: MonadThrow m => ByteString -> m FlagName
+parseFlagName :: MonadThrow m => Text -> m FlagName
 parseFlagName x = go x
   where go =
           either (const (throwM (FlagNameParseFail x))) return .
@@ -107,26 +103,26 @@ parseFlagName x = go x
 -- | Migration function.
 parseFlagNameFromString :: MonadThrow m => String -> m FlagName
 parseFlagNameFromString =
-  parseFlagName . S8.pack
+  parseFlagName . T.pack
 
 -- | Produce a string representation of a flag name.
 flagNameString :: FlagName -> String
-flagNameString (FlagName n) = S8.unpack n
+flagNameString (FlagName n) = T.unpack n
 
 -- | Produce a string representation of a flag name.
 flagNameText :: FlagName -> Text
-flagNameText (FlagName n) = T.decodeUtf8 n
+flagNameText (FlagName n) = n
 
 -- | Convert from a Cabal flag name.
 fromCabalFlagName :: Cabal.FlagName -> FlagName
 fromCabalFlagName (Cabal.FlagName name) =
-  let !x = S8.pack name
+  let !x = T.pack name
   in FlagName x
 
 -- | Convert to a Cabal flag name.
 toCabalFlagName :: FlagName -> Cabal.FlagName
 toCabalFlagName (FlagName name) =
-  let !x = S8.unpack name
+  let !x = T.unpack name
   in Cabal.FlagName x
 
 instance ToJSON a => ToJSON (Map FlagName a) where
