@@ -104,7 +104,7 @@ instance FromJSON a => FromJSON (Map Version a) where
             k' <- either (fail . show) return $ parseVersionFromString k
             return (k', v)
 
--- | Attoparsec parser for a package version from bytestring.
+-- | Attoparsec parser for a package version.
 versionParser :: Parser Version
 versionParser =
   do ls <- ((:) <$> num <*> many num')
@@ -114,7 +114,7 @@ versionParser =
         num' = point *> num
         point = satisfy (== '.')
 
--- | Convenient way to parse a package version from a bytestring.
+-- | Convenient way to parse a package version from a 'Text'.
 parseVersion :: MonadThrow m => Text -> m Version
 parseVersion x = go x
   where go =

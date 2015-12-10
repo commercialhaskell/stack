@@ -74,7 +74,7 @@ instance FromJSON FlagName where
            fail ("Couldn't parse flag name: " ++ s)
          Just ver -> return ver
 
--- | Attoparsec parser for a flag name from bytestring.
+-- | Attoparsec parser for a flag name
 flagNameParser :: Parser FlagName
 flagNameParser =
   fmap (FlagName . T.pack)
@@ -93,14 +93,14 @@ mkFlagName s =
     Nothing -> error ("Invalid flag name: " ++ show s)
     Just pn -> [|pn|]
 
--- | Convenient way to parse a flag name from a bytestring.
+-- | Convenient way to parse a flag name from a 'Text'.
 parseFlagName :: MonadThrow m => Text -> m FlagName
 parseFlagName x = go x
   where go =
           either (const (throwM (FlagNameParseFail x))) return .
           parseOnly (flagNameParser <* endOfInput)
 
--- | Migration function.
+-- | Convenience function for parsing from a 'String'
 parseFlagNameFromString :: MonadThrow m => String -> m FlagName
 parseFlagNameFromString =
   parseFlagName . T.pack

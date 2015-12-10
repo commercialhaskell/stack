@@ -66,7 +66,7 @@ instance ToJSON GhcPkgId where
   toJSON g =
     toJSON (ghcPkgIdString g)
 
--- | Convenient way to parse a package name from a bytestring.
+-- | Convenient way to parse a package name from a 'Text'.
 parseGhcPkgId :: MonadThrow m => Text -> m GhcPkgId
 parseGhcPkgId x = go x
   where go =

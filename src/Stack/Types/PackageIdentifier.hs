@@ -83,14 +83,14 @@ packageIdentifierParser =
      version <- versionParser
      return (PackageIdentifier name version)
 
--- | Convenient way to parse a package identifier from a bytestring.
+-- | Convenient way to parse a package identifier from a 'Text'.
 parsePackageIdentifier :: MonadThrow m => Text -> m PackageIdentifier
 parsePackageIdentifier x = go x
   where go =
           either (const (throwM (PackageIdentifierParseFail x))) return .
           parseOnly (packageIdentifierParser <* endOfInput)
 
--- | Migration function.
+-- | Convenience function for parsing from a 'String'.
 parsePackageIdentifierFromString :: MonadThrow m => String -> m PackageIdentifier
 parsePackageIdentifierFromString =
   parsePackageIdentifier . T.pack
