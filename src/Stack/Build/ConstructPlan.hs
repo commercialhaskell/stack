@@ -19,7 +19,6 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Logger (MonadLogger, logWarn)
 import           Control.Monad.RWS.Strict
 import           Control.Monad.Trans.Resource
-import qualified Data.ByteString.Char8 as S8
 import           Data.Either
 import           Data.Function
 import           Data.List
@@ -180,7 +179,7 @@ constructPlan mbp0 baseConfigOpts0 locals extraToBuild0 localDumpPkgs loadPackag
         , combinedMap = combineMap sourceMap installedMap
         , toolToPackages = \ (Dependency name _) ->
           maybe Map.empty (Map.fromSet (const anyVersion)) $
-          Map.lookup (S8.pack . packageNameString . fromCabalPackageName $ name) toolMap
+          Map.lookup (T.pack . packageNameString . fromCabalPackageName $ name) toolMap
         , ctxEnvConfig = econfig
         , callStack = []
         , extraToBuild = extraToBuild0

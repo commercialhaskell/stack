@@ -53,6 +53,7 @@ import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
+import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 import           Data.Time (Day)
@@ -283,7 +284,7 @@ addDeps allowMissing compilerVersion toCalc = do
                     }
                 name = packageIdentifierName ident
                 pd = resolvePackageDescription packageConfig gpd
-                exes = Set.fromList $ map (ExeName . S8.pack . exeName) $ executables pd
+                exes = Set.fromList $ map (ExeName . T.pack . exeName) $ executables pd
                 notMe = Set.filter (/= name) . Map.keysSet
             return (name, MiniPackageInfo
                 { mpiVersion = packageIdentifierVersion ident
@@ -368,7 +369,7 @@ getDeps mbp isShadowed packages =
 type ToolMap = Map ByteString (Set PackageName)
 
 -- | Map from tool name to package providing it
-getToolMap :: MiniBuildPlan -> Map ByteString (Set PackageName)
+getToolMap :: MiniBuildPlan -> Map Text (Set PackageName)
 getToolMap mbp =
       Map.unionsWith Set.union
 

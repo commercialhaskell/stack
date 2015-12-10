@@ -998,7 +998,7 @@ getCabalInstallVersion menv = do
     ebs <- tryProcessStdout Nothing menv "cabal" ["--numeric-version"]
     case ebs of
         Left _ -> return Nothing
-        Right bs -> Just <$> parseVersion (T.encodeUtf8 (T.dropWhileEnd isSpace (T.decodeUtf8 bs)))
+        Right bs -> Just <$> parseVersion (T.dropWhileEnd isSpace (T.decodeUtf8 bs))
 
 -- | Check if given processes appear to be present, throwing an exception if
 -- missing.
