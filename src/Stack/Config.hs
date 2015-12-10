@@ -477,7 +477,8 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
                     Nothing
                 readInNull dirTmp commandName menv
                     (resetCommand ++ [T.unpack commit])
-                    Nothing
+                    (Just $ "Please ensure that commit " <> commit <>
+                      " exists within " <> url)
 
         case remotePackageType of
             RPTHttpTarball -> do
