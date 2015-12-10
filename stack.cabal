@@ -270,6 +270,7 @@ test-suite stack-test
   ghc-options:    -Wall -threaded
   build-depends:  base >=4.7 && <5
                 , hspec <2.3
+                , attoparsec
                 , containers >= 0.5.5.1
                 , directory
                 , exceptions
