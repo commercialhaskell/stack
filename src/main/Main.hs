@@ -14,11 +14,12 @@ module Main (main) where
 import           Control.Exception
 import qualified Control.Exception.Lifted as EL
 import           Control.Monad hiding (mapM, forM)
+import           Control.Monad.Catch (MonadThrow)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask, asks, runReaderT)
 import           Control.Monad.Trans.Control (MonadBaseControl)
-import           Data.Attoparsec.Args (withInterpreterArgs, parseArgs, EscapingMode (Escaping))
+import           Data.Attoparsec.Args (getInterpreterArgs, parseArgs, EscapingMode (Escaping))
 import qualified Data.ByteString.Lazy as L
 import           Data.IORef
 import           Data.List
@@ -43,12 +44,13 @@ import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Network.HTTP.Client
 import           Options.Applicative
 import           Options.Applicative.Args
+import           Options.Applicative.Help(footerHelp,stringChunk)
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Complicated
 #ifdef USE_GIT_INFO
 import           Options.Applicative.Simple (simpleVersion)
 #endif
-import           Options.Applicative.Types (readerAsk)
+import           Options.Applicative.Types (readerAsk, ParserHelp)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
@@ -86,7 +88,7 @@ import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import           System.Directory (canonicalizePath, doesFileExist, doesDirectoryExist, createDirectoryIfMissing)
 import qualified System.Directory as Directory (findExecutable)
-import           System.Environment (getEnvironment, getProgName)
+import           System.Environment (getEnvironment, getProgName, getArgs, withArgs)
 import           System.Exit
 import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
 import           System.FilePath (searchPathSeparator)
@@ -105,9 +107,29 @@ hSetTranslit h = do
               hSetEncoding h enc'
         _ -> return ()
 
--- | Commandline dispatcher.
+dockerHelpOptName :: String
+dockerHelpOptName = Docker.dockerCmdName ++ "-help"
+
+nixHelpOptName :: String
+nixHelpOptName = Nix.nixCmdName ++ "-help"
+
+versionString' :: String
+#ifdef USE_GIT_INFO
+versionString' = concat $ concat
+    [ [$(simpleVersion Meta.version)]
+      -- Leave out number of commits for --depth=1 clone
+      -- See https://github.com/commercialhaskell/stack/issues/792
+    , [" (" ++ commitCount ++ " commits)" | commitCount /= ("1"::String) &&
+                                          commitCount /= ("UNKNOWN" :: String)]
+    , [" ", display buildArch]
+    ]
+    where commitCount = $gitCommitCount
+#else
+versionString' = showVersion Meta.version ++ ' ' : display buildArch
+#endif
+
 main :: IO ()
-main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
+main = do
      -- Line buffer the output by default, particularly for non-terminal runs.
      -- See https://github.com/commercialhaskell/stack/pull/360
      hSetBuffering stdout LineBuffering
@@ -115,6 +137,7 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
      hSetBuffering stderr LineBuffering
      hSetTranslit stdout
      hSetTranslit stderr
+     args <- getArgs
      progName <- getProgName
      isTerminal <- hIsTerminalDevice stdout
      execExtraHelp args
@@ -125,52 +148,39 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                    nixHelpOptName
                    (nixOptsParser False)
                    ("Only showing --" ++ Nix.nixCmdName ++ "* options.")
-#ifdef USE_GIT_INFO
-     let commitCount = $gitCommitCount
-         versionString' = concat $ concat
-            [ [$(simpleVersion Meta.version)]
-              -- Leave out number of commits for --depth=1 clone
-              -- See https://github.com/commercialhaskell/stack/issues/792
-            , [" (" ++ commitCount ++ " commits)" | commitCount /= ("1"::String) &&
-                                                    commitCount /= ("UNKNOWN" :: String)]
-            , [" ", display buildArch]
-            ]
-#else
-     let versionString' = showVersion Meta.version ++ ' ' : display buildArch
-#endif
 
-     let globalOpts hide =
-             extraHelpOption hide progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
-             extraHelpOption hide progName (Nix.nixCmdName ++ "*") nixHelpOptName <*>             
-             globalOptsParser hide (if isInterpreter
-                                    then Just $ LevelOther "silent"
-                                    else Nothing)
-         addCommand' cmd title footerStr constr =
-             addCommand cmd title footerStr constr (globalOpts True)
-         addSubCommands' cmd title footerStr =
-             addSubCommands cmd title footerStr (globalOpts True)
-     eGlobalRun <- try $
-       complicatedOptions
+     eGlobalRun <- try $ commandLineHandler progName False
+     case eGlobalRun of
+       Left (exitCode :: ExitCode) -> do
+         throwIO exitCode
+       Right (globalMonoid,run) -> do
+         let global = globalOptsFromMonoid isTerminal globalMonoid
+         when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
+         case globalReExecVersion global of
+             Just expectVersion
+                 | expectVersion /= showVersion Meta.version ->
+                     throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
+             _ -> return ()
+         run global `catch` \e ->
+            -- This special handler stops "stack: " from being printed before the
+            -- exception
+            case fromException e of
+                Just ec -> exitWith ec
+                Nothing -> do
+                    printExceptionStderr e
+                    exitFailure
+
+commandLineHandler
+  :: String
+  -> Bool
+  -> IO (GlobalOptsMonoid, GlobalOpts -> IO ())
+commandLineHandler progName isInterpreter = complicatedOptions
          Meta.version
          (Just versionString')
          "stack - The Haskell Tool Stack"
          ""
          (globalOpts False)
-         -- when there's a parse failure
-         (Just $ \f as ->
-           -- fall-through to external executables in `git` style if they exist
-           -- (i.e. `stack something` looks for `stack-something` before
-           -- failing with "Invalid argument `something'")
-           case stripPrefix "Invalid argument" (fst (renderFailure f "")) of
-             Just _ -> do
-               mExternalExec <- Directory.findExecutable ("stack-" ++ head as)
-               case mExternalExec of
-                 Just ex -> do
-                   menv <- getEnvOverride buildPlatform
-                   runNoLoggingT (exec menv ex (tail as))
-                 Nothing -> handleParseResult (Failure f)
-             Nothing -> handleParseResult (Failure f)
-         )
+         (Just failureCallback)
          (do addCommand' "build"
                         "Build the package(s) in this directory/configuration"
                         cmdFooter
@@ -432,38 +442,67 @@ main = withInterpreterArgs stackProgName $ \args isInterpreter -> do
                      cmdFooter
                      sigSignSdistCmd
                      Sig.sigSignSdistOpts)))
-     case eGlobalRun of
-       Left (exitCode :: ExitCode) -> do
-         when isInterpreter $
-           hPutStrLn stderr $ concat
-             [ "\nIf you are trying to use "
-             , stackProgName
-             , " as a script interpreter, a\n'-- "
-             , stackProgName
-             , " [options] runghc [options]' comment is required."
-             , "\nSee https://github.com/commercialhaskell/stack/blob/release/doc/GUIDE.md#ghcrunghc" ]
-         throwIO exitCode
-       Right (globalMonoid,run) -> do
-         let global = globalOptsFromMonoid isTerminal globalMonoid
-         when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
-         case globalReExecVersion global of
-             Just expectVersion
-                 | expectVersion /= showVersion Meta.version ->
-                     throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
-             _ -> return ()
-         run global `catch` \e ->
-            -- This special handler stops "stack: " from being printed before the
-            -- exception
-            case fromException e of
-                Just ec -> exitWith ec
-                Nothing -> do
-                    printExceptionStderr e
-                    exitFailure
-  where
-    ignoreCheckSwitch = switch (long "ignore-check" <> help "Do not check package for common mistakes")
-    dockerHelpOptName = Docker.dockerCmdName ++ "-help"
-    nixHelpOptName    = Nix.nixCmdName ++ "-help"
-    cmdFooter = "Run 'stack --help' for global options that apply to all subcommands."
+    where
+        failureCallback f args =
+            case stripPrefix "Invalid argument" (fst (renderFailure f "")) of
+                Just _ -> if isInterpreter
+                          then handleParseResult (Failure f)
+                          else secondaryCommandHandler args
+                              >>= maybe (interpreterHandler f args) id
+                Nothing -> handleParseResult (Failure f)
+        globalOpts hide =
+               extraHelpOption hide progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
+               extraHelpOption hide progName (Nix.nixCmdName ++ "*") nixHelpOptName <*>
+               globalOptsParser hide (if isInterpreter
+                                      then Just $ LevelOther "silent"
+                                      else Nothing)
+        addCommand' cmd title footerStr constr =
+               addCommand cmd title footerStr constr (globalOpts True)
+        addSubCommands' cmd title footerStr =
+               addSubCommands cmd title footerStr (globalOpts True)
+        ignoreCheckSwitch = switch (long "ignore-check" <> help "Do not check package for common mistakes")
+        cmdFooter = "Run 'stack --help' for global options that apply to all subcommands."
+
+secondaryCommandHandler
+  :: (MonadIO m, MonadThrow m, MonadBaseControl IO m)
+  => [String]
+  -> IO (Maybe (m a))
+
+-- fall-through to external executables in `git` style if they exist
+-- (i.e. `stack something` looks for `stack-something` before
+-- failing with "Invalid argument `something'")
+secondaryCommandHandler args = do
+    -- FIXME this is broken when any options are specified before the command
+    -- e.g. stack --verbosity silent cmd
+    mExternalExec <- Directory.findExecutable ("stack-" ++ head args)
+    case mExternalExec of
+      Just ex -> do
+        menv <- getEnvOverride buildPlatform
+        return (Just $ runNoLoggingT (exec menv ex (tail args)))
+      Nothing -> return Nothing
+
+interpreterHandler
+  :: Monoid t
+  => ParserFailure ParserHelp
+  -> [String]
+  -> IO (GlobalOptsMonoid, (GlobalOpts -> IO (), t))
+interpreterHandler f args = do
+    val <- getInterpreterArgs args stackProgName
+    case val of
+      Nothing -> do
+        let hlp = footerHelp $ stringChunk $ concat
+              [ "\nIf you are trying to use "
+              , stackProgName
+              , " as a script interpreter, a\n'-- "
+              , stackProgName
+              , " [options] runghc [options]' comment is required."
+              , "\nSee https://github.com/commercialhaskell/stack/blob/release/doc/GUIDE.md#ghcrunghc" ]
+        handleParseResult (overFailure (mappend hlp) (Failure f))
+      Just iargs -> do
+        progName <- getProgName
+        let cmdlineParse = commandLineHandler progName True
+        (a,b) <- withArgs (iargs ++ "--" : args) cmdlineParse
+        return (a,(b,mempty))
 
 -- | Print out useful path information in a human-readable format (and
 -- support others later).
