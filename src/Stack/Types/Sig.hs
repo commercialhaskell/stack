@@ -26,7 +26,6 @@ import           Data.Monoid ((<>))
 import           Data.String (IsString(..))
 import           Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
 import           Data.Typeable (Typeable)
 import           Stack.Types.PackageName
 
@@ -68,7 +67,7 @@ instance IsString Fingerprint where
 instance FromJSON (Aeson PackageName) where
     parseJSON j = do
         s <- parseJSON j
-        case (parsePackageName . T.encodeUtf8) s of
+        case parsePackageName s of
             Just name -> return (Aeson name)
             Nothing -> fail ("Invalid package name: " <> T.unpack s)
 

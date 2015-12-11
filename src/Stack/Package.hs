@@ -445,10 +445,10 @@ packageDependencies =
   allBuildInfo'
 
 -- | Get all build tool dependencies of the package (buildable targets only).
-packageToolDependencies :: PackageDescription -> Map BS.ByteString VersionRange
+packageToolDependencies :: PackageDescription -> Map Text VersionRange
 packageToolDependencies =
   M.fromList .
-  concatMap (fmap (packageNameByteString . depName &&& depRange) .
+  concatMap (fmap (packageNameText . depName &&& depRange) .
              buildTools) .
   allBuildInfo'
 

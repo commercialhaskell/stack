@@ -110,7 +110,7 @@ data StackBuildException
         (Path Abs File)  -- cabal Executable
         [String]         -- cabal arguments
         (Maybe (Path Abs File)) -- logfiles location
-        [S.ByteString]     -- log contents
+        [Text]     -- log contents
   | ExecutionFailure [SomeException]
   | LocalPackageDoesn'tMatchTarget
         PackageName
@@ -256,7 +256,7 @@ instance Show StackBuildException where
            logLocations ++
            (if null bss
                 then ""
-                else "\n\n" ++ doubleIndent (map (T.unpack . decodeUtf8With lenientDecode) bss))
+                else "\n\n" ++ doubleIndent (map T.unpack bss))
          where
           doubleIndent = dropWhileEnd isSpace . unlines . fmap (\line -> "    " ++ line)
           dropQuotes = filter ('\"' /=)

@@ -5,7 +5,6 @@
 module Stack.DotSpec where
 
 import           Control.Monad (filterM)
-import           Data.ByteString.Char8 (ByteString)
 import           Data.Foldable as F
 import           Data.Functor.Identity
 import           Data.List ((\\))
@@ -13,6 +12,7 @@ import qualified Data.Map as Map
 import           Data.Maybe (fromMaybe)
 import           Data.Set (Set)
 import qualified Data.Set as Set
+import           Data.Text (Text)
 import           Stack.Types
 import           Test.Hspec
 import           Test.Hspec.QuickCheck (prop)
@@ -74,7 +74,7 @@ sublistOf :: [a] -> Gen [a]
 sublistOf = filterM (\_ -> choose (False, True))
 
 -- Unsafe internal helper to create a package name
-pkgName :: ByteString -> PackageName
+pkgName :: Text -> PackageName
 pkgName = fromMaybe failure . parsePackageName
   where
    failure = error "Internal error during package name creation in DotSpec.pkgName"

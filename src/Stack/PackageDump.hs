@@ -35,12 +35,9 @@ import           Control.Monad.Trans.Control
 import           Data.Attoparsec.Args
 import           Data.Attoparsec.Text as P
 import           Data.Binary.VersionTagged
-import           Data.ByteString (ByteString)
-import qualified Data.ByteString as S
-import qualified Data.ByteString.Char8 as S8
 import           Data.Conduit
-import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
+import qualified Data.Conduit.Text as CT
 import           Data.Either (partitionEithers)
 import           Data.IORef
 import           Data.Map (Map)
@@ -48,7 +45,8 @@ import qualified Data.Map as Map
 import           Data.Maybe (catMaybes, listToMaybe)
 import           Data.Maybe.Extra (mapMaybeM)
 import qualified Data.Set as Set
-import qualified Data.Text.Encoding as T
+import qualified Data.Text as T
+import           Data.Text (Text)
 import           Data.Typeable (Typeable)
 import           GHC.Generics (Generic)
 import           Path
@@ -83,7 +81,7 @@ ghcPkgDump
     => EnvOverride
     -> WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
-    -> Sink ByteString IO a
+    -> Sink Text IO a
     -> m a
 ghcPkgDump = ghcPkgCmdArgs ["dump"]
 
@@ -94,7 +92,7 @@ ghcPkgDescribe
     -> EnvOverride
     -> WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
-    -> Sink ByteString IO a
+    -> Sink Text IO a
     -> m a
 ghcPkgDescribe pkgName = ghcPkgCmdArgs ["describe", "--simple-output", packageNameString pkgName]
 
@@ -105,13 +103,13 @@ ghcPkgCmdArgs
     -> EnvOverride
     -> WhichCompiler
     -> [Path Abs Dir] -- ^ if empty, use global
-    -> Sink ByteString IO a
+    -> Sink Text IO a
     -> m a
 ghcPkgCmdArgs cmd menv wc mpkgDbs sink = do
     case reverse mpkgDbs of
         (pkgDb:_) -> createDatabase menv wc pkgDb -- TODO maybe use some retry logic instead?
         _ -> return ()
-    sinkProcessStdout Nothing menv (ghcPkgExeName wc) args sink
+    sinkProcessStdout Nothing menv (ghcPkgExeName wc) args sink'
   where
     args = concat
         [ case mpkgDbs of
@@ -121,6 +119,7 @@ ghcPkgCmdArgs cmd menv wc mpkgDbs sink = do
         , cmd
         , ["--expand-pkgroot"]
         ]
+    sink' = CT.decodeUtf8 =$= sink
 
 -- | Create a new, empty @InstalledCache@
 newInstalledCache :: MonadIO m => m InstalledCache
@@ -233,12 +232,12 @@ addProfiling (InstalledCache ref) =
         return dp { dpProfiling = p }
 
 isProfiling :: FilePath -- ^ entry in directory
-            -> ByteString -- ^ name of library
+            -> Text -- ^ name of library
             -> Bool
 isProfiling content lib =
-    prefix `S.isPrefixOf` S8.pack content
+    prefix `T.isPrefixOf` T.pack content
   where
-    prefix = S.concat ["lib", lib, "_p"]
+    prefix = T.concat ["lib", lib, "_p"]
 
 -- | Add haddock information to the stream of @DumpPackage@s
 addHaddock :: MonadIO m
@@ -268,7 +267,7 @@ data DumpPackage profiling haddock = DumpPackage
     { dpGhcPkgId :: !GhcPkgId
     , dpPackageIdent :: !PackageIdentifier
     , dpLibDirs :: ![FilePath]
-    , dpLibraries :: ![ByteString]
+    , dpLibraries :: ![Text]
     , dpHasExposedModules :: !Bool
     , dpDepends :: ![GhcPkgId]
     , dpHaddockInterfaces :: ![FilePath]
@@ -280,8 +279,8 @@ data DumpPackage profiling haddock = DumpPackage
     deriving (Show, Eq, Ord)
 
 data PackageDumpException
-    = MissingSingleField ByteString (Map ByteString [Line])
-    | Couldn'tParseField ByteString [Line]
+    = MissingSingleField Text (Map Text [Line])
+    | Couldn'tParseField Text [Line]
     deriving Typeable
 instance Exception PackageDumpException
 instance Show PackageDumpException where
@@ -298,7 +297,7 @@ instance Show PackageDumpException where
 
 -- | Convert a stream of bytes into a stream of @DumpPackage@s
 conduitDumpPackage :: MonadThrow m
-                   => Conduit ByteString m (DumpPackage () ())
+                   => Conduit Text m (DumpPackage () ())
 conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
     pairs <- eachPair (\k -> (k, ) <$> CL.consume) =$= CL.consume
     let m = Map.fromList pairs
@@ -310,15 +309,15 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
         -- https://github.com/fpco/stack/issues/182
         parseM k = Map.findWithDefault [] k m
 
-        parseDepend :: MonadThrow m => ByteString -> m (Maybe GhcPkgId)
+        parseDepend :: MonadThrow m => Text -> m (Maybe GhcPkgId)
         parseDepend "builtin_rts" = return Nothing
         parseDepend bs =
             liftM Just $ parseGhcPkgId bs'
           where
             (bs', _builtinRts) =
-                case stripSuffixBS " builtin_rts" bs of
+                case stripSuffixText " builtin_rts" bs of
                     Nothing ->
-                        case stripPrefixBS "builtin_rts " bs of
+                        case stripPrefixText "builtin_rts " bs of
                             Nothing -> (bs, False)
                             Just x -> (x, True)
                     Just x -> (x, True)
@@ -337,7 +336,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
             depends <- mapMaybeM parseDepend $ parseM "depends"
 
             let parseQuoted key =
-                    case mapM (P.parseOnly (argsParser NoEscaping) . T.decodeUtf8) val of
+                    case mapM (P.parseOnly (argsParser NoEscaping)) val of
                         Left{} -> throwM (Couldn'tParseField key val)
                         Right dirs -> return (concat dirs)
                   where
@@ -350,7 +349,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 { dpGhcPkgId = ghcPkgId
                 , dpPackageIdent = PackageIdentifier name version
                 , dpLibDirs = libDirPaths
-                , dpLibraries = S8.words $ S8.unwords libraries
+                , dpLibraries = T.words $ T.unwords libraries
                 , dpHasExposedModules = not (null libraries || null exposedModules)
                 , dpDepends = depends
                 , dpHaddockInterfaces = haddockInterfaces
@@ -360,34 +359,33 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 , dpIsExposed = exposed == ["True"]
                 }
 
-stripPrefixBS :: ByteString -> ByteString -> Maybe ByteString
-stripPrefixBS x y
-    | x `S.isPrefixOf` y = Just $ S.drop (S.length x) y
+stripPrefixText :: Text -> Text -> Maybe Text
+stripPrefixText x y
+    | x `T.isPrefixOf` y = Just $ T.drop (T.length x) y
     | otherwise = Nothing
 
-stripSuffixBS :: ByteString -> ByteString -> Maybe ByteString
-stripSuffixBS x y
-    | x `S.isSuffixOf` y = Just $ S.take (S.length y - S.length x) y
+stripSuffixText :: Text -> Text -> Maybe Text
+stripSuffixText x y
+    | x `T.isSuffixOf` y = Just $ T.take (T.length y - T.length x) y
     | otherwise = Nothing
 
 -- | A single line of input, not including line endings
-type Line = ByteString
+type Line = Text
 
 -- | Apply the given Sink to each section of output, broken by a single line containing ---
 eachSection :: Monad m
             => Sink Line m a
-            -> Conduit ByteString m a
+            -> Conduit Text m a
 eachSection inner =
-    CL.map (S.filter (/= _cr)) =$= CB.lines =$= start
+    CL.map (T.filter (/= '\r')) =$= CT.lines =$= start
   where
-    _cr = 13
 
-    peekBS = await >>= maybe (return Nothing) (\bs ->
-        if S.null bs
-            then peekBS
+    peekText = await >>= maybe (return Nothing) (\bs ->
+        if T.null bs
+            then peekText
             else leftover bs >> return (Just bs))
 
-    start = peekBS >>= maybe (return ()) (const go)
+    start = peekText >>= maybe (return ()) (const go)
 
     go = do
         x <- toConsumer $ takeWhileC (/= "---") =$= inner
@@ -397,25 +395,22 @@ eachSection inner =
 
 -- | Grab each key/value pair
 eachPair :: Monad m
-         => (ByteString -> Sink Line m a)
+         => (Text -> Sink Line m a)
          -> Conduit Line m a
 eachPair inner =
     start
   where
     start = await >>= maybe (return ()) start'
 
-    _colon = 58
-    _space = 32
-
     start' bs1 =
         toConsumer (valSrc =$= inner key) >>= yield >> start
       where
-        (key, bs2) = S.break (== _colon) bs1
-        (spaces, bs3) = S.span (== _space) $ S.drop 1 bs2
-        indent = S.length key + 1 + S.length spaces
+        (key, bs2) = T.break (== ':') bs1
+        (spaces, bs3) = T.span (== ' ') $ T.drop 1 bs2
+        indent = T.length key + 1 + T.length spaces
 
         valSrc
-            | S.null bs3 = noIndent
+            | T.null bs3 = noIndent
             | otherwise = yield bs3 >> loopIndent indent
 
     noIndent = do
@@ -423,12 +418,12 @@ eachPair inner =
         case mx of
             Nothing -> return ()
             Just bs -> do
-                let (spaces, val) = S.span (== _space) bs
-                if S.length spaces == 0
+                let (spaces, val) = T.span (== ' ') bs
+                if T.length spaces == 0
                     then leftover val
                     else do
                         yield val
-                        loopIndent (S.length spaces)
+                        loopIndent (T.length spaces)
 
     loopIndent i =
         loop
@@ -436,11 +431,11 @@ eachPair inner =
         loop = await >>= maybe (return ()) go
 
         go bs
-            | S.length spaces == i && S.all (== _space) spaces =
+            | T.length spaces == i && T.all (== ' ') spaces =
                 yield val >> loop
             | otherwise = leftover bs
           where
-            (spaces, val) = S.splitAt i bs
+            (spaces, val) = T.splitAt i bs
 
 -- | General purpose utility
 takeWhileC :: Monad m => (a -> Bool) -> Conduit a m a

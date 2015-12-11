@@ -134,7 +134,7 @@ findGhcPkgVersion :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatc
 findGhcPkgVersion menv wc pkgDbs name = do
     mv <- findGhcPkgField menv wc pkgDbs (packageNameString name) "version"
     case mv of
-        Just !v -> return (parseVersion (T.encodeUtf8 v))
+        Just !v -> return (parseVersion v)
         _ -> return Nothing
 
 unregisterGhcPkgId :: (MonadIO m, MonadLogger m, MonadThrow m, MonadCatch m, MonadBaseControl IO m)
