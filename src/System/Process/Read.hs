@@ -141,7 +141,7 @@ readProcessNull wd menv name args =
     sinkProcessStdout wd menv name args CL.sinkNull
 
 -- | Run the given command in the given directory. If it exits with anything
--- but success, prints an error and then calls 'exitWith' to exit the program.
+-- but success, print an error and then call 'exitWith' to exit the program.
 readInNull :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
            => Path Abs Dir -- ^ Directory to run in
            -> FilePath -- ^ Command to run
