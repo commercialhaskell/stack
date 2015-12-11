@@ -342,7 +342,7 @@ findExecutable eo name = liftIO $ do
                                 else testFPs fps
                     testFPs fps0
             epath <- loop $ eoPath eo
-            !() <- atomicModifyIORef (eoExeCache eo) $ \m' ->
+            () <- atomicModifyIORef (eoExeCache eo) $ \m' ->
                 (Map.insert name epath m', ())
             return epath
     return $ either throwM return epath
