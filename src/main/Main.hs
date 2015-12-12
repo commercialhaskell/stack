@@ -452,7 +452,7 @@ commandLineHandler progName isInterpreter = complicatedOptions
                 Nothing -> handleParseResult (Failure f)
         globalOpts hide =
            extraHelpOption hide progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
-           extraHelpOption hide puogName (Nix.nixCmdName ++ "*") nixHelpOptName <*>
+           extraHelpOption hide progName (Nix.nixCmdName ++ "*") nixHelpOptName <*>
            globalOptsParser hide (if isInterpreter
                                   then Just $ LevelOther "silent"
                                   else Nothing)
