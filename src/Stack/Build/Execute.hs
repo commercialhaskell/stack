@@ -487,7 +487,7 @@ executePlan' installedMap0 plan ee@ExecuteEnv {..} = do
         let total = length actions
             loop prev
                 | prev == total =
-                    runInBase $ $logStickyDone ("Completed all " <> T.pack (show total) <> " actions.")
+                    runInBase $ $logStickyDone ("Completed " <> T.pack (show total) <> " action(s).")
                 | otherwise = do
                     when terminal $ runInBase $
                         $logSticky ("Progress: " <> T.pack (show prev) <> "/" <> T.pack (show total))
