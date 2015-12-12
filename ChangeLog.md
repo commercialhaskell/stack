@@ -16,6 +16,28 @@ Bug fixes:
 
 ## 0.1.10.0
 
+Release notes:
+
+* The Stack home page is now at [haskellstack.org](http://haskellstack.org),
+  which shows the documentation rendered by readthedocs.org. Note: this
+  has necessitated some changes to the links in the documentation's markdown
+  source code, so please check the links on the website before submitting a PR
+  to fix them.
+* The locations of the
+  [Ubuntu](http://docs.haskellstack.org/en/stable/install_and_upgrade.html#ubuntu)
+  and
+  [Debian](http://docs.haskellstack.org/en/stable/install_and_upgrade.html#debian)
+  package repositories have changed to have correct URL semantics according to
+  Debian's guidelines
+  [#1378](https://github.com/commercialhaskell/stack/issues/1378). The old
+  locations will continue to work for some months, but we suggest that you
+  adjust your `/etc/apt/sources.list.d/fpco.list` to the new location to avoid
+  future disruption.
+* [openSUSE and SUSE Linux Enterprise](http://docs.haskellstack.org/en/stable/install_and_upgrade.html#opensuse-suse-linux-enterprise)
+  packages are now available, thanks to [@mimi1vx](https://github.com/mimi1vx).
+  Note: there will be some lag before these pick up new versions, as they are
+  based on Stackage LTS.
+
 Major changes:
 
 * Support for building inside a Nix-shell providing system dependencies
