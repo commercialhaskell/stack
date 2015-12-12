@@ -152,18 +152,12 @@ readInNull :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
 readInNull wd cmd menv args errMsg = do
     result <- try (readProcessNull (Just wd) menv cmd args)
     case result of
-        Left (ProcessExitedUnsuccessfully _ ec) -> do
-            $logError $
-                T.pack $
-                concat
-                    [ "Exit code "
-                    , show ec
-                    , " while running "
-                    , show (cmd : args)
-                    , " in "
-                    , toFilePath wd]
-            forM_ errMsg $logError
-            liftIO (exitWith ec)
+        Left ex -> do
+            $logError (T.pack (show ex))
+            case ex of
+                ReadProcessException{} -> forM_ errMsg $logError
+                _ -> return ()
+            liftIO exitFailure
         Right () -> return ()
 
 -- | Try to produce a strict 'S.ByteString' from the stdout of a
