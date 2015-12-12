@@ -58,7 +58,7 @@ module Data.Attoparsec.Args
     , argsParser
     , interpreterArgsParser -- for unit tests
     , parseArgs
-    , withInterpreterArgs
+    , getInterpreterArgs
     ) where
 
 import           Control.Applicative
@@ -72,7 +72,6 @@ import           Data.Conduit.Text(decodeUtf8)
 import           Data.Char (isSpace)
 import           Data.Text (Text, pack)
 import           System.Directory (doesFileExist)
-import           System.Environment (getArgs, withArgs)
 import           System.IO (IOMode (ReadMode), withBinaryFile)
 
 -- | Mode for parsing escape characters.
@@ -125,32 +124,20 @@ interpreterArgsParser progName = P.option "" sheBangLine *> interpreterComment
     blockComment = comment "{-" (P.string "-}" <?> "unterminated block comment")
     interpreterComment = lineComment <|> blockComment
 
--- | Use 'withArgs' on result of 'getInterpreterArgs'.
-withInterpreterArgs :: String -> ([String] -> Bool -> IO a) -> IO a
-withInterpreterArgs progName inner = do
-    (args, isInterpreter) <- getInterpreterArgs progName
-    withArgs args $ inner args isInterpreter
-
 -- | Extract stack arguments from a correctly placed and correctly formatted
 -- comment when it is being used as an interpreter
-getInterpreterArgs :: String -> IO ([String], Bool)
-getInterpreterArgs progName = do
-    args0 <- getArgs
-    case args0 of
-        (x:_) -> do
-            isFile <- doesFileExist x
-            if isFile
-                then do
-                    margs <-
-                        withBinaryFile x ReadMode $ \h ->
-                        CB.sourceHandle h
-                            =$= decodeUtf8
-                            $$ sinkInterpreterArgs progName
-                    return $ case margs of
-                        Nothing -> (args0, True)
-                        Just args -> (args ++ "--" : args0, True)
-                else return (args0, False)
-        _ -> return (args0, False)
+-- FIXME this is broken when options are specified before the filename
+getInterpreterArgs :: [String] -> String -> IO (Maybe [String])
+getInterpreterArgs (f:_) progName = do
+    isFile <- doesFileExist f
+    if isFile
+    then withBinaryFile f ReadMode parse
+    else return Nothing
+    where parse h =
+            CB.sourceHandle h
+            =$= decodeUtf8
+            $$ sinkInterpreterArgs progName
+getInterpreterArgs _ _ = return Nothing
 
 sinkInterpreterArgs :: MonadThrow m => String -> Sink Text m (Maybe [String])
 sinkInterpreterArgs progName = do
