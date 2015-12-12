@@ -130,45 +130,45 @@ versionString' = showVersion Meta.version ++ ' ' : display buildArch
 
 main :: IO ()
 main = do
-     -- Line buffer the output by default, particularly for non-terminal runs.
-     -- See https://github.com/commercialhaskell/stack/pull/360
-     hSetBuffering stdout LineBuffering
-     hSetBuffering stdin  LineBuffering
-     hSetBuffering stderr LineBuffering
-     hSetTranslit stdout
-     hSetTranslit stderr
-     args <- getArgs
-     progName <- getProgName
-     isTerminal <- hIsTerminalDevice stdout
-     execExtraHelp args
-                   dockerHelpOptName
-                   (dockerOptsParser False)
-                   ("Only showing --" ++ Docker.dockerCmdName ++ "* options.")
-     execExtraHelp args
-                   nixHelpOptName
-                   (nixOptsParser False)
-                   ("Only showing --" ++ Nix.nixCmdName ++ "* options.")
+  -- Line buffer the output by default, particularly for non-terminal runs.
+  -- See https://github.com/commercialhaskell/stack/pull/360
+  hSetBuffering stdout LineBuffering
+  hSetBuffering stdin  LineBuffering
+  hSetBuffering stderr LineBuffering
+  hSetTranslit stdout
+  hSetTranslit stderr
+  args <- getArgs
+  progName <- getProgName
+  isTerminal <- hIsTerminalDevice stdout
+  execExtraHelp args
+                dockerHelpOptName
+                (dockerOptsParser False)
+                ("Only showing --" ++ Docker.dockerCmdName ++ "* options.")
+  execExtraHelp args
+                nixHelpOptName
+                (nixOptsParser False)
+                ("Only showing --" ++ Nix.nixCmdName ++ "* options.")
 
-     eGlobalRun <- try $ commandLineHandler progName False
-     case eGlobalRun of
-       Left (exitCode :: ExitCode) -> do
-         throwIO exitCode
-       Right (globalMonoid,run) -> do
-         let global = globalOptsFromMonoid isTerminal globalMonoid
-         when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
-         case globalReExecVersion global of
-             Just expectVersion
-                 | expectVersion /= showVersion Meta.version ->
-                     throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
-             _ -> return ()
-         run global `catch` \e ->
-            -- This special handler stops "stack: " from being printed before the
-            -- exception
-            case fromException e of
-                Just ec -> exitWith ec
-                Nothing -> do
-                    printExceptionStderr e
-                    exitFailure
+  eGlobalRun <- try $ commandLineHandler progName False
+  case eGlobalRun of
+    Left (exitCode :: ExitCode) -> do
+      throwIO exitCode
+    Right (globalMonoid,run) -> do
+      let global = globalOptsFromMonoid isTerminal globalMonoid
+      when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
+      case globalReExecVersion global of
+          Just expectVersion
+              | expectVersion /= showVersion Meta.version ->
+                  throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
+          _ -> return ()
+      run global `catch` \e ->
+          -- This special handler stops "stack: " from being printed before the
+          -- exception
+          case fromException e of
+              Just ec -> exitWith ec
+              Nothing -> do
+                  printExceptionStderr e
+                  exitFailure
 
 commandLineHandler
   :: String
@@ -451,15 +451,15 @@ commandLineHandler progName isInterpreter = complicatedOptions
                               >>= maybe (interpreterHandler f args) id
                 Nothing -> handleParseResult (Failure f)
         globalOpts hide =
-               extraHelpOption hide progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
-               extraHelpOption hide progName (Nix.nixCmdName ++ "*") nixHelpOptName <*>
-               globalOptsParser hide (if isInterpreter
-                                      then Just $ LevelOther "silent"
-                                      else Nothing)
+           extraHelpOption hide progName (Docker.dockerCmdName ++ "*") dockerHelpOptName <*>
+           extraHelpOption hide puogName (Nix.nixCmdName ++ "*") nixHelpOptName <*>
+           globalOptsParser hide (if isInterpreter
+                                  then Just $ LevelOther "silent"
+                                  else Nothing)
         addCommand' cmd title footerStr constr =
-               addCommand cmd title footerStr constr (globalOpts True)
+           addCommand cmd title footerStr constr (globalOpts True)
         addSubCommands' cmd title footerStr =
-               addSubCommands cmd title footerStr (globalOpts True)
+           addSubCommands cmd title footerStr (globalOpts True)
         ignoreCheckSwitch = switch (long "ignore-check" <> help "Do not check package for common mistakes")
         cmdFooter = "Run 'stack --help' for global options that apply to all subcommands."
 
