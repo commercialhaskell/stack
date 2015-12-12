@@ -106,7 +106,7 @@ executables.
    Just try to add a new version in the `stack.yaml` file in the `extra-deps` section.
 
 It was a really fast introduction on how to start to code in Haskell using `stack`.
-If you want to go further, we highly recommend you to read the [`stack` guide](GUIDE.html).
+If you want to go further, we highly recommend you to read the [`stack` guide](GUIDE.md).
 
 #### How to contribute
 
@@ -135,7 +135,7 @@ stack build
 #### Complete guide to stack
 
 This repository also contains a complete [user guide to using stack
-](GUIDE.html), covering all of the most common use cases.
+](GUIDE.md), covering all of the most common use cases.
 
 
 #### Questions, Feedback, Discussion
