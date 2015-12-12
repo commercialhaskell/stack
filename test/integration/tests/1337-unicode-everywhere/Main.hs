@@ -1,4 +1,5 @@
 import StackTest
 
 main :: IO ()
-main = stack ["build"]
+main = do stack ["build"]
+          stack ["exec", "以-exe"]
