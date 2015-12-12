@@ -1205,18 +1205,24 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                                             [] -> ""
                                             _ -> ", args: " <> T.intercalate " " (map showProcessArgDebug args)
                         announce $ "test (suite: " <> testName <> argsDisplay <> ")"
-                        let cp = (proc (toFilePath exePath) args)
+
+                        -- Clear "Progress: ..." message before
+                        -- redirecting output.
+                        when (isNothing mlogFile) $ do
+                            $logStickyDone ""
+                            liftIO $ hFlush stdout
+                            liftIO $ hFlush stderr
+
+                        let output =
+                                case mlogFile of
+                                    Nothing -> Inherit
+                                    Just (_, h) -> UseHandle h
+                            cp = (proc (toFilePath exePath) args)
                                 { cwd = Just $ toFilePath pkgDir
                                 , Process.env = envHelper menv
                                 , std_in = CreatePipe
-                                , std_out =
-                                    case mlogFile of
-                                        Nothing -> Inherit
-                                        Just (_, h) -> UseHandle h
-                                , std_err =
-                                    case mlogFile of
-                                        Nothing -> Inherit
-                                        Just (_, h) -> UseHandle h
+                                , std_out = output
+                                , std_err = output
                                 }
 
                         -- Use createProcess_ to avoid the log file being closed afterwards
@@ -1227,6 +1233,9 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                             liftIO $ hPutStr inH $ show (logPath, testName)
                         liftIO $ hClose inH
                         ec <- liftIO $ waitForProcess ph
+                        -- Add a trailing newline, incase the test
+                        -- output didn't finish with a newline.
+                        when (isNothing mlogFile) ($logInfo "")
                         -- Move the .tix file out of the package
                         -- directory into the hpc work dir, for
                         -- tidiness.
