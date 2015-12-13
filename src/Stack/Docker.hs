@@ -9,6 +9,7 @@ module Stack.Docker
   ,CleanupAction(..)
   ,dockerCleanupCmdName
   ,dockerCmdName
+  ,dockerHelpOptName
   ,dockerPullCmdName
   ,entrypoint
   ,preventInContainer
@@ -845,6 +846,9 @@ inContainerEnvVar = stackProgNameUpper ++ "_IN_CONTAINER"
 -- | Command-line argument for "docker"
 dockerCmdName :: String
 dockerCmdName = "docker"
+
+dockerHelpOptName :: String
+dockerHelpOptName = dockerCmdName ++ "-help"
 
 -- | Command-line argument for @docker pull@.
 dockerPullCmdName :: String
