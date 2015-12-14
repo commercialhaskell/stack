@@ -6,6 +6,7 @@
 module Stack.Nix
   (reexecWithOptionalShell
   ,nixCmdName
+  ,nixHelpOptName
   ) where
 
 import           Control.Applicative
@@ -116,6 +117,9 @@ inShellEnvVar = concat [map toUpper stackProgName,"_IN_NIXSHELL"]
 -- | Command-line argument for "nix"
 nixCmdName :: String
 nixCmdName = "nix"
+
+nixHelpOptName :: String
+nixHelpOptName = nixCmdName ++ "-help"
 
 type M env m =
   (MonadIO m
