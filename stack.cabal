@@ -135,7 +135,7 @@ library
                    , base >= 4.7 && <5
                    , base16-bytestring
                    , base64-bytestring
-                   , bifunctors >= 4.2.1
+                   , bifunctors >= 4.2.1 && < 5.2
                    , binary >= 0.7
                    , binary-tagged >= 0.1.1
                    , blaze-builder
