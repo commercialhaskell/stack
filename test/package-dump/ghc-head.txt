@@ -1,0 +1,1146 @@
+name: ghc-boot
+version: 0.0.0.0
+id: ghc-boot-0.0.0.0
+key: ghc-boot-0.0.0.0
+license: BSD3
+maintainer: ghc-devs@haskell.org
+synopsis: Shared functionality between GHC and its boot libraries
+description:
+    This library is shared between GHC, ghc-pkg, and other boot
+    libraries.
+    .
+    A note about "GHC.PackageDb": it only deals with the subset of
+    the package database that the compiler cares about: modules
+    paths etc and not package metadata like description, authors
+    etc. It is thus not a library interface to ghc-pkg and is *not*
+    suitable for modifying GHC package databases.
+    .
+    The package database format and this library are constructed in
+    such a way that while ghc-pkg depends on Cabal, the GHC library
+    and program do not have to depend on Cabal.
+exposed: True
+exposed-modules:
+    GHC.Lexeme GHC.PackageDb
+abi: 7a24014b606b3e9dd8b7b8aa4cf35acc
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/ghc-boot-0.0.0.0
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/ghc-boot-0.0.0.0
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/ghc-boot-0.0.0.0
+hs-libraries: HSghc-boot-0.0.0.0
+depends:
+    base-4.9.0.0 binary-0.7.5.0 bytestring-0.10.7.0 directory-1.2.5.0
+    filepath-1.4.1.0
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/ghc-boot-0.0.0.0/ghc-boot.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/ghc-boot-0.0.0.0
+---
+name: ghc
+version: 7.11.20151213
+id: ghc-7.11.20151213
+key: ghc-7.11.20151213
+license: BSD3
+maintainer: glasgow-haskell-users@haskell.org
+homepage: http://www.haskell.org/ghc/
+synopsis: The GHC API
+description:
+    GHC's functionality can be useful for more things than just
+    compiling Haskell programs. Important use cases are programs
+    that analyse (and perhaps transform) Haskell code. Others
+    include loading Haskell code dynamically in a GHCi-like manner.
+    For this reason, a lot of GHC's functionality is made available
+    through this package.
+category: Development
+author: The GHC Team
+exposed: False
+exposed-modules:
+    Avail BasicTypes ConLike DataCon PatSyn Demand Debug Exception
+    FieldLabel GhcMonad Hooks Id IdInfo Lexeme Literal Llvm Llvm.AbsSyn
+    Llvm.MetaData Llvm.PpLlvm Llvm.Types LlvmCodeGen LlvmCodeGen.Base
+    LlvmCodeGen.CodeGen LlvmCodeGen.Data LlvmCodeGen.Ppr
+    LlvmCodeGen.Regs LlvmMangler MkId Module Name NameEnv NameSet
+    OccName RdrName SrcLoc UniqSupply Unique Var VarEnv VarSet
+    UnVarGraph BlockId CLabel Cmm CmmBuildInfoTables CmmPipeline
+    CmmCallConv CmmCommonBlockElim CmmImplementSwitchPlans
+    CmmContFlowOpt CmmExpr CmmInfo CmmLex CmmLint CmmLive CmmMachOp
+    CmmSwitch CmmNode CmmOpt CmmParse CmmProcPoint CmmSink CmmType
+    CmmUtils CmmLayoutStack MkGraph PprBase PprC PprCmm PprCmmDecl
+    PprCmmExpr Bitmap CodeGen.Platform CodeGen.Platform.ARM
+    CodeGen.Platform.ARM64 CodeGen.Platform.NoRegs CodeGen.Platform.PPC
+    CodeGen.Platform.PPC_Darwin CodeGen.Platform.SPARC
+    CodeGen.Platform.X86 CodeGen.Platform.X86_64 CgUtils StgCmm
+    StgCmmBind StgCmmClosure StgCmmCon StgCmmEnv StgCmmExpr
+    StgCmmForeign StgCmmHeap StgCmmHpc StgCmmArgRep StgCmmLayout
+    StgCmmMonad StgCmmPrim StgCmmProf StgCmmTicky StgCmmUtils
+    StgCmmExtCode SMRep CoreArity CoreFVs CoreLint CorePrep CoreSubst
+    CoreSyn TrieMap CoreTidy CoreUnfold CoreUtils CoreSeq CoreStats
+    MkCore PprCore PmExpr TmOracle Check Coverage Desugar DsArrows
+    DsBinds DsCCall DsExpr DsForeign DsGRHSs DsListComp DsMonad DsUtils
+    Match MatchCon MatchLit HsBinds HsDecls HsDoc HsExpr HsImpExp HsLit
+    PlaceHolder HsPat HsSyn HsTypes HsUtils BinIface BuildTyCl IfaceEnv
+    IfaceSyn IfaceType LoadIface MkIface TcIface FlagChecker
+    Annotations BreakArray CmdLineParser CodeOutput Config Constants
+    DriverMkDepend DriverPhases PipelineMonad DriverPipeline DynFlags
+    ErrUtils Finder GHC GhcMake GhcPlugins DynamicLoading HeaderInfo
+    HscMain HscStats HscTypes InteractiveEval InteractiveEvalTypes
+    PackageConfig Packages PlatformConstants Plugins TcPluginM
+    PprTyThing StaticFlags StaticPtrTable SysTools Elf TidyPgm Ctype
+    HaddockUtils Lexer OptCoercion Parser RdrHsSyn ApiAnnotation
+    ForeignCall PrelInfo PrelNames PrelRules PrimOp TysPrim TysWiredIn
+    CostCentre ProfInit SCCfinal RnBinds RnEnv RnExpr RnHsDoc RnNames
+    RnPat RnSource RnSplice RnTypes CoreMonad CSE FloatIn FloatOut
+    LiberateCase OccurAnal SAT SetLevels SimplCore SimplEnv SimplMonad
+    SimplUtils Simplify SimplStg StgStats UnariseStg Rules SpecConstr
+    Specialise CoreToStg StgLint StgSyn CallArity DmdAnal WorkWrap
+    WwLib FamInst Inst TcAnnotations TcArrows TcBinds TcClassDcl
+    TcDefaults TcDeriv TcEnv TcExpr TcForeign TcGenDeriv TcGenGenerics
+    TcHsSyn TcHsType TcInstDcls TcMType TcValidity TcMatches TcPat
+    TcPatSyn TcRnDriver TcRnMonad TcRnTypes TcRules TcSimplify TcErrors
+    TcTyClsDecls TcTyDecls TcTypeable TcType TcEvidence TcUnify
+    TcInteract TcCanonical TcFlatten TcSMonad TcTypeNats TcSplice Class
+    Coercion DsMeta THNames FamInstEnv FunDeps InstEnv TyCon CoAxiom
+    Kind Type TyCoRep Unify Bag Binary BooleanFormula BufWrite Digraph
+    Encoding FastFunctions FastMutInt FastString FastStringEnv
+    Fingerprint FiniteMap FV GraphBase GraphColor GraphOps GraphPpr
+    IOEnv ListSetOps Maybes MonadUtils OrdList Outputable Pair Panic
+    Pretty Serialized State Stream StringBuffer UniqDFM UniqDSet UniqFM
+    UniqSet Util Vectorise.Builtins.Base Vectorise.Builtins.Initialise
+    Vectorise.Builtins Vectorise.Monad.Base Vectorise.Monad.Naming
+    Vectorise.Monad.Local Vectorise.Monad.Global
+    Vectorise.Monad.InstEnv Vectorise.Monad Vectorise.Utils.Base
+    Vectorise.Utils.Closure Vectorise.Utils.Hoisting
+    Vectorise.Utils.PADict Vectorise.Utils.Poly Vectorise.Utils
+    Vectorise.Generic.Description Vectorise.Generic.PAMethods
+    Vectorise.Generic.PADict Vectorise.Generic.PData Vectorise.Type.Env
+    Vectorise.Type.Type Vectorise.Type.TyConDecl
+    Vectorise.Type.Classify Vectorise.Convert Vectorise.Vect
+    Vectorise.Var Vectorise.Env Vectorise.Exp Vectorise Hoopl.Dataflow
+    Hoopl AsmCodeGen TargetReg NCGMonad Instruction Format Reg RegClass
+    PIC Platform CPrim X86.Regs X86.RegInfo X86.Instr X86.Cond X86.Ppr
+    X86.CodeGen PPC.Regs PPC.RegInfo PPC.Instr PPC.Cond PPC.Ppr
+    PPC.CodeGen SPARC.Base SPARC.Regs SPARC.Imm SPARC.AddrMode
+    SPARC.Cond SPARC.Instr SPARC.Stack SPARC.ShortcutJump SPARC.Ppr
+    SPARC.CodeGen SPARC.CodeGen.Amode SPARC.CodeGen.Base
+    SPARC.CodeGen.CondCode SPARC.CodeGen.Gen32 SPARC.CodeGen.Gen64
+    SPARC.CodeGen.Sanity SPARC.CodeGen.Expand RegAlloc.Liveness
+    RegAlloc.Graph.Main RegAlloc.Graph.Stats RegAlloc.Graph.ArchBase
+    RegAlloc.Graph.ArchX86 RegAlloc.Graph.Coalesce RegAlloc.Graph.Spill
+    RegAlloc.Graph.SpillClean RegAlloc.Graph.SpillCost
+    RegAlloc.Graph.TrivColorable RegAlloc.Linear.Main
+    RegAlloc.Linear.JoinToTargets RegAlloc.Linear.State
+    RegAlloc.Linear.Stats RegAlloc.Linear.FreeRegs
+    RegAlloc.Linear.StackMap RegAlloc.Linear.Base
+    RegAlloc.Linear.X86.FreeRegs RegAlloc.Linear.X86_64.FreeRegs
+    RegAlloc.Linear.PPC.FreeRegs RegAlloc.Linear.SPARC.FreeRegs Dwarf
+    Dwarf.Types Dwarf.Constants Convert ByteCodeAsm ByteCodeGen
+    ByteCodeInstr ByteCodeItbls ByteCodeLink Debugger LibFFI Linker
+    ObjLink RtClosureInspect DebuggerUtils
+abi: bc2e1cb7cdee2089e52f007db59a253c
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/ghc-7.11.20151213
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/ghc-7.11.20151213
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/ghc-7.11.20151213
+hs-libraries: HSghc-7.11.20151213
+include-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/ghc-7.11.20151213/include
+depends:
+    array-0.5.1.0 base-4.9.0.0 binary-0.7.5.0 bytestring-0.10.7.0
+    containers-0.5.6.3 directory-1.2.5.0 filepath-1.4.1.0
+    ghc-boot-0.0.0.0 hoopl-3.10.2.0 hpc-0.6.0.2 process-1.4.1.0
+    template-haskell-2.11.0.0 time-1.5.0.1 transformers-0.4.3.0
+    unix-2.7.1.1
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/ghc-7.11.20151213/ghc.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/ghc-7.11.20151213
+---
+name: haskeline
+version: 0.7.2.1
+id: haskeline-0.7.2.1
+key: haskeline-0.7.2.1
+license: BSD3
+copyright: (c) Judah Jacobson
+maintainer: Judah Jacobson <judah.jacobson@gmail.com>
+stability: Experimental
+homepage: http://trac.haskell.org/haskeline
+synopsis: A command-line interface for user input, written in Haskell.
+description:
+    Haskeline provides a user interface for line input in command-line
+    programs.  This library is similar in purpose to readline, but since
+    it is written in Haskell it is (hopefully) more easily used in other
+    Haskell programs.
+    .
+    Haskeline runs both on POSIX-compatible systems and on Windows.
+category: User Interfaces
+author: Judah Jacobson
+exposed: True
+exposed-modules:
+    System.Console.Haskeline System.Console.Haskeline.Completion
+    System.Console.Haskeline.MonadException
+    System.Console.Haskeline.History System.Console.Haskeline.IO
+hidden-modules: System.Console.Haskeline.Backend
+                System.Console.Haskeline.Backend.WCWidth
+                System.Console.Haskeline.Command
+                System.Console.Haskeline.Command.Completion
+                System.Console.Haskeline.Command.History
+                System.Console.Haskeline.Command.KillRing
+                System.Console.Haskeline.Directory System.Console.Haskeline.Emacs
+                System.Console.Haskeline.InputT System.Console.Haskeline.Key
+                System.Console.Haskeline.LineState System.Console.Haskeline.Monads
+                System.Console.Haskeline.Prefs System.Console.Haskeline.RunCommand
+                System.Console.Haskeline.Term System.Console.Haskeline.Command.Undo
+                System.Console.Haskeline.Vi System.Console.Haskeline.Recover
+                System.Console.Haskeline.Backend.Posix
+                System.Console.Haskeline.Backend.Posix.Encoder
+                System.Console.Haskeline.Backend.DumbTerm
+                System.Console.Haskeline.Backend.Terminfo
+abi: 1084385e878ca046b1ba1b0149406b60
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/haskeline-0.7.2.1
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/haskeline-0.7.2.1
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/haskeline-0.7.2.1
+hs-libraries: HShaskeline-0.7.2.1
+depends:
+    base-4.9.0.0 bytestring-0.10.7.0 containers-0.5.6.3
+    directory-1.2.5.0 filepath-1.4.1.0 terminfo-0.4.0.1
+    transformers-0.4.3.0 unix-2.7.1.1
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/haskeline-0.7.2.1/haskeline.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/haskeline-0.7.2.1
+---
+name: terminfo
+version: 0.4.0.1
+id: terminfo-0.4.0.1
+key: terminfo-0.4.0.1
+license: BSD3
+copyright: (c) Judah Jacobson
+maintainer: Judah Jacobson <judah.jacobson@gmail.com>
+stability: Stable
+homepage: https://github.com/judah/terminfo
+synopsis: Haskell bindings to the terminfo library.
+description:
+    This library provides an interface to the terminfo database (via bindings to the
+    curses library).  <http://en.wikipedia.org/wiki/Terminfo Terminfo> allows POSIX
+    systems to interact with a variety of terminals using a standard set of capabilities.
+category: User Interfaces
+author: Judah Jacobson
+exposed: True
+exposed-modules:
+    System.Console.Terminfo System.Console.Terminfo.Base
+    System.Console.Terminfo.Cursor System.Console.Terminfo.Color
+    System.Console.Terminfo.Edit System.Console.Terminfo.Effects
+    System.Console.Terminfo.Keys
+abi: d0bd235d4bbae7f2cbb36b97e6bcfba9
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/terminfo-0.4.0.1
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/terminfo-0.4.0.1
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/terminfo-0.4.0.1
+hs-libraries: HSterminfo-0.4.0.1
+extra-libraries:
+    tinfo
+includes:
+    ncurses.h term.h
+depends:
+    base-4.9.0.0
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/terminfo-0.4.0.1/terminfo.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/terminfo-0.4.0.1
+---
+name: xhtml
+version: 3000.2.1
+id: xhtml-3000.2.1
+key: xhtml-3000.2.1
+license: BSD3
+copyright: Bjorn Bringert 2004-2006, Andy Gill and the Oregon
+           Graduate Institute of Science and Technology, 1999-2001
+maintainer: Chris Dornan <chris@chrisdornan.com>
+stability: Stable
+homepage: https://github.com/haskell/xhtml
+synopsis: An XHTML combinator library
+description:
+    This package provides combinators for producing
+    XHTML 1.0, including the Strict, Transitional and
+    Frameset variants.
+category: Web, XML, Pretty Printer
+author: Bjorn Bringert
+exposed: True
+exposed-modules:
+    Text.XHtml Text.XHtml.Frameset Text.XHtml.Strict
+    Text.XHtml.Transitional Text.XHtml.Debug Text.XHtml.Table
+hidden-modules: Text.XHtml.Strict.Attributes
+                Text.XHtml.Strict.Elements Text.XHtml.Frameset.Attributes
+                Text.XHtml.Frameset.Elements Text.XHtml.Transitional.Attributes
+                Text.XHtml.Transitional.Elements Text.XHtml.BlockTable
+                Text.XHtml.Extras Text.XHtml.Internals
+abi: 932c4b6847d698115f4ad73b10e56807
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/xhtml-3000.2.1
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/xhtml-3000.2.1
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/xhtml-3000.2.1
+hs-libraries: HSxhtml-3000.2.1
+depends:
+    base-4.9.0.0
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/xhtml-3000.2.1/xhtml.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/xhtml-3000.2.1
+---
+name: transformers
+version: 0.4.3.0
+id: transformers-0.4.3.0
+key: transformers-0.4.3.0
+license: BSD3
+maintainer: Ross Paterson <R.Paterson@city.ac.uk>
+synopsis: Concrete functor and monad transformers
+description:
+    A portable library of functor and monad transformers, inspired by
+    the paper \"Functional Programming with Overloading and Higher-Order
+    Polymorphism\", by Mark P Jones,
+    in /Advanced School of Functional Programming/, 1995
+    (<http://web.cecs.pdx.edu/~mpj/pubs/springschool.html>).
+    .
+    This package contains:
+    .
+    * the monad transformer class (in "Control.Monad.Trans.Class")
+    and IO monad class (in "Control.Monad.IO.Class")
+    .
+    * concrete functor and monad transformers, each with associated
+    operations and functions to lift operations associated with other
+    transformers.
+    .
+    The package can be used on its own in portable Haskell code, in
+    which case operations need to be manually lifted through transformer
+    stacks (see "Control.Monad.Trans.Class" for some examples).
+    Alternatively, it can be used with the non-portable monad classes in
+    the @mtl@ or @monads-tf@ packages, which automatically lift operations
+    introduced by monad transformers through other transformers.
+category: Control
+author: Andy Gill, Ross Paterson
+exposed: True
+exposed-modules:
+    Control.Applicative.Backwards Control.Applicative.Lift
+    Control.Monad.Signatures Control.Monad.Trans.Class
+    Control.Monad.Trans.Cont Control.Monad.Trans.Except
+    Control.Monad.Trans.Error Control.Monad.Trans.Identity
+    Control.Monad.Trans.List Control.Monad.Trans.Maybe
+    Control.Monad.Trans.Reader Control.Monad.Trans.RWS
+    Control.Monad.Trans.RWS.Lazy Control.Monad.Trans.RWS.Strict
+    Control.Monad.Trans.State Control.Monad.Trans.State.Lazy
+    Control.Monad.Trans.State.Strict Control.Monad.Trans.Writer
+    Control.Monad.Trans.Writer.Lazy Control.Monad.Trans.Writer.Strict
+    Data.Functor.Classes Data.Functor.Compose Data.Functor.Constant
+    Data.Functor.Product Data.Functor.Reverse Data.Functor.Sum
+abi: d71166f18d2591685ff3ee72b17638c0
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/transformers-0.4.3.0
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/transformers-0.4.3.0
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/transformers-0.4.3.0
+hs-libraries: HStransformers-0.4.3.0
+depends:
+    base-4.9.0.0
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/transformers-0.4.3.0/transformers.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/transformers-0.4.3.0
+---
+name: hoopl
+version: 3.10.2.0
+id: hoopl-3.10.2.0
+key: hoopl-3.10.2.0
+license: BSD3
+maintainer: nr@cs.tufts.edu, andreas.voellmy@gmail.com, email@ningwang.org
+homepage: http://ghc.cs.tufts.edu/hoopl/
+synopsis: A library to support dataflow analysis and optimization
+description:
+    Higher-order optimization library
+    .
+    See /Norman Ramsey, Joao Dias, and Simon Peyton Jones./
+    <http://research.microsoft.com/en-us/um/people/simonpj/Papers/c--/hoopl-haskell10.pdf "Hoopl: A Modular, Reusable Library for Dataflow Analysis and Transformation"> /(2010)/ for more details.
+category: Compilers/Interpreters
+author: Norman Ramsey, Joao Dias, Simon Marlow and Simon Peyton Jones
+exposed: True
+exposed-modules:
+    Compiler.Hoopl Compiler.Hoopl.Internals Compiler.Hoopl.Wrappers
+    Compiler.Hoopl.Passes.Dominator Compiler.Hoopl.Passes.DList
+hidden-modules: Compiler.Hoopl.Checkpoint
+                Compiler.Hoopl.Collections Compiler.Hoopl.Combinators
+                Compiler.Hoopl.Dataflow Compiler.Hoopl.Debug Compiler.Hoopl.Block
+                Compiler.Hoopl.Graph Compiler.Hoopl.Label Compiler.Hoopl.MkGraph
+                Compiler.Hoopl.Fuel Compiler.Hoopl.Pointed Compiler.Hoopl.Shape
+                Compiler.Hoopl.Show Compiler.Hoopl.Unique Compiler.Hoopl.XUtil
+abi: 719b00050240e530b78b62520193b342
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/hoopl-3.10.2.0
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/hoopl-3.10.2.0
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/hoopl-3.10.2.0
+hs-libraries: HShoopl-3.10.2.0
+depends:
+    base-4.9.0.0 containers-0.5.6.3
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/hoopl-3.10.2.0/hoopl.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/hoopl-3.10.2.0
+---
+name: template-haskell
+version: 2.11.0.0
+id: template-haskell-2.11.0.0
+key: template-haskell-2.11.0.0
+license: BSD3
+maintainer: libraries@haskell.org
+synopsis: Support library for Template Haskell
+description:
+    This package provides modules containing facilities for manipulating
+    Haskell source code using Template Haskell.
+    .
+    See <http://www.haskell.org/haskellwiki/Template_Haskell> for more
+    information.
+category: Template Haskell
+exposed: True
+exposed-modules:
+    Language.Haskell.TH Language.Haskell.TH.Lib Language.Haskell.TH.Ppr
+    Language.Haskell.TH.PprLib Language.Haskell.TH.Quote
+    Language.Haskell.TH.Syntax
+hidden-modules: Language.Haskell.TH.Lib.Map
+abi: 26855f7c84ab668b019a8d35abdb5276
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/template-haskell-2.11.0.0
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/template-haskell-2.11.0.0
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/template-haskell-2.11.0.0
+hs-libraries: HStemplate-haskell-2.11.0.0
+depends:
+    base-4.9.0.0 ghc-boot-0.0.0.0 pretty-1.1.2.0
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/template-haskell-2.11.0.0/template-haskell.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/template-haskell-2.11.0.0
+---
+name: Cabal
+version: 1.23.0.0
+id: Cabal-1.23.0.0
+key: Cabal-1.23.0.0
+license: BSD3
+copyright: 2003-2006, Isaac Jones
+           2005-2011, Duncan Coutts
+maintainer: cabal-devel@haskell.org
+homepage: http://www.haskell.org/cabal/
+synopsis: A framework for packaging Haskell software
+description:
+    The Haskell Common Architecture for Building Applications and
+    Libraries: a framework defining a common interface for authors to more
+    easily build their Haskell applications in a portable way.
+    .
+    The Haskell Cabal is part of a larger infrastructure for distributing,
+    organizing, and cataloging Haskell libraries and tools.
+category: Distribution
+author: Isaac Jones <ijones@syntaxpolice.org>
+        Duncan Coutts <duncan@community.haskell.org>
+exposed: True
+exposed-modules:
+    Distribution.Compat.CreatePipe Distribution.Compat.Environment
+    Distribution.Compat.Exception Distribution.Compat.Internal.TempFile
+    Distribution.Compat.ReadP Distribution.Compiler
+    Distribution.InstalledPackageInfo Distribution.License
+    Distribution.Make Distribution.ModuleName Distribution.Package
+    Distribution.PackageDescription
+    Distribution.PackageDescription.Check
+    Distribution.PackageDescription.Configuration
+    Distribution.PackageDescription.Parse
+    Distribution.PackageDescription.PrettyPrint
+    Distribution.PackageDescription.Utils Distribution.ParseUtils
+    Distribution.ReadE Distribution.Simple Distribution.Simple.Bench
+    Distribution.Simple.Build Distribution.Simple.Build.Macros
+    Distribution.Simple.Build.PathsModule
+    Distribution.Simple.BuildPaths Distribution.Simple.BuildTarget
+    Distribution.Simple.CCompiler Distribution.Simple.Command
+    Distribution.Simple.Compiler Distribution.Simple.Configure
+    Distribution.Simple.GHC Distribution.Simple.GHCJS
+    Distribution.Simple.Haddock Distribution.Simple.HaskellSuite
+    Distribution.Simple.Hpc Distribution.Simple.Install
+    Distribution.Simple.InstallDirs Distribution.Simple.JHC
+    Distribution.Simple.LHC Distribution.Simple.LocalBuildInfo
+    Distribution.Simple.PackageIndex Distribution.Simple.PreProcess
+    Distribution.Simple.PreProcess.Unlit Distribution.Simple.Program
+    Distribution.Simple.Program.Ar Distribution.Simple.Program.Builtin
+    Distribution.Simple.Program.Db Distribution.Simple.Program.Find
+    Distribution.Simple.Program.GHC Distribution.Simple.Program.HcPkg
+    Distribution.Simple.Program.Hpc
+    Distribution.Simple.Program.Internal Distribution.Simple.Program.Ld
+    Distribution.Simple.Program.Run Distribution.Simple.Program.Script
+    Distribution.Simple.Program.Strip Distribution.Simple.Program.Types
+    Distribution.Simple.Register Distribution.Simple.Setup
+    Distribution.Simple.SrcDist Distribution.Simple.Test
+    Distribution.Simple.Test.ExeV10 Distribution.Simple.Test.LibV09
+    Distribution.Simple.Test.Log Distribution.Simple.UHC
+    Distribution.Simple.UserHooks Distribution.Simple.Utils
+    Distribution.System Distribution.TestSuite Distribution.Text
+    Distribution.Utils.NubList Distribution.Verbosity
+    Distribution.Version Language.Haskell.Extension
+hidden-modules: Distribution.Compat.Binary
+                Distribution.Compat.CopyFile Distribution.GetOpt Distribution.Lex
+                Distribution.Simple.GHC.Internal Distribution.Simple.GHC.IPI641
+                Distribution.Simple.GHC.IPI642 Distribution.Simple.GHC.ImplInfo
+                Paths_Cabal
+abi: 4b55984d7d0e5898df279f52ba75702f
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/Cabal-1.23.0.0
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/Cabal-1.23.0.0
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/Cabal-1.23.0.0
+hs-libraries: HSCabal-1.23.0.0
+depends:
+    array-0.5.1.0 base-4.9.0.0 binary-0.7.5.0 bytestring-0.10.7.0
+    containers-0.5.6.3 deepseq-1.4.2.0 directory-1.2.5.0
+    filepath-1.4.1.0 pretty-1.1.2.0 process-1.4.1.0 time-1.5.0.1
+    unix-2.7.1.1
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/Cabal-1.23.0.0/Cabal.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/Cabal-1.23.0.0
+---
+name: binary
+version: 0.7.5.0
+id: binary-0.7.5.0
+key: binary-0.7.5.0
+license: BSD3
+maintainer: Lennart Kolmodin, Don Stewart <dons00@gmail.com>
+stability: provisional
+homepage: https://github.com/kolmodin/binary
+synopsis: Binary serialisation for Haskell values using lazy ByteStrings
+description:
+    Efficient, pure binary serialisation using lazy ByteStrings.
+    Haskell values may be encoded to and from binary formats,
+    written to disk as binary, or sent over the network.
+    The format used can be automatically generated, or
+    you can choose to implement a custom format if needed.
+    Serialisation speeds of over 1 G\/sec have been observed,
+    so this library should be suitable for high performance
+    scenarios.
+category: Data, Parsing
+author: Lennart Kolmodin <kolmodin@gmail.com>
+exposed: True
+exposed-modules:
+    Data.Binary Data.Binary.Put Data.Binary.Get
+    Data.Binary.Get.Internal Data.Binary.Builder
+    Data.Binary.Builder.Internal
+hidden-modules: Data.Binary.Builder.Base Data.Binary.Class
+                Data.Binary.Generic
+abi: 023629bb1f3d2da077b9dfaec842d5d6
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/binary-0.7.5.0
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/binary-0.7.5.0
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/binary-0.7.5.0
+hs-libraries: HSbinary-0.7.5.0
+depends:
+    array-0.5.1.0 base-4.9.0.0 bytestring-0.10.7.0 containers-0.5.6.3
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/binary-0.7.5.0/binary.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/binary-0.7.5.0
+---
+name: pretty
+version: 1.1.2.0
+id: pretty-1.1.2.0
+key: pretty-1.1.2.0
+license: BSD3
+maintainer: David Terei <code@davidterei.com>
+stability: Stable
+homepage: http://github.com/haskell/pretty
+synopsis: Pretty-printing library
+description:
+    This package contains a pretty-printing library, a set of API's
+    that provides a way to easily print out text in a consistent
+    format of your choosing. This is useful for compilers and related
+    tools.
+    .
+    This library was originally designed by John Hughes's and has since
+    been heavily modified by Simon Peyton Jones.
+category: Text
+exposed: True
+exposed-modules:
+    Text.PrettyPrint Text.PrettyPrint.HughesPJ
+    Text.PrettyPrint.HughesPJClass
+abi: ff204a4f63b87ec08dfb63935ab60346
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/pretty-1.1.2.0
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/pretty-1.1.2.0
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/pretty-1.1.2.0
+hs-libraries: HSpretty-1.1.2.0
+depends:
+    base-4.9.0.0 deepseq-1.4.2.0 ghc-prim-0.5.0.0
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/pretty-1.1.2.0/pretty.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/pretty-1.1.2.0
+---
+name: hpc
+version: 0.6.0.2
+id: hpc-0.6.0.2
+key: hpc-0.6.0.2
+license: BSD3
+maintainer: ghc-devs@haskell.org
+synopsis: Code Coverage Library for Haskell
+description:
+    This package provides the code coverage library for Haskell.
+    .
+    See <http://www.haskell.org/haskellwiki/Haskell_program_coverage> for more
+    information.
+category: Control
+author: Andy Gill
+exposed: True
+exposed-modules:
+    Trace.Hpc.Util Trace.Hpc.Mix Trace.Hpc.Tix Trace.Hpc.Reflect
+abi: b98013c17bf1741c790e3a830237e8bc
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/hpc-0.6.0.2
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/hpc-0.6.0.2
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/hpc-0.6.0.2
+hs-libraries: HShpc-0.6.0.2
+depends:
+    base-4.9.0.0 containers-0.5.6.3 directory-1.2.5.0 filepath-1.4.1.0
+    time-1.5.0.1
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/hpc-0.6.0.2/hpc.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/hpc-0.6.0.2
+---
+name: process
+version: 1.4.1.0
+id: process-1.4.1.0
+key: process-1.4.1.0
+license: BSD3
+maintainer: libraries@haskell.org
+synopsis: Process libraries
+description:
+    This package contains libraries for dealing with system processes.
+category: System
+exposed: True
+exposed-modules:
+    System.Cmd System.Process System.Process.Internals
+hidden-modules: System.Process.Common System.Process.Posix
+abi: 483b4c1d894e8c880c567a1ee593790f
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/process-1.4.1.0
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/process-1.4.1.0
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/process-1.4.1.0
+hs-libraries: HSprocess-1.4.1.0
+include-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/process-1.4.1.0/include
+includes:
+    runProcess.h
+depends:
+    base-4.9.0.0 deepseq-1.4.2.0 directory-1.2.5.0 filepath-1.4.1.0
+    unix-2.7.1.1
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/process-1.4.1.0/process.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/process-1.4.1.0
+---
+name: directory
+version: 1.2.5.0
+id: directory-1.2.5.0
+key: directory-1.2.5.0
+license: BSD3
+maintainer: libraries@haskell.org
+synopsis: Platform-agnostic library for filesystem operations
+description:
+    This library provides a basic set of operations for manipulating files and
+    directories in a portable way.
+category: System
+exposed: True
+exposed-modules:
+    System.Directory
+hidden-modules: System.Directory.Internal
+                System.Directory.Internal.Config
+                System.Directory.Internal.C_utimensat
+                System.Directory.Internal.Posix System.Directory.Internal.Windows
+abi: 73051d50bd0377c1f91d40ac29eafcde
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/directory-1.2.5.0
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/directory-1.2.5.0
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/directory-1.2.5.0
+hs-libraries: HSdirectory-1.2.5.0
+include-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/directory-1.2.5.0/include
+includes:
+    HsDirectory.h
+depends:
+    base-4.9.0.0 filepath-1.4.1.0 time-1.5.0.1 unix-2.7.1.1
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/directory-1.2.5.0/directory.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/directory-1.2.5.0
+---
+name: unix
+version: 2.7.1.1
+id: unix-2.7.1.1
+key: unix-2.7.1.1
+license: BSD3
+maintainer: libraries@haskell.org
+homepage: https://github.com/haskell/unix
+synopsis: POSIX functionality
+description:
+    This package gives you access to the set of operating system
+    services standardised by POSIX 1003.1b (or the IEEE Portable
+    Operating System Interface for Computing Environments -
+    IEEE Std. 1003.1).
+    .
+    The package is not supported under Windows (except under Cygwin).
+category: System
+exposed: True
+exposed-modules:
+    System.Posix System.Posix.ByteString System.Posix.Error
+    System.Posix.Resource System.Posix.Time System.Posix.Unistd
+    System.Posix.User System.Posix.Signals System.Posix.Signals.Exts
+    System.Posix.Semaphore System.Posix.SharedMem
+    System.Posix.ByteString.FilePath System.Posix.Directory
+    System.Posix.Directory.ByteString System.Posix.DynamicLinker.Module
+    System.Posix.DynamicLinker.Module.ByteString
+    System.Posix.DynamicLinker.Prim
+    System.Posix.DynamicLinker.ByteString System.Posix.DynamicLinker
+    System.Posix.Files System.Posix.Files.ByteString System.Posix.IO
+    System.Posix.IO.ByteString System.Posix.Env
+    System.Posix.Env.ByteString System.Posix.Fcntl System.Posix.Process
+    System.Posix.Process.Internals System.Posix.Process.ByteString
+    System.Posix.Temp System.Posix.Temp.ByteString
+    System.Posix.Terminal System.Posix.Terminal.ByteString
+hidden-modules: System.Posix.Directory.Common
+                System.Posix.DynamicLinker.Common System.Posix.Files.Common
+                System.Posix.IO.Common System.Posix.Process.Common
+                System.Posix.Terminal.Common
+abi: 416bbf4a68812f768d46e0603efc98e6
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/unix-2.7.1.1
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/unix-2.7.1.1
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/unix-2.7.1.1
+hs-libraries: HSunix-2.7.1.1
+extra-libraries:
+    rt util dl pthread
+include-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/unix-2.7.1.1/include
+includes:
+    HsUnix.h execvpe.h
+depends:
+    base-4.9.0.0 bytestring-0.10.7.0 time-1.5.0.1
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/unix-2.7.1.1/unix.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/unix-2.7.1.1
+---
+name: time
+version: 1.5.0.1
+id: time-1.5.0.1
+key: time-1.5.0.1
+license: BSD3
+maintainer: <ashley@semantic.org>
+stability: stable
+homepage: https://github.com/haskell/time
+synopsis: A time library
+description:
+    A time library
+category: System
+author: Ashley Yakeley
+exposed: True
+exposed-modules:
+    Data.Time.Calendar Data.Time.Calendar.MonthDay
+    Data.Time.Calendar.OrdinalDate Data.Time.Calendar.WeekDate
+    Data.Time.Calendar.Julian Data.Time.Calendar.Easter Data.Time.Clock
+    Data.Time.Clock.POSIX Data.Time.Clock.TAI Data.Time.LocalTime
+    Data.Time.Format Data.Time
+hidden-modules: Data.Time.Calendar.Private Data.Time.Calendar.Days
+                Data.Time.Calendar.Gregorian Data.Time.Calendar.JulianYearDay
+                Data.Time.Clock.Scale Data.Time.Clock.UTC Data.Time.Clock.CTimeval
+                Data.Time.Clock.UTCDiff Data.Time.LocalTime.TimeZone
+                Data.Time.LocalTime.TimeOfDay Data.Time.LocalTime.LocalTime
+                Data.Time.Format.Parse Data.Time.Format.Locale
+abi: fa14628fffb7d93741bb88caab63757e
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/time-1.5.0.1
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/time-1.5.0.1
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/time-1.5.0.1
+hs-libraries: HStime-1.5.0.1
+include-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/time-1.5.0.1/include
+depends:
+    base-4.9.0.0 deepseq-1.4.2.0
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/time-1.5.0.1/time.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/time-1.5.0.1
+---
+name: containers
+version: 0.5.6.3
+id: containers-0.5.6.3
+key: containers-0.5.6.3
+license: BSD3
+maintainer: fox@ucw.cz
+synopsis: Assorted concrete container types
+description:
+    This package contains efficient general-purpose implementations
+    of various basic immutable container types.  The declared cost of
+    each operation is either worst-case or amortized, but remains
+    valid even if structures are shared.
+category: Data Structures
+exposed: True
+exposed-modules:
+    Data.IntMap Data.IntMap.Lazy Data.IntMap.Strict Data.IntSet
+    Data.Map Data.Map.Lazy Data.Map.Strict Data.Set Data.Graph
+    Data.Sequence Data.Tree
+hidden-modules: Data.IntMap.Base Data.IntSet.Base Data.Map.Base
+                Data.Set.Base Data.Utils.BitUtil Data.Utils.StrictFold
+                Data.Utils.StrictPair
+abi: 4ae96ef90aaf7e7c342611448391c5cd
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/containers-0.5.6.3
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/containers-0.5.6.3
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/containers-0.5.6.3
+hs-libraries: HScontainers-0.5.6.3
+depends:
+    array-0.5.1.0 base-4.9.0.0 deepseq-1.4.2.0 ghc-prim-0.5.0.0
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/containers-0.5.6.3/containers.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/containers-0.5.6.3
+---
+name: bytestring
+version: 0.10.7.0
+id: bytestring-0.10.7.0
+key: bytestring-0.10.7.0
+license: BSD3
+copyright: Copyright (c) Don Stewart          2005-2009,
+           (c) Duncan Coutts        2006-2015,
+           (c) David Roundy         2003-2005,
+           (c) Jasper Van der Jeugt 2010,
+           (c) Simon Meier          2010-2013.
+maintainer: Duncan Coutts <duncan@community.haskell.org>
+homepage: https://github.com/haskell/bytestring
+synopsis: Fast, compact, strict and lazy byte strings with a list interface
+description:
+    An efficient compact, immutable byte string type (both strict and lazy)
+    suitable for binary or 8-bit character data.
+    .
+    The 'ByteString' type represents sequences of bytes or 8-bit characters.
+    It is suitable for high performance use, both in terms of large data
+    quantities, or high speed requirements. The 'ByteString' functions follow
+    the same style as Haskell\'s ordinary lists, so it is easy to convert code
+    from using 'String' to 'ByteString'.
+    .
+    Two 'ByteString' variants are provided:
+    .
+    * Strict 'ByteString's keep the string as a single large array. This
+    makes them convenient for passing data between C and Haskell.
+    .
+    * Lazy 'ByteString's use a lazy list of strict chunks which makes it
+    suitable for I\/O streaming tasks.
+    .
+    The @Char8@ modules provide a character-based view of the same
+    underlying 'ByteString' types. This makes it convenient to handle mixed
+    binary and 8-bit character content (which is common in many file formats
+    and network protocols).
+    .
+    The 'Builder' module provides an efficient way to build up 'ByteString's
+    in an ad-hoc way by repeated concatenation. This is ideal for fast
+    serialisation or pretty printing.
+    .
+    There is also a 'ShortByteString' type which has a lower memory overhead
+    and can can be converted to or from a 'ByteString', but supports very few
+    other operations. It is suitable for keeping many short strings in memory.
+    .
+    'ByteString's are not designed for Unicode. For Unicode strings you should
+    use the 'Text' type from the @text@ package.
+    .
+    These modules are intended to be imported qualified, to avoid name clashes
+    with "Prelude" functions, e.g.
+    .
+    > import qualified Data.ByteString as BS
+category: Data
+author: Don Stewart,
+        Duncan Coutts
+exposed: True
+exposed-modules:
+    Data.ByteString Data.ByteString.Char8 Data.ByteString.Unsafe
+    Data.ByteString.Internal Data.ByteString.Lazy
+    Data.ByteString.Lazy.Char8 Data.ByteString.Lazy.Internal
+    Data.ByteString.Short Data.ByteString.Short.Internal
+    Data.ByteString.Builder Data.ByteString.Builder.Extra
+    Data.ByteString.Builder.Prim Data.ByteString.Builder.Internal
+    Data.ByteString.Builder.Prim.Internal Data.ByteString.Lazy.Builder
+    Data.ByteString.Lazy.Builder.Extras
+    Data.ByteString.Lazy.Builder.ASCII
+hidden-modules: Data.ByteString.Builder.ASCII
+                Data.ByteString.Builder.Prim.Binary
+                Data.ByteString.Builder.Prim.ASCII
+                Data.ByteString.Builder.Prim.Internal.Floating
+                Data.ByteString.Builder.Prim.Internal.UncheckedShifts
+                Data.ByteString.Builder.Prim.Internal.Base16
+abi: d9206a8fe0d44e69be0c04076cabad23
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/bytestring-0.10.7.0
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/bytestring-0.10.7.0
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/bytestring-0.10.7.0
+hs-libraries: HSbytestring-0.10.7.0
+include-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/bytestring-0.10.7.0/include
+includes:
+    fpstring.h
+depends:
+    base-4.9.0.0 deepseq-1.4.2.0 ghc-prim-0.5.0.0 integer-gmp-1.0.0.0
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/bytestring-0.10.7.0/bytestring.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/bytestring-0.10.7.0
+---
+name: deepseq
+version: 1.4.2.0
+id: deepseq-1.4.2.0
+key: deepseq-1.4.2.0
+license: BSD3
+maintainer: libraries@haskell.org
+synopsis: Deep evaluation of data structures
+description:
+    This package provides methods for fully evaluating data structures
+    (\"deep evaluation\"). Deep evaluation is often used for adding
+    strictness to a program, e.g. in order to force pending exceptions,
+    remove space leaks, or force lazy I/O to happen. It is also useful
+    in parallel programs, to ensure pending work does not migrate to the
+    wrong thread.
+    .
+    The primary use of this package is via the 'deepseq' function, a
+    \"deep\" version of 'seq'. It is implemented on top of an 'NFData'
+    typeclass (\"Normal Form Data\", data structures with no unevaluated
+    components) which defines strategies for fully evaluating different
+    data types.
+category: Control
+exposed: True
+exposed-modules:
+    Control.DeepSeq
+abi: 63c4c214c0c19484502b3c8b7e42ec69
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/deepseq-1.4.2.0
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/deepseq-1.4.2.0
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/deepseq-1.4.2.0
+hs-libraries: HSdeepseq-1.4.2.0
+depends:
+    array-0.5.1.0 base-4.9.0.0
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/deepseq-1.4.2.0/deepseq.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/deepseq-1.4.2.0
+---
+name: array
+version: 0.5.1.0
+id: array-0.5.1.0
+key: array-0.5.1.0
+license: BSD3
+maintainer: libraries@haskell.org
+synopsis: Mutable and immutable arrays
+description:
+    In addition to providing the "Data.Array" module
+    <http://www.haskell.org/onlinereport/haskell2010/haskellch14.html as specified in the Haskell 2010 Language Report>,
+    this package also defines the classes 'IArray' of
+    immutable arrays and 'MArray' of arrays mutable within appropriate
+    monads, as well as some instances of these classes.
+category: Data Structures
+exposed: True
+exposed-modules:
+    Data.Array Data.Array.Base Data.Array.IArray Data.Array.IO
+    Data.Array.IO.Safe Data.Array.IO.Internals Data.Array.MArray
+    Data.Array.MArray.Safe Data.Array.ST Data.Array.ST.Safe
+    Data.Array.Storable Data.Array.Storable.Safe
+    Data.Array.Storable.Internals Data.Array.Unboxed Data.Array.Unsafe
+abi: 2b2b879a09eb81c865ac273803e08132
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/array-0.5.1.0
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/array-0.5.1.0
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/array-0.5.1.0
+hs-libraries: HSarray-0.5.1.0
+depends:
+    base-4.9.0.0
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/array-0.5.1.0/array.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/array-0.5.1.0
+---
+name: filepath
+version: 1.4.1.0
+id: filepath-1.4.1.0
+key: filepath-1.4.1.0
+license: BSD3
+copyright: Neil Mitchell 2005-2015
+maintainer: Neil Mitchell <ndmitchell@gmail.com>
+homepage: https://github.com/haskell/filepath#readme
+synopsis: Library for manipulating FilePaths in a cross platform way.
+description:
+    This package provides functionality for manipulating @FilePath@ values, and is shipped with both <https://www.haskell.org/ghc/ GHC> and the <https://www.haskell.org/platform/ Haskell Platform>. It provides three modules:
+    .
+    * "System.FilePath.Posix" manipulates POSIX\/Linux style @FilePath@ values (with @\/@ as the path separator).
+    .
+    * "System.FilePath.Windows" manipulates Windows style @FilePath@ values (with either @\\@ or @\/@ as the path separator, and deals with drives).
+    .
+    * "System.FilePath" is an alias for the module appropriate to your platform.
+    .
+    All three modules provide the same API, and the same documentation (calling out differences in the different variants).
+category: System
+author: Neil Mitchell <ndmitchell@gmail.com>
+exposed: True
+exposed-modules:
+    System.FilePath System.FilePath.Posix System.FilePath.Windows
+abi: 1e3d9055afc6aa08b97f5ad5f8014ce4
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/filepath-1.4.1.0
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/filepath-1.4.1.0
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/filepath-1.4.1.0
+hs-libraries: HSfilepath-1.4.1.0
+depends:
+    base-4.9.0.0
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/filepath-1.4.1.0/filepath.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/filepath-1.4.1.0
+---
+name: base
+version: 4.9.0.0
+id: base-4.9.0.0
+key: base-4.9.0.0
+license: BSD3
+maintainer: libraries@haskell.org
+synopsis: Basic libraries
+description:
+    This package contains the "Prelude" and its support libraries,
+    and a large collection of useful libraries ranging from data
+    structures to parsing combinators and debugging utilities.
+category: Prelude
+exposed: True
+exposed-modules:
+    Control.Applicative Control.Arrow Control.Category
+    Control.Concurrent Control.Concurrent.Chan Control.Concurrent.MVar
+    Control.Concurrent.QSem Control.Concurrent.QSemN Control.Exception
+    Control.Exception.Base Control.Monad Control.Monad.Fail
+    Control.Monad.Fix Control.Monad.Instances Control.Monad.IO.Class
+    Control.Monad.ST Control.Monad.ST.Lazy Control.Monad.ST.Lazy.Safe
+    Control.Monad.ST.Lazy.Unsafe Control.Monad.ST.Safe
+    Control.Monad.ST.Strict Control.Monad.ST.Unsafe Control.Monad.Zip
+    Data.Bifunctor Data.Bits Data.Bool Data.Char Data.Coerce
+    Data.Complex Data.Data Data.Dynamic Data.Either Data.Eq Data.Fixed
+    Data.Foldable Data.Function Data.Functor Data.Functor.Identity
+    Data.IORef Data.Int Data.Ix Data.Kind Data.List Data.List.NonEmpty
+    Data.Maybe Data.Monoid Data.Ord Data.Proxy Data.Ratio
+    Data.Semigroup Data.STRef Data.STRef.Lazy Data.STRef.Strict
+    Data.String Data.Traversable Data.Tuple Data.Type.Bool
+    Data.Type.Coercion Data.Type.Equality Data.Typeable
+    Data.Typeable.Internal Data.Unique Data.Version Data.Void Data.Word
+    Debug.Trace Foreign Foreign.C Foreign.C.Error Foreign.C.String
+    Foreign.C.Types Foreign.Concurrent Foreign.ForeignPtr
+    Foreign.ForeignPtr.Safe Foreign.ForeignPtr.Unsafe Foreign.Marshal
+    Foreign.Marshal.Alloc Foreign.Marshal.Array Foreign.Marshal.Error
+    Foreign.Marshal.Pool Foreign.Marshal.Safe Foreign.Marshal.Unsafe
+    Foreign.Marshal.Utils Foreign.Ptr Foreign.Safe Foreign.StablePtr
+    Foreign.Storable GHC.Arr GHC.Base GHC.Char GHC.Conc GHC.Conc.IO
+    GHC.Conc.Signal GHC.Conc.Sync GHC.ConsoleHandler GHC.Constants
+    GHC.Desugar GHC.Enum GHC.Environment GHC.Err GHC.Exception
+    GHC.ExecutionStack GHC.ExecutionStack.Internal GHC.Exts
+    GHC.Fingerprint GHC.Fingerprint.Type GHC.Float
+    GHC.Float.ConversionUtils GHC.Float.RealFracMethods GHC.Foreign
+    GHC.ForeignPtr GHC.GHCi GHC.Generics GHC.IO GHC.IO.Buffer
+    GHC.IO.BufferedIO GHC.IO.Device GHC.IO.Encoding
+    GHC.IO.Encoding.CodePage GHC.IO.Encoding.Failure
+    GHC.IO.Encoding.Iconv GHC.IO.Encoding.Latin1 GHC.IO.Encoding.Types
+    GHC.IO.Encoding.UTF16 GHC.IO.Encoding.UTF32 GHC.IO.Encoding.UTF8
+    GHC.IO.Exception GHC.IO.FD GHC.IO.Handle GHC.IO.Handle.FD
+    GHC.IO.Handle.Internals GHC.IO.Handle.Text GHC.IO.Handle.Types
+    GHC.IO.IOMode GHC.IO.Unsafe GHC.IOArray GHC.IORef GHC.Int GHC.List
+    GHC.MVar GHC.Natural GHC.Num GHC.OldList GHC.OverloadedLabels
+    GHC.PArr GHC.Pack GHC.Profiling GHC.Ptr GHC.Read GHC.Real
+    GHC.RTS.Flags GHC.ST GHC.StaticPtr GHC.STRef GHC.Show GHC.Stable
+    GHC.Stack GHC.Stack.CCS GHC.Stack.Types GHC.Stats GHC.Storable
+    GHC.TopHandler GHC.TypeLits GHC.Unicode GHC.Weak GHC.Word Numeric
+    Numeric.Natural Prelude System.CPUTime System.Console.GetOpt
+    System.Environment System.Exit System.IO System.IO.Error
+    System.IO.Unsafe System.Info System.Mem System.Mem.StableName
+    System.Mem.Weak System.Posix.Internals System.Posix.Types
+    System.Timeout Text.ParserCombinators.ReadP
+    Text.ParserCombinators.ReadPrec Text.Printf Text.Read Text.Read.Lex
+    Text.Show Text.Show.Functions Unsafe.Coerce GHC.Event
+hidden-modules: Control.Monad.ST.Imp Control.Monad.ST.Lazy.Imp
+                Data.OldList Foreign.ForeignPtr.Imp
+                System.Environment.ExecutablePath GHC.Event.Arr GHC.Event.Array
+                GHC.Event.Clock GHC.Event.Control GHC.Event.EPoll
+                GHC.Event.IntTable GHC.Event.Internal GHC.Event.KQueue
+                GHC.Event.Manager GHC.Event.PSQ GHC.Event.Poll GHC.Event.Thread
+                GHC.Event.TimerManager GHC.Event.Unique
+abi: 472df40e39128303d276cf121f250e89
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/base-4.9.0.0
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/base-4.9.0.0
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/base-4.9.0.0
+hs-libraries: HSbase-4.9.0.0
+include-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/base-4.9.0.0/include
+includes:
+    HsBase.h
+depends:
+    ghc-prim-0.5.0.0 integer-gmp-1.0.0.0 rts
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/base-4.9.0.0/base.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/base-4.9.0.0
+---
+name: integer-gmp
+version: 1.0.0.0
+id: integer-gmp-1.0.0.0
+key: integer-gmp-1.0.0.0
+license: BSD3
+maintainer: hvr@gnu.org
+synopsis: Integer library based on GMP
+category: Numeric, Algebra
+author: Herbert Valerio Riedel
+exposed: True
+exposed-modules:
+    GHC.Integer GHC.Integer.Logarithms GHC.Integer.Logarithms.Internals
+    GHC.Integer.GMP.Internals
+hidden-modules: GHC.Integer.Type
+abi: 32980bb533b4a3996f3424fd198cf767
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/integer-gmp-1.0.0.0
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/integer-gmp-1.0.0.0
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/integer-gmp-1.0.0.0
+hs-libraries: HSinteger-gmp-1.0.0.0
+extra-libraries:
+    gmp
+include-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/integer-gmp-1.0.0.0/include
+depends:
+    ghc-prim-0.5.0.0
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/integer-gmp-1.0.0.0/integer-gmp.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/integer-gmp-1.0.0.0
+---
+name: ghc-prim
+version: 0.5.0.0
+id: ghc-prim-0.5.0.0
+key: ghc-prim-0.5.0.0
+license: BSD3
+maintainer: libraries@haskell.org
+synopsis: GHC primitives
+description:
+    GHC primitives.
+category: GHC
+exposed: True
+exposed-modules:
+    GHC.CString GHC.Classes GHC.Debug GHC.IntWord64 GHC.Magic
+    GHC.PrimopWrappers GHC.Tuple GHC.Types GHC.Prim
+abi: 9f5ec1125ba73d164ce53f7b537009e8
+trusted: False
+import-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/ghc-prim-0.5.0.0
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/ghc-prim-0.5.0.0
+data-dir: /opt/ghc/head/share/x86_64-linux-ghc-7.11.20151213/ghc-prim-0.5.0.0
+hs-libraries: HSghc-prim-0.5.0.0
+depends:
+    rts
+haddock-interfaces: /opt/ghc/head/share/doc/ghc/html/libraries/ghc-prim-0.5.0.0/ghc-prim.haddock
+haddock-html: /opt/ghc/head/share/doc/ghc/html/libraries/ghc-prim-0.5.0.0
+---
+name: rts
+version: 1.0
+id: rts
+key: rts
+license: BSD3
+maintainer: glasgow-haskell-users@haskell.org
+exposed: True
+abi:
+trusted: False
+library-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/rts
+hs-libraries: HSrts Cffi
+extra-libraries:
+    m rt dl
+include-dirs: /opt/ghc/head/lib/ghc-7.11.20151213/include
+includes:
+    Stg.h
+ld-options: "-Wl,-u,ghczmprim_GHCziTypes_Izh_static_info"
+            "-Wl,-u,ghczmprim_GHCziTypes_Czh_static_info"
+            "-Wl,-u,ghczmprim_GHCziTypes_Fzh_static_info"
+            "-Wl,-u,ghczmprim_GHCziTypes_Dzh_static_info"
+            "-Wl,-u,base_GHCziPtr_Ptr_static_info"
+            "-Wl,-u,ghczmprim_GHCziTypes_Wzh_static_info"
+            "-Wl,-u,base_GHCziInt_I8zh_static_info"
+            "-Wl,-u,base_GHCziInt_I16zh_static_info"
+            "-Wl,-u,base_GHCziInt_I32zh_static_info"
+            "-Wl,-u,base_GHCziInt_I64zh_static_info"
+            "-Wl,-u,base_GHCziWord_W8zh_static_info"
+            "-Wl,-u,base_GHCziWord_W16zh_static_info"
+            "-Wl,-u,base_GHCziWord_W32zh_static_info"
+            "-Wl,-u,base_GHCziWord_W64zh_static_info"
+            "-Wl,-u,base_GHCziStable_StablePtr_static_info"
+            "-Wl,-u,ghczmprim_GHCziTypes_Izh_con_info"
+            "-Wl,-u,ghczmprim_GHCziTypes_Czh_con_info"
+            "-Wl,-u,ghczmprim_GHCziTypes_Fzh_con_info"
+            "-Wl,-u,ghczmprim_GHCziTypes_Dzh_con_info"
+            "-Wl,-u,base_GHCziPtr_Ptr_con_info"
+            "-Wl,-u,base_GHCziPtr_FunPtr_con_info"
+            "-Wl,-u,base_GHCziStable_StablePtr_con_info"
+            "-Wl,-u,ghczmprim_GHCziTypes_False_closure"
+            "-Wl,-u,ghczmprim_GHCziTypes_True_closure"
+            "-Wl,-u,base_GHCziPack_unpackCString_closure"
+            "-Wl,-u,base_GHCziIOziException_stackOverflow_closure"
+            "-Wl,-u,base_GHCziIOziException_heapOverflow_closure"
+            "-Wl,-u,base_ControlziExceptionziBase_nonTermination_closure"
+            "-Wl,-u,base_GHCziIOziException_blockedIndefinitelyOnMVar_closure"
+            "-Wl,-u,base_GHCziIOziException_blockedIndefinitelyOnSTM_closure"
+            "-Wl,-u,base_GHCziIOziException_allocationLimitExceeded_closure"
+            "-Wl,-u,base_ControlziExceptionziBase_nestedAtomically_closure"
+            "-Wl,-u,base_GHCziEventziThread_blockedOnBadFD_closure"
+            "-Wl,-u,base_GHCziWeak_runFinalizzerBatch_closure"
+            "-Wl,-u,base_GHCziTopHandler_flushStdHandles_closure"
+            "-Wl,-u,base_GHCziTopHandler_runIO_closure"
+            "-Wl,-u,base_GHCziTopHandler_runNonIO_closure"
+            "-Wl,-u,base_GHCziConcziIO_ensureIOManagerIsRunning_closure"
+            "-Wl,-u,base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure"
+            "-Wl,-u,base_GHCziConcziSync_runSparks_closure"
+            "-Wl,-u,base_GHCziConcziSignal_runHandlersPtr_closure"

@@ -160,6 +160,36 @@ spec = do
                 , dpHaddock = ()
                 , dpIsExposed = True
                 }
+        it "ghc HEAD" $ do
+          ghcBoot:_ <- runResourceT
+              $ CB.sourceFile "test/package-dump/ghc-head.txt"
+            =$= decodeUtf8
+             $$ conduitDumpPackage
+             =$ CL.consume
+          ghcPkgId <- parseGhcPkgId "ghc-boot-0.0.0.0"
+          pkgId <- parsePackageIdentifier "ghc-boot-0.0.0.0"
+          depends <- mapM parseGhcPkgId
+            [ "base-4.9.0.0"
+            , "binary-0.7.5.0"
+            , "bytestring-0.10.7.0"
+            , "directory-1.2.5.0"
+            , "filepath-1.4.1.0"
+            ]
+          ghcBoot `shouldBe` DumpPackage
+            { dpGhcPkgId = ghcPkgId
+            , dpPackageIdent = pkgId
+            , dpLibDirs =
+                  ["/opt/ghc/head/lib/ghc-7.11.20151213/ghc-boot-0.0.0.0"]
+            , dpHaddockInterfaces = ["/opt/ghc/head/share/doc/ghc/html/libraries/ghc-boot-0.0.0.0/ghc-boot.haddock"]
+            , dpHaddockHtml = Just "/opt/ghc/head/share/doc/ghc/html/libraries/ghc-boot-0.0.0.0"
+            , dpDepends = depends
+            , dpLibraries = ["HSghc-boot-0.0.0.0"]
+            , dpHasExposedModules = True
+            , dpProfiling = ()
+            , dpHaddock = ()
+            , dpIsExposed = True
+            }
+
 
     it "ghcPkgDump + addProfiling + addHaddock" $ (id :: IO () -> IO ()) $ runNoLoggingT $ do
         menv' <- getEnvOverride buildPlatform
