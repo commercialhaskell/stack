@@ -315,44 +315,31 @@ ghcjsBootPackages =
     maybe (error "Parse error in ghcjsBootPackages") HashSet.fromList mparsed
   where
     mparsed = mapM parsePackageName
-      -- stage1a
-      [ "array"
+      -- This list consists of packages from stage 1 of ghcjs-boot -
+      -- things that get patched, along with their unpatched
+      -- dependencies.
+      --
+      -- Here are the packages that get patched:
+      [ "Win32"
       , "base"
-      , "binary"
       , "bytestring"
-      , "containers"
-      , "deepseq"
-      , "integer-gmp"
-      , "pretty"
-      , "primitive"
-      , "integer-gmp"
-      , "pretty"
-      , "primitive"
-      , "template-haskell"
-      , "transformers"
-      -- stage1b
       , "directory"
       , "filepath"
-      , "old-locale"
-      , "process"
-      , "time"
-      -- stage2
-      , "async"
-      , "aeson"
-      , "attoparsec"
-      , "case-insensitive"
-      , "dlist"
-      , "extensible-exceptions"
+      , "ghc-prim"
       , "hashable"
-      , "mtl"
+      , "integer-gmp"
       , "old-time"
-      , "parallel"
-      , "scientific"
-      , "stm"
-      , "syb"
-      , "text"
-      , "unordered-containers"
-      , "vector"
+      , "primitive"
+      , "process"
+      , "unix"
+      -- Dependencies of packages that get patched
+      , "rts" -- dep of base etc
+      , "deepseq" -- dep of bytestring etc
+      , "time" -- dep of directory etc
+      , "text" -- dep of hashable etc
+      , "old-locale" -- dep of old-time etc
+      , "transformers" -- dep of primitive etc
+      , "time" -- dep of unix etc
       ]
 
 -- | Just to avoid repetition and magic strings.
