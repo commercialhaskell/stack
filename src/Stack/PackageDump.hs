@@ -333,7 +333,7 @@ conduitDumpPackage = (=$= CL.catMaybes) $ eachSection $ do
                 libraries = parseM "hs-libraries"
                 exposedModules = parseM "exposed-modules"
                 exposed = parseM "exposed"
-            depends <- mapMaybeM parseDepend $ parseM "depends"
+            depends <- mapMaybeM parseDepend $ concatMap T.words $ parseM "depends"
 
             let parseQuoted key =
                     case mapM (P.parseOnly (argsParser NoEscaping)) val of
