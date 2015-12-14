@@ -11,7 +11,7 @@ module Control.Concurrent.Execute
     ) where
 
 import           Control.Applicative
-import           Control.Concurrent.Async (Concurrently (..), async, wait)
+import           Control.Concurrent.Async (Concurrently (..), async)
 import           Control.Concurrent.STM
 import           Control.Exception
 import           Control.Monad            (join, unless)
@@ -75,11 +75,10 @@ runActions threads keepGoing concurrentFinal actions0 withProgress = do
                 then pure Nothing
                 else Just <$> atomically (newTMVar ()))
         <*> pure keepGoing
-    progressThread <- async $ withProgress $ esCompleted es
+    _ <- async $ withProgress $ esCompleted es
     if threads <= 1
         then runActions' es
         else runConcurrently $ sequenceA_ $ replicate threads $ Concurrently $ runActions' es
-    () <- wait progressThread
     readTVarIO $ esExceptions es
 
 runActions' :: ExecuteState -> IO ()
