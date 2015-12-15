@@ -128,7 +128,7 @@ library
                      Data.Set.Monad
                      Distribution.Version.Extra
   build-depends:     Cabal >= 1.18.1.5
-                   , aeson >= 0.8.0.2 && < 0.10
+                   , aeson >= 0.8.0.2 && < 0.11
                    , ansi-terminal >= 0.6.2.3
                    , async >= 2.0.2
                    , attoparsec >= 0.12.1.5 && < 0.14
@@ -271,7 +271,7 @@ test-suite stack-test
   ghc-options:    -Wall -threaded
   build-depends:  base >=4.7 && <5
                 , hspec <2.3
-                , attoparsec
+                , attoparsec < 0.14
                 , containers >= 0.5.5.1
                 , directory
                 , exceptions
