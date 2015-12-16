@@ -80,13 +80,36 @@ a custom shell file (see below).
 ### Use stack as normal
 
 With Nix enabled, `stack build` and `stack exec` will automatically
-launch themselves in a nix-shell. Note that for now `stack ghci` will
-not work, due to a bug in GHCi when working with external shared
+launch themselves in a nix-shell. Note that for now `stack ghci` is bound to
+fail on OSX, due to a bug in GHCi when working with external shared
 libraries.
 
 If `enable:` is set to `false`, you can still build in a nix-shell by
 passing the `--nix` flag to stack, for instance `stack --nix build`.
-Nix just won't be used by default.
+Passing any `--nix*` option to the command line will do the same.
+
+### The Nix shell
+
+By default, stack will run the build in a pure Nix shell, which means the build should
+fail if you haven't specified all the dependencies in the `packages:` section of the
+`stack.yaml` file, even if these dependencies are installed elsewhere on your system.
+This behaviour enforces complete description of the build environment to facilitate
+reproducibility.
+To override this behaviour, add `pure: false` to your `stack.yaml` or pass the `--no-nix-pure`
+option to the command line.
+
+NOTE: Currently on OSX non pure shells are used by default. This is due to locale
+problems that will be sorted out in the future. So do not count on nix shells not being pure
+on OSX.
+
+### Package sources
+
+By default, the Nix-shell will look for the nixpkgs directory set by your `NIX_PATH` environment variable.
+This will usually be `$HOME/.nix-defexpr/channels/nixpkgs`.
+
+You can override this by passing `--nix-path="nixpkgs=/my/own/nixpkgs/clone"` to ask nix to use
+a nixpkgs that you cloned yourself. This e.g. can allow you to use bleeding edge nixpkgs, cloned from [nixpkgs](http://www.github.com/NixOS/nixpkgs) `master` branch, or to rewrite the nix expressions of some packages.
+Setting `path: [nixpkgs=/my/own/nixpkgs/clone]` in your `stack.yaml` will do the same.
 
 ## Command-line options
 
@@ -103,9 +126,12 @@ Here is a commented configuration file, showing the default values:
 ```yaml
 nix:
 
-  # `true` by default when the nix section is present. Set
+  # true by default when the nix section is present. Set
   # it to `false` to disable using Nix.
   enable: true
+
+  # true by default. Tells Nix whether to run in a pure shell or not
+  pure: true
 
   # Empty by default. The list of packages you want to be
   # available in the nix-shell at build time (with `stack
@@ -120,6 +146,10 @@ nix:
   # A list of strings, empty by default. Additional options that
   # will be passed verbatim to the `nix-shell` command.
   nix-shell-options: []
+
+  # A list of strings, empty by default, such as `[nixpkgs=/my/local/nixpkgs/clone]`
+  # that will be used to override the NIX_PATH
+  path: []
 ```
 ## Using a custom shell.nix file
 
