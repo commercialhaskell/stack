@@ -24,19 +24,21 @@ nixOptsFromMonoid
     -> m NixOpts
 nixOptsFromMonoid mproject maresolver NixOptsMonoid{..} = do
     let nixEnable = fromMaybe nixMonoidDefaultEnable nixMonoidEnable
+        nixPureShell = fromMaybe False nixMonoidPureShell
         mresolver = case maresolver of
           Just (ARResolver resolver) -> Just resolver
           Just _ -> Nothing
           Nothing -> fmap projectResolver mproject
+        pkgs = fromMaybe [] nixMonoidPackages
         nixPackages = case mproject of
-           Nothing -> nixMonoidPackages
-           Just _ -> nixMonoidPackages ++ [case mresolver of
+           Nothing -> pkgs
+           Just _ -> pkgs ++ [case mresolver of
               Just (ResolverSnapshot (LTS x y)) ->
                 pack ("haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc")
               _ -> pack "ghc"]
         nixInitFile = nixMonoidInitFile
-        nixShellOptions = nixMonoidShellOptions
-    when (not (null nixMonoidPackages) && isJust nixInitFile) $
+        nixShellOptions = fromMaybe [] nixMonoidShellOptions
+    when (not (null pkgs) && isJust nixInitFile) $
        throwM NixCannotUseShellFileAndPackagesException
     return NixOpts{..}
 

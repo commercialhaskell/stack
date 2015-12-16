@@ -320,22 +320,33 @@ configOptsParser hide0 =
   where hide = hideMods hide0
 
 nixOptsParser :: Bool -> Parser NixOptsMonoid
-nixOptsParser hide0 =
-  NixOptsMonoid
+nixOptsParser hide0 = overrideActivation <$>
+  (NixOptsMonoid
   <$> pure False
   <*> maybeBoolFlags nixCmdName
-                     "using a Nix-shell"
+                     "use of a Nix-shell"
                      hide
-  <*> pure []
-  <*> pure Nothing
-  <*> ((map T.pack . fromMaybe [])
+  <*> maybeBoolFlags "nix-pure"
+                     "use of a pure Nix-shell"
+                     hide
+  <*> (fmap (map T.pack)
+       <$> optional (argsOption (long "nix-packages" <>
+                                 metavar "NAMES" <>
+                                 help "List of packages that should be available in the nix-shell (space separated)" <>
+                                 hide)))
+  <*> optional (option str (long "nix-shell-file" <>
+                            metavar "FILEPATH" <>
+                            help "Nix file to be used to launch a nix-shell (for regular Nix users)"))
+  <*> (fmap (map T.pack)
        <$> optional (argsOption (long "nix-shell-options" <>
                                  metavar "OPTION" <>
                                  help "Additional options passed to nix-shell" <>
-                                 hide)))
+                                 hide))))
   where
     hide = hideMods hide0
-
+    overrideActivation m =
+      if m /= mempty then m { nixMonoidEnable = Just True }
+      else m
 
 -- | Options parser configuration for Docker.
 dockerOptsParser :: Bool -> Parser DockerOptsMonoid

@@ -67,6 +67,7 @@ runShellAndExit getCmdArgs = do
      (cmnd,args) <- getCmdArgs
      let mshellFile = nixInitFile (configNix config)
          pkgsInConfig = nixPackages (configNix config)
+         pureShell = nixPureShell (configNix config)
          nixopts = case mshellFile of
            Just filePath -> [filePath]
            Nothing -> ["-E", T.unpack $ T.intercalate " " $ concat
@@ -82,7 +83,7 @@ runShellAndExit getCmdArgs = do
                                            pkgsInConfig), ["'' ;"
                                ,"} \"\""]]]
                     -- glibcLocales is necessary on Linux to avoid warnings about GHC being incapable to set the locale.
-         fullArgs = concat [ -- ["--pure"],
+         fullArgs = concat [if pureShell then ["--pure"] else [],
                             map T.unpack (nixShellOptions (configNix config))
                            ,nixopts
                            ,["--command", intercalate " " (map escape (cmnd:args))
