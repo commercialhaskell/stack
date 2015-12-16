@@ -411,18 +411,22 @@ makeObjectFilePathFromC cabalDir namedComponent distDir cFilePath = do
     relCFilePath <- stripDir cabalDir cFilePath
     relOFilePath <-
         parseRelFile (replaceExtension (toFilePath relCFilePath) "o")
-    addComponentPrefix <- fromComponentName
+    addComponentPrefix <- fileGenDirFromComponentName namedComponent
     return (addComponentPrefix (buildDir distDir) </> relOFilePath)
-  where
-    fromComponentName =
-        case namedComponent of
-            CLib -> return id
-            CExe name -> makeTmp name
-            CTest name -> makeTmp name
-            CBench name -> makeTmp name
-    makeTmp name = do
-        prefix <- parseRelDir (T.unpack name <> "/" <> T.unpack name <> "-tmp")
-        return (</> prefix)
+
+-- | The directory where generated files are put like .o or .hs (from .x files).
+fileGenDirFromComponentName
+    :: MonadThrow m
+    => NamedComponent -> m (Path b Dir -> Path b Dir)
+fileGenDirFromComponentName namedComponent =
+    case namedComponent of
+        CLib -> return id
+        CExe name -> makeTmp name
+        CTest name -> makeTmp name
+        CBench name -> makeTmp name
+  where makeTmp name = do
+            prefix <- parseRelDir (T.unpack name <> "/" <> T.unpack name <> "-tmp")
+            return (</> prefix)
 
 -- | Make the autogen dir.
 autogenDir :: Path Abs Dir -> Path Abs Dir
