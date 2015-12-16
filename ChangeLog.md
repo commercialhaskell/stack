@@ -10,6 +10,8 @@ Major changes:
 
 Other enhancements:
 
+* Nix support: all options can be overriden on command line [#1483](https://github.com/commercialhaskell/stack/issues/1483). Shells are now pure by default.
+
 
 Bug fixes:
 
