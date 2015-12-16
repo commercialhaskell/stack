@@ -37,7 +37,7 @@ import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Char (isSpace,toUpper,isAscii,isDigit)
 import           Data.Conduit.List (sinkNull)
 import           Data.List (dropWhileEnd,intercalate,isPrefixOf,isInfixOf,foldl')
-import           Data.List.Extra (trim,nubOrd)
+import           Data.List.Extra (trim)
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
@@ -67,7 +67,6 @@ import           System.Directory (canonicalizePath,getModificationTime)
 import           System.Environment (getEnv,getProgName,getArgs,getExecutablePath,lookupEnv)
 import           System.Exit (exitSuccess, exitWith)
 import qualified System.FilePath as FP
-import qualified System.FilePath.Posix as Posix
 import           System.IO (stderr,stdin,stdout,hIsTerminalDevice)
 import           System.IO.Error (isDoesNotExistError)
 import           System.IO.Unsafe (unsafePerformIO)
@@ -288,11 +287,11 @@ runContainerAndExit getCmdArgs
                          -- This is fixed in Docker 1.9.1, but will leave the workaround
                          -- in place for now, for users who haven't upgraded yet.
                          (isTerm || (isNothing bamboo && isNothing jenkins))
-         newPathEnv = intercalate [Posix.searchPathSeparator] $
-                      nubOrd $
-                      [hostBinDir
-                      ,toFilePathNoTrailingSep $ sandboxHomeDir </> $(mkRelDir ".local/bin")] ++
-                      maybe [] Posix.splitSearchPath (lookupImageEnv "PATH" imageEnvVars)
+     newPathEnv <- augmentPath
+                      [ hostBinDir
+                      , toFilePathNoTrailingSep $ sandboxHomeDir
+                                            </> $(mkRelDir ".local/bin")]
+                      (T.pack <$> lookupImageEnv "PATH" imageEnvVars)
      (cmnd,args,envVars,extraMount) <- getCmdArgs docker envOverride imageInfo isRemoteDocker
      pwd <- getWorkingDir
      liftIO
@@ -307,7 +306,7 @@ runContainerAndExit getCmdArgs
           ,"-e",stackRootEnvVar ++ "=" ++ toFilePathNoTrailingSep stackRoot
           ,"-e",platformVariantEnvVar ++ "=dk" ++ platformVariant
           ,"-e","HOME=" ++ toFilePathNoTrailingSep sandboxHomeDir
-          ,"-e","PATH=" ++ newPathEnv
+          ,"-e","PATH=" ++ T.unpack newPathEnv
           ,"-v",toFilePathNoTrailingSep stackRoot ++ ":" ++ toFilePathNoTrailingSep stackRoot
           ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toFilePathNoTrailingSep projectRoot
           ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toFilePathNoTrailingSep sandboxHomeDir
