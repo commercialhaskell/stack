@@ -10,6 +10,7 @@ import Control.Monad (when)
 import qualified Data.Text as T
 import Data.Maybe
 import Data.Typeable
+import Distribution.System (OS (..))
 import Stack.Types
 import Control.Exception.Lifted
 import Control.Monad.Catch (throwM,MonadCatch)
@@ -21,10 +22,14 @@ nixOptsFromMonoid
     => Maybe Project
     -> Maybe AbstractResolver
     -> NixOptsMonoid
+    -> OS
     -> m NixOpts
-nixOptsFromMonoid mproject maresolver NixOptsMonoid{..} = do
+nixOptsFromMonoid mproject maresolver NixOptsMonoid{..} os = do
     let nixEnable = fromMaybe nixMonoidDefaultEnable nixMonoidEnable
-        nixPureShell = fromMaybe False nixMonoidPureShell
+        defaultPure = case os of
+          OSX -> False
+          _ -> True
+        nixPureShell = fromMaybe defaultPure nixMonoidPureShell
         mresolver = case maresolver of
           Just (ARResolver resolver) -> Just resolver
           Just _ -> Nothing
