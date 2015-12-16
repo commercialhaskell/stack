@@ -113,6 +113,7 @@ library
                      System.Process.Run
                      Network.HTTP.Download.Verified
                      Data.Attoparsec.Args
+                     Data.Attoparsec.Interpreter
                      Data.Maybe.Extra
                      Path.IO
                      Path.Extra

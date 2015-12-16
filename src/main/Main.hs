@@ -21,7 +21,8 @@ import           Control.Monad.Reader (ask, asks, runReaderT)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Control.Monad.Trans.Either (EitherT)
 import           Control.Monad.Trans.Writer (Writer)
-import           Data.Attoparsec.Args (getInterpreterArgs, parseArgs, EscapingMode (Escaping))
+import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
+import           Data.Attoparsec.Interpreter (getInterpreterArgs)
 import qualified Data.ByteString.Lazy as L
 import           Data.IORef
 import           Data.List
