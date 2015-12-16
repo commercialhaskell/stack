@@ -7,7 +7,7 @@ module Stack.Config.Nix
        ) where
 
 import Control.Monad (when)
-import Data.Text (pack)
+import qualified Data.Text as T
 import Data.Maybe
 import Data.Typeable
 import Stack.Types
@@ -34,13 +34,16 @@ nixOptsFromMonoid mproject maresolver NixOptsMonoid{..} = do
            Nothing -> pkgs
            Just _ -> pkgs ++ [case mresolver of
               Just (ResolverSnapshot (LTS x y)) ->
-                pack ("haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc")
-              _ -> pack "ghc"]
+                T.pack ("haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc")
+              _ -> T.pack "ghc"]
         nixInitFile = nixMonoidInitFile
         nixShellOptions = fromMaybe [] nixMonoidShellOptions
+                          ++ prefixAll (T.pack "-I") (fromMaybe [] nixMonoidPath)
     when (not (null pkgs) && isJust nixInitFile) $
        throwM NixCannotUseShellFileAndPackagesException
     return NixOpts{..}
+  where prefixAll p (x:xs) = p : x : prefixAll p xs
+        prefixAll _ _      = []
 
 -- Exceptions thown specifically by Stack.Nix
 data StackNixException

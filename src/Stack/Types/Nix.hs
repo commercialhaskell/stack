@@ -38,6 +38,8 @@ data NixOptsMonoid = NixOptsMonoid
     -- ^ The path of a file containing preconfiguration of the environment (e.g shell.nix)
   ,nixMonoidShellOptions :: !(Maybe [Text])
     -- ^ Options to be given to the nix-shell command line
+  ,nixMonoidPath :: !(Maybe [Text])
+    -- ^ Override parts of NIX_PATH (notably 'nixpkgs')
   }
   deriving (Eq, Show)
 
@@ -45,30 +47,33 @@ data NixOptsMonoid = NixOptsMonoid
 instance FromJSON (NixOptsMonoid, [JSONWarning]) where
   parseJSON = withObjectWarnings "NixOptsMonoid"
     (\o -> do nixMonoidDefaultEnable <- pure True
-              nixMonoidEnable <- o ..:? nixEnableArgName
-              nixMonoidPureShell <- o ..:? nixPureShellArgName
-              nixMonoidPackages <- o ..:? nixPackagesArgName
-              nixMonoidInitFile <- o ..:? nixInitFileArgName
-              nixMonoidShellOptions <- o ..:? nixShellOptsArgName
+              nixMonoidEnable        <- o ..:? nixEnableArgName
+              nixMonoidPureShell     <- o ..:? nixPureShellArgName
+              nixMonoidPackages      <- o ..:? nixPackagesArgName
+              nixMonoidInitFile      <- o ..:? nixInitFileArgName
+              nixMonoidShellOptions  <- o ..:? nixShellOptsArgName
+              nixMonoidPath          <- o ..:? nixPathArgName
               return NixOptsMonoid{..})
 
 -- | Left-biased combine Nix options
 instance Monoid NixOptsMonoid where
   mempty = NixOptsMonoid
     {nixMonoidDefaultEnable = False
-    ,nixMonoidEnable = Nothing
-    ,nixMonoidPureShell = Nothing
-    ,nixMonoidPackages = Nothing
-    ,nixMonoidInitFile = Nothing
-    ,nixMonoidShellOptions = Nothing
+    ,nixMonoidEnable        = Nothing
+    ,nixMonoidPureShell     = Nothing
+    ,nixMonoidPackages      = Nothing
+    ,nixMonoidInitFile      = Nothing
+    ,nixMonoidShellOptions  = Nothing
+    ,nixMonoidPath          = Nothing
     }
   mappend l r = NixOptsMonoid
     {nixMonoidDefaultEnable = nixMonoidDefaultEnable l || nixMonoidDefaultEnable r
-    ,nixMonoidEnable = nixMonoidEnable l <|> nixMonoidEnable r
-    ,nixMonoidPureShell = nixMonoidPureShell l <|> nixMonoidPureShell r
-    ,nixMonoidPackages = nixMonoidPackages l <|> nixMonoidPackages r
-    ,nixMonoidInitFile = nixMonoidInitFile l <|> nixMonoidInitFile r
-    ,nixMonoidShellOptions = nixMonoidShellOptions l <|> nixMonoidShellOptions r
+    ,nixMonoidEnable        = nixMonoidEnable l <|> nixMonoidEnable r
+    ,nixMonoidPureShell     = nixMonoidPureShell l <|> nixMonoidPureShell r
+    ,nixMonoidPackages      = nixMonoidPackages l <|> nixMonoidPackages r
+    ,nixMonoidInitFile      = nixMonoidInitFile l <|> nixMonoidInitFile r
+    ,nixMonoidShellOptions  = nixMonoidShellOptions l <|> nixMonoidShellOptions r
+    ,nixMonoidPath          = nixMonoidPath l <|> nixMonoidPath r
     }
 
 -- | Nix enable argument name.
@@ -90,3 +95,7 @@ nixInitFileArgName = "shell-file"
 -- | Extra options for the nix-shell command argument name.
 nixShellOptsArgName :: Text
 nixShellOptsArgName = "nix-shell-options"
+
+-- | NIX_PATH override argument name
+nixPathArgName :: Text
+nixPathArgName = "path"
