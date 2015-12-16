@@ -349,7 +349,9 @@ generateBuildInfoOpts sourceMap installedMap mcabalMacros cabalDir distDir omitP
             (("-i" <>) . toFilePathNoTrailingSep)
             ([cabalDir | null (hsSourceDirs b)] <>
              mapMaybe toIncludeDir (hsSourceDirs b) <>
-             [autogenDir distDir,buildDir distDir]) ++
+             [autogenDir distDir,buildDir distDir] <>
+             [makeGenDir (buildDir distDir)
+             | Just makeGenDir <- [fileGenDirFromComponentName componentName]]) ++
         ["-stubdir=" ++ toFilePathNoTrailingSep (buildDir distDir)]
     toIncludeDir "." = Just cabalDir
     toIncludeDir x = fmap (cabalDir </>) (parseRelDir x)
