@@ -9,6 +9,9 @@ module Stack.Types.Nix where
 import Control.Applicative
 import Data.Aeson.Extended
 import Data.Text (Text)
+import Data.Monoid
+
+import Prelude
 
 -- | Nix configuration.
 data NixOpts = NixOpts
