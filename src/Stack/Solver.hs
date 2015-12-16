@@ -69,9 +69,9 @@ cabalSolver wc cabalfps constraints userFlags cabalArgs = withSystemTempDirector
                         $logInfo $ "No GHC on path, selecting: " <>
                                    T.pack (versionString version)
                         ed <- extraDirs $ Tool $ PackageIdentifier ghcName version
-                        mkEnvOverride platform
-                            $ augmentPathMap (edBins ed)
-                            $ unEnvOverride menv0
+                        pathsEnv <- augmentPathMap (edBins ed)
+                                                   (unEnvOverride menv0)
+                        mkEnvOverride platform pathsEnv
     mcabal <- findExecutable menv "cabal"
     case mcabal of
         Nothing -> throwM SolverMissingCabalInstall

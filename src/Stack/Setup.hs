@@ -211,9 +211,8 @@ setupEnv mResolveMissingGHC = do
     -- Modify the initial environment to include the GHC path, if a local GHC
     -- is being used
     menv0 <- getMinimalEnvOverride
-    let env = removeHaskellEnvVars
-            $ augmentPathMap (maybe [] edBins mghcBin)
-            $ unEnvOverride menv0
+    env <- removeHaskellEnvVars
+             <$> augmentPathMap (maybe [] edBins mghcBin) (unEnvOverride menv0)
 
     menv <- mkEnvOverride platform env
     compilerVer <- getCompilerVersion menv wc
@@ -232,8 +231,8 @@ setupEnv mResolveMissingGHC = do
     mkDirs <- runReaderT extraBinDirs envConfig0
     let mpath = Map.lookup "PATH" env
         mkDirs' = map toFilePath . mkDirs
-        depsPath = augmentPath (mkDirs' False) mpath
-        localsPath = augmentPath (mkDirs' True) mpath
+    depsPath <- augmentPath (mkDirs' False) mpath
+    localsPath <- augmentPath (mkDirs' True) mpath
 
     deps <- runReaderT packageDatabaseDeps envConfig0
     createDatabase menv wc deps
@@ -417,7 +416,7 @@ ensureCompiler sopts = do
             Nothing -> return menv0
             Just ed -> do
                 config <- asks getConfig
-                let m = augmentPathMap (edBins ed) (unEnvOverride menv0)
+                m <- augmentPathMap (edBins ed) (unEnvOverride menv0)
                 mkEnvOverride (configPlatform config) (removeHaskellEnvVars m)
 
     when (soptsUpgradeCabal sopts) $ do
@@ -1066,10 +1065,9 @@ installMsys2Windows osKey si archiveFile archiveType destDir = do
 
     platform <- asks getPlatform
     menv0 <- getMinimalEnvOverride
-    let oldEnv = unEnvOverride menv0
-        newEnv = augmentPathMap
-            [toFilePath $ destDir </> $(mkRelDir "usr") </> $(mkRelDir "bin")]
-            oldEnv
+    newEnv <- augmentPathMap [toFilePath $ destDir </> $(mkRelDir "usr")
+                                                   </> $(mkRelDir "bin")]
+                             (unEnvOverride menv0)
     menv <- mkEnvOverride platform newEnv
 
     -- I couldn't find this officially documented anywhere, but you need to run
