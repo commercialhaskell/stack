@@ -137,10 +137,7 @@ loadTemplate name =
             catch
                 (redownload req path)
                 (throwM . FailedToDownloadTemplate name)
-        exists <- fileExists path
-        if exists
-            then liftIO (T.readFile (toFilePath path))
-            else throwM (FailedToLoadTemplate name (toFilePath path))
+        loadLocalFile path
 
 -- | Apply and unpack a template into a directory.
 applyTemplate
