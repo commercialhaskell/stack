@@ -66,6 +66,7 @@ data GhciOpts = GhciOpts
     , ghciAdditionalPackages :: ![String]
     , ghciMainIs             :: !(Maybe Text)
     , ghciSkipIntermediate   :: !Bool
+    , ghciHidePackages       :: !Bool
     , ghciBuildOpts          :: !BuildOpts
     } deriving Show
 
@@ -98,8 +99,11 @@ ghci GhciOpts{..} = do
     mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
     wc <- getWhichCompiler
     let pkgopts = hidePkgOpt ++ genOpts ++ ghcOpts
-        hidePkgOpt = if null pkgs then [] else ["-hide-all-packages"]
-        genOpts = nubOrd (concatMap (concatMap (bioOneWordOpts . snd) . ghciPkgOpts) pkgs)
+        hidePkgOpt = if null pkgs || not ghciHidePackages then [] else ["-hide-all-packages"]
+        oneWordOpts bio
+            | ghciHidePackages = bioOneWordOpts bio ++ bioPackageFlags bio
+            | otherwise = bioOneWordOpts bio
+        genOpts = nubOrd (concatMap (concatMap (oneWordOpts . snd) . ghciPkgOpts) pkgs)
         (omittedOpts, ghcOpts) = partition badForGhci $
             concatMap (concatMap (bioOpts . snd) . ghciPkgOpts) pkgs ++
             getUserOptions Nothing ++

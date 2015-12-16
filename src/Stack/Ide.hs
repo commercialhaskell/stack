@@ -100,6 +100,7 @@ getPackageOptsAndTargetFiles pwd pkg = do
     let ghcOptions bio =
             bioOneWordOpts bio ++
             bioOpts bio ++
+            bioPackageFlags bio ++
             maybe [] (\cabalMacros -> ["-optP-include", "-optP" <> toFilePath cabalMacros]) (bioCabalMacros bio)
     return
         ( ("--dist-dir=" <> toFilePathNoTrailingSep dist) :

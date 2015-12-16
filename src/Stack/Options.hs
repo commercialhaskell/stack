@@ -513,6 +513,7 @@ ghciOptsParser = GhciOpts
                                  \module to load, such as for an executable for \
                                  \test suite or benchmark."))
              <*> switch (long "skip-intermediate-deps" <> help "Skip loading intermediate target dependencies")
+             <*> boolFlags True "hide-packages" "package hiding" idm
              <*> buildOptsParser Build
 
 -- | Parser for exec command

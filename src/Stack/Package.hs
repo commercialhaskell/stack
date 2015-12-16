@@ -316,7 +316,8 @@ generateBuildInfoOpts sourceMap installedMap mcabalMacros cabalDir distDir omitP
         --
         -- See https://github.com/commercialhaskell/stack/issues/1255
         , bioOneWordOpts = nubOrd $ concat
-            [extOpts b, srcOpts, includeOpts, deps, extra b, extraDirs, fworks b, cObjectFiles]
+            [extOpts b, srcOpts, includeOpts, extra b, extraDirs, fworks b, cObjectFiles]
+        , bioPackageFlags = deps
         , bioCabalMacros = mcabalMacros
         }
   where
