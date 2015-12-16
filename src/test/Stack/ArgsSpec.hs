@@ -3,14 +3,14 @@
 module Stack.ArgsSpec where
 
 import Control.Applicative
-import Control.Exception.Base(assert)
+import Control.Exception.Base (assert)
 import Control.Monad
-import Options.Applicative.Args
-import Test.Hspec
-import Data.Text (pack)
-import Data.Attoparsec.Args(interpreterArgsParser)
-import Stack.Constants(stackProgName)
+import Data.Attoparsec.Interpreter (interpreterArgsParser)
 import qualified Data.Attoparsec.Text as P
+import Data.Text (pack)
+import Options.Applicative.Args
+import Stack.Constants (stackProgName)
+import Test.Hspec
 
 -- | Test spec.
 spec :: Spec
