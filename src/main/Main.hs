@@ -47,13 +47,13 @@ import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Network.HTTP.Client
 import           Options.Applicative
 import           Options.Applicative.Args
-import           Options.Applicative.Help(footerHelp,stringChunk)
+import           Options.Applicative.Help(errorHelp,stringChunk)
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Complicated
 #ifdef USE_GIT_INFO
 import           Options.Applicative.Simple (simpleVersion)
 #endif
-import           Options.Applicative.Types (readerAsk, ParserHelp)
+import           Options.Applicative.Types (readerAsk, ParserHelp(..))
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO
@@ -465,22 +465,26 @@ interpreterHandler
   -> [String]
   -> IO (GlobalOptsMonoid, (GlobalOpts -> IO (), t))
 interpreterHandler f args = do
-    val <- getInterpreterArgs args stackProgName
-    case val of
-      Nothing -> do
-        let hlp = footerHelp $ stringChunk $ concat
-              [ "\nIf you are trying to use "
-              , stackProgName
-              , " as a script interpreter, a\n'-- "
-              , stackProgName
-              , " [options] runghc [options]' comment is required."
-              , "\nSee https://github.com/commercialhaskell/stack/blob/release/doc/GUIDE.md#ghcrunghc" ]
-        handleParseResult (overFailure (mappend hlp) (Failure f))
-      Just iargs -> do
-        progName <- getProgName
-        let cmdlineParse = commandLineHandler progName True
-        (a,b) <- withArgs (iargs ++ "--" : args) cmdlineParse
-        return (a,(b,mempty))
+  let file = head args
+  isFile <- doesFileExist file
+  if isFile
+  then runInterpreterCommand file
+  else parseResultHandler (flip mappend (noSuchFile file))
+  where
+    parseResultHandler fn = handleParseResult (overFailure fn (Failure f))
+    noSuchFile name = errorHelp $ stringChunk
+      ("\nNo such source file to interpret `" ++ name ++ "\'")
+
+    runInterpreterCommand file = do
+      progName <- getProgName
+      iargs <- getInterpreterArgs file
+      let parseCmdLine = commandLineHandler progName True
+      let cmdArgs = iargs ++ "--" : args
+       -- TODO show the command in verbose mode
+       -- hPutStrLn stderr $ unwords $
+       --   ["Running", "[" ++ progName, unwords cmdArgs ++ "]"]
+      (a,b) <- withArgs cmdArgs parseCmdLine
+      return (a,(b,mempty))
 
 -- | Print out useful path information in a human-readable format (and
 -- support others later).

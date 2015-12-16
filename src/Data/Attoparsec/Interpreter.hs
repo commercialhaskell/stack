@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns #-}
 {- |  This module implements parsing of additional arguments embedded in a
       comment when stack is invoked as a script interpreter
 
@@ -33,12 +32,10 @@
 @
   #!\/usr\/bin\/env stack
   {\- stack
-    --verbosity silent
     --resolver lts-3.14
     --install-ghc
     runghc
     --package random
-    --package system-argv0
   -\}
 @
 
@@ -56,18 +53,18 @@ module Data.Attoparsec.Interpreter
     ) where
 
 import           Control.Applicative
-import           Control.Monad.Catch (MonadThrow)
 import           Data.Attoparsec.Args
 import           Data.Attoparsec.Text ((<?>))
 import qualified Data.Attoparsec.Text as P
+import           Data.Char (isSpace)
 import           Data.Conduit
 import           Data.Conduit.Attoparsec
 import qualified Data.Conduit.Binary as CB
 import           Data.Conduit.Text(decodeUtf8)
-import           Data.Char (isSpace)
-import           Data.Text (Text, pack)
-import           System.Directory (doesFileExist)
-import           System.IO (IOMode (ReadMode), withBinaryFile)
+import           Data.List (intercalate)
+import           Data.Text (pack)
+import           Stack.Constants
+import           System.IO (IOMode (ReadMode), withBinaryFile, stderr, hPutStrLn)
 
 -- | Parser to extract the stack command line embedded inside a comment
 -- after validating the placement and formatting rules for a valid
@@ -78,9 +75,9 @@ interpreterArgsParser progName = P.option "" sheBangLine *> interpreterComment
     sheBangLine =   P.string "#!"
                  *> P.manyTill P.anyChar P.endOfLine
 
-    commentStart str =   P.string str
+    commentStart str =   (P.string str <?> (progName ++ " options comment"))
                       *> P.skipSpace
-                      *> P.string (pack progName)
+                      *> (P.string (pack progName) <?> show progName)
 
     -- Treat newlines as spaces inside the block comment
     anyCharNormalizeSpace = let normalizeSpace c = if isSpace c then ' ' else c
@@ -88,31 +85,52 @@ interpreterArgsParser progName = P.option "" sheBangLine *> interpreterComment
 
     comment start end = commentStart start
       *> ((end >> return "")
-          <|> (P.space *> P.manyTill anyCharNormalizeSpace end))
+          <|> (P.space *> (P.manyTill anyCharNormalizeSpace end <?> "-}")))
 
     lineComment =  comment "--" (P.endOfLine <|> P.endOfInput)
-    blockComment = comment "{-" (P.string "-}" <?> "unterminated block comment")
+    blockComment = comment "{-" (P.string "-}")
     interpreterComment = lineComment <|> blockComment
 
 -- | Extract stack arguments from a correctly placed and correctly formatted
 -- comment when it is being used as an interpreter
--- FIXME this is broken when options are specified before the filename
-getInterpreterArgs :: [String] -> String -> IO (Maybe [String])
-getInterpreterArgs (f:_) progName = do
-    isFile <- doesFileExist f
-    if isFile
-    then withBinaryFile f ReadMode parse
-    else return Nothing
-    where parse h =
-            CB.sourceHandle h
-            =$= decodeUtf8
-            $$ sinkInterpreterArgs progName
-getInterpreterArgs _ _ = return Nothing
+getInterpreterArgs :: String -> IO [String]
+getInterpreterArgs file = do
+  eArgStr <- withBinaryFile file ReadMode parseFile
+  case eArgStr of
+    Left err -> handleFailure $ decodeError err
+    Right str -> parseArgStr str
+  where
+    parseFile h =
+      CB.sourceHandle h
+      =$= decodeUtf8
+      $$ sinkParserEither (interpreterArgsParser stackProgName)
 
-sinkInterpreterArgs :: MonadThrow m => String -> Sink Text m (Maybe [String])
-sinkInterpreterArgs progName = do
-    eArgs <- sinkParserEither (interpreterArgsParser progName)
-    case eArgs of
-        Right (P.parseOnly (argsParser Escaping) . pack -> Right args) ->
-            return $ Just args
-        _ -> return Nothing
+    -- FIXME We should print anything only when explicit verbose mode is
+    -- specified by the user on command line. But currently the
+    -- implementation does not accept or parse any command line flags in
+    -- interpreter mode. We can only invoke the interpreter as
+    -- "stack <file name>" strictly without any options.
+    stackWarn s = hPutStrLn stderr $ stackProgName ++ ": WARNING! " ++ s
+
+    handleFailure err = do
+      mapM_ stackWarn (lines err)
+      stackWarn "Missing or unusable stack options specification"
+      stackWarn "Using runghc without any additional stack options"
+      return ["runghc"]
+
+    parseArgStr str =
+      case P.parseOnly (argsParser Escaping) (pack str) of
+        Left err -> handleFailure ("Error parsing command specified in the \
+                        \stack options comment: " ++ err)
+        Right [] -> handleFailure ("Empty argument list in stack options \
+                        \comment")
+        Right args -> return args
+
+    decodeError e =
+      case e of
+        ParseError ctxs _ (Position line col) ->
+          if length ctxs == 0
+          then "Parse error"
+          else ("Expecting " ++ (intercalate " or " ctxs))
+          ++ " at line " ++ (show line) ++ ", column " ++ (show col)
+        DivergentParser -> "Divergent parser"
