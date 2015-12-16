@@ -397,7 +397,7 @@ dockerOptsParser hide0 =
                         hide <>
                         metavar "PATH" <>
                         help "Location of image usage tracking database")
-    <*> optional (option str
+    <*> maybeStrOption
             (long(dockerOptName dockerStackExeArgName) <>
              hide <>
              metavar (intercalate "|"
@@ -407,7 +407,7 @@ dockerOptsParser hide0 =
                           , "PATH" ]) <>
              help (concat [ "Location of "
                           , stackProgName
-                          , " executable used in container" ])))
+                          , " executable used in container" ]))
     <*> maybeBoolFlags (dockerOptName dockerSetUserArgName)
                        "setting user in container to match host"
                        hide
