@@ -93,7 +93,7 @@ import qualified System.Directory as Directory (findExecutable)
 import           System.Environment (getEnvironment, getProgName, getArgs, withArgs)
 import           System.Exit
 import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
-import           System.FilePath (searchPathSeparator)
+import           System.FilePath (pathSeparator, searchPathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, Handle, hGetEncoding, hSetEncoding)
 import           System.Process.Read
 
@@ -166,6 +166,12 @@ main = do
                   printExceptionStderr e
                   exitFailure
 
+-- Vertically combine only the error component of the first argument with the
+-- error component of the second.
+vcatErrorHelp :: ParserHelp -> ParserHelp -> ParserHelp
+vcatErrorHelp (ParserHelp e1 _ _ _ _) (ParserHelp e2 h2 u2 b2 f2) =
+  ParserHelp (vcatChunks [e2, e1]) h2 u2 b2 f2
+
 commandLineHandler
   :: String
   -> Bool
@@ -190,13 +196,11 @@ commandLineHandler progName isInterpreter = complicatedOptions
     parseResultHandler args f =
       if isInterpreter
       then do
-        let hlp = stringChunk
+        let hlp = errorHelp $ stringChunk
               (unwords ["Error executing interpreter command:"
                         , progName
                         , unwords args])
-        let vcatErrChunk err (ParserHelp e h u b ft) =
-              ParserHelp (vcatChunks [err, e]) h u b ft
-        handleParseResult (overFailure (vcatErrChunk hlp) (Failure f))
+        handleParseResult (overFailure (vcatErrorHelp hlp) (Failure f))
       else handleParseResult (Failure f)
 
     globalOpts hide =
@@ -460,23 +464,27 @@ secondaryCommandHandler
 -- fall-through to external executables in `git` style if they exist
 -- (i.e. `stack something` looks for `stack-something` before
 -- failing with "Invalid argument `something'")
-secondaryCommandHandler args f = do
+secondaryCommandHandler args f =
+    -- don't even try when the argument looks like a path
+    if elem pathSeparator cmd
+       then return f
+    else do
+      mExternalExec <- Directory.findExecutable cmd
+      case mExternalExec of
+        Just ex -> do
+          menv <- getEnvOverride buildPlatform
+          -- TODO show the command in verbose mode
+          -- hPutStrLn stderr $ unwords $
+          --   ["Running", "[" ++ ex, unwords (tail args) ++ "]"]
+          _ <- runNoLoggingT (exec menv ex (tail args))
+          return f
+        Nothing -> return $ fmap (vcatErrorHelp (noSuchCmd cmd)) f
+  where
     -- FIXME this is broken when any options are specified before the command
     -- e.g. stack --verbosity silent cmd
-    mExternalExec <- Directory.findExecutable cmd
-    case mExternalExec of
-      Just ex -> do
-        menv <- getEnvOverride buildPlatform
-        -- TODO show the command in verbose mode
-        -- hPutStrLn stderr $ unwords $
-        --   ["Running", "[" ++ ex, unwords (tail args) ++ "]"]
-        _ <- runNoLoggingT (exec menv ex (tail args))
-        return f
-      Nothing -> return $ fmap (flip mappend (noSuchCmd cmd)) f
-  where
     cmd = stackProgName ++ "-" ++ (head args)
     noSuchCmd name = errorHelp $ stringChunk
-      ("\nNo such auxiliary command in path `" ++ name ++ "'")
+      ("Auxiliary command not found in path `" ++ name ++ "'")
 
 interpreterHandler
   :: Monoid t
@@ -484,19 +492,31 @@ interpreterHandler
   -> ParserFailure ParserHelp
   -> IO (GlobalOptsMonoid, (GlobalOpts -> IO (), t))
 interpreterHandler args f = do
-  let file = head args
   isFile <- doesFileExist file
   if isFile
   then runInterpreterCommand file
-  else parseResultHandler (flip mappend (noSuchFile file))
+  else parseResultHandler (errorCombine (noSuchFile file))
   where
+    file = head args
+
+    -- if the filename contains a path separator then we know that it is not a
+    -- command it is a file to be interpreted. In that case we only show the
+    -- interpreter error message and exclude the command related error messages.
+    errorCombine =
+      if elem pathSeparator file
+      then overrideErrorHelp
+      else vcatErrorHelp
+
+    overrideErrorHelp (ParserHelp e1 _ _ _ _) (ParserHelp _ h2 u2 b2 f2) =
+      ParserHelp e1 h2 u2 b2 f2
+
     parseResultHandler fn = handleParseResult (overFailure fn (Failure f))
     noSuchFile name = errorHelp $ stringChunk
-      ("\nNo such source file to interpret `" ++ name ++ "'")
+      ("File does not exist or is not a regular file `" ++ name ++ "'")
 
-    runInterpreterCommand file = do
+    runInterpreterCommand path = do
       progName <- getProgName
-      iargs <- getInterpreterArgs file
+      iargs <- getInterpreterArgs path
       let parseCmdLine = commandLineHandler progName True
       let cmdArgs = iargs ++ "--" : args
        -- TODO show the command in verbose mode
