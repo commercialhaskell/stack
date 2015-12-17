@@ -69,7 +69,8 @@ parseTemplateNameFromString fname =
         , TemplateName prefix        . AbsPath <$> parseAbsFile hsf
         , TemplateName prefix        . RelPath <$> parseRelFile hsf
         ]
-    expected = "Expected a template filename like: foo or foo.hsfiles"
+    expected = "Expected a template like: foo or foo.hsfiles or\
+               \ https://example.com/foo.hsfiles"
 
 -- | Make a template name.
 mkTemplateName :: String -> Q Exp
