@@ -80,13 +80,51 @@ benchOptsParser = BenchmarkOpts
 buildOptsParser :: Command
                 -> Parser BuildOpts
 buildOptsParser cmd =
+            transform <$> trace <*> profile <*> options
+  where transform tracing profiling = enable
+          where enable opts
+                  | tracing || profiling =
+                      opts {boptsLibProfile = True
+                           ,boptsExeProfile = True
+                           ,boptsGhcOptions = ["-auto-all","-caf-all"]
+                           ,boptsBenchmarkOpts =
+                                bopts {beoAdditionalArgs =
+                                           beoAdditionalArgs bopts <>
+                                           Just (unwords additionalArgs)}
+                           ,boptsTestOpts =
+                                topts {toAdditionalArgs =
+                                           (toAdditionalArgs topts) <>
+                                           additionalArgs}}
+                  | otherwise = opts
+                  where bopts = boptsBenchmarkOpts opts
+                        topts = boptsTestOpts opts
+                        additionalArgs = [" +RTS ", trac, prof]
+                        trac = if tracing
+                                  then " -xc "
+                                  else ""
+                        prof = if profiling
+                                  then " -p "
+                                  else ""
+        profile =
+            flag False True
+             ( long "profile"
+            <> help "Enable profiling in libraries, executables, etc. \
+                    \for all expressions and generate a profiling report\
+                    \ in exec or benchmarks")
+        trace =
+            flag False True
+             ( long "trace"
+            <> help "Enable profiling in libraries, executables, etc. \
+                    \for all expressions and generate a backtrace on \
+                    \exception")
+        options =
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
             haddock <*> haddockDeps <*> dryRun <*> ghcOpts <*>
             flags <*> copyBins <*> preFetch <*> buildSubset <*>
             fileWatch' <*> keepGoing <*> forceDirty <*> tests <*>
             testOptsParser <*> benches <*> benchOptsParser <*>
             many exec <*> onlyConfigure <*> reconfigure <*> cabalVerbose
-  where target =
+        target =
            many (textArgument
                    (metavar "TARGET" <>
                     help "If none specified, use all packages"))
