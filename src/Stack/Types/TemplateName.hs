@@ -8,6 +8,7 @@
 module Stack.Types.TemplateName where
 
 import           Control.Error.Safe (justErr)
+import           Data.Aeson.Extended (FromJSON, withText, parseJSON)
 import           Data.Foldable (asum)
 import           Data.Monoid
 import           Data.Text (Text)
@@ -30,6 +31,10 @@ data TemplatePath = AbsPath (Path Abs File)
                   | UrlPath String
                   -- ^ a full URL
   deriving (Eq, Ord, Show)
+
+instance FromJSON TemplateName where
+    parseJSON = withText "TemplateName" $
+        either fail return . parseTemplateNameFromString . T.unpack
 
 -- | An argument which accepts a template name of the format
 -- @foo.hsfiles@ or @foo@, ultimately normalized to @foo@.
