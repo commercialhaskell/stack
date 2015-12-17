@@ -30,6 +30,7 @@ import           Data.Conduit
 import           Data.List
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
+import           Data.Maybe (fromMaybe)
 import           Data.Maybe.Extra (mapMaybeM)
 import           Data.Monoid
 import           Data.Set (Set)
@@ -112,14 +113,25 @@ loadTemplate
     :: forall m r.
        (HasConfig r, HasHttpManager r, MonadReader r m, MonadIO m, MonadThrow m, MonadCatch m)
     => TemplateName -> m Text
-loadTemplate name =
+loadTemplate name = do
+    templateDir <- templatesDir <$> asks getConfig
     case templatePath name of
-        Left absFile -> loadLocalFile absFile
-        Right relFile ->
+        AbsPath absFile -> loadLocalFile absFile
+        UrlPath s -> do
+            let req = fromMaybe (error "impossible happened: already valid \
+                                       \URL couldn't be parsed")
+                                (parseUrl s)
+                rel = fromMaybe backupUrlRelPath (parseRelFile s)
+            downloadTemplate req (templateDir </> rel)
+        RelPath relFile ->
             catch
                 (loadLocalFile relFile)
-                (\(_ :: NewException) ->
-                      downloadTemplate relFile)
+                (\(e :: NewException) ->
+                      case relRequest relFile of
+                        Just req -> downloadTemplate req
+                                                     (templateDir </> relFile)
+                        Nothing -> throwM e
+                )
   where
     loadLocalFile :: Path b File -> m Text
     loadLocalFile path = do
@@ -127,17 +139,16 @@ loadTemplate name =
         if exists
             then liftIO (T.readFile (toFilePath path))
             else throwM (FailedToLoadTemplate name (toFilePath path))
-    downloadTemplate :: Path Rel File -> m Text
-    downloadTemplate rel = do
-        config <- asks getConfig
-        req <- parseUrl (defaultTemplateUrl <> "/" <> toFilePath rel)
-        let path :: Path Abs File
-            path = templatesDir config </> rel
+    relRequest :: MonadThrow n => Path Rel File -> n Request
+    relRequest rel = parseUrl (defaultTemplateUrl <> "/" <> toFilePath rel)
+    downloadTemplate :: Request -> Path Abs File -> m Text
+    downloadTemplate req path = do
         _ <-
             catch
                 (redownload req path)
                 (throwM . FailedToDownloadTemplate name)
         loadLocalFile path
+    backupUrlRelPath = $(mkRelFile "downloaded.template.file.hsfiles")
 
 -- | Apply and unpack a template into a directory.
 applyTemplate
