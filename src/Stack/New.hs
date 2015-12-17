@@ -82,8 +82,7 @@ new opts = do
     if exists && not bare
         then throwM (AlreadyExists absDir)
         else do
-            logUsing absDir
-            templateText <- loadTemplate template
+            templateText <- loadTemplate template (logUsing absDir)
             files <-
                 applyTemplate
                     project
@@ -98,9 +97,13 @@ new opts = do
     template = newOptsTemplate opts
     project = newOptsProjectName opts
     bare = newOptsCreateBare opts
-    logUsing absDir =
+    logUsing absDir templateFrom =
+        let loading = case templateFrom of
+                          LocalTemp -> "Loading local"
+                          RemoteTemp -> "Downloading"
+         in
         $logInfo
-            ("Downloading template \"" <> templateName template <>
+            (loading <> " template \"" <> templateName template <>
              "\" to create project \"" <>
              packageNameText project <>
              "\" in " <>
@@ -108,15 +111,17 @@ new opts = do
                      else T.pack (toFilePath (dirname absDir)) <>
              " ...")
 
+data TemplateFrom = LocalTemp | RemoteTemp
+
 -- | Download and read in a template's text content.
 loadTemplate
     :: forall m r.
-       (HasConfig r, HasHttpManager r, MonadReader r m, MonadIO m, MonadThrow m, MonadCatch m)
-    => TemplateName -> m Text
-loadTemplate name = do
+       (HasConfig r, HasHttpManager r, MonadReader r m, MonadIO m, MonadThrow m, MonadCatch m, MonadLogger m)
+    => TemplateName -> (TemplateFrom -> m ()) -> m Text
+loadTemplate name logIt = do
     templateDir <- templatesDir <$> asks getConfig
     case templatePath name of
-        AbsPath absFile -> loadLocalFile absFile
+        AbsPath absFile -> logIt LocalTemp >> loadLocalFile absFile
         UrlPath s -> do
             let req = fromMaybe (error "impossible happened: already valid \
                                        \URL couldn't be parsed")
@@ -125,7 +130,7 @@ loadTemplate name = do
             downloadTemplate req (templateDir </> rel)
         RelPath relFile ->
             catch
-                (loadLocalFile relFile)
+                (loadLocalFile relFile <* logIt LocalTemp)
                 (\(e :: NewException) ->
                       case relRequest relFile of
                         Just req -> downloadTemplate req
@@ -135,7 +140,10 @@ loadTemplate name = do
   where
     loadLocalFile :: Path b File -> m Text
     loadLocalFile path = do
+        $logDebug ("Opening local template: \"" <> T.pack (toFilePath path)
+                                                <> "\"")
         exists <- fileExists path
+        unless exists ($logDebug "Template file doesn't exist")
         if exists
             then liftIO (T.readFile (toFilePath path))
             else throwM (FailedToLoadTemplate name (toFilePath path))
@@ -143,6 +151,7 @@ loadTemplate name = do
     relRequest rel = parseUrl (defaultTemplateUrl <> "/" <> toFilePath rel)
     downloadTemplate :: Request -> Path Abs File -> m Text
     downloadTemplate req path = do
+        logIt RemoteTemp
         _ <-
             catch
                 (redownload req path)
