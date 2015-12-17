@@ -802,12 +802,11 @@ newOptsParser = (,) <$> newOpts <*> initOptsParser
         switch
             (long "bare" <>
              help "Do not create a subdirectory for the project") <*>
-        templateNameArgument
+        optional (templateNameArgument
             (metavar "TEMPLATE_NAME" <>
              help "Name of a template or a local template in a file or a URL.\
                   \ For example: foo or foo.hsfiles or ~/foo or\
-                  \ https://example.com/foo.hsfiles" <>
-             value defaultTemplateName) <*>
+                  \ https://example.com/foo.hsfiles")) <*>
         fmap
             M.fromList
             (many

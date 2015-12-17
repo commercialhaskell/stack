@@ -27,6 +27,7 @@ import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.ByteString.Lazy.Char8 as L8
 import           Data.Conduit
+import           Data.Foldable (asum)
 import           Data.List
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
@@ -63,7 +64,7 @@ data NewOpts = NewOpts
     -- ^ Name of the project to create.
     , newOptsCreateBare   :: Bool
     -- ^ Whether to create the project without a directory.
-    , newOptsTemplate     :: TemplateName
+    , newOptsTemplate     :: Maybe TemplateName
     -- ^ Name of the template to use.
     , newOptsNonceParams  :: Map Text Text
     -- ^ Nonce parameters specified just for this invocation.
@@ -79,10 +80,14 @@ new opts = do
                       else do relDir <- parseRelDir (packageNameString project)
                               liftM (pwd </>) (return relDir)
     exists <- dirExists absDir
+    configTemplate <- configDefaultTemplate <$> asks getConfig
+    let template = fromMaybe defaultTemplateName $ asum [ cliOptionTemplate
+                                                        , configTemplate
+                                                        ]
     if exists && not bare
         then throwM (AlreadyExists absDir)
         else do
-            templateText <- loadTemplate template (logUsing absDir)
+            templateText <- loadTemplate template (logUsing absDir template)
             files <-
                 applyTemplate
                     project
@@ -94,10 +99,10 @@ new opts = do
             runTemplateInits absDir
             return absDir
   where
-    template = newOptsTemplate opts
+    cliOptionTemplate = newOptsTemplate opts
     project = newOptsProjectName opts
     bare = newOptsCreateBare opts
-    logUsing absDir templateFrom =
+    logUsing absDir template templateFrom =
         let loading = case templateFrom of
                           LocalTemp -> "Loading local"
                           RemoteTemp -> "Downloading"
