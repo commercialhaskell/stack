@@ -151,6 +151,7 @@ library
                    , edit-distance >= 0.2
                    , either
                    , enclosed-exceptions
+                   , errors
                    , exceptions >= 0.8.0.2
                    , extra
                    , fast-logger >= 2.3.1

@@ -7,17 +7,29 @@
 
 module Stack.Types.TemplateName where
 
+import           Control.Error.Safe (justErr)
+import           Data.Foldable (asum)
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Language.Haskell.TH
+import           Network.HTTP.Client (parseUrl)
 import qualified Options.Applicative as O
 import           Path
 import           Path.Internal
 
 -- | A template name.
-data TemplateName = TemplateName !Text !(Either (Path Abs File) (Path Rel File))
+data TemplateName = TemplateName !Text !TemplatePath
   deriving (Ord,Eq,Show)
+
+data TemplatePath = AbsPath (Path Abs File)
+                  -- ^ an absolute path on the filesystem
+                  | RelPath (Path Rel File)
+                  -- ^ a relative path on the filesystem, or relative to
+                  -- the template repository
+                  | UrlPath String
+                  -- ^ a full URL
+  deriving (Eq, Ord, Show)
 
 -- | An argument which accepts a template name of the format
 -- @foo.hsfiles@ or @foo@, ultimately normalized to @foo@.
@@ -46,16 +58,17 @@ templateParamArgument =
 parseTemplateNameFromString :: String -> Either String TemplateName
 parseTemplateNameFromString fname =
     case T.stripSuffix ".hsfiles" (T.pack fname) of
-        Nothing -> parseValidFile (T.pack fname) (fname <> ".hsfiles")
-        Just prefix -> parseValidFile prefix fname
+        Nothing -> parseValidFile (T.pack fname) (fname <> ".hsfiles") fname
+        Just prefix -> parseValidFile prefix fname fname
   where
-    parseValidFile prefix str =
-        case parseRelFile str of
-            Nothing ->
-                case parseAbsFile str of
-                    Nothing -> Left expected
-                    Just fp -> return (TemplateName prefix (Left fp))
-            Just fp -> return (TemplateName prefix (Right fp))
+    parseValidFile prefix hsf orig = justErr expected
+                                           $ asum (validParses prefix hsf orig)
+    validParses prefix hsf orig =
+        -- NOTE: order is important
+        [ TemplateName (T.pack orig) . UrlPath <$> (parseUrl orig *> Just orig)
+        , TemplateName prefix        . AbsPath <$> parseAbsFile hsf
+        , TemplateName prefix        . RelPath <$> parseRelFile hsf
+        ]
     expected = "Expected a template filename like: foo or foo.hsfiles"
 
 -- | Make a template name.
@@ -67,13 +80,14 @@ mkTemplateName s =
             [|TemplateName (T.pack prefix) $(pn)|]
             where pn =
                       case p of
-                          Left (Path fp) -> [|Left (Path fp)|]
-                          Right (Path fp) -> [|Right (Path fp)|]
+                          AbsPath (Path fp) -> [|AbsPath (Path fp)|]
+                          RelPath (Path fp) -> [|RelPath (Path fp)|]
+                          UrlPath fp -> [|UrlPath fp|]
 
 -- | Get a text representation of the template name.
 templateName :: TemplateName -> Text
 templateName (TemplateName prefix _) = prefix
 
 -- | Get the path of the template.
-templatePath :: TemplateName -> Either (Path Abs File) (Path Rel File)
+templatePath :: TemplateName -> TemplatePath
 templatePath (TemplateName _ fp) = fp
