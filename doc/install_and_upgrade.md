@@ -140,6 +140,10 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
         sudo apt-get update && sudo apt-get install stack -y
 
+### Building your own package
+
+Stack needs itself (the stack command) to build. You can download a stack binary following the instructions for the [generic Linux option](#linux), then look into the etc/scripts/vagrant-distros.sh script (basically, you need to use stack to compile release.hs, then execute that binary with specific parameters). The preferred method is to install the FP Complete repo, if you try this route you are on your own.
+
 ## CentOS / Red Hat / Amazon Linux
 
 *note*: for 32-bit, use the [generic Linux option](#linux)
