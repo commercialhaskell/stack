@@ -356,15 +356,15 @@ instance Exception PathException
 instance Show PathException where
     show (PathsInvalidInPath paths) = unlines $
         [ "Would need to add some paths to the PATH environment variable \
-          \to continue, but they would be invalid because they contain a \
-          \colon."
+          \to continue, but they would be invalid because they contain a "
+          ++ show FP.searchPathSeparator ++ "."
         , "Please fix the following paths and try again:"
         ] ++ paths
 
 -- | Augment the PATH environment variable with the given extra paths.
 augmentPath :: MonadThrow m => [FilePath] -> Maybe Text -> m Text
 augmentPath dirs mpath =
-  do let illegal = filter (':' `elem`) dirs
+  do let illegal = filter (FP.searchPathSeparator `elem`) dirs
      unless (null illegal) (throwM $ PathsInvalidInPath illegal)
      return $ T.intercalate (T.singleton FP.searchPathSeparator)
             $ map (T.pack . FP.dropTrailingPathSeparator) dirs
