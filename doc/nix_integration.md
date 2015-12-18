@@ -36,40 +36,36 @@ configured resolver. Enabling Nix support means packages will always
 be built using a GHC available inside the shell, rather than your
 globally installed one if any.
 
-Note also that this also means that you cannot set your `resolver:` to
-something that has not yet been mirrored in the Nixpkgs package
-repository. In order to check this, the quickest way is to install and
-launch a `nix-repl`:
+Note that in this mode `stack` can use only those resolvers that have already been
+mirrored into the Nix package repository. To find out which resolvers are
+available to you, run the shell command
 
 ```sh
-$ nix-channel --update
-$ nix-env -i nix-repl
-$ nix-repl
+$ nix-instantiate --eval -E "with import <nixpkgs> {}; lib.attrNames haskell.packages"
 ```
 
-Then, inside the `nix-repl`, do:
+to lists all known Haskell package sets in Nix. If you are interested in a
+particular resolver, say `lts-3.13`, then you can use the command
 
 ```sh
-nix-repl> :l <nixpkgs>
-nix-repl> haskell.packages.lts-3_13.ghc
+$ nix-env -f "<nixpkgs>" -qaP -A haskell.packages.lts-3_13.ghc
+haskell.packages.lts-3_13.ghc  ghc-7.10.2
 ```
 
-Replace the resolver version with whatever version you are using. If it outputs
-a path of a derivation in the Nix store, like
+to check whether it's available. If Nix doesn't know that resolver yet, then
+you'll see the following error message instead:
 
-`«derivation /nix/store/00xx8y0p3r0dqyq2frq277yr1ldqzzg0-ghc-7.10.2.drv»`
+```sh
+$ nix-env -f "<nixpkgs>" -qaP -A haskell.packages.lts-3_99.ghc
+error: attribute ‘lts-3_99’ in selection path ‘haskell.packages.lts-3_99.ghc’ not found
+```
 
-then it means that this resolver has been mirrored and exists in your local copy of the nixpkgs. Whereas an error like
-
-`error: attribute ‘lts-3_99’ missing, at (string):1:1`
-
-means you should use a different resolver. You can also use
-autocompletion with TAB to know which attributes `haskell.packages`
-contains.
-
-In Nixpkgs master branch, you can find the mirrored resolvers in the
-Haskell modules
-[here on Github](https://github.com/NixOS/nixpkgs/tree/master/pkgs/development/haskell-modules).
+The [Nixpkgs master branch](https://github.com/NixOS/nixpkgs/tree/master/pkgs/development/haskell-modules)
+usually picks up new resolvers within two or three days. Then it takes another
+two or three days before those updates arrive in the `unstable` channel.
+Release channels, like `nixos-15.09`, receive those updates only occasionally
+-- say, every two or three months --, so you should not expect them to have the
+latest resolvers available.
 
 *Note:* currently, stack only discovers dynamic and static libraries
 in the `lib/` folder of any nix package, and likewise header files in
