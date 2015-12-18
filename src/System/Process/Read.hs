@@ -38,7 +38,7 @@ import           Control.Applicative
 import           Control.Arrow ((***), first)
 import           Control.Concurrent.Async (Concurrently (..))
 import           Control.Exception hiding (try, catch)
-import           Control.Monad (join, liftM)
+import           Control.Monad (join, liftM, unless)
 import           Control.Monad.Catch (MonadThrow, MonadCatch, throwM, try, catch)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Logger (MonadLogger, logError)
@@ -53,7 +53,7 @@ import           Data.Foldable (forM_)
 import           Data.IORef
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (isJust)
+import           Data.Maybe (isJust, maybeToList)
 import           Data.Monoid
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -349,17 +349,32 @@ getEnvOverride platform =
           mkEnvOverride platform
         . Map.fromList . map (T.pack *** T.pack)
 
+data PathException = PathsInvalidInPath [FilePath]
+    deriving Typeable
+
+instance Exception PathException
+instance Show PathException where
+    show (PathsInvalidInPath paths) = unlines $
+        [ "Would need to add some paths to the PATH environment variable \
+          \to continue, but they would be invalid because they contain a "
+          ++ show FP.searchPathSeparator ++ "."
+        , "Please fix the following paths and try again:"
+        ] ++ paths
+
 -- | Augment the PATH environment variable with the given extra paths.
-augmentPath :: [FilePath] -> Maybe Text -> Text
+augmentPath :: MonadThrow m => [FilePath] -> Maybe Text -> m Text
 augmentPath dirs mpath =
-    T.intercalate (T.singleton FP.searchPathSeparator)
-    $ map (T.pack . FP.dropTrailingPathSeparator) dirs
-   ++ maybe [] return mpath
+  do let illegal = filter (FP.searchPathSeparator `elem`) dirs
+     unless (null illegal) (throwM $ PathsInvalidInPath illegal)
+     return $ T.intercalate (T.singleton FP.searchPathSeparator)
+            $ map (T.pack . FP.dropTrailingPathSeparator) dirs
+            ++ maybeToList mpath
 
 -- | Apply 'augmentPath' on the PATH value in the given Map.
-augmentPathMap :: [FilePath] -> Map Text Text -> Map Text Text
-augmentPathMap paths origEnv =
-    Map.insert "PATH" path origEnv
+augmentPathMap :: MonadThrow m => [FilePath] -> Map Text Text
+                               -> m (Map Text Text)
+augmentPathMap dirs origEnv =
+  do path <- augmentPath dirs mpath
+     return $ Map.insert "PATH" path origEnv
   where
     mpath = Map.lookup "PATH" origEnv
-    path = augmentPath paths mpath
