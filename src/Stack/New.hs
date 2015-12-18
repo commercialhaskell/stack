@@ -150,7 +150,6 @@ loadTemplate name logIt = do
         $logDebug ("Opening local template: \"" <> T.pack (toFilePath path)
                                                 <> "\"")
         exists <- fileExists path
-        unless exists ($logDebug "Template file doesn't exist")
         if exists
             then liftIO (T.readFile (toFilePath path))
             else throwM (FailedToLoadTemplate name (toFilePath path))
