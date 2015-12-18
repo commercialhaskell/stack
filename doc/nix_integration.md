@@ -60,6 +60,22 @@ $ nix-env -f "<nixpkgs>" -qaP -A haskell.packages.lts-3_99.ghc
 error: attribute ‘lts-3_99’ in selection path ‘haskell.packages.lts-3_99.ghc’ not found
 ```
 
+Another option may be to install `nix-repl`, which is a convenient tool to explore the nixpkgs:
+
+```sh
+nix-env -i nix-repl
+nix-repl
+```
+
+And in the repl you load the nixpkgs and get the same information through autocomplete:
+
+```sh
+nix-repl> :l <nixpkgs>
+nix-repl> haskell.packages.lts-<Tab>
+```
+
+You can type and evaluate any nix expression in the nix-repl, such as the one we gave to `nix-instantiate` earlier.
+
 The [Nixpkgs master branch](https://github.com/NixOS/nixpkgs/tree/master/pkgs/development/haskell-modules)
 usually picks up new resolvers within two or three days. Then it takes another
 two or three days before those updates arrive in the `unstable` channel.
