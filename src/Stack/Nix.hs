@@ -10,6 +10,7 @@ module Stack.Nix
   ) where
 
 import           Control.Applicative
+import           Control.Arrow ((***))
 import           Control.Monad
 import           Control.Monad.Catch (try,MonadCatch)
 import           Control.Monad.IO.Class (MonadIO,liftIO)
@@ -64,7 +65,7 @@ runShellAndExit :: M env m
 runShellAndExit getCmdArgs = do
      config <- asks getConfig
      envOverride <- getEnvOverride (configPlatform config)
-     (cmnd,args) <- getCmdArgs
+     (cmnd,args) <- fmap (escape *** map escape) getCmdArgs
      let mshellFile = nixInitFile (configNix config)
          pkgsInConfig = nixPackages (configNix config)
          pureShell = nixPureShell (configNix config)
@@ -86,9 +87,9 @@ runShellAndExit getCmdArgs = do
          fullArgs = concat [if pureShell then ["--pure"] else [],
                             map T.unpack (nixShellOptions (configNix config))
                            ,nixopts
-                           ,["--command", intercalate " " (map escape (cmnd:args))
-                                          ++ " $STACK_IN_NIX_EXTRA_ARGS"]
+                           ,["--command", intercalate " " (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args)]
                            ]
+
      $logDebug $
          "Using a nix-shell environment " <> (case mshellFile of
             Just filePath -> "from file: " <> (T.pack filePath)
