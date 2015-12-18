@@ -63,8 +63,8 @@ error: attribute ‘lts-3_99’ in selection path ‘haskell.packages.lts-3_99.g
 Another option may be to install `nix-repl`, which is a convenient tool to explore the nixpkgs:
 
 ```sh
-nix-env -i nix-repl
-nix-repl
+$ nix-env -i nix-repl
+$ nix-repl
 ```
 
 And in the repl you load the nixpkgs and get the same information through autocomplete:
