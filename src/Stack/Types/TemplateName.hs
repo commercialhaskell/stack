@@ -8,6 +8,7 @@
 module Stack.Types.TemplateName where
 
 import           Control.Error.Safe (justErr)
+import           Control.Applicative
 import           Data.Aeson.Extended (FromJSON, withText, parseJSON)
 import           Data.Foldable (asum)
 import           Data.Monoid
@@ -18,6 +19,7 @@ import           Network.HTTP.Client (parseUrl)
 import qualified Options.Applicative as O
 import           Path
 import           Path.Internal
+import           Prelude
 
 -- | A template name.
 data TemplateName = TemplateName !Text !TemplatePath

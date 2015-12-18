@@ -16,6 +16,7 @@ module Stack.New
     , listTemplates)
     where
 
+import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -47,6 +48,7 @@ import           Network.HTTP.Download
 import           Network.HTTP.Types.Status
 import           Path
 import           Path.IO
+import           Prelude
 import           Stack.Constants
 import           Stack.Types
 import           Stack.Types.TemplateName
@@ -72,7 +74,7 @@ data NewOpts = NewOpts
 
 -- | Create a new project with the given options.
 new
-    :: (HasConfig r, MonadReader r m, MonadLogger m, MonadCatch m, MonadThrow m, MonadIO m, HasHttpManager r)
+    :: (HasConfig r, MonadReader r m, MonadLogger m, MonadCatch m, MonadThrow m, MonadIO m, HasHttpManager r, Functor m, Applicative m)
     => NewOpts -> m (Path Abs Dir)
 new opts = do
     pwd <- getWorkingDir
@@ -121,7 +123,7 @@ data TemplateFrom = LocalTemp | RemoteTemp
 -- | Download and read in a template's text content.
 loadTemplate
     :: forall m r.
-       (HasConfig r, HasHttpManager r, MonadReader r m, MonadIO m, MonadThrow m, MonadCatch m, MonadLogger m)
+       (HasConfig r, HasHttpManager r, MonadReader r m, MonadIO m, MonadThrow m, MonadCatch m, MonadLogger m, Functor m, Applicative m)
     => TemplateName -> (TemplateFrom -> m ()) -> m Text
 loadTemplate name logIt = do
     templateDir <- templatesDir <$> asks getConfig
