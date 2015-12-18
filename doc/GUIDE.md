@@ -1361,7 +1361,15 @@ ghc` or `stack exec runghc` for that. As simple helpers, we also provide the
 stack also offers a very useful feature for running files: a script
 interpreter. For too long have Haskellers felt shackled to bash or Python
 because it's just too hard to create reusable source-only Haskell scripts.
-stack attempts to solve that. An example will be easiest to understand:
+stack attempts to solve that.
+
+You can use `stack <file name>` to execute a Haskell source file or specify
+`stack` as the interpreter using a shebang line on a Unix like operating systems.
+Additional stack options can be specified using a special Haskell comment in
+the source file to specify dependencies and automatically install them before
+running the file.
+
+An example will be easiest to understand:
 
 ```
 michael@d30748af6d3d:~$ cat turtle.hs
@@ -1389,20 +1397,23 @@ dependencies), but subsequent runs are able to reuse everything already built,
 and are therefore quite fast.
 
 The first line in the source file is the usual "shebang" to use stack as a
-script interpreter. The second line, which is required, is a Haskell comment
-providing additional options to stack (due to the common limitation of the
-"shebang" line only being allowed a single argument). In this case, the options
-tell stack to use the lts-3.2 resolver, automatically install GHC if it is not
-already installed, and ensure the turtle package is available.
+script interpreter. The second line, is a Haskell comment providing additional
+options to stack (due to the common limitation of the "shebang" line only being
+allowed a single argument). In this case, the options tell stack to use the
+lts-3.2 resolver, automatically install GHC if it is not already installed, and
+ensure the turtle package is available.
 
 If you're on Windows: you can run `stack turtle.hs` instead of `./turtle.hs`.
 The shebang line is not required in that case.
 
-The stack comment must specify a single valid stack command line, starting with
-`stack` as the command followed by the stack options to use for executing
-this file. The comment must always be on the line immediately following the
-shebang line when the shebang line is present otherwise it must be the first
-line in the file. The comment must always start in the first column of the line.
+### Specifying interpreter options
+
+The stack interpreter options comment must specify a single valid stack command
+line, starting with `stack` as the command followed by the stack options to use
+for executing this file. The comment must always be on the line immediately
+following the shebang line when the shebang line is present otherwise it must
+be the first line in the file. The comment must always start in the first
+column of the line.
 
 When many options are needed a block style comment may be more convenient to
 split the command on multiple lines for better readability. Here is an example
