@@ -19,7 +19,7 @@ data NixOpts = NixOpts
   ,nixPureShell :: !Bool
   ,nixPackages :: ![Text]
     -- ^ The system packages to be installed in the environment before it runs
-  ,nixInitFile :: !(Maybe String)
+  ,nixInitFile :: !(Maybe FilePath)
     -- ^ The path of a file containing preconfiguration of the environment (e.g shell.nix)
   ,nixShellOptions :: ![Text]
     -- ^ Options to be given to the nix-shell command line
@@ -37,7 +37,7 @@ data NixOptsMonoid = NixOptsMonoid
     -- ^ Should the nix-shell be pure
   ,nixMonoidPackages :: !(Maybe [Text])
     -- ^ System packages to use (given to nix-shell)
-  ,nixMonoidInitFile :: !(Maybe String)
+  ,nixMonoidInitFile :: !(Maybe FilePath)
     -- ^ The path of a file containing preconfiguration of the environment (e.g shell.nix)
   ,nixMonoidShellOptions :: !(Maybe [Text])
     -- ^ Options to be given to the nix-shell command line
