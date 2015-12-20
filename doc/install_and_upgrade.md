@@ -136,6 +136,10 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
             echo 'deb http://download.fpcomplete.com/debian wheezy main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
+    For unstable Debian distributions, the package from the most recent stable
+    release will usually work. If it doesn't, please
+    [report it](https://github.com/commercialhaskell/stack/issues/new).
+
  3. Update apt and install
 
         sudo apt-get update && sudo apt-get install stack -y
