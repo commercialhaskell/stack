@@ -11,6 +11,7 @@ module Stack.Nix
 
 import           Control.Applicative
 import           Control.Arrow ((***))
+import           Control.Exception (Exception,throw)
 import           Control.Monad
 import           Control.Monad.Catch (try,MonadCatch)
 import           Control.Monad.IO.Class (MonadIO,liftIO)
@@ -24,7 +25,10 @@ import           Data.Monoid
 import           Data.Streaming.Process (ProcessExitedUnsuccessfully(..))
 import qualified Data.Text as T
 import           Data.Version (showVersion)
+import           Data.Typeable (Typeable)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
+import           Path
+import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude -- Fix redundant import warnings
 import           Stack.Constants (stackProgName,platformVariantEnvVar)
@@ -41,14 +45,15 @@ import           System.Exit (exitSuccess, exitWith)
 -- Otherwise, runs the inner action.
 reexecWithOptionalShell
     :: M env m
-    => IO ()
+    => Maybe (Path Abs Dir)
+    -> IO ()
     -> m ()
-reexecWithOptionalShell inner =
+reexecWithOptionalShell mprojectRoot inner =
   do config <- asks getConfig
      inShell <- getInShell
      isReExec <- asks getReExec
      if nixEnable (configNix config) && not inShell && not isReExec
-       then runShellAndExit getCmdArgs
+       then runShellAndExit mprojectRoot getCmdArgs
        else liftIO inner
   where
     getCmdArgs = do
@@ -59,18 +64,22 @@ reexecWithOptionalShell inner =
         exePath <- liftIO getExecutablePath
         return (exePath, args)
 
-runShellAndExit :: M env m
-                => m (String, [String])
-                -> m ()
-runShellAndExit getCmdArgs = do
+runShellAndExit
+    :: M env m
+    => Maybe (Path Abs Dir)
+    -> m (String, [String])
+    -> m ()
+runShellAndExit mprojectRoot getCmdArgs = do
      config <- asks getConfig
      envOverride <- getEnvOverride (configPlatform config)
      (cmnd,args) <- fmap (escape *** map escape) getCmdArgs
-     let mshellFile = nixInitFile (configNix config)
-         pkgsInConfig = nixPackages (configNix config)
+     mshellFile <-
+         traverse (resolveFile (fromMaybeProjectRoot mprojectRoot)) $
+         nixInitFile (configNix config)
+     let pkgsInConfig = nixPackages (configNix config)
          pureShell = nixPureShell (configNix config)
          nixopts = case mshellFile of
-           Just filePath -> [filePath]
+           Just fp -> [toFilePath fp]
            Nothing -> ["-E", T.unpack $ T.intercalate " " $ concat
                               [["with (import <nixpkgs> {});"
                                ,"runCommand \"myEnv\" {"
@@ -92,7 +101,7 @@ runShellAndExit getCmdArgs = do
 
      $logDebug $
          "Using a nix-shell environment " <> (case mshellFile of
-            Just filePath -> "from file: " <> (T.pack filePath)
+            Just path -> "from file: " <> (T.pack (toFilePath path))
             Nothing -> "with nix packages: " <> (T.intercalate ", " pkgsInConfig))
      e <- try (exec envOverride "nix-shell" fullArgs)
      case e of
@@ -105,6 +114,10 @@ escape str = "'" ++ foldr (\c -> if c == '\'' then
                                    ("'\"'\"'"++)
                                  else (c:)) "" str
                  ++ "'"
+
+-- | Fail with friendly error if project root not set.
+fromMaybeProjectRoot :: Maybe (Path Abs Dir) -> Path Abs Dir
+fromMaybeProjectRoot = fromMaybe (throw CannotDetermineProjectRootException)
 
 -- | 'True' if we are currently running inside a Nix.
 getInShell :: (MonadIO m) => m Bool
@@ -122,6 +135,18 @@ nixCmdName = "nix"
 
 nixHelpOptName :: String
 nixHelpOptName = nixCmdName ++ "-help"
+
+-- | Exceptions thrown by "Stack.Nix".
+data StackNixException
+  = CannotDetermineProjectRootException
+    -- ^ Can't determine the project root (location of the shell file if any).
+  deriving (Typeable)
+
+instance Exception StackNixException
+
+instance Show StackNixException where
+  show CannotDetermineProjectRootException =
+    "Cannot determine project root directory."
 
 type M env m =
   (MonadIO m

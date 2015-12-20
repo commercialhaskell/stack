@@ -666,7 +666,7 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
           (lcProjectRoot lc)
           Nothing
           (runStackTGlobal manager (lcConfig lc) go $
-           Nix.reexecWithOptionalShell $
+           Nix.reexecWithOptionalShell (lcProjectRoot lc) $
            runStackLoggingTGlobal manager go $ do
               (wantedCompiler, compilerCheck, mstack) <-
                   case scoCompilerVersion of
@@ -832,7 +832,7 @@ withBuildConfigExt go@GlobalOpts{..} mbefore inner mafter = do
                  (lcProjectRoot lc)
                  mbefore
                  (runStackTGlobal manager (lcConfig lc) go $
-                    Nix.reexecWithOptionalShell (inner'' lk0))
+                    Nix.reexecWithOptionalShell (lcProjectRoot lc) (inner'' lk0))
                  mafter
                  (Just $ liftIO $
                       do lk' <- readIORef curLk
@@ -974,6 +974,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                         config <- asks getConfig
                         menv <- liftIO $ configEnvOverride config plainEnvSettings
                         Nix.reexecWithOptionalShell
+                            (lcProjectRoot lc)
                             (runStackTGlobal manager (lcConfig lc) go $
                                 exec menv cmd args))
                     Nothing

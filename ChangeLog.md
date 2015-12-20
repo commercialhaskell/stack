@@ -28,6 +28,8 @@ Bug fixes:
 
 * Nix: stack exec options are passed properly to the stack sub process
   [#1538](https://github.com/commercialhaskell/stack/issues/1538).
+* Nix: specifying a shell-file works in any current working directory
+  [#1547](https://github.com/commercialhaskell/stack/issues/1547).
 
 ## 0.1.10.1
 
