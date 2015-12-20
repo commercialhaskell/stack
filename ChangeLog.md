@@ -8,6 +8,9 @@ Major changes:
 
 Other enhancements:
 
+- Added flag `--open` to the `stack haddock` command. It opens the local haddock
+  documentation root in the browser using the `open-browser` package. This is
+  issue [#1396](https://github.com/commercialhaskell/stack/issues/1396)
 - Disable locale/codepage hacks when GHC >=7.10.3
   [#1552](https://github.com/commercialhaskell/stack/issues/1552)
 - Specify multiple images to build for `stack image container`

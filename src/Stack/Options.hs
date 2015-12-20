@@ -127,7 +127,7 @@ buildOptsParser cmd =
                     \exception")
         options =
             BuildOpts <$> target <*> libProfiling <*> exeProfiling <*>
-            haddock <*> haddockDeps <*> dryRun <*> ghcOpts <*>
+            haddock <*> openHaddock <*> haddockDeps <*> dryRun <*> ghcOpts <*>
             flags <*> copyBins <*> preFetch <*> buildSubset <*>
             fileWatch' <*> keepGoing <*> forceDirty <*> tests <*>
             testOptsParser <*> benches <*> benchOptsParser <*>
@@ -151,6 +151,10 @@ buildOptsParser cmd =
                     "haddock"
                     "generating Haddocks the package(s) in this directory/configuration"
                     idm
+
+        openHaddock = switch (long "open" <>
+                              help "Open the local Haddock documentation in the browser")
+
         haddockDeps =
              maybeBoolFlags
                        "haddock-deps"

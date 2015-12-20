@@ -1,5 +1,6 @@
 resolver: lts-2.22
 extra-deps:
+- open-browser-0.2.0.0
 - path-0.5.2
 - Win32-notify-0.3.0.1
 - hfsevents-0.1.5
