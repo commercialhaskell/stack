@@ -10,7 +10,6 @@ Major changes:
 
 Other enhancements:
 
-* Nix support: all options can be overriden on command line [#1483](https://github.com/commercialhaskell/stack/issues/1483). Shells are now pure by default.
 * Added flag `--profile` flag: passed with `stack build`, it will
   enable profiling, and for `--bench` and `--test` it will generate a
   profiling report by passing `+RTS -p` to the executable(s). Great
@@ -21,9 +20,14 @@ Other enhancements:
   profiling, but instead of generating a report for `--bench` and
   `--test`, prints out a stack trace on exception. Great for using
   like `stack build --test --trace`.
+* Nix: all options can be overriden on command line
+  [#1483](https://github.com/commercialhaskell/stack/issues/1483).
+* Nix: build environments (shells) are now pure by default.
 
 Bug fixes:
 
+* Nix: stack exec options are passed properly to the stack sub process
+  [#1538](https://github.com/commercialhaskell/stack/issues/1538).
 
 ## 0.1.10.1
 
