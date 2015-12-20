@@ -29,7 +29,7 @@ to go:
       "obvious" version in sequence (if doing a non-obvious jump) and replace
       with new version
     * Look for any links to "latest" documentation, replace with version tag
-    * Ensure to inter-doc links use `.html` extension (not `.md`)
+    * Ensure all inter-doc links use `.html` extension (not `.md`)
     * Ensure all documentation pages listed in `doc/index.rst`
 * Check that any new Linux distribution versions added to
   `etc/scripts/release.hs` and `etc/scripts/vagrant-releases.sh`
