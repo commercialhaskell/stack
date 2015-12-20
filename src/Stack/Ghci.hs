@@ -455,10 +455,11 @@ preprocessCabalMacros pkgs out = liftIO $ do
         return ["-optP-include", "-optP" <> toFilePath out]
 
 setScriptPerms :: MonadIO m => FilePath -> m ()
-setScriptPerms fp = do
 #ifdef WINDOWS
+setScriptPerms _ = do
     return ()
 #else
+setScriptPerms fp = do
     liftIO $ Posix.setFileMode fp $ foldl1 Posix.unionFileModes
         [ Posix.ownerReadMode
         , Posix.ownerWriteMode
