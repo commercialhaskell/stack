@@ -271,8 +271,8 @@ See [issue #644](https://github.com/commercialhaskell/stack/issues/644) for more
 
 #### I get strange `ld` errors about recompiling with "-fPIC"
 
-Some users (myself included!) have come across a linker errors (example below) that seem to be dependent on the local environment, i.e. the package may compile on a different machine. There is no known workaround (if you come across one please include details), however the issue has been reported to be [non-deterministic]
-(https://github.com/commercialhaskell/stack/issues/614) in some cases. I've had success using the docker functionality to build the project on a machine that would not compile it otherwise.
+Some users (myself included!) have come across a linker errors (example below) that seem to be dependent on the local environment, i.e. the package may compile on a different machine. There is no known workaround (if you come across one please include details), however the issue has been reported to be [non-deterministic](https://github.com/commercialhaskell/stack/issues/614)
+in some cases. I've had success using the docker functionality to build the project on a machine that would not compile it otherwise.
 
 ```
 tmp-0.1.0.0: build
