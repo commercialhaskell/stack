@@ -8,6 +8,7 @@ import System.Directory
 import System.IO
 import System.Process
 import System.Exit
+import System.Info (os)
 
 run' :: FilePath -> [String] -> IO ExitCode
 run' cmd args = do
@@ -114,3 +115,9 @@ showProcessArgDebug x
   where special '"' = True
         special ' ' = True
         special _ = False
+
+-- | Extension of executables
+exeExt = if isWindows then ".exe" else ""
+
+-- | Is the OS Windows?
+isWindows = os == "mingw32"
