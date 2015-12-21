@@ -203,6 +203,7 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject c
          configRebuildGhcOptions = fromMaybe False configMonoidRebuildGhcOptions
          configApplyGhcOptions = fromMaybe AGOLocals configMonoidApplyGhcOptions
          configAllowNewer = fromMaybe False configMonoidAllowNewer
+         configDefaultTemplate = configMonoidDefaultTemplate
 
      return Config {..}
 

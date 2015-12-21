@@ -167,6 +167,7 @@ import           Stack.Types.Image
 import           Stack.Types.PackageIdentifier
 import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
+import           Stack.Types.TemplateName
 import           Stack.Types.Version
 import           System.PosixCompat.Types (UserID, GroupID)
 import           System.Process.Read (EnvOverride)
@@ -273,6 +274,9 @@ data Config =
          ,configAllowNewer          :: !Bool
          -- ^ Ignore version ranges in .cabal files. Funny naming chosen to
          -- match cabal.
+         ,configDefaultTemplate     :: !(Maybe TemplateName)
+         -- ^ The default template to use when none is specified.
+         -- (If Nothing, the default default is used.)
          }
 
 -- | Which packages to ghc-options on the command line apply to?
@@ -793,6 +797,9 @@ data ConfigMonoid =
     -- ^ See 'configApplyGhcOptions'
     ,configMonoidAllowNewer          :: !(Maybe Bool)
     -- ^ See 'configMonoidAllowNewer'
+    ,configMonoidDefaultTemplate     :: !(Maybe TemplateName)
+    -- ^ The default template to use when none is specified.
+    -- (If Nothing, the default default is used.)
     }
   deriving Show
 
@@ -831,6 +838,7 @@ instance Monoid ConfigMonoid where
     , configMonoidRebuildGhcOptions = Nothing
     , configMonoidApplyGhcOptions = Nothing
     , configMonoidAllowNewer = Nothing
+    , configMonoidDefaultTemplate = Nothing
     }
   mappend l r = ConfigMonoid
     { configMonoidWorkDir = configMonoidWorkDir l <|> configMonoidWorkDir r
@@ -867,6 +875,7 @@ instance Monoid ConfigMonoid where
     , configMonoidRebuildGhcOptions = configMonoidRebuildGhcOptions l <|> configMonoidRebuildGhcOptions r
     , configMonoidApplyGhcOptions = configMonoidApplyGhcOptions l <|> configMonoidApplyGhcOptions r
     , configMonoidAllowNewer = configMonoidAllowNewer l <|> configMonoidAllowNewer r
+    , configMonoidDefaultTemplate = configMonoidDefaultTemplate l <|> configMonoidDefaultTemplate r
     }
 
 instance FromJSON (ConfigMonoid, [JSONWarning]) where
@@ -930,6 +939,7 @@ parseConfigMonoidJSON obj = do
     configMonoidRebuildGhcOptions <- obj ..:? configMonoidRebuildGhcOptionsName
     configMonoidApplyGhcOptions <- obj ..:? configMonoidApplyGhcOptionsName
     configMonoidAllowNewer <- obj ..:? configMonoidAllowNewerName
+    configMonoidDefaultTemplate <- obj ..:? configMonoidDefaultTemplateName
 
     return ConfigMonoid {..}
   where
@@ -1054,6 +1064,9 @@ configMonoidApplyGhcOptionsName = "apply-ghc-options"
 
 configMonoidAllowNewerName :: Text
 configMonoidAllowNewerName = "allow-newer"
+
+configMonoidDefaultTemplateName :: Text
+configMonoidDefaultTemplateName = "default-template"
 
 data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException

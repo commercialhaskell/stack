@@ -16,6 +16,7 @@ module Stack.New
     , listTemplates)
     where
 
+import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -27,9 +28,11 @@ import           Data.Aeson.Types
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.ByteString.Lazy.Char8 as L8
 import           Data.Conduit
+import           Data.Foldable (asum)
 import           Data.List
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
+import           Data.Maybe (fromMaybe)
 import           Data.Maybe.Extra (mapMaybeM)
 import           Data.Monoid
 import           Data.Set (Set)
@@ -45,6 +48,7 @@ import           Network.HTTP.Download
 import           Network.HTTP.Types.Status
 import           Path
 import           Path.IO
+import           Prelude
 import           Stack.Constants
 import           Stack.Types
 import           Stack.Types.TemplateName
@@ -62,7 +66,7 @@ data NewOpts = NewOpts
     -- ^ Name of the project to create.
     , newOptsCreateBare   :: Bool
     -- ^ Whether to create the project without a directory.
-    , newOptsTemplate     :: TemplateName
+    , newOptsTemplate     :: Maybe TemplateName
     -- ^ Name of the template to use.
     , newOptsNonceParams  :: Map Text Text
     -- ^ Nonce parameters specified just for this invocation.
@@ -70,7 +74,7 @@ data NewOpts = NewOpts
 
 -- | Create a new project with the given options.
 new
-    :: (HasConfig r, MonadReader r m, MonadLogger m, MonadCatch m, MonadThrow m, MonadIO m, HasHttpManager r)
+    :: (HasConfig r, MonadReader r m, MonadLogger m, MonadCatch m, MonadThrow m, MonadIO m, HasHttpManager r, Functor m, Applicative m)
     => NewOpts -> m (Path Abs Dir)
 new opts = do
     pwd <- getWorkingDir
@@ -78,11 +82,14 @@ new opts = do
                       else do relDir <- parseRelDir (packageNameString project)
                               liftM (pwd </>) (return relDir)
     exists <- dirExists absDir
+    configTemplate <- configDefaultTemplate <$> asks getConfig
+    let template = fromMaybe defaultTemplateName $ asum [ cliOptionTemplate
+                                                        , configTemplate
+                                                        ]
     if exists && not bare
         then throwM (AlreadyExists absDir)
         else do
-            logUsing absDir
-            templateText <- loadTemplate template
+            templateText <- loadTemplate template (logUsing absDir template)
             files <-
                 applyTemplate
                     project
@@ -94,12 +101,16 @@ new opts = do
             runTemplateInits absDir
             return absDir
   where
-    template = newOptsTemplate opts
+    cliOptionTemplate = newOptsTemplate opts
     project = newOptsProjectName opts
     bare = newOptsCreateBare opts
-    logUsing absDir =
+    logUsing absDir template templateFrom =
+        let loading = case templateFrom of
+                          LocalTemp -> "Loading local"
+                          RemoteTemp -> "Downloading"
+         in
         $logInfo
-            ("Downloading template \"" <> templateName template <>
+            (loading <> " template \"" <> templateName template <>
              "\" to create project \"" <>
              packageNameText project <>
              "\" in " <>
@@ -107,37 +118,52 @@ new opts = do
                      else T.pack (toFilePath (dirname absDir)) <>
              " ...")
 
+data TemplateFrom = LocalTemp | RemoteTemp
+
 -- | Download and read in a template's text content.
 loadTemplate
     :: forall m r.
-       (HasConfig r, HasHttpManager r, MonadReader r m, MonadIO m, MonadThrow m, MonadCatch m)
-    => TemplateName -> m Text
-loadTemplate name =
+       (HasConfig r, HasHttpManager r, MonadReader r m, MonadIO m, MonadThrow m, MonadCatch m, MonadLogger m, Functor m, Applicative m)
+    => TemplateName -> (TemplateFrom -> m ()) -> m Text
+loadTemplate name logIt = do
+    templateDir <- templatesDir <$> asks getConfig
     case templatePath name of
-        Left absFile -> loadLocalFile absFile
-        Right relFile ->
+        AbsPath absFile -> logIt LocalTemp >> loadLocalFile absFile
+        UrlPath s -> do
+            let req = fromMaybe (error "impossible happened: already valid \
+                                       \URL couldn't be parsed")
+                                (parseUrl s)
+                rel = fromMaybe backupUrlRelPath (parseRelFile s)
+            downloadTemplate req (templateDir </> rel)
+        RelPath relFile ->
             catch
-                (loadLocalFile relFile)
-                (\(_ :: NewException) ->
-                      downloadTemplate relFile)
+                (loadLocalFile relFile <* logIt LocalTemp)
+                (\(e :: NewException) ->
+                      case relRequest relFile of
+                        Just req -> downloadTemplate req
+                                                     (templateDir </> relFile)
+                        Nothing -> throwM e
+                )
   where
     loadLocalFile :: Path b File -> m Text
     loadLocalFile path = do
+        $logDebug ("Opening local template: \"" <> T.pack (toFilePath path)
+                                                <> "\"")
         exists <- fileExists path
         if exists
             then liftIO (T.readFile (toFilePath path))
             else throwM (FailedToLoadTemplate name (toFilePath path))
-    downloadTemplate :: Path Rel File -> m Text
-    downloadTemplate rel = do
-        config <- asks getConfig
-        req <- parseUrl (defaultTemplateUrl <> "/" <> toFilePath rel)
-        let path :: Path Abs File
-            path = templatesDir config </> rel
+    relRequest :: MonadThrow n => Path Rel File -> n Request
+    relRequest rel = parseUrl (defaultTemplateUrl <> "/" <> toFilePath rel)
+    downloadTemplate :: Request -> Path Abs File -> m Text
+    downloadTemplate req path = do
+        logIt RemoteTemp
         _ <-
             catch
                 (redownload req path)
                 (throwM . FailedToDownloadTemplate name)
         loadLocalFile path
+    backupUrlRelPath = $(mkRelFile "downloaded.template.file.hsfiles")
 
 -- | Apply and unpack a template into a directory.
 applyTemplate
