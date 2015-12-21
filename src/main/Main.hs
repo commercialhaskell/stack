@@ -14,7 +14,6 @@ module Main (main) where
 import           Control.Exception
 import qualified Control.Exception.Lifted as EL
 import           Control.Monad hiding (mapM, forM)
-import           Control.Monad.Catch (MonadThrow)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (ask, asks, runReaderT)
@@ -47,7 +46,7 @@ import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import           Network.HTTP.Client
 import           Options.Applicative
 import           Options.Applicative.Args
-import           Options.Applicative.Help(errorHelp,stringChunk)
+import           Options.Applicative.Help (errorHelp, stringChunk, vcatChunks)
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Complicated
 #ifdef USE_GIT_INFO
@@ -94,7 +93,7 @@ import qualified System.Directory as Directory (findExecutable)
 import           System.Environment (getEnvironment, getProgName, getArgs, withArgs)
 import           System.Exit
 import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
-import           System.FilePath (searchPathSeparator)
+import           System.FilePath (pathSeparator, searchPathSeparator)
 import           System.IO (hIsTerminalDevice, stderr, stdin, stdout, hSetBuffering, BufferMode(..), hPutStrLn, Handle, hGetEncoding, hSetEncoding)
 import           System.Process.Read
 
@@ -167,6 +166,12 @@ main = do
                   printExceptionStderr e
                   exitFailure
 
+-- Vertically combine only the error component of the first argument with the
+-- error component of the second.
+vcatErrorHelp :: ParserHelp -> ParserHelp -> ParserHelp
+vcatErrorHelp (ParserHelp e1 _ _ _ _) (ParserHelp e2 h2 u2 b2 f2) =
+  ParserHelp (vcatChunks [e2, e1]) h2 u2 b2 f2
+
 commandLineHandler
   :: String
   -> Bool
@@ -181,19 +186,29 @@ commandLineHandler progName isInterpreter = complicatedOptions
   (addCommands (globalOpts True) isInterpreter)
   where
     failureCallback f args =
-        case stripPrefix "Invalid argument" (fst (renderFailure f "")) of
-            Just _ -> if isInterpreter
-                      then handleParseResult (Failure f)
-                      else secondaryCommandHandler args
-                          >>= maybe (interpreterHandler f args) id
-            Nothing -> handleParseResult (Failure f)
+      case stripPrefix "Invalid argument" (fst (renderFailure f "")) of
+          Just _ -> if isInterpreter
+                    then parseResultHandler args f
+                    else secondaryCommandHandler args f
+                        >>= interpreterHandler args
+          Nothing -> parseResultHandler args f
+
+    parseResultHandler args f =
+      if isInterpreter
+      then do
+        let hlp = errorHelp $ stringChunk
+              (unwords ["Error executing interpreter command:"
+                        , progName
+                        , unwords args])
+        handleParseResult (overFailure (vcatErrorHelp hlp) (Failure f))
+      else handleParseResult (Failure f)
 
     globalOpts hide =
-        extraHelpOption hide progName (Docker.dockerCmdName ++ "*") Docker.dockerHelpOptName <*>
-        extraHelpOption hide progName (Nix.nixCmdName ++ "*") Nix.nixHelpOptName <*>
-        globalOptsParser hide (if isInterpreter
-                               then Just $ LevelOther "silent"
-                               else Nothing)
+      extraHelpOption hide progName (Docker.dockerCmdName ++ "*") Docker.dockerHelpOptName <*>
+      extraHelpOption hide progName (Nix.nixCmdName ++ "*") Nix.nixHelpOptName <*>
+      globalOptsParser hide (if isInterpreter
+                             then Just $ LevelOther "silent"
+                             else Nothing)
 
 globalFooter :: String
 globalFooter = "Run 'stack --help' for global options that apply to all subcommands."
@@ -442,42 +457,66 @@ addCommands globalOpts isInterpreter = do
         addSubCommands cmd title globalFooter globalOpts
 
 secondaryCommandHandler
-  :: (MonadIO m, MonadThrow m, MonadBaseControl IO m)
-  => [String]
-  -> IO (Maybe (m a))
+  :: [String]
+  -> ParserFailure ParserHelp
+  -> IO (ParserFailure ParserHelp)
 
 -- fall-through to external executables in `git` style if they exist
 -- (i.e. `stack something` looks for `stack-something` before
 -- failing with "Invalid argument `something'")
-secondaryCommandHandler args = do
+secondaryCommandHandler args f =
+    -- don't even try when the argument looks like a path
+    if elem pathSeparator cmd
+       then return f
+    else do
+      mExternalExec <- Directory.findExecutable cmd
+      case mExternalExec of
+        Just ex -> do
+          menv <- getEnvOverride buildPlatform
+          -- TODO show the command in verbose mode
+          -- hPutStrLn stderr $ unwords $
+          --   ["Running", "[" ++ ex, unwords (tail args) ++ "]"]
+          _ <- runNoLoggingT (exec menv ex (tail args))
+          return f
+        Nothing -> return $ fmap (vcatErrorHelp (noSuchCmd cmd)) f
+  where
     -- FIXME this is broken when any options are specified before the command
     -- e.g. stack --verbosity silent cmd
-    mExternalExec <- Directory.findExecutable ("stack-" ++ head args)
-    case mExternalExec of
-      Just ex -> do
-        menv <- getEnvOverride buildPlatform
-        return (Just $ runNoLoggingT (exec menv ex (tail args)))
-      Nothing -> return Nothing
+    cmd = stackProgName ++ "-" ++ (head args)
+    noSuchCmd name = errorHelp $ stringChunk
+      ("Auxiliary command not found in path `" ++ name ++ "'")
 
 interpreterHandler
   :: Monoid t
-  => ParserFailure ParserHelp
-  -> [String]
+  => [String]
+  -> ParserFailure ParserHelp
   -> IO (GlobalOptsMonoid, (GlobalOpts -> IO (), t))
-interpreterHandler f args = do
-  let file = head args
+interpreterHandler args f = do
   isFile <- doesFileExist file
   if isFile
   then runInterpreterCommand file
-  else parseResultHandler (flip mappend (noSuchFile file))
+  else parseResultHandler (errorCombine (noSuchFile file))
   where
+    file = head args
+
+    -- if the filename contains a path separator then we know that it is not a
+    -- command it is a file to be interpreted. In that case we only show the
+    -- interpreter error message and exclude the command related error messages.
+    errorCombine =
+      if elem pathSeparator file
+      then overrideErrorHelp
+      else vcatErrorHelp
+
+    overrideErrorHelp (ParserHelp e1 _ _ _ _) (ParserHelp _ h2 u2 b2 f2) =
+      ParserHelp e1 h2 u2 b2 f2
+
     parseResultHandler fn = handleParseResult (overFailure fn (Failure f))
     noSuchFile name = errorHelp $ stringChunk
-      ("\nNo such source file to interpret `" ++ name ++ "\'")
+      ("File does not exist or is not a regular file `" ++ name ++ "'")
 
-    runInterpreterCommand file = do
+    runInterpreterCommand path = do
       progName <- getProgName
-      iargs <- getInterpreterArgs file
+      iargs <- getInterpreterArgs path
       let parseCmdLine = commandLineHandler progName True
       let cmdArgs = iargs ++ "--" : args
        -- TODO show the command in verbose mode
