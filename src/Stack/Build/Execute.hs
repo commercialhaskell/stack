@@ -1179,7 +1179,12 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
             hpcDir <- hpcDirFromDir pkgDir
             when needHpc (createTree hpcDir)
 
-            let suitesToRun = Map.toList $ packageTests package
+            let suitesToRun
+                  = [ testSuitePair
+                    | testSuitePair <- Map.toList $ packageTests package
+                    , let testName = fst testSuitePair
+                    , testName `elem` testsToRun
+                    ]
 
             errs <- liftM Map.unions $ forM suitesToRun $ \(testName, suiteInterface) -> do
                 let stestName = T.unpack testName
