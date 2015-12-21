@@ -1,0 +1,217 @@
+#compdef stack
+
+# Load completion helper functions
+_completion_helpers
+
+# Extract command names and descriptions from stack help text (supplied as input).
+# Takes 2 args: the name of an array in which to store the command names,
+#               and the name of an array in which to store the command descriptions
+function _stack_get_commands() {
+    # extract command help lines, and join split description lines together
+    _join_lines " " 25 "^Available commands:" "^[^[:space:]]" |\
+	_extract_parts "^[[:space:]]*([^[:space:]]+)[[:space:]]+([^[:space:]].*)" "$1" "$2"
+}
+
+# Extract option names and descriptions from stack help text (supplied as input).
+# Takes 2 args: the name of an array in which to store the option names,
+#               and the name of an array in which to store the option descriptions
+function _stack_get_options() {
+    # extract option help lines, and join split description lines together
+    _join_lines " " 25 "^Available options:" "^[^[:space:]]" |\
+	# remove excessive whitespace (e.g. between option arg and description)
+	sed -r 's/[[:space:]]{3,}/   /g' |\
+	# extract option and description (keep option arg with description)
+	_extract_parts "^[[:space:]]*(?:[^[:space:],]+,)?(--[a-z-\*]+)[[:space:]]+([^[:space:]].*)" "$1" "$2"
+}
+
+# Extract usage string from stack help text (supplied as input), and transform the text
+# into a skeleton for arguments to _regex_arguments. 
+# Takes 1 optional argument: the subcommand being completed (none if completing main command)
+function _stack_get_optargs_skeleton() {
+    # First remove initial title line if present
+    sed -r '{s/^stack - .*//;s/^[[:space:]]*$//}' |\
+	# Extract usage string, and join into a single line
+	_join_lines " " 10 "" "^[[:space:]]{,9}([^U[:space:]]|U[^s]|Us[^a])" |\
+	# Remove preliminary text (make sure there's an initial space in result)
+	sed -r "s/Usage: stack ([a-z -]+)?([^a-z -])/ \2/" |\
+	# Remove any dots (e.g. in [SELECTOR...])
+	tr -d . |\
+	# Put brackets around whole set of options (by matching on 1st and last square parentheses)
+	sed -r "{s/\[/( [/;s/\]([^]]*)$/] ) '#' \1/}" |\
+	# put | between items
+	sed -r "s/([])]) ([[(])/\1 | \2/g" |\
+	# sometimes (stack sig sign sdist --help) we have an unbracketed item in the middle
+	sed -r "s/([])]) ([^]|[]+) ([[(])/\1 | \2 | \3/g" |\
+	# remove short options (just use long ones)
+	sed -r "s/\[([^[:space:]]+\|)?(--[^][:space:]]*)( [^]]+)?\]/[\2\3]/g" |\
+	#sed -r "s/\[([A-Z][^] \t]+)\]/\1/g"
+	# put single quotes and spaces around (,) & |
+	sed -r "s/([\|\(\)])/ '\1' /g" |\
+	# remove non-option bracketed stuff
+	sed -r "s/\[([A-Z_-]+)\]/\1/g" |\
+	# finally, put options and option args in form usable by _regex_arguments
+	sed -r "s/\[(--[^][:space:]]*)( [^]]+)?\]/\/$'\1\\\0'\/ ':options:$1 options:((\1\:\"description\"))'\2 /g" 
+}
+
+# This function creates the final arguments for _regex_arguments
+# Arguments:
+# 1) the name of an associative array containing option argument names and their replacements,
+# rest) full command line of command to be completed without any options, e.g. stack sig sign sdist
+function _stack_regex_arguments() {
+    # store stack help output in $helpstr
+    local optargs=$1
+    shift
+    local helpstr
+    helpstr=$("${@}" --help)
+    # save current state of rematchpcre shell option, and set it
+    local -A SAVED_SHELL_OPTIONS
+    _save_options rematchpcre
+    setopt rematchpcre
+    # get lists of commands, options, and descriptions of those things
+    local -a cmds cmd_descs opts opt_descs
+    print "$helpstr" | _stack_get_commands cmds cmd_descs
+    print "$helpstr" | _stack_get_options opts opt_descs
+    # get basic skeleton for arguments list to _regex_arguments
+    local regexopt="$(print $helpstr | _stack_get_optargs_skeleton $@)"
+    # insert option arg completions
+    local -A opt_args
+    set -A opt_args "${(kvP@)optargs}"
+    regexopt=$(print "$regexopt" | _multi_substitute opt_args)
+    # insert option descriptions into $regexopt
+    local opt_desc i=1
+    while [[ "$i" -le "${#opts}" ]]; do
+	opt_desc="${(qL)${opt_descs[i]//\"/\\\"}//[\`\']/}"
+	regexopt="${regexopt//\(\($opts[i]\:\"description\"\)\)/((${opts[i]//\*/}\:\"$opt_desc\"))}"
+	let i=i+1
+    done
+    # special treatment for "-- ARGS" (it's not listed under "Available options")
+    regexopt="${regexopt//\(\(--\:\"description\"\)\)/((--:\"ARGS (e.g. stack ghc -- X.hs -o x)\"))}"
+    # Create completions for commands
+    local cmd cmd_desc cmd_opts regexcmd i=1 
+    # make sure we have some commands
+    if [[ ( "$cmds" =~ "[[:alpha:]]+" ) ]]; then
+	regexcmd=" '(' "
+	while [[ ( "$i" -le "${#cmds}" ) ]]; do
+	    cmd="${cmds[$i]}"
+	    cmd_desc="${(q)${${cmd_descs[$i]//\"/\\\"}//[\`\']/}}"
+	    regexcmd+=" /\$'$cmd\0'/ ':cmds:commands:(($cmd:\\\"$cmd_desc\\\"))' "
+	    # recursively create completion functions for subcommands
+	    # (named by concatenating commands with _, e.g: _stack_sig_sign_sdist)
+	    regexcmd+=" /\$'[^\0]##\0'/ ':opt:$cmd options:{ _create_stack_completion_function $optargs ${@} $cmd; _${${^^@}// /_}_$cmd }' '#' "
+	    if [[ "$i" -lt "${#cmds}" ]]; then
+		regexcmd+=" '|' "
+	    fi
+	    let i=i+1
+	done
+	regexcmd+=" ')' "
+    fi
+    # Put all completions together
+    local regexall="${regexopt//COMMAND/} ${regexcmd}"
+    _restore_options rematchpcre
+    # output the _regex_arguments arguments
+    print "$regexall"
+}
+
+# Unless it already exists, create the completion function for stack or one of its subcommands.
+# Arguments:
+# 1) the name of an associative array containing option argument names and their replacements,
+# rest) full command line of command to be completed without any options, e.g. stack sig sign sdist
+_create_stack_completion_function() {
+    local optargs=$1
+    shift
+    local func regex
+    func="_${${^^@}// /_}"
+    regex="/$'${${^^@}// /\\0*}\\0'/"
+    if ! whence -w $func >/dev/null; then
+	eval "_regex_arguments $func $regex $(_stack_regex_arguments $optargs $@)"
+    fi
+}
+
+# Anonymous function for main code
+function() {
+    # arguments to _regex_arguments for completing files and directories
+    local matchany matchinteger matchquoted 
+    matchany="/$'[^\0]##\0'/"
+    matchinteger="/$'[0-9]##\0'/"
+    # the following regexp matches backslashed quotes only. I can't get it to match non-backslashed quotes.
+    matchquoted="/$'\"[^\"]##\"\0'/"
+    local -a files dirs
+    files=("$matchany" ':file:file:_files')
+    dirs=("$matchany" ':dir:directory:_dirs')
+    # following line commented out because it is too slow
+    #local templatesdir="$(stack path --global-stack-root 2>/dev/null)/templates"
+    # replace following path with path to templates directory if different    
+    local templatesdir="$HOME/.stack/templates/"
+    typeset -gA STACKOPTARGS
+    # Need to have spaces surrounding each key and value in following assoc array.
+    STACKOPTARGS=(
+	" ARCH " " /$'[a-z0-9-_]##\0'/ ':arch:system architecture:(i386 x86_64 ppc sparc)' "
+	# Following 2 entries correspond with  "ARGS (e.g. stack ghc -- X.hs -o x)"
+	" ARGS " " $matchany ':args:args for command:' "
+	# Remove this stuff
+	" '(' eg stack ghc -- Xhs -o x ')' " ""
+	" ARG " " $matchany ':arg:arg:' "
+	" BENCH_ARGS " " $matchany ':args:arguments:' "
+	" CMD " " $matchquoted ':cmd:command to run after build:' "
+	" CMD ARGS " " $matchquoted ':cmd:command to run after build:' "
+	" CODE " " $matchquoted ':code:code:' "
+	" COMPILER " " /$'ghc[^\0]#\0'/ ':compiler:compiler:' "
+	" CREATED-DAYS-AGO " " $matchinteger ':number:number:' "
+	" DEPTH " " $matchinteger ':number:number:' "
+	" DIR " " $matchany ':directory:directory:_dirs' "		
+	" FIELD VALUE " " '(' $matchany ':field:field:' $matchany ':value:value:' ')' "
+	" GHC " " $matchany ':file:ghc:_files' "
+	" GHC_VERSION " " /$'[0-9.]##\0'/ ':version:version:' "
+	" IGNORED " ""
+	" JOBS " " $matchinteger ':number:number of concurrent jobs to run:' "
+	" KEY:VALUE " " $matchany ':keyval:template parameter:' "
+	" LAST-USED-DAYS-AGO " " $matchinteger ':number:number:' "
+	" OPTION " " $matchany ':options:options:' "
+	" OS " " /$'[a-z]##\0'/ ':os:operating system:(linux windows osx freebsd solaris)' "
+	" PACKAGE " " $matchany ':name:package name:' "
+	" PACKAGE:-FLAG " " $matchany ':flag:package flag:' "
+	" PACKAGES " " $matchany ':name:package name:' "
+	" PACKAGE_NAME " " $matchany ':name:package name:' "
+	" PATH " " $matchany ':file:file:_files' "
+	" PVP-BOUNDS " " $matchany ':bounds:pvp version bounds:(none lower upper both)' "
+	" RESOLVER " " $matchany ':resolver:resolver:' "
+	" SELECTOR " " $matchany ':selector:selector:' "
+	" SEP " " $matchany ':separator:separator:' "
+	" STACK-YAML " " /$'[^\0]##.yaml\0'/ ':file:file:_files' "
+	" TARBALL/DIR " " $matchany ':name:package name:_files' "
+	# TODO: a completer for targets would be nice	
+	" TARGET " " /$'[a-zA-Z][^\0]##\0'/ ':target:package or package component:' "
+	" TEMPLATE_NAME " " $matchany ':name:template name:_path_files -W \"$templatesdir\" -g \"*.hsfiles(-.:r)\"' "
+	" TEST_ARGS " " $matchany ':args:arguments:' "
+	" URL " " $matchany ':url:url:' "
+	" VARIANT " " $matchany ':variant:ghc variant:' "
+	" VERBOSITY " " /$'(silent|error|warn|info|debug)\0'/ ':verbosity:verbosity:(silent error warn info debug)' "
+	" WORK-DIR " " $matchany ':directory:directory:_dirs' "
+    )
+    # remove any existing _stack functions
+    local -a stack_cmds 
+    stack --help | _stack_get_commands stack_cmds 
+    local cmd
+    # remove all preexisting stack completion functions
+    for cmd in "${stack_cmds[@]}"; do
+	for func in "${(k@)functions[(I)_stack_$cmd*]}"; do
+	    if whence -w $func >/dev/null; then
+		unfunction $func
+	    fi
+	done
+    done
+    if whence -w _stack >/dev/null; then
+	unfunction _stack
+    fi
+    # Create main stack completion function
+    _create_stack_completion_function STACKOPTARGS stack
+    # Set tag-order so that options are completed separately from arguments
+    zstyle ":completion:${curcontext}:" tag-order '! options'
+
+    # Execute the completion function
+    _stack "$@"
+}
+
+# Local Variables:"
+# mode:sh"
+# End:"
