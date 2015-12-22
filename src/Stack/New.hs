@@ -167,7 +167,7 @@ loadTemplate name logIt = do
 
 -- | Apply and unpack a template into a directory.
 applyTemplate
-    :: (MonadIO m, MonadThrow m, MonadReader r m, HasConfig r, MonadLogger m)
+    :: (MonadIO m, MonadThrow m, MonadCatch m, MonadReader r m, HasConfig r, MonadLogger m)
     => PackageName
     -> TemplateName
     -> Map Text Text
@@ -189,9 +189,17 @@ applyTemplate project template nonceParams dir templateText = do
     unless (S.null missingKeys)
          ($logInfo (T.pack (show (MissingParameters project template missingKeys (configUserConfigPath config)))))
     files :: Map FilePath LB.ByteString <-
-        execWriterT $
-        yield (T.encodeUtf8 (LT.toStrict applied)) $$
-        unpackTemplate receiveMem id
+        catch (execWriterT $
+               yield (T.encodeUtf8 (LT.toStrict applied)) $$
+               unpackTemplate receiveMem id
+              )
+              (\(e :: ProjectTemplateException) ->
+                   throwM (InvalidTemplate template (show e)))
+    when (M.null files) $
+         throwM (InvalidTemplate template "Template does not contain any files")
+    unless (any (".cabal" `isSuffixOf`) . M.keys $ files) $
+         throwM (InvalidTemplate template "Template does not contain a .cabal\
+                                          \ file")
     liftM
         M.fromList
         (mapM
@@ -319,6 +327,7 @@ data NewException
     | BadTemplatesJSON !String !LB.ByteString
     | AlreadyExists !(Path Abs Dir)
     | MissingParameters !PackageName !TemplateName !(Set String) !(Path Abs File)
+    | InvalidTemplate !TemplateName !String
     deriving (Typeable)
 
 instance Exception NewException
@@ -373,3 +382,7 @@ instance Show NewException where
                        (\key ->
                              "-p \"" <> key <> ":value\"")
                        (S.toList missingKeys))]
+    show (InvalidTemplate name why) =
+        "The template \"" <> T.unpack (templateName name) <>
+        "\" is invalid and could not be used. " <>
+        "The error was: \"" <> why <> "\""
