@@ -1253,7 +1253,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                         -- directory into the hpc work dir, for
                         -- tidiness.
                         when needHpc $
-                            updateTixFile (packageName package) tixPath
+                            updateTixFile (packageName package) tixPath testName'
                         return $ case ec of
                             ExitSuccess -> Map.empty
                             _ -> Map.singleton testName $ Just ec

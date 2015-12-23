@@ -66,24 +66,21 @@ deleteHpcReports = do
 -- | Move a tix file into a sub-directory of the hpc report directory. Deletes the old one if one is
 -- present.
 updateTixFile :: (MonadIO m,MonadReader env m,HasConfig env,MonadLogger m,MonadBaseControl IO m,MonadCatch m,HasEnvConfig env)
-            => PackageName -> Path Abs File -> m ()
-updateTixFile pkgName tixSrc = do
-    case stripSuffix ".tix" (toFilePath (filename tixSrc)) of
-        Nothing -> error "Invariant violated: updateTixFile expected a tix filepath."
-        Just testName -> do
-            exists <- fileExists tixSrc
-            when exists $ do
-                tixDest <- tixFilePath pkgName testName
-                removeFileIfExists tixDest
-                createTree (parent tixDest)
-                -- Remove exe modules because they are problematic. This could be revisited if there's a GHC
-                -- version that fixes https://ghc.haskell.org/trac/ghc/ticket/1853
-                mtix <- readTixOrLog tixSrc
-                case mtix of
-                    Nothing -> $logError $ "Failed to read " <> T.pack (toFilePath tixSrc)
-                    Just tix -> do
-                        liftIO $ writeTix (toFilePath tixDest) (removeExeModules tix)
-                        removeFileIfExists tixSrc
+            => PackageName -> Path Abs File -> String -> m ()
+updateTixFile pkgName tixSrc testName = do
+    exists <- fileExists tixSrc
+    when exists $ do
+        tixDest <- tixFilePath pkgName testName
+        removeFileIfExists tixDest
+        createTree (parent tixDest)
+        -- Remove exe modules because they are problematic. This could be revisited if there's a GHC
+        -- version that fixes https://ghc.haskell.org/trac/ghc/ticket/1853
+        mtix <- readTixOrLog tixSrc
+        case mtix of
+            Nothing -> $logError $ "Failed to read " <> T.pack (toFilePath tixSrc)
+            Just tix -> do
+                liftIO $ writeTix (toFilePath tixDest) (removeExeModules tix)
+                removeFileIfExists tixSrc
 
 testExeName :: (MonadReader env m,HasConfig env) => String -> m String
 testExeName testName = do
