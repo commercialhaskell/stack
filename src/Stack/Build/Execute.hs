@@ -1194,7 +1194,10 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                         C.TestSuiteExeV10{} -> return (stestName, False)
                         interface -> throwM (TestSuiteTypeUnsupported interface)
 
-                exeName <- testExeName testName'
+                let exeName = testName' ++
+                        case configPlatform config of
+                            Platform _ Windows -> ".exe"
+                            _ -> ""
                 tixPath <- liftM (pkgDir </>) $ parseRelFile $ exeName ++ ".tix"
                 exePath <- liftM (buildDir </>) $ parseRelFile $ "build/" ++ testName' ++ "/" ++ exeName
                 exists <- fileExists exePath
