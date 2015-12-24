@@ -58,6 +58,7 @@ main =
                 gArch = arch
                 gBinarySuffix = ""
                 gUploadLabel = Nothing
+                gTestHaddocks = True
                 gProjectRoot = "" -- Set to real value velow.
                 global0 = foldl (flip id) Global{..} flags
             -- Need to get paths after options since the '--arch' argument can effect them.
@@ -98,7 +99,10 @@ options =
         "Extra suffix to add to binary executable archive filename."
     , Option "" [uploadLabelOptName]
         (ReqArg (\v -> Right $ \g -> g{gUploadLabel = Just v}) "LABEL")
-        "Label to give the uploaded release asset" ]
+        "Label to give the uploaded release asset"
+    , Option "" [noTestHaddocksOptName] (NoArg $ Right $ \g -> g{gTestHaddocks = False})
+        "Disable testing building haddocks."
+    ]
 
 -- | Shake rules.
 rules :: Global -> [String] -> Rules ()
@@ -148,7 +152,8 @@ rules global@Global{..} args = do
             let cmd0 = cmd (releaseBinDir </> binaryName </> stackExeFileName)
                     (stackArgs global)
                     ["--local-bin-path=" ++ tmpDir]
-            () <- cmd0 "install --pedantic --haddock --no-haddock-deps"
+            () <- cmd0 $ concat $ concat
+                [["install --pedantic --no-haddock-deps"], [" --haddock" | gTestHaddocks]]
             () <- cmd0 "install cabal-install"
             let cmd' = cmd (AddPath [tmpDir] []) stackProgName (stackArgs global)
             () <- cmd' "clean"
@@ -612,6 +617,10 @@ binaryVariantOptName = "binary-variant"
 uploadLabelOptName :: String
 uploadLabelOptName = "upload-label"
 
+-- | @--no-test-haddocks@ command-line option name.
+noTestHaddocksOptName :: String
+noTestHaddocksOptName = "no-test-haddocks"
+
 -- | Arguments to pass to all 'stack' invocations.
 stackArgs :: Global -> [String]
 stackArgs Global{..} = ["--install-ghc", "--arch=" ++ display gArch]
@@ -659,5 +668,6 @@ data Global = Global
     , gHomeDir :: !FilePath
     , gArch :: !Arch
     , gBinarySuffix :: !String
-    , gUploadLabel ::(Maybe String)}
+    , gUploadLabel :: (Maybe String)
+    , gTestHaddocks :: !Bool }
     deriving (Show)
