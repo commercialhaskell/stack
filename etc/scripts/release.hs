@@ -156,8 +156,6 @@ rules global@Global{..} args = do
                 [["install --pedantic --no-haddock-deps"], [" --haddock" | gTestHaddocks]]
             () <- cmd0 "install --resolver=lts-3.0 cabal-install"
             let cmd' = cmd (AddPath [tmpDir] []) stackProgName (stackArgs global)
-            () <- cmd' "clean"
-            () <- cmd' "build --pedantic"
             () <- cmd' "test --pedantic --flag stack:integration-tests"
             return ()
         copyFileChanged (releaseBinDir </> binaryName </> stackExeFileName) out
