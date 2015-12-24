@@ -130,7 +130,7 @@ renderStackYaml p =
             \# system-ghc: true\n\n\
             \# Require a specific version of stack, using version ranges\n\
             \# require-stack-version: -any # Default\n\
-            \# require-stack-version: >= 0.1.10.0\n\n\
+            \# require-stack-version: >= 1.0.0\n\n\
             \# Override the architecture used by stack, especially useful on Windows\n\
             \# arch: i386\n\
             \# arch: x86_64\n\n\
