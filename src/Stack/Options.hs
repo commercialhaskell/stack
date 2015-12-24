@@ -374,7 +374,8 @@ nixOptsParser hide0 = overrideActivation <$>
                                  hide)))
   <*> optional (option str (long "nix-shell-file" <>
                             metavar "FILEPATH" <>
-                            help "Nix file to be used to launch a nix-shell (for regular Nix users)"))
+                            help "Nix file to be used to launch a nix-shell (for regular Nix users)" <>
+                            hide))
   <*> (fmap (map T.pack)
        <$> optional (argsOption (long "nix-shell-options" <>
                                  metavar "OPTIONS" <>
