@@ -4,32 +4,64 @@
 
 Release notes:
 
+*  We're calling this version 1.0.0 in preparation for Stackage
+   LTS 4.  Note, however, that this does not mean the code's API
+   will be stable as this is primarily an end-user tool.
 
-Major changes:
-
-
-Other enhancements:
+Enhancements:
 
 * Added flag `--profile` flag: passed with `stack build`, it will
   enable profiling, and for `--bench` and `--test` it will generate a
   profiling report by passing `+RTS -p` to the executable(s). Great
   for using like `stack build --bench --profile` (remember that
   enabling profile will slow down your benchmarks by >4x). Run `stack
-  build --bench` again to disable the profiling and get proper speeds.
+  build --bench` again to disable the profiling and get proper speeds
 * Added flag `--trace` flag: just like `--profile`, it enables
   profiling, but instead of generating a report for `--bench` and
   `--test`, prints out a stack trace on exception. Great for using
-  like `stack build --test --trace`.
+  like `stack build --test --trace`
 * Nix: all options can be overriden on command line
-  [#1483](https://github.com/commercialhaskell/stack/issues/1483).
+  [#1483](https://github.com/commercialhaskell/stack/issues/1483)
 * Nix: build environments (shells) are now pure by default.
+* Make verbosity silent by default in script interpreter mode
+  [#1472](https://github.com/commercialhaskell/stack/issues/1472)
+* Show a message when resetting git commit fails
+  [#1453](https://github.com/commercialhaskell/stack/issues/1453)
+* Improve Unicode handling in project/package names
+  [#1337](https://github.com/commercialhaskell/stack/issues/1337)
+* Fix ambiguity between a stack command and a filename to execute (prefer
+  `stack` subcommands)
+  [#1471](https://github.com/commercialhaskell/stack/issues/1471)
+* Support multi line interpreter directive comments
+  [#1394](https://github.com/commercialhaskell/stack/issues/1394)
+* Handle space separated pids in ghc-pkg dump (for GHC HEAD)
+  [#1509](https://github.com/commercialhaskell/stack/issues/1509)
+* Add ghci --no-package-hiding option
+  [#1517](https://github.com/commercialhaskell/stack/issues/1517)
+* `stack new` can download templates from URL
+  [#1466](https://github.com/commercialhaskell/stack/issues/1466)
 
 Bug fixes:
 
 * Nix: stack exec options are passed properly to the stack sub process
-  [#1538](https://github.com/commercialhaskell/stack/issues/1538).
+  [#1538](https://github.com/commercialhaskell/stack/issues/1538)
 * Nix: specifying a shell-file works in any current working directory
-  [#1547](https://github.com/commercialhaskell/stack/issues/1547).
+  [#1547](https://github.com/commercialhaskell/stack/issues/1547)
+* Nix: use `--resolver` argument
+* Docker: fix missing image message and '--docker-auto-pull'
+* No HTML escaping for "stack new" template params
+  [#1475](https://github.com/commercialhaskell/stack/issues/1475)
+* Set permissions for generated .ghci script
+  [#1480](https://github.com/commercialhaskell/stack/issues/1480)
+* Restrict commands allowed in interpreter mode
+  [#1504](https://github.com/commercialhaskell/stack/issues/1504)
+* stack ghci doesn't see preprocessed files for executables
+  [#1347](https://github.com/commercialhaskell/stack/issues/1347)
+* All test suites run even when only one is requested
+  [#1550](https://github.com/commercialhaskell/stack/pull/1550)
+* Edge cases in broken templates give odd errors
+  [#1535](https://github.com/commercialhaskell/stack/issues/1535)
+* Fix test coverage bug on windows
 
 ## 0.1.10.1
 
