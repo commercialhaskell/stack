@@ -18,6 +18,7 @@ to go:
 * Running `stack build` a second time on either stack or wai is a no-op
 * Build something that depends on `happy` (suggestion: `hlint`), since `happy`
   has special logic for moving around the `dist` directory
+* Check for any important changes that missed getting an entry in Changelog
 * In release candidate branch:
     * Bump the version number (to even second-to-last component) in the .cabal
       file
@@ -25,12 +26,10 @@ to go:
         * Rename the "unreleased changes" section to the new version
         * Check for any entries that snuck into the previous version's changes
           due to merges
-        * Check the Git log for any Changelog entries that were missed
 * In master branch:
     * Bump version to next odd second-to-last component
     * Add new "unreleased changes" secion in changelog
     * Bump to use latest LTS version
-* Check for any important changes that missed getting an entry in Changelog
 * Review documentation for any changes that need to be made
     * Search for old Stack version, unstable stack version, and the next
       "obvious" version in sequence (if doing a non-obvious jump) and replace
