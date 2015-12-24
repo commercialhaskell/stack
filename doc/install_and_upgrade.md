@@ -136,6 +136,10 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
 
             echo 'deb http://download.fpcomplete.com/debian wheezy main'|sudo tee /etc/apt/sources.list.d/fpco.list
 
+        Note: The official GHC >7.10.3 bindists do not support Debian 7, so
+        `stack setup` will not work on Debian 7 with GHC >7.10.3.  We will drop
+        support for Debian 7 once GHC 8.0 is released.
+
     For unstable Debian distributions, the package from the most recent stable
     release will usually work. If it doesn't, please
     [report it](https://github.com/commercialhaskell/stack/issues/new).
