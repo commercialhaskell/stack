@@ -28,6 +28,7 @@ Documentation table of contents
    nix_integration.md
    nonstandard_project_init.md
    shell_autocompletion.md
+   travis_ci.md
    GUIDE.md
    yaml_configuration.md
 

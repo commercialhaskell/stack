@@ -1608,8 +1608,8 @@ can use the `stack dot` command and Graphviz. More information is
 ### Travis with caching
 
 Many people use Travis CI to test out a project for every Git push. We have [a
-Wiki page devoted to
-Travis](https://github.com/commercialhaskell/stack/wiki/Travis). However, for
+document devoted to
+Travis](travis_ci.html). However, for
 most people, the following example will be sufficient to get started:
 
 ```yaml
