@@ -1,4 +1,4 @@
-resolver: lts-3.16
+resolver: lts-3.19
 image:
   container:
     base: "fpco/ubuntu-with-libgmp:14.04"
