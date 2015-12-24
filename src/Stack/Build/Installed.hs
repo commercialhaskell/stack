@@ -191,7 +191,7 @@ processLoadResult mdb _ (reason, lh) = do
         , packageNameText (fst (lhPair lh))
         ] ++
         maybe [] (\db -> [", from ", T.pack (show db), ","]) mdb ++
-        [ " due to "
+        [ " due to"
         , case reason of
             Allowed -> " the impossible?!?!"
             NeedsProfiling -> " it needing profiling."
