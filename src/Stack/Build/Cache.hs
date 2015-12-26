@@ -268,8 +268,11 @@ precompiledCacheFile pkgident copts installedPackageIDs = do
     -- cache hit just because it was installed in a different directory.
     copts' <- parseRelFile $ S8.unpack $ B16.encode $ SHA256.hashlazy cacheInput
 
+    platformRelDir <- platformGhcRelDir
+
     return $ getStackRoot ec
          </> $(mkRelDir "precompiled")
+         </> platformRelDir
          </> compiler
          </> cabal
          </> pkg
