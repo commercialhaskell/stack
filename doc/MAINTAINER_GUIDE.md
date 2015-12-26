@@ -81,30 +81,30 @@ for requirements to perform the release, and more details about the tool.
 
 * Publish Github release
 
-* Edit
-  [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml),
-  and add the new linux64 stack bindist
-
 * Upload package to Hackage: `stack upload . --pvp-bounds=both`
 
 * Upload haddocks to Hackage: `etc/scripts/upload-haddocks.sh`
+
+* On a machine with Vagrant installed:
+    * Run `etc/scripts/vagrant-distros.sh`
+
+* Edit
+  [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml),
+  and add the new linux64 stack bindist
 
 * Activate version for new release tag on
   [readthedocs.org](https://readthedocs.org/projects/stack/versions/), and
   ensure that stable documentation has updated
 
-* On a machine with Vagrant installed:
-    * Run `etc/scripts/vagrant-distros.sh`
+* Submit a PR for the
+  [haskell-stack Homebrew formula](https://github.com/Homebrew/homebrew/blob/master/Library/Formula/haskell-stack.rb)
+      * Be sure to update the SHA sum
+      * The commit message should just be `haskell-stack <VERSION>`
 
 * Update in Arch Linux's
   [haskell-stack.git](ssh+git://aur@aur.archlinux.org/haskell-stack.git):
   `PKGBUILD` and `.SRCINFO`
       * Be sure to reset `pkgrel` in both files, and update the SHA1 sum
-
-* Submit a PR for the
-  [haskell-stack Homebrew formula](https://github.com/Homebrew/homebrew/blob/master/Library/Formula/haskell-stack.rb)
-      * Be sure to update the SHA sum
-      * The commit message should just be `haskell-stack <VERSION>`
 
 * Keep an eye on the
   [Hackage matrix builder](http://matrix.hackage.haskell.org/package/stack)
