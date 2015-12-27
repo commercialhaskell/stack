@@ -246,7 +246,7 @@ setupEnv mResolveMissingGHC = do
 
     executablePath <- liftIO getExecutablePath
 
-    utf8EnvVars <- getUtf8LocaleVars menv
+    utf8EnvVars <- getUtf8EnvVars menv compilerVer
 
     envRef <- liftIO $ newIORef Map.empty
     let getEnvOverride' es = do
@@ -1302,77 +1302,83 @@ removeHaskellEnvVars =
     Map.delete "HASKELL_PACKAGE_SANDBOXES" .
     Map.delete "HASKELL_DIST_DIR"
 
--- | Get map of environment variables to set to change the locale's encoding to UTF-8
-getUtf8LocaleVars
+-- | Get map of environment variables to set to change the GHC's encoding to UTF-8
+getUtf8EnvVars
     :: forall m env.
        (MonadReader env m, HasPlatform env, MonadLogger m, MonadCatch m, MonadBaseControl IO m, MonadIO m)
-    => EnvOverride -> m (Map Text Text)
-getUtf8LocaleVars menv = do
-    Platform _ os <- asks getPlatform
-    if os == Cabal.Windows
-        then
-             -- On Windows, locale is controlled by the code page, so we don't set any environment
-             -- variables.
-             return
-                 Map.empty
-        else do
-            let checkedVars = map checkVar (Map.toList $ eoTextMap menv)
-                -- List of environment variables that will need to be updated to set UTF-8 (because
-                -- they currently do not specify UTF-8).
-                needChangeVars = concatMap fst checkedVars
-                -- Set of locale-related environment variables that have already have a value.
-                existingVarNames = Set.unions (map snd checkedVars)
-                -- True if a locale is already specified by one of the "global" locale variables.
-                hasAnyExisting =
-                    any (`Set.member` existingVarNames) ["LANG", "LANGUAGE", "LC_ALL"]
-            if null needChangeVars && hasAnyExisting
-                then
-                     -- If no variables need changes and at least one "global" variable is set, no
-                     -- changes to environment need to be made.
-                     return
-                         Map.empty
-                else do
-                    -- Get a list of known locales by running @locale -a@.
-                    elocales <- tryProcessStdout Nothing menv "locale" ["-a"]
-                    let
-                        -- Filter the list to only include locales with UTF-8 encoding.
-                        utf8Locales =
-                            case elocales of
-                                Left _ -> []
-                                Right locales ->
-                                    filter
-                                        isUtf8Locale
-                                        (T.lines $
-                                         T.decodeUtf8With
-                                             T.lenientDecode
-                                             locales)
-                        mfallback = getFallbackLocale utf8Locales
-                    when
-                        (isNothing mfallback)
-                        ($logWarn
-                             "Warning: unable to set locale to UTF-8 encoding; GHC may fail with 'invalid character'")
-                    let
-                        -- Get the new values of variables to adjust.
-                        changes =
-                            Map.unions $
-                            map
-                                (adjustedVarValue utf8Locales mfallback)
-                                needChangeVars
-                        -- Get the values of variables to add.
-                        adds
-                          | hasAnyExisting =
-                              -- If we already have a "global" variable, then nothing needs
-                              -- to be added.
-                              Map.empty
-                          | otherwise =
-                              -- If we don't already have a "global" variable, then set LANG to the
-                              -- fallback.
-                              case mfallback of
-                                  Nothing -> Map.empty
-                                  Just fallback ->
-                                      Map.singleton "LANG" fallback
-                    return (Map.union changes adds)
+    => EnvOverride -> CompilerVersion -> m (Map Text Text)
+getUtf8EnvVars menv compilerVer = do
+    if getGhcVersion compilerVer >= $(mkVersion "7.10.3")
+        -- GHC_CHARENC supported by GHC >=7.10.3
+        --EKB XXX TEST
+        then return $ Map.singleton "GHC_CHARENC" "UTF-8"
+        else legacyLocale
   where
+    legacyLocale = do
+        Platform _ os <- asks getPlatform
+        if os == Cabal.Windows
+            then
+                 -- On Windows, locale is controlled by the code page, so we don't set any environment
+                 -- variables.
+                 return
+                     Map.empty
+            else do
+                let checkedVars = map checkVar (Map.toList $ eoTextMap menv)
+                    -- List of environment variables that will need to be updated to set UTF-8 (because
+                    -- they currently do not specify UTF-8).
+                    needChangeVars = concatMap fst checkedVars
+                    -- Set of locale-related environment variables that have already have a value.
+                    existingVarNames = Set.unions (map snd checkedVars)
+                    -- True if a locale is already specified by one of the "global" locale variables.
+                    hasAnyExisting =
+                        any (`Set.member` existingVarNames) ["LANG", "LANGUAGE", "LC_ALL"]
+                if null needChangeVars && hasAnyExisting
+                    then
+                         -- If no variables need changes and at least one "global" variable is set, no
+                         -- changes to environment need to be made.
+                         return
+                             Map.empty
+                    else do
+                        -- Get a list of known locales by running @locale -a@.
+                        elocales <- tryProcessStdout Nothing menv "locale" ["-a"]
+                        let
+                            -- Filter the list to only include locales with UTF-8 encoding.
+                            utf8Locales =
+                                case elocales of
+                                    Left _ -> []
+                                    Right locales ->
+                                        filter
+                                            isUtf8Locale
+                                            (T.lines $
+                                             T.decodeUtf8With
+                                                 T.lenientDecode
+                                                 locales)
+                            mfallback = getFallbackLocale utf8Locales
+                        when
+                            (isNothing mfallback)
+                            ($logWarn
+                                 "Warning: unable to set locale to UTF-8 encoding; GHC may fail with 'invalid character'")
+                        let
+                            -- Get the new values of variables to adjust.
+                            changes =
+                                Map.unions $
+                                map
+                                    (adjustedVarValue utf8Locales mfallback)
+                                    needChangeVars
+                            -- Get the values of variables to add.
+                            adds
+                              | hasAnyExisting =
+                                  -- If we already have a "global" variable, then nothing needs
+                                  -- to be added.
+                                  Map.empty
+                              | otherwise =
+                                  -- If we don't already have a "global" variable, then set LANG to the
+                                  -- fallback.
+                                  case mfallback of
+                                      Nothing -> Map.empty
+                                      Just fallback ->
+                                          Map.singleton "LANG" fallback
+                        return (Map.union changes adds)
     -- Determines whether an environment variable is locale-related and, if so, whether it needs to
     -- be adjusted.
     checkVar

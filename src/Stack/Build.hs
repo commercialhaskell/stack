@@ -77,7 +77,7 @@ build :: M env m
       -> Maybe FileLock
       -> BuildOpts
       -> m ()
-build setLocalFiles mbuildLk bopts = fixCodePage' $ do
+build setLocalFiles mbuildLk bopts = fixCodePage $ do
     menv <- getMinimalEnvOverride
 
     (_, mbp, locals, extraToBuild, sourceMap) <- loadSourceMap NeedTargets bopts
@@ -261,35 +261,42 @@ withLoadPackage menv inner = do
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738
-fixCodePage :: (MonadIO m, MonadMask m, MonadLogger m) => m a -> m a
+fixCodePage :: M env m => m a -> m a
 #ifdef WINDOWS
 fixCodePage inner = do
-    origCPI <- liftIO getConsoleCP
-    origCPO <- liftIO getConsoleOutputCP
-
-    let setInput = origCPI /= expected
-        setOutput = origCPO /= expected
-        fixInput
-            | setInput = Catch.bracket_
-                (liftIO $ do
-                    setConsoleCP expected)
-                (liftIO $ setConsoleCP origCPI)
-            | otherwise = id
-        fixOutput
-            | setInput = Catch.bracket_
-                (liftIO $ do
-                    setConsoleOutputCP expected)
-                (liftIO $ setConsoleOutputCP origCPO)
-            | otherwise = id
-
-    case (setInput, setOutput) of
-        (False, False) -> return ()
-        (True, True) -> warn ""
-        (True, False) -> warn " input"
-        (False, True) -> warn " output"
-
-    fixInput $ fixOutput inner
+    mcp <- asks $ configModifyCodePage . getConfig
+    ec <- asks getEnvConfig
+    if mcp && getGhcVersion (envConfigCompilerVersion ec) < $(mkVersion "7.10.3")
+        then fixCodePage'
+        -- GHC >=7.10.3 doesn't need this code page hack.
+        else inner
   where
+    fixCodePage' = do
+        origCPI <- liftIO getConsoleCP
+        origCPO <- liftIO getConsoleOutputCP
+
+        let setInput = origCPI /= expected
+            setOutput = origCPO /= expected
+            fixInput
+                | setInput = Catch.bracket_
+                    (liftIO $ do
+                        setConsoleCP expected)
+                    (liftIO $ setConsoleCP origCPI)
+                | otherwise = id
+            fixOutput
+                | setInput = Catch.bracket_
+                    (liftIO $ do
+                        setConsoleOutputCP expected)
+                    (liftIO $ setConsoleOutputCP origCPO)
+                | otherwise = id
+
+        case (setInput, setOutput) of
+            (False, False) -> return ()
+            (True, True) -> warn ""
+            (True, False) -> warn " input"
+            (False, True) -> warn " output"
+
+        fixInput $ fixOutput inner
     expected = 65001 -- UTF-8
     warn typ = $logInfo $ T.concat
         [ "Setting"
@@ -299,15 +306,6 @@ fixCodePage inner = do
 #else
 fixCodePage = id
 #endif
-
-fixCodePage' :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env)
-             => m a
-             -> m a
-fixCodePage' inner = do
-    mcp <- asks $ configModifyCodePage . getConfig
-    if mcp
-        then fixCodePage inner
-        else inner
 
 -- | Query information about the build and print the result to stdout in YAML format.
 queryBuildInfo :: M env m
