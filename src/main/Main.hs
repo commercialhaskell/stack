@@ -1055,11 +1055,6 @@ evalCmd EvalOpts {..} go@GlobalOpts {..} = execCmd execOpts go
 ghciCmd :: GhciOpts -> GlobalOpts -> IO ()
 ghciCmd ghciOpts go@GlobalOpts{..} =
   withBuildConfigAndLock go $ \lk -> do
-    let packageTargets = concatMap words (ghciAdditionalPackages ghciOpts)
-    unless (null packageTargets) $
-       Stack.Build.build (const $ return ()) lk defaultBuildOpts
-           { boptsTargets = map T.pack packageTargets
-           }
     munlockFile lk -- Don't hold the lock while in the GHCI.
     ghci ghciOpts
 
@@ -1086,7 +1081,7 @@ targetsCmd :: Text -> GlobalOpts -> IO ()
 targetsCmd target go@GlobalOpts{..} =
     withBuildConfig go $
     do let bopts = defaultBuildOpts { boptsTargets = [target] }
-       (_realTargets,_,pkgs) <- ghciSetup bopts False False Nothing
+       (_realTargets,_,pkgs) <- ghciSetup bopts False False Nothing []
        pwd <- getWorkingDir
        targets <-
            fmap

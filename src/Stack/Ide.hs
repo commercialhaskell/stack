@@ -48,7 +48,7 @@ ide targets useropts = do
             { boptsTargets = targets
             , boptsBuildSubset = BSOnlyDependencies
             }
-    (_realTargets,_,pkgs) <- ghciSetup bopts False False Nothing
+    (_realTargets,_,pkgs) <- ghciSetup bopts False False Nothing []
     pwd <- getWorkingDir
     (pkgopts,_srcfiles) <-
         liftM mconcat $ forM pkgs $ getPackageOptsAndTargetFiles pwd

@@ -93,7 +93,7 @@ ghci GhciOpts{..} = do
             { boptsTestOpts = (boptsTestOpts ghciBuildOpts) { toDisableRun = True }
             , boptsBenchmarkOpts = (boptsBenchmarkOpts ghciBuildOpts) { beoDisableRun = True }
             }
-    (targets,mainIsTargets,pkgs) <- ghciSetup bopts ghciNoBuild ghciSkipIntermediate ghciMainIs
+    (targets,mainIsTargets,pkgs) <- ghciSetup bopts ghciNoBuild ghciSkipIntermediate ghciMainIs ghciAdditionalPackages
     config <- asks getConfig
     bconfig <- asks getBuildConfig
     mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
@@ -218,15 +218,19 @@ ghciSetup
     -> Bool
     -> Bool
     -> Maybe Text
+    -> [String]
     -> m (Map PackageName SimpleTarget, Maybe (Map PackageName SimpleTarget), [GhciPkgInfo])
-ghciSetup bopts noBuild skipIntermediate mainIs = do
-    (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets bopts
+ghciSetup bopts0 noBuild skipIntermediate mainIs additionalPackages = do
+    (_,_,targets) <- parseTargetsFromBuildOpts AllowNoTargets bopts0
     mainIsTargets <-
         case mainIs of
             Nothing -> return Nothing
             Just target -> do
-                (_,_,targets') <- parseTargetsFromBuildOpts AllowNoTargets bopts { boptsTargets = [target] }
+                (_,_,targets') <- parseTargetsFromBuildOpts AllowNoTargets bopts0 { boptsTargets = [target] }
                 return (Just targets')
+    let bopts = bopts0
+            { boptsTargets = boptsTargets bopts0 ++ map T.pack additionalPackages
+            }
     econfig <- asks getEnvConfig
     (realTargets,_,_,_,sourceMap) <- loadSourceMap AllowNoTargets bopts
     menv <- getMinimalEnvOverride
