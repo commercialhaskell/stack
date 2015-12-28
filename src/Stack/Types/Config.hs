@@ -1084,7 +1084,7 @@ instance Show ConfigException where
         , toFilePath configFile
         , "':\n"
         , show exception
-        , "\nSee https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md."
+        , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration.html."
         ]
     show (ParseResolverException t) = concat
         [ "Invalid resolver value: "
@@ -1122,7 +1122,7 @@ instance Show ConfigException where
             (\name -> "    stack init --resolver " ++ T.unpack (renderSnapName name))
             names
         , "\nYou'll then need to add some extra-deps. See:\n\n"
-        , "    https://github.com/commercialhaskell/stack/blob/release/doc/yaml_configuration.md#extra-deps"
+        , "    http://docs.haskellstack.org/en/stable/yaml_configuration.html#extra-deps"
         , "\n\nYou can also try falling back to a dependency solver with:\n\n"
         , "    stack init --solver"
         ]
