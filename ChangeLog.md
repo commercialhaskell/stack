@@ -8,7 +8,14 @@ Major changes:
 
 Other enhancements:
 
+- Disable locale/codepage hacks when GHC >=7.10.3
+  [#1552](https://github.com/commercialhaskell/stack/issues/1552)
+
 Bug fixes:
+
+- Don't share precompiled packages between GHC/platform variants and Docker
+  [#1551](https://github.com/commercialhaskell/stack/issues/1551)
+
 
 ## 1.0.0
 
