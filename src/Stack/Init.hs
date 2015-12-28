@@ -136,7 +136,9 @@ renderStackYaml p =
             \# arch: x86_64\n\n\
             \# Extra directories used by stack for building\n\
             \# extra-include-dirs: [/path/to/dir]\n\
-            \# extra-lib-dirs: [/path/to/dir]\n"
+            \# extra-lib-dirs: [/path/to/dir]\n\n\
+            \# Allow a newer minor version of GHC than the snapshot specifies\n\
+            \# compiler-check: newer-minor\n"
 
     comments =
         [ ("resolver", "Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)")
