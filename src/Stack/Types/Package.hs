@@ -105,6 +105,7 @@ newtype GetPackageOpts = GetPackageOpts
                      => SourceMap
                      -> InstalledMap
                      -> [PackageName]
+                     -> [PackageName]
                      -> Path Abs File
                      -> m (Map NamedComponent (Set ModuleName)
                           ,Map NamedComponent (Set DotCabalPath)

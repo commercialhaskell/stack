@@ -15,6 +15,7 @@ module Stack.Ghci
     , ghci
     ) where
 
+import           Control.Applicative
 import           Control.Exception.Enclosed (tryAny)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -228,6 +229,10 @@ ghciSetup bopts0 noBuild skipIntermediate mainIs additionalPackages = do
             Just target -> do
                 (_,_,targets') <- parseTargetsFromBuildOpts AllowNoTargets bopts0 { boptsTargets = [target] }
                 return (Just targets')
+    addPkgs <- forM additionalPackages $ \name -> do
+        let mres = (packageIdentifierName <$> parsePackageIdentifierFromString name)
+                <|> parsePackageNameFromString name
+        maybe (fail $ "Failed to parse --package option " ++ name) return mres
     let bopts = bopts0
             { boptsTargets = boptsTargets bopts0 ++ map T.pack additionalPackages
             }
@@ -277,7 +282,7 @@ ghciSetup bopts0 noBuild skipIntermediate mainIs additionalPackages = do
     infos <-
         forM wanted $
         \(name,(cabalfp,target)) ->
-             makeGhciPkgInfo bopts sourceMap installedMap localLibs name cabalfp target
+             makeGhciPkgInfo bopts sourceMap installedMap localLibs addPkgs name cabalfp target
     checkForIssues infos
     return (realTargets, mainIsTargets, infos)
   where
@@ -294,11 +299,12 @@ makeGhciPkgInfo
     -> SourceMap
     -> InstalledMap
     -> [PackageName]
+    -> [PackageName]
     -> PackageName
     -> Path Abs File
     -> SimpleTarget
     -> m GhciPkgInfo
-makeGhciPkgInfo bopts sourceMap installedMap locals name cabalfp target = do
+makeGhciPkgInfo bopts sourceMap installedMap locals addPkgs name cabalfp target = do
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
     let config =
@@ -311,7 +317,7 @@ makeGhciPkgInfo bopts sourceMap installedMap locals name cabalfp target = do
             }
     (warnings,pkg) <- readPackage config cabalfp
     mapM_ (printCabalFileWarning cabalfp) warnings
-    (mods,files,opts) <- getPackageOpts (packageOpts pkg) sourceMap installedMap locals cabalfp
+    (mods,files,opts) <- getPackageOpts (packageOpts pkg) sourceMap installedMap locals addPkgs cabalfp
     let filteredOpts = filterWanted opts
         filterWanted = M.filterWithKey (\k _ -> k `S.member` allWanted)
         allWanted = wantedPackageComponents bopts target pkg
