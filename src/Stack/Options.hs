@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings,RecordWildCards #-}
 
 module Stack.Options
-    (Command(..)
+    (BuildCommand(..)
+    ,GlobalOptsContext(..)
     ,benchOptsParser
     ,buildOptsParser
     ,cleanOptsParser
@@ -58,13 +59,20 @@ import           Stack.Types
 import           Stack.Types.TemplateName
 
 -- | Command sum type for conditional arguments.
-data Command
+data BuildCommand
     = Build
     | Test
     | Haddock
     | Bench
     | Install
     deriving (Eq)
+
+-- | Allows adjust global options depending on their context
+data GlobalOptsContext
+    = OuterGlobalOpts -- | Global options before subcommand name
+    | InitCmdGlobalOpts -- | Global options following 'stack init'
+    | OtherCmdGlobalOpts -- | Global options following any other subcommand
+    deriving (Show, Eq)
 
 -- | Parser for bench arguments.
 benchOptsParser :: Parser BenchmarkOpts
@@ -77,7 +85,7 @@ benchOptsParser = BenchmarkOpts
                    help "Disable running of benchmarks. (Benchmarks will still be built.)")
 
 -- | Parser for build arguments.
-buildOptsParser :: Command
+buildOptsParser :: BuildCommand
                 -> Parser BuildOpts
 buildOptsParser cmd =
             transform <$> trace <*> profile <*> options
@@ -622,14 +630,18 @@ execOptsExtraParser = eoPlainParser <|>
                            help "Use an unmodified environment (only useful with Docker)")
 
 -- | Parser for global command-line options.
-globalOptsParser :: Bool -> Maybe LogLevel -> Parser GlobalOptsMonoid
-globalOptsParser hide0 defLogLevel =
+globalOptsParser :: GlobalOptsContext -> Maybe LogLevel -> Parser GlobalOptsMonoid
+globalOptsParser kind defLogLevel =
     GlobalOptsMonoid <$>
     optional (strOption (long Docker.reExecArgName <> hidden <> internal)) <*>
     optional (option auto (long dockerEntrypointArgName <> hidden <> internal)) <*>
     logLevelOptsParser hide0 defLogLevel <*>
     configOptsParser hide0 <*>
-    optional (abstractResolverOptsParser hide0) <*>
+    (if kind == InitCmdGlobalOpts
+     -- The 'stack init' command has its own '--resolver' option, and having a global
+     -- one causes ambiguity, so disable it.
+     then pure Nothing
+     else optional (abstractResolverOptsParser hide0)) <*>
     optional (compilerOptsParser hide0) <*>
     maybeBoolFlags
         "terminal"
@@ -640,7 +652,9 @@ globalOptsParser hide0 defLogLevel =
                          help ("Override project stack.yaml file " <>
                                "(overrides any STACK_YAML environment variable)") <>
                          hide))
-  where hide = hideMods hide0
+  where
+    hide = hideMods hide0
+    hide0 = kind /= OuterGlobalOpts
 
 -- | Create GlobalOpts from GlobalOptsMonoid.
 globalOptsFromMonoid :: Bool -> GlobalOptsMonoid -> GlobalOpts

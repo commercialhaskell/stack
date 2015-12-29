@@ -1310,7 +1310,6 @@ getUtf8EnvVars
 getUtf8EnvVars menv compilerVer = do
     if getGhcVersion compilerVer >= $(mkVersion "7.10.3")
         -- GHC_CHARENC supported by GHC >=7.10.3
-        --EKB XXX TEST
         then return $ Map.singleton "GHC_CHARENC" "UTF-8"
         else legacyLocale
   where
