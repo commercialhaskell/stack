@@ -398,7 +398,7 @@ nixOptsParser hide0 = overrideActivation <$>
   where
     hide = hideMods hide0
     overrideActivation m =
-      if m /= mempty then m { nixMonoidEnable = Just True }
+      if m /= mempty then m { nixMonoidEnable = Just . fromMaybe True $ nixMonoidEnable m }
       else m
 
 -- | Options parser configuration for Docker.
