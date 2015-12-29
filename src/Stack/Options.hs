@@ -69,9 +69,9 @@ data BuildCommand
 
 -- | Allows adjust global options depending on their context
 data GlobalOptsContext
-    = OuterGlobalOpts -- | Global options before subcommand name
-    | InitCmdGlobalOpts -- | Global options following 'stack init'
-    | OtherCmdGlobalOpts -- | Global options following any other subcommand
+    = OuterGlobalOpts -- ^ Global options before subcommand name
+    | InitCmdGlobalOpts -- ^ Global options following 'stack init'
+    | OtherCmdGlobalOpts -- ^ Global options following any other subcommand
     deriving (Show, Eq)
 
 -- | Parser for bench arguments.
