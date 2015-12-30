@@ -15,6 +15,8 @@ Bug fixes:
 
 - Don't share precompiled packages between GHC/platform variants and Docker
   [#1551](https://github.com/commercialhaskell/stack/issues/1551)
+- Properly redownload corrupted downloads with the correct file size.
+  [Mailing list discussion](https://groups.google.com/d/msg/haskell-stack/iVGDG5OHYxs/FjUrR5JsDQAJ)
 
 
 ## 1.0.0
