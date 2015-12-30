@@ -17,7 +17,8 @@ Bug fixes:
   [#1551](https://github.com/commercialhaskell/stack/issues/1551)
 - Properly redownload corrupted downloads with the correct file size.
   [Mailing list discussion](https://groups.google.com/d/msg/haskell-stack/iVGDG5OHYxs/FjUrR5JsDQAJ)
-
+- Gracefully handle invalid paths in error/warning messages
+  [#1561](https://github.com/commercialhaskell/stack/issues/1561)
 
 ## 1.0.0
 
