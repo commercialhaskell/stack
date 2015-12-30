@@ -243,8 +243,8 @@ verifiedDownload DownloadRequest{..} destpath progressSink = do
     -- precondition: file exists
     -- TODO: add logging
     fileMatchesExpectations =
-        (checkExpectations >> return True)
-          `catch` \(_ :: VerifyFileException) -> return False
+        ((checkExpectations >> return True)
+          `catch` \(_ :: VerifyFileException) -> return False)
           `catch` \(_ :: VerifiedDownloadException) -> return False
 
     checkExpectations = bracket (openFile fp ReadMode) hClose $ \h -> do
