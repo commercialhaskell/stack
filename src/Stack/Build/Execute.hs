@@ -1363,7 +1363,7 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
         let (x, y) = T.break (== ':') bs
         mabs <-
             if isValidSuffix y
-                then fmap (T.pack . toFilePath) <$> resolveFileMaybe pkgDir (T.unpack $ T.strip x)
+                then liftM (fmap (T.pack . toFilePath)) $ resolveFileMaybe pkgDir (T.unpack $ T.strip x)
                 else return Nothing
         case mabs of
             Nothing -> return bs
