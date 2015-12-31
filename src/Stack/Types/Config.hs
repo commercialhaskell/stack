@@ -1074,7 +1074,9 @@ data ConfigException
   | NoProjectConfigFound (Path Abs Dir) (Maybe Text)
   | UnexpectedTarballContents [Path Abs Dir] [Path Abs File]
   | BadStackVersionException VersionRange
-  | NoMatchingSnapshot [SnapName]
+  | NoMatchingSnapshot
+  | ResolverMismatch Resolver
+  | ResolverPartial Resolver
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
   deriving Typeable
@@ -1114,17 +1116,23 @@ instance Show ConfigException where
         ,"version range specified in stack.yaml ("
         , T.unpack (versionRangeText requiredRange)
         , ")." ]
-    show (NoMatchingSnapshot names) = concat
-        [ "There was no snapshot found that matched the package "
-        , "bounds in your .cabal files.\n"
-        , "Please choose one of the following commands to get started.\n\n"
-        , unlines $ map
-            (\name -> "    stack init --resolver " ++ T.unpack (renderSnapName name))
-            names
-        , "\nYou'll then need to add some extra-deps. See:\n\n"
-        , "    http://docs.haskellstack.org/en/stable/yaml_configuration.html#extra-deps"
-        , "\n\nYou can also try falling back to a dependency solver with:\n\n"
-        , "    stack init --solver"
+    show NoMatchingSnapshot = concat
+        [ "No snapshot is 'compiler compatible' with the package "
+        , "constraints specified in your .cabal files.\n"
+        ]
+    show (ResolverMismatch resolver) = concat
+        [ "Selected resolver '"
+        , T.unpack (resolverName resolver)
+        , "' is not 'compiler compatible' with the package "
+        , "constraints specified in your .cabal files.\n"
+        ]
+    show (ResolverPartial resolver) = concat
+        [ "Resolver '"
+        , T.unpack (resolverName resolver)
+        , "' does not satisfy all the package "
+        , "requirements and constraints specified in your .cabal files.\n\n"
+        , "However, you can use the '--solver' command line switch to resolve "
+        , "the constraints using external packages."
         ]
     show (NoSuchDirectory dir) = concat
         ["No directory could be located matching the supplied path: "

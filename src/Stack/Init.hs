@@ -188,43 +188,55 @@ getDefaultResolver :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env,
                    -> [C.GenericPackageDescription] -- ^ cabal descriptions
                    -> InitOpts
                    -> m (Resolver, Map PackageName (Map FlagName Bool), Map PackageName Version)
-getDefaultResolver cabalfps gpds initOpts =
-    case ioMethod initOpts of
-        MethodSnapshot snapPref -> do
-            msnapshots <- getSnapshots'
-            names <-
-                case msnapshots of
-                    Nothing -> return []
-                    Just snapshots -> getRecommendedSnapshots snapshots snapPref
-            mpair <- findBuildPlan gpds names
-            case mpair of
-                Just (snap, flags) ->
-                    return (ResolverSnapshot snap, flags, Map.empty)
-                Nothing -> throwM $ NoMatchingSnapshot names
-        MethodResolver aresolver -> do
-            resolver <- makeConcreteResolver aresolver
-            mpair <-
-                case resolver of
-                    ResolverSnapshot name -> findBuildPlan gpds [name]
-                    ResolverCompiler _ -> return Nothing
-                    ResolverCustom _ _ -> return Nothing
-            case mpair of
-                Just (snap, flags) ->
-                    return (ResolverSnapshot snap, flags, Map.empty)
-                Nothing -> return (resolver, Map.empty, Map.empty)
-        MethodSolver -> do
-            (compilerVersion, extraDeps) <- cabalSolver Ghc (map parent cabalfps) Map.empty Map.empty []
-            return
-                ( ResolverCompiler compilerVersion
-                , Map.filter (not . Map.null) $ fmap snd extraDeps
-                , fmap fst extraDeps
-                )
+getDefaultResolver cabalfps gpds initOpts = do
+    resolver <- getResolver (ioMethod initOpts)
+    result   <- checkResolverSpec gpds Nothing resolver
+
+    case result of
+        BuildPlanCheckFail _ _ -> throwM $ ResolverMismatch resolver
+        BuildPlanCheckOk flags -> return (resolver, flags, Map.empty)
+        BuildPlanCheckPartial _ _
+            | needSolver resolver initOpts -> do
+                (compilerVersion, extraDeps) <- cabalSolver Ghc (map parent cabalfps) Map.empty Map.empty []
+                return
+                    ( ResolverCompiler compilerVersion
+                    , Map.filter (not . Map.null) $ fmap snd extraDeps
+                    , fmap fst extraDeps
+                    )
+            | otherwise -> throwM $ ResolverPartial resolver
+    where
+      -- TODO support selecting best across regular and custom snapshots
+      getResolver (MethodSnapshot snapPref) = selectSnapResolver snapPref
+      getResolver (MethodResolver aresolver) = makeConcreteResolver aresolver
+
+      selectSnapResolver snapPref =
+          getSnapshots'
+          >>= maybe (throwM NoMatchingSnapshot)
+                  (getRecommendedSnapshots snapPref)
+          >>= selectBestSnapshot gpds
+          >>= maybe (throwM NoMatchingSnapshot)
+                    (\s -> do
+                      $logInfo ("Selected snapshot '"
+                                <> (renderSnapName s)
+                                <> "'.")
+                      return $ ResolverSnapshot s)
+
+      checkResolverSpec packages flags resolver = do
+          case resolver of
+            ResolverSnapshot name -> checkSnapBuildPlan packages flags name
+            ResolverCompiler _ -> return $ BuildPlanCheckPartial Map.empty Map.empty
+            -- TODO support custom resolver for stack init
+            ResolverCustom _ _ -> return $ BuildPlanCheckPartial Map.empty Map.empty
+
+      needSolver _ (InitOpts {useSolver = True}) = True
+      needSolver (ResolverCompiler _)  _ = True
+      needSolver _ _ = False
 
 getRecommendedSnapshots :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, HasGHCVariant env, MonadLogger m, MonadBaseControl IO m)
-                        => Snapshots
-                        -> SnapPref
+                        => SnapPref
+                        -> Snapshots
                         -> m [SnapName]
-getRecommendedSnapshots snapshots pref = do
+getRecommendedSnapshots pref snapshots = do
     -- Get the most recent LTS and Nightly in the snapshots directory and
     -- prefer them over anything else, since odds are high that something
     -- already exists for them.
@@ -256,6 +268,8 @@ getRecommendedSnapshots snapshots pref = do
 
 data InitOpts = InitOpts
     { ioMethod       :: !Method
+    -- ^ Use solver
+    , useSolver :: Bool
     -- ^ Preferred snapshots
     , forceOverwrite :: Bool
     -- ^ Overwrite existing files
@@ -266,7 +280,7 @@ data InitOpts = InitOpts
 data SnapPref = PrefNone | PrefLTS | PrefNightly
 
 -- | Method of initializing
-data Method = MethodSnapshot SnapPref | MethodResolver AbstractResolver | MethodSolver
+data Method = MethodSnapshot SnapPref | MethodResolver AbstractResolver
 
 -- | Turn an 'AbstractResolver' into a 'Resolver'.
 makeConcreteResolver :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadLogger m)

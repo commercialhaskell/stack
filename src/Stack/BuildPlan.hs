@@ -11,13 +11,15 @@
 
 module Stack.BuildPlan
     ( BuildPlanException (..)
+    , BuildPlanCheck (..)
+    , checkSnapBuildPlan
     , MiniBuildPlan(..)
     , MiniPackageInfo(..)
     , Snapshots (..)
     , getSnapshots
     , loadMiniBuildPlan
     , resolveBuildPlan
-    , findBuildPlan
+    , selectBestSnapshot
     , ToolMap
     , getToolMap
     , shadowMiniBuildPlan
@@ -699,38 +701,36 @@ checkSnapBuildPlan gpds flags snap = do
 -- | Find a snapshot and set of flags that is compatible with and matches as
 -- best as possible with the given 'GenericPackageDescription's. Returns
 -- 'Nothing' if no such snapshot is found.
-findBuildPlan
+selectBestSnapshot
     :: ( MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m
        , HasHttpManager env, HasConfig env, HasGHCVariant env
        , MonadBaseControl IO m)
     => [GenericPackageDescription]
     -> [SnapName]
-    -> m (Maybe (SnapName, Map PackageName (Map FlagName Bool)))
-findBuildPlan gpds snaps = do
+    -> m (Maybe SnapName)
+selectBestSnapshot gpds snaps = do
     $logInfo $ "Selecting the best among "
                <> T.pack (show (length snaps))
                <> " snapshots...\n"
     loop Nothing snaps
     where
         loop Nothing [] = return Nothing
-        loop (Just (snap, f, e)) []
-            | Map.null e = return (Just (snap, f))
-            | otherwise =  return Nothing
+        loop (Just (snap, _)) [] = return $ Just snap
         loop bestYet (snap:rest) = do
             result <- checkSnapBuildPlan gpds Nothing snap
             reportResult result snap
             case result of
                 BuildPlanCheckFail _ _ -> loop bestYet rest
-                BuildPlanCheckOk f -> return $ Just (snap, f)
-                BuildPlanCheckPartial f e -> do
+                BuildPlanCheckOk _ -> return $ Just snap
+                BuildPlanCheckPartial _ e -> do
                     case bestYet of
-                        Nothing -> loop (Just (snap, f, e)) rest
+                        Nothing -> loop (Just (snap, e)) rest
                         Just prev ->
-                            loop (Just (betterSnap prev (snap, f, e))) rest
+                            loop (Just (betterSnap prev (snap, e))) rest
 
-        betterSnap (s1, f1, e1) (s2, f2, e2)
-          | (Map.size e1) <= (Map.size e2) = (s1, f1, e1)
-          | otherwise = (s2, f2, e2)
+        betterSnap (s1, e1) (s2, e2)
+          | (Map.size e1) <= (Map.size e2) = (s1, e1)
+          | otherwise = (s2, e2)
 
         reportResult (BuildPlanCheckOk _) snap =
             $logInfo $ "* Selected " <> renderSnapName snap
