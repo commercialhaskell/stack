@@ -706,37 +706,46 @@ findBuildPlan
     => [GenericPackageDescription]
     -> [SnapName]
     -> m (Maybe (SnapName, Map PackageName (Map FlagName Bool)))
-findBuildPlan gpds = do
-    loop Nothing
+findBuildPlan gpds snaps = do
+    $logInfo $ "Selecting the best among "
+               <> T.pack (show (length snaps))
+               <> " snapshots...\n"
+    loop Nothing snaps
     where
         loop Nothing [] = return Nothing
         loop (Just (snap, f, e)) []
             | Map.null e = return (Just (snap, f))
             | otherwise =  return Nothing
         loop bestYet (snap:rest) = do
-            $logInfo $ "Checking against build plan " <> renderSnapName snap
             result <- checkSnapBuildPlan gpds Nothing snap
+            reportResult result snap
             case result of
-                BuildPlanCheckFail _ e -> do
-                    logFailure e
-                    loop bestYet rest
+                BuildPlanCheckFail _ _ -> loop bestYet rest
                 BuildPlanCheckOk f -> return $ Just (snap, f)
                 BuildPlanCheckPartial f e -> do
-                    logFailure e
                     case bestYet of
                         Nothing -> loop (Just (snap, f, e)) rest
                         Just prev ->
                             loop (Just (betterSnap prev (snap, f, e))) rest
 
         betterSnap (s1, f1, e1) (s2, f2, e2)
-            | (Map.size e1) <= (Map.size e2) = (s1, f1, e1)
-            | otherwise = (s2, f2, e2)
+          | (Map.size e1) <= (Map.size e2) = (s1, f1, e1)
+          | otherwise = (s2, f2, e2)
 
-        logFailure errs = do
-            $logInfo ""
-            $logInfo "* Build plan did not match your requirements:"
+        reportResult (BuildPlanCheckOk _) snap =
+            $logInfo $ "* Selected " <> renderSnapName snap
+
+        reportResult (BuildPlanCheckPartial _ errs) snap = do
+            $logWarn $ "* Partially matches " <> renderSnapName snap
             displayDepErrors errs
-            $logInfo ""
+
+        reportResult (BuildPlanCheckFail compiler errs) snap = do
+            $logWarn $ "* Rejected "
+                       <> renderSnapName snap
+                       <> " due to conflicting compiler ("
+                       <> compilerVersionText compiler
+                       <> ") requirements"
+            displayDepErrors errs
 
 displayDepErrors :: MonadLogger m => DepErrors -> m ()
 displayDepErrors errs =
