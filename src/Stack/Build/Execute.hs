@@ -22,7 +22,7 @@ import           Control.Concurrent.Async (withAsync, wait)
 import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
-import           Control.Exception.Enclosed (catchIO, tryIO)
+import           Control.Exception.Enclosed (catchIO)
 import           Control.Exception.Lifted
 import           Control.Monad (liftM, when, unless, void, join, filterM, (<=<))
 import           Control.Monad.Catch (MonadCatch, MonadMask)
@@ -1338,7 +1338,7 @@ printBuildOutput excludeTHLoading makeAbsolute pkgDir level outH = void $
     =$ CL.mapM_ (monadLoggerLog $(TH.location >>= liftLoc) "" level)
 
 -- | Strip Template Haskell "Loading package" lines and making paths absolute.
-mungeBuildOutput :: MonadIO m
+mungeBuildOutput :: (MonadIO m, MonadThrow m, Functor m)
                  => Bool -- ^ exclude TH loading?
                  -> Bool -- ^ convert paths to absolute?
                  -> Path Abs Dir -- ^ package's root directory
@@ -1363,21 +1363,17 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
         let (x, y) = T.break (== ':') bs
         mabs <-
             if isValidSuffix y
-                then do
-                    efp <- liftIO $ tryIO $ resolveFile pkgDir (T.unpack x)
-                    case efp of
-                        Left _ -> return Nothing
-                        Right fp -> return $ Just $ T.pack (toFilePath fp)
+                then liftM (fmap (T.pack . toFilePath)) $ resolveFileMaybe pkgDir (T.unpack $ T.strip x)
                 else return Nothing
         case mabs of
             Nothing -> return bs
             Just fp -> return $ fp `T.append` y
 
     -- | Match the line:column format at the end of lines
-    isValidSuffix = isRight . parseOnly (lineCol <* endOfInput)
+    isValidSuffix = isRight . parseOnly lineCol
     lineCol = char ':' >> (decimal :: Parser Int)
            >> char ':' >> (decimal :: Parser Int)
-           >> (string ":" <|> string ": Warning:")
+           >> char ':'
            >> return ()
 
     -- | Strip @\r@ characters from the byte vector. Used because Windows.

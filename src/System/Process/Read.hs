@@ -192,10 +192,11 @@ data ReadProcessException
     | ExecutableNotFoundAt FilePath
     deriving Typeable
 instance Show ReadProcessException where
-    show (ReadProcessException cp ec out err) = concat
+    show (ReadProcessException cp ec out err) = concat $
         [ "Running "
-        , showSpec $ cmdspec cp
-        , " exited with "
+        , showSpec $ cmdspec cp] ++
+        maybe [] (\x -> [" in directory ", x]) (cwd cp) ++
+        [ " exited with "
         , show ec
         , "\n"
         , toStr out
