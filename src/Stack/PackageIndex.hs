@@ -245,8 +245,9 @@ updateIndexGit menv indexName' index gitUrl = do
             unless repoExists
                    (readInNull suDir "git" menv cloneArgs Nothing)
             $logSticky "Fetching package index ..."
-            readProcessNull (Just acfDir) menv "git" ["fetch","--tags","--depth=1"] `C.catch` \(_ :: ReadProcessException) -> do
+            readProcessNull (Just acfDir) menv "git" ["fetch","--tags","--depth=1"] `C.catch` \(ex :: ReadProcessException) -> do
               -- we failed, so wipe the directory and try again, see #1418
+              $logWarn (T.pack (show ex))
               $logStickyDone "Failed to fetch package index, retrying."
               removeTree acfDir
               readInNull suDir "git" menv cloneArgs Nothing
