@@ -1338,7 +1338,7 @@ printBuildOutput excludeTHLoading makeAbsolute pkgDir level outH = void $
     =$ CL.mapM_ (monadLoggerLog $(TH.location >>= liftLoc) "" level)
 
 -- | Strip Template Haskell "Loading package" lines and making paths absolute.
-mungeBuildOutput :: (MonadIO m, MonadThrow m)
+mungeBuildOutput :: (MonadIO m, MonadThrow m, Functor m)
                  => Bool -- ^ exclude TH loading?
                  -> Bool -- ^ convert paths to absolute?
                  -> Path Abs Dir -- ^ package's root directory
