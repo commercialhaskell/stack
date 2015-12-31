@@ -44,6 +44,7 @@ import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
 import qualified Data.Foldable as F
 import qualified Data.HashMap.Strict as HM
+import qualified Data.HashSet as HashSet
 import           Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import           Data.List (intercalate)
@@ -655,7 +656,8 @@ checkBundleBuildPlan platform compiler pool flags gpds =
         dupError _ _ = error "Bug: Duplicate packages are not expected here"
 
 data BuildPlanCheck =
-    BuildPlanCheckOk (Map PackageName (Map FlagName Bool))
+      BuildPlanCheckFail CompilerVersion DepErrors
+    | BuildPlanCheckOk (Map PackageName (Map FlagName Bool))
     | BuildPlanCheckPartial (Map PackageName (Map FlagName Bool)) DepErrors
 
 -- | Check a set of 'GenericPackageDescription's and a set of flags against a
@@ -677,10 +679,22 @@ checkSnapBuildPlan gpds flags snap = do
         compiler = mbpCompilerVersion mbp
         snapPkgs = fmap mpiVersion $ mbpPackages mbp
         (f, errs) = checkBundleBuildPlan platform compiler snapPkgs flags gpds
+        cerrs = compilerErrors compiler errs
 
     if Map.null errs then
         return $ BuildPlanCheckOk f
-    else return $ BuildPlanCheckPartial f errs
+    else if Map.null cerrs then do
+            return $ BuildPlanCheckPartial f errs
+        else
+            return $ BuildPlanCheckFail compiler cerrs
+    where
+        compilerErrors compiler errs
+            | whichCompiler compiler == Ghc = ghcErrors errs
+            -- FIXME not sure how to handle ghcjs boot packages
+            | otherwise = Map.empty
+
+        isGhcWiredIn p _ = p `HashSet.member` wiredInPackages
+        ghcErrors = Map.filterWithKey isGhcWiredIn
 
 -- | Find a snapshot and set of flags that is compatible with and matches as
 -- best as possible with the given 'GenericPackageDescription's. Returns
@@ -703,12 +717,12 @@ findBuildPlan gpds = do
             $logInfo $ "Checking against build plan " <> renderSnapName snap
             result <- checkSnapBuildPlan gpds Nothing snap
             case result of
+                BuildPlanCheckFail _ e -> do
+                    logFailure e
+                    loop bestYet rest
                 BuildPlanCheckOk f -> return $ Just (snap, f)
                 BuildPlanCheckPartial f e -> do
-                    $logInfo ""
-                    $logInfo "* Build plan did not match your requirements:"
-                    displayDepErrors e
-                    $logInfo ""
+                    logFailure e
                     case bestYet of
                         Nothing -> loop (Just (snap, f, e)) rest
                         Just prev ->
@@ -717,6 +731,12 @@ findBuildPlan gpds = do
         betterSnap (s1, f1, e1) (s2, f2, e2)
             | (Map.size e1) <= (Map.size e2) = (s1, f1, e1)
             | otherwise = (s2, f2, e2)
+
+        logFailure errs = do
+            $logInfo ""
+            $logInfo "* Build plan did not match your requirements:"
+            displayDepErrors errs
+            $logInfo ""
 
 displayDepErrors :: MonadLogger m => DepErrors -> m ()
 displayDepErrors errs =
