@@ -416,14 +416,15 @@ solveExtraDeps modStackYaml = do
     bconfig <- asks getBuildConfig
 
     let stackYaml = bcStackYaml bconfig
-    stackYamlFP <- makeRel stackYaml
+    relStackYaml <- liftIO $ makeRelativeToCurrentDirectory
+                           $ toFilePath stackYaml
 
     let cabalDirs = Map.keys $ envConfigPackages econfig
         noPkgMsg = "No cabal packages found. Please add at least one directory \
-                   \containing a .cabal file in '" <> stackYamlFP <> "' or use \
+                   \containing a .cabal file in '" <> relStackYaml <> "' or use \
                    \'stack init' to automatically generate the config file."
         dupPkgFooter = "Please remove the directories containing duplicate \
-                       \entries from '" <> stackYamlFP <> "'."
+                       \entries from '" <> relStackYaml <> "'."
 
     cabalfps  <- liftM concat (mapM (findCabalFiles False) cabalDirs)
     gpds <- cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter
@@ -448,11 +449,9 @@ solveExtraDeps modStackYaml = do
                     (\f f' -> if f == f' then Nothing else Just f)
                     flags (bcFlags bconfig)
 
-    $logInfo "This command is not guaranteed to give you a perfect build plan"
     if Map.null newDeps
-        then $logInfo "No needed changes found"
+        then $logInfo $ "No changes needed to " <> T.pack relStackYaml
         else do
-            $logInfo "It's possible that even with the changes generated below, you will still need to do some manual tweaking"
             let o = object
                     $ ("extra-deps" .= map fromTuple (Map.toList newDeps))
                     : (if Map.null newFlags
@@ -475,10 +474,7 @@ solveExtraDeps modStackYaml = do
                     (toJSON $ Map.union (projectFlags project) newFlags)
                 obj
         liftIO $ Yaml.encodeFile fp obj'
-        $logInfo $ T.pack $ "Updated " ++ fp
+        $logInfo $ "Updated " <> T.pack relStackYaml
       else do
         $logInfo ""
         $logInfo "To automatically modify your stack.yaml file, rerun with '--modify-stack-yaml'"
-
-    where
-      makeRel = liftIO . makeRelativeToCurrentDirectory . toFilePath
