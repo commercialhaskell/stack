@@ -46,6 +46,7 @@ import           Stack.Types
 import           Stack.Types.Internal            ( HasTerminal, HasReExec
                                                  , HasLogLevel)
 import           System.Directory                (getDirectoryContents)
+import           System.FilePath                 (dropTrailingPathSeparator)
 import           Stack.Config                    ( getSnapshots
                                                  , makeConcreteResolver)
 
@@ -55,7 +56,8 @@ findCabalFiles recurse dir =
   where
     isCabal path = ".cabal" `isSuffixOf` toFilePath path
 
-    isIgnored path = toFilePath (dirname path) `Set.member` ignoredDirs
+    isIgnored path = dropTrailingPathSeparator (toFilePath (dirname path))
+                     `Set.member` ignoredDirs
 
 -- | Special directories that we don't want to traverse for .cabal files
 ignoredDirs :: Set FilePath
