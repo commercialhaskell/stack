@@ -16,8 +16,10 @@ module Stack.Setup
   ( setupEnv
   , ensureCompiler
   , ensureDockerStackExe
+  , getSystemCompiler
   , SetupOpts (..)
   , defaultStackSetupYaml
+  , removeHaskellEnvVars
   ) where
 
 import           Control.Applicative

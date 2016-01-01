@@ -3,8 +3,8 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TemplateHaskell       #-}
 module Stack.Solver
-    ( cabalSolver
-    , solveExtraDeps
+    ( solveExtraDeps
+    , solveResolverSpec
     ) where
 
 import           Control.Applicative
@@ -30,8 +30,12 @@ import           Path
 import           Path.IO                     (parseRelAsAbsDir)
 import           Prelude
 import           Stack.BuildPlan
+import           Stack.Setup
 import           Stack.Setup.Installed
 import           Stack.Types
+import           Stack.Types.Internal        ( HasTerminal
+                                             , HasReExec
+                                             , HasLogLevel)
 import           System.Directory            (copyFile,
                                               createDirectoryIfMissing,
                                               getTemporaryDirectory)
@@ -40,44 +44,16 @@ import           System.IO.Temp              (withSystemTempDirectory)
 import           System.Process.Read
 
 cabalSolver :: (MonadIO m, MonadLogger m, MonadMask m, MonadBaseControl IO m, MonadReader env m, HasConfig env)
-            => WhichCompiler
+            => EnvOverride
             -> [Path Abs Dir] -- ^ cabal files
             -> Map PackageName Version -- ^ constraints
             -> Map PackageName (Map FlagName Bool) -- ^ user-specified flags
             -> [String] -- ^ additional arguments
-            -> m (CompilerVersion, Map PackageName (Version, Map FlagName Bool))
-cabalSolver wc cabalfps constraints userFlags cabalArgs = withSystemTempDirectory "cabal-solver" $ \dir -> do
-    when (null cabalfps) $ throwM SolverNoCabalFiles
+            -> m (Map PackageName (Version, Map FlagName Bool))
+cabalSolver menv cabalfps constraints userFlags cabalArgs = withSystemTempDirectory "cabal-solver" $ \dir -> do
     configLines <- getCabalConfig dir constraints
     let configFile = dir FP.</> "cabal.config"
     liftIO $ S.writeFile configFile $ encodeUtf8 $ T.unlines configLines
-
-    menv0 <- getMinimalEnvOverride
-    mghc <- findExecutable menv0 "ghc"
-    platform <- asks getPlatform
-    menv <-
-        case mghc of
-            Just _ -> return menv0
-            Nothing -> do
-                localPrograms <- asks $ configLocalPrograms . getConfig
-                tools <- listInstalled localPrograms
-                let ghcName = $(mkPackageName "ghc")
-                case [version | Tool (PackageIdentifier name version) <- tools, name == ghcName] of
-                    [] -> throwM SolverMissingGHC
-                    versions -> do
-                        let version = maximum versions
-                        $logInfo $ "No GHC on path, selecting: " <>
-                                   T.pack (versionString version)
-                        ed <- extraDirs $ Tool $ PackageIdentifier ghcName version
-                        pathsEnv <- augmentPathMap (edBins ed)
-                                                   (unEnvOverride menv0)
-                        mkEnvOverride platform pathsEnv
-    mcabal <- findExecutable menv "cabal"
-    case mcabal of
-        Nothing -> throwM SolverMissingCabalInstall
-        Just _ -> return ()
-
-    compilerVersion <- getCompilerVersion menv wc
 
     -- Run from a temporary directory to avoid cabal getting confused by any
     -- sandbox files, see:
@@ -100,22 +76,18 @@ cabalSolver wc cabalfps constraints userFlags cabalArgs = withSystemTempDirector
              : "--package-db=global"
              : cabalArgs ++
                toConstraintArgs userFlags ++
-               fmap toFilePath cabalfps ++
-               ["--ghcjs" | wc == Ghcjs]
+               fmap toFilePath cabalfps
 
     $logInfo "Asking cabal to calculate a build plan, please wait"
 
-    menv' <- mkEnvOverride platform
-           $ Map.delete "GHCJS_PACKAGE_PATH"
-           $ Map.delete "GHC_PACKAGE_PATH" $ unEnvOverride menv
-    bs <- readProcessStdout (Just tmpdir) menv' "cabal" args
+    bs <- readProcessStdout (Just tmpdir) menv "cabal" args
     let ls = drop 1
            $ dropWhile (not . T.isPrefixOf "In order, ")
            $ T.lines
            $ decodeUtf8 bs
         (errs, pairs) = partitionEithers $ map parseLine ls
     if null errs
-        then return (compilerVersion, Map.fromList pairs)
+        then return (Map.fromList pairs)
         else error $ "Could not parse cabal-install output: " ++ show errs
   where
     parseLine t0 = maybe (Left t0) Right $ do
@@ -174,13 +146,120 @@ getCabalConfig dir constraints = do
         , T.pack $ versionString version
         ]
 
+setupCompiler
+    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
+       , MonadReader env m, HasConfig env , HasGHCVariant env
+       , HasHttpManager env , HasLogLevel env , HasReExec env
+       , HasTerminal env)
+    => CompilerVersion
+    -> m (Maybe ExtraDirs)
+setupCompiler compiler = do
+    let msg = Just $ T.concat
+          [ "Compiler version (" <> compilerVersionText compiler <> ") "
+          , "required by your resolver specification cannot be found.\n\n"
+          , "Please use '--install-ghc' command line switch to automatically "
+          , "install the compiler or '--system-ghc' to use a suitable "
+          , "compiler available on your PATH." ]
+
+    config <- asks getConfig
+    mpaths <- ensureCompiler SetupOpts
+        { soptsInstallIfMissing  = configInstallGHC config
+        , soptsUseSystem         = configSystemGHC config
+        , soptsWantedCompiler    = compiler
+        , soptsCompilerCheck     = configCompilerCheck config
+
+        , soptsStackYaml         = Nothing
+        , soptsForceReinstall    = False
+        , soptsSanityCheck       = False
+        , soptsSkipGhcCheck      = False
+        , soptsSkipMsys          = configSkipMsys config
+        , soptsUpgradeCabal      = False
+        , soptsResolveMissingGHC = msg
+        , soptsStackSetupYaml    = defaultStackSetupYaml
+        , soptsGHCBindistURL     = Nothing
+        }
+
+    return mpaths
+
+setupCabalEnv
+    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
+       , MonadReader env m, HasConfig env , HasGHCVariant env
+       , HasHttpManager env , HasLogLevel env , HasReExec env
+       , HasTerminal env)
+    => CompilerVersion
+    -> m EnvOverride
+setupCabalEnv compiler = do
+    mpaths <- setupCompiler compiler
+    menv0 <- getMinimalEnvOverride
+    envMap <- removeHaskellEnvVars
+              <$> augmentPathMap (maybe [] edBins mpaths)
+                                 (unEnvOverride menv0)
+    platform <- asks getPlatform
+    menv <- mkEnvOverride platform envMap
+
+    mcabal <- findExecutable menv "cabal"
+    case mcabal of
+        Nothing -> throwM SolverMissingCabalInstall
+        Just _ -> return ()
+
+    mver <- getSystemCompiler menv (whichCompiler compiler)
+    case mver of
+        Just (version, _) ->
+            $logInfo $ "Solver: using compiler " <> compilerVersionText version
+        Nothing -> error "Failed to determine compiler version. \
+                         \This is most likely a bug."
+    return menv
+
+solveResolverSpec
+    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
+       , MonadReader env m, HasConfig env , HasGHCVariant env
+       , HasHttpManager env , HasLogLevel env , HasReExec env
+       , HasTerminal env)
+    => Path Abs File  -- ^ stack.yaml file location
+    -> [Path Abs Dir] -- ^ package dirs containing cabal files
+    -> ( Resolver
+       , Map PackageName (Map FlagName Bool)
+       , Map PackageName Version)
+    -> m ( Resolver
+         , Map PackageName (Map FlagName Bool)
+         , Map PackageName Version)
+solveResolverSpec stackYaml cabalDirs (resolver, flags, extraPackages) = do
+    compilerVer <- getResolverCompiler resolver
+    menv <- setupCabalEnv compilerVer
+    extraDeps <- cabalSolver menv cabalDirs extraPackages flags $
+                  ["--ghcjs" | (whichCompiler compilerVer) == Ghcjs]
+    return
+        ( ResolverCompiler compilerVer
+        , Map.filter (not . Map.null) $ fmap snd extraDeps
+        , fmap fst extraDeps
+        )
+
+    where
+      getResolverCompiler (ResolverSnapshot snapName) = do
+          mbp <- loadMiniBuildPlan snapName
+          return (mbpCompilerVersion mbp)
+
+      getResolverCompiler (ResolverCompiler compiler) =
+          return compiler
+
+      -- FIXME instead of passing the stackYaml dir we should maintain
+      -- the file URL in the custom resolver always relative to stackYaml.
+      getResolverCompiler (ResolverCustom _ url) = do
+          mbp <- parseCustomMiniBuildPlan stackYaml url
+          return (mbpCompilerVersion mbp)
+
 -- | Determine missing extra-deps
-solveExtraDeps :: (MonadReader env m, HasEnvConfig env, MonadIO m, MonadMask m, MonadLogger m, MonadBaseControl IO m, HasHttpManager env)
-               => Bool -- ^ modify stack.yaml?
-               -> m ()
+solveExtraDeps
+    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
+       , MonadReader env m, HasConfig env , HasEnvConfig env, HasGHCVariant env
+       , HasHttpManager env , HasLogLevel env , HasReExec env
+       , HasTerminal env)
+    => Bool -- ^ modify stack.yaml?
+    -> m ()
 solveExtraDeps modStackYaml = do
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
+    let stackYaml = bcStackYaml bconfig
     snapshot <-
         case bcResolver bconfig of
             ResolverSnapshot snapName -> liftM mbpPackages $ loadMiniBuildPlan snapName
@@ -193,16 +272,14 @@ solveExtraDeps modStackYaml = do
             (bcExtraDeps bconfig)
             (mpiVersion <$> snapshot)
 
-    wc <- getWhichCompiler
-    (_compilerVersion, extraDeps) <- cabalSolver
-        wc
-        (Map.keys $ envConfigPackages econfig)
-        packages
-        (bcFlags bconfig)
-        []
+    (_, flags, extraDeps) <- solveResolverSpec stackYaml
+                              (Map.keys $ envConfigPackages econfig)
+                              (bcResolver bconfig,
+                               (bcFlags bconfig),
+                               packages)
 
     let newDeps = extraDeps `Map.difference` packages
-        newFlags = Map.filter (not . Map.null) $ fmap snd newDeps
+        newFlags = Map.filter (not . Map.null) $ flags
 
     $logInfo "This command is not guaranteed to give you a perfect build plan"
     if Map.null newDeps
@@ -210,7 +287,7 @@ solveExtraDeps modStackYaml = do
         else do
             $logInfo "It's possible that even with the changes generated below, you will still need to do some manual tweaking"
             let o = object
-                    $ ("extra-deps" .= map fromTuple (Map.toList $ fmap fst newDeps))
+                    $ ("extra-deps" .= map fromTuple (Map.toList newDeps))
                     : (if Map.null newFlags
                         then []
                         else ["flags" .= newFlags])
@@ -226,7 +303,7 @@ solveExtraDeps modStackYaml = do
         let obj' =
                 HashMap.insert "extra-deps"
                     (toJSON $ map fromTuple $ Map.toList
-                            $ Map.union (projectExtraDeps project) (fmap fst newDeps))
+                            $ Map.union (projectExtraDeps project) newDeps)
               $ HashMap.insert ("flags" :: Text)
                     (toJSON $ Map.union (projectFlags project) newFlags)
                 obj

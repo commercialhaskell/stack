@@ -43,6 +43,8 @@ import           Stack.Constants
 import           Stack.Package
 import           Stack.Solver
 import           Stack.Types
+import           Stack.Types.Internal            ( HasTerminal, HasReExec
+                                                 , HasLogLevel)
 import           System.Directory                (getDirectoryContents)
 import           Stack.Config                    ( getSnapshots
                                                  , makeConcreteResolver)
@@ -64,10 +66,14 @@ ignoredDirs = Set.fromList
     ]
 
 -- | Generate stack.yaml
-initProject :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, HasGHCVariant env, MonadLogger m, MonadBaseControl IO m)
-            => Path Abs Dir
-            -> InitOpts
-            -> m ()
+initProject
+    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
+       , MonadReader env m, HasConfig env , HasGHCVariant env
+       , HasHttpManager env , HasLogLevel env , HasReExec env
+       , HasTerminal env)
+    => Path Abs Dir
+    -> InitOpts
+    -> m ()
 initProject currDir initOpts = do
     let dest = currDir </> stackDotYaml
         dest' = toFilePath dest
@@ -87,7 +93,7 @@ initProject currDir initOpts = do
     (warnings,gpds) <- fmap unzip (mapM readPackageUnresolved cabalfps)
     zipWithM_ (mapM_ . printCabalFileWarning) cabalfps warnings
 
-    (r, flags, extraDeps) <- getDefaultResolver cabalfps gpds initOpts
+    (r, flags, extraDeps) <- getDefaultResolver dest cabalfps gpds initOpts
     let p = Project
             { projectPackages = pkgs
             , projectExtraDeps = extraDeps
@@ -182,12 +188,19 @@ getSnapshots' =
         return Nothing
 
 -- | Get the default resolver value
-getDefaultResolver :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, HasGHCVariant env, MonadLogger m, MonadBaseControl IO m)
-                   => [Path Abs File] -- ^ cabal files
-                   -> [C.GenericPackageDescription] -- ^ cabal descriptions
-                   -> InitOpts
-                   -> m (Resolver, Map PackageName (Map FlagName Bool), Map PackageName Version)
-getDefaultResolver cabalfps gpds initOpts = do
+getDefaultResolver
+    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
+       , MonadReader env m, HasConfig env , HasGHCVariant env
+       , HasHttpManager env , HasLogLevel env , HasReExec env
+       , HasTerminal env)
+    => Path Abs File   -- ^ stack.yaml
+    -> [Path Abs File]  -- ^ cabal dirs
+    -> [C.GenericPackageDescription] -- ^ cabal descriptions
+    -> InitOpts
+    -> m ( Resolver
+         , Map PackageName (Map FlagName Bool)
+         , Map PackageName Version)
+getDefaultResolver stackYaml cabalfps gpds initOpts = do
     resolver <- getResolver (ioMethod initOpts)
     result   <- checkResolverSpec gpds Nothing resolver
 
@@ -195,13 +208,9 @@ getDefaultResolver cabalfps gpds initOpts = do
         BuildPlanCheckFail _ _ -> throwM $ ResolverMismatch resolver
         BuildPlanCheckOk flags -> return (resolver, flags, Map.empty)
         BuildPlanCheckPartial _ _
-            | needSolver resolver initOpts -> do
-                (compilerVersion, extraDeps) <- cabalSolver Ghc (map parent cabalfps) Map.empty Map.empty []
-                return
-                    ( ResolverCompiler compilerVersion
-                    , Map.filter (not . Map.null) $ fmap snd extraDeps
-                    , fmap fst extraDeps
-                    )
+            | needSolver resolver initOpts ->
+                solveResolverSpec stackYaml (map parent cabalfps)
+                                  (resolver, Map.empty, Map.empty)
             | otherwise -> throwM $ ResolverPartial resolver
     where
       -- TODO support selecting best across regular and custom snapshots
