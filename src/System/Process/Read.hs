@@ -198,7 +198,7 @@ instance Show ReadProcessException where
         maybe [] (\x -> [" in directory ", x]) (cwd cp) ++
         [ " exited with "
         , show ec
-        , "\n"
+        , "\n\n"
         , toStr out
         , "\n"
         , toStr err

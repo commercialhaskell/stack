@@ -24,12 +24,16 @@ import           Data.Monoid
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import           Data.Text.Encoding          (decodeUtf8, encodeUtf8)
+import           Data.Text.Encoding.Error    (lenientDecode)
+import qualified Data.Text.Lazy              as LT
+import           Data.Text.Lazy.Encoding     (decodeUtf8With)
 import qualified Data.Yaml                   as Yaml
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.IO                     (parseRelAsAbsDir)
 import           Prelude
 import           Stack.BuildPlan
+import           Stack.Constants             (stackDotYaml)
 import           Stack.Setup
 import           Stack.Setup.Installed
 import           Stack.Types
@@ -43,15 +47,18 @@ import qualified System.FilePath             as FP
 import           System.IO.Temp              (withSystemTempDirectory)
 import           System.Process.Read
 
+data ConstraintType = Constraint | Preference deriving (Eq)
+
 cabalSolver :: (MonadIO m, MonadLogger m, MonadMask m, MonadBaseControl IO m, MonadReader env m, HasConfig env)
             => EnvOverride
             -> [Path Abs Dir] -- ^ cabal files
+            -> ConstraintType
             -> Map PackageName Version -- ^ constraints
             -> Map PackageName (Map FlagName Bool) -- ^ user-specified flags
             -> [String] -- ^ additional arguments
-            -> m (Map PackageName (Version, Map FlagName Bool))
-cabalSolver menv cabalfps constraints userFlags cabalArgs = withSystemTempDirectory "cabal-solver" $ \dir -> do
-    configLines <- getCabalConfig dir constraints
+            -> m (Maybe (Map PackageName (Version, Map FlagName Bool)))
+cabalSolver menv cabalfps constraintType constraints userFlags cabalArgs = withSystemTempDirectory "cabal-solver" $ \dir -> do
+    configLines <- getCabalConfig dir constraintType constraints
     let configFile = dir FP.</> "cabal.config"
     liftIO $ S.writeFile configFile $ encodeUtf8 $ T.unlines configLines
 
@@ -67,7 +74,6 @@ cabalSolver menv cabalfps constraints userFlags cabalArgs = withSystemTempDirect
              : "install"
              : "--enable-tests"
              : "--enable-benchmarks"
-             : "-v"
              : "--dry-run"
              : "--only-dependencies"
              : "--reorder-goals"
@@ -78,18 +84,30 @@ cabalSolver menv cabalfps constraints userFlags cabalArgs = withSystemTempDirect
                toConstraintArgs userFlags ++
                fmap toFilePath cabalfps
 
-    $logInfo "Asking cabal to calculate a build plan, please wait"
+    catch (liftM Just (readProcessStdout (Just tmpdir) menv "cabal" args))
+          (\e@(ReadProcessException _ _ _ err) -> do
+              let errMsg = decodeUtf8With lenientDecode err
+              if LT.isInfixOf "Could not resolve dependencies" errMsg
+              then do
+                  $logInfo "Solver: attempt failed."
+                  $logInfo "\n>>>> Cabal errors begin"
+                  $logInfo $ LT.toStrict errMsg
+                             <> "<<<< Cabal errors end\n"
+                  return Nothing
+              else throwM e)
+    >>= maybe (return Nothing) parseCabalOutput
 
-    bs <- readProcessStdout (Just tmpdir) menv "cabal" args
-    let ls = drop 1
-           $ dropWhile (not . T.isPrefixOf "In order, ")
-           $ T.lines
-           $ decodeUtf8 bs
-        (errs, pairs) = partitionEithers $ map parseLine ls
-    if null errs
-        then return (Map.fromList pairs)
-        else error $ "Could not parse cabal-install output: " ++ show errs
   where
+    parseCabalOutput bs = do
+        let ls = drop 1
+               $ dropWhile (not . T.isPrefixOf "In order, ")
+               $ T.lines
+               $ decodeUtf8 bs
+            (errs, pairs) = partitionEithers $ map parseLine ls
+        if null errs
+          then return $ Just (Map.fromList pairs)
+          else error $ "Could not parse cabal-install output: " ++ show errs
+
     parseLine t0 = maybe (Left t0) Right $ do
         -- get rid of (new package) and (latest: ...) bits
         ident':flags' <- Just $ T.words $ T.takeWhile (/= '(') t0
@@ -109,8 +127,11 @@ cabalSolver menv cabalfps constraints userFlags cabalArgs = withSystemTempDirect
                         Just x -> (x, True)
                 Just x -> (x, False)
     toConstraintArgs userFlagMap =
-        [formatFlagConstraint package flag enabled | (package, fs) <- Map.toList userFlagMap
-                                                   , (flag, enabled) <- Map.toList fs]
+        [formatFlagConstraint package flag enabled
+            | constraintType == Constraint
+            , (package, fs) <- Map.toList userFlagMap
+            , (flag, enabled) <- Map.toList fs]
+
     formatFlagConstraint package flag enabled =
         let sign = if enabled then '+' else '-'
         in
@@ -118,9 +139,10 @@ cabalSolver menv cabalfps constraints userFlags cabalArgs = withSystemTempDirect
 
 getCabalConfig :: (MonadReader env m, HasConfig env, MonadIO m, MonadThrow m)
                => FilePath -- ^ temp dir
+               -> ConstraintType
                -> Map PackageName Version -- ^ constraints
                -> m [Text]
-getCabalConfig dir constraints = do
+getCabalConfig dir constraintType constraints = do
     indices <- asks $ configPackageIndices . getConfig
     remotes <- mapM goIndex indices
     let cache = T.pack $ "remote-repo-cache: " ++ dir
@@ -140,7 +162,9 @@ getCabalConfig dir constraints = do
             ]
 
     goConstraint (name, version) = T.concat
-        [ "constraint: "
+        [ (if constraintType == Constraint
+           then "constraint: "
+           else "preference: ")
         , T.pack $ packageNameString name
         , "=="
         , T.pack $ versionString version
@@ -224,20 +248,60 @@ solveResolverSpec
          , Map PackageName (Map FlagName Bool)
          , Map PackageName Version)
 solveResolverSpec stackYaml cabalDirs (resolver, flags, extraPackages) = do
+    $logInfo $ "Solver: using resolver " <> resolverName resolver
     (compilerVer, snapPackages) <- getResolverMiniPlan resolver
     menv <- setupCabalEnv compilerVer
     -- Note - The order in Map.union below is important.
     -- We prefer extraPackages over the snapshot
     let availablePkgs = Map.union extraPackages snapPackages
-    pairs <- cabalSolver menv cabalDirs availablePkgs flags $
-                  ["--ghcjs" | (whichCompiler compilerVer) == Ghcjs]
+        solver t = cabalSolver menv cabalDirs t availablePkgs flags $
+                          ["-v"] -- TODO make it conditional on debug
+                       ++ ["--ghcjs" | (whichCompiler compilerVer) == Ghcjs]
 
-    let versiondiff (v, f) v' = if v == v' then Nothing else Just (v, f)
-        newPairs = Map.differenceWith versiondiff pairs availablePkgs
+    let srcNames = (T.intercalate " and ") $
+          ["packages from " <> resolverName resolver
+              | not (Map.null snapPackages)] ++
+          [T.pack ((show $ Map.size extraPackages) <> " external packages")
+              | not (Map.null extraPackages)]
 
-    return ( resolver
-           , Map.filter (not . Map.null) (fmap snd pairs)
-           , fmap fst newPairs)
+    $logInfo "Solver: asking cabal to calculate a build plan..."
+    unless (Map.null availablePkgs)
+        ($logInfo $ "Solver: trying with " <> srcNames <> " as hard constraints...")
+
+    mdeps <- solver Constraint
+    mdeps' <- case mdeps of
+        Nothing | not (Map.null availablePkgs) -> do
+            $logInfo $ "Solver: retrying with " <> srcNames <> " as preferences..."
+            solver Preference
+        _ -> return mdeps
+
+    case mdeps' of
+      Just pairs -> do
+        let versiondiff (v, f) v' = if v == v' then Nothing else Just (v, f)
+            newPairs = Map.differenceWith versiondiff pairs availablePkgs
+
+        $logInfo $ "Solver: successfully determined a build plan with "
+                 <> T.pack (show $ Map.size newPairs)
+                 <> " new dependencies "
+
+        return ( resolver
+               , Map.filter (not . Map.null) (fmap snd pairs)
+               , fmap fst newPairs)
+      Nothing ->
+        error ("Solver could not resolve package dependencies. "
+            <> "You can try one or more of the following:\n"
+            <> "- If the problem is due to a stale package index you can try "
+            <> "again after udating the package index with 'stack update'.\n"
+            <> "- Create pivot points for the solver by specifying some "
+            <> "extra dependencies in " <> toFilePath stackDotYaml
+            <> " and then use 'stack solver' to figure out the rest of the "
+            <> " dependencies.\n"
+            <> "- Check if you missed adding a custom package or remote "
+            <> "package location needed to build your package. Also, you may "
+            <> "want to remove any unnecessary packages causing dependency "
+            <> "problems.\n"
+            <> "- Use '--ignore-subdirs' to avoid using unwanted .cabal files "
+            <> "in subdirectories.")
     where
       getResolverMiniPlan (ResolverSnapshot snapName) = do
           mbp <- loadMiniBuildPlan snapName
