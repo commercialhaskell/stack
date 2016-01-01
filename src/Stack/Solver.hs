@@ -3,7 +3,9 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TemplateHaskell       #-}
 module Stack.Solver
-    ( solveExtraDeps
+    ( checkResolverSpec
+    , findCabalFiles
+    , solveExtraDeps
     , solveResolverSpec
     ) where
 
@@ -18,9 +20,12 @@ import           Data.Aeson.Extended         (object, (.=), toJSON, logJSONWarni
 import qualified Data.ByteString             as S
 import           Data.Either
 import qualified Data.HashMap.Strict         as HashMap
+import           Data.List                   (isSuffixOf)
 import           Data.Map                    (Map)
 import qualified Data.Map                    as Map
 import           Data.Monoid
+import           Data.Set                    (Set)
+import qualified Data.Set                    as Set
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 import           Data.Text.Encoding          (decodeUtf8, encodeUtf8)
@@ -28,12 +33,15 @@ import           Data.Text.Encoding.Error    (lenientDecode)
 import qualified Data.Text.Lazy              as LT
 import           Data.Text.Lazy.Encoding     (decodeUtf8With)
 import qualified Data.Yaml                   as Yaml
+import qualified Distribution.PackageDescription as C
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
+import           Path.Find                   (findFiles)
 import           Path.IO                     (parseRelAsAbsDir)
 import           Prelude
 import           Stack.BuildPlan
 import           Stack.Constants             (stackDotYaml)
+import           Stack.Package               (readPackageUnresolved)
 import           Stack.Setup
 import           Stack.Setup.Installed
 import           Stack.Types
@@ -316,6 +324,43 @@ solveResolverSpec stackYaml cabalDirs (resolver, flags, extraPackages) = do
           mbp <- parseCustomMiniBuildPlan stackYaml url
           return (mbpCompilerVersion mbp, fmap mpiVersion (mbpPackages mbp))
 
+-- | Given a bundle of packages and a resolver, check the resolver with respect
+-- to the packages and return how well the resolver satisfies the depndencies
+-- of the packages. If 'flags' is passed as 'Nothing' then flags are chosen
+-- automatically.
+
+checkResolverSpec
+    :: ( MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m
+       , HasHttpManager env, HasConfig env, HasGHCVariant env
+       , MonadBaseControl IO m)
+    => [C.GenericPackageDescription]
+    -> Maybe (Map PackageName (Map FlagName Bool))
+    -> Resolver
+    -> m BuildPlanCheck
+checkResolverSpec gpds flags resolver = do
+    case resolver of
+      ResolverSnapshot name -> checkSnapBuildPlan gpds flags name
+      ResolverCompiler _ -> return $ BuildPlanCheckPartial Map.empty Map.empty
+      -- TODO support custom resolver for stack init
+      ResolverCustom _ _ -> return $ BuildPlanCheckPartial Map.empty Map.empty
+
+findCabalFiles :: MonadIO m => Bool -> Path Abs Dir -> m [Path Abs File]
+findCabalFiles recurse dir =
+    liftIO $ findFiles dir isCabal (\subdir -> recurse && not (isIgnored subdir))
+  where
+    isCabal path = ".cabal" `isSuffixOf` toFilePath path
+
+    isIgnored path = FP.dropTrailingPathSeparator (toFilePath (dirname path))
+                     `Set.member` ignoredDirs
+
+-- | Special directories that we don't want to traverse for .cabal files
+ignoredDirs :: Set FilePath
+ignoredDirs = Set.fromList
+    [ ".git"
+    , "dist"
+    , ".stack-work"
+    ]
+
 -- | Determine missing extra-deps
 solveExtraDeps
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
@@ -327,24 +372,24 @@ solveExtraDeps
 solveExtraDeps modStackYaml = do
     econfig <- asks getEnvConfig
     bconfig <- asks getBuildConfig
+
     let stackYaml = bcStackYaml bconfig
-    snapshot <-
-        case bcResolver bconfig of
-            ResolverSnapshot snapName -> liftM mbpPackages $ loadMiniBuildPlan snapName
-            ResolverCompiler _ -> return Map.empty
-            ResolverCustom _ url -> liftM mbpPackages $ parseCustomMiniBuildPlan
-                (bcStackYaml bconfig)
-                url
+        cabalDirs = Map.keys $ envConfigPackages econfig
 
-    let packages = Map.union
-            (bcExtraDeps bconfig)
-            (mpiVersion <$> snapshot)
+    cabalfps  <- liftM concat (mapM (findCabalFiles False) cabalDirs)
+    (_warnings, gpds) <- fmap unzip (mapM readPackageUnresolved cabalfps)
 
-    (_, flags, extraDeps) <- solveResolverSpec stackYaml
-                              (Map.keys $ envConfigPackages econfig)
-                              (bcResolver bconfig,
-                               (bcFlags bconfig),
-                               packages)
+    let oldFlags = bcFlags bconfig
+        resolver = bcResolver bconfig
+
+    result <- checkResolverSpec gpds (Just oldFlags) resolver
+    (_, flags, extraDeps) <- case result of
+        BuildPlanCheckFail _ _ -> throwM $ ResolverMismatch resolver
+        BuildPlanCheckOk flags -> return (resolver, flags, Map.empty)
+        BuildPlanCheckPartial _ _ -> solveResolverSpec stackYaml cabalDirs
+                                                       ( resolver
+                                                       , oldFlags
+                                                       , bcExtraDeps bconfig)
 
     -- FIXME we are not reporting any deleted dependencies
     let newDeps = Map.differenceWith

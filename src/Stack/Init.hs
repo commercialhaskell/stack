@@ -3,8 +3,7 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TemplateHaskell       #-}
 module Stack.Init
-    ( findCabalFiles
-    , initProject
+    ( initProject
     , InitOpts (..)
     , SnapPref (..)
     , Method (..)
@@ -23,20 +22,17 @@ import qualified Data.ByteString.Lazy            as L
 import qualified Data.HashMap.Strict             as HM
 import qualified Data.IntMap                     as IntMap
 import qualified Data.Foldable                   as F
-import           Data.List                       (isSuffixOf,sortBy)
+import           Data.List                       (sortBy)
 import           Data.List.Extra                 (nubOrd)
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
 import           Data.Maybe                      (mapMaybe)
 import           Data.Monoid
-import           Data.Set                        (Set)
-import qualified Data.Set                        as Set
 import qualified Data.Text                       as T
 import qualified Data.Yaml                       as Yaml
 import qualified Distribution.PackageDescription as C
 import           Network.HTTP.Client.Conduit     (HasHttpManager)
 import           Path
-import           Path.Find
 import           Path.IO
 import           Stack.BuildPlan
 import           Stack.Constants
@@ -46,26 +42,8 @@ import           Stack.Types
 import           Stack.Types.Internal            ( HasTerminal, HasReExec
                                                  , HasLogLevel)
 import           System.Directory                (getDirectoryContents)
-import           System.FilePath                 (dropTrailingPathSeparator)
 import           Stack.Config                    ( getSnapshots
                                                  , makeConcreteResolver)
-
-findCabalFiles :: MonadIO m => Bool -> Path Abs Dir -> m [Path Abs File]
-findCabalFiles recurse dir =
-    liftIO $ findFiles dir isCabal (\subdir -> recurse && not (isIgnored subdir))
-  where
-    isCabal path = ".cabal" `isSuffixOf` toFilePath path
-
-    isIgnored path = dropTrailingPathSeparator (toFilePath (dirname path))
-                     `Set.member` ignoredDirs
-
--- | Special directories that we don't want to traverse for .cabal files
-ignoredDirs :: Set FilePath
-ignoredDirs = Set.fromList
-    [ ".git"
-    , "dist"
-    , ".stack-work"
-    ]
 
 -- | Generate stack.yaml
 initProject
@@ -230,13 +208,6 @@ getDefaultResolver stackYaml cabalfps gpds initOpts = do
                                 <> (renderSnapName s)
                                 <> "'.")
                       return $ ResolverSnapshot s)
-
-      checkResolverSpec packages flags resolver = do
-          case resolver of
-            ResolverSnapshot name -> checkSnapBuildPlan packages flags name
-            ResolverCompiler _ -> return $ BuildPlanCheckPartial Map.empty Map.empty
-            -- TODO support custom resolver for stack init
-            ResolverCustom _ _ -> return $ BuildPlanCheckPartial Map.empty Map.empty
 
       needSolver _ (InitOpts {useSolver = True}) = True
       needSolver (ResolverCompiler _)  _ = True
