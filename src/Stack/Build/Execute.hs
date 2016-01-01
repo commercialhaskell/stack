@@ -24,8 +24,9 @@ import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
 import           Control.Exception.Enclosed (catchIO)
 import           Control.Exception.Lifted
-import           Control.Monad (liftM, when, unless, void, join, filterM, (<=<))
+import           Control.Monad (liftM, when, unless, void, join)
 import           Control.Monad.Catch (MonadCatch, MonadMask)
+import           Control.Monad.Extra (anyM, (&&^))
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader, asks)
@@ -349,13 +350,6 @@ executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages loc
         createTree destDir
 
         destDir' <- liftIO . D.canonicalizePath . toFilePath $ destDir
-        isInPATH <- liftIO . fmap (any (FP.equalFilePath destDir')) . (mapM D.canonicalizePath <=< filterM D.doesDirectoryExist) $ (envSearchPath menv)
-        when (not isInPATH) $
-            $logWarn $ T.concat
-                [ "Installation path "
-                , T.pack destDir'
-                , " not found in PATH environment variable"
-                ]
 
         platform <- asks getPlatform
         let ext =
@@ -403,6 +397,16 @@ executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages loc
                 , T.pack dest
                 , ":"]
             forM_ executables $ \exe -> $logInfo $ T.append "- " exe
+
+        destDirIsInPATH <- liftIO $
+            anyM (\dir -> D.doesDirectoryExist dir &&^ fmap (FP.equalFilePath destDir') (D.canonicalizePath dir)) (envSearchPath menv)
+        unless destDirIsInPATH $ do
+            $logWarn ""
+            $logWarn $ T.concat
+                [ "WARNING: Installation path "
+                , T.pack destDir'
+                , " not found in PATH environment variable"
+                ]
 
     config <- asks getConfig
     menv' <- liftIO $ configEnvOverride config EnvSettings
