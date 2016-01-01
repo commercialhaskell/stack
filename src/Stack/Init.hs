@@ -207,10 +207,10 @@ getDefaultResolver stackYaml cabalfps gpds initOpts = do
     case result of
         BuildPlanCheckFail _ _ -> throwM $ ResolverMismatch resolver
         BuildPlanCheckOk flags -> return (resolver, flags, Map.empty)
-        BuildPlanCheckPartial _ _
+        BuildPlanCheckPartial flags _
             | needSolver resolver initOpts ->
                 solveResolverSpec stackYaml (map parent cabalfps)
-                                  (resolver, Map.empty, Map.empty)
+                                  (resolver, flags, Map.empty)
             | otherwise -> throwM $ ResolverPartial resolver
     where
       -- TODO support selecting best across regular and custom snapshots

@@ -224,29 +224,33 @@ solveResolverSpec
          , Map PackageName (Map FlagName Bool)
          , Map PackageName Version)
 solveResolverSpec stackYaml cabalDirs (resolver, flags, extraPackages) = do
-    compilerVer <- getResolverCompiler resolver
+    (compilerVer, snapPackages) <- getResolverMiniPlan resolver
     menv <- setupCabalEnv compilerVer
-    extraDeps <- cabalSolver menv cabalDirs extraPackages flags $
+    -- Note - The order in Map.union below is important.
+    -- We prefer extraPackages over the snapshot
+    let availablePkgs = Map.union extraPackages snapPackages
+    pairs <- cabalSolver menv cabalDirs availablePkgs flags $
                   ["--ghcjs" | (whichCompiler compilerVer) == Ghcjs]
-    return
-        ( ResolverCompiler compilerVer
-        , Map.filter (not . Map.null) $ fmap snd extraDeps
-        , fmap fst extraDeps
-        )
 
+    let versiondiff (v, f) v' = if v == v' then Nothing else Just (v, f)
+        newPairs = Map.differenceWith versiondiff pairs availablePkgs
+
+    return ( resolver
+           , Map.filter (not . Map.null) (fmap snd pairs)
+           , fmap fst newPairs)
     where
-      getResolverCompiler (ResolverSnapshot snapName) = do
+      getResolverMiniPlan (ResolverSnapshot snapName) = do
           mbp <- loadMiniBuildPlan snapName
-          return (mbpCompilerVersion mbp)
+          return (mbpCompilerVersion mbp, fmap mpiVersion (mbpPackages mbp))
 
-      getResolverCompiler (ResolverCompiler compiler) =
-          return compiler
+      getResolverMiniPlan (ResolverCompiler compiler) =
+          return (compiler, Map.empty)
 
       -- FIXME instead of passing the stackYaml dir we should maintain
       -- the file URL in the custom resolver always relative to stackYaml.
-      getResolverCompiler (ResolverCustom _ url) = do
+      getResolverMiniPlan (ResolverCustom _ url) = do
           mbp <- parseCustomMiniBuildPlan stackYaml url
-          return (mbpCompilerVersion mbp)
+          return (mbpCompilerVersion mbp, fmap mpiVersion (mbpPackages mbp))
 
 -- | Determine missing extra-deps
 solveExtraDeps
@@ -278,8 +282,13 @@ solveExtraDeps modStackYaml = do
                                (bcFlags bconfig),
                                packages)
 
-    let newDeps = extraDeps `Map.difference` packages
-        newFlags = Map.filter (not . Map.null) $ flags
+    -- FIXME we are not reporting any deleted dependencies
+    let newDeps = Map.differenceWith
+                    (\v v' -> if v == v' then Nothing else Just v)
+                    extraDeps (bcExtraDeps bconfig)
+        newFlags = Map.differenceWith
+                    (\f f' -> if f == f' then Nothing else Just f)
+                    flags (bcFlags bconfig)
 
     $logInfo "This command is not guaranteed to give you a perfect build plan"
     if Map.null newDeps
