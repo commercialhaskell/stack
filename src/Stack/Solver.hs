@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 module Stack.Solver
     ( checkResolverSpec
+    , cabalPackagesCheck
     , findCabalFiles
     , solveExtraDeps
     , solveResolverSpec
@@ -41,7 +42,8 @@ import           Path.IO                     (parseRelAsAbsDir)
 import           Prelude
 import           Stack.BuildPlan
 import           Stack.Constants             (stackDotYaml)
-import           Stack.Package               (readPackageUnresolved)
+import           Stack.Package               ( printCabalFileWarning
+                                             , readPackageUnresolved)
 import           Stack.Setup
 import           Stack.Setup.Installed
 import           Stack.Types
@@ -50,7 +52,8 @@ import           Stack.Types.Internal        ( HasTerminal
                                              , HasLogLevel)
 import           System.Directory            (copyFile,
                                               createDirectoryIfMissing,
-                                              getTemporaryDirectory)
+                                              getTemporaryDirectory,
+                                              makeRelativeToCurrentDirectory)
 import qualified System.FilePath             as FP
 import           System.IO.Temp              (withSystemTempDirectory)
 import           System.Process.Read
@@ -361,6 +364,34 @@ ignoredDirs = Set.fromList
     , ".stack-work"
     ]
 
+-- | Do some basic checks on a list of cabal file paths to be used for creating
+-- stack config, print some informative and error messages and if all is ok
+-- return @GenericPackageDescription@ list.
+cabalPackagesCheck
+    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
+       , MonadReader env m, HasConfig env , HasGHCVariant env
+       , HasHttpManager env , HasLogLevel env , HasReExec env
+       , HasTerminal env)
+     => [Path Abs File]
+     -> String
+     -> m [C.GenericPackageDescription]
+cabalPackagesCheck cabalfps noPkgMsg = do
+    when (null cabalfps) $
+        error noPkgMsg
+
+    relpaths <- mapM makeRel cabalfps
+    $logInfo $ "Using the following cabal packages:"
+    $logInfo $ T.pack (formatGroup relpaths)
+
+    (warnings,gpds) <- fmap unzip (mapM readPackageUnresolved cabalfps)
+    zipWithM_ (mapM_ . printCabalFileWarning) cabalfps warnings
+    return gpds
+
+    where
+        makeRel         = liftIO . makeRelativeToCurrentDirectory . toFilePath
+        formatPath path = "- " <> path <> "\n"
+        formatGroup     = concat . (map formatPath)
+
 -- | Determine missing extra-deps
 solveExtraDeps
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
@@ -374,10 +405,15 @@ solveExtraDeps modStackYaml = do
     bconfig <- asks getBuildConfig
 
     let stackYaml = bcStackYaml bconfig
-        cabalDirs = Map.keys $ envConfigPackages econfig
+    stackYamlFP <- makeRel stackYaml
+
+    let cabalDirs = Map.keys $ envConfigPackages econfig
+        noPkgMsg = "No cabal packages found. Please add at least one directory \
+                   \containing a .cabal file in '" <> stackYamlFP <> "' or use \
+                   \'stack init' to automatically generate the config file."
 
     cabalfps  <- liftM concat (mapM (findCabalFiles False) cabalDirs)
-    (_warnings, gpds) <- fmap unzip (mapM readPackageUnresolved cabalfps)
+    gpds <- cabalPackagesCheck cabalfps noPkgMsg
 
     let oldFlags = bcFlags bconfig
         resolver = bcResolver bconfig
@@ -430,3 +466,6 @@ solveExtraDeps modStackYaml = do
       else do
         $logInfo ""
         $logInfo "To automatically modify your stack.yaml file, rerun with '--modify-stack-yaml'"
+
+    where
+      makeRel = liftIO . makeRelativeToCurrentDirectory . toFilePath

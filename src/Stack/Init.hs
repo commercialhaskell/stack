@@ -11,7 +11,7 @@ module Stack.Init
 
 import           Control.Exception               (assert)
 import           Control.Exception.Enclosed      (catchAny, handleIO)
-import           Control.Monad                   (liftM, when, zipWithM_)
+import           Control.Monad                   (liftM, when)
 import           Control.Monad.Catch             (MonadMask, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -36,12 +36,12 @@ import           Path
 import           Path.IO
 import           Stack.BuildPlan
 import           Stack.Constants
-import           Stack.Package
 import           Stack.Solver
 import           Stack.Types
 import           Stack.Types.Internal            ( HasTerminal, HasReExec
                                                  , HasLogLevel)
-import           System.Directory                (getDirectoryContents)
+import           System.Directory                ( getDirectoryContents
+                                                 , makeRelativeToCurrentDirectory)
 import           Stack.Config                    ( getSnapshots
                                                  , makeConcreteResolver)
 
@@ -57,23 +57,23 @@ initProject
 initProject currDir initOpts = do
     let dest = currDir </> stackDotYaml
         dest' = toFilePath dest
+
+    reldest <- liftIO $ makeRelativeToCurrentDirectory dest'
+
     exists <- fileExists dest
-    when (not (forceOverwrite initOpts) && exists) $
-      error ("Refusing to overwrite existing stack.yaml, " <>
-             "please delete before running stack init " <>
-             "or if you are sure use \"--force\"")
+    when (not (forceOverwrite initOpts) && exists) $ do
+        error ("Stack configuration file " <> reldest <>
+               " exists, use 'stack solver' to fix the existing config file or \
+               \'--force' to overwrite it.")
+
+    let noPkgMsg =  "In order to init, you should have an existing .cabal \
+                    \file. Please try \"stack new\" instead."
 
     cabalfps <- findCabalFiles (includeSubDirs initOpts) currDir
-    $logInfo $ "Writing default config file to: " <> T.pack dest'
-    $logInfo $ "Basing on cabal files:"
-    mapM_ (\path -> $logInfo $ "- " <> T.pack (toFilePath path)) cabalfps
-    $logInfo ""
+    gpds <- cabalPackagesCheck cabalfps noPkgMsg
 
-    when (null cabalfps) $ error "In order to init, you should have an existing .cabal file. Please try \"stack new\" instead"
-    (warnings,gpds) <- fmap unzip (mapM readPackageUnresolved cabalfps)
-    zipWithM_ (mapM_ . printCabalFileWarning) cabalfps warnings
-
-    (r, flags, extraDeps) <- getDefaultResolver dest cabalfps gpds initOpts
+    (r, flags, extraDeps) <-
+        getDefaultResolver dest (map parent cabalfps) gpds initOpts
     let p = Project
             { projectPackages = pkgs
             , projectExtraDeps = extraDeps
@@ -94,9 +94,11 @@ initProject currDir initOpts = do
                     Just rel -> toFilePath rel
             , peSubdirs = []
             }
-    $logInfo $ "Selected resolver: " <> resolverName r
+
+    $logInfo $ "Initialising stack configuration using resolver: " <> resolverName r
+    $logInfo $ "Writing stack configuration to: " <> T.pack reldest
     liftIO $ L.writeFile dest' $ B.toLazyByteString $ renderStackYaml p
-    $logInfo $ "Wrote project config to: " <> T.pack dest'
+    $logInfo "All done."
 
 -- | Render a stack.yaml file with comments, see:
 -- https://github.com/commercialhaskell/stack/issues/226
@@ -174,13 +176,13 @@ getDefaultResolver
        , HasHttpManager env , HasLogLevel env , HasReExec env
        , HasTerminal env)
     => Path Abs File   -- ^ stack.yaml
-    -> [Path Abs File]  -- ^ cabal dirs
+    -> [Path Abs Dir]  -- ^ cabal dirs
     -> [C.GenericPackageDescription] -- ^ cabal descriptions
     -> InitOpts
     -> m ( Resolver
          , Map PackageName (Map FlagName Bool)
          , Map PackageName Version)
-getDefaultResolver stackYaml cabalfps gpds initOpts = do
+getDefaultResolver stackYaml cabalDirs gpds initOpts = do
     resolver <- getResolver (ioMethod initOpts)
     result   <- checkResolverSpec gpds Nothing resolver
 
@@ -189,7 +191,7 @@ getDefaultResolver stackYaml cabalfps gpds initOpts = do
         BuildPlanCheckOk flags -> return (resolver, flags, Map.empty)
         BuildPlanCheckPartial flags _
             | needSolver resolver initOpts ->
-                solveResolverSpec stackYaml (map parent cabalfps)
+                solveResolverSpec stackYaml cabalDirs
                                   (resolver, flags, Map.empty)
             | otherwise -> throwM $ ResolverPartial resolver
     where
