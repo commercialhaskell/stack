@@ -21,7 +21,8 @@ import           Data.Aeson.Extended         (object, (.=), toJSON, logJSONWarni
 import qualified Data.ByteString             as S
 import           Data.Either
 import qualified Data.HashMap.Strict         as HashMap
-import           Data.List                   (isSuffixOf)
+import           Data.List                   (isSuffixOf, intercalate)
+import           Data.List.Extra             (groupSortOn)
 import           Data.Map                    (Map)
 import qualified Data.Map                    as Map
 import           Data.Monoid
@@ -42,7 +43,7 @@ import           Path.IO                     (parseRelAsAbsDir)
 import           Prelude
 import           Stack.BuildPlan
 import           Stack.Constants             (stackDotYaml)
-import           Stack.Package               ( printCabalFileWarning
+import           Stack.Package               (printCabalFileWarning
                                              , readPackageUnresolved)
 import           Stack.Setup
 import           Stack.Setup.Installed
@@ -374,8 +375,9 @@ cabalPackagesCheck
        , HasTerminal env)
      => [Path Abs File]
      -> String
+     -> String
      -> m [C.GenericPackageDescription]
-cabalPackagesCheck cabalfps noPkgMsg = do
+cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter = do
     when (null cabalfps) $
         error noPkgMsg
 
@@ -383,12 +385,21 @@ cabalPackagesCheck cabalfps noPkgMsg = do
     $logInfo $ "Using the following cabal packages:"
     $logInfo $ T.pack (formatGroup relpaths)
 
+    when (dupGroups relpaths /= []) $
+        error $ "Duplicate cabal package names cannot be used in a single "
+        <> "stack project. Following duplicates were found:\n"
+        <> intercalate "\n" (dupGroups relpaths)
+        <> "\n"
+        <> dupPkgFooter
+
     (warnings,gpds) <- fmap unzip (mapM readPackageUnresolved cabalfps)
     zipWithM_ (mapM_ . printCabalFileWarning) cabalfps warnings
     return gpds
 
     where
         makeRel         = liftIO . makeRelativeToCurrentDirectory . toFilePath
+        groups          = filter ((> 1) . length) . groupSortOn (FP.takeFileName)
+        dupGroups       = (map formatGroup) . groups
         formatPath path = "- " <> path <> "\n"
         formatGroup     = concat . (map formatPath)
 
@@ -411,9 +422,11 @@ solveExtraDeps modStackYaml = do
         noPkgMsg = "No cabal packages found. Please add at least one directory \
                    \containing a .cabal file in '" <> stackYamlFP <> "' or use \
                    \'stack init' to automatically generate the config file."
+        dupPkgFooter = "Please remove the directories containing duplicate \
+                       \entries from '" <> stackYamlFP <> "'."
 
     cabalfps  <- liftM concat (mapM (findCabalFiles False) cabalDirs)
-    gpds <- cabalPackagesCheck cabalfps noPkgMsg
+    gpds <- cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter
 
     let oldFlags = bcFlags bconfig
         resolver = bcResolver bconfig

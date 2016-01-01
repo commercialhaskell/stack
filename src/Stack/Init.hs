@@ -69,8 +69,16 @@ initProject currDir initOpts = do
     let noPkgMsg =  "In order to init, you should have an existing .cabal \
                     \file. Please try \"stack new\" instead."
 
+        dupPkgFooter = "You have the following options:\n"
+            <> "- Use '--ignore-subdirs' command line switch to ignore "
+            <> "packages in subdirectories. You can init subdirectories as "
+            <> "independent projects.\n"
+            <> "- Put selected packages in the stack config file "
+            <> "and then use 'stack solver' command to automatically resolve "
+            <> "dependencies and update the config file."
+
     cabalfps <- findCabalFiles (includeSubDirs initOpts) currDir
-    gpds <- cabalPackagesCheck cabalfps noPkgMsg
+    gpds <- cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter
 
     (r, flags, extraDeps) <-
         getDefaultResolver dest (map parent cabalfps) gpds initOpts
