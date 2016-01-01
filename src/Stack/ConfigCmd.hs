@@ -21,7 +21,7 @@ import qualified Data.Yaml as Yaml
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Stack.BuildPlan
-import           Stack.Init
+import           Stack.Config (makeConcreteResolver)
 import           Stack.Types
 
 data ConfigCmdSet = ConfigCmdSetResolver AbstractResolver

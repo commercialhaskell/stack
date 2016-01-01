@@ -15,8 +15,6 @@ module Stack.BuildPlan
     , checkSnapBuildPlan
     , MiniBuildPlan(..)
     , MiniPackageInfo(..)
-    , Snapshots (..)
-    , getSnapshots
     , loadMiniBuildPlan
     , resolveBuildPlan
     , selectBestSnapshot
@@ -37,7 +35,7 @@ import           Control.Monad.State.Strict      (State, execState, get, modify,
                                                   put)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
-import           Data.Aeson.Extended (FromJSON (..), withObject, withText, (.:), (.:?), (.!=))
+import           Data.Aeson.Extended (FromJSON (..), withObject, (.:), (.:?), (.!=))
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Base16 as B16
@@ -45,10 +43,7 @@ import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
 import qualified Data.Foldable as F
-import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HashSet
-import           Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
 import           Data.List (intercalate)
 import           Data.Map (Map)
 import qualified Data.Map as Map
@@ -59,7 +54,6 @@ import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
-import           Data.Time (Day)
 import qualified Data.Traversable as Tr
 import           Data.Typeable (Typeable)
 import           Data.Yaml (decodeEither', decodeFileEither)
@@ -395,39 +389,6 @@ getToolMap mbp =
         map (flip Map.singleton (Set.singleton pname) . unExeName)
       $ Set.toList
       $ mpiExes mpi
-
--- | Download the 'Snapshots' value from stackage.org.
-getSnapshots :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env, HasStackRoot env, HasConfig env)
-             => m Snapshots
-getSnapshots = askLatestSnapshotUrl >>= parseUrl . T.unpack >>= downloadJSON
-
--- | Most recent Nightly and newest LTS version per major release.
-data Snapshots = Snapshots
-    { snapshotsNightly :: !Day
-    , snapshotsLts     :: !(IntMap Int)
-    }
-    deriving Show
-instance FromJSON Snapshots where
-    parseJSON = withObject "Snapshots" $ \o -> Snapshots
-        <$> (o .: "nightly" >>= parseNightly)
-        <*> (fmap IntMap.unions
-                $ mapM (parseLTS . snd)
-                $ filter (isLTS . fst)
-                $ HM.toList o)
-      where
-        parseNightly t =
-            case parseSnapName t of
-                Left e -> fail $ show e
-                Right (LTS _ _) -> fail "Unexpected LTS value"
-                Right (Nightly d) -> return d
-
-        isLTS = ("lts-" `T.isPrefixOf`)
-
-        parseLTS = withText "LTS" $ \t ->
-            case parseSnapName t of
-                Left e -> fail $ show e
-                Right (LTS x y) -> return $ IntMap.singleton x y
-                Right (Nightly _) -> fail "Unexpected nightly value"
 
 -- | Load up a 'MiniBuildPlan', preferably from cache
 loadMiniBuildPlan

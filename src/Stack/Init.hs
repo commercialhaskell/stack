@@ -8,18 +8,15 @@ module Stack.Init
     , InitOpts (..)
     , SnapPref (..)
     , Method (..)
-    , makeConcreteResolver
-    , tryDeprecatedPath
-    , getImplicitGlobalProjectDir
     ) where
 
 import           Control.Exception               (assert)
 import           Control.Exception.Enclosed      (catchAny, handleIO)
 import           Control.Monad                   (liftM, when, zipWithM_)
-import           Control.Monad.Catch             (MonadMask, MonadThrow, throwM)
+import           Control.Monad.Catch             (MonadMask, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader            (MonadReader, asks)
+import           Control.Monad.Reader            (MonadReader)
 import           Control.Monad.Trans.Control     (MonadBaseControl)
 import qualified Data.ByteString.Builder         as B
 import qualified Data.ByteString.Lazy            as L
@@ -47,6 +44,8 @@ import           Stack.Package
 import           Stack.Solver
 import           Stack.Types
 import           System.Directory                (getDirectoryContents)
+import           Stack.Config                    ( getSnapshots
+                                                 , makeConcreteResolver)
 
 findCabalFiles :: MonadIO m => Bool -> Path Abs Dir -> m [Path Abs File]
 findCabalFiles recurse dir =
@@ -281,79 +280,3 @@ data SnapPref = PrefNone | PrefLTS | PrefNightly
 
 -- | Method of initializing
 data Method = MethodSnapshot SnapPref | MethodResolver AbstractResolver
-
--- | Turn an 'AbstractResolver' into a 'Resolver'.
-makeConcreteResolver :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadLogger m)
-                     => AbstractResolver
-                     -> m Resolver
-makeConcreteResolver (ARResolver r) = return r
-makeConcreteResolver ar = do
-    snapshots <- getSnapshots
-    r <-
-        case ar of
-            ARResolver r -> assert False $ return r
-            ARGlobal -> do
-                config <- asks getConfig
-                implicitGlobalDir <- getImplicitGlobalProjectDir config
-                let fp = implicitGlobalDir </> stackDotYaml
-                (ProjectAndConfigMonoid project _, _warnings) <-
-                    liftIO (Yaml.decodeFileEither $ toFilePath fp)
-                    >>= either throwM return
-                return $ projectResolver project
-            ARLatestNightly -> return $ ResolverSnapshot $ Nightly $ snapshotsNightly snapshots
-            ARLatestLTSMajor x ->
-                case IntMap.lookup x $ snapshotsLts snapshots of
-                    Nothing -> error $ "No LTS release found with major version " ++ show x
-                    Just y -> return $ ResolverSnapshot $ LTS x y
-            ARLatestLTS
-                | IntMap.null $ snapshotsLts snapshots -> error "No LTS releases found"
-                | otherwise ->
-                    let (x, y) = IntMap.findMax $ snapshotsLts snapshots
-                     in return $ ResolverSnapshot $ LTS x y
-    $logInfo $ "Selected resolver: " <> resolverName r
-    return r
-
--- | Get the location of the implicit global project directory.
--- If the directory already exists at the deprecated location, its location is returned.
--- Otherwise, the new location is returned.
-getImplicitGlobalProjectDir
-    :: (MonadIO m, MonadLogger m)
-    => Config -> m (Path Abs Dir)
-getImplicitGlobalProjectDir config =
-    --TEST no warning printed
-    liftM fst $ tryDeprecatedPath
-        Nothing
-        dirExists
-        (implicitGlobalProjectDir stackRoot)
-        (implicitGlobalProjectDirDeprecated stackRoot)
-  where
-    stackRoot = configStackRoot config
-
--- | If deprecated path exists, use it and print a warning.
--- Otherwise, return the new path.
-tryDeprecatedPath
-    :: (MonadIO m, MonadLogger m)
-    => Maybe T.Text -- ^ Description of file for warning (if Nothing, no deprecation warning is displayed)
-    -> (Path Abs a -> m Bool) -- ^ Test for existence
-    -> Path Abs a -- ^ New path
-    -> Path Abs a -- ^ Deprecated path
-    -> m (Path Abs a, Bool) -- ^ (Path to use, whether it already exists)
-tryDeprecatedPath mWarningDesc exists new old = do
-    newExists <- exists new
-    if newExists
-        then return (new, True)
-        else do
-            oldExists <- exists old
-            if oldExists
-                then do
-                    case mWarningDesc of
-                        Nothing -> return ()
-                        Just desc ->
-                            $logWarn $ T.concat
-                                [ "Warning: Location of ", desc, " at '"
-                                , T.pack (toFilePath old)
-                                , "' is deprecated; rename it to '"
-                                , T.pack (toFilePath new)
-                                , "' instead" ]
-                    return (old, True)
-                else return (new, False)

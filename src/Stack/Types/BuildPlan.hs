@@ -15,6 +15,7 @@ module Stack.Types.BuildPlan
     , Maintainer (..)
     , ExeName (..)
     , SimpleDesc (..)
+    , Snapshots (..)
     , DepInfo (..)
     , Component (..)
     , SnapName (..)
@@ -34,6 +35,8 @@ import           Data.Aeson                      (FromJSON (..), ToJSON (..),
 import           Data.Binary.VersionTagged
 import           Data.Hashable                   (Hashable)
 import qualified Data.HashMap.Strict             as HashMap
+import           Data.IntMap                     (IntMap)
+import qualified Data.IntMap                     as IntMap
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
 import           Data.Maybe                      (fromMaybe)
@@ -358,6 +361,34 @@ parseSnapName t0 =
     nightly = do
         t1 <- T.stripPrefix "nightly-" t0
         Nightly <$> readMay (T.unpack t1)
+
+-- | Most recent Nightly and newest LTS version per major release.
+data Snapshots = Snapshots
+    { snapshotsNightly :: !Day
+    , snapshotsLts     :: !(IntMap Int)
+    }
+    deriving Show
+instance FromJSON Snapshots where
+    parseJSON = withObject "Snapshots" $ \o -> Snapshots
+        <$> (o .: "nightly" >>= parseNightly)
+        <*> (fmap IntMap.unions
+                $ mapM (parseLTS . snd)
+                $ filter (isLTS . fst)
+                $ HashMap.toList o)
+      where
+        parseNightly t =
+            case parseSnapName t of
+                Left e -> fail $ show e
+                Right (LTS _ _) -> fail "Unexpected LTS value"
+                Right (Nightly d) -> return d
+
+        isLTS = ("lts-" `T.isPrefixOf`)
+
+        parseLTS = withText "LTS" $ \t ->
+            case parseSnapName t of
+                Left e -> fail $ show e
+                Right (LTS x y) -> return $ IntMap.singleton x y
+                Right (Nightly _) -> fail "Unexpected nightly value"
 
 instance ToJSON a => ToJSON (Map ExeName a) where
   toJSON = toJSON . Map.mapKeysWith const unExeName
