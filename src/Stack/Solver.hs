@@ -290,11 +290,11 @@ solveResolverSpec stackYaml cabalDirs (resolver, flags, extraPackages) = do
     case mdeps' of
       Just pairs -> do
         let versiondiff (v, f) v' = if v == v' then Nothing else Just (v, f)
-            newPairs = Map.differenceWith versiondiff pairs availablePkgs
+            newPairs = Map.differenceWith versiondiff pairs snapPackages
 
         $logInfo $ "Solver: successfully determined a build plan with "
                  <> T.pack (show $ Map.size newPairs)
-                 <> " new dependencies "
+                 <> " external dependencies "
 
         return ( resolver
                , Map.filter (not . Map.null) (fmap snd pairs)
@@ -429,8 +429,9 @@ solveExtraDeps modStackYaml = do
     cabalfps  <- liftM concat (mapM (findCabalFiles False) cabalDirs)
     gpds <- cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter
 
-    let oldFlags = bcFlags bconfig
-        resolver = bcResolver bconfig
+    let oldFlags     = bcFlags bconfig
+        oldExtraDeps = bcExtraDeps bconfig
+        resolver     = bcResolver bconfig
 
     result <- checkResolverSpec gpds (Just oldFlags) resolver
     (_, flags, extraDeps) <- case result of
@@ -439,42 +440,60 @@ solveExtraDeps modStackYaml = do
         BuildPlanCheckPartial _ _ -> solveResolverSpec stackYaml cabalDirs
                                                        ( resolver
                                                        , oldFlags
-                                                       , bcExtraDeps bconfig)
+                                                       , oldExtraDeps)
 
-    -- FIXME we are not reporting any deleted dependencies
-    let newDeps = Map.differenceWith
-                    (\v v' -> if v == v' then Nothing else Just v)
-                    extraDeps (bcExtraDeps bconfig)
-        newFlags = Map.differenceWith
-                    (\f f' -> if f == f' then Nothing else Just f)
-                    flags (bcFlags bconfig)
+    let
+        vDiff v v' = if v == v' then Nothing else Just v
+        depsDiff = Map.differenceWith vDiff
+        newDeps  = depsDiff extraDeps oldExtraDeps
+        goneDeps = depsDiff oldExtraDeps extraDeps
 
-    if Map.null newDeps
-        then $logInfo $ "No changes needed to " <> T.pack relStackYaml
+        fDiff f f' = if f == f' then Nothing else Just f
+        flagsDiff  = Map.differenceWith fDiff
+        newFlags   = flagsDiff flags oldFlags
+        goneFlags  = flagsDiff oldFlags flags
+
+        changed =    any (not . Map.null) [newDeps, goneDeps]
+                  || any (not . Map.null) [newFlags, goneFlags]
+
+    if changed then do
+        printFlags newFlags  "New"
+        printDeps  newDeps   "New"
+
+        printFlags goneFlags "Deleted"
+        printDeps  goneDeps  "Deleted"
+
+        if modStackYaml then do
+            writeStackYaml stackYaml extraDeps flags
+            $logInfo $ "Updated " <> T.pack relStackYaml
         else do
-            let o = object
-                    $ ("extra-deps" .= map fromTuple (Map.toList newDeps))
-                    : (if Map.null newFlags
-                        then []
-                        else ["flags" .= newFlags])
-            mapM_ $logInfo $ T.lines $ decodeUtf8 $ Yaml.encode o
+            $logInfo "To automatically modify your stack.yaml file, \
+                     \rerun with '--modify-stack-yaml'"
+     else
+        $logInfo $ "No changes needed to " <> T.pack relStackYaml
 
-    if modStackYaml
-      then do
-        let fp = toFilePath $ bcStackYaml bconfig
-        obj <- liftIO (Yaml.decodeFileEither fp) >>= either throwM return
-        (ProjectAndConfigMonoid project _, warnings) <-
-            liftIO (Yaml.decodeFileEither fp) >>= either throwM return
-        logJSONWarnings fp warnings
-        let obj' =
-                HashMap.insert "extra-deps"
-                    (toJSON $ map fromTuple $ Map.toList
-                            $ Map.union (projectExtraDeps project) newDeps)
-              $ HashMap.insert ("flags" :: Text)
-                    (toJSON $ Map.union (projectFlags project) newFlags)
-                obj
-        liftIO $ Yaml.encodeFile fp obj'
-        $logInfo $ "Updated " <> T.pack relStackYaml
-      else do
-        $logInfo ""
-        $logInfo "To automatically modify your stack.yaml file, rerun with '--modify-stack-yaml'"
+    where
+        printFlags fl msg = do
+            when ((not . Map.null) fl) $ do
+                $logInfo ""
+                $logInfo $ T.pack msg <> " flags:"
+                $logInfo $ decodeUtf8 $ Yaml.encode $ object ["flags" .= fl]
+
+        printDeps deps msg = do
+            when ((not . Map.null) deps) $ do
+                $logInfo ""
+                $logInfo $ T.pack msg <> " dependencies:"
+                $logInfo $ decodeUtf8 $ Yaml.encode $ object $
+                        [("extra-deps" .= map fromTuple (Map.toList deps))]
+
+        writeStackYaml path deps fl = do
+            let fp = toFilePath path
+            obj <- liftIO (Yaml.decodeFileEither fp) >>= either throwM return
+            (ProjectAndConfigMonoid _ _, warnings) <-
+                liftIO (Yaml.decodeFileEither fp) >>= either throwM return
+            logJSONWarnings fp warnings
+            let obj' =
+                    HashMap.insert "extra-deps"
+                        (toJSON $ map fromTuple $ Map.toList deps)
+                  $ HashMap.insert ("flags" :: Text) (toJSON fl) obj
+            liftIO $ Yaml.encodeFile fp obj'
