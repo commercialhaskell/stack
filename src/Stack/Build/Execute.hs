@@ -387,16 +387,15 @@ executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages loc
                         Platform _ Windows | FP.equalFilePath destFile currExe ->
                             windowsRenameCopy (toFilePath file) destFile
                         _ -> D.copyFile (toFilePath file) destFile
-                    return $ Just (destDir', [T.append name (T.pack ext)])
+                    return $ Just (name <> T.pack ext)
 
-        let destToInstalled = Map.fromListWith (++) installed
-        unless (Map.null destToInstalled) $ $logInfo ""
-        forM_ (Map.toList destToInstalled) $ \(dest, executables) -> do
+        unless (null installed) $ do
+            $logInfo ""
             $logInfo $ T.concat
                 [ "Copied executables to "
-                , T.pack dest
+                , T.pack destDir'
                 , ":"]
-            forM_ executables $ \exe -> $logInfo $ T.append "- " exe
+        forM_ installed $ \exe -> $logInfo ("- " <> exe)
 
         destDirIsInPATH <- liftIO $
             anyM (\dir -> D.doesDirectoryExist dir &&^ fmap (FP.equalFilePath destDir') (D.canonicalizePath dir)) (envSearchPath menv)
