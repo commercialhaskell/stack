@@ -34,6 +34,7 @@ import           Control.Monad.Trans.Control (liftBaseWith)
 import           Control.Monad.Trans.Resource
 import           Data.Attoparsec.Text
 import qualified Data.ByteString as S
+import           Data.Char (isSpace)
 import           Data.Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
@@ -1373,7 +1374,7 @@ printBuildOutput excludeTHLoading makeAbsolute pkgDir level outH = void $
     =$ CL.mapM_ (monadLoggerLog $(TH.location >>= liftLoc) "" level)
 
 -- | Strip Template Haskell "Loading package" lines and making paths absolute.
-mungeBuildOutput :: (MonadIO m, MonadThrow m, Functor m)
+mungeBuildOutput :: (MonadIO m, MonadThrow m)
                  => Bool -- ^ exclude TH loading?
                  -> Bool -- ^ convert paths to absolute?
                  -> Path Abs Dir -- ^ package's root directory
@@ -1398,7 +1399,8 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
         let (x, y) = T.break (== ':') bs
         mabs <-
             if isValidSuffix y
-                then liftM (fmap (T.pack . toFilePath)) $ resolveFileMaybe pkgDir (T.unpack $ T.strip x)
+                then liftM (fmap ((T.takeWhile isSpace x <>) . T.pack . toFilePath)) $
+                        resolveFileMaybe pkgDir (T.unpack $ T.dropWhile isSpace x)
                 else return Nothing
         case mabs of
             Nothing -> return bs
