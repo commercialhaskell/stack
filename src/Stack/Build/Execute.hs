@@ -399,13 +399,35 @@ executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages loc
 
         destDirIsInPATH <- liftIO $
             anyM (\dir -> D.doesDirectoryExist dir &&^ fmap (FP.equalFilePath destDir') (D.canonicalizePath dir)) (envSearchPath menv)
-        unless destDirIsInPATH $ do
-            $logWarn ""
-            $logWarn $ T.concat
-                [ "WARNING: Installation path "
-                , T.pack destDir'
-                , " not found in PATH environment variable"
-                ]
+        if destDirIsInPATH
+            then forM_ installed $ \exe -> do
+                mexePath <- (liftIO . D.findExecutable . T.unpack) exe  -- Search on the actual PATH instead of `envSearchPath menv`
+                                                                        -- in order to avoid stack-provided executables like cabal.
+                case mexePath of
+                    Just exePath -> do
+                        exeDir <- (liftIO . fmap FP.takeDirectory . D.canonicalizePath) exePath
+                        unless (exeDir `FP.equalFilePath` destDir') $ do
+                            $logWarn ""
+                            $logWarn $ T.concat
+                                [ "WARNING: The \""
+                                , exe
+                                , "\" executable found on the PATH environment variable is "
+                                , T.pack exePath
+                                , ", and not the version that was just installed."
+                                ]
+                            $logWarn $ T.concat
+                                [ "This means that \""
+                                , exe
+                                , "\" calls on the command line will not use this version."
+                                ]
+                    Nothing -> return ()
+            else do
+                $logWarn ""
+                $logWarn $ T.concat
+                    [ "WARNING: Installation path "
+                    , T.pack destDir'
+                    , " not found in PATH environment variable"
+                    ]
 
     config <- asks getConfig
     menv' <- liftIO $ configEnvOverride config EnvSettings
