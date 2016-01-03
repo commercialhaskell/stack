@@ -121,8 +121,17 @@ cabalSolver menv cabalfps constraintType constraints userFlags cabalArgs = withS
           else error $ "Could not parse cabal-install output: " ++ show errs
 
     parseLine t0 = maybe (Left t0) Right $ do
-        -- get rid of (new package) and (latest: ...) bits
-        ident':flags' <- Just $ T.words $ T.takeWhile (/= '(') t0
+        -- Sample output to parse:
+        -- text-1.2.1.1 (latest: 1.2.2.0) -integer-simple (via: parsec-3.1.9) (new package))
+        -- An ugly parser to extract module id and flags
+        let t1 = T.concat $
+                 [ T.takeWhile (/= '(')
+                 ,   (T.takeWhile (/= '('))
+                   . (T.drop 1)
+                   . (T.dropWhile (/= ')'))
+                 ] <*> [t0]
+
+        ident':flags' <- Just $ T.words t1
         PackageIdentifier name version <-
             parsePackageIdentifierFromString $ T.unpack ident'
         flags <- mapM parseFlag flags'
@@ -140,8 +149,7 @@ cabalSolver menv cabalfps constraintType constraints userFlags cabalArgs = withS
                 Just x -> (x, False)
     toConstraintArgs userFlagMap =
         [formatFlagConstraint package flag enabled
-            | constraintType == Constraint
-            , (package, fs) <- Map.toList userFlagMap
+            | (package, fs) <- Map.toList userFlagMap
             , (flag, enabled) <- Map.toList fs]
 
     formatFlagConstraint package flag enabled =
