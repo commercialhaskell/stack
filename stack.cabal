@@ -43,7 +43,7 @@ flag disable-git-info
 
 library
   hs-source-dirs:    src/
-  ghc-options:       -Wall
+  ghc-options:       -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
   exposed-modules:   Options.Applicative.Builder.Extra
                      Options.Applicative.Args
                      Options.Applicative.Complicated
@@ -216,7 +216,7 @@ library
 executable stack
   hs-source-dirs: src/main
   main-is:        Main.hs
-  ghc-options:    -Wall -threaded -rtsopts
+  ghc-options:    -threaded -rtsopts -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
   other-modules:  Paths_stack
 
   build-depends:  base >=4.7 && < 5
@@ -269,7 +269,7 @@ test-suite stack-test
                 , Stack.ArgsSpec
                 , Stack.NixSpec
                 , Network.HTTP.Download.VerifiedSpec
-  ghc-options:    -Wall -threaded
+  ghc-options:    -threaded -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
   build-depends:  base >=4.7 && <5
                 , hspec <2.3
                 , attoparsec < 0.14
@@ -299,7 +299,7 @@ test-suite stack-integration-test
   type:           exitcode-stdio-1.0
   hs-source-dirs: test/integration
   main-is:        IntegrationSpec.hs
-  ghc-options:    -Wall -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:    -threaded -rtsopts -with-rtsopts=-N -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
 
   if !flag(integration-tests)
     buildable: False
