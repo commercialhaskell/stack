@@ -13,6 +13,7 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TupleSections              #-}
 {-# LANGUAGE ViewPatterns               #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 
 -- | Dealing with the 00-index file and all its cabal files.
 module Stack.PackageIndex
@@ -64,7 +65,8 @@ import           Stack.Types.StackT
 import           System.FilePath (takeBaseName, (<.>))
 import           System.IO                             (IOMode (ReadMode, WriteMode),
                                                         withBinaryFile)
-import           System.Process.Read (readInNull, EnvOverride, doesExecutableExist)
+import           System.Process.Read (readInNull, readProcessNull, ReadProcessException(..),
+                                      EnvOverride, doesExecutableExist)
 
 -- | Populate the package index caches and return them.
 populateCache
@@ -243,7 +245,14 @@ updateIndexGit menv indexName' index gitUrl = do
             unless repoExists
                    (readInNull suDir "git" menv cloneArgs Nothing)
             $logSticky "Fetching package index ..."
-            readInNull acfDir "git" menv ["fetch","--tags","--depth=1"] Nothing
+            readProcessNull (Just acfDir) menv "git" ["fetch","--tags","--depth=1"] `C.catch` \(ex :: ReadProcessException) -> do
+              -- we failed, so wipe the directory and try again, see #1418
+              $logWarn (T.pack (show ex))
+              $logStickyDone "Failed to fetch package index, retrying."
+              removeTree acfDir
+              readInNull suDir "git" menv cloneArgs Nothing
+              $logSticky "Fetching package index ..."
+              readInNull acfDir "git" menv ["fetch","--tags","--depth=1"] Nothing
             $logStickyDone "Fetched package index."
             removeFileIfExists tarFile
             when (indexGpgVerify index)
