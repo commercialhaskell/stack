@@ -426,7 +426,7 @@ executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages loc
                 $logWarn $ T.concat
                     [ "WARNING: Installation path "
                     , T.pack destDir'
-                    , " not found in PATH environment variable"
+                    , " not found on the PATH environment variable"
                     ]
 
     config <- asks getConfig
