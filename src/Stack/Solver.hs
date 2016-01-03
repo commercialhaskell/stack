@@ -101,7 +101,7 @@ cabalSolver menv cabalfps constraintType constraints userFlags cabalArgs = withS
               let errMsg = decodeUtf8With lenientDecode err
               if LT.isInfixOf "Could not resolve dependencies" errMsg
               then do
-                  $logInfo "Solver: attempt failed."
+                  $logInfo "Attempt failed."
                   $logInfo "\n>>>> Cabal errors begin"
                   $logInfo $ LT.toStrict errMsg
                              <> "<<<< Cabal errors end\n"
@@ -241,7 +241,7 @@ setupCabalEnv compiler = do
     mver <- getSystemCompiler menv (whichCompiler compiler)
     case mver of
         Just (version, _) ->
-            $logInfo $ "Solver: using compiler " <> compilerVersionText version
+            $logInfo $ "Using compiler: " <> compilerVersionText version
         Nothing -> error "Failed to determine compiler version. \
                          \This is most likely a bug."
     return menv
@@ -260,7 +260,7 @@ solveResolverSpec
          , Map PackageName (Map FlagName Bool)
          , Map PackageName Version)
 solveResolverSpec stackYaml cabalDirs (resolver, flags, extraPackages) = do
-    $logInfo $ "Solver: using resolver " <> resolverName resolver
+    $logInfo $ "Using resolver: " <> resolverName resolver
     (compilerVer, snapPackages) <- getResolverMiniPlan resolver
     menv <- setupCabalEnv compilerVer
     -- Note - The order in Map.union below is important.
@@ -276,14 +276,14 @@ solveResolverSpec stackYaml cabalDirs (resolver, flags, extraPackages) = do
           [T.pack ((show $ Map.size extraPackages) <> " external packages")
               | not (Map.null extraPackages)]
 
-    $logInfo "Solver: asking cabal to calculate a build plan..."
+    $logInfo "Asking cabal to calculate a build plan..."
     unless (Map.null availablePkgs)
-        ($logInfo $ "Solver: trying with " <> srcNames <> " as hard constraints...")
+        ($logInfo $ "Trying with " <> srcNames <> " as hard constraints...")
 
     mdeps <- solver Constraint
     mdeps' <- case mdeps of
         Nothing | not (Map.null availablePkgs) -> do
-            $logInfo $ "Solver: retrying with " <> srcNames <> " as preferences..."
+            $logInfo $ "Retrying with " <> srcNames <> " as preferences..."
             solver Preference
         _ -> return mdeps
 
@@ -292,9 +292,9 @@ solveResolverSpec stackYaml cabalDirs (resolver, flags, extraPackages) = do
         let versiondiff (v, f) v' = if v == v' then Nothing else Just (v, f)
             newPairs = Map.differenceWith versiondiff pairs snapPackages
 
-        $logInfo $ "Solver: successfully determined a build plan with "
+        $logInfo $ "Successfully determined a build plan with "
                  <> T.pack (show $ Map.size newPairs)
-                 <> " external dependencies "
+                 <> " external dependencies."
 
         return ( resolver
                , Map.filter (not . Map.null) (fmap snd pairs)
@@ -304,14 +304,13 @@ solveResolverSpec stackYaml cabalDirs (resolver, flags, extraPackages) = do
             <> "You can try one or more of the following:\n"
             <> "- If the problem is due to a stale package index you can try "
             <> "again after udating the package index with 'stack update'.\n"
-            <> "- Create pivot points for the solver by specifying some "
+            <> "- Guide the solver by specifying some of the "
             <> "extra dependencies in " <> toFilePath stackDotYaml
-            <> " and then use 'stack solver' to figure out the rest of the "
-            <> " dependencies.\n"
+            <> " and then use 'stack solver' figure out the rest.\n"
             <> "- Check if you missed adding a custom package or remote "
-            <> "package location needed to build your package. Also, you may "
-            <> "want to remove any unnecessary packages causing dependency "
-            <> "problems.\n"
+            <> "package location needed to build your package.\n"
+            <> "- You may also want to remove any unnecessary packages "
+            <> "causing dependency problems.\n"
             <> "- Use '--ignore-subdirs' to avoid using unwanted .cabal files "
             <> "in subdirectories.")
     where
@@ -382,7 +381,7 @@ cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter = do
         error noPkgMsg
 
     relpaths <- mapM makeRel cabalfps
-    $logInfo $ "Using the following cabal packages:"
+    $logInfo $ "Using cabal packages:"
     $logInfo $ T.pack (formatGroup relpaths)
 
     when (dupGroups relpaths /= []) $
@@ -419,10 +418,12 @@ solveExtraDeps modStackYaml = do
     relStackYaml <- liftIO $ makeRelativeToCurrentDirectory
                            $ toFilePath stackYaml
 
+    $logInfo $ "Using configuration file: " <> T.pack relStackYaml
     let cabalDirs = Map.keys $ envConfigPackages econfig
-        noPkgMsg = "No cabal packages found. Please add at least one directory \
-                   \containing a .cabal file in '" <> relStackYaml <> "' or use \
-                   \'stack init' to automatically generate the config file."
+        noPkgMsg = "No cabal packages found in " <> relStackYaml <>
+                   ". Please add at least one directory containing a .cabal \
+                   \file. You can also use 'stack init' to automatically \
+                   \generate the config file."
         dupPkgFooter = "Please remove the directories containing duplicate \
                        \entries from '" <> relStackYaml <> "'."
 
@@ -457,6 +458,9 @@ solveExtraDeps modStackYaml = do
                   || any (not . Map.null) [newFlags, goneFlags]
 
     if changed then do
+        $logInfo $ "The following changes will be made to "
+                   <> T.pack relStackYaml <> ":"
+
         printFlags newFlags  "New"
         printDeps  newDeps   "New"
 
@@ -467,8 +471,8 @@ solveExtraDeps modStackYaml = do
             writeStackYaml stackYaml extraDeps flags
             $logInfo $ "Updated " <> T.pack relStackYaml
         else do
-            $logInfo "To automatically modify your stack.yaml file, \
-                     \rerun with '--modify-stack-yaml'"
+            $logInfo $ "To automatically update " <> T.pack relStackYaml
+                       <> ", rerun with '--modify-stack-yaml'"
      else
         $logInfo $ "No changes needed to " <> T.pack relStackYaml
 

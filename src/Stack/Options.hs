@@ -694,7 +694,7 @@ initOptsParser =
     resolver = option readAbstractResolver
         (long "resolver" <>
          metavar "RESOLVER" <>
-         help "Use the given resolver, even if not all dependencies are met")
+         help "Use the specified resolver")
 
 -- | Parser for a logging level.
 logLevelOptsParser :: Bool -> Maybe LogLevel -> Parser (Maybe LogLevel)
