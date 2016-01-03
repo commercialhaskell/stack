@@ -420,7 +420,15 @@ executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages loc
                                 , exe
                                 , "\" calls on the command line will not use this version."
                                 ]
-                    Nothing -> return ()
+                    Nothing -> do
+                        $logWarn ""
+                        $logWarn $ T.concat
+                            [ "WARNING: Installation path "
+                            , T.pack destDir'
+                            , " is on the PATH but the \""
+                            , exe
+                            , "\" executable that was just installed could not be found on the PATH."
+                            ]
             else do
                 $logWarn ""
                 $logWarn $ T.concat
