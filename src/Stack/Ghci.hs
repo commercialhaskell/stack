@@ -53,6 +53,7 @@ import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal
 import           System.Directory (getTemporaryDirectory)
+import Text.Read (readMaybe)
 
 #ifndef WINDOWS
 import qualified System.Posix.Files as Posix
@@ -156,7 +157,7 @@ ghci GhciOpts{..} = do
 -- is none, sometimes it's unambiguous, sometimes it's
 -- ambiguous. Warns and returns nothing if it's ambiguous.
 figureOutMainFile
-    :: (Monad m, MonadLogger m)
+    :: (Monad m, MonadLogger m, MonadIO m)
     => BuildOpts
     -> Maybe (Map PackageName SimpleTarget)
     -> Map PackageName SimpleTarget
@@ -167,18 +168,22 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
         [] -> return Nothing
         [c@(_,_,fp)] -> do $logInfo ("Using main module: " <> renderCandidate c)
                            return (Just fp)
-        candidate:_ -> borderedWarning $ do
+        candidate:_ -> do
+          borderedWarning $ do
             $logWarn "The main module to load is ambiguous. Candidates are: "
             forM_ (map renderCandidate candidates) $logWarn
             $logWarn
-                "None will be loaded. You can specify which one to pick by: "
+                "You can specify which one to pick by: "
             $logWarn
-                (" 1) Specifying targets to stack ghci e.g. stack ghci " <>
+                (" * Specifying targets to stack ghci e.g. stack ghci " <>
                  sampleTargetArg candidate)
             $logWarn
-                (" 2) Specifying what the main is e.g. stack ghci " <>
+                (" * Specifying what the main is e.g. stack ghci " <>
                  sampleMainIsArg candidate)
-            return Nothing
+            $logWarn
+                (" * Choosing from the candidate above [1.." <>
+                T.pack (show $ length candidates) <> "]")
+          liftIO userOption
   where
     targets = fromMaybe targets0 mainIsTargets
     candidates = do
@@ -195,11 +200,35 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
               where
                 wantedComponents =
                     wantedPackageComponents bopts target (ghciPkgPackage pkg)
-    renderCandidate (pkgName,namedComponent,mainIs) =
-        "Package `" <> packageNameText pkgName <> "' component " <>
-        renderComp namedComponent <>
-        " with main-is file: " <>
-        T.pack (toFilePath mainIs)
+    renderCandidate c@(pkgName,namedComponent,mainIs) =
+        let candidateIndex = T.pack . show . (+1) . fromMaybe 0 . elemIndex c
+        in  candidateIndex candidates <> ". Package `" <>
+            packageNameText pkgName <>
+            "' component " <>
+            renderComp namedComponent <>
+            " with main-is file: " <>
+            T.pack (toFilePath mainIs)
+    candidateIndices = take (length candidates) [1 :: Int ..]
+    userOption = do
+      putStr "Specify candidate to use: "
+      option <- getLine
+      let selected = fromMaybe
+                      ((+1) $ length candidateIndices)
+                      (readMaybe option :: Maybe Int)
+      case elemIndex selected candidateIndices  of
+        Nothing -> do
+            putStrLn
+              "Not loading any maim modules, as no valid module selected"
+            putStrLn ""
+            return Nothing
+        Just op -> do
+            let (_,_,fp) = candidates !! op
+            putStrLn
+              ("Loading main module from cadidate " <>
+              show (op + 1) <> ", -- main-is " <>
+              toFilePath fp)
+            putStrLn ""
+            return $ Just fp
     renderComp c =
         case c of
             CLib -> "lib"
