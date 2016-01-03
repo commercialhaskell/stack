@@ -10,7 +10,8 @@
 -- snapshot.
 
 module Stack.BuildPlan
-    ( BuildPlanException (..)
+    ( gpdPackages
+    , BuildPlanException (..)
     , BuildPlanCheck (..)
     , checkSnapBuildPlan
     , MiniBuildPlan(..)
@@ -459,6 +460,13 @@ loadBuildPlan name = do
     handle404 (Status 404 _) _ _ = Just $ SomeException $ SnapshotNotFound name
     handle404 _ _ _              = Nothing
 
+gpdPackages :: [GenericPackageDescription] -> Map PackageName Version
+gpdPackages gpds = Map.fromList $
+            map (fromCabalIdent . C.package . C.packageDescription) gpds
+    where
+        fromCabalIdent (C.PackageIdentifier name version) =
+            (fromCabalPackageName name, fromCabalVersion version)
+
 gpdPackageName :: GenericPackageDescription -> PackageName
 gpdPackageName = fromCabalPackageName
     . C.pkgName
@@ -608,13 +616,7 @@ checkBundleBuildPlan platform compiler pool flags gpds =
         pkgPlan (Just f) gpd =
             checkPackageBuildPlan platform compiler pool' (flags' f gpd) gpd
         flags' f gpd = maybe Map.empty id (Map.lookup (gpdPackageName gpd) f)
-        pool' = Map.union buildPkgs pool
-
-        buildPkgs = Map.fromList $
-            map (fromCabalIdent . C.package . C.packageDescription) gpds
-
-        fromCabalIdent (C.PackageIdentifier name version) =
-            (fromCabalPackageName name, fromCabalVersion version)
+        pool' = Map.union (gpdPackages gpds) pool
 
         dupError _ _ = error "Bug: Duplicate packages are not expected here"
 

@@ -261,19 +261,24 @@ solveResolverSpec
        , HasTerminal env)
     => Path Abs File  -- ^ stack.yaml file location
     -> [Path Abs Dir] -- ^ package dirs containing cabal files
+    -> Map PackageName Version -- ^ local packages to build
     -> ( Resolver
        , Map PackageName (Map FlagName Bool)
        , Map PackageName Version)
     -> m ( Resolver
          , Map PackageName (Map FlagName Bool)
          , Map PackageName Version)
-solveResolverSpec stackYaml cabalDirs (resolver, flags, extraPackages) = do
+solveResolverSpec stackYaml cabalDirs packages
+                  (resolver, flags, extraPackages) = do
     $logInfo $ "Using resolver: " <> resolverName resolver
     (compilerVer, snapPackages) <- getResolverMiniPlan resolver
     menv <- setupCabalEnv compilerVer
     -- Note - The order in Map.union below is important.
-    -- We prefer extraPackages over the snapshot
-    let availablePkgs = Map.union extraPackages snapPackages
+    -- If versions of  packages we are building are also available in the
+    -- snapshot then we override those with  the versions we are building.
+    -- Also, we prefer extraPackages over the snapshot packages.
+    let availablePkgs = Map.union packages $
+                        Map.union extraPackages snapPackages
         solver t = cabalSolver menv cabalDirs t availablePkgs flags $
                           ["-v"] -- TODO make it conditional on debug
                        ++ ["--ghcjs" | (whichCompiler compilerVer) == Ghcjs]
@@ -447,6 +452,7 @@ solveExtraDeps modStackYaml = do
         BuildPlanCheckFail _ _ -> throwM $ ResolverMismatch resolver
         BuildPlanCheckOk flags -> return (resolver, flags, Map.empty)
         BuildPlanCheckPartial _ _ -> solveResolverSpec stackYaml cabalDirs
+                                                       (gpdPackages gpds)
                                                        ( resolver
                                                        , oldFlags
                                                        , oldExtraDeps)

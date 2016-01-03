@@ -199,7 +199,7 @@ getDefaultResolver stackYaml cabalDirs gpds initOpts = do
         BuildPlanCheckOk flags -> return (resolver, flags, Map.empty)
         BuildPlanCheckPartial flags _
             | needSolver resolver initOpts ->
-                solveResolverSpec stackYaml cabalDirs
+                solveResolverSpec stackYaml cabalDirs (gpdPackages gpds)
                                   (resolver, flags, Map.empty)
             | otherwise -> throwM $ ResolverPartial resolver
     where
