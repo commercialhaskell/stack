@@ -56,7 +56,11 @@ upgrade gitRepo mresolver builtHash =
                 return Nothing
             else do
                 $logInfo "Cloning stack"
-                let args = [ "clone", repo , "stack", "--depth", "1"]
+                -- NOTE: "--recursive" was added after v1.0.0 (and before the
+                -- next release).  This means that we can't use submodules in
+                -- the stack repo until we're comfortable with "stack upgrade
+                -- --git" not working for earlier versions.
+                let args = [ "clone", repo , "stack", "--depth", "1", "--recursive"]
                 runCmd (Cmd (Just tmp) "git" menv args) Nothing
                 return $ Just $ tmp </> $(mkRelDir "stack")
       Nothing -> do
