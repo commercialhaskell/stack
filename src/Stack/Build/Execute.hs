@@ -397,12 +397,12 @@ executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages loc
                 , ":"]
         forM_ installed $ \exe -> $logInfo ("- " <> exe)
 
+        searchPath <- liftIO FP.getSearchPath
         destDirIsInPATH <- liftIO $
-            anyM (\dir -> D.doesDirectoryExist dir &&^ fmap (FP.equalFilePath destDir') (D.canonicalizePath dir)) (envSearchPath menv)
+            anyM (\dir -> D.doesDirectoryExist dir &&^ fmap (FP.equalFilePath destDir') (D.canonicalizePath dir)) searchPath
         if destDirIsInPATH
             then forM_ installed $ \exe -> do
-                mexePath <- (liftIO . D.findExecutable . T.unpack) exe  -- Search on the actual PATH instead of `envSearchPath menv`
-                                                                        -- in order to avoid stack-provided executables like cabal.
+                mexePath <- (liftIO . D.findExecutable . T.unpack) exe
                 case mexePath of
                     Just exePath -> do
                         exeDir <- (liftIO . fmap FP.takeDirectory . D.canonicalizePath) exePath
