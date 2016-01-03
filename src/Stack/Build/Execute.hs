@@ -996,7 +996,9 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                         , "--force"
                         , packageIdentifierString taskProvides
                         ])
-                    (\(ReadProcessException _ _ _ _) -> return ())
+                    (\ex -> case ex of
+                        ReadProcessException{} -> return ()
+                        _ -> throwM ex)
 
                 readProcessNull Nothing menv' "ghc-pkg"
                     [ "register"
