@@ -695,8 +695,9 @@ selectBestSnapshot gpds snaps = do
           | (Map.size e1) <= (Map.size e2) = (s1, e1)
           | otherwise = (s2, e2)
 
-        reportResult (BuildPlanCheckOk _) snap =
+        reportResult (BuildPlanCheckOk _) snap = do
             $logInfo $ "* Selected " <> renderSnapName snap
+            $logInfo ""
 
         reportResult (BuildPlanCheckPartial _ errs) snap = do
             $logWarn $ "* Partially matches " <> renderSnapName snap
@@ -705,9 +706,9 @@ selectBestSnapshot gpds snaps = do
         reportResult (BuildPlanCheckFail compiler errs) snap = do
             $logWarn $ "* Rejected "
                        <> renderSnapName snap
-                       <> " due to conflicting compiler ("
+                       <> " due to conflict of compiler ("
                        <> compilerVersionText compiler
-                       <> ") requirements"
+                       <> ") packages"
             displayDepErrors errs
 
 displayDepErrors :: MonadLogger m => DepErrors -> m ()

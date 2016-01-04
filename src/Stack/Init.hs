@@ -204,20 +204,16 @@ getDefaultResolver stackYaml cabalDirs gpds initOpts = do
             | otherwise -> throwM $ ResolverPartial resolver
     where
       -- TODO support selecting best across regular and custom snapshots
-      getResolver (MethodSnapshot snapPref) = selectSnapResolver snapPref
+      getResolver (MethodSnapshot snapPref)  = selectSnapResolver snapPref
       getResolver (MethodResolver aresolver) = makeConcreteResolver aresolver
 
       selectSnapResolver snapPref =
           getSnapshots'
           >>= maybe (throwM NoMatchingSnapshot)
-                  (getRecommendedSnapshots snapPref)
+                    (getRecommendedSnapshots snapPref)
           >>= selectBestSnapshot gpds
           >>= maybe (throwM NoMatchingSnapshot)
-                    (\s -> do
-                      $logInfo ("Selected snapshot '"
-                                <> (renderSnapName s)
-                                <> "'.")
-                      return $ ResolverSnapshot s)
+                    (return . ResolverSnapshot)
 
       needSolver _ (InitOpts {useSolver = True}) = True
       needSolver (ResolverCompiler _)  _ = True
