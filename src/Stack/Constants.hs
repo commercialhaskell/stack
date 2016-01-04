@@ -267,12 +267,14 @@ projectDockerSandboxDir projectRoot = do
   return $ projectRoot </> workDir </> $(mkRelDir "docker/")
 
 -- | Image staging dir from project root.
-imageStagingDir :: (MonadReader env m, HasConfig env)
+imageStagingDir :: (MonadReader env m, HasConfig env, MonadThrow m)
   => Path Abs Dir      -- ^ Project root
+  -> Int               -- ^ Index of image
   -> m (Path Abs Dir)  -- ^ Docker sandbox
-imageStagingDir projectRoot = do
+imageStagingDir projectRoot imageIdx = do
   workDir <- getWorkDir
-  return $ projectRoot </> workDir </> $(mkRelDir "image/")
+  idxRelDir <- parseRelDir (show imageIdx)
+  return $ projectRoot </> workDir </> $(mkRelDir "image") </> idxRelDir
 
 -- | Name of the 'stack' program, uppercased
 stackProgNameUpper :: String

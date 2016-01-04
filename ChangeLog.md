@@ -10,6 +10,10 @@ Other enhancements:
 
 - Disable locale/codepage hacks when GHC >=7.10.3
   [#1552](https://github.com/commercialhaskell/stack/issues/1552)
+- Specify multiple images to build for `stack image container`
+  [docs](http://docs.haskellstack.org/en/latest/yaml_configuration.html#image)
+- Specify which executables to include in images for `stack image container`
+  [docs](http://docs.haskellstack.org/en/latest/yaml_configuration.html#image)
 
 Bug fixes:
 

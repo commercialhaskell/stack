@@ -1,20 +1,22 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Stack.Types.Image where
 
-import Control.Applicative
 import Data.Aeson.Extended
 import Data.Monoid
 import Data.Map (Map)
+import qualified Data.Map as Map
+import Data.Maybe (maybeToList)
 import Data.Text (Text)
 import Prelude -- Fix redundant import warnings
 
 -- | Image options. Currently only Docker image options.
 data ImageOpts = ImageOpts
-    { imgDocker :: !(Maybe ImageDockerOpts)
-      -- ^ Maybe a section for docker image settings.
+    { imgDockers :: ![ImageDockerOpts]
+      -- ^ One or more stanzas for docker image settings.
     } deriving (Show)
 
 data ImageDockerOpts = ImageDockerOpts
@@ -29,24 +31,21 @@ data ImageDockerOpts = ImageDockerOpts
       -- specific directory in all the images.
     , imgDockerImageName :: !(Maybe String)
       -- ^ Maybe have a name for the image we are creating
+    , imgDockerExecutables :: !(Maybe [FilePath])
+      -- ^ Filenames of executables to add (if Nothing, add them all)
     } deriving (Show)
 
 data ImageOptsMonoid = ImageOptsMonoid
-    { imgMonoidDocker :: !(Maybe ImageDockerOptsMonoid)
-    } deriving (Show)
-
-data ImageDockerOptsMonoid = ImageDockerOptsMonoid
-    { imgDockerMonoidBase :: !(Maybe String)
-    , imgDockerMonoidEntrypoints :: !(Maybe [String])
-    , imgDockerMonoidAdd :: !(Maybe (Map String FilePath))
-    , imgDockerMonoidImageName :: !(Maybe String)
+    { imgMonoidDockers :: ![ImageDockerOpts]
     } deriving (Show)
 
 instance FromJSON (ImageOptsMonoid, [JSONWarning]) where
     parseJSON = withObjectWarnings
             "ImageOptsMonoid"
             (\o ->
-                  do imgMonoidDocker <- jsonSubWarningsT (o ..:? imgDockerArgName)
+                  do (oldDocker :: Maybe ImageDockerOpts) <- jsonSubWarningsT (o ..:? imgDockerOldArgName)
+                     (dockers :: [ImageDockerOpts]) <- jsonSubWarningsT (o ..:? imgDockersArgName ..!= [])
+                     let imgMonoidDockers = dockers ++ maybeToList oldDocker
                      return
                          ImageOptsMonoid
                          { ..
@@ -54,46 +53,35 @@ instance FromJSON (ImageOptsMonoid, [JSONWarning]) where
 
 instance Monoid ImageOptsMonoid where
     mempty = ImageOptsMonoid
-        { imgMonoidDocker = Nothing
+        { imgMonoidDockers = []
         }
     mappend l r = ImageOptsMonoid
-        { imgMonoidDocker = imgMonoidDocker l <|> imgMonoidDocker r
+        { imgMonoidDockers = imgMonoidDockers l <> imgMonoidDockers r
         }
 
-instance FromJSON (ImageDockerOptsMonoid, [JSONWarning]) where
+instance FromJSON (ImageDockerOpts, [JSONWarning]) where
     parseJSON = withObjectWarnings
-            "ImageDockerOptsMonoid"
+            "ImageDockerOpts"
             (\o ->
-                  do imgDockerMonoidBase <- o ..:? imgDockerBaseArgName
-                     imgDockerMonoidEntrypoints <- o ..:?
-                                                   imgDockerEntrypointsArgName
-                     imgDockerMonoidAdd <- o ..:? imgDockerAddArgName
-                     imgDockerMonoidImageName <- o ..:? imgDockerImageNameArgName
+                  do imgDockerBase <- o ..:? imgDockerBaseArgName
+                     imgDockerEntrypoints <- o ..:? imgDockerEntrypointsArgName
+                     imgDockerAdd <- o ..:? imgDockerAddArgName ..!= Map.empty
+                     imgDockerImageName <- o ..:? imgDockerImageNameArgName
+                     imgDockerExecutables <- o ..:? imgDockerExecutablesArgName
                      return
-                         ImageDockerOptsMonoid
+                         ImageDockerOpts
                          { ..
                          })
-
-instance Monoid ImageDockerOptsMonoid where
-    mempty = ImageDockerOptsMonoid
-        { imgDockerMonoidBase = Nothing
-        , imgDockerMonoidEntrypoints = Nothing
-        , imgDockerMonoidAdd = Nothing
-        , imgDockerMonoidImageName = Nothing
-        }
-    mappend l r = ImageDockerOptsMonoid
-        { imgDockerMonoidBase = imgDockerMonoidBase l <|> imgDockerMonoidBase r
-        , imgDockerMonoidEntrypoints = imgDockerMonoidEntrypoints l <|> imgDockerMonoidEntrypoints
-                                                                            r
-        , imgDockerMonoidAdd = imgDockerMonoidAdd l <|> imgDockerMonoidAdd r
-        , imgDockerMonoidImageName = imgDockerMonoidImageName l <|> imgDockerMonoidImageName r
-        }
 
 imgArgName :: Text
 imgArgName = "image"
 
-imgDockerArgName :: Text
-imgDockerArgName = "container"
+-- Kept for backward compatibility
+imgDockerOldArgName :: Text
+imgDockerOldArgName = "container"
+
+imgDockersArgName :: Text
+imgDockersArgName = "containers"
 
 imgDockerBaseArgName :: Text
 imgDockerBaseArgName = "base"
@@ -106,3 +94,6 @@ imgDockerEntrypointsArgName = "entrypoints"
 
 imgDockerImageNameArgName :: Text
 imgDockerImageNameArgName = "name"
+
+imgDockerExecutablesArgName :: Text
+imgDockerExecutablesArgName = "executables"

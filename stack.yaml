@@ -1,12 +1,12 @@
 resolver: lts-3.19
 image:
-  container:
-    base: "fpco/ubuntu-with-libgmp:14.04"
-    entrypoints:
-      - stack
+  containers:
+    - base: "fpco/ubuntu-with-libgmp:14.04"
+      entrypoints:
+        - stack
 
 nix:
   # --nix on the command-line to enable.
   enable: false
   packages:
-  - zlib
+    - zlib

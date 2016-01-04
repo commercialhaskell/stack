@@ -10,11 +10,9 @@
 -- | This module builds Docker (OpenContainer) images.
 module Stack.Image
        (stageContainerImageArtifacts, createContainerImageFromStage,
-        imgCmdName, imgDockerCmdName, imgOptsFromMonoid,
-        imgDockerOptsFromMonoid, imgOptsParser, imgDockerOptsParser)
+        imgCmdName, imgDockerCmdName, imgOptsFromMonoid)
        where
 
-import           Control.Applicative
 import           Control.Exception.Lifted hiding (finally)
 import           Control.Monad
 import           Control.Monad.Catch hiding (bracket)
@@ -25,10 +23,7 @@ import           Control.Monad.Trans.Control
 import           Data.Char (toLower)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
-import           Data.Monoid
-import qualified Data.Text as T
 import           Data.Typeable
-import           Options.Applicative
 import           Path
 import           Path.Extra
 import           Path.IO
@@ -45,11 +40,14 @@ type Assemble e m = (HasConfig e, HasTerminal e, MonadBaseControl IO m, MonadCat
 -- directory under '.stack-work'
 stageContainerImageArtifacts :: Build e m => m ()
 stageContainerImageArtifacts = do
-    imageDir <- getWorkingDir >>= imageStagingDir
-    removeTreeIfExists imageDir
-    createTree imageDir
-    stageExesInDir imageDir
-    syncAddContentToDir imageDir
+    config <- asks getConfig
+    workingDir <- getWorkingDir
+    forM_ (zip [0..] $ imgDockers $ configImage config) $ \(idx, opts) -> do
+        imageDir <- imageStagingDir workingDir idx
+        removeTreeIfExists imageDir
+        createTree imageDir
+        stageExesInDir opts imageDir
+        syncAddContentToDir opts imageDir
 
 -- | Builds a Docker (OpenContainer) image extending the `base` image
 -- specified in the project's stack.yaml.  Then new image will be
@@ -57,29 +55,35 @@ stageContainerImageArtifacts = do
 -- in the config file.
 createContainerImageFromStage :: Assemble e m => m ()
 createContainerImageFromStage = do
-    imageDir <- getWorkingDir >>= imageStagingDir
-    createDockerImage imageDir
-    extendDockerImageWithEntrypoint imageDir
+    config <- asks getConfig
+    workingDir <- getWorkingDir
+    forM_ (zip [0..] $ imgDockers $ configImage config) $ \(idx, opts) -> do
+        imageDir <- imageStagingDir workingDir idx
+        createDockerImage opts imageDir
+        extendDockerImageWithEntrypoint opts imageDir
 
 -- | Stage all the Package executables in the usr/local/bin
 -- subdirectory of a temp directory.
-stageExesInDir :: Build e m => Path Abs Dir -> m ()
-stageExesInDir dir = do
+stageExesInDir :: Build e m => ImageDockerOpts -> Path Abs Dir -> m ()
+stageExesInDir opts dir = do
     srcBinPath <-
         (</> $(mkRelDir "bin")) <$>
         installationRootLocal
     let destBinPath = dir </>
             $(mkRelDir "usr/local/bin")
     createTree destBinPath
-    copyDirectoryRecursive srcBinPath destBinPath
+    case imgDockerExecutables opts of
+        Nothing -> copyDirectoryRecursive srcBinPath destBinPath
+        Just exes -> forM_ exes $ \exe -> do
+            exeRelFile <- parseRelFile exe
+            copyFile (srcBinPath </> exeRelFile) (destBinPath </> exeRelFile)
 
 -- | Add any additional files into the temp directory, respecting the
 -- (Source, Destination) mapping.
-syncAddContentToDir :: Build e m => Path Abs Dir -> m ()
-syncAddContentToDir dir = do
-    config <- asks getConfig
+syncAddContentToDir :: Build e m => ImageDockerOpts -> Path Abs Dir -> m ()
+syncAddContentToDir opts dir = do
     bconfig <- asks getBuildConfig
-    let imgAdd = maybe Map.empty imgDockerAdd (imgDocker (configImage config))
+    let imgAdd = imgDockerAdd opts
     forM_
         (Map.toList imgAdd)
         (\(source,dest) ->
@@ -95,18 +99,12 @@ syncAddContentToDir dir = do
 imageName :: Path Abs Dir -> String
 imageName = map toLower . toFilePathNoTrailingSep . dirname
 
-mkDockerConfig :: (HasConfig e, MonadReader e m) => m (Maybe ImageDockerOpts)
-mkDockerConfig = do
-  config <- asks getConfig
-  return (imgDocker (configImage config))
-
 -- | Create a general purpose docker image from the temporary
 -- directory of executables & static content.
-createDockerImage :: Assemble e m => Path Abs Dir -> m ()
-createDockerImage dir = do
+createDockerImage :: Assemble e m => ImageDockerOpts -> Path Abs Dir -> m ()
+createDockerImage dockerConfig dir = do
     menv <- getMinimalEnvOverride
-    dockerConfig <- mkDockerConfig
-    case imgDockerBase =<< dockerConfig of
+    case imgDockerBase dockerConfig of
         Nothing -> throwM StackImageDockerBaseUnspecifiedException
         Just base -> do
             liftIO
@@ -118,22 +116,21 @@ createDockerImage dir = do
             let args = [ "build"
                        , "-t"
                        , fromMaybe
-                             (imageName (parent (parent dir)))
-                             (imgDockerImageName =<< dockerConfig)
+                             (imageName (parent (parent (parent dir))))
+                             (imgDockerImageName dockerConfig)
                        , toFilePathNoTrailingSep dir]
             callProcess $ Cmd Nothing "docker" menv args
 
 
 -- | Extend the general purpose docker image with entrypoints (if
 -- specified).
-extendDockerImageWithEntrypoint :: Assemble e m => Path Abs Dir -> m ()
-extendDockerImageWithEntrypoint dir = do
+extendDockerImageWithEntrypoint :: Assemble e m => ImageDockerOpts -> Path Abs Dir -> m ()
+extendDockerImageWithEntrypoint dockerConfig dir = do
     menv <- getMinimalEnvOverride
-    dockerConfig <- mkDockerConfig
     let dockerImageName = fromMaybe
-                (imageName (parent (parent dir)))
-                (imgDockerImageName =<< dockerConfig)
-    let imgEntrypoints = maybe Nothing imgDockerEntrypoints dockerConfig
+                (imageName (parent (parent (parent dir))))
+                (imgDockerImageName dockerConfig)
+    let imgEntrypoints = imgDockerEntrypoints dockerConfig
     case imgEntrypoints of
         Nothing -> return ()
         Just eps ->
@@ -167,50 +164,11 @@ imgCmdName = "image"
 imgDockerCmdName :: String
 imgDockerCmdName = "container"
 
--- | A parser for ImageOptsMonoid.
-imgOptsParser :: Parser ImageOptsMonoid
-imgOptsParser = ImageOptsMonoid <$>
-    optional
-        (subparser
-             (command
-                  imgDockerCmdName
-                  (info
-                       imgDockerOptsParser
-                       (progDesc "Create a container image (EXPERIMENTAL)"))))
-
--- | A parser for ImageDockerOptsMonoid.
-imgDockerOptsParser :: Parser ImageDockerOptsMonoid
-imgDockerOptsParser = ImageDockerOptsMonoid <$>
-    optional
-        (option
-             str
-             (long (imgDockerCmdName ++ "-" ++ T.unpack imgDockerBaseArgName) <>
-              metavar "NAME" <>
-              help "Docker base image name")) <*>
-    pure Nothing <*>
-    pure Nothing <*>
-    pure Nothing
-
 -- | Convert image opts monoid to image options.
 imgOptsFromMonoid :: ImageOptsMonoid -> ImageOpts
 imgOptsFromMonoid ImageOptsMonoid{..} = ImageOpts
-    { imgDocker = imgDockerOptsFromMonoid <$> imgMonoidDocker
+    { imgDockers = imgMonoidDockers
     }
-
--- | Convert Docker image opts monoid to Docker image options.
-imgDockerOptsFromMonoid :: ImageDockerOptsMonoid -> ImageDockerOpts
-imgDockerOptsFromMonoid ImageDockerOptsMonoid{..} = ImageDockerOpts
-    { imgDockerBase = emptyToNothing imgDockerMonoidBase
-    , imgDockerEntrypoints = emptyToNothing imgDockerMonoidEntrypoints
-    , imgDockerAdd = fromMaybe Map.empty imgDockerMonoidAdd
-    , imgDockerImageName = emptyToNothing imgDockerMonoidImageName
-    }
-    where emptyToNothing Nothing = Nothing
-          emptyToNothing (Just s)
-              | null s =
-                  Nothing
-              | otherwise =
-                  Just s
 
 -- | Stack image exceptions.
 data StackImageException =
