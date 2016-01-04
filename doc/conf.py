@@ -47,7 +47,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'stack'
-copyright = u'2015, Stack contributors'
+copyright = u'2015-2016, Stack contributors'
 author = u'Stack contributors'
 
 # The version info for the project you're documenting, acts as replacement for
