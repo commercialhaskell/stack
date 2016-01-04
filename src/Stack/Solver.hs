@@ -42,7 +42,6 @@ import           Path.Find                   (findFiles)
 import           Path.IO                     (parseRelAsAbsDir)
 import           Prelude
 import           Stack.BuildPlan
-import           Stack.Constants             (stackDotYaml)
 import           Stack.Package               (printCabalFileWarning
                                              , readPackageUnresolved)
 import           Stack.Setup
@@ -265,9 +264,9 @@ solveResolverSpec
     -> ( Resolver
        , Map PackageName (Map FlagName Bool)
        , Map PackageName Version)
-    -> m ( Resolver
-         , Map PackageName (Map FlagName Bool)
-         , Map PackageName Version)
+    -> m (Maybe ( Resolver
+               , Map PackageName (Map FlagName Bool)
+               , Map PackageName Version))
 solveResolverSpec stackYaml cabalDirs packages
                   (resolver, flags, extraPackages) = do
     $logInfo $ "Using resolver: " <> resolverName resolver
@@ -309,23 +308,13 @@ solveResolverSpec stackYaml cabalDirs packages
                  <> T.pack (show $ Map.size newPairs)
                  <> " external dependencies."
 
-        return ( resolver
+        return $ Just ( resolver
                , Map.filter (not . Map.null) (fmap snd pairs)
                , fmap fst newPairs)
-      Nothing ->
-        error ("Solver could not resolve package dependencies. "
-            <> "You can try one or more of the following:\n"
-            <> "- If the problem is due to a stale package index you can try "
-            <> "again after udating the package index with 'stack update'.\n"
-            <> "- Guide the solver by specifying some of the "
-            <> "extra dependencies in " <> toFilePath stackDotYaml
-            <> " and then use 'stack solver' figure out the rest.\n"
-            <> "- Check if you missed adding a custom package or remote "
-            <> "package location needed to build your package.\n"
-            <> "- You may also want to remove any unnecessary packages "
-            <> "causing dependency problems.\n"
-            <> "- Use '--ignore-subdirs' to avoid using unwanted .cabal files "
-            <> "in subdirectories.")
+      Nothing -> do
+        $logInfo $ "Failed to arrive at a workable build plan using "
+                   <> resolverName resolver <> " resolver."
+        return Nothing
     where
       getResolverMiniPlan (ResolverSnapshot snapName) = do
           mbp <- loadMiniBuildPlan snapName
@@ -448,14 +437,18 @@ solveExtraDeps modStackYaml = do
         resolver     = bcResolver bconfig
 
     result <- checkResolverSpec gpds (Just oldFlags) resolver
-    (_, flags, extraDeps) <- case result of
+    resolverSpec <- case result of
         BuildPlanCheckFail _ _ -> throwM $ ResolverMismatch resolver
-        BuildPlanCheckOk flags -> return (resolver, flags, Map.empty)
+        BuildPlanCheckOk flags -> return $ Just (resolver, flags, Map.empty)
         BuildPlanCheckPartial _ _ -> solveResolverSpec stackYaml cabalDirs
                                                        (gpdPackages gpds)
                                                        ( resolver
                                                        , oldFlags
                                                        , oldExtraDeps)
+
+    (flags, extraDeps) <- case resolverSpec of
+        Nothing -> throwM (SolverGiveUp Nothing)
+        Just (_, f, e) -> return (f, e)
 
     let
         vDiff v v' = if v == v' then Nothing else Just v

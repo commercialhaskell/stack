@@ -103,8 +103,11 @@ initProject currDir initOpts = do
             , peSubdirs = []
             }
 
-    $logInfo $ "Initialising stack configuration using resolver: " <> resolverName r
-    $logInfo $ "Writing stack configuration to: " <> T.pack reldest
+    $logInfo $ "Initialising configuration using resolver: " <> resolverName r
+    $logInfo $
+        (if exists then "Overwriting existing configuration file: "
+         else "Writing configuration to file: ")
+        <> T.pack reldest
     liftIO $ L.writeFile dest' $ B.toLazyByteString $ renderStackYaml p
     $logInfo "All done."
 
@@ -198,11 +201,29 @@ getDefaultResolver stackYaml cabalDirs gpds initOpts = do
         BuildPlanCheckFail _ _ -> throwM $ ResolverMismatch resolver
         BuildPlanCheckOk flags -> return (resolver, flags, Map.empty)
         BuildPlanCheckPartial flags _
-            | needSolver resolver initOpts ->
-                solveResolverSpec stackYaml cabalDirs (gpdPackages gpds)
-                                  (resolver, flags, Map.empty)
+            | needSolver resolver initOpts -> solve (resolver, flags)
             | otherwise -> throwM $ ResolverPartial resolver
+
     where
+      solve (res, f) = do
+          let partialSpec = (res, f, Map.empty)
+          mresolver <- solveResolverSpec stackYaml cabalDirs
+                                         (gpdPackages gpds)
+                                         partialSpec
+          case mresolver of
+              Just r -> return r
+              Nothing
+                  | forceOverwrite initOpts -> do
+                      $logWarn "\nSolver could not arrive at a workable build \
+                               \plan.\nProceeding to create a config with an \
+                               \incomplete plan anyway..."
+                      return partialSpec
+                  | otherwise -> do
+                      let footer = "Use '--force' to create "
+                                   <> toFilePath stackDotYaml <>
+                                   " with an incomplete build plan anyway."
+                      throwM (SolverGiveUp $ Just footer)
+
       -- TODO support selecting best across regular and custom snapshots
       getResolver (MethodSnapshot snapPref)  = selectSnapResolver snapPref
       getResolver (MethodResolver aresolver) = makeConcreteResolver aresolver
