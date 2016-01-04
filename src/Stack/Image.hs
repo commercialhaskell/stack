@@ -67,8 +67,7 @@ createContainerImageFromStage = do
 stageExesInDir :: Build e m => ImageDockerOpts -> Path Abs Dir -> m ()
 stageExesInDir opts dir = do
     srcBinPath <-
-        (</> $(mkRelDir "bin")) <$>
-        installationRootLocal
+        liftM (</> $(mkRelDir "bin")) installationRootLocal
     let destBinPath = dir </>
             $(mkRelDir "usr/local/bin")
     createTree destBinPath

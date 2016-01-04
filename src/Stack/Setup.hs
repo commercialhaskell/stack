@@ -541,9 +541,9 @@ getSystemCompiler menv wc = do
             eres <- tryProcessStdout Nothing menv exeName ["--info"]
             let minfo = do
                     Right bs <- Just eres
-                    pairs <- readMay $ S8.unpack bs :: Maybe [(String, String)]
-                    version <- lookup "Project version" pairs >>= parseVersionFromString
-                    arch <- lookup "Target platform" pairs >>= simpleParse . takeWhile (/= '-')
+                    pairs_ <- readMay $ S8.unpack bs :: Maybe [(String, String)]
+                    version <- lookup "Project version" pairs_ >>= parseVersionFromString
+                    arch <- lookup "Target platform" pairs_ >>= simpleParse . takeWhile (/= '-')
                     return (version, arch)
             case (wc, minfo) of
                 (Ghc, Just (version, arch)) -> return (Just (GhcVersion version, arch))
@@ -652,7 +652,7 @@ downloadAndInstallCompiler si wanted@(GhcVersion{}) versionCheck mbindistURL = d
             ghcKey <- getGhcKey
             case Map.lookup ghcKey $ siGHCs si of
                 Nothing -> throwM $ UnknownOSKey ghcKey
-                Just pairs -> getWantedCompilerInfo ghcKey versionCheck wanted GhcVersion pairs
+                Just pairs_ -> getWantedCompilerInfo ghcKey versionCheck wanted GhcVersion pairs_
     config <- asks getConfig
     let installer =
             case configPlatform config of
@@ -676,7 +676,7 @@ downloadAndInstallCompiler si wanted versionCheck _mbindistUrl = do
         _ -> throwM GHCJSRequiresStandardVariant
     (selectedVersion, downloadInfo) <- case Map.lookup "source" $ siGHCJSs si of
         Nothing -> throwM $ UnknownOSKey "source"
-        Just pairs -> getWantedCompilerInfo "source" versionCheck wanted id pairs
+        Just pairs_ -> getWantedCompilerInfo "source" versionCheck wanted id pairs_
     $logInfo "Preparing to install GHCJS to an isolated location."
     $logInfo "This will not interfere with any system-level installation."
     let tool = ToolGhcjs selectedVersion
@@ -692,15 +692,15 @@ getWantedCompilerInfo :: (Ord k, MonadThrow m)
                       -> (k -> CompilerVersion)
                       -> Map k a
                       -> m (k, a)
-getWantedCompilerInfo key versionCheck wanted toCV pairs =
+getWantedCompilerInfo key versionCheck wanted toCV pairs_ =
     case mpair of
         Just pair -> return pair
-        Nothing -> throwM $ UnknownCompilerVersion key wanted (map toCV (Map.keys pairs))
+        Nothing -> throwM $ UnknownCompilerVersion key wanted (map toCV (Map.keys pairs_))
   where
     mpair =
         listToMaybe $
         sortBy (flip (comparing fst)) $
-        filter (isWantedCompiler versionCheck wanted . toCV . fst) (Map.toList pairs)
+        filter (isWantedCompiler versionCheck wanted . toCV . fst) (Map.toList pairs_)
 
 getGhcKey :: (MonadReader env m, MonadThrow m, HasPlatform env, HasGHCVariant env, MonadLogger m, MonadIO m, MonadCatch m, MonadBaseControl IO m)
           => m Text
