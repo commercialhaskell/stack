@@ -11,6 +11,7 @@ module Stack.Solver
     ) where
 
 import           Control.Applicative
+import           Control.Exception (assert)
 import           Control.Exception.Enclosed  (tryIO)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
@@ -156,7 +157,7 @@ cabalSolver menv cabalfps constraintType constraints userFlags cabalArgs = withS
         in
         "--constraint=" ++ unwords [packageNameString package, sign : flagNameString flag]
 
-getCabalConfig :: (MonadReader env m, HasConfig env, MonadIO m, MonadThrow m)
+getCabalConfig :: (MonadLogger m, MonadReader env m, HasConfig env, MonadIO m, MonadThrow m)
                => FilePath -- ^ temp dir
                -> ConstraintType
                -> Map PackageName Version -- ^ constraints
@@ -267,18 +268,23 @@ solveResolverSpec
     -> m (Maybe ( Resolver
                , Map PackageName (Map FlagName Bool)
                , Map PackageName Version))
-solveResolverSpec stackYaml cabalDirs packages
+solveResolverSpec stackYaml cabalDirs srcPackages
                   (resolver, flags, extraPackages) = do
     $logInfo $ "Using resolver: " <> resolverName resolver
     (compilerVer, snapPackages) <- getResolverMiniPlan resolver
     menv <- setupCabalEnv compilerVer
+
+    let assertVer v = assert ((not . null . versionString) v) $ return ()
+    mapM_ assertVer snapPackages
+    mapM_ assertVer extraPackages
+
     -- Note - The order in Map.union below is important.
-    -- If versions of  packages we are building are also available in the
-    -- snapshot then we override those with  the versions we are building.
-    -- Also, we prefer extraPackages over the snapshot packages.
-    let availablePkgs = Map.union packages $
-                        Map.union extraPackages snapPackages
-        solver t = cabalSolver menv cabalDirs t availablePkgs flags $
+    -- We prefer extraPackages over the snapshot packages.
+    let externalPackages = Map.union extraPackages snapPackages
+        -- We cannot have the snapshot versions of source packages as
+        -- constraints.
+        constraints = Map.difference externalPackages srcPackages
+        solver t = cabalSolver menv cabalDirs t constraints flags $
                           ["-v"] -- TODO make it conditional on debug
                        ++ ["--ghcjs" | (whichCompiler compilerVer) == Ghcjs]
 
@@ -289,12 +295,12 @@ solveResolverSpec stackYaml cabalDirs packages
               | not (Map.null extraPackages)]
 
     $logInfo "Asking cabal to calculate a build plan..."
-    unless (Map.null availablePkgs)
+    unless (Map.null constraints)
         ($logInfo $ "Trying with " <> srcNames <> " as hard constraints...")
 
     mdeps <- solver Constraint
     mdeps' <- case mdeps of
-        Nothing | not (Map.null availablePkgs) -> do
+        Nothing | not (Map.null constraints) -> do
             $logInfo $ "Retrying with " <> srcNames <> " as preferences..."
             solver Preference
         _ -> return mdeps
