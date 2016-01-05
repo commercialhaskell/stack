@@ -483,12 +483,13 @@ solveExtraDeps modStackYaml = do
         printFlags goneFlags "* Flags to be deleted"
         printDeps  goneDeps  "* Dependencies to be deleted"
 
+        -- TODO backup the old config file
         if modStackYaml then do
             writeStackYaml stackYaml resolver extraDeps flags
             $logInfo $ "Updated " <> T.pack relStackYaml
         else do
             $logInfo $ "To automatically update " <> T.pack relStackYaml
-                       <> ", rerun with '--modify-stack-yaml'"
+                       <> ", rerun with '--update-config'"
      else
         $logInfo $ "No changes needed to " <> T.pack relStackYaml
 

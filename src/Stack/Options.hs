@@ -783,8 +783,8 @@ ghcVariantParser hide =
 -- | Parser for @solverCmd@
 solverOptsParser :: Parser Bool
 solverOptsParser = boolFlags False
-    "modify-stack-yaml"
-    "Automatically modify stack.yaml with the solver's recommendations"
+    "update-config"
+    "Automatically update stack.yaml with the solver's recommendations"
     idm
 
 -- | Parser for test arguments.
