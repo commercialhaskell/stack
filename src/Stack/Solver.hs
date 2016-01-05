@@ -181,14 +181,16 @@ getCabalConfig dir constraintType constraints = do
             , ":http://0.0.0.0/fake-url"
             ]
 
-    goConstraint (name, version) = T.concat
-        [ (if constraintType == Constraint
-           then "constraint: "
-           else "preference: ")
-        , T.pack $ packageNameString name
-        , "=="
-        , T.pack $ versionString version
-        ]
+    goConstraint (name, version) =
+        assert (not . null . versionString $ version) $
+            T.concat
+              [ (if constraintType == Constraint
+                 then "constraint: "
+                 else "preference: ")
+              , T.pack $ packageNameString name
+              , "=="
+              , T.pack $ versionString version
+              ]
 
 setupCompiler
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
@@ -273,10 +275,6 @@ solveResolverSpec stackYaml cabalDirs srcPackages
     $logInfo $ "Using resolver: " <> resolverName resolver
     (compilerVer, snapPackages) <- getResolverMiniPlan resolver
     menv <- setupCabalEnv compilerVer
-
-    let assertVer v = assert ((not . null . versionString) v) $ return ()
-    mapM_ assertVer snapPackages
-    mapM_ assertVer extraPackages
 
     -- Note - The order in Map.union below is important.
     -- We prefer extraPackages over the snapshot packages.
