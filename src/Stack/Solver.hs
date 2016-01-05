@@ -469,17 +469,22 @@ solveExtraDeps modStackYaml = do
                   || any (not . Map.null) [newFlags, goneFlags]
 
     if changed then do
+        $logInfo ""
         $logInfo $ "The following changes will be made to "
                    <> T.pack relStackYaml <> ":"
 
-        printFlags newFlags  "New"
-        printDeps  newDeps   "New"
+        -- TODO print whether resolver changed from previous
+        $logInfo $ "* Resolver is " <> resolverName resolver
 
-        printFlags goneFlags "Deleted"
-        printDeps  goneDeps  "Deleted"
+        -- TODO indent the yaml output
+        printFlags newFlags  "* Flags to be added"
+        printDeps  newDeps   "* Dependencies to be added"
+
+        printFlags goneFlags "* Flags to be deleted"
+        printDeps  goneDeps  "* Dependencies to be deleted"
 
         if modStackYaml then do
-            writeStackYaml stackYaml extraDeps flags
+            writeStackYaml stackYaml resolver extraDeps flags
             $logInfo $ "Updated " <> T.pack relStackYaml
         else do
             $logInfo $ "To automatically update " <> T.pack relStackYaml
@@ -490,18 +495,16 @@ solveExtraDeps modStackYaml = do
     where
         printFlags fl msg = do
             when ((not . Map.null) fl) $ do
-                $logInfo ""
-                $logInfo $ T.pack msg <> " flags:"
+                $logInfo $ T.pack msg
                 $logInfo $ decodeUtf8 $ Yaml.encode $ object ["flags" .= fl]
 
         printDeps deps msg = do
             when ((not . Map.null) deps) $ do
-                $logInfo ""
-                $logInfo $ T.pack msg <> " dependencies:"
+                $logInfo $ T.pack msg
                 $logInfo $ decodeUtf8 $ Yaml.encode $ object $
                         [("extra-deps" .= map fromTuple (Map.toList deps))]
 
-        writeStackYaml path deps fl = do
+        writeStackYaml path res deps fl = do
             let fp = toFilePath path
             obj <- liftIO (Yaml.decodeFileEither fp) >>= either throwM return
             (ProjectAndConfigMonoid _ _, warnings) <-
@@ -510,5 +513,6 @@ solveExtraDeps modStackYaml = do
             let obj' =
                     HashMap.insert "extra-deps"
                         (toJSON $ map fromTuple $ Map.toList deps)
-                  $ HashMap.insert ("flags" :: Text) (toJSON fl) obj
+                  $ HashMap.insert ("flags" :: Text) (toJSON fl)
+                  $ HashMap.insert ("resolver" :: Text) (toJSON (resolverName res)) obj
             liftIO $ Yaml.encodeFile fp obj'
