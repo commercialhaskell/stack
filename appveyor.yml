@@ -1,6 +1,6 @@
 # Disabled cache in hope of improving reliability of AppVeyor builds
 #cache:
-#- "c:\\sr" # stack root, short paths == less problems
+#- "c:\\sr" # stack root, short paths == fewer problems
 
 build: off
 
