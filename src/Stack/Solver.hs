@@ -6,6 +6,7 @@ module Stack.Solver
     ( checkResolverSpec
     , cabalPackagesCheck
     , findCabalFiles
+    , mergeConstraints
     , solveExtraDeps
     , solveResolverSpec
     ) where
@@ -60,17 +61,22 @@ import           System.IO.Temp              (withSystemTempDirectory)
 import           System.Process.Read
 
 data ConstraintType = Constraint | Preference deriving (Eq)
+type ConstraintSpec = Map PackageName (Version, Map FlagName Bool)
 
 cabalSolver :: (MonadIO m, MonadLogger m, MonadMask m, MonadBaseControl IO m, MonadReader env m, HasConfig env)
             => EnvOverride
             -> [Path Abs Dir] -- ^ cabal files
             -> ConstraintType
-            -> Map PackageName Version -- ^ constraints
-            -> Map PackageName (Map FlagName Bool) -- ^ user-specified flags
+            -> ConstraintSpec -- ^ src constraints
+            -> ConstraintSpec -- ^ dep constraints
             -> [String] -- ^ additional arguments
-            -> m (Maybe (Map PackageName (Version, Map FlagName Bool)))
-cabalSolver menv cabalfps constraintType constraints userFlags cabalArgs = withSystemTempDirectory "cabal-solver" $ \dir -> do
-    configLines <- getCabalConfig dir constraintType constraints
+            -> m (Maybe ConstraintSpec)
+cabalSolver menv cabalfps constraintType
+            srcConstraints depConstraints cabalArgs =
+  withSystemTempDirectory "cabal-solver" $ \dir -> do
+
+    let versionConstraints = fmap fst depConstraints
+    configLines <- getCabalConfig dir constraintType versionConstraints
     let configFile = dir FP.</> "cabal.config"
     liftIO $ S.writeFile configFile $ encodeUtf8 $ T.unlines configLines
 
@@ -93,7 +99,7 @@ cabalSolver menv cabalfps constraintType constraints userFlags cabalArgs = withS
              : "--package-db=clear"
              : "--package-db=global"
              : cabalArgs ++
-               toConstraintArgs userFlags ++
+               toConstraintArgs (flagConstraints constraintType) ++
                fmap toFilePath cabalfps
 
     catch (liftM Just (readProcessStdout (Just tmpdir) menv "cabal" args))
@@ -156,6 +162,15 @@ cabalSolver menv cabalfps constraintType constraints userFlags cabalArgs = withS
         let sign = if enabled then '+' else '-'
         in
         "--constraint=" ++ unwords [packageNameString package, sign : flagNameString flag]
+
+    -- Note the order of the Map union is important
+    -- We override a package in snapshot by a src package
+    flagConstraints Constraint = fmap snd (Map.union srcConstraints
+                                           depConstraints)
+    -- Even when using preferences we want to
+    -- keep the src package flags unchanged
+    -- TODO - this should be done only for manual flags.
+    flagConstraints Preference = fmap snd srcConstraints
 
 getCabalConfig :: (MonadLogger m, MonadReader env m, HasConfig env, MonadIO m, MonadThrow m)
                => FilePath -- ^ temp dir
@@ -256,6 +271,27 @@ setupCabalEnv compiler = do
                          \This is most likely a bug."
     return menv
 
+mergeConstraints
+    :: Map PackageName v
+    -> Map PackageName (Map p f)
+    -> Map PackageName (v, Map p f)
+mergeConstraints = Map.mergeWithKey
+    -- combine entry in both maps
+    (\_ v f -> Just (v, f))
+    -- convert entry in first map only
+    (fmap (flip (,) Map.empty))
+    -- convert entry in second map only
+    (\m -> if Map.null m then Map.empty
+           else error "Bug: An entry in flag map must have a corresponding \
+                      \entry in the version map")
+
+diffConstraints
+    :: (Eq v, Eq f)
+    => (v, f) -> (v, f) -> Maybe (v, f)
+diffConstraints (v, f) (v', f')
+    | (v == v') && (f == f') = Nothing
+    | otherwise              = Just (v, f)
+
 solveResolverSpec
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
        , MonadReader env m, HasConfig env , HasGHCVariant env
@@ -263,75 +299,88 @@ solveResolverSpec
        , HasTerminal env)
     => Path Abs File  -- ^ stack.yaml file location
     -> [Path Abs Dir] -- ^ package dirs containing cabal files
-    -> Map PackageName Version -- ^ local packages to build
     -> ( Resolver
-       , Map PackageName (Map FlagName Bool)
-       , Map PackageName Version)
-    -> m (Maybe ( Resolver
-               , Map PackageName (Map FlagName Bool)
-               , Map PackageName Version))
-solveResolverSpec stackYaml cabalDirs srcPackages
-                  (resolver, flags, extraPackages) = do
+       , ConstraintSpec -- ^ src package constraints
+       , ConstraintSpec) -- ^ extra dependency constraints
+    -> m (Maybe ( ConstraintSpec -- ^ resulting src package specs
+                , ConstraintSpec)) -- ^ resulting external package specs
+solveResolverSpec stackYaml cabalDirs
+                  (resolver, srcConstraints, extraConstraints) = do
     $logInfo $ "Using resolver: " <> resolverName resolver
-    (compilerVer, snapPackages) <- getResolverMiniPlan resolver
+    (compilerVer, snapConstraints) <- getResolverConstraints resolver
     menv <- setupCabalEnv compilerVer
 
-    -- Note - The order in Map.union below is important.
-    -- We prefer extraPackages over the snapshot packages.
-    let externalPackages = Map.union extraPackages snapPackages
-        -- We cannot have the snapshot versions of source packages as
-        -- constraints.
-        constraints = Map.difference externalPackages srcPackages
-        solver t = cabalSolver menv cabalDirs t constraints flags $
+    let -- Note - The order in Map.union below is important.
+        -- We want to override snapshot with extra deps
+        depConstraints = Map.union extraConstraints snapConstraints
+        -- Make sure deps do not include any src packages
+        -- There are two reasons for this:
+        -- 1. We do not want snapshot versions to override the sources
+        -- 2. Sources may not have versions leading to bad cabal constraints
+        depOnlyConstraints = Map.difference depConstraints srcConstraints
+        solver t = cabalSolver menv cabalDirs t
+                               srcConstraints depOnlyConstraints $
                           ["-v"] -- TODO make it conditional on debug
                        ++ ["--ghcjs" | (whichCompiler compilerVer) == Ghcjs]
 
     let srcNames = (T.intercalate " and ") $
           ["packages from " <> resolverName resolver
-              | not (Map.null snapPackages)] ++
-          [T.pack ((show $ Map.size extraPackages) <> " external packages")
-              | not (Map.null extraPackages)]
+              | not (Map.null snapConstraints)] ++
+          [T.pack ((show $ Map.size extraConstraints) <> " external packages")
+              | not (Map.null extraConstraints)]
 
     $logInfo "Asking cabal to calculate a build plan..."
-    unless (Map.null constraints)
+    unless (Map.null depOnlyConstraints)
         ($logInfo $ "Trying with " <> srcNames <> " as hard constraints...")
 
     mdeps <- solver Constraint
     mdeps' <- case mdeps of
-        Nothing | not (Map.null constraints) -> do
+        Nothing | not (Map.null depOnlyConstraints) -> do
             $logInfo $ "Retrying with " <> srcNames <> " as preferences..."
             solver Preference
         _ -> return mdeps
 
     case mdeps' of
-      Just pairs -> do
-        let versiondiff (v, f) v' = if v == v' then Nothing else Just (v, f)
-            newPairs = Map.differenceWith versiondiff pairs snapPackages
+        Just deps -> do
+            let
+                -- All src package constraints returned by cabal.
+                -- Flags may have changed.
+                srcs = Map.intersection deps srcConstraints
+                inSnap = Map.intersection deps snapConstraints
+                -- All packages which are in the snapshot but cabal solver
+                -- returned versions or flags different from the snapshot.
+                inSnapChanged = Map.differenceWith diffConstraints
+                                                   inSnap snapConstraints
+                -- Packages neither in snapshot, nor srcs
+                extra = Map.difference deps (Map.union srcConstraints
+                                                       snapConstraints)
+                external = Map.union inSnapChanged extra
 
-        $logInfo $ "Successfully determined a build plan with "
-                 <> T.pack (show $ Map.size newPairs)
-                 <> " external dependencies."
+            $logInfo $ "Successfully determined a build plan with "
+                     <> T.pack (show $ Map.size external)
+                     <> " external dependencies."
 
-        return $ Just ( resolver
-               , Map.filter (not . Map.null) (fmap snd pairs)
-               , fmap fst newPairs)
-      Nothing -> do
-        $logInfo $ "Failed to arrive at a workable build plan using "
-                   <> resolverName resolver <> " resolver."
-        return Nothing
+            return $ Just (srcs, external)
+        Nothing -> do
+            $logInfo $ "Failed to arrive at a workable build plan using "
+                       <> resolverName resolver <> " resolver."
+            return Nothing
     where
-      getResolverMiniPlan (ResolverSnapshot snapName) = do
-          mbp <- loadMiniBuildPlan snapName
-          return (mbpCompilerVersion mbp, fmap mpiVersion (mbpPackages mbp))
+      mpiConstraints mpi = (mpiVersion mpi, mpiFlags mpi)
+      mbpConstraints mbp = fmap mpiConstraints (mbpPackages mbp)
 
-      getResolverMiniPlan (ResolverCompiler compiler) =
+      getResolverConstraints (ResolverSnapshot snapName) = do
+          mbp <- loadMiniBuildPlan snapName
+          return (mbpCompilerVersion mbp, mbpConstraints mbp)
+
+      getResolverConstraints (ResolverCompiler compiler) =
           return (compiler, Map.empty)
 
       -- FIXME instead of passing the stackYaml dir we should maintain
       -- the file URL in the custom resolver always relative to stackYaml.
-      getResolverMiniPlan (ResolverCustom _ url) = do
+      getResolverConstraints (ResolverCustom _ url) = do
           mbp <- parseCustomMiniBuildPlan stackYaml url
-          return (mbpCompilerVersion mbp, fmap mpiVersion (mbpPackages mbp))
+          return (mbpCompilerVersion mbp, mbpConstraints mbp)
 
 -- | Given a bundle of packages and a resolver, check the resolver with respect
 -- to the packages and return how well the resolver satisfies the depndencies
@@ -436,36 +485,44 @@ solveExtraDeps modStackYaml = do
     cabalfps  <- liftM concat (mapM (findCabalFiles False) cabalDirs)
     gpds <- cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter
 
-    let oldFlags     = bcFlags bconfig
-        oldExtraDeps = bcExtraDeps bconfig
-        resolver     = bcResolver bconfig
+    let oldFlags          = bcFlags bconfig
+        oldExtraVersions  = bcExtraDeps bconfig
+        resolver          = bcResolver bconfig
+        oldSrcs           = gpdPackages gpds
+        oldSrcFlags       = Map.intersection oldFlags oldSrcs
+        oldExtraFlags     = Map.intersection oldFlags oldExtraVersions
 
-    result <- checkResolverSpec gpds (Just oldFlags) resolver
-    resolverSpec <- case result of
+        srcConstraints    = mergeConstraints oldSrcs oldSrcFlags
+        extraConstraints  = mergeConstraints oldExtraVersions oldExtraFlags
+
+    resolverResult <- checkResolverSpec gpds (Just oldSrcFlags) resolver
+    resultSpecs <- case resolverResult of
         BuildPlanCheckFail _ _ -> throwM $ ResolverMismatch resolver
-        BuildPlanCheckOk flags -> return $ Just (resolver, flags, Map.empty)
-        BuildPlanCheckPartial _ _ -> solveResolverSpec stackYaml cabalDirs
-                                                       (gpdPackages gpds)
-                                                       ( resolver
-                                                       , oldFlags
-                                                       , oldExtraDeps)
+        BuildPlanCheckOk flags ->
+            return $ Just ((mergeConstraints oldSrcs flags), Map.empty)
+        BuildPlanCheckPartial _ _ ->
+            solveResolverSpec stackYaml cabalDirs
+                              (resolver, srcConstraints, extraConstraints)
 
-    (flags, extraDeps) <- case resolverSpec of
+    (srcs, edeps) <- case resultSpecs of
         Nothing -> throwM (SolverGiveUp Nothing)
-        Just (_, f, e) -> return (f, e)
+        Just x -> return x
 
     let
+        flags    = Map.filter (not . Map.null) (fmap snd (Map.union srcs edeps))
+        versions = fmap fst edeps
+
         vDiff v v' = if v == v' then Nothing else Just v
-        depsDiff = Map.differenceWith vDiff
-        newDeps  = depsDiff extraDeps oldExtraDeps
-        goneDeps = depsDiff oldExtraDeps extraDeps
+        versionsDiff = Map.differenceWith vDiff
+        newVersions  = versionsDiff versions oldExtraVersions
+        goneVersions = versionsDiff oldExtraVersions versions
 
         fDiff f f' = if f == f' then Nothing else Just f
         flagsDiff  = Map.differenceWith fDiff
         newFlags   = flagsDiff flags oldFlags
         goneFlags  = flagsDiff oldFlags flags
 
-        changed =    any (not . Map.null) [newDeps, goneDeps]
+        changed =    any (not . Map.null) [newVersions, goneVersions]
                   || any (not . Map.null) [newFlags, goneFlags]
 
     if changed then do
@@ -478,14 +535,14 @@ solveExtraDeps modStackYaml = do
 
         -- TODO indent the yaml output
         printFlags newFlags  "* Flags to be added"
-        printDeps  newDeps   "* Dependencies to be added"
+        printDeps  newVersions   "* Dependencies to be added"
 
         printFlags goneFlags "* Flags to be deleted"
-        printDeps  goneDeps  "* Dependencies to be deleted"
+        printDeps  goneVersions  "* Dependencies to be deleted"
 
         -- TODO backup the old config file
         if modStackYaml then do
-            writeStackYaml stackYaml resolver extraDeps flags
+            writeStackYaml stackYaml resolver versions flags
             $logInfo $ "Updated " <> T.pack relStackYaml
         else do
             $logInfo $ "To automatically update " <> T.pack relStackYaml

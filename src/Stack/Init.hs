@@ -206,18 +206,20 @@ getDefaultResolver stackYaml cabalDirs gpds initOpts = do
 
     where
       solve (res, f) = do
-          let partialSpec = (res, f, Map.empty)
+          let srcConstraints = mergeConstraints (gpdPackages gpds) f
           mresolver <- solveResolverSpec stackYaml cabalDirs
-                                         (gpdPackages gpds)
-                                         partialSpec
+                                         (res, srcConstraints, Map.empty)
           case mresolver of
-              Just r -> return r
+              Just (src, ext) -> do
+                  let flags  = fmap snd (Map.union src ext)
+                      flags' = Map.filter (not . Map.null) flags
+                  return (res, flags', fmap fst ext)
               Nothing
                   | forceOverwrite initOpts -> do
                       $logWarn "\nSolver could not arrive at a workable build \
                                \plan.\nProceeding to create a config with an \
                                \incomplete plan anyway..."
-                      return partialSpec
+                      return (res, f, Map.empty)
                   | otherwise -> do
                       let footer = "Use '--force' to create "
                                    <> toFilePath stackDotYaml <>
