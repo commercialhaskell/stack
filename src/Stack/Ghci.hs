@@ -210,7 +210,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
             T.pack (toFilePath mainIs)
     candidateIndices = take (length candidates) [1 :: Int ..]
     userOption = do
-      putStr "Specify candidate to use: "
+      putStr "Specify main module to use (press enter to load none): "
       option <- getLine
       let selected = fromMaybe
                       ((+1) $ length candidateIndices)
@@ -225,7 +225,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
             let (_,_,fp) = candidates !! op
             putStrLn
               ("Loading main module from cadidate " <>
-              show (op + 1) <> ", -- main-is " <>
+              show (op + 1) <> ", --main-is " <>
               toFilePath fp)
             putStrLn ""
             return $ Just fp
