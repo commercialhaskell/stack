@@ -66,7 +66,7 @@ explain the second option. With single GHC the situation is simple:
 
 ```yaml
 before_install:
-  - export PATH=/opt/ghc/7.8.4/bin:$PATH
+  - export PATH=/opt/ghc/7.10.2/bin:$PATH
 
 addons:
   apt:
