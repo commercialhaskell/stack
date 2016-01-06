@@ -85,8 +85,7 @@ initProject currDir initOpts = do
     let p = Project
             { projectPackages = pkgs
             , projectExtraDeps = extraDeps
-            -- TODO do not write flags with default values
-            , projectFlags = Map.filter (not . Map.null) flags
+            , projectFlags = removeSrcPkgDefaultFlags gpds flags
             , projectResolver = r
             , projectCompiler = Nothing
             , projectExtraPackageDBs = []

@@ -17,6 +17,7 @@ module Stack.BuildPlan
     , MiniBuildPlan(..)
     , MiniPackageInfo(..)
     , loadMiniBuildPlan
+    , removeSrcPkgDefaultFlags
     , resolveBuildPlan
     , selectBestSnapshot
     , ToolMap
@@ -491,6 +492,29 @@ gpdPackageDeps gpd cv platform flags =
             , packageConfigCompilerVersion = cv
             , packageConfigPlatform = platform
             }
+
+-- Remove any src package flags having default values
+-- Remove any package entries with no flags set
+removeSrcPkgDefaultFlags :: [C.GenericPackageDescription]
+                         -> Map PackageName (Map FlagName Bool)
+                         -> Map PackageName (Map FlagName Bool)
+removeSrcPkgDefaultFlags gpds flags =
+    let defaults = Map.unions (map gpdDefaultFlags gpds)
+        flags'   = Map.differenceWith removeSame flags defaults
+    in  Map.filter (not . Map.null) flags'
+    where
+        removeSame f1 f2 =
+            let diff v v' = if v == v' then Nothing else Just v
+            in Just $ Map.differenceWith diff f1 f2
+
+        gpdDefaultFlags gpd =
+            let tuples = map getDefault (C.genPackageFlags gpd)
+            in Map.singleton (gpdPackageName gpd) (Map.fromList tuples)
+
+        flagName' = fromCabalFlagName . C.flagName
+        getDefault f
+            | C.flagDefault f = (flagName' f, True)
+            | otherwise       = (flagName' f, False)
 
 -- | Find the set of @FlagName@s necessary to get the given
 -- @GenericPackageDescription@ to compile against the given @BuildPlan@. Will

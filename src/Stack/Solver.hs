@@ -467,8 +467,9 @@ reportMissingCabalFiles cabalfps includeSubdirs = do
     allCabalfps <- findCabalFiles (includeSubdirs) =<< getWorkingDir
 
     relpaths <- mapM makeRel (allCabalfps \\ cabalfps)
-    $logWarn $ "The following packages are missing from the config:"
-    $logWarn $ T.pack (formatGroup relpaths)
+    when (not (null relpaths)) $ do
+        $logWarn $ "The following packages are missing from the config:"
+        $logWarn $ T.pack (formatGroup relpaths)
 
 -- | Solver can be thought of as a counterpart of init. init creates a
 -- stack.yaml whereas solver verifies or fixes an existing one. It can verify
@@ -535,7 +536,7 @@ solveExtraDeps modStackYaml = do
         Just x -> return x
 
     let
-        flags    = Map.filter (not . Map.null) (fmap snd (Map.union srcs edeps))
+        flags = removeSrcPkgDefaultFlags gpds (fmap snd (Map.union srcs edeps))
         versions = fmap fst edeps
 
         vDiff v v' = if v == v' then Nothing else Just v
