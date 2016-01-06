@@ -85,7 +85,8 @@ initProject currDir initOpts = do
     let p = Project
             { projectPackages = pkgs
             , projectExtraDeps = extraDeps
-            , projectFlags = flags
+            -- TODO do not write flags with default values
+            , projectFlags = Map.filter (not . Map.null) flags
             , projectResolver = r
             , projectCompiler = Nothing
             , projectExtraPackageDBs = []
@@ -211,9 +212,7 @@ getDefaultResolver stackYaml cabalDirs gpds initOpts = do
                                          (res, srcConstraints, Map.empty)
           case mresolver of
               Just (src, ext) -> do
-                  let flags  = fmap snd (Map.union src ext)
-                      flags' = Map.filter (not . Map.null) flags
-                  return (res, flags', fmap fst ext)
+                  return (res, fmap snd (Map.union src ext), fmap fst ext)
               Nothing
                   | forceOverwrite initOpts -> do
                       $logWarn "\nSolver could not arrive at a workable build \
