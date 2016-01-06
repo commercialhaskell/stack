@@ -23,7 +23,7 @@ import           Data.Aeson.Extended         (object, (.=), toJSON, logJSONWarni
 import qualified Data.ByteString             as S
 import           Data.Either
 import qualified Data.HashMap.Strict         as HashMap
-import           Data.List                   (isSuffixOf, intercalate)
+import           Data.List                   ((\\), isSuffixOf, intercalate)
 import           Data.List.Extra             (groupSortOn)
 import           Data.Map                    (Map)
 import qualified Data.Map                    as Map
@@ -41,7 +41,7 @@ import qualified Distribution.PackageDescription as C
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.Find                   (findFiles)
-import           Path.IO                     (parseRelAsAbsDir)
+import           Path.IO                     (getWorkingDir, parseRelAsAbsDir)
 import           Prelude
 import           Stack.BuildPlan
 import           Stack.Package               (printCabalFileWarning
@@ -451,13 +451,36 @@ cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter = do
     return gpds
 
     where
-        makeRel         = liftIO . makeRelativeToCurrentDirectory . toFilePath
         groups          = filter ((> 1) . length) . groupSortOn (FP.takeFileName)
         dupGroups       = (map formatGroup) . groups
-        formatPath path = "- " <> path <> "\n"
-        formatGroup     = concat . (map formatPath)
 
--- | Determine missing extra-deps
+makeRel :: (MonadIO m) => Path Abs File -> m FilePath
+makeRel = liftIO . makeRelativeToCurrentDirectory . toFilePath
+
+formatGroup :: [String] -> String
+formatGroup = concat . (map formatPath)
+    where formatPath path = "- " <> path <> "\n"
+
+reportMissingCabalFiles
+    :: (MonadIO m, MonadLogger m) => [Path Abs File] -> Bool -> m ()
+reportMissingCabalFiles cabalfps includeSubdirs = do
+    allCabalfps <- findCabalFiles (includeSubdirs) =<< getWorkingDir
+
+    relpaths <- mapM makeRel (allCabalfps \\ cabalfps)
+    $logWarn $ "The following packages are missing from the config:"
+    $logWarn $ T.pack (formatGroup relpaths)
+
+-- | Solver can be thought of as a counterpart of init. init creates a
+-- stack.yaml whereas solver verifies or fixes an existing one. It can verify
+-- the dependencies of the packages and determine if any extra-dependecies
+-- outside the snapshots are needed.
+--
+-- TODO Currently solver uses a stack.yaml in the parent chain when there is
+-- no stack.yaml in the current directory. It should instead look for a
+-- stack yaml only in the current directory and suggest init if there is
+-- none available. That will make the behavior consistent with init and provide
+-- a correct meaning to a --ignore-subdirs option if implemented.
+
 solveExtraDeps
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
        , MonadReader env m, HasConfig env , HasEnvConfig env, HasGHCVariant env
@@ -470,8 +493,7 @@ solveExtraDeps modStackYaml = do
     bconfig <- asks getBuildConfig
 
     let stackYaml = bcStackYaml bconfig
-    relStackYaml <- liftIO $ makeRelativeToCurrentDirectory
-                           $ toFilePath stackYaml
+    relStackYaml <- makeRel stackYaml
 
     $logInfo $ "Using configuration file: " <> T.pack relStackYaml
     let cabalDirs = Map.keys $ envConfigPackages econfig
@@ -484,6 +506,10 @@ solveExtraDeps modStackYaml = do
 
     cabalfps  <- liftM concat (mapM (findCabalFiles False) cabalDirs)
     gpds <- cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter
+
+    -- TODO when solver supports --ignore-subdirs option pass that as the
+    -- second argument here.
+    reportMissingCabalFiles cabalfps True
 
     let oldFlags          = bcFlags bconfig
         oldExtraVersions  = bcExtraDeps bconfig
