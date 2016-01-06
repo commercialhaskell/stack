@@ -131,7 +131,7 @@ library
   build-depends:     Cabal >= 1.18.1.5
                    , aeson >= 0.8.0.2 && < 0.11
                    , ansi-terminal >= 0.6.2.3
-                   , async >= 2.0.2
+                   , async >= 2.0.2 && < 2.2
                    , attoparsec >= 0.12.1.5 && < 0.14
                    , base >= 4.7 && <5
                    , base16-bytestring
@@ -307,7 +307,7 @@ test-suite stack-integration-test
 
   build-depends:  base >= 4.7 && < 5
                 , temporary
-                , hspec <2.3
+                , hspec < 2.3
                 , process
                 , filepath
                 , directory
@@ -317,7 +317,7 @@ test-suite stack-integration-test
                 , conduit
                 , conduit-extra
                 , resourcet
-                , async
+                , async < 2.2
                 , transformers
                 , bytestring
   default-language:    Haskell2010
