@@ -163,7 +163,8 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     ["--hpcdir", toFilePathNoTrailingSep hpcRelDir, "--reset-hpcdirs"]
             menv <- getMinimalEnvOverride
             $logInfo $ "Generating " <> report
-            outputLines <- liftM S8.lines $ readProcessStdout Nothing menv "hpc"
+            outputLines <- liftM (map (S8.filter (/= '\r')) . S8.lines) $
+                readProcessStdout Nothing menv "hpc"
                 ( "report"
                 : toFilePath tixSrc
                 : (args ++ extraReportArgs)
@@ -186,7 +187,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     generateHpcErrorReport reportDir (msg True)
                 else do
                     -- Print output, stripping @\r@ characters because Windows.
-                    forM_ outputLines ($logInfo . T.decodeUtf8 . S8.filter (/= '\r'))
+                    forM_ outputLines ($logInfo . T.decodeUtf8)
                     $logInfo
                         ("The " <> report <> " is available at " <>
                          T.pack (toFilePath (reportDir </> $(mkRelFile "hpc_index.html"))))
