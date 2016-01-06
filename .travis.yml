@@ -38,16 +38,16 @@ matrix:
       compiler: ": #stack 7.8.4"
       addons: {apt: {packages: [cabal-install-head,ghc-7.8.4], sources: [hvr-ghc]}}
 
-    - env: BUILD=stack GHCVER=7.10.2 STACK_YAML=stack.yaml
-      compiler: ": #stack 7.10.2"
-      addons: {apt: {packages: [cabal-install-head,ghc-7.10.2], sources: [hvr-ghc]}}
+    - env: BUILD=stack GHCVER=7.10.3 STACK_YAML=stack.yaml
+      compiler: ": #stack 7.10.3"
+      addons: {apt: {packages: [cabal-install-head,ghc-7.10.3], sources: [hvr-ghc]}}
 
     - env: BUILD=cabal CABALVER=head GHCVER=head
       compiler: ": #GHC head"
       addons: {apt: {packages: [cabal-install-head,ghc-head], sources: [hvr-ghc]}}
 
     - env: BUILD=stack STACK_YAML=stack.yaml
-      compiler: ": #stack 7.10.2 osx"
+      compiler: ": #stack 7.10.3 osx"
       os: osx
 
   allow_failures:
