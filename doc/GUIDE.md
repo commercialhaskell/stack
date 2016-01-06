@@ -1801,6 +1801,11 @@ of a program called `main` compiled with the above command, you can run
 `./main +RTS -p`
 
 to generate a `main.prof` file containing the requested profiling information.
+Alternatively, you can use `stack exec main -- +RTS -p`, where `--` allows you
+to specify parameters for `main` executable (without `--` the `stack`
+executable would use those parameters instead).
+
+
 For more commands and uses, see [the official GHC chapter on
 profiling](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/profiling.html),
 [the Haskell wiki](https://wiki.haskell.org/How_to_profile_a_Haskell_program),
