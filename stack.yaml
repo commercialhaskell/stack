@@ -1,10 +1,9 @@
-resolver: lts-3.19
+resolver: lts-4.0
 image:
   containers:
     - base: "fpco/ubuntu-with-libgmp:14.04"
       entrypoints:
         - stack
-
 nix:
   # --nix on the command-line to enable.
   enable: false

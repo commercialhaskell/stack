@@ -1,3 +1,3 @@
-resolver: lts-3.0
+resolver: lts-4.0
 packages:
 - auto-update-0.1.2.1

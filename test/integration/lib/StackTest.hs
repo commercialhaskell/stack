@@ -126,4 +126,4 @@ isWindows = os == "mingw32"
 -- version is released, pass this argument to @stack@ when running in
 -- a global context.  The LTS major version here should match that of
 -- the main @stack.yaml@.
-defaultResolverArg = "--resolver=lts-3"
+defaultResolverArg = "--resolver=lts-4"

@@ -1,4 +1,4 @@
-resolver: lts-3.0
+resolver: lts-4.0
 extra-deps:
 - bytestring-0.10.6.0
 packages:
