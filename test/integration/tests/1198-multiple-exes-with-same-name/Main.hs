@@ -4,8 +4,8 @@ import StackTest
 
 main :: IO ()
 main = do
-    stack ["clean"]
-    stack ["init", "--force"]
+    stack [defaultResolverArg, "clean"]
+    stack [defaultResolverArg, "init", "--force"]
     stackCheckStderr
         ["build", "also-has-exe-foo", "has-exe-foo"]
         (expectMessage buildMessage1)

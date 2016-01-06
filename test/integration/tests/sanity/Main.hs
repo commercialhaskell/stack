@@ -11,4 +11,4 @@ main = do
     stackErr ["build"]
     doesNotExist "stack.yaml"
 
-    stack ["exec", "./foo.bat"]
+    stack [defaultResolverArg, "exec", "./foo.bat"]
