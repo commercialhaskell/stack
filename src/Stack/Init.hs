@@ -199,11 +199,11 @@ getDefaultResolver stackYaml cabalDirs gpds initOpts = do
     result   <- checkResolverSpec gpds Nothing resolver
 
     case result of
-        BuildPlanCheckFail _ _ -> throwM $ ResolverMismatch resolver
         BuildPlanCheckOk flags -> return (resolver, flags, Map.empty)
         BuildPlanCheckPartial flags _
             | needSolver resolver initOpts -> solve (resolver, flags)
             | otherwise -> throwM $ ResolverPartial resolver
+        BuildPlanCheckFail _ _ _ -> throwM $ ResolverMismatch resolver
 
     where
       solve (res, f) = do

@@ -27,7 +27,7 @@ module Stack.BuildPlan
 
 import           Control.Applicative
 import           Control.Exception (assert)
-import           Control.Monad (liftM, forM)
+import           Control.Monad (liftM, forM, when)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -621,9 +621,10 @@ checkBundleBuildPlan platform compiler pool flags gpds =
         dupError _ _ = error "Bug: Duplicate packages are not expected here"
 
 data BuildPlanCheck =
-      BuildPlanCheckFail CompilerVersion DepErrors
-    | BuildPlanCheckOk (Map PackageName (Map FlagName Bool))
+      BuildPlanCheckOk      (Map PackageName (Map FlagName Bool))
     | BuildPlanCheckPartial (Map PackageName (Map FlagName Bool)) DepErrors
+    | BuildPlanCheckFail    (Map PackageName (Map FlagName Bool)) DepErrors
+                            CompilerVersion
 
 -- | Check a set of 'GenericPackageDescription's and a set of flags against a
 -- given snapshot. Returns how well the snapshot satisfies the dependencies of
@@ -651,7 +652,7 @@ checkSnapBuildPlan gpds flags snap = do
     else if Map.null cerrs then do
             return $ BuildPlanCheckPartial f errs
         else
-            return $ BuildPlanCheckFail compiler cerrs
+            return $ BuildPlanCheckFail f cerrs compiler
     where
         compilerErrors compiler errs
             | whichCompiler compiler == Ghc = ghcErrors errs
@@ -683,7 +684,7 @@ selectBestSnapshot gpds snaps = do
             result <- checkSnapBuildPlan gpds Nothing snap
             reportResult result snap
             case result of
-                BuildPlanCheckFail _ _ -> loop bestYet rest
+                BuildPlanCheckFail _ _ _ -> loop bestYet rest
                 BuildPlanCheckOk _ -> return $ Just snap
                 BuildPlanCheckPartial _ e -> do
                     case bestYet of
@@ -699,20 +700,24 @@ selectBestSnapshot gpds snaps = do
             $logInfo $ "* Selected " <> renderSnapName snap
             $logInfo ""
 
-        reportResult (BuildPlanCheckPartial _ errs) snap = do
+        reportResult (BuildPlanCheckPartial f errs) snap = do
             $logWarn $ "* Partially matches " <> renderSnapName snap
-            displayDepErrors errs
+            displayDepErrors f errs
 
-        reportResult (BuildPlanCheckFail compiler errs) snap = do
+        reportResult (BuildPlanCheckFail f errs compiler) snap = do
             $logWarn $ "* Rejected "
                        <> renderSnapName snap
                        <> " due to conflict of compiler ("
                        <> compilerVersionText compiler
                        <> ") packages"
-            displayDepErrors errs
+            displayDepErrors f errs
 
-displayDepErrors :: MonadLogger m => DepErrors -> m ()
-displayDepErrors errs =
+displayDepErrors
+    :: MonadLogger m
+    => Map PackageName (Map FlagName Bool)
+    -> DepErrors
+    -> m ()
+displayDepErrors flags errs =
     F.forM_ (Map.toList errs) $ \(depName, DepError mversion neededBy) -> do
         $logInfo $ T.concat
             [ "    "
@@ -731,7 +736,17 @@ displayDepErrors errs =
             , " requires "
             , T.pack $ display range
             ]
+        F.forM_ (Map.toList neededBy) $ \(user, _) ->
+            maybe (return ()) (printFlags user) (Map.lookup user flags)
         $logInfo ""
+    where
+        printFlags user fl = when (not $ Map.null fl) $
+            $logDebug $ T.concat
+                [ "    - "
+                , T.pack $ packageNameString user
+                , " configured with flags "
+                , T.pack $ (show fl)
+                ]
 
 shadowMiniBuildPlan :: MiniBuildPlan
                     -> Set PackageName

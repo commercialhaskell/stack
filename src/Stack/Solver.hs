@@ -497,12 +497,12 @@ solveExtraDeps modStackYaml = do
 
     resolverResult <- checkResolverSpec gpds (Just oldSrcFlags) resolver
     resultSpecs <- case resolverResult of
-        BuildPlanCheckFail _ _ -> throwM $ ResolverMismatch resolver
         BuildPlanCheckOk flags ->
             return $ Just ((mergeConstraints oldSrcs flags), Map.empty)
         BuildPlanCheckPartial _ _ ->
             solveResolverSpec stackYaml cabalDirs
                               (resolver, srcConstraints, extraConstraints)
+        BuildPlanCheckFail _ _ _ -> throwM $ ResolverMismatch resolver
 
     (srcs, edeps) <- case resultSpecs of
         Nothing -> throwM (SolverGiveUp Nothing)
