@@ -44,6 +44,7 @@ import           Path.Find                   (findFiles)
 import           Path.IO                     (getWorkingDir, parseRelAsAbsDir)
 import           Prelude
 import           Stack.BuildPlan
+import           Stack.Constants             (stackDotYaml)
 import           Stack.Package               (printCabalFileWarning
                                              , readPackageUnresolved)
 import           Stack.Setup
@@ -529,10 +530,11 @@ solveExtraDeps modStackYaml = do
         BuildPlanCheckPartial _ _ ->
             solveResolverSpec stackYaml cabalDirs
                               (resolver, srcConstraints, extraConstraints)
-        BuildPlanCheckFail _ _ _ -> throwM $ ResolverMismatch resolver
+        BuildPlanCheckFail f e c ->
+            throwM $ ResolverMismatch resolver (showCompilerErrors f e c)
 
     (srcs, edeps) <- case resultSpecs of
-        Nothing -> throwM (SolverGiveUp Nothing)
+        Nothing -> throwM (SolverGiveUp giveUpMsg)
         Just x -> return x
 
     let
@@ -578,15 +580,18 @@ solveExtraDeps modStackYaml = do
         $logInfo $ "No changes needed to " <> T.pack relStackYaml
 
     where
+        indent t = T.unlines $ fmap ("    " <>) (T.lines t)
+
         printFlags fl msg = do
             when ((not . Map.null) fl) $ do
                 $logInfo $ T.pack msg
-                $logInfo $ decodeUtf8 $ Yaml.encode $ object ["flags" .= fl]
+                $logInfo $ indent $ decodeUtf8 $ Yaml.encode
+                                  $ object ["flags" .= fl]
 
         printDeps deps msg = do
             when ((not . Map.null) deps) $ do
                 $logInfo $ T.pack msg
-                $logInfo $ decodeUtf8 $ Yaml.encode $ object $
+                $logInfo $ indent $ decodeUtf8 $ Yaml.encode $ object $
                         [("extra-deps" .= map fromTuple (Map.toList deps))]
 
         writeStackYaml path res deps fl = do
@@ -601,3 +606,11 @@ solveExtraDeps modStackYaml = do
                   $ HashMap.insert ("flags" :: Text) (toJSON fl)
                   $ HashMap.insert ("resolver" :: Text) (toJSON (resolverName res)) obj
             liftIO $ Yaml.encodeFile fp obj'
+
+        giveUpMsg = concat
+            [ "    - Update external packages with 'stack update' and try again.\n"
+            , "    - Tweak " <> toFilePath stackDotYaml <> " and try again\n"
+            , "        - Remove any unnecessary packages.\n"
+            , "        - Add any missing remote packages.\n"
+            , "        - Add extra dependencies to guide solver.\n"
+            ]

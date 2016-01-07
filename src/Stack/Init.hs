@@ -198,11 +198,13 @@ getDefaultResolver stackYaml cabalDirs gpds initOpts = do
     result   <- checkResolverSpec gpds Nothing resolver
 
     case result of
-        BuildPlanCheckOk flags -> return (resolver, flags, Map.empty)
-        BuildPlanCheckPartial flags _
-            | needSolver resolver initOpts -> solve (resolver, flags)
-            | otherwise -> throwM $ ResolverPartial resolver
-        BuildPlanCheckFail _ _ _ -> throwM $ ResolverMismatch resolver
+        BuildPlanCheckOk f-> return (resolver, f, Map.empty)
+        BuildPlanCheckPartial f e
+            | needSolver resolver initOpts -> solve (resolver, f)
+            | otherwise ->
+                throwM $ ResolverPartial resolver (showDepErrors f e)
+        BuildPlanCheckFail f e c ->
+            throwM $ ResolverMismatch resolver (showCompilerErrors f e c)
 
     where
       solve (res, f) = do
@@ -218,23 +220,30 @@ getDefaultResolver stackYaml cabalDirs gpds initOpts = do
                                \plan.\nProceeding to create a config with an \
                                \incomplete plan anyway..."
                       return (res, f, Map.empty)
-                  | otherwise -> do
-                      let footer = "Use '--force' to create "
-                                   <> toFilePath stackDotYaml <>
-                                   " with an incomplete build plan anyway."
-                      throwM (SolverGiveUp $ Just footer)
+                  | otherwise -> throwM (SolverGiveUp giveUpMsg)
+
+      giveUpMsg = concat
+          [ "    - Use '--ignore-subdirs' to skip packages in subdirectories.\n"
+          , "    - Update external packages with 'stack update' and try again.\n"
+          , "    - Use '--force' to create an initial "
+          , toFilePath stackDotYaml <> ", tweak it and run 'stack solver':\n"
+          , "        - Remove any unnecessary packages.\n"
+          , "        - Add any missing remote packages.\n"
+          , "        - Add extra dependencies to guide solver.\n"
+          ]
 
       -- TODO support selecting best across regular and custom snapshots
       getResolver (MethodSnapshot snapPref)  = selectSnapResolver snapPref
       getResolver (MethodResolver aresolver) = makeConcreteResolver aresolver
 
-      selectSnapResolver snapPref =
-          getSnapshots'
-          >>= maybe (throwM NoMatchingSnapshot)
-                    (getRecommendedSnapshots snapPref)
-          >>= selectBestSnapshot gpds
-          >>= maybe (throwM NoMatchingSnapshot)
-                    (return . ResolverSnapshot)
+      selectSnapResolver snapPref = do
+          msnaps <- getSnapshots'
+          snaps <- maybe (error "No snapshots to select from.")
+                         (getRecommendedSnapshots snapPref)
+                         msnaps
+          selectBestSnapshot gpds snaps
+            >>= maybe (throwM (NoMatchingSnapshot snaps))
+                      (return . ResolverSnapshot)
 
       needSolver _ (InitOpts {useSolver = True}) = True
       needSolver (ResolverCompiler _)  _ = True

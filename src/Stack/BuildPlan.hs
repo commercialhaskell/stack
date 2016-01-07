@@ -23,12 +23,14 @@ module Stack.BuildPlan
     , ToolMap
     , getToolMap
     , shadowMiniBuildPlan
+    , showCompilerErrors
+    , showDepErrors
     , parseCustomMiniBuildPlan
     ) where
 
 import           Control.Applicative
 import           Control.Exception (assert)
-import           Control.Monad (liftM, forM, when)
+import           Control.Monad (liftM, forM)
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -726,26 +728,50 @@ selectBestSnapshot gpds snaps = do
 
         reportResult (BuildPlanCheckPartial f errs) snap = do
             $logWarn $ "* Partially matches " <> renderSnapName snap
-            displayDepErrors f errs
+            $logWarn $ indent $ showDepErrors f errs
 
         reportResult (BuildPlanCheckFail f errs compiler) snap = do
-            $logWarn $ "* Rejected "
-                       <> renderSnapName snap
-                       <> " due to conflict of compiler ("
-                       <> compilerVersionText compiler
-                       <> ") packages"
-            displayDepErrors f errs
+            $logWarn $ "* Rejected " <> renderSnapName snap
+            $logWarn $ indent $ showCompilerErrors f errs compiler
 
-displayDepErrors
-    :: MonadLogger m
-    => Map PackageName (Map FlagName Bool)
+        indent t = T.unlines $ fmap ("    " <>) (T.lines t)
+
+showCompilerErrors
+    :: Map PackageName (Map FlagName Bool)
     -> DepErrors
-    -> m ()
-displayDepErrors flags errs =
-    F.forM_ (Map.toList errs) $ \(depName, DepError mversion neededBy) -> do
-        $logInfo $ T.concat
-            [ "    "
-            , T.pack $ packageNameString depName
+    -> CompilerVersion
+    -> Text
+showCompilerErrors flags errs compiler =
+    -- TODO print the package filename to enable quick mapping for the user
+    T.concat
+        [ compilerVersionText compiler
+        , " cannot be used for these packages:\n"
+        , T.concat (map formatError (Map.toList errs))
+        , showDepErrors flags errs -- TODO only in debug mode
+        ]
+    where
+        formatError (_, DepError _ neededBy) = T.concat $
+            map formatItem (Map.toList neededBy)
+
+        formatItem (user, _) = T.concat
+            [ "    - "
+            , T.pack $ packageNameString user
+            , "\n"
+            ]
+
+showDepErrors :: Map PackageName (Map FlagName Bool) -> DepErrors -> Text
+showDepErrors flags errs =
+    T.concat $ map formatError (Map.toList errs)
+    where
+        formatError (depName, DepError mversion neededBy) = T.concat
+            [ showDepVersion depName mversion
+            , T.concat (map showRequirement (Map.toList neededBy))
+            -- TODO only in debug
+            , T.concat (map showFlags (Map.toList neededBy))
+            ]
+
+        showDepVersion depName mversion = T.concat
+            [ T.pack $ packageNameString depName
             , case mversion of
                 Nothing -> " not found"
                 Just version -> T.concat
@@ -753,24 +779,33 @@ displayDepErrors flags errs =
                     , T.pack $ versionString version
                     , " found"
                     ]
+            , "\n"
             ]
-        F.forM_ (Map.toList neededBy) $ \(user, range) -> $logInfo $ T.concat
+
+        showRequirement (user, range) = T.concat
             [ "    - "
             , T.pack $ packageNameString user
             , " requires "
             , T.pack $ display range
+            , "\n"
             ]
-        F.forM_ (Map.toList neededBy) $ \(user, _) ->
-            maybe (return ()) (printFlags user) (Map.lookup user flags)
-        $logInfo ""
-    where
-        printFlags user fl = when (not $ Map.null fl) $
-            $logDebug $ T.concat
-                [ "    - "
-                , T.pack $ packageNameString user
-                , " configured with flags "
-                , T.pack $ (show fl)
-                ]
+
+        showFlags (user, _) =
+            maybe "" (printFlags user) (Map.lookup user flags)
+
+        printFlags user fl =
+            if (not $ Map.null fl) then
+                T.concat
+                    [ "    - "
+                    , T.pack $ packageNameString user
+                    , " flags: "
+                    , T.pack $ intercalate ", "
+                             $ map formatFlags (Map.toList fl)
+                    , "\n"
+                    ]
+            else ""
+
+        formatFlags (f, v) = (show f) ++ " = " ++ (show v)
 
 shadowMiniBuildPlan :: MiniBuildPlan
                     -> Set PackageName

@@ -70,7 +70,6 @@ import           GHC.Generics
 import           Path (Path, Abs, File, Dir, mkRelDir, toFilePath, parseRelDir, (</>))
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Prelude
-import           Stack.Constants (stackDotYaml)
 import           Stack.Types.FlagName
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Compiler
@@ -121,7 +120,7 @@ data StackBuildException
   | InvalidFlagSpecification (Set UnusedFlags)
   | TargetParseException [Text]
   | DuplicateLocalPackageNames [(PackageName, [Path Abs Dir])]
-  | SolverGiveUp (Maybe String)
+  | SolverGiveUp String
   | SolverMissingCabalInstall
   | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
   deriving Typeable
@@ -322,18 +321,10 @@ instance Show StackBuildException where
             : (packageNameString name ++ " used in:")
             : map goDir dirs
         goDir dir = "- " ++ toFilePath dir
-    show (SolverGiveUp footer) = concat
-        [ "\nSolver could not resolve package dependencies. "
-        , "You can:\n"
-        , "- Use 'stack update' to update the package index and try again.\n"
-        , "- Add some extra dependencies in " <> toFilePath stackDotYaml
-        , " and then use 'stack solver' to figure out the rest.\n"
-        , "- Add any missed local or remote source package required to "
-        , "build your package.\n"
-        , "- Remove any unnecessary packages which may be causing dependency "
-        , "issues.\n"
-        , "- Use '--ignore-subdirs' to ignore packages in subdirectories.\n"
-        , maybe "" (("\n" <>) . id) footer
+    show (SolverGiveUp msg) = concat
+        [ "\nSolver could not resolve package dependencies.\n"
+        , "You can try the following:\n"
+        , msg
         ]
     show SolverMissingCabalInstall = unlines
         [ "Solver requires that cabal be on your PATH"

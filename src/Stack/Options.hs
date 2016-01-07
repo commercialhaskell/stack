@@ -675,7 +675,8 @@ initOptsParser =
     ignoreSubDirs = switch (long "ignore-subdirs" <>
                            help "Do not search for .cabal files in sub directories")
     overwrite = switch (long "force" <>
-                       help "Force overwriting of an existing stack.yaml if it exists")
+                       help "Force overwriting an existing stack.yaml or \
+                            \creating a stack.yaml with incomplete config.")
     solver = switch (long "solver" <>
              help "Use a dependency solver to determine extra dependencies")
 

@@ -1074,9 +1074,9 @@ data ConfigException
   | NoProjectConfigFound (Path Abs Dir) (Maybe Text)
   | UnexpectedTarballContents [Path Abs Dir] [Path Abs File]
   | BadStackVersionException VersionRange
-  | NoMatchingSnapshot
-  | ResolverMismatch Resolver
-  | ResolverPartial Resolver
+  | NoMatchingSnapshot [SnapName]
+  | ResolverMismatch Resolver Text
+  | ResolverPartial Resolver Text
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
   deriving Typeable
@@ -1116,23 +1116,30 @@ instance Show ConfigException where
         ,"version range specified in stack.yaml ("
         , T.unpack (versionRangeText requiredRange)
         , ")." ]
-    show NoMatchingSnapshot = concat
-        [ "No snapshot is 'compiler compatible' with the package "
-        , "constraints specified in your .cabal files.\n"
+    show (NoMatchingSnapshot names) = concat
+        [ "None of the following snapshots provides a compiler matching "
+        , "your package(s):\n"
+        , unlines $ map (\name -> "    - " <> T.unpack (renderSnapName name))
+                        names
+        , "\nYou can try the following options:\n"
+        , "    - Exclude mismatching package(s) and build the rest.\n"
+        , "        - Use '--ignore-subdirs' to exclude subdirectories.\n"
+        , "        - Manually create a config, then use 'stack solver'\n"
+        , "    - Use '--resolver' to specify a matching snapshot/resolver\n"
+        , "    - Use a custom snapshot having the right compiler.\n"
         ]
-    show (ResolverMismatch resolver) = concat
+    show (ResolverMismatch resolver errDesc) = concat
         [ "Selected resolver '"
         , T.unpack (resolverName resolver)
-        , "' is not 'compiler compatible' with the package "
-        , "constraints specified in your .cabal files.\n"
+        , "' does not have a matching compiler to build your package(s).\n"
+        , T.unpack errDesc
         ]
-    show (ResolverPartial resolver) = concat
-        [ "Resolver '"
+    show (ResolverPartial resolver errDesc) = concat
+        [ "Selected resolver '"
         , T.unpack (resolverName resolver)
-        , "' does not satisfy all the package "
-        , "requirements and constraints specified in your .cabal files.\n\n"
-        , "However, you can use the '--solver' command line switch to resolve "
-        , "the constraints using external packages."
+        , "' does not have all the packages to match your requirements.\n"
+        , T.unpack $ T.unlines $ fmap ("    " <>) (T.lines errDesc)
+        , "\nHowever, you can try '--solver' to use external packages."
         ]
     show (NoSuchDirectory dir) = concat
         ["No directory could be located matching the supplied path: "
