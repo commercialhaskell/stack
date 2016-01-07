@@ -198,13 +198,12 @@ getDefaultResolver stackYaml cabalDirs gpds initOpts = do
     result   <- checkResolverSpec gpds Nothing resolver
 
     case result of
-        BuildPlanCheckOk f-> return (resolver, f, Map.empty)
-        BuildPlanCheckPartial f e
+        BuildPlanCheckOk f -> return (resolver, f, Map.empty)
+        (BuildPlanCheckPartial f _)
             | needSolver resolver initOpts -> solve (resolver, f)
-            | otherwise ->
-                throwM $ ResolverPartial resolver (showDepErrors f e)
-        BuildPlanCheckFail f e c ->
-            throwM $ ResolverMismatch resolver (showCompilerErrors f e c)
+            | otherwise -> throwM $ ResolverPartial resolver (show result)
+        (BuildPlanCheckFail _ _ _) ->
+            throwM $ ResolverMismatch resolver (show result)
 
     where
       solve (res, f) = do
@@ -257,6 +256,7 @@ getRecommendedSnapshots pref snapshots = do
     -- Get the most recent LTS and Nightly in the snapshots directory and
     -- prefer them over anything else, since odds are high that something
     -- already exists for them.
+    -- TODO Include all major compiler versions available
     existing <-
         liftM (sortBy (flip compare) . mapMaybe (parseSnapName . T.pack)) $
         snapshotsDir >>=

@@ -536,8 +536,8 @@ solveExtraDeps modStackYaml = do
         BuildPlanCheckPartial _ _ ->
             solveResolverSpec stackYaml cabalDirs
                               (resolver, srcConstraints, extraConstraints)
-        BuildPlanCheckFail f e c ->
-            throwM $ ResolverMismatch resolver (showCompilerErrors f e c)
+        (BuildPlanCheckFail _ _ _) ->
+            throwM $ ResolverMismatch resolver (show resolverResult)
 
     (srcs, edeps) <- case resultSpecs of
         Nothing -> throwM (SolverGiveUp giveUpMsg)

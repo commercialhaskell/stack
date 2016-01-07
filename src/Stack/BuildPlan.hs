@@ -23,8 +23,6 @@ module Stack.BuildPlan
     , ToolMap
     , getToolMap
     , shadowMiniBuildPlan
-    , showCompilerErrors
-    , showDepErrors
     , parseCustomMiniBuildPlan
     ) where
 
@@ -652,6 +650,11 @@ data BuildPlanCheck =
     | BuildPlanCheckFail    (Map PackageName (Map FlagName Bool)) DepErrors
                             CompilerVersion
 
+instance Show BuildPlanCheck where
+    show (BuildPlanCheckOk _) = ""
+    show (BuildPlanCheckPartial f e)  = T.unpack $ showDepErrors f e
+    show (BuildPlanCheckFail f e c) = T.unpack $ showCompilerErrors f e c
+
 -- | Check a set of 'GenericPackageDescription's and a set of flags against a
 -- given snapshot. Returns how well the snapshot satisfies the dependencies of
 -- the packages.
@@ -726,13 +729,13 @@ selectBestSnapshot gpds snaps = do
             $logInfo $ "* Selected " <> renderSnapName snap
             $logInfo ""
 
-        reportResult (BuildPlanCheckPartial f errs) snap = do
+        reportResult r@(BuildPlanCheckPartial _ _) snap = do
             $logWarn $ "* Partially matches " <> renderSnapName snap
-            $logWarn $ indent $ showDepErrors f errs
+            $logWarn $ indent $ T.pack $ show r
 
-        reportResult (BuildPlanCheckFail f errs compiler) snap = do
+        reportResult r@(BuildPlanCheckFail _ _ _) snap = do
             $logWarn $ "* Rejected " <> renderSnapName snap
-            $logWarn $ indent $ showCompilerErrors f errs compiler
+            $logWarn $ indent $ T.pack $ show r
 
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 

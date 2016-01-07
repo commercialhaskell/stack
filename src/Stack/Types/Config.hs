@@ -1076,8 +1076,8 @@ data ConfigException
   | UnexpectedTarballContents [Path Abs Dir] [Path Abs File]
   | BadStackVersionException VersionRange
   | NoMatchingSnapshot [SnapName]
-  | ResolverMismatch Resolver Text
-  | ResolverPartial Resolver Text
+  | ResolverMismatch Resolver String
+  | ResolverPartial Resolver String
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
   deriving Typeable
@@ -1133,13 +1133,13 @@ instance Show ConfigException where
         [ "Selected resolver '"
         , T.unpack (resolverName resolver)
         , "' does not have a matching compiler to build your package(s).\n"
-        , T.unpack errDesc
+        , errDesc
         ]
     show (ResolverPartial resolver errDesc) = concat
         [ "Selected resolver '"
         , T.unpack (resolverName resolver)
         , "' does not have all the packages to match your requirements.\n"
-        , T.unpack $ T.unlines $ fmap ("    " <>) (T.lines errDesc)
+        , unlines $ fmap ("    " <>) (lines errDesc)
         , "\nHowever, you can try '--solver' to use external packages."
         ]
     show (NoSuchDirectory dir) = concat
