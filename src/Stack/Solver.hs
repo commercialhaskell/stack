@@ -303,10 +303,14 @@ solveResolverSpec
     => Path Abs File  -- ^ stack.yaml file location
     -> [Path Abs Dir] -- ^ package dirs containing cabal files
     -> ( Resolver
-       , ConstraintSpec -- ^ src package constraints
-       , ConstraintSpec) -- ^ extra dependency constraints
-    -> m (Maybe ( ConstraintSpec -- ^ resulting src package specs
-                , ConstraintSpec)) -- ^ resulting external package specs
+       , ConstraintSpec
+       , ConstraintSpec) -- ^ ( resolver
+                         --   , src package constraints
+                         --   , extra dependency constraints )
+    -> m (Maybe ( ConstraintSpec
+                , ConstraintSpec)) -- ^ ( resulting src package specs
+                                   --   ,  resulting external package specs )
+
 solveResolverSpec stackYaml cabalDirs
                   (resolver, srcConstraints, extraConstraints) = do
     $logInfo $ "Using resolver: " <> resolverName resolver
