@@ -357,7 +357,7 @@ is an example (replace `custom` if you prefer a different name for your derived
 container):
 
     # On host
-    $ stack  --docker-persist --docker-container-name=temp docker exec bash
+    $ stack  --docker-persist --docker-container-name=temp exec --plain bash
 
     # In container, make changes to OS
     $ sudo apt-get install r-cran-numderiv
