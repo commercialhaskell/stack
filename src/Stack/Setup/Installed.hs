@@ -152,7 +152,7 @@ data ExtraDirs = ExtraDirs
     { edBins :: ![FilePath]
     , edInclude :: ![FilePath]
     , edLib :: ![FilePath]
-    }
+    } deriving (Show)
 instance Monoid ExtraDirs where
     mempty = ExtraDirs [] [] []
     mappend (ExtraDirs a b c) (ExtraDirs x y z) = ExtraDirs

@@ -670,20 +670,18 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
 
 initOptsParser :: Parser InitOpts
 initOptsParser =
-    InitOpts <$> method <*> overwrite <*> fmap not ignoreSubDirs
+    InitOpts <$> method <*> solver <*> overwrite <*> fmap not ignoreSubDirs
   where
     ignoreSubDirs = switch (long "ignore-subdirs" <>
                            help "Do not search for .cabal files in sub directories")
     overwrite = switch (long "force" <>
-                       help "Force overwriting of an existing stack.yaml if it exists")
-    method = solver
-         <|> (MethodResolver <$> resolver)
-         <|> (MethodSnapshot <$> snapPref)
+                       help "Force overwriting an existing stack.yaml or \
+                            \creating a stack.yaml with incomplete config.")
+    solver = switch (long "solver" <>
+             help "Use a dependency solver to determine extra dependencies")
 
-    solver =
-        flag' MethodSolver
-            (long "solver" <>
-             help "Use a dependency solver to determine dependencies")
+    method = (MethodResolver <$> resolver)
+         <|> (MethodSnapshot <$> snapPref)
 
     snapPref =
         flag' PrefLTS
@@ -697,7 +695,7 @@ initOptsParser =
     resolver = option readAbstractResolver
         (long "resolver" <>
          metavar "RESOLVER" <>
-         help "Use the given resolver, even if not all dependencies are met")
+         help "Use the specified resolver")
 
 -- | Parser for a logging level.
 logLevelOptsParser :: Bool -> Maybe LogLevel -> Parser (Maybe LogLevel)
@@ -786,8 +784,8 @@ ghcVariantParser hide =
 -- | Parser for @solverCmd@
 solverOptsParser :: Parser Bool
 solverOptsParser = boolFlags False
-    "modify-stack-yaml"
-    "Automatically modify stack.yaml with the solver's recommendations"
+    "update-config"
+    "Automatically update stack.yaml with the solver's recommendations"
     idm
 
 -- | Parser for test arguments.

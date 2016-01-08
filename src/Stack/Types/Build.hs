@@ -120,9 +120,8 @@ data StackBuildException
   | InvalidFlagSpecification (Set UnusedFlags)
   | TargetParseException [Text]
   | DuplicateLocalPackageNames [(PackageName, [Path Abs Dir])]
+  | SolverGiveUp String
   | SolverMissingCabalInstall
-  | SolverMissingGHC
-  | SolverNoCabalFiles
   | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
   deriving Typeable
 
@@ -322,17 +321,14 @@ instance Show StackBuildException where
             : (packageNameString name ++ " used in:")
             : map goDir dirs
         goDir dir = "- " ++ toFilePath dir
+    show (SolverGiveUp msg) = concat
+        [ "\nSolver could not resolve package dependencies.\n"
+        , "You can try the following:\n"
+        , msg
+        ]
     show SolverMissingCabalInstall = unlines
         [ "Solver requires that cabal be on your PATH"
         , "Try running 'stack install cabal-install'"
-        ]
-    show SolverMissingGHC = unlines
-        [ "Solver requires that GHC be on your PATH"
-        , "Try running 'stack setup'"
-        ]
-    show SolverNoCabalFiles = unlines
-        [ "No cabal files provided.  Maybe this is due to not having a stack.yaml file?"
-        , "Try running 'stack init' to create a stack.yaml"
         ]
     show (SomeTargetsNotBuildable xs) =
         "The following components have 'buildable: False' set in the cabal configuration, and so cannot be targets:\n    " ++

@@ -10,17 +10,21 @@
 -- snapshot.
 
 module Stack.BuildPlan
-    ( BuildPlanException (..)
+    ( gpdPackages
+    , BuildPlanException (..)
+    , BuildPlanCheck (..)
+    , checkSnapBuildPlan
     , MiniBuildPlan(..)
     , MiniPackageInfo(..)
-    , Snapshots (..)
-    , getSnapshots
     , loadMiniBuildPlan
+    , removeSrcPkgDefaultFlags
     , resolveBuildPlan
-    , findBuildPlan
+    , selectBestSnapshot
     , ToolMap
     , getToolMap
     , shadowMiniBuildPlan
+    , showCompilerErrors
+    , showDepErrors
     , parseCustomMiniBuildPlan
     ) where
 
@@ -35,7 +39,7 @@ import           Control.Monad.State.Strict      (State, execState, get, modify,
                                                   put)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Crypto.Hash.SHA256 as SHA256
-import           Data.Aeson.Extended (FromJSON (..), withObject, withText, (.:), (.:?), (.!=))
+import           Data.Aeson.Extended (FromJSON (..), withObject, (.:), (.:?), (.!=))
 import           Data.Binary.VersionTagged (taggedDecodeOrLoad)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Base16 as B16
@@ -43,20 +47,17 @@ import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import           Data.Either (partitionEithers)
 import qualified Data.Foldable as F
-import qualified Data.HashMap.Strict as HM
-import           Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
+import qualified Data.HashSet as HashSet
 import           Data.List (intercalate)
 import           Data.Map (Map)
 import qualified Data.Map as Map
-import           Data.Maybe (fromMaybe, mapMaybe)
+import           Data.Maybe (fromJust, fromMaybe, mapMaybe)
 import           Data.Monoid
 import           Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
-import           Data.Time (Day)
 import qualified Data.Traversable as Tr
 import           Data.Typeable (Typeable)
 import           Data.Yaml (decodeEither', decodeFileEither)
@@ -64,6 +65,7 @@ import           Distribution.PackageDescription (GenericPackageDescription,
                                                   flagDefault, flagManual,
                                                   flagName, genPackageFlags,
                                                   executables, exeName, library, libBuildInfo, buildable)
+import           Distribution.System (Platform)
 import qualified Distribution.Package as C
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Version as C
@@ -392,39 +394,6 @@ getToolMap mbp =
       $ Set.toList
       $ mpiExes mpi
 
--- | Download the 'Snapshots' value from stackage.org.
-getSnapshots :: (MonadThrow m, MonadIO m, MonadReader env m, HasHttpManager env, HasStackRoot env, HasConfig env)
-             => m Snapshots
-getSnapshots = askLatestSnapshotUrl >>= parseUrl . T.unpack >>= downloadJSON
-
--- | Most recent Nightly and newest LTS version per major release.
-data Snapshots = Snapshots
-    { snapshotsNightly :: !Day
-    , snapshotsLts     :: !(IntMap Int)
-    }
-    deriving Show
-instance FromJSON Snapshots where
-    parseJSON = withObject "Snapshots" $ \o -> Snapshots
-        <$> (o .: "nightly" >>= parseNightly)
-        <*> (fmap IntMap.unions
-                $ mapM (parseLTS . snd)
-                $ filter (isLTS . fst)
-                $ HM.toList o)
-      where
-        parseNightly t =
-            case parseSnapName t of
-                Left e -> fail $ show e
-                Right (LTS _ _) -> fail "Unexpected LTS value"
-                Right (Nightly d) -> return d
-
-        isLTS = ("lts-" `T.isPrefixOf`)
-
-        parseLTS = withText "LTS" $ \t ->
-            case parseSnapName t of
-                Left e -> fail $ show e
-                Right (LTS x y) -> return $ IntMap.singleton x y
-                Right (Nightly _) -> fail "Unexpected nightly value"
-
 -- | Load up a 'MiniBuildPlan', preferably from cache
 loadMiniBuildPlan
     :: (MonadIO m, MonadThrow m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m, MonadCatch m)
@@ -494,67 +463,136 @@ loadBuildPlan name = do
     handle404 (Status 404 _) _ _ = Just $ SomeException $ SnapshotNotFound name
     handle404 _ _ _              = Nothing
 
--- | Find the set of @FlagName@s necessary to get the given
--- @GenericPackageDescription@ to compile against the given @BuildPlan@. Will
--- only modify non-manual flags, and will prefer default values for flags.
--- Returns @Nothing@ if no combination exists.
-checkBuildPlan :: (MonadLogger m, MonadThrow m, MonadIO m, MonadReader env m, HasConfig env, MonadCatch m)
-               => Map PackageName Version -- ^ locally available packages
-               -> MiniBuildPlan
-               -> GenericPackageDescription
-               -> m (Either DepErrors (Map PackageName (Map FlagName Bool)))
-checkBuildPlan locals mbp gpd = do
-    platform <- asks (configPlatform . getConfig)
-    return $ loop platform flagOptions
-  where
-    packages = Map.union locals $ fmap mpiVersion $ mbpPackages mbp
-    loop _ [] = assert False $ Left Map.empty
-    loop platform (flags:rest)
-        | Map.null errs = Right $
-            if Map.null flags
-                then Map.empty
-                else Map.singleton (packageName pkg) flags
-        | null rest = Left errs
-        | otherwise = loop platform rest
-      where
-        errs = checkDeps (packageName pkg) (packageDeps pkg) packages
-        pkg = resolvePackage pkgConfig gpd
+gpdPackages :: [GenericPackageDescription] -> Map PackageName Version
+gpdPackages gpds = Map.fromList $
+            map (fromCabalIdent . C.package . C.packageDescription) gpds
+    where
+        fromCabalIdent (C.PackageIdentifier name version) =
+            (fromCabalPackageName name, fromCabalVersion version)
+
+gpdPackageName :: GenericPackageDescription -> PackageName
+gpdPackageName = fromCabalPackageName
+    . C.pkgName
+    . C.package
+    . C.packageDescription
+
+gpdPackageDeps
+    :: GenericPackageDescription
+    -> CompilerVersion
+    -> Platform
+    -> Map FlagName Bool
+    -> Map PackageName VersionRange
+gpdPackageDeps gpd cv platform flags =
+    Map.filterWithKey (const . (/= name)) (packageDependencies pkgDesc)
+    where
+        name = gpdPackageName gpd
+        pkgDesc = resolvePackageDescription pkgConfig gpd
         pkgConfig = PackageConfig
             { packageConfigEnableTests = True
             , packageConfigEnableBenchmarks = True
             , packageConfigFlags = flags
-            , packageConfigCompilerVersion = compilerVersion
+            , packageConfigCompilerVersion = cv
             , packageConfigPlatform = platform
             }
 
-    compilerVersion = mbpCompilerVersion mbp
+-- Remove any src package flags having default values
+-- Remove any package entries with no flags set
+removeSrcPkgDefaultFlags :: [C.GenericPackageDescription]
+                         -> Map PackageName (Map FlagName Bool)
+                         -> Map PackageName (Map FlagName Bool)
+removeSrcPkgDefaultFlags gpds flags =
+    let defaults = Map.unions (map gpdDefaultFlags gpds)
+        flags'   = Map.differenceWith removeSame flags defaults
+    in  Map.filter (not . Map.null) flags'
+    where
+        removeSame f1 f2 =
+            let diff v v' = if v == v' then Nothing else Just v
+            in Just $ Map.differenceWith diff f1 f2
 
-    flagName' = fromCabalFlagName . flagName
+        gpdDefaultFlags gpd =
+            let tuples = map getDefault (C.genPackageFlags gpd)
+            in Map.singleton (gpdPackageName gpd) (Map.fromList tuples)
 
-    -- Avoid exponential complexity in flag combinations making us sad pandas.
-    -- See: https://github.com/commercialhaskell/stack/issues/543
-    maxFlagOptions = 128
+        flagName' = fromCabalFlagName . C.flagName
+        getDefault f
+            | C.flagDefault f = (flagName' f, True)
+            | otherwise       = (flagName' f, False)
 
-    flagOptions = take maxFlagOptions $ map Map.fromList $ mapM getOptions $ genPackageFlags gpd
-    getOptions f
-        | flagManual f = [(flagName' f, flagDefault f)]
-        | flagDefault f =
-            [ (flagName' f, True)
-            , (flagName' f, False)
-            ]
-        | otherwise =
-            [ (flagName' f, False)
-            , (flagName' f, True)
-            ]
+-- | Find the set of @FlagName@s necessary to get the given
+-- @GenericPackageDescription@ to compile against the given @BuildPlan@. Will
+-- only modify non-manual flags, and will prefer default values for flags.
+-- Returns the plan which produces least number of dep errors
+selectPackageBuildPlan
+    :: Platform
+    -> CompilerVersion
+    -> Map PackageName Version
+    -> GenericPackageDescription
+    -> (Map PackageName (Map FlagName Bool), DepErrors)
+selectPackageBuildPlan platform compiler pool gpd =
+    fromJust (go flagOptions Nothing)
+    where
+        go :: [Map FlagName Bool] -> Maybe (Map PackageName (Map FlagName Bool), DepErrors) -> Maybe (Map PackageName (Map FlagName Bool), DepErrors)
+        -- impossible
+        go [] Nothing = assert False Nothing
+        -- last
+        go [] (Just plan) = Just plan
+        -- got the best possible result
+        go _ (Just plan) | Map.null (snd plan) = Just plan
+        -- initial
+        go (flags:rest) Nothing = go rest $ Just (nextPlan flags)
+        -- keep looking for better results
+        go (flags:rest) (Just plan) =
+          go rest $ Just (betterPlan plan (nextPlan flags))
+
+        nextPlan flags = checkPackageBuildPlan platform compiler pool flags gpd
+
+        betterPlan (f1, e1) (f2, e2)
+          | (Map.size e1) <= (Map.size e2) = (f1, e1)
+          | otherwise = (f2, e2)
+
+        flagName' = fromCabalFlagName . flagName
+
+        -- Avoid exponential complexity in flag combinations making us sad pandas.
+        -- See: https://github.com/commercialhaskell/stack/issues/543
+        maxFlagOptions = 128
+
+        flagOptions :: [Map FlagName Bool]
+        flagOptions = take maxFlagOptions $ map Map.fromList $ mapM getOptions $ genPackageFlags gpd
+        getOptions f
+            | flagManual f = [(flagName' f, flagDefault f)]
+            | flagDefault f =
+                [ (flagName' f, True)
+                , (flagName' f, False)
+                ]
+            | otherwise =
+                [ (flagName' f, False)
+                , (flagName' f, True)
+                ]
+
+-- | Check whether with the given set of flags a package's dependency
+-- constraints can be satisfied against a given build plan or pool of packages.
+checkPackageBuildPlan
+    :: Platform
+    -> CompilerVersion
+    -> Map PackageName Version
+    -> Map FlagName Bool
+    -> GenericPackageDescription
+    -> (Map PackageName (Map FlagName Bool), DepErrors)
+checkPackageBuildPlan platform compiler pool flags gpd =
+    (Map.singleton pkg flags, errs)
+    where
+        pkg         = gpdPackageName gpd
+        errs        = checkPackageDeps pkg constraints pool
+        constraints = gpdPackageDeps gpd compiler platform flags
 
 -- | Checks if the given package dependencies can be satisfied by the given set
 -- of packages. Will fail if a package is either missing or has a version
 -- outside of the version range.
-checkDeps :: PackageName -- ^ package using dependencies, for constructing DepErrors
-          -> Map PackageName VersionRange
-          -> Map PackageName Version
+checkPackageDeps :: PackageName -- ^ package using dependencies, for constructing DepErrors
+          -> Map PackageName VersionRange -- ^ dependency constraints
+          -> Map PackageName Version -- ^ Available package pool or index
           -> DepErrors
-checkDeps myName deps packages =
+checkPackageDeps myName deps packages =
     Map.unionsWith mappend $ map go $ Map.toList deps
   where
     go :: (PackageName, VersionRange) -> DepErrors
@@ -575,47 +613,165 @@ type DepErrors = Map PackageName DepError
 data DepError = DepError
     { deVersion :: !(Maybe Version)
     , deNeededBy :: !(Map PackageName VersionRange)
-    }
+    } deriving Show
 instance Monoid DepError where
     mempty = DepError Nothing Map.empty
     mappend (DepError a x) (DepError b y) = DepError
         (maybe a Just b)
         (Map.unionWith C.intersectVersionRanges x y)
 
--- | Find a snapshot and set of flags that is compatible with the given
--- 'GenericPackageDescription'. Returns 'Nothing' if no such snapshot is found.
-findBuildPlan :: (MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m, HasHttpManager env, HasConfig env, HasGHCVariant env, MonadBaseControl IO m)
-              => [GenericPackageDescription]
-              -> [SnapName]
-              -> m (Maybe (SnapName, Map PackageName (Map FlagName Bool)))
-findBuildPlan gpds0 =
-    loop
-  where
-    loop [] = return Nothing
-    loop (name:names') = do
-        mbp <- loadMiniBuildPlan name
-        $logInfo $ "Checking against build plan " <> renderSnapName name
-        res <- mapM (checkBuildPlan localNames mbp) gpds0
-        case partitionEithers res of
-            ([], flags) -> return $ Just (name, Map.unions flags)
-            (errs, _) -> do
-                $logInfo ""
-                $logInfo "* Build plan did not match your requirements:"
-                displayDepErrors $ Map.unionsWith mappend errs
-                $logInfo ""
-                loop names'
+-- | Given a bundle of packages (a list of @GenericPackageDescriptions@'s) to
+-- build and an available package pool (snapshot) check whether the bundle's
+-- dependencies can be satisfied. If flags is passed as Nothing flag settings
+-- will be chosen automatically.
+checkBundleBuildPlan
+    :: Platform
+    -> CompilerVersion
+    -> Map PackageName Version
+    -> Maybe (Map PackageName (Map FlagName Bool))
+    -> [GenericPackageDescription]
+    -> (Map PackageName (Map FlagName Bool), DepErrors)
+checkBundleBuildPlan platform compiler pool flags gpds =
+    (Map.unionsWith dupError (map fst plans)
+    , Map.unionsWith mappend (map snd plans))
 
-    localNames = Map.fromList $ map (fromCabalIdent . C.package . C.packageDescription) gpds0
+    where
+        plans = map (pkgPlan flags) gpds
+        pkgPlan Nothing gpd =
+            selectPackageBuildPlan platform compiler pool' gpd
+        pkgPlan (Just f) gpd =
+            checkPackageBuildPlan platform compiler pool' (flags' f gpd) gpd
+        flags' f gpd = maybe Map.empty id (Map.lookup (gpdPackageName gpd) f)
+        pool' = Map.union (gpdPackages gpds) pool
 
-    fromCabalIdent (C.PackageIdentifier name version) =
-        (fromCabalPackageName name, fromCabalVersion version)
+        dupError _ _ = error "Bug: Duplicate packages are not expected here"
 
-displayDepErrors :: MonadLogger m => DepErrors -> m ()
-displayDepErrors errs =
-    F.forM_ (Map.toList errs) $ \(depName, DepError mversion neededBy) -> do
-        $logInfo $ T.concat
-            [ "    "
-            , T.pack $ packageNameString depName
+data BuildPlanCheck =
+      BuildPlanCheckOk      (Map PackageName (Map FlagName Bool))
+    | BuildPlanCheckPartial (Map PackageName (Map FlagName Bool)) DepErrors
+    | BuildPlanCheckFail    (Map PackageName (Map FlagName Bool)) DepErrors
+                            CompilerVersion
+
+-- | Check a set of 'GenericPackageDescription's and a set of flags against a
+-- given snapshot. Returns how well the snapshot satisfies the dependencies of
+-- the packages.
+checkSnapBuildPlan
+    :: ( MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m
+       , HasHttpManager env, HasConfig env, HasGHCVariant env
+       , MonadBaseControl IO m)
+    => [GenericPackageDescription]
+    -> Maybe (Map PackageName (Map FlagName Bool))
+    -> SnapName
+    -> m BuildPlanCheck
+checkSnapBuildPlan gpds flags snap = do
+    platform <- asks (configPlatform . getConfig)
+    mbp <- loadMiniBuildPlan snap
+
+    let
+        compiler = mbpCompilerVersion mbp
+        snapPkgs = fmap mpiVersion $ mbpPackages mbp
+        (f, errs) = checkBundleBuildPlan platform compiler snapPkgs flags gpds
+        cerrs = compilerErrors compiler errs
+
+    if Map.null errs then
+        return $ BuildPlanCheckOk f
+    else if Map.null cerrs then do
+            return $ BuildPlanCheckPartial f errs
+        else
+            return $ BuildPlanCheckFail f cerrs compiler
+    where
+        compilerErrors compiler errs
+            | whichCompiler compiler == Ghc = ghcErrors errs
+            -- FIXME not sure how to handle ghcjs boot packages
+            | otherwise = Map.empty
+
+        isGhcWiredIn p _ = p `HashSet.member` wiredInPackages
+        ghcErrors = Map.filterWithKey isGhcWiredIn
+
+-- | Find a snapshot and set of flags that is compatible with and matches as
+-- best as possible with the given 'GenericPackageDescription's. Returns
+-- 'Nothing' if no such snapshot is found.
+selectBestSnapshot
+    :: ( MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m
+       , HasHttpManager env, HasConfig env, HasGHCVariant env
+       , MonadBaseControl IO m)
+    => [GenericPackageDescription]
+    -> [SnapName]
+    -> m (Maybe SnapName)
+selectBestSnapshot gpds snaps = do
+    $logInfo $ "Selecting the best among "
+               <> T.pack (show (length snaps))
+               <> " snapshots...\n"
+    loop Nothing snaps
+    where
+        loop Nothing [] = return Nothing
+        loop (Just (snap, _)) [] = return $ Just snap
+        loop bestYet (snap:rest) = do
+            result <- checkSnapBuildPlan gpds Nothing snap
+            reportResult result snap
+            case result of
+                BuildPlanCheckFail _ _ _ -> loop bestYet rest
+                BuildPlanCheckOk _ -> return $ Just snap
+                BuildPlanCheckPartial _ e -> do
+                    case bestYet of
+                        Nothing -> loop (Just (snap, e)) rest
+                        Just prev ->
+                            loop (Just (betterSnap prev (snap, e))) rest
+
+        betterSnap (s1, e1) (s2, e2)
+          | (Map.size e1) <= (Map.size e2) = (s1, e1)
+          | otherwise = (s2, e2)
+
+        reportResult (BuildPlanCheckOk _) snap = do
+            $logInfo $ "* Selected " <> renderSnapName snap
+            $logInfo ""
+
+        reportResult (BuildPlanCheckPartial f errs) snap = do
+            $logWarn $ "* Partially matches " <> renderSnapName snap
+            $logWarn $ indent $ showDepErrors f errs
+
+        reportResult (BuildPlanCheckFail f errs compiler) snap = do
+            $logWarn $ "* Rejected " <> renderSnapName snap
+            $logWarn $ indent $ showCompilerErrors f errs compiler
+
+        indent t = T.unlines $ fmap ("    " <>) (T.lines t)
+
+showCompilerErrors
+    :: Map PackageName (Map FlagName Bool)
+    -> DepErrors
+    -> CompilerVersion
+    -> Text
+showCompilerErrors flags errs compiler =
+    -- TODO print the package filename to enable quick mapping for the user
+    T.concat
+        [ compilerVersionText compiler
+        , " cannot be used for these packages:\n"
+        , T.concat (map formatError (Map.toList errs))
+        , showDepErrors flags errs -- TODO only in debug mode
+        ]
+    where
+        formatError (_, DepError _ neededBy) = T.concat $
+            map formatItem (Map.toList neededBy)
+
+        formatItem (user, _) = T.concat
+            [ "    - "
+            , T.pack $ packageNameString user
+            , "\n"
+            ]
+
+showDepErrors :: Map PackageName (Map FlagName Bool) -> DepErrors -> Text
+showDepErrors flags errs =
+    T.concat $ map formatError (Map.toList errs)
+    where
+        formatError (depName, DepError mversion neededBy) = T.concat
+            [ showDepVersion depName mversion
+            , T.concat (map showRequirement (Map.toList neededBy))
+            -- TODO only in debug
+            , T.concat (map showFlags (Map.toList neededBy))
+            ]
+
+        showDepVersion depName mversion = T.concat
+            [ T.pack $ packageNameString depName
             , case mversion of
                 Nothing -> " not found"
                 Just version -> T.concat
@@ -623,14 +779,33 @@ displayDepErrors errs =
                     , T.pack $ versionString version
                     , " found"
                     ]
+            , "\n"
             ]
-        F.forM_ (Map.toList neededBy) $ \(user, range) -> $logInfo $ T.concat
+
+        showRequirement (user, range) = T.concat
             [ "    - "
             , T.pack $ packageNameString user
             , " requires "
             , T.pack $ display range
+            , "\n"
             ]
-        $logInfo ""
+
+        showFlags (user, _) =
+            maybe "" (printFlags user) (Map.lookup user flags)
+
+        printFlags user fl =
+            if (not $ Map.null fl) then
+                T.concat
+                    [ "    - "
+                    , T.pack $ packageNameString user
+                    , " flags: "
+                    , T.pack $ intercalate ", "
+                             $ map formatFlags (Map.toList fl)
+                    , "\n"
+                    ]
+            else ""
+
+        formatFlags (f, v) = (show f) ++ " = " ++ (show v)
 
 shadowMiniBuildPlan :: MiniBuildPlan
                     -> Set PackageName

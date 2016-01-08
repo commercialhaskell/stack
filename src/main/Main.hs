@@ -1166,23 +1166,30 @@ loadConfigWithOpts go@GlobalOpts{..} = do
         return lc
     return (manager,lc)
 
--- | Project initialization
-initCmd :: InitOpts -> GlobalOpts -> IO ()
-initCmd initOpts go =
-    withConfigAndLock go $
-    do pwd <- getWorkingDir
+withMiniConfigAndLock
+    :: GlobalOpts
+    -> StackT MiniConfig (StackT Config IO) ()
+    -> IO ()
+withMiniConfigAndLock go inner =
+    withConfigAndLock go $ do
        config <- asks getConfig
        miniConfig <- loadMiniConfig config
-       runReaderT (initProject pwd initOpts) miniConfig
+       manager <- asks getHttpManager
+       runStackTGlobal manager miniConfig go inner
+
+-- | Project initialization
+initCmd :: InitOpts -> GlobalOpts -> IO ()
+initCmd initOpts go = do
+    pwd <- getWorkingDir
+    withMiniConfigAndLock go (initProject pwd initOpts)
 
 -- | Create a project directory structure and initialize the stack config.
 newCmd :: (NewOpts,InitOpts) -> GlobalOpts -> IO ()
-newCmd (newOpts,initOpts) go@GlobalOpts{..} =
-    withConfigAndLock go $
-    do dir <- new newOpts
-       config <- asks getConfig
-       miniConfig <- loadMiniConfig config
-       runReaderT (initProject dir initOpts) miniConfig
+newCmd (newOpts,initOpts) go@GlobalOpts{..} = do
+    withMiniConfigAndLock go $ do
+        dir <- new newOpts
+        initProject dir initOpts
+
 
 -- | List the available templates.
 templatesCmd :: () -> GlobalOpts -> IO ()

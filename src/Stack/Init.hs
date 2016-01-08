@@ -3,96 +3,89 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TemplateHaskell       #-}
 module Stack.Init
-    ( findCabalFiles
-    , initProject
+    ( initProject
     , InitOpts (..)
     , SnapPref (..)
     , Method (..)
-    , makeConcreteResolver
-    , tryDeprecatedPath
-    , getImplicitGlobalProjectDir
     ) where
 
 import           Control.Exception               (assert)
 import           Control.Exception.Enclosed      (catchAny, handleIO)
-import           Control.Monad                   (liftM, when, zipWithM_)
-import           Control.Monad.Catch             (MonadMask, MonadThrow, throwM)
+import           Control.Monad                   (liftM, when)
+import           Control.Monad.Catch             (MonadMask, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader            (MonadReader, asks)
+import           Control.Monad.Reader            (MonadReader)
 import           Control.Monad.Trans.Control     (MonadBaseControl)
 import qualified Data.ByteString.Builder         as B
 import qualified Data.ByteString.Lazy            as L
 import qualified Data.HashMap.Strict             as HM
 import qualified Data.IntMap                     as IntMap
 import qualified Data.Foldable                   as F
-import           Data.List                       (isSuffixOf,sortBy)
+import           Data.List                       (sortBy)
 import           Data.List.Extra                 (nubOrd)
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
 import           Data.Maybe                      (mapMaybe)
 import           Data.Monoid
-import           Data.Set                        (Set)
-import qualified Data.Set                        as Set
 import qualified Data.Text                       as T
 import qualified Data.Yaml                       as Yaml
 import qualified Distribution.PackageDescription as C
 import           Network.HTTP.Client.Conduit     (HasHttpManager)
 import           Path
-import           Path.Find
 import           Path.IO
 import           Stack.BuildPlan
 import           Stack.Constants
-import           Stack.Package
 import           Stack.Solver
 import           Stack.Types
-import           System.Directory                (getDirectoryContents)
-
-findCabalFiles :: MonadIO m => Bool -> Path Abs Dir -> m [Path Abs File]
-findCabalFiles recurse dir =
-    liftIO $ findFiles dir isCabal (\subdir -> recurse && not (isIgnored subdir))
-  where
-    isCabal path = ".cabal" `isSuffixOf` toFilePath path
-
-    isIgnored path = toFilePath (dirname path) `Set.member` ignoredDirs
-
--- | Special directories that we don't want to traverse for .cabal files
-ignoredDirs :: Set FilePath
-ignoredDirs = Set.fromList
-    [ ".git"
-    , "dist"
-    , ".stack-work"
-    ]
+import           Stack.Types.Internal            ( HasTerminal, HasReExec
+                                                 , HasLogLevel)
+import           System.Directory                ( getDirectoryContents
+                                                 , makeRelativeToCurrentDirectory)
+import           Stack.Config                    ( getSnapshots
+                                                 , makeConcreteResolver)
 
 -- | Generate stack.yaml
-initProject :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, HasGHCVariant env, MonadLogger m, MonadBaseControl IO m)
-            => Path Abs Dir
-            -> InitOpts
-            -> m ()
+initProject
+    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
+       , MonadReader env m, HasConfig env , HasGHCVariant env
+       , HasHttpManager env , HasLogLevel env , HasReExec env
+       , HasTerminal env)
+    => Path Abs Dir
+    -> InitOpts
+    -> m ()
 initProject currDir initOpts = do
     let dest = currDir </> stackDotYaml
         dest' = toFilePath dest
+
+    reldest <- liftIO $ makeRelativeToCurrentDirectory dest'
+
     exists <- fileExists dest
-    when (not (forceOverwrite initOpts) && exists) $
-      error ("Refusing to overwrite existing stack.yaml, " <>
-             "please delete before running stack init " <>
-             "or if you are sure use \"--force\"")
+    when (not (forceOverwrite initOpts) && exists) $ do
+        error ("Stack configuration file " <> reldest <>
+               " exists, use 'stack solver' to fix the existing config file or \
+               \'--force' to overwrite it.")
+
+    let noPkgMsg =  "In order to init, you should have an existing .cabal \
+                    \file. Please try \"stack new\" instead."
+
+        dupPkgFooter = "You have the following options:\n"
+            <> "- Use '--ignore-subdirs' command line switch to ignore "
+            <> "packages in subdirectories. You can init subdirectories as "
+            <> "independent projects.\n"
+            <> "- Put selected packages in the stack config file "
+            <> "and then use 'stack solver' command to automatically resolve "
+            <> "dependencies and update the config file."
 
     cabalfps <- findCabalFiles (includeSubDirs initOpts) currDir
-    $logInfo $ "Writing default config file to: " <> T.pack dest'
-    $logInfo $ "Basing on cabal files:"
-    mapM_ (\path -> $logInfo $ "- " <> T.pack (toFilePath path)) cabalfps
-    $logInfo ""
+    gpds <- cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter
 
-    when (null cabalfps) $ error "In order to init, you should have an existing .cabal file. Please try \"stack new\" instead"
-    (warnings,gpds) <- fmap unzip (mapM readPackageUnresolved cabalfps)
-    zipWithM_ (mapM_ . printCabalFileWarning) cabalfps warnings
-
-    (r, flags, extraDeps) <- getDefaultResolver cabalfps gpds initOpts
+    (r, flags, extraDeps) <-
+        getDefaultResolver dest (map parent cabalfps) gpds initOpts
     let p = Project
             { projectPackages = pkgs
             , projectExtraDeps = extraDeps
-            , projectFlags = flags
+            , projectFlags = removeSrcPkgDefaultFlags gpds flags
             , projectResolver = r
             , projectCompiler = Nothing
             , projectExtraPackageDBs = []
@@ -109,9 +102,14 @@ initProject currDir initOpts = do
                     Just rel -> toFilePath rel
             , peSubdirs = []
             }
-    $logInfo $ "Selected resolver: " <> resolverName r
+
+    $logInfo $ "Initialising configuration using resolver: " <> resolverName r
+    $logInfo $
+        (if exists then "Overwriting existing configuration file: "
+         else "Writing configuration to file: ")
+        <> T.pack reldest
     liftIO $ L.writeFile dest' $ B.toLazyByteString $ renderStackYaml p
-    $logInfo $ "Wrote project config to: " <> T.pack dest'
+    $logInfo "All done."
 
 -- | Render a stack.yaml file with comments, see:
 -- https://github.com/commercialhaskell/stack/issues/226
@@ -183,48 +181,79 @@ getSnapshots' =
         return Nothing
 
 -- | Get the default resolver value
-getDefaultResolver :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, HasGHCVariant env, MonadLogger m, MonadBaseControl IO m)
-                   => [Path Abs File] -- ^ cabal files
-                   -> [C.GenericPackageDescription] -- ^ cabal descriptions
-                   -> InitOpts
-                   -> m (Resolver, Map PackageName (Map FlagName Bool), Map PackageName Version)
-getDefaultResolver cabalfps gpds initOpts =
-    case ioMethod initOpts of
-        MethodSnapshot snapPref -> do
-            msnapshots <- getSnapshots'
-            names <-
-                case msnapshots of
-                    Nothing -> return []
-                    Just snapshots -> getRecommendedSnapshots snapshots snapPref
-            mpair <- findBuildPlan gpds names
-            case mpair of
-                Just (snap, flags) ->
-                    return (ResolverSnapshot snap, flags, Map.empty)
-                Nothing -> throwM $ NoMatchingSnapshot names
-        MethodResolver aresolver -> do
-            resolver <- makeConcreteResolver aresolver
-            mpair <-
-                case resolver of
-                    ResolverSnapshot name -> findBuildPlan gpds [name]
-                    ResolverCompiler _ -> return Nothing
-                    ResolverCustom _ _ -> return Nothing
-            case mpair of
-                Just (snap, flags) ->
-                    return (ResolverSnapshot snap, flags, Map.empty)
-                Nothing -> return (resolver, Map.empty, Map.empty)
-        MethodSolver -> do
-            (compilerVersion, extraDeps) <- cabalSolver Ghc (map parent cabalfps) Map.empty Map.empty []
-            return
-                ( ResolverCompiler compilerVersion
-                , Map.filter (not . Map.null) $ fmap snd extraDeps
-                , fmap fst extraDeps
-                )
+getDefaultResolver
+    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
+       , MonadReader env m, HasConfig env , HasGHCVariant env
+       , HasHttpManager env , HasLogLevel env , HasReExec env
+       , HasTerminal env)
+    => Path Abs File   -- ^ stack.yaml
+    -> [Path Abs Dir]  -- ^ cabal dirs
+    -> [C.GenericPackageDescription] -- ^ cabal descriptions
+    -> InitOpts
+    -> m ( Resolver
+         , Map PackageName (Map FlagName Bool)
+         , Map PackageName Version)
+getDefaultResolver stackYaml cabalDirs gpds initOpts = do
+    resolver <- getResolver (ioMethod initOpts)
+    result   <- checkResolverSpec gpds Nothing resolver
+
+    case result of
+        BuildPlanCheckOk f-> return (resolver, f, Map.empty)
+        BuildPlanCheckPartial f e
+            | needSolver resolver initOpts -> solve (resolver, f)
+            | otherwise ->
+                throwM $ ResolverPartial resolver (showDepErrors f e)
+        BuildPlanCheckFail f e c ->
+            throwM $ ResolverMismatch resolver (showCompilerErrors f e c)
+
+    where
+      solve (res, f) = do
+          let srcConstraints = mergeConstraints (gpdPackages gpds) f
+          mresolver <- solveResolverSpec stackYaml cabalDirs
+                                         (res, srcConstraints, Map.empty)
+          case mresolver of
+              Just (src, ext) -> do
+                  return (res, fmap snd (Map.union src ext), fmap fst ext)
+              Nothing
+                  | forceOverwrite initOpts -> do
+                      $logWarn "\nSolver could not arrive at a workable build \
+                               \plan.\nProceeding to create a config with an \
+                               \incomplete plan anyway..."
+                      return (res, f, Map.empty)
+                  | otherwise -> throwM (SolverGiveUp giveUpMsg)
+
+      giveUpMsg = concat
+          [ "    - Use '--ignore-subdirs' to skip packages in subdirectories.\n"
+          , "    - Update external packages with 'stack update' and try again.\n"
+          , "    - Use '--force' to create an initial "
+          , toFilePath stackDotYaml <> ", tweak it and run 'stack solver':\n"
+          , "        - Remove any unnecessary packages.\n"
+          , "        - Add any missing remote packages.\n"
+          , "        - Add extra dependencies to guide solver.\n"
+          ]
+
+      -- TODO support selecting best across regular and custom snapshots
+      getResolver (MethodSnapshot snapPref)  = selectSnapResolver snapPref
+      getResolver (MethodResolver aresolver) = makeConcreteResolver aresolver
+
+      selectSnapResolver snapPref = do
+          msnaps <- getSnapshots'
+          snaps <- maybe (error "No snapshots to select from.")
+                         (getRecommendedSnapshots snapPref)
+                         msnaps
+          selectBestSnapshot gpds snaps
+            >>= maybe (throwM (NoMatchingSnapshot snaps))
+                      (return . ResolverSnapshot)
+
+      needSolver _ (InitOpts {useSolver = True}) = True
+      needSolver (ResolverCompiler _)  _ = True
+      needSolver _ _ = False
 
 getRecommendedSnapshots :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, HasGHCVariant env, MonadLogger m, MonadBaseControl IO m)
-                        => Snapshots
-                        -> SnapPref
+                        => SnapPref
+                        -> Snapshots
                         -> m [SnapName]
-getRecommendedSnapshots snapshots pref = do
+getRecommendedSnapshots pref snapshots = do
     -- Get the most recent LTS and Nightly in the snapshots directory and
     -- prefer them over anything else, since odds are high that something
     -- already exists for them.
@@ -256,6 +285,8 @@ getRecommendedSnapshots snapshots pref = do
 
 data InitOpts = InitOpts
     { ioMethod       :: !Method
+    -- ^ Use solver
+    , useSolver :: Bool
     -- ^ Preferred snapshots
     , forceOverwrite :: Bool
     -- ^ Overwrite existing files
@@ -266,80 +297,4 @@ data InitOpts = InitOpts
 data SnapPref = PrefNone | PrefLTS | PrefNightly
 
 -- | Method of initializing
-data Method = MethodSnapshot SnapPref | MethodResolver AbstractResolver | MethodSolver
-
--- | Turn an 'AbstractResolver' into a 'Resolver'.
-makeConcreteResolver :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m, HasHttpManager env, MonadLogger m)
-                     => AbstractResolver
-                     -> m Resolver
-makeConcreteResolver (ARResolver r) = return r
-makeConcreteResolver ar = do
-    snapshots <- getSnapshots
-    r <-
-        case ar of
-            ARResolver r -> assert False $ return r
-            ARGlobal -> do
-                config <- asks getConfig
-                implicitGlobalDir <- getImplicitGlobalProjectDir config
-                let fp = implicitGlobalDir </> stackDotYaml
-                (ProjectAndConfigMonoid project _, _warnings) <-
-                    liftIO (Yaml.decodeFileEither $ toFilePath fp)
-                    >>= either throwM return
-                return $ projectResolver project
-            ARLatestNightly -> return $ ResolverSnapshot $ Nightly $ snapshotsNightly snapshots
-            ARLatestLTSMajor x ->
-                case IntMap.lookup x $ snapshotsLts snapshots of
-                    Nothing -> error $ "No LTS release found with major version " ++ show x
-                    Just y -> return $ ResolverSnapshot $ LTS x y
-            ARLatestLTS
-                | IntMap.null $ snapshotsLts snapshots -> error "No LTS releases found"
-                | otherwise ->
-                    let (x, y) = IntMap.findMax $ snapshotsLts snapshots
-                     in return $ ResolverSnapshot $ LTS x y
-    $logInfo $ "Selected resolver: " <> resolverName r
-    return r
-
--- | Get the location of the implicit global project directory.
--- If the directory already exists at the deprecated location, its location is returned.
--- Otherwise, the new location is returned.
-getImplicitGlobalProjectDir
-    :: (MonadIO m, MonadLogger m)
-    => Config -> m (Path Abs Dir)
-getImplicitGlobalProjectDir config =
-    --TEST no warning printed
-    liftM fst $ tryDeprecatedPath
-        Nothing
-        dirExists
-        (implicitGlobalProjectDir stackRoot)
-        (implicitGlobalProjectDirDeprecated stackRoot)
-  where
-    stackRoot = configStackRoot config
-
--- | If deprecated path exists, use it and print a warning.
--- Otherwise, return the new path.
-tryDeprecatedPath
-    :: (MonadIO m, MonadLogger m)
-    => Maybe T.Text -- ^ Description of file for warning (if Nothing, no deprecation warning is displayed)
-    -> (Path Abs a -> m Bool) -- ^ Test for existence
-    -> Path Abs a -- ^ New path
-    -> Path Abs a -- ^ Deprecated path
-    -> m (Path Abs a, Bool) -- ^ (Path to use, whether it already exists)
-tryDeprecatedPath mWarningDesc exists new old = do
-    newExists <- exists new
-    if newExists
-        then return (new, True)
-        else do
-            oldExists <- exists old
-            if oldExists
-                then do
-                    case mWarningDesc of
-                        Nothing -> return ()
-                        Just desc ->
-                            $logWarn $ T.concat
-                                [ "Warning: Location of ", desc, " at '"
-                                , T.pack (toFilePath old)
-                                , "' is deprecated; rename it to '"
-                                , T.pack (toFilePath new)
-                                , "' instead" ]
-                    return (old, True)
-                else return (new, False)
+data Method = MethodSnapshot SnapPref | MethodResolver AbstractResolver

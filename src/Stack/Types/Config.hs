@@ -1075,6 +1075,8 @@ data ConfigException
   | UnexpectedTarballContents [Path Abs Dir] [Path Abs File]
   | BadStackVersionException VersionRange
   | NoMatchingSnapshot [SnapName]
+  | ResolverMismatch Resolver Text
+  | ResolverPartial Resolver Text
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
   deriving Typeable
@@ -1115,16 +1117,29 @@ instance Show ConfigException where
         , T.unpack (versionRangeText requiredRange)
         , ")." ]
     show (NoMatchingSnapshot names) = concat
-        [ "There was no snapshot found that matched the package "
-        , "bounds in your .cabal files.\n"
-        , "Please choose one of the following commands to get started.\n\n"
-        , unlines $ map
-            (\name -> "    stack init --resolver " ++ T.unpack (renderSnapName name))
-            names
-        , "\nYou'll then need to add some extra-deps. See:\n\n"
-        , "    http://docs.haskellstack.org/en/stable/yaml_configuration.html#extra-deps"
-        , "\n\nYou can also try falling back to a dependency solver with:\n\n"
-        , "    stack init --solver"
+        [ "None of the following snapshots provides a compiler matching "
+        , "your package(s):\n"
+        , unlines $ map (\name -> "    - " <> T.unpack (renderSnapName name))
+                        names
+        , "\nYou can try the following options:\n"
+        , "    - Exclude mismatching package(s) and build the rest.\n"
+        , "        - Use '--ignore-subdirs' to exclude subdirectories.\n"
+        , "        - Manually create a config, then use 'stack solver'\n"
+        , "    - Use '--resolver' to specify a matching snapshot/resolver\n"
+        , "    - Use a custom snapshot having the right compiler.\n"
+        ]
+    show (ResolverMismatch resolver errDesc) = concat
+        [ "Selected resolver '"
+        , T.unpack (resolverName resolver)
+        , "' does not have a matching compiler to build your package(s).\n"
+        , T.unpack errDesc
+        ]
+    show (ResolverPartial resolver errDesc) = concat
+        [ "Selected resolver '"
+        , T.unpack (resolverName resolver)
+        , "' does not have all the packages to match your requirements.\n"
+        , T.unpack $ T.unlines $ fmap ("    " <>) (T.lines errDesc)
+        , "\nHowever, you can try '--solver' to use external packages."
         ]
     show (NoSuchDirectory dir) = concat
         ["No directory could be located matching the supplied path: "
