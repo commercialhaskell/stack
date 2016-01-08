@@ -338,7 +338,7 @@ and publish port 3000.
 If you do want to do all your work, including editing, in the container, it
 might be better to use a persistent container in which you can install Ubuntu
 packages. You could get that by running something like `stack
---docker-container-name=NAME --docker-persist docker exec bash`. This
+--docker-container-name=NAME --docker-persist exec --plain bash`. This
 means when the container exits, it won't be deleted. You can then restart it
 using `docker start -a -i NAME`. It's also possible to detach from a container
 while it continues running in the background using by pressing Ctrl-P Ctrl-Q,
