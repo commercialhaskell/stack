@@ -104,16 +104,18 @@ cabalSolver menv cabalfps constraintType
                fmap toFilePath cabalfps
 
     catch (liftM Just (readProcessStdout (Just tmpdir) menv "cabal" args))
-          (\e@(ReadProcessException _ _ _ err) -> do
-              let errMsg = decodeUtf8With lenientDecode err
-              if LT.isInfixOf "Could not resolve dependencies" errMsg
-              then do
-                  $logInfo "Attempt failed."
-                  $logInfo "\n>>>> Cabal errors begin"
-                  $logInfo $ LT.toStrict errMsg
-                             <> "<<<< Cabal errors end\n"
-                  return Nothing
-              else throwM e)
+          (\ex -> case ex of
+              ReadProcessException _ _ _ err -> do
+                  let errMsg = decodeUtf8With lenientDecode err
+                  if LT.isInfixOf "Could not resolve dependencies" errMsg
+                  then do
+                      $logInfo "Attempt failed."
+                      $logInfo "\n>>>> Cabal errors begin"
+                      $logInfo $ LT.toStrict errMsg
+                                 <> "<<<< Cabal errors end\n"
+                      return Nothing
+                  else throwM ex
+              _ -> throwM ex)
     >>= maybe (return Nothing) parseCabalOutput
 
   where
