@@ -909,8 +909,8 @@ instance FromJSON ImageConfig where
   parseJSON v =
     do o <- parseJSON v
        ImageConfig
-         <$> o .:? "Env" .!= []
-         <*> o .:? "Entrypoint" .!= []
+         <$> fmap join (o .:? "Env") .!= []
+         <*> fmap join (o .:? "Entrypoint") .!= []
 
 -- | Exceptions thrown by Stack.Docker.
 data StackDockerException
