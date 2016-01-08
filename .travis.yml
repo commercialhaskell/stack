@@ -88,6 +88,7 @@ script:
        cabal configure --enable-tests --enable-benchmarks -v2 --ghc-options="-O0 -Werror";
        cabal build;
        cabal test;
+       cabal haddock;
        cabal check;
        cabal sdist;
        cabal copy;
