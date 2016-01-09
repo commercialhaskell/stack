@@ -5,7 +5,8 @@
 module Path.Find
   (findFileUp
   ,findDirUp
-  ,findFiles)
+  ,findFiles
+  ,findInParents)
   where
 
 import Control.Monad
@@ -66,3 +67,16 @@ findFiles dir p traversep =
                   then findFiles entry p traversep
                   else return [])
      return (concat (filter p files : subResults))
+
+-- | @findInParents f path@ applies @f@ to @path@ and its 'parent's until
+-- it finds a 'Just' or reaches the root directory.
+findInParents :: MonadIO m => (Path Abs Dir -> m (Maybe a)) -> Path Abs Dir -> m (Maybe a)
+findInParents f path = do
+    mres <- f path
+    case mres of
+        Just res -> return (Just res)
+        Nothing -> do
+            let next = parent path
+            if next == path
+                then return Nothing
+                else findInParents f next
