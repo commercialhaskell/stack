@@ -152,7 +152,7 @@ library
                    , edit-distance >= 0.2
                    , either
                    , enclosed-exceptions
-                   , errors
+                   , errors < 2.2
                    , exceptions >= 0.8.0.2
                    , extra
                    , fast-logger >= 2.3.1

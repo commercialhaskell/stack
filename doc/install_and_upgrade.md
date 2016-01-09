@@ -73,6 +73,11 @@ brew install haskell-stack
 Note: the Homebrew formula and bottles lag slightly behind new Stack releases,
 but tend to be updated within a day or two.
 
+Normally, Homebrew will install from a pre-built binary (aka "pour from a
+bottle"), but if `brew` starts trying to build everything from source (which
+will take hours), see
+[their FAQ on the topic](https://github.com/Homebrew/homebrew/blob/master/share/doc/homebrew/FAQ.md#why-do-you-compile-everything).
+
 ### Manual download
 
 * Download the latest release:
@@ -135,10 +140,6 @@ Yosemite and Mavericks as well, and may also work on older versions (YMMV).
       * Debian 7 (amd64)
 
             echo 'deb http://download.fpcomplete.com/debian wheezy main'|sudo tee /etc/apt/sources.list.d/fpco.list
-
-        Note: The official GHC >7.10.3 bindists do not support Debian 7, so
-        `stack setup` will not work on Debian 7 with GHC >7.10.3.  We will drop
-        support for Debian 7 once GHC 8.0 is released.
 
     For unstable Debian distributions, the package from the most recent stable
     release will usually work. If it doesn't, please
