@@ -145,7 +145,7 @@ in your `stack.yaml` will do the same.
 
 ## Command-line options
 
-The configuration present in your `stack.yaml` can be overriden on the
+The configuration present in your `stack.yaml` can be overridden on the
 command-line. See `stack --nix-help` for a list of all Nix options.
 
 ## Configuration
