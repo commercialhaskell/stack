@@ -41,6 +41,13 @@ flag disable-git-info
   -- should otherwise be avoided
   -- see: https://github.com/commercialhaskell/stack/issues/1425
 
+flag static
+  manual: True
+  default: False
+  description: Pass -static/-pthread to ghc when linking the stack binary.
+  -- Not intended for general use. Simply makes it easier to
+  -- build a fully static binary on Linux platforms that enable it.
+
 library
   hs-source-dirs:    src/
   ghc-options:       -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
@@ -218,6 +225,8 @@ executable stack
   main-is:        Main.hs
   ghc-options:    -threaded -rtsopts -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
   other-modules:  Paths_stack
+  if flag(static)
+      ld-options: -static -pthread
 
   build-depends:  base >=4.7 && < 5
                 , bytestring >= 0.10.4.0
