@@ -46,6 +46,7 @@ import           System.Directory               (getModificationTime)
 import qualified System.FilePath                as FP
 import           System.IO.Error                (isDoesNotExistError)
 import           System.Process.Read
+import qualified Web.Browser (openBrowser)
 
 -- | Determine whether we should haddock for a package.
 shouldHaddockPackage :: BuildOpts
@@ -87,6 +88,9 @@ generateLocalHaddockIndex envOverride wc bco localDumpPkgs locals = do
         dumpPackages
         "."
         (localDocDir bco)
+
+    when (boptsOpenHaddock (bcoBuildOpts bco)) $
+        liftIO $ void $ Web.Browser.openBrowser (toFilePath (haddockIndexFile (localDocDir bco)))
 
 -- | Generate Haddock index and contents for local packages and their dependencies.
 generateDepsHaddockIndex

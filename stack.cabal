@@ -202,6 +202,7 @@ library
                    , zlib >= 0.5.4.2 && < 0.7
                    , deepseq >= 1.4
                    , file-embed
+                   , open-browser >= 0.2
                    , word8
                    , hastache
                    , project-template >= 0.2

@@ -9,3 +9,6 @@ nix:
   enable: false
   packages:
     - zlib
+
+extra-deps:
+  - open-browser-0.2.1.0

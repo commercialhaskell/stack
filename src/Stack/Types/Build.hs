@@ -422,6 +422,8 @@ data BuildOpts =
             ,boptsExeProfile :: !Bool
             ,boptsHaddock :: !Bool
             -- ^ Build haddocks?
+            ,boptsOpenHaddock :: !Bool
+            -- ^ Open local haddocks on the browser?
             ,boptsHaddockDeps :: !(Maybe Bool)
             -- ^ Build haddocks for dependencies?
             ,boptsDryrun :: !Bool
@@ -465,6 +467,7 @@ defaultBuildOpts = BuildOpts
     , boptsLibProfile = False
     , boptsExeProfile = False
     , boptsHaddock = False
+    , boptsOpenHaddock = False
     , boptsHaddockDeps = Nothing
     , boptsDryrun = False
     , boptsGhcOptions = []
