@@ -25,19 +25,21 @@ import Path
 import System.Console.ANSI
 import System.Exit
 import System.FSNotify
-import System.IO (stdout, stderr)
+import System.IO (Handle, stdout, stderr, hPutStrLn)
 
 -- | Print an exception to stderr
 printExceptionStderr :: Exception e => e -> IO ()
 printExceptionStderr e =
     L.hPut stderr $ toLazyByteString $ fromShow e <> copyByteString "\n"
 
-fileWatch :: ((Set (Path Abs File) -> IO ()) -> IO ())
+fileWatch :: Handle
+          -> ((Set (Path Abs File) -> IO ()) -> IO ())
           -> IO ()
 fileWatch = fileWatchConf defaultConfig
 
-fileWatchPoll :: ((Set (Path Abs File) -> IO ()) -> IO ())
-               -> IO ()
+fileWatchPoll :: Handle
+              -> ((Set (Path Abs File) -> IO ()) -> IO ())
+              -> IO ()
 fileWatchPoll = fileWatchConf $ defaultConfig { confUsePolling = True }
 
 -- | Run an action, watching for file changes
@@ -45,9 +47,20 @@ fileWatchPoll = fileWatchConf $ defaultConfig { confUsePolling = True }
 -- The action provided takes a callback that is used to set the files to be
 -- watched. When any of those files are changed, we rerun the action again.
 fileWatchConf :: WatchConfig
+              -> Handle
               -> ((Set (Path Abs File) -> IO ()) -> IO ())
               -> IO ()
-fileWatchConf cfg inner = withManagerConf cfg $ \manager -> do
+fileWatchConf cfg out inner = withManagerConf cfg $ \manager -> do
+    let putLn = hPutStrLn out
+    let withColor color action = do
+            outputIsTerminal <- hIsTerminalDevice stdout
+            if outputIsTerminal
+            then do
+                setSGR [SetColor Foreground Dull color]
+                action
+                setSGR [Reset]
+            else action
+
     allFiles <- newTVarIO Set.empty
     dirtyVar <- newTVarIO True
     watchVar <- newTVarIO Map.empty
@@ -87,22 +100,23 @@ fileWatchConf cfg inner = withManagerConf cfg $ \manager -> do
                 listen <- watchDir manager dir' (const True) onChange
                 return $ Just listen
 
+
     let watchInput = do
             line <- getLine
             unless (line == "quit") $ do
                 case line of
                     "help" -> do
-                        putStrLn ""
-                        putStrLn "help: display this help"
-                        putStrLn "quit: exit"
-                        putStrLn "build: force a rebuild"
-                        putStrLn "watched: display watched files"
+                        putLn ""
+                        putLn "help: display this help"
+                        putLn "quit: exit"
+                        putLn "build: force a rebuild"
+                        putLn "watched: display watched files"
                     "build" -> atomically $ writeTVar dirtyVar True
                     "watched" -> do
                         watch <- readTVarIO allFiles
-                        mapM_ putStrLn (Set.toList watch)
+                        mapM_ putLn (Set.toList watch)
                     "" -> atomically $ writeTVar dirtyVar True
-                    _ -> putStrLn $ concat
+                    _ -> putLn $ concat
                         [ "Unknown command: "
                         , show line
                         , ". Try 'help'"
@@ -125,15 +139,6 @@ fileWatchConf cfg inner = withManagerConf cfg $ \manager -> do
         -- https://github.com/commercialhaskell/stack/issues/822
         atomically $ writeTVar dirtyVar False
 
-        let withColor color action = do
-                outputIsTerminal <- hIsTerminalDevice stdout
-                if outputIsTerminal
-                then do
-                    setSGR [SetColor Foreground Dull color]
-                    action
-                    setSGR [Reset]
-                else action
-
         case eres of
             Left e -> do
                 let color = case fromException e of
@@ -141,6 +146,6 @@ fileWatchConf cfg inner = withManagerConf cfg $ \manager -> do
                         _ -> Red
                 withColor color $ printExceptionStderr e
             _ -> withColor Green $
-                putStrLn "Success! Waiting for next file change."
+                putLn "Success! Waiting for next file change."
 
-        putStrLn "Type help for available commands. Press enter to force a rebuild."
+        putLn "Type help for available commands. Press enter to force a rebuild."

@@ -882,8 +882,8 @@ buildCmd opts go = do
     hPutStrLn stderr "See: https://github.com/commercialhaskell/stack/issues/1015"
     error "-prof GHC option submitted"
   case boptsFileWatch opts of
-    FileWatchPoll -> fileWatchPoll inner
-    FileWatch -> fileWatch inner
+    FileWatchPoll -> fileWatchPoll stderr inner
+    FileWatch -> fileWatch stderr inner
     NoFileWatch -> inner $ const $ return ()
   where
     inner setLocalFiles = withBuildConfigAndLock go $ \lk ->
