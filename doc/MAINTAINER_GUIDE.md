@@ -28,7 +28,7 @@ to go:
           due to merges
 * In master branch:
     * Bump version to next odd second-to-last component
-    * Add new "unreleased changes" secion in changelog
+    * Add new "unreleased changes" section in changelog
     * Bump to use latest LTS version
 * Review documentation for any changes that need to be made
     * Search for old Stack version, unstable stack version, and the next

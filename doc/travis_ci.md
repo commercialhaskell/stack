@@ -80,7 +80,7 @@ addons:
 
 Travis apt plugin doesn't yet support installing apt packages dynamically
 (https://github.com/travis-ci/travis-ci/issues/4291). That for we need to write
-a bit repetetive `.travis.yml`.
+a bit repetitive `.travis.yml`.
 
 Also for different GHC versions, you probably want to use different `stack.yaml`
 files.
