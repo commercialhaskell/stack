@@ -7,6 +7,11 @@ To use GHCJS with stack `>= 0.1.8`, place a GHCJS version in the [`compiler`](ht
 
 You can also build existing stack projects which target GHC, and instead build them with GHCJS.  For example: `stack build --compiler ghcjs-0.1.0.20150924_ghc-7.10.2`
 
+Sidenote: If you receive a message like `The program 'ghcjs' version >=0.1 is
+required but the version of .../ghcjs could not be determined.`, then you may
+need to install a different version of `node`. See
+[stack issue #1496](https://github.com/commercialhaskell/stack/issues/1496).
+
 ## Example Configurations
 
 ### GHCJS (old base)
