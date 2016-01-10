@@ -14,6 +14,7 @@ module System.Process.Read
   ,tryProcessStdout
   ,sinkProcessStdout
   ,sinkProcessStderrStdout
+  ,sinkProcessStderrStdoutHandle
   ,readProcess
   ,EnvOverride(..)
   ,unEnvOverride
@@ -34,9 +35,8 @@ module System.Process.Read
   )
   where
 
-import           Control.Applicative
 import           Control.Arrow ((***), first)
-import           Control.Concurrent.Async (Concurrently (..))
+import           Control.Concurrent.Async (concurrently)
 import           Control.Exception hiding (try, catch)
 import           Control.Monad (join, liftM, unless)
 import           Control.Monad.Catch (MonadThrow, MonadCatch, throwM, try, catch)
@@ -69,6 +69,7 @@ import           System.Directory (doesFileExist, getCurrentDirectory)
 import           System.Environment (getEnvironment)
 import           System.Exit
 import qualified System.FilePath as FP
+import           System.IO (Handle)
 import           System.Process.Log
 
 -- | Override the environment received by a child process.
@@ -256,7 +257,7 @@ sinkProcessStdout wd menv name args sinkStdout = do
   return sinkRet
 
 -- | Consume the stdout and stderr of a process feeding strict 'S.ByteString's to the consumers.
-sinkProcessStderrStdout :: (MonadIO m, MonadLogger m)
+sinkProcessStderrStdout :: forall m e o. (MonadIO m, MonadLogger m)
                         => Maybe (Path Abs Dir) -- ^ Optional directory to run in
                         -> EnvOverride
                         -> String -- ^ Command
@@ -267,15 +268,32 @@ sinkProcessStderrStdout :: (MonadIO m, MonadLogger m)
 sinkProcessStderrStdout wd menv name args sinkStderr sinkStdout = do
   $logProcessRun name args
   name' <- preProcess wd menv name
-  liftIO (withCheckedProcess
-            (proc name' args) { env = envHelper menv, cwd = fmap toFilePath wd }
-            (\ClosedStream out err ->
-               runConcurrently $
-               (,) <$>
-               Concurrently (asBSSource err $$ sinkStderr) <*>
-               Concurrently (asBSSource out $$ sinkStdout)))
-  where asBSSource :: Source m S.ByteString -> Source m S.ByteString
-        asBSSource = id
+  liftIO $ withCheckedProcess
+      (proc name' args) { env = envHelper menv, cwd = fmap toFilePath wd }
+      (\ClosedStream out err -> f err out)
+  where
+    f :: Source IO S.ByteString -> Source IO S.ByteString -> IO (e, o)
+    f err out = (err $$ sinkStderr) `concurrently` (out $$ sinkStdout)
+
+sinkProcessStderrStdoutHandle :: (MonadIO m, MonadLogger m)
+                              => Maybe (Path Abs Dir) -- ^ Optional directory to run in
+                              -> EnvOverride
+                              -> String -- ^ Command
+                              -> [String] -- ^ Command line arguments
+                              -> Handle
+                              -> Handle
+                              -> m ()
+sinkProcessStderrStdoutHandle wd menv name args err out = do
+  $logProcessRun name args
+  name' <- preProcess wd menv name
+  liftIO $ withCheckedProcess
+      (proc name' args)
+          { env = envHelper menv
+          , cwd = fmap toFilePath wd
+          , std_err = UseHandle err
+          , std_out = UseHandle out
+          }
+      (\ClosedStream UseProvidedHandle UseProvidedHandle -> return ())
 
 -- | Perform pre-call-process tasks.  Ensure the working directory exists and find the
 -- executable path.

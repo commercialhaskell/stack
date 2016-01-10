@@ -842,63 +842,39 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                            ++ ["-package-db=" ++ toFilePathNoTrailingSep (bcoSnapDB eeBaseConfigOpts)]
 
                 setupArgs = ("--builddir=" ++ toFilePathNoTrailingSep distRelativeDir') : args
-                runExe exeName fullArgs = do
-                    $logProcessRun (toFilePath exeName) fullArgs
-
-                    -- Use createProcess_ to avoid the log file being closed afterwards
-                    (Nothing, moutH, merrH, ph) <- liftIO $ createProcess_ "singleBuild" cp
-
-                    let makeAbsolute = stripTHLoading -- If users want control, we should add a config option for this
-
-                    ec <-
-                        liftIO $
-                        withAsync (runInBase $ maybePrintBuildOutput stripTHLoading makeAbsolute pkgDir LevelInfo mlogFile moutH) $ \outThreadID ->
-                        withAsync (runInBase $ maybePrintBuildOutput False makeAbsolute pkgDir LevelWarn mlogFile merrH) $ \errThreadID -> do
-                            ec <- waitForProcess ph
-                            wait errThreadID
-                            wait outThreadID
-                            return ec
-                    case ec of
-                        ExitSuccess -> return ()
-                        _ -> do
-                            bss <-
-                                case mlogFile of
-                                    Nothing -> return []
-                                    Just (logFile, h) -> do
-                                        liftIO $ hClose h
-                                        runResourceT
-                                            $ CB.sourceFile (toFilePath logFile)
-                                            =$= CT.decodeUtf8
-                                            $$ mungeBuildOutput stripTHLoading makeAbsolute pkgDir
-                                            =$ CL.consume
-                            throwM $ CabalExitedUnsuccessfully
-                                ec
-                                taskProvides
-                                exeName
-                                fullArgs
-                                (fmap fst mlogFile)
-                                bss
+                runExe exeName fullArgs =
+                    runAndOutput `catch` \(ProcessExitedUnsuccessfully _ ec) -> do
+                        bss <-
+                            case mlogFile of
+                                Nothing -> return []
+                                Just (logFile, h) -> do
+                                    liftIO $ hClose h
+                                    runResourceT
+                                        $ CB.sourceFile (toFilePath logFile)
+                                        =$= CT.decodeUtf8
+                                        $$ mungeBuildOutput stripTHLoading makeAbsolute pkgDir
+                                        =$ CL.consume
+                        throwM $ CabalExitedUnsuccessfully
+                            ec
+                            taskProvides
+                            exeName
+                            fullArgs
+                            (fmap fst mlogFile)
+                            bss
                   where
-                    cp0 = proc (toFilePath exeName) fullArgs
-                    cp = cp0
-                        { cwd = Just $ toFilePath pkgDir
-                        , Process.env = envHelper menv
-                        -- Ideally we'd create a new pipe here and then close it
-                        -- below to avoid the child process from taking from our
-                        -- stdin. However, if we do this, the child process won't
-                        -- be able to get the codepage on Windows that we want.
-                        -- See:
-                        -- https://github.com/commercialhaskell/stack/issues/738
-                        -- , std_in = CreatePipe
-                        , std_out =
-                            case mlogFile of
-                                    Nothing -> CreatePipe
-                                    Just (_, h) -> UseHandle h
-                        , std_err =
-                            case mlogFile of
-                                Nothing -> CreatePipe
-                                Just (_, h) -> UseHandle h
-                        }
+                    runAndOutput = case mlogFile of
+                        Just (_, h) ->
+                            sinkProcessStderrStdoutHandle (Just pkgDir) menv (toFilePath exeName) fullArgs h h
+                        Nothing ->
+                            void $ sinkProcessStderrStdout (Just pkgDir) menv (toFilePath exeName) fullArgs
+                                (outputSink False LevelWarn)
+                                (outputSink stripTHLoading LevelInfo)
+                    outputSink excludeTH level =
+                        CT.decodeUtf8
+                        =$ mungeBuildOutput excludeTH makeAbsolute pkgDir
+                        =$ CL.mapM_ (runInBase . monadLoggerLog $(TH.location >>= liftLoc) "" level)
+                    -- If users want control, we should add a config option for this
+                    makeAbsolute = stripTHLoading
 
             wc <- getWhichCompiler
             (exeName, fullArgs) <- case (esetupexehs, wc) of
@@ -926,14 +902,6 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                             Ghcjs -> ["-build-runner"])
                     return (outputFile, setupArgs)
             runExe exeName $ (if boptsCabalVerbose eeBuildOpts then ("--verbose":) else id) fullArgs
-
-    maybePrintBuildOutput stripTHLoading makeAbsolute pkgDir level mlogFile mh =
-        case mh of
-            Just h ->
-                case mlogFile of
-                  Just{} -> return ()
-                  Nothing -> printBuildOutput stripTHLoading makeAbsolute pkgDir level h
-            Nothing -> return ()
 
 singleBuild :: M env m
             => (m () -> IO ())
@@ -1355,23 +1323,6 @@ singleBench runInBase beopts benchesToRun ac ee task installedMap = do
         when toRun $ do
           announce "benchmarks"
           cabal False ("bench" : args)
-
--- | Grab all output from the given @Handle@ and log it, stripping
--- Template Haskell "Loading package" lines and making paths absolute.
--- thread.
-printBuildOutput :: (MonadIO m, MonadBaseControl IO m, MonadLogger m,
-                     MonadThrow m)
-                 => Bool -- ^ exclude TH loading?
-                 -> Bool -- ^ convert paths to absolute?
-                 -> Path Abs Dir -- ^ package's root directory
-                 -> LogLevel
-                 -> Handle
-                 -> m ()
-printBuildOutput excludeTHLoading makeAbsolute pkgDir level outH = void $
-    CB.sourceHandle outH
-    $$ CT.decodeUtf8
-    =$ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir
-    =$ CL.mapM_ (monadLoggerLog $(TH.location >>= liftLoc) "" level)
 
 -- | Strip Template Haskell "Loading package" lines and making paths absolute.
 mungeBuildOutput :: (MonadIO m, MonadThrow m)
