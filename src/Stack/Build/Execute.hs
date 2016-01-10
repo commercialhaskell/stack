@@ -1008,7 +1008,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             _ -> return Nothing
 
     copyPreCompiled (PrecompiledCache mlib exes) = do
-        announceTask task "copying precompiled package"
+        announceTask task "using precompiled package"
         forM_ mlib $ \libpath -> do
             menv <- getMinimalEnvOverride
             withMVar eeInstallLock $ \() -> do
