@@ -835,10 +835,9 @@ installGHCJS version si archiveFile archiveType destDir = do
     -- install cabal-install. This lets us also fix the version of
     -- cabal-install used.
     let unpackDir = destDir </> $(mkRelDir "src")
-    tarComponent <- parseRelDir ("ghcjs-" ++ versionString version)
     runUnpack <- case platform of
         Platform _ Cabal.Windows -> return $
-            withUnpackedTarball7z "GHCJS" si archiveFile archiveType tarComponent unpackDir
+            withUnpackedTarball7z "GHCJS" si archiveFile archiveType Nothing unpackDir
         _ -> do
             zipTool' <-
                 case archiveType of
@@ -854,7 +853,8 @@ installGHCJS version si archiveFile archiveType destDir = do
             return $ do
                 removeTreeIfExists unpackDir
                 readInNull destDir tarTool menv ["xf", toFilePath archiveFile] Nothing
-                renameDir (destDir </> tarComponent) unpackDir
+                innerDir <- expectSingleUnpackedDir archiveFile destDir
+                renameDir innerDir unpackDir
 
     $logSticky $ T.concat ["Unpacking GHCJS into ", T.pack . toFilePath $ unpackDir, " ..."]
     $logDebug $ "Unpacking " <> T.pack (toFilePath archiveFile)
@@ -1044,7 +1044,7 @@ installGHCWindows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, 
                   -> m ()
 installGHCWindows version si archiveFile archiveType destDir = do
     tarComponent <- parseRelDir $ "ghc-" ++ versionString version
-    withUnpackedTarball7z "GHC" si archiveFile archiveType tarComponent destDir
+    withUnpackedTarball7z "GHC" si archiveFile archiveType (Just tarComponent) destDir
     $logInfo $ "GHC installed to " <> T.pack (toFilePath destDir)
 
 installMsys2Windows :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, MonadBaseControl IO m)
@@ -1063,7 +1063,7 @@ installMsys2Windows osKey si archiveFile archiveType destDir = do
         throwM e
 
     msys <- parseRelDir $ "msys" ++ T.unpack (fromMaybe "32" $ T.stripPrefix "windows" osKey)
-    withUnpackedTarball7z "MSYS2" si archiveFile archiveType msys destDir
+    withUnpackedTarball7z "MSYS2" si archiveFile archiveType (Just msys) destDir
 
     platform <- asks getPlatform
     menv0 <- getMinimalEnvOverride
@@ -1091,10 +1091,10 @@ withUnpackedTarball7z :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env
                       -> SetupInfo
                       -> Path Abs File -- ^ Path to archive file
                       -> ArchiveType
-                      -> Path Rel Dir -- ^ Name of directory expected to be in archive.
+                      -> Maybe (Path Rel Dir) -- ^ Name of directory expected in archive.  If Nothing, expects a single folder.
                       -> Path Abs Dir -- ^ Destination directory.
                       -> m ()
-withUnpackedTarball7z name si archiveFile archiveType srcDir destDir = do
+withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
     suffix <-
         case archiveType of
             TarXz -> return ".xz"
@@ -1109,7 +1109,9 @@ withUnpackedTarball7z name si archiveFile archiveType srcDir destDir = do
     let tmpName = toFilePathNoTrailingSep (dirname destDir) ++ "-tmp"
     createTree (parent destDir)
     withCanonicalizedTempDirectory (toFilePath $ parent destDir) tmpName $ \tmpDir -> do
-        let absSrcDir = tmpDir </> srcDir
+        absSrcDir <- case msrcDir of
+            Just srcDir -> return $ tmpDir </> srcDir
+            Nothing -> expectSingleUnpackedDir archiveFile tmpDir
         removeTreeIfExists destDir
         run7z (parent archiveFile) archiveFile
         run7z tmpDir tarFile
@@ -1121,6 +1123,13 @@ withUnpackedTarball7z name si archiveFile archiveType srcDir destDir = do
                 , T.pack $ show e
                 ])
         renameDir absSrcDir destDir
+
+expectSingleUnpackedDir :: (MonadIO m, MonadThrow m) => Path Abs File -> Path Abs Dir -> m (Path Abs Dir)
+expectSingleUnpackedDir archiveFile destDir = do
+    contents <- listDirectory destDir
+    case contents of
+        ([dir], []) -> return dir
+        _ -> error $ "Expected a single directory within unpacked " ++ toFilePath archiveFile
 
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
