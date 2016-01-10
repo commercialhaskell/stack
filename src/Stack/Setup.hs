@@ -682,10 +682,7 @@ downloadAndInstallCompiler si wanted versionCheck _mbindistUrl = do
     $logInfo "Preparing to install GHCJS to an isolated location."
     $logInfo "This will not interfere with any system-level installation."
     let tool = ToolGhcjs selectedVersion
-        installer = installGHCJS $ case selectedVersion of
-            GhcjsVersion version _ -> version
-            _ -> error "Invariant violated: expected ghcjs version in downloadAndInstallCompiler."
-    downloadAndInstallTool (configLocalPrograms config) si downloadInfo tool installer
+    downloadAndInstallTool (configLocalPrograms config) si downloadInfo tool installGHCJS
 
 getWantedCompilerInfo :: (Ord k, MonadThrow m)
                       => Text
@@ -808,13 +805,12 @@ installGHCPosix version _ archiveFile archiveType destDir = do
         $logDebug $ "GHC installed to " <> T.pack (toFilePath destDir)
 
 installGHCJS :: (MonadIO m, MonadMask m, MonadLogger m, MonadReader env m, HasConfig env, HasHttpManager env, HasTerminal env, HasReExec env, HasLogLevel env, MonadBaseControl IO m)
-             => Version
-             -> SetupInfo
+             => SetupInfo
              -> Path Abs File
              -> ArchiveType
              -> Path Abs Dir
              -> m ()
-installGHCJS version si archiveFile archiveType destDir = do
+installGHCJS si archiveFile archiveType destDir = do
     platform <- asks getPlatform
     menv0 <- getMinimalEnvOverride
     -- This ensures that locking is disabled for the invocations of

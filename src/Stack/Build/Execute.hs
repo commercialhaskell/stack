@@ -18,7 +18,6 @@ module Stack.Build.Execute
 
 import           Control.Applicative
 import           Control.Arrow ((&&&))
-import           Control.Concurrent.Async (withAsync, wait)
 import           Control.Concurrent.Execute
 import           Control.Concurrent.MVar.Lifted
 import           Control.Concurrent.STM
