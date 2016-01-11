@@ -23,6 +23,10 @@ Bug fixes:
   [Mailing list discussion](https://groups.google.com/d/msg/haskell-stack/iVGDG5OHYxs/FjUrR5JsDQAJ)
 - Gracefully handle invalid paths in error/warning messages
   [#1561](https://github.com/commercialhaskell/stack/issues/1561)
+- Nix: select the correct GHC version corresponding to the snapshot
+  even when an abstract resolver is passed via `--resolver` on the
+  command-line.
+  [#1641](https://github.com/commercialhaskell/stack/issues/1641)
 
 ## 1.0.0
 

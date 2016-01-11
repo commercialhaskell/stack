@@ -35,6 +35,7 @@ import           Path.IO
 import qualified Paths_stack as Meta
 import           Prelude -- Fix redundant import warnings
 import           Stack.Constants (stackProgName,platformVariantEnvVar)
+import           Stack.Config (makeConcreteResolver)
 import           Stack.Docker (reExecArgName)
 import           Stack.Exec (exec)
 import           System.Process.Read (getEnvOverride)
@@ -42,6 +43,7 @@ import           Stack.Types
 import           Stack.Types.Internal
 import           System.Environment (lookupEnv,getArgs,getExecutablePath)
 import           System.Exit (exitSuccess, exitWith)
+import           Prelude hiding (mapM)
 
 
 -- | If Nix is enabled, re-runs the currently running OS command in a Nix container.
@@ -49,14 +51,15 @@ import           System.Exit (exitSuccess, exitWith)
 reexecWithOptionalShell
     :: M env m
     => Maybe (Path Abs Dir)
+    -> Maybe AbstractResolver
     -> IO ()
     -> m ()
-reexecWithOptionalShell mprojectRoot inner =
+reexecWithOptionalShell mprojectRoot maresolver inner =
   do config <- asks getConfig
      inShell <- getInShell
      isReExec <- asks getReExec
      if nixEnable (configNix config) && not inShell && not isReExec
-       then runShellAndExit mprojectRoot getCmdArgs
+       then runShellAndExit mprojectRoot maresolver getCmdArgs
        else liftIO inner
   where
     getCmdArgs = do
@@ -70,30 +73,37 @@ reexecWithOptionalShell mprojectRoot inner =
 runShellAndExit
     :: M env m
     => Maybe (Path Abs Dir)
+    -> Maybe AbstractResolver
     -> m (String, [String])
     -> m ()
-runShellAndExit mprojectRoot getCmdArgs = do
+runShellAndExit mprojectRoot maresolver getCmdArgs = do
      config <- asks getConfig
+     mresolver <- mapM makeConcreteResolver maresolver
      envOverride <- getEnvOverride (configPlatform config)
      (cmnd,args) <- fmap (escape *** map escape) getCmdArgs
      mshellFile <-
          traverse (resolveFile (fromMaybeProjectRoot mprojectRoot)) $
          nixInitFile (configNix config)
      let pkgsInConfig = nixPackages (configNix config)
+         pkgs =
+           pkgsInConfig ++ [case mresolver of
+             Just (ResolverSnapshot (LTS x y)) ->
+               T.pack ("haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc")
+             _ -> T.pack "ghc"]
          pureShell = nixPureShell (configNix config)
          nixopts = case mshellFile of
            Just fp -> [toFilePath fp]
            Nothing -> ["-E", T.unpack $ T.intercalate " " $ concat
                               [["with (import <nixpkgs> {});"
                                ,"runCommand \"myEnv\" {"
-                               ,"buildInputs=lib.optional stdenv.isLinux glibcLocales ++ ["],pkgsInConfig,["];"
+                               ,"buildInputs=lib.optional stdenv.isLinux glibcLocales ++ ["],pkgs,["];"
                                ,T.pack platformVariantEnvVar <> "=''nix'';"
                                ,T.pack inShellEnvVar <> "=1;"
                                ,"STACK_IN_NIX_EXTRA_ARGS=''"]
                                ,      (map (\p -> T.concat
                                                   ["--extra-lib-dirs=${",p,"}/lib"
                                                   ," --extra-include-dirs=${",p,"}/include "])
-                                           pkgsInConfig), ["'' ;"
+                                           pkgs), ["'' ;"
                                ,"} \"\""]]]
                     -- glibcLocales is necessary on Linux to avoid warnings about GHC being incapable to set the locale.
          fullArgs = concat [if pureShell then ["--pure"] else [],
@@ -105,7 +115,7 @@ runShellAndExit mprojectRoot getCmdArgs = do
      $logDebug $
          "Using a nix-shell environment " <> (case mshellFile of
             Just path -> "from file: " <> (T.pack (toFilePath path))
-            Nothing -> "with nix packages: " <> (T.intercalate ", " pkgsInConfig))
+            Nothing -> "with nix packages: " <> (T.intercalate ", " pkgs))
      e <- try (exec envOverride "nix-shell" fullArgs)
      case e of
        Left (ProcessExitedUnsuccessfully _ ec) -> liftIO (exitWith ec)
