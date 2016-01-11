@@ -19,32 +19,20 @@ import Control.Monad.Catch (throwM,MonadCatch)
 -- | Interprets NixOptsMonoid options.
 nixOptsFromMonoid
     :: (Monad m, MonadCatch m)
-    => Maybe Project
-    -> Maybe AbstractResolver
-    -> NixOptsMonoid
+    => NixOptsMonoid
     -> OS
     -> m NixOpts
-nixOptsFromMonoid mproject maresolver NixOptsMonoid{..} os = do
+nixOptsFromMonoid NixOptsMonoid{..} os = do
     let nixEnable = fromMaybe nixMonoidDefaultEnable nixMonoidEnable
         defaultPure = case os of
           OSX -> False
           _ -> True
         nixPureShell = fromMaybe defaultPure nixMonoidPureShell
-        mresolver = case maresolver of
-          Just (ARResolver resolver) -> Just resolver
-          Just _ -> Nothing
-          Nothing -> fmap projectResolver mproject
-        pkgs = fromMaybe [] nixMonoidPackages
-        nixPackages = case mproject of
-           Nothing -> pkgs
-           Just _ -> pkgs ++ [case mresolver of
-              Just (ResolverSnapshot (LTS x y)) ->
-                T.pack ("haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc")
-              _ -> T.pack "ghc"]
+        nixPackages = fromMaybe [] nixMonoidPackages
         nixInitFile = nixMonoidInitFile
         nixShellOptions = fromMaybe [] nixMonoidShellOptions
                           ++ prefixAll (T.pack "-I") (fromMaybe [] nixMonoidPath)
-    when (not (null pkgs) && isJust nixInitFile) $
+    when (not (null nixPackages) && isJust nixInitFile) $
        throwM NixCannotUseShellFileAndPackagesException
     return NixOpts{..}
   where prefixAll p (x:xs) = p : x : prefixAll p xs
