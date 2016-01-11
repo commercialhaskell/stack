@@ -10,10 +10,13 @@ import Control.Applicative
 import Data.Aeson.Extended
 import Data.Text (Text)
 import Data.Monoid
-
 import Prelude
+import Stack.Types.Compiler (CompilerVersion)
+import {-# SOURCE #-} Stack.Types.Config (Resolver)
+import Text.Show.Functions ()
 
--- | Nix configuration.
+-- | Nix configuration. Parameterize by resolver type to avoid cyclic
+-- dependency.
 data NixOpts = NixOpts
   {nixEnable   :: !Bool
   ,nixPureShell :: !Bool
@@ -23,6 +26,8 @@ data NixOpts = NixOpts
     -- ^ The path of a file containing preconfiguration of the environment (e.g shell.nix)
   ,nixShellOptions :: ![Text]
     -- ^ Options to be given to the nix-shell command line
+  ,nixCompiler :: !(Maybe Resolver -> Maybe CompilerVersion -> Text)
+   -- ^ Yield a compiler attribute name given a resolver override.
   }
   deriving (Show)
 
