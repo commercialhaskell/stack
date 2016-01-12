@@ -253,7 +253,7 @@ executable stack
     cpp-options:     -DWINDOWS
   if !flag(disable-git-info)
     cpp-options:     -DUSE_GIT_INFO
-    build-depends:   gitrev >= 1.1
+    build-depends:   gitrev >= 1.1 && < 1.3
                    , optparse-simple >= 0.0.3
 
 test-suite stack-test
