@@ -14,7 +14,7 @@ module Stack.Nix
 import           Control.Applicative
 import           Control.Arrow ((***))
 import           Control.Exception (Exception,throw)
-import           Control.Monad
+import           Control.Monad hiding (mapM)
 import           Control.Monad.Catch (try,MonadCatch)
 import           Control.Monad.IO.Class (MonadIO,liftIO)
 import           Control.Monad.Logger (MonadLogger,logDebug)
