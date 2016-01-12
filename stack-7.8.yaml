@@ -5,7 +5,7 @@ extra-deps:
 - hfsevents-0.1.5
 - project-template-0.2.0
 - filelock-0.1.0.1
-- gitrev-1.1.0
+- gitrev-1.2.0
 - http-client-0.4.19
 - http-conduit-2.1.8
 - ignore-0.1.1.0

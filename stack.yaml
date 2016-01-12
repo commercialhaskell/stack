@@ -9,3 +9,6 @@ nix:
   enable: false
   packages:
     - zlib
+extra-deps:
+# Should be removed once gitrev is updated in stackage (lts-5)
+- gitrev-1.2.0
