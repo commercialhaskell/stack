@@ -38,10 +38,8 @@ nixOptsFromMonoid mproject NixOptsMonoid{..} os = do
           let mresolver = resolverOverride <|> fmap projectResolver mproject
               mcompiler = compilerOverride <|> join (fmap projectCompiler mproject)
           in case (mresolver, mcompiler)  of
-               (_, Just (GhcVersion v)) ->
-                 T.filter (== '.') (versionText v)
-               (Just (ResolverCompiler (GhcVersion v)), _) ->
-                 T.filter (== '.') (versionText v)
+               (_, Just (GhcVersion v)) -> nixCompilerFromVersion v
+               (Just (ResolverCompiler (GhcVersion v)), _) -> nixCompilerFromVersion v
                (Just (ResolverSnapshot (LTS x y)), _) ->
                  T.pack ("haskell.packages.lts-" ++ show x ++ "_" ++ show y ++ ".ghc")
                _ -> T.pack "ghc"
@@ -50,6 +48,7 @@ nixOptsFromMonoid mproject NixOptsMonoid{..} os = do
     return NixOpts{..}
   where prefixAll p (x:xs) = p : x : prefixAll p xs
         prefixAll _ _      = []
+        nixCompilerFromVersion v = T.filter (/= '.') $ T.append (T.pack "haskell.compiler.ghc") (versionText v)
 
 -- Exceptions thown specifically by Stack.Nix
 data StackNixException
