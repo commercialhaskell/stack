@@ -134,13 +134,13 @@ Non-project config options may go in the global config (`/etc/stack/config.yaml`
 
 ### docker
 
-See [Docker integration](docker_integration.html#configuration).
+See [Docker integration](docker_integration.md#configuration).
 
 ### nix
 
 (since 0.1.10.0)
 
-See [Nix integration](nix_integration.html#configuration).
+See [Nix integration](nix_integration.md#configuration).
 
 ### connection-count
 
