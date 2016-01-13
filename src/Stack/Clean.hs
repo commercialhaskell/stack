@@ -20,7 +20,7 @@ import           Data.Typeable (Typeable)
 import           Path.IO (removeTreeIfExists)
 import           Stack.Build.Source (getLocalPackageViews)
 import           Stack.Build.Target (LocalPackageView(..))
-import           Stack.Constants (distDirFromDir)
+import           Stack.Constants (distDirFromDir, workDirFromDir)
 import           Stack.Types (HasEnvConfig,PackageName)
 
 
@@ -33,7 +33,7 @@ clean
     :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfig env, MonadLogger m)
     => CleanOpts
     -> m ()
-clean (CleanOpts targets) = do
+clean (CleanOpts targets doFullClean) = do
     locals <- getLocalPackageViews
     case targets \\ Map.keys locals of
         [] -> do
@@ -42,15 +42,19 @@ clean (CleanOpts targets) = do
                         then Map.elems locals -- default to cleaning all local packages
                         else mapMaybe (`Map.lookup` locals) targets
             forM_ lpvs $ \(LocalPackageView{lpvRoot = pkgDir},_) -> do
-                distDir <- distDirFromDir pkgDir
-                removeTreeIfExists distDir
+                let delDir =
+                          if doFullClean
+                              then workDirFromDir pkgDir
+                              else distDirFromDir pkgDir
+                removeTreeIfExists =<< delDir
         pkgs -> throwM (NonLocalPackages pkgs)
 
 -- | Options for cleaning a project.
-newtype CleanOpts = CleanOpts
+data CleanOpts = CleanOpts
     { cleanOptsTargets :: [PackageName]
     -- ^ Names of the packages to clean.
     -- If the list is empty, every local package should be cleaned.
+    , cleanOptsFull :: Bool
     }
 
 -- | Exceptions during cleanup.
