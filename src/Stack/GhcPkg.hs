@@ -160,12 +160,12 @@ unregisterGhcPkgId menv wc cv pkgDb gid ident = do
 
 -- | Get the version of Cabal from the global package database.
 getCabalPkgVer :: (MonadThrow m, MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
-               => EnvOverride -> WhichCompiler -> m Version
-getCabalPkgVer menv wc =
+               => EnvOverride -> WhichCompiler -> Path Abs Dir -> m Version
+getCabalPkgVer menv wc pkgdb =
     findGhcPkgVersion
         menv
         wc
-        [] -- global DB
+        [pkgdb] -- global DB
         cabalPackageName >>=
         maybe (throwM $ Couldn'tFindPkgId cabalPackageName) return
 
