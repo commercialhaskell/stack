@@ -1123,11 +1123,8 @@ instance Show ConfigException where
         , unlines $ map (\name -> "    - " <> T.unpack (renderSnapName name))
                         names
         , "\nYou can try the following options:\n"
-        , "    - Exclude mismatching package(s) and build the rest.\n"
-        , "        - Use '--ignore-subdirs' to exclude subdirectories.\n"
-        , "        - Manually create a config, then use 'stack solver'\n"
+        , "    - Use '--force' to ignore mismatching package(s).\n"
         , "    - Use '--resolver' to specify a matching snapshot/resolver\n"
-        , "    - Use a custom snapshot having the right compiler.\n"
         ]
     show (ResolverMismatch resolver errDesc) = concat
         [ "Selected resolver '"

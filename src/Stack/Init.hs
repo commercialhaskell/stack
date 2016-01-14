@@ -237,6 +237,7 @@ getWorkingResolverPlan
        --   , Extra dependencies
        --   , Src packages actually considered)
 getWorkingResolverPlan stackYaml initOpts bundle resolver = do
+    $logInfo $ "Selected resolver: " <> resolverName resolver
     go bundle
     where
         go info = do
@@ -248,10 +249,13 @@ getWorkingResolverPlan stackYaml initOpts bundle resolver = do
                     | Map.null good ->
                         return (resolver, Map.empty, Map.empty, Map.empty)
                     | otherwise -> do
+                        $logWarn "Ignoring compiler incompatible packages:"
+                        $logWarn $ indent $ showMismatchingPackages e
                         assert ((Map.size good) < (Map.size info)) (go good)
                     where
                       failed   = Map.unions (Map.elems (fmap deNeededBy e))
                       good     = Map.difference info failed
+                      indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 
 checkBundleResolver
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
@@ -271,13 +275,20 @@ checkBundleResolver stackYaml initOpts bundle resolver = do
         BuildPlanCheckOk f -> return $ Right (f, Map.empty)
         (BuildPlanCheckPartial f _)
             | needSolver resolver initOpts -> do
+                $logWarn $ "Resolver " <> resolverName resolver
+                            <> " will need external packages: "
+                $logWarn $ indent $ T.pack $ show result
                 liftM (\x -> Right x) (solve f)
             | otherwise -> throwM $ ResolverPartial resolver (show result)
         (BuildPlanCheckFail _ e _)
             | (forceOverwrite initOpts) -> do
+                $logWarn $ "Resolver compiler mismatch: "
+                           <> resolverName resolver
+                $logWarn $ indent $ T.pack $ show result
                 return $ Left e
             | otherwise -> throwM $ ResolverMismatch resolver (show result)
     where
+      indent t    = T.unlines $ fmap ("    " <>) (T.lines t)
       gpds        = Map.elems (fmap snd bundle)
       solve flags = do
           let cabalDirs      = Map.elems (fmap fst bundle)
