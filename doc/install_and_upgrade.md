@@ -226,15 +226,16 @@ releases by ten days or more.
 
 ## Arch Linux
 
-*note*: for 32-bit, use the [generic Linux option](#linux). (You will need to ensure libtinfo is installed, see below.)
+*Note:* `stack` package in the [community] repository isn't managed by the 
+Stack release team. Depending on the maintainer's availability, it can lag
+new releases by some days.
 
-stack can be found in the AUR:
-  - [haskell-stack](https://aur.archlinux.org/packages/haskell-stack/) _latest stable version_
+  - [stack](https://www.archlinux.org/packages/community/x86_64/stack/) _latest stable version_
   - [haskell-stack-git](https://aur.archlinux.org/packages/haskell-stack-git/) _git version_
 
-In order to install stack from Hackage or from source, you will need the [libtinfo](https://aur.archlinux.org/packages/libtinfo/) Arch Linux package installed.  If this package is not installed, stack will not be able to install GHC.  
+In order to install stack from Hackage or from source, you will need the [libtinfo](https://aur.archlinux.org/packages/libtinfo/) Arch Linux package installed.  If this package is not installed, stack will not be able to install GHC.
 
-If you use the [ArchHaskell repository](https://wiki.archlinux.org/index.php/ArchHaskell), you can also get the `haskell-stack` package from there.
+If you use the [ArchHaskell repository](https://wiki.archlinux.org/index.php/ArchHaskell), you can also get the `haskell-stack-tool` package from there.
 
 ## NixOS
 
