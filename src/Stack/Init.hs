@@ -81,6 +81,11 @@ initProject currDir initOpts = do
     bundle  <- cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter
 
     (r, flags, extraDeps, rbundle) <- getDefaultResolver dest initOpts bundle
+
+    -- TODO insert ignored packages as commented out
+    -- TODO insert warnings in the file when there are ignored packages or
+    -- extra dependencies. Then always create a config and use --force only
+    -- for overwriting.
     let gpds = Map.elems $ fmap snd rbundle
         p = Project
             { projectPackages = pkgs
@@ -104,6 +109,21 @@ initProject currDir initOpts = do
             }
 
     $logInfo $ "Initialising configuration using resolver: " <> resolverName r
+
+    let ignored = Map.difference bundle rbundle
+        indent t = T.unlines $ fmap ("    " <>) (T.lines t)
+
+    when (Map.size ignored > 0) $ do
+        $logWarn $ "Warning! Ignoring "
+                   <> (T.pack $ show $ Map.size ignored)
+                   <> " out of "
+                   <> (T.pack $ show $ Map.size bundle)
+                   <> " packages:"
+        $logWarn $ indent $ showMapPackages ignored
+
+    when (Map.size extraDeps > 0) $ do
+        $logWarn $ "Warning! " <> (T.pack $ show $ Map.size extraDeps)
+                   <> " external dependencies were added."
     $logInfo $
         (if exists then "Overwriting existing configuration file: "
          else "Writing configuration to file: ")
@@ -250,7 +270,7 @@ getWorkingResolverPlan stackYaml initOpts bundle resolver = do
                         return (resolver, Map.empty, Map.empty, Map.empty)
                     | otherwise -> do
                         $logWarn "Ignoring compiler incompatible packages:"
-                        $logWarn $ indent $ showMismatchingPackages e
+                        $logWarn $ indent $ showMapPackages failed
                         assert ((Map.size good) < (Map.size info)) (go good)
                     where
                       failed   = Map.unions (Map.elems (fmap deNeededBy e))

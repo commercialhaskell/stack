@@ -26,7 +26,7 @@ module Stack.BuildPlan
     , ToolMap
     , getToolMap
     , shadowMiniBuildPlan
-    , showMismatchingPackages
+    , showMapPackages
     , parseCustomMiniBuildPlan
     ) where
 
@@ -764,10 +764,8 @@ selectBestSnapshot gpds snaps = do
 
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 
-showMismatchingPackages :: DepErrors -> Text
-showMismatchingPackages errs =
-    let list = Map.keys $ Map.unions (Map.elems (fmap deNeededBy errs))
-    in T.concat (map formatItem list)
+showMapPackages :: Map PackageName a -> Text
+showMapPackages mp = T.concat (map formatItem $ Map.keys mp)
     where
         formatItem pkg = T.concat
             [ "    - "
@@ -784,7 +782,7 @@ showCompilerErrors flags errs compiler =
     T.concat
         [ compilerVersionText compiler
         , " cannot be used for these packages:\n"
-        , showMismatchingPackages errs
+        , showMapPackages $ Map.unions (Map.elems (fmap deNeededBy errs))
         , showDepErrors flags errs -- TODO only in debug mode
         ]
 
