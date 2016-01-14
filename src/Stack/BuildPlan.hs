@@ -10,10 +10,13 @@
 -- snapshot.
 
 module Stack.BuildPlan
-    ( gpdPackages
-    , BuildPlanException (..)
+    ( BuildPlanException (..)
     , BuildPlanCheck (..)
     , checkSnapBuildPlan
+    , DepError(..)
+    , DepErrors
+    , gpdPackages
+    , gpdPackageName
     , MiniBuildPlan(..)
     , MiniPackageInfo(..)
     , loadMiniBuildPlan
@@ -723,21 +726,21 @@ selectBestSnapshot
        , MonadBaseControl IO m)
     => [GenericPackageDescription]
     -> [SnapName]
-    -> m (Maybe SnapName)
+    -> m (SnapName, BuildPlanCheck)
 selectBestSnapshot gpds snaps = do
     $logInfo $ "Selecting the best among "
                <> T.pack (show (length snaps))
                <> " snapshots...\n"
     loop Nothing snaps
     where
-        loop Nothing [] = return Nothing
-        loop (Just (snap, _)) [] = return $ Just snap
+        loop Nothing []          = error "Bug: in best snapshot selection"
+        loop (Just pair) []      = return pair
         loop bestYet (snap:rest) = do
             result <- checkSnapBuildPlan gpds Nothing snap
             reportResult result snap
             let new = (snap, result)
             case result of
-                BuildPlanCheckOk _ -> return $ Just snap
+                BuildPlanCheckOk _ -> return new
                 _ -> case bestYet of
                         Nothing  -> loop (Just new) rest
                         Just old -> loop (Just (betterSnap old new)) rest

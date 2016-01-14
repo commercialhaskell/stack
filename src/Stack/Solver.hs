@@ -437,7 +437,7 @@ cabalPackagesCheck
      => [Path Abs File]
      -> String
      -> String
-     -> m [C.GenericPackageDescription]
+     -> m (Map PackageName (Path Abs Dir, C.GenericPackageDescription))
 cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter = do
     when (null cabalfps) $
         error noPkgMsg
@@ -455,7 +455,10 @@ cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter = do
 
     (warnings,gpds) <- fmap unzip (mapM readPackageUnresolved cabalfps)
     zipWithM_ (mapM_ . printCabalFileWarning) cabalfps warnings
-    return gpds
+    return $ Map.fromList
+           $ zipWith (\dir gpd -> ((gpdPackageName gpd),(dir, gpd)))
+                     (map parent cabalfps)
+                     gpds
 
     where
         groups          = filter ((> 1) . length) . groupSortOn (FP.takeFileName)
@@ -513,13 +516,13 @@ solveExtraDeps modStackYaml = do
                        \entries from '" <> relStackYaml <> "'."
 
     cabalfps  <- liftM concat (mapM (findCabalFiles False) cabalDirs)
-    gpds <- cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter
-
     -- TODO when solver supports --ignore-subdirs option pass that as the
     -- second argument here.
     reportMissingCabalFiles cabalfps True
+    bundle <- cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter
 
-    let oldFlags          = bcFlags bconfig
+    let gpds              = Map.elems $ fmap snd bundle
+        oldFlags          = bcFlags bconfig
         oldExtraVersions  = bcExtraDeps bconfig
         resolver          = bcResolver bconfig
         oldSrcs           = gpdPackages gpds
@@ -568,7 +571,6 @@ solveExtraDeps modStackYaml = do
         -- TODO print whether resolver changed from previous
         $logInfo $ "* Resolver is " <> resolverName resolver
 
-        -- TODO indent the yaml output
         printFlags newFlags  "* Flags to be added"
         printDeps  newVersions   "* Dependencies to be added"
 

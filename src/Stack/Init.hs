@@ -78,11 +78,11 @@ initProject currDir initOpts = do
             <> "dependencies and update the config file."
 
     cabalfps <- findCabalFiles (includeSubDirs initOpts) currDir
-    gpds <- cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter
+    bundle  <- cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter
 
-    (r, flags, extraDeps) <-
-        getDefaultResolver dest (map parent cabalfps) gpds initOpts
-    let p = Project
+    (r, flags, extraDeps, rbundle) <- getDefaultResolver dest initOpts bundle
+    let gpds = Map.elems $ fmap snd rbundle
+        p = Project
             { projectPackages = pkgs
             , projectExtraDeps = extraDeps
             , projectFlags = removeSrcPkgDefaultFlags gpds flags
@@ -90,15 +90,15 @@ initProject currDir initOpts = do
             , projectCompiler = Nothing
             , projectExtraPackageDBs = []
             }
-        pkgs = map toPkg cabalfps
-        toPkg fp = PackageEntry
+        pkgs = map toPkg $ Map.elems (fmap fst rbundle)
+        toPkg dir = PackageEntry
             { peValidWanted = Nothing
             , peExtraDepMaybe = Nothing
             , peLocation = PLFilePath $
-                case stripDir currDir $ parent fp of
+                case stripDir currDir dir of
                     Nothing
-                        | currDir == parent fp -> "."
-                        | otherwise -> assert False $ toFilePath $ parent fp
+                        | currDir == dir -> "."
+                        | otherwise -> assert False $ toFilePath dir
                     Just rel -> toFilePath rel
             , peSubdirs = []
             }
@@ -187,38 +187,113 @@ getDefaultResolver
        , HasHttpManager env , HasLogLevel env , HasReExec env
        , HasTerminal env)
     => Path Abs File   -- ^ stack.yaml
-    -> [Path Abs Dir]  -- ^ cabal dirs
-    -> [C.GenericPackageDescription] -- ^ cabal descriptions
     -> InitOpts
+    -> Map PackageName (Path Abs Dir, C.GenericPackageDescription)
+       -- ^ Src package name: cabal dir, cabal package description
     -> m ( Resolver
          , Map PackageName (Map FlagName Bool)
-         , Map PackageName Version)
-getDefaultResolver stackYaml cabalDirs gpds initOpts = do
-    resolver <- getResolver (ioMethod initOpts)
-    result   <- checkResolverSpec gpds Nothing resolver
-
-    case result of
-        BuildPlanCheckOk f -> return (resolver, f, Map.empty)
-        (BuildPlanCheckPartial f _)
-            | needSolver resolver initOpts -> solve (resolver, f)
-            | otherwise -> throwM $ ResolverPartial resolver (show result)
-        (BuildPlanCheckFail _ _ _) ->
-            throwM $ ResolverMismatch resolver (show result)
-
+         , Map PackageName Version
+         , Map PackageName (Path Abs Dir, C.GenericPackageDescription))
+       -- ^ ( Resolver
+       --   , Flags for src packages and extra deps
+       --   , Extra dependencies
+       --   , Src packages actually considered)
+getDefaultResolver stackYaml initOpts bundle =
+    getResolver (ioMethod initOpts)
+      >>= getWorkingResolverPlan stackYaml initOpts bundle
     where
-      solve (res, f) = do
-          let srcConstraints = mergeConstraints (gpdPackages gpds) f
-          mresolver <- solveResolverSpec stackYaml cabalDirs
-                                         (res, srcConstraints, Map.empty)
-          case mresolver of
-              Just (src, ext) -> do
-                  return (res, fmap snd (Map.union src ext), fmap fst ext)
+        -- TODO support selecting best across regular and custom snapshots
+        getResolver (MethodSnapshot snapPref)  = selectSnapResolver snapPref
+        getResolver (MethodResolver aresolver) = makeConcreteResolver aresolver
+
+        selectSnapResolver snapPref = do
+            msnaps <- getSnapshots'
+            snaps <- maybe (error "No snapshots to select from.")
+                           (getRecommendedSnapshots snapPref)
+                           msnaps
+            let gpds = Map.elems (fmap snd bundle)
+            (s, r) <- selectBestSnapshot gpds snaps
+            case r of
+                (BuildPlanCheckFail _ _ _) | not (forceOverwrite initOpts)
+                        -> throwM (NoMatchingSnapshot snaps)
+                _ -> return $ ResolverSnapshot s
+
+getWorkingResolverPlan
+    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
+       , MonadReader env m, HasConfig env , HasGHCVariant env
+       , HasHttpManager env , HasLogLevel env , HasReExec env
+       , HasTerminal env)
+    => Path Abs File   -- ^ stack.yaml
+    -> InitOpts
+    -> Map PackageName (Path Abs Dir, C.GenericPackageDescription)
+       -- ^ Src package name: cabal dir, cabal package description
+    -> Resolver
+    -> m ( Resolver
+         , Map PackageName (Map FlagName Bool)
+         , Map PackageName Version
+         , Map PackageName (Path Abs Dir, C.GenericPackageDescription))
+       -- ^ ( Resolver
+       --   , Flags for src packages and extra deps
+       --   , Extra dependencies
+       --   , Src packages actually considered)
+getWorkingResolverPlan stackYaml initOpts bundle resolver = do
+    go bundle
+    where
+        go info = do
+            eres <- checkBundleResolver stackYaml initOpts info resolver
+            -- if some packages failed try again using the rest
+            case eres of
+                Right (f, edeps)-> return (resolver, f, edeps, info)
+                Left e
+                    | Map.null good ->
+                        return (resolver, Map.empty, Map.empty, Map.empty)
+                    | otherwise -> do
+                        assert ((Map.size good) < (Map.size info)) (go good)
+                    where
+                      failed   = Map.unions (Map.elems (fmap deNeededBy e))
+                      good     = Map.difference info failed
+
+checkBundleResolver
+    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
+       , MonadReader env m, HasConfig env , HasGHCVariant env
+       , HasHttpManager env , HasLogLevel env , HasReExec env
+       , HasTerminal env)
+    => Path Abs File   -- ^ stack.yaml
+    -> InitOpts
+    -> Map PackageName (Path Abs Dir, C.GenericPackageDescription)
+       -- ^ Src package name: cabal dir, cabal package description
+    -> Resolver
+    -> m (Either DepErrors ( Map PackageName (Map FlagName Bool)
+                           , Map PackageName Version))
+checkBundleResolver stackYaml initOpts bundle resolver = do
+    result <- checkResolverSpec gpds Nothing resolver
+    case result of
+        BuildPlanCheckOk f -> return $ Right (f, Map.empty)
+        (BuildPlanCheckPartial f _)
+            | needSolver resolver initOpts -> do
+                liftM (\x -> Right x) (solve f)
+            | otherwise -> throwM $ ResolverPartial resolver (show result)
+        (BuildPlanCheckFail _ e _)
+            | (forceOverwrite initOpts) -> do
+                return $ Left e
+            | otherwise -> throwM $ ResolverMismatch resolver (show result)
+    where
+      gpds        = Map.elems (fmap snd bundle)
+      solve flags = do
+          let cabalDirs      = Map.elems (fmap fst bundle)
+              srcConstraints = mergeConstraints (gpdPackages gpds) flags
+
+          mresult <- solveResolverSpec stackYaml cabalDirs
+                                       (resolver, srcConstraints, Map.empty)
+          case mresult of
+              Just (src, ext) ->
+                  return (fmap snd (Map.union src ext), fmap fst ext)
               Nothing
                   | forceOverwrite initOpts -> do
                       $logWarn "\nSolver could not arrive at a workable build \
                                \plan.\nProceeding to create a config with an \
                                \incomplete plan anyway..."
-                      return (res, f, Map.empty)
+                      return (flags, Map.empty)
                   | otherwise -> throwM (SolverGiveUp giveUpMsg)
 
       giveUpMsg = concat
@@ -230,19 +305,6 @@ getDefaultResolver stackYaml cabalDirs gpds initOpts = do
           , "        - Add any missing remote packages.\n"
           , "        - Add extra dependencies to guide solver.\n"
           ]
-
-      -- TODO support selecting best across regular and custom snapshots
-      getResolver (MethodSnapshot snapPref)  = selectSnapResolver snapPref
-      getResolver (MethodResolver aresolver) = makeConcreteResolver aresolver
-
-      selectSnapResolver snapPref = do
-          msnaps <- getSnapshots'
-          snaps <- maybe (error "No snapshots to select from.")
-                         (getRecommendedSnapshots snapPref)
-                         msnaps
-          selectBestSnapshot gpds snaps
-            >>= maybe (throwM (NoMatchingSnapshot snaps))
-                      (return . ResolverSnapshot)
 
       needSolver _ (InitOpts {useSolver = True}) = True
       needSolver (ResolverCompiler _)  _ = True
