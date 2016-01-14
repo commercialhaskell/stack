@@ -98,7 +98,6 @@ ghci GhciOpts{..} = do
     (targets,mainIsTargets,pkgs) <- ghciSetup bopts ghciNoBuild ghciSkipIntermediate ghciMainIs ghciAdditionalPackages
     config <- asks getConfig
     bconfig <- asks getBuildConfig
-    mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
     wc <- getWhichCompiler
     let pkgopts = hidePkgOpt ++ genOpts ++ ghcOpts
         hidePkgOpt = if null pkgs || not ghciHidePackages then [] else ["-hide-all-packages"]
@@ -119,11 +118,12 @@ ghci GhciOpts{..} = do
             ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
              T.unwords (map T.pack (nubOrd omittedOpts)))
     oiDir <- objectInterfaceDir bconfig
-    let modulesToLoad = nubOrd $
-            concatMap (map display . S.toList . ghciPkgModules) pkgs
-        thingsToLoad =
-            maybe [] (return . toFilePath) mainFile <> modulesToLoad
-        odir =
+    (modulesToLoad, thingsToLoad) <- if ghciNoLoadModules then return ([], []) else do
+        mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
+        let modulesToLoad = nubOrd $ concatMap (map display . S.toList . ghciPkgModules) pkgs
+            thingsToLoad = maybe [] (return . toFilePath) mainFile <> modulesToLoad
+        return (modulesToLoad, thingsToLoad)
+    let odir =
             [ "-odir=" <> toFilePathNoTrailingSep oiDir
             , "-hidir=" <> toFilePathNoTrailingSep oiDir ]
     $logInfo
