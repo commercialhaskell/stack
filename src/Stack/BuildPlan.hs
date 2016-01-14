@@ -650,6 +650,29 @@ data BuildPlanCheck =
     | BuildPlanCheckFail    (Map PackageName (Map FlagName Bool)) DepErrors
                             CompilerVersion
 
+-- Greater means a better plan
+instance Ord BuildPlanCheck where
+  (BuildPlanCheckPartial _ e1) `compare` (BuildPlanCheckPartial _ e2) =
+      compare (Map.size e1) (Map.size e2)
+
+  (BuildPlanCheckFail _ e1 _)  `compare` (BuildPlanCheckFail _ e2 _) =
+      compare (Map.size e1) (Map.size e2)
+
+  (BuildPlanCheckOk _)        `compare` (BuildPlanCheckOk _)         = EQ
+  (BuildPlanCheckOk _)        `compare` (BuildPlanCheckPartial _ _)  = GT
+  (BuildPlanCheckOk _)        `compare` (BuildPlanCheckFail _ _ _)   = GT
+  (BuildPlanCheckPartial _ _) `compare` (BuildPlanCheckFail _ _ _)   = GT
+  _ `compare` _ = LT
+
+instance Eq BuildPlanCheck where
+  (BuildPlanCheckOk _)         == (BuildPlanCheckOk _)         = True
+  (BuildPlanCheckPartial _ e1) == (BuildPlanCheckPartial _ e2) =
+      (Map.size e1) == (Map.size e2)
+  (BuildPlanCheckFail _ e1 _)  == (BuildPlanCheckFail _ e2 _)  =
+      (Map.size e1) == (Map.size e2)
+
+  _ == _ = False
+
 instance Show BuildPlanCheck where
     show (BuildPlanCheckOk _) = ""
     show (BuildPlanCheckPartial f e)  = T.unpack $ showDepErrors f e
@@ -712,21 +735,19 @@ selectBestSnapshot gpds snaps = do
         loop bestYet (snap:rest) = do
             result <- checkSnapBuildPlan gpds Nothing snap
             reportResult result snap
+            let new = (snap, result)
             case result of
-                BuildPlanCheckFail _ _ _ -> loop bestYet rest
                 BuildPlanCheckOk _ -> return $ Just snap
-                BuildPlanCheckPartial _ e -> do
-                    case bestYet of
-                        Nothing -> loop (Just (snap, e)) rest
-                        Just prev ->
-                            loop (Just (betterSnap prev (snap, e))) rest
+                _ -> case bestYet of
+                        Nothing  -> loop (Just new) rest
+                        Just old -> loop (Just (betterSnap old new)) rest
 
-        betterSnap (s1, e1) (s2, e2)
-          | (Map.size e1) <= (Map.size e2) = (s1, e1)
-          | otherwise = (s2, e2)
+        betterSnap (s1, r1) (s2, r2)
+          | r1 <= r2  = (s1, r1)
+          | otherwise = (s2, r2)
 
         reportResult (BuildPlanCheckOk _) snap = do
-            $logInfo $ "* Selected " <> renderSnapName snap
+            $logInfo $ "* Matches " <> renderSnapName snap
             $logInfo ""
 
         reportResult r@(BuildPlanCheckPartial _ _) snap = do
