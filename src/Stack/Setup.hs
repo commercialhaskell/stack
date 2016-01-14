@@ -218,8 +218,7 @@ setupEnv mResolveMissingGHC = do
 
     menv <- mkEnvOverride platform env
     compilerVer <- getCompilerVersion menv wc
-    globaldb <- getGlobalDB menv wc
-    cabalVer <- getCabalPkgVer menv wc globaldb
+    cabalVer <- getCabalPkgVer menv wc
     packages <- mapM
         (resolvePackageEntry menv (bcRoot bconfig))
         (bcPackageEntries bconfig)
@@ -241,6 +240,7 @@ setupEnv mResolveMissingGHC = do
     createDatabase menv wc deps
     localdb <- runReaderT packageDatabaseLocal envConfig0
     createDatabase menv wc localdb
+    globaldb <- getGlobalDB menv wc
     extras <- runReaderT packageDatabaseExtra envConfig0
     let mkGPP locals = mkGhcPackagePath locals localdb deps extras globaldb
 
@@ -483,8 +483,7 @@ upgradeCabal menv wc = do
             [PackageIdentifier name' version]
                 | name == name' -> return version
             x -> error $ "Unexpected results for resolvePackages: " ++ show x
-    globaldb <- getGlobalDB menv wc
-    installed <- getCabalPkgVer menv wc globaldb
+    installed <- getCabalPkgVer menv wc
     if installed >= newest
         then $logInfo $ T.concat
             [ "Currently installed Cabal is "
