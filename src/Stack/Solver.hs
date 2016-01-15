@@ -6,6 +6,7 @@ module Stack.Solver
     ( checkResolverSpec
     , cabalPackagesCheck
     , findCabalFiles
+    , getResolverConstraints
     , mergeConstraints
     , solveExtraDeps
     , solveResolverSpec
@@ -307,14 +308,14 @@ solveResolverSpec
        , ConstraintSpec) -- ^ ( resolver
                          --   , src package constraints
                          --   , extra dependency constraints )
-    -> m (Maybe ( ConstraintSpec
-                , ConstraintSpec)) -- ^ ( resulting src package specs
-                                   --   ,  resulting external package specs )
+    -> m (Either [PackageName] (ConstraintSpec , ConstraintSpec))
+       -- ^ (Conflicting packages
+       --    (resulting src package specs, external dependency specs))
 
 solveResolverSpec stackYaml cabalDirs
                   (resolver, srcConstraints, extraConstraints) = do
     $logInfo $ "Using resolver: " <> resolverName resolver
-    (compilerVer, snapConstraints) <- getResolverConstraints resolver
+    (compilerVer, snapConstraints) <- getResolverConstraints stackYaml resolver
     menv <- setupCabalEnv compilerVer
 
     let -- Note - The order in Map.union below is important.
@@ -367,27 +368,38 @@ solveResolverSpec stackYaml cabalDirs
                      <> T.pack (show $ Map.size external)
                      <> " external dependencies."
 
-            return $ Just (srcs, external)
+            return $ Right (srcs, external)
         Nothing -> do
             $logInfo $ "Failed to arrive at a workable build plan using "
                        <> resolverName resolver <> " resolver."
-            return Nothing
+            -- TODO get the list of conflicting packages from cabal and return
+            -- it here.
+            return $ Left []
+
+getResolverConstraints
+    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
+       , MonadReader env m, HasConfig env , HasGHCVariant env
+       , HasHttpManager env , HasLogLevel env , HasReExec env
+       , HasTerminal env)
+    => Path Abs File
+    -> Resolver
+    -> m (CompilerVersion,
+          Map PackageName (Version, Map FlagName Bool))
+getResolverConstraints stackYaml resolver
+    | (ResolverSnapshot snapName) <- resolver = do
+        mbp <- loadMiniBuildPlan snapName
+        return (mbpCompilerVersion mbp, mbpConstraints mbp)
+    | (ResolverCustom _ url) <- resolver = do
+        -- FIXME instead of passing the stackYaml dir we should maintain
+        -- the file URL in the custom resolver always relative to stackYaml.
+        mbp <- parseCustomMiniBuildPlan stackYaml url
+        return (mbpCompilerVersion mbp, mbpConstraints mbp)
+    | (ResolverCompiler compiler) <- resolver =
+        return (compiler, Map.empty)
+    | otherwise = error "Not reached"
     where
       mpiConstraints mpi = (mpiVersion mpi, mpiFlags mpi)
       mbpConstraints mbp = fmap mpiConstraints (mbpPackages mbp)
-
-      getResolverConstraints (ResolverSnapshot snapName) = do
-          mbp <- loadMiniBuildPlan snapName
-          return (mbpCompilerVersion mbp, mbpConstraints mbp)
-
-      getResolverConstraints (ResolverCompiler compiler) =
-          return (compiler, Map.empty)
-
-      -- FIXME instead of passing the stackYaml dir we should maintain
-      -- the file URL in the custom resolver always relative to stackYaml.
-      getResolverConstraints (ResolverCustom _ url) = do
-          mbp <- parseCustomMiniBuildPlan stackYaml url
-          return (mbpCompilerVersion mbp, mbpConstraints mbp)
 
 -- | Given a bundle of packages and a resolver, check the resolver with respect
 -- to the packages and return how well the resolver satisfies the depndencies
@@ -536,9 +548,12 @@ solveExtraDeps modStackYaml = do
     resultSpecs <- case resolverResult of
         BuildPlanCheckOk flags ->
             return $ Just ((mergeConstraints oldSrcs flags), Map.empty)
-        BuildPlanCheckPartial _ _ ->
-            solveResolverSpec stackYaml cabalDirs
+        BuildPlanCheckPartial _ _ -> do
+            eres <- solveResolverSpec stackYaml cabalDirs
                               (resolver, srcConstraints, extraConstraints)
+            -- TODO Solver should also use the init code to ignore incompatible
+            -- packages
+            return $ either (const Nothing) Just eres
         (BuildPlanCheckFail _ _ _) ->
             throwM $ ResolverMismatch resolver (show resolverResult)
 

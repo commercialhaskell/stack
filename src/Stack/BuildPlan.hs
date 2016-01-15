@@ -15,6 +15,7 @@ module Stack.BuildPlan
     , checkSnapBuildPlan
     , DepError(..)
     , DepErrors
+    , gpdPackageDeps
     , gpdPackages
     , gpdPackageName
     , MiniBuildPlan(..)
@@ -27,6 +28,7 @@ module Stack.BuildPlan
     , getToolMap
     , shadowMiniBuildPlan
     , showMapPackages
+    , showPackages
     , parseCustomMiniBuildPlan
     ) where
 
@@ -764,14 +766,17 @@ selectBestSnapshot gpds snaps = do
 
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 
-showMapPackages :: Map PackageName a -> Text
-showMapPackages mp = T.concat (map formatItem $ Map.keys mp)
+showPackages :: [PackageName] -> Text
+showPackages pkgs = T.concat (map formatItem pkgs)
     where
         formatItem pkg = T.concat
             [ "    - "
             , T.pack $ packageNameString pkg
             , "\n"
             ]
+
+showMapPackages :: Map PackageName a -> Text
+showMapPackages mp = showPackages $ Map.keys mp
 
 showCompilerErrors
     :: Map PackageName (Map FlagName Bool)

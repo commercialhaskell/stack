@@ -15,7 +15,7 @@ import           Control.Monad                   (liftM, when)
 import           Control.Monad.Catch             (MonadMask, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader            (MonadReader)
+import           Control.Monad.Reader            (asks, MonadReader)
 import           Control.Monad.Trans.Control     (MonadBaseControl)
 import qualified Data.ByteString.Builder         as B
 import qualified Data.ByteString.Lazy            as L
@@ -23,11 +23,11 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.HashMap.Strict             as HM
 import qualified Data.IntMap                     as IntMap
 import qualified Data.Foldable                   as F
-import           Data.List                       (sortBy)
+import           Data.List                       (intersect, sortBy)
 import           Data.List.Extra                 (nubOrd)
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
-import           Data.Maybe                      (mapMaybe)
+import           Data.Maybe                      (fromJust, mapMaybe)
 import           Data.Monoid
 import qualified Data.Text                       as T
 import qualified Data.Yaml                       as Yaml
@@ -301,17 +301,27 @@ getWorkingResolverPlan stackYaml initOpts bundle resolver = do
             -- if some packages failed try again using the rest
             case eres of
                 Right (f, edeps)-> return (resolver, f, edeps, info)
-                Left e
-                    | Map.null good ->
+                Left bad
+                    | Map.null good -> do
+                        $logWarn "None of the packages were found to be \
+                                 \compatible with the resolver compiler."
                         return (resolver, Map.empty, Map.empty, Map.empty)
                     | otherwise -> do
-                        $logWarn "Ignoring compiler incompatible packages:"
-                        $logWarn $ indent $ showMapPackages failed
-                        assert ((Map.size good) < (Map.size info)) (go good)
+                        when ((Map.size good) == (Map.size info)) $
+                            error "Bug: No packages to ignore"
+
+                        if length bad > 1 then do
+                          $logWarn "Ignoring compiler incompatible packages:"
+                          $logWarn $ indent $ showPackages bad
+                        else
+                          $logWarn $ "Ignoring compiler incompatible package: "
+                                     <> (T.pack $ packageNameString (head bad))
+
+                        go good
                     where
-                      failed   = Map.unions (Map.elems (fmap deNeededBy e))
-                      good     = Map.difference info failed
-                      indent t = T.unlines $ fmap ("    " <>) (T.lines t)
+                      indent t   = T.unlines $ fmap ("    " <>) (T.lines t)
+                      isGood k _ = not (k `elem` bad)
+                      good       = Map.filterWithKey isGood info
 
 checkBundleResolver
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
@@ -323,8 +333,8 @@ checkBundleResolver
     -> Map PackageName (Path Abs Dir, C.GenericPackageDescription)
        -- ^ Src package name: cabal dir, cabal package description
     -> Resolver
-    -> m (Either DepErrors ( Map PackageName (Map FlagName Bool)
-                           , Map PackageName Version))
+    -> m (Either [PackageName] ( Map PackageName (Map FlagName Bool)
+                               , Map PackageName Version))
 checkBundleResolver stackYaml initOpts bundle resolver = do
     result <- checkResolverSpec gpds Nothing resolver
     case result of
@@ -334,14 +344,15 @@ checkBundleResolver stackYaml initOpts bundle resolver = do
                 $logWarn $ "Resolver " <> resolverName resolver
                             <> " will need external packages: "
                 $logWarn $ indent $ T.pack $ show result
-                liftM (\x -> Right x) (solve f)
+                solve f
             | otherwise -> throwM $ ResolverPartial resolver (show result)
         (BuildPlanCheckFail _ e _)
             | (forceOverwrite initOpts) -> do
                 $logWarn $ "Resolver compiler mismatch: "
                            <> resolverName resolver
                 $logWarn $ indent $ T.pack $ show result
-                return $ Left e
+                let failed = Map.unions (Map.elems (fmap deNeededBy e))
+                return $ Left (Map.keys failed)
             | otherwise -> throwM $ ResolverMismatch resolver (show result)
     where
       indent t    = T.unlines $ fmap ("    " <>) (T.lines t)
@@ -350,18 +361,32 @@ checkBundleResolver stackYaml initOpts bundle resolver = do
           let cabalDirs      = Map.elems (fmap fst bundle)
               srcConstraints = mergeConstraints (gpdPackages gpds) flags
 
-          mresult <- solveResolverSpec stackYaml cabalDirs
+          eresult <- solveResolverSpec stackYaml cabalDirs
                                        (resolver, srcConstraints, Map.empty)
-          case mresult of
-              Just (src, ext) ->
-                  return (fmap snd (Map.union src ext), fmap fst ext)
-              Nothing
-                  | forceOverwrite initOpts -> do
-                      $logWarn "\nSolver could not arrive at a workable build \
-                               \plan.\nProceeding to create a config with an \
-                               \incomplete plan anyway..."
-                      return (flags, Map.empty)
+          case eresult of
+              Right (src, ext) ->
+                  return $ Right (fmap snd (Map.union src ext), fmap fst ext)
+              Left packages
+                  | forceOverwrite initOpts, srcpkgs /= []-> do
+                      pkg <- findOneIndependent srcpkgs flags
+                      return $ Left [pkg]
                   | otherwise -> throwM (SolverGiveUp giveUpMsg)
+                  where srcpkgs = intersect (Map.keys bundle) packages
+
+      -- among a list of packages find one on which none among the rest of the
+      -- packages depend. This package is a good candidate to be removed from
+      -- the list of packages when there is conflict in dependencies among this
+      -- set of packages.
+      findOneIndependent packages flags = do
+          platform <- asks (configPlatform . getConfig)
+          (compiler, _) <- getResolverConstraints stackYaml resolver
+          let getGpd pkg = snd (fromJust (Map.lookup pkg bundle))
+              getFlags pkg = fromJust (Map.lookup pkg flags)
+              deps pkg = gpdPackageDeps (getGpd pkg) compiler platform
+                                        (getFlags pkg)
+              allDeps = concat $ map (Map.keys . deps) packages
+              isIndependent pkg = not $ pkg `elem` allDeps
+          return $ head (filter isIndependent packages)
 
       giveUpMsg = concat
           [ "    - Use '--ignore-subdirs' to skip packages in subdirectories.\n"
