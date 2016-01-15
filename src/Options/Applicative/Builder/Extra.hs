@@ -29,9 +29,7 @@ boolFlags :: Bool                 -- ^ Default value
 boolFlags defaultValue = enableDisableFlags defaultValue True False
 
 -- | Enable/disable flags for a 'Bool', without a default case (to allow chaining with '<|>').
-boolFlagsNoDefault :: Maybe Bool           -- ^ Hide the enabling or disabling flag from the
-                                           -- brief description?
-                   -> String               -- ^ Flag name
+boolFlagsNoDefault :: String               -- ^ Flag name
                    -> String               -- ^ Help suffix
                    -> Mod FlagFields Bool
                    -> Parser Bool
@@ -54,54 +52,38 @@ enableDisableFlags :: (Eq a)
                    -> Mod FlagFields a
                    -> Parser a
 enableDisableFlags defaultValue enabledValue disabledValue name helpSuffix mods =
-  enableDisableFlagsNoDefault enabledValue disabledValue (Just defaultValue) name helpSuffix mods <|>
+  enableDisableFlagsNoDefault enabledValue disabledValue name helpSuffix mods <|>
   pure defaultValue
 
 -- | Enable/disable flags for any type, without a default (to allow chaining with '<|>')
 enableDisableFlagsNoDefault :: (Eq a)
                             => a                 -- ^ Enabled value
                             -> a                 -- ^ Disabled value
-                            -> Maybe a           -- ^ Hide the enabling or disabling flag
-                                                 -- from the brief description??
                             -> String            -- ^ Name
                             -> String            -- ^ Help suffix
                             -> Mod FlagFields a
                             -> Parser a
-enableDisableFlagsNoDefault enabledValue disabledValue maybeHideValue name helpSuffix mods =
-  last <$> some (enableDisableFlagsNoDefault' enabledValue disabledValue maybeHideValue name helpSuffix mods)
-
-enableDisableFlagsNoDefault' :: (Eq a) => a -> a -> Maybe a -> String -> String -> Mod FlagFields a -> Parser a
-enableDisableFlagsNoDefault' enabledValue disabledValue maybeHideValue name helpSuffix mods =
-    let hideEnabled = Just enabledValue == maybeHideValue
-        hideDisabled = Just disabledValue == maybeHideValue
-    in flag'
+enableDisableFlagsNoDefault enabledValue disabledValue name helpSuffix mods =
+  last <$> some
+      ((flag'
            enabledValue
-           ((if hideEnabled
-                 then hidden <> internal
-                 else idm) <>
+           (hidden <>
+            internal <>
             long name <>
-            help
-                (concat $ concat
-                     [ ["Enable ", helpSuffix]
-                     , [" (--no-" ++ name ++ " to disable)" | hideDisabled]]) <>
+            help helpSuffix <>
             mods) <|>
        flag'
-           enabledValue
-           (hidden <> internal <> long ("enable-" ++ name) <> mods) <|>
-       flag'
            disabledValue
-           ((if hideDisabled
-                 then hidden <> internal
-                 else idm) <>
+           (hidden <>
+            internal <>
             long ("no-" ++ name) <>
-            help
-                (concat $ concat
-                     [ ["Disable ", helpSuffix]
-                     , [" (--" ++ name ++ " to enable)" | hideEnabled]]) <>
-            mods) <|>
+            help helpSuffix <>
+            mods)) <|>
        flag'
            disabledValue
-           (hidden <> internal <> long ("disable-" ++ name) <> mods)
+           (long (concat ["[no-]", name]) <>
+            help (concat ["Enable/disable ", helpSuffix]) <>
+            mods))
 
 -- | Show an extra help option (e.g. @--docker-help@ shows help for all @--docker*@ args).
 --
