@@ -205,7 +205,7 @@ library
                    , word8
                    , hastache
                    , project-template >= 0.2
-                   , email-validate >=2.0
+                   , email-validate >=2.0 && < 2.3
                    , uuid
   if os(windows)
     cpp-options:     -DWINDOWS
