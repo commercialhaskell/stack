@@ -374,6 +374,11 @@ loadConfig configArgs mstackYaml mresolver = do
                               (configMonoidDockerOpts c) {dockerMonoidDefaultEnable = False}})
                 extraConfigs0
     mproject <- loadProjectConfig mstackYaml
+
+    let printUserMessage (p, _, _) =
+         maybe (return ()) ($logWarn . T.pack) (projectUserMsg p)
+    maybe (return ()) printUserMessage mproject
+
     let mproject' = (\(project, stackYaml, _) -> (project, stackYaml)) <$> mproject
     config <- configFromConfigMonoid stackRoot userConfigPath mresolver mproject' $ mconcat $
         case mproject of
@@ -435,7 +440,8 @@ loadBuildConfig mproject config mresolver mcompiler = do
                    $logInfo ("Writing implicit global project config file to: " <> T.pack dest')
                    $logInfo "Note: You can change the snapshot via the resolver field there."
                    let p = Project
-                           { projectPackages = mempty
+                           { projectUserMsg = Nothing
+                           , projectPackages = mempty
                            , projectExtraDeps = mempty
                            , projectFlags = mempty
                            , projectResolver = r
