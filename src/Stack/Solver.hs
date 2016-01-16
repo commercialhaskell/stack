@@ -28,6 +28,7 @@ import           Data.List                   ((\\), isSuffixOf, intercalate)
 import           Data.List.Extra             (groupSortOn)
 import           Data.Map                    (Map)
 import qualified Data.Map                    as Map
+import           Data.Maybe                  (catMaybes, isNothing)
 import           Data.Monoid
 import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
@@ -38,7 +39,9 @@ import           Data.Text.Encoding.Error    (lenientDecode)
 import qualified Data.Text.Lazy              as LT
 import           Data.Text.Lazy.Encoding     (decodeUtf8With)
 import qualified Data.Yaml                   as Yaml
+import qualified Distribution.Package        as C
 import qualified Distribution.PackageDescription as C
+import qualified Distribution.Text           as C
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.Find                   (findFiles)
@@ -72,7 +75,7 @@ cabalSolver :: (MonadIO m, MonadLogger m, MonadMask m, MonadBaseControl IO m, Mo
             -> ConstraintSpec -- ^ src constraints
             -> ConstraintSpec -- ^ dep constraints
             -> [String] -- ^ additional arguments
-            -> m (Maybe ConstraintSpec)
+            -> m (Either [PackageName] ConstraintSpec)
 cabalSolver menv cabalfps constraintType
             srcConstraints depConstraints cabalArgs =
   withSystemTempDirectory "cabal-solver" $ \dir -> do
@@ -104,22 +107,52 @@ cabalSolver menv cabalfps constraintType
                toConstraintArgs (flagConstraints constraintType) ++
                fmap toFilePath cabalfps
 
-    catch (liftM Just (readProcessStdout (Just tmpdir) menv "cabal" args))
+    catch (liftM Right (readProcessStdout (Just tmpdir) menv "cabal" args))
           (\ex -> case ex of
-              ReadProcessException _ _ _ err -> do
-                  let errMsg = decodeUtf8With lenientDecode err
-                  if LT.isInfixOf "Could not resolve dependencies" errMsg
-                  then do
-                      $logInfo "Attempt failed."
-                      $logInfo "\n>>>> Cabal errors begin"
-                      $logInfo $ LT.toStrict errMsg
-                                 <> "<<<< Cabal errors end\n"
-                      return Nothing
-                  else throwM ex
+              ReadProcessException _ _ _ err -> return $ Left err
               _ -> throwM ex)
-    >>= maybe (return Nothing) parseCabalOutput
+    >>= either parseCabalErrors parseCabalOutput
 
   where
+    errCheck = LT.isInfixOf "Could not resolve dependencies"
+
+    parseCabalErrors err = do
+        let errExit = error "Could not parse cabal-install errors"
+            msg = decodeUtf8With lenientDecode err
+
+        if errCheck msg then do
+            $logInfo "Attempt failed."
+            $logInfo "\n>>>> Cabal errors begin"
+            $logInfo $ LT.toStrict msg
+                       <> "<<<< Cabal errors end\n"
+            $logInfo $ "*** User packages involved in cabal failure: "
+                 <> (LT.toStrict $ LT.intercalate ", "
+                                 $ parseConflictingPkgs msg)
+            let pkgs = parseConflictingPkgs msg
+                mPkgNames = map (C.simpleParse . T.unpack . LT.toStrict) pkgs
+                pkgNames  = map (fromCabalPackageName . C.pkgName)
+                                (catMaybes mPkgNames)
+
+            when (any isNothing mPkgNames) $
+                  $logInfo $ "*** Only some package names could be parsed: " <>
+                      (T.pack (intercalate ", " (map show pkgNames)))
+
+            if pkgNames /= [] then do
+                  return $ Left pkgNames
+            else errExit
+        else errExit
+
+    parseConflictingPkgs msg =
+        let ls = dropWhile (not . errCheck) $ LT.lines msg
+            select s = ((LT.isPrefixOf "trying:" s)
+                      || (LT.isPrefixOf "next goal:" s))
+                      && (LT.isSuffixOf "(user goal)" s)
+            pkgName =   (take 1)
+                      . LT.words
+                      . (LT.drop 1)
+                      . (LT.dropWhile (/= ':'))
+        in concat $ map pkgName (filter select ls)
+
     parseCabalOutput bs = do
         let ls = drop 1
                $ dropWhile (not . T.isPrefixOf "In order, ")
@@ -127,7 +160,7 @@ cabalSolver menv cabalfps constraintType
                $ decodeUtf8 bs
             (errs, pairs) = partitionEithers $ map parseLine ls
         if null errs
-          then return $ Just (Map.fromList pairs)
+          then return $ Right (Map.fromList pairs)
           else error $ "Could not parse cabal-install output: " ++ show errs
 
     parseLine t0 = maybe (Left t0) Right $ do
@@ -341,15 +374,15 @@ solveResolverSpec stackYaml cabalDirs
     unless (Map.null depOnlyConstraints)
         ($logInfo $ "Trying with " <> srcNames <> " as hard constraints...")
 
-    mdeps <- solver Constraint
-    mdeps' <- case mdeps of
-        Nothing | not (Map.null depOnlyConstraints) -> do
+    eresult <- solver Constraint
+    eresult' <- case eresult of
+        Left _ | not (Map.null depOnlyConstraints) -> do
             $logInfo $ "Retrying with " <> srcNames <> " as preferences..."
             solver Preference
-        _ -> return mdeps
+        _ -> return eresult
 
-    case mdeps' of
-        Just deps -> do
+    case eresult' of
+        Right deps -> do
             let
                 -- All src package constraints returned by cabal.
                 -- Flags may have changed.
@@ -369,12 +402,12 @@ solveResolverSpec stackYaml cabalDirs
                      <> " external dependencies."
 
             return $ Right (srcs, external)
-        Nothing -> do
+        Left x -> do
             $logInfo $ "Failed to arrive at a workable build plan using "
                        <> resolverName resolver <> " resolver."
             -- TODO get the list of conflicting packages from cabal and return
             -- it here.
-            return $ Left []
+            return $ Left x
 
 getResolverConstraints
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m

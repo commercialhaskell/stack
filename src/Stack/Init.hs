@@ -301,27 +301,28 @@ getWorkingResolverPlan stackYaml initOpts bundle resolver = do
             -- if some packages failed try again using the rest
             case eres of
                 Right (f, edeps)-> return (resolver, f, edeps, info)
-                Left bad
-                    | Map.null good -> do
-                        $logWarn "None of the packages were found to be \
-                                 \compatible with the resolver compiler."
+                Left ignored
+                    | Map.null available -> do
+                        $logWarn "*** Could not find a working plan for any of \
+                                 \the user packages.\nProceeding to create a \
+                                 \config anyway."
                         return (resolver, Map.empty, Map.empty, Map.empty)
                     | otherwise -> do
-                        when ((Map.size good) == (Map.size info)) $
+                        when ((Map.size available) == (Map.size info)) $
                             error "Bug: No packages to ignore"
 
-                        if length bad > 1 then do
-                          $logWarn "Ignoring compiler incompatible packages:"
-                          $logWarn $ indent $ showPackages bad
+                        if length ignored > 1 then do
+                          $logWarn "*** Ignoring packages:"
+                          $logWarn $ indent $ showPackages ignored
                         else
-                          $logWarn $ "Ignoring compiler incompatible package: "
-                                     <> (T.pack $ packageNameString (head bad))
+                          $logWarn $ "*** Ignoring package: "
+                                 <> (T.pack $ packageNameString (head ignored))
 
-                        go good
+                        go available
                     where
                       indent t   = T.unlines $ fmap ("    " <>) (T.lines t)
-                      isGood k _ = not (k `elem` bad)
-                      good       = Map.filterWithKey isGood info
+                      isAvailable k _ = not (k `elem` ignored)
+                      available       = Map.filterWithKey isAvailable info
 
 checkBundleResolver
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
@@ -341,14 +342,14 @@ checkBundleResolver stackYaml initOpts bundle resolver = do
         BuildPlanCheckOk f -> return $ Right (f, Map.empty)
         (BuildPlanCheckPartial f _)
             | needSolver resolver initOpts -> do
-                $logWarn $ "Resolver " <> resolverName resolver
+                $logWarn $ "*** Resolver " <> resolverName resolver
                             <> " will need external packages: "
                 $logWarn $ indent $ T.pack $ show result
                 solve f
             | otherwise -> throwM $ ResolverPartial resolver (show result)
         (BuildPlanCheckFail _ e _)
             | (forceOverwrite initOpts) -> do
-                $logWarn $ "Resolver compiler mismatch: "
+                $logWarn $ "*** Resolver compiler mismatch: "
                            <> resolverName resolver
                 $logWarn $ indent $ T.pack $ show result
                 let failed = Map.unions (Map.elems (fmap deNeededBy e))
