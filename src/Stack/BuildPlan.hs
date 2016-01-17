@@ -661,7 +661,8 @@ instance Ord BuildPlanCheck where
       compare (Map.size e1) (Map.size e2)
 
   (BuildPlanCheckFail _ e1 _)  `compare` (BuildPlanCheckFail _ e2 _) =
-      compare (Map.size e1) (Map.size e2)
+      let numUserPkgs e = Map.size $ Map.unions (Map.elems (fmap deNeededBy e))
+      in compare (numUserPkgs e1) (numUserPkgs e2)
 
   (BuildPlanCheckOk _)        `compare` (BuildPlanCheckOk _)         = EQ
   (BuildPlanCheckOk _)        `compare` (BuildPlanCheckPartial _ _)  = GT
@@ -674,7 +675,8 @@ instance Eq BuildPlanCheck where
   (BuildPlanCheckPartial _ e1) == (BuildPlanCheckPartial _ e2) =
       (Map.size e1) == (Map.size e2)
   (BuildPlanCheckFail _ e1 _)  == (BuildPlanCheckFail _ e2 _)  =
-      (Map.size e1) == (Map.size e2)
+      let numUserPkgs e = Map.size $ Map.unions (Map.elems (fmap deNeededBy e))
+      in numUserPkgs e1 == numUserPkgs e2
 
   _ == _ = False
 
