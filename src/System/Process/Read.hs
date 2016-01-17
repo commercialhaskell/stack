@@ -326,13 +326,20 @@ makeAbsolute = fmap FP.normalise . absolutize
 --
 -- Throws a 'ReadProcessException' if unsuccessful.
 findExecutable :: (MonadIO m, MonadThrow n) => EnvOverride -> String -> m (n (Path Abs File))
-findExecutable _ name | any FP.isPathSeparator name = do
-    exists <- liftIO $ doesFileExist name
-    if exists
-        then do
-            path <- liftIO $ parseRelAsAbsFile name
-            return $ return path
-        else return $ throwM $ ExecutableNotFoundAt name
+findExecutable eo name0 | any FP.isPathSeparator name0 = do
+    let names0
+            | null (eoExeExtension eo) = [name0]
+            -- Support `stack exec foo/bar.exe` on Windows
+            | otherwise = [name0 ++ eoExeExtension eo, name0]
+        testNames [] = return $ throwM $ ExecutableNotFoundAt name0
+        testNames (name:names) = do
+            exists <- liftIO $ doesFileExist name
+            if exists
+                then do
+                    path <- liftIO $ parseRelAsAbsFile name
+                    return $ return path
+                else testNames names
+    testNames names0
 findExecutable eo name = liftIO $ do
     m <- readIORef $ eoExeCache eo
     epath <- case Map.lookup name m of
