@@ -67,3 +67,9 @@ label. Issues that are suitable for newcomers to the codebase have the
 [newcomer](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3A%22awaiting+pr%22+label%3Anewcomer)
 label. Best to post a comment to the issue before you start work, in case anyone
 has already started.
+
+Please include a
+[ChangeLog](https://github.com/commercialhaskell/stack/blob/master/ChangeLog.md)
+entry and
+[documentation](https://github.com/commercialhaskell/stack/tree/master/doc/)
+updates with your pull request.

@@ -5,45 +5,47 @@
 The following should be tested minimally before a release is considered good
 to go:
 
-* After GHC 8.0: switch to Debian 8 and CentOS 6.7 Vagrant boxes for building Stack
-  binaries (to match GHC bindists) and drop support for Debian 7.
+* After GHC 8.0: maybe switch to Debian 8 and CentOS 6.7 Vagrant boxes for
+  building Stack binaries (to match GHC bindists) and drop support for Debian 7.
 * Ensure `release` and `stable` branches merged to `master`
-* Integration tests pass on a representative sample of platforms: `stack install
-  --pedantic && stack test --pedantic --flag stack:integration-tests` . The actual
-  release script will perform a more thorough test for every platform/variant
-  prior to uploading, so this is just a pre-check
-* Ensure `stack haddock` works
+* Integration tests pass on a representative Windows, Mac OS X, and Linux (Linux
+  is handled by Jenkins automatically): `stack install --pedantic && stack test
+  --pedantic --flag stack:integration-tests` . The actual release script will
+  perform a more thorough test for every platform/variant prior to uploading, so
+  this is just a pre-check
+* Ensure `stack haddock` works (Travis CI now does this)
 * Stack builds with `stack-7.8.yaml` (Travis CI now does this)
 * stack can build the wai repo
 * Running `stack build` a second time on either stack or wai is a no-op
 * Build something that depends on `happy` (suggestion: `hlint`), since `happy`
   has special logic for moving around the `dist` directory
-* Check for any important changes that missed getting an entry in Changelog
-* In release candidate branch:
-    * Bump the version number (to even second-to-last component) in the .cabal
-      file
+* In master branch:
+    * stack.cabal: bump the version number (to next even third component)
+    * ChangeLog: rename the "unreleased changes" section to the new version
+* Cut a release candidate branch from master
+* In master branch:
+    * stack.cabal: bump version to next odd third component
+    * Changelog: add new "unreleased changes" section
+    * stack.yaml: bump to use latest LTS version
+* In RC branch:
     * Update the ChangeLog:
-        * Rename the "unreleased changes" section to the new version
+        * Check for any important changes that missed getting an entry in Changelog
         * Check for any entries that snuck into the previous version's changes
           due to merges
-* In master branch:
-    * Bump version to next odd second-to-last component
-    * Add new "unreleased changes" section in changelog
-    * Bump to use latest LTS version
-* Review documentation for any changes that need to be made
-    * Search for old Stack version, unstable stack version, and the next
-      "obvious" version in sequence (if doing a non-obvious jump) and replace
-      with new version
-    * Look for any links to "latest" documentation, replace with version tag
-    * Ensure all inter-doc links use `.html` extension (not `.md`)
-    * Ensure all documentation pages listed in `doc/index.rst`
-* Check that any new Linux distribution versions added to
-  `etc/scripts/release.hs` and `etc/scripts/vagrant-releases.sh`
-* Check that no new entries need to be added to
-  [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml),
-  [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md),
-  and
-  [README.md](https://github.com/commercialhaskell/stack/blob/master/README.md)
+    * Review documentation for any changes that need to be made
+        * Search for old Stack version, unstable stack version, and the next
+          "obvious" version in sequence (if doing a non-obvious jump) and replace
+          with new version
+        * Look for any links to "latest" documentation, replace with version tag
+        * Ensure all inter-doc links use `.html` extension (not `.md`)
+        * Ensure all documentation pages listed in `doc/index.rst`
+    * Check that any new Linux distribution versions added to
+      `etc/scripts/release.hs` and `etc/scripts/vagrant-releases.sh`
+    * Check that no new entries need to be added to
+      [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml),
+      [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md),
+      and
+      [README.md](https://github.com/commercialhaskell/stack/blob/master/README.md)
 
 ## Release process
 
@@ -81,7 +83,7 @@ for requirements to perform the release, and more details about the tool.
 
 * Publish Github release
 
-* Upload package to Hackage: `stack upload . --pvp-bounds=both`
+* Upload package to Hackage: `stack upload .`
 
 * Upload haddocks to Hackage: `etc/scripts/upload-haddocks.sh`
 
