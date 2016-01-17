@@ -70,20 +70,19 @@ initProject currDir initOpts = do
     let noPkgMsg =  "In order to init, you should have an existing .cabal \
                     \file. Please try \"stack new\" instead."
 
-        dupPkgFooter = "You have the following options:\n"
-            <> "- Use '--ignore-subdirs' command line switch to ignore "
-            <> "packages in subdirectories. You can init subdirectories as "
-            <> "independent projects.\n"
-            <> "- Put selected packages in the stack config file "
-            <> "and then use 'stack solver' command to automatically resolve "
-            <> "dependencies and update the config file."
-
     cabalfps <- findCabalFiles (includeSubDirs initOpts) currDir
-    bundle  <- cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter
+    (bundle, dupPkgs)  <- cabalPackagesCheck cabalfps noPkgMsg Nothing
 
     (r, flags, extraDeps, rbundle) <- getDefaultResolver dest initOpts bundle
 
     let ignored = Map.difference bundle rbundle
+        dupPkgMsg
+            | (dupPkgs /= []) =
+                "Warning: Some packages were found to have names conflicting \
+                \with others and have been commented out in the \
+                \packages section.\n"
+            | otherwise = ""
+
         missingPkgMsg
             | (Map.size ignored > 0) =
                 "Warning: Some packages were found to be incompatible with \
@@ -98,13 +97,15 @@ initProject currDir initOpts = do
                 \as dependencies.\n"
             | otherwise = ""
 
-        footer
-            | (Map.size ignored > 0) || (Map.size extraDeps > 0) =
-                "You can suppress this message by removing it from \
-                 \stack.yaml\n"
-            | otherwise = ""
+        makeUserMsg msgs =
+            let msg = concat msgs
+            in if msg /= "" then
+                  msg <> "You can suppress this message by removing it from \
+                         \stack.yaml\n"
+                 else ""
 
-        userMsg = missingPkgMsg <> extraDepMsg <> footer
+        userMsg = makeUserMsg [dupPkgMsg, missingPkgMsg, extraDepMsg]
+
         gpds = Map.elems $ fmap snd rbundle
         p = Project
             { projectUserMsg = if userMsg == "" then Nothing else Just userMsg
@@ -116,31 +117,41 @@ initProject currDir initOpts = do
             , projectExtraPackageDBs = []
             }
 
-        makeRel dir =
+        makeRelDir dir =
             case stripDir currDir dir of
                 Nothing
                     | currDir == dir -> "."
                     | otherwise -> assert False $ toFilePath dir
                 Just rel -> toFilePath rel
 
-        pkgs = map toPkg $ Map.elems (fmap fst rbundle)
+        makeRel = liftIO . makeRelativeToCurrentDirectory . toFilePath
+
+        pkgs = map toPkg $ Map.elems (fmap (parent . fst) rbundle)
         toPkg dir = PackageEntry
             { peValidWanted = Nothing
             , peExtraDepMaybe = Nothing
-            , peLocation = PLFilePath $ makeRel dir
+            , peLocation = PLFilePath $ makeRelDir dir
             , peSubdirs = []
             }
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 
     $logInfo $ "Initialising configuration using resolver: " <> resolverName r
+    $logInfo $ "Total number of packages considered: "
+               <> (T.pack $ show $ (Map.size bundle + length dupPkgs))
+
+    when (dupPkgs /= []) $ do
+        $logWarn $ "Warning! Ignoring "
+                   <> (T.pack $ show $ length dupPkgs)
+                   <> " duplicate packages:"
+        rels <- mapM makeRel dupPkgs
+        $logWarn $ indent $ showItems rels
 
     when (Map.size ignored > 0) $ do
         $logWarn $ "Warning! Ignoring "
                    <> (T.pack $ show $ Map.size ignored)
-                   <> " out of "
-                   <> (T.pack $ show $ Map.size bundle)
-                   <> " packages:"
-        $logWarn $ indent $ showMapPackages ignored
+                   <> " packages due to dependency conflicts:"
+        rels <- mapM makeRel (Map.elems (fmap fst ignored))
+        $logWarn $ indent $ showItems $ rels
 
     when (Map.size extraDeps > 0) $ do
         $logWarn $ "Warning! " <> (T.pack $ show $ Map.size extraDeps)
@@ -151,13 +162,15 @@ initProject currDir initOpts = do
         <> T.pack reldest
     liftIO $ L.writeFile dest'
            $ B.toLazyByteString
-           $ renderStackYaml p (Map.elems $ fmap (makeRel . fst) ignored)
+           $ renderStackYaml p
+               (Map.elems $ fmap (makeRelDir . parent . fst) ignored)
+               (map (makeRelDir . parent) dupPkgs)
     $logInfo "All done."
 
 -- | Render a stack.yaml file with comments, see:
 -- https://github.com/commercialhaskell/stack/issues/226
-renderStackYaml :: Project -> [FilePath]-> B.Builder
-renderStackYaml p ignoredPackages =
+renderStackYaml :: Project -> [FilePath] -> [FilePath] -> B.Builder
+renderStackYaml p ignoredPackages dupPackages =
     case Yaml.toJSON p of
         Yaml.Object o -> renderObject o
         _ -> assert False $ B.byteString $ Yaml.encode p
@@ -182,20 +195,30 @@ renderStackYaml p ignoredPackages =
             \# Allow a newer minor version of GHC than the snapshot specifies\n\
             \# compiler-check: newer-minor\n"
 
-    ignoredPackagesComment =
-        if ignoredPackages /= [] then
-            "\n# Note: Some packages were found to be incompatible with the resolver and \
-            \have been commented out"
-        else ""
-
     comments =
         [ ("user-message", "A message to be displayed to the user. Used when autogenerated config ignored some packages or added extra deps.")
         , ("resolver", "Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)")
-        , ("packages", "Local packages, usually specified by relative directory name" <> ignoredPackagesComment)
+        , ("packages", "Local packages, usually specified by relative directory name")
         , ("extra-deps", "Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)")
         , ("flags", "Override default flag values for local packages and extra-deps")
         , ("extra-package-dbs", "Extra package databases containing global packages")
         ]
+
+    commentedPackages =
+        let ignoredComment = "# The following packages have been ignored \
+                \due to incompatibility with the resolver compiler or \
+                \dependency conflicts with other packages"
+            dupComment = "# The following packages have been ignored due \
+                \to package name conflict with other packages"
+        in commentPackages ignoredComment ignoredPackages
+           <> commentPackages dupComment dupPackages
+
+    commentPackages comment pkgs
+        | pkgs /= [] =
+            B.byteString (BC.pack $ comment ++ "\n")
+            <> (B.byteString $ BC.pack $ concat
+                 $ (map (\x -> "#- " ++ x ++ "\n") pkgs) ++ ["\n"])
+        | otherwise = ""
 
     goComment o (name, comment) =
         case HM.lookup name o of
@@ -205,11 +228,7 @@ renderStackYaml p ignoredPackages =
                 B.byteString comment <>
                 B.byteString "\n" <>
                 B.byteString (Yaml.encode $ Yaml.object [(name, v)]) <>
-                if (name == "packages") then
-                    B.byteString $ BC.pack $ concat
-                        $ (map (\x -> "#- " ++ x ++ "\n")
-                               ignoredPackages) ++ ["\n"]
-                else "" <>
+                if (name == "packages") then commentedPackages else "" <>
                 B.byteString "\n"
 
     goOthers o
@@ -244,12 +263,12 @@ getDefaultResolver
        , HasTerminal env)
     => Path Abs File   -- ^ stack.yaml
     -> InitOpts
-    -> Map PackageName (Path Abs Dir, C.GenericPackageDescription)
+    -> Map PackageName (Path Abs File, C.GenericPackageDescription)
        -- ^ Src package name: cabal dir, cabal package description
     -> m ( Resolver
          , Map PackageName (Map FlagName Bool)
          , Map PackageName Version
-         , Map PackageName (Path Abs Dir, C.GenericPackageDescription))
+         , Map PackageName (Path Abs File, C.GenericPackageDescription))
        -- ^ ( Resolver
        --   , Flags for src packages and extra deps
        --   , Extra dependencies
@@ -281,13 +300,13 @@ getWorkingResolverPlan
        , HasTerminal env)
     => Path Abs File   -- ^ stack.yaml
     -> InitOpts
-    -> Map PackageName (Path Abs Dir, C.GenericPackageDescription)
+    -> Map PackageName (Path Abs File, C.GenericPackageDescription)
        -- ^ Src package name: cabal dir, cabal package description
     -> Resolver
     -> m ( Resolver
          , Map PackageName (Map FlagName Bool)
          , Map PackageName Version
-         , Map PackageName (Path Abs Dir, C.GenericPackageDescription))
+         , Map PackageName (Path Abs File, C.GenericPackageDescription))
        -- ^ ( Resolver
        --   , Flags for src packages and extra deps
        --   , Extra dependencies
@@ -313,7 +332,7 @@ getWorkingResolverPlan stackYaml initOpts bundle resolver = do
 
                         if length ignored > 1 then do
                           $logWarn "*** Ignoring packages:"
-                          $logWarn $ indent $ showPackages ignored
+                          $logWarn $ indent $ showItems ignored
                         else
                           $logWarn $ "*** Ignoring package: "
                                  <> (T.pack $ packageNameString (head ignored))
@@ -331,7 +350,7 @@ checkBundleResolver
        , HasTerminal env)
     => Path Abs File   -- ^ stack.yaml
     -> InitOpts
-    -> Map PackageName (Path Abs Dir, C.GenericPackageDescription)
+    -> Map PackageName (Path Abs File, C.GenericPackageDescription)
        -- ^ Src package name: cabal dir, cabal package description
     -> Resolver
     -> m (Either [PackageName] ( Map PackageName (Map FlagName Bool)
@@ -359,7 +378,7 @@ checkBundleResolver stackYaml initOpts bundle resolver = do
       indent t    = T.unlines $ fmap ("    " <>) (T.lines t)
       gpds        = Map.elems (fmap snd bundle)
       solve flags = do
-          let cabalDirs      = Map.elems (fmap fst bundle)
+          let cabalDirs      = map parent (Map.elems (fmap fst bundle))
               srcConstraints = mergeConstraints (gpdPackages gpds) flags
 
           eresult <- solveResolverSpec stackYaml cabalDirs

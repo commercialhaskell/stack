@@ -125,7 +125,7 @@ cabalSolver menv cabalfps constraintType
             $logInfo "\n>>>> Cabal errors begin"
             $logInfo $ LT.toStrict msg
                        <> "<<<< Cabal errors end\n"
-            $logInfo $ "*** User packages involved in cabal failure: "
+            $logInfo $ "User packages involved in cabal failure: "
                  <> (LT.toStrict $ LT.intercalate ", "
                                  $ parseConflictingPkgs msg)
             let pkgs = parseConflictingPkgs msg
@@ -403,10 +403,7 @@ solveResolverSpec stackYaml cabalDirs
 
             return $ Right (srcs, external)
         Left x -> do
-            $logInfo $ "Failed to arrive at a workable build plan using "
-                       <> resolverName resolver <> " resolver."
-            -- TODO get the list of conflicting packages from cabal and return
-            -- it here.
+            $logInfo $ "*** Failed to arrive at a workable build plan."
             return $ Left x
 
 getResolverConstraints
@@ -481,9 +478,10 @@ cabalPackagesCheck
        , HasTerminal env)
      => [Path Abs File]
      -> String
-     -> String
-     -> m (Map PackageName (Path Abs Dir, C.GenericPackageDescription))
-cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter = do
+     -> Maybe String
+     -> m ( Map PackageName (Path Abs File, C.GenericPackageDescription)
+          , [Path Abs File])
+cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
     when (null cabalfps) $
         error noPkgMsg
 
@@ -491,23 +489,30 @@ cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter = do
     $logInfo $ "Using cabal packages:"
     $logInfo $ T.pack (formatGroup relpaths)
 
-    when (dupGroups relpaths /= []) $
-        error $ "Duplicate cabal package names cannot be used in a single "
-        <> "stack project. Following duplicates were found:\n"
-        <> intercalate "\n" (dupGroups relpaths)
-        <> "\n"
-        <> dupPkgFooter
+    let dupTails  = concat $ map tail (dupGroups cabalfps)
+    when (dupTails /= []) $ do
+        dups <- mapM (mapM makeRel) (dupGroups cabalfps)
+        $logWarn $ T.pack $
+            "Following packages have duplicate names:\n"
+            <> intercalate "\n" (map formatGroup dups)
+            <> "\n"
+        case dupErrMsg of
+          Nothing -> $logWarn $ T.pack $
+              "*** Only the first one among packages with \
+              \duplicate names will be used."
+          Just msg -> error msg
 
-    (warnings,gpds) <- fmap unzip (mapM readPackageUnresolved cabalfps)
-    zipWithM_ (mapM_ . printCabalFileWarning) cabalfps warnings
-    return $ Map.fromList
-           $ zipWith (\dir gpd -> ((gpdPackageName gpd),(dir, gpd)))
-                     (map parent cabalfps)
-                     gpds
+    let uniquefps = cabalfps \\ dupTails
+    (warnings, gpds) <- fmap unzip (mapM readPackageUnresolved uniquefps)
+    zipWithM_ (mapM_ . printCabalFileWarning) uniquefps warnings
+    return (Map.fromList
+            $ zipWith (\dir gpd -> ((gpdPackageName gpd),(dir, gpd)))
+                      uniquefps gpds
+           , dupTails)
 
     where
-        groups          = filter ((> 1) . length) . groupSortOn (FP.takeFileName)
-        dupGroups       = (map formatGroup) . groups
+        dupGroups = filter ((> 1) . length)
+                           . groupSortOn (FP.takeFileName . toFilePath)
 
 makeRel :: (MonadIO m) => Path Abs File -> m FilePath
 makeRel = liftIO . makeRelativeToCurrentDirectory . toFilePath
@@ -564,7 +569,7 @@ solveExtraDeps modStackYaml = do
     -- TODO when solver supports --ignore-subdirs option pass that as the
     -- second argument here.
     reportMissingCabalFiles cabalfps True
-    bundle <- cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter
+    (bundle, _) <- cabalPackagesCheck cabalfps noPkgMsg (Just dupPkgFooter)
 
     let gpds              = Map.elems $ fmap snd bundle
         oldFlags          = bcFlags bconfig
