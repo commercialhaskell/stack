@@ -1183,15 +1183,14 @@ withMiniConfigAndLock go inner =
 initCmd :: InitOpts -> GlobalOpts -> IO ()
 initCmd initOpts go = do
     pwd <- getWorkingDir
-    withMiniConfigAndLock go (initProject pwd initOpts)
+    withMiniConfigAndLock go (initProject pwd initOpts (globalResolver go))
 
 -- | Create a project directory structure and initialize the stack config.
 newCmd :: (NewOpts,InitOpts) -> GlobalOpts -> IO ()
 newCmd (newOpts,initOpts) go@GlobalOpts{..} = do
     withMiniConfigAndLock go $ do
         dir <- new newOpts
-        initProject dir initOpts
-
+        initProject dir initOpts globalResolver
 
 -- | List the available templates.
 templatesCmd :: () -> GlobalOpts -> IO ()

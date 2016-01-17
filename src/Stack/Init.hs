@@ -5,7 +5,6 @@
 module Stack.Init
     ( initProject
     , InitOpts (..)
-    , Method (..)
     ) where
 
 import           Control.Exception               (assert)
@@ -52,8 +51,9 @@ initProject
        , HasTerminal env)
     => Path Abs Dir
     -> InitOpts
+    -> Maybe AbstractResolver
     -> m ()
-initProject currDir initOpts = do
+initProject currDir initOpts mresolver = do
     let dest = currDir </> stackDotYaml
         dest' = toFilePath dest
 
@@ -71,7 +71,8 @@ initProject currDir initOpts = do
     cabalfps <- findCabalFiles (includeSubDirs initOpts) currDir
     (bundle, dupPkgs)  <- cabalPackagesCheck cabalfps noPkgMsg Nothing
 
-    (r, flags, extraDeps, rbundle) <- getDefaultResolver dest initOpts bundle
+    (r, flags, extraDeps, rbundle) <- getDefaultResolver dest initOpts
+                                                         mresolver bundle
 
     let ignored = Map.difference bundle rbundle
         dupPkgMsg
@@ -261,6 +262,7 @@ getDefaultResolver
        , HasTerminal env)
     => Path Abs File   -- ^ stack.yaml
     -> InitOpts
+    -> Maybe AbstractResolver
     -> Map PackageName (Path Abs File, C.GenericPackageDescription)
        -- ^ Src package name: cabal dir, cabal package description
     -> m ( Resolver
@@ -271,14 +273,11 @@ getDefaultResolver
        --   , Flags for src packages and extra deps
        --   , Extra dependencies
        --   , Src packages actually considered)
-getDefaultResolver stackYaml initOpts bundle =
-    getResolver (ioMethod initOpts)
+getDefaultResolver stackYaml initOpts mresolver bundle =
+    maybe selectSnapResolver makeConcreteResolver mresolver
       >>= getWorkingResolverPlan stackYaml initOpts bundle
     where
         -- TODO support selecting best across regular and custom snapshots
-        getResolver (MethodAutoSelect) = selectSnapResolver
-        getResolver (MethodResolver aresolver) = makeConcreteResolver aresolver
-
         selectSnapResolver = do
             let gpds = Map.elems (fmap snd bundle)
             snaps <- getSnapshots' >>= getRecommendedSnapshots
@@ -430,10 +429,8 @@ getRecommendedSnapshots snapshots = do
         ]
 
 data InitOpts = InitOpts
-    { ioMethod       :: !Method
+    { useSolver :: Bool
     -- ^ Use solver
-    , useSolver :: Bool
-    -- ^ Preferred snapshots
     , omitPackages :: Bool
     -- ^ Exclude conflicting or incompatible user packages
     , forceOverwrite :: Bool
@@ -441,6 +438,3 @@ data InitOpts = InitOpts
     , includeSubDirs :: Bool
     -- ^ If True, include all .cabal files found in any sub directories
     }
-
--- | Method of initializing
-data Method = MethodAutoSelect | MethodResolver AbstractResolver

@@ -670,7 +670,7 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
 
 initOptsParser :: Parser InitOpts
 initOptsParser =
-    InitOpts <$> method <*> solver <*> omitPackages
+    InitOpts <$> solver <*> omitPackages
              <*> overwrite <*> fmap not ignoreSubDirs
   where
     ignoreSubDirs = switch (long "ignore-subdirs" <>
@@ -681,14 +681,6 @@ initOptsParser =
                            help "Exclude conflicting or incompatible user packages")
     solver = switch (long "solver" <>
              help "Use a dependency solver to determine extra dependencies")
-
-    method = (MethodResolver <$> resolver)
-         <|> (pure MethodAutoSelect)
-
-    resolver = option readAbstractResolver
-        (long "resolver" <>
-         metavar "RESOLVER" <>
-         help "Use the specified resolver")
 
 -- | Parser for a logging level.
 logLevelOptsParser :: Bool -> Maybe LogLevel -> Parser (Maybe LogLevel)
