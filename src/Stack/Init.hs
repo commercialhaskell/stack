@@ -289,7 +289,7 @@ getDefaultResolver stackYaml initOpts bundle =
             let gpds = Map.elems (fmap snd bundle)
             (s, r) <- selectBestSnapshot gpds snaps
             case r of
-                (BuildPlanCheckFail _ _ _) | not (forceOverwrite initOpts)
+                (BuildPlanCheckFail _ _ _) | not (omitPackages initOpts)
                         -> throwM (NoMatchingSnapshot snaps)
                 _ -> return $ ResolverSnapshot s
 
@@ -367,7 +367,7 @@ checkBundleResolver stackYaml initOpts bundle resolver = do
                 solve f
             | otherwise -> throwM $ ResolverPartial resolver (show result)
         (BuildPlanCheckFail _ e _)
-            | (forceOverwrite initOpts) -> do
+            | (omitPackages initOpts) -> do
                 $logWarn $ "*** Resolver compiler mismatch: "
                            <> resolverName resolver
                 $logWarn $ indent $ T.pack $ show result
@@ -387,7 +387,7 @@ checkBundleResolver stackYaml initOpts bundle resolver = do
               Right (src, ext) ->
                   return $ Right (fmap snd (Map.union src ext), fmap fst ext)
               Left packages
-                  | forceOverwrite initOpts, srcpkgs /= []-> do
+                  | omitPackages initOpts, srcpkgs /= []-> do
                       pkg <- findOneIndependent srcpkgs flags
                       return $ Left [pkg]
                   | otherwise -> throwM (SolverGiveUp giveUpMsg)
@@ -409,13 +409,12 @@ checkBundleResolver stackYaml initOpts bundle resolver = do
           return $ head (filter isIndependent packages)
 
       giveUpMsg = concat
-          [ "    - Use '--ignore-subdirs' to skip packages in subdirectories.\n"
-          , "    - Update external packages with 'stack update' and try again.\n"
-          , "    - Use '--force' to create an initial "
-          , toFilePath stackDotYaml <> ", tweak it and run 'stack solver':\n"
-          , "        - Remove any unnecessary packages.\n"
+          [ "    - Use '--omit-packages to exclude conflicting package(s).\n"
+          , "    - Tweak the generated "
+          , toFilePath stackDotYaml <> " and then run 'stack solver':\n"
           , "        - Add any missing remote packages.\n"
           , "        - Add extra dependencies to guide solver.\n"
+          , "    - Update external packages with 'stack update' and try again.\n"
           ]
 
       needSolver _ (InitOpts {useSolver = True}) = True
@@ -462,6 +461,8 @@ data InitOpts = InitOpts
     -- ^ Use solver
     , useSolver :: Bool
     -- ^ Preferred snapshots
+    , omitPackages :: Bool
+    -- ^ Exclude conflicting or incompatible packages
     , forceOverwrite :: Bool
     -- ^ Overwrite existing files
     , includeSubDirs :: Bool

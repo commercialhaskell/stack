@@ -1127,17 +1127,20 @@ instance Show ConfigException where
         , unlines $ map (\name -> "    - " <> T.unpack (renderSnapName name))
                         names
         , "\nYou can try the following options:\n"
-        , "    - Use '--force' to ignore mismatching package(s).\n"
+        , "    - Use '--omit-packages to exclude mismatching package(s).\n"
         , "    - Use '--resolver' to specify a matching snapshot/resolver\n"
         ]
     show (ResolverMismatch resolver errDesc) = concat
-        [ "Selected resolver '"
+        [ "Resolver '"
         , T.unpack (resolverName resolver)
-        , "' does not have a matching compiler to build your package(s).\n"
+        , "' does not have a matching compiler to build some or all of your "
+        , "package(s).\n"
         , errDesc
+        , "\nHowever, you can try '--omit-packages to exclude mismatching "
+        , "package(s)."
         ]
     show (ResolverPartial resolver errDesc) = concat
-        [ "Selected resolver '"
+        [ "Resolver '"
         , T.unpack (resolverName resolver)
         , "' does not have all the packages to match your requirements.\n"
         , unlines $ fmap ("    " <>) (lines errDesc)

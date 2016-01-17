@@ -670,13 +670,15 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
 
 initOptsParser :: Parser InitOpts
 initOptsParser =
-    InitOpts <$> method <*> solver <*> overwrite <*> fmap not ignoreSubDirs
+    InitOpts <$> method <*> solver <*> omitPackages
+             <*> overwrite <*> fmap not ignoreSubDirs
   where
     ignoreSubDirs = switch (long "ignore-subdirs" <>
                            help "Do not search for .cabal files in sub directories")
     overwrite = switch (long "force" <>
-                       help "Force overwriting an existing stack.yaml or \
-                            \creating a stack.yaml with incomplete config.")
+                       help "Force overwriting an existing stack.yaml")
+    omitPackages = switch (long "omit-packages" <>
+                           help "Exlcude conflicting or incompatible packages")
     solver = switch (long "solver" <>
              help "Use a dependency solver to determine extra dependencies")
 
