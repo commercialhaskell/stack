@@ -4,6 +4,12 @@
 
 Release notes:
 
+- Arch Linux: Stack has been adopted into the
+  [official community repository](https://www.archlinux.org/packages/community/x86_64/stack/),
+  so we will no longer be updating the AUR with new versions. See the
+  [install/upgrade guide](http://docs.haskellstack.org/en/stable/install_and_upgrade.html#arch-linux)
+  for current download instructions.
+
 Major changes:
 
 Other enhancements:

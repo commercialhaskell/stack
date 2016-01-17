@@ -101,10 +101,7 @@ for requirements to perform the release, and more details about the tool.
       * Be sure to update the SHA sum
       * The commit message should just be `haskell-stack <VERSION>`
 
-* Update in Arch Linux's
-  [haskell-stack.git](ssh+git://aur@aur.archlinux.org/haskell-stack.git):
-  `PKGBUILD` and `.SRCINFO`
-      * Be sure to reset `pkgrel` in both files, and update the SHA1 sum
+* [Flag the Arch Linux package as out-of-date](https://www.archlinux.org/packages/community/x86_64/stack/flag/)
 
 * Keep an eye on the
   [Hackage matrix builder](http://matrix.hackage.haskell.org/package/stack)

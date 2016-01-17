@@ -131,8 +131,6 @@ rules global@Global{..} args = do
     distroPhonies debianDistro debianVersions debPackageFileName
     distroPhonies centosDistro centosVersions rpmPackageFileName
     distroPhonies fedoraDistro fedoraVersions rpmPackageFileName
-    phony archUploadPhony $ need [archDir </> archPackageFileName <.> uploadExt]
-    phony archBuildPhony $ need [archDir </> archPackageFileName]
 
     releaseDir </> "*" <.> uploadExt %> \out -> do
         let srcFile = dropExtension out
@@ -233,30 +231,6 @@ rules global@Global{..} args = do
     debDistroRules debianDistro debianVersions
     rpmDistroRules centosDistro centosVersions
     rpmDistroRules fedoraDistro fedoraVersions
-
-    archDir </> archPackageFileName <.> uploadExt %> \out -> do
-       let pkgFile = dropExtension out
-       need [pkgFile]
-       () <- cmd "aws s3 cp"
-           [ pkgFile
-           , "s3://download.fpcomplete.com/archlinux/" ++ takeFileName pkgFile ]
-       copyFileChanged pkgFile out
-    archDir </> archPackageFileName %> \out -> do
-        docFiles <- getDocFiles
-        let inputFiles = concat
-                [[archStagedExeFile
-                 ,archStagedBashCompletionFile]
-                ,map (archStagedDocDir </>) docFiles]
-        need inputFiles
-        putNormal $ "tar gzip " ++ out
-        writeTarGz out archStagingDir inputFiles
-    archStagedExeFile %> \out -> do
-        copyFileChanged (releaseDir </> binaryExeFileName) out
-    archStagedBashCompletionFile %> \out -> do
-        writeBashCompletion archStagedExeFile out
-    archStagedDocDir ++ "//*" %> \out -> do
-        let origFile = dropDirectoryPrefix archStagedDocDir out
-        copyFileChanged origFile out
 
   where
 
@@ -396,8 +370,6 @@ rules global@Global{..} args = do
     buildPhony = "build"
     distroUploadPhony DistroVersion{..} = "upload-" ++ dvDistro ++ "-" ++ dvVersion
     distroBuildPhony DistroVersion{..} = "build-" ++ dvDistro ++ "-" ++ dvVersion
-    archUploadPhony = "upload-" ++ archDistro
-    archBuildPhony = "build-" ++ archDistro
 
     releaseCheckDir = releaseDir </> "check"
     releaseStageDir = releaseDir </> "stage"
@@ -442,14 +414,6 @@ rules global@Global{..} args = do
     rpmPackageIterationStr DistroVersion{..} = "0." ++ dvCodeName
     rpmPackageVersionStr _ = stackVersionStr global
 
-    archStagedDocDir = archStagingDir </> "usr/share/doc" </> stackProgName
-    archStagedBashCompletionFile = archStagingDir </> "usr/share/bash-completion/completions/stack"
-    archStagedExeFile = archStagingDir </> "usr/bin" </> stackProgName
-    archStagingDir = archDir </> archPackageName
-    archPackageFileName = archPackageName <.> tarGzExt
-    archPackageName = stackProgName ++ "_" ++ stackVersionStr global ++ "-" ++ "x86_64"
-    archDir = releaseDir </> archDistro
-
     ubuntuVersions =
         [ ("12.04", "precise")
         , ("14.04", "trusty")
@@ -471,7 +435,6 @@ rules global@Global{..} args = do
     debianDistro = "debian"
     centosDistro = "centos"
     fedoraDistro = "fedora"
-    archDistro = "arch"
 
     anyDistroVersion distro = DistroVersion distro "*" "*"
 

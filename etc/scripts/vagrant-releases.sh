@@ -21,7 +21,7 @@ if [[ "$(basename "$0")" == "vagrant-releases.sh" ]]; then
   with_vagrant centos-6-x86_64 "--binary-variant=gmp4 --upload-label='Linux 64-bit, libgmp4 for CentOS 6.x' release"
   with_vagrant centos-6-i386 "--binary-variant=gmp4 --upload-label='Linux 32-bit, libgmp4 for CentOS 6.x' release"
 elif [[ "$(basename "$0")" == "vagrant-distros.sh" ]]; then
-  with_vagrant debian-7-amd64 "upload-ubuntu-12.04 upload-ubuntu-14.04 upload-ubuntu-14.10 upload-ubuntu-15.04 upload-ubuntu-15.10 upload-debian-7 upload-debian-8 upload-arch"
+  with_vagrant debian-7-amd64 "upload-ubuntu-12.04 upload-ubuntu-14.04 upload-ubuntu-14.10 upload-ubuntu-15.04 upload-ubuntu-15.10 upload-debian-7 upload-debian-8"
   with_vagrant centos-7-x86_64 "upload-centos-7 upload-fedora-21 upload-fedora-22 upload-fedora-23"
   with_vagrant centos-6-x86_64 "--binary-variant=gmp4 upload-centos-6"
 else
