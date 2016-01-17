@@ -14,6 +14,7 @@ Other enhancements:
   [docs](http://docs.haskellstack.org/en/latest/yaml_configuration.html#image)
 - Specify which executables to include in images for `stack image container`
   [docs](http://docs.haskellstack.org/en/latest/yaml_configuration.html#image)
+- Docker: pass supplemantary groups and umask into container
 
 Bug fixes:
 

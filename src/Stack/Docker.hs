@@ -72,6 +72,7 @@ import           System.IO (stderr,stdin,stdout,hIsTerminalDevice)
 import           System.IO.Error (isDoesNotExistError)
 import           System.IO.Unsafe (unsafePerformIO)
 import qualified System.PosixCompat.User as User
+import qualified System.PosixCompat.Files as Files
 import           System.Process.PagerEditor (editByteString)
 import           System.Process.Read
 import           System.Process.Run
@@ -82,6 +83,7 @@ import           Text.Printf (printf)
 import           Control.Concurrent (threadDelay)
 import           Control.Monad.Trans.Control (liftBaseWith)
 import           System.Posix.Signals
+import qualified System.Posix.User as PosixUser
 #endif
 
 -- | If Docker is enabled, re-runs the currently running OS command in a Docker container.
@@ -104,10 +106,16 @@ reexecWithOptionalContainer mprojectRoot =
   where
     getCmdArgs docker envOverride imageInfo isRemoteDocker = do
         config <- asks getConfig
-        deUidGid <-
+        deUser <-
             if fromMaybe (not isRemoteDocker) (dockerSetUser docker)
-                then liftIO $ Just <$>
-                  ((,) <$> User.getEffectiveUserID <*> User.getEffectiveGroupID)
+                then liftIO $ do
+                  duUid <- User.getEffectiveUserID
+                  duGid <- User.getEffectiveGroupID
+                  duGroups <- User.getGroups
+                  duUmask <- Files.setFileCreationMask 0o022
+                  -- Only way to get old umask seems to be to change it, so set it back afterward
+                  _ <- Files.setFileCreationMask duUmask
+                  return (Just DockerUser{..})
                 else return Nothing
         args <-
             fmap
@@ -713,10 +721,10 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
       estackUserEntry0 <- liftIO $ tryJust (guard . isDoesNotExistError) $
         User.getUserEntryForName stackUserName
       -- Switch UID/GID if needed, and update user's home directory
-      case deUidGid of
+      case deUser of
         Nothing -> return ()
-        Just (0,_) -> return ()
-        Just (uid,gid) -> updateOrCreateStackUser envOverride estackUserEntry0 homeDir uid gid
+        Just (DockerUser 0 _ _ _) -> return ()
+        Just du -> updateOrCreateStackUser envOverride estackUserEntry0 homeDir du
       case estackUserEntry0 of
         Left _ -> return ()
         Right ue -> do
@@ -751,35 +759,45 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
                     copyFile srcIndex destIndex
     return True
   where
-    updateOrCreateStackUser envOverride estackUserEntry homeDir uid gid = do
+    updateOrCreateStackUser envOverride estackUserEntry homeDir DockerUser{..} = do
       case estackUserEntry of
         Left _ -> do
           -- If no 'stack' user in image, create one with correct UID/GID and home directory
           readProcessNull Nothing envOverride "groupadd"
             ["-o"
-            ,"--gid",show gid
+            ,"--gid",show duGid
             ,stackUserName]
           readProcessNull Nothing envOverride "useradd"
             ["-oN"
-            ,"--uid",show uid
-            ,"--gid",show gid
+            ,"--uid",show duUid
+            ,"--gid",show duGid
             ,"--home",toFilePathNoTrailingSep homeDir
             ,stackUserName]
         Right _ -> do
-          -- If there is already a 'stack' user in thr image, adjust its UID/GID and home directory
+          -- If there is already a 'stack' user in the image, adjust its UID/GID and home directory
           readProcessNull Nothing envOverride "usermod"
             ["-o"
-            ,"--uid",show uid
+            ,"--uid",show duUid
             ,"--home",toFilePathNoTrailingSep homeDir
             ,stackUserName]
           readProcessNull Nothing envOverride "groupmod"
             ["-o"
-            ,"--gid",show gid
+            ,"--gid",show duGid
             ,stackUserName]
+      forM_ duGroups $ \gid -> do
+        readProcessNull Nothing envOverride "groupadd"
+          ["-o"
+          ,"--gid",show gid
+          ,"group" ++ show gid]
       -- 'setuid' to the wanted UID and GID
       liftIO $ do
-        User.setGroupID gid
-        User.setUserID uid
+        User.setGroupID duGid
+#ifndef WINDOWS
+        PosixUser.setGroups duGroups
+#endif
+        User.setUserID duUid
+        _ <- Files.setFileCreationMask duUmask
+        return ()
     stackUserName = "stack"::String
 
 -- | MVar used to ensure the Docker entrypoint is performed exactly once

@@ -119,6 +119,7 @@ module Stack.Types.Config
   ,SetupInfoLocation(..)
   -- ** Docker entrypoint
   ,DockerEntrypoint(..)
+  ,DockerUser(..)
   ) where
 
 import           Control.Applicative
@@ -169,7 +170,7 @@ import           Stack.Types.PackageIndex
 import           Stack.Types.PackageName
 import           Stack.Types.TemplateName
 import           Stack.Types.Version
-import           System.PosixCompat.Types (UserID, GroupID)
+import           System.PosixCompat.Types (UserID, GroupID, FileMode)
 import           System.Process.Read (EnvOverride)
 #ifdef mingw32_HOST_OS
 import qualified Crypto.Hash.SHA1 as SHA1
@@ -1613,6 +1614,14 @@ explicitSetupDeps name = do
 
 -- | Data passed into Docker container for the Docker entrypoint's use
 data DockerEntrypoint = DockerEntrypoint
-    { deUidGid :: !(Maybe (UserID, GroupID))
-      -- ^ UID/GID of host user, if we wish to perform UID/GID switch in container
+    { deUser :: !(Maybe DockerUser)
+      -- ^ UID/GID/etc of host user, if we wish to perform UID/GID switch in container
+    } deriving (Read,Show)
+
+-- | Docker host user info
+data DockerUser = DockerUser
+    { duUid :: UserID -- ^ uid
+    , duGid :: GroupID -- ^ gid
+    , duGroups :: [GroupID] -- ^ Supplemantal groups
+    , duUmask :: FileMode -- ^ File creation mask }
     } deriving (Read,Show)
