@@ -678,21 +678,12 @@ initOptsParser =
     overwrite = switch (long "force" <>
                        help "Force overwriting an existing stack.yaml")
     omitPackages = switch (long "omit-packages" <>
-                           help "Exlcude conflicting or incompatible packages")
+                           help "Exclude conflicting or incompatible user packages")
     solver = switch (long "solver" <>
              help "Use a dependency solver to determine extra dependencies")
 
     method = (MethodResolver <$> resolver)
-         <|> (MethodSnapshot <$> snapPref)
-
-    snapPref =
-        flag' PrefLTS
-            (long "prefer-lts" <>
-             help "Prefer LTS snapshots over Nightly snapshots") <|>
-        flag' PrefNightly
-            (long "prefer-nightly" <>
-             help "Prefer Nightly snapshots over LTS snapshots") <|>
-        pure PrefNone
+         <|> (pure MethodAutoSelect)
 
     resolver = option readAbstractResolver
         (long "resolver" <>

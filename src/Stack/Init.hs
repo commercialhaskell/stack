@@ -5,13 +5,12 @@
 module Stack.Init
     ( initProject
     , InitOpts (..)
-    , SnapPref (..)
     , Method (..)
     ) where
 
 import           Control.Exception               (assert)
-import           Control.Exception.Enclosed      (catchAny, handleIO)
-import           Control.Monad                   (liftM, when)
+import           Control.Exception.Enclosed      (catchAny)
+import           Control.Monad                   (when)
 import           Control.Monad.Catch             (MonadMask, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -23,11 +22,11 @@ import qualified Data.ByteString.Char8           as BC
 import qualified Data.HashMap.Strict             as HM
 import qualified Data.IntMap                     as IntMap
 import qualified Data.Foldable                   as F
-import           Data.List                       (intersect, sortBy)
+import           Data.List                       (intersect)
 import           Data.List.Extra                 (nubOrd)
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
-import           Data.Maybe                      (fromJust, mapMaybe)
+import           Data.Maybe                      (fromJust)
 import           Data.Monoid
 import qualified Data.Text                       as T
 import qualified Data.Yaml                       as Yaml
@@ -41,8 +40,7 @@ import           Stack.Solver
 import           Stack.Types
 import           Stack.Types.Internal            ( HasTerminal, HasReExec
                                                  , HasLogLevel)
-import           System.Directory                ( getDirectoryContents
-                                                 , makeRelativeToCurrentDirectory)
+import           System.Directory                (makeRelativeToCurrentDirectory)
 import           Stack.Config                    ( getSnapshots
                                                  , makeConcreteResolver)
 
@@ -236,9 +234,9 @@ renderStackYaml p ignoredPackages dupPackages =
         | otherwise = assert False $ B.byteString $ Yaml.encode o
 
 getSnapshots' :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, MonadLogger m, MonadBaseControl IO m)
-              => m (Maybe Snapshots)
+              => m Snapshots
 getSnapshots' =
-    liftM Just getSnapshots `catchAny` \e -> do
+    getSnapshots `catchAny` \e -> do
         $logError $
             "Unable to download snapshot list, and therefore could " <>
             "not generate a stack.yaml file automatically"
@@ -253,7 +251,7 @@ getSnapshots' =
         $logError "    http://docs.haskellstack.org/en/stable/yaml_configuration.html"
         $logError ""
         $logError $ "Exception was: " <> T.pack (show e)
-        return Nothing
+        error ""
 
 -- | Get the default resolver value
 getDefaultResolver
@@ -278,15 +276,12 @@ getDefaultResolver stackYaml initOpts bundle =
       >>= getWorkingResolverPlan stackYaml initOpts bundle
     where
         -- TODO support selecting best across regular and custom snapshots
-        getResolver (MethodSnapshot snapPref)  = selectSnapResolver snapPref
+        getResolver (MethodAutoSelect) = selectSnapResolver
         getResolver (MethodResolver aresolver) = makeConcreteResolver aresolver
 
-        selectSnapResolver snapPref = do
-            msnaps <- getSnapshots'
-            snaps <- maybe (error "No snapshots to select from.")
-                           (getRecommendedSnapshots snapPref)
-                           msnaps
+        selectSnapResolver = do
             let gpds = Map.elems (fmap snd bundle)
+            snaps <- getSnapshots' >>= getRecommendedSnapshots
             (s, r) <- selectBestSnapshot gpds snaps
             case r of
                 (BuildPlanCheckFail _ _ _) | not (omitPackages initOpts)
@@ -422,39 +417,17 @@ checkBundleResolver stackYaml initOpts bundle resolver = do
       needSolver _ _ = False
 
 getRecommendedSnapshots :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpManager env, HasGHCVariant env, MonadLogger m, MonadBaseControl IO m)
-                        => SnapPref
-                        -> Snapshots
+                        => Snapshots
                         -> m [SnapName]
-getRecommendedSnapshots pref snapshots = do
-    -- Get the most recent LTS and Nightly in the snapshots directory and
-    -- prefer them over anything else, since odds are high that something
-    -- already exists for them.
-    -- TODO Include all major compiler versions available
-    existing <-
-        liftM (sortBy (flip compare) . mapMaybe (parseSnapName . T.pack)) $
-        snapshotsDir >>=
-        liftIO . handleIO (const $ return [])
-               . getDirectoryContents . toFilePath
-    let isLTS LTS{} = True
-        isLTS Nightly{} = False
-        isNightly Nightly{} = True
-        isNightly LTS{} = False
-
-        names = nubOrd $ concat
-            [ take 2 $ filter isLTS existing
-            , take 2 $ filter isNightly existing
-            , map (uncurry LTS)
-                (take 2 $ reverse $ IntMap.toList $ snapshotsLts snapshots)
-            , [Nightly $ snapshotsNightly snapshots]
-            ]
-
-        namesLTS = filter isLTS names
-        namesNightly = filter isNightly names
-
-    case pref of
-        PrefNone -> return names
-        PrefLTS -> return $ namesLTS ++ namesNightly
-        PrefNightly -> return $ namesNightly ++ namesLTS
+getRecommendedSnapshots snapshots = do
+    -- in order - Latest LTS, Latest Nightly, all LTS most recent first
+    return $ nubOrd $ concat
+        [ map (uncurry LTS)
+            (take 1 $ reverse $ IntMap.toList $ snapshotsLts snapshots)
+        , [Nightly $ snapshotsNightly snapshots]
+        , map (uncurry LTS)
+            (drop 1 $ reverse $ IntMap.toList $ snapshotsLts snapshots)
+        ]
 
 data InitOpts = InitOpts
     { ioMethod       :: !Method
@@ -462,14 +435,12 @@ data InitOpts = InitOpts
     , useSolver :: Bool
     -- ^ Preferred snapshots
     , omitPackages :: Bool
-    -- ^ Exclude conflicting or incompatible packages
+    -- ^ Exclude conflicting or incompatible user packages
     , forceOverwrite :: Bool
     -- ^ Overwrite existing files
     , includeSubDirs :: Bool
     -- ^ If True, include all .cabal files found in any sub directories
     }
 
-data SnapPref = PrefNone | PrefLTS | PrefNightly
-
 -- | Method of initializing
-data Method = MethodSnapshot SnapPref | MethodResolver AbstractResolver
+data Method = MethodAutoSelect | MethodResolver AbstractResolver
