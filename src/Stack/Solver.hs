@@ -30,7 +30,7 @@ import           Data.List                   ( (\\), isSuffixOf, intercalate
 import           Data.List.Extra             (groupSortOn)
 import           Data.Map                    (Map)
 import qualified Data.Map                    as Map
-import           Data.Maybe                  (catMaybes, isNothing)
+import           Data.Maybe                  (catMaybes, isNothing, mapMaybe)
 import           Data.Monoid
 import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
@@ -116,43 +116,43 @@ cabalSolver menv cabalfps constraintType
     >>= either parseCabalErrors parseCabalOutput
 
   where
-    errCheck = LT.isInfixOf "Could not resolve dependencies"
+    errCheck = T.isInfixOf "Could not resolve dependencies"
 
     parseCabalErrors err = do
-        let errExit = error "Could not parse cabal-install errors"
-            msg = decodeUtf8With lenientDecode err
+        let errExit e = error $ "Could not parse cabal-install errors:\n"
+                              ++ (T.unpack e)
+            msg = LT.toStrict $ decodeUtf8With lenientDecode err
 
         if errCheck msg then do
             $logInfo "Attempt failed."
             $logInfo "\n>>>> Cabal errors begin"
-            $logInfo $ LT.toStrict msg
-                       <> "<<<< Cabal errors end\n"
-            $logInfo $ "User packages involved in cabal failure: "
-                 <> (LT.toStrict $ LT.intercalate ", "
-                                 $ parseConflictingPkgs msg)
+            $logInfo $ msg <> "<<<< Cabal errors end\n"
             let pkgs = parseConflictingPkgs msg
-                mPkgNames = map (C.simpleParse . T.unpack . LT.toStrict) pkgs
+                mPkgNames = map (C.simpleParse . T.unpack) pkgs
                 pkgNames  = map (fromCabalPackageName . C.pkgName)
                                 (catMaybes mPkgNames)
 
-            when (any isNothing mPkgNames) $
+            when (any isNothing mPkgNames) $ do
                   $logInfo $ "*** Only some package names could be parsed: " <>
                       (T.pack (intercalate ", " (map show pkgNames)))
+                  error $ T.unpack $
+                       "*** User packages involved in cabal failure: "
+                       <> (T.intercalate ", " $ parseConflictingPkgs msg)
 
             if pkgNames /= [] then do
                   return $ Left pkgNames
-            else errExit
-        else errExit
+            else errExit msg
+        else errExit msg
 
     parseConflictingPkgs msg =
-        let ls = dropWhile (not . errCheck) $ LT.lines msg
-            select s = ((LT.isPrefixOf "trying:" s)
-                      || (LT.isPrefixOf "next goal:" s))
-                      && (LT.isSuffixOf "(user goal)" s)
+        let ls = dropWhile (not . errCheck) $ T.lines msg
+            select s = ((T.isPrefixOf "trying:" s)
+                      || (T.isPrefixOf "next goal:" s))
+                      && (T.isSuffixOf "(user goal)" s)
             pkgName =   (take 1)
-                      . LT.words
-                      . (LT.drop 1)
-                      . (LT.dropWhile (/= ':'))
+                      . T.words
+                      . (T.drop 1)
+                      . (T.dropWhile (/= ':'))
         in concat $ map pkgName (filter select ls)
 
     parseCabalOutput bs = do
@@ -495,7 +495,17 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
     zipWithM_ (mapM_ . printCabalFileWarning) cabalfps warnings
 
     let packages  = zip cabalfps gpds
-        dupGroups = filter ((> 1) . length)
+        getEmptyNamePkg (fp, gpd)
+            | ((show . gpdPackageName) gpd) == "" = Just fp
+            | otherwise = Nothing
+        emptyNamePkgs = mapMaybe getEmptyNamePkg packages
+
+    when (emptyNamePkgs /= []) $ do
+        rels <- mapM makeRel emptyNamePkgs
+        error $ "Please assign a name to the following package(s):\n"
+                <> (formatGroup rels)
+
+    let dupGroups = filter ((> 1) . length)
                             . groupSortOn (gpdPackageName . snd)
         dupAll    = concat $ dupGroups packages
 
