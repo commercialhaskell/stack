@@ -23,8 +23,10 @@ import           Control.Monad.Trans.Control
 import           Data.Aeson.Extended         (object, (.=), toJSON, logJSONWarnings)
 import qualified Data.ByteString             as S
 import           Data.Either
+import           Data.Function               (on)
 import qualified Data.HashMap.Strict         as HashMap
-import           Data.List                   ((\\), isSuffixOf, intercalate)
+import           Data.List                   ( (\\), isSuffixOf, intercalate
+                                             , minimumBy)
 import           Data.List.Extra             (groupSortOn)
 import           Data.Map                    (Map)
 import qualified Data.Map                    as Map
@@ -489,30 +491,35 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
     $logInfo $ "Using cabal packages:"
     $logInfo $ T.pack (formatGroup relpaths)
 
-    let dupTails  = concat $ map tail (dupGroups cabalfps)
-    when (dupTails /= []) $ do
-        dups <- mapM (mapM makeRel) (dupGroups cabalfps)
+    (warnings, gpds) <- fmap unzip (mapM readPackageUnresolved cabalfps)
+    zipWithM_ (mapM_ . printCabalFileWarning) cabalfps warnings
+
+    let packages  = zip cabalfps gpds
+        dupGroups = filter ((> 1) . length)
+                            . groupSortOn (gpdPackageName . snd)
+        dupAll    = concat $ dupGroups packages
+
+        -- Among duplicates prefer to include the ones in upper level dirs
+        pathlen     = length . FP.splitPath . toFilePath . fst
+        getmin      = minimumBy (compare `on` pathlen)
+        dupSelected = map getmin (dupGroups packages)
+        dupIgnored  = dupAll \\ dupSelected
+        unique      = packages \\ dupIgnored
+
+    when (dupIgnored /= []) $ do
+        dups <- mapM (mapM (makeRel . fst)) (dupGroups packages)
         $logWarn $ T.pack $
-            "Following packages have duplicate names:\n"
+            "Following packages have duplicate package names:\n"
             <> intercalate "\n" (map formatGroup dups)
-            <> "\n"
         case dupErrMsg of
           Nothing -> $logWarn $ T.pack $
-              "*** Only the first one among packages with \
-              \duplicate names will be used."
+                 "Packages with duplicate names will be ignored.\n"
+              <> "Packages in upper level directories will be preferred.\n"
           Just msg -> error msg
 
-    let uniquefps = cabalfps \\ dupTails
-    (warnings, gpds) <- fmap unzip (mapM readPackageUnresolved uniquefps)
-    zipWithM_ (mapM_ . printCabalFileWarning) uniquefps warnings
     return (Map.fromList
-            $ zipWith (\dir gpd -> ((gpdPackageName gpd),(dir, gpd)))
-                      uniquefps gpds
-           , dupTails)
-
-    where
-        dupGroups = filter ((> 1) . length)
-                           . groupSortOn (FP.takeFileName . toFilePath)
+            $ map (\(file, gpd) -> ((gpdPackageName gpd),(file, gpd))) unique
+           , map fst dupIgnored)
 
 makeRel :: (MonadIO m) => Path Abs File -> m FilePath
 makeRel = liftIO . makeRelativeToCurrentDirectory . toFilePath
