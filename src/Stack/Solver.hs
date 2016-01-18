@@ -416,15 +416,15 @@ getResolverConstraints
     -> m (CompilerVersion,
           Map PackageName (Version, Map FlagName Bool))
 getResolverConstraints stackYaml resolver
-    | (ResolverSnapshot snapName) <- resolver = do
+    | ResolverSnapshot snapName <- resolver = do
         mbp <- loadMiniBuildPlan snapName
         return (mbpCompilerVersion mbp, mbpConstraints mbp)
-    | (ResolverCustom _ url) <- resolver = do
+    | ResolverCustom _ url <- resolver = do
         -- FIXME instead of passing the stackYaml dir we should maintain
         -- the file URL in the custom resolver always relative to stackYaml.
         mbp <- parseCustomMiniBuildPlan stackYaml url
         return (mbpCompilerVersion mbp, mbpConstraints mbp)
-    | (ResolverCompiler compiler) <- resolver =
+    | ResolverCompiler compiler <- resolver =
         return (compiler, Map.empty)
     | otherwise = error "Not reached"
     where
@@ -447,9 +447,9 @@ checkResolverSpec
 checkResolverSpec gpds flags resolver = do
     case resolver of
       ResolverSnapshot name -> checkSnapBuildPlan gpds flags name
-      ResolverCompiler _ -> return $ BuildPlanCheckPartial Map.empty Map.empty
+      ResolverCompiler {} -> return $ BuildPlanCheckPartial Map.empty Map.empty
       -- TODO support custom resolver for stack init
-      ResolverCustom _ _ -> return $ BuildPlanCheckPartial Map.empty Map.empty
+      ResolverCustom {} -> return $ BuildPlanCheckPartial Map.empty Map.empty
 
 findCabalFiles :: MonadIO m => Bool -> Path Abs Dir -> m [Path Abs File]
 findCabalFiles recurse dir =
@@ -586,13 +586,13 @@ solveExtraDeps modStackYaml = do
     resultSpecs <- case resolverResult of
         BuildPlanCheckOk flags ->
             return $ Just ((mergeConstraints oldSrcs flags), Map.empty)
-        BuildPlanCheckPartial _ _ -> do
+        BuildPlanCheckPartial {} -> do
             eres <- solveResolverSpec stackYaml cabalDirs
                               (resolver, srcConstraints, extraConstraints)
             -- TODO Solver should also use the init code to ignore incompatible
             -- packages
             return $ either (const Nothing) Just eres
-        (BuildPlanCheckFail _ _ _) ->
+        BuildPlanCheckFail {} ->
             throwM $ ResolverMismatch resolver (show resolverResult)
 
     (srcs, edeps) <- case resultSpecs of

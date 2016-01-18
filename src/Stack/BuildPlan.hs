@@ -657,31 +657,31 @@ data BuildPlanCheck =
 
 -- Greater means a better plan
 instance Ord BuildPlanCheck where
-  (BuildPlanCheckPartial _ e1) `compare` (BuildPlanCheckPartial _ e2) =
+  BuildPlanCheckPartial _ e1 `compare` BuildPlanCheckPartial _ e2 =
       compare (Map.size e1) (Map.size e2)
 
-  (BuildPlanCheckFail _ e1 _)  `compare` (BuildPlanCheckFail _ e2 _) =
+  BuildPlanCheckFail _ e1 _  `compare` BuildPlanCheckFail _ e2 _ =
       let numUserPkgs e = Map.size $ Map.unions (Map.elems (fmap deNeededBy e))
       in compare (numUserPkgs e1) (numUserPkgs e2)
 
-  (BuildPlanCheckOk _)        `compare` (BuildPlanCheckOk _)         = EQ
-  (BuildPlanCheckOk _)        `compare` (BuildPlanCheckPartial _ _)  = GT
-  (BuildPlanCheckOk _)        `compare` (BuildPlanCheckFail _ _ _)   = GT
-  (BuildPlanCheckPartial _ _) `compare` (BuildPlanCheckFail _ _ _)   = GT
+  BuildPlanCheckOk {}        `compare` BuildPlanCheckOk {}      = EQ
+  BuildPlanCheckOk {}        `compare` BuildPlanCheckPartial {} = GT
+  BuildPlanCheckOk {}        `compare` BuildPlanCheckFail {}    = GT
+  BuildPlanCheckPartial {}   `compare` BuildPlanCheckFail {}    = GT
   _ `compare` _ = LT
 
 instance Eq BuildPlanCheck where
-  (BuildPlanCheckOk _)         == (BuildPlanCheckOk _)         = True
-  (BuildPlanCheckPartial _ e1) == (BuildPlanCheckPartial _ e2) =
-      (Map.size e1) == (Map.size e2)
-  (BuildPlanCheckFail _ e1 _)  == (BuildPlanCheckFail _ e2 _)  =
+  BuildPlanCheckOk {}          == BuildPlanCheckOk {}        = True
+  BuildPlanCheckPartial _ e1   == BuildPlanCheckPartial _ e2 =
+      Map.size e1 == Map.size e2
+  BuildPlanCheckFail _ e1 _  == BuildPlanCheckFail _ e2 _    =
       let numUserPkgs e = Map.size $ Map.unions (Map.elems (fmap deNeededBy e))
       in numUserPkgs e1 == numUserPkgs e2
 
   _ == _ = False
 
 instance Show BuildPlanCheck where
-    show (BuildPlanCheckOk _) = ""
+    show BuildPlanCheckOk {} = ""
     show (BuildPlanCheckPartial f e)  = T.unpack $ showDepErrors f e
     show (BuildPlanCheckFail f e c) = T.unpack $ showCompilerErrors f e c
 
@@ -744,7 +744,7 @@ selectBestSnapshot gpds snaps = do
             reportResult result snap
             let new = (snap, result)
             case result of
-                BuildPlanCheckOk _ -> return new
+                BuildPlanCheckOk {} -> return new
                 _ -> case bestYet of
                         Nothing  -> loop (Just new) rest
                         Just old -> loop (Just (betterSnap old new)) rest
@@ -753,15 +753,15 @@ selectBestSnapshot gpds snaps = do
           | r1 <= r2  = (s1, r1)
           | otherwise = (s2, r2)
 
-        reportResult (BuildPlanCheckOk _) snap = do
+        reportResult BuildPlanCheckOk {} snap = do
             $logInfo $ "* Matches " <> renderSnapName snap
             $logInfo ""
 
-        reportResult r@(BuildPlanCheckPartial _ _) snap = do
+        reportResult r@BuildPlanCheckPartial {} snap = do
             $logWarn $ "* Partially matches " <> renderSnapName snap
             $logWarn $ indent $ T.pack $ show r
 
-        reportResult r@(BuildPlanCheckFail _ _ _) snap = do
+        reportResult r@BuildPlanCheckFail {} snap = do
             $logWarn $ "* Rejected " <> renderSnapName snap
             $logWarn $ indent $ T.pack $ show r
 

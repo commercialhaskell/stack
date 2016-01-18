@@ -283,7 +283,7 @@ getDefaultResolver stackYaml initOpts mresolver bundle =
             snaps <- getSnapshots' >>= getRecommendedSnapshots
             (s, r) <- selectBestSnapshot gpds snaps
             case r of
-                (BuildPlanCheckFail _ _ _) | not (omitPackages initOpts)
+                BuildPlanCheckFail {} | not (omitPackages initOpts)
                         -> throwM (NoMatchingSnapshot snaps)
                 _ -> return $ ResolverSnapshot s
 
@@ -353,14 +353,14 @@ checkBundleResolver stackYaml initOpts bundle resolver = do
     result <- checkResolverSpec gpds Nothing resolver
     case result of
         BuildPlanCheckOk f -> return $ Right (f, Map.empty)
-        (BuildPlanCheckPartial f _)
+        BuildPlanCheckPartial f _
             | needSolver resolver initOpts -> do
                 $logWarn $ "*** Resolver " <> resolverName resolver
                             <> " will need external packages: "
                 $logWarn $ indent $ T.pack $ show result
                 solve f
             | otherwise -> throwM $ ResolverPartial resolver (show result)
-        (BuildPlanCheckFail _ e _)
+        BuildPlanCheckFail _ e _
             | (omitPackages initOpts) -> do
                 $logWarn $ "*** Resolver compiler mismatch: "
                            <> resolverName resolver
