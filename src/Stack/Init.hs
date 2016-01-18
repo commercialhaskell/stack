@@ -18,10 +18,11 @@ import           Control.Monad.Trans.Control     (MonadBaseControl)
 import qualified Data.ByteString.Builder         as B
 import qualified Data.ByteString.Lazy            as L
 import qualified Data.ByteString.Char8           as BC
+import           Data.Function                   (on)
 import qualified Data.HashMap.Strict             as HM
 import qualified Data.IntMap                     as IntMap
 import qualified Data.Foldable                   as F
-import           Data.List                       (intersect)
+import           Data.List                       (intersect, maximumBy)
 import           Data.List.Extra                 (nubOrd)
 import           Data.Map                        (Map)
 import qualified Data.Map                        as Map
@@ -42,6 +43,7 @@ import           Stack.Types.Internal            ( HasTerminal, HasReExec
 import           System.Directory                (makeRelativeToCurrentDirectory)
 import           Stack.Config                    ( getSnapshots
                                                  , makeConcreteResolver)
+import qualified System.FilePath                 as FP
 
 -- | Generate stack.yaml
 initProject
@@ -135,7 +137,7 @@ initProject currDir initOpts mresolver = do
         indent t = T.unlines $ fmap ("    " <>) (T.lines t)
 
     $logInfo $ "Initialising configuration using resolver: " <> resolverName r
-    $logInfo $ "Total number of packages considered: "
+    $logInfo $ "Total number of user packages considered: "
                <> (T.pack $ show $ (Map.size bundle + length dupPkgs))
 
     when (dupPkgs /= []) $ do
@@ -400,7 +402,13 @@ checkBundleResolver stackYaml initOpts bundle resolver = do
                                         (getFlags pkg)
               allDeps = concat $ map (Map.keys . deps) packages
               isIndependent pkg = not $ pkg `elem` allDeps
-          return $ head (filter isIndependent packages)
+
+              -- prefer to reject packages in deeper directories
+              path pkg = fst (fromJust (Map.lookup pkg bundle))
+              pathlen = length . FP.splitPath . toFilePath . path
+              maxPathlen = maximumBy (compare `on` pathlen)
+
+          return $ maxPathlen (filter isIndependent packages)
 
       giveUpMsg = concat
           [ "    - Use '--omit-packages to exclude conflicting package(s).\n"
