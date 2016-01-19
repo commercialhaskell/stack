@@ -235,11 +235,9 @@ commandLineHandler progName isInterpreter = complicatedOptions
                     "List the templates available for `stack new'."
                     templatesCmd
                     (pure ())
-        addCommand  "init"
+        addCommand' "init"
                     "Initialize a stack project based on one or more cabal packages"
-                    globalFooter
                     initCmd
-                    (globalOpts InitCmdGlobalOpts)
                     initOptsParser
         addCommand' "solver"
                     "Use a dependency solver to try and determine missing extra-deps"

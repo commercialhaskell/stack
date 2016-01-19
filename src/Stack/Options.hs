@@ -68,9 +68,12 @@ data BuildCommand
     deriving (Eq)
 
 -- | Allows adjust global options depending on their context
+-- Note: This was being used to remove ambibuity between the local and global
+-- implementation of stack init --resolver option. Now that stack init has no
+-- local --resolver this is not being used anymore but the code is kept for any
+-- similar future use cases.
 data GlobalOptsContext
     = OuterGlobalOpts -- ^ Global options before subcommand name
-    | InitCmdGlobalOpts -- ^ Global options following 'stack init'
     | OtherCmdGlobalOpts -- ^ Global options following any other subcommand
     deriving (Show, Eq)
 
@@ -637,11 +640,7 @@ globalOptsParser kind defLogLevel =
     optional (option auto (long dockerEntrypointArgName <> hidden <> internal)) <*>
     logLevelOptsParser hide0 defLogLevel <*>
     configOptsParser hide0 <*>
-    (if kind == InitCmdGlobalOpts
-     -- The 'stack init' command has its own '--resolver' option, and having a global
-     -- one causes ambiguity, so disable it.
-     then pure Nothing
-     else optional (abstractResolverOptsParser hide0)) <*>
+    optional (abstractResolverOptsParser hide0) <*>
     optional (compilerOptsParser hide0) <*>
     maybeBoolFlags
         "terminal"
