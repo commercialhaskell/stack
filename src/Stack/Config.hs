@@ -645,11 +645,7 @@ getProjectConfig Nothing = do
     case lookup "STACK_YAML" env of
         Just fp -> do
             $logInfo "Getting project config file from STACK_YAML environment"
-            liftM Just $ case parseAbsFile fp of
-                Left _ -> do
-                    currDir <- getWorkingDir
-                    resolveFile currDir fp
-                Right path -> return path
+            Just <$> parseRelAsAbsFile fp
         Nothing -> do
             currDir <- getWorkingDir
             search currDir

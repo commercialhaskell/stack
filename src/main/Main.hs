@@ -1151,12 +1151,7 @@ sigSignSdistCmd (url,path) go =
 loadConfigWithOpts :: GlobalOpts -> IO (Manager,LoadConfig (StackLoggingT IO))
 loadConfigWithOpts go@GlobalOpts{..} = do
     manager <- newTLSManager
-    mstackYaml <-
-        case globalStackYaml of
-            Nothing -> return Nothing
-            Just fp -> do
-                path <- canonicalizePath fp >>= parseAbsFile
-                return $ Just path
+    mstackYaml <- forM globalStackYaml parseRelAsAbsFile
     lc <- runStackLoggingTGlobal manager go $ do
         lc <- loadConfig globalConfigMonoid mstackYaml globalResolver
         -- If we have been relaunched in a Docker container, perform in-container initialization
