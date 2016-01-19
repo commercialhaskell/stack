@@ -494,15 +494,23 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
     (warnings, gpds) <- fmap unzip (mapM readPackageUnresolved cabalfps)
     zipWithM_ (mapM_ . printCabalFileWarning) cabalfps warnings
 
-    let packages  = zip cabalfps gpds
-        getEmptyNamePkg (fp, gpd)
-            | ((show . gpdPackageName) gpd) == "" = Just fp
-            | otherwise = Nothing
-        emptyNamePkgs = mapMaybe getEmptyNamePkg packages
+    -- package name cannot be empty or missing otherwise
+    -- it will result in cabal solver failure.
+    -- stack requires packages name to match the cabal file name
+    -- Just the latter check is enough to cover both the cases
 
-    when (emptyNamePkgs /= []) $ do
-        rels <- mapM makeRel emptyNamePkgs
-        error $ "Please assign a name to the following package(s):\n"
+    let packages  = zip cabalfps gpds
+        getNameMismatchPkg (fp, gpd)
+            | (show . gpdPackageName) gpd /= (FP.takeBaseName . toFilePath) fp
+                = Just fp
+            | otherwise = Nothing
+        nameMismatchPkgs = mapMaybe getNameMismatchPkg packages
+
+    when (nameMismatchPkgs /= []) $ do
+        rels <- mapM makeRel nameMismatchPkgs
+        error $ "Package name as defined in the .cabal file must match the \
+                \.cabal file name.\n\
+                \Please fix the following packages and try again:\n"
                 <> (formatGroup rels)
 
     let dupGroups = filter ((> 1) . length)
