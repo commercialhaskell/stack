@@ -438,11 +438,11 @@ getRecommendedSnapshots snapshots = do
 
 data InitOpts = InitOpts
     { useSolver :: Bool
-    -- ^ Use solver
+    -- ^ Use solver to determine required external dependencies
     , omitPackages :: Bool
     -- ^ Exclude conflicting or incompatible user packages
     , forceOverwrite :: Bool
-    -- ^ Overwrite existing files
+    -- ^ Overwrite existing stack.yaml
     , includeSubDirs :: Bool
     -- ^ If True, include all .cabal files found in any sub directories
     }

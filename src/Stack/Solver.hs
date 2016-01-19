@@ -310,6 +310,9 @@ setupCabalEnv compiler = do
                          \This is most likely a bug."
     return menv
 
+-- | Merge two separate maps, one defining constraints on package versions and
+-- the other defining package flagmap, into a single map of version and flagmap
+-- tuples.
 mergeConstraints
     :: Map PackageName v
     -> Map PackageName (Map p f)
@@ -331,6 +334,17 @@ diffConstraints (v, f) (v', f')
     | (v == v') && (f == f') = Nothing
     | otherwise              = Just (v, f)
 
+-- | Given a resolver, user package constraints (versions and flags) and extra
+-- dependency constraints determine what extra dependencies are required
+-- outside the resolver snapshot and the specified extra dependencies.
+
+-- First it tries by using the snapshot and the input extra dependencies
+-- as hard constraints, if no solution is arrived at by using hard
+-- constraints it then tries using them as soft constraints or preferences.
+
+-- It returns either conflicting packages when no solution is arrived at
+-- or the solution in terms of src package flag settings and extra
+-- dependencies.
 solveResolverSpec
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
        , MonadReader env m, HasConfig env , HasGHCVariant env
@@ -408,6 +422,9 @@ solveResolverSpec stackYaml cabalDirs
             $logInfo $ "*** Failed to arrive at a workable build plan."
             return $ Left x
 
+-- | Given a resolver (snpashot, compiler or custom resolver)
+-- return the compiler version, package versions and packages flags
+-- for that resolver.
 getResolverConstraints
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
        , MonadReader env m, HasConfig env , HasGHCVariant env
@@ -433,11 +450,12 @@ getResolverConstraints stackYaml resolver
       mpiConstraints mpi = (mpiVersion mpi, mpiFlags mpi)
       mbpConstraints mbp = fmap mpiConstraints (mbpPackages mbp)
 
--- | Given a bundle of packages and a resolver, check the resolver with respect
--- to the packages and return how well the resolver satisfies the depndencies
--- of the packages. If 'flags' is passed as 'Nothing' then flags are chosen
--- automatically.
+-- | Given a bundle of user packages, flag constraints on those packages and a
+-- resolver, determine if the resolver fully, partially or fails to satisfy the
+-- dependencies of the user packages.
 
+-- If the package flags are passed as 'Nothing' then flags are chosen
+-- automatically.
 checkResolverSpec
     :: ( MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m
        , HasHttpManager env, HasConfig env, HasGHCVariant env
@@ -453,6 +471,8 @@ checkResolverSpec gpds flags resolver = do
       -- TODO support custom resolver for stack init
       ResolverCustom {} -> return $ BuildPlanCheckPartial Map.empty Map.empty
 
+-- | Finds all files with a .cabal extension under a given directory.
+-- Subdirectories can be included depending on the @recurse@ parameter.
 findCabalFiles :: MonadIO m => Bool -> Path Abs Dir -> m [Path Abs File]
 findCabalFiles recurse dir =
     liftIO $ findFiles dir isCabal (\subdir -> recurse && not (isIgnored subdir))
@@ -470,9 +490,13 @@ ignoredDirs = Set.fromList
     , ".stack-work"
     ]
 
--- | Do some basic checks on a list of cabal file paths to be used for creating
--- stack config, print some informative and error messages and if all is ok
--- return @GenericPackageDescription@ list.
+-- | Perform some basic checks on a list of cabal files to be used for creating
+-- stack config. It checks for duplicate package names, package name and
+-- cabal file name mismatch and reports any issues related to those.
+
+-- If no error occurs it returns filepath and @GenericPackageDescription@s
+-- pairs as well as any filenames for duplicate packages not included in the
+-- pairs.
 cabalPackagesCheck
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
        , MonadReader env m, HasConfig env , HasGHCVariant env
@@ -556,17 +580,15 @@ reportMissingCabalFiles cabalfps includeSubdirs = do
         $logWarn $ "The following packages are missing from the config:"
         $logWarn $ T.pack (formatGroup relpaths)
 
--- | Solver can be thought of as a counterpart of init. init creates a
--- stack.yaml whereas solver verifies or fixes an existing one. It can verify
--- the dependencies of the packages and determine if any extra-dependecies
--- outside the snapshots are needed.
---
 -- TODO Currently solver uses a stack.yaml in the parent chain when there is
 -- no stack.yaml in the current directory. It should instead look for a
 -- stack yaml only in the current directory and suggest init if there is
 -- none available. That will make the behavior consistent with init and provide
 -- a correct meaning to a --ignore-subdirs option if implemented.
 
+-- | Verify the combination of resolver, package flags and extra
+-- dependencies in an existing stack.yaml and suggest changes in flags or
+-- extra dependencies so that the specified packages can be compiled.
 solveExtraDeps
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
        , MonadReader env m, HasConfig env , HasEnvConfig env, HasGHCVariant env
