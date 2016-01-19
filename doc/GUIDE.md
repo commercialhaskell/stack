@@ -674,7 +674,7 @@ will work.
 Given that LTS Haskell and Stackage Nightly have ~1400 of the most common
 Haskell packages, this will often be enough to build most packages. However,
 at times, you may find that not all dependencies required may be available in
-the stackage snapshots.
+the Stackage snapshots.
 
 Let's simulate an unsatisfied dependency by adding acme-missiles to our
 build-depends and re-initing:
@@ -716,7 +716,7 @@ However, you can try '--solver' to use external packages.
 
 stack has tested six different snapshots, and in every case discovered that
 acme-missiles is not available. In the end it suggested that you use the
-`--solver` command line switch if you want to use packages outside stackage. So
+`--solver` command line switch if you want to use packages outside Stackage. So
 let's give it a try:
 
 
@@ -837,8 +837,8 @@ packages:
 In case wrong packages are excluded you can uncomment the right one and comment
 the other one.
 
-Packages may get excluded due to confilcting requirements among user packages
-or due to conflicting requiements between a user package and the resolver
+Packages may get excluded due to conflicting requirements among user packages
+or due to conflicting requirements between a user package and the resolver
 compiler. If all of the packages have a conflict with the compiler then all of
 them may get commented out. 
 
@@ -889,84 +889,156 @@ Warning: Specified resolver could not satisfy all dependencies. Some external pa
 You can suppress this message by removing it from stack.yaml
 
 ```
+### stack solver
 
-### Alternative solution: dependency solving
+While `stack init` is used to create stack configuration file from existing
+cabal files, `stack solver` can be used to fine tune or fix an existing stack
+configuration file.
 
-There's another solution to consider for missing dependencies. At the end
-of the previous error message, it said:
+`stack solver` uses the existing file as a constraint. For example it will
+use only those packages specified in the existing config file or use existing
+external dependencies as constraints to figure out other dependencies.
 
-```
-You may also want to try the 'stack solver' command
-```
-
-This approach uses a full-blown dependency solver to look at all upstream
-package versions available and compare them to your snapshot selection and
-version ranges in your .cabal file. In order to use this feature, you'll need
-the cabal executable available. Let's build that with:
+Let's try `stack solver` to verify the config that we generated earlier with
+`stack init`:
 
 ```
-michael@d30748af6d3d:~/yackage-0.8.0$ stack build cabal-install
-random-1.1: download
-mtl-2.2.1: download
-network-2.6.2.1: download
-old-locale-1.0.0.7: download
-random-1.1: configure
-random-1.1: build
-# ...
-cabal-install-1.22.6.0: download
-cabal-install-1.22.6.0: configure
-cabal-install-1.22.6.0: build
-cabal-install-1.22.6.0: install
-Completed all 10 actions.
+cueball:~/yackage-0.8.0$ stack solver
+Using configuration file: stack.yaml
+The following packages are missing from the config:
+- example/yackage-test.cabal
+
+Using cabal packages:
+- yackage.cabal
+
+Using resolver: lts-4.2
+Using compiler: ghc-7.10.3
+Asking cabal to calculate a build plan...
+Trying with packages from lts-4.2 and 3 external packages as hard constraints...
+Successfully determined a build plan with 3 external dependencies.
+No changes needed to stack.yaml
 ```
 
-Now we can use `stack solver`:
+It says there are no changes needed to your config. Notice that it also reports
+`example/yackage-test.cabal` as missing from the config. It was purposely
+omitted by `stack init` to resolve a conflict.
+
+Sometimes `stack init` may not be able to give you a perfect configuration. In
+that case, you can tweak the configuration file as per your requirements and then
+run `stack solver`, it will check the file and suggest or apply any fixes
+needed.
+
+For example, if `stack init` ignored certain packages due to name conflicts or
+dependency conflicts, the choice that `stack init` made may not be the correct
+one. In that case you can revert the choice and use solver to fix things.
+
+Let's try commenting out `.` and uncommenting `examples/` in our previously
+generated `stack.yaml` and then run `stack solver`:
 
 ```
-michael@d30748af6d3d:~/yackage-0.8.0$ stack solver
-This command is not guaranteed to give you a perfect build plan
-It's possible that even with the changes generated below, you will still need to do some manual tweaking
-Asking cabal to calculate a build plan, please wait
-extra-deps:
-- acme-missiles-0.3
+cueball:~/yackage-0.8.0$ stack solver
+
+Using configuration file: stack.yaml
+The following packages are missing from the config:
+- yackage.cabal
+
+Using cabal packages:
+- example/yackage-test.cabal
+
+.
+.
+.
+
+Retrying with packages from lts-4.2 and 3 external packages as preferences...
+Successfully determined a build plan with 5 external dependencies.
+
+The following changes will be made to stack.yaml:
+* Resolver is lts-4.2
+* Dependencies to be added
+    extra-deps:
+    - acme-missiles-0.2
+    - email-validate-2.2.0
+    - tar-0.5.0.1
+
+* Dependencies to be deleted
+    extra-deps:
+    - acme-missiles-0.3
+
+To automatically update stack.yaml, rerun with '--update-config'
 ```
 
-And if we're exceptionally lazy, we can ask stack to modify our stack.yaml file
-for us:
-
-```
-michael@d30748af6d3d:~/yackage-0.8.0$ stack solver --modify-stack-yaml
-This command is not guaranteed to give you a perfect build plan
-It's possible that even with the changes generated below, you will still need to do some manual tweaking
-Asking cabal to calculate a build plan, please wait
-extra-deps:
-- acme-missiles-0.3
-Updated /home/michael/yackage-0.8.0/stack.yaml
-```
-
-With that change, `stack build` will now run.
+Due to the change that we made, solver suggested some new dependencies.
+By default it does not make changes to the config. As it suggested you can use
+`--update-config` to make changes to the config.
 
 NOTE: You should probably back up your stack.yaml before doing this, such as
 committing to Git/Mercurial/Darcs.
 
-There's one final approach to mention: skipping the snapshot entirely and just
-using dependency solving. You can do this with the `--solver` flag to `init`.
-This is not a commonly used workflow with stack, as you end up with a large
-number of extra-deps and no guarantee that the packages will compile together.
-For those interested, however, the option is available. You need to make sure
-you have both the ghc and cabal commands on your PATH. An easy way to do this
-is to use the `stack exec` command:
+Sometimes, you may want to use specific versions of certain packages for your
+project. To do that you can fix those versions by specifying them in the
+extra-deps section and then use `stack solver` to figure out whether it is
+feasible to use those or what other dependencies are needed as a result.
+
+If you want to change the resolver for your project, you can run `stack solver
+--resolver <resolver name>` and it will figure out the changes needed for you.
+
+Let's see what happens if we change the resolver to lts-2.22:
 
 ```
-michael@d30748af6d3d:~/yackage-0.8.0$ stack exec -- stack init --solver --force
-Writing default config file to: /home/michael/yackage-0.8.0/stack.yaml
-Basing on cabal files:
-- /home/michael/yackage-0.8.0/yackage.cabal
+cueball:~/yackage-0.8.0$ stack solver --resolver lts-2.22
+Using configuration file: stack.yaml
+The following packages are missing from the config:
+- yackage.cabal
 
-Asking cabal to calculate a build plan, please wait
-Selected resolver: ghc-7.10
-Wrote project config to: /home/michael/yackage-0.8.0/stack.yaml
+Using cabal packages:
+- example/yackage-test.cabal
+
+Using resolver: lts-2.22
+Using compiler: ghc-7.8.4
+
+.
+.
+.
+
+Retrying with packages from lts-2.22 and 3 external packages as preferences...
+Successfully determined a build plan with 19 external dependencies.
+
+The following changes will be made to stack.yaml:
+* Resolver is lts-2.22
+* Flags to be added
+    flags:
+    - old-locale: true
+
+* Dependencies to be added
+    extra-deps:
+    - acme-missiles-0.2
+    - aeson-0.10.0.0
+    - aeson-compat-0.3.0.0
+    - attoparsec-0.13.0.1
+    - conduit-extra-1.1.9.2
+    - email-validate-2.2.0
+    - hex-0.1.2
+    - http-api-data-0.2.2
+    - http2-1.1.0
+    - persistent-2.2.4
+    - persistent-template-2.1.5
+    - primitive-0.6.1.0
+    - tar-0.5.0.1
+    - unix-time-0.3.6
+    - vector-0.11.0.0
+    - wai-extra-3.0.14
+    - warp-3.1.3.1
+
+* Dependencies to be deleted
+    extra-deps:
+    - acme-missiles-0.3
+
+To automatically update stack.yaml, rerun with '--update-config'
 ```
+
+As you can see, it automatically suggested changes in `extra-deps` due to the
+change of resolver.
+
 ## Different databases
 
 Time to take a short break from hands-on examples and discuss a little
