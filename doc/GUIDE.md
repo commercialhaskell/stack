@@ -856,6 +856,11 @@ You can also init with a compiler resolver if you do not want to use a
 snapshot. That will result in all of your project's dependencies being put
 under the `extra-deps` section.
 
+#### Installing the compiler
+
+You can install the required compiler if not already installed by using the
+`--install-ghc` flag with the `stack init` command.
+
 #### Miscellaneous and diagnostics
 
 _Duplicate package names_: If multiple packages under the directory tree have
