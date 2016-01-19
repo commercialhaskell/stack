@@ -975,6 +975,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             _ -> return Nothing
 
     copyPreCompiled (PrecompiledCache mlib exes) = do
+        wc <- getWhichCompiler
         announceTask task "using precompiled package"
         forM_ mlib $ \libpath -> do
             menv <- getMinimalEnvOverride
@@ -991,8 +992,9 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
 
                 -- In case a build of the library with different flags already exists, unregister it
                 -- before copying.
+                let ghcPkgExe = ghcPkgExeName wc
                 catch
-                    (readProcessNull Nothing menv' "ghc-pkg"
+                    (readProcessNull Nothing menv' ghcPkgExe
                         [ "unregister"
                         , "--force"
                         , packageIdentifierString taskProvides
@@ -1001,7 +1003,7 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
                         ReadProcessException{} -> return ()
                         _ -> throwM ex)
 
-                readProcessNull Nothing menv' "ghc-pkg"
+                readProcessNull Nothing menv' ghcPkgExe
                     [ "register"
                     , "--force"
                     , libpath
@@ -1015,7 +1017,6 @@ singleBuild runInBase ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} in
             _ -> return ()
 
         -- Find the package in the database
-        wc <- getWhichCompiler
         let pkgDbs = [bcoSnapDB eeBaseConfigOpts]
 
         case mlib of
