@@ -1,12 +1,12 @@
 # FAQ
 
 So that this doesn't become repetitive: for the reasons behind the answers
-below, see the [Architecture](architecture.html) page. The goal of the answers here is to be as
+below, see the [Architecture](architecture.md) page. The goal of the answers here is to be as
 helpful and concise as possible.
 
 #### Where is stack installed and will it interfere with `ghc` (etc) I already have installed?
 
-Stack itself is installed in normal system locations based on the mechanism you used (see the [Install and upgrade](install_and_upgrade.html) page). Stack installs the Stackage libraries in `~/.stack` and any project libraries or extra dependencies in a `.stack-work` directory within each project's directory. None of this should affect any existing Haskell tools at all.
+Stack itself is installed in normal system locations based on the mechanism you used (see the [Install and upgrade](install_and_upgrade.md) page). Stack installs the Stackage libraries in `~/.stack` and any project libraries or extra dependencies in a `.stack-work` directory within each project's directory. None of this should affect any existing Haskell tools at all.
 
 #### What is the relationship between stack and cabal?
 
@@ -165,7 +165,7 @@ Like all other targets, `stack test` runs test suites in parallel by default. Th
 
 #### Can I get bash autocompletion?
 
-Yes, see the [shell-autocompletion documentation](shell_autocompletion.html)
+Yes, see the [shell-autocompletion documentation](shell_autocompletion.md)
 
 #### How do I update my package index?
 
@@ -186,7 +186,7 @@ of those three. Updating the index will have no impact on stack's behavior.
 
 #### I have a custom package index I'd like to use, how do I do so?
 
-You can configure this in your stack.yaml. See [YAML configuration](yaml_configuration.html).
+You can configure this in your stack.yaml. See [YAML configuration](yaml_configuration.md).
 
 #### How can I make sure my project builds against multiple ghc versions?
 
@@ -214,15 +214,15 @@ $ STACK_YAML=stack-7.10.yaml stack build  # builds using the given yaml file
 #### I heard you can use this with Docker?
 
 Yes, stack supports using Docker with images that contain preinstalled Stackage
-packages and the tools. See [Docker integration](docker_integration.html) for details.
+packages and the tools. See [Docker integration](docker_integration.md) for details.
 
 #### How do I use this with Travis CI?
 
-See the [Travis section in the GUIDE](GUIDE.html#travis-with-caching)
+See the [Travis section in the GUIDE](GUIDE.md#travis-with-caching)
 
 #### What is licensing restrictions on Windows?
 
-Currently on Windows GHC produces binaries linked statically with [GNU Multiple Precision Arithmetic Library](https://gmplib.org/) (GMP), which is used by [integer-gmp](https://hackage.haskell.org/package/integer-gmp) library to provide big integer implementation for Haskell. Contrary to the majority of Haskell code licensed under permissive BSD3 license, GMP library is licensed under LGPL, which means resulting binaries [have to be provided with source code or object files](http://www.gnu.org/licenses/gpl-faq.html#LGPLStaticVsDynamic). That may or may not be acceptable for your situation. Current workaround is to use GHC built with alternative big integer implementation called integer-simple, which is free from LGPL limitations as it's pure Haskell and does not use GMP. Unfortunately it has yet to be available out of the box with stack. See [issue #399](https://github.com/commercialhaskell/stack/issues/399) for the ongoing effort and information on workarounds.
+Currently on Windows GHC produces binaries linked statically with [GNU Multiple Precision Arithmetic Library](https://gmplib.org/) (GMP), which is used by [integer-gmp](https://hackage.haskell.org/package/integer-gmp) library to provide big integer implementation for Haskell. Contrary to the majority of Haskell code licensed under permissive BSD3 license, GMP library is licensed under LGPL, which means resulting binaries [have to be provided with source code or object files](http://www.gnu.org/licenses/gpl-faq.md#LGPLStaticVsDynamic). That may or may not be acceptable for your situation. Current workaround is to use GHC built with alternative big integer implementation called integer-simple, which is free from LGPL limitations as it's pure Haskell and does not use GMP. Unfortunately it has yet to be available out of the box with stack. See [issue #399](https://github.com/commercialhaskell/stack/issues/399) for the ongoing effort and information on workarounds.
 
 #### How to get a working executable on Windows?
 
