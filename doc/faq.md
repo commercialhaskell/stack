@@ -247,6 +247,13 @@ A custom temporary directory can be forced:
 * on Linux by setting the environment variable TMPDIR (eg `$ TMPDIR=path-to-tmp stack setup`)
 * on Windows by setting one of the environment variable (given in priority order), TMP, TEMP, USERPROFILE
 
+If you use Stack with Nix integration, be aware that Nix _also_ uses that TMPDIR
+variable, and if it is not set Nix sets it to some subdirectory of `/run`, which
+on most Linuxes is a Ramdir. Nix will run the builds in TMPDIR, therefore if you
+don't have enough RAM you will get errors about disk space.  If this happens to
+you, please _manually_ set TMPDIR before launching Stack to some directory on the
+disk.
+
 #### stack sometimes rebuilds based on flag changes when I wouldn't expect it to. How come?
 
 stack tries to give you reproducibility whenever possible. In some cases, this means that you get a recompile when one may not seem necessary. The most common example is running something like this in a multi-package project:
