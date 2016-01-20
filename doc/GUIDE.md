@@ -1737,6 +1737,10 @@ integration discussed above:
 * implicit sharing of system packages between projects, so you don't
   have more copies on-disk than you need to.
 
+When using the Nix integration, Stack downloads and builds Haskell dependencies
+as usual, but resorts on Nix to provide non-Haskell dependencies that exist in
+the Nixpkgs.
+
 Both Docker and Nix are methods to *isolate* builds and thereby make
 them more reproducible. They just differ in the means of achieving
 this isolation. Nix provides slightly weaker isolation guarantees than

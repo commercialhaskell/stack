@@ -2,6 +2,10 @@
 
 (since 0.1.10.0)
 
+When using the Nix integration, Haskell dependencies are handled as usual: they
+are downloaded from Stackage and build locally by Stack. Nix is used by Stack to
+provide the _non-Haskell_ dependencies needed by these Haskell packages.
+
 `stack` can automatically create a build environment (the equivalent
 of a "container" in Docker parlance) using `nix-shell`, provided Nix
 is already installed on your system. To do so, please visit the
