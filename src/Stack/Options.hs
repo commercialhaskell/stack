@@ -106,13 +106,13 @@ buildOptsParser cmd =
                   | otherwise = opts
                   where bopts = boptsBenchmarkOpts opts
                         topts = boptsTestOpts opts
-                        additionalArgs = [" +RTS ", trac, prof]
+                        additionalArgs = "+RTS" : catMaybes [trac, prof]
                         trac = if tracing
-                                  then " -xc "
-                                  else ""
+                                  then Just "-xc"
+                                  else Nothing
                         prof = if profiling
-                                  then " -p "
-                                  else ""
+                                  then Just "-p"
+                                  else Nothing
         profile =
             flag False True
              ( long "profile"
