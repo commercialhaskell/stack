@@ -256,11 +256,11 @@ stickyLoggerFunc loc src level msg = do
                 case level of
                     LevelOther "sticky-done" -> do
                         clear
-                        liftIO (T.hPutStrLn out msgText)
+                        liftIO (T.hPutStrLn out msgText >> hFlush out)
                         return Nothing
                     LevelOther "sticky" -> do
                         clear
-                        liftIO (T.hPutStr out msgText)
+                        liftIO (T.hPutStr out msgText >> hFlush out)
                         return (Just msgText)
                     _
                       | level >= maxLogLevel -> do
@@ -270,7 +270,7 @@ stickyLoggerFunc loc src level msg = do
                               Nothing ->
                                   return Nothing
                               Just line -> do
-                                  liftIO (T.hPutStr out line)
+                                  liftIO (T.hPutStr out line >> hFlush out)
                                   return sticky
                       | otherwise ->
                           return sticky
