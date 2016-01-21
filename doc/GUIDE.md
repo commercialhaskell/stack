@@ -1627,18 +1627,46 @@ addons:
 
 # The different configurations we want to test. You could also do things like
 # change flags or use --stack-yaml to point to a different file.
-env:
-- ARGS=""
-- ARGS="--resolver lts-2"
-- ARGS="--resolver lts-3"
-- ARGS="--resolver lts"
-- ARGS="--resolver nightly"
+#
+# We set the compiler values here to tell Travis to use a different
+# cache file per set of arguments.
+#
+# If you need to have different apt packages for each combination in the
+# matrix, you can use a line such as:
+#     addons: {apt: {packages: [libfcgi-dev,libgmp-dev]}}
+matrix:
+  include:
+  - env: ARGS=""
+    compiler: ": # Default"
+  - env: ARGS="--resolver lts-2"
+    compiler: ": # lts-2"
+  - env: ARGS="--resolver lts-3"
+    compiler: ": # lts-3"
+  - env: ARGS="--resolver lts-4"
+    compiler: ": # lts-4"
+  - env: ARGS="--resolver lts"
+    compiler: ": # lts"
+  - env: ARGS="--resolver nightly"
+    compiler: ": # nightly"
+  # Do some testing on OS X as well. Feel free to add more
+  # rows if desired
+  - env: ARGS=""
+    compiler: ": # Default osx"
+    os: osx
 
 before_install:
+# Using compiler above sets CC to an invalid value, so unset it
+- unset CC
+
 # Download and unpack the stack executable
 - mkdir -p ~/.local/bin
 - export PATH=$HOME/.local/bin:$PATH
-- travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+- if [ `uname` = "Darwin" ];
+  then
+    curl --insecure -L https://www.stackage.org/stack/osx-x86_64 | tar xz --strip-components=1 --include '*/stack' -C ~/.local/bin;
+  else
+    curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack';
+  fi
 
 # This line does all of the work: installs GHC if necessary, build the library,
 # executables, and test suites, and runs the test suites. --no-terminal works
