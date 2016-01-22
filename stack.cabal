@@ -172,6 +172,7 @@ library
                    , http-conduit >= 2.1.7
                    , http-types >= 0.8.6 && < 0.10
                    , lifted-base
+                   , microlens >= 0.3.0.0
                    , monad-control
                    , monad-logger >= 0.3.13.1
                    , mtl >= 2.1.3.1
@@ -234,6 +235,7 @@ executable stack
                 , filepath
                 , http-client
                 , lifted-base
+                , microlens >= 0.3.0.0
                 , monad-control
                 , monad-logger >= 0.3.13.1
                 , mtl >= 2.1.3.1

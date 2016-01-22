@@ -44,11 +44,11 @@ ide
     -> [String] -- ^ GHC options.
     -> m ()
 ide targets useropts = do
-    let bopts = defaultBuildOpts
-            { boptsTargets = targets
-            , boptsBuildSubset = BSOnlyDependencies
+    let boptsCli = defaultBuildOptsCLI
+            { boptsCLITargets = targets
+            , boptsCLIBuildSubset = BSOnlyDependencies
             }
-    (_realTargets,_,pkgs) <- ghciSetup (ideGhciOpts bopts)
+    (_realTargets,_,pkgs) <- ghciSetup (ideGhciOpts boptsCli)
     pwd <- getCurrentDir
     (pkgopts,_srcfiles) <-
         liftM mconcat $ forM pkgs $ getPackageOptsAndTargetFiles pwd
@@ -110,8 +110,8 @@ getPackageOptsAndTargetFiles pwd pkg = do
               (S.toList (ghciPkgCFiles pkg) <> S.toList (ghciPkgModFiles pkg) <>
                [paths_foo | paths_foo_exists]))
 
-ideGhciOpts :: BuildOpts -> GhciOpts
-ideGhciOpts bopts = GhciOpts
+ideGhciOpts :: BuildOptsCLI -> GhciOpts
+ideGhciOpts boptsCli = GhciOpts
     { ghciNoBuild = False
     , ghciArgs = []
     , ghciGhcCommand = Nothing
@@ -121,5 +121,5 @@ ideGhciOpts bopts = GhciOpts
     , ghciLoadLocalDeps = False
     , ghciSkipIntermediate = False
     , ghciHidePackages = True
-    , ghciBuildOpts = bopts
+    , ghciBuildOptsCLI = boptsCli
     }

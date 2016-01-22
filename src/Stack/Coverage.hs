@@ -218,9 +218,8 @@ generateHpcReportForTargets opts = do
                  $logWarn $ "Since --all is used, it is redundant to specify these targets: " <> T.pack (show targetNames)
              (_,_,targets) <- parseTargetsFromBuildOpts
                  AllowNoTargets
-                 defaultBuildOpts
-                 { boptsTargets = if hroptsAll opts then [] else targetNames
-                 }
+                 defaultBuildOptsCLI
+                    { boptsCLITargets = if hroptsAll opts then [] else targetNames }
              liftM concat $ forM (Map.toList targets) $ \(name, target) ->
                  case target of
                      STUnknown -> fail $

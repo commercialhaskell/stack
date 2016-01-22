@@ -5,43 +5,44 @@
 module Stack.Types.Config.Build
     (
       BuildOpts(..)
+    , BuildCommand(..)
     , defaultBuildOpts
+    , defaultBuildOptsCLI
+    , BuildOptsCLI(..)
     , BuildOptsMonoid(..)
     , TestOpts(..)
     , defaultTestOpts
+    , TestOptsMonoid(..)
     , BenchmarkOpts(..)
     , defaultBenchmarkOpts
+    , BenchmarkOptsMonoid(..)
     , FileWatchOpts(..)
     , BuildSubset(..)
     )
     where
 
 import           Data.Aeson.Extended
-import qualified Data.Map as Map
 import           Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import           Data.Monoid
 import           Data.Text (Text)
 import           Stack.Types.FlagName
 import           Stack.Types.PackageName
 import           Control.Applicative
 
+-- | Build options that is interpreted by the build command.
+--   This is built up from BuildOptsCLI and BuildOptsMonoid
 data BuildOpts =
-  BuildOpts {boptsTargets :: ![Text]
-            ,boptsLibProfile :: !Bool
+  BuildOpts {boptsLibProfile :: !Bool
             ,boptsExeProfile :: !Bool
             ,boptsHaddock :: !Bool
             -- ^ Build haddocks?
             ,boptsHaddockDeps :: !(Maybe Bool)
             -- ^ Build haddocks for dependencies?
-            ,boptsDryrun :: !Bool
-            ,boptsGhcOptions :: ![Text]
-            ,boptsFlags :: !(Map (Maybe PackageName) (Map FlagName Bool))
             ,boptsInstallExes :: !Bool
             -- ^ Install executables to user path after building?
             ,boptsPreFetch :: !Bool
             -- ^ Fetch all packages immediately
-            ,boptsBuildSubset :: !BuildSubset
-            ,boptsFileWatch :: !FileWatchOpts
             -- ^ Watch files for changes and automatically rebuild
             ,boptsKeepGoing :: !(Maybe Bool)
             -- ^ Keep building/running after failure
@@ -57,9 +58,7 @@ data BuildOpts =
             -- ^ Turn on benchmarks for local targets
             ,boptsBenchmarkOpts :: !BenchmarkOpts
             -- ^ Additional test arguments
-            ,boptsExec :: ![(String, [String])]
             -- ^ Commands (with arguments) to run after a successful build
-            ,boptsOnlyConfigure :: !Bool
             -- ^ Only perform the configure step when building
             ,boptsReconfigure :: !Bool
             -- ^ Perform the configure step even if already configured
@@ -70,35 +69,60 @@ data BuildOpts =
 
 defaultBuildOpts :: BuildOpts
 defaultBuildOpts = BuildOpts
-    { boptsTargets = []
-    , boptsLibProfile = False
+    { boptsLibProfile = False
     , boptsExeProfile = False
     , boptsHaddock = False
     , boptsHaddockDeps = Nothing
-    , boptsDryrun = False
-    , boptsGhcOptions = []
-    , boptsFlags = Map.empty
     , boptsInstallExes = False
     , boptsPreFetch = False
-    , boptsBuildSubset = BSAll
-    , boptsFileWatch = NoFileWatch
     , boptsKeepGoing = Nothing
     , boptsForceDirty = False
     , boptsTests = False
     , boptsTestOpts = defaultTestOpts
     , boptsBenchmarks = False
     , boptsBenchmarkOpts = defaultBenchmarkOpts
-    , boptsExec = []
-    , boptsOnlyConfigure = False
     , boptsReconfigure = False
     , boptsCabalVerbose = False
     }
 
--- | An uninterpreted representation of build options.
--- Configurations may be "cascaded" using mappend (left-biased).
+defaultBuildOptsCLI ::BuildOptsCLI
+defaultBuildOptsCLI = BuildOptsCLI
+    { boptsCLITargets = []
+    , boptsCLIDryrun = False
+    , boptsCLIFlags = Map.empty
+    , boptsCLIGhcOptions = []
+    , boptsCLIBuildSubset = BSAll
+    , boptsCLIFileWatch = NoFileWatch
+    , boptsCLIExec = []
+    , boptsCLIOnlyConfigure = False
+    , boptsCLICommand = Build
+    }
+
+-- | Build options that may only be specified from the CLI
+data BuildOptsCLI = BuildOptsCLI
+    { boptsCLITargets :: ![Text]
+    , boptsCLIDryrun :: !Bool
+    , boptsCLIGhcOptions :: ![Text]
+    , boptsCLIFlags :: !(Map (Maybe PackageName) (Map FlagName Bool))
+    , boptsCLIBuildSubset :: !BuildSubset
+    , boptsCLIFileWatch :: !FileWatchOpts
+    , boptsCLIExec :: ![(String, [String])]
+    , boptsCLIOnlyConfigure :: !Bool
+    , boptsCLICommand :: !BuildCommand
+    } deriving Show
+
+-- | Command sum type for conditional arguments.
+data BuildCommand
+    = Build
+    | Test
+    | Haddock
+    | Bench
+    | Install
+    deriving (Eq, Show)
+
+-- | Build options that may be specified in the stack.yaml or from the CLI
 data BuildOptsMonoid = BuildOptsMonoid
-    { -- buildMonoidTargets :: ![Text]
-    buildMonoidLibProfile :: !(Maybe Bool)
+    { buildMonoidLibProfile :: !(Maybe Bool)
     , buildMonoidExeProfile :: !(Maybe Bool)
     , buildMonoidHaddock :: !(Maybe Bool)
     , buildMonoidHaddockDeps :: !(Maybe Bool)
@@ -236,10 +260,10 @@ defaultTestOpts = TestOpts
 
 data TestOptsMonoid =
   TestOptsMonoid
-    {toMonoidRerunTests :: !(Maybe Bool)
-    ,toMonoidAdditionalArgs :: ![String]
-    ,toMonoidCoverage :: !(Maybe Bool)
-    ,toMonoidDisableRun :: !(Maybe Bool)
+    { toMonoidRerunTests :: !(Maybe Bool)
+    , toMonoidAdditionalArgs :: ![String]
+    , toMonoidCoverage :: !(Maybe Bool)
+    , toMonoidDisableRun :: !(Maybe Bool)
     } deriving (Show)
 
 instance FromJSON (TestOptsMonoid, [JSONWarning]) where
@@ -264,23 +288,24 @@ toMonoidDisableRunArgName = "no-run-tests"
 
 instance Monoid TestOptsMonoid where
   mempty = TestOptsMonoid
-    {toMonoidRerunTests = Nothing
-    ,toMonoidAdditionalArgs = []
-    ,toMonoidCoverage = Nothing
-    ,toMonoidDisableRun = Nothing
+    { toMonoidRerunTests = Nothing
+    , toMonoidAdditionalArgs = []
+    , toMonoidCoverage = Nothing
+    , toMonoidDisableRun = Nothing
     }
   mappend l r = TestOptsMonoid
-    {toMonoidRerunTests = toMonoidRerunTests l <|> toMonoidRerunTests r
-    ,toMonoidAdditionalArgs = toMonoidAdditionalArgs l <> toMonoidAdditionalArgs r
-    ,toMonoidCoverage = toMonoidCoverage l <|> toMonoidCoverage r
-    ,toMonoidDisableRun = toMonoidDisableRun l <|> toMonoidDisableRun r
+    { toMonoidRerunTests = toMonoidRerunTests l <|> toMonoidRerunTests r
+    , toMonoidAdditionalArgs = toMonoidAdditionalArgs l <> toMonoidAdditionalArgs r
+    , toMonoidCoverage = toMonoidCoverage l <|> toMonoidCoverage r
+    , toMonoidDisableRun = toMonoidDisableRun l <|> toMonoidDisableRun r
     }
 
 -- | Options for the 'FinalAction' 'DoBenchmarks'
 data BenchmarkOpts =
-  BenchmarkOpts {beoAdditionalArgs :: !(Maybe String) -- ^ Arguments passed to the benchmark program
-                ,beoDisableRun :: !Bool -- ^ Disable running of benchmarks
-                } deriving (Eq,Show)
+  BenchmarkOpts
+    { beoAdditionalArgs :: !(Maybe String) -- ^ Arguments passed to the benchmark program
+    , beoDisableRun :: !Bool -- ^ Disable running of benchmarks
+    } deriving (Eq,Show)
 
 defaultBenchmarkOpts :: BenchmarkOpts
 defaultBenchmarkOpts = BenchmarkOpts
@@ -290,8 +315,8 @@ defaultBenchmarkOpts = BenchmarkOpts
 
 data BenchmarkOptsMonoid =
   BenchmarkOptsMonoid
-     {beoMonoidAdditionalArgs :: !(Maybe String)
-     ,beoMonoidDisableRun :: !(Maybe Bool)
+     { beoMonoidAdditionalArgs :: !(Maybe String)
+     , beoMonoidDisableRun :: !(Maybe Bool)
      } deriving (Show)
 
 instance FromJSON (BenchmarkOptsMonoid, [JSONWarning]) where
@@ -308,14 +333,16 @@ beoMonoidDisableRunArgName = "no-run-benchmarks"
 
 instance Monoid BenchmarkOptsMonoid where
   mempty = BenchmarkOptsMonoid
-    {beoMonoidAdditionalArgs = Nothing
-    ,beoMonoidDisableRun = Nothing}
+    { beoMonoidAdditionalArgs = Nothing
+    , beoMonoidDisableRun = Nothing}
   mappend l r = BenchmarkOptsMonoid
-    {beoMonoidAdditionalArgs = beoMonoidAdditionalArgs l <|> beoMonoidAdditionalArgs r
-    ,beoMonoidDisableRun = beoMonoidDisableRun l <|> beoMonoidDisableRun r}
+    { beoMonoidAdditionalArgs = beoMonoidAdditionalArgs l <|> beoMonoidAdditionalArgs r
+    , beoMonoidDisableRun = beoMonoidDisableRun l <|> beoMonoidDisableRun r}
 
 data FileWatchOpts
   = NoFileWatch
   | FileWatch
   | FileWatchPoll
   deriving (Show,Eq)
+
+

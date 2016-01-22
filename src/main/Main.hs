@@ -16,7 +16,7 @@ import qualified Control.Exception.Lifted as EL
 import           Control.Monad hiding (mapM, forM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (ask, asks, runReaderT)
+import           Control.Monad.Reader (ask, asks,local,runReaderT)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
@@ -41,6 +41,7 @@ import           Development.GitRev (gitCommitCount, gitHash)
 import           Distribution.System (buildArch, buildPlatform)
 import           Distribution.Text (display)
 import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
+import           Lens.Micro
 import           Network.HTTP.Client
 import           Options.Applicative
 import           Options.Applicative.Args
@@ -530,7 +531,7 @@ pathCmd keys go =
             -- So it's not the *minimal* override path.
             menv <- getMinimalEnvOverride
             snap <- packageDatabaseDeps
-            local <- packageDatabaseLocal
+            plocal <- packageDatabaseLocal
             extra <- packageDatabaseExtra
             global <- getGlobalDB menv =<< getWhichCompiler
             snaproot <- installationRootDeps
@@ -556,7 +557,7 @@ pathCmd keys go =
                                     bc
                                     menv
                                     snap
-                                    local
+                                    plocal
                                     global
                                     snaproot
                                     localroot
@@ -870,20 +871,27 @@ cleanCmd :: CleanOpts -> GlobalOpts -> IO ()
 cleanCmd opts go = withBuildConfigAndLock go (const (clean opts))
 
 -- | Helper for build and install commands
-buildCmd :: BuildOpts -> GlobalOpts -> IO ()
+buildCmd :: BuildOptsCLI -> GlobalOpts -> IO ()
 buildCmd opts go = do
-  when (any (("-prof" `elem`) . either (const []) id . parseArgs Escaping) (boptsGhcOptions opts)) $ do
+  when (any (("-prof" `elem`) . either (const []) id . parseArgs Escaping) (boptsCLIGhcOptions opts)) $ do
     hPutStrLn stderr "When building with stack, you should not use the -prof GHC option"
     hPutStrLn stderr "Instead, please use --library-profiling and --executable-profiling"
     hPutStrLn stderr "See: https://github.com/commercialhaskell/stack/issues/1015"
     error "-prof GHC option submitted"
-  case boptsFileWatch opts of
+  case boptsCLIFileWatch opts of
     FileWatchPoll -> fileWatchPoll stderr inner
     FileWatch -> fileWatch stderr inner
     NoFileWatch -> inner $ const $ return ()
   where
-    inner setLocalFiles = withBuildConfigAndLock go $ \lk ->
+    inner setLocalFiles = withBuildConfigAndLock go' $ \lk ->
         Stack.Build.build setLocalFiles lk opts
+    -- Read the build command from the CLI and enable it to run
+    go' = case boptsCLICommand opts of
+               Test -> set (globalOptsBuildOptsMonoid.buildOptsMonoidTests) (Just True) go
+               Haddock -> set (globalOptsBuildOptsMonoid.buildOptsMonoidHaddock) (Just True) go
+               Bench -> set (globalOptsBuildOptsMonoid.buildOptsMonoidBenchmarks) (Just True) go
+               Install -> set (globalOptsBuildOptsMonoid.buildOptsMonoidInstallExes) (Just True) go
+               Build -> go -- Default case is just Build
 
 uninstallCmd :: [String] -> GlobalOpts -> IO ()
 uninstallCmd _ go = withConfigAndLock go $ do
@@ -1020,8 +1028,8 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                    (ExecRunGhc, args) -> execCompiler "run" args
                let targets = concatMap words eoPackages
                unless (null targets) $
-                   Stack.Build.build (const $ return ()) lk defaultBuildOpts
-                       { boptsTargets = map T.pack targets
+                   Stack.Build.build (const $ return ()) lk defaultBuildOptsCLI
+                       { boptsCLITargets = map T.pack targets
                        }
                munlockFile lk -- Unlock before transferring control away.
                menv <- liftIO $ configEnvOverride config eoEnvSettings
@@ -1047,7 +1055,14 @@ ghciCmd :: GhciOpts -> GlobalOpts -> IO ()
 ghciCmd ghciOpts go@GlobalOpts{..} =
   withBuildConfigAndLock go $ \lk -> do
     munlockFile lk -- Don't hold the lock while in the GHCI.
-    ghci ghciOpts
+    bopts <- asks (configBuild . getConfig)
+    -- override env so running of tests and benchmarks is disabled
+    let boptsLocal = bopts
+               { boptsTestOpts = (boptsTestOpts bopts) { toDisableRun = True }
+               , boptsBenchmarkOpts = (boptsBenchmarkOpts bopts) { beoDisableRun = True }
+               }
+    local (set (envEnvConfig.envConfigBuildOpts) boptsLocal)
+          (ghci ghciOpts)
 
 -- | Run ide-backend in the context of a project.
 ideCmd :: ([Text], [String]) -> GlobalOpts -> IO ()
@@ -1071,8 +1086,8 @@ packagesCmd () go@GlobalOpts{..} =
 targetsCmd :: Text -> GlobalOpts -> IO ()
 targetsCmd target go@GlobalOpts{..} =
     withBuildConfig go $
-    do let bopts = defaultBuildOpts { boptsTargets = [target] }
-       (_realTargets,_,pkgs) <- ghciSetup (ideGhciOpts bopts)
+    do let boptsCli = defaultBuildOptsCLI { boptsCLITargets = [target] }
+       (_realTargets,_,pkgs) <- ghciSetup (ideGhciOpts boptsCli)
        pwd <- getCurrentDir
        targets <-
            fmap
@@ -1126,7 +1141,7 @@ imgDockerCmd rebuild go@GlobalOpts{..} =
               do when rebuild $ Stack.Build.build
                          (const (return ()))
                          lk
-                         defaultBuildOpts
+                         defaultBuildOptsCLI
                  Image.stageContainerImageArtifacts)
         (Just Image.createContainerImageFromStage)
 

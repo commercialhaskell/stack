@@ -17,12 +17,12 @@ import           Data.Monoid                 ((<>))
 import qualified Data.Monoid
 import qualified Data.Set                    as Set
 import qualified Data.Text as T
+import           Lens.Micro                  (set)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.IO
 import qualified Paths_stack as Paths
 import           Stack.Build
-import           Stack.Types.Build
 import           Stack.Config
 import           Stack.Fetch
 import           Stack.PackageIndex
@@ -101,8 +101,7 @@ upgrade gitRepo mresolver builtHash =
         envConfig1 <- runInnerStackT bconfig $ setupEnv $ Just $
             "Try rerunning with --install-ghc to install the correct GHC into " <>
             T.pack (toFilePath (configLocalPrograms config))
-        runInnerStackT envConfig1 $
-            build (const $ return ()) Nothing defaultBuildOpts
-                { boptsTargets = ["stack"]
-                , boptsInstallExes = True
+        runInnerStackT (set (envConfigBuildOpts.buildOptsInstallExes) True envConfig1) $
+            build (const $ return ()) Nothing defaultBuildOptsCLI
+                { boptsCLITargets = ["stack"]
                 }
