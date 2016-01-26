@@ -20,8 +20,6 @@ Project specific options are only valid in the `stack.yaml` file local to a proj
 
 ### packages
 
-(Mercurial support since 0.1.10.0)
-
 This lists all local packages. In the simplest usage, it will be a list of directories, e.g.:
 
 ```yaml
@@ -31,7 +29,7 @@ packages:
 - dir3
 ```
 
-However, it supports three other location types: an HTTP URL referring to a tarball that can be downloaded, and information on a Git or Mercurial repo to clone, together with this SHA1 commit. For example:
+However, it supports three other location types: an HTTP URL referring to a tarball that can be downloaded, and information on a Git or Mercurial (since 0.1.10.0) repo to clone, together with this SHA1 commit. For example:
 
 ```yaml
 packages:
