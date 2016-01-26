@@ -29,6 +29,13 @@ packages:
 - dir3
 ```
 
+When the `packages` field is not present, it is equivalent to
+
+```yaml
+packages:
+  - .
+```
+
 However, it supports three other location types: an HTTP URL referring to a tarball that can be downloaded, and information on a Git or Mercurial (since 0.1.10.0) repo to clone, together with this SHA1 commit. For example:
 
 ```yaml
