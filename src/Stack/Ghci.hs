@@ -265,6 +265,14 @@ ghciSetup bopts0 noBuild skipIntermediate mainIs additionalPackages = do
     let bopts = bopts0
             { boptsTargets = boptsTargets bopts0 ++ map T.pack additionalPackages
             }
+    -- Try to build, but optimistically launch GHCi anyway if it fails (#1065)
+    unless noBuild $ do
+        eres <- tryAny $ build (const (return ())) Nothing bopts
+        case eres of
+            Right () -> return ()
+            Left err -> do
+                $logError $ T.pack (show err)
+                $logWarn "Warning: build failed, but optimistically launching GHCi anyway"
     econfig <- asks getEnvConfig
     (realTargets,_,_,_,sourceMap) <- loadSourceMap AllowNoTargets bopts
     menv <- getMinimalEnvOverride
@@ -298,14 +306,6 @@ ghciSetup bopts0 noBuild skipIntermediate mainIs additionalPackages = do
                     , "\n(Use --skip-intermediate-deps to omit these)"
                     ]
                 return (directlyWanted ++ intermediateDeps)
-    -- Try to build, but optimistically launch GHCi anyway if it fails (#1065)
-    unless noBuild $ do
-        eres <- tryAny $ build (const (return ())) Nothing bopts
-        case eres of
-            Right () -> return ()
-            Left err -> do
-                $logError $ T.pack (show err)
-                $logWarn "Warning: build failed, but optimistically launching GHCi anyway"
     -- Load the list of modules _after_ building, to catch changes in unlisted dependencies (#1180)
     let localLibs = [name | (name, (_, target)) <- wanted , hasLocalComp isCLib target]
     infos <-

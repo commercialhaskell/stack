@@ -10,6 +10,9 @@ Other enhancements:
 
 Bug fixes:
 
+* Previously, `stack ghci` would fail with `cannot satisfy -package-id` when the
+  implicit build step changes the package key of some dependency.
+
 ## 1.0.2
 
 Release notes:
