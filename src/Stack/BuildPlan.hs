@@ -452,7 +452,7 @@ loadBuildPlan name = do
             req <- parseUrl $ T.unpack url
             $logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
             $logDebug $ "Downloading build plan from: " <> url
-            _ <- download req { checkStatus = handle404 } fp
+            _ <- redownload req { checkStatus = handle404 } fp
             $logStickyDone $ "Downloaded " <> renderSnapName name <> " build plan."
             liftIO (decodeFileEither $ toFilePath fp) >>= either throwM return
 
