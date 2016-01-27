@@ -68,9 +68,12 @@ data BuildCommand
     deriving (Eq)
 
 -- | Allows adjust global options depending on their context
+-- Note: This was being used to remove ambibuity between the local and global
+-- implementation of stack init --resolver option. Now that stack init has no
+-- local --resolver this is not being used anymore but the code is kept for any
+-- similar future use cases.
 data GlobalOptsContext
     = OuterGlobalOpts -- ^ Global options before subcommand name
-    | InitCmdGlobalOpts -- ^ Global options following 'stack init'
     | OtherCmdGlobalOpts -- ^ Global options following any other subcommand
     deriving (Show, Eq)
 
@@ -641,11 +644,7 @@ globalOptsParser kind defLogLevel =
     optional (option auto (long dockerEntrypointArgName <> hidden <> internal)) <*>
     logLevelOptsParser hide0 defLogLevel <*>
     configOptsParser hide0 <*>
-    (if kind == InitCmdGlobalOpts
-     -- The 'stack init' command has its own '--resolver' option, and having a global
-     -- one causes ambiguity, so disable it.
-     then pure Nothing
-     else optional (abstractResolverOptsParser hide0)) <*>
+    optional (abstractResolverOptsParser hide0) <*>
     optional (compilerOptsParser hide0) <*>
     maybeBoolFlags
         "terminal"
@@ -674,32 +673,17 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
 
 initOptsParser :: Parser InitOpts
 initOptsParser =
-    InitOpts <$> method <*> solver <*> overwrite <*> fmap not ignoreSubDirs
+    InitOpts <$> solver <*> omitPackages
+             <*> overwrite <*> fmap not ignoreSubDirs
   where
     ignoreSubDirs = switch (long "ignore-subdirs" <>
                            help "Do not search for .cabal files in sub directories")
     overwrite = switch (long "force" <>
-                       help "Force overwriting an existing stack.yaml or \
-                            \creating a stack.yaml with incomplete config.")
+                       help "Force overwriting an existing stack.yaml")
+    omitPackages = switch (long "omit-packages" <>
+                           help "Exclude conflicting or incompatible user packages")
     solver = switch (long "solver" <>
              help "Use a dependency solver to determine extra dependencies")
-
-    method = (MethodResolver <$> resolver)
-         <|> (MethodSnapshot <$> snapPref)
-
-    snapPref =
-        flag' PrefLTS
-            (long "prefer-lts" <>
-             help "Prefer LTS snapshots over Nightly snapshots") <|>
-        flag' PrefNightly
-            (long "prefer-nightly" <>
-             help "Prefer Nightly snapshots over LTS snapshots") <|>
-        pure PrefNone
-
-    resolver = option readAbstractResolver
-        (long "resolver" <>
-         metavar "RESOLVER" <>
-         help "Use the specified resolver")
 
 -- | Parser for a logging level.
 logLevelOptsParser :: Bool -> Maybe LogLevel -> Parser (Maybe LogLevel)

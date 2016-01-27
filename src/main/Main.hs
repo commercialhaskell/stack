@@ -235,11 +235,9 @@ commandLineHandler progName isInterpreter = complicatedOptions
                     "List the templates available for `stack new'."
                     templatesCmd
                     (pure ())
-        addCommand  "init"
+        addCommand' "init"
                     "Initialize a stack project based on one or more cabal packages"
-                    globalFooter
                     initCmd
-                    (globalOpts InitCmdGlobalOpts)
                     initOptsParser
         addCommand' "solver"
                     "Use a dependency solver to try and determine missing extra-deps"
@@ -1178,15 +1176,14 @@ withMiniConfigAndLock go inner =
 initCmd :: InitOpts -> GlobalOpts -> IO ()
 initCmd initOpts go = do
     pwd <- getWorkingDir
-    withMiniConfigAndLock go (initProject pwd initOpts)
+    withMiniConfigAndLock go (initProject pwd initOpts (globalResolver go))
 
 -- | Create a project directory structure and initialize the stack config.
 newCmd :: (NewOpts,InitOpts) -> GlobalOpts -> IO ()
 newCmd (newOpts,initOpts) go@GlobalOpts{..} = do
     withMiniConfigAndLock go $ do
         dir <- new newOpts
-        initProject dir initOpts
-
+        initProject dir initOpts globalResolver
 
 -- | List the available templates.
 templatesCmd :: () -> GlobalOpts -> IO ()

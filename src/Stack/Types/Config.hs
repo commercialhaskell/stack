@@ -604,7 +604,10 @@ instance FromJSON (PackageLocation, [JSONWarning]) where
 -- | A project is a collection of packages. We can have multiple stack.yaml
 -- files, but only one of them may contain project information.
 data Project = Project
-    { projectPackages :: ![PackageEntry]
+    { projectUserMsg :: !(Maybe String)
+    -- ^ A warning message to display to the user when the auto generated
+    -- config may have issues.
+    , projectPackages :: ![PackageEntry]
     -- ^ Components of the package list
     , projectExtraDeps :: !(Map PackageName Version)
     -- ^ Components of the package list referring to package/version combos,
@@ -622,12 +625,13 @@ data Project = Project
 instance ToJSON Project where
     toJSON p = object $
         (maybe id (\cv -> (("compiler" .= cv) :)) (projectCompiler p))
+        ((maybe id (\msg -> (("user-message" .= msg) :)) (projectUserMsg p))
         [ "packages"          .= projectPackages p
         , "extra-deps"        .= map fromTuple (Map.toList $ projectExtraDeps p)
         , "flags"             .= projectFlags p
         , "resolver"          .= projectResolver p
         , "extra-package-dbs" .= projectExtraPackageDBs p
-        ]
+        ])
 
 -- | How we resolve which dependencies to install given a set of packages.
 data Resolver
@@ -1076,8 +1080,8 @@ data ConfigException
   | UnexpectedTarballContents [Path Abs Dir] [Path Abs File]
   | BadStackVersionException VersionRange
   | NoMatchingSnapshot [SnapName]
-  | ResolverMismatch Resolver Text
-  | ResolverPartial Resolver Text
+  | ResolverMismatch Resolver String
+  | ResolverPartial Resolver String
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
   deriving Typeable
@@ -1123,23 +1127,23 @@ instance Show ConfigException where
         , unlines $ map (\name -> "    - " <> T.unpack (renderSnapName name))
                         names
         , "\nYou can try the following options:\n"
-        , "    - Exclude mismatching package(s) and build the rest.\n"
-        , "        - Use '--ignore-subdirs' to exclude subdirectories.\n"
-        , "        - Manually create a config, then use 'stack solver'\n"
+        , "    - Use '--omit-packages to exclude mismatching package(s).\n"
         , "    - Use '--resolver' to specify a matching snapshot/resolver\n"
-        , "    - Use a custom snapshot having the right compiler.\n"
         ]
     show (ResolverMismatch resolver errDesc) = concat
-        [ "Selected resolver '"
+        [ "Resolver '"
         , T.unpack (resolverName resolver)
-        , "' does not have a matching compiler to build your package(s).\n"
-        , T.unpack errDesc
+        , "' does not have a matching compiler to build some or all of your "
+        , "package(s).\n"
+        , errDesc
+        , "\nHowever, you can try '--omit-packages to exclude mismatching "
+        , "package(s)."
         ]
     show (ResolverPartial resolver errDesc) = concat
-        [ "Selected resolver '"
+        [ "Resolver '"
         , T.unpack (resolverName resolver)
         , "' does not have all the packages to match your requirements.\n"
-        , T.unpack $ T.unlines $ fmap ("    " <>) (T.lines errDesc)
+        , unlines $ fmap ("    " <>) (lines errDesc)
         , "\nHowever, you can try '--solver' to use external packages."
         ]
     show (NoSuchDirectory dir) = concat
@@ -1373,10 +1377,12 @@ instance (warnings ~ [JSONWarning]) => FromJSON (ProjectAndConfigMonoid, warning
         flags <- o ..:? "flags" ..!= mempty
         resolver <- jsonSubWarnings (o ..: "resolver")
         compiler <- o ..:? "compiler"
+        msg <- o ..:? "user-message"
         config <- parseConfigMonoidJSON o
         extraPackageDBs <- o ..:? "extra-package-dbs" ..!= []
         let project = Project
-                { projectPackages = dirs
+                { projectUserMsg = msg
+                , projectPackages = dirs
                 , projectExtraDeps = extraDeps
                 , projectFlags = flags
                 , projectResolver = resolver

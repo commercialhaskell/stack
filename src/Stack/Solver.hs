@@ -6,6 +6,7 @@ module Stack.Solver
     ( checkResolverSpec
     , cabalPackagesCheck
     , findCabalFiles
+    , getResolverConstraints
     , mergeConstraints
     , solveExtraDeps
     , solveResolverSpec
@@ -22,11 +23,14 @@ import           Control.Monad.Trans.Control
 import           Data.Aeson.Extended         (object, (.=), toJSON, logJSONWarnings)
 import qualified Data.ByteString             as S
 import           Data.Either
+import           Data.Function               (on)
 import qualified Data.HashMap.Strict         as HashMap
-import           Data.List                   ((\\), isSuffixOf, intercalate)
+import           Data.List                   ( (\\), isSuffixOf, intercalate
+                                             , minimumBy)
 import           Data.List.Extra             (groupSortOn)
 import           Data.Map                    (Map)
 import qualified Data.Map                    as Map
+import           Data.Maybe                  (catMaybes, isNothing, mapMaybe)
 import           Data.Monoid
 import           Data.Set                    (Set)
 import qualified Data.Set                    as Set
@@ -37,7 +41,9 @@ import           Data.Text.Encoding.Error    (lenientDecode)
 import qualified Data.Text.Lazy              as LT
 import           Data.Text.Lazy.Encoding     (decodeUtf8With)
 import qualified Data.Yaml                   as Yaml
+import qualified Distribution.Package        as C
 import qualified Distribution.PackageDescription as C
+import qualified Distribution.Text           as C
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.Find                   (findFiles)
@@ -71,7 +77,7 @@ cabalSolver :: (MonadIO m, MonadLogger m, MonadMask m, MonadBaseControl IO m, Mo
             -> ConstraintSpec -- ^ src constraints
             -> ConstraintSpec -- ^ dep constraints
             -> [String] -- ^ additional arguments
-            -> m (Maybe ConstraintSpec)
+            -> m (Either [PackageName] ConstraintSpec)
 cabalSolver menv cabalfps constraintType
             srcConstraints depConstraints cabalArgs =
   withSystemTempDirectory "cabal-solver" $ \dir -> do
@@ -103,22 +109,52 @@ cabalSolver menv cabalfps constraintType
                toConstraintArgs (flagConstraints constraintType) ++
                fmap toFilePath cabalfps
 
-    catch (liftM Just (readProcessStdout (Just tmpdir) menv "cabal" args))
+    catch (liftM Right (readProcessStdout (Just tmpdir) menv "cabal" args))
           (\ex -> case ex of
-              ReadProcessException _ _ _ err -> do
-                  let errMsg = decodeUtf8With lenientDecode err
-                  if LT.isInfixOf "Could not resolve dependencies" errMsg
-                  then do
-                      $logInfo "Attempt failed."
-                      $logInfo "\n>>>> Cabal errors begin"
-                      $logInfo $ LT.toStrict errMsg
-                                 <> "<<<< Cabal errors end\n"
-                      return Nothing
-                  else throwM ex
+              ReadProcessException _ _ _ err -> return $ Left err
               _ -> throwM ex)
-    >>= maybe (return Nothing) parseCabalOutput
+    >>= either parseCabalErrors parseCabalOutput
 
   where
+    errCheck = T.isInfixOf "Could not resolve dependencies"
+
+    parseCabalErrors err = do
+        let errExit e = error $ "Could not parse cabal-install errors:\n"
+                              ++ (T.unpack e)
+            msg = LT.toStrict $ decodeUtf8With lenientDecode err
+
+        if errCheck msg then do
+            $logInfo "Attempt failed."
+            $logInfo "\n>>>> Cabal errors begin"
+            $logInfo $ msg <> "<<<< Cabal errors end\n"
+            let pkgs = parseConflictingPkgs msg
+                mPkgNames = map (C.simpleParse . T.unpack) pkgs
+                pkgNames  = map (fromCabalPackageName . C.pkgName)
+                                (catMaybes mPkgNames)
+
+            when (any isNothing mPkgNames) $ do
+                  $logInfo $ "*** Only some package names could be parsed: " <>
+                      (T.pack (intercalate ", " (map show pkgNames)))
+                  error $ T.unpack $
+                       "*** User packages involved in cabal failure: "
+                       <> (T.intercalate ", " $ parseConflictingPkgs msg)
+
+            if pkgNames /= [] then do
+                  return $ Left pkgNames
+            else errExit msg
+        else errExit msg
+
+    parseConflictingPkgs msg =
+        let ls = dropWhile (not . errCheck) $ T.lines msg
+            select s = ((T.isPrefixOf "trying:" s)
+                      || (T.isPrefixOf "next goal:" s))
+                      && (T.isSuffixOf "(user goal)" s)
+            pkgName =   (take 1)
+                      . T.words
+                      . (T.drop 1)
+                      . (T.dropWhile (/= ':'))
+        in concat $ map pkgName (filter select ls)
+
     parseCabalOutput bs = do
         let ls = drop 1
                $ dropWhile (not . T.isPrefixOf "In order, ")
@@ -126,7 +162,7 @@ cabalSolver menv cabalfps constraintType
                $ decodeUtf8 bs
             (errs, pairs) = partitionEithers $ map parseLine ls
         if null errs
-          then return $ Just (Map.fromList pairs)
+          then return $ Right (Map.fromList pairs)
           else error $ "Could not parse cabal-install output: " ++ show errs
 
     parseLine t0 = maybe (Left t0) Right $ do
@@ -274,6 +310,9 @@ setupCabalEnv compiler = do
                          \This is most likely a bug."
     return menv
 
+-- | Merge two separate maps, one defining constraints on package versions and
+-- the other defining package flagmap, into a single map of version and flagmap
+-- tuples.
 mergeConstraints
     :: Map PackageName v
     -> Map PackageName (Map p f)
@@ -295,6 +334,17 @@ diffConstraints (v, f) (v', f')
     | (v == v') && (f == f') = Nothing
     | otherwise              = Just (v, f)
 
+-- | Given a resolver, user package constraints (versions and flags) and extra
+-- dependency constraints determine what extra dependencies are required
+-- outside the resolver snapshot and the specified extra dependencies.
+
+-- First it tries by using the snapshot and the input extra dependencies
+-- as hard constraints, if no solution is arrived at by using hard
+-- constraints it then tries using them as soft constraints or preferences.
+
+-- It returns either conflicting packages when no solution is arrived at
+-- or the solution in terms of src package flag settings and extra
+-- dependencies.
 solveResolverSpec
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
        , MonadReader env m, HasConfig env , HasGHCVariant env
@@ -307,14 +357,14 @@ solveResolverSpec
        , ConstraintSpec) -- ^ ( resolver
                          --   , src package constraints
                          --   , extra dependency constraints )
-    -> m (Maybe ( ConstraintSpec
-                , ConstraintSpec)) -- ^ ( resulting src package specs
-                                   --   ,  resulting external package specs )
+    -> m (Either [PackageName] (ConstraintSpec , ConstraintSpec))
+       -- ^ (Conflicting packages
+       --    (resulting src package specs, external dependency specs))
 
 solveResolverSpec stackYaml cabalDirs
                   (resolver, srcConstraints, extraConstraints) = do
     $logInfo $ "Using resolver: " <> resolverName resolver
-    (compilerVer, snapConstraints) <- getResolverConstraints resolver
+    (compilerVer, snapConstraints) <- getResolverConstraints stackYaml resolver
     menv <- setupCabalEnv compilerVer
 
     let -- Note - The order in Map.union below is important.
@@ -340,15 +390,15 @@ solveResolverSpec stackYaml cabalDirs
     unless (Map.null depOnlyConstraints)
         ($logInfo $ "Trying with " <> srcNames <> " as hard constraints...")
 
-    mdeps <- solver Constraint
-    mdeps' <- case mdeps of
-        Nothing | not (Map.null depOnlyConstraints) -> do
+    eresult <- solver Constraint
+    eresult' <- case eresult of
+        Left _ | not (Map.null depOnlyConstraints) -> do
             $logInfo $ "Retrying with " <> srcNames <> " as preferences..."
             solver Preference
-        _ -> return mdeps
+        _ -> return eresult
 
-    case mdeps' of
-        Just deps -> do
+    case eresult' of
+        Right deps -> do
             let
                 -- All src package constraints returned by cabal.
                 -- Flags may have changed.
@@ -367,33 +417,45 @@ solveResolverSpec stackYaml cabalDirs
                      <> T.pack (show $ Map.size external)
                      <> " external dependencies."
 
-            return $ Just (srcs, external)
-        Nothing -> do
-            $logInfo $ "Failed to arrive at a workable build plan using "
-                       <> resolverName resolver <> " resolver."
-            return Nothing
+            return $ Right (srcs, external)
+        Left x -> do
+            $logInfo $ "*** Failed to arrive at a workable build plan."
+            return $ Left x
+
+-- | Given a resolver (snpashot, compiler or custom resolver)
+-- return the compiler version, package versions and packages flags
+-- for that resolver.
+getResolverConstraints
+    :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
+       , MonadReader env m, HasConfig env , HasGHCVariant env
+       , HasHttpManager env , HasLogLevel env , HasReExec env
+       , HasTerminal env)
+    => Path Abs File
+    -> Resolver
+    -> m (CompilerVersion,
+          Map PackageName (Version, Map FlagName Bool))
+getResolverConstraints stackYaml resolver
+    | ResolverSnapshot snapName <- resolver = do
+        mbp <- loadMiniBuildPlan snapName
+        return (mbpCompilerVersion mbp, mbpConstraints mbp)
+    | ResolverCustom _ url <- resolver = do
+        -- FIXME instead of passing the stackYaml dir we should maintain
+        -- the file URL in the custom resolver always relative to stackYaml.
+        mbp <- parseCustomMiniBuildPlan stackYaml url
+        return (mbpCompilerVersion mbp, mbpConstraints mbp)
+    | ResolverCompiler compiler <- resolver =
+        return (compiler, Map.empty)
+    | otherwise = error "Not reached"
     where
       mpiConstraints mpi = (mpiVersion mpi, mpiFlags mpi)
       mbpConstraints mbp = fmap mpiConstraints (mbpPackages mbp)
 
-      getResolverConstraints (ResolverSnapshot snapName) = do
-          mbp <- loadMiniBuildPlan snapName
-          return (mbpCompilerVersion mbp, mbpConstraints mbp)
+-- | Given a bundle of user packages, flag constraints on those packages and a
+-- resolver, determine if the resolver fully, partially or fails to satisfy the
+-- dependencies of the user packages.
 
-      getResolverConstraints (ResolverCompiler compiler) =
-          return (compiler, Map.empty)
-
-      -- FIXME instead of passing the stackYaml dir we should maintain
-      -- the file URL in the custom resolver always relative to stackYaml.
-      getResolverConstraints (ResolverCustom _ url) = do
-          mbp <- parseCustomMiniBuildPlan stackYaml url
-          return (mbpCompilerVersion mbp, mbpConstraints mbp)
-
--- | Given a bundle of packages and a resolver, check the resolver with respect
--- to the packages and return how well the resolver satisfies the depndencies
--- of the packages. If 'flags' is passed as 'Nothing' then flags are chosen
+-- If the package flags are passed as 'Nothing' then flags are chosen
 -- automatically.
-
 checkResolverSpec
     :: ( MonadIO m, MonadCatch m, MonadLogger m, MonadReader env m
        , HasHttpManager env, HasConfig env, HasGHCVariant env
@@ -405,10 +467,12 @@ checkResolverSpec
 checkResolverSpec gpds flags resolver = do
     case resolver of
       ResolverSnapshot name -> checkSnapBuildPlan gpds flags name
-      ResolverCompiler _ -> return $ BuildPlanCheckPartial Map.empty Map.empty
+      ResolverCompiler {} -> return $ BuildPlanCheckPartial Map.empty Map.empty
       -- TODO support custom resolver for stack init
-      ResolverCustom _ _ -> return $ BuildPlanCheckPartial Map.empty Map.empty
+      ResolverCustom {} -> return $ BuildPlanCheckPartial Map.empty Map.empty
 
+-- | Finds all files with a .cabal extension under a given directory.
+-- Subdirectories can be included depending on the @recurse@ parameter.
 findCabalFiles :: MonadIO m => Bool -> Path Abs Dir -> m [Path Abs File]
 findCabalFiles recurse dir =
     liftIO $ findFiles dir isCabal (\subdir -> recurse && not (isIgnored subdir))
@@ -426,9 +490,13 @@ ignoredDirs = Set.fromList
     , ".stack-work"
     ]
 
--- | Do some basic checks on a list of cabal file paths to be used for creating
--- stack config, print some informative and error messages and if all is ok
--- return @GenericPackageDescription@ list.
+-- | Perform some basic checks on a list of cabal files to be used for creating
+-- stack config. It checks for duplicate package names, package name and
+-- cabal file name mismatch and reports any issues related to those.
+
+-- If no error occurs it returns filepath and @GenericPackageDescription@s
+-- pairs as well as any filenames for duplicate packages not included in the
+-- pairs.
 cabalPackagesCheck
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
        , MonadReader env m, HasConfig env , HasGHCVariant env
@@ -436,9 +504,10 @@ cabalPackagesCheck
        , HasTerminal env)
      => [Path Abs File]
      -> String
-     -> String
-     -> m [C.GenericPackageDescription]
-cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter = do
+     -> Maybe String
+     -> m ( Map PackageName (Path Abs File, C.GenericPackageDescription)
+          , [Path Abs File])
+cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
     when (null cabalfps) $
         error noPkgMsg
 
@@ -446,20 +515,53 @@ cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter = do
     $logInfo $ "Using cabal packages:"
     $logInfo $ T.pack (formatGroup relpaths)
 
-    when (dupGroups relpaths /= []) $
-        error $ "Duplicate cabal package names cannot be used in a single "
-        <> "stack project. Following duplicates were found:\n"
-        <> intercalate "\n" (dupGroups relpaths)
-        <> "\n"
-        <> dupPkgFooter
-
-    (warnings,gpds) <- fmap unzip (mapM readPackageUnresolved cabalfps)
+    (warnings, gpds) <- fmap unzip (mapM readPackageUnresolved cabalfps)
     zipWithM_ (mapM_ . printCabalFileWarning) cabalfps warnings
-    return gpds
 
-    where
-        groups          = filter ((> 1) . length) . groupSortOn (FP.takeFileName)
-        dupGroups       = (map formatGroup) . groups
+    -- package name cannot be empty or missing otherwise
+    -- it will result in cabal solver failure.
+    -- stack requires packages name to match the cabal file name
+    -- Just the latter check is enough to cover both the cases
+
+    let packages  = zip cabalfps gpds
+        getNameMismatchPkg (fp, gpd)
+            | (show . gpdPackageName) gpd /= (FP.takeBaseName . toFilePath) fp
+                = Just fp
+            | otherwise = Nothing
+        nameMismatchPkgs = mapMaybe getNameMismatchPkg packages
+
+    when (nameMismatchPkgs /= []) $ do
+        rels <- mapM makeRel nameMismatchPkgs
+        error $ "Package name as defined in the .cabal file must match the \
+                \.cabal file name.\n\
+                \Please fix the following packages and try again:\n"
+                <> (formatGroup rels)
+
+    let dupGroups = filter ((> 1) . length)
+                            . groupSortOn (gpdPackageName . snd)
+        dupAll    = concat $ dupGroups packages
+
+        -- Among duplicates prefer to include the ones in upper level dirs
+        pathlen     = length . FP.splitPath . toFilePath . fst
+        getmin      = minimumBy (compare `on` pathlen)
+        dupSelected = map getmin (dupGroups packages)
+        dupIgnored  = dupAll \\ dupSelected
+        unique      = packages \\ dupIgnored
+
+    when (dupIgnored /= []) $ do
+        dups <- mapM (mapM (makeRel . fst)) (dupGroups packages)
+        $logWarn $ T.pack $
+            "Following packages have duplicate package names:\n"
+            <> intercalate "\n" (map formatGroup dups)
+        case dupErrMsg of
+          Nothing -> $logWarn $ T.pack $
+                 "Packages with duplicate names will be ignored.\n"
+              <> "Packages in upper level directories will be preferred.\n"
+          Just msg -> error msg
+
+    return (Map.fromList
+            $ map (\(file, gpd) -> ((gpdPackageName gpd),(file, gpd))) unique
+           , map fst dupIgnored)
 
 makeRel :: (MonadIO m) => Path Abs File -> m FilePath
 makeRel = liftIO . makeRelativeToCurrentDirectory . toFilePath
@@ -478,17 +580,15 @@ reportMissingCabalFiles cabalfps includeSubdirs = do
         $logWarn $ "The following packages are missing from the config:"
         $logWarn $ T.pack (formatGroup relpaths)
 
--- | Solver can be thought of as a counterpart of init. init creates a
--- stack.yaml whereas solver verifies or fixes an existing one. It can verify
--- the dependencies of the packages and determine if any extra-dependecies
--- outside the snapshots are needed.
---
 -- TODO Currently solver uses a stack.yaml in the parent chain when there is
 -- no stack.yaml in the current directory. It should instead look for a
 -- stack yaml only in the current directory and suggest init if there is
 -- none available. That will make the behavior consistent with init and provide
 -- a correct meaning to a --ignore-subdirs option if implemented.
 
+-- | Verify the combination of resolver, package flags and extra
+-- dependencies in an existing stack.yaml and suggest changes in flags or
+-- extra dependencies so that the specified packages can be compiled.
 solveExtraDeps
     :: ( MonadBaseControl IO m, MonadIO m, MonadLogger m, MonadMask m
        , MonadReader env m, HasConfig env , HasEnvConfig env, HasGHCVariant env
@@ -513,13 +613,13 @@ solveExtraDeps modStackYaml = do
                        \entries from '" <> relStackYaml <> "'."
 
     cabalfps  <- liftM concat (mapM (findCabalFiles False) cabalDirs)
-    gpds <- cabalPackagesCheck cabalfps noPkgMsg dupPkgFooter
-
     -- TODO when solver supports --ignore-subdirs option pass that as the
     -- second argument here.
     reportMissingCabalFiles cabalfps True
+    (bundle, _) <- cabalPackagesCheck cabalfps noPkgMsg (Just dupPkgFooter)
 
-    let oldFlags          = bcFlags bconfig
+    let gpds              = Map.elems $ fmap snd bundle
+        oldFlags          = bcFlags bconfig
         oldExtraVersions  = bcExtraDeps bconfig
         resolver          = bcResolver bconfig
         oldSrcs           = gpdPackages gpds
@@ -533,11 +633,14 @@ solveExtraDeps modStackYaml = do
     resultSpecs <- case resolverResult of
         BuildPlanCheckOk flags ->
             return $ Just ((mergeConstraints oldSrcs flags), Map.empty)
-        BuildPlanCheckPartial _ _ ->
-            solveResolverSpec stackYaml cabalDirs
+        BuildPlanCheckPartial {} -> do
+            eres <- solveResolverSpec stackYaml cabalDirs
                               (resolver, srcConstraints, extraConstraints)
-        BuildPlanCheckFail f e c ->
-            throwM $ ResolverMismatch resolver (showCompilerErrors f e c)
+            -- TODO Solver should also use the init code to ignore incompatible
+            -- packages
+            return $ either (const Nothing) Just eres
+        BuildPlanCheckFail {} ->
+            throwM $ ResolverMismatch resolver (show resolverResult)
 
     (srcs, edeps) <- case resultSpecs of
         Nothing -> throwM (SolverGiveUp giveUpMsg)
@@ -568,7 +671,6 @@ solveExtraDeps modStackYaml = do
         -- TODO print whether resolver changed from previous
         $logInfo $ "* Resolver is " <> resolverName resolver
 
-        -- TODO indent the yaml output
         printFlags newFlags  "* Flags to be added"
         printDeps  newVersions   "* Dependencies to be added"
 

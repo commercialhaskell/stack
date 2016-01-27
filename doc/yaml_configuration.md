@@ -133,6 +133,28 @@ You can also specify `entrypoints`. By default all your executables are placed
 in `/usr/local/bin`, but you can specify a list using `executables` to only add
 some.
 
+### user-message
+
+A user-message is inserted by `stack init` when it omits packages or adds
+external dependencies. For example:
+
+```yaml
+user-message: ! 'Warning: Some packages were found to be incompatible with the resolver
+  and have been left commented out in the packages section.
+
+  Warning: Specified resolver could not satisfy all dependencies. Some external packages
+  have been added as dependencies.
+
+  You can suppress this message by removing it from stack.yaml
+
+'
+```
+
+This messages is displayed every time the config is loaded by stack and serves
+as a reminder for the user to review the configuration and make any changes if
+needed. The user can delete this message if the generated configuration is
+acceptable.
+
 ## Non-project config
 
 Non-project config options may go in the global config (`/etc/stack/config.yaml`) or the user config (`~/.stack/config.yaml`).
