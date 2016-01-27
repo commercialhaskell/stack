@@ -655,30 +655,18 @@ data BuildPlanCheck =
     | BuildPlanCheckFail    (Map PackageName (Map FlagName Bool)) DepErrors
                             CompilerVersion
 
--- Greater means a better plan
-instance Ord BuildPlanCheck where
-  BuildPlanCheckPartial _ e1 `compare` BuildPlanCheckPartial _ e2 =
-      compare (Map.size e1) (Map.size e2)
-
-  BuildPlanCheckFail _ e1 _  `compare` BuildPlanCheckFail _ e2 _ =
-      let numUserPkgs e = Map.size $ Map.unions (Map.elems (fmap deNeededBy e))
-      in compare (numUserPkgs e1) (numUserPkgs e2)
-
-  BuildPlanCheckOk {}        `compare` BuildPlanCheckOk {}      = EQ
-  BuildPlanCheckOk {}        `compare` BuildPlanCheckPartial {} = GT
-  BuildPlanCheckOk {}        `compare` BuildPlanCheckFail {}    = GT
-  BuildPlanCheckPartial {}   `compare` BuildPlanCheckFail {}    = GT
-  _ `compare` _ = LT
-
-instance Eq BuildPlanCheck where
-  BuildPlanCheckOk {}          == BuildPlanCheckOk {}        = True
-  BuildPlanCheckPartial _ e1   == BuildPlanCheckPartial _ e2 =
-      Map.size e1 == Map.size e2
-  BuildPlanCheckFail _ e1 _  == BuildPlanCheckFail _ e2 _    =
-      let numUserPkgs e = Map.size $ Map.unions (Map.elems (fmap deNeededBy e))
-      in numUserPkgs e1 == numUserPkgs e2
-
-  _ == _ = False
+-- | Compare 'BuildPlanCheck', where GT means a better plan.
+compareBuildPlanCheck :: BuildPlanCheck -> BuildPlanCheck -> Ordering
+compareBuildPlanCheck (BuildPlanCheckPartial _ e1) (BuildPlanCheckPartial _ e2) =
+    compare (Map.size e1) (Map.size e2)
+compareBuildPlanCheck (BuildPlanCheckFail _ e1 _) (BuildPlanCheckFail _ e2 _) =
+    let numUserPkgs e = Map.size $ Map.unions (Map.elems (fmap deNeededBy e))
+    in compare (numUserPkgs e1) (numUserPkgs e2)
+compareBuildPlanCheck BuildPlanCheckOk{}      BuildPlanCheckOk{}      = EQ
+compareBuildPlanCheck BuildPlanCheckOk{}      BuildPlanCheckPartial{} = GT
+compareBuildPlanCheck BuildPlanCheckOk{}      BuildPlanCheckFail{}    = GT
+compareBuildPlanCheck BuildPlanCheckPartial{} BuildPlanCheckFail{}    = GT
+compareBuildPlanCheck _                       _                       = LT
 
 instance Show BuildPlanCheck where
     show BuildPlanCheckOk {} = ""
@@ -750,7 +738,7 @@ selectBestSnapshot gpds snaps = do
                         Just old -> loop (Just (betterSnap old new)) rest
 
         betterSnap (s1, r1) (s2, r2)
-          | r1 <= r2  = (s1, r1)
+          | compareBuildPlanCheck r1 r2 /= GT = (s1, r1)
           | otherwise = (s2, r2)
 
         reportResult BuildPlanCheckOk {} snap = do
