@@ -36,7 +36,7 @@ packages:
   - .
 ```
 
-However, it supports three other location types: an HTTP URL referring to a tarball that can be downloaded, and information on a Git or Mercurial (since 0.1.10.0) repo to clone, together with this SHA1 commit. For example:
+However, it supports three other location types: an HTTP URL referring to a tarball or a zip that can be downloaded, and information on a Git or Mercurial (since 0.1.10.0) repo to clone, together with this SHA1 commit. For example:
 
 ```yaml
 packages:
@@ -70,6 +70,16 @@ packages:
 - location:
     git: git@github.com:yesodweb/wai
     commit: 2f8a8e1b771829f4a8a77c0111352ce45a14c30f
+  subdirs:
+  - auto-update
+  - wai
+```
+
+Instead of using Git to clone from Github, it is also possible to use the 'Download commit as Zip' feature of the website. For example:
+
+```yaml
+packages:
+- location: http://github.com/yesodweb/wai/archive/2f8a8e1b771829f4a8a77c0111352ce45a14c30f.zip
   subdirs:
   - auto-update
   - wai
