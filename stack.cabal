@@ -213,6 +213,7 @@ library
                    , hastache
                    , project-template >= 0.2
                    , uuid
+                   , zip-archive
   if os(windows)
     cpp-options:     -DWINDOWS
     build-depends:   Win32

@@ -33,6 +33,7 @@ module Stack.Config
   ) where
 
 import qualified Codec.Archive.Tar as Tar
+import qualified Codec.Archive.Zip as Zip
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Arrow ((***))
@@ -536,14 +537,14 @@ resolvePackageLocation _ projRoot (PLFilePath fp) = resolveDir projRoot fp
 resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
     workDir <- getWorkDir
     let nameBeforeHashing = case remotePackageType of
-            RPTHttpTarball -> url
+            RPTHttp        -> url
             RPTGit commit  -> T.unwords [url, commit]
             RPTHg  commit  -> T.unwords [url, commit, "hg"]
         name = T.unpack $ decodeUtf8 $ B16.encode $ SHA256.hash $ encodeUtf8 nameBeforeHashing
         root = projRoot </> workDir </> $(mkRelDir "downloaded")
         fileExtension = case remotePackageType of
-            RPTHttpTarball -> ".tar.gz"
-            _              -> ".unused"
+            RPTHttp -> ".http-archive"
+            _       -> ".unused"
 
     fileRel <- parseRelFile $ name ++ fileExtension
     dirRel <- parseRelDir name
@@ -570,14 +571,30 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
                       " exists within " <> url)
 
         case remotePackageType of
-            RPTHttpTarball -> do
+            RPTHttp -> do
+                let fp = toFilePath file
                 req <- parseUrl $ T.unpack url
                 _ <- download req file
 
-                liftIO $ withBinaryFile (toFilePath file) ReadMode $ \h -> do
-                    lbs <- L.hGetContents h
-                    let entries = Tar.read $ GZip.decompress lbs
-                    Tar.unpack (toFilePath dirTmp) entries
+                let tryTar = do
+                        $logDebug $ "Trying to untar " <> T.pack fp
+                        liftIO $ withBinaryFile fp ReadMode $ \h -> do
+                            lbs <- L.hGetContents h
+                            let entries = Tar.read $ GZip.decompress lbs
+                            Tar.unpack fp entries
+                    tryZip = do
+                        $logDebug $ "Trying to unzip " <> T.pack fp
+                        archive <- fmap Zip.toArchive $ liftIO $ L.readFile fp
+                        liftIO $  Zip.extractFilesFromArchive [Zip.OptDestination
+                                                               (toFilePath dirTmp)] archive
+                    err = throwM $ UnableToExtractArchive url file
+
+                    catchAllLog goodpath handler =
+                        catchAll goodpath $ \e -> do
+                            $logDebug $ "Got exception: " <> T.pack (show e)
+                            handler
+
+                tryTar `catchAllLog` tryZip `catchAllLog` err
 
             RPTGit commit -> cloneAndExtract "git" ["reset", "--hard"] commit
             RPTHg  commit -> cloneAndExtract "hg"  ["update", "-C"]    commit
@@ -585,15 +602,13 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
         renameDir dirTmp dir
 
     case remotePackageType of
-        RPTHttpTarball -> do
-            x <- listDirectory dir
-            case x of
-                ([dir'], []) -> return dir'
-                (dirs, files) -> do
-                    removeFileIfExists file
-                    removeTreeIfExists dir
-                    throwM $ UnexpectedTarballContents dirs files
-
+        RPTHttp -> do x <- listDirectory dir
+                      case x of
+                          ([dir'], []) -> return dir'
+                          (dirs, files) -> do
+                              removeFileIfExists file
+                              removeTreeIfExists dir
+                              throwM $ UnexpectedArchiveContents dirs files
         _ -> return dir
 
 -- | Get the stack root, e.g. ~/.stack

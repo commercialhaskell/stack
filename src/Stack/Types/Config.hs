@@ -572,14 +572,14 @@ data PackageLocation
     deriving Show
 
 data RemotePackageType
-    = RPTHttpTarball
+    = RPTHttp
     | RPTGit Text -- ^ Commit
     | RPTHg  Text -- ^ Commit
     deriving Show
 
 instance ToJSON PackageLocation where
     toJSON (PLFilePath fp) = toJSON fp
-    toJSON (PLRemote t RPTHttpTarball) = toJSON t
+    toJSON (PLRemote t RPTHttp) = toJSON t
     toJSON (PLRemote x (RPTGit y)) = toJSON $ T.unwords ["git", x, y]
     toJSON (PLRemote x (RPTHg  y)) = toJSON $ T.unwords ["hg",  x, y]
 
@@ -592,8 +592,9 @@ instance FromJSON (PackageLocation, [JSONWarning]) where
         file t = pure $ PLFilePath $ T.unpack t
         http t =
             case parseUrl $ T.unpack t of
-                Left _ -> mzero
-                Right _ -> return $ PLRemote t RPTHttpTarball
+                Left  _ -> mzero
+                Right _ -> return $ PLRemote t RPTHttp
+
         git = withObjectWarnings "PackageGitLocation" $ \o -> PLRemote
             <$> o ..: "git"
             <*> (RPTGit <$> o ..: "commit")
@@ -1077,7 +1078,8 @@ data ConfigException
   = ParseConfigFileException (Path Abs File) ParseException
   | ParseResolverException Text
   | NoProjectConfigFound (Path Abs Dir) (Maybe Text)
-  | UnexpectedTarballContents [Path Abs Dir] [Path Abs File]
+  | UnexpectedArchiveContents [Path Abs Dir] [Path Abs File]
+  | UnableToExtractArchive Text (Path Abs File)
   | BadStackVersionException VersionRange
   | NoMatchingSnapshot [SnapName]
   | ResolverMismatch Resolver String
@@ -1107,12 +1109,16 @@ instance Show ConfigException where
             Nothing -> ""
             Just cmd -> "\nRecommended action: stack " ++ T.unpack cmd
         ]
-    show (UnexpectedTarballContents dirs files) = concat
-        [ "When unpacking a tarball specified in your stack.yaml file, "
+    show (UnexpectedArchiveContents dirs files) = concat
+        [ "When unpacking an archive specified in your stack.yaml file, "
         , "did not find expected contents. Expected: a single directory. Found: "
         , show ( map (toFilePath . dirname) dirs
                , map (toFilePath . filename) files
                )
+        ]
+    show (UnableToExtractArchive url file) = concat
+        [ "Archive extraction failed. We support tarballs and zip, couldn't handle the following URL, "
+        , T.unpack url, " downloaded to the file ", toFilePath $ filename file
         ]
     show (BadStackVersionException requiredRange) = concat
         [ "The version of stack you are using ("
