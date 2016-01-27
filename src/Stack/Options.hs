@@ -269,13 +269,17 @@ readFlag = do
 
 -- | Command-line parser for the clean command.
 cleanOptsParser :: Parser CleanOpts
-cleanOptsParser = CleanOpts <$> packages
+cleanOptsParser = CleanTargets <$> packages <|> CleanFull <$> doFullClean
   where
     packages =
         many
             (packageNameArgument
                  (metavar "PACKAGE" <>
                   help "If none specified, clean all local packages"))
+    doFullClean =
+        switch
+            (long "full" <>
+             help "Remove whole the work dir, default is .stack-work")
 
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid

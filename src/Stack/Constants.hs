@@ -10,6 +10,7 @@ module Stack.Constants
     ,configuredFileFromDir
     ,defaultShakeThreads
     ,distDirFromDir
+    ,workDirFromDir
     ,distRelativeDir
     ,haskellModuleExts
     ,imageStagingDir
@@ -202,6 +203,13 @@ distDirFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env, HasEnvConfi
                -> m (Path Abs Dir)
 distDirFromDir fp =
     liftM (fp </>) distRelativeDir
+
+-- | Package's working directory.
+workDirFromDir :: (MonadThrow m, MonadReader env m, HasPlatform env, HasEnvConfig env)
+               => Path Abs Dir
+               -> m (Path Abs Dir)
+workDirFromDir fp =
+    liftM (fp </>) getWorkDir
 
 -- | Directory for project templates.
 templatesDir :: Config -> Path Abs Dir
