@@ -658,10 +658,11 @@ data BuildPlanCheck =
 -- | Compare 'BuildPlanCheck', where GT means a better plan.
 compareBuildPlanCheck :: BuildPlanCheck -> BuildPlanCheck -> Ordering
 compareBuildPlanCheck (BuildPlanCheckPartial _ e1) (BuildPlanCheckPartial _ e2) =
-    compare (Map.size e1) (Map.size e2)
+    -- Note: order of comparison flipped, since it's better to have fewer errors.
+    compare (Map.size e2) (Map.size e1)
 compareBuildPlanCheck (BuildPlanCheckFail _ e1 _) (BuildPlanCheckFail _ e2 _) =
     let numUserPkgs e = Map.size $ Map.unions (Map.elems (fmap deNeededBy e))
-    in compare (numUserPkgs e1) (numUserPkgs e2)
+    in compare (numUserPkgs e2) (numUserPkgs e1)
 compareBuildPlanCheck BuildPlanCheckOk{}      BuildPlanCheckOk{}      = EQ
 compareBuildPlanCheck BuildPlanCheckOk{}      BuildPlanCheckPartial{} = GT
 compareBuildPlanCheck BuildPlanCheckOk{}      BuildPlanCheckFail{}    = GT
@@ -738,7 +739,7 @@ selectBestSnapshot gpds snaps = do
                         Just old -> loop (Just (betterSnap old new)) rest
 
         betterSnap (s1, r1) (s2, r2)
-          | compareBuildPlanCheck r1 r2 /= GT = (s1, r1)
+          | compareBuildPlanCheck r1 r2 /= LT = (s1, r1)
           | otherwise = (s2, r2)
 
         reportResult BuildPlanCheckOk {} snap = do
