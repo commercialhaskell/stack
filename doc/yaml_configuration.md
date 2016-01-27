@@ -29,7 +29,7 @@ packages:
 - dir3
 ```
 
-When the `packages` field is not present, it is equivalent to
+When the `packages` field is not present, it defaults to looking for a package in the project's root directory:
 
 ```yaml
 packages:
