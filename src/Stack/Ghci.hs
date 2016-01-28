@@ -53,7 +53,7 @@ import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal
 import           System.Directory (getTemporaryDirectory)
-import Text.Read (readMaybe)
+import           Text.Read (readMaybe)
 
 #ifndef WINDOWS
 import qualified System.Posix.Files as Posix
