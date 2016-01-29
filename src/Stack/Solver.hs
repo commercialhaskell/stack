@@ -334,11 +334,11 @@ diffConstraints (v, f) (v', f')
 -- | Given a resolver, user package constraints (versions and flags) and extra
 -- dependency constraints determine what extra dependencies are required
 -- outside the resolver snapshot and the specified extra dependencies.
-
+--
 -- First it tries by using the snapshot and the input extra dependencies
 -- as hard constraints, if no solution is arrived at by using hard
 -- constraints it then tries using them as soft constraints or preferences.
-
+--
 -- It returns either conflicting packages when no solution is arrived at
 -- or the solution in terms of src package flag settings and extra
 -- dependencies.
@@ -450,7 +450,7 @@ getResolverConstraints stackYaml resolver
 -- | Given a bundle of user packages, flag constraints on those packages and a
 -- resolver, determine if the resolver fully, partially or fails to satisfy the
 -- dependencies of the user packages.
-
+--
 -- If the package flags are passed as 'Nothing' then flags are chosen
 -- automatically.
 checkResolverSpec
@@ -490,7 +490,7 @@ ignoredDirs = Set.fromList
 -- | Perform some basic checks on a list of cabal files to be used for creating
 -- stack config. It checks for duplicate package names, package name and
 -- cabal file name mismatch and reports any issues related to those.
-
+--
 -- If no error occurs it returns filepath and @GenericPackageDescription@s
 -- pairs as well as any filenames for duplicate packages not included in the
 -- pairs.
