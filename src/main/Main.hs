@@ -1175,8 +1175,19 @@ withMiniConfigAndLock go inner =
 -- | Project initialization
 initCmd :: InitOpts -> GlobalOpts -> IO ()
 initCmd initOpts go = do
-    pwd <- getWorkingDir
-    withMiniConfigAndLock go (initProject pwd initOpts (globalResolver go))
+    let selectedDirs = searchDirs initOpts
+    if null selectedDirs
+    then do
+      pwd <- getWorkingDir
+      checkDir pwd
+    else checkSubDirs selectedDirs
+    where checkSubDirs = mapM_ (liftM checkDir . parseRelAsAbsDir . T.unpack)
+          checkDir dir =
+            withMiniConfigAndLock go $
+            initProject dir initOpts $
+            globalResolver go
+
+
 
 -- | Create a project directory structure and initialize the stack config.
 newCmd :: (NewOpts,InitOpts) -> GlobalOpts -> IO ()
