@@ -22,6 +22,8 @@ Other enhancements:
 
 * Docker: pass ~/.ssh and SSH auth socket into container, so that git repos
   work [#1358](https://github.com/commercialhaskell/stack/issues/1358)
+* Docker: strip suffix from docker --version
+  [#1653](https://github.com/commercialhaskell/stack/issues/1653)
 
 Bug fixes:
 

@@ -697,7 +697,7 @@ checkDockerVersion envOverride docker =
      dockerVersionOut <- readDockerProcess envOverride ["--version"]
      case words (decodeUtf8 dockerVersionOut) of
        (_:_:v:_) ->
-         case parseVersionFromString (dropWhileEnd (not . isDigit) v) of
+         case parseVersionFromString (stripVersion v) of
            Just v'
              | v' < minimumDockerVersion ->
                throwM (DockerTooOldException minimumDockerVersion v')
@@ -711,6 +711,7 @@ checkDockerVersion envOverride docker =
        _ -> throwM InvalidVersionOutputException
   where minimumDockerVersion = $(mkVersion "1.6.0")
         prohibitedDockerVersions = []
+        stripVersion v = fst $ break (== '-') $ dropWhileEnd (not . isDigit) v
 
 -- | Remove the project's Docker sandbox.
 reset :: (MonadIO m, MonadReader env m, HasConfig env)
