@@ -42,6 +42,8 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
+import           Data.Time.Calendar
+import           Data.Time.Clock
 import           Data.Typeable
 import           Network.HTTP.Client.Conduit hiding (path)
 import           Network.HTTP.Download
@@ -176,9 +178,14 @@ applyTemplate
     -> m (Map (Path Abs File) LB.ByteString)
 applyTemplate project template nonceParams dir templateText = do
     config <- asks getConfig
-    let context = M.union (M.union nonceParams name) configParams
+    currentYear <- do
+      now <- liftIO getCurrentTime
+      (year, _, _) <- return $ toGregorian . utctDay $ now
+      return $ T.pack . show $ year
+    let context = M.union (M.union nonceParams extraParams) configParams
           where
-            name = M.fromList [("name", packageNameText project)]
+            extraParams = M.fromList [ ("name", packageNameText project)
+                                     , ("year", currentYear) ]
             configParams = configTemplateParams config
     (applied,missingKeys) <-
         runWriterT
