@@ -64,7 +64,7 @@ import           Stack.Docker.GlobalDB
 import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Setup (ensureDockerStackExe)
-import           System.Directory (canonicalizePath,getModificationTime)
+import           System.Directory (canonicalizePath,getModificationTime,getAppUserDataDirectory)
 import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath
                                     ,lookupEnv)
 import           System.Exit (exitSuccess, exitWith)
@@ -257,21 +257,23 @@ runContainerAndExit getCmdArgs
      let docker = configDocker config
      envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride docker
-     env <- liftIO getEnvironment
+     (env,isStdinTerminal,isStderrTerminal) <- liftIO $
+       (,,)
+       <$> getEnvironment
+       <*> hIsTerminalDevice stdin
+       <*> hIsTerminalDevice stderr
+     isStdoutTerminal <- asks getTerminal
+     esshDir <- liftIO $ tryJust (guard . isDoesNotExistError) (getAppUserDataDirectory "ssh")
      let dockerHost = lookup "DOCKER_HOST" env
          dockerCertPath = lookup "DOCKER_CERT_PATH" env
          bamboo = lookup "bamboo_buildKey" env
          jenkins = lookup "JENKINS_HOME" env
          msshAuthSock = lookup "SSH_AUTH_SOCK" env
          isRemoteDocker = maybe False (isPrefixOf "tcp://") dockerHost
-     isStdoutTerminal <- asks getTerminal
-     (isStdinTerminal,isStderrTerminal) <-
-       liftIO ((,) <$> hIsTerminalDevice stdin
-                   <*> hIsTerminalDevice stderr)
+         image = dockerImage docker
      when (isRemoteDocker &&
            maybe False (isInfixOf "boot2docker") dockerCertPath)
           ($logWarn "Warning: Using boot2docker is NOT supported, and not likely to perform well.")
-     let image = dockerImage docker
      maybeImageInfo <- inspect envOverride image
      imageInfo@Inspect{..} <- case maybeImageInfo of
        Just ii -> return ii
@@ -322,6 +324,11 @@ runContainerAndExit getCmdArgs
           ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toFilePathNoTrailingSep projectRoot
           ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toFilePathNoTrailingSep sandboxHomeDir
           ,"-w",toFilePathNoTrailingSep pwd]
+         ,case esshDir of
+            Left _ -> []
+            Right sshDir ->
+              ["-v"
+              ,sshDir ++ ":" ++ toFilePathNoTrailingSep (sandboxHomeDir </> $(mkRelDir ".ssh/"))]
          ,case msshAuthSock of
             Nothing -> []
             Just sshAuthSock ->

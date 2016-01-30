@@ -20,7 +20,8 @@ Major changes:
 
 Other enhancements:
 
-* Docker: pass SSH auth socket into container
+* Docker: pass ~/.ssh and SSH auth socket into container, so that git repos
+  work [#1358](https://github.com/commercialhaskell/stack/issues/1358)
 
 Bug fixes:
 
