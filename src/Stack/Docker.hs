@@ -271,6 +271,7 @@ runContainerAndExit getCmdArgs
          bamboo = lookup "bamboo_buildKey" env
          jenkins = lookup "JENKINS_HOME" env
          msshAuthSock = lookup "SSH_AUTH_SOCK" env
+         muserEnv = lookup "USER" env
          isRemoteDocker = maybe False (isPrefixOf "tcp://") dockerHost
          image = dockerImage docker
      when (isRemoteDocker &&
@@ -322,10 +323,14 @@ runContainerAndExit getCmdArgs
           ,"-e",platformVariantEnvVar ++ "=dk" ++ platformVariant
           ,"-e","HOME=" ++ toFilePathNoTrailingSep sandboxHomeDir
           ,"-e","PATH=" ++ T.unpack newPathEnv
+          ,"-e","PWD=" ++ toFilePathNoTrailingSep pwd
           ,"-v",toFilePathNoTrailingSep stackRoot ++ ":" ++ toFilePathNoTrailingSep stackRoot
           ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toFilePathNoTrailingSep projectRoot
           ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toFilePathNoTrailingSep sandboxHomeDir
           ,"-w",toFilePathNoTrailingSep pwd]
+         ,case muserEnv of
+            Nothing -> []
+            Just userEnv -> ["-e","USER=" ++ userEnv]
          ,if sshDirExists
           then ["-v",toFilePathNoTrailingSep sshDir ++ ":" ++
                      toFilePathNoTrailingSep (sandboxHomeDir </> sshRelDir)]
