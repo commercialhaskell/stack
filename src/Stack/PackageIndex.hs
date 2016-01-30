@@ -53,7 +53,6 @@ import           Data.Traversable (forM)
 
 import           Data.Typeable (Typeable)
 
-
 import           Network.HTTP.Download
 import           Path                                  (mkRelDir, parent,
                                                         parseRelDir, toFilePath,
@@ -177,20 +176,20 @@ instance Show PackageIndexException where
 
 -- | Require that an index be present, updating if it isn't.
 requireIndex :: (MonadIO m,MonadLogger m
-                ,MonadThrow m,MonadReader env m,HasHttpManager env
+                ,MonadReader env m,HasHttpManager env
                 ,HasConfig env,MonadBaseControl IO m,MonadCatch m)
              => EnvOverride
              -> PackageIndex
              -> m ()
 requireIndex menv index = do
     tarFile <- configPackageIndex $ indexName index
-    exists <- fileExists tarFile
+    exists <- doesFileExist tarFile
     unless exists $ updateIndex menv index
 
 -- | Update all of the package indices
 updateAllIndices
     :: (MonadIO m,MonadLogger m
-       ,MonadThrow m,MonadReader env m,HasHttpManager env
+       ,MonadReader env m,HasHttpManager env
        ,HasConfig env,MonadBaseControl IO m, MonadCatch m)
     => EnvOverride
     -> m ()
@@ -199,7 +198,7 @@ updateAllIndices menv =
 
 -- | Update the index tarball
 updateIndex :: (MonadIO m,MonadLogger m
-               ,MonadThrow m,MonadReader env m,HasHttpManager env
+               ,MonadReader env m,HasHttpManager env
                ,HasConfig env,MonadBaseControl IO m, MonadCatch m)
             => EnvOverride
             -> PackageIndex
@@ -216,7 +215,7 @@ updateIndex menv index =
         (False, ILGit url) -> logUpdate url >> throwM (GitNotAvailable name)
 
 -- | Update the index Git repo and the index tarball
-updateIndexGit :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasConfig env,MonadBaseControl IO m, MonadCatch m)
+updateIndexGit :: (MonadIO m,MonadLogger m,MonadReader env m,HasConfig env,MonadBaseControl IO m, MonadCatch m)
                => EnvOverride
                -> IndexName
                -> PackageIndex
@@ -225,7 +224,7 @@ updateIndexGit :: (MonadIO m,MonadLogger m,MonadThrow m,MonadReader env m,HasCon
 updateIndexGit menv indexName' index gitUrl = do
      tarFile <- configPackageIndex indexName'
      let idxPath = parent tarFile
-     createTree idxPath
+     ensureDir idxPath
      do
             repoName <- parseRelDir $ takeBaseName $ T.unpack gitUrl
             let cloneArgs =
@@ -241,7 +240,7 @@ updateIndexGit menv indexName' index gitUrl = do
                   sDir </>
                   $(mkRelDir "git-update")
                 acfDir = suDir </> repoName
-            repoExists <- dirExists acfDir
+            repoExists <- doesDirExist acfDir
             unless repoExists
                    (readInNull suDir "git" menv cloneArgs Nothing)
             $logSticky "Fetching package index ..."
@@ -249,12 +248,12 @@ updateIndexGit menv indexName' index gitUrl = do
               -- we failed, so wipe the directory and try again, see #1418
               $logWarn (T.pack (show ex))
               $logStickyDone "Failed to fetch package index, retrying."
-              removeTree acfDir
+              removeDirRecur acfDir
               readInNull suDir "git" menv cloneArgs Nothing
               $logSticky "Fetching package index ..."
               readInNull acfDir "git" menv ["fetch","--tags","--depth=1"] Nothing
             $logStickyDone "Fetched package index."
-            removeFileIfExists tarFile
+            ignoringAbsence (removeFile tarFile)
             when (indexGpgVerify index)
                  (readInNull acfDir
                              "git"
@@ -297,7 +296,7 @@ updateIndexHTTP indexName' index url = do
     toUnpack <-
         if wasDownloaded
             then return True
-            else liftM not $ fileExists tar
+            else not `liftM` doesFileExist tar
 
     when toUnpack $ do
         let tmp = toFilePath tar <.> "tmp"

@@ -50,7 +50,6 @@ import           Control.Monad.Logger (MonadLogger,logWarn)
 import           Control.Monad.Reader
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
-import           Data.Either
 import           Data.Function
 import           Data.List
 import           Data.List.Extra (nubOrd)
@@ -83,14 +82,14 @@ import qualified Distribution.Verbosity as D
 import           Path as FL
 import           Path.Extra
 import           Path.Find
-import           Path.IO
+import           Path.IO hiding (findFiles)
 import           Prelude
 import           Safe (headDef, tailSafe)
 import           Stack.Build.Installed
 import           Stack.Constants
 import           Stack.Types
 import qualified Stack.Types.PackageIdentifier
-import           System.Directory (doesFileExist, getDirectoryContents)
+import qualified System.Directory as D
 import           System.FilePath (splitExtensions, replaceExtension)
 import qualified System.FilePath as FilePath
 import           System.IO.Error
@@ -249,7 +248,7 @@ generatePkgDescOpts
 generatePkgDescOpts sourceMap installedMap omitPkgs addPkgs cabalfp pkg componentPaths = do
     distDir <- distDirFromDir cabalDir
     let cabalMacros = autogenDir distDir </> $(mkRelFile "cabal_macros.h")
-    exists <- fileExists cabalMacros
+    exists <- doesFileExist cabalMacros
     let mcabalMacros =
             if exists
                 then Just cabalMacros
@@ -587,7 +586,7 @@ matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
                 ++ " If a wildcard is used it must be with an file extension."
   Just (NoGlob filepath') -> return [filepath']
   Just (FileGlob dir' ext) -> do
-    files <- getDirectoryContents (dir FilePath.</> dir')
+    files <- D.getDirectoryContents (dir FilePath.</> dir')
     case   [ dir' FilePath.</> file
            | file <- files
            , let (name, ext') = splitExtensions file
@@ -598,7 +597,7 @@ matchDirFileGlob_ dir filepath = case parseFileGlob filepath of
 
 -- | Get all files referenced by the benchmark.
 benchmarkFiles
-    :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m)
+    :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader (Path Abs File, Path Abs Dir) m)
     => Benchmark -> m (Set ModuleName, Set DotCabalPath, [PackageWarning])
 benchmarkFiles bench = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
@@ -621,7 +620,7 @@ benchmarkFiles bench = do
 
 -- | Get all files referenced by the test.
 testFiles
-    :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m)
+    :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader (Path Abs File, Path Abs Dir) m)
     => TestSuite
     -> m (Set ModuleName, Set DotCabalPath, [PackageWarning])
 testFiles test = do
@@ -646,7 +645,7 @@ testFiles test = do
 
 -- | Get all files referenced by the executable.
 executableFiles
-    :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m)
+    :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader (Path Abs File, Path Abs Dir) m)
     => Executable
     -> m (Set ModuleName, Set DotCabalPath, [PackageWarning])
 executableFiles exe = do
@@ -666,7 +665,7 @@ executableFiles exe = do
 
 -- | Get all files referenced by the library.
 libraryFiles
-    :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m)
+    :: (MonadLogger m, MonadIO m, MonadCatch m, MonadReader (Path Abs File, Path Abs Dir) m)
     => Library -> m (Set ModuleName, Set DotCabalPath, [PackageWarning])
 libraryFiles lib = do
     dirs <- mapMaybeM resolveDirOrWarn (hsSourceDirs build)
@@ -686,7 +685,7 @@ libraryFiles lib = do
     build = libBuildInfo lib
 
 -- | Get all C sources and extra source files in a build.
-buildOtherSources :: (MonadLogger m,MonadIO m,MonadThrow m,MonadReader (Path Abs File, Path Abs Dir) m)
+buildOtherSources :: (MonadLogger m,MonadIO m,MonadCatch m,MonadReader (Path Abs File, Path Abs Dir) m)
            => BuildInfo -> m (Set DotCabalPath)
 buildOtherSources build =
     do csources <- liftM
@@ -894,7 +893,7 @@ getDependencies component dotCabalPath =
                         FilePath.replaceExtension
                             (toFilePath (dumpHIDir </> fileRel))
                             ".dump-hi"
-                dumpHIExists <- liftIO $ doesFileExist dumpHIPath
+                dumpHIExists <- liftIO $ D.doesFileExist dumpHIPath
                 if dumpHIExists
                     then parseDumpHI dumpHIPath
                     else return (S.empty, [])
@@ -977,29 +976,20 @@ findCandidate dirs exts name = do
             DotCabalCFile{} -> DotCabalCFilePath
     paths_pkg pkg = "Paths_" ++ packageNameString pkg
     makeNameCandidates =
-        liftM (nubOrd . rights . concat) (mapM makeDirCandidates dirs)
+        liftM (nubOrd . catMaybes . concat) (mapM makeDirCandidates dirs)
     makeDirCandidates :: Path Abs Dir
-                      -> IO [Either ResolveException (Path Abs File)]
+                      -> IO [Maybe (Path Abs File)]
     makeDirCandidates dir =
         case name of
-            DotCabalMain fp -> liftM return (try (resolveFile' dir fp))
-            DotCabalFile fp -> liftM return (try (resolveFile' dir fp))
-            DotCabalCFile fp -> liftM return (try (resolveFile' dir fp))
+            DotCabalMain fp -> return `liftM` forgivingAbsence (resolveFile dir fp)
+            DotCabalFile fp -> return `liftM` forgivingAbsence (resolveFile dir fp)
+            DotCabalCFile fp -> return `liftM` forgivingAbsence (resolveFile dir fp)
             DotCabalModule mn ->
                 mapM
                   ((\ ext ->
-                     try (resolveFile' dir (Cabal.toFilePath mn ++ "." ++ ext)))
+                     forgivingAbsence (resolveFile dir (Cabal.toFilePath mn ++ "." ++ ext)))
                    . T.unpack)
                    exts
-    resolveFile'
-        :: (MonadIO m, MonadThrow m)
-        => Path Abs Dir -> FilePath.FilePath -> m (Path Abs File)
-    resolveFile' x y = do
-        p <- parseCollapsedAbsFile (toFilePath x FilePath.</> y)
-        exists <- fileExists p
-        if exists
-            then return p
-            else throwM $ ResolveFileFailed x y (toFilePath p)
 
 -- | Warn the user that multiple candidates are available for an
 -- entry, but that we picked one anyway and continued.
@@ -1044,7 +1034,7 @@ logPossibilities dirs mn = do
     makePossibilities name =
         mapM
             (\dir ->
-                  do (_,files) <- listDirectory dir
+                  do (_,files) <- listDir dir
                      return
                          (map
                               filename
@@ -1085,13 +1075,13 @@ buildLogPath package' msuffix = do
   return $ stack </> $(mkRelDir "logs") </> fp
 
 -- Internal helper to define resolveFileOrWarn and resolveDirOrWarn
-resolveOrWarn :: (MonadLogger m, MonadIO m, MonadReader (Path Abs File, Path Abs Dir) m)
+resolveOrWarn :: (MonadLogger m, MonadIO m, MonadThrow m, MonadReader (Path Abs File, Path Abs Dir) m)
               => Text
               -> (Path Abs Dir -> String -> m (Maybe a))
               -> FilePath.FilePath
               -> m (Maybe a)
 resolveOrWarn subject resolver path =
-  do cwd <- getWorkingDir
+  do cwd <- getCurrentDir
      file <- asks fst
      dir <- asks (parent . fst)
      result <- resolver dir path
@@ -1104,17 +1094,19 @@ resolveOrWarn subject resolver path =
 
 -- | Resolve the file, if it can't be resolved, warn for the user
 -- (purely to be helpful).
-resolveFileOrWarn :: (MonadThrow m,MonadIO m,MonadLogger m,MonadReader (Path Abs File, Path Abs Dir) m)
+resolveFileOrWarn :: (MonadCatch m,MonadIO m,MonadLogger m,MonadReader (Path Abs File, Path Abs Dir) m)
                   => FilePath.FilePath
                   -> m (Maybe (Path Abs File))
-resolveFileOrWarn = resolveOrWarn "File" resolveFileMaybe
+resolveFileOrWarn = resolveOrWarn "File" f
+  where f p x = forgivingAbsence (resolveFile p x)
 
 -- | Resolve the directory, if it can't be resolved, warn for the user
 -- (purely to be helpful).
-resolveDirOrWarn :: (MonadThrow m,MonadIO m,MonadLogger m,MonadReader (Path Abs File, Path Abs Dir) m)
+resolveDirOrWarn :: (MonadCatch m,MonadIO m,MonadLogger m,MonadReader (Path Abs File, Path Abs Dir) m)
                  => FilePath.FilePath
                  -> m (Maybe (Path Abs Dir))
-resolveDirOrWarn = resolveOrWarn "Directory" resolveDirMaybe
+resolveDirOrWarn = resolveOrWarn "Directory" f
+  where f p x = forgivingAbsence (resolveDir p x)
 
 -- | Extract the @PackageIdentifier@ given an exploded haskell package
 -- path.

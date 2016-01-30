@@ -122,7 +122,6 @@ library
                      Data.Attoparsec.Args
                      Data.Attoparsec.Interpreter
                      Data.Maybe.Extra
-                     Path.IO
                      Path.Extra
   other-modules:     Network.HTTP.Download
                      Control.Concurrent.Execute
@@ -180,6 +179,7 @@ library
                    , old-locale >= 1.0.0.6
                    , optparse-applicative >= 0.11 && < 0.13
                    , path >= 0.5.1
+                   , path-io >= 0.3.1
                    , persistent >= 2.1.2
                    , persistent-sqlite >= 2.1.4
                    , persistent-template >= 2.1.1
@@ -244,6 +244,7 @@ executable stack
                 , old-locale >= 1.0.0.6
                 , optparse-applicative >= 0.11.0.2 && < 0.13
                 , path
+                , path-io >= 0.3.1
                 , process
                 , resourcet >= 1.1.4.1
                 , stack
@@ -288,6 +289,7 @@ test-suite stack-test
                 , exceptions
                 , filepath
                 , path
+                , path-io >= 0.3.1
                 , temporary
                 , stack
                 , monad-logger

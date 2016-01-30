@@ -10,14 +10,11 @@ import Network.HTTP.Client.Conduit
 import Network.HTTP.Download.Verified
 import Path
 import Path.IO
-import System.Directory
 import Test.Hspec hiding (shouldNotBe, shouldNotReturn)
 
-
 -- TODO: share across test files
-withTempDir :: (Path Abs Dir -> IO a) -> IO a
-withTempDir = withCanonicalizedSystemTempDirectory "NHD_VerifiedSpec"
-
+withTempDir' :: (Path Abs Dir -> IO a) -> IO a
+withTempDir' = withSystemTempDir "NHD_VerifiedSpec"
 
 -- | An example path to download the exampleReq.
 getExamplePath :: Path Abs Dir -> IO (Path Abs File)
@@ -96,59 +93,54 @@ spec = beforeAll setup $ afterAll teardown $ do
     -- Preconditions:
     -- * the exampleReq server is running
     -- * the test runner has working internet access to it
-    it "downloads the file correctly" $ \T{..} -> withTempDir $ \dir -> do
+    it "downloads the file correctly" $ \T{..} -> withTempDir' $ \dir -> do
       examplePath <- getExamplePath dir
-      let exampleFilePath = toFilePath examplePath
-      doesFileExist exampleFilePath `shouldReturn` False
+      doesFileExist examplePath `shouldReturn` False
       let go = runWith manager $ verifiedDownload exampleReq examplePath exampleProgressHook
       go `shouldReturn` True
-      doesFileExist exampleFilePath `shouldReturn` True
+      doesFileExist examplePath `shouldReturn` True
 
-    it "is idempotent, and doesn't redownload unnecessarily" $ \T{..} -> withTempDir $ \dir -> do
+    it "is idempotent, and doesn't redownload unnecessarily" $ \T{..} -> withTempDir' $ \dir -> do
       examplePath <- getExamplePath dir
-      let exampleFilePath = toFilePath examplePath
-      doesFileExist exampleFilePath `shouldReturn` False
+      doesFileExist examplePath `shouldReturn` False
       let go = runWith manager $ verifiedDownload exampleReq examplePath exampleProgressHook
       go `shouldReturn` True
-      doesFileExist exampleFilePath `shouldReturn` True
+      doesFileExist examplePath `shouldReturn` True
       go `shouldReturn` False
-      doesFileExist exampleFilePath `shouldReturn` True
+      doesFileExist examplePath `shouldReturn` True
 
     -- https://github.com/commercialhaskell/stack/issues/372
-    it "does redownload when the destination file is wrong" $ \T{..} -> withTempDir $ \dir -> do
+    it "does redownload when the destination file is wrong" $ \T{..} -> withTempDir' $ \dir -> do
       examplePath <- getExamplePath dir
       let exampleFilePath = toFilePath examplePath
       writeFile exampleFilePath exampleWrongContent
-      doesFileExist exampleFilePath `shouldReturn` True
+      doesFileExist examplePath `shouldReturn` True
       readFile exampleFilePath `shouldReturn` exampleWrongContent
       let go = runWith manager $ verifiedDownload exampleReq examplePath exampleProgressHook
       go `shouldReturn` True
-      doesFileExist exampleFilePath `shouldReturn` True
+      doesFileExist examplePath `shouldReturn` True
       readFile exampleFilePath `shouldNotReturn` exampleWrongContent
 
-    it "rejects incorrect content length" $ \T{..} -> withTempDir $ \dir -> do
+    it "rejects incorrect content length" $ \T{..} -> withTempDir' $ \dir -> do
       examplePath <- getExamplePath dir
-      let exampleFilePath = toFilePath examplePath
       let wrongContentLengthReq = exampleReq
             { drLengthCheck = Just exampleWrongContentLength
             }
       let go = runWith manager $ verifiedDownload wrongContentLengthReq examplePath exampleProgressHook
       go `shouldThrow` isWrongContentLength
-      doesFileExist exampleFilePath `shouldReturn` False
+      doesFileExist examplePath `shouldReturn` False
 
-    it "rejects incorrect digest" $ \T{..} -> withTempDir $ \dir -> do
+    it "rejects incorrect digest" $ \T{..} -> withTempDir' $ \dir -> do
       examplePath <- getExamplePath dir
-      let exampleFilePath = toFilePath examplePath
       let wrongHashCheck = exampleHashCheck { hashCheckHexDigest = exampleWrongDigest }
       let wrongDigestReq = exampleReq { drHashChecks = [wrongHashCheck] }
       let go = runWith manager $ verifiedDownload wrongDigestReq examplePath exampleProgressHook
       go `shouldThrow` isWrongDigest
-      doesFileExist exampleFilePath `shouldReturn` False
+      doesFileExist examplePath `shouldReturn` False
 
     -- https://github.com/commercialhaskell/stack/issues/240
-    it "can download hackage tarballs" $ \T{..} -> withTempDir $ \dir -> do
+    it "can download hackage tarballs" $ \T{..} -> withTempDir' $ \dir -> do
       dest <- fmap (dir </>) $ parseRelFile "acme-missiles-0.3.tar.gz"
-      let destFp = toFilePath dest
       req <- parseUrl "http://hackage.haskell.org/package/acme-missiles-0.3/acme-missiles-0.3.tar.gz"
       let dReq = DownloadRequest
             { drRequest = req
@@ -157,6 +149,6 @@ spec = beforeAll setup $ afterAll teardown $ do
             , drRetryPolicy = limitRetries 1
             }
       let go = runWith manager $ verifiedDownload dReq dest exampleProgressHook
-      doesFileExist destFp `shouldReturn` False
+      doesFileExist dest `shouldReturn` False
       go `shouldReturn` True
-      doesFileExist destFp `shouldReturn` True
+      doesFileExist dest `shouldReturn` True

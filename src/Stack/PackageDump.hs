@@ -50,7 +50,7 @@ import           Data.Text (Text)
 import           Data.Typeable (Typeable)
 import           GHC.Generics (Generic)
 import           Path
-import           Path.IO (createTree)
+import           Path.IO (ensureDir)
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Prelude -- Fix AMP warning
 import           Stack.GhcPkg
@@ -135,7 +135,7 @@ loadInstalledCache path = do
 -- | Save a @InstalledCache@ to disk
 saveInstalledCache :: MonadIO m => Path Abs File -> InstalledCache -> m ()
 saveInstalledCache path (InstalledCache ref) = liftIO $ do
-    createTree (parent path)
+    ensureDir (parent path)
     readIORef ref >>= taggedEncodeFile path
 
 -- | Prune a list of possible packages down to those whose dependencies are met.

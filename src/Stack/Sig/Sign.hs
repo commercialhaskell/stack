@@ -133,6 +133,6 @@ withStackWorkTempDir projectRoot f = do
     workDir <- getWorkDir
     let tempDir = projectRoot </> workDir </> $(mkRelDir "tmp") </> uuidPath
     bracket
-        (createTree tempDir)
-        (const (removeTree tempDir))
+        (ensureDir tempDir)
+        (const (removeDirRecur tempDir))
         (const (f tempDir))

@@ -9,7 +9,7 @@ module Stack.Init
 
 import           Control.Exception               (assert)
 import           Control.Exception.Enclosed      (catchAny)
-import           Control.Monad                   (when)
+import           Control.Monad
 import           Control.Monad.Catch             (MonadMask, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -40,7 +40,6 @@ import           Stack.Solver
 import           Stack.Types
 import           Stack.Types.Internal            ( HasTerminal, HasReExec
                                                  , HasLogLevel)
-import           System.Directory                (makeRelativeToCurrentDirectory)
 import           Stack.Config                    ( getSnapshots
                                                  , makeConcreteResolver)
 import qualified System.FilePath                 as FP
@@ -57,11 +56,10 @@ initProject
     -> m ()
 initProject currDir initOpts mresolver = do
     let dest = currDir </> stackDotYaml
-        dest' = toFilePath dest
 
-    reldest <- liftIO $ makeRelativeToCurrentDirectory dest'
+    reldest <- toFilePath `liftM` makeRelativeToCurrentDir dest
 
-    exists <- fileExists dest
+    exists <- doesFileExist dest
     when (not (forceOverwrite initOpts) && exists) $ do
         error ("Stack configuration file " <> reldest <>
                " exists, use 'stack solver' to fix the existing config file or \
@@ -125,7 +123,7 @@ initProject currDir initOpts mresolver = do
                     | otherwise -> assert False $ toFilePath dir
                 Just rel -> toFilePath rel
 
-        makeRel = liftIO . makeRelativeToCurrentDirectory . toFilePath
+        makeRel = fmap toFilePath . makeRelativeToCurrentDir
 
         pkgs = map toPkg $ Map.elems (fmap (parent . fst) rbundle)
         toPkg dir = PackageEntry
@@ -161,7 +159,7 @@ initProject currDir initOpts mresolver = do
         (if exists then "Overwriting existing configuration file: "
          else "Writing configuration to file: ")
         <> T.pack reldest
-    liftIO $ L.writeFile dest'
+    liftIO $ L.writeFile (toFilePath dest)
            $ B.toLazyByteString
            $ renderStackYaml p
                (Map.elems $ fmap (makeRelDir . parent . fst) ignored)

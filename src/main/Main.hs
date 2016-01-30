@@ -86,8 +86,7 @@ import           Stack.Types.Internal
 import           Stack.Types.StackT
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
-import           System.Directory (canonicalizePath, doesFileExist, doesDirectoryExist, createDirectoryIfMissing)
-import qualified System.Directory as Directory (findExecutable)
+import qualified System.Directory as D
 import           System.Environment (getEnvironment, getProgName, getArgs, withArgs)
 import           System.Exit
 import           System.FileLock (lockFile, tryLockFile, unlockFile, SharedExclusive(Exclusive), FileLock)
@@ -437,7 +436,6 @@ commandLineHandler progName isInterpreter = complicatedOptions
         addSubCommands' cmd title =
             addSubCommands cmd title globalFooter (globalOpts OtherCmdGlobalOpts)
 
-
     globalOpts kind =
         extraHelpOption hide progName (Docker.dockerCmdName ++ "*") Docker.dockerHelpOptName <*>
         extraHelpOption hide progName (Nix.nixCmdName ++ "*") Nix.nixHelpOptName <*>
@@ -460,7 +458,7 @@ secondaryCommandHandler args f =
     if elem pathSeparator cmd
        then return f
     else do
-      mExternalExec <- Directory.findExecutable cmd
+      mExternalExec <- D.findExecutable cmd
       case mExternalExec of
         Just ex -> do
           menv <- getEnvOverride buildPlatform
@@ -483,7 +481,7 @@ interpreterHandler
   -> ParserFailure ParserHelp
   -> IO (GlobalOptsMonoid, (GlobalOpts -> IO (), t))
 interpreterHandler args f = do
-  isFile <- doesFileExist file
+  isFile <- D.doesFileExist file
   if isFile
   then runInterpreterCommand file
   else parseResultHandler (errorCombine (noSuchFile file))
@@ -762,7 +760,7 @@ withUserFileLock go@GlobalOpts{} dir act = do
         then do
             let lockfile = $(mkRelFile "lockfile")
             let pth = dir </> lockfile
-            liftIO $ createDirectoryIfMissing True (toFilePath dir)
+            ensureDir dir
             -- Just in case of asynchronous exceptions, we need to be careful
             -- when using tryLockFile here:
             EL.bracket (liftIO $ tryLockFile (toFilePath pth) Exclusive)
@@ -923,8 +921,8 @@ uploadCmd (args, mpvpBounds, ignoreCheck, shouldSign) go = do
             r <- f x
             (as, bs) <- partitionM f xs
             return $ if r then (x:as, bs) else (as, x:bs)
-    (files, nonFiles) <- partitionM doesFileExist args
-    (dirs, invalid) <- partitionM doesDirectoryExist nonFiles
+    (files, nonFiles) <- partitionM D.doesFileExist args
+    (dirs, invalid) <- partitionM D.doesDirectoryExist nonFiles
     unless (null invalid) $ error $
         "stack upload expects a list sdist tarballs or cabal directories.  Can't find " ++
         show invalid
@@ -940,11 +938,11 @@ uploadCmd (args, mpvpBounds, ignoreCheck, shouldSign) go = do
     withBuildConfigAndLock go $ \_ -> do
         uploader <- getUploader
         unless ignoreCheck $
-            mapM_ (parseRelAsAbsFile >=> checkSDistTarball) files
+            mapM_ (resolveFile' >=> checkSDistTarball) files
         forM_
             files
             (\file ->
-                  do tarFile <- parseRelAsAbsFile file
+                  do tarFile <- resolveFile' file
                      liftIO
                          (Upload.upload uploader (toFilePath tarFile))
                      when
@@ -955,7 +953,7 @@ uploadCmd (args, mpvpBounds, ignoreCheck, shouldSign) go = do
                               tarFile))
         unless (null dirs) $
             forM_ dirs $ \dir -> do
-                pkgDir <- parseRelAsAbsDir dir
+                pkgDir <- resolveDir' dir
                 (tarName, tarBytes) <- getSDistTarball mpvpBounds pkgDir
                 unless ignoreCheck $ checkSDistTarball' tarName tarBytes
                 liftIO $ Upload.uploadBytes uploader tarName tarBytes
@@ -974,12 +972,12 @@ sdistCmd (dirs, mpvpBounds, ignoreCheck) go =
         -- If no directories are specified, build all sdist tarballs.
         dirs' <- if null dirs
             then asks (Map.keys . envConfigPackages . getEnvConfig)
-            else mapM (parseAbsDir <=< liftIO . canonicalizePath) dirs
+            else mapM resolveDir' dirs
         forM_ dirs' $ \dir -> do
             (tarName, tarBytes) <- getSDistTarball mpvpBounds dir
             distDir <- distDirFromDir dir
             tarPath <- (distDir </>) <$> parseRelFile tarName
-            liftIO $ createTree $ parent tarPath
+            ensureDir (parent tarPath)
             liftIO $ L.writeFile (toFilePath tarPath) tarBytes
             unless ignoreCheck (checkSDistTarball tarPath)
             $logInfo $ "Wrote sdist tarball to " <> T.pack (toFilePath tarPath)
@@ -1075,7 +1073,7 @@ targetsCmd target go@GlobalOpts{..} =
     withBuildConfig go $
     do let bopts = defaultBuildOpts { boptsTargets = [target] }
        (_realTargets,_,pkgs) <- ghciSetup (ideGhciOpts bopts)
-       pwd <- getWorkingDir
+       pwd <- getCurrentDir
        targets <-
            fmap
                (concat . snd . unzip)
@@ -1137,7 +1135,7 @@ sigSignSdistCmd (url,path) go =
     withConfigAndLock
         go
         (do (manager,lc) <- liftIO (loadConfigWithOpts go)
-            tarBall <- parseRelAsAbsFile path
+            tarBall <- resolveFile' path
             runStackTGlobal
                 manager
                 (lcConfig lc)
@@ -1149,7 +1147,7 @@ sigSignSdistCmd (url,path) go =
 loadConfigWithOpts :: GlobalOpts -> IO (Manager,LoadConfig (StackLoggingT IO))
 loadConfigWithOpts go@GlobalOpts{..} = do
     manager <- newTLSManager
-    mstackYaml <- forM globalStackYaml parseRelAsAbsFile
+    mstackYaml <- forM globalStackYaml resolveFile'
     lc <- runStackLoggingTGlobal manager go $ do
         lc <- loadConfig globalConfigMonoid mstackYaml globalResolver
         -- If we have been relaunched in a Docker container, perform in-container initialization
@@ -1175,7 +1173,7 @@ withMiniConfigAndLock go inner =
 -- | Project initialization
 initCmd :: InitOpts -> GlobalOpts -> IO ()
 initCmd initOpts go = do
-    pwd <- getWorkingDir
+    pwd <- getCurrentDir
     withMiniConfigAndLock go (initProject pwd initOpts (globalResolver go))
 
 -- | Create a project directory structure and initialize the stack config.

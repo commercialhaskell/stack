@@ -56,7 +56,7 @@ import           GHC.Exts (sortWith)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
-import           Path.IO
+import           Path.IO hiding (canonicalizePath)
 import qualified Paths_stack as Meta
 import           Prelude -- Fix redundant import warnings
 import           Stack.Constants
@@ -64,7 +64,7 @@ import           Stack.Docker.GlobalDB
 import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Setup (ensureDockerStackExe)
-import           System.Directory (canonicalizePath,getModificationTime,getHomeDirectory)
+import           System.Directory (canonicalizePath,getHomeDirectory)
 import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath
                                     ,lookupEnv)
 import           System.Exit (exitSuccess, exitWith)
@@ -142,7 +142,7 @@ reexecWithOptionalContainer mprojectRoot =
                   (exePath,exeTimestamp,misCompatible) <-
                       liftIO $
                       do exePath <- liftIO getExecutablePath
-                         exeTimestamp <- liftIO (getModificationTime exePath)
+                         exeTimestamp <- resolveFile' exePath >>= getModificationTime
                          isKnown <-
                              liftIO $
                              getDockerImageExe
@@ -265,7 +265,7 @@ runContainerAndExit getCmdArgs
        <*> (parseAbsDir =<< getHomeDirectory)
      isStdoutTerminal <- asks getTerminal
      let sshDir = homeDir </> sshRelDir
-     sshDirExists <- dirExists sshDir
+     sshDirExists <- doesDirExist sshDir
      let dockerHost = lookup "DOCKER_HOST" env
          dockerCertPath = lookup "DOCKER_CERT_PATH" env
          bamboo = lookup "bamboo_buildKey" env
@@ -309,10 +309,10 @@ runContainerAndExit getCmdArgs
                                             </> $(mkRelDir ".local/bin")]
                       (T.pack <$> lookupImageEnv "PATH" imageEnvVars)
      (cmnd,args,envVars,extraMount) <- getCmdArgs docker envOverride imageInfo isRemoteDocker
-     pwd <- getWorkingDir
+     pwd <- getCurrentDir
      liftIO
        (do updateDockerImageLastUsed config iiId (toFilePath projectRoot)
-           mapM_ createTree [sandboxHomeDir, stackRoot])
+           mapM_ (ensureDir) [sandboxHomeDir, stackRoot])
      containerID <- (trim . decodeUtf8) <$> readDockerProcess
        envOverride
        (concat
@@ -754,19 +754,19 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
           -- its original home directory to the host's stack root, to avoid needing to download them
           origStackHomeDir <- parseAbsDir (User.homeDirectory ue)
           let origStackRoot = origStackHomeDir </> $(mkRelDir ("." ++ stackProgName))
-          buildPlanDirExists <- dirExists (buildPlanDir origStackRoot)
+          buildPlanDirExists <- doesDirExist (buildPlanDir origStackRoot)
           when buildPlanDirExists $ do
-            (_, buildPlans) <- listDirectory (buildPlanDir origStackRoot)
+            (_, buildPlans) <- listDir (buildPlanDir origStackRoot)
             forM_ buildPlans $ \srcBuildPlan -> do
               let destBuildPlan = buildPlanDir configStackRoot </> filename srcBuildPlan
-              exists <- fileExists destBuildPlan
+              exists <- doesFileExist destBuildPlan
               unless exists $ do
-                createTree (parent destBuildPlan)
+                ensureDir (parent destBuildPlan)
                 copyFile srcBuildPlan destBuildPlan
           forM_ configPackageIndices $ \pkgIdx -> do
             msrcIndex <- flip runReaderT (config{configStackRoot = origStackRoot}) $ do
                srcIndex <- configPackageIndex (indexName pkgIdx)
-               exists <- fileExists srcIndex
+               exists <- doesFileExist srcIndex
                return $ if exists
                  then Just srcIndex
                  else Nothing
@@ -775,9 +775,9 @@ entrypoint config@Config{..} DockerEntrypoint{..} =
               Just srcIndex -> do
                 flip runReaderT config $ do
                   destIndex <- configPackageIndex (indexName pkgIdx)
-                  exists <- fileExists destIndex
+                  exists <- doesFileExist destIndex
                   unless exists $ do
-                    createTree (parent destIndex)
+                    ensureDir (parent destIndex)
                     copyFile srcIndex destIndex
     return True
   where
@@ -835,12 +835,12 @@ removeDirectoryContents :: Path Abs Dir -- ^ Directory to remove contents of
                         -> [Path Rel File] -- ^ Top-level file names to exclude from removal
                         -> IO ()
 removeDirectoryContents path excludeDirs excludeFiles =
-  do isRootDir <- dirExists path
+  do isRootDir <- doesDirExist path
      when isRootDir
-          (do (lsd,lsf) <- listDirectory path
+          (do (lsd,lsf) <- listDir path
               forM_ lsd
                     (\d -> unless (dirname d `elem` excludeDirs)
-                                  (removeTree d))
+                                  (removeDirRecur d))
               forM_ lsf
                     (\f -> unless (filename f `elem` excludeFiles)
                                   (removeFile f)))
@@ -1089,7 +1089,6 @@ type GetCmdArgs env m
   -> Inspect
   -> Bool
   -> m (FilePath,[String],[(String,String)],[Mount])
-
 
 type M env m = (MonadIO m,MonadReader env m,MonadLogger m,MonadBaseControl IO m,MonadCatch m
                ,HasConfig env,HasTerminal env,HasReExec env,HasHttpManager env,MonadMask m)

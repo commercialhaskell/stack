@@ -14,7 +14,7 @@ import Control.Monad.IO.Class
 import System.IO.Error (isPermissionError)
 import Data.List
 import Path
-import Path.IO
+import Path.IO hiding (findFiles)
 
 -- | Find the location of a file matching the given predicate.
 findFileUp :: (MonadIO m,MonadThrow m)
@@ -41,7 +41,7 @@ findPathUp :: (MonadIO m,MonadThrow m)
            -> Maybe (Path Abs Dir)             -- ^ Do not ascend above this directory.
            -> m (Maybe (Path Abs t))           -- ^ Absolute path.
 findPathUp pathType dir p upperBound =
-  do entries <- listDirectory dir
+  do entries <- listDir dir
      case find p (pathType entries) of
        Just path -> return (Just path)
        Nothing | Just dir == upperBound -> return Nothing
@@ -57,7 +57,7 @@ findFiles dir p traversep =
   do (dirs,files) <- catchJust (\ e -> if isPermissionError e
                                          then Just ()
                                          else Nothing)
-                               (listDirectory dir)
+                               (listDir dir)
                                (\ _ -> return ([], []))
      subResults <-
        forM dirs

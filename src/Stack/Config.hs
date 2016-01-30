@@ -77,7 +77,7 @@ import qualified Stack.Image as Image
 import           Stack.PackageIndex
 import           Stack.Types
 import           Stack.Types.Internal
-import           System.Directory (getAppUserDataDirectory, createDirectoryIfMissing, canonicalizePath)
+import qualified System.Directory as D
 import           System.Environment
 import           System.IO
 import           System.Process.Read
@@ -121,7 +121,7 @@ getImplicitGlobalProjectDir config =
     --TEST no warning printed
     liftM fst $ tryDeprecatedPath
         Nothing
-        dirExists
+        doesDirExist
         (implicitGlobalProjectDir stackRoot)
         (implicitGlobalProjectDirDeprecated stackRoot)
   where
@@ -257,12 +257,12 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject c
      configLocalBin <-
          case configMonoidLocalBinPath of
              Nothing -> do
-                 localDir <- liftIO (getAppUserDataDirectory "local") >>= parseAbsDir
+                 localDir <- getAppUserDataDir $(mkRelDir "local")
                  return $ localDir </> $(mkRelDir "bin")
              Just userPath ->
                  (case mproject of
                      -- Not in a project
-                     Nothing -> parseRelAsAbsDir userPath
+                     Nothing -> resolveDir' userPath
                      -- Resolves to the project dir and appends the user path if it is relative
                      Just (_, configYaml) -> resolveDir (parent configYaml) userPath)
                  -- TODO: Either catch specific exceptions or add a
@@ -414,8 +414,8 @@ loadBuildConfig mproject config mresolver mcompiler = do
                 dest = destDir </> stackDotYaml
                 dest' :: FilePath
                 dest' = toFilePath dest
-            createTree destDir
-            exists <- fileExists dest
+            ensureDir destDir
+            exists <- doesFileExist dest
             if exists
                then do
                    ProjectAndConfigMonoid project _ <- loadYaml dest
@@ -486,7 +486,7 @@ loadBuildConfig mproject config mresolver mcompiler = do
                     return $ mbpCompilerVersion mbp
                 ResolverCompiler wantedCompiler -> return wantedCompiler
 
-    extraPackageDBs <- mapM parseRelAsAbsDir (projectExtraPackageDBs project)
+    extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
 
     packageCaches <- runReaderT (getMinimalEnvOverride >>= getPackageCaches) miniConfig
 
@@ -553,12 +553,12 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
         dir = root </> dirRel
         dirTmp = root </> dirRelTmp
 
-    exists <- dirExists dir
+    exists <- doesDirExist dir
     unless exists $ do
-        removeTreeIfExists dirTmp
+        ignoringAbsence (removeDirRecur dirTmp)
 
         let cloneAndExtract commandName resetCommand commit = do
-                createTree (parent dirTmp)
+                ensureDir (parent dirTmp)
                 readInNull (parent dirTmp) commandName menv
                     [ "clone"
                     , T.unpack url
@@ -602,12 +602,12 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
         renameDir dirTmp dir
 
     case remotePackageType of
-        RPTHttp -> do x <- listDirectory dir
+        RPTHttp -> do x <- listDir dir
                       case x of
                           ([dir'], []) -> return dir'
                           (dirs, files) -> do
-                              removeFileIfExists file
-                              removeTreeIfExists dir
+                              ignoringAbsence (removeFile file)
+                              ignoringAbsence (removeDirRecur dir)
                               throwM $ UnexpectedArchiveContents dirs files
         _ -> return dir
 
@@ -616,14 +616,10 @@ determineStackRoot :: (MonadIO m, MonadThrow m) => m (Path Abs Dir)
 determineStackRoot = do
     env <- liftIO getEnvironment
     case lookup stackRootEnvVar env of
-        Nothing -> do
-            x <- liftIO $ getAppUserDataDirectory stackProgName
-            parseAbsDir x
+        Nothing -> getAppUserDataDir $(mkRelDir stackProgName)
         Just x -> do
-            y <- liftIO $ do
-                createDirectoryIfMissing True x
-                canonicalizePath x
-            parseAbsDir y
+            liftIO $ D.createDirectoryIfMissing True x
+            resolveDir' x
 
 -- | Determine the extra config file locations which exist.
 --
@@ -641,7 +637,7 @@ getExtraConfigs userConfigPath = do
     mstackGlobalConfig <-
         maybe (return Nothing) (fmap Just . parseAbsFile)
       $ lookup "STACK_GLOBAL_CONFIG" env
-    filterM fileExists
+    filterM doesFileExist
         $ fromMaybe userConfigPath mstackConfig
         : maybe [] return (mstackGlobalConfig <|> defaultStackGlobalConfigPath)
 
@@ -666,16 +662,16 @@ getProjectConfig Nothing = do
     case lookup "STACK_YAML" env of
         Just fp -> do
             $logInfo "Getting project config file from STACK_YAML environment"
-            liftM Just $ parseRelAsAbsFile fp
+            liftM Just $ resolveFile' fp
         Nothing -> do
-            currDir <- getWorkingDir
+            currDir <- getCurrentDir
             search currDir
   where
     search dir = do
         let fp = dir </> stackDotYaml
             fp' = toFilePath fp
         $logDebug $ "Checking for project config at: " <> T.pack fp'
-        exists <- fileExists fp
+        exists <- doesFileExist fp
         if exists
             then return $ Just fp
             else do
@@ -696,7 +692,7 @@ loadProjectConfig mstackYaml = do
     mfp <- getProjectConfig mstackYaml
     case mfp of
         Just fp -> do
-            currDir <- getWorkingDir
+            currDir <- getCurrentDir
             $logDebug $ "Loading project config file " <>
                         T.pack (maybe (toFilePath fp) toFilePath (stripDir currDir fp))
             load fp
@@ -720,7 +716,7 @@ getDefaultGlobalConfigPath =
             liftM (Just . fst ) $
             tryDeprecatedPath
                 (Just "non-project global configuration file")
-                fileExists
+                doesFileExist
                 new
                 old
         (Just new,Nothing) -> return (Just new)
@@ -735,11 +731,11 @@ getDefaultUserConfigPath
 getDefaultUserConfigPath stackRoot = do
     (path, exists) <- tryDeprecatedPath
         (Just "non-project configuration file")
-        fileExists
+        doesFileExist
         (defaultUserConfigPath stackRoot)
         (defaultUserConfigPathDeprecated stackRoot)
     unless exists $ do
-        createTree (parent path)
+        ensureDir (parent path)
         liftIO $ S.writeFile (toFilePath path) $ S.concat
             [ "# This file contains default non-project-specific settings for 'stack', used\n"
             , "# in all projects.  For more information about stack's configuration, see\n"
@@ -747,7 +743,6 @@ getDefaultUserConfigPath stackRoot = do
             , "#\n"
             , Yaml.encode (mempty :: Object) ]
     return path
-
 
 packagesParser :: Parser [String]
 packagesParser = many (strOption (long "package" <> help "Additional packages that must be installed"))

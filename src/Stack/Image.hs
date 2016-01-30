@@ -41,11 +41,11 @@ type Assemble e m = (HasConfig e, HasTerminal e, MonadBaseControl IO m, MonadCat
 stageContainerImageArtifacts :: Build e m => m ()
 stageContainerImageArtifacts = do
     config <- asks getConfig
-    workingDir <- getWorkingDir
+    workingDir <- getCurrentDir
     forM_ (zip [0..] $ imgDockers $ configImage config) $ \(idx, opts) -> do
         imageDir <- imageStagingDir workingDir idx
-        removeTreeIfExists imageDir
-        createTree imageDir
+        ignoringAbsence (removeDirRecur imageDir)
+        ensureDir imageDir
         stageExesInDir opts imageDir
         syncAddContentToDir opts imageDir
 
@@ -56,7 +56,7 @@ stageContainerImageArtifacts = do
 createContainerImageFromStage :: Assemble e m => m ()
 createContainerImageFromStage = do
     config <- asks getConfig
-    workingDir <- getWorkingDir
+    workingDir <- getCurrentDir
     forM_ (zip [0..] $ imgDockers $ configImage config) $ \(idx, opts) -> do
         imageDir <- imageStagingDir workingDir idx
         createDockerImage opts imageDir
@@ -70,9 +70,9 @@ stageExesInDir opts dir = do
         liftM (</> $(mkRelDir "bin")) installationRootLocal
     let destBinPath = dir </>
             $(mkRelDir "usr/local/bin")
-    createTree destBinPath
+    ensureDir destBinPath
     case imgDockerExecutables opts of
-        Nothing -> copyDirectoryRecursive srcBinPath destBinPath
+        Nothing -> copyDirRecur srcBinPath destBinPath
         Just exes -> forM_ exes $ \exe -> do
             exeRelFile <- parseRelFile exe
             copyFile (srcBinPath </> exeRelFile) (destBinPath </> exeRelFile)
@@ -89,8 +89,8 @@ syncAddContentToDir opts dir = do
               do sourcePath <- parseRelDir source
                  destPath <- parseAbsDir dest
                  let destFullPath = dir </> dropRoot destPath
-                 createTree destFullPath
-                 copyDirectoryRecursive
+                 ensureDir destFullPath
+                 copyDirRecur
                      (bcRoot bconfig </> sourcePath)
                      destFullPath)
 
@@ -119,7 +119,6 @@ createDockerImage dockerConfig dir = do
                              (imgDockerImageName dockerConfig)
                        , toFilePathNoTrailingSep dir]
             callProcess $ Cmd Nothing "docker" menv args
-
 
 -- | Extend the general purpose docker image with entrypoints (if
 -- specified).
