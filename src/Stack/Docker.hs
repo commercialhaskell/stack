@@ -64,7 +64,7 @@ import           Stack.Docker.GlobalDB
 import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Setup (ensureDockerStackExe)
-import           System.Directory (canonicalizePath,getModificationTime,getAppUserDataDirectory)
+import           System.Directory (canonicalizePath,getModificationTime,getHomeDirectory)
 import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath
                                     ,lookupEnv)
 import           System.Exit (exitSuccess, exitWith)
@@ -257,13 +257,15 @@ runContainerAndExit getCmdArgs
      let docker = configDocker config
      envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride docker
-     (env,isStdinTerminal,isStderrTerminal) <- liftIO $
-       (,,)
+     (env,isStdinTerminal,isStderrTerminal,homeDir) <- liftIO $
+       (,,,)
        <$> getEnvironment
        <*> hIsTerminalDevice stdin
        <*> hIsTerminalDevice stderr
+       <*> (parseAbsDir =<< getHomeDirectory)
      isStdoutTerminal <- asks getTerminal
-     esshDir <- liftIO $ tryJust (guard . isDoesNotExistError) (getAppUserDataDirectory "ssh")
+     let sshDir = homeDir </> sshRelDir
+     sshDirExists <- dirExists sshDir
      let dockerHost = lookup "DOCKER_HOST" env
          dockerCertPath = lookup "DOCKER_CERT_PATH" env
          bamboo = lookup "bamboo_buildKey" env
@@ -324,11 +326,10 @@ runContainerAndExit getCmdArgs
           ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toFilePathNoTrailingSep projectRoot
           ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toFilePathNoTrailingSep sandboxHomeDir
           ,"-w",toFilePathNoTrailingSep pwd]
-         ,case esshDir of
-            Left _ -> []
-            Right sshDir ->
-              ["-v"
-              ,sshDir ++ ":" ++ toFilePathNoTrailingSep (sandboxHomeDir </> $(mkRelDir ".ssh/"))]
+         ,if sshDirExists
+          then ["-v",toFilePathNoTrailingSep sshDir ++ ":" ++
+                     toFilePathNoTrailingSep (sandboxHomeDir </> sshRelDir)]
+          else []
          ,case msshAuthSock of
             Nothing -> []
             Just sshAuthSock ->
@@ -400,6 +401,7 @@ runContainerAndExit getCmdArgs
         _ -> Nothing
     mountArg (Mount host container) = ["-v",host ++ ":" ++ container]
     projectRoot = fromMaybeProjectRoot mprojectRoot
+    sshRelDir = $(mkRelDir ".ssh/")
 
 -- | Clean-up old docker images and containers.
 cleanup :: M env m
