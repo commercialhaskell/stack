@@ -20,6 +20,8 @@ Major changes:
 
 Other enhancements:
 
+* Docker: pass SSH auth socket into container
+
 Bug fixes:
 
 * Previously, `stack ghci` would fail with `cannot satisfy -package-id` when the

@@ -65,7 +65,8 @@ import           Stack.Types
 import           Stack.Types.Internal
 import           Stack.Setup (ensureDockerStackExe)
 import           System.Directory (canonicalizePath,getModificationTime)
-import           System.Environment (getEnv,getProgName,getArgs,getExecutablePath,lookupEnv)
+import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath
+                                    ,lookupEnv)
 import           System.Exit (exitSuccess, exitWith)
 import qualified System.FilePath as FP
 import           System.IO (stderr,stdin,stdout,hIsTerminalDevice)
@@ -256,12 +257,13 @@ runContainerAndExit getCmdArgs
      let docker = configDocker config
      envOverride <- getEnvOverride (configPlatform config)
      checkDockerVersion envOverride docker
-     (dockerHost,dockerCertPath,bamboo,jenkins) <-
-       liftIO ((,,,) <$> lookupEnv "DOCKER_HOST"
-                     <*> lookupEnv "DOCKER_CERT_PATH"
-                     <*> lookupEnv "bamboo_buildKey"
-                     <*> lookupEnv "JENKINS_HOME")
-     let isRemoteDocker = maybe False (isPrefixOf "tcp://") dockerHost
+     env <- liftIO getEnvironment
+     let dockerHost = lookup "DOCKER_HOST" env
+         dockerCertPath = lookup "DOCKER_CERT_PATH" env
+         bamboo = lookup "bamboo_buildKey" env
+         jenkins = lookup "JENKINS_HOME" env
+         msshAuthSock = lookup "SSH_AUTH_SOCK" env
+         isRemoteDocker = maybe False (isPrefixOf "tcp://") dockerHost
      isStdoutTerminal <- asks getTerminal
      (isStdinTerminal,isStderrTerminal) <-
        liftIO ((,) <$> hIsTerminalDevice stdin
@@ -320,6 +322,11 @@ runContainerAndExit getCmdArgs
           ,"-v",toFilePathNoTrailingSep projectRoot ++ ":" ++ toFilePathNoTrailingSep projectRoot
           ,"-v",toFilePathNoTrailingSep sandboxHomeDir ++ ":" ++ toFilePathNoTrailingSep sandboxHomeDir
           ,"-w",toFilePathNoTrailingSep pwd]
+         ,case msshAuthSock of
+            Nothing -> []
+            Just sshAuthSock ->
+              ["-e","SSH_AUTH_SOCK=" ++ sshAuthSock
+              ,"-v",sshAuthSock ++ ":" ++ sshAuthSock]
            -- Disable the deprecated entrypoint in FP Complete-generated images
          ,["--entrypoint=/usr/bin/env"
              | isJust (lookupImageEnv oldSandboxIdEnvVar imageEnvVars) &&
