@@ -5,6 +5,18 @@
 Release notes:
 
 Major changes:
+* Some notable changes in `stack init`:
+  * Overall it should now be able to initialize almost all existing cabal
+    packages out of the box as long as the package itself is consistently
+    defined.
+  * Choose the best possible snapshot and add extra dependencies on top
+    of a snapshot resolver rather than a compiler resolver -
+    [#1583](https://github.com/commercialhaskell/stack/pull/1583)
+  * Automatically omit a package (`--omit-packages`) when it is compiler
+    incompatible or when there are packages with conflicting dependency
+    requirements - [#1674](https://github.com/commercialhaskell/stack/pull/1674).
+  * Some more changes for a better user experience. Please refer to
+    the doc guide for details.
 
 Other enhancements:
 
