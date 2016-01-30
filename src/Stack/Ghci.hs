@@ -11,6 +11,7 @@
 module Stack.Ghci
     ( GhciOpts(..)
     , GhciPkgInfo(..)
+    , GhciException(..)
     , ghciSetup
     , ghci
     ) where
@@ -36,6 +37,7 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Data.Typeable (Typeable)
 import           Distribution.ModuleName (ModuleName)
 import           Distribution.Text (display)
 import           Network.HTTP.Client.Conduit
@@ -84,6 +86,21 @@ data GhciPkgInfo = GhciPkgInfo
     , ghciPkgPackage :: !Package
     } deriving Show
 
+data GhciException
+    = InvalidPackageOption String
+    | LoadingDuplicateModules
+    deriving (Typeable)
+
+instance Exception GhciException
+
+instance Show GhciException where
+    show (InvalidPackageOption name) =
+        "Failed to parse --package option " ++ name
+    show LoadingDuplicateModules = unlines
+        [ "Not attempting to start ghci due to these duplicate modules."
+        , "Use --no-load to try to start it anyway, without loading any modules (but these are still likely to cause errors)"
+        ]
+
 -- | Launch a GHCi session for the given local package targets with the
 -- given options and configure it with the load paths and extensions
 -- of those targets.
@@ -117,12 +134,12 @@ ghci GhciOpts{..} = do
         $logWarn
             ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
              T.unwords (map T.pack (nubOrd omittedOpts)))
+    allModules <- checkForDuplicateModules ghciNoLoadModules pkgs
     oiDir <- objectInterfaceDir bconfig
     (modulesToLoad, thingsToLoad) <- if ghciNoLoadModules then return ([], []) else do
         mainFile <- figureOutMainFile bopts mainIsTargets targets pkgs
-        let modulesToLoad = nubOrd $ concatMap (map display . S.toList . ghciPkgModules) pkgs
-            thingsToLoad = maybe [] (return . toFilePath) mainFile <> modulesToLoad
-        return (modulesToLoad, thingsToLoad)
+        let thingsToLoad = maybe [] (return . toFilePath) mainFile <> allModules
+        return (allModules, thingsToLoad)
     let odir =
             [ "-odir=" <> toFilePathNoTrailingSep oiDir
             , "-hidir=" <> toFilePathNoTrailingSep oiDir ]
@@ -261,7 +278,7 @@ ghciSetup bopts0 noBuild skipIntermediate mainIs additionalPackages = do
     addPkgs <- forM additionalPackages $ \name -> do
         let mres = (packageIdentifierName <$> parsePackageIdentifierFromString name)
                 <|> parsePackageNameFromString name
-        maybe (fail $ "Failed to parse --package option " ++ name) return mres
+        maybe (throwM $ InvalidPackageOption name) return mres
     let bopts = bopts0
             { boptsTargets = boptsTargets bopts0 ++ map T.pack additionalPackages
             }
@@ -307,7 +324,7 @@ ghciSetup bopts0 noBuild skipIntermediate mainIs additionalPackages = do
                     ]
                 return (directlyWanted ++ intermediateDeps)
     -- Load the list of modules _after_ building, to catch changes in unlisted dependencies (#1180)
-    let localLibs = [name | (name, (_, target)) <- wanted , hasLocalComp isCLib target]
+    let localLibs = [name | (name, (_, target)) <- wanted, hasLocalComp isCLib target]
     infos <-
         forM wanted $
         \(name,(cabalfp,target)) ->
@@ -445,6 +462,22 @@ borderedWarning f = do
     $logWarn "* * * * * * * *"
     $logWarn ""
     return x
+
+checkForDuplicateModules :: (MonadThrow m, MonadLogger m) => Bool -> [GhciPkgInfo] -> m [String]
+checkForDuplicateModules noLoadModules pkgs = do
+    unless (null duplicates) $ do
+        borderedWarning $ do
+            $logWarn "The following modules are present in multiple packages:"
+            forM_ duplicates $ \(mn, pns) -> do
+                $logWarn (" * " <> T.pack mn <> " (in " <> T.intercalate ", " (map packageNameText pns) <> ")")
+        unless noLoadModules $ throwM LoadingDuplicateModules
+    return (map fst allModules)
+  where
+    duplicates, allModules :: [(String, [PackageName])]
+    duplicates = filter (not . null . tail . snd) allModules
+    allModules =
+        M.toList $ M.fromListWith (++) $
+        concatMap (\pkg -> map (, [ghciPkgName pkg]) (map display (S.toList (ghciPkgModules pkg)))) pkgs
 
 -- Adds in intermediate dependencies between ghci targets. Note that it
 -- will return a Lib component for these intermediate dependencies even
