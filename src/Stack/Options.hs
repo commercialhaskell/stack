@@ -583,6 +583,7 @@ ghciOptsParser = GhciOpts
                             help "Specify which target should contain the main \
                                  \module to load, such as for an executable for \
                                  \test suite or benchmark."))
+             <*> switch (long "load-local-deps" <> help "Load all local dependencies of your targets")
              <*> switch (long "skip-intermediate-deps" <> help "Skip loading intermediate target dependencies")
              <*> boolFlags True "package-hiding" "package hiding" idm
              <*> buildOptsParser Build

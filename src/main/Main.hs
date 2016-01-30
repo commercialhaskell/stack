@@ -1074,7 +1074,7 @@ targetsCmd :: Text -> GlobalOpts -> IO ()
 targetsCmd target go@GlobalOpts{..} =
     withBuildConfig go $
     do let bopts = defaultBuildOpts { boptsTargets = [target] }
-       (_realTargets,_,pkgs) <- ghciSetup bopts False False Nothing []
+       (_realTargets,_,pkgs) <- ghciSetup (ideGhciOpts bopts)
        pwd <- getWorkingDir
        targets <-
            fmap
