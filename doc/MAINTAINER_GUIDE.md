@@ -20,11 +20,12 @@ to go:
 * Build something that depends on `happy` (suggestion: `hlint`), since `happy`
   has special logic for moving around the `dist` directory
 * In master branch:
-    * stack.cabal: bump the version number (to next even third component)
+    * stack.cabal: bump the version number to release (even third
+      component)
     * ChangeLog: rename the "unreleased changes" section to the new version
 * Cut a release candidate branch from master
 * In master branch:
-    * stack.cabal: bump version to next odd third component
+    * stack.cabal: bump version number to unstable (odd third component)
     * Changelog: add new "unreleased changes" section
     * stack.yaml: bump to use latest LTS version
 * In RC branch:
@@ -81,14 +82,9 @@ for requirements to perform the release, and more details about the tool.
 
 * Update the `stable` branch similarly
 
+* Delete the RC branch
+
 * Publish Github release
-
-* Upload package to Hackage: `stack upload .`
-
-* Upload haddocks to Hackage: `etc/scripts/upload-haddocks.sh`
-
-* On a machine with Vagrant installed:
-    * Run `etc/scripts/vagrant-distros.sh`
 
 * Edit
   [stack-setup-2.yaml](https://github.com/fpco/stackage-content/blob/master/stack/stack-setup-2.yaml),
@@ -98,6 +94,11 @@ for requirements to perform the release, and more details about the tool.
   [readthedocs.org](https://readthedocs.org/projects/stack/versions/), and
   ensure that stable documentation has updated
 
+* Upload package to Hackage: `stack upload . --pvp-bounds=both`
+
+* On a machine with Vagrant installed:
+    * Run `etc/scripts/vagrant-distros.sh`
+
 * Submit a PR for the
   [haskell-stack Homebrew formula](https://github.com/Homebrew/homebrew/blob/master/Library/Formula/haskell-stack.rb)
       * Be sure to update the SHA sum
@@ -105,10 +106,12 @@ for requirements to perform the release, and more details about the tool.
 
 * [Flag the Arch Linux package as out-of-date](https://www.archlinux.org/packages/community/x86_64/stack/flag/)
 
+* Upload haddocks to Hackage: `etc/scripts/upload-haddocks.sh`
+
+* Merge any changes made in the RC/release/stable branches to master.
+
 * Keep an eye on the
   [Hackage matrix builder](http://matrix.hackage.haskell.org/package/stack)
 
 * Announce to haskell-cafe@haskell.org, haskell-stack@googlegroups.com,
   commercialhaskell@googlegroups.com mailing lists
-
-* Merge any changes made in the RC/release/stable branches to master.
