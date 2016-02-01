@@ -460,7 +460,7 @@ While constructing the BuildPlan the following exceptions were encountered:
     Could not find package acme-missiles in known packages
 
 --  Failure when adding dependencies:
-      acme-missiles: needed (-any), latest is 0.3, but not present in build plan
+      acme-missiles: needed (-any), stack configuration has no specified version (latest applicable is 0.3)
     needed for package: helloworld-0.1.0.0
 
 Recommended action: try adding the following to your extra-deps in /home/michael/helloworld/stack.yaml

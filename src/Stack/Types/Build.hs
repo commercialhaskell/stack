@@ -383,7 +383,7 @@ instance Show ConstructPlanException where
                     Nothing -> ""
                     Just la -> " (latest applicable is " ++ versionString la ++ ")"
            in case badDep of
-                NotInBuildPlan -> "not present in build plan" ++ latestApplicableStr
+                NotInBuildPlan -> "stack configuration has no specified version" ++ latestApplicableStr
                 Couldn'tResolveItsDependencies -> "couldn't resolve its dependencies"
                 DependencyMismatch version ->
                     case mlatestApplicable of
