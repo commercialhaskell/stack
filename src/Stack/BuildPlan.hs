@@ -783,13 +783,15 @@ showCompilerErrors flags errs compiler =
 
 showDepErrors :: Map PackageName (Map FlagName Bool) -> DepErrors -> Text
 showDepErrors flags errs =
-    T.concat $ map formatError (Map.toList errs)
+    T.concat
+        [ T.concat $ map formatError (Map.toList errs)
+        ,"User package flags used:\n"
+        , T.concat (map showFlags userPkgs)
+        ]
     where
         formatError (depName, DepError mversion neededBy) = T.concat
             [ showDepVersion depName mversion
             , T.concat (map showRequirement (Map.toList neededBy))
-            -- TODO only in debug
-            , T.concat (map showFlags (Map.toList neededBy))
             ]
 
         showDepVersion depName mversion = T.concat
@@ -812,15 +814,15 @@ showDepErrors flags errs =
             , "\n"
             ]
 
-        showFlags (user, _) =
-            maybe "" (printFlags user) (Map.lookup user flags)
+        userPkgs = Map.keys $ Map.unions (Map.elems (fmap deNeededBy errs))
+        showFlags pkg = maybe "" (printFlags pkg) (Map.lookup pkg flags)
 
-        printFlags user fl =
+        printFlags pkg fl =
             if (not $ Map.null fl) then
                 T.concat
                     [ "    - "
-                    , T.pack $ packageNameString user
-                    , " flags: "
+                    , T.pack $ packageNameString pkg
+                    , ": "
                     , T.pack $ intercalate ", "
                              $ map formatFlags (Map.toList fl)
                     , "\n"
