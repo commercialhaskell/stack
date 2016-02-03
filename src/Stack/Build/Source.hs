@@ -63,7 +63,7 @@ import           Stack.Constants (wiredInPackages)
 import           Stack.Package
 import           Stack.Types
 
-import           System.Directory
+import qualified System.Directory as D
 import           System.IO (withBinaryFile, IOMode (ReadMode))
 import           System.IO.Error (isDoesNotExistError)
 
@@ -176,7 +176,7 @@ parseTargetsFromBuildOpts needTargets bopts = do
                 stackYamlFP <- asks $ bcStackYaml . getBuildConfig
                 parseCustomMiniBuildPlan stackYamlFP url
     rawLocals <- getLocalPackageViews
-    workingDir <- getWorkingDir
+    workingDir <- getCurrentDir
 
     let snapshot = mpiVersion <$> mbpPackages mbp0
     flagExtraDeps <- convertSnapshotToExtra
@@ -532,7 +532,7 @@ getModTimeMaybe fp =
         (catch
              (liftM
                   (Just . modTime)
-                  (getModificationTime fp))
+                  (D.getModificationTime fp))
              (\e ->
                    if isDoesNotExistError e
                        then return Nothing

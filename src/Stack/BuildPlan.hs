@@ -84,8 +84,8 @@ import           Stack.Fetch
 import           Stack.Package
 import           Stack.Types
 import           Stack.Types.StackT
-import           System.Directory (canonicalizePath)
-import qualified System.FilePath as FP
+import qualified System.Directory as D
+import qualified System.FilePath  as FP
 
 data BuildPlanException
     = UnknownPackages
@@ -448,7 +448,7 @@ loadBuildPlan name = do
         Right bp -> return bp
         Left e -> do
             $logDebug $ "Decoding build plan from file failed: " <> T.pack (show e)
-            createTree (parent fp)
+            ensureDir (parent fp)
             req <- parseUrl $ T.unpack url
             $logSticky $ "Downloading " <> renderSnapName name <> " build plan ..."
             $logDebug $ "Downloading build plan from: " <> url
@@ -919,7 +919,7 @@ parseCustomMiniBuildPlan stackYamlFP url0 = do
         return cacheFP
 
     getYamlFPFromFile url = do
-        fp <- liftIO $ canonicalizePath $ toFilePath (parent stackYamlFP) FP.</> T.unpack (fromMaybe url $
+        fp <- liftIO $ D.canonicalizePath $ toFilePath (parent stackYamlFP) FP.</> T.unpack (fromMaybe url $
             T.stripPrefix "file://" url <|> T.stripPrefix "file:" url)
         parseAbsFile fp
 

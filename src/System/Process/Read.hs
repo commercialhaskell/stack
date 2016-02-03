@@ -62,10 +62,10 @@ import qualified Data.Text.Lazy.Encoding as LT
 import qualified Data.Text.Lazy as LT
 import           Data.Typeable (Typeable)
 import           Distribution.System (OS (Windows), Platform (Platform))
-import           Path (Path, Abs, Dir, toFilePath, File, parseAbsFile)
-import           Path.IO (createTree, parseRelAsAbsFile)
+import           Path
+import           Path.IO hiding (findExecutable)
 import           Prelude -- Fix AMP warning
-import           System.Directory (doesFileExist, getCurrentDirectory)
+import qualified System.Directory as D
 import           System.Environment (getEnvironment)
 import           System.Exit
 import qualified System.FilePath as FP
@@ -298,34 +298,29 @@ sinkProcessStderrStdoutHandle wd menv name args err out = do
 -- | Perform pre-call-process tasks.  Ensure the working directory exists and find the
 -- executable path.
 preProcess :: (MonadIO m)
-           => Maybe (Path Abs Dir) -- ^ Optional directory to create if necessary
-           -> EnvOverride
-           -> String -- ^ Command name
-           -> m FilePath
+  => Maybe (Path Abs Dir) -- ^ Optional directory to create if necessary
+  -> EnvOverride       -- ^ How to override environment
+  -> String            -- ^ Command name
+  -> m FilePath
 preProcess wd menv name = do
   name' <- liftIO $ liftM toFilePath $ join $ findExecutable menv name
-  maybe (return ()) createTree wd
+  maybe (return ()) ensureDir wd
   return name'
 
 -- | Check if the given executable exists on the given PATH.
-doesExecutableExist :: MonadIO m => EnvOverride -> String -> m Bool
+doesExecutableExist :: (MonadIO m)
+  => EnvOverride       -- ^ How to override environment
+  -> String            -- ^ Name of executable
+  -> m Bool
 doesExecutableExist menv name = liftM isJust $ findExecutable menv name
-
--- | Turn a relative path into an absolute path.
---
---   Note: this function duplicates the functionality of makeAbsolute
---   in recent versions of "System.Directory", and can be removed once
---   we no longer need to support older versions of GHC.
-makeAbsolute :: FilePath -> IO FilePath
-makeAbsolute = fmap FP.normalise . absolutize
-  where absolutize path
-          | FP.isRelative path = fmap (FP.</> path) getCurrentDirectory
-          | otherwise          = return path
 
 -- | Find the complete path for the executable.
 --
 -- Throws a 'ReadProcessException' if unsuccessful.
-findExecutable :: (MonadIO m, MonadThrow n) => EnvOverride -> String -> m (n (Path Abs File))
+findExecutable :: (MonadIO m, MonadThrow n)
+  => EnvOverride       -- ^ How to override environment
+  -> String            -- ^ Name of executable
+  -> m (n (Path Abs File)) -- ^ Full path to that executable on success
 findExecutable eo name0 | any FP.isPathSeparator name0 = do
     let names0
             | null (eoExeExtension eo) = [name0]
@@ -333,10 +328,10 @@ findExecutable eo name0 | any FP.isPathSeparator name0 = do
             | otherwise = [name0 ++ eoExeExtension eo, name0]
         testNames [] = return $ throwM $ ExecutableNotFoundAt name0
         testNames (name:names) = do
-            exists <- liftIO $ doesFileExist name
+            exists <- liftIO $ D.doesFileExist name
             if exists
                 then do
-                    path <- liftIO $ parseRelAsAbsFile name
+                    path <- liftIO $ resolveFile' name
                     return $ return path
                 else testNames names
     testNames names0
@@ -354,10 +349,10 @@ findExecutable eo name = liftIO $ do
                             | otherwise = [fp0 ++ eoExeExtension eo, fp0]
                         testFPs [] = loop dirs
                         testFPs (fp:fps) = do
-                            exists <- doesFileExist fp
+                            exists <- D.doesFileExist fp
                             if exists
                                 then do
-                                    fp' <- makeAbsolute fp >>= parseAbsFile
+                                    fp' <- D.makeAbsolute fp >>= parseAbsFile
                                     return $ return fp'
                                 else testFPs fps
                     testFPs fps0

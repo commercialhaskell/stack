@@ -60,7 +60,6 @@ spec = beforeAll setup $ afterAll teardown $ do
         let resetVar = setEnv name originalValue
         bracket_ setVar resetVar action
 
-
   describe "loadConfig" $ do
     let loadConfig' m = runStackLoggingT m logLevel False False (loadConfig mempty Nothing Nothing)
     let loadBuildConfigRest m = runStackLoggingT m logLevel False False
@@ -86,7 +85,7 @@ spec = beforeAll setup $ afterAll teardown $ do
       bcRoot bc `shouldBe` parentDir
 
     it "respects the STACK_YAML env variable" $ \T{..} -> inTempDir $ do
-      withCanonicalizedSystemTempDirectory "config-is-here" $ \dir -> do
+      withSystemTempDir "config-is-here" $ \dir -> do
         let stackYamlFp = toFilePath (dir </> stackDotYaml)
         writeFile stackYamlFp sampleConfig
         withEnvVar "STACK_YAML" stackYamlFp $ do

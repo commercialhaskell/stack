@@ -63,20 +63,20 @@ markInstalled programsPath tool = do
     fpRel <- parseRelFile $ toolString tool ++ ".installed"
     liftIO $ writeFile (toFilePath $ programsPath </> fpRel) "installed"
 
-unmarkInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
+unmarkInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadCatch m)
                 => Path Abs Dir
                 -> Tool
                 -> m ()
 unmarkInstalled programsPath tool = do
     fpRel <- parseRelFile $ toolString tool ++ ".installed"
-    removeFileIfExists $ programsPath </> fpRel
+    ignoringAbsence (removeFile $ programsPath </> fpRel)
 
 listInstalled :: (MonadIO m, MonadReader env m, HasConfig env, MonadThrow m)
               => Path Abs Dir
               -> m [Tool]
 listInstalled programsPath = do
-    createTree programsPath
-    (_, files) <- listDirectory programsPath
+    ensureDir programsPath
+    (_, files) <- listDir programsPath
     return $ mapMaybe toTool files
   where
     toTool fp = do

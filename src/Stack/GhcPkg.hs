@@ -32,25 +32,24 @@ import           Data.Maybe
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Path (Path, Abs, Dir, toFilePath, parent, parseAbsDir)
+import           Path (Path, Abs, Dir, toFilePath, parent)
 import           Path.Extra (toFilePathNoTrailingSep)
-import           Path.IO (dirExists, createTree)
+import           Path.IO
 import           Prelude hiding (FilePath)
 import           Stack.Constants
 import           Stack.Types
-import           System.Directory (canonicalizePath)
 import           System.FilePath (searchPathSeparator)
 import           System.Process.Read
 
 -- | Get the global package database
-getGlobalDB :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
+getGlobalDB :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m)
             => EnvOverride -> WhichCompiler -> m (Path Abs Dir)
 getGlobalDB menv wc = do
     -- This seems like a strange way to get the global package database
     -- location, but I don't know of a better one
     bs <- ghcPkg menv wc [] ["list", "--global"] >>= either throwM return
     let fp = S8.unpack $ stripTrailingColon $ firstLine bs
-    liftIO (canonicalizePath fp) >>= parseAbsDir
+    resolveDir' fp
   where
     stripTrailingColon bs
         | S8.null bs = bs
@@ -80,12 +79,12 @@ ghcPkg menv wc pkgDbs args = do
 createDatabase :: (MonadIO m, MonadLogger m, MonadBaseControl IO m, MonadCatch m, MonadThrow m)
                => EnvOverride -> WhichCompiler -> Path Abs Dir -> m ()
 createDatabase menv wc db = do
-    exists <- dirExists db
+    exists <- doesDirExist db
     unless exists $ do
         -- Creating the parent doesn't seem necessary, as ghc-pkg
         -- seems to be sufficiently smart. But I don't feel like
         -- finding out it isn't the hard way
-        createTree (parent db)
+        ensureDir (parent db)
         _ <- tryProcessStdout Nothing menv (ghcPkgExeName wc) ["init", toFilePath db]
         return ()
 

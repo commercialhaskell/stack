@@ -39,7 +39,7 @@ upgrade :: (MonadIO m, MonadMask m, MonadReader env m, HasConfig env, HasHttpMan
         -> Maybe String -- ^ git hash at time of building, if known
         -> m ()
 upgrade gitRepo mresolver builtHash =
-  withCanonicalizedSystemTempDirectory "stack-upgrade" $ \tmp -> do
+  withSystemTempDir "stack-upgrade" $ \tmp -> do
     menv <- getMinimalEnvOverride
     mdir <- case gitRepo of
       Just repo -> do

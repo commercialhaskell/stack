@@ -54,7 +54,6 @@ import           Stack.Exec
 import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal
-import           System.Directory (getTemporaryDirectory)
 import           Text.Read (readMaybe)
 
 #ifndef WINDOWS
@@ -156,8 +155,7 @@ ghci opts@GhciOpts{..} = do
                  -- include CWD.
                   "-i" :
                   odir <> pkgopts <> ghciArgs <> extras)
-    tmp <- liftIO getTemporaryDirectory
-    withCanonicalizedTempDirectory tmp "ghci" $ \tmpDir -> do
+    withSystemTempDir "ghci" $ \tmpDir -> do
         let macrosFile = tmpDir </> $(mkRelFile "cabal_macros.h")
         macrosOpts <- preprocessCabalMacros pkgs macrosFile
         if ghciNoLoadModules

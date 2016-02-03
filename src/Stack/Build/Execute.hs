@@ -64,7 +64,7 @@ import           Language.Haskell.TH as TH (location)
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
-import           Path.IO
+import           Path.IO hiding (findExecutable, makeAbsolute)
 import           Prelude hiding (FilePath, writeFile, any)
 import           Stack.Build.Cache
 import           Stack.Build.Haddock
@@ -291,7 +291,7 @@ withExecuteEnv :: M env m
                -> (ExecuteEnv -> m a)
                -> m a
 withExecuteEnv menv bopts baseConfigOpts locals globalPackages snapshotPackages localPackages inner = do
-    withCanonicalizedSystemTempDirectory stackProgName $ \tmpdir -> do
+    withSystemTempDir stackProgName $ \tmpdir -> do
         configLock <- newMVar ()
         installLock <- newMVar ()
         idMap <- liftIO $ newTVarIO Map.empty
@@ -347,7 +347,7 @@ executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages loc
         snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
         localBin <- (</> bindirSuffix) `liftM` installationRootLocal
         destDir <- asks $ configLocalBin . getConfig
-        createTree destDir
+        ensureDir destDir
 
         destDir' <- liftIO . D.canonicalizePath . toFilePath $ destDir
 
@@ -364,7 +364,7 @@ executePlan menv bopts baseConfigOpts locals globalPackages snapshotPackages loc
                     case loc of
                         Snap -> snapBin
                         Local -> localBin
-            mfp <- resolveFileMaybe bindir $ T.unpack name ++ ext
+            mfp <- forgivingAbsence (resolveFile bindir $ T.unpack name ++ ext)
             case mfp of
                 Nothing -> do
                     $logWarn $ T.concat
@@ -759,7 +759,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
         | console = inner Nothing
         | otherwise = do
             logPath <- buildLogPath package msuffix
-            createTree (parent logPath)
+            ensureDir (parent logPath)
             let fp = toFilePath logPath
             bracket
                 (liftIO $ openBinaryFile fp WriteMode)
@@ -882,7 +882,7 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
                     distDir <- distDirFromDir pkgDir
                     let setupDir = distDir </> $(mkRelDir "setup")
                         outputFile = setupDir </> $(mkRelFile "setup")
-                    createTree setupDir
+                    ensureDir setupDir
                     compilerPath <-
                         case compiler of
                             Ghc -> getGhcPath
@@ -1181,7 +1181,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
         when toRun $ do
             buildDir <- distDirFromDir pkgDir
             hpcDir <- hpcDirFromDir pkgDir
-            when needHpc (createTree hpcDir)
+            when needHpc (ensureDir hpcDir)
 
             let suitesToRun
                   = [ testSuitePair
@@ -1204,7 +1204,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                             _ -> ""
                 tixPath <- liftM (pkgDir </>) $ parseRelFile $ exeName ++ ".tix"
                 exePath <- liftM (buildDir </>) $ parseRelFile $ "build/" ++ testName' ++ "/" ++ exeName
-                exists <- fileExists exePath
+                exists <- doesFileExist exePath
                 menv <- liftIO $    configEnvOverride config EnvSettings
                     { esIncludeLocals = taskLocation task == Local
                     , esIncludeGhcPackagePath = True
@@ -1215,10 +1215,10 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                     then do
                         -- We clear out the .tix files before doing a run.
                         when needHpc $ do
-                            tixexists <- fileExists tixPath
+                            tixexists <- doesFileExist tixPath
                             when tixexists $
                                 $logWarn ("Removing HPC file " <> T.pack (toFilePath tixPath))
-                            removeFileIfExists tixPath
+                            ignoringAbsence (removeFile tixPath)
 
                         let args = toAdditionalArgs topts
                             argsDisplay = case args of
@@ -1249,7 +1249,7 @@ singleTest runInBase topts testsToRun ac ee task installedMap = do
                         (Just inH, Nothing, Nothing, ph) <- liftIO $ createProcess_ "singleBuild.runTests" cp
                         when isTestTypeLib $ do
                             logPath <- buildLogPath package (Just stestName)
-                            createTree (parent logPath)
+                            ensureDir (parent logPath)
                             liftIO $ hPutStr inH $ show (logPath, testName)
                         liftIO $ hClose inH
                         ec <- liftIO $ waitForProcess ph
@@ -1325,7 +1325,7 @@ singleBench runInBase beopts benchesToRun ac ee task installedMap = do
           cabal False ("bench" : args)
 
 -- | Strip Template Haskell "Loading package" lines and making paths absolute.
-mungeBuildOutput :: (MonadIO m, MonadThrow m)
+mungeBuildOutput :: (MonadIO m, MonadCatch m)
                  => Bool -- ^ exclude TH loading?
                  -> Bool -- ^ convert paths to absolute?
                  -> Path Abs Dir -- ^ package's root directory
@@ -1351,7 +1351,7 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
         mabs <-
             if isValidSuffix y
                 then liftM (fmap ((T.takeWhile isSpace x <>) . T.pack . toFilePath)) $
-                        resolveFileMaybe pkgDir (T.unpack $ T.dropWhile isSpace x)
+                        forgivingAbsence (resolveFile pkgDir (T.unpack $ T.dropWhile isSpace x))
                 else return Nothing
         case mabs of
             Nothing -> return bs
@@ -1373,11 +1373,11 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
 getSetupHs :: Path Abs Dir -- ^ project directory
            -> IO (Path Abs File)
 getSetupHs dir = do
-    exists1 <- fileExists fp1
+    exists1 <- doesFileExist fp1
     if exists1
         then return fp1
         else do
-            exists2 <- fileExists fp2
+            exists2 <- doesFileExist fp2
             if exists2
                 then return fp2
                 else throwM $ NoSetupHsFound dir

@@ -29,7 +29,7 @@ import           Database.Persist
 import           Database.Persist.Sqlite
 import           Database.Persist.TH
 import           Path (toFilePath, parent)
-import           Path.IO (createTree)
+import           Path.IO (ensureDir)
 import           Stack.Types.Config
 import           Stack.Types.Docker
 
@@ -100,7 +100,7 @@ setDockerImageExe config imageId exePath exeTimestamp compatible =
 withGlobalDB :: forall a. Config -> SqlPersistT (NoLoggingT (ResourceT IO)) a -> IO a
 withGlobalDB config action =
   do let db = dockerDatabasePath (configDocker config)
-     createTree (parent db)
+     ensureDir (parent db)
      runSqlite (T.pack (toFilePath db))
                (do _ <- runMigrationSilent migrateTables
                    action)
