@@ -304,6 +304,10 @@ commandLineHandler progName isInterpreter = complicatedOptions
                     "Run ghc"
                     execCmd
                     (execOptsParser $ Just ExecGhc)
+        addCommand' "ghcCmd"
+                    "Run ghc with package context"
+                    ghcCmd
+                    (execOptsParser $ Just ExecGhc)
         addCommand' "ghci"
                     "Run ghci in the context of package(s) (experimental)"
                     ghciCmd
@@ -1048,6 +1052,17 @@ ghciCmd ghciOpts go@GlobalOpts{..} =
   withBuildConfigAndLock go $ \lk -> do
     munlockFile lk -- Don't hold the lock while in the GHCI.
     ghci ghciOpts
+
+-- | Run GHC in the context of a project.
+ghcCmd :: ExecOpts -> GlobalOpts -> IO ()
+ghcCmd execOpts go@GlobalOpts { .. } =
+  withBuildConfig go $ do
+    pkgOpts <- ghciSetup' ghciOpts
+    let e = execOpts { eoArgs = ("-i" : "-hide-all-packages" : pkgOpts) ++ eoArgs execOpts }
+    liftIO $ execCmd e go
+  where
+    ghciOpts :: GhciOpts
+    ghciOpts = GhciOpts False [] Nothing False [] Nothing False False False defaultBuildOpts
 
 -- | Run ide-backend in the context of a project.
 ideCmd :: ([Text], [String]) -> GlobalOpts -> IO ()
