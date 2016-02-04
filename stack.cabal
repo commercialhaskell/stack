@@ -51,9 +51,32 @@ flag static
 library
   hs-source-dirs:    src/
   ghc-options:       -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
-  exposed-modules:   Options.Applicative.Builder.Extra
+  exposed-modules:   Control.Concurrent.Execute
+                     Data.Aeson.Extended
+                     Data.Attoparsec.Args
+                     Data.Attoparsec.Combinators
+                     Data.Attoparsec.Interpreter
+                     Data.Binary.VersionTagged
+                     Data.IORef.RunOnce
+                     Data.Maybe.Extra
+                     Data.Set.Monad
+                     Distribution.Version.Extra
+                     Network.HTTP.Download 
+                     Network.HTTP.Download.Verified
                      Options.Applicative.Args
+                     Options.Applicative.Builder.Extra
                      Options.Applicative.Complicated
+                     Path.Extra
+                     Path.Find
+                     Paths_stack
+                     Stack.Build
+                     Stack.Build.Cache
+                     Stack.Build.ConstructPlan
+                     Stack.Build.Execute
+                     Stack.Build.Haddock
+                     Stack.Build.Installed
+                     Stack.Build.Source
+                     Stack.Build.Target
                      Stack.BuildPlan
                      Stack.Clean
                      Stack.Config
@@ -65,10 +88,13 @@ library
                      Stack.Docker
                      Stack.Docker.GlobalDB
                      Stack.Dot
-                     Stack.Fetch
                      Stack.Exec
+                     Stack.Fetch
                      Stack.FileWatch
                      Stack.GhcPkg
+                     Stack.Ghci
+                     Stack.Ide
+                     Stack.Image
                      Stack.Init
                      Stack.New
                      Stack.Nix
@@ -76,15 +102,15 @@ library
                      Stack.Package
                      Stack.PackageDump
                      Stack.PackageIndex
-                     Stack.Ghci
-                     Stack.Ide
-                     Stack.Image
                      Stack.SDist
                      Stack.Setup
                      Stack.Setup.Installed
+                     Stack.Sig
+                     Stack.Sig.GPG
+                     Stack.Sig.Sign
                      Stack.Solver
                      Stack.Types
-                     Stack.Types.Internal
+                     Stack.Types.Build
                      Stack.Types.BuildPlan
                      Stack.Types.Compiler
                      Stack.Types.Config
@@ -92,48 +118,22 @@ library
                      Stack.Types.FlagName
                      Stack.Types.GhcPkgId
                      Stack.Types.Image
+                     Stack.Types.Internal
                      Stack.Types.Nix
+                     Stack.Types.Package
                      Stack.Types.PackageIdentifier
                      Stack.Types.PackageIndex
                      Stack.Types.PackageName
-                     Stack.Types.TemplateName
-                     Stack.Types.Version
                      Stack.Types.Sig
                      Stack.Types.StackT
-                     Stack.Types.Build
-                     Stack.Types.Package
-                     Stack.Build
-                     Stack.Build.Cache
-                     Stack.Build.ConstructPlan
-                     Stack.Build.Execute
-                     Stack.Build.Haddock
-                     Stack.Build.Installed
-                     Stack.Build.Source
-                     Stack.Build.Target
-                     Stack.Sig
-                     Stack.Sig.GPG
-                     Stack.Sig.Sign
+                     Stack.Types.TemplateName
+                     Stack.Types.Version
                      Stack.Upgrade
                      Stack.Upload
-                     System.Process.Read
                      System.Process.Log
-                     System.Process.Run
-                     Network.HTTP.Download.Verified
-                     Data.Attoparsec.Args
-                     Data.Attoparsec.Interpreter
-                     Data.Maybe.Extra
-                     Path.Extra
-  other-modules:     Network.HTTP.Download
-                     Control.Concurrent.Execute
-                     Path.Find
                      System.Process.PagerEditor
-                     Paths_stack
-                     Data.Aeson.Extended
-                     Data.Attoparsec.Combinators
-                     Data.Binary.VersionTagged
-                     Data.IORef.RunOnce
-                     Data.Set.Monad
-                     Distribution.Version.Extra
+                     System.Process.Read
+                     System.Process.Run
   build-depends:     Cabal >= 1.18.1.5
                    , aeson >= 0.8.0.2 && < 0.11
                    , ansi-terminal >= 0.6.2.3
