@@ -383,6 +383,7 @@ data ExecOptsExtra
     | ExecOptsEmbellished
         { eoEnvSettings :: !EnvSettings
         , eoPackages :: ![String]
+        , eoGhciPackages :: !Bool
         }
     deriving (Show)
 

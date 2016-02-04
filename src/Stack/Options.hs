@@ -621,6 +621,10 @@ execOptsExtraParser = eoPlainParser <|>
                       ExecOptsEmbellished
                          <$> eoEnvSettingsParser
                          <*> eoPackagesParser
+                         <*> boolFlags False
+                                 "add-ghci-packages"
+                                 "prefix the executed command line with the same -package (etc.) args that would be used for GHCI"
+                                 idm
   where
     eoEnvSettingsParser :: Parser EnvSettings
     eoEnvSettingsParser = EnvSettings

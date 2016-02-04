@@ -1029,12 +1029,20 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
                        }
                munlockFile lk -- Unlock before transferring control away.
                menv <- liftIO $ configEnvOverride config eoEnvSettings
-               exec menv cmd args
+
+               if eoCmd == ExecGhc || eoGhciPackages
+               then do
+                   pkgOpts <- ghciSetup' ghciOpts
+                   exec menv cmd $ ("-i" : "-hide-all-packages" : pkgOpts) ++ args
+               else
+                   exec menv cmd args
   where
     execCompiler cmdPrefix args = do
         wc <- getWhichCompiler
         let cmd = cmdPrefix ++ compilerExeName wc
         return (cmd, args)
+    ghciOpts :: GhciOpts
+    ghciOpts = GhciOpts True [] Nothing False [] Nothing False False False defaultBuildOpts
 
 -- | Evaluate some haskell code inline.
 evalCmd :: EvalOpts -> GlobalOpts -> IO ()
