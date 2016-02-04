@@ -231,7 +231,7 @@ executable stack
 
   build-depends:  base >=4.7 && < 5
                 , bytestring >= 0.10.4.0
-                , Cabal
+                , Cabal >= 1.18.1.5
                 , containers >= 0.5.5.1
                 , exceptions
                 , filepath
@@ -299,7 +299,7 @@ test-suite stack-test
                 , conduit
                 , conduit-extra
                 , resourcet
-                , Cabal
+                , Cabal >= 1.18.1.5
                 , text
                 , optparse-applicative >= 0.11 && < 0.13
                 , bytestring
