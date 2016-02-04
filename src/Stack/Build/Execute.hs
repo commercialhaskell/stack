@@ -272,6 +272,7 @@ getSetupExe setupHs tmpdir = do
                     , toFilePath setupHs
                     , "-o"
                     , toFilePath tmpOutputPath
+                    , "-rtsopts"
                     ] ++
                     ["-build-runner" | wc == Ghcjs]
             runCmd' (\cp -> cp { std_out = UseHandle stderr }) (Cmd (Just tmpdir) (compilerExeName wc) menv args) Nothing
