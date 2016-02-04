@@ -23,6 +23,7 @@ import           Data.Attoparsec.Interpreter (getInterpreterArgs)
 import qualified Data.ByteString.Lazy as L
 import           Data.IORef
 import           Data.List
+import           Data.List.Extra (nubOrd)
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
 import           Data.Maybe
@@ -1028,7 +1029,7 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
 
                if eoCmd == ExecGhc || eoGhciPackages
                then do
-                   pkgOpts <- ghciSetup' ghciOpts
+                   pkgOpts <- genOpts . extract <$> ghciSetup ghciOpts
                    exec menv cmd $ ("-i" : "-hide-all-packages" : pkgOpts) ++ args
                else
                    exec menv cmd args
@@ -1039,6 +1040,11 @@ execCmd ExecOpts {..} go@GlobalOpts{..} =
         return (cmd, args)
     ghciOpts :: GhciOpts
     ghciOpts = GhciOpts True [] Nothing False [] Nothing False False False defaultBuildOpts
+    extract (_, _, x) = x
+    genOpts :: [GhciPkgInfo] -> [String]
+    genOpts pkgs = nubOrd (concatMap (concatMap (oneWordOpts . snd) . ghciPkgOpts) pkgs)
+    oneWordOpts bio = bioOneWordOpts bio ++ bioPackageFlags bio
+
 
 -- | Evaluate some haskell code inline.
 evalCmd :: EvalOpts -> GlobalOpts -> IO ()

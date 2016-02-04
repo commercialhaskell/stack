@@ -13,7 +13,6 @@ module Stack.Ghci
     , GhciPkgInfo(..)
     , GhciException(..)
     , ghciSetup
-    , ghciSetup'
     , ghci
     ) where
 
@@ -101,14 +100,6 @@ instance Show GhciException where
         [ "Not attempting to start ghci due to these duplicate modules."
         , "Use --no-load to try to start it anyway, without loading any modules (but these are still likely to cause errors)"
         ]
-
-ghciSetup' :: (MonadIO f, HasHttpManager r, MonadReader r f, MonadBaseControl IO f, MonadMask f, MonadLogger f, HasEnvConfig r, HasTerminal r, HasLogLevel r) => GhciOpts -> f [String]
-ghciSetup' opts = genOpts . extract <$> ghciSetup opts
-  where
-    extract (_, _, x) = x
-    genOpts :: [GhciPkgInfo] -> [String]
-    genOpts pkgs = nubOrd (concatMap (concatMap (oneWordOpts . snd) . ghciPkgOpts) pkgs)
-    oneWordOpts bio = bioOneWordOpts bio ++ bioPackageFlags bio
 
 -- | Launch a GHCi session for the given local package targets with the
 -- given options and configure it with the load paths and extensions
