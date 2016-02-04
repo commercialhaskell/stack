@@ -40,7 +40,7 @@ import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Arrow ((***))
 import           Control.Exception (assert)
-import           Control.Monad
+import           Control.Monad (liftM, unless, when, filterM)
 import           Control.Monad.Catch (MonadThrow, MonadCatch, catchAll, throwM)
 import           Control.Monad.Extra (firstJustM)
 import           Control.Monad.IO.Class
@@ -52,6 +52,7 @@ import           Data.Aeson.Extended
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as L
+import           Data.Foldable (forM_)
 import qualified Data.IntMap as IntMap
 import           Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
