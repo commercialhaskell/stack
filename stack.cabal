@@ -257,6 +257,7 @@ executable stack
                 , conduit
                 , transformers
                 , http-client
+                , extra
   default-language:    Haskell2010
   if os(windows)
     build-depends:   Win32
