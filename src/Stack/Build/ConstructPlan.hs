@@ -481,9 +481,7 @@ addPackageDeps treatAsDep package = do
     case partitionEithers deps of
         ([], pairs) -> return $ Right $ mconcat pairs
         (errs, _) -> return $ Left $ DependencyPlanFailures
-            (PackageIdentifier
-                (packageName package)
-                (packageVersion package))
+            package
             (Map.fromList errs)
   where
     adrVersion (ADRToInstall task) = packageIdentifierVersion $ taskProvides task

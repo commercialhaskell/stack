@@ -339,7 +339,7 @@ instance Exception StackBuildException
 
 data ConstructPlanException
     = DependencyCycleDetected [PackageName]
-    | DependencyPlanFailures PackageIdentifier (Map PackageName (VersionRange, LatestApplicableVersion, BadDependency))
+    | DependencyPlanFailures Package (Map PackageName (VersionRange, LatestApplicableVersion, BadDependency))
     | UnknownPackage PackageName -- TODO perhaps this constructor will be removed, and BadDependency will handle it all
     -- ^ Recommend adding to extra-deps, give a helpful version number?
     deriving (Typeable, Eq)
@@ -360,9 +360,10 @@ instance Show ConstructPlanException where
          (DependencyCycleDetected pNames) ->
            "While checking call stack,\n" ++
            "  dependency cycle detected in packages:" ++ indent (appendLines pNames)
-         (DependencyPlanFailures pIdent (Map.toList -> pDeps)) ->
+         (DependencyPlanFailures pkg (Map.toList -> pDeps)) ->
            "Failure when adding dependencies:" ++ doubleIndent (appendDeps pDeps) ++ "\n" ++
-           "  needed for package: " ++ packageIdentifierString pIdent
+           "  needed for package " ++ packageIdentifierString (packageIdentifier pkg) ++
+           appendFlags (packageFlags pkg)
          (UnknownPackage pName) ->
              "While attempting to add dependency,\n" ++
              "  Could not find package " ++ show pName  ++ " in known packages"
@@ -371,6 +372,12 @@ instance Show ConstructPlanException where
       appendLines = foldr (\pName-> (++) ("\n" ++ show pName)) ""
       indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
       doubleIndent = indent . indent
+      appendFlags flags =
+          if Map.null flags
+              then ""
+              else " with flags:\n" ++
+                  (doubleIndent . intercalate "\n" . map showFlag . Map.toList) flags
+      showFlag (name, bool) = show name ++ ": " ++ show bool
       appendDeps = foldr (\dep-> (++) ("\n" ++ showDep dep)) ""
       showDep (name, (range, mlatestApplicable, badDep)) = concat
         [ show name
