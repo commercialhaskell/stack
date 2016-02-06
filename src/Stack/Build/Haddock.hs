@@ -173,7 +173,7 @@ generateHaddockIndex descr envOverride wc dumpPackages docRelFP destDir = do
         when needUpdate $ do
             $logInfo
                 (T.concat ["Updating Haddock index for ", descr, " in\n",
-                           T.pack (show destIndexFile)])
+                           T.pack (toFilePath destIndexFile)])
             liftIO (mapM_ copyPkgDocs interfaceOpts)
             readProcessNull
                 (Just destDir)
