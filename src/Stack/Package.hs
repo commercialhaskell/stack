@@ -976,20 +976,29 @@ findCandidate dirs exts name = do
             DotCabalCFile{} -> DotCabalCFilePath
     paths_pkg pkg = "Paths_" ++ packageNameString pkg
     makeNameCandidates =
-        liftM (nubOrd . catMaybes . concat) (mapM makeDirCandidates dirs)
+        liftM (nubOrd . concat) (mapM makeDirCandidates dirs)
     makeDirCandidates :: Path Abs Dir
-                      -> IO [Maybe (Path Abs File)]
+                      -> IO [Path Abs File]
     makeDirCandidates dir =
         case name of
-            DotCabalMain fp -> return `liftM` forgivingAbsence (resolveFile dir fp)
-            DotCabalFile fp -> return `liftM` forgivingAbsence (resolveFile dir fp)
-            DotCabalCFile fp -> return `liftM` forgivingAbsence (resolveFile dir fp)
+            DotCabalMain fp -> resolveCandidate dir fp
+            DotCabalFile fp -> resolveCandidate dir fp
+            DotCabalCFile fp -> resolveCandidate dir fp
             DotCabalModule mn ->
-                mapM
+                liftM concat
+                $ mapM
                   ((\ ext ->
-                     forgivingAbsence (resolveFile dir (Cabal.toFilePath mn ++ "." ++ ext)))
+                     resolveCandidate dir (Cabal.toFilePath mn ++ "." ++ ext))
                    . T.unpack)
                    exts
+    resolveCandidate
+        :: (MonadIO m, MonadThrow m)
+        => Path Abs Dir -> FilePath.FilePath -> m [Path Abs File]
+    resolveCandidate x y = do
+        -- The standard canonicalizePath does not work for this case
+        p <- parseCollapsedAbsFile (toFilePath x FilePath.</> y)
+        exists <- doesFileExist p
+        return $ if exists then [p] else []
 
 -- | Warn the user that multiple candidates are available for an
 -- entry, but that we picked one anyway and continued.
