@@ -619,7 +619,7 @@ At the time of writing:
 * Experimental custom snapshot support
 
 The most up-to-date information can always be found in the
-[stack.yaml documentation](yaml_configuration.html#resolver).
+[stack.yaml documentation](yaml_configuration.md#resolver).
 
 ## Existing projects
 
