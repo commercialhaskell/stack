@@ -299,8 +299,7 @@ To get tab-completion of commands on bash, just run the following (or add it to
 
     eval "$(stack --bash-completion-script stack)"
 
-For more information and other shells, see [the shell auto-completion wiki
-page](https://github.com/commercialhaskell/stack/wiki/Shell-autocompletion)
+For more information and other shells, see [the shell auto-completion page](shell_autocompletion.html)
 
 ## Upgrade
 
