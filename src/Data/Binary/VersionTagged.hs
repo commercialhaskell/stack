@@ -29,7 +29,7 @@ import Data.Monoid ((<>))
 import Data.Typeable (Typeable)
 import Control.Exception.Enclosed (tryAnyDeep)
 import Path
-import Path.IO (createTree)
+import Path.IO (ensureDir)
 import qualified Data.Text as T
 
 type BinarySchema a = (Binary a, NFData a, HasStructuralInfo a, HasSemanticVersion a)
@@ -40,7 +40,7 @@ taggedEncodeFile :: (BinarySchema a, MonadIO m)
                  -> a
                  -> m ()
 taggedEncodeFile fp x = liftIO $ do
-    createTree (parent fp)
+    ensureDir (parent fp)
     BinaryTagged.taggedEncodeFile (toFilePath fp) x
 
 -- | Read from the given file. If the read fails, run the given action and

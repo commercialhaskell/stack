@@ -46,7 +46,7 @@ import           Distribution.Version (simplifyVersionRange, orLaterVersion, ear
 import           Distribution.Version.Extra
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
-import           Path.IO
+import           Path.IO hiding (getModificationTime, getPermissions)
 import           Prelude -- Fix redundant import warnings
 import           Stack.Build (mkBaseConfigOpts)
 import           Stack.Build.Execute
@@ -57,8 +57,7 @@ import           Stack.Constants
 import           Stack.Package
 import           Stack.Types
 import           Stack.Types.Internal
-import           System.Directory (getModificationTime, getPermissions, Permissions(..))
-import           System.IO.Temp (withSystemTempDirectory)
+import           System.Directory (getModificationTime, getPermissions)
 import qualified System.FilePath as FP
 
 -- | Special exception to throw when you want to fail because of bad results
@@ -151,7 +150,6 @@ getCabalLbs pvpBounds fp = do
                       Just (_, installed) -> Just (installedVersion installed)
                       Nothing -> Nothing
 
-
     addUpper version = intersectVersionRanges
         (earlierVersion $ toCabalVersion $ nextMajorVersion version)
     addLower version = intersectVersionRanges
@@ -201,7 +199,7 @@ readLocalPackage pkgDir = do
 -- | Returns a newline-separate list of paths, and the absolute path to the .cabal file.
 getSDistFileList :: M env m => LocalPackage -> m (String, Path Abs File)
 getSDistFileList lp =
-    withCanonicalizedSystemTempDirectory (stackProgName <> "-sdist") $ \tmpdir -> do
+    withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> do
         menv <- getMinimalEnvOverride
         let bopts = defaultBuildOpts
         baseConfigOpts <- mkBaseConfigOpts bopts
@@ -296,8 +294,7 @@ checkSDistTarball' :: (MonadIO m, MonadMask m, MonadThrow m, MonadCatch m, Monad
   => String       -- ^ Tarball name
   -> L.ByteString -- ^ Tarball contents as a byte string
   -> m ()
-checkSDistTarball' name bytes = withSystemTempDirectory "stack" $ \tdir -> do
-    tpath   <- parseAbsDir tdir
+checkSDistTarball' name bytes = withSystemTempDir "stack" $ \tpath -> do
     npath   <- (tpath </>) `liftM` parseRelFile name
     liftIO $ L.writeFile (toFilePath npath) bytes
     checkSDistTarball npath
@@ -306,8 +303,7 @@ withTempTarGzContents :: (MonadIO m, MonadMask m, MonadThrow m)
   => Path Abs File         -- ^ Location of tarball
   -> (Path Abs Dir -> m a) -- ^ Perform actions given dir with tarball contents
   -> m a
-withTempTarGzContents apath f = withSystemTempDirectory "stack" $ \tdir -> do
-    tpath   <- parseAbsDir tdir
+withTempTarGzContents apath f = withSystemTempDir "stack" $ \tpath -> do
     archive <- liftIO $ L.readFile (toFilePath apath)
     liftIO . Tar.unpack (toFilePath tpath) . Tar.read . GZip.decompress $ archive
     f tpath

@@ -5,7 +5,8 @@
 module Path.Find
   (findFileUp
   ,findDirUp
-  ,findFiles)
+  ,findFiles
+  ,findInParents)
   where
 
 import Control.Monad
@@ -14,7 +15,7 @@ import Control.Monad.IO.Class
 import System.IO.Error (isPermissionError)
 import Data.List
 import Path
-import Path.IO
+import Path.IO hiding (findFiles)
 
 -- | Find the location of a file matching the given predicate.
 findFileUp :: (MonadIO m,MonadThrow m)
@@ -41,7 +42,7 @@ findPathUp :: (MonadIO m,MonadThrow m)
            -> Maybe (Path Abs Dir)             -- ^ Do not ascend above this directory.
            -> m (Maybe (Path Abs t))           -- ^ Absolute path.
 findPathUp pathType dir p upperBound =
-  do entries <- listDirectory dir
+  do entries <- listDir dir
      case find p (pathType entries) of
        Just path -> return (Just path)
        Nothing | Just dir == upperBound -> return Nothing
@@ -57,7 +58,7 @@ findFiles dir p traversep =
   do (dirs,files) <- catchJust (\ e -> if isPermissionError e
                                          then Just ()
                                          else Nothing)
-                               (listDirectory dir)
+                               (listDir dir)
                                (\ _ -> return ([], []))
      subResults <-
        forM dirs
@@ -66,3 +67,16 @@ findFiles dir p traversep =
                   then findFiles entry p traversep
                   else return [])
      return (concat (filter p files : subResults))
+
+-- | @findInParents f path@ applies @f@ to @path@ and its 'parent's until
+-- it finds a 'Just' or reaches the root directory.
+findInParents :: MonadIO m => (Path Abs Dir -> m (Maybe a)) -> Path Abs Dir -> m (Maybe a)
+findInParents f path = do
+    mres <- f path
+    case mres of
+        Just res -> return (Just res)
+        Nothing -> do
+            let next = parent path
+            if next == path
+                then return Nothing
+                else findInParents f next

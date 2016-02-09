@@ -9,4 +9,5 @@ nix:
   enable: false
   packages:
     - zlib
-extra-deps: []
+extra-deps:
+- path-io-0.3.1

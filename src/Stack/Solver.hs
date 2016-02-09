@@ -47,7 +47,7 @@ import qualified Distribution.Text           as C
 import           Network.HTTP.Client.Conduit (HasHttpManager)
 import           Path
 import           Path.Find                   (findFiles)
-import           Path.IO                     (getWorkingDir, parseRelAsAbsDir)
+import           Path.IO                     hiding (findExecutable, findFiles)
 import           Prelude
 import           Stack.BuildPlan
 import           Stack.Constants             (stackDotYaml)
@@ -59,12 +59,8 @@ import           Stack.Types
 import           Stack.Types.Internal        ( HasTerminal
                                              , HasReExec
                                              , HasLogLevel)
-import           System.Directory            (copyFile,
-                                              createDirectoryIfMissing,
-                                              getTemporaryDirectory,
-                                              makeRelativeToCurrentDirectory)
+import qualified System.Directory            as D
 import qualified System.FilePath             as FP
-import           System.IO.Temp              (withSystemTempDirectory)
 import           System.Process.Read
 
 data ConstraintType = Constraint | Preference deriving (Eq)
@@ -80,9 +76,10 @@ cabalSolver :: (MonadIO m, MonadLogger m, MonadMask m, MonadBaseControl IO m, Mo
             -> m (Either [PackageName] ConstraintSpec)
 cabalSolver menv cabalfps constraintType
             srcConstraints depConstraints cabalArgs =
-  withSystemTempDirectory "cabal-solver" $ \dir -> do
+  withSystemTempDir "cabal-solver" $ \dir' -> do
 
     let versionConstraints = fmap fst depConstraints
+        dir = toFilePath dir'
     configLines <- getCabalConfig dir constraintType versionConstraints
     let configFile = dir FP.</> "cabal.config"
     liftIO $ S.writeFile configFile $ encodeUtf8 $ T.unlines configLines
@@ -93,7 +90,7 @@ cabalSolver menv cabalfps constraintType
     --
     -- In theory we could use --ignore-sandbox, but not all versions of cabal
     -- support it.
-    tmpdir <- liftIO getTemporaryDirectory >>= parseRelAsAbsDir
+    tmpdir <- getTempDir
 
     let args = ("--config-file=" ++ configFile)
              : "install"
@@ -227,8 +224,8 @@ getCabalConfig dir constraintType constraints = do
         let dstdir = dir FP.</> T.unpack (indexNameText $ indexName index)
             dst = dstdir FP.</> "00-index.tar"
         liftIO $ void $ tryIO $ do
-            createDirectoryIfMissing True dstdir
-            copyFile (toFilePath src) dst
+            D.createDirectoryIfMissing True dstdir
+            D.copyFile (toFilePath src) dst
         return $ T.concat
             [ "remote-repo: "
             , indexNameText $ indexName index
@@ -337,11 +334,11 @@ diffConstraints (v, f) (v', f')
 -- | Given a resolver, user package constraints (versions and flags) and extra
 -- dependency constraints determine what extra dependencies are required
 -- outside the resolver snapshot and the specified extra dependencies.
-
+--
 -- First it tries by using the snapshot and the input extra dependencies
 -- as hard constraints, if no solution is arrived at by using hard
 -- constraints it then tries using them as soft constraints or preferences.
-
+--
 -- It returns either conflicting packages when no solution is arrived at
 -- or the solution in terms of src package flag settings and extra
 -- dependencies.
@@ -453,7 +450,7 @@ getResolverConstraints stackYaml resolver
 -- | Given a bundle of user packages, flag constraints on those packages and a
 -- resolver, determine if the resolver fully, partially or fails to satisfy the
 -- dependencies of the user packages.
-
+--
 -- If the package flags are passed as 'Nothing' then flags are chosen
 -- automatically.
 checkResolverSpec
@@ -493,7 +490,7 @@ ignoredDirs = Set.fromList
 -- | Perform some basic checks on a list of cabal files to be used for creating
 -- stack config. It checks for duplicate package names, package name and
 -- cabal file name mismatch and reports any issues related to those.
-
+--
 -- If no error occurs it returns filepath and @GenericPackageDescription@s
 -- pairs as well as any filenames for duplicate packages not included in the
 -- pairs.
@@ -511,7 +508,7 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
     when (null cabalfps) $
         error noPkgMsg
 
-    relpaths <- mapM makeRel cabalfps
+    relpaths <- mapM makeRelativeToCurrentDir cabalfps
     $logInfo $ "Using cabal packages:"
     $logInfo $ T.pack (formatGroup relpaths)
 
@@ -531,7 +528,7 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
         nameMismatchPkgs = mapMaybe getNameMismatchPkg packages
 
     when (nameMismatchPkgs /= []) $ do
-        rels <- mapM makeRel nameMismatchPkgs
+        rels <- mapM makeRelativeToCurrentDir nameMismatchPkgs
         error $ "Package name as defined in the .cabal file must match the \
                 \.cabal file name.\n\
                 \Please fix the following packages and try again:\n"
@@ -549,7 +546,7 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
         unique      = packages \\ dupIgnored
 
     when (dupIgnored /= []) $ do
-        dups <- mapM (mapM (makeRel . fst)) (dupGroups packages)
+        dups <- mapM (mapM (makeRelativeToCurrentDir . fst)) (dupGroups packages)
         $logWarn $ T.pack $
             "Following packages have duplicate package names:\n"
             <> intercalate "\n" (map formatGroup dups)
@@ -560,23 +557,22 @@ cabalPackagesCheck cabalfps noPkgMsg dupErrMsg = do
           Just msg -> error msg
 
     return (Map.fromList
-            $ map (\(file, gpd) -> ((gpdPackageName gpd),(file, gpd))) unique
+            $ map (\(file, gpd) -> (gpdPackageName gpd,(file, gpd))) unique
            , map fst dupIgnored)
 
-makeRel :: (MonadIO m) => Path Abs File -> m FilePath
-makeRel = liftIO . makeRelativeToCurrentDirectory . toFilePath
+formatGroup :: [Path Rel File] -> String
+formatGroup = concatMap formatPath
+    where formatPath path = "- " <> toFilePath path <> "\n"
 
-formatGroup :: [String] -> String
-formatGroup = concat . (map formatPath)
-    where formatPath path = "- " <> path <> "\n"
-
-reportMissingCabalFiles
-    :: (MonadIO m, MonadLogger m) => [Path Abs File] -> Bool -> m ()
+reportMissingCabalFiles :: (MonadIO m, MonadThrow m, MonadLogger m)
+  => [Path Abs File]   -- ^ Directories to scan
+  -> Bool              -- ^ Whether to scan sub-directories
+  -> m ()
 reportMissingCabalFiles cabalfps includeSubdirs = do
-    allCabalfps <- findCabalFiles (includeSubdirs) =<< getWorkingDir
+    allCabalfps <- findCabalFiles includeSubdirs =<< getCurrentDir
 
-    relpaths <- mapM makeRel (allCabalfps \\ cabalfps)
-    when (not (null relpaths)) $ do
+    relpaths <- mapM makeRelativeToCurrentDir (allCabalfps \\ cabalfps)
+    unless (null relpaths) $ do
         $logWarn $ "The following packages are missing from the config:"
         $logWarn $ T.pack (formatGroup relpaths)
 
@@ -601,7 +597,7 @@ solveExtraDeps modStackYaml = do
     bconfig <- asks getBuildConfig
 
     let stackYaml = bcStackYaml bconfig
-    relStackYaml <- makeRel stackYaml
+    relStackYaml <- toFilePath <$> makeRelativeToCurrentDir stackYaml
 
     $logInfo $ "Using configuration file: " <> T.pack relStackYaml
     let cabalDirs = Map.keys $ envConfigPackages econfig

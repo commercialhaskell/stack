@@ -79,11 +79,11 @@ new
     :: (HasConfig r, MonadReader r m, MonadLogger m, MonadCatch m, MonadThrow m, MonadIO m, HasHttpManager r, Functor m, Applicative m)
     => NewOpts -> m (Path Abs Dir)
 new opts = do
-    pwd <- getWorkingDir
+    pwd <- getCurrentDir
     absDir <- if bare then return pwd
                       else do relDir <- parseRelDir (packageNameString project)
                               liftM (pwd </>) (return relDir)
-    exists <- dirExists absDir
+    exists <- doesDirExist absDir
     configTemplate <- configDefaultTemplate <$> asks getConfig
     let template = fromMaybe defaultTemplateName $ asum [ cliOptionTemplate
                                                         , configTemplate
@@ -151,7 +151,7 @@ loadTemplate name logIt = do
     loadLocalFile path = do
         $logDebug ("Opening local template: \"" <> T.pack (toFilePath path)
                                                 <> "\"")
-        exists <- fileExists path
+        exists <- doesFileExist path
         if exists
             then liftIO (T.readFile (toFilePath path))
             else throwM (FailedToLoadTemplate name (toFilePath path))
@@ -238,7 +238,7 @@ writeTemplateFiles files =
     forM_
         (M.toList files)
         (\(fp,bytes) ->
-              do createTree (parent fp)
+              do ensureDir (parent fp)
                  liftIO (LB.writeFile (toFilePath fp) bytes))
 
 -- | Run any initialization functions, such as Git.

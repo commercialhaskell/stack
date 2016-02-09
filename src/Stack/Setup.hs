@@ -68,7 +68,7 @@ import           Network.HTTP.Client.Conduit
 import           Network.HTTP.Download.Verified
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
-import           Path.IO
+import           Path.IO hiding (findExecutable)
 import qualified Paths_stack as Meta
 import           Prelude hiding (concat, elem, any) -- Fix AMP warning
 import           Safe (readMay)
@@ -446,7 +446,7 @@ ensureDockerStackExe containerPlatform = do
         stackVersion = fromCabalVersion Meta.version
         tool = Tool (PackageIdentifier $(mkPackageName "stack") stackVersion)
     stackExePath <- (</> $(mkRelFile "stack")) <$> installDir programsPath tool
-    stackExeExists <- fileExists stackExePath
+    stackExeExists <- doesFileExist stackExePath
     unless stackExeExists $
         do
            $logInfo $ mconcat ["Downloading Docker-compatible ", T.pack stackProgName, " executable"]
@@ -492,7 +492,7 @@ upgradeCabal menv wc = do
             , T.pack $ versionString newest
             , ". I'm not upgrading Cabal."
             ]
-        else withCanonicalizedSystemTempDirectory "stack-cabal-upgrade" $ \tmpdir -> do
+        else withSystemTempDir "stack-cabal-upgrade" $ \tmpdir -> do
             $logInfo $ T.concat
                 [ "Installing Cabal-"
                 , T.pack $ versionString newest
@@ -784,7 +784,7 @@ installGHCPosix version _ archiveFile archiveType destDir = do
     $logDebug $ "make: " <> T.pack makeTool
     $logDebug $ "tar: " <> T.pack tarTool
 
-    withCanonicalizedSystemTempDirectory "stack-setup" $ \root -> do
+    withSystemTempDir "stack-setup" $ \root -> do
         dir <-
             liftM (root </>) $
             parseRelDir $
@@ -847,7 +847,7 @@ installGHCJS si archiveFile archiveType destDir = do
             $logDebug $ "ziptool: " <> T.pack zipTool
             $logDebug $ "tar: " <> T.pack tarTool
             return $ do
-                removeTreeIfExists unpackDir
+                ignoringAbsence (removeDirRecur unpackDir)
                 readInNull destDir tarTool menv ["xf", toFilePath archiveFile] Nothing
                 innerDir <- expectSingleUnpackedDir archiveFile destDir
                 renameDir innerDir unpackDir
@@ -859,7 +859,7 @@ installGHCJS si archiveFile archiveType destDir = do
     $logSticky "Setting up GHCJS build environment"
     let stackYaml = unpackDir </> $(mkRelFile "stack.yaml")
         destBinDir = destDir </> $(mkRelDir "bin")
-    createTree destBinDir
+    ensureDir destBinDir
     envConfig <- loadGhcjsEnvConfig stackYaml destBinDir
 
     -- On windows we need to copy options files out of the install dir.  Argh!
@@ -875,10 +875,10 @@ installGHCJS si archiveFile archiveType destDir = do
         build (\_ -> return ()) Nothing defaultBuildOpts { boptsInstallExes = True }
     -- Copy over *.options files needed on windows.
     forM_ mwindowsInstallDir $ \dir -> do
-        (_, files) <- listDirectory (dir </> $(mkRelDir "bin"))
+        (_, files) <- listDir (dir </> $(mkRelDir "bin"))
         forM_ (filter ((".options" `isSuffixOf`). toFilePath) files) $ \optionsFile -> do
             let dest = destDir </> $(mkRelDir "bin") </> filename optionsFile
-            removeFileIfExists dest
+            ignoringAbsence (removeFile dest)
             copyFile optionsFile dest
     $logStickyDone "Installed GHCJS."
 
@@ -895,7 +895,7 @@ installDockerStackExe _ archiveFile _ destDir = do
         checkDependencies $
         (,) <$> checkDependency "gzip" <*> checkDependency "tar"
     menv <- getMinimalEnvOverride
-    createTree destDir
+    ensureDir destDir
     readInNull
         destDir
         tarTool
@@ -924,14 +924,14 @@ ensureGhcjsBooted menv cv shouldBoot  = do
                 -- https://github.com/commercialhaskell/stack/issues/749#issuecomment-147382783
                 -- This only affects the case where GHCJS has been
                 -- installed with an older version and not yet booted.
-                stackYamlExists <- fileExists stackYaml
+                stackYamlExists <- doesFileExist stackYaml
                 actualStackYaml <- if stackYamlExists then return stackYaml
                     else case cv of
                         GhcjsVersion version _ ->
                             liftM ((destDir </> $(mkRelDir "src")) </>) $
                             parseRelFile $ "ghcjs-" ++ versionString version ++ "/stack.yaml"
                         _ -> fail "ensureGhcjsBooted invoked on non GhcjsVersion"
-                actualStackYamlExists <- fileExists actualStackYaml
+                actualStackYamlExists <- doesFileExist actualStackYaml
                 unless actualStackYamlExists $
                     fail "Couldn't find GHCJS stack.yaml in old or new location."
                 bootGhcjs actualStackYaml destDir
@@ -1103,12 +1103,12 @@ withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
             Just x -> parseAbsFile $ T.unpack x
     run7z <- setup7z si
     let tmpName = toFilePathNoTrailingSep (dirname destDir) ++ "-tmp"
-    createTree (parent destDir)
-    withCanonicalizedTempDirectory (toFilePath $ parent destDir) tmpName $ \tmpDir -> do
+    ensureDir (parent destDir)
+    withTempDir (parent destDir) tmpName $ \tmpDir -> do
         absSrcDir <- case msrcDir of
             Just srcDir -> return $ tmpDir </> srcDir
             Nothing -> expectSingleUnpackedDir archiveFile tmpDir
-        removeTreeIfExists destDir
+        ignoringAbsence (removeDirRecur destDir)
         run7z (parent archiveFile) archiveFile
         run7z tmpDir tarFile
         removeFile tarFile `catchIO` \e ->
@@ -1122,7 +1122,7 @@ withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
 
 expectSingleUnpackedDir :: (MonadIO m, MonadThrow m) => Path Abs File -> Path Abs Dir -> m (Path Abs Dir)
 expectSingleUnpackedDir archiveFile destDir = do
-    contents <- listDirectory destDir
+    contents <- listDir destDir
     case contents of
         ([dir], []) -> return dir
         _ -> error $ "Expected a single directory within unpacked " ++ toFilePath archiveFile
@@ -1277,13 +1277,12 @@ chunksOverTime diff = do
           else put (lastTime,    acc')
         go
 
-
 -- | Perform a basic sanity check of GHC
 sanityCheck :: (MonadIO m, MonadMask m, MonadLogger m, MonadBaseControl IO m)
             => EnvOverride
             -> WhichCompiler
             -> m ()
-sanityCheck menv wc = withCanonicalizedSystemTempDirectory "stack-sanity-check" $ \dir -> do
+sanityCheck menv wc = withSystemTempDir "stack-sanity-check" $ \dir -> do
     let fp = toFilePath $ dir </> $(mkRelFile "Main.hs")
     liftIO $ writeFile fp $ unlines
         [ "import Distribution.Simple" -- ensure Cabal library is present

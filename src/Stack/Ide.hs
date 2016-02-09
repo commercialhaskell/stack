@@ -49,7 +49,7 @@ ide targets useropts = do
             , boptsBuildSubset = BSOnlyDependencies
             }
     (_realTargets,_,pkgs) <- ghciSetup (ideGhciOpts bopts)
-    pwd <- getWorkingDir
+    pwd <- getCurrentDir
     (pkgopts,_srcfiles) <-
         liftM mconcat $ forM pkgs $ getPackageOptsAndTargetFiles pwd
     localdb <- packageDatabaseLocal
@@ -96,7 +96,7 @@ getPackageOptsAndTargetFiles pwd pkg = do
             (autogen </>)
             (parseRelFile
                  ("Paths_" ++ packageNameString (ghciPkgName pkg) ++ ".hs"))
-    paths_foo_exists <- fileExists paths_foo
+    paths_foo_exists <- doesFileExist paths_foo
     let ghcOptions bio =
             bioOneWordOpts bio ++
             bioOpts bio ++

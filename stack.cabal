@@ -51,9 +51,32 @@ flag static
 library
   hs-source-dirs:    src/
   ghc-options:       -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
-  exposed-modules:   Options.Applicative.Builder.Extra
+  exposed-modules:   Control.Concurrent.Execute
+                     Data.Aeson.Extended
+                     Data.Attoparsec.Args
+                     Data.Attoparsec.Combinators
+                     Data.Attoparsec.Interpreter
+                     Data.Binary.VersionTagged
+                     Data.IORef.RunOnce
+                     Data.Maybe.Extra
+                     Data.Set.Monad
+                     Distribution.Version.Extra
+                     Network.HTTP.Download 
+                     Network.HTTP.Download.Verified
                      Options.Applicative.Args
+                     Options.Applicative.Builder.Extra
                      Options.Applicative.Complicated
+                     Path.Extra
+                     Path.Find
+                     Paths_stack
+                     Stack.Build
+                     Stack.Build.Cache
+                     Stack.Build.ConstructPlan
+                     Stack.Build.Execute
+                     Stack.Build.Haddock
+                     Stack.Build.Installed
+                     Stack.Build.Source
+                     Stack.Build.Target
                      Stack.BuildPlan
                      Stack.Clean
                      Stack.Config
@@ -65,10 +88,13 @@ library
                      Stack.Docker
                      Stack.Docker.GlobalDB
                      Stack.Dot
-                     Stack.Fetch
                      Stack.Exec
+                     Stack.Fetch
                      Stack.FileWatch
                      Stack.GhcPkg
+                     Stack.Ghci
+                     Stack.Ide
+                     Stack.Image
                      Stack.Init
                      Stack.New
                      Stack.Nix
@@ -76,15 +102,15 @@ library
                      Stack.Package
                      Stack.PackageDump
                      Stack.PackageIndex
-                     Stack.Ghci
-                     Stack.Ide
-                     Stack.Image
                      Stack.SDist
                      Stack.Setup
                      Stack.Setup.Installed
+                     Stack.Sig
+                     Stack.Sig.GPG
+                     Stack.Sig.Sign
                      Stack.Solver
                      Stack.Types
-                     Stack.Types.Internal
+                     Stack.Types.Build
                      Stack.Types.BuildPlan
                      Stack.Types.Compiler
                      Stack.Types.Config
@@ -92,49 +118,22 @@ library
                      Stack.Types.FlagName
                      Stack.Types.GhcPkgId
                      Stack.Types.Image
+                     Stack.Types.Internal
                      Stack.Types.Nix
+                     Stack.Types.Package
                      Stack.Types.PackageIdentifier
                      Stack.Types.PackageIndex
                      Stack.Types.PackageName
-                     Stack.Types.TemplateName
-                     Stack.Types.Version
                      Stack.Types.Sig
                      Stack.Types.StackT
-                     Stack.Types.Build
-                     Stack.Types.Package
-                     Stack.Build
-                     Stack.Build.Cache
-                     Stack.Build.ConstructPlan
-                     Stack.Build.Execute
-                     Stack.Build.Haddock
-                     Stack.Build.Installed
-                     Stack.Build.Source
-                     Stack.Build.Target
-                     Stack.Sig
-                     Stack.Sig.GPG
-                     Stack.Sig.Sign
+                     Stack.Types.TemplateName
+                     Stack.Types.Version
                      Stack.Upgrade
                      Stack.Upload
-                     System.Process.Read
                      System.Process.Log
-                     System.Process.Run
-                     Network.HTTP.Download.Verified
-                     Data.Attoparsec.Args
-                     Data.Attoparsec.Interpreter
-                     Data.Maybe.Extra
-                     Path.IO
-                     Path.Extra
-  other-modules:     Network.HTTP.Download
-                     Control.Concurrent.Execute
-                     Path.Find
                      System.Process.PagerEditor
-                     Paths_stack
-                     Data.Aeson.Extended
-                     Data.Attoparsec.Combinators
-                     Data.Binary.VersionTagged
-                     Data.IORef.RunOnce
-                     Data.Set.Monad
-                     Distribution.Version.Extra
+                     System.Process.Read
+                     System.Process.Run
   build-depends:     Cabal >= 1.18.1.5
                    , aeson >= 0.8.0.2 && < 0.11
                    , ansi-terminal >= 0.6.2.3
@@ -143,13 +142,11 @@ library
                    , base >= 4.7 && <5
                    , base16-bytestring
                    , base64-bytestring
-                   , bifunctors >= 4.2.1 && < 5.3
                    , binary >= 0.7
                    , binary-tagged >= 0.1.1
                    , blaze-builder
                    , byteable
                    , bytestring
-                   , conduit-combinators >= 0.3.1
                    , conduit >= 1.2.4
                    , conduit-extra >= 1.1.7.1
                    , containers >= 0.5.5.1
@@ -175,11 +172,10 @@ library
                    , lifted-base
                    , monad-control
                    , monad-logger >= 0.3.13.1
-                   , monad-loops >= 0.4.2.1
                    , mtl >= 2.1.3.1
-                   , old-locale >= 1.0.0.6
                    , optparse-applicative >= 0.11 && < 0.13
                    , path >= 0.5.1
+                   , path-io >= 0.3.1
                    , persistent >= 2.1.2
                    , persistent-sqlite >= 2.1.4
                    , persistent-template >= 2.1.1
@@ -204,12 +200,9 @@ library
                    , unordered-containers >= 0.2.5.1
                    , vector >= 0.10.12.3 && < 0.12
                    , vector-binary-instances
-                   , void >= 0.7
                    , yaml >= 0.8.10.1
                    , zlib >= 0.5.4.2 && < 0.7
                    , deepseq >= 1.4
-                   , file-embed
-                   , word8
                    , hastache
                    , project-template >= 0.2
                    , uuid
@@ -229,33 +222,24 @@ executable stack
   if flag(static)
       ld-options: -static -pthread
 
-  build-depends:  base >=4.7 && < 5
+  build-depends:  Cabal >= 1.18.1.5
+                , base >=4.7 && < 5
                 , bytestring >= 0.10.4.0
-                , Cabal
                 , containers >= 0.5.5.1
-                , exceptions
-                , filepath
+                , directory
                 , filelock >= 0.1.0.1
-                , http-conduit >= 2.1.5
+                , filepath
+                , http-client
                 , lifted-base
                 , monad-control
                 , monad-logger >= 0.3.13.1
                 , mtl >= 2.1.3.1
-                , old-locale >= 1.0.0.6
                 , optparse-applicative >= 0.11.0.2 && < 0.13
                 , path
-                , process
-                , resourcet >= 1.1.4.1
+                , path-io >= 0.3.1
                 , stack
                 , text >= 1.2.0.4
-                , either
-                , directory
-                , split
-                , unordered-containers
-                , hashable
-                , conduit
                 , transformers
-                , http-client
   default-language:    Haskell2010
   if os(windows)
     build-depends:   Win32
@@ -280,29 +264,27 @@ test-suite stack-test
                 , Stack.NixSpec
                 , Network.HTTP.Download.VerifiedSpec
   ghc-options:    -threaded -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
-  build-depends:  base >=4.7 && <5
-                , hspec <2.3
+  build-depends:  Cabal >= 1.18.1.5
+                , QuickCheck
                 , attoparsec < 0.14
-                , containers >= 0.5.5.1
-                , directory
-                , exceptions
-                , filepath
-                , path
-                , temporary
-                , stack
-                , monad-logger
-                , http-conduit
-                , cryptohash
-                , transformers
+                , base >=4.7 && <5
                 , conduit
                 , conduit-extra
+                , containers >= 0.5.5.1
+                , cryptohash
+                , directory
+                , exceptions
+                , hspec <2.3
+                , http-conduit
+                , monad-logger
+                , path
+                , path-io >= 0.3.1
                 , resourcet
-                , Cabal
-                , text
-                , optparse-applicative >= 0.11 && < 0.13
-                , bytestring
-                , QuickCheck
                 , retry >= 0.6 && < 0.8
+                , stack
+                , temporary
+                , text
+                , transformers
   default-language:    Haskell2010
 
 test-suite stack-integration-test
@@ -314,21 +296,21 @@ test-suite stack-integration-test
   if !flag(integration-tests)
     buildable: False
 
-  build-depends:  base >= 4.7 && < 5
-                , temporary
-                , hspec < 2.3
-                , process
-                , filepath
-                , directory
-                , text
-                , unix-compat
-                , containers >= 0.5.5.1
+  build-depends:  async < 2.2
+                , base >= 4.7 && < 5
+                , bytestring
                 , conduit
                 , conduit-extra
+                , containers >= 0.5.5.1
+                , directory
+                , filepath
+                , hspec < 2.3
+                , process
                 , resourcet
-                , async < 2.2
+                , temporary
+                , text
                 , transformers
-                , bytestring
+                , unix-compat
   default-language:    Haskell2010
 
   -- This isn't actually needed to build stack-integration-test, but it makes it

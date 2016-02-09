@@ -42,7 +42,6 @@ import           Prelude
 import           Stack.Types.Build
 import           Stack.PackageDump
 import           Stack.Types
-import           System.Directory               (getModificationTime)
 import qualified System.FilePath                as FP
 import           System.IO.Error                (isDoesNotExistError)
 import           System.Process.Read
@@ -152,7 +151,7 @@ generateSnapHaddockIndex envOverride wc bco globalDumpPkgs snapshotDumpPkgs =
 
 -- | Generate Haddock index and contents for specified packages.
 generateHaddockIndex
-    :: (MonadIO m, MonadCatch m, MonadThrow m, MonadLogger m, MonadBaseControl IO m)
+    :: (MonadIO m, MonadCatch m, MonadLogger m, MonadBaseControl IO m)
     => Text
     -> EnvOverride
     -> WhichCompiler
@@ -161,10 +160,10 @@ generateHaddockIndex
     -> Path Abs Dir
     -> m ()
 generateHaddockIndex descr envOverride wc dumpPackages docRelFP destDir = do
-    createTree destDir
+    ensureDir destDir
     interfaceOpts <- (liftIO . fmap nubOrd . mapMaybeM toInterfaceOpt) dumpPackages
     unless (null interfaceOpts) $ do
-        let destIndexFile = toFilePath (haddockIndexFile destDir)
+        let destIndexFile = haddockIndexFile destDir
         eindexModTime <- liftIO (tryGetModificationTime destIndexFile)
         let needUpdate =
                 case eindexModTime of
@@ -174,7 +173,7 @@ generateHaddockIndex descr envOverride wc dumpPackages docRelFP destDir = do
         when needUpdate $ do
             $logInfo
                 (T.concat ["Updating Haddock index for ", descr, " in\n",
-                           T.pack destIndexFile])
+                           T.pack (toFilePath destIndexFile)])
             liftIO (mapM_ copyPkgDocs interfaceOpts)
             readProcessNull
                 (Just destDir)
@@ -194,7 +193,7 @@ generateHaddockIndex descr envOverride wc dumpPackages docRelFP destDir = do
                         packageIdentifierString dpPackageIdent FP.</>
                         (packageNameString name FP.<.> "haddock")
                 destInterfaceAbsFile <- parseCollapsedAbsFile (toFilePath destDir FP.</> destInterfaceRelFP)
-                esrcInterfaceModTime <- tryGetModificationTime (toFilePath srcInterfaceAbsFile)
+                esrcInterfaceModTime <- tryGetModificationTime srcInterfaceAbsFile
                 return $
                     case esrcInterfaceModTime of
                         Left _ -> Nothing
@@ -208,7 +207,7 @@ generateHaddockIndex descr envOverride wc dumpPackages docRelFP destDir = do
                                 , srcInterfaceModTime
                                 , srcInterfaceAbsFile
                                 , destInterfaceAbsFile )
-    tryGetModificationTime :: FilePath -> IO (Either () UTCTime)
+    tryGetModificationTime :: Path Abs File -> IO (Either () UTCTime)
     tryGetModificationTime = tryJust (guard . isDoesNotExistError) . getModificationTime
     copyPkgDocs :: (a, UTCTime, Path Abs File, Path Abs File) -> IO ()
     copyPkgDocs (_,srcInterfaceModTime,srcInterfaceAbsFile,destInterfaceAbsFile) = do
@@ -218,7 +217,7 @@ generateHaddockIndex descr envOverride wc dumpPackages docRelFP destDir = do
         -- aren't reliably supported on Windows, and (2) the filesystem containing dependencies'
         -- docs may not be available where viewing the docs (e.g. if building in a Docker
         -- container).
-        edestInterfaceModTime <- tryGetModificationTime (toFilePath destInterfaceAbsFile)
+        edestInterfaceModTime <- tryGetModificationTime destInterfaceAbsFile
         case edestInterfaceModTime of
             Left _ -> doCopy
             Right destInterfaceModTime
@@ -226,11 +225,11 @@ generateHaddockIndex descr envOverride wc dumpPackages docRelFP destDir = do
                 | otherwise -> return ()
       where
         doCopy = do
-            removeTreeIfExists destHtmlAbsDir
-            createTree destHtmlAbsDir
+            ignoringAbsence (removeDirRecur destHtmlAbsDir)
+            ensureDir destHtmlAbsDir
             onException
-                (copyDirectoryRecursive (parent srcInterfaceAbsFile) destHtmlAbsDir)
-                (removeTreeIfExists destHtmlAbsDir)
+                (copyDirRecur (parent srcInterfaceAbsFile) destHtmlAbsDir)
+                (ignoringAbsence (removeDirRecur destHtmlAbsDir))
         destHtmlAbsDir = parent destInterfaceAbsFile
 
 -- | Find first DumpPackage matching the GhcPkgId

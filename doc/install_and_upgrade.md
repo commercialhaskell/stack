@@ -70,10 +70,10 @@ If you have a popular [brew](http://brew.sh/) tool installed, you can just do:
 brew install haskell-stack
 ```
 
-Note: the Homebrew formula and bottles lag slightly behind new Stack releases,
+* The Homebrew formula and bottles lag slightly behind new Stack releases,
 but tend to be updated within a day or two.
-
-Normally, Homebrew will install from a pre-built binary (aka "pour from a
+* At later stage, running `stack setup` might fail with `configure: error: cannot run C compiled programs.` in which case you should run `xcode-select --install`.
+* Normally, Homebrew will install from a pre-built binary (aka "pour from a
 bottle"), but if `brew` starts trying to build everything from source (which
 will take hours), see
 [their FAQ on the topic](https://github.com/Homebrew/homebrew/blob/master/share/doc/homebrew/FAQ.md#why-do-you-compile-everything).
