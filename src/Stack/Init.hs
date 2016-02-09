@@ -9,7 +9,7 @@ module Stack.Init
 
 import           Control.Exception               (assert)
 import           Control.Exception.Enclosed      (catchAny)
-import           Control.Monad                   (when)
+import           Control.Monad                   (liftM, when)
 import           Control.Monad.Catch             (MonadMask, throwM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
@@ -52,12 +52,13 @@ initProject
        , HasHttpManager env , HasLogLevel env , HasReExec env
        , HasTerminal env)
     => Path Abs Dir
+    -> [Path Abs Dir]
     -> InitOpts
     -> Maybe AbstractResolver
     -> m ()
-initProject currDir initOpts mresolver = do
+initProject currDir searchDirs' initOpts mresolver = do
     let dest = currDir </> stackDotYaml
-        dest' = toFilePath dest
+        dest' = toFilePath currDir
 
     reldest <- liftIO $ makeRelativeToCurrentDirectory dest'
 
@@ -69,8 +70,13 @@ initProject currDir initOpts mresolver = do
 
     let noPkgMsg =  "In order to init, you should have an existing .cabal \
                     \file. Please try \"stack new\" instead."
-
-    cabalfps <- findCabalFiles (includeSubDirs initOpts) currDir
+    let findCabalFiles' = findCabalFiles (includeSubDirs initOpts)
+    cabalfps <- if null searchDirs'
+                then
+                   findCabalFiles' currDir
+                else
+                  liftM concat $
+                  mapM findCabalFiles' searchDirs'
     (bundle, dupPkgs)  <- cabalPackagesCheck cabalfps noPkgMsg Nothing
 
     (r, flags, extraDeps, rbundle) <- getDefaultResolver dest initOpts

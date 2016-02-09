@@ -1176,25 +1176,18 @@ withMiniConfigAndLock go inner =
 initCmd :: InitOpts -> GlobalOpts -> IO ()
 initCmd initOpts go = do
     let selectedDirs = searchDirs initOpts
-    if null selectedDirs
-    then do
-      pwd <- getWorkingDir
-      checkDir pwd
-    else checkSubDirs selectedDirs
-    where checkSubDirs = mapM_ (liftM checkDir . parseRelAsAbsDir . T.unpack)
-          checkDir dir =
-            withMiniConfigAndLock go $
-            initProject dir initOpts $
-            globalResolver go
-
-
+    selectedDirs' <- mapM (parseRelAsAbsDir . T.unpack) selectedDirs
+    pwd <- getWorkingDir
+    withMiniConfigAndLock go $
+      initProject pwd selectedDirs' initOpts $
+      globalResolver go
 
 -- | Create a project directory structure and initialize the stack config.
 newCmd :: (NewOpts,InitOpts) -> GlobalOpts -> IO ()
 newCmd (newOpts,initOpts) go@GlobalOpts{..} = do
     withMiniConfigAndLock go $ do
         dir <- new newOpts
-        initProject dir initOpts globalResolver
+        initProject dir [] initOpts globalResolver
 
 -- | List the available templates.
 templatesCmd :: () -> GlobalOpts -> IO ()
