@@ -76,8 +76,7 @@ initProject currDir searchDirs' initOpts mresolver = do
                 then
                    findCabalFiles' currDir
                 else
-                  liftM concat $
-                  mapM findCabalFiles' searchDirs'
+                  liftM concat $ mapM findCabalFiles' searchDirs'
     (bundle, dupPkgs)  <- cabalPackagesCheck cabalfps noPkgMsg Nothing
 
     (r, flags, extraDeps, rbundle) <- getDefaultResolver dest initOpts
