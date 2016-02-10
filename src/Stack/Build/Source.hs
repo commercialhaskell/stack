@@ -227,7 +227,7 @@ getLocalPackageViews :: (MonadThrow m, MonadIO m, MonadReader env m, HasEnvConfi
 getLocalPackageViews = do
     econfig <- asks getEnvConfig
     locals <- forM (Map.toList $ envConfigPackages econfig) $ \(dir, validWanted) -> do
-        cabalfp <- getCabalFileName dir
+        cabalfp <- findOrGenerateCabalFile dir
         (warnings,gpkg) <- readPackageUnresolved cabalfp
         mapM_ (printCabalFileWarning cabalfp) warnings
         let cabalID = package $ packageDescription gpkg

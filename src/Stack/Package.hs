@@ -20,7 +20,7 @@ module Stack.Package
   ,readPackageUnresolved
   ,readPackageUnresolvedBS
   ,resolvePackage
-  ,getCabalFileName
+  ,findOrGenerateCabalFile
   ,Package(..)
   ,GetPackageFiles(..)
   ,GetPackageOpts(..)
@@ -93,6 +93,8 @@ import qualified System.Directory as D
 import           System.FilePath (splitExtensions, replaceExtension)
 import qualified System.FilePath as FilePath
 import           System.IO.Error
+import qualified Hpack
+import qualified Hpack.Config as Hpack
 
 packageIdentifier :: Package -> Stack.Types.PackageIdentifier.PackageIdentifier
 packageIdentifier pkg =
@@ -149,7 +151,7 @@ readPackageDescriptionDir :: (MonadLogger m, MonadIO m, MonadThrow m, MonadCatch
   -> Path Abs Dir
   -> m (GenericPackageDescription, PackageDescription)
 readPackageDescriptionDir config pkgDir = do
-    cabalfp <- getCabalFileName pkgDir
+    cabalfp <- findOrGenerateCabalFile pkgDir
     gdesc   <- liftM snd (readPackageUnresolved cabalfp)
     return (gdesc, resolvePackageDescription config gdesc)
 
@@ -1057,11 +1059,15 @@ logPossibilities dirs mn = do
 --
 -- If no .cabal file is present, or more than one is present, an exception is
 -- thrown via 'throwM'.
-getCabalFileName
+--
+-- If the directory contains a file named package.yaml, hpack is used to
+-- generate a .cabal file from it.
+findOrGenerateCabalFile
     :: (MonadThrow m, MonadIO m)
     => Path Abs Dir -- ^ package directory
     -> m (Path Abs File)
-getCabalFileName pkgDir = do
+findOrGenerateCabalFile pkgDir = do
+    liftIO $ hpack pkgDir
     files <- liftIO $ findFiles
         pkgDir
         (flip hasExtension "cabal" . FL.toFilePath)
@@ -1071,6 +1077,13 @@ getCabalFileName pkgDir = do
         [x] -> return x
         _:_ -> throwM $ PackageMultipleCabalFilesFound pkgDir files
   where hasExtension fp x = FilePath.takeExtension fp == "." ++ x
+
+-- | Generate .cabal file from package.yaml, if necessary.
+hpack :: Path Abs Dir -> IO ()
+hpack pkgDir = do
+    exists <- doesFileExist (pkgDir </> $(mkRelFile Hpack.packageConfig))
+    when exists $ do
+        Hpack.hpack (toFilePath pkgDir) True
 
 -- | Path for the package's build log.
 buildLogPath :: (MonadReader env m, HasBuildConfig env, MonadThrow m)

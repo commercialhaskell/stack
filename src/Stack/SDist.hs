@@ -174,7 +174,7 @@ gtraverseT f =
 -- use-cases.
 readLocalPackage :: M env m => Path Abs Dir -> m LocalPackage
 readLocalPackage pkgDir = do
-    cabalfp <- getCabalFileName pkgDir
+    cabalfp <- findOrGenerateCabalFile pkgDir
     name    <- parsePackageNameFromFilePath cabalfp
     config  <- getPackageConfig defaultBuildOpts name
     (warnings,package) <- readPackage config cabalfp
@@ -267,7 +267,7 @@ checkSDistTarball tarball = withTempTarGzContents tarball $ \pkgDir' -> do
     pkgDir  <- (pkgDir' </>) `liftM`
         (parseRelDir . FP.takeBaseName . FP.takeBaseName . toFilePath $ tarball)
     --               ^ drop ".tar"     ^ drop ".gz"
-    cabalfp <- getCabalFileName pkgDir
+    cabalfp <- findOrGenerateCabalFile pkgDir
     name    <- parsePackageNameFromFilePath cabalfp
     config  <- getPackageConfig defaultBuildOpts name
     (gdesc, pkgDesc) <- readPackageDescriptionDir config pkgDir
