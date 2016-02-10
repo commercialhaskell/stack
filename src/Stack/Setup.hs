@@ -1105,12 +1105,12 @@ withUnpackedTarball7z name si archiveFile archiveType msrcDir destDir = do
     let tmpName = toFilePathNoTrailingSep (dirname destDir) ++ "-tmp"
     ensureDir (parent destDir)
     withTempDir (parent destDir) tmpName $ \tmpDir -> do
-        absSrcDir <- case msrcDir of
-            Just srcDir -> return $ tmpDir </> srcDir
-            Nothing -> expectSingleUnpackedDir archiveFile tmpDir
         ignoringAbsence (removeDirRecur destDir)
         run7z (parent archiveFile) archiveFile
         run7z tmpDir tarFile
+        absSrcDir <- case msrcDir of
+            Just srcDir -> return $ tmpDir </> srcDir
+            Nothing -> expectSingleUnpackedDir archiveFile tmpDir
         removeFile tarFile `catchIO` \e ->
             $logWarn (T.concat
                 [ "Exception when removing "
