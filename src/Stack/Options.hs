@@ -109,7 +109,7 @@ buildOptsParser cmd =
                   | otherwise = opts
                   where bopts = boptsBenchmarkOpts opts
                         topts = boptsTestOpts opts
-                        additionalArgs = "+RTS" : catMaybes [trac, prof]
+                        additionalArgs = "+RTS" : catMaybes [trac, prof, Just "-RTS"]
                         trac = if tracing
                                   then Just "-xc"
                                   else Nothing
