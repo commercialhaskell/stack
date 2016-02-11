@@ -435,20 +435,6 @@ allow-newer: true
 Note that this also ignores lower bounds. The name "allow-newer" is chosen to
 match the commonly used cabal option.
 
-### allow-different-user
-
-(Since 1.0.1)
-
-Allow users other than the owner of the stack root directory (typically `~/.stack`)
-to use the stack installation. The default is `false`. POSIX systems only.
-
-```yaml
-allow-different-user: true
-```
-
-The intention of this option is to prevent file permission problems, for example
-as the result of a `stack` command executed under `sudo`.
-
 ### templates
 
 Templates used with `stack new` have a number of parameters that affect the generated code. These can be set for all new projects you create. The result of them can be observed in the generated LICENSE and cabal files.

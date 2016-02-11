@@ -43,7 +43,6 @@ import           Data.Foldable (forM_, any)
 import           Data.Function
 import           Data.IORef.RunOnce (runOnce)
 import           Data.List hiding (any)
-import           Data.List.NonEmpty (NonEmpty(..))
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
@@ -71,7 +70,6 @@ import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
 import           Stack.Build.Source
-import           Stack.Config
 import           Stack.Constants
 import           Stack.Coverage
 import           Stack.Fetch as Fetch
@@ -771,10 +769,6 @@ withSingleContext runInBase ActionContext {..} ExecuteEnv {..} task@Task {..} md
 
     withCabal package pkgDir mlogFile inner = do
         config <- asks getConfig
-
-        unless (configAllowDifferentUser config) $
-            checkOwnership (pkgDir </> configWorkDir config :| [pkgDir])
-
         let envSettings = EnvSettings
                 { esIncludeLocals = taskLocation task == Local
                 , esIncludeGhcPackagePath = False

@@ -288,7 +288,7 @@ cleanOptsParser = CleanTargets <$> packages <|> CleanFull <$> doFullClean
 -- | Command-line arguments parser for configuration.
 configOptsParser :: Bool -> Parser ConfigMonoid
 configOptsParser hide0 =
-    (\workDir dockerOpts nixOpts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin modifyCodePage allowDifferentUser -> mempty
+    (\workDir dockerOpts nixOpts systemGHC installGHC arch os ghcVariant jobs includes libs skipGHCCheck skipMsys localBin modifyCodePage -> mempty
         { configMonoidWorkDir = workDir
         , configMonoidDockerOpts = dockerOpts
         , configMonoidNixOpts = nixOpts
@@ -304,7 +304,6 @@ configOptsParser hide0 =
         , configMonoidSkipMsys = skipMsys
         , configMonoidLocalBinPath = localBin
         , configMonoidModifyCodePage = modifyCodePage
-        , configMonoidAllowDifferentUser = allowDifferentUser
         })
     <$> optional (strOption
             ( long "work-dir"
@@ -371,11 +370,6 @@ configOptsParser hide0 =
     <*> maybeBoolFlags
             "modify-code-page"
             "setting the codepage to support UTF-8 (Windows only)"
-            hide
-    <*> maybeBoolFlags
-            "allow-different-user"
-            ("permission for users other than the owner of the stack root " ++
-                "directory to use a stack installation (POSIX only)")
             hide
   where hide = hideMods hide0
 

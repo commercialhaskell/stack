@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -31,7 +30,6 @@ module Stack.Config
   ,getIsGMP4
   ,getSnapshots
   ,makeConcreteResolver
-  ,checkOwnership
   ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -42,7 +40,6 @@ import           Control.Arrow ((***))
 import           Control.Exception (assert)
 import           Control.Monad (liftM, unless, when, filterM)
 import           Control.Monad.Catch (MonadThrow, MonadCatch, catchAll, throwM)
-import           Control.Monad.Extra (firstJustM)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger hiding (Loc)
 import           Control.Monad.Reader (MonadReader, ask, asks, runReaderT)
@@ -54,8 +51,6 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as L
 import           Data.Foldable (forM_)
 import qualified Data.IntMap as IntMap
-import           Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import           Data.Maybe
 import           Data.Monoid
@@ -72,7 +67,6 @@ import           Network.HTTP.Download (download, downloadJSON)
 import           Options.Applicative (Parser, strOption, long, help)
 import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
-import           Path.Find (findInParents)
 import           Path.IO
 import qualified Paths_stack as Meta
 import           Safe (headMay)
@@ -84,10 +78,9 @@ import qualified Stack.Image as Image
 import           Stack.PackageIndex
 import           Stack.Types
 import           Stack.Types.Internal
+import qualified System.Directory as D
 import           System.Environment
 import           System.IO
-import           System.PosixCompat.Files (fileOwner, getFileStatus)
-import           System.PosixCompat.User (getEffectiveUserID)
 import           System.Process.Read
 
 -- | If deprecated path exists, use it and print a warning.
@@ -296,7 +289,6 @@ configFromConfigMonoid configStackRoot configUserConfigPath mresolver mproject c
          configApplyGhcOptions = fromMaybe AGOLocals configMonoidApplyGhcOptions
          configAllowNewer = fromMaybe False configMonoidAllowNewer
          configDefaultTemplate = configMonoidDefaultTemplate
-         configAllowDifferentUser = fromMaybe False configMonoidAllowDifferentUser
 
      return Config {..}
 
@@ -374,7 +366,7 @@ loadConfig :: (MonadLogger m,MonadIO m,MonadCatch m,MonadThrow m,MonadBaseContro
            -- ^ Override resolver
            -> m (LoadConfig m)
 loadConfig configArgs mstackYaml mresolver = do
-    (stackRoot, userOwnsStackRoot) <- determineStackRootAndOwnership
+    stackRoot <- determineStackRoot
     userConfigPath <- getDefaultUserConfigPath stackRoot
     extraConfigs0 <- getExtraConfigs userConfigPath >>= mapM loadYaml
     let extraConfigs =
@@ -396,18 +388,10 @@ loadConfig configArgs mstackYaml mresolver = do
             Just (_, _, projectConfig) -> configArgs : projectConfig : extraConfigs
     unless (fromCabalVersion Meta.version `withinRange` configRequireStackVersion config)
         (throwM (BadStackVersionException (configRequireStackVersion config)))
-
-    let mprojectRoot = fmap (\(_, fp, _) -> parent fp) mproject
-    unless (configAllowDifferentUser config) $ do
-        unless userOwnsStackRoot $
-            throwM (UserDoesn'tOwnDirectory stackRoot)
-        forM_ mprojectRoot $ \dir ->
-            checkOwnership (dir </> configWorkDir config :| [dir])
-
     return LoadConfig
         { lcConfig          = config
         , lcLoadBuildConfig = loadBuildConfig mproject config mresolver
-        , lcProjectRoot     = mprojectRoot
+        , lcProjectRoot     = fmap (\(_, fp, _) -> parent fp) mproject
         }
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
@@ -628,78 +612,15 @@ resolvePackageLocation menv projRoot (PLRemote url remotePackageType) = do
                               throwM $ UnexpectedArchiveContents dirs files
         _ -> return dir
 
--- | Get the stack root, e.g. @~/.stack@, and determine whether the user owns it.
---
--- On Windows, the second value is always 'True'.
-determineStackRootAndOwnership
-    :: (MonadIO m, MonadCatch m)
-    => m (Path Abs Dir, Bool)
-determineStackRootAndOwnership = do
-    stackRoot <- do
-        mstackRoot <- liftIO $ lookupEnv stackRootEnvVar
-        case mstackRoot of
-            Nothing -> getAppUserDataDir $(mkRelDir stackProgName)
-            Just x -> parseAbsDir x
-
-    (existingStackRootOrParentDir, userOwnsIt) <- do
-        mdirAndOwnership <- findInParents getDirAndOwnership stackRoot
-        case mdirAndOwnership of
-            Just x -> return x
-            Nothing -> throwM (BadStackRootEnvVar stackRoot)
-
-    when (existingStackRootOrParentDir /= stackRoot) $
-        if userOwnsIt
-            then liftIO $ ensureDir stackRoot
-            else throwM $
-                Won'tCreateStackRootInDirectoryOwnedByDifferentUser
-                    stackRoot
-                    existingStackRootOrParentDir
-
-    stackRoot' <- canonicalizePath stackRoot
-    return (stackRoot', userOwnsIt)
-
--- | @'checkOwnership' dirs@ throws 'UserDoesn'tOwnDirectory' if the first
--- existing directory of @dirs@ isn't owned by the current user.
---
--- If none of the directories exist, throws @'NoSuchDirectory' lastDir@, where
--- @lastDir@ is @last dirs@.
-checkOwnership :: (MonadIO m, MonadCatch m) => NonEmpty (Path Abs Dir) -> m ()
-checkOwnership dirs = do
-    mdirAndOwnership <- firstJustM getDirAndOwnership (NE.toList dirs)
-    case mdirAndOwnership of
-        Just (_, True) -> return ()
-        Just (dir, False) -> throwM (UserDoesn'tOwnDirectory dir)
-        Nothing ->
-            (throwM . NoSuchDirectory . toFilePathNoTrailingSep . NE.last) dirs
-
--- | @'getDirAndOwnership' dir@ returns @'Just' (dir, 'True')@ when @dir@
--- exists and the current user owns it in the sense of 'isOwnedByUser'.
-getDirAndOwnership
-    :: (MonadIO m, MonadCatch m)
-    => Path Abs Dir
-    -> m (Maybe (Path Abs Dir, Bool))
-getDirAndOwnership dir = forgivingAbsence $ do
-    ownership <- isOwnedByUser dir
-    return (dir, ownership)
-
--- | Check whether the current user (determined with 'getEffectiveUserId') is
--- the owner for the given path.
---
--- Will always return 'True' on Windows.
-isOwnedByUser :: MonadIO m => Path Abs t -> m Bool
-isOwnedByUser path = liftIO $ do
-    if osIsWindows
-        then return True
-        else do
-            fileStatus <- getFileStatus (toFilePath path)
-            user <- getEffectiveUserID
-            return (user == fileOwner fileStatus)
-  where
-#ifdef WINDOWS
-    osIsWindows = True
-#else
-    osIsWindows = False
-#endif
+-- | Get the stack root, e.g. ~/.stack
+determineStackRoot :: (MonadIO m, MonadThrow m) => m (Path Abs Dir)
+determineStackRoot = do
+    env <- liftIO getEnvironment
+    case lookup stackRootEnvVar env of
+        Nothing -> getAppUserDataDir $(mkRelDir stackProgName)
+        Just x -> do
+            liftIO $ D.createDirectoryIfMissing True x
+            resolveDir' x
 
 -- | Determine the extra config file locations which exist.
 --
@@ -745,16 +666,21 @@ getProjectConfig Nothing = do
             liftM Just $ resolveFile' fp
         Nothing -> do
             currDir <- getCurrentDir
-            findInParents getStackDotYaml currDir
+            search currDir
   where
-    getStackDotYaml dir = do
+    search dir = do
         let fp = dir </> stackDotYaml
             fp' = toFilePath fp
         $logDebug $ "Checking for project config at: " <> T.pack fp'
         exists <- doesFileExist fp
         if exists
             then return $ Just fp
-            else return Nothing
+            else do
+                let dir' = parent dir
+                if dir == dir'
+                    -- fully traversed, give up
+                    then return Nothing
+                    else search dir'
 
 -- | Find the project config file location, respecting environment variables
 -- and otherwise traversing parents. If no config is found, we supply a default
