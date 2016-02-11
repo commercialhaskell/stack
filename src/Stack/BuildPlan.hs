@@ -785,8 +785,8 @@ showDepErrors :: Map PackageName (Map FlagName Bool) -> DepErrors -> Text
 showDepErrors flags errs =
     T.concat
         [ T.concat $ map formatError (Map.toList errs)
-        ,"User package flags used:\n"
-        , T.concat (map showFlags userPkgs)
+        , if T.null flagVals then ""
+          else ("Using package flags:\n" <> flagVals)
         ]
     where
         formatError (depName, DepError mversion neededBy) = T.concat
@@ -814,6 +814,7 @@ showDepErrors flags errs =
             , "\n"
             ]
 
+        flagVals = T.concat (map showFlags userPkgs)
         userPkgs = Map.keys $ Map.unions (Map.elems (fmap deNeededBy errs))
         showFlags pkg = maybe "" (printFlags pkg) (Map.lookup pkg flags)
 
