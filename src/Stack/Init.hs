@@ -57,7 +57,6 @@ initProject
 initProject currDir initOpts mresolver = do
     let dest = currDir </> stackDotYaml
 
-    dirs <- mapM (resolveDir' . T.unpack) (searchDirs initOpts)
     reldest <- toFilePath `liftM` makeRelativeToCurrentDir dest
 
     exists <- doesFileExist dest
@@ -66,12 +65,12 @@ initProject currDir initOpts mresolver = do
                " exists, use 'stack solver' to fix the existing config file or \
                \'--force' to overwrite it.")
 
+    dirs <- mapM (resolveDir' . T.unpack) (searchDirs initOpts)
     let noPkgMsg =  "In order to init, you should have an existing .cabal \
                     \file. Please try \"stack new\" instead."
-    let findCabalFiles' = findCabalFiles (includeSubDirs initOpts)
-    cabalfps <- if null dirs
-                then findCabalFiles' currDir
-                else liftM concat $ mapM findCabalFiles' dirs
+        find  = findCabalFiles (includeSubDirs initOpts)
+        dirs' = if null dirs then [currDir] else dirs
+    cabalfps <- liftM concat $ mapM find dirs'
     (bundle, dupPkgs)  <- cabalPackagesCheck cabalfps noPkgMsg Nothing
 
     (r, flags, extraDeps, rbundle) <- getDefaultResolver dest initOpts
@@ -438,7 +437,9 @@ getRecommendedSnapshots snapshots = do
         ]
 
 data InitOpts = InitOpts
-    { useSolver      :: Bool
+    { searchDirs     :: ![T.Text]
+    -- ^ List of sub directories to search for .cabal files
+    , useSolver      :: Bool
     -- ^ Use solver to determine required external dependencies
     , omitPackages   :: Bool
     -- ^ Exclude conflicting or incompatible user packages
@@ -446,6 +447,4 @@ data InitOpts = InitOpts
     -- ^ Overwrite existing stack.yaml
     , includeSubDirs :: Bool
     -- ^ If True, include all .cabal files found in any sub directories
-    , searchDirs     :: ![T.Text]
-    -- ^ List of sub directories to search for .cabal files
     }

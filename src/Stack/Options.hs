@@ -675,9 +675,9 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = GlobalOpts
 
 initOptsParser :: Parser InitOpts
 initOptsParser =
-    InitOpts <$> solver <*> omitPackages
+    InitOpts <$> searchDirs
+             <*> solver <*> omitPackages
              <*> overwrite <*> fmap not ignoreSubDirs
-             <*> searchDirs
   where
     searchDirs =
       many (textArgument

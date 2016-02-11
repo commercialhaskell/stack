@@ -667,7 +667,7 @@ stack init does quite a few things for you behind the scenes:
   nightly, other LTS versions in that order
 
 Assuming it finds a match, it will write your stack.yaml file, and everything
-will work. 
+will work.
 
 #### External Dependencies
 
@@ -737,7 +737,7 @@ Selecting the best among 6 snapshots...
 .
 
 Selected resolver: lts-4.1
-*** Resolver lts-4.1 will need external packages: 
+*** Resolver lts-4.1 will need external packages:
     acme-missiles not found
         - yackage requires -any
         - yackage flags: upload = True
@@ -803,7 +803,7 @@ Selecting the best among 6 snapshots...
 
 *** Failed to arrive at a workable build plan.
 *** Ignoring package: yackage-test
-*** Resolver lts-4.2 will need external packages: 
+*** Resolver lts-4.2 will need external packages:
     acme-missiles not found
         - yackage requires ==0.3
         - yackage flags: upload = True
@@ -840,7 +840,7 @@ the other one.
 Packages may get excluded due to conflicting requirements among user packages
 or due to conflicting requirements between a user package and the resolver
 compiler. If all of the packages have a conflict with the compiler then all of
-them may get commented out. 
+them may get commented out.
 
 When packages are commented out you will see a warning every time you run a
 command which needs the config file. The warning can be disabled by editing the
@@ -863,6 +863,10 @@ You can install the required compiler if not already installed by using the
 
 #### Miscellaneous and diagnostics
 
+_Add selected packages_: If you want to use only selected packages from your
+project directory you can do so by explicitly specifying the package directories
+on the command line.
+
 _Duplicate package names_: If multiple packages under the directory tree have
 same name, stack init will report those and automatically ignore one of them.
 
@@ -875,8 +879,8 @@ a cabal package file. You may want to pay attention to the warnings as
 sometimes they may result in incomprehensible errors later on during dependency
 solving.
 
-_Packages with no names_: If the `Name` field in a cabal file is empty or not
-present then stack init will refuse to continue.
+_Package naming_: If the `Name` field defined in a cabal file does not match
+with the cabal file name then `stack init` will refuse to continue.
 
 _Cabal install errors_: stack init uses `cabal-install` to determine external
 dependencies. When cabal-install encounters errors, cabal errors are displayed
