@@ -454,8 +454,8 @@ secondaryCommandHandler
   -> ParserFailure ParserHelp
   -> IO (ParserFailure ParserHelp)
 secondaryCommandHandler args f =
-    -- don't even try when the argument looks like a path
-    if elem pathSeparator cmd
+    -- don't even try when the argument looks like a path or flag
+    if elem pathSeparator cmd || "-" `isPrefixOf` cmd
        then return f
     else do
       mExternalExec <- D.findExecutable cmd
