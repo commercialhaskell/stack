@@ -37,8 +37,6 @@ import           Path.IO
 import           Stack.BuildPlan
 import           Stack.Config                    (getSnapshots,
                                                   makeConcreteResolver)
-import           Stack.Config                    (getSnapshots,
-                                                  makeConcreteResolver)
 import           Stack.Constants
 import           Stack.Solver
 import           Stack.Types
@@ -53,16 +51,14 @@ initProject
        , HasHttpManager env , HasLogLevel env , HasReExec env
        , HasTerminal env)
     => Path Abs Dir
-    -> [Path Abs Dir]
     -> InitOpts
     -> Maybe AbstractResolver
     -> m ()
-initProject currDir searchDirs' initOpts mresolver = do
+initProject currDir initOpts mresolver = do
     let dest = currDir </> stackDotYaml
-        dest' = toFilePath currDir
 
+    dirs <- mapM (resolveDir' . T.unpack) (searchDirs initOpts)
     reldest <- toFilePath `liftM` makeRelativeToCurrentDir dest
-
     exists <- doesFileExist dest
     when (not (forceOverwrite initOpts) && exists) $ do
         error ("Stack configuration file " <> reldest <>
@@ -72,11 +68,11 @@ initProject currDir searchDirs' initOpts mresolver = do
     let noPkgMsg =  "In order to init, you should have an existing .cabal \
                     \file. Please try \"stack new\" instead."
     let findCabalFiles' = findCabalFiles (includeSubDirs initOpts)
-    cabalfps <- if null searchDirs'
+    cabalfps <- if null dirs
                 then
                    findCabalFiles' currDir
                 else
-                  liftM concat $ mapM findCabalFiles' searchDirs'
+                  liftM concat $ mapM findCabalFiles' dirs
     (bundle, dupPkgs)  <- cabalPackagesCheck cabalfps noPkgMsg Nothing
 
     (r, flags, extraDeps, rbundle) <- getDefaultResolver dest initOpts

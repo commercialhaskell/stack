@@ -687,8 +687,8 @@ initOptsParser =
   where
     searchDirs =
       many (textArgument
-              (metavar "SEARCH-DIRECTORIES" <>
-               help "Directories which are searched for cabal files. If non specified, uses current directory."))
+              (metavar "DIRS" <>
+               help "Directories to include, default is current directory."))
     ignoreSubDirs = switch (long "ignore-subdirs" <>
                            help "Do not search for .cabal files in sub directories")
     overwrite = switch (long "force" <>
