@@ -102,7 +102,7 @@ buildOptsParser cmd =
                            ,boptsBenchmarkOpts =
                                 bopts {beoAdditionalArgs =
                                            beoAdditionalArgs bopts <>
-                                           Just (unwords additionalArgs)}
+                                           Just (" " <> unwords additionalArgs)}
                            ,boptsTestOpts =
                                 topts {toAdditionalArgs =
                                            (toAdditionalArgs topts) <>
