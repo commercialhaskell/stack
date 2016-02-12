@@ -1,4 +1,5 @@
-{-# LANGUAGE OverloadedStrings,RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Stack.Options
     (BuildCommand(..)
@@ -26,32 +27,32 @@ module Stack.Options
     ,globalOptsFromMonoid
     ) where
 
-import           Control.Monad.Logger (LogLevel(..))
-import           Data.Char (isSpace, toLower)
-import           Data.List (intercalate)
-import           Data.List.Split (splitOn)
-import qualified Data.Map as Map
-import           Data.Map.Strict (Map)
-import qualified Data.Map.Strict as M
+import           Control.Monad.Logger              (LogLevel (..))
+import           Data.Char                         (isSpace, toLower)
+import           Data.List                         (intercalate)
+import           Data.List.Split                   (splitOn)
+import qualified Data.Map                          as Map
+import           Data.Map.Strict                   (Map)
+import qualified Data.Map.Strict                   as M
 import           Data.Maybe
 import           Data.Monoid
-import qualified Data.Set as Set
-import qualified Data.Text as T
-import           Data.Text.Read (decimal)
-import           Distribution.Version (anyVersion)
+import qualified Data.Set                          as Set
+import qualified Data.Text                         as T
+import           Data.Text.Read                    (decimal)
+import           Distribution.Version              (anyVersion)
 import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
-import           Options.Applicative.Types (fromM, oneM, readerAsk)
-import           Stack.Clean (CleanOpts(..))
-import           Stack.Config (packagesParser)
+import           Options.Applicative.Types         (fromM, oneM, readerAsk)
+import           Stack.Clean                       (CleanOpts (..))
+import           Stack.Config                      (packagesParser)
 import           Stack.ConfigCmd
-import           Stack.Constants (stackProgName)
-import           Stack.Coverage (HpcReportOpts(..))
+import           Stack.Constants                   (stackProgName)
+import           Stack.Coverage                    (HpcReportOpts (..))
 import           Stack.Docker
-import qualified Stack.Docker as Docker
+import qualified Stack.Docker                      as Docker
 import           Stack.Dot
-import           Stack.Ghci (GhciOpts(..))
+import           Stack.Ghci                        (GhciOpts (..))
 import           Stack.Init
 import           Stack.New
 import           Stack.Nix
@@ -682,7 +683,12 @@ initOptsParser :: Parser InitOpts
 initOptsParser =
     InitOpts <$> solver <*> omitPackages
              <*> overwrite <*> fmap not ignoreSubDirs
+             <*> searchDirs
   where
+    searchDirs =
+      many (textArgument
+              (metavar "DIRS" <>
+               help "Directories to include, default is current directory."))
     ignoreSubDirs = switch (long "ignore-subdirs" <>
                            help "Do not search for .cabal files in sub directories")
     overwrite = switch (long "force" <>
